@@ -54,7 +54,7 @@ gateway/                          (вместо tg-gateway/, G0)
       upstream-tls.conf           proxy_ssl_verify, CA, verify_depth, server_name
     sites/
       tg.vashfindir.ru.conf       Telegram
-      ai.vashfindir.ru.conf       /openai/ /deepseek/ /kimi/ (G1)
+      ai.vashfindir.ru.conf       /openai/ /deepseek/ /kimi/ (G1, подробно — g1.md)
       00-default.conf             неизвестный Host → закрыть (G1, отдельным решением)
   scripts/install.sh              установка набора с откатом (запускает деплой)
   scripts/nginx-test.sh           nginx -t в контейнере (CI и локально)
@@ -68,7 +68,7 @@ gateway/                          (вместо tg-gateway/, G0)
 
 - Не открытый прокси: upstream — константы конфига, из запроса берётся только путь.
 - Ключи — `/etc/nginx/gateway-secrets.conf` (root, 0600), собирается деплоем из
-  GitHub Secrets, в репозитории нет, в логи не попадает.
+  GitHub Secrets (`scripts/render-secrets.sh`), в репозитории нет, в логи не попадает.
 - Токен клиента — через `map`; на время ротации шлюз принимает два токена
   (текущий и следующий) — смена без простоя.
 - Провайдеру уходят только нужные заголовки; служебные заголовки ответа
@@ -106,8 +106,9 @@ gateway/                          (вместо tg-gateway/, G0)
 
 - Владелец: DNS A `ai.vashfindir.ru → 109.73.204.179`, `certbot`, секреты
   (`keys.md`).
-- `00-default`: неизвестный Host → 444 / `ssl_reject_handshake` — после сверки
-  с `mybots` (сейчас он отвечает на неизвестные Host на 443).
+- Подробно — `g1.md` (контракт поведения B1–B12, тесты, решения).
+- `00-default` (неизвестный Host → 444 / `ssl_reject_handshake`) — не в G1:
+  меняет ответ `mybots` на неизвестные Host, отдельное решение Владельца.
 - `ai.vashfindir.ru.conf`: `/health`, `/openai/`, `/deepseek/`, `/kimi/`;
   `app-only` + токен; подмена `Authorization`; `limit_req`; остальное 404.
 - Деплой проверяет ключи провайдеров с хоста шлюза (проверка 1 ниже).
