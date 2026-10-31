@@ -15,6 +15,7 @@ use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CounterpartyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
@@ -168,6 +169,55 @@ final class CashTransactionAutoRuleCandidateControllerTest extends WebTestCaseBa
         self::assertSelectorTextNotContains('body', 'Чужой счёт');
         self::assertSelectorTextNotContains('body', 'Чужая статья');
         self::assertSame($auditCountBefore, $this->em()->getRepository(AuditLog::class)->count([]));
+    }
+
+    public function testAiProposalOpensPrefilledRuleForm(): void
+    {
+        $client = static::createClient();
+        $user = UserBuilder::aUser()->withIndex(1)->asCompanyOwner()->build();
+        $company = CompanyBuilder::aCompany()->withIndex(1)->withOwner($user)->build();
+        $category = CashflowCategoryBuilder::aCashflowCategory()->withIndex(1)->withCompany($company)->withName('Аренда офиса')->build();
+        $account = $this->account($company, 1, 'Основной счёт');
+        $landlord = CounterpartyBuilder::aCounterparty()->withId(Uuid::uuid4()->toString())->withCompany($company)->withName('ООО Арендодатель')->build();
+        foreach ([$user, $company, $category, $account, $landlord] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $transactions = $this->transactions($company, $account, array_fill(0, 3, $category), 'bank', new \DateTimeImmutable('today'));
+        foreach ($transactions as $transaction) {
+            $transaction->setCounterparty($landlord);
+            $this->em()->persist($transaction);
+        }
+        $this->em()->flush();
+        foreach ($transactions as $transaction) {
+            $this->em()->getConnection()->insert('cash_category_suggestion', [
+                'id' => Uuid::uuid7()->toString(),
+                'company_id' => (string) $company->getId(),
+                'transaction_id' => (string) $transaction->getId(),
+                'task_id' => Uuid::uuid4()->toString(),
+                'status' => 'accepted',
+                'category_id' => (string) $category->getId(),
+                'confidence' => '0.9500',
+                'verdict' => 'accepted',
+                'requested_at' => '2026-10-01 12:00:00',
+            ]);
+        }
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $crawler = $client->request('GET', '/cash-transaction-auto-rules/candidates');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('.auto-rule-ai-proposals[data-proposal-count="1"]');
+        self::assertSelectorTextContains('.auto-rule-ai-proposal', 'ООО Арендодатель');
+        self::assertSelectorTextContains('.auto-rule-ai-proposal', 'Аренда офиса');
+        self::assertSelectorTextContains('.auto-rule-ai-proposal', '3 операций');
+        $link = $crawler->filter('.auto-rule-ai-proposal a')->link();
+        // Образец — последняя по дате подтверждённая операция.
+        self::assertStringContainsString('fromTransaction='.$transactions[0]->getId(), $link->getUri());
+
+        $client->click($link);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('input[value="ООО Арендодатель → Аренда офиса"]');
     }
 
     private function account(Company $company, int $index, string $name): MoneyAccount

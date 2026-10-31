@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Cash\Infrastructure\Query;
 
 use App\Cash\Application\DTO\CashAiAutoApplyGateStats;
+use App\Cash\Application\DTO\CashAiRuleProposal;
 use App\Cash\Application\DTO\CashCategorizationCategory;
 use App\Cash\Application\DTO\CashCategorizationHistoryCase;
 use App\Cash\Application\DTO\CashCategorizationOperation;
 use App\Cash\Application\DTO\CashCategorizationStats;
 use App\Cash\Application\DTO\CashCategorySuggestionView;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashflowCategoryStatus;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
@@ -36,6 +40,9 @@ final readonly class CashCategorizationQuery
         AND (SELECT count(*) FROM cash_transaction_split split WHERE split.cash_transaction_id = tx.id) <= 1
         AND (company.finance_lock_before IS NULL OR tx.occurred_at >= company.finance_lock_before)
         SQL;
+
+    /** Порог предложения автоправила по ИИ-подсказкам: операций со статьёй человека. */
+    public const RULE_PROPOSAL_MIN_CONFIRMED = 3;
 
     public function __construct(private Connection $connection)
     {
@@ -187,6 +194,104 @@ final readonly class CashCategorizationQuery
             autoApplied: (int) ($row['auto_applied'] ?? 0),
             autoCorrected: $autoCorrected,
         );
+    }
+
+    /**
+     * Предложения автоправил «контрагент + направление → статья» по операциям с ИИ-подсказкой.
+     *
+     * Статья человека — текущая статья операции с ручной разбивкой (источник разбивки
+     * меняется только вместе со статьёй); автоприменение без человека — не решение.
+     * Подтверждение — статья человека совпала с подсказкой; против — подсказка отклонена или
+     * человек выбрал другую статью. Предложение — не меньше `$minConfirmed` подтверждённых
+     * операций, все с одной статьёй, и ни одного решения против в группе. Контрагент в
+     * архиве или уже с активным правилом по контрагенту — не предлагается.
+     *
+     * @return list<CashAiRuleProposal>
+     */
+    public function findRuleProposals(string $companyId, int $minConfirmed = self::RULE_PROPOSAL_MIN_CONFIRMED, int $limit = 50): array
+    {
+        Assert::uuid($companyId);
+        Assert::range($minConfirmed, 1, 1000);
+        Assert::range($limit, 1, 500);
+
+        $rows = $this->connection->fetchAllAssociative(
+            'WITH d AS (
+                 SELECT s.transaction_id, s.status, s.category_id, tx.counterparty_id, tx.direction, tx.occurred_at,
+                        CASE WHEN s.status IN (\'accepted\', \'suggested\', \'auto_applied\')
+                              AND tx.cashflow_category_id IS NOT NULL
+                              AND category.system_code IS DISTINCT FROM :unallocated
+                              AND category.system_code IS DISTINCT FROM :legacyUnallocated
+                              AND EXISTS (
+                                  SELECT 1 FROM cash_transaction_split split
+                                  WHERE split.cash_transaction_id = tx.id AND split.source = :manual
+                              )
+                             THEN tx.cashflow_category_id END AS human_category,
+                        (s.status = \'suggested\' AND '.self::UNCATEGORIZED.') AS pending
+                 FROM cash_category_suggestion s
+                 JOIN cash_transaction tx ON tx.id = s.transaction_id AND tx.company_id = :companyId
+                 JOIN "companies" company ON company.id = tx.company_id
+                 LEFT JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id
+                 WHERE s.company_id = :companyId AND tx.deleted_at IS NULL AND tx.counterparty_id IS NOT NULL
+             ), v AS (
+                 SELECT d.*,
+                        (d.human_category = d.category_id) AS confirmed,
+                        (d.status = \'dismissed\' OR d.human_category <> d.category_id) AS against
+                 FROM d
+             ), g AS (
+                 SELECT v.counterparty_id, v.direction,
+                        min(v.category_id::text) FILTER (WHERE v.confirmed)::uuid AS category_id,
+                        count(DISTINCT v.transaction_id) FILTER (WHERE v.confirmed) AS confirmed,
+                        (array_agg(v.transaction_id ORDER BY v.occurred_at DESC, v.transaction_id DESC)
+                            FILTER (WHERE v.confirmed))[1] AS sample_transaction_id
+                 FROM v
+                 GROUP BY v.counterparty_id, v.direction
+                 HAVING count(DISTINCT v.transaction_id) FILTER (WHERE v.confirmed) >= :minConfirmed
+                    AND count(DISTINCT v.category_id) FILTER (WHERE v.confirmed) = 1
+                    AND NOT coalesce(bool_or(v.against), false)
+             )
+             SELECT g.counterparty_id, counterparty.name AS counterparty_name, g.direction, g.category_id,
+                    category.name AS category_name, g.confirmed, g.sample_transaction_id,
+                    (SELECT count(DISTINCT p.transaction_id) FROM d p
+                     WHERE p.counterparty_id = g.counterparty_id AND p.direction = g.direction
+                       AND p.pending AND p.category_id = g.category_id) AS pending
+             FROM g
+             JOIN "counterparty" counterparty ON counterparty.id = g.counterparty_id
+                  AND counterparty.company_id = :companyId AND counterparty.is_archived = false
+             JOIN "cashflow_categories" category ON category.id = g.category_id
+                  AND category.company_id = :companyId AND category.status = :active
+             WHERE NOT EXISTS (
+                       SELECT 1
+                       FROM cash_transaction_auto_rule rule
+                       JOIN cash_transaction_auto_rule_condition condition ON condition.auto_rule_id = rule.id
+                       WHERE rule.company_id = :companyId AND rule.is_active
+                         AND condition.field = :counterpartyField AND condition.counterparty_id = g.counterparty_id
+                   )
+             ORDER BY g.confirmed DESC, counterparty.name, g.direction
+             LIMIT :limit',
+            [
+                'companyId' => $companyId,
+                'unallocated' => CashflowCategory::CODE_UNALLOCATED,
+                'legacyUnallocated' => CashflowCategory::SYSTEM_UNALLOCATED,
+                'unallocatedCodes' => [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
+                'manual' => CashTransactionSplitSource::MANUAL->value,
+                'active' => CashflowCategoryStatus::ACTIVE->value,
+                'counterpartyField' => CashTransactionAutoRuleConditionField::COUNTERPARTY->value,
+                'minConfirmed' => $minConfirmed,
+                'limit' => $limit,
+            ],
+            ['unallocatedCodes' => ArrayParameterType::STRING],
+        );
+
+        return array_map(static fn (array $row): CashAiRuleProposal => new CashAiRuleProposal(
+            counterpartyId: (string) $row['counterparty_id'],
+            counterpartyName: (string) $row['counterparty_name'],
+            direction: CashDirection::from((string) $row['direction']),
+            categoryId: (string) $row['category_id'],
+            categoryName: (string) $row['category_name'],
+            confirmed: (int) $row['confirmed'],
+            pending: (int) $row['pending'],
+            sampleTransactionId: (string) $row['sample_transaction_id'],
+        ), $rows);
     }
 
     /**

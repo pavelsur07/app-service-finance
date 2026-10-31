@@ -61,5 +61,51 @@
                 <div class="card-footer text-muted">Показаны первые {{ maxCandidates }} кандидатов.</div>
             {% endif %}
         </div>
+
+        <h3 class="mt-4 mb-2">Предложения ИИ</h3>
+        <p class="text-muted mb-2">
+            Контрагент, по которому ИИ подсказывал статью, а люди подтвердили её в
+            {{ aiProposalMinConfirmed }} и более операциях без единого отказа. Правило
+            создаётся только после проверки и сохранения формы.
+        </p>
+        <div class="card auto-rule-ai-proposals" data-proposal-count="{{ aiProposals|length }}">
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter">
+                    <thead>
+                        <tr>
+                            <th>Контрагент</th>
+                            <th>Тип операции</th>
+                            <th>Статья</th>
+                            <th>Подтверждено</th>
+                            <th>Ждут подсказки</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for proposal in aiProposals %}
+                        <tr class="auto-rule-ai-proposal">
+                            <td>{{ proposal.counterpartyName }}</td>
+                            <td>{{ proposal.directionLabel }}</td>
+                            <td>{{ proposal.categoryName }}</td>
+                            <td>{{ proposal.confirmed }} операций</td>
+                            <td>{{ proposal.pending }}</td>
+                            <td class="text-end">
+                                {% if is_granted('module.finance.write') %}
+                                    <a class="btn btn-sm btn-primary"
+                                       href="{{ path('cash_transaction_auto_rule_new', {fromTransaction: proposal.sampleTransactionId}) }}">Создать правило</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                Повторяющихся подтверждённых подсказок пока нет.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 {% endblock %}
