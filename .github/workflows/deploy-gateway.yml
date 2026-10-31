@@ -1,0 +1,104 @@
+name: 🚀 Deploy Gateway
+
+# Шлюз 109.73.204.179 (системный nginx): tg.vashfindir.ru, ai.vashfindir.ru. Устройство — gateway/README.md.
+on:
+    workflow_dispatch:
+
+    pull_request:
+        paths:
+            - 'gateway/**'
+            - '.github/workflows/deploy-gateway.yml'
+
+    push:
+        branches: [ master ]
+        paths:
+            - 'gateway/**'
+            - '.github/workflows/deploy-gateway.yml'
+
+concurrency:
+    group: deploy-gateway-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    validate:
+        name: 🔎 nginx -t gateway
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v4
+
+            - name: 🐚 shellcheck
+              working-directory: gateway
+              run: shellcheck scripts/*.sh tests/*.sh
+
+            - name: 🔎 nginx -t
+              run: gateway/scripts/nginx-test.sh
+
+            - name: 🧪 render-secrets
+              run: gateway/tests/render-secrets-test.sh
+
+            - name: 🧪 Поведение шлюза (B1–B12)
+              run: gateway/tests/behavior-test.sh
+
+            - name: 🧪 install.sh — установка и откат
+              run: gateway/tests/install-test.sh
+
+    deploy:
+        name: 🚀 Deploy gateway
+        needs: validate
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v4
+
+            - name: 🔐 Setup SSH key
+              uses: webfactory/ssh-agent@v0.8.0
+              with:
+                  ssh-private-key: ${{ secrets.TG_SSH_PRIVATE_KEY }}
+
+            - name: 🚀 Upload, install and reload nginx
+              env:
+                  TARGET: ${{ secrets.TG_SERVER_USER }}@${{ secrets.TG_SERVER_HOST }}
+                  AI_GATEWAY_TOKEN: ${{ secrets.AI_GATEWAY_TOKEN }}
+                  AI_GATEWAY_TOKEN_NEXT: ${{ secrets.AI_GATEWAY_TOKEN_NEXT }}
+                  AI_OPENAI_API_KEY: ${{ secrets.AI_OPENAI_API_KEY }}
+                  AI_DEEPSEEK_API_KEY: ${{ secrets.AI_DEEPSEEK_API_KEY }}
+                  AI_KIMI_API_KEY: ${{ secrets.AI_KIMI_API_KEY }}
+              run: |
+                  umask 077
+                  # Секреты уходят только на хост с закреплённым ключом (gateway/known_hosts).
+                  SSH_OPTS=(-o HostKeyAlias=gateway-host -o UserKnownHostsFile=gateway/known_hosts -o StrictHostKeyChecking=yes)
+                  BUNDLE=$(mktemp -d)
+                  REMOTE=""
+                  cleanup() {
+                      rm -rf "$BUNDLE"
+                      # shellcheck disable=SC2029 # путь раскрывается на раннере намеренно
+                      if [ -n "$REMOTE" ]; then ssh "${SSH_OPTS[@]}" "$TARGET" "rm -rf '$REMOTE'" < /dev/null || true; fi
+                  }
+                  trap cleanup EXIT
+
+                  gateway/scripts/render-secrets.sh "$BUNDLE/gateway-secrets.conf"
+                  cp -r gateway/nginx "$BUNDLE/nginx"
+                  mkdir "$BUNDLE/scripts"
+                  cp gateway/scripts/install.sh "$BUNDLE/scripts/"
+                  tar -C "$BUNDLE" -czf "$BUNDLE/gateway.tgz" nginx scripts gateway-secrets.conf
+
+                  # Приватный каталог (mktemp -d, 0700) на хосте — до загрузки: архив с
+                  # секретами и исполняемый install.sh не лежат по предсказуемому пути.
+                  REMOTE=$(ssh "${SSH_OPTS[@]}" "$TARGET" 'umask 077; mktemp -d' < /dev/null)
+                  if ! [[ "$REMOTE" =~ ^/tmp/tmp\.[A-Za-z0-9]+$ ]]; then
+                      echo "❌ Неожиданный staging-каталог на хосте"
+                      REMOTE=""
+                      exit 1
+                  fi
+                  scp "${SSH_OPTS[@]}" "$BUNDLE/gateway.tgz" "$TARGET:$REMOTE/gateway.tgz"
+                  ssh "${SSH_OPTS[@]}" "$TARGET" bash -s -- "$REMOTE" << 'EOF'
+                      set -e
+                      umask 077
+                      STAGE=$1
+                      tar -C "$STAGE" -xzf "$STAGE/gateway.tgz"
+                      bash "$STAGE/scripts/install.sh" "$STAGE/nginx" "$STAGE/gateway-secrets.conf"
+                  EOF

@@ -3184,7 +3184,7 @@ Telegram создаёт ДДС-транзакции только через це
 **Webhook URL (конфигурация):**
 - Публичный URL вебхука задаётся через `.env` → `TELEGRAM_WEBHOOK_URL` (параметр `telegram.webhook_url`, bind `string $telegramWebhookUrl`).
 - Используется в `TelegramBotController::webhookSet()` (вызов `setWebhook`) и проверке статуса.
-- Прод-дефолт — шлюз `tg-gateway`: `https://tg.vashfindir.ru/telegram/webhook`. Хардкод URL запрещён.
+- Прод-дефолт — шлюз `gateway/` (сайт `tg.vashfindir.ru`): `https://tg.vashfindir.ru/telegram/webhook`. Хардкод URL запрещён.
 - В проде значение передаётся через `docker-compose.prod.yml` (якорь `x-php-env`), а не через репозиторный `.env`.
 
 **Webhook secret_token (аутентификация):**
@@ -3196,9 +3196,9 @@ Telegram создаёт ДДС-транзакции только через це
 **Telegram Bot API base URL (исходящие вызовы):**
 - `TELEGRAM_API_BASE_URL` (параметр `telegram.api_base_url`, bind `string $telegramApiBaseUrl`), без завершающего слэша.
 - Используется во ВСЕХ исходящих вызовах: `sendMessage`/`editMessageText`/`getFile`/скачивание файла (`TelegramWebhookController`) и `setWebhook`/`getWebhookInfo` (`TelegramBotController`).
-- Дефолт `https://api.telegram.org`. В проде app-сервер не имеет прямого доступа к Telegram → значение `https://tg.vashfindir.ru/bot-api` (reverse-proxy на шлюзе `tg-gateway`, `location /bot-api/`, доступ по IP app-сервера).
+- Дефолт `https://api.telegram.org`. В проде app-сервер не имеет прямого доступа к Telegram → значение `https://tg.vashfindir.ru/bot-api` (reverse-proxy на шлюзе `gateway/`, `location /bot-api/`, доступ по IP app-сервера).
 - Схема: вход — `tg.vashfindir.ru/telegram/webhook` → app; выход — app → `tg.vashfindir.ru/bot-api/` → `api.telegram.org`.
-- Шлюз `tg-gateway` — сайт системного nginx на хосте `109.73.204.179` (там же `mybots.vashfindir.ru`, его не трогать): конфиг `tg-gateway/nginx/tg.vashfindir.ru.conf`, сертификат certbot (`certbot certonly --nginx`), деплой — `.github/workflows/deploy-tg-gateway.yml` (`nginx -t` + reload, секреты `TG_SSH_PRIVATE_KEY`, `TG_SERVER_HOST`, `TG_SERVER_USER`). `/bot-api/` — `allow 217.198.13.171; deny all`, без access log (токен бота в URL).
+- Шлюз — проект `gateway/` (`gateway/README.md`): системный nginx на хосте `109.73.204.179` (там же `mybots.vashfindir.ru`, его не трогать), сайт `gateway/nginx/sites/tg.vashfindir.ru.conf` (на хосте `sites-available/tg-gateway`), общие сниппеты `app-only.conf` (IP app — `conf.d/gateway-app.conf`, `geo` + `return 403`) и `upstream-tls.conf`, JSON access log `gateway_json`; сайт `ai.vashfindir.ru` — прокси к OpenAI/DeepSeek/Kimi для ai-service (только IP app + токен шлюза `AI_GATEWAY_TOKEN`, ключи провайдеров только на шлюзе в `/etc/nginx/gateway-secrets.conf`, `docs/tasks/ai/gateway/g1.md`); сертификат certbot (`certbot certonly --nginx`). Деплой — `.github/workflows/deploy-gateway.yml`: на PR `nginx -t` в контейнере, на master установка всего набора с бэкапом, `nginx -t`, reload и проверками, при провале — откат набора целиком; секреты `TG_SSH_PRIVATE_KEY`, `TG_SERVER_HOST`, `TG_SERVER_USER`. `/bot-api/` — только IP app, без access log (токен бота в URL).
 
 **Политика обработки ошибок вебхука:**
 - `TelegramWebhookController` ВСЕГДА отвечает HTTP 200 (иначе Telegram ретраит апдейт).
@@ -3215,7 +3215,7 @@ Telegram создаёт ДДС-транзакции только через це
   (инвариант `SentryChannelCoverageTest`).
 - Уровни сбоев Bot API: `403`/`429` — `WARNING` (проходят сами: бот заблокирован, flood
   control); всё остальное, включая `400`, `401`, `5xx`, ответ без `ok:true` и ответ не от
-  Telegram (шлюз `tg-gateway`, прокси) — `ERROR`, потому что ответа не получит уже никто.
+  Telegram (шлюз `gateway/`, прокси) — `ERROR`, потому что ответа не получит уже никто.
 - В логи канала не попадают: текст сообщения пользователя (суммы, контрагенты, назначения
   платежей), токен привязки из `/start` и токен бота — он лежит в URL Bot API и вырезается
   из текста исключений перед логированием.
@@ -4437,7 +4437,9 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.98 | 2026-10-31 | ai-service на проде (выключен): сервисы `ai-service`/`ai-service-worker` за профилем в `docker-compose.prod.yml`, шаг деплоя `[4c/5]` (`docker/ai-service/db-bootstrap.sql`, миграции), CI-гейты `services-python` и образ `ai-service`, env `AI_SERVICE_*` у PHP и scheduler, cron `app:ai-service:import-results` и `app:cash:ai-categorize --all-enabled`, GlitchTip сервиса; runbook `docs/maintenance/ai-service-prod.md` |
+| 2.100 | 2026-10-31 | ai-service на проде (выключен): сервисы `ai-service`/`ai-service-worker` за профилем в `docker-compose.prod.yml`, шаг деплоя `[4c/5]` (`docker/ai-service/db-bootstrap.sql`, миграции), CI-гейты `services-python` и образ `ai-service`, env `AI_SERVICE_*` у PHP и scheduler, cron `app:ai-service:import-results` и `app:cash:ai-categorize --all-enabled`, GlitchTip сервиса; runbook `docs/maintenance/ai-service-prod.md` |
+| 2.99 | 2026-10-31 | Шлюз: сайт `ai.vashfindir.ru` (`/openai/`, `/deepseek/`, `/kimi/`) — IP app + токен, ключи провайдеров из GitHub Secrets в `gateway-secrets.conf`, `limit_req`; IP-фильтр через `geo`; тесты поведения и установки в `deploy-gateway.yml` |
+| 2.98 | 2026-10-31 | Telegram: шлюз `tg-gateway/` перенесён в единый проект `gateway/` (сниппеты, JSON access log, `deploy-gateway.yml` с проверкой на PR и откатом всего набора); проверка TLS `api.telegram.org` для `/bot-api/` |
 | 2.97 | 2026-10-31 | Cash: предложения автоправил по ИИ-подсказкам — `CashCategorizationQuery::findRuleProposals()`, DTO `CashAiRuleProposal`, раздел «Предложения ИИ» на «Кандидатах правил» с переходом в предзаполненную форму правила. Миграций нет |
 | 2.96 | 2026-10-30 | Cash: автоприменение ИИ-подсказок статей ДДС — флаг `cash_ai_categorization_setting` (миграция `Version20261030220000`), `CashAiAutoApplyPolicy` (0.90 / 100 / 0.95), `AutoApplyCashCategorySuggestionsAction` в `app:cash:ai-categorize`, команда `app:cash:ai-auto-apply`, статус `auto_applied`, общий `CashCategorySuggestionApplier`, значок «ИИ» в списке операций |
 | 2.95 | 2026-10-30 | Cash: выгрузка золотого набора ИИ-категоризации `app:cash:ai-eval-export`, `CashCategorizationPayloadMapper` (общий с постановкой); ai-service: `evals-import` (обезличивание), `evals-compare` (модель × точность × стоимость × задержка) |

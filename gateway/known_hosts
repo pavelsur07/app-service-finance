@@ -1,0 +1,3 @@
+# Ключ хоста шлюза 109.73.204.179 (ed25519, SHA256:UXCeuWKtuUMUNmtw2slyO5B+ENNi//wPh09icI+G67s).
+# Сверен 31.10.2026 с known_hosts dev-машины (запись с 29.10). Смена ключа хоста — обновить здесь.
+gateway-host ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDpY9aHvXhihCKhZeZHwgb2o2MmEu1fBehx3ctiaINcG
