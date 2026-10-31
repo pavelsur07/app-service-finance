@@ -30,7 +30,9 @@ C
 rm -f /etc/nginx/conf.d/default.conf
 mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled /etc/letsencrypt
 cp -r /le/. /etc/letsencrypt/
-printf '#!/bin/sh\nnginx -s reload; sleep 1\n' > /usr/local/bin/systemctl; chmod +x /usr/local/bin/systemctl
+# Без паузы после reload, как systemctl на хосте: проверки должны пережить гонку
+# со старыми worker'ами (деплой G1 31.10 откатился именно на ней).
+printf '#!/bin/sh\nnginx -s reload\n' > /usr/local/bin/systemctl; chmod +x /usr/local/bin/systemctl
 # Прежнее состояние: старый сайт Telegram и чужой mybots.
 cat > /etc/nginx/sites-available/tg-gateway <<'C'
 server { listen 80; server_name tg.vashfindir.ru; location = /health { return 200 'old'; } }
