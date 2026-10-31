@@ -124,12 +124,12 @@ def test_import_command_writes_a_loadable_set(tmp_path: Path, monkeypatch: pytes
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr(cli, "_EVALS", tmp_path / "evals")
+    monkeypatch.setenv("AI_SERVICE_EVALS_DIR", str(tmp_path))
 
     assert cli.main(["evals-import", str(export), "--name", "acme-1"]) == 0
     assert cli.main(["evals-import", str(export), "--name", "../escape"]) == 2
 
-    [loaded] = load_sets(tmp_path / "evals")
+    [loaded] = load_sets(tmp_path / "categorize_transactions")
     assert loaded.name == "history/acme-1"
     assert loaded.cases[0]["expected_category_id"] == "c-01"
 

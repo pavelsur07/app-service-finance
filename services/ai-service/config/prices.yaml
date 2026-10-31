@@ -1,5 +1,6 @@
 # Цены моделей для evals-compare, ₽ за 1 млн токенов (вход / выход).
-# Пусто — цена не известна, в таблице «—». Заполняется с выбором провайдеров (ТЗ §12).
+# Пусто — цена не известна, в таблице «—». Заполняется по прайсам провайдеров вместе с
+# evals-compare (G3, docs/tasks/ai/gateway/g2.md).
 deepseek/deepseek-chat: {input: null, output: null}
-yandex/yandexgpt/latest: {input: null, output: null}
-anthropic/claude-haiku-5-5: {input: null, output: null}
+openai/gpt-4.1-mini: {input: null, output: null}
+kimi/kimi-k2-0905-preview: {input: null, output: null}

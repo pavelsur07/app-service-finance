@@ -33,8 +33,12 @@ RUN useradd --system --uid 10001 --no-create-home app
 COPY --from=build /opt/venv /opt/venv
 COPY --from=build /app/config /app/config
 COPY --from=build /app/migrations /app/migrations
+# Наборы evals (синтетика, обезличенная история) — для evals-compare в контейнере: модели
+# прод-маршрутов отвечают только через шлюз ИИ, то есть только с app-сервера.
+COPY evals /app/evals
 WORKDIR /app
-ENV AI_SERVICE_ROUTES_FILE=/app/config/routes.yaml AI_SERVICE_MIGRATIONS_DIR=/app/migrations
+ENV AI_SERVICE_ROUTES_FILE=/app/config/routes.yaml AI_SERVICE_MIGRATIONS_DIR=/app/migrations \
+    AI_SERVICE_EVALS_DIR=/app/evals
 USER app
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 \

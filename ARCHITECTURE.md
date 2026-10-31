@@ -437,6 +437,12 @@
   `AI_SERVICE_API_TOKEN` (направление «Symfony → сервис»),
   `AI_SERVICE_COMPANY_ALLOWLIST` (через запятую; пусто — никому, `*` — всем).
   Любое пустое значение — выключено.
+- Провайдеры моделей (OpenAI, DeepSeek, Kimi) — только через шлюз
+  `ai.vashfindir.ru` (`docs/tasks/ai/gateway/`): в `services/ai-service/config/routes.yaml`
+  `base_url` шлюза и один токен `AI_GATEWAY_TOKEN`, ключи провайдеров — только на
+  шлюзе. При заданном `AI_SERVICE_LLM_GATEWAY_URL` (прод-compose) провайдер мимо
+  шлюза не загружается — сервис не стартует. Связь: `gateway-check` (бесплатно,
+  в деплое при включённом сервисе), `llm-ping`.
 - `AiTaskFacadeInterface` (реализация `AiTaskFacade`):
   `requestTask(companyId, taskType, payload, idempotencyKey, ?requestedByUserId): ?string` —
   выводит `task_id` из компании, типа и ключа (UUIDv5: повтор — тот же `task_id`)
@@ -1870,8 +1876,10 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   она `CF_UNALLOC`/`UNALLOCATED`, нет разбивки, не перевод, не удалена, не в
   закрытом периоде (`finance_lock_before`).
 - `RequestCashAiCategorizationAction(companyId, limit)` — точка входа команды
-  `app:cash:ai-categorize --company-id= [--limit=200]` (lock по компании; cron
-  не подключён). Сервис выключен для компании → ничего. Пачка до 50 операций:
+  `app:cash:ai-categorize --company-id= [--limit=200]` (lock по компании) и
+  cron `app:cash:ai-categorize --all-enabled` (компании allowlist с операциями за
+  90 дней, `CashAiCategorizationCompaniesQuery`; сбой компании не останавливает
+  остальные). Сервис выключен для компании → ничего. Пачка до 50 операций:
   `CashCategorizationTask` (`cash_categorization_task`: `id` = `task_id =
   taskIdFor(...)`, ключ повтора, исходный payload, `dispatched_at`) и строки
   `requested` — одной `wrapInTransaction`, после commit `requestTask`. Задача с
@@ -4339,6 +4347,8 @@ config/
 | `app:ingestion:ozon-performance:daily-load --window=month-to-date` | `25 7 * * *` | Планирование Ozon Performance ingestion с начала месяца до вчерашнего дня; HTTP-загрузка выполняется `ingest_fetch` worker'ом |
 | **Инфраструктура** | | |
 | `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
+| `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (`AI_SERVICE_ENABLED`, адрес, токен) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
+| `app:cash:ai-categorize --all-enabled` | `25 * * * *` | Компании allowlist ai-service с операциями за 90 дней: автоприменение по флагу компании, затем постановка ИИ-подсказок статей ДДС; сбой компании — ERROR, остальные идут дальше |
 | `app:storage:healthcheck` | `*/5 * * * *` | Синтетическая проверка объектного хранилища (write→read→delete); сбой → `error` → GlitchTip |
 | `app:mailer:healthcheck` | `7 * * * *` | Проверка SMTP без отправки письма; сбой → `error` + exit 1 |
 | `app:directories:integrity-check` | `37 7 * * *` | Read-only гейт справочников: соседние статьи ОПиУ, ДДС и Баланса с одинаковым названием; exit 1 + один агрегированный `error`; деревья ОПиУ без кодов шаблона — справочный `info` |
@@ -4433,6 +4443,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.100 | 2026-10-31 | ai-service на проде (выключен): сервисы `ai-service`/`ai-service-worker` за профилем в `docker-compose.prod.yml`, шаг деплоя `[4c/5]` (`docker/ai-service/db-bootstrap.sql`, миграции), CI-гейты `services-python` и образ `ai-service`, env `AI_SERVICE_*` у PHP и scheduler, cron `app:ai-service:import-results` и `app:cash:ai-categorize --all-enabled`, GlitchTip сервиса; провайдеры OpenAI/DeepSeek/Kimi только через шлюз `ai.vashfindir.ru` (`AI_GATEWAY_TOKEN`, сторож `AI_SERVICE_LLM_GATEWAY_URL`, команды `gateway-check` и `llm-ping`, ключей провайдеров на app нет); runbook `docs/maintenance/ai-service-prod.md` |
 | 2.99 | 2026-10-31 | Шлюз: сайт `ai.vashfindir.ru` (`/openai/`, `/deepseek/`, `/kimi/`) — IP app + токен, ключи провайдеров из GitHub Secrets в `gateway-secrets.conf`, `limit_req`; IP-фильтр через `geo`; тесты поведения и установки в `deploy-gateway.yml` |
 | 2.98 | 2026-10-31 | Telegram: шлюз `tg-gateway/` перенесён в единый проект `gateway/` (сниппеты, JSON access log, `deploy-gateway.yml` с проверкой на PR и откатом всего набора); проверка TLS `api.telegram.org` для `/bot-api/` |
 | 2.97 | 2026-10-31 | Cash: предложения автоправил по ИИ-подсказкам — `CashCategorizationQuery::findRuleProposals()`, DTO `CashAiRuleProposal`, раздел «Предложения ИИ» на «Кандидатах правил» с переходом в предзаполненную форму правила. Миграций нет |
@@ -4624,6 +4635,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 | 2026-10-04 | Marketplace | Финальное закрытие месяца блокируется неполными днями WB-периода (`report_days_ready`), а после привязки строк — инвариантом «ничего подходящего не осталось» с откатом; оперативное закрытие — только предупреждение | R-04/M-01: месяц закрывался при `failed`/`conflict` днях и непривязанных строках; на проде июнь b57d7682 закрыт финально при дне в `conflict` |
 | 2026-10-30 | ai-service | ИИ-задачи — отдельный Python-сервис с общим pipeline `prepare → generate → parse → verify → decide → finalize`; вердикт решают проверки, высокий риск никогда не принимается автоматически | Модель не источник цифр: проверяемость и единый путь для всех задач |
 | 2026-10-30 | ai-service | LLM Gateway: провайдеры через адаптеры по семейству API (OpenAI-совместимый, Anthropic, YandexGPT), маршрут задачи в `routes.yaml`, режимы `single`/`fallback`, `vote` — этап 2 | Минимум 3 модели без зашитого провайдера; задачи SDK не импортируют |
+| 2026-10-31 | ai-service | Провайдеры моделей — только через свой шлюз `ai.vashfindir.ru`, сервис предъявляет токен шлюза; сторож `base_url` при старте | Ключи провайдеров не живут на app: компрометация app не раскрывает ключи, отзыв — смена токена (решение Владельца 31.10) |
 | 2026-10-30 | ServiceGateway | Обмен с ai-service — pull: Symfony ставит задачу (`Idempotency-Key`) и забирает результаты курсором с ack; сервис не пишет в Symfony | Сервис не знает о БД Symfony; повтор безопасен с обеих сторон |
 | 2026-10-30 | Cash | ИИ-категоризация ДДС — сначала только подсказки с решением человека; запись задачи (ключ, payload) и строки подсказок пишутся до постановки с предсказанным `task_id`, задача без ответа переотправляется тем же ключом и payload | Автоприменение — после периода подсказок (решение Владельца); падение между commit и dispatch или потерянное сообщение не теряют задачу, запоздалый ответ принимается |
 | 2026-10-30 | Cash | Автоприменение ИИ-подсказок — только по флагу компании и при открытых воротах (≥ 100 решений людей по уверенным подсказкам, точность ≥ 0.95); разбивка `auto`, статус `auto_applied`, исправление человеком считается ошибкой и закрывает ворота | Ошибочная статья тихо искажает ДДС и ОПиУ; автоприменение должно опираться на измеренную точность на данных компании и само выключаться при её падении |
