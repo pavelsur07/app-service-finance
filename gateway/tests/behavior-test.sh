@@ -24,11 +24,16 @@ trap cleanup EXIT
 
 die() { echo "FAIL настройка: $*"; exit 1; }
 
-# Сеть с подсетью от docker (фиксированная может пересечься с чужими);
-# адреса клиентов — из её первых /24.
-docker network create "$NET" >/dev/null || die "docker network create"
-SUBNET=$(docker network inspect -f '{{(index .IPAM.Config 0).Subnet}}' "$NET")
-PREFIX=${SUBNET%.*}
+# Фиксированные IP требуют явной подсети; берём первую свободную из кандидатов
+# (любая может пересечься с сетями машины).
+PREFIX=""
+for candidate in 172.31.250 10.213.47 192.168.247 172.30.199; do
+    if docker network create --subnet "$candidate.0/24" "$NET" >/dev/null 2>&1; then
+        PREFIX=$candidate
+        break
+    fi
+done
+[ -n "$PREFIX" ] || die "docker network create: все подсети-кандидаты заняты"
 GW_IP=$PREFIX.10
 APP_IP=$PREFIX.20
 STRANGER_IP=$PREFIX.30
