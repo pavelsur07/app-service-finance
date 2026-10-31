@@ -104,6 +104,40 @@ def test_anonymize_drops_duplicates_and_cases_outside_the_tree() -> None:
     assert [c["id"] for c in cases] == ["h-0001", "h-0002"]
 
 
+def test_anonymize_redacts_company_names_and_uuids() -> None:
+    # Выгрузка Вумджой 31.10: своё название и бренд остались в 46 полях, номера счетов-UUID — в 8.
+    export = _export(
+        [
+            {
+                "operation": _operation(
+                    "0192f0a0-0000-7000-8000-0000000000e1",
+                    "Возврат ООО «РОГА И КОПЫТА» по счету № 3f2a9c1e-0b7d-4e21-9a5c-1d2e3f4a5b6c, аккаунт рогакопыта",
+                    'ООО "Рога и копыта"',
+                ),
+                "expected_category_id": RENT,
+            },
+        ]
+    )
+    export["categories"][0]["path"] = "Расходы / Займы Рога И Копыта"
+
+    categories, cases = anonymize_history(export, redact=["Рога и копыта", "рогакопыта"])
+
+    text = json.dumps([categories, cases], ensure_ascii=False).lower()
+    for secret in ("рога", "копыта", "3f2a9c1e"):
+        assert secret not in text
+    op = cases[0]["operation"]
+    assert op["counterparty"] == 'ООО "[COMPANY]"'
+    assert "№ [ID]" in op["description"]
+    assert "аккаунт [COMPANY]" in op["description"]
+    assert categories[0]["path"] == "Расходы / Займы [COMPANY]"
+
+
+@pytest.mark.parametrize("term", ["", "  ", "ab"])
+def test_anonymize_rejects_too_short_redact_term(term: str) -> None:
+    with pytest.raises(ValueError, match="redact"):
+        anonymize_history(_export([]), redact=[term])
+
+
 def test_anonymize_rejects_unknown_format() -> None:
     with pytest.raises(ExportFormatError):
         anonymize_history({"format": "other", "categories": [], "cases": []})
@@ -126,8 +160,11 @@ def test_import_command_writes_a_loadable_set(tmp_path: Path, monkeypatch: pytes
     )
     monkeypatch.setenv("AI_SERVICE_EVALS_DIR", str(tmp_path))
 
-    assert cli.main(["evals-import", str(export), "--name", "acme-1"]) == 0
-    assert cli.main(["evals-import", str(export), "--name", "../escape"]) == 2
+    # Без --redact набор не пишется: своё название компании импорт сам не знает.
+    with pytest.raises(SystemExit):
+        cli.main(["evals-import", str(export), "--name", "acme-1"])
+    assert cli.main(["evals-import", str(export), "--name", "acme-1", "--redact", "Акме"]) == 0
+    assert cli.main(["evals-import", str(export), "--name", "../escape", "--redact", "Акме"]) == 2
 
     [loaded] = load_sets(tmp_path / "categorize_transactions")
     assert loaded.name == "history/acme-1"

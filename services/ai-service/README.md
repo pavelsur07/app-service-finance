@@ -40,7 +40,7 @@ php bin/console app:cash:ai-categorize-stats --company-id=<uuid>
 
 ```bash
 php bin/console app:cash:ai-eval-export --company-id=<uuid> > export.json   # ПДн в открытом виде, не коммитить
-python -m ai_service evals-import export.json --name <имя>                 # обезличивание; результат просмотреть
+python -m ai_service evals-import export.json --name <имя> --redact <название> [--redact <бренд>]  # обезличивание; результат просмотреть
 python -m ai_service evals-compare [--models a/m,b/m] [--sets synthetic,history/<имя>]
 ```
 

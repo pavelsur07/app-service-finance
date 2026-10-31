@@ -54,6 +54,12 @@ def main(argv: list[str] | None = None) -> int:
     importer = commands.add_parser("evals-import", help="обезличить выгрузку app:cash:ai-eval-export в набор")
     importer.add_argument("export", type=Path)
     importer.add_argument("--name", required=True, help="имя набора: evals/categorize_transactions/history/<имя>")
+    importer.add_argument(
+        "--redact",
+        action="append",
+        required=True,
+        help="название или бренд компании → [COMPANY]; повторять для каждого варианта",
+    )
     comparer = commands.add_parser("evals-compare", help="таблица «модель × точность × стоимость × задержка»")
     comparer.add_argument("--models", help="через запятую; по умолчанию — модели маршрута с ключами")
     comparer.add_argument("--sets", help="через запятую: synthetic, history/<имя>; по умолчанию — все")
@@ -69,7 +75,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Evals — без БД и токена API: только файлы наборов и вызовы моделей.
     if args.command == "evals-import":
-        return _evals_import(evals, args.export, args.name)
+        return _evals_import(evals, args.export, args.name, args.redact)
     if args.command == "evals-compare":
         return _evals_compare(evals, args)
     if args.command in ("gateway-check", "llm-ping"):
@@ -157,11 +163,11 @@ def _connectivity(args: argparse.Namespace) -> int:
     return 0 if all(line.ok for line in lines) else 1
 
 
-def _evals_import(evals: Path, export: Path, name: str) -> int:
+def _evals_import(evals: Path, export: Path, name: str, redact: list[str]) -> int:
     if not name.replace("-", "").replace("_", "").isalnum():
         print("--name: only letters, digits, - and _", file=sys.stderr)  # noqa: T201
         return 2
-    categories, cases = anonymize_history(json.loads(export.read_text(encoding="utf-8")))
+    categories, cases = anonymize_history(json.loads(export.read_text(encoding="utf-8")), redact)
     target = evals / HISTORY_DIR / name
     write_set(target, categories, cases)
     print(f"{len(cases)} cases, {len(categories)} categories -> {target}; review masking before commit")  # noqa: T201
