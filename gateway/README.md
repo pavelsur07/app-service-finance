@@ -30,7 +30,8 @@ app ──▶ ai.vashfindir.ru/{openai|deepseek|kimi}/… ──▶ провай
 - `ai-client.conf` — токен клиента (`$ai_client_ok`), после `app-only.conf`.
   В `gateway-secrets.conf` токен — регулярка `~^Bearer …$`: строковые ключи
   `map` nginx сравнивает без учёта регистра.
-- `ai-upstream.conf` — заголовки к провайдеру и от него; подключается в
+- `ai-upstream.conf` — заголовки к провайдеру и от него и `error_log /dev/null`
+  (ошибки 413/429/upstream пишут строку запроса с query); подключается в
   location: `proxy_set_header` из server в location со своими не наследуется.
 - `upstream-tls.conf` — проверка TLS upstream; `proxy_ssl_name` задаёт location.
 - `log_format gateway_json` — в `conf.d`, чтобы быть объявленным раньше сайтов.
@@ -71,8 +72,9 @@ app ──▶ ai.vashfindir.ru/{openai|deepseek|kimi}/… ──▶ провай
   (поведение обоих доменов в docker с мок-upstream), `tests/install-test.sh`
   (установка и откат);
 - push в master и ручной запуск — то же, затем на раннере
-  `scripts/render-secrets.sh` (значения проверяются, не печатаются) и на хосте
-  `scripts/install.sh`: бэкап всех управляемых файлов → установка → `nginx -t`
+  `scripts/render-secrets.sh` (значения проверяются, не печатаются), архив
+  уходит в приватный каталог `mktemp -d` на хосте (создаётся до загрузки,
+  удаляется при любом исходе), и там `scripts/install.sh`: бэкап всех управляемых файлов → установка → `nginx -t`
   → reload → проверки хоста (`/health` обоих доменов по 80 и 443, `/bot-api/` и
   `/openai/` с самого хоста → 403, неизвестный путь → 404). Любой сбой до
   конца проверок — откат всего набора и reload; если не удался и он, бэкап

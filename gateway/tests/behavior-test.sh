@@ -16,7 +16,7 @@ NEXT=fedcba9876543210fedcba9876543210fedcba9876543210
 WORK=$(mktemp -d)
 
 cleanup() {
-    docker rm -f "$ID-gw" "$ID-mock" "$ID-app" "$ID-stranger" >/dev/null 2>&1
+    docker rm -f "$ID-gw" "$ID-gw2" "$ID-mock" "$ID-app" "$ID-stranger" >/dev/null 2>&1
     docker network rm "$NET" >/dev/null 2>&1
     rm -rf "$WORK"
 }
@@ -33,6 +33,7 @@ GW_IP=$PREFIX.10
 APP_IP=$PREFIX.20
 STRANGER_IP=$PREFIX.30
 MOCK_IP=$PREFIX.40
+GW2_IP=$PREFIX.11
 
 # --- тестовый CA и сертификат мока на все имена upstream ---
 UPSTREAMS=(api.openai.com api.deepseek.com api.moonshot.ai api.telegram.org app.vashfindir.ru)
@@ -86,9 +87,15 @@ CONF
 AI_GATEWAY_TOKEN=$TOKEN AI_GATEWAY_TOKEN_NEXT=$NEXT AI_KIMI_API_KEY='' \
     gateway_test_secrets "$WORK/secrets.conf" || { echo "FAIL render-secrets"; exit 1; }
 gateway_layout "$WORK/gw" "$WORK/secrets.conf"
+# Второй экземпляр — все провайдеры настроены (Kimi с ключом).
+AI_GATEWAY_TOKEN=$TOKEN AI_KIMI_API_KEY=sk-test-kimi \
+    gateway_test_secrets "$WORK/secrets2.conf" || { echo "FAIL render-secrets"; exit 1; }
+gateway_layout "$WORK/gw2" "$WORK/secrets2.conf"
 # Тестовые подмены: резолвер docker и IP «app».
-sed -i 's/resolver 127.0.0.53/resolver 127.0.0.11/' "$WORK/gw/nginx/sites-enabled/"*
-sed -i "s/217\.198\.13\.171/$APP_IP/" "$WORK/gw/nginx/conf.d/"*.conf
+for gw in gw gw2; do
+    sed -i 's/resolver 127.0.0.53/resolver 127.0.0.11/' "$WORK/$gw/nginx/sites-enabled/"*
+    sed -i "s/217\.198\.13\.171/$APP_IP/" "$WORK/$gw/nginx/conf.d/"*.conf
+done
 chmod -R a+rX "$WORK"
 
 ALIASES=()
@@ -100,6 +107,10 @@ docker run -d --name "$ID-gw" --network "$NET" --ip "$GW_IP" \
     -v "$WORK/gw/nginx:/etc/nginx:ro" -v "$WORK/gw/letsencrypt:/etc/letsencrypt:ro" \
     -v "$WORK/ca/ca.pem:/etc/ssl/certs/ca-certificates.crt:ro" \
     "$NGINX_IMAGE" >/dev/null || die "gateway"
+docker run -d --name "$ID-gw2" --network "$NET" --ip "$GW2_IP" \
+    -v "$WORK/gw2/nginx:/etc/nginx:ro" -v "$WORK/gw2/letsencrypt:/etc/letsencrypt:ro" \
+    -v "$WORK/ca/ca.pem:/etc/ssl/certs/ca-certificates.crt:ro" \
+    "$NGINX_IMAGE" >/dev/null || die "gateway 2"
 for c in app stranger; do
     ip=$APP_IP; [ "$c" = stranger ] && ip=$STRANGER_IP
     docker run -d --name "$ID-$c" --network "$NET" --ip "$ip" \
@@ -111,7 +122,7 @@ for _ in $(seq 1 30); do
     docker exec "$ID-app" curl -sk -o /dev/null https://ai.vashfindir.ru/health && break
     sleep 0.5
 done
-for c in gw mock; do
+for c in gw gw2 mock; do
     if [ "$(docker inspect -f '{{.State.Running}}' "$ID-$c")" != true ]; then
         docker logs "$ID-$c" 2>&1 | tail -20
         die "$c не запустился"
@@ -184,7 +195,7 @@ req app "${AUTH[@]}" "$AI/kimi/v1/models"; check "B7 kimi без ключа → 
 
 # B8
 docker exec "$ID-app" sh -c 'head -c 1100000 /dev/zero > /tmp/big'
-req app "${AUTH[@]}" --data-binary @/tmp/big "$AI/openai/v1/chat/completions"; check "B8 тело > 1 МБ → 413" '[ "$CODE" = 413 ]'
+req app "${AUTH[@]}" --data-binary @/tmp/big "$AI/openai/v1/chat/completions?leak=Q413"; check "B8 тело > 1 МБ → 413" '[ "$CODE" = 413 ]'
 docker exec "$ID-app" sh -c 'head -c 500000 /dev/zero > /tmp/ok'
 req app "${AUTH[@]}" --data-binary @/tmp/ok "$AI/openai/v1/chat/completions"; check "B8 тело 0,5 МБ проходит" '[ "$CODE" = 200 ]'
 
@@ -200,16 +211,28 @@ req stranger -X POST -d '{}' https://tg.vashfindir.ru/telegram/webhook
 check "B12 вебхук → app" '[ "$CODE" = 200 ] && [[ "$BODY" == *app.vashfindir.ru* ]]'
 req stranger https://tg.vashfindir.ru/health; check "B12 tg /health" '[ "$CODE" = 200 ]'
 
-# B9 — последним: выбирает лимит deepseek
-codes=$(docker exec "$ID-app" sh -c 'for i in $(seq 1 60); do curl -sk -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer '"$TOKEN"'" https://ai.vashfindir.ru/deepseek/v1/models; done' | sort | uniq -c | tr '\n' ' ')
+# B4–B6 для Kimi с ключом (второй экземпляр)
+GW2=(--resolve "ai.vashfindir.ru:443:$GW2_IP")
+req app "${GW2[@]}" "${AUTH[@]}" -H "Cookie: s=1" "$AI/kimi/v1/models?x=1"
+check "B4 kimi с ключом → 200" '[ "$CODE" = 200 ]'
+check "B5 kimi: путь, query, Host, ключ" '[[ "$BODY" == *"\"uri\":\"/v1/models?x=1\""* ]] && [[ "$BODY" == *"\"host\":\"api.moonshot.ai\""* ]] && [[ "$BODY" == *"\"auth\":\"Bearer sk-test-kimi\""* ]] && [[ "$BODY" == *"\"cookie\":\"\""* ]]'
+check "B6 kimi: служебные заголовки скрыты" '! grep -qiE "^(set-cookie|openai-organization|openai-project):" <<<"$HEADERS"'
+req app "${GW2[@]}" "$AI/kimi/v1/models"; check "B3 kimi без токена → 401" '[ "$CODE" = 401 ]'
+
+# B9 — выбирает лимит deepseek
+codes=$(docker exec "$ID-app" sh -c 'for i in $(seq 1 60); do curl -sk -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer '"$TOKEN"'" https://ai.vashfindir.ru/deepseek/v1/models?leak=Q429; done' | sort | uniq -c | tr '\n' ' ')
 CODE=$codes BODY=
 check "B9 всплеск → 429 ($codes)" '[[ "$codes" == *" 429"* ]] && [[ "$codes" == *" 200"* ]]'
+
+# Провайдер недоступен (мок остановлен) → 502, тоже с маркером в query.
+docker stop "$ID-mock" >/dev/null
+req app "${AUTH[@]}" "$AI/openai/v1/models?leak=Q502"; check "502/504 при недоступном провайдере" '[ "$CODE" = 502 ] || [ "$CODE" = 504 ]'
 
 # B11 — журналы
 docker exec "$ID-gw" sh -c 'cat /var/log/nginx/ai-gateway.access.log /var/log/nginx/tg-gateway.access.log' > "$WORK/access.log" 2>/dev/null
 docker exec "$ID-gw" sh -c 'cat /var/log/nginx/ai-gateway.error.log /var/log/nginx/tg-gateway.error.log' > "$WORK/error.log" 2>/dev/null
 CODE=- BODY=
 check "B11 access log: успешный запрос с исходным путём и статусом" 'grep -q "\"path\":\"/openai/v1/models\",\"status\":200" "$WORK/access.log"'
-check "B11 в журналах нет токена, ключей, query, токена бота" '! grep -qE "$TOKEN|$NEXT|sk-test-|limit=2|SECRET" "$WORK/access.log" "$WORK/error.log"'
+check "B11 в журналах нет токена, ключей, query, токена бота (и на 413/429/502)" '! grep -qE "$TOKEN|$NEXT|sk-test-|limit=2|leak=|SECRET" "$WORK/access.log" "$WORK/error.log"'
 
 exit $fail

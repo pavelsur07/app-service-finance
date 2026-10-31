@@ -59,7 +59,7 @@ jobs:
               with:
                   ssh-private-key: ${{ secrets.TG_SSH_PRIVATE_KEY }}
 
-            - name: 📤 Upload gateway files
+            - name: 🚀 Upload, install and reload nginx
               env:
                   TARGET: ${{ secrets.TG_SERVER_USER }}@${{ secrets.TG_SERVER_HOST }}
                   AI_GATEWAY_TOKEN: ${{ secrets.AI_GATEWAY_TOKEN }}
@@ -72,24 +72,33 @@ jobs:
                   # Секреты уходят только на хост с закреплённым ключом (gateway/known_hosts).
                   SSH_OPTS=(-o HostKeyAlias=gateway-host -o UserKnownHostsFile=gateway/known_hosts -o StrictHostKeyChecking=yes)
                   BUNDLE=$(mktemp -d)
-                  trap 'rm -rf "$BUNDLE" gateway.tgz' EXIT
+                  REMOTE=""
+                  cleanup() {
+                      rm -rf "$BUNDLE"
+                      # shellcheck disable=SC2029 # путь раскрывается на раннере намеренно
+                      if [ -n "$REMOTE" ]; then ssh "${SSH_OPTS[@]}" "$TARGET" "rm -rf '$REMOTE'" < /dev/null || true; fi
+                  }
+                  trap cleanup EXIT
+
                   gateway/scripts/render-secrets.sh "$BUNDLE/gateway-secrets.conf"
                   cp -r gateway/nginx "$BUNDLE/nginx"
                   mkdir "$BUNDLE/scripts"
                   cp gateway/scripts/install.sh "$BUNDLE/scripts/"
-                  tar -C "$BUNDLE" -czf gateway.tgz nginx scripts gateway-secrets.conf
-                  scp "${SSH_OPTS[@]}" gateway.tgz "$TARGET":/tmp/gateway.tgz
+                  tar -C "$BUNDLE" -czf "$BUNDLE/gateway.tgz" nginx scripts gateway-secrets.conf
 
-            - name: 🚀 Install and reload nginx
-              env:
-                  TARGET: ${{ secrets.TG_SERVER_USER }}@${{ secrets.TG_SERVER_HOST }}
-              run: |
-                  ssh -o HostKeyAlias=gateway-host -o UserKnownHostsFile=gateway/known_hosts \
-                      -o StrictHostKeyChecking=yes "$TARGET" << 'EOF'
+                  # Приватный каталог (mktemp -d, 0700) на хосте — до загрузки: архив с
+                  # секретами и исполняемый install.sh не лежат по предсказуемому пути.
+                  REMOTE=$(ssh "${SSH_OPTS[@]}" "$TARGET" 'umask 077; mktemp -d' < /dev/null)
+                  if ! [[ "$REMOTE" =~ ^/tmp/tmp\.[A-Za-z0-9]+$ ]]; then
+                      echo "❌ Неожиданный staging-каталог на хосте"
+                      REMOTE=""
+                      exit 1
+                  fi
+                  scp "${SSH_OPTS[@]}" "$BUNDLE/gateway.tgz" "$TARGET:$REMOTE/gateway.tgz"
+                  ssh "${SSH_OPTS[@]}" "$TARGET" bash -s -- "$REMOTE" << 'EOF'
                       set -e
                       umask 077
-                      STAGE=$(mktemp -d)
-                      trap 'rm -rf "$STAGE" /tmp/gateway.tgz' EXIT
-                      tar -C "$STAGE" -xzf /tmp/gateway.tgz
+                      STAGE=$1
+                      tar -C "$STAGE" -xzf "$STAGE/gateway.tgz"
                       bash "$STAGE/scripts/install.sh" "$STAGE/nginx" "$STAGE/gateway-secrets.conf"
                   EOF
