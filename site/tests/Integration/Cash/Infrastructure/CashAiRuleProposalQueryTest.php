@@ -61,8 +61,8 @@ final class CashAiRuleProposalQueryTest extends IntegrationTestCase
         foreach ([1, 2, 3] as $_) {
             $this->operation($landlord, 'accepted', $this->rent, $this->rent);
         }
-        // Человек сам поставил статью вместо подсказки — тоже его решение; операция последняя.
-        $latest = $this->operation($landlord, 'suggested', $this->utilities, $this->rent);
+        // Подсказка ещё висела, а человек сам поставил ту же статью — подтверждение; операция последняя.
+        $latest = $this->operation($landlord, 'suggested', $this->rent, $this->rent);
         $this->operation($landlord, 'suggested', $this->rent);
         $this->operation($landlord, 'suggested', $this->rent);
 
@@ -110,14 +110,37 @@ final class CashAiRuleProposalQueryTest extends IntegrationTestCase
         self::assertSame([], $this->proposals());
     }
 
+    public function testCorrectionsToAnotherCategoryAreDecisionsAgainst(): void
+    {
+        // Только исправления: ИИ трижды ошибся — ни статья подсказки, ни статья человека не предлагаются.
+        $landlord = $this->counterparty('Арендодатель');
+        foreach ([1, 2, 3] as $_) {
+            $this->operation($landlord, 'suggested', $this->utilities, $this->rent);
+        }
+        // Одно исправление среди подтверждений тоже закрывает группу.
+        $mixed = $this->counterparty('Смешанный');
+        foreach ([1, 2, 3] as $_) {
+            $this->operation($mixed, 'accepted', $this->rent, $this->rent);
+        }
+        $this->operation($mixed, 'suggested', $this->utilities, $this->rent);
+
+        self::assertSame([], $this->proposals());
+    }
+
     public function testAutoAppliedWithoutHumanIsNotAConfirmation(): void
     {
         $landlord = $this->counterparty('Арендодатель');
         foreach ([1, 2, 3] as $_) {
-            $this->operation($landlord, 'auto_applied', $this->rent, $this->rent, CashTransactionSplitSource::AUTO);
+            $tx = $this->operation($landlord, 'auto_applied', $this->rent, $this->rent, CashTransactionSplitSource::AUTO);
+            // Правка другого поля через форму синхронизирует разбивку как ручную — источник
+            // остаётся `auto`, пока статья та же.
+            $tx->setDescription('Аренда за месяц');
+            self::getContainer()->get(CashTransactionSplitSynchronizer::class)->sync($tx, CashTransactionSplitSource::MANUAL);
+            $this->em->flush();
         }
 
         self::assertSame([], $this->proposals());
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM cash_transaction_split WHERE company_id = ? AND source = ?', [(string) $this->company->getId(), CashTransactionSplitSource::MANUAL->value]));
     }
 
     public function testExistingRuleOrArchivedCounterpartyIsNotProposed(): void

@@ -199,10 +199,11 @@ final readonly class CashCategorizationQuery
     /**
      * Предложения автоправил «контрагент + направление → статья» по операциям с ИИ-подсказкой.
      *
-     * Статья человека — текущая статья операции с ручной разбивкой (`accepted` или правка,
-     * в т. ч. автоприменения); автоприменение без человека подтверждением не считается.
-     * Предложение — не меньше `$minConfirmed` операций со статьёй человека, все в одну
-     * статью, и ни одной отклонённой подсказки этой статьи по той же группе. Контрагент в
+     * Статья человека — текущая статья операции с ручной разбивкой (источник разбивки
+     * меняется только вместе со статьёй); автоприменение без человека — не решение.
+     * Подтверждение — статья человека совпала с подсказкой; против — подсказка отклонена или
+     * человек выбрал другую статью. Предложение — не меньше `$minConfirmed` подтверждённых
+     * операций, все с одной статьёй, и ни одного решения против в группе. Контрагент в
      * архиве или уже с активным правилом по контрагенту — не предлагается.
      *
      * @return list<CashAiRuleProposal>
@@ -231,16 +232,22 @@ final readonly class CashCategorizationQuery
                  JOIN "companies" company ON company.id = tx.company_id
                  LEFT JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id
                  WHERE s.company_id = :companyId AND tx.deleted_at IS NULL AND tx.counterparty_id IS NOT NULL
-             ), g AS (
-                 SELECT d.counterparty_id, d.direction,
-                        min(d.human_category::text)::uuid AS category_id,
-                        count(DISTINCT d.transaction_id) FILTER (WHERE d.human_category IS NOT NULL) AS confirmed,
-                        (array_agg(d.transaction_id ORDER BY d.occurred_at DESC, d.transaction_id DESC)
-                            FILTER (WHERE d.human_category IS NOT NULL))[1] AS sample_transaction_id
+             ), v AS (
+                 SELECT d.*,
+                        (d.human_category = d.category_id) AS confirmed,
+                        (d.status = \'dismissed\' OR d.human_category <> d.category_id) AS against
                  FROM d
-                 GROUP BY d.counterparty_id, d.direction
-                 HAVING count(DISTINCT d.transaction_id) FILTER (WHERE d.human_category IS NOT NULL) >= :minConfirmed
-                    AND count(DISTINCT d.human_category) = 1
+             ), g AS (
+                 SELECT v.counterparty_id, v.direction,
+                        min(v.category_id::text) FILTER (WHERE v.confirmed)::uuid AS category_id,
+                        count(DISTINCT v.transaction_id) FILTER (WHERE v.confirmed) AS confirmed,
+                        (array_agg(v.transaction_id ORDER BY v.occurred_at DESC, v.transaction_id DESC)
+                            FILTER (WHERE v.confirmed))[1] AS sample_transaction_id
+                 FROM v
+                 GROUP BY v.counterparty_id, v.direction
+                 HAVING count(DISTINCT v.transaction_id) FILTER (WHERE v.confirmed) >= :minConfirmed
+                    AND count(DISTINCT v.category_id) FILTER (WHERE v.confirmed) = 1
+                    AND NOT coalesce(bool_or(v.against), false)
              )
              SELECT g.counterparty_id, counterparty.name AS counterparty_name, g.direction, g.category_id,
                     category.name AS category_name, g.confirmed, g.sample_transaction_id,
@@ -253,11 +260,6 @@ final readonly class CashCategorizationQuery
              JOIN "cashflow_categories" category ON category.id = g.category_id
                   AND category.company_id = :companyId AND category.status = :active
              WHERE NOT EXISTS (
-                       SELECT 1 FROM d r
-                       WHERE r.counterparty_id = g.counterparty_id AND r.direction = g.direction
-                         AND r.status = \'dismissed\' AND r.category_id = g.category_id
-                   )
-               AND NOT EXISTS (
                        SELECT 1
                        FROM cash_transaction_auto_rule rule
                        JOIN cash_transaction_auto_rule_condition condition ON condition.auto_rule_id = rule.id
