@@ -1,7 +1,7 @@
 """Маршруты задач и провайдеры из YAML (ТЗ §5.1): провайдер, модель и режим — конфиг, не код."""
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -31,6 +31,9 @@ class ProviderConfig:
     base_url: str | None
     api_key: str | None
     folder_id: str | None
+    # Поля тела запроса провайдера сверх общих (openai_compatible), например
+    # {"thinking": {"type": "disabled"}} у DeepSeek.
+    extra_body: dict[str, Any] = field(default_factory=dict)
 
     @property
     def available(self) -> bool:
@@ -59,6 +62,10 @@ class RoutingConfigError(ValueError):
     pass
 
 
+# Ключи тела, которые задаёт сам адаптер: extra_body их не переопределяет.
+_ADAPTER_BODY_KEYS = frozenset({"model", "messages", "max_tokens", "temperature"})
+
+
 def load_routing(path: Path, env: dict[str, str] | None = None) -> RoutingConfig:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     return parse_routing(raw, dict(os.environ) if env is None else env)
@@ -81,6 +88,7 @@ def parse_routing(raw: Any, env: dict[str, str]) -> RoutingConfig:
             base_url=spec.get("base_url"),
             api_key=_env(env, spec.get("api_key_env")),
             folder_id=_env(env, spec.get("folder_id_env")),
+            extra_body=_extra_body(name, spec.get("extra_body")),
         )
 
     routes: dict[str, Route] = {}
@@ -108,6 +116,17 @@ def parse_routing(raw: Any, env: dict[str, str]) -> RoutingConfig:
         routes[task_type] = Route(task_type=task_type, mode=mode, models=models)
 
     return RoutingConfig(providers=providers, routes=routes)
+
+
+def _extra_body(provider: str, raw: Any) -> dict[str, Any]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise RoutingConfigError(f"provider {provider}: extra_body must be a mapping")
+    reserved = sorted(_ADAPTER_BODY_KEYS & raw.keys())
+    if reserved:
+        raise RoutingConfigError(f"provider {provider}: extra_body must not set {', '.join(reserved)}")
+    return dict(raw)
 
 
 def _env(env: dict[str, str], name: Any) -> str | None:

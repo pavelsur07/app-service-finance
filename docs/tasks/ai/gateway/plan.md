@@ -130,7 +130,7 @@ gateway/                          (вместо tg-gateway/, G0)
 ### G3. Живые проверки и включение (по команде Владельца, §3.3)
 
 `llm-ping` → `evals-compare` на синтетике → порядок моделей → `echo` → подсказки
-одной компании (`docs/maintenance/ai-service-prod.md`).
+одной компании (`docs/maintenance/ai-service-prod.md`). Ход и результаты — `g3.md`.
 
 ## Проверки подключения каждого ИИ
 

@@ -50,6 +50,35 @@ def test_openai_compatible_request_and_response() -> None:
     )
 
 
+def _openai_body(**kwargs: Any) -> dict[str, Any]:
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.update(json.loads(request.content))
+        return httpx.Response(200, json={"choices": [{"message": {"content": "{}"}}], "usage": {}})
+
+    adapter = OpenAiCompatibleAdapter(
+        provider="deepseek",
+        base_url="http://x",
+        api_key="k",
+        timeout=5,
+        transport=httpx.MockTransport(handler),
+        **kwargs,
+    )
+    adapter.complete("m", REQ)
+    return seen
+
+
+def test_openai_compatible_adds_provider_extra_body() -> None:
+    body = _openai_body(extra_body={"thinking": {"type": "disabled"}})
+    assert body["thinking"] == {"type": "disabled"}
+    assert (body["model"], body["max_tokens"]) == ("m", 100)
+
+
+def test_openai_compatible_body_without_extra_body_is_unchanged() -> None:
+    assert set(_openai_body()) == {"model", "messages", "max_tokens", "temperature"}
+
+
 @pytest.mark.parametrize(
     ("status", "retryable"), [(429, True), (500, True), (503, True), (400, False), (401, False), (404, False)]
 )

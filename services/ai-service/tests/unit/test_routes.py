@@ -41,6 +41,22 @@ def test_repository_route_uses_only_configured_gateway_providers() -> None:
     assert [ref.provider for ref in route.models] == ["deepseek", "openai"]
 
 
+def test_repository_route_uses_deepseek_flash_without_thinking() -> None:
+    # deepseek-chat выводится DeepSeek; у deepseek-flash размышление по умолчанию включено (g3.md).
+    routing = load_routing(ROUTES_FILE, env={})
+    assert routing.routes["categorize_transactions"].models[0].key == "deepseek/deepseek-flash"
+    assert routing.providers["deepseek"].extra_body == {"thinking": {"type": "disabled"}}
+    assert routing.providers["openai"].extra_body == {}
+
+
+@pytest.mark.parametrize(
+    "extra_body", ["thinking", ["thinking"], {"model": "x"}, {"messages": []}, {"max_tokens": 1}, {"temperature": 1}]
+)
+def test_invalid_extra_body_is_rejected(extra_body: object) -> None:
+    with pytest.raises(RoutingConfigError, match="provider p: extra_body"):
+        _one_provider({"type": "openai_compatible", "base_url": GATEWAY + "/x/v1", "extra_body": extra_body})
+
+
 def _one_provider(spec: dict[str, object]) -> RoutingConfig:
     return parse_routing({"providers": {"stub": {"type": "stub"}, "p": spec}}, {})
 
