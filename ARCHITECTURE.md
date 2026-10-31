@@ -1944,7 +1944,8 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   (одна разбивка `manual`, несистемная статья, не перевод, не удалена, без
   принятой ИИ-подсказки; не больше N последних на статью); статья не из
   текущего справочника конечных — кейс пропускается. Содержит ПДн в открытом
-  виде: в репозиторий — только через `python -m ai_service evals-import`.
+  виде: в репозиторий — только через `python -m ai_service evals-import` с `--redact`
+  (название и бренды компании → `[COMPANY]`; UUID в назначениях → `[ID]`).
 - Метки точности: `accepted`, `dismissed`; «исправлено» — операция получила
   другую статью при открытой подсказке (считается запросом). `app:cash:ai-categorize-stats
   --company-id=` — доли статусов и точность `accepted / (accepted + dismissed + исправлено)`;
@@ -4443,6 +4444,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.102 | 2026-10-31 | ai-service: `evals-import --redact` (обязательный; название и бренды компании → `[COMPANY]`), UUID в назначениях → `[ID]`; набор истории `evals/categorize_transactions/history/vumjoy` (219 кейсов, 21 статья) |
 | 2.101 | 2026-10-31 | ai-service: `extra_body` провайдера в `routes.yaml` (поля тела запроса OpenAI-совместимого адаптера, без `model`/`messages`/`max_tokens`/`temperature`); маршрут `categorize_transactions` — `deepseek/deepseek-flash` (`thinking` выключен) → `openai/gpt-4.1-mini`, цены в `prices.yaml` (G3, `docs/tasks/ai/gateway/g3.md`) |
 | 2.100 | 2026-10-31 | ai-service на проде (выключен): сервисы `ai-service`/`ai-service-worker` за профилем в `docker-compose.prod.yml`, шаг деплоя `[4c/5]` (`docker/ai-service/db-bootstrap.sql`, миграции), CI-гейты `services-python` и образ `ai-service`, env `AI_SERVICE_*` у PHP и scheduler, cron `app:ai-service:import-results` и `app:cash:ai-categorize --all-enabled`, GlitchTip сервиса; провайдеры OpenAI/DeepSeek/Kimi только через шлюз `ai.vashfindir.ru` (`AI_GATEWAY_TOKEN`, сторож `AI_SERVICE_LLM_GATEWAY_URL`, команды `gateway-check` и `llm-ping`, ключей провайдеров на app нет); runbook `docs/maintenance/ai-service-prod.md` |
 | 2.99 | 2026-10-31 | Шлюз: сайт `ai.vashfindir.ru` (`/openai/`, `/deepseek/`, `/kimi/`) — IP app + токен, ключи провайдеров из GitHub Secrets в `gateway-secrets.conf`, `limit_req`; IP-фильтр через `geo`; тесты поведения и установки в `deploy-gateway.yml` |
