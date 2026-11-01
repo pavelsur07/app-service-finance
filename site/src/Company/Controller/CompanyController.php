@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace App\Company\Controller;
 
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
+use App\Company\Application\Service\CompanyTaxProfileWriter;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Company\Enum\TaxRegime;
+use App\Company\Enum\VatMode;
 use App\Company\Event\CompanyCreatedEvent;
+use App\Company\Form\CompanyTaxProfileType;
 use App\Company\Form\CompanyType;
 use App\Company\Infrastructure\Repository\CompanyRepository;
+use App\Company\Repository\CompanyTaxProfileRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -65,6 +70,7 @@ class CompanyController extends AbstractController
         EntityManagerInterface $em,
         EventDispatcherInterface $eventDispatcher,
         CompanyOwnerMembershipCreator $companyOwnerMembershipCreator,
+        CompanyTaxProfileWriter $taxProfileWriter,
     ): Response {
         $user = $this->getUser();
         if (!$user instanceof User) {
@@ -74,14 +80,21 @@ class CompanyController extends AbstractController
         $company = new Company(id: Uuid::uuid7()->toString(), user: $user);
         $company->setUser($user); // Автоматически проставляем владельца
 
-        $form = $this->createForm(CompanyType::class, $company);
+        $form = $this->createForm(CompanyType::class, $company, ['with_tax_profile' => true]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            /** @var array{taxRegime: ?TaxRegime, vatMode: ?VatMode} $taxProfile */
+            $taxProfile = $form->get('taxProfile')->getData();
+
             // Подписчики события (Balance) ищут данные через SQL, поэтому им нужен flush до события.
             // Общая транзакция держит создание компании со стартовыми данными атомарным.
-            $em->wrapInTransaction(function () use ($company, $user, $em, $eventDispatcher, $companyOwnerMembershipCreator): void {
+            $em->wrapInTransaction(function () use ($company, $user, $em, $eventDispatcher, $companyOwnerMembershipCreator, $taxProfileWriter, $taxProfile): void {
                 $companyOwnerMembershipCreator->persistCompanyWithOwnerMembership($company, $user);
+                // Начальный налоговый профиль; форма пропускает только оба поля или ни одного.
+                if (null !== $taxProfile['taxRegime'] && null !== $taxProfile['vatMode']) {
+                    $taxProfileWriter->upsert((string) $company->getId(), $taxProfile['taxRegime'], $taxProfile['vatMode'], null);
+                }
                 $em->flush();
                 $eventDispatcher->dispatch(new CompanyCreatedEvent((string) $company->getId(), $company->getBusinessProfile()));
             });
@@ -109,8 +122,14 @@ class CompanyController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'company_edit', methods: ['GET', 'POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
-    public function edit(string $id, Request $request, CompanyRepository $companyRepository, EntityManagerInterface $em, LoggerInterface $logger): Response
-    {
+    public function edit(
+        string $id,
+        Request $request,
+        CompanyRepository $companyRepository,
+        CompanyTaxProfileRepository $taxProfileRepository,
+        EntityManagerInterface $em,
+        LoggerInterface $logger,
+    ): Response {
         $company = $companyRepository->find($id);
 
         if (!$company || $company->getUser() !== $this->getUser()) {
@@ -131,9 +150,15 @@ class CompanyController extends AbstractController
             return $this->redirectToRoute('company_index');
         }
 
+        $taxProfileForm = $this->createForm(CompanyTaxProfileType::class, null, [
+            'action' => $this->generateUrl('company_tax_profile_save', ['id' => $id]),
+        ]);
+
         return $this->render('company/edit.html.twig', [
             'form' => $form->createView(),
             'company' => $company,
+            'taxProfiles' => $taxProfileRepository->findByCompany($id),
+            'taxProfileForm' => $taxProfileForm->createView(),
         ]);
     }
 

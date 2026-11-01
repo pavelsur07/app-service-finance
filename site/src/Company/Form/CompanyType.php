@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Company\Form;
 
 use App\Company\Entity\Company;
-use App\Company\Enum\CompanyTaxSystem;
 use App\Shared\Form\Type\MoneyValueType;
 use Symfony\Component\Form\AbstractType;
-use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -27,14 +25,6 @@ class CompanyType extends AbstractType
                 'label' => 'ИНН',
                 'required' => false,
             ])
-            ->add('taxSystem', ChoiceType::class, [
-                'label' => 'Налоговый режим (НДС)',
-                'choices' => CompanyTaxSystem::cases(),
-                'choice_label' => static fn (CompanyTaxSystem $choice) => $choice->label(),
-                'placeholder' => 'Не выбран',
-                'required' => false,
-                'attr' => ['class' => 'form-control'],
-            ])
             ->add('financeLockBefore', DateType::class, [
                 'widget' => 'single_text',
                 'required' => false,
@@ -42,6 +32,16 @@ class CompanyType extends AbstractType
                 'attr' => ['class' => 'form-control'],
             ])
             ->add('minimumBalance', MoneyValueType::class);
+
+        // Налоговый режим при создании; дальше — блок «Налоги» в карточке компании (история периодов).
+        if ($options['with_tax_profile']) {
+            $builder->add('taxProfile', CompanyTaxProfileType::class, [
+                'mapped' => false,
+                'label' => false,
+                'require_profile' => false,
+                'with_valid_from' => false,
+            ]);
+        }
 
         // От профиля зависят стартовые шаблоны. Смена в настройках справочники не перестраивает:
         // «Базовый шаблон ОПиУ» берёт шаблон нового профиля и не применяется к дереву из другого.
@@ -60,7 +60,9 @@ class CompanyType extends AbstractType
         $resolver->setDefaults([
             'data_class' => Company::class,
             'business_profile_help' => false,
+            'with_tax_profile' => false,
         ]);
+        $resolver->setAllowedTypes('with_tax_profile', 'bool');
         $resolver->setAllowedTypes('business_profile_help', 'bool');
     }
 }

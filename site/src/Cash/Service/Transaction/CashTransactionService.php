@@ -56,7 +56,7 @@ final class CashTransactionService
 
     public function applyVat(CashTransaction $tx, Company $company, CashDirection $direction, string $amount): void
     {
-        $rate = $this->vatPolicy->decideForCash($company, $direction, $tx->getOccurredAt());
+        $rate = $this->vatPolicy->decideForCash((string) $company->getId(), $direction, $tx->getOccurredAt());
 
         if (null === $rate) {
             $tx->setVatRatePercent(null);

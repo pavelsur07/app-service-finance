@@ -7,7 +7,10 @@ namespace App\Tests\Unit\Cash\Service\Vat;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Service\Vat\VatPolicy;
 use App\Cash\Service\Vat\VatRates;
-use App\Company\Enum\CompanyTaxSystem;
+use App\Company\Enum\TaxRegime;
+use App\Company\Enum\VatMode;
+use App\Company\Facade\CompanyTaxProfileFacadeInterface;
+use App\Company\Facade\DTO\CompanyTaxProfileDTO;
 use App\Tests\Builders\Company\CompanyBuilder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -15,35 +18,53 @@ use PHPUnit\Framework\TestCase;
 final class VatPolicyTest extends TestCase
 {
     /**
-     * @return iterable<string, array{?CompanyTaxSystem, CashDirection, string, ?int}>
+     * @return iterable<string, array{?VatMode, CashDirection, string, ?int}>
      */
     public static function decisionProvider(): iterable
     {
         yield 'режим не выбран' => [null, CashDirection::OUTFLOW, '2026-03-10', null];
-        yield 'УСН без НДС' => [CompanyTaxSystem::USN_NO_VAT, CashDirection::OUTFLOW, '2026-03-10', null];
-        yield 'УСН 5%, расход' => [CompanyTaxSystem::USN_VAT_5, CashDirection::OUTFLOW, '2026-03-10', 5];
-        yield 'УСН 5%, поступление' => [CompanyTaxSystem::USN_VAT_5, CashDirection::INFLOW, '2026-03-10', null];
-        yield 'УСН 7%, расход' => [CompanyTaxSystem::USN_VAT_7, CashDirection::OUTFLOW, '2026-03-10', 7];
-        yield 'УСН 7%, поступление' => [CompanyTaxSystem::USN_VAT_7, CashDirection::INFLOW, '2026-03-10', null];
-        yield 'ОСНО, расход 2025' => [CompanyTaxSystem::OSNO, CashDirection::OUTFLOW, '2025-12-15', 20];
-        // Регрессия: с 01.01.2026 общая ставка 22%, раньше политика ставила 20% на любую дату.
-        yield 'ОСНО, расход 2026' => [CompanyTaxSystem::OSNO, CashDirection::OUTFLOW, '2026-03-10', 22];
-        yield 'ОСНО, поступление 2026' => [CompanyTaxSystem::OSNO, CashDirection::INFLOW, '2026-03-10', null];
+        yield 'без НДС' => [VatMode::EXEMPT, CashDirection::OUTFLOW, '2026-03-10', null];
+        yield 'УСН 5%, расход' => [VatMode::USN_5, CashDirection::OUTFLOW, '2026-03-10', 5];
+        yield 'УСН 5%, поступление' => [VatMode::USN_5, CashDirection::INFLOW, '2026-03-10', null];
+        yield 'УСН 7%, расход' => [VatMode::USN_7, CashDirection::OUTFLOW, '2026-03-10', 7];
+        yield 'УСН 7%, поступление' => [VatMode::USN_7, CashDirection::INFLOW, '2026-03-10', null];
+        yield 'общие ставки, расход 2025' => [VatMode::GENERAL, CashDirection::OUTFLOW, '2025-12-15', 20];
+        // Регрессия этапа 1: с 01.01.2026 общая ставка 22%, раньше политика ставила 20% на любую дату.
+        yield 'общие ставки, расход 2026' => [VatMode::GENERAL, CashDirection::OUTFLOW, '2026-03-10', 22];
+        yield 'общие ставки, поступление 2026' => [VatMode::GENERAL, CashDirection::INFLOW, '2026-03-10', null];
     }
 
     #[DataProvider('decisionProvider')]
-    public function testDecidesRateByTaxSystemDirectionAndDate(
-        ?CompanyTaxSystem $taxSystem,
+    public function testDecidesRateByVatModeDirectionAndDate(
+        ?VatMode $vatMode,
         CashDirection $direction,
         string $occurredOn,
         ?int $expectedRate,
     ): void {
-        $company = CompanyBuilder::aCompany()->build();
-        $company->setTaxSystem($taxSystem);
+        $profiles = $this->profiles(static fn (): ?VatMode => $vatMode);
 
-        $rate = (new VatPolicy(new VatRates()))->decideForCash($company, $direction, new \DateTimeImmutable($occurredOn));
+        $rate = (new VatPolicy(new VatRates(), $profiles))->decideForCash(CompanyBuilder::DEFAULT_COMPANY_ID, $direction, new \DateTimeImmutable($occurredOn));
 
         self::assertSame($expectedRate, $rate);
+    }
+
+    public function testUsesProfileEffectiveOnOperationDate(): void
+    {
+        // Без НДС до марта 2026, УСН 5% с марта: ставка зависит от даты операции, а не от текущего режима.
+        $profiles = $this->profiles(static fn (\DateTimeImmutable $date): VatMode => $date->format('Y-m') >= '2026-03' ? VatMode::USN_5 : VatMode::EXEMPT);
+        $policy = new VatPolicy(new VatRates(), $profiles);
+
+        self::assertNull($policy->decideForCash(CompanyBuilder::DEFAULT_COMPANY_ID, CashDirection::OUTFLOW, new \DateTimeImmutable('2026-02-28')));
+        self::assertSame(5, $policy->decideForCash(CompanyBuilder::DEFAULT_COMPANY_ID, CashDirection::OUTFLOW, new \DateTimeImmutable('2026-03-01')));
+    }
+
+    public function testInflowDoesNotReadProfile(): void
+    {
+        $profiles = $this->profiles(static function (): never {
+            self::fail('профиль не нужен для поступления');
+        });
+
+        self::assertNull((new VatPolicy(new VatRates(), $profiles))->decideForCash(CompanyBuilder::DEFAULT_COMPANY_ID, CashDirection::INFLOW, new \DateTimeImmutable('2026-03-10')));
     }
 
     /**
@@ -66,5 +87,27 @@ final class VatPolicyTest extends TestCase
     public function testGeneralRateSwitchesOnCalendarDate(string $at, int $expected): void
     {
         self::assertSame($expected, (new VatRates())->generalRateOn(new \DateTimeImmutable($at)));
+    }
+
+    /**
+     * @param \Closure(\DateTimeImmutable): ?VatMode $vatModeOn
+     */
+    private function profiles(\Closure $vatModeOn): CompanyTaxProfileFacadeInterface
+    {
+        return new class($vatModeOn) implements CompanyTaxProfileFacadeInterface {
+            /**
+             * @param \Closure(\DateTimeImmutable): ?VatMode $vatModeOn
+             */
+            public function __construct(private readonly \Closure $vatModeOn)
+            {
+            }
+
+            public function taxProfileOn(string $companyId, \DateTimeImmutable $date): ?CompanyTaxProfileDTO
+            {
+                $mode = ($this->vatModeOn)($date);
+
+                return null === $mode ? null : new CompanyTaxProfileDTO(TaxRegime::USN, $mode, null);
+            }
+        };
     }
 }

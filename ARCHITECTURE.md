@@ -1669,15 +1669,16 @@ manage — только владелец. Новые права автомати
 
 ### Cash: ставка НДС операции ДДС
 
-- `Cash\Service\Vat\VatPolicy::decideForCash(Company, CashDirection,
+- `Cash\Service\Vat\VatPolicy::decideForCash(string $companyId, CashDirection,
   occurredAt)` — ставка операции ДДС, созданной или изменённой через `AddCashTransactionAction`
   (форма, `CashFacade::createTransaction()`, Telegram) и
   `UpdateCashTransactionAction` — через `CashTransactionService::applyVat()`;
   банковский и файловый импорт НДС не выделяют;
   результат пишется в `vatRatePercent`/`vatAmount`. НДС выделяется только из
-  расходов; режим берётся из `Company.taxSystem`: УСН без НДС и пустой режим —
-  без НДС, УСН 5% / 7% — фиксированная ставка, ОСНО — общая ставка на дату
-  операции.
+  расходов; режим НДС — налоговый профиль компании на дату операции
+  (`CompanyTaxProfileFacadeInterface::taxProfileOn()`): нет профиля и «без НДС» —
+  без НДС, УСН 5% / 7% — фиксированная ставка, общие ставки — общая ставка на
+  дату операции.
 - Общая ставка — `VatRates::generalRateOn()`: 18% до 2019, 20% с 01.01.2019,
   22% с 01.01.2026; граница по календарной дате операции в её часовом поясе.
   Сохранённые операции при смене справочника не пересчитываются.
@@ -1748,6 +1749,33 @@ manage — только владелец. Новые права автомати
 - Home и dashboard UI сохраняют выбранную RUB/USD/EUR/KZT валюту в URL и
   передают её в snapshot API. Server-rendered Home balance учитывает только
   активные счета выбранной валюты; URL без параметра намеренно означает RUB.
+
+### Company: налоговый профиль (`company_tax_profiles`)
+
+- `CompanyTaxProfile`: `companyId`, `TaxRegime` (ОСНО, УСН, АУСН, ПСН, ЕСХН),
+  `VatMode` (без НДС, УСН 5%, УСН 7%, общие ставки), `validFrom` — 1-е число
+  месяца или `null` (начальный профиль, «с начала учёта»). Допустимые сочетания —
+  `TaxRegime::allowedVatModes()`, проверяются в конструкторе и `change()`.
+  Unique `(company_id, valid_from) NULLS NOT DISTINCT` и CHECK «1-е число» — в
+  миграции `Version20261101120000`. Подвид УСН не хранится.
+- Профиль на дату — последний датированный с `validFrom ≤ календарной даты`
+  (в часовом поясе переданной даты), иначе начальный, иначе `null`.
+- `CompanyTaxProfileFacadeInterface::taxProfileOn(string $companyId,
+  DateTimeImmutable $date): ?CompanyTaxProfileDTO` — чтение для других модулей
+  (`VatPolicy`, строка режима в шапках отчётов ДДС и ОПиУ через Twig
+  `active_company_tax_profile()`).
+- Запись: `SaveCompanyTaxProfileAction` (upsert по `(company, validFrom)`, повтор
+  того же месяца меняет тот же период) и `DeleteCompanyTaxProfileAction` —
+  транзакцией владеют сами, под `pg_advisory_xact_lock(hashtextextended(
+  'company_tax_profile:'||companyId))`. При создании компании начальный профиль
+  пишет `CompanyTaxProfileWriter::upsert()` (только persist) в транзакции
+  `CompanyController::new`. Меняет только владелец компании (`/company/{id}/tax-profile`).
+- Сохранённые операции при смене профиля не пересчитываются.
+- `companies.tax_system` (`Company::$taxSystem`) устарело: не читается и не
+  обновляется, перенесено в начальный профиль; колонка удаляется отдельной
+  миграцией.
+- Откат миграции (`DROP TABLE`) возвращает состояние до неё, но теряет периоды,
+  сохранённые после деплоя; `tax_system` к тому времени устаревает.
 
 ### Company: общий минимальный остаток
 
@@ -4459,6 +4487,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.106 | 2026-11-01 | Company: налоговый профиль с историей (`CompanyTaxProfile`, `TaxRegime`, `VatMode`, `CompanyTaxProfileFacadeInterface::taxProfileOn()`); `VatPolicy::decideForCash()` принимает `companyId` и читает профиль на дату операции; `Company.taxSystem` устарело |
 | 2.105 | 2026-11-01 | Cash: общая ставка НДС по дате операции (`VatRates`, 22% с 01.01.2026); `VatPolicy::decideForCash()` принимает дату операции |
 | 2.104 | 2026-11-01 | ai-service: промпт `categorize_transactions/v2` — справочник юрлиц маркетплейсов (Ozon — ООО «Интернет Решения», Wildberries — ООО «РВБ»/«Вайлдберриз», Яндекс Маркет, Мегамаркет — ООО «Маркетплейс»), поступление от них — выручка маркетплейса |
 | 2.103 | 2026-11-01 | ai-service: `evals-compare` печатает под таблицей разбивку ошибок каждой модели — частые пары «ожидали → ответ модели» по путям статей, доля от кейсов статьи, id кейсов |

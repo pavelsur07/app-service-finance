@@ -34,6 +34,10 @@ class Company
     #[ORM\Column(type: 'date_immutable', nullable: true)]
     private ?\DateTimeImmutable $financeLockBefore = null;
 
+    /**
+     * @deprecated заменено CompanyTaxProfile (история режима и НДС); не читается и не обновляется,
+     *             колонка удаляется отдельной миграцией (docs/tasks/vat-company-tax-settings)
+     */
     #[ORM\Column(nullable: true, enumType: CompanyTaxSystem::class)]
     private ?CompanyTaxSystem $taxSystem = null;
 

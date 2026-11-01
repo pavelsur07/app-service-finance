@@ -118,6 +118,8 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         'company_edit' => ['inline-owner', 'App\Company\Controller\CompanyController::edit'],
         'company_delete' => ['inline-owner', 'App\Company\Controller\CompanyController::delete'],
         'company_set_active' => ['inline-owner', 'App\Company\Controller\CompanyController::setActive'],
+        'company_tax_profile_save' => ['inline-owner', 'App\Company\Controller\TaxProfile\SaveCompanyTaxProfileController::__invoke'],
+        'company_tax_profile_delete' => ['inline-owner', 'App\Company\Controller\TaxProfile\DeleteCompanyTaxProfileController::__invoke'],
         // Личные настройки пользователя.
         'app_profile_password' => ['authenticated-self', 'App\Company\Controller\ProfileController::changePassword'],
         'app_ui_mode_switch' => ['authenticated-self', 'App\Shared\Controller\UiModeController::__invoke'],

@@ -1,0 +1,54 @@
+{# Блок «Налоги» карточки компании: периоды налогового профиля и изменение с месяца. #}
+<div class="card mt-3" id="taxes">
+    <div class="card-header"><b>Налоги</b></div>
+    <div class="card-body">
+        {% if taxProfiles is empty %}
+            <p class="text-warning mb-3">
+                <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+                Налоговый режим не выбран — НДС в операциях не выделяется.
+            </p>
+        {% else %}
+            <div class="table-responsive mb-3">
+                <table class="table table-vcenter card-table">
+                    <thead>
+                    <tr>
+                        <th>Действует</th>
+                        <th>Режим налогообложения</th>
+                        <th>НДС</th>
+                        <th class="w-1"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for profile in taxProfiles %}
+                        {% set next = taxProfiles[loop.index] ?? null %}
+                        <tr>
+                            <td>
+                                {{ profile.validFrom ? 'с ' ~ profile.validFrom|date('m.Y') : 'с начала учёта' }}
+                                {% if next %}<span class="text-secondary">по {{ next.validFrom|date_modify('-1 day')|date('m.Y') }}</span>{% endif %}
+                            </td>
+                            <td>{{ profile.taxRegime.label }}</td>
+                            <td>{{ profile.vatMode.label }}</td>
+                            <td>
+                                <form method="post" action="{{ path('company_tax_profile_delete', {id: company.id, profileId: profile.id}) }}"
+                                      onsubmit="return confirm('Удалить период налогового режима?');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_tax_profile' ~ profile.id) }}">
+                                    <button class="btn btn-sm btn-ghost-danger" type="submit">Удалить</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
+        <h4 class="mb-2">{{ taxProfiles is empty ? 'Указать режим' : 'Изменить с месяца' }}</h4>
+        {{ form_start(taxProfileForm) }}
+        {% include 'company/_tax_profile_fields.html.twig' with {tax_form: taxProfileForm} %}
+        <div class="form-hint mb-2">
+            Сохранённые операции не пересчитываются: новый режим применяется к операциям, которые создаются или изменяются после сохранения.
+        </div>
+        <button class="btn btn-primary" type="submit">Сохранить режим</button>
+        {{ form_end(taxProfileForm) }}
+    </div>
+</div>

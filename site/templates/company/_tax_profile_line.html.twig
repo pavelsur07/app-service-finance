@@ -1,0 +1,11 @@
+{# Строка налогового режима активной компании в шапке отчёта. #}
+{% set tax = active_company_tax_profile() %}
+<div class="text-secondary small mt-1" data-tax-profile-line>
+    {% if tax.profile %}
+        Налоговый режим: {{ tax.profile.label }}
+        {% if tax.canEdit %}· <a href="{{ path('company_edit', {id: tax.companyId}) }}#taxes">изменить</a>{% endif %}
+    {% else %}
+        <span class="text-warning"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Налоговый режим не выбран</span>
+        {% if tax.canEdit %}— <a href="{{ path('company_edit', {id: tax.companyId}) }}#taxes">указать</a>{% endif %}
+    {% endif %}
+</div>

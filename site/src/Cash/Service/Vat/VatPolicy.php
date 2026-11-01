@@ -5,33 +5,38 @@ declare(strict_types=1);
 namespace App\Cash\Service\Vat;
 
 use App\Cash\Enum\Transaction\CashDirection;
-use App\Company\Entity\Company;
-use App\Company\Enum\CompanyTaxSystem;
+use App\Company\Enum\VatMode;
+use App\Company\Facade\CompanyTaxProfileFacadeInterface;
 
 final readonly class VatPolicy
 {
     public function __construct(
         private VatRates $vatRates,
+        private CompanyTaxProfileFacadeInterface $taxProfiles,
     ) {
     }
 
     /**
      * Ставка НДС операции ДДС, %; null — НДС не выделяется.
-     * Общая ставка (ОСНО) берётся на дату операции, пониженные ставки УСН от даты не зависят.
+     * Режим НДС — налоговый профиль компании на дату операции; общая ставка тоже на эту дату,
+     * пониженные ставки УСН от даты не зависят.
      */
-    public function decideForCash(Company $company, CashDirection $direction, \DateTimeImmutable $occurredAt): ?int
+    public function decideForCash(string $companyId, CashDirection $direction, \DateTimeImmutable $occurredAt): ?int
     {
-        $taxSystem = $company->getTaxSystem();
-
-        if (null === $taxSystem || CashDirection::OUTFLOW !== $direction) {
+        if (CashDirection::OUTFLOW !== $direction) {
             return null;
         }
 
-        return match ($taxSystem) {
-            CompanyTaxSystem::USN_NO_VAT => null,
-            CompanyTaxSystem::USN_VAT_5 => 5,
-            CompanyTaxSystem::USN_VAT_7 => 7,
-            CompanyTaxSystem::OSNO => $this->vatRates->generalRateOn($occurredAt),
+        $profile = $this->taxProfiles->taxProfileOn($companyId, $occurredAt);
+        if (null === $profile) {
+            return null;
+        }
+
+        return match ($profile->vatMode) {
+            VatMode::EXEMPT => null,
+            VatMode::USN_5 => 5,
+            VatMode::USN_7 => 7,
+            VatMode::GENERAL => $this->vatRates->generalRateOn($occurredAt),
         };
     }
 }
