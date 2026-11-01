@@ -13,6 +13,7 @@ type SortField =
     | 'revenue'
     | 'quantity'
     | 'returnsTotal'
+    | 'returnsQuantity'
     | 'costPriceTotal'
     | 'costPriceUnit'
     | 'stockQty'
@@ -184,6 +185,7 @@ const HEADERS: { field: SortField; label: React.ReactNode; align?: string; toolt
     { field: 'revenue', label: 'Выручка', align: 'text-end' },
     { field: 'quantity', label: 'Кол-во', align: 'text-end' },
     { field: 'returnsTotal', label: 'Возвраты', align: 'text-end' },
+    { field: 'returnsQuantity', label: 'Кол-во', align: 'text-end', tooltip: 'Возвращено, шт.' },
     { field: 'costPriceTotal', label: 'Себестоимость', align: 'text-end' },
     { field: 'costPriceUnit', label: 'Себест. ед.', align: 'text-end' },
     { field: 'stockQty', label: 'Ост. шт.', align: 'text-end' },
@@ -608,6 +610,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                         <td className="text-end">{formatMoney(row.revenue)}</td>
                                         <td className="text-end">{row.quantity.toLocaleString('ru-RU')}</td>
                                         <td className="text-end text-red">{formatMoney(row.returnsTotal)}</td>
+                                        <td className="text-end">{row.returnsQuantity.toLocaleString('ru-RU')}</td>
                                         <td className="text-end">{formatMoney(row.costPriceTotal)}</td>
                                         <td className="text-end">{formatMoney(row.costPriceUnit)}</td>
                                         <td className="text-end">{formatQty(row.stockQty)}</td>
@@ -693,6 +696,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                 <td className="text-end">{formatMoney(totals.revenue)}</td>
                                 <td className="text-end">{totals.quantity.toLocaleString('ru-RU')}</td>
                                 <td className="text-end text-red">{formatMoney(totals.returnsTotal)}</td>
+                                <td className="text-end">{totals.returnsQuantity.toLocaleString('ru-RU')}</td>
                                 <td className="text-end">{formatMoney(totals.costPriceTotal)}</td>
                                 <td className="text-end">{'—'}</td>
                                 <td className="text-end">{'—'}</td>

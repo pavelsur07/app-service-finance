@@ -198,6 +198,17 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         $dataRows = array_slice($rows, $headerRowIndex + 1, 3);
         self::assertCount(3, $dataRows, 'Expected exactly 3 data rows');
 
+        // «Кол-во» встречается дважды: проданные единицы после «Выручка» и
+        // возвращённые единицы сразу после «Возвраты».
+        $returnsTotalColumnIndex = array_search('Возвраты', $header, true);
+        self::assertNotFalse($returnsTotalColumnIndex);
+        $returnsQuantityColumnIndex = $returnsTotalColumnIndex + 1;
+        self::assertSame('Кол-во', $header[$returnsQuantityColumnIndex] ?? null, '"Кол-во" возвратов должно идти сразу после "Возвраты"');
+        self::assertSame('Кол-во', $header[$revenueColumnIndex + 1] ?? null, '"Кол-во" продаж остаётся сразу после "Выручка"');
+        self::assertSame('1', (string) ($dataRows[0][$returnsQuantityColumnIndex] ?? ''));
+        self::assertSame('0', (string) ($dataRows[1][$returnsQuantityColumnIndex] ?? ''));
+        self::assertSame('1', (string) ($rows[$headerRowIndex + 4][$returnsQuantityColumnIndex] ?? ''));
+
         $skus = array_map(static fn (array $row): string => (string) ($row[0] ?? ''), $dataRows);
         self::assertSame(['SKU-A', 'SKU-B', 'SKU-C'], $skus);
         self::assertSame('ART-A', (string) ($dataRows[0][$articleColumnIndex] ?? ''));
