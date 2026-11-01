@@ -4444,6 +4444,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.104 | 2026-11-01 | ai-service: промпт `categorize_transactions/v2` — справочник юрлиц маркетплейсов (Ozon — ООО «Интернет Решения», Wildberries — ООО «РВБ»/«Вайлдберриз», Яндекс Маркет, Мегамаркет — ООО «Маркетплейс»), поступление от них — выручка маркетплейса |
 | 2.103 | 2026-11-01 | ai-service: `evals-compare` печатает под таблицей разбивку ошибок каждой модели — частые пары «ожидали → ответ модели» по путям статей, доля от кейсов статьи, id кейсов |
 | 2.102 | 2026-10-31 | ai-service: `evals-import --redact` (обязательный; название и бренды компании → `[COMPANY]`), UUID в назначениях → `[ID]`; набор истории `evals/categorize_transactions/history/vumjoy` (219 кейсов, 21 статья) |
 | 2.101 | 2026-10-31 | ai-service: `extra_body` провайдера в `routes.yaml` (поля тела запроса OpenAI-совместимого адаптера, без `model`/`messages`/`max_tokens`/`temperature`); маршрут `categorize_transactions` — `deepseek/deepseek-flash` (`thinking` выключен) → `openai/gpt-4.1-mini`, цены в `prices.yaml` (G3, `docs/tasks/ai/gateway/g3.md`) |
