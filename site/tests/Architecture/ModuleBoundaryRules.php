@@ -26,6 +26,7 @@ final class ModuleBoundaryRules
      */
     private const MODULES_WITH_FACADE = [
         'Balance',
+        'Billing',
         'Cash',
         'Catalog',
         'Company',

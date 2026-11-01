@@ -9,6 +9,7 @@ use App\Ingestion\Domain\OzonCategoryGroupSeed;
 use App\Ingestion\Domain\SystemCounterparties;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\Billing\TariffSeed;
 use App\Tests\Support\Db\DbReset;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 
@@ -60,6 +61,8 @@ final class DbResetTest extends IntegrationTestCase
             \count(OzonCategoryGroupSeed::rules()),
             (int) $this->connection->fetchOne('SELECT COUNT(*) FROM ingest_category_group_rules'),
         );
+        self::assertSame(\count(TariffSeed::tariffs()), (int) $this->connection->fetchOne('SELECT COUNT(*) FROM billing_tariffs'));
+        self::assertSame(\count(TariffSeed::prices()), (int) $this->connection->fetchOne('SELECT COUNT(*) FROM billing_tariff_prices'));
     }
 
     /**
@@ -73,7 +76,7 @@ final class DbResetTest extends IntegrationTestCase
      */
     public function testEveryMigrationSeededTableIsRestored(): void
     {
-        $restored = ['company_role', 'system_counterparties', 'ingest_category_groups', 'ingest_category_group_rules'];
+        $restored = ['company_role', 'system_counterparties', 'ingest_category_groups', 'ingest_category_group_rules', 'billing_tariffs', 'billing_tariff_prices'];
 
         $files = glob(\dirname(__DIR__, 3).'/migrations/*.php');
         self::assertNotEmpty($files, 'Миграции не найдены — проверь путь.');
