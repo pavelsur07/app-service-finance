@@ -4,6 +4,10 @@
 тот же pipeline, что в проде: маскирование, промпт, проверки, вердикт. Пачка без результата
 (модель недоступна, блокирующая проверка) засчитывается как ошибка по всем её операциям, в том
 числе по ловушкам: отсутствие ответа — не ответ «недостаточно данных».
+
+Разбивка ошибок — пары «ожидали → ответ модели» по путям статей (id статей в наборах свои, путь
+однозначен между наборами) с id кейсов, чтобы найти операцию в cases.jsonl и отличить ошибку
+модели от непоследовательной ручной разметки. Сбой пачки в разбивку не попадает — он в таблице.
 """
 
 import statistics
@@ -23,6 +27,10 @@ from ai_service.tasks.registry import build_registry
 TASK = "categorize_transactions"
 BATCH_SIZE = 50
 EVAL_COMPANY = "0192f0a0-0000-7000-8000-0000000000c1"
+# Ловушка в эталоне и ответ «недостаточно данных» у модели — одна и та же «статья».
+NO_CATEGORY = "без статьи"
+TOP_ERRORS = 15
+EXAMPLES = 3
 
 
 @dataclass(slots=True)
@@ -43,12 +51,19 @@ class Score:
     input_tokens: int = 0
     output_tokens: int = 0
     latencies_ms: list[int] = field(default_factory=list)
+    # Кейсов по ожидаемой статье; ошибки: (ожидали, ответ) → id кейсов «набор:кейс».
+    by_expected: dict[str, int] = field(default_factory=dict)
+    errors: dict[tuple[str, str], list[str]] = field(default_factory=dict)
 
     def add(self, other: "Score") -> None:
         for name in self.__slots__:
             value = getattr(other, name)
             if isinstance(value, list):
                 getattr(self, name).extend(value)
+            elif isinstance(value, dict):
+                merged = getattr(self, name)
+                for key, item in value.items():
+                    merged[key] = merged.get(key, 0 if isinstance(item, int) else []) + item
             else:
                 setattr(self, name, getattr(self, name) + value)
 
@@ -81,6 +96,7 @@ def evaluate(pipeline: Pipeline, eval_set: EvalSet) -> Score:
     if spec is None:
         raise LookupError(TASK)
     threshold = spec.confidence_threshold
+    paths = {c["id"]: c["path"] for c in eval_set.categories}
     score = Score()
     for chunk in _chunks(eval_set.cases, BATCH_SIZE):
         payload = {"categories": eval_set.categories, "operations": [c["operation"] for c in chunk]}
@@ -106,7 +122,9 @@ def evaluate(pipeline: Pipeline, eval_set: EvalSet) -> Score:
                     i["operation_id"]: (i["category_id"], float(i["confidence"])) for i in outcome.output["items"]
                 }
         for case in chunk:
-            _score_case(score, case, predicted.get(case["id"]), threshold)
+            answer = predicted.get(case["id"])
+            _score_case(score, case, answer, threshold)
+            _record_error(score, f"{eval_set.name}:{case['id']}", case["expected_category_id"], answer, paths)
     return score
 
 
@@ -141,6 +159,32 @@ def render(rows: list[tuple[str, Score]], prices: dict[str, Price]) -> str:
     return "\n".join(lines)
 
 
+def render_errors(rows: list[tuple[str, Score]]) -> str:
+    """Частые ошибки каждой модели: доля — от кейсов ожидаемой статьи, примеры — id кейсов."""
+    blocks: list[str] = []
+    for model, s in rows:
+        if not s.errors:
+            blocks.append(f"Ошибки {model}: нет")
+            continue
+        ordered = sorted(s.errors.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+        lines = [
+            f"Ошибки {model}:",
+            "| ожидали | ответ модели | раз | доля от кейсов статьи | кейсы |",
+            "|---|---|---|---|---|",
+        ]
+        for (expected, answered), ids in ordered[:TOP_ERRORS]:
+            examples = ", ".join(ids[:EXAMPLES]) + (" …" if len(ids) > EXAMPLES else "")
+            lines.append(
+                f"| {expected} | {answered} | {len(ids)} | {_pct(len(ids), s.by_expected.get(expected, 0))} "
+                f"| {examples} |"
+            )
+        if len(ordered) > TOP_ERRORS:
+            rest = ordered[TOP_ERRORS:]
+            lines.append(f"ещё {len(rest)} пар, {sum(len(ids) for _, ids in rest)} ошибок")
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
 def parse_prices(raw: Any) -> dict[str, Price]:
     prices: dict[str, Price] = {}
     for model, value in (raw or {}).items():
@@ -170,6 +214,23 @@ def _score_case(score: Score, case: dict[str, Any], answer: tuple[str | None, fl
     if category is not None and confidence >= threshold:
         score.confident += 1
         score.confident_correct += int(correct)
+
+
+def _record_error(
+    score: Score, case_ref: str, expected_id: str | None, answer: tuple[str | None, float] | None, paths: dict[str, str]
+) -> None:
+    expected = _path(expected_id, paths)
+    score.by_expected[expected] = score.by_expected.get(expected, 0) + 1
+    if answer is None or answer[0] == expected_id:
+        return
+    score.errors.setdefault((expected, _path(answer[0], paths)), []).append(case_ref)
+
+
+def _path(category_id: str | None, paths: dict[str, str]) -> str:
+    if category_id is None:
+        return NO_CATEGORY
+    # Статья вне дерева набора — показываем id, чтобы не потерять ошибку.
+    return paths.get(category_id, category_id)
 
 
 def _chunks(items: list[dict[str, Any]], size: int) -> Iterator[list[dict[str, Any]]]:

@@ -292,3 +292,67 @@ def test_confident_wrong_answer_on_trap_counts_against_confident_precision() -> 
     assert (score.traps, score.traps_ok) == (1, 0)
     assert (score.confident, score.confident_correct) == (2, 1)
     assert (score.answered, score.answered_correct) == (1, 1)
+
+
+_TWO_CATEGORIES = [
+    {"id": "rent", "path": "Расходы / Аренда", "direction": "outflow"},
+    {"id": "fuel", "path": "Расходы / Топливо", "direction": "outflow"},
+]
+
+
+def test_evaluate_collects_errors_by_expected_and_answered_category() -> None:
+    cases: list[dict[str, Any]] = [
+        {"id": "f1", "operation": _operation("f1", "Бензин"), "expected_category_id": "fuel"},
+        {"id": "f2", "operation": _operation("f2", "АЗС"), "expected_category_id": "fuel"},
+        {"id": "r1", "operation": _operation("r1", "Оплата аренды"), "expected_category_id": "rent"},
+        *_CASES[1:],
+    ]
+
+    score = compare.evaluate(_pipeline("always-rent", _AlwaysRent()), EvalSet("s", _TWO_CATEGORIES, cases))
+
+    assert score.by_expected == {"Расходы / Топливо": 2, "Расходы / Аренда": 1, compare.NO_CATEGORY: 1}
+    assert score.errors == {
+        ("Расходы / Топливо", "Расходы / Аренда"): ["s:f1", "s:f2"],
+        (compare.NO_CATEGORY, "Расходы / Аренда"): ["s:trap"],
+    }
+
+
+def test_failed_batch_is_not_an_error_by_category() -> None:
+    score = compare.evaluate(_pipeline("fail", StubAdapter()), EvalSet("s", _CATEGORIES, _CASES))
+
+    assert score.errors == {}
+    assert score.by_expected == {"Расходы / Аренда": 1, compare.NO_CATEGORY: 1}
+
+
+def test_score_add_merges_errors() -> None:
+    total = compare.Score()
+    total.add(compare.Score(cases=1, by_expected={"А": 1}, errors={("А", "Б"): ["s:1"]}))
+    total.add(compare.Score(cases=2, by_expected={"А": 2}, errors={("А", "Б"): ["t:1"], ("А", "В"): ["t:2"]}))
+
+    assert total.cases == 3
+    assert total.by_expected == {"А": 3}
+    assert total.errors == {("А", "Б"): ["s:1", "t:1"], ("А", "В"): ["t:2"]}
+
+
+def test_render_errors_lists_most_frequent_confusions_first_with_share_and_examples() -> None:
+    score = compare.Score(
+        by_expected={"А": 4, "Б": 2},
+        errors={("Б", "А"): ["s:1"], ("А", "Б"): ["s:2", "s:3", "s:4", "s:5"]},
+    )
+
+    lines = compare.render_errors([("a/m", score), ("b/m", compare.Score())]).splitlines()
+
+    assert lines[0] == "Ошибки a/m:"
+    assert lines[3] == "| А | Б | 4 | 100% | s:2, s:3, s:4 … |"
+    assert lines[4] == "| Б | А | 1 | 50% | s:1 |"
+    assert "Ошибки b/m: нет" in lines
+
+
+def test_render_errors_keeps_only_top_confusions() -> None:
+    errors = {("А", f"Б{n}"): [f"s:{n}"] for n in range(compare.TOP_ERRORS + 5)}
+    score = compare.Score(by_expected={"А": len(errors)}, errors=errors)
+
+    table = compare.render_errors([("a/m", score)])
+
+    assert table.count("| А | Б") == compare.TOP_ERRORS
+    assert "ещё 5 пар" in table
