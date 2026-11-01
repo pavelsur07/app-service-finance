@@ -7,7 +7,9 @@ namespace App\Tests\Support\Db;
 use App\Company\Security\SystemCompanyRoles;
 use App\Ingestion\Domain\OzonCategoryGroupSeed;
 use App\Ingestion\Domain\SystemCounterparties;
+use App\Tests\Support\Billing\TariffSeed;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -105,6 +107,21 @@ final class DbReset
             $connection->executeStatement(
                 'INSERT INTO ingest_category_group_rules (id, source, priority, pattern, group_code, confidence, active, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, true, ?, ?, ?)',
                 [$id, 'ozon', $rule['priority'], $rule['pattern'], $rule['groupCode'], $rule['confidence'], $rule['note'], $now, $now],
+            );
+        }
+
+        foreach (TariffSeed::tariffs() as $id => $tariff) {
+            $connection->executeStatement(
+                'INSERT INTO billing_tariffs (id, code, name, is_public, is_perpetual, is_active, sort_order, created_at) VALUES (?, ?, ?, ?, ?, true, ?, ?)',
+                [$id, $tariff['code'], $tariff['name'], $tariff['public'], $tariff['perpetual'], $tariff['sortOrder'], $now],
+                [3 => ParameterType::BOOLEAN, 4 => ParameterType::BOOLEAN],
+            );
+        }
+
+        foreach (TariffSeed::prices() as $id => $price) {
+            $connection->executeStatement(
+                'INSERT INTO billing_tariff_prices (id, tariff_id, months, amount_kopecks) VALUES (?, ?, ?, ?)',
+                [$id, $price['tariffId'], $price['months'], $price['amountKopecks']],
             );
         }
     }

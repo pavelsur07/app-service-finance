@@ -11,6 +11,7 @@ use App\Billing\Repository\TariffRepository;
 use App\Tests\Builders\Billing\CompanySubscriptionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\Billing\TariffSeed;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 
 final class BillingFacadeTest extends IntegrationTestCase
@@ -62,18 +63,27 @@ final class BillingFacadeTest extends IntegrationTestCase
         self::assertNull($access->daysLeft);
     }
 
-    public function testSeededTariffsAndPrices(): void
+    /**
+     * Справочник в БД (после миграции или DbReset) совпадает с копией для DbReset.
+     */
+    public function testSeededTariffsMatchMigration(): void
     {
-        $prices = $this->connection->fetchAllKeyValue(
-            "SELECT t.code || ':' || p.months, p.amount_kopecks FROM billing_tariff_prices p JOIN billing_tariffs t ON t.id = p.tariff_id ORDER BY 1",
-        );
+        $tariffs = $this->connection->fetchAllAssociativeIndexed('SELECT id, code, name, is_public, is_perpetual, is_active, sort_order FROM billing_tariffs ORDER BY id');
+        $expected = [];
+        foreach (TariffSeed::tariffs() as $id => $t) {
+            $expected[$id] = ['code' => $t['code'], 'name' => $t['name'], 'is_public' => $t['public'], 'is_perpetual' => $t['perpetual'], 'is_active' => true, 'sort_order' => $t['sortOrder']];
+        }
+        ksort($expected);
+        self::assertSame($expected, $tariffs);
 
-        self::assertSame(6, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM billing_tariffs'));
-        self::assertCount(12, $prices);
-        self::assertSame(497000, $prices['start:1']);
-        self::assertSame(995000, $prices['base:1']);
-        self::assertSame(1479000, $prices['pro:1']);
-        self::assertSame(14198000, $prices['pro:12']);
+        $prices = $this->connection->fetchAllAssociativeIndexed('SELECT id, tariff_id, months, amount_kopecks FROM billing_tariff_prices ORDER BY id');
+        $expectedPrices = [];
+        foreach (TariffSeed::prices() as $id => $p) {
+            $expectedPrices[$id] = ['tariff_id' => $p['tariffId'], 'months' => $p['months'], 'amount_kopecks' => $p['amountKopecks']];
+        }
+        ksort($expectedPrices);
+        self::assertSame($expectedPrices, $prices);
+        self::assertSame(14198000, $expectedPrices['01a18a1b-3000-7000-8000-00000000014c']['amount_kopecks'], 'Профи, 12 мес = 141 980 ₽');
     }
 
     private function persistSubscription(TariffCode $code, string $from, ?string $until): void

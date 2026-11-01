@@ -149,5 +149,11 @@
   тариф, чужой `paymentId` → проброс `UniqueConstraintViolationException`.
 - После правок: Billing unit + integration — 51 OK; unit-набор — 4315 OK;
   PHPStan — No errors; CS — чисто.
+- CI (первый прогон PR #2853): 15 падений integration — `DbReset` после
+  TRUNCATE не восстанавливал справочник тарифов (`DbResetTest` требует).
+  Исправлено: копия справочника `tests/Support/Billing/TariffSeed.php`
+  восстанавливается в `DbReset`, совпадение с миграцией проверяет
+  `BillingFacadeTest::testSeededTariffsMatchMigration`. Integration целиком
+  локально — 2351 OK.
 - В follow-up (TASK.md): `ON DELETE CASCADE` журнала оплат; подтверждение
   в админке при оплате, снимающей «Друга».
