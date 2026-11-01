@@ -37,15 +37,22 @@ final class DeleteCompanyTaxProfileAction
             throw new CompanyTaxProfileNotFoundException();
         }
 
-        $this->entityManager->wrapInTransaction(function () use ($companyId, $profileId): void {
+        /** @var bool $removed */
+        $removed = $this->entityManager->wrapInTransaction(function () use ($companyId, $profileId): bool {
             $this->writer->lockCompany($companyId);
+            // Параллельный запрос мог удалить период, пока ждали блокировку: повтор удаления — не ошибка.
             $profile = $this->repository->findOneByIdAndCompany($profileId, $companyId);
-            if (null !== $profile) {
-                $this->entityManager->remove($profile);
-                $this->entityManager->flush();
+            if (null === $profile) {
+                return false;
             }
+            $this->entityManager->remove($profile);
+            $this->entityManager->flush();
+
+            return true;
         });
 
-        $this->logger->info('Company tax profile deleted', ['companyId' => $companyId, 'profileId' => $profileId]);
+        if ($removed) {
+            $this->logger->info('Company tax profile deleted', ['companyId' => $companyId, 'profileId' => $profileId]);
+        }
     }
 }

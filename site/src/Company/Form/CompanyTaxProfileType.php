@@ -10,6 +10,7 @@ use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
@@ -53,8 +54,8 @@ final class CompanyTaxProfileType extends AbstractType
                 'label' => 'С месяца',
                 'required' => false,
                 'help' => 'Пусто — режим с начала учёта.',
-                'attr' => ['type' => 'month', 'class' => 'form-control', 'placeholder' => 'ГГГГ-ММ'],
-                'constraints' => [new Assert\Regex(pattern: '/^\d{4}-(0[1-9]|1[0-2])$/', message: 'Укажите месяц в формате ГГГГ-ММ.')],
+                'attr' => ['class' => 'form-control', 'placeholder' => 'ГГГГ-ММ'],
+                'constraints' => [new Assert\Regex(pattern: '/^(19|20)\d{2}-(0[1-9]|1[0-2])$/', message: 'Укажите месяц в формате ГГГГ-ММ.')],
             ]);
         }
     }
@@ -64,7 +65,11 @@ final class CompanyTaxProfileType extends AbstractType
         $resolver->setDefaults([
             'require_profile' => true,
             'with_valid_from' => true,
-            'constraints' => [new Assert\Callback(self::validateCombination(...))],
+        ]);
+        // Сочетание проверяется, только когда заданы оба поля или одно в необязательной форме:
+        // в обязательной пустое поле уже ловит NotNull — второе сообщение не нужно.
+        $resolver->setDefault('constraints', static fn (Options $options): array => [
+            new Assert\Callback(static fn (?array $data, ExecutionContextInterface $context) => self::validateCombination($data, $context, $options['require_profile'])),
         ]);
         $resolver->setAllowedTypes('require_profile', 'bool');
         $resolver->setAllowedTypes('with_valid_from', 'bool');
@@ -73,12 +78,15 @@ final class CompanyTaxProfileType extends AbstractType
     /**
      * @param array<string, mixed>|null $data
      */
-    public static function validateCombination(?array $data, ExecutionContextInterface $context): void
+    public static function validateCombination(?array $data, ExecutionContextInterface $context, bool $required): void
     {
         $regime = $data['taxRegime'] ?? null;
         $vatMode = $data['vatMode'] ?? null;
 
         if (null === $regime && null === $vatMode) {
+            return;
+        }
+        if ($required && (null === $regime || null === $vatMode)) {
             return;
         }
         if (!$regime instanceof TaxRegime || !$vatMode instanceof VatMode) {

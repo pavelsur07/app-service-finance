@@ -5,7 +5,7 @@
     <div class="col-md-{{ col }}">{{ form_row(tax_form.taxRegime) }}</div>
     <div class="col-md-{{ col }}">{{ form_row(tax_form.vatMode) }}</div>
     {% if tax_form.validFrom is defined %}
-        <div class="col-md-4">{{ form_row(tax_form.validFrom) }}</div>
+        <div class="col-md-4">{{ form_row(tax_form.validFrom, {type: 'month'}) }}</div>
     {% endif %}
 </div>
 {{ form_errors(tax_form) }}
@@ -23,7 +23,9 @@
                 option.hidden = !ok;
                 option.disabled = !ok;
             }
-            if (allowed !== null && !allowed.includes(vat.value)) {
+            if (allowed === null) {
+                vat.value = '';
+            } else if (!allowed.includes(vat.value)) {
                 vat.value = allowed[0];
             }
         };

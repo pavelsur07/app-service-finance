@@ -95,6 +95,9 @@ final class CompanyTaxProfileTest extends WebTestCaseBase
 
         $this->client->followRedirect();
         self::assertStringContainsString('Укажите месяц в формате ГГГГ-ММ.', (string) $this->client->getResponse()->getContent());
+
+        // Год 0000 PHP разбирает, а PostgreSQL отвергает — должен отсекаться формой, а не 500.
+        $this->saveProfile('USN', 'EXEMPT', '0000-01');
         self::assertSame([], $this->profiles());
     }
 
