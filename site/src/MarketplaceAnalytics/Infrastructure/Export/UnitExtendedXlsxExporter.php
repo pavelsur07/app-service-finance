@@ -37,6 +37,7 @@ final readonly class UnitExtendedXlsxExporter
         ['label' => 'Выручка',         'field' => 'revenue',        'type' => 'money'],
         ['label' => 'Кол-во',          'field' => 'quantity',       'type' => 'integer'],
         ['label' => 'Возвраты',        'field' => 'returnsTotal',   'type' => 'money'],
+        ['label' => 'Кол-во',          'field' => 'returnsQuantity', 'type' => 'integer'],
         ['label' => 'Себестоимость',   'field' => 'costPriceTotal', 'type' => 'money'],
         ['label' => 'Себест. ед.',     'field' => 'costPriceUnit',  'type' => 'money'],
         ['label' => 'Ост. шт.',        'field' => 'stockQty',      'type' => 'number'],
