@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Company\Entity;
 
 use App\Company\Enum\BusinessProfile;
-use App\Company\Enum\CompanyTaxSystem;
 use App\Shared\Domain\ValueObject\Money;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
@@ -33,13 +32,6 @@ class Company
 
     #[ORM\Column(type: 'date_immutable', nullable: true)]
     private ?\DateTimeImmutable $financeLockBefore = null;
-
-    /**
-     * @deprecated заменено CompanyTaxProfile (история режима и НДС); не читается и не обновляется,
-     *             колонка удаляется отдельной миграцией (docs/tasks/vat-company-tax-settings)
-     */
-    #[ORM\Column(nullable: true, enumType: CompanyTaxSystem::class)]
-    private ?CompanyTaxSystem $taxSystem = null;
 
     #[ORM\Column(length: 32, enumType: BusinessProfile::class, options: ['default' => 'MARKETPLACE'])]
     private BusinessProfile $businessProfile = BusinessProfile::DEFAULT;
@@ -109,18 +101,6 @@ class Company
     public function setFinanceLockBefore(?\DateTimeImmutable $date): self
     {
         $this->financeLockBefore = $date ? $date->setTime(0, 0) : null;
-
-        return $this;
-    }
-
-    public function getTaxSystem(): ?CompanyTaxSystem
-    {
-        return $this->taxSystem;
-    }
-
-    public function setTaxSystem(?CompanyTaxSystem $taxSystem): self
-    {
-        $this->taxSystem = $taxSystem;
 
         return $this;
     }
