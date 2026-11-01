@@ -70,3 +70,13 @@ services:
         class: App\Tests\Support\BankSync\StubBankAuthorizationProvider
         autowire: false
         arguments: []
+
+    # Billing: потребители (админка, страница тарифа) появятся на этапах 2–3
+    # (docs/tasks/billing); до них сервисы ни от кого не зависят и без public
+    # вырезаются из контейнера.
+    App\Billing\Application\RegisterPaymentAction:
+        public: true
+
+    App\Billing\Facade\BillingFacadeInterface:
+        alias: App\Billing\Facade\BillingFacade
+        public: true

@@ -19,7 +19,7 @@
 | `Finance` | PnL-отчёты, кэшфлоу, фасады финансовой аналитики | `Company $company` (legacy) |
 | `Company` | Компании, пользователи, приглашения, тарифы | — (владелец) |
 | `Balance` | Автономный управленческий баланс, счета и журнал движений | `string $companyId` ✅ |
-| `Billing` | Биллинг и подписки — старый модуль удалён 01.11.2026, новый строится по `docs/tasks/billing` | — |
+| `Billing` | Тарифы, подписка компании, журнал оплат (`docs/tasks/billing`) | `string $companyId` ✅ |
 | `Loan` | Кредиты и займы | legacy |
 | `Telegram` | Telegram-бот, вебхуки | — |
 | `MoySklad` | Интеграция с МойСклад | `string $companyId` ✅ |
@@ -1776,6 +1776,41 @@ manage — только владелец. Новые права автомати
   (сочетания вне старого enum — `NULL`).
 - Откат миграции (`DROP TABLE`) возвращает состояние до неё, но теряет периоды,
   сохранённые после деплоя; `tax_system` к тому времени устаревает.
+
+### Billing: тарифы и оплаченный период (`billing_*`)
+
+План задачи — `docs/tasks/billing/TASK.md`. Сейчас есть ядро (этап 1): UI,
+пробного периода и ограничения доступа нет.
+
+- `Tariff` (`billing_tariffs`): `TariffCode` (`start`, `base`, `pro` —
+  публичные; `friend`, `support`, `outsourcer` — скрытые), `isPublic`,
+  `isPerpetual` (только `friend`), `isActive`, `sortOrder`. Справочник засеян
+  миграцией `Version20261101210000`; строк из кода не создаётся.
+- `TariffPrice` (`billing_tariff_prices`): цена публичного тарифа за 1/3/6/12
+  мес готовой суммой в копейках; unique `(tariff_id, months)`.
+- `CompanySubscription` (`billing_company_subscriptions`): одна на компанию
+  (unique `company_id`); `paidFrom` — начало непрерывно оплаченного отрезка,
+  `paidUntil` — «оплачено по» включительно, `NULL` у бессрочного тарифа.
+- `BillingPayment` (`billing_payments`): неизменяемый журнал; `id` — ключ
+  повтора от вызывающего; unique `(source, external_id)`; уплаченная сумма,
+  срок и период фиксируются в записи.
+- Период «от даты оплаты» — `PaidPeriodCalculator`: день зачисления по Москве;
+  оплата до окончания продолжает с `paidUntil + 1`, после — с дня зачисления;
+  конец = начало + N мес − 1 день, нет числа в целевом месяце — его последний
+  день. Даты-колонки читаются по `Y-m-d` без перевода зоны.
+- Статус — `SubscriptionAccessPolicy` (не хранится): `active` (оплачено или
+  бессрочный) → `grace` (`GRACE_DAYS` = 5 после `paidUntil`) → `read_only`;
+  `none` — подписки нет.
+- `BillingFacadeInterface::accessFor(string $companyId, DateTimeImmutable
+  $now): BillingAccessDTO` — статус, код и название тарифа, `paidUntil`, дней
+  до окончания.
+- Запись: `RegisterPaymentAction` — точка входа, коммитит сама одним
+  `wrapInTransaction()` под `pg_advisory_xact_lock(hashtextextended(
+  'billing_subscription:'||companyId, 0))`; повтор по `id` или `(source,
+  external_id)` возвращает исходную оплату; `UniqueConstraintViolation` —
+  поиск DBAL после rollback. Оплата другого тарифа при действующем платном
+  периоде — `TariffChangeNotSupportedException`; бессрочный и отключённый
+  тарифы не оплачиваются.
 
 ### Company: общий минимальный остаток
 
@@ -4487,6 +4522,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.110 | 2026-11-01 | Billing: новый модуль — `Tariff`, `TariffPrice`, `CompanySubscription`, `BillingPayment`, `RegisterPaymentAction`, `BillingFacadeInterface::accessFor()` (`Version20261101210000`) |
 | 2.109 | 2026-11-01 | Billing: старый модуль `src/Billing/` и таблицы `billing_*` удалены (`Version20261101200000`), новый — `docs/tasks/billing` |
 | 2.108 | 2026-11-01 | Company: колонка `companies.tax_system` удалена миграцией `Version20261101180000` |
 | 2.107 | 2026-11-01 | Company: `Company::$taxSystem` и `CompanyTaxSystem` удалены (колонка `companies.tax_system` ещё в схеме, удаляется следующей миграцией) |
