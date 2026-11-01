@@ -30,7 +30,7 @@ def build() -> TaskSpec[CategorizeInput, CategorizeOutput]:
         task_type=TASK_TYPE,
         input_model=CategorizeInput,
         output_model=CategorizeOutput,
-        prompt=Prompt.load(TASK_TYPE, "v1", Path(__file__).parent / "prompts"),
+        prompt=Prompt.load(TASK_TYPE, "v2", Path(__file__).parent / "prompts"),
         risk=Risk.LOW,
         build_user=build_user,
         checks=(completeness, category_in_tree, direction_matches),

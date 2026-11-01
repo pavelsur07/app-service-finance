@@ -97,3 +97,24 @@ def test_model_sees_masked_purpose_but_intact_ids_and_amounts() -> None:
     assert OP1 in user
     assert RENT in user
     assert "123456789012.00" in user
+
+
+def test_prompt_names_marketplace_legal_entities() -> None:
+    prompt = categorize.build().prompt
+    assert prompt.version == "v2"
+    for name in ("Интернет Решения", "РВБ", "Вайлдберриз", "Яндекс Маркет", "Маркетплейс"):
+        assert name in prompt.text
+
+
+def test_marketplace_legal_entities_survive_masking() -> None:
+    # Справочник бесполезен, если маскирование сотрёт юрлицо из назначения или контрагента.
+    payload = example("categorize_payload")
+    payload["operations"][0]["direction"] = "inflow"
+    payload["operations"][0]["description"] = 'Оплата за ООО "ИНТЕРНЕТ РЕШЕНИЯ" по реестру, дог. ИР-17719/19'
+    payload["operations"][0]["counterparty"] = 'ООО "СБЕРБАНК ФАКТОРИНГ"'
+    payload["operations"][1]["counterparty"] = 'ООО "РВБ"'
+    _, adapter = run(items((OP1, REVENUE, 0.9), (OP2, None, 0.0)), payload)
+    user = adapter.requests[0].user
+    assert "ИНТЕРНЕТ РЕШЕНИЯ" in user
+    assert "ИР-17719/19" in user
+    assert "РВБ" in user
