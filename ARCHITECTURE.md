@@ -19,7 +19,7 @@
 | `Finance` | PnL-отчёты, кэшфлоу, фасады финансовой аналитики | `Company $company` (legacy) |
 | `Company` | Компании, пользователи, приглашения, тарифы | — (владелец) |
 | `Balance` | Автономный управленческий баланс, счета и журнал движений | `string $companyId` ✅ |
-| `Billing` | Биллинг и подписки | — |
+| `Billing` | Биллинг и подписки — старый модуль удалён 01.11.2026, новый строится по `docs/tasks/billing` | — |
 | `Loan` | Кредиты и займы | legacy |
 | `Telegram` | Telegram-бот, вебхуки | — |
 | `MoySklad` | Интеграция с МойСклад | `string $companyId` ✅ |
@@ -4487,6 +4487,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.109 | 2026-11-01 | Billing: старый модуль `src/Billing/` и таблицы `billing_*` удалены (`Version20261101200000`), новый — `docs/tasks/billing` |
 | 2.108 | 2026-11-01 | Company: колонка `companies.tax_system` удалена миграцией `Version20261101180000` |
 | 2.107 | 2026-11-01 | Company: `Company::$taxSystem` и `CompanyTaxSystem` удалены (колонка `companies.tax_system` ещё в схеме, удаляется следующей миграцией) |
 | 2.106 | 2026-11-01 | Company: налоговый профиль с историей (`CompanyTaxProfile`, `TaxRegime`, `VatMode`, `CompanyTaxProfileFacadeInterface::taxProfileOn()`); `VatPolicy::decideForCash()` принимает `companyId` и читает профиль на дату операции; `Company.taxSystem` устарело |
