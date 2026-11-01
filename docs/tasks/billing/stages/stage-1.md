@@ -9,7 +9,7 @@
 
 ## Результат
 
-Ветка `feat/billing-core` (поверх `refactor/billing-drop-legacy`), один PR.
+Второй коммит ветки задачи `feat/billing-core`.
 
 **Конфигурация модуля:** mapping `Billing` в `doctrine.yaml`; `Billing` в
 списке модулей `tests/Architecture/ModuleBoundaryRules.php`. Маршрутов,

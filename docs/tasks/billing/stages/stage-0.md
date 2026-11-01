@@ -15,7 +15,7 @@ Integration / SubscriptionIntegration / UsageCounter / Subscription,
 
 ## Результат
 
-Один PR `refactor/billing-drop-legacy`:
+Коммит в ветке задачи `feat/billing-core`:
 
 1. Удалены `site/src/Billing/` целиком (включая `README.md`, `Fixture/`) и
    `site/tests/Unit/Billing/`.
@@ -54,7 +54,7 @@ Integration / SubscriptionIntegration / UsageCounter / Subscription,
 
 ## Итог
 
-01.11.2026, коммит на ветке `refactor/billing-drop-legacy`.
+01.11.2026, первый коммит ветки `feat/billing-core`.
 
 - Удалено 36 файлов (`src/Billing/`, `tests/Unit/Billing/`), mapping снят.
 - Baseline PHPStan: −28 записей (168 строк), добавленных нет.
