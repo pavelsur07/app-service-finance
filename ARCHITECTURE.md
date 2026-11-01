@@ -1771,9 +1771,9 @@ manage — только владелец. Новые права автомати
   пишет `CompanyTaxProfileWriter::upsert()` (только persist) в транзакции
   `CompanyController::new`. Меняет только владелец компании (`/company/{id}/tax-profile`).
 - Сохранённые операции при смене профиля не пересчитываются.
-- `companies.tax_system` (`Company::$taxSystem`) устарело: не читается и не
-  обновляется, перенесено в начальный профиль; колонка удаляется отдельной
-  миграцией.
+- `companies.tax_system` снято с сущности `Company` (enum `CompanyTaxSystem`
+  удалён): значение перенесено в начальный профиль; колонка удаляется отдельной
+  миграцией после деплоя кода без маппинга.
 - Откат миграции (`DROP TABLE`) возвращает состояние до неё, но теряет периоды,
   сохранённые после деплоя; `tax_system` к тому времени устаревает.
 
@@ -4487,6 +4487,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.107 | 2026-11-01 | Company: `Company::$taxSystem` и `CompanyTaxSystem` удалены (колонка `companies.tax_system` ещё в схеме, удаляется следующей миграцией) |
 | 2.106 | 2026-11-01 | Company: налоговый профиль с историей (`CompanyTaxProfile`, `TaxRegime`, `VatMode`, `CompanyTaxProfileFacadeInterface::taxProfileOn()`); `VatPolicy::decideForCash()` принимает `companyId` и читает профиль на дату операции; `Company.taxSystem` устарело |
 | 2.105 | 2026-11-01 | Cash: общая ставка НДС по дате операции (`VatRates`, 22% с 01.01.2026); `VatPolicy::decideForCash()` принимает дату операции |
 | 2.104 | 2026-11-01 | ai-service: промпт `categorize_transactions/v2` — справочник юрлиц маркетплейсов (Ozon — ООО «Интернет Решения», Wildberries — ООО «РВБ»/«Вайлдберриз», Яндекс Маркет, Мегамаркет — ООО «Маркетплейс»), поступление от них — выручка маркетплейса |

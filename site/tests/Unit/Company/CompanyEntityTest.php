@@ -6,7 +6,6 @@ namespace App\Tests\Unit\Company;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Company\Enum\CompanyTaxSystem;
 use App\Shared\Domain\ValueObject\Money;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -103,24 +102,6 @@ final class CompanyEntityTest extends TestCase
 
         // Then
         self::assertNull($company->getFinanceLockBefore());
-    }
-
-    public function testTaxSystemRoundtrip(): void
-    {
-        // Given
-        $company = CompanyBuilder::aCompany()->build();
-
-        // When
-        $company->setTaxSystem(CompanyTaxSystem::OSNO);
-
-        // Then
-        self::assertSame(CompanyTaxSystem::OSNO, $company->getTaxSystem());
-
-        // When
-        $company->setTaxSystem(null);
-
-        // Then
-        self::assertNull($company->getTaxSystem());
     }
 
     public function testMinimumBalanceDefaultsToZeroRubAndCanBeChanged(): void
