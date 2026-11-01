@@ -8,21 +8,30 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\Company;
 use App\Company\Enum\CompanyTaxSystem;
 
-class VatPolicy
+final readonly class VatPolicy
 {
-    public function decideForCash(Company $company, CashDirection $direction): ?int
+    public function __construct(
+        private VatRates $vatRates,
+    ) {
+    }
+
+    /**
+     * Ставка НДС операции ДДС, %; null — НДС не выделяется.
+     * Общая ставка (ОСНО) берётся на дату операции, пониженные ставки УСН от даты не зависят.
+     */
+    public function decideForCash(Company $company, CashDirection $direction, \DateTimeImmutable $occurredAt): ?int
     {
         $taxSystem = $company->getTaxSystem();
 
-        if (null === $taxSystem) {
+        if (null === $taxSystem || CashDirection::OUTFLOW !== $direction) {
             return null;
         }
 
         return match ($taxSystem) {
             CompanyTaxSystem::USN_NO_VAT => null,
-            CompanyTaxSystem::USN_VAT_5 => CashDirection::OUTFLOW === $direction ? 5 : null,
-            CompanyTaxSystem::USN_VAT_7 => CashDirection::OUTFLOW === $direction ? 7 : null,
-            CompanyTaxSystem::OSNO => CashDirection::OUTFLOW === $direction ? 20 : null,
+            CompanyTaxSystem::USN_VAT_5 => 5,
+            CompanyTaxSystem::USN_VAT_7 => 7,
+            CompanyTaxSystem::OSNO => $this->vatRates->generalRateOn($occurredAt),
         };
     }
 }
