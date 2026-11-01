@@ -1,0 +1,33 @@
+{# Поля CompanyTaxProfileType; варианты НДС фильтруются по выбранному режиму (сочетание проверяет и сервер). #}
+{% set box_id = 'tax-profile-fields-' ~ tax_form.vars.id %}
+{% set col = tax_form.validFrom is defined ? 4 : 6 %}
+<div class="row g-2" id="{{ box_id }}" data-matrix="{{ tax_vat_matrix()|json_encode|e('html_attr') }}">
+    <div class="col-md-{{ col }}">{{ form_row(tax_form.taxRegime) }}</div>
+    <div class="col-md-{{ col }}">{{ form_row(tax_form.vatMode) }}</div>
+    {% if tax_form.validFrom is defined %}
+        <div class="col-md-4">{{ form_row(tax_form.validFrom) }}</div>
+    {% endif %}
+</div>
+{{ form_errors(tax_form) }}
+<script>
+    (function () {
+        const box = document.getElementById('{{ box_id|e('js') }}');
+        const matrix = JSON.parse(box.dataset.matrix);
+        const regime = box.querySelector('[data-tax-regime]');
+        const vat = box.querySelector('[data-vat-mode]');
+        const sync = function () {
+            const allowed = matrix[regime.value] ?? null;
+            for (const option of vat.options) {
+                if (option.value === '') { continue; }
+                const ok = allowed === null || allowed.includes(option.value);
+                option.hidden = !ok;
+                option.disabled = !ok;
+            }
+            if (allowed !== null && !allowed.includes(vat.value)) {
+                vat.value = allowed[0];
+            }
+        };
+        regime.addEventListener('change', sync);
+        sync();
+    })();
+</script>

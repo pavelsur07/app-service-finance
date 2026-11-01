@@ -6,6 +6,7 @@
             <div class="card-header"><b>{{ company is defined ? 'Редактировать' : 'Добавить' }} компанию</b></div>
             <div class="card-body">
                 {{ form_start(form) }}
+                {{ form_errors(form) }}
                 <div class="mb-3">
                     {{ form_label(form.name) }}
                     {{ form_widget(form.name, {'attr': {'class': 'form-control'}}) }}
@@ -19,9 +20,11 @@
                 <div class="mb-3">
                     {{ form_row(form.businessProfile, {help: 'От профиля зависят стартовые статьи ОПиУ и Баланса'}) }}
                 </div>
-                <div class="mb-3">
-                    {{ form_row(form.taxSystem) }}
-                </div>
+                <fieldset class="mb-3">
+                    <legend class="form-label">Налоги</legend>
+                    {% include 'company/_tax_profile_fields.html.twig' with {tax_form: form.taxProfile} %}
+                    <div class="form-hint">Режим можно указать позже и менять с любого месяца в карточке компании.</div>
+                </fieldset>
                 <div class="mb-3">
                     {{ form_row(form.financeLockBefore) }}
                 </div>

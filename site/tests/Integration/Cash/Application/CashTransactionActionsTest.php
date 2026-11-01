@@ -24,8 +24,11 @@ use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
+use App\Company\Enum\TaxRegime;
+use App\Company\Enum\VatMode;
 use App\Finance\Entity\Document;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CompanyTaxProfileBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -184,6 +187,26 @@ final class CashTransactionActionsTest extends IntegrationTestCase
 
         $this->expectException(UniqueConstraintViolationException::class);
         $this->action(AddCashTransactionAction::class)($dto);
+    }
+
+    /**
+     * НДС операции — по налоговому профилю компании на дату операции, а не по текущему режиму.
+     */
+    public function testAddTakesVatFromTaxProfileOnOperationDate(): void
+    {
+        $companyId = (string) $this->company->getId();
+        $profile = CompanyTaxProfileBuilder::aProfile()->forCompany($companyId);
+        $this->em->persist($profile->withId(Uuid::uuid7()->toString())->with(TaxRegime::USN, VatMode::EXEMPT)->build());
+        $this->em->persist($profile->withId(Uuid::uuid7()->toString())->with(TaxRegime::USN, VatMode::USN_5)->validFrom('2024-03-01')->build());
+        $this->em->flush();
+
+        $february = $this->action(AddCashTransactionAction::class)($this->dto('105.00', '2024-02-10'));
+        $march = $this->action(AddCashTransactionAction::class)($this->dto('105.00', '2024-03-05'));
+
+        self::assertNull($february->getVatRatePercent());
+        self::assertNull($february->getVatAmount());
+        self::assertSame(5, $march->getVatRatePercent());
+        self::assertSame('5.00', $march->getVatAmount());
     }
 
     public function testAddPersistsPaymentPlanMatch(): void
