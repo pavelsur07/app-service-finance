@@ -1670,8 +1670,10 @@ manage — только владелец. Новые права автомати
 ### Cash: ставка НДС операции ДДС
 
 - `Cash\Service\Vat\VatPolicy::decideForCash(Company, CashDirection,
-  occurredAt)` — ставка ручной операции ДДС (`AddCashTransactionAction`,
-  `UpdateCashTransactionAction` через `CashTransactionService::applyVat()`),
+  occurredAt)` — ставка операции ДДС, созданной или изменённой через `AddCashTransactionAction`
+  (форма, `CashFacade::createTransaction()`, Telegram) и
+  `UpdateCashTransactionAction` — через `CashTransactionService::applyVat()`;
+  банковский и файловый импорт НДС не выделяют;
   результат пишется в `vatRatePercent`/`vatAmount`. НДС выделяется только из
   расходов; режим берётся из `Company.taxSystem`: УСН без НДС и пустой режим —
   без НДС, УСН 5% / 7% — фиксированная ставка, ОСНО — общая ставка на дату
