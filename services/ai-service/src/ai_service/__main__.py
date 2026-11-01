@@ -203,6 +203,8 @@ def _evals_compare(evals: Path, args: argparse.Namespace) -> int:
         rows.append((model, total))
     print(f"Наборы: {', '.join(s.name for s in sets)}")  # noqa: T201
     print(compare.render(rows, prices))  # noqa: T201
+    print()  # noqa: T201
+    print(compare.render_errors(rows))  # noqa: T201
     return 0
 
 
