@@ -137,6 +137,12 @@ marketplace_ads_controllers:
 admin:
     resource: routes/admin.yaml
 
+billing_admin_controllers:
+    resource:
+        path: ../src/Billing/Controller/Admin/
+        namespace: App\Billing\Controller\Admin
+    type: attribute
+
 marketplace_admin_controllers:
     resource:
         path: ../src/Marketplace/Controller/Admin/

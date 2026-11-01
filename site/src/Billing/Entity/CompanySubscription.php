@@ -66,6 +66,17 @@ class CompanySubscription
         return new self($companyId, $tariff, PaidPeriodCalculator::date($from), null, $now, $id);
     }
 
+    /**
+     * Подписка, назначенная администратором: бессрочный тариф — без даты окончания,
+     * остальные — с явным периодом (договор сопровождения, аутсорсер, ручная правка).
+     */
+    public static function assignNew(string $companyId, Tariff $tariff, \DateTimeImmutable $from, ?\DateTimeImmutable $until, \DateTimeImmutable $now, ?string $id = null): self
+    {
+        [$from, $until] = self::assignedPeriod($tariff, $from, $until);
+
+        return new self($companyId, $tariff, $from, $until, $now, $id);
+    }
+
     private function __construct(
         string $companyId,
         Tariff $tariff,
@@ -128,6 +139,33 @@ class CompanySubscription
         $this->tariff = $tariff;
         $this->paidUntil = $period->until;
         $this->updatedAt = $now;
+    }
+
+    /**
+     * Назначение тарифа администратором поверх текущей подписки.
+     */
+    public function assign(Tariff $tariff, \DateTimeImmutable $from, ?\DateTimeImmutable $until, \DateTimeImmutable $now): void
+    {
+        [$this->paidFrom, $this->paidUntil] = self::assignedPeriod($tariff, $from, $until);
+        $this->tariff = $tariff;
+        $this->updatedAt = $now;
+    }
+
+    /**
+     * @return array{\DateTimeImmutable, ?\DateTimeImmutable}
+     */
+    private static function assignedPeriod(Tariff $tariff, \DateTimeImmutable $from, ?\DateTimeImmutable $until): array
+    {
+        if ($tariff->isPerpetual()) {
+            Assert::null($until, 'У бессрочного тарифа нет даты окончания.');
+
+            return [PaidPeriodCalculator::date($from), null];
+        }
+
+        Assert::notNull($until, 'Для тарифа с периодом нужна дата окончания.');
+        $period = new PaidPeriod($from, $until);
+
+        return [$period->from, $period->until];
     }
 
     public function getId(): string

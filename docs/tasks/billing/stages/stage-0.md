@@ -50,7 +50,7 @@ Integration / SubscriptionIntegration / UsageCounter / Subscription,
 - [x] `make site-cs-check`, `make site-cs-strict-types` — зелёные
 - [x] `make site-test-unit` — зелёный; функциональные тесты админки (`/admin/billing`) и ModuleAccessMap — зелёные
 - [x] `ARCHITECTURE.md` обновлён
-- [ ] после деплоя: `SELECT count(*) FROM information_schema.tables WHERE table_name LIKE 'billing\_%'` = 0
+- [x] после деплоя: `SELECT count(*) FROM information_schema.tables WHERE table_name LIKE 'billing\_%'` = 0
 
 ## Итог
 
@@ -66,4 +66,5 @@ Integration / SubscriptionIntegration / UsageCounter / Subscription,
   относится.
 - PHPStan — No errors; CS и strict_types по изменённым файлам — чисто;
   unit — 4282 OK; Functional/Admin, Company/Security, Architecture — 58 OK.
-- Осталось: сверка на проде после деплоя (последний пункт чек-листа).
+- На проде 01.11.2026 (PR #2853): миграция применена в 20:02 МСК, таблиц
+  старого модуля 0.

@@ -22,6 +22,8 @@ final readonly class RegisterPaymentCommand
         public \DateTimeImmutable $receivedAt,
         public PaymentSource $source,
         public ?string $externalId = null,
+        /** Явное согласие снять бессрочный тариф («Друг») оплатой платного. */
+        public bool $confirmLeavePerpetual = false,
     ) {
     }
 }

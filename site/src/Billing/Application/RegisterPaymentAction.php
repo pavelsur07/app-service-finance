@@ -9,6 +9,8 @@ use App\Billing\Domain\PaidPeriodCalculator;
 use App\Billing\Entity\BillingPayment;
 use App\Billing\Entity\CompanySubscription;
 use App\Billing\Entity\Tariff;
+use App\Billing\Exception\InvalidBillingInputException;
+use App\Billing\Exception\PerpetualTariffChangeNotConfirmedException;
 use App\Billing\Exception\TariffNotPayableException;
 use App\Billing\Repository\BillingPaymentRepository;
 use App\Billing\Repository\CompanySubscriptionRepository;
@@ -28,6 +30,9 @@ use Webmozart\Assert\Assert;
  */
 final class RegisterPaymentAction
 {
+    /** Верхняя граница колонки INT `amount_kopecks`. */
+    public const MAX_AMOUNT_KOPECKS = 2_147_483_647;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly TariffRepository $tariffs,
@@ -47,11 +52,27 @@ final class RegisterPaymentAction
         Assert::uuid($command->paymentId);
         Assert::uuid($command->companyId);
 
-        // Проверка тарифа до транзакции: доменное исключение внутри wrapInTransaction()
+        // Проверки до транзакции: доменное исключение внутри wrapInTransaction()
         // закрыло бы EntityManager вызывающего (HTML-контроллер с flash).
+        if ($command->months < 1 || $command->months > 36) {
+            throw new InvalidBillingInputException('Срок оплаты — от 1 до 36 месяцев.');
+        }
+        if ($command->amountKopecks < 0 || $command->amountKopecks > self::MAX_AMOUNT_KOPECKS) {
+            throw new InvalidBillingInputException('Сумма оплаты — от 0 до 21 474 836,47 ₽.');
+        }
+        if (null !== $command->externalId && ('' === trim($command->externalId) || mb_strlen($command->externalId) > 128)) {
+            throw new InvalidBillingInputException('Номер счёта — от 1 до 128 символов.');
+        }
+
         $tariff = $this->tariffs->findOneByCode($command->tariffCode);
         if (null === $tariff || !$tariff->isActive() || $tariff->isPerpetual()) {
             throw new TariffNotPayableException($command->tariffCode);
+        }
+
+        $current = $this->subscriptions->findOneByCompanyId($command->companyId);
+        if (null !== $current) {
+            $this->assertMayLeavePerpetual($current, $command);
+            $current->renewalBase($tariff, $command->receivedAt); // смена тарифа при действующем периоде — отказ до транзакции
         }
 
         try {
@@ -91,6 +112,8 @@ final class RegisterPaymentAction
             // Сущность могла попасть в identity map до блокировки (например, через Facade) —
             // гидрация её не обновит; без refresh продление считалось бы от устаревшего paidUntil.
             $this->entityManager->refresh($subscription);
+            // Повтор под блокировкой: «Друга» могли назначить между проверкой выше и блокировкой.
+            $this->assertMayLeavePerpetual($subscription, $command);
         }
         $period = $this->calculator->next(
             $subscription?->renewalBase($tariff, $command->receivedAt),
@@ -127,6 +150,13 @@ final class RegisterPaymentAction
         ]);
 
         return $command->paymentId;
+    }
+
+    private function assertMayLeavePerpetual(CompanySubscription $subscription, RegisterPaymentCommand $command): void
+    {
+        if ($subscription->getTariff()->isPerpetual() && !$command->confirmLeavePerpetual) {
+            throw new PerpetualTariffChangeNotConfirmedException($subscription->getTariff()->getName());
+        }
     }
 
     private function concurrentlyRegistered(RegisterPaymentCommand $command): ?string

@@ -10,6 +10,8 @@ use App\Billing\Entity\BillingPayment;
 use App\Billing\Entity\CompanySubscription;
 use App\Billing\Enum\PaymentSource;
 use App\Billing\Enum\TariffCode;
+use App\Billing\Exception\InvalidBillingInputException;
+use App\Billing\Exception\PerpetualTariffChangeNotConfirmedException;
 use App\Billing\Exception\TariffChangeNotSupportedException;
 use App\Billing\Exception\TariffNotPayableException;
 use App\Billing\Repository\TariffRepository;
@@ -120,7 +122,15 @@ final class RegisterPaymentActionTest extends IntegrationTestCase
         $this->em->persist(CompanySubscriptionBuilder::aSubscription()->forCompany(self::COMPANY_ID)->onTariff($friend)->perpetualFrom('2026-11-01')->build());
         $this->em->flush();
 
-        $this->pay(TariffCode::BASE, '2027-01-15 15:00:00', amount: 995000);
+        try {
+            $this->pay(TariffCode::BASE, '2027-01-15 15:00:00', amount: 995000);
+            self::fail('leaving perpetual tariff requires confirmation');
+        } catch (PerpetualTariffChangeNotConfirmedException) {
+        }
+        self::assertSame(0, $this->paymentCount());
+        self::assertTrue($this->em->isOpen(), 'pre-transaction rejection keeps EntityManager open');
+
+        $this->pay(TariffCode::BASE, '2027-01-15 15:00:00', amount: 995000, confirmLeavePerpetual: true);
 
         $subscription = $this->subscription();
         self::assertSame(TariffCode::BASE, $subscription->getTariff()->getCode());
@@ -172,6 +182,41 @@ final class RegisterPaymentActionTest extends IntegrationTestCase
 
         $this->expectException(UniqueConstraintViolationException::class);
         $this->pay(TariffCode::START, '2027-01-15 15:00:00', paymentId: $paymentId);
+    }
+
+    /**
+     * «Друга» назначили между проверкой до транзакции и блокировкой: проверка под блокировкой
+     * (после refresh) не даёт снять бессрочный тариф без подтверждения.
+     */
+    public function testPerpetualAssignedConcurrentlyIsCheckedUnderLock(): void
+    {
+        $this->pay(TariffCode::START, '2027-01-15 15:00:00');
+        $this->em->clear();
+        self::assertNotNull($this->em->getRepository(CompanySubscription::class)->findOneBy(['companyId' => self::COMPANY_ID]));
+
+        // Параллельное назначение «Друга» мимо этого EntityManager.
+        $this->connection->executeStatement(
+            "UPDATE billing_company_subscriptions SET tariff_id = (SELECT id FROM billing_tariffs WHERE code = 'friend'), paid_until = NULL WHERE company_id = ?",
+            [self::COMPANY_ID],
+        );
+
+        try {
+            $this->pay(TariffCode::START, '2027-02-10 11:00:00');
+            self::fail('stale pre-check must be repeated under the lock');
+        } catch (PerpetualTariffChangeNotConfirmedException) {
+        }
+
+        self::assertSame(1, $this->paymentCount());
+    }
+
+    public function testAmountIsLimitedByColumnRange(): void
+    {
+        $max = RegisterPaymentAction::MAX_AMOUNT_KOPECKS;
+        $this->pay(TariffCode::START, '2027-01-15 15:00:00', amount: $max);
+        self::assertSame($max, (int) $this->connection->fetchOne('SELECT amount_kopecks FROM billing_payments WHERE company_id = ?', [self::COMPANY_ID]));
+
+        $this->expectException(InvalidBillingInputException::class);
+        $this->pay(TariffCode::START, '2027-01-15 15:00:00', amount: $max + 1);
     }
 
     /**
@@ -246,6 +291,7 @@ final class RegisterPaymentActionTest extends IntegrationTestCase
         int $amount = 497000,
         ?string $paymentId = null,
         ?string $externalId = null,
+        bool $confirmLeavePerpetual = false,
     ): string {
         return self::getContainer()->get(RegisterPaymentAction::class)(new RegisterPaymentCommand(
             $paymentId ?? Uuid::uuid7()->toString(),
@@ -256,6 +302,7 @@ final class RegisterPaymentActionTest extends IntegrationTestCase
             new \DateTimeImmutable($receivedAt, new \DateTimeZone('Europe/Moscow')),
             PaymentSource::MANUAL_INVOICE,
             $externalId,
+            $confirmLeavePerpetual,
         ));
     }
 

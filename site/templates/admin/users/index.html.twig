@@ -83,6 +83,20 @@
                       {% else %}
                         <span class="status status--neutral"><span class="dot"></span>Участник</span>
                       {% endif %}
+                      {% set access = cabinetAccess[cabinet.id] ?? null %}
+                      {% if access %}
+                        {% set accessCls = { active: 'success', grace: 'warning', read_only: 'danger', none: 'neutral' }[access.status.value] %}
+                        <a href="{{ path('admin_billing_company', { companyId: cabinet.id }) }}" class="status status--{{ accessCls }}" title="Тариф кабинета" data-billing-badge="{{ cabinet.id }}">
+                          <span class="dot"></span>
+                          {%- if access.tariffName is null -%}
+                            Нет тарифа
+                          {%- elseif access.paidUntil is null -%}
+                            {{ access.tariffName }}
+                          {%- else -%}
+                            {{ access.tariffName }} · по {{ access.paidUntil|date('d.m.Y') }}
+                          {%- endif -%}
+                        </a>
+                      {% endif %}
                     </div>
                   {% endfor %}
                 {% else %}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Billing\Entity;
 
+use App\Billing\Repository\TariffPriceRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
@@ -12,7 +13,7 @@ use Webmozart\Assert\Assert;
  * Цена тарифа за срок — готовая сумма, а не процент скидки. Уплаченная сумма
  * фиксируется в оплате, поэтому смена цены прошлые оплаты не меняет.
  */
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: TariffPriceRepository::class)]
 #[ORM\Table(name: 'billing_tariff_prices')]
 #[ORM\UniqueConstraint(name: 'uniq_billing_tariff_prices_tariff_months', columns: ['tariff_id', 'months'])]
 class TariffPrice
