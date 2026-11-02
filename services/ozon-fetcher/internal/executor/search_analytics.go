@@ -11,6 +11,7 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/fetch"
 )
 
 // Поисковая аналитика (ozon-9-search-analytics.md §3).
@@ -72,15 +73,15 @@ func parseSearchCursor(cursor, fp string, chunks int) (searchCursor, error) {
 // ozon.stocks дня исполнения порциями по ozon.MaxSearchSKUs, страницы порции
 // до page_count.
 func (r *taskRun) searchAnalytics(ctx context.Context, creds ozon.Credentials, cabinet connections.Cabinet) error {
-	details := r.task.ResourceType == ResourceSearchDetails
+	details := r.Task.ResourceType == ResourceSearchDetails
 	endpoint := ozon.EndpointSearchQueries
 	if details {
 		endpoint = ozon.EndpointSearchQueriesDetails
 	}
 	loc := r.exec.cfg.Location
-	day, err := time.ParseInLocation(time.DateOnly, r.task.PeriodKey, loc)
+	day, err := time.ParseInLocation(time.DateOnly, r.Task.PeriodKey, loc)
 	if err != nil {
-		return fmt.Errorf("%w: %q", errBadPeriod, r.task.PeriodKey)
+		return fmt.Errorf("%w: %q", errBadPeriod, r.Task.PeriodKey)
 	}
 	now := r.exec.now().In(loc)
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
@@ -102,17 +103,17 @@ func (r *taskRun) searchAnalytics(ctx context.Context, creds ozon.Credentials, c
 
 	at := searchCursor{pageCount: -1}
 	switch {
-	case r.cursor == end:
+	case r.Cursor == end:
 		return nil
-	case r.cursor != "":
-		if at, err = parseSearchCursor(r.cursor, fp, chunks); err != nil {
+	case r.Cursor != "":
+		if at, err = parseSearchCursor(r.Cursor, fp, chunks); err != nil {
 			return err
 		}
-	case len(r.hashes) > 0:
+	case len(r.Hashes) > 0:
 		return errStocksRevised
 	}
 	if len(skus) == 0 {
-		return r.store(ctx, ozon.Page{No: r.nextPage, Body: []byte(emptySearchPage(details)), Cursor: end, ContentType: "application/json"})
+		return r.Store(ctx, ozon.Page{No: r.NextPage, Body: []byte(emptySearchPage(details)), Cursor: end, ContentType: "application/json"})
 	}
 
 	var drift ozon.Drift
@@ -121,7 +122,7 @@ func (r *taskRun) searchAnalytics(ctx context.Context, creds ozon.Credentials, c
 	for chunk := at.chunk; chunk < chunks; chunk++ {
 		part := skus[chunk*ozon.MaxSearchSKUs : min((chunk+1)*ozon.MaxSearchSKUs, len(skus))]
 		page, expected := 0, -1
-		resumed := chunk == at.chunk && r.task.Cursor != ""
+		resumed := chunk == at.chunk && r.Task.Cursor != ""
 		if resumed && at.pageCount > 0 {
 			page, expected = at.page, at.pageCount
 		}
@@ -129,18 +130,18 @@ func (r *taskRun) searchAnalytics(ctx context.Context, creds ozon.Credentials, c
 		// Хеши страниц порции: страницы порции сохраняются подряд, поэтому
 		// после рестарта на странице N это последние N хешей загрузки.
 		seen := map[string]bool{}
-		if resumed && at.page > 0 && at.page <= len(r.hashes) {
-			for _, h := range r.hashes[len(r.hashes)-at.page:] {
+		if resumed && at.page > 0 && at.page <= len(r.Hashes) {
+			for _, h := range r.Hashes[len(r.Hashes)-at.page:] {
 				seen[h] = true
 			}
 		}
 		for {
-			p, stats, err := r.exec.ozon.FetchSearchPage(ctx, creds, r.task.ConnectionRef, details, day, part, page)
+			p, stats, err := r.exec.ozon.FetchSearchPage(ctx, creds, r.Task.ConnectionRef, details, day, part, page)
 			if ozon.IsSearchNoData(err) {
 				if day.Before(today.AddDate(0, 0, -SearchHistoryDays)) {
-					return fmt.Errorf("%w: %s", errHistoryUnavailable, r.task.PeriodKey)
+					return fmt.Errorf("%w: %s", errHistoryUnavailable, r.Task.PeriodKey)
 				}
-				return fmt.Errorf("%w: %s", errSearchNotReady, r.task.PeriodKey)
+				return fmt.Errorf("%w: %s", errSearchNotReady, r.Task.PeriodKey)
 			}
 			if err != nil {
 				return err
@@ -158,7 +159,7 @@ func (r *taskRun) searchAnalytics(ctx context.Context, creds ozon.Credentials, c
 				// Пустая страница до конца выдачи — тихая обрезка.
 				return ozon.InvalidResponse(endpoint, fmt.Sprintf("empty page %d of %d", page, stats.PageCount))
 			}
-			if sum := sha256Hex(p.Body); seen[sum] {
+			if sum := fetch.SHA256Hex(p.Body); seen[sum] {
 				// Повтор страницы: настоящая страница потеряна, хотя число строк сходится.
 				return ozon.InvalidResponse(endpoint, fmt.Sprintf("page %d repeats an earlier page of the chunk", page))
 			} else {
@@ -168,7 +169,7 @@ func (r *taskRun) searchAnalytics(ctx context.Context, creds ozon.Credentials, c
 			chunkRows += stats.Rows
 			total = stats.Total
 			next := page + 1
-			p.No = r.nextPage
+			p.No = r.NextPage
 			switch {
 			case next < stats.PageCount:
 				p.Cursor = fmt.Sprintf("%s:%d:%d:%d", fp, chunk, next, stats.PageCount)
@@ -177,7 +178,7 @@ func (r *taskRun) searchAnalytics(ctx context.Context, creds ozon.Credentials, c
 			default:
 				p.Cursor = end
 			}
-			if err := r.store(ctx, p); err != nil {
+			if err := r.Store(ctx, p); err != nil {
 				return err
 			}
 			pages++
@@ -189,12 +190,12 @@ func (r *taskRun) searchAnalytics(ctx context.Context, creds ozon.Credentials, c
 		rows += chunkRows
 		// Сверка с total — только у порции, прочитанной с первой страницы в этой попытке.
 		if (!resumed || at.page == 0) && total >= 0 && chunkRows != total {
-			r.log.Warn("search analytics: rows differ from total", slog.String("stage", "fetch"),
+			r.Log.Warn("search analytics: rows differ from total", slog.String("stage", "fetch"),
 				slog.Int("chunk", chunk), slog.Int("rows", chunkRows), slog.Int("total", total))
 		}
 	}
-	r.log.Info("search analytics read", slog.String("stage", "fetch"), slog.Int("skus", len(skus)),
-		slog.Int("pages", pages), slog.Int("rows", rows), slog.Bool("continued", r.task.Cursor != ""))
+	r.Log.Info("search analytics read", slog.String("stage", "fetch"), slog.Int("skus", len(skus)),
+		slog.Int("pages", pages), slog.Int("rows", rows), slog.Bool("continued", r.Task.Cursor != ""))
 	return nil
 }
 

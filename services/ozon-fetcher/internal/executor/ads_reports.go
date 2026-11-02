@@ -12,6 +12,7 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonperf"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/fetch"
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
@@ -110,7 +111,7 @@ func (e *Executor) nextAdsWindow(now time.Time) time.Time {
 // adsReports — отчёты по порциям ≤ 10 активных SKU-кампаний; страница = отчёт.
 func (r *taskRun) adsReports(ctx context.Context, creds ozonperf.Credentials, cabinet connections.Cabinet) error {
 	e := r.exec
-	if r.cursor == "" && len(r.hashes) > 0 {
+	if r.Cursor == "" && len(r.Hashes) > 0 {
 		return nil
 	}
 	from, to, err := r.reportRange()
@@ -121,7 +122,7 @@ func (r *taskRun) adsReports(ctx context.Context, creds ozonperf.Credentials, ca
 	if errors.Is(err, errAdsRawInvalid) {
 		// Постоянная ошибка сбросит курсор: заказанный отчёт сначала доводится
 		// до конца, чтобы аккаунт не получил второй отчёт.
-		if saved, ok := parseReportCursor(r.cursor); ok && saved.uuid != "" {
+		if saved, ok := parseReportCursor(r.Cursor); ok && saved.uuid != "" {
 			if retireErr := r.retireReport(ctx, creds, saved); !errors.Is(retireErr, errAdsCampaignsRevised) {
 				return retireErr
 			}
@@ -133,8 +134,8 @@ func (r *taskRun) adsReports(ctx context.Context, creds ozonperf.Credentials, ca
 	}
 	fp := numbersFingerprint(ids)
 	cur := reportCursor{fp: fp}
-	if r.cursor != "" {
-		saved, ok := parseReportCursor(r.cursor)
+	if r.Cursor != "" {
+		saved, ok := parseReportCursor(r.Cursor)
 		if !ok {
 			return errAdsCampaignsRevised
 		}
@@ -146,7 +147,7 @@ func (r *taskRun) adsReports(ctx context.Context, creds ozonperf.Credentials, ca
 		cur = saved
 	}
 	if len(ids) == 0 {
-		return r.store(ctx, ozon.Page{No: r.nextPage, Body: []byte(emptyAdsReportPage), ContentType: "application/json"})
+		return r.Store(ctx, ozon.Page{No: r.NextPage, Body: []byte(emptyAdsReportPage), ContentType: "application/json"})
 	}
 
 	for cur.idx*ozonperf.MaxReportCampaigns < len(ids) {
@@ -165,19 +166,19 @@ func (r *taskRun) adsReports(ctx context.Context, creds ozonperf.Credentials, ca
 		if err != nil {
 			return err
 		}
-		page, err := e.perf.DownloadReport(ctx, creds, r.task.ConnectionRef, cur.uuid, st.Link)
+		page, err := e.perf.DownloadReport(ctx, creds, r.Task.ConnectionRef, cur.uuid, st.Link)
 		if err != nil {
 			return err
 		}
 		next := reportCursor{fp: fp, idx: cur.idx + 1}
-		page.No, page.Cursor = r.nextPage, ""
+		page.No, page.Cursor = r.NextPage, ""
 		if next.idx*ozonperf.MaxReportCampaigns < len(ids) {
 			page.Cursor = next.String()
 		}
-		if err := r.store(ctx, page); err != nil {
+		if err := r.Store(ctx, page); err != nil {
 			return err
 		}
-		r.log.Info("ads report saved", slog.String("stage", "fetch"), slog.Int("batch", cur.idx),
+		r.Log.Info("ads report saved", slog.String("stage", "fetch"), slog.Int("batch", cur.idx),
 			slog.Int("campaigns", len(chunk)), slog.Int("bytes", len(page.Body)), slog.String("content_type", page.ContentType))
 		cur = next
 	}
@@ -220,7 +221,7 @@ func (r *taskRun) expireReservation(ctx context.Context, cur *reportCursor) erro
 	if e.now().Before(until) {
 		return &adsReportWait{at: until, reason: "report order outcome unknown"}
 	}
-	r.log.Warn("ads report order outcome unknown, reservation expired", slog.String("stage", "fetch"), slog.Int("batch", cur.idx))
+	r.Log.Warn("ads report order outcome unknown, reservation expired", slog.String("stage", "fetch"), slog.Int("batch", cur.idx))
 	cur.uuid, cur.orderedAt = "", 0
 	return r.saveCursor(ctx, *cur)
 }
@@ -236,9 +237,9 @@ func (r *taskRun) orderReport(ctx context.Context, creds ozonperf.Credentials, c
 	if now.Before(start) || !now.Before(end) {
 		return &adsReportWait{at: e.nextAdsWindow(now), reason: "outside the order window"}
 	}
-	busy, err := e.tasks.AdsReportInFlight(ctx, r.task.TaskKey)
+	busy, err := e.tasks.AdsReportInFlight(ctx, r.Task.TaskKey)
 	if err != nil {
-		return &storeError{err}
+		return fetch.StoreError(err)
 	}
 	if busy {
 		return errAdsReportBusy
@@ -248,7 +249,7 @@ func (r *taskRun) orderReport(ctx context.Context, creds ozonperf.Credentials, c
 		return err
 	}
 	orderCtx, cancel := context.WithTimeout(ctx, end.Sub(now))
-	id, err := e.perf.OrderReport(orderCtx, creds, r.task.ConnectionRef, chunk, from, to)
+	id, err := e.perf.OrderReport(orderCtx, creds, r.Task.ConnectionRef, chunk, from, to)
 	cancel()
 	if err != nil {
 		var apiErr *ozon.APIError
@@ -274,7 +275,7 @@ func (r *taskRun) orderReport(ctx context.Context, creds ozonperf.Credentials, c
 		default:
 			// Сбой сети, 5xx, 2xx без номера отчёта: Ozon мог принять заказ —
 			// резерв до срока, затем заказ заново.
-			r.log.Warn("ads report order outcome unknown", slog.String("stage", "fetch"), slog.String("error", err.Error()))
+			r.Log.Warn("ads report order outcome unknown", slog.String("stage", "fetch"), slog.String("error", err.Error()))
 			return &adsReportWait{at: time.Unix(cur.orderedAt, 0).Add(e.cfg.AdsReportReservation), reason: "order outcome unknown"}
 		}
 	}
@@ -282,7 +283,7 @@ func (r *taskRun) orderReport(ctx context.Context, creds ozonperf.Credentials, c
 	if err := r.saveCursor(ctx, *cur); err != nil {
 		return err
 	}
-	r.log.Info("ads report ordered", slog.String("stage", "fetch"), slog.Int("batch", cur.idx), slog.Int("campaigns", len(chunk)))
+	r.Log.Info("ads report ordered", slog.String("stage", "fetch"), slog.Int("batch", cur.idx), slog.Int("campaigns", len(chunk)))
 	return nil
 }
 
@@ -291,7 +292,7 @@ func (r *taskRun) awaitReport(ctx context.Context, creds ozonperf.Credentials, c
 	e := r.exec
 	deadline := e.now().Add(e.cfg.AdsReportAttempt)
 	for {
-		st, err := e.perf.ReportStatus(ctx, creds, r.task.ConnectionRef, cur.uuid)
+		st, err := e.perf.ReportStatus(ctx, creds, r.Task.ConnectionRef, cur.uuid)
 		if err != nil {
 			if ctx.Err() != nil {
 				return st, ctx.Err()
@@ -299,7 +300,7 @@ func (r *taskRun) awaitReport(ctx context.Context, creds ozonperf.Credentials, c
 			// Отчёт заказан: любая ошибка опроса (сеть, 5xx, 401, битый ответ)
 			// оставляет UUID — аккаунт занят, опрос повторится; срок «брошен»
 			// проверяется на каждом опросе.
-			r.log.Warn("ads report status failed, UUID kept", slog.String("stage", "fetch"), slog.String("error", err.Error()))
+			r.Log.Warn("ads report status failed, UUID kept", slog.String("stage", "fetch"), slog.String("error", err.Error()))
 			if e.now().Sub(time.Unix(cur.orderedAt, 0)) >= e.cfg.AdsReportAbandon {
 				return st, r.abandonReport(ctx, cur, "status unavailable")
 			}
@@ -310,7 +311,7 @@ func (r *taskRun) awaitReport(ctx context.Context, creds ozonperf.Credentials, c
 			return st, nil
 		case ozonperf.ReportFailed:
 			cur.fails++
-			r.log.Warn("ads report failed at Ozon", slog.String("stage", "fetch"), slog.String("state", st.Raw), slog.Int("failures", cur.fails))
+			r.Log.Warn("ads report failed at Ozon", slog.String("stage", "fetch"), slog.String("state", st.Raw), slog.Int("failures", cur.fails))
 			if cur.fails >= adsReportMaxFailures {
 				return st, errAdsReportFailed
 			}
@@ -336,7 +337,7 @@ func (r *taskRun) awaitReport(ctx context.Context, creds ozonperf.Credentials, c
 // abandonReport — отчёт не готов за AdsReportAbandon: UUID брошен, заказ —
 // в следующем окне (WARNING).
 func (r *taskRun) abandonReport(ctx context.Context, cur *reportCursor, state string) error {
-	r.log.Warn("ads report abandoned: not ready in time", slog.String("stage", "fetch"), slog.String("state", state))
+	r.Log.Warn("ads report abandoned: not ready in time", slog.String("stage", "fetch"), slog.String("state", state))
 	cur.uuid, cur.orderedAt = "", 0
 	if err := r.saveCursor(ctx, *cur); err != nil {
 		return err
@@ -345,23 +346,23 @@ func (r *taskRun) abandonReport(ctx context.Context, cur *reportCursor, state st
 }
 
 func (r *taskRun) saveCursor(ctx context.Context, cur reportCursor) error {
-	if err := r.exec.tasks.SaveCursor(ctx, r.task.TaskKey, r.task.AttemptID, cur.String()); err != nil {
+	if err := r.exec.tasks.SaveCursor(ctx, r.Task.TaskKey, r.Task.AttemptID, cur.String()); err != nil {
 		if errors.Is(err, store.ErrLeaseLost) {
 			return err
 		}
-		return &storeError{err}
+		return fetch.StoreError(err)
 	}
-	r.cursor = cur.String()
+	r.Cursor = cur.String()
 	return nil
 }
 
 // reportRange — дни отчёта: день задачи или хвост до дня прохода.
 func (r *taskRun) reportRange() (time.Time, time.Time, error) {
-	day, err := time.ParseInLocation(time.DateOnly, r.task.PeriodKey, r.exec.cfg.Location)
+	day, err := time.ParseInLocation(time.DateOnly, r.Task.PeriodKey, r.exec.cfg.Location)
 	if err != nil {
-		return time.Time{}, time.Time{}, fmt.Errorf("%w: %q", errBadPeriod, r.task.PeriodKey)
+		return time.Time{}, time.Time{}, fmt.Errorf("%w: %q", errBadPeriod, r.Task.PeriodKey)
 	}
-	if r.task.ResourceType == ResourceAdsStatisticsTail {
+	if r.Task.ResourceType == ResourceAdsStatisticsTail {
 		return day.AddDate(0, 0, -AdsReportTailDays), day.AddDate(0, 0, -1), nil
 	}
 	return day, day, nil
@@ -376,7 +377,7 @@ func (r *taskRun) reportCampaigns(ctx context.Context, cabinet connections.Cabin
 		return nil, errResourceNotEnabled
 	}
 	today := e.now().In(e.cfg.Location).Format(time.DateOnly)
-	content, err := e.tasks.ContentPages(ctx, store.TaskKey{ConnectionRef: r.task.ConnectionRef, ResourceType: ResourceAdsCampaigns, PeriodKey: today})
+	content, err := e.tasks.ContentPages(ctx, store.TaskKey{ConnectionRef: r.Task.ConnectionRef, ResourceType: ResourceAdsCampaigns, PeriodKey: today})
 	if errors.Is(err, store.ErrNoContent) {
 		return nil, errAdsCampaignsNotLoaded
 	}
@@ -384,7 +385,7 @@ func (r *taskRun) reportCampaigns(ctx context.Context, cabinet connections.Cabin
 		return nil, fmt.Errorf("%w: %v", errAdsRawInvalid, err)
 	}
 	if err != nil {
-		return nil, &storeError{err}
+		return nil, fetch.StoreError(err)
 	}
 	var sku []string
 	err = r.readContent(ctx, content, ResourceAdsCampaigns, errAdsRawInvalid, func(body []byte) error {
@@ -405,7 +406,7 @@ func (r *taskRun) reportCampaigns(ctx context.Context, cabinet connections.Cabin
 			out = append(out, id)
 		}
 	}
-	r.log.Info("ads report campaigns", slog.String("stage", "fetch"), slog.Int("sku", len(sku)), slog.Int("active", len(out)))
+	r.Log.Info("ads report campaigns", slog.String("stage", "fetch"), slog.Int("sku", len(sku)), slog.Int("active", len(out)))
 	return out, nil
 }
 
@@ -418,9 +419,9 @@ func (r *taskRun) activeCampaigns(ctx context.Context, cabinet connections.Cabin
 	}
 	active := map[string]bool{}
 	for d := from; !d.After(to); d = d.AddDate(0, 0, 1) {
-		content, err := e.tasks.ContentPages(ctx, store.TaskKey{ConnectionRef: r.task.ConnectionRef, ResourceType: ResourceAdsDaily, PeriodKey: d.Format(time.DateOnly)})
+		content, err := e.tasks.ContentPages(ctx, store.TaskKey{ConnectionRef: r.Task.ConnectionRef, ResourceType: ResourceAdsDaily, PeriodKey: d.Format(time.DateOnly)})
 		if err != nil {
-			r.log.Info("ads report: daily statistics unavailable, all SKU campaigns", slog.String("stage", "fetch"), slog.String("day", d.Format(time.DateOnly)))
+			r.Log.Info("ads report: daily statistics unavailable, all SKU campaigns", slog.String("stage", "fetch"), slog.String("day", d.Format(time.DateOnly)))
 			return nil, false
 		}
 		known := true
@@ -436,7 +437,7 @@ func (r *taskRun) activeCampaigns(ctx context.Context, cabinet connections.Cabin
 			return nil
 		})
 		if readErr != nil || !known {
-			r.log.Info("ads report: daily statistics shape unknown, all SKU campaigns", slog.String("stage", "fetch"), slog.String("day", d.Format(time.DateOnly)))
+			r.Log.Info("ads report: daily statistics shape unknown, all SKU campaigns", slog.String("stage", "fetch"), slog.String("day", d.Format(time.DateOnly)))
 			return nil, false
 		}
 	}

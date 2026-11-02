@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/fetch"
 	"io"
 	"net/http"
 	"net/url"
@@ -27,12 +28,7 @@ const (
 const MaxAccrualPages = 100
 
 // Page — страница ответа: исходные байты без перекодирования.
-type Page struct {
-	No          int    // с 1
-	Body        []byte // как прислал Ozon
-	Cursor      string // курсор следующей страницы; "" — последняя
-	ContentType string
-}
+type Page = fetch.Page
 
 // PageHandler сохраняет страницу до запроса следующей. Ошибка останавливает обход.
 type PageHandler func(Page) error

@@ -5,14 +5,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/executor"
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
 // Контракт ответа — services/_contracts/service-coverage/v1.
 const (
 	coverageSchemaVersion = "1"
-	coverageService       = "ozon-fetcher"
 	// MaxCoverageDays — окно M-2…M занимает до 92 дней.
 	MaxCoverageDays = 93
 )
@@ -36,7 +34,7 @@ type coverageRow struct {
 }
 
 func coverage(w http.ResponseWriter, r *http.Request, d Deps) {
-	if d.Coverage == nil || d.Cabinets == nil {
+	if d.Coverage == nil || d.Expected == nil {
 		writeError(w, http.StatusServiceUnavailable, "ingestion_disabled", "loading is disabled")
 		return
 	}
@@ -53,35 +51,8 @@ func coverage(w http.ResponseWriter, r *http.Request, d Deps) {
 		return
 	}
 
-	// Ресурс ожидается у кабинета, только если есть его ключ: seller-ресурсы —
-	// с ключом Seller API, реклама — с ключом Performance.
-	var refs []string
-	expected := map[string]int{}
-	// cabinets_total — кабинеты с ключом Seller: запасное «ожидается» карты
-	// Symfony для отчётов продаж без строк.
-	sellerCabinets := 0
-	for _, cab := range d.Cabinets() {
-		if cab.Seller == nil && !cab.HasPerformance {
-			continue
-		}
-		if cab.Seller != nil {
-			sellerCabinets++
-		}
-		refs = append(refs, cab.Ref)
-		seen := map[string]bool{}
-		for _, rt := range cab.ResourceTypes {
-			ads := executor.IsAdsResource(rt)
-			if (ads && !cab.HasPerformance) || (!ads && cab.Seller == nil) {
-				continue
-			}
-			if !seen[rt] {
-				seen[rt] = true
-				expected[rt]++
-			}
-		}
-	}
-
-	rows, err := d.Coverage(r.Context(), refs, from.Format(time.DateOnly), to.Format(time.DateOnly))
+	exp := d.Expected()
+	rows, err := d.Coverage(r.Context(), exp.Refs, from.Format(time.DateOnly), to.Format(time.DateOnly))
 	if err != nil {
 		d.Logger.Warn("coverage failed", slog.String("stage", "coverage"), slog.String("error", err.Error()))
 		writeError(w, http.StatusServiceUnavailable, "coverage_unavailable", "coverage is unavailable")
@@ -89,12 +60,12 @@ func coverage(w http.ResponseWriter, r *http.Request, d Deps) {
 	}
 	writeJSON(w, http.StatusOK, coverageResponse{
 		SchemaVersion: coverageSchemaVersion,
-		Service:       coverageService,
+		Service:       d.Service,
 		GeneratedAt:   now.UTC().Format(time.RFC3339),
 		From:          from.Format(time.DateOnly),
 		To:            to.Format(time.DateOnly),
-		CabinetsTotal: sellerCabinets,
-		Rows:          toCoverageRows(rows, expected),
+		CabinetsTotal: exp.Total,
+		Rows:          toCoverageRows(rows, exp.ByResource),
 	})
 }
 

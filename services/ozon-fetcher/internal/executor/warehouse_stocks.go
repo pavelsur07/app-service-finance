@@ -11,6 +11,7 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/fetch"
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
@@ -38,13 +39,13 @@ const warehouseEnd = "end"
 // «отпечаток:end»: повтор после несостоявшейся записи итога сверяет отпечаток
 // со снимком остатков, а не принимает сохранённое молча.
 func (r *taskRun) warehouseStocks(ctx context.Context, creds ozon.Credentials, cabinet connections.Cabinet) error {
-	return r.withinSnapshot(ctx, StocksWindowStart[r.task.ResourceType], func(ctx context.Context) error {
+	return r.withinSnapshot(ctx, StocksWindowStart[r.Task.ResourceType], func(ctx context.Context) error {
 		return r.loadWarehouseStocks(ctx, creds, cabinet)
 	})
 }
 
 func (r *taskRun) loadWarehouseStocks(ctx context.Context, creds ozon.Credentials, cabinet connections.Cabinet) error {
-	skus, err := r.snapshotSKUs(ctx, cabinet, r.task.PeriodKey)
+	skus, err := r.snapshotSKUs(ctx, cabinet, r.Task.PeriodKey)
 	if err != nil {
 		return err
 	}
@@ -58,22 +59,22 @@ func (r *taskRun) loadWarehouseStocks(ctx context.Context, creds ozon.Credential
 
 	start := 0
 	switch {
-	case r.cursor == end:
+	case r.Cursor == end:
 		// Все порции этого набора SKU уже сохранены прежней попыткой.
 		return nil
-	case r.cursor != "":
-		cursorFP, idx, ok := strings.Cut(r.cursor, ":")
+	case r.Cursor != "":
+		cursorFP, idx, ok := strings.Cut(r.Cursor, ":")
 		n, parseErr := strconv.Atoi(idx)
 		if !ok || cursorFP != fp || parseErr != nil || n <= 0 || n >= len(skus) {
 			return errStocksRevised
 		}
 		start = n
-	case len(r.hashes) > 0:
+	case len(r.Hashes) > 0:
 		// Страницы без курсора — не от этого набора SKU.
 		return errStocksRevised
 	}
 	if len(skus) == 0 {
-		return r.store(ctx, ozon.Page{No: r.nextPage, Body: []byte(emptyWarehouseStocksPage), Cursor: end, ContentType: "application/json"})
+		return r.Store(ctx, ozon.Page{No: r.NextPage, Body: []byte(emptyWarehouseStocksPage), Cursor: end, ContentType: "application/json"})
 	}
 	var drift ozon.Drift
 	// И при обрыве попытки: продолжение сохранённую порцию не перечитает.
@@ -81,24 +82,24 @@ func (r *taskRun) loadWarehouseStocks(ctx context.Context, creds ozon.Credential
 	var rows, withRows int
 	for i := start; i < len(skus); i += ozon.MaxWarehouseStocksSKUs {
 		chunk := skus[i:min(i+ozon.MaxWarehouseStocksSKUs, len(skus))]
-		page, stats, err := r.exec.ozon.FetchWarehouseStocks(ctx, creds, r.task.ConnectionRef, chunk)
+		page, stats, err := r.exec.ozon.FetchWarehouseStocks(ctx, creds, r.Task.ConnectionRef, chunk)
 		if err != nil {
 			return err
 		}
 		rows += stats.Rows
 		withRows += stats.SKUs
 		drift.Add(ozon.WarehouseStocksDrift(page.Body))
-		page.No = r.nextPage
+		page.No = r.NextPage
 		page.Cursor = end
 		if next := i + len(chunk); next < len(skus) {
 			page.Cursor = fp + ":" + strconv.Itoa(next)
 		}
-		if err := r.store(ctx, page); err != nil {
+		if err := r.Store(ctx, page); err != nil {
 			return err
 		}
 	}
 	// SKU без строк — товар нигде не лежит; числа — для сверки без чтения raw.
-	r.log.Info("warehouse stocks read", slog.String("stage", "fetch"), slog.Int("skus", len(skus)),
+	r.Log.Info("warehouse stocks read", slog.String("stage", "fetch"), slog.Int("skus", len(skus)),
 		slog.Int("requested", len(skus)-start), slog.Int("skus_with_rows", withRows), slog.Int("rows", rows),
 		slog.Bool("continued", start > 0))
 	return nil
@@ -110,7 +111,7 @@ func (r *taskRun) snapshotSKUs(ctx context.Context, cabinet connections.Cabinet,
 		// Остатки сняты с кабинета — не из чего брать SKU.
 		return nil, errResourceNotEnabled
 	}
-	key := store.TaskKey{ConnectionRef: r.task.ConnectionRef, ResourceType: ResourceStocks, PeriodKey: periodKey}
+	key := store.TaskKey{ConnectionRef: r.Task.ConnectionRef, ResourceType: ResourceStocks, PeriodKey: periodKey}
 	content, err := r.exec.tasks.ContentPages(ctx, key)
 	if errors.Is(err, store.ErrNoContent) {
 		return nil, errStocksNotLoaded
@@ -119,7 +120,7 @@ func (r *taskRun) snapshotSKUs(ctx context.Context, cabinet connections.Cabinet,
 		return nil, fmt.Errorf("%w: %v", errStocksRawInvalid, err)
 	}
 	if err != nil {
-		return nil, &storeError{err}
+		return nil, fetch.StoreError(err)
 	}
 	set := map[int64]bool{}
 	err = r.readContent(ctx, content, ResourceStocks, errStocksRawInvalid, func(body []byte) error {

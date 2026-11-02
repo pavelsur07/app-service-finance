@@ -36,14 +36,14 @@ func isCursorSnapshot(resourceType string) bool {
 // stocks — снимок остатков по cursor до пустой страницы, только в окне снимка
 // дня. Журнал — число товаров и SKU страниц этой попытки для сверки с Symfony.
 func (r *taskRun) stocks(ctx context.Context, creds ozon.Credentials) error {
-	if r.cursor == "" && len(r.hashes) > 0 {
+	if r.Cursor == "" && len(r.Hashes) > 0 {
 		// Все страницы уже сохранены прежней попыткой.
 		return nil
 	}
 	items, total, pages := 0, int64(-1), 0
 	skus := map[int64]bool{}
-	err := r.withinSnapshot(ctx, StocksWindowStart[r.task.ResourceType], func(ctx context.Context) error {
-		return r.exec.ozon.FetchStocks(ctx, creds, r.task.ConnectionRef, r.cursor, r.nextPage, func(p ozon.Page) error {
+	err := r.withinSnapshot(ctx, StocksWindowStart[r.Task.ResourceType], func(ctx context.Context) error {
+		return r.exec.ozon.FetchStocks(ctx, creds, r.Task.ConnectionRef, r.Cursor, r.NextPage, func(p ozon.Page) error {
 			if page, err := ozon.ParseStocksPage(p.Body); err == nil {
 				pages++
 				items += page.Items
@@ -55,18 +55,18 @@ func (r *taskRun) stocks(ctx context.Context, creds ozon.Credentials) error {
 					total = page.Total
 				}
 			}
-			return r.store(ctx, p)
+			return r.Store(ctx, p)
 		})
 	})
 	if err != nil {
 		return err
 	}
-	r.log.Info("stocks snapshot read", slog.String("stage", "fetch"), slog.Int("pages", pages),
+	r.Log.Info("stocks snapshot read", slog.String("stage", "fetch"), slog.Int("pages", pages),
 		slog.Int("items", items), slog.Int("skus", len(skus)), slog.Int64("total", total),
-		slog.Bool("continued", r.task.Cursor != ""))
-	if total >= 0 && r.task.Cursor == "" && int64(items) != total {
+		slog.Bool("continued", r.Task.Cursor != ""))
+	if total >= 0 && r.Task.Cursor == "" && int64(items) != total {
 		// Снимок мог измениться во время обхода — повтор зациклился бы у активного продавца.
-		r.log.Warn("stocks snapshot: items differ from total", slog.String("stage", "fetch"),
+		r.Log.Warn("stocks snapshot: items differ from total", slog.String("stage", "fetch"),
 			slog.Int("items", items), slog.Int64("total", total))
 	}
 	return nil
