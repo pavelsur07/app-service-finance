@@ -78,6 +78,7 @@ jobs:
                       services:
                         - 'services/ozon-fetcher/**'
                         - 'services/shared/fetchkit/**'
+                        - 'services/wb-fetcher/**'
                       # Python-сервис ИИ-задач (docs/tasks/ai, docs/maintenance/ai-service-prod.md).
                       ai_service:
                         - 'services/ai-service/**'
@@ -578,7 +579,7 @@ jobs:
     #   -race требует cgo — образ golang:1.27 (debian), не alpine.
     #   Интеграционные тесты (TEST_DB_DSN, TEST_S3_ENDPOINT) здесь пропускаются.
     services-go:
-        name: 🐹 Go services gates (fetchkit, ozon-fetcher)
+        name: 🐹 Go services gates (fetchkit, ozon-fetcher, wb-fetcher)
         needs: changes
         if: ${{ needs.changes.outputs.services == 'true' }}
         runs-on: ubuntu-latest
@@ -589,20 +590,20 @@ jobs:
             # services/ целиком: модули подключают ../shared/fetchkit через replace.
             - name: 🔍 go vet
               run: |
-                  for m in shared/fetchkit ozon-fetcher; do
+                  for m in shared/fetchkit ozon-fetcher wb-fetcher; do
                     docker run --rm -e GOWORK=off -v "$PWD/services:/services" -w "/services/$m" golang:1.27 go vet ./...
                   done
 
             - name: 🧹 golangci-lint
               run: |
-                  for m in shared/fetchkit ozon-fetcher; do
+                  for m in shared/fetchkit ozon-fetcher wb-fetcher; do
                     docker run --rm -e GOWORK=off -v "$PWD/services:/services" -w "/services/$m" golangci/golangci-lint:v2.14.0-alpine golangci-lint run ./...
                   done
 
             # Ядро первым: в нём гейт «fetchkit не знает о провайдерах» (internal/boundary).
             - name: 🧪 go test -race
               run: |
-                  for m in shared/fetchkit ozon-fetcher; do
+                  for m in shared/fetchkit ozon-fetcher wb-fetcher; do
                     docker run --rm -e GOWORK=off -e CGO_ENABLED=1 -v "$PWD/services:/services" -w "/services/$m" golang:1.27 go test -race ./...
                   done
 

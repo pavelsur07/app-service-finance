@@ -234,6 +234,25 @@ ozon-fetcher-vet:
 ozon-fetcher-lint:
 	$(DOCKER_COMPOSE) --profile services run --rm services-ozon-fetcher-lint run ./...
 
+# wb-fetcher (services/wb-fetcher): финансовые отчёты Wildberries.
+wb-fetcher-build:
+	$(DOCKER_COMPOSE) build services-wb-fetcher
+
+wb-fetcher-up: wb-fetcher-build
+	$(DOCKER_COMPOSE) --profile services up -d services-wb-fetcher
+
+wb-fetcher-test:
+	$(DOCKER_COMPOSE) --profile services run --rm services-wb-fetcher-dev go test -race ./...
+
+wb-fetcher-vet:
+	$(DOCKER_COMPOSE) --profile services run --rm services-wb-fetcher-dev go vet ./...
+
+wb-fetcher-lint:
+	$(DOCKER_COMPOSE) --profile services run --rm services-wb-fetcher-lint run ./...
+
+wb-fetcher-migrate:
+	$(DOCKER_COMPOSE) --profile services run --rm services-wb-fetcher-dev go run ./cmd/wb-fetcher -migrate
+
 # Общее ядро Go-сервисов (services/shared/fetchkit): тулчейн-контейнеры ozon-fetcher.
 fetchkit-test:
 	$(DOCKER_COMPOSE) --profile services run --rm -w /services/shared/fetchkit services-ozon-fetcher-dev go test -race ./...

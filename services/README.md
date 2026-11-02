@@ -17,7 +17,8 @@ source normalization маркетплейсов. Symfony остаётся вла
 | Сервис | Язык | Назначение | Статус |
 |---|---|---|---|
 | [ozon-fetcher](ozon-fetcher/README.md) | Go | Получение финансовых данных Ozon Seller API, публикация source facts | scaffold |
-| [shared/fetchkit](shared/fetchkit/README.md) | Go | Общее ядро загрузчиков маркетплейсов: очередь задач, исполнитель, лимитер, raw в S3, HTTP API | библиотека, в ozon-fetcher |
+| [wb-fetcher](wb-fetcher/README.md) | Go | Финансовые отчёты Wildberries (детальный отчёт о реализации) в raw S3 | этап 2, не в проде |
+| [shared/fetchkit](shared/fetchkit/README.md) | Go | Общее ядро загрузчиков маркетплейсов: очередь задач, исполнитель, лимитер, raw в S3, HTTP API | библиотека, в ozon-fetcher и wb-fetcher |
 | [ai-service](ai-service/README.md) | Python | ИИ-задачи для Symfony: pipeline с проверками, несколько LLM | каркас, не в проде |
 
 ## Запуск (dev)

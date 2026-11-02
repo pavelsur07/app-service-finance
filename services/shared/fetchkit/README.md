@@ -1,7 +1,7 @@
 # fetchkit — ядро загрузчиков маркетплейсов
 
 Go-модуль `services/shared/fetchkit`: общий код сервисов загрузки raw
-(`ozon-fetcher`, далее `wb-fetcher`). Вынесен из ozon-fetcher 02.11.2026
+(`ozon-fetcher`, `wb-fetcher`). Вынесен из ozon-fetcher 02.11.2026
 (`docs/tasks/wb-fetcher-finance/stages/stage-0.md`) без изменения поведения.
 
 Ядро не знает о провайдерах: имена ресурсов, классы ошибок конкретного API,
