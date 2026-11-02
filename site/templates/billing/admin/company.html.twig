@@ -46,6 +46,10 @@
         <div data-billing-next-tariff>
           <div class="form-hint">Запланировано</div>
           <div>С {{ access.nextTariffFrom|date('d.m.Y') }} — тариф «{{ access.nextTariffName }}»</div>
+          <form method="post" action="{{ path('admin_billing_company_cancel_next', { companyId: company.id }) }}" style="margin-top:var(--s-1);" data-billing-cancel-next>
+            <input type="hidden" name="_token" value="{{ csrf_token('billing_cancel_next_' ~ company.id) }}">
+            <button type="submit" class="btn btn-sm btn-secondary" title="До {{ access.paidUntil|date('d.m.Y') }} останется тариф «{{ access.tariffName }}» — дни, оплаченные по цене «{{ access.nextTariffName }}», клиент получит на текущем тарифе. Онлайн-повышение до этой даты — только через вас.">Отменить переход</button>
+          </form>
         </div>
       {% endif %}
       {% if access.daysLeft is not null %}
@@ -85,6 +89,10 @@
           </div>
         </div>
         <div class="form-hint" style="margin-bottom:var(--s-3);">Для бессрочного тарифа дата «По» не учитывается. Назначение снимает запланированный переход.</div>
+        <label class="checkbox-label" style="margin-bottom:var(--s-3);" data-billing-confirm-shorten>
+          <input type="checkbox" class="checkbox" name="confirm_shorten" value="1">
+          <span>Сократить оплаченный период (например, после возврата)</span>
+        </label>
         <button type="submit" class="btn btn-md btn-primary">Назначить</button>
       </form>
     </section>

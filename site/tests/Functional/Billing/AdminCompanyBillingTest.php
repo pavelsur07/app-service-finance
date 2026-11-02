@@ -141,6 +141,41 @@ final class AdminCompanyBillingTest extends WebTestCaseBase
         self::assertSame('2099-02-28', $this->subscription()->getPaidUntil()?->format('Y-m-d'));
     }
 
+    public function testScheduledSwitchCanBeCancelled(): void
+    {
+        $this->testCheaperTariffDuringActivePeriodIsScheduledAndShown();
+
+        $crawler = $this->openPage();
+        $form = $crawler->filter('[data-billing-cancel-next]')->form();
+        $this->client->submit($form);
+        self::assertResponseRedirects($this->url());
+
+        $content = $this->followedContent();
+        self::assertStringContainsString('Запланированный переход отменён', $content);
+        self::assertStringNotContainsString('data-billing-next-tariff', $content);
+        self::assertNull($this->subscription()->getNextTariff());
+    }
+
+    public function testCancelWithoutCsrfIsForbidden(): void
+    {
+        $this->client->loginUser($this->admin, 'admin');
+        $this->client->request('POST', $this->url().'/next-tariff/cancel', ['_token' => 'wrong']);
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testShorteningPaidPeriodNeedsCheckbox(): void
+    {
+        $this->submit('Зачислить оплату', ['tariff' => 'start', 'months' => '1', 'amount' => '4970', 'received_on' => '2027-01-15']);
+
+        $this->submit('Назначить', ['tariff' => 'start', 'from' => '2027-01-15', 'until' => '2027-01-31']);
+        self::assertStringContainsString('отметьте «Сократить оплаченный период»', $this->followedContent());
+        self::assertSame('2027-02-14', $this->subscription()->getPaidUntil()?->format('Y-m-d'));
+
+        $this->submit('Назначить', ['tariff' => 'start', 'from' => '2027-01-15', 'until' => '2027-01-31', 'confirm_shorten' => true]);
+        self::assertSame('2027-01-31', $this->subscription()->getPaidUntil()?->format('Y-m-d'));
+    }
+
     public function testHiddenTariffDuringActivePeriodShowsError(): void
     {
         $start = static::getContainer()->get(TariffRepository::class)->findOneByCode(TariffCode::START);

@@ -90,6 +90,20 @@ final class BillingPaymentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Последний оплаченный день кабинета по журналу: максимум «по» среди оплат, остаток которых не
+     * перенесён в повышение (их дни уже в оплате повышения); null — таких оплат нет.
+     */
+    public function findLatestPaidUntil(string $companyId): ?\DateTimeImmutable
+    {
+        $value = $this->getEntityManager()->getConnection()->fetchOne(
+            'SELECT MAX(period_until) FROM billing_payments WHERE company_id = :companyId AND superseded_by_payment_id IS NULL',
+            ['companyId' => $companyId],
+        );
+
+        return \is_string($value) ? PaidPeriodCalculator::date(new \DateTimeImmutable($value)) : null;
+    }
+
+    /**
      * История оплат кабинета для Pagerfanta: новые сверху.
      */
     public function createByCompanyQueryBuilder(string $companyId): QueryBuilder
