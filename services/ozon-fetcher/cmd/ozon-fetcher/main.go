@@ -15,8 +15,9 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/app"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/config"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/httpapi"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonstore"
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/observability"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
 // service — имя сервиса в логах и тег в GlitchTip.
@@ -57,7 +58,7 @@ func run(setFlush func(func())) error {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		return store.Migrate(ctx, cfg.DBDSN)
+		return ozonstore.Migrate(ctx, cfg.DBDSN)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

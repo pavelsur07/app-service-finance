@@ -13,22 +13,43 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store/storetest"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store/storetest"
 )
 
 // Интеграционные тесты: TEST_DB_DSN — отдельная пустая БД; каждый тест
 // начинает с чистых таблиц. Без переменной — пропуск.
 func testTasks(t *testing.T) *Tasks {
 	t.Helper()
+	return testTasksWith(t, Options{})
+}
+
+// adsPrefix — отдельный слот в тестах (как реклама ozon-fetcher).
+const adsPrefix = "ozon.ads."
+
+// testTasksSeparateSlot — очередь с отдельным слотом adsPrefix: индекс
+// running-задач — как в миграции 00006 ozon-fetcher.
+func testTasksSeparateSlot(t *testing.T) *Tasks {
+	t.Helper()
+	tasks := testTasksWith(t, Options{SeparateSlotPrefix: adsPrefix})
+	_, err := tasks.pool.Exec(context.Background(), `
+		DROP INDEX IF EXISTS fetch_task_one_running_per_connection;
+		CREATE UNIQUE INDEX IF NOT EXISTS fetch_task_one_running_per_connection_family
+		    ON fetch_task (connection_ref, (resource_type LIKE 'ozon.ads.%')) WHERE status = 'running'`)
+	require.NoError(t, err)
+	return tasks
+}
+
+func testTasksWith(t *testing.T, opts Options) *Tasks {
+	t.Helper()
 	dsn := storetest.DSN(t, "store")
 	ctx := context.Background()
-	require.NoError(t, Migrate(ctx, dsn))
+	require.NoError(t, Migrate(ctx, dsn, CoreMigrations(), "migrations"))
 	pool, err := Open(ctx, dsn, PoolSize(4))
 	require.NoError(t, err)
 	t.Cleanup(pool.Close)
 	_, err = pool.Exec(ctx, `TRUNCATE raw_object, fetch_attempt, fetch_task, connection_state, connection_limit, resource_stop, planner_run`)
 	require.NoError(t, err)
-	return NewTasks(pool)
+	return NewTasks(pool, opts)
 }
 
 var t0 = time.Date(2026, 10, 17, 9, 0, 0, 0, time.UTC)
@@ -804,29 +825,6 @@ func TestCoverageCountsActiveCabinetsWithinWindow(t *testing.T) {
 	assert.Empty(t, empty)
 }
 
-func TestMigrationLowersAccrualPostingsPriority(t *testing.T) {
-	tasks := testTasks(t)
-	ctx := context.Background()
-	accrual := spec("a", "ozon.finance.accrual-postings", "2026-10-20", 5)
-	orders := spec("a", "ozon.orders.fbo", "2026-10-20", 5)
-	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{accrual, orders}))
-
-	up, err := migrationsFS.ReadFile("migrations/00005_accrual_postings_priority.sql")
-	require.NoError(t, err)
-	body, _, _ := strings.Cut(string(up), "-- +goose Down")
-	_, err = tasks.pool.Exec(ctx, body)
-	require.NoError(t, err)
-
-	priority := func(s TaskSpec) int {
-		var p int
-		require.NoError(t, tasks.pool.QueryRow(ctx, `SELECT priority FROM fetch_task WHERE connection_ref=$1 AND resource_type=$2 AND period_key=$3`,
-			s.ConnectionRef, s.ResourceType, s.PeriodKey).Scan(&p))
-		return p
-	}
-	assert.Equal(t, 1, priority(accrual))
-	assert.Equal(t, 5, priority(orders), "другие ресурсы не трогаются")
-}
-
 func TestRateLimitedTaskYieldsToReadyTaskOfSamePriority(t *testing.T) {
 	tasks := testTasks(t)
 	ctx := context.Background()
@@ -841,7 +839,7 @@ func TestRateLimitedTaskYieldsToReadyTaskOfSamePriority(t *testing.T) {
 }
 
 func TestAdsAndSellerTasksOfCabinetRunInParallel(t *testing.T) {
-	tasks := testTasks(t)
+	tasks := testTasksSeparateSlot(t)
 	ctx := context.Background()
 	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{
 		spec("a", "ozon.finance.accrual-by-day", "2026-10-20", 5),
@@ -870,7 +868,7 @@ func TestAdsAndSellerTasksOfCabinetRunInParallel(t *testing.T) {
 }
 
 func TestSellerSuspensionDoesNotStopAds(t *testing.T) {
-	tasks := testTasks(t)
+	tasks := testTasksSeparateSlot(t)
 	ctx := context.Background()
 	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{
 		spec("a", "ozon.finance.accrual-by-day", "2026-10-20", 5),
@@ -885,44 +883,41 @@ func TestSellerSuspensionDoesNotStopAds(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNoTask, "seller на паузе")
 }
 
-func TestSaveCursorAndAdsReportInFlight(t *testing.T) {
+func TestWithoutSeparateSlotCabinetRunsOneTaskAndSuspensionStopsAll(t *testing.T) {
 	tasks := testTasks(t)
 	ctx := context.Background()
-	daily := spec("a", "ozon.ads.statistics", "2026-10-21", 5)
-	tail := spec("a", "ozon.ads.statistics.tail", "2026-10-22", 5)
-	other := spec("b", "ozon.ads.statistics", "2026-10-21", 5)
-	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{daily, tail, other}))
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{
+		spec("a", "wb.finance.sales-report.daily", "2026-10-20", 5),
+		spec("a", "wb.finance.sales-report.weekly", "2026-W43", 5),
+		spec("a", "ozon.ads.expense", "2026-10-20", 5),
+	}))
 
-	busy, err := tasks.AdsReportInFlight(ctx, tail.TaskKey)
+	_, err := claim(t, tasks, []string{"a"}, t0)
 	require.NoError(t, err)
-	assert.False(t, busy)
+	_, err = claim(t, tasks, []string{"a"}, t0)
+	assert.ErrorIs(t, err, ErrNoTask, "без отдельного слота — одна задача кабинета, какой бы ни был ресурс")
+
+	require.NoError(t, tasks.SuspendConnection(ctx, "b", "auth", t0.Add(time.Hour)))
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{spec("b", "ozon.ads.expense", "2026-10-20", 5)}))
+	_, err = claim(t, tasks, []string{"b"}, t0)
+	assert.ErrorIs(t, err, ErrNoTask, "пауза кабинета останавливает все ресурсы")
+}
+
+func TestSaveCursorKeepsCursorOfOwnAttemptOnly(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	daily := spec("a", "x.report", "2026-10-21", 5)
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{daily}))
 
 	got, err := claim(t, tasks, []string{"a"}, t0)
 	require.NoError(t, err)
 	require.NoError(t, tasks.SaveCursor(ctx, got.TaskKey, got.AttemptID, "fp:0:uuid-1:1700000000:0"))
 	assert.ErrorIs(t, tasks.SaveCursor(ctx, got.TaskKey, newAttemptID(), "x"), ErrLeaseLost)
 
-	otherKey := tail.TaskKey
-	if got.TaskKey == tail.TaskKey {
-		otherKey = daily.TaskKey
-	}
-	busy, err = tasks.AdsReportInFlight(ctx, otherKey)
-	require.NoError(t, err)
-	assert.True(t, busy, "отчёт другой задачи кабинета заказан")
-	busy, err = tasks.AdsReportInFlight(ctx, got.TaskKey)
-	require.NoError(t, err)
-	assert.False(t, busy, "своя задача не мешает")
-	busy, err = tasks.AdsReportInFlight(ctx, other.TaskKey)
-	require.NoError(t, err)
-	assert.False(t, busy, "другой кабинет не мешает")
-
-	// Освобождение с курсором (отчёт ещё не готов) — UUID сохраняется.
+	// Освобождение с курсором — курсор сохраняется до следующей попытки.
 	_, err = tasks.FinishTask(ctx, got.TaskKey, got.AttemptID, Outcome{Status: StatusPending, Label: "report_pending", KeepCursor: true, NextRunAt: t0}, t0)
 	require.NoError(t, err)
 	again, err := claim(t, tasks, []string{"a"}, t0)
 	require.NoError(t, err)
-	if again.TaskKey == got.TaskKey {
-		assert.Equal(t, "fp:0:uuid-1:1700000000:0", again.Cursor)
-	}
-	require.NoError(t, tasks.SaveCursor(ctx, again.TaskKey, again.AttemptID, "fp:1::0:0"))
+	assert.Equal(t, "fp:0:uuid-1:1700000000:0", again.Cursor)
 }

@@ -14,13 +14,14 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/executor"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store/storetest"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonstore"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store/storetest"
 )
 
 // storeRunner завершает задачу в настоящей БД и следит, чтобы кабинет не вёлся дважды.
 type storeRunner struct {
-	tasks    *store.Tasks
+	tasks    *ozonstore.Tasks
 	delay    map[string]time.Duration
 	mu       sync.Mutex
 	active   map[string]int
@@ -59,13 +60,13 @@ func (r *storeRunner) Run(ctx context.Context, task store.Task, _ connections.Ca
 func TestTwoDispatchersOnOneDatabase(t *testing.T) {
 	dsn := storetest.DSN(t, "dispatcher")
 	ctx := context.Background()
-	require.NoError(t, store.Migrate(ctx, dsn))
+	require.NoError(t, ozonstore.Migrate(ctx, dsn))
 	pool, err := store.Open(ctx, dsn, store.PoolSize(4))
 	require.NoError(t, err)
 	t.Cleanup(pool.Close) // Cleanup — LIFO: пул закроется после остановки диспетчеров
 	_, err = pool.Exec(ctx, `TRUNCATE raw_object, fetch_attempt, fetch_task, connection_state, connection_limit, resource_stop`)
 	require.NoError(t, err)
-	tasks := store.NewTasks(pool)
+	tasks := ozonstore.NewTasks(pool)
 
 	refs := []string{"cab-a", "cab-b", "cab-slow"}
 	var specs []store.TaskSpec

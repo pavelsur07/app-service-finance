@@ -18,16 +18,17 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/executor"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonperf"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonstore"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/planner"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ratelimit"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/rawstore"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
 // Ingestion — запущенная цепочка; Wait возвращается после остановки всех частей.
 type Ingestion struct {
 	Cabinets *connections.Cache
-	Tasks    *store.Tasks
+	Tasks    *ozonstore.Tasks
 	Raw      *rawstore.Store
 	Location *time.Location
 	wg       sync.WaitGroup
@@ -42,7 +43,7 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 	if err != nil {
 		return nil, fmt.Errorf("app: load Europe/Moscow: %w", err)
 	}
-	tasks := store.NewTasks(pool)
+	tasks := ozonstore.NewTasks(pool)
 	now := time.Now
 
 	cabinets := connections.NewCache(

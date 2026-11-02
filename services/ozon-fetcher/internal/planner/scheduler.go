@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
 // TaskStore — постановка задач.

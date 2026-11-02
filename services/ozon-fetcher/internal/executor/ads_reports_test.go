@@ -14,7 +14,7 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonperf"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
 // reportFake — заказ, статус и скачивание отчётов.

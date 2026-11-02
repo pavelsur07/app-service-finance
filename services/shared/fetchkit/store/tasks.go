@@ -57,16 +57,30 @@ type Task struct {
 	LeaseUntil     time.Time
 }
 
+// Options — особенности очереди сервиса.
+type Options struct {
+	// SeparateSlotPrefix — ресурсы с этим префиксом идут отдельным слотом
+	// кабинета и не стоят на паузе ключа основного API (у них свой ключ):
+	// например, реклама со своим ключом. Пусто — у кабинета один слот на все
+	// ресурсы. Префикс должен совпадать с выражением уникального индекса
+	// running-задач в миграциях сервиса.
+	SeparateSlotPrefix string
+}
+
 // Tasks — очередь fetch_task.
 type Tasks struct {
 	pool *Pool
+	opts Options
 }
 
-func NewTasks(pool *Pool) *Tasks { return &Tasks{pool: pool} }
+func NewTasks(pool *Pool, opts Options) *Tasks { return &Tasks{pool: pool, opts: opts} }
+
+// Pool — пул БД для запросов сервиса к своим ресурсам поверх общей схемы.
+func (t *Tasks) Pool() *Pool { return t.pool }
 
 // Upsert ставит задачу идемпотентно: running не трогает, приоритет —
 // максимум, done и failed_permanent переводит в pending только при Refresh
-// (плановая перезагрузка повторяет и задачи, упавшие на ответе Ozon). Refresh
+// (плановая перезагрузка повторяет и задачи, упавшие на ответе источника). Refresh
 // задачи с незавершённой загрузкой откладывается до её итога (refresh_pending).
 func (t *Tasks) Upsert(ctx context.Context, specs []TaskSpec) error {
 	if len(specs) == 0 {
@@ -163,16 +177,16 @@ func (t *Tasks) ClaimNext(ctx context.Context, connectionRefs []string, owner, a
 		WHERE t.status IN ('pending', 'not_ready', 'failed_retryable')
 		  AND t.next_run_at <= $2
 		  AND t.connection_ref = ANY($1)
-		  -- Пауза кабинета — по отказу ключа seller; у рекламы свой ключ (00006).
-		  AND (t.resource_type LIKE 'ozon.ads.%' OR cs.suspended_until IS NULL OR cs.suspended_until <= $2)
-		  -- Одна running-задача на (кабинет, семейство API): индекс 00006.
+		  -- Пауза кабинета — по отказу ключа основного API; у отдельного слота свой ключ.
+		  AND (($3 <> '' AND starts_with(t.resource_type, $3)) OR cs.suspended_until IS NULL OR cs.suspended_until <= $2)
+		  -- Одна running-задача на (кабинет, слот): уникальный индекс в миграциях сервиса.
 		  AND NOT EXISTS (SELECT 1 FROM fetch_task r WHERE r.connection_ref = t.connection_ref AND r.status = 'running'
-		                  AND (r.resource_type LIKE 'ozon.ads.%') = (t.resource_type LIKE 'ozon.ads.%'))
+		                  AND ($3 <> '' AND starts_with(r.resource_type, $3)) = ($3 <> '' AND starts_with(t.resource_type, $3)))
 		  AND NOT EXISTS (SELECT 1 FROM resource_stop s WHERE s.resource_type = t.resource_type)
 		ORDER BY t.priority DESC, cs.last_served_at ASC NULLS FIRST, t.next_run_at ASC
 		LIMIT 1
 		FOR UPDATE OF t SKIP LOCKED`,
-		connectionRefs, now,
+		connectionRefs, now, t.opts.SeparateSlotPrefix,
 	).Scan(&task.ConnectionRef, &task.ResourceType, &task.PeriodKey, &task.Attempts,
 		&task.Cursor, &task.NextPageNo, &pageHashes, &task.ContentHash, &task.Revision, &task.LastErrorClass)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -509,21 +523,4 @@ func (t *Tasks) SaveCursor(ctx context.Context, key TaskKey, attemptID, cursor s
 		return ErrLeaseLost
 	}
 	return nil
-}
-
-// AdsReportInFlight — у кабинета есть другая незавершённая задача отчётов
-// рекламы с заказанным отчётом (третье поле курсора «отпечаток:порция:UUID:…»):
-// у аккаунта Performance — не больше одного отчёта одновременно.
-func (t *Tasks) AdsReportInFlight(ctx context.Context, except TaskKey) (bool, error) {
-	var found bool
-	err := t.pool.QueryRow(ctx, `
-		SELECT EXISTS (SELECT 1 FROM fetch_task
-			WHERE connection_ref = $1 AND resource_type LIKE 'ozon.ads.statistics%'
-			  AND NOT (resource_type = $2 AND period_key = $3)
-			  AND status <> 'done' AND split_part(COALESCE(cursor, ''), ':', 3) <> '')`,
-		except.ConnectionRef, except.ResourceType, except.PeriodKey).Scan(&found)
-	if err != nil {
-		return false, fmt.Errorf("store: ads report in flight: %w", err)
-	}
-	return found, nil
 }
