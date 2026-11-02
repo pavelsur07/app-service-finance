@@ -143,6 +143,12 @@ billing_admin_controllers:
         namespace: App\Billing\Controller\Admin
     type: attribute
 
+billing_client_controllers:
+    resource:
+        path: ../src/Billing/Controller/Client/
+        namespace: App\Billing\Controller\Client
+    type: attribute
+
 marketplace_admin_controllers:
     resource:
         path: ../src/Marketplace/Controller/Admin/

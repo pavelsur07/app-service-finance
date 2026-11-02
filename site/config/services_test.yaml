@@ -79,6 +79,9 @@ services:
     App\Billing\Application\AssignTariffAction:
         public: true
 
+    App\Billing\Application\StartTrialAction:
+        public: true
+
     App\Billing\Facade\BillingFacadeInterface:
         alias: App\Billing\Facade\BillingFacade
         public: true

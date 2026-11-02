@@ -40,6 +40,10 @@ class CompanySubscription
     #[ORM\Column(name: 'paid_until', type: 'date_immutable', nullable: true)]
     private ?\DateTimeImmutable $paidUntil;
 
+    /** Пробный период: тариф без оплаты до `paidUntil`; снимается оплатой или назначением тарифа. */
+    #[ORM\Column(name: 'is_trial', type: 'boolean', options: ['default' => false])]
+    private bool $trial = false;
+
     #[ORM\Column(name: 'created_at', type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -54,6 +58,19 @@ class CompanySubscription
         Assert::false($tariff->isPerpetual(), 'Бессрочный тариф не оплачивается за период.');
 
         return new self($companyId, $tariff, $period->from, $period->until, $now, $id);
+    }
+
+    /**
+     * Пробный период нового кабинета: платный тариф без оплаты на заданный срок.
+     */
+    public static function startTrial(string $companyId, Tariff $tariff, PaidPeriod $period, \DateTimeImmutable $now, ?string $id = null): self
+    {
+        Assert::false($tariff->isPerpetual(), 'Пробный период — только на тарифе с датой окончания.');
+
+        $subscription = new self($companyId, $tariff, $period->from, $period->until, $now, $id);
+        $subscription->trial = true;
+
+        return $subscription;
     }
 
     /**
@@ -102,6 +119,7 @@ class CompanySubscription
     /**
      * «Оплачено по», от которого продолжается новая оплата этого тарифа; null — новый период
      * начинается с дня зачисления (подписка истекла или тариф меняется с бессрочного/истёкшего).
+     * Во время пробного периода любой платный тариф продолжает от его конца: дни пробного не сгорают.
      *
      * @throws TariffChangeNotSupportedException смена тарифа при действующем платном периоде
      */
@@ -112,7 +130,7 @@ class CompanySubscription
         }
 
         $active = PaidPeriodCalculator::date($this->paidUntil) >= PaidPeriodCalculator::day($receivedAt);
-        if ($tariff->getId() === $this->tariff->getId()) {
+        if ($this->trial || $tariff->getId() === $this->tariff->getId()) {
             return $active ? $this->paidUntil : null;
         }
         if ($active) {
@@ -124,12 +142,14 @@ class CompanySubscription
 
     /**
      * Применяет оплаченный период: продолжение текущего отрезка или новый отрезок.
+     * Первая оплата после пробного периода начинает оплаченный отрезок и снимает признак пробного.
      */
     public function applyPaidPeriod(Tariff $tariff, PaidPeriod $period, \DateTimeImmutable $now): void
     {
         Assert::false($tariff->isPerpetual(), 'Бессрочный тариф не оплачивается за период.');
 
-        $continues = null !== $this->paidUntil
+        $continues = !$this->trial
+            && null !== $this->paidUntil
             && $tariff->getId() === $this->tariff->getId()
             && $period->from->format('Y-m-d') === $this->paidUntil->modify('+1 day')->format('Y-m-d');
 
@@ -138,6 +158,7 @@ class CompanySubscription
         }
         $this->tariff = $tariff;
         $this->paidUntil = $period->until;
+        $this->trial = false;
         $this->updatedAt = $now;
     }
 
@@ -148,6 +169,7 @@ class CompanySubscription
     {
         [$this->paidFrom, $this->paidUntil] = self::assignedPeriod($tariff, $from, $until);
         $this->tariff = $tariff;
+        $this->trial = false;
         $this->updatedAt = $now;
     }
 
@@ -191,6 +213,11 @@ class CompanySubscription
     public function getPaidUntil(): ?\DateTimeImmutable
     {
         return $this->paidUntil;
+    }
+
+    public function isTrial(): bool
+    {
+        return $this->trial;
     }
 
     public function getUpdatedAt(): \DateTimeImmutable

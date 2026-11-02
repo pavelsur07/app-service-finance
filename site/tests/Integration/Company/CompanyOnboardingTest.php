@@ -30,6 +30,7 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         'pl_categories' => 72,
         'balance_articles' => 33,
         'balance_accounts' => 'ACC_MAIN_BANK, ACC_MAIN_REGISTER',
+        'billing' => 'base:true:14',
     ];
 
     public function testRegistrationCreatesFullSetup(): void
@@ -127,6 +128,8 @@ final class CompanyOnboardingTest extends IntegrationTestCase
             'pl_categories' => (int) $this->connection->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [$companyId]),
             'balance_articles' => (int) $this->connection->fetchOne('SELECT COUNT(*) FROM balance_articles WHERE company_id = ?', [$companyId]),
             'balance_accounts' => $list('SELECT code FROM balance_accounts WHERE company_id = ? ORDER BY code'),
+            // Пробный период: тариф, признак, длина в днях.
+            'billing' => $list("SELECT t.code || ':' || s.is_trial || ':' || (s.paid_until - s.paid_from + 1) FROM billing_company_subscriptions s JOIN billing_tariffs t ON t.id = s.tariff_id WHERE s.company_id = ?"),
         ];
     }
 }

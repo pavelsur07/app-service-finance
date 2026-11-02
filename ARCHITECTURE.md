@@ -1779,9 +1779,10 @@ manage — только владелец. Новые права автомати
 
 ### Billing: тарифы и оплаченный период (`billing_*`)
 
-План задачи — `docs/tasks/billing/TASK.md`. Есть ядро и админка (этапы 1–2);
-страницы клиента, пробного периода и ограничения доступа нет. Всем кабинетам,
-существовавшим на 01.11.2026, назначен «Друг» (`Version20261101230000`).
+План задачи — `docs/tasks/billing/TASK.md`. Есть ядро, админка, страница
+клиента, пробный период и напоминания (этапы 1–3); ограничения доступа нет.
+Всем кабинетам, существовавшим на 01.11.2026, назначен «Друг»
+(`Version20261101230000`).
 
 - `Tariff` (`billing_tariffs`): `TariffCode` (`start`, `base`, `pro` —
   публичные; `friend`, `support`, `outsourcer` — скрытые), `isPublic`,
@@ -1791,7 +1792,9 @@ manage — только владелец. Новые права автомати
   мес готовой суммой в копейках; unique `(tariff_id, months)`.
 - `CompanySubscription` (`billing_company_subscriptions`): одна на компанию
   (unique `company_id`); `paidFrom` — начало непрерывно оплаченного отрезка,
-  `paidUntil` — «оплачено по» включительно, `NULL` у бессрочного тарифа.
+  `paidUntil` — «оплачено по» включительно, `NULL` у бессрочного тарифа;
+  `isTrial` — пробный период (всегда с `paidUntil`, CHECK), снимается первой
+  оплатой и назначением тарифа.
 - `BillingPayment` (`billing_payments`): неизменяемый журнал; `id` — ключ
   повтора от вызывающего; unique `(source, external_id)`; уплаченная сумма,
   срок и период фиксируются в записи.
@@ -1799,18 +1802,42 @@ manage — только владелец. Новые права автомати
   оплата до окончания продолжает с `paidUntil + 1`, после — с дня зачисления;
   конец = начало + N мес − 1 день, нет числа в целевом месяце — его последний
   день. Даты-колонки читаются по `Y-m-d` без перевода зоны.
+- Пробный период — `StartTrialAction` (`TRIAL_TARIFF` = «База»,
+  `TRIAL_DAYS` = 14, считая день начала по Москве): listener
+  `CompanyCreatedEvent` и `CompanyOnboardingBackfillEvent` (пункт
+  `billing_trial`). Не точка входа: только `persist()` под той же
+  advisory-блокировкой, коммитит транзакция создания компании или backfill;
+  подписка есть — ничего. Оплата во время пробного — любой платный тариф,
+  период от конца пробного (`renewalBase`), оплаченный отрезок начинается
+  после него.
 - Статус — `SubscriptionAccessPolicy` (не хранится): `active` (оплачено или
   бессрочный) → `grace` (`GRACE_DAYS` = 5 после `paidUntil`) → `read_only`;
   `none` — подписки нет.
 - `BillingFacadeInterface::accessFor(string $companyId, DateTimeImmutable
   $now): BillingAccessDTO` — статус, код и название тарифа, `paidUntil`, дней
-  до окончания; `accessForCompanies(list<string> $companyIds, $now):
+  до окончания, `trial`; `accessForCompanies(list<string> $companyIds, $now):
   array<string, BillingAccessDTO>` — то же для списка кабинетов одним запросом
   (страница «Пользователи» в админке).
 - Админка: `/admin/billing/companies/{companyId}` (`src/Billing/Controller/Admin/`,
   exempt в `ModuleAccessMap`, гейт — firewall `admin` + `ROLE_ADMIN`) — тариф,
   статус, назначение тарифа, отметка оплаты по счёту, история оплат; плашка
   тарифа со ссылкой — в строке кабинета на `/admin/users`.
+- Клиент: `/company/price` (`company_price_index`,
+  `src/Billing/Controller/Client/`, exempt в `ModuleAccessMap` — любому
+  участнику) — тариф и статус, цены публичных тарифов за 1/3/6/12 мес, «как
+  оплатить» (`APP_MAIL_REPLY_TO`); история оплат — только владельцу.
+  Баннер `billing/_partials/expiry_notice.html.twig` в обоих layout'ах через
+  Twig-функцию `billing_notice()` (`ExpiryNotice`): за 7 дней до конца
+  периода или пробного, в льготные дни и в «только чтение».
+- Напоминания: `app:billing:expiry-reminders` (cron 10:00) →
+  `ScheduleExpiryRemindersAction`: оплаченный период — за 7/3/1/0 дней,
+  пробный — за 3/0. Строка `billing_expiry_reminders` (unique `(company_id,
+  paid_until, days_before)`) пишется до постановки письма — повтор прогона
+  писем не дублирует, сбой постановки теряет одно письмо (ERROR).
+  `SendBillingExpiryReminderMessage` → `async_sync`; handler шлёт владельцу
+  кабинета и пропускает, если «оплачено по» изменилось. В письме нет названия
+  компании и ссылок (адрес нового кабинета не подтверждён; у воркера нет
+  базового URL).
 - Запись: `RegisterPaymentAction` — точка входа, коммитит сама одним
   `wrapInTransaction()` под `pg_advisory_xact_lock(hashtextextended(
   'billing_subscription:'||companyId, 0))`; повтор по `id` или `(source,
@@ -4443,6 +4470,7 @@ config/
 | `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (`AI_SERVICE_ENABLED`, адрес, токен) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
 | `app:cash:ai-categorize --all-enabled` | `25 * * * *` | Компании allowlist ai-service с операциями за 90 дней: автоприменение по флагу компании, затем постановка ИИ-подсказок статей ДДС; сбой компании — ERROR, остальные идут дальше |
 | `app:storage:healthcheck` | `*/5 * * * *` | Синтетическая проверка объектного хранилища (write→read→delete); сбой → `error` → GlitchTip |
+| `app:billing:expiry-reminders` | `0 10 * * *` | Напоминания владельцам об окончании оплаты (7/3/1/0 дней, пробный — 3/0) → `async_sync`; повтор в тот же день писем не дублирует (`billing_expiry_reminders`); сбой постановки — exit 1 + один `error` |
 | `app:mailer:healthcheck` | `7 * * * *` | Проверка SMTP без отправки письма; сбой → `error` + exit 1 |
 | `app:directories:integrity-check` | `37 7 * * *` | Read-only гейт справочников: соседние статьи ОПиУ, ДДС и Баланса с одинаковым названием; exit 1 + один агрегированный `error`; деревья ОПиУ без кодов шаблона — справочный `info` |
 | `app:messenger:failed-queue-check` | `32 7 * * *` | Read-only гейт очереди `failed`: глубина и возраст; ERROR при возрасте ≥ 12 ч или глубине ≥ 10 |
@@ -4536,6 +4564,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.112 | 2026-11-02 | Billing: страница клиента `/company/price` на справочнике, баннер `billing_notice()`, пробный период 14 дней на «Базе» по `CompanyCreatedEvent` и backfill, напоминания `app:billing:expiry-reminders` (`Version20261102100000`) |
 | 2.111 | 2026-11-01 | Billing: админка тарифа кабинета, `AssignTariffAction`, `BillingFacadeInterface::accessForCompanies()`; всем кабинетам — «Друг» (`Version20261101230000`); заглушка `/admin/billing` удалена |
 | 2.110 | 2026-11-01 | Billing: новый модуль — `Tariff`, `TariffPrice`, `CompanySubscription`, `BillingPayment`, `RegisterPaymentAction`, `BillingFacadeInterface::accessFor()` (`Version20261101210000`) |
 | 2.109 | 2026-11-01 | Billing: старый модуль `src/Billing/` и таблицы `billing_*` удалены (`Version20261101200000`), новый — `docs/tasks/billing` |

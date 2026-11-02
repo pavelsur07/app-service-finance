@@ -83,4 +83,13 @@ final class PaidPeriodCalculatorTest extends TestCase
 
         (new PaidPeriodCalculator())->next(null, new \DateTimeImmutable('2027-01-01'), 0);
     }
+
+    public function testTrialCountsStartDayInMoscow(): void
+    {
+        // 21:30 UTC 31.12 — уже 01.01 по Москве.
+        $period = (new PaidPeriodCalculator())->trial(new \DateTimeImmutable('2026-12-31 21:30:00', new \DateTimeZone('UTC')), 14);
+
+        self::assertSame('2027-01-01', $period->from->format('Y-m-d'));
+        self::assertSame('2027-01-14', $period->until->format('Y-m-d'));
+    }
 }

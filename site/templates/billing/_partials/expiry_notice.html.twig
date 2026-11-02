@@ -1,0 +1,28 @@
+{#
+  Баннер об окончании оплаты активного кабинета (billing_notice()).
+  variant: 'legacy' — Tabler-layout, 'app' — DS «Ваш Финдир».
+#}
+{% set notice = billing_notice() %}
+{% if notice %}
+  {% set level = notice.kind in ['grace', 'read_only'] ? 'danger' : 'warning' %}
+  {% set text %}
+    {%- if notice.kind == 'trial_ending' -%}
+      Пробный период заканчивается {{ notice.paidUntil|date('d.m.Y') }}, осталось дней: {{ notice.daysLeft }}. Выберите тариф, чтобы продолжить работу без перерыва.
+    {%- elseif notice.kind == 'ending' -%}
+      Тариф оплачен по {{ notice.paidUntil|date('d.m.Y') }}, осталось дней: {{ notice.daysLeft }}. Продлите его заранее.
+    {%- elseif notice.kind == 'grace' -%}
+      Оплаченный период закончился {{ notice.paidUntil|date('d.m.Y') }}. До {{ notice.graceUntil|date('d.m.Y') }} всё работает, затем кабинет перейдёт в режим «только чтение».
+    {%- else -%}
+      Оплаченный период закончился {{ notice.paidUntil|date('d.m.Y') }}. Продлите тариф, чтобы снова вносить изменения.
+    {%- endif -%}
+  {% endset %}
+  {% if variant|default('legacy') == 'app' %}
+    <div class="alert alert--{{ level }}" role="status" data-billing-notice="{{ notice.kind }}" style="margin:var(--s-3) var(--s-4) 0;">
+      <div class="a-body"><p class="a-text">{{ text }} <a href="{{ path('company_price_index') }}">Тарифы и оплата</a></p></div>
+    </div>
+  {% else %}
+    <div class="alert alert-{{ level }}" role="status" data-billing-notice="{{ notice.kind }}">
+      {{ text }} <a href="{{ path('company_price_index') }}" class="alert-link">Тарифы и оплата</a>
+    </div>
+  {% endif %}
+{% endif %}

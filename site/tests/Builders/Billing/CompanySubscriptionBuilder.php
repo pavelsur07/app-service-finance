@@ -18,10 +18,19 @@ final class CompanySubscriptionBuilder
     private ?Tariff $tariff = null;
     private string $paidFrom = '2027-01-01';
     private ?string $paidUntil = '2027-01-31';
+    private bool $trial = false;
 
     public static function aSubscription(): self
     {
         return new self();
+    }
+
+    public function withId(string $id): self
+    {
+        $clone = clone $this;
+        $clone->id = $id;
+
+        return $clone;
     }
 
     public function forCompany(string $companyId): self
@@ -49,6 +58,15 @@ final class CompanySubscriptionBuilder
         return $clone;
     }
 
+    /** Пробный период с датами; без onTariff() — на платном тарифе из TariffBuilder. */
+    public function trial(string $from, string $until): self
+    {
+        $clone = $this->paid($from, $until);
+        $clone->trial = true;
+
+        return $clone;
+    }
+
     /** Бессрочная подписка; без onTariff() — на бессрочном тарифе из TariffBuilder. */
     public function perpetualFrom(string $from): self
     {
@@ -70,6 +88,10 @@ final class CompanySubscriptionBuilder
 
         $tariff = $this->tariff ?? TariffBuilder::aTariff()->build();
         $period = new PaidPeriod(new \DateTimeImmutable($this->paidFrom), new \DateTimeImmutable($this->paidUntil));
+
+        if ($this->trial) {
+            return CompanySubscription::startTrial($this->companyId, $tariff, $period, $now, $this->id);
+        }
 
         return CompanySubscription::startPaid($this->companyId, $tariff, $period, $now, $this->id);
     }

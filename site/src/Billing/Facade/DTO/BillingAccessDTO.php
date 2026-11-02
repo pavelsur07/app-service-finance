@@ -9,7 +9,7 @@ use App\Billing\Enum\TariffCode;
 
 /**
  * Доступ компании на дату. `tariffCode`/`tariffName` = null — подписки нет;
- * `paidUntil` = null — подписки нет или тариф бессрочный.
+ * `paidUntil` = null — подписки нет или тариф бессрочный; `trial` — пробный период (до `paidUntil`).
  */
 final readonly class BillingAccessDTO
 {
@@ -19,6 +19,7 @@ final readonly class BillingAccessDTO
         public ?string $tariffName,
         public ?\DateTimeImmutable $paidUntil,
         public ?int $daysLeft,
+        public bool $trial = false,
     ) {
     }
 }
