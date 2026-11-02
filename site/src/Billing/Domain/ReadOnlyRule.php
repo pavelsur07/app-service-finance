@@ -17,12 +17,22 @@ final readonly class ReadOnlyRule
 
     /**
      * Изменяющие маршруты, доступные и в «только чтение»: вход и личные настройки, управление
-     * кабинетами (переключиться, создать, удалить свой), принять приглашение в другой кабинет,
-     * пересчёт и предпросмотр отчётов — POST без изменения учёта.
+     * кабинетами (переключиться, создать, удалить свой), принять приглашение в другой кабинет;
+     * отзыв доступа (сотрудник, приглашение, ключи API, интеграции) — безопасность важнее оплаты;
+     * пересчёт отчётов (пересобирает производные данные из исходных, ничего не вводит) и
+     * предпросмотр. Вход/выход обрабатывает firewall раньше гейта — в списке для полноты.
      */
     public const ALLOWED_ROUTES = [
         'app_login',
         'app_logout',
+        'company_member_disable',
+        'company_member_disable_legacy',
+        'company_invite_revoke',
+        'company_invite_revoke_legacy',
+        'settings_api_revoke',
+        'settings_report_api_key_revoke',
+        'bank_sync_account_unlink',
+        'moysklad_connections_disable',
         'app_profile_password',
         'app_ui_mode_switch',
         'company_set_active',
@@ -34,6 +44,28 @@ final readonly class ReadOnlyRule
         'marketplace_cost_pl_mapping_default_preview',
         'marketplace_pl_mappings_default_preview',
     ];
+
+    /**
+     * Маршруты, которые меняют компанию из пути `{id}`, а не активную из сессии. Для маршрутов
+     * с параметром `{companyId}` целевая компания берётся из него всегда.
+     */
+    public const COMPANY_ID_ROUTES = [
+        'company_edit',
+        'company_tax_profile_save',
+        'company_tax_profile_delete',
+    ];
+
+    /**
+     * ID компании, данные которой меняет маршрут, если он задан в пути; иначе null (активная компания).
+     *
+     * @param array<string, mixed> $routeParams
+     */
+    public static function targetCompanyId(?string $route, array $routeParams): ?string
+    {
+        $id = $routeParams['companyId'] ?? (\in_array($route, self::COMPANY_ID_ROUTES, true) ? ($routeParams['id'] ?? null) : null);
+
+        return \is_string($id) && '' !== $id ? $id : null;
+    }
 
     public static function isMutating(string $method): bool
     {

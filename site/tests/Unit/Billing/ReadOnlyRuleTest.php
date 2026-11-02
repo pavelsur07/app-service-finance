@@ -29,9 +29,17 @@ final class ReadOnlyRuleTest extends TestCase
 
     public function testAllowedRoutesPassEvenInReadOnly(): void
     {
-        foreach (['company_set_active', 'app_logout', 'app_ui_mode_switch', 'finance_report_preview_recalc'] as $route) {
+        foreach (['company_set_active', 'app_logout', 'app_ui_mode_switch', 'finance_report_preview_recalc', 'company_member_disable', 'settings_api_revoke'] as $route) {
             self::assertFalse(ReadOnlyRule::blocks('POST', $route, AccessStatus::READ_ONLY), $route);
         }
         self::assertTrue(ReadOnlyRule::blocks('POST', null, AccessStatus::READ_ONLY), 'маршрут неизвестен — блокируется');
+    }
+
+    public function testTargetCompanyIsTakenFromPath(): void
+    {
+        self::assertSame('c1', ReadOnlyRule::targetCompanyId('company_member_disable_legacy', ['companyId' => 'c1', 'memberId' => 'm']));
+        self::assertSame('c2', ReadOnlyRule::targetCompanyId('company_edit', ['id' => 'c2']));
+        self::assertNull(ReadOnlyRule::targetCompanyId('cash_transaction_edit', ['id' => 'tx']), '{id} чужого маршрута — не компания');
+        self::assertNull(ReadOnlyRule::targetCompanyId(null, []));
     }
 }

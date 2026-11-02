@@ -1841,11 +1841,14 @@ manage — только владелец. Новые права автомати
 - Режим «только чтение»: `ReadOnlyModeSubscriber` (`KernelEvents::CONTROLLER`,
   main-request, firewall `main`) отклоняет `POST`/`PUT`/`PATCH`/`DELETE`
   кабинета в статусе `read_only` (`ReadOnlyRule`; `grace` и `none` не
-  ограничиваются); белый список маршрутов — `ReadOnlyRule::ALLOWED_ROUTES`
-  (вход/выход, пароль, тема, переключение/создание/удаление компании,
-  приглашение, пересчёт и предпросмотр отчётов). Ответ: HTML — 303 на
+  ограничиваются). Статус — у компании, которую меняет запрос: из пути
+  (`{companyId}`, `ReadOnlyRule::COMPANY_ID_ROUTES`) при доступе
+  пользователя, иначе активной. Приоритет −8 — после `ModuleAccessSubscriber`
+  и `#[IsGranted]`. Белый список — `ReadOnlyRule::ALLOWED_ROUTES` (вход/выход,
+  пароль, тема, переключение/создание/удаление компании, приглашение, отзыв
+  доступа, пересчёт и предпросмотр отчётов). Ответ: HTML — 303 на
   `/company/price` с flash; JSON/XHR/`/api/` — 403
-  `{"error":{"code":"billing_read_only"}}`. Флаг `BILLING_READ_ONLY_ENFORCED`
+  `{"error":{"code":"billing_read_only","message"},"message"}`. Флаг `BILLING_READ_ONLY_ENFORCED`
   (по умолчанию `false`; в `.env.test` — `true`): выключен — только `info`
   «заблокировал бы». Внешнее API (`/api/external/v1`), админка и фоновые
   загрузки не ограничиваются.

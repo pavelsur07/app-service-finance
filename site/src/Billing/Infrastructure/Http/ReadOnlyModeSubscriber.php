@@ -6,6 +6,8 @@ namespace App\Billing\Infrastructure\Http;
 
 use App\Billing\Domain\ReadOnlyRule;
 use App\Billing\Facade\BillingFacadeInterface;
+use App\Company\Entity\User;
+use App\Company\Facade\CompanyFacade;
 use App\Shared\Service\ActiveCompanyService;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -25,6 +27,8 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 /**
  * Гейт режима «только чтение» (ReadOnlyRule) для кабинета клиента — firewall `main`.
+ * Статус берётся у компании, которую меняет запрос: из пути (`{companyId}`, `/company/{id}/…`),
+ * если у пользователя есть к ней доступ, иначе — активной из сессии.
  * Флаг BILLING_READ_ONLY_ENFORCED выключен — запрос проходит, в журнал пишется «заблокировал бы».
  * HTML — redirect на «Тариф и оплата» с сообщением; JSON/XHR/`/api/` — 403 `billing_read_only`.
  */
@@ -37,6 +41,7 @@ final class ReadOnlyModeSubscriber implements EventSubscriberInterface
         private readonly Security $security,
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly BillingFacadeInterface $billing,
+        private readonly CompanyFacade $companies,
         private readonly ClockInterface $clock,
         private readonly UrlGeneratorInterface $urls,
         private readonly LoggerInterface $logger,
@@ -47,7 +52,9 @@ final class ReadOnlyModeSubscriber implements EventSubscriberInterface
 
     public static function getSubscribedEvents(): array
     {
-        return [KernelEvents::CONTROLLER => 'onKernelController'];
+        // После модульного гейта и #[IsGranted] (приоритет 0): нет доступа к модулю — 403 от них,
+        // а не redirect на тариф; иначе замена контроллера на closure их бы обошла.
+        return [KernelEvents::CONTROLLER => ['onKernelController', -8]];
     }
 
     public function onKernelController(ControllerEvent $event): void
@@ -64,9 +71,8 @@ final class ReadOnlyModeSubscriber implements EventSubscriberInterface
             return;
         }
 
-        try {
-            $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
-        } catch (NotFoundHttpException|SessionNotFoundException) {
+        $companyId = $this->targetCompanyId($request, $route);
+        if (null === $companyId) {
             return;
         }
 
@@ -87,10 +93,28 @@ final class ReadOnlyModeSubscriber implements EventSubscriberInterface
         $event->setController(static fn (): Response => $response);
     }
 
+    private function targetCompanyId(Request $request, ?string $route): ?string
+    {
+        $routeParams = $request->attributes->get('_route_params');
+        $target = ReadOnlyRule::targetCompanyId($route, \is_array($routeParams) ? $routeParams : []);
+        $user = $this->security->getUser();
+        // Чужую компанию контроллер и так отклонит; её статус не используем, чтобы не раскрывать его.
+        if (null !== $target && $user instanceof User && $this->companies->userHasAccess($target, (string) $user->getId())) {
+            return $target;
+        }
+
+        try {
+            return (string) $this->activeCompanyService->getActiveCompany()->getId();
+        } catch (NotFoundHttpException|SessionNotFoundException) {
+            return null;
+        }
+    }
+
     private function response(Request $request): Response
     {
         if ($this->wantsJson($request)) {
-            return new JsonResponse(['error' => ['code' => self::ERROR_CODE, 'message' => self::MESSAGE]], Response::HTTP_FORBIDDEN);
+            // `message` верхнего уровня — для legacy-скриптов, читающих data.message.
+            return new JsonResponse(['error' => ['code' => self::ERROR_CODE, 'message' => self::MESSAGE], 'message' => self::MESSAGE], Response::HTTP_FORBIDDEN);
         }
 
         $session = $request->hasSession() ? $request->getSession() : null;
