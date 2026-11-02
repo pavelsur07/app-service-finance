@@ -4060,7 +4060,8 @@ internal_api → stateless, /internal/* для сервисов services/
   (единица лимита отчёта WB, как бакет `connection:<id>` в `WbFinanceRateLimiter`),
   `performance: null`; без пригодного токена не выдаётся. Ресурсы
   `wb.finance.sales-report.daily`, `wb.finance.sales-report.weekly` — компаниям из
-  `wb_fetcher.finance_companies` (`['*']` — всем, `[]` — никому), остальным `[]`.
+  `wb_fetcher.finance_companies` (`['*']` — всем, `[]` — никому), остальным `[]`. На проде `['*']`:
+  кабинеты ограничивает allowlist wb-fetcher (`vars.WB_FETCHER_CONNECTION_ALLOWLIST`, `docs/maintenance/wb-fetcher-prod.md`).
   Другие провайдеры — 422 `unsupported_provider`.
 
 Иерархия ролей: `ROLE_USER → ROLE_COMPANY_USER → ROLE_COMPANY_OWNER`
@@ -4703,6 +4704,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.120 | 2026-11-02 | Прод: сервис `wb-fetcher` за `WB_FETCHER_ENABLED` (compose-профиль, БД `wb_fetcher`, S3 — ключи ozon-fetcher), scheduler — `WB_FETCHER_BASE_URL/_API_TOKEN`; `wb_fetcher.finance_companies: ['*']` (задача wb-fetcher-finance, этап 5) |
 | 2.119 | 2026-11-02 | ServiceGateway: покрытие нескольких сервисов — `ServiceCoverageHttpClient` на сервис (`WB_FETCHER_BASE_URL/_API_TOKEN`), команда обновления обходит все клиенты, страница `/admin/services/coverage` с вкладками Ozon \| Wildberries, недельные ячейки; прежний адрес — 301 (задача wb-fetcher-finance, этап 4) |
 | 2.118 | 2026-11-02 | ServiceGateway: `ServiceCoverageV1Parser` принимает недельный `period_key` `YYYY-Www` (контракт `service-coverage` v1.1.0, задача wb-fetcher-finance, этап 3) |
 | 2.117 | 2026-11-02 | Marketplace: `/internal/marketplace-connections?provider=wildberries` — `WbConnectionsSnapshotBuilder`, параметр `wb_fetcher.finance_companies` (задача wb-fetcher-finance, этап 1) |

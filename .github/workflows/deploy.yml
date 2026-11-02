@@ -164,6 +164,7 @@ jobs:
                   fi
                   if [ "$sv" = "true" ]; then
                     items+=('{"service":"ozon-fetcher","context":"./services","file":"./services/ozon-fetcher/docker/Dockerfile","image":"ozon-fetcher"}')
+                    items+=('{"service":"wb-fetcher","context":"./services","file":"./services/wb-fetcher/docker/Dockerfile","image":"wb-fetcher"}')
                   fi
                   if [ "$ai" = "true" ]; then
                     items+=('{"service":"ai-service","context":"./services/ai-service","file":"./services/ai-service/docker/Dockerfile","image":"ai-service"}')
@@ -767,6 +768,9 @@ jobs:
                   OZON_FETCHER_S3_ACCESS_KEY_ID: ${{ secrets.OZON_FETCHER_S3_ACCESS_KEY_ID }}
                   OZON_FETCHER_S3_SECRET_ACCESS_KEY: ${{ secrets.OZON_FETCHER_S3_SECRET_ACCESS_KEY }}
                   OZON_FETCHER_CONNECTION_ALLOWLIST: ${{ vars.OZON_FETCHER_CONNECTION_ALLOWLIST }}
+                  WB_FETCHER_API_TOKEN: ${{ secrets.WB_FETCHER_API_TOKEN }}
+                  WB_FETCHER_DB_PASSWORD: ${{ secrets.WB_FETCHER_DB_PASSWORD }}
+                  WB_FETCHER_CONNECTION_ALLOWLIST: ${{ vars.WB_FETCHER_CONNECTION_ALLOWLIST }}
                   AI_SERVICE_API_TOKEN: ${{ secrets.AI_SERVICE_API_TOKEN }}
                   AI_SERVICE_DB_PASSWORD: ${{ secrets.AI_SERVICE_DB_PASSWORD }}
                   AI_GATEWAY_TOKEN: ${{ secrets.AI_GATEWAY_TOKEN }}
@@ -784,7 +788,7 @@ jobs:
               run: |
                   # case по всей строке, а не grep: grep смотрит построчно и пропустил бы перевод
                   # строки (значение с «\nEOF\n» закрыло бы heredoc ниже).
-                  for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY AI_SERVICE_API_TOKEN AI_SERVICE_DB_PASSWORD AI_GATEWAY_TOKEN; do
+                  for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY WB_FETCHER_API_TOKEN WB_FETCHER_DB_PASSWORD AI_SERVICE_API_TOKEN AI_SERVICE_DB_PASSWORD AI_GATEWAY_TOKEN; do
                     case "${!v}" in
                       *[!A-Za-z0-9._~-]*)
                         echo "❌ Секрет $v содержит недопустимые символы: разрешены A-Za-z0-9._~-"
@@ -817,6 +821,11 @@ jobs:
                   case "$OZON_FETCHER_CONNECTION_ALLOWLIST" in
                     *[!A-Za-z0-9,_-]*)
                       echo "❌ OZON_FETCHER_CONNECTION_ALLOWLIST: разрешены A-Za-z0-9,_-"
+                      exit 1 ;;
+                  esac
+                  case "$WB_FETCHER_CONNECTION_ALLOWLIST" in
+                    *[!A-Za-z0-9,_-]*)
+                      echo "❌ WB_FETCHER_CONNECTION_ALLOWLIST: разрешены A-Za-z0-9,_-"
                       exit 1 ;;
                   esac
                   # Billing (docs/tasks/billing): флаг «только чтение» и магазин ЮKassa.
@@ -893,6 +902,14 @@ jobs:
                     # ://@ — но одинарные кавычки, а в DSN их не бывает.
                     export OZON_FETCHER_SENTRY_DSN='${{ secrets.OZON_FETCHER_SENTRY_DSN }}'
                     OZON_FETCHER_ENABLED='${{ vars.OZON_FETCHER_ENABLED }}'
+                    # wb-fetcher (docs/maintenance/wb-fetcher-prod.md): S3 — ключи ozon-fetcher (тот же
+                    # бакет, префикс wb/). Без WB_FETCHER_ENABLED=true не стартует; scheduler видит
+                    # WB_FETCHER_API_TOKEN всегда (пусто — обновление витрины WB выключено).
+                    export WB_FETCHER_API_TOKEN='${{ secrets.WB_FETCHER_API_TOKEN }}'
+                    export WB_FETCHER_DB_PASSWORD='${{ secrets.WB_FETCHER_DB_PASSWORD }}'
+                    export WB_FETCHER_CONNECTION_ALLOWLIST='${{ vars.WB_FETCHER_CONNECTION_ALLOWLIST }}'
+                    export WB_FETCHER_SENTRY_DSN='${{ secrets.WB_FETCHER_SENTRY_DSN }}'
+                    WB_FETCHER_ENABLED='${{ vars.WB_FETCHER_ENABLED }}'
                     # ai-service (docs/maintenance/ai-service-prod.md): без AI_SERVICE_ENABLED=true сервис не
                     # стартует, а Symfony видит его выключенным. Алфавит секретов проверен шагом выше.
                     export AI_SERVICE_ENABLED='${{ vars.AI_SERVICE_ENABLED }}'
@@ -919,7 +936,7 @@ jobs:
                     export YOOKASSA_SHOP_ID='${{ vars.YOOKASSA_SHOP_ID }}'
                     export YOOKASSA_SECRET_KEY='${{ secrets.YOOKASSA_SECRET_KEY }}'
                     export YOOKASSA_RECEIPT_VAT_CODE='${{ vars.YOOKASSA_RECEIPT_VAT_CODE }}'
-                    for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY AI_SERVICE_API_TOKEN AI_SERVICE_DB_PASSWORD AI_GATEWAY_TOKEN; do
+                    for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY WB_FETCHER_API_TOKEN WB_FETCHER_DB_PASSWORD AI_SERVICE_API_TOKEN AI_SERVICE_DB_PASSWORD AI_GATEWAY_TOKEN; do
                       eval "val=\${$v}"
                       case "$val" in
                         *[!A-Za-z0-9._~-]*)
@@ -973,6 +990,27 @@ jobs:
                     else
                       echo "⏸ ozon-fetcher выключен (vars.OZON_FETCHER_ENABLED != true)"
                       docker compose -f docker-compose.prod.yml --profile ozon-fetcher stop ozon-fetcher 2>/dev/null || true
+                    fi
+
+                    # wb-fetcher — за профилем: без WB_FETCHER_ENABLED=true не стартует.
+                    # Миграции его БД — до шага 5/5, иначе `up` поднял бы сервис раньше них.
+                    if [ "$WB_FETCHER_ENABLED" = "true" ]; then
+                      export COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}wb-fetcher"
+                      echo "🐳 [4b2/5] wb-fetcher: БД и роль, образ, миграции, запуск"
+                      if [ -z "$WB_FETCHER_DB_PASSWORD" ] || [ -z "$INTERNAL_AUTH_TOKEN" ] || [ -z "$WB_FETCHER_API_TOKEN" ] || [ -z "$OZON_FETCHER_S3_ACCESS_KEY_ID" ]; then
+                        echo "❌ WB_FETCHER_ENABLED=true, но не заведены секреты WB_FETCHER_DB_PASSWORD / INTERNAL_AUTH_TOKEN / WB_FETCHER_API_TOKEN / OZON_FETCHER_S3_ACCESS_KEY_ID"
+                        exit 1
+                      fi
+                      # Идемпотентно: роль, пароль из секрета, БД (docker/wb-fetcher/db-bootstrap.sql).
+                      docker compose -f docker-compose.prod.yml exec -T -e WB_FETCHER_DB_PASSWORD site-postgres \
+                        psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/wb-fetcher/db-bootstrap.sql
+                      docker compose -f docker-compose.prod.yml pull wb-fetcher
+                      docker compose -f docker-compose.prod.yml run --rm --no-deps -T wb-fetcher -migrate < /dev/null
+                      docker compose -f docker-compose.prod.yml up -d --no-deps --wait wb-fetcher
+                      echo "✅ wb-fetcher healthy"
+                    else
+                      echo "⏸ wb-fetcher выключен (vars.WB_FETCHER_ENABLED != true)"
+                      docker compose -f docker-compose.prod.yml --profile wb-fetcher stop wb-fetcher 2>/dev/null || true
                     fi
 
                     # ai-service — за профилем: без AI_SERVICE_ENABLED=true не стартует.

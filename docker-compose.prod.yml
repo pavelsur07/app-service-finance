@@ -510,6 +510,9 @@ services:
             # Пустой токен — обновление выключено (exit 0).
             OZON_FETCHER_BASE_URL: http://ozon-fetcher:8080
             OZON_FETCHER_API_TOKEN: ${OZON_FETCHER_API_TOKEN:-}
+            # Витрина покрытия wb-fetcher (вкладка Wildberries), токен «Symfony → сервис».
+            WB_FETCHER_BASE_URL: http://wb-fetcher:8080
+            WB_FETCHER_API_TOKEN: ${WB_FETCHER_API_TOKEN:-}
             # ai-service: cron импорта результатов и подсказок статей (как в x-php-env).
             AI_SERVICE_ENABLED: ${AI_SERVICE_ENABLED:-false}
             AI_SERVICE_BASE_URL: http://ai-service:8080
@@ -620,6 +623,55 @@ services:
             resources:
                 limits:
                     memory: 384M
+                reservations:
+                    memory: 64M
+
+    # Финансовые отчёты Wildberries (services/wb-fetcher, docs/tasks/wb-fetcher-finance).
+    # Профиль: не стартует, пока деплой не включит его переменной WB_FETCHER_ENABLED=true.
+    # Без ingress: только сеть default. S3 — бакет и ключи ozon-fetcher, префикс wb/.
+    # См. docs/maintenance/wb-fetcher-prod.md.
+    wb-fetcher:
+        image: ghcr.io/pavelsur07/wb-fetcher:${IMAGE_TAG:-latest}
+        container_name: wb-fetcher
+        profiles: ["wb-fetcher"]
+        restart: always
+        logging: *default-logging
+        environment:
+            TZ: Europe/Moscow
+            LISTEN_ADDR: ":8080"
+            DB_DSN: postgres://svc_wb_fetcher:${WB_FETCHER_DB_PASSWORD:-}@site-postgres:5432/wb_fetcher?sslmode=disable
+            SYMFONY_INTERNAL_BASE_URL: http://site-nginx
+            INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN:-}
+            # Токен «Symfony → сервис» для /internal/* сервиса; пусто — /internal/* закрыт.
+            SERVICE_API_TOKEN: ${WB_FETCHER_API_TOKEN:-}
+            CONNECTIONS_POLL_INTERVAL: 5m
+            MAX_PARALLEL_CONNECTIONS: "2"
+            # connection_ref или company_id через запятую; пусто — все кабинеты WB.
+            CONNECTION_ALLOWLIST: ${WB_FETCHER_CONNECTION_ALLOWLIST:-}
+            SENTRY_DSN: ${WB_FETCHER_SENTRY_DSN:-}
+            SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+            SENTRY_ENVIRONMENT: prod
+            S3_ENDPOINT: "https://s3.twcstorage.ru"
+            S3_REGION: "ru-1"
+            S3_BUCKET: "vashfindir-services-raw"
+            S3_ACCESS_KEY_ID: ${OZON_FETCHER_S3_ACCESS_KEY_ID:-}
+            S3_SECRET_ACCESS_KEY: ${OZON_FETCHER_S3_SECRET_ACCESS_KEY:-}
+        networks:
+            - default
+        depends_on:
+            site-postgres:
+                condition: service_healthy
+        stop_grace_period: 30s
+        healthcheck:
+            test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 10s
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
                 reservations:
                     memory: 64M
 

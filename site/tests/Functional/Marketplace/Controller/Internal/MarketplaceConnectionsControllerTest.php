@@ -130,8 +130,9 @@ final class MarketplaceConnectionsControllerTest extends WebTestCaseBase
         self::assertSame('wildberries', $cabinet['provider']);
         self::assertSame(['client_id' => self::WB_SELLER, 'api_key' => 'wb-token-never-logged'], $cabinet['credentials']['seller']);
         self::assertNull($cabinet['credentials']['performance']);
-        // `wb_fetcher.finance_companies: []` — до включения кабинеты выдаются без ресурсов.
-        self::assertSame([], $cabinet['resource_types']);
+        // `wb_fetcher.finance_companies: ['*']` — оба ресурса каждому кабинету; кабинеты
+        // ограничивает allowlist сервиса (docs/maintenance/wb-fetcher-prod.md).
+        self::assertSame(['wb.finance.sales-report.daily', 'wb.finance.sales-report.weekly'], $cabinet['resource_types']);
 
         foreach ($logs->getRecords() as $record) {
             self::assertStringNotContainsString('wb-token-never-logged', $record->message.json_encode($record->context, \JSON_PARTIAL_OUTPUT_ON_ERROR));

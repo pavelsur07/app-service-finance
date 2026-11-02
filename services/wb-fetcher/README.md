@@ -8,7 +8,9 @@ API WB — [`docs/wb-api.md`](docs/wb-api.md).
 
 Статус: этап 3 — дневной и недельный детальный отчёт о реализации
 (`wb.finance.sales-report.daily`, `wb.finance.sales-report.weekly`); недельный —
-эталон сверки с дневными. Вкладка покрытия в админке — этап 4, прод — этап 5. Загрузка WB в Symfony продолжает работать.
+эталон сверки с дневными. Покрытие — админка, «Покрытие Сервис GO» → Wildberries. Прод —
+[`docs/maintenance/wb-fetcher-prod.md`](../../docs/maintenance/wb-fetcher-prod.md) (за переключателем
+`WB_FETCHER_ENABLED`). Загрузка WB в Symfony продолжает работать.
 
 ## Ресурсы
 
