@@ -7,6 +7,7 @@ namespace App\Billing\Controller\Client;
 use App\Billing\Application\ApplyYooKassaPaymentAction;
 use App\Billing\Entity\BillingCheckout;
 use App\Billing\Entity\Tariff;
+use App\Billing\Enum\CheckoutStatus;
 use App\Billing\Exception\TariffChangeNotSupportedException;
 use App\Billing\Exception\YooKassaRequestFailedException;
 use App\Billing\Exception\YooKassaUnavailableException;
@@ -110,7 +111,7 @@ final class CompanyTariffController extends AbstractController
 
         $online = $isOwner && $this->yooKassa->isEnabled() ? $this->onlinePayment($companyId, $offers) : null;
 
-        return $this->render('billing/client/tariff.html.twig', [
+        $response = $this->render('billing/client/tariff.html.twig', [
             'company' => $company,
             'access' => $this->billing->accessFor($companyId, $this->clock->now()),
             'offers' => $offers,
@@ -120,32 +121,42 @@ final class CompanyTariffController extends AbstractController
             'checkout' => $checkout,
             'online' => $online,
         ]);
+        // Скрытый ID формы оплаты не должен вернуться из кэша браузера («Назад» из ЮKassa).
+        $response->headers->set('Cache-Control', 'no-store, private');
+
+        return $response;
     }
 
     /**
-     * Попытка оплаты, с которой клиент вернулся с ЮKassa; незавершённую сверяет с ЮKassa сразу.
+     * Попытка оплаты, с которой клиент вернулся с ЮKassa, и её статус; незавершённую сверяет с ЮKassa сразу
+     * (завершённую Action возвращает без запроса в ЮKassa).
+     * Статус берётся из ответа Action: `failed_to_apply` пишется DBAL, объект в identity map его не видит.
+     *
+     * @return array{checkout: BillingCheckout, status: CheckoutStatus}|null
      */
-    private function returnedCheckout(Request $request, string $companyId): ?BillingCheckout
+    private function returnedCheckout(Request $request, string $companyId): ?array
     {
         $id = $request->query->get('checkout');
         if (!\is_string($id) || !Uuid::isValid($id)) {
             return null;
         }
         $checkout = $this->checkouts->findOneByIdAndCompanyId(strtolower($id), $companyId);
-        if (null === $checkout || $checkout->getStatus()->isFinal() || null === $checkout->getProviderPaymentId()) {
-            return $checkout;
+        if (null === $checkout) {
+            return null;
+        }
+        if (null === $checkout->getProviderPaymentId()) {
+            return ['checkout' => $checkout, 'status' => $checkout->getStatus()];
         }
 
         try {
-            ($this->applyYooKassaPayment)($checkout->getProviderPaymentId());
+            $status = ($this->applyYooKassaPayment)($checkout->getProviderPaymentId());
         } catch (YooKassaUnavailableException|YooKassaRequestFailedException) {
             // Статус покажем «обрабатывается»; добор — уведомлением ЮKassa или cron-сверкой.
             $this->logger->warning('Billing: сверка платежа при возврате с ЮKassa не удалась', ['companyId' => $companyId, 'checkoutId' => $checkout->getId()]);
-
-            return $checkout;
+            $status = null;
         }
 
-        return $this->checkouts->findOneByIdAndCompanyId($checkout->getId(), $companyId) ?? $checkout;
+        return ['checkout' => $checkout, 'status' => $status ?? CheckoutStatus::PENDING];
     }
 
     /**

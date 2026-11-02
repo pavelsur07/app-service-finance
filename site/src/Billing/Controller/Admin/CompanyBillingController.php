@@ -65,7 +65,7 @@ final class CompanyBillingController extends AbstractController
             'tariffs' => $this->tariffs->findActiveOrdered(),
             'pricesByTariff' => $this->prices->amountsByTariffCode(),
             'payments' => $pager,
-            'failedCheckouts' => $this->checkouts->findFailedToApplyByCompanyId($companyId),
+            'failedCheckouts' => $this->checkouts->findNeedingAttentionByCompanyId($companyId, $this->clock->now()->modify('-24 hours')),
             'paymentFormId' => Uuid::uuid7()->toString(),
             'defaultPaymentTariff' => null !== $currentTariff && !$currentTariff->isPerpetual() ? $currentTariff->getCode()->value : 'start',
             'today' => PaidPeriodCalculator::day($this->clock->now())->format('Y-m-d'),

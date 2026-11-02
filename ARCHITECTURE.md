@@ -1889,33 +1889,39 @@ manage — только владелец. Новые права автомати
   `YooKassaRequestFailedException`. В лог — без тела, ключей и ID платежа в
   адресе.
 - `BillingCheckout` (`billing_checkouts`): попытка онлайн-оплаты; `id` —
-  скрытый UUIDv7 формы, он же `Idempotence-Key` и ID будущей
-  `BillingPayment`; сумма — из справочника при создании; статус
-  `pending` → `succeeded` / `canceled` / `failed_to_apply`;
-  unique `provider_payment_id`.
+  скрытый UUIDv7 формы (каноническая запись), он же `Idempotence-Key` и ID
+  будущей `BillingPayment`; сумма — из справочника при создании; статус
+  `pending` → `succeeded` / `canceled` / `failed_to_apply` (переходы — DBAL
+  `UPDATE … WHERE status = 'pending'` в `ApplyYooKassaPaymentAction`);
+  `updated_at` — время последней проверки; unique `provider_payment_id`.
 - `StartCheckoutAction` — точка входа (`POST /company/price/checkout`,
   `company_price_checkout`, только владелец, CSRF; в белом списке
   «только чтение»): проверки до денег (публичный тариф с ценой за срок, не
   бессрочный тариф у кабинета, без смены тарифа при действующем платном
-  периоде) → `flush` попытки → HTTP вне транзакции → `flush` ссылки. Повтор
-  той же формы — та же ссылка; упавшая ЮKassa оставляет попытку без ссылки,
-  повтор проходит с тем же ключом.
-- `ApplyYooKassaPaymentAction` — точка входа; истина — `GET` платежа
-  (metadata должна совпасть с попыткой). Фазы: `RegisterPaymentAction`
-  (`source = yookassa`, `externalId` — ID платежа, `paymentId` — ID попытки,
-  `receivedAt` — `captured_at` по Москве) → `flush` отметки `succeeded`;
-  падение между фазами добирает следующая проверка без дубля. `canceled` →
-  `canceled`. Сумма или валюта не совпали, доменный отказ зачисления —
-  `failed_to_apply` (DBAL после отката) + `error`; такие попытки — в
-  админке кабинета, пока оплату с ID платежа ЮKassa в номере не отметят
+  периоде; ID формы не занят оплатой или попыткой) → `flush` попытки → HTTP
+  вне транзакции → `flush` ссылки. Повтор той же формы — та же ссылка; с
+  другим тарифом или сроком — отказ «форма устарела»; упавшая ЮKassa
+  оставляет попытку без ссылки, повтор проверяет правила заново и проходит с
+  тем же ключом. Страница тарифа — `Cache-Control: no-store`.
+- `ApplyYooKassaPaymentAction` — точка входа; статус попытки читается из БД;
+  истина — `GET` платежа. Фазы: `RegisterPaymentAction` (`source =
+  yookassa`, `externalId` — ID платежа, `paymentId` — ID попытки,
+  `receivedAt` — `captured_at` по Москве) → отметка `succeeded`; оплата с ID
+  попытки уже есть (сбой между фазами) — сразу отметка, без повторных правил
+  тарифа. `canceled` → `canceled`; `pending` — только время проверки.
+  Сумма или валюта не совпали, доменный отказ зачисления, metadata не
+  совпала, платежа нет в магазине (404) — `failed_to_apply` + `error`.
+  Админка кабинета показывает `failed_to_apply` и `pending` с платежом
+  старше суток, пока оплату с ID платежа ЮKassa в номере не отметят
   вручную. Вызовы: `ApplyYooKassaPaymentMessage` → `async_sync` (из
   уведомления `POST /billing/yookassa/webhook` — `#[PublicAccess]`,
-  `PUBLIC_ACCESS` в `access_control`, тело не доверяется, только ставит
-  проверку; и из cron `app:billing:yookassa-sync` каждые 10 мин — `pending`
-  со ссылкой старше 5 мин и моложе 72 ч); синхронно — при возврате на
-  `/company/price?checkout={id}`. Handler: недоступность — `Recoverable`,
-  отказ ЮKassa — `Unrecoverable`. Платёж, которого нет в
-  `billing_checkouts`, в ЮKassa не запрашивается.
+  `PUBLIC_ACCESS` в `access_control`, тело не доверяется; в очередь — только
+  ID незавершённой попытки, остальное — 200 без действий, не-JSON — 400; и
+  из cron `app:billing:yookassa-sync` каждые 10 мин — `pending` со ссылкой
+  старше 5 мин без ограничения возраста, давно не проверенные первыми, до
+  200); синхронно — при возврате на `/company/price?checkout={id}`.
+  Handler: недоступность ЮKassa — обычное исключение (повторы по
+  `retry_strategy`), отказ — `Unrecoverable`.
 
 ### Company: общий минимальный остаток
 

@@ -34,24 +34,23 @@ final class BillingCheckoutRepository extends ServiceEntityRepository
     }
 
     /**
-     * Незавершённые попытки с платежом ЮKassa, созданные в окне — для cron-сверки.
+     * Незавершённые попытки с платежом ЮKassa, созданные раньше `$createdBefore`; давно не
+     * проверенные первыми (`updated_at` двигает каждая проверка) — вечные `pending` не занимают окно.
      *
-     * @companyScopeExempt обход всех кабинетов cron-командой сверки ЮKassa; ограничение — статус и окно времени
+     * @companyScopeExempt обход всех кабинетов cron-командой сверки ЮKassa; ограничение — статус pending
      *
      * @return list<BillingCheckout>
      */
-    public function findPendingWithProviderPayment(\DateTimeImmutable $createdAfter, \DateTimeImmutable $createdBefore, int $limit): array
+    public function findPendingWithProviderPayment(\DateTimeImmutable $createdBefore, int $limit): array
     {
         /** @var list<BillingCheckout> $rows */
         $rows = $this->createQueryBuilder('c')
             ->andWhere('c.status = :status')
             ->andWhere('c.providerPaymentId IS NOT NULL')
-            ->andWhere('c.createdAt >= :after')
             ->andWhere('c.createdAt < :before')
             ->setParameter('status', CheckoutStatus::PENDING)
-            ->setParameter('after', $createdAfter)
             ->setParameter('before', $createdBefore)
-            ->orderBy('c.createdAt', \SortDirection::Ascending)
+            ->orderBy('c.updatedAt', \SortDirection::Ascending)
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
@@ -60,22 +59,25 @@ final class BillingCheckoutRepository extends ServiceEntityRepository
     }
 
     /**
-     * `failed_to_apply`, ещё не разобранные: администратор не отметил оплату с ID платежа ЮKassa
-     * в номере (любым способом).
+     * Попытки, требующие внимания администратора: `failed_to_apply` и `pending` с платежом ЮKassa,
+     * созданные раньше `$stalePendingBefore` (сверка не может довести их до конца); без оплаты
+     * с ID платежа ЮKassa в номере (её отметка вручную снимает попытку из списка).
      *
      * @return list<BillingCheckout>
      */
-    public function findFailedToApplyByCompanyId(string $companyId): array
+    public function findNeedingAttentionByCompanyId(string $companyId, \DateTimeImmutable $stalePendingBefore): array
     {
         /** @var list<BillingCheckout> $rows */
         $rows = $this->createQueryBuilder('c')
             ->addSelect('t')
             ->join('c.tariff', 't')
             ->andWhere('c.companyId = :companyId')
-            ->andWhere('c.status = :status')
+            ->andWhere('c.status = :failed OR (c.status = :pending AND c.providerPaymentId IS NOT NULL AND c.createdAt < :staleBefore)')
             ->andWhere('NOT EXISTS (SELECT p.id FROM '.BillingPayment::class.' p WHERE p.companyId = c.companyId AND p.externalId = c.providerPaymentId)')
             ->setParameter('companyId', $companyId)
-            ->setParameter('status', CheckoutStatus::FAILED_TO_APPLY)
+            ->setParameter('failed', CheckoutStatus::FAILED_TO_APPLY)
+            ->setParameter('pending', CheckoutStatus::PENDING)
+            ->setParameter('staleBefore', $stalePendingBefore)
             ->orderBy('c.createdAt', \SortDirection::Descending)
             ->getQuery()
             ->getResult();

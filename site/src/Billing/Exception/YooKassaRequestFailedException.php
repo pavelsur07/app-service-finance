@@ -9,8 +9,13 @@ namespace App\Billing\Exception;
  */
 final class YooKassaRequestFailedException extends \RuntimeException
 {
-    public function __construct(?int $statusCode, ?string $errorCode = null)
+    public function __construct(private readonly ?int $statusCode, ?string $errorCode = null)
     {
         parent::__construct(sprintf('ЮKassa отклонила запрос (%s%s).', null === $statusCode ? 'нечитаемый ответ' : 'HTTP '.$statusCode, null === $errorCode ? '' : ', '.$errorCode));
+    }
+
+    public function getStatusCode(): ?int
+    {
+        return $this->statusCode;
     }
 }

@@ -19,7 +19,9 @@ use Symfony\Component\Messenger\MessageBusInterface;
 /**
  * Cron: сверка незавершённых онлайн-оплат с ЮKassa — на случай потерянного уведомления
  * и закрытой до возврата вкладки. Ставит проверку каждой попытки в очередь `async_sync`;
- * повтор безопасен (`ApplyYooKassaPaymentAction` идемпотентен).
+ * повтор безопасен (`ApplyYooKassaPaymentAction` идемпотентен). Возраст не ограничен: после
+ * простоя или выключенных ключей успешный платёж всё равно дойдёт; неоплаченный ЮKassa
+ * сама переводит в `canceled`, и попытка выходит из сверки.
  */
 #[AsCommand(name: 'app:billing:yookassa-sync', description: 'Сверить незавершённые онлайн-оплаты с ЮKassa')]
 final class YooKassaSyncCommand extends Command
@@ -28,8 +30,6 @@ final class YooKassaSyncCommand extends Command
 
     /** Не трогаем совсем свежие: клиент ещё на странице оплаты. */
     private const MIN_AGE = '-5 minutes';
-    /** Неоплаченный платёж ЮKassa отменяет сама раньше; дальше сверять нечего. */
-    private const MAX_AGE = '-72 hours';
     private const LIMIT = 200;
 
     public function __construct(
@@ -57,7 +57,7 @@ final class YooKassaSyncCommand extends Command
 
         try {
             $now = $this->clock->now();
-            $pending = $this->checkouts->findPendingWithProviderPayment($now->modify(self::MAX_AGE), $now->modify(self::MIN_AGE), self::LIMIT);
+            $pending = $this->checkouts->findPendingWithProviderPayment($now->modify(self::MIN_AGE), self::LIMIT);
             foreach ($pending as $checkout) {
                 $this->bus->dispatch(new ApplyYooKassaPaymentMessage((string) $checkout->getProviderPaymentId()));
             }

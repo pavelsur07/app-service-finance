@@ -186,6 +186,16 @@ final class AdminCompanyBillingTest extends WebTestCaseBase
 
         $crawler = $this->openPage();
         self::assertCount(0, $crawler->filter('[data-billing-failed-checkouts]'), 'отмеченная вручную оплата из списка уходит');
+
+        // Платёж больше суток без конечного статуса — тоже на виду у администратора.
+        $tariff = static::getContainer()->get(TariffRepository::class)->findOneByCode(TariffCode::START);
+        self::assertNotNull($tariff);
+        $stale = BillingCheckoutBuilder::aCheckout()->withId(Uuid::uuid7()->toString())->forCompany((string) $this->company->getId())->onTariff($tariff, 1, 497000)
+            ->withProviderPayment('2f8a6b3c-000f-5000-9000-000000000077')->createdAt('2026-01-01 10:00:00')->build();
+        $this->em()->persist($stale);
+        $this->em()->flush();
+        $crawler = $this->openPage();
+        self::assertStringContainsString('нет конечного статуса больше суток', $crawler->filter('[data-billing-failed-checkouts]')->text());
         self::assertStringContainsString('Счёт', $crawler->filter('table')->last()->text());
     }
 

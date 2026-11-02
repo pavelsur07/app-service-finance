@@ -32,7 +32,6 @@ use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Tester\CommandTester;
-use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
@@ -165,8 +164,16 @@ final class YooKassaCheckoutTest extends IntegrationTestCase
         ));
         $this->yooKassa->then(YooKassaResponses::payment('succeeded', self::START_1_MONTH, $this->metadata($checkout->getId())));
 
+        // После зачисления администратор назначил «Друга» — повтор не должен счесть оплату отказом.
+        $this->connection->executeStatement(
+            'UPDATE billing_company_subscriptions SET tariff_id = (SELECT id FROM billing_tariffs WHERE code = ?), paid_until = NULL WHERE company_id = ?',
+            ['friend', $this->companyId],
+        );
+        $this->em->clear();
+
         self::assertSame(CheckoutStatus::SUCCEEDED, $this->apply());
         self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM billing_payments WHERE company_id = ?', [$this->companyId]));
+        self::assertSame('succeeded', $this->connection->fetchOne('SELECT status FROM billing_checkouts WHERE id = ?', [$checkout->getId()]));
     }
 
     public function testCanceledPaymentMarksCheckoutCanceledAndRegistersNothing(): void
@@ -186,16 +193,51 @@ final class YooKassaCheckoutTest extends IntegrationTestCase
         $this->yooKassa->then(YooKassaResponses::payment('pending', self::START_1_MONTH, $this->metadata($checkout->getId())));
         self::assertSame(CheckoutStatus::PENDING, $this->apply());
 
-        // Платёж чужой попытки (metadata не совпадает).
-        $this->yooKassa->then(YooKassaResponses::payment('succeeded', self::START_1_MONTH, $this->metadata(Uuid::uuid7()->toString())));
-        self::assertSame(CheckoutStatus::PENDING, $this->apply());
-
         // Платежа нет в наших попытках — в ЮKassa даже не ходим.
         self::assertNull(self::getContainer()->get(ApplyYooKassaPaymentAction::class)('3f000000-000f-5000-9000-000000000000'));
 
-        self::assertCount(2, $this->yooKassa->requests);
+        self::assertCount(1, $this->yooKassa->requests);
         self::assertSame(0, $this->paymentCount());
         self::assertSame('pending', $this->checkoutStatus($checkout));
+    }
+
+    public function testMetadataMismatchAndUnknownPaymentAreLeftForAdmin(): void
+    {
+        $checkout = $this->checkout(TariffCode::START, 1, self::START_1_MONTH);
+        $this->yooKassa->then(YooKassaResponses::payment('succeeded', self::START_1_MONTH, $this->metadata(Uuid::uuid7()->toString())));
+        self::assertSame(CheckoutStatus::FAILED_TO_APPLY, $this->apply());
+        self::assertSame(0, $this->paymentCount());
+
+        $other = BillingCheckoutBuilder::aCheckout()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId)->onTariff($this->tariff(TariffCode::START), 1, self::START_1_MONTH)->withProviderPayment('2f8a6b3c-000f-5000-9000-000000000009')->build();
+        $this->em->persist($other);
+        $this->em->flush();
+        $this->yooKassa->then(YooKassaResponses::error(404, 'not_found'));
+        self::assertSame(CheckoutStatus::FAILED_TO_APPLY, self::getContainer()->get(ApplyYooKassaPaymentAction::class)('2f8a6b3c-000f-5000-9000-000000000009'));
+        self::assertSame('failed_to_apply', $this->checkoutStatus($other));
+        self::assertSame('failed_to_apply', $this->checkoutStatus($checkout));
+    }
+
+    public function testCheckWithoutKeysDoesNotCallYooKassa(): void
+    {
+        $checkout = $this->checkout(TariffCode::START, 1, self::START_1_MONTH);
+        self::getContainer()->set(YooKassaConfig::class, new YooKassaConfig('', ''));
+
+        self::assertSame(CheckoutStatus::PENDING, $this->apply());
+        self::assertSame([], $this->yooKassa->requests);
+        self::assertSame('pending', $this->checkoutStatus($checkout));
+    }
+
+    public function testRepeatedFormWithOtherChoiceAndTakenIdAreRefused(): void
+    {
+        $checkoutId = Uuid::uuid7()->toString();
+        $this->yooKassa->then(YooKassaResponses::payment('pending', self::START_1_MONTH, $this->metadata($checkoutId)));
+        $this->start($checkoutId, TariffCode::START, 1);
+
+        $this->assertRefused(fn () => $this->start($checkoutId, TariffCode::START, 12), 'Форма устарела');
+
+        // ID формы совпал с чужой попыткой — не «повтор» и не новая оплата.
+        $this->assertRefused(fn () => $this->start($checkoutId, TariffCode::START, 1, $this->company()), 'Форма устарела');
+        self::assertCount(1, $this->yooKassa->requests);
     }
 
     public function testAmountMismatchIsNotRegisteredAndLeftForAdmin(): void
@@ -207,7 +249,7 @@ final class YooKassaCheckoutTest extends IntegrationTestCase
 
         self::assertSame(0, $this->paymentCount());
         self::assertSame(
-            ['status' => 'failed_to_apply', 'failure_reason' => 'ЮKassa: 497000 RUB, ожидалось 1416000 RUB'],
+            ['status' => 'failed_to_apply', 'failure_reason' => 'ЮKassa: 4970.00 RUB, ожидалось 14160.00 RUB'],
             $this->connection->fetchAssociative('SELECT status, failure_reason FROM billing_checkouts WHERE id = ?', [$checkout->getId()]),
         );
     }
@@ -239,7 +281,7 @@ final class YooKassaCheckoutTest extends IntegrationTestCase
         self::assertSame('pending', $this->checkoutStatus($checkout));
     }
 
-    public function testSyncCommandQueuesOnlyPendingCheckoutsInWindow(): void
+    public function testSyncCommandQueuesPendingCheckoutsOldestFirstExceptFresh(): void
     {
         $tariff = $this->tariff(TariffCode::START);
         $due = BillingCheckoutBuilder::aCheckout()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId)->onTariff($tariff, 1, self::START_1_MONTH)->createdAt('2027-03-10 09:00:00')->build();
@@ -263,7 +305,8 @@ final class YooKassaCheckoutTest extends IntegrationTestCase
             self::assertInstanceOf(ApplyYooKassaPaymentMessage::class, $message);
             $queued[] = $message->providerPaymentId;
         }
-        self::assertSame([YooKassaResponses::PAYMENT_ID], $queued);
+        // Старую тоже: после простоя успешный платёж должен дойти, возраст не ограничен.
+        self::assertSame(['2f8a6b3c-000f-5000-9000-000000000003', YooKassaResponses::PAYMENT_ID], $queued);
         self::assertSame([], $this->yooKassa->requests, 'команда сама в ЮKassa не ходит');
     }
 
@@ -275,8 +318,8 @@ final class YooKassaCheckoutTest extends IntegrationTestCase
 
         try {
             $handler(new ApplyYooKassaPaymentMessage(YooKassaResponses::PAYMENT_ID));
-            self::fail('ожидался RecoverableMessageHandlingException');
-        } catch (RecoverableMessageHandlingException) {
+            self::fail('ожидался YooKassaUnavailableException — повторы по retry_strategy');
+        } catch (YooKassaUnavailableException) {
         }
 
         $this->yooKassa->then(YooKassaResponses::error(401, 'invalid_credentials'));

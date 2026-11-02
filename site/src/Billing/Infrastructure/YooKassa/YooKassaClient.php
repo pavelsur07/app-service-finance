@@ -20,7 +20,10 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class YooKassaClient
 {
-    private const TIMEOUT_SECONDS = 20;
+    /** Простой соединения. */
+    private const TIMEOUT_SECONDS = 10;
+    /** Весь запрос целиком: синхронная проверка идёт и в GET страницы тарифа. */
+    private const MAX_DURATION_SECONDS = 15;
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -90,6 +93,7 @@ final readonly class YooKassaClient
             $response = $this->httpClient->request($method, rtrim($this->config->apiUrl, '/').$path, $options + [
                 'auth_basic' => [$this->config->shopId, $this->config->secretKey],
                 'timeout' => self::TIMEOUT_SECONDS,
+                'max_duration' => self::MAX_DURATION_SECONDS,
             ]);
             $statusCode = $response->getStatusCode();
             $payload = $response->toArray(false);

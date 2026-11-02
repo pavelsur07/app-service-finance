@@ -67,9 +67,16 @@ final class StartCheckoutAction
             if ($checkout->getStatus()->isFinal()) {
                 throw new OnlinePaymentNotAvailableException('Эта оплата уже завершена. Обновите страницу, чтобы начать новую.');
             }
+            // Та же форма с другим выбором (например, «Назад» из ЮKassa и другой срок): старая ссылка
+            // на другую сумму была бы неожиданностью — просим новую форму.
+            if ($checkout->getTariff()->getCode() !== $command->tariffCode || $checkout->getMonths() !== $command->months) {
+                throw new OnlinePaymentNotAvailableException('Форма устарела — обновите страницу и выберите тариф ещё раз.');
+            }
             if (null !== $checkout->getConfirmationUrl()) {
                 return $checkout->getConfirmationUrl();
             }
+            // Ссылки нет (ЮKassa падала): правила продления могли измениться — проверить до денег.
+            $this->assertRenewalAllowed($checkout->getCompanyId(), $checkout->getTariff(), $this->clock->now());
         } else {
             $checkout = $this->createCheckout($command);
         }
@@ -125,6 +132,14 @@ final class StartCheckoutAction
 
         $now = $this->clock->now();
         $this->assertRenewalAllowed($command->companyId, $tariff, $now);
+        // ID попытки станет ID оплаты: занятый (подмена скрытого поля) дал бы ложный «повтор».
+        // Проверка по всем компаниям: первичные ключи общие, чужой ID тоже занят.
+        if (false !== $this->entityManager->getConnection()->fetchOne(
+            'SELECT 1 FROM billing_payments WHERE id = :id UNION ALL SELECT 1 FROM billing_checkouts WHERE id = :id LIMIT 1',
+            ['id' => $command->checkoutId],
+        )) {
+            throw new OnlinePaymentNotAvailableException('Форма устарела — обновите страницу и выберите тариф ещё раз.');
+        }
 
         $checkout = new BillingCheckout($command->checkoutId, $command->companyId, $tariff, $command->months, $amount, $now);
         $this->entityManager->persist($checkout);

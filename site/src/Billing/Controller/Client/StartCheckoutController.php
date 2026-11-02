@@ -9,7 +9,6 @@ use App\Billing\Application\StartCheckoutAction;
 use App\Billing\Enum\TariffCode;
 use App\Billing\Exception\OnlinePaymentNotAvailableException;
 use App\Shared\Service\ActiveCompanyService;
-use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -47,10 +46,13 @@ final class StartCheckoutController extends AbstractController
             return $this->redirectToRoute('company_price_index');
         }
 
-        $checkoutId = (string) $request->request->get('checkout_id');
+        $rawCheckoutId = (string) $request->request->get('checkout_id');
         $tariffCode = TariffCode::tryFrom((string) $request->request->get('tariff'));
         $months = $request->request->getInt('months');
-        if (!Uuid::isValid($checkoutId) || null === $tariffCode || $months < 1) {
+        // Каноническая запись UUID (без скобок и urn:): ID уходит в metadata и Idempotence-Key ЮKassa
+        // и сверяется с ID в БД строкой.
+        $checkoutId = 1 === preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', strtolower($rawCheckoutId)) ? strtolower($rawCheckoutId) : null;
+        if (null === $checkoutId || null === $tariffCode || $months < 1) {
             $this->addFlash('danger', 'Выберите тариф и срок.');
 
             return $this->redirectToRoute('company_price_index');
@@ -58,11 +60,11 @@ final class StartCheckoutController extends AbstractController
 
         try {
             $confirmationUrl = ($this->startCheckout)(new StartCheckoutCommand(
-                checkoutId: strtolower($checkoutId),
+                checkoutId: $checkoutId,
                 companyId: (string) $company->getId(),
                 tariffCode: $tariffCode,
                 months: $months,
-                returnUrl: $this->generateUrl('company_price_index', ['checkout' => strtolower($checkoutId)], UrlGeneratorInterface::ABSOLUTE_URL),
+                returnUrl: $this->generateUrl('company_price_index', ['checkout' => $checkoutId], UrlGeneratorInterface::ABSOLUTE_URL),
                 customerEmail: $owner->getEmail(),
             ));
         } catch (OnlinePaymentNotAvailableException $exception) {

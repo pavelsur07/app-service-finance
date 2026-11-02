@@ -51,15 +51,14 @@ final class OnlinePaymentTest extends WebTestCaseBase
         $this->em()->flush();
     }
 
-    public function testWebhookQueuesCheckWithoutLoginAndRejectsGarbage(): void
+    public function testWebhookQueuesCheckOnlyForOwnPendingCheckout(): void
     {
-        $this->client->request('POST', '/billing/yookassa/webhook', [], [], ['CONTENT_TYPE' => 'application/json'], (string) json_encode([
-            'type' => 'notification',
-            'event' => 'payment.succeeded',
-            'object' => ['id' => YooKassaResponses::PAYMENT_ID, 'status' => 'succeeded', 'paid' => true, 'amount' => ['value' => '4970.00', 'currency' => 'RUB']],
-        ]));
-        self::assertResponseStatusCodeSame(200);
+        $checkout = BillingCheckoutBuilder::aCheckout()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId())->onTariff($this->tariff(TariffCode::START), 1, 497000)->build();
+        $this->em()->persist($checkout);
+        $this->em()->flush();
 
+        $this->notify('payment.succeeded', YooKassaResponses::PAYMENT_ID);
+        self::assertResponseStatusCodeSame(200);
         $sent = $this->syncTransport()->getSent();
         self::assertCount(1, $sent);
         $message = $sent[0]->getMessage();
@@ -67,10 +66,28 @@ final class OnlinePaymentTest extends WebTestCaseBase
         self::assertSame(YooKassaResponses::PAYMENT_ID, $message->providerPaymentId);
         self::assertSame([], $this->yooKassa->requests, 'уведомление само в ЮKassa не ходит — только очередь');
 
-        $this->client->request('POST', '/billing/yookassa/webhook', [], [], ['CONTENT_TYPE' => 'application/json'], '{"event":"payment.succeeded","object":{"id":"../../x"}}');
-        self::assertResponseStatusCodeSame(400);
         // In-memory транспорт сбрасывается в начале каждого запроса: пусто — значит, этот запрос ничего не поставил.
+        $this->notify('payment.succeeded', '3f000000-000f-5000-9000-000000000000');
+        self::assertResponseStatusCodeSame(200, 'чужой ID — 200, иначе ЮKassa повторяет сутки');
         self::assertSame([], $this->syncTransport()->getSent());
+
+        $this->notify('refund.succeeded', 'rf-1');
+        self::assertResponseStatusCodeSame(200);
+        self::assertSame([], $this->syncTransport()->getSent());
+
+        $this->client->request('POST', '/billing/yookassa/webhook', [], [], ['CONTENT_TYPE' => 'application/json'], 'not json');
+        self::assertResponseStatusCodeSame(400);
+    }
+
+    public function testCheckoutWithInvalidCsrfIsRejected(): void
+    {
+        $this->subscribe(CompanySubscriptionBuilder::aSubscription()->onTariff($this->tariff(TariffCode::BASE))->trial('2027-03-01', '2027-03-14'));
+        $this->login($this->owner);
+
+        $this->client->request('POST', '/company/price/checkout', ['_token' => 'bad', 'checkout_id' => Uuid::uuid7()->toString(), 'tariff' => 'base', 'months' => 1]);
+
+        self::assertResponseRedirects('/company/price');
+        self::assertSame([], $this->yooKassa->requests);
     }
 
     public function testOwnerPaysOnlineAndReturnShowsSuccessAndHistory(): void
@@ -122,6 +139,20 @@ final class OnlinePaymentTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('[data-billing-checkout-status="pending"]');
+    }
+
+    public function testReturnWithAmountMismatchShowsNotCredited(): void
+    {
+        $checkout = BillingCheckoutBuilder::aCheckout()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId())->onTariff($this->tariff(TariffCode::START), 3, 1416000)->build();
+        $this->em()->persist($checkout);
+        $this->em()->flush();
+        $this->login($this->owner);
+        $this->yooKassa->then(YooKassaResponses::payment('succeeded', 497000, $this->metadata($checkout->getId())));
+
+        $this->client->request('GET', '/company/price?checkout='.$checkout->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('[data-billing-checkout-status="failed_to_apply"]');
     }
 
     public function testNoOnlineButtonForFriendMemberAndWithoutKeys(): void
@@ -178,6 +209,15 @@ final class OnlinePaymentTest extends WebTestCaseBase
 
         self::assertResponseStatusCodeSame(303);
         self::assertStringStartsWith('https://yoomoney.ru/', (string) $this->client->getResponse()->headers->get('Location'));
+    }
+
+    private function notify(string $event, string $paymentId): void
+    {
+        $this->client->request('POST', '/billing/yookassa/webhook', [], [], ['CONTENT_TYPE' => 'application/json'], (string) json_encode([
+            'type' => 'notification',
+            'event' => $event,
+            'object' => ['id' => $paymentId, 'status' => 'succeeded', 'paid' => true, 'amount' => ['value' => '4970.00', 'currency' => 'RUB']],
+        ]));
     }
 
     private function subscribe(CompanySubscriptionBuilder $builder): void

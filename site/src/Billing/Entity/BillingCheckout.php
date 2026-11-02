@@ -87,31 +87,6 @@ class BillingCheckout
         $this->updatedAt = $now;
     }
 
-    public function markSucceeded(\DateTimeImmutable $now): void
-    {
-        $this->finish(CheckoutStatus::SUCCEEDED, $now);
-    }
-
-    public function markCanceled(\DateTimeImmutable $now): void
-    {
-        $this->finish(CheckoutStatus::CANCELED, $now);
-    }
-
-    /**
-     * `failed_to_apply` пишет `ApplyYooKassaPaymentAction` через DBAL после отката зачисления
-     * (EntityManager к тому моменту может быть закрыт) — здесь только успех и отмена.
-     */
-    private function finish(CheckoutStatus $status, \DateTimeImmutable $now): void
-    {
-        if ($this->status === $status) {
-            return;
-        }
-        Assert::false($this->status->isFinal(), sprintf('Оплата уже в статусе «%s».', $this->status->value));
-
-        $this->status = $status;
-        $this->updatedAt = $now;
-    }
-
     public function getId(): string
     {
         return $this->id;
