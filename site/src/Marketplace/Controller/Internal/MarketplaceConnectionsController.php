@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Controller\Internal;
 
 use App\Marketplace\Application\Service\MarketplaceConnectionsSnapshotBuilder;
+use App\Marketplace\Application\Service\WbConnectionsSnapshotBuilder;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\Internal\ActiveConnectionCredentialsQuery;
 use Psr\Log\LoggerInterface;
@@ -24,6 +25,7 @@ final class MarketplaceConnectionsController extends AbstractController
     public function __construct(
         private readonly ActiveConnectionCredentialsQuery $query,
         private readonly MarketplaceConnectionsSnapshotBuilder $builder,
+        private readonly WbConnectionsSnapshotBuilder $wbBuilder,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
     ) {
@@ -33,15 +35,18 @@ final class MarketplaceConnectionsController extends AbstractController
     public function __invoke(Request $request): JsonResponse
     {
         $provider = (string) $request->query->get('provider', MarketplaceConnectionsSnapshotBuilder::PROVIDER);
-        if (MarketplaceConnectionsSnapshotBuilder::PROVIDER !== $provider) {
+        $snapshot = match ($provider) {
+            MarketplaceConnectionsSnapshotBuilder::PROVIDER => $this->builder->build($this->query->fetchActive(MarketplaceType::OZON), $this->clock->now()),
+            WbConnectionsSnapshotBuilder::PROVIDER => $this->wbBuilder->build($this->query->fetchActive(MarketplaceType::WILDBERRIES), $this->clock->now()),
+            default => null,
+        };
+        if (null === $snapshot) {
             return $this->json(
-                ['error' => ['code' => 'unsupported_provider', 'message' => 'Поддерживается только provider=ozon']],
+                ['error' => ['code' => 'unsupported_provider', 'message' => 'Поддерживаются provider=ozon и provider=wildberries']],
                 422,
                 ['Cache-Control' => 'no-store'],
             );
         }
-
-        $snapshot = $this->builder->build($this->query->fetchActive(MarketplaceType::OZON), $this->clock->now());
 
         $this->logger->info('Internal connections snapshot served', [
             'provider' => $provider,

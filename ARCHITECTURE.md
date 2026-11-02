@@ -4045,6 +4045,13 @@ internal_api → stateless, /internal/* для сервисов services/
   рекламы performance (`ozon.ads.campaigns`, `ozon.ads.expense`, `ozon.ads.daily`) — компаниям
   `ozon_fetcher.ads_companies`, отчёты по товарам (`ozon.ads.statistics`,
   `ozon.ads.statistics.tail`) — из них компаниям `ozon_fetcher.ads_reports_companies`.
+- `GET /internal/marketplace-connections?provider=wildberries` — снимок активных
+  WB-кабинетов для wb-fetcher (тот же контроллер и Query → `WbConnectionsSnapshotBuilder`):
+  кабинет = seller-подключение WB, `connection_ref` и `seller.client_id` — id подключения
+  (единица лимита отчёта WB, как бакет `connection:<id>` в `WbFinanceRateLimiter`),
+  `performance: null`; без пригодного токена не выдаётся. Ресурсы
+  `wb.finance.sales-report.daily`, `wb.finance.sales-report.weekly` — компаниям из
+  `wb_fetcher.finance_companies` (`['*']` — всем, `[]` — никому), остальным `[]`.
   Другие провайдеры — 422 `unsupported_provider`.
 
 Иерархия ролей: `ROLE_USER → ROLE_COMPANY_USER → ROLE_COMPANY_OWNER`
@@ -4687,6 +4694,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.117 | 2026-11-02 | Marketplace: `/internal/marketplace-connections?provider=wildberries` — `WbConnectionsSnapshotBuilder`, параметр `wb_fetcher.finance_companies` (задача wb-fetcher-finance, этап 1) |
 | 2.116 | 2026-11-02 | Billing: подтверждение сокращения оплаченного периода при назначении тарифа, `CancelScheduledTariffAction`, FK журнала оплат и попыток на `companies` — `RESTRICT` (`Version20261102170000`) |
 | 2.115 | 2026-11-02 | Billing: смена тарифа при действующем периоде — `PaymentPlanner`/`PaymentPlanResolver`, запланированный переход у подписки, перенесённый остаток и `superseded_by_payment_id` у оплаты, `BillingAccessDTO::nextTariffName/nextTariffFrom` (`Version20261102150000`) |
 | 2.114 | 2026-11-02 | Billing: онлайн-оплата ЮKassa — `BillingCheckout`, `StartCheckoutAction`, `ApplyYooKassaPaymentAction`, уведомление `/billing/yookassa/webhook`, cron `app:billing:yookassa-sync`, `PaymentSource::YOOKASSA` (`Version20261102120000`); без ключей выключено |

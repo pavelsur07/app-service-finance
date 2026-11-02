@@ -1,5 +1,12 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-11-02) — Wildberries
+
+- Endpoint отвечает на `provider=wildberries` (раньше 422): кабинет — seller-подключение WB,
+  `seller.client_id` — id подключения (единица лимита WB), `performance: null`.
+- Новые значения `resource_types`: `wb.finance.sales-report.daily`, `wb.finance.sales-report.weekly`
+  (детальный отчёт о реализации); выдаются по списку `wb_fetcher.finance_companies`. Схема не менялась.
+
 ## Правка (2026-10-24) — акции, поставки, кластеры
 
 - Новые значения `resource_types` у seller: `ozon.actions`, `ozon.supplies`, `ozon.clusters`
