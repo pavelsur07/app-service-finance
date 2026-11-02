@@ -8,7 +8,6 @@ require (
 	github.com/pavelsur07/app-service-finance/services/shared/fetchkit v0.0.0
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/goleak v1.3.0
-	golang.org/x/time v0.14.0
 )
 
 require (
@@ -35,6 +34,7 @@ require (
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/time v0.14.0 // indirect
 )
 
 // Общее ядро загрузчиков (services/go.md «Монорепо»).

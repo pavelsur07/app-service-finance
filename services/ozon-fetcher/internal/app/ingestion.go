@@ -16,11 +16,12 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/dispatcher"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/executor"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/limits"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonperf"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonstore"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/planner"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ratelimit"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/ratelimit"
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/rawstore"
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
@@ -50,7 +51,7 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 		connections.NewClient(cfg.SymfonyBaseURL, cfg.InternalAuthToken, &http.Client{Timeout: 30 * time.Second}),
 		logger, now).WithAllowlist(cfg.ConnectionAllowlist)
 
-	limits := ratelimit.New(ratelimit.DefaultConfig(), now, ozon.SleepContext, func(ref, endpoint string, rps float64) {
+	limits := ratelimit.New(limits.DefaultConfig(), now, ozon.SleepContext, func(ref, endpoint string, rps float64) {
 		go func() {
 			saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 			defer cancel()

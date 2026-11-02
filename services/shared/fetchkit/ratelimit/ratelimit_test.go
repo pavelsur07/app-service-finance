@@ -9,15 +9,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/apierr"
 )
 
 const (
 	refA = "conn-a"
 	refB = "conn-b"
-	ep   = ozon.EndpointAccrualByDay
-	ep2  = ozon.EndpointAccrualTypes
-	ep3  = ozon.EndpointAccrualPostings
+	ep   = "/v1/finance/accrual/by-day"
+	ep2  = "/v1/finance/accrual/types"
+	ep3  = "/v1/finance/accrual/postings"
 )
 
 type fakeClock struct {
@@ -73,8 +73,8 @@ func newRegistry() (*Registry, *fakeClock, *changes) {
 	return New(testConfig(), clock.Now, clock.Sleep, ch.record), clock, ch
 }
 
-func rateLimited(retry time.Duration) *ozon.APIError {
-	return &ozon.APIError{Class: ozon.ClassRateLimit, RetryAfter: retry}
+func rateLimited(retry time.Duration) *apierr.APIError {
+	return &apierr.APIError{Class: apierr.ClassRateLimit, RetryAfter: retry}
 }
 
 func TestStartsFromEndpointDefaultsAndFallback(t *testing.T) {
@@ -131,7 +131,7 @@ func TestAnyErrorBreaksSuccessStreak(t *testing.T) {
 	r, _, _ := newRegistry()
 	r.Observe(refA, ep, nil)
 	r.Observe(refA, ep, nil)
-	r.Observe(refA, ep, &ozon.APIError{Class: ozon.ClassTransient})
+	r.Observe(refA, ep, &apierr.APIError{Class: apierr.ClassTransient})
 	r.Observe(refA, ep, nil)
 	assert.InDelta(t, 1.0, r.Rate(refA, ep), 1e-9, "успехи не подряд — роста нет")
 	r.Observe(refA, ep, nil)
@@ -163,8 +163,8 @@ func TestCallerQueuedForTokenRespectsPauseSetMeanwhile(t *testing.T) {
 
 func TestOtherErrorsDoNotChangeRate(t *testing.T) {
 	r, _, ch := newRegistry()
-	for _, class := range []ozon.Class{ozon.ClassTransient, ozon.ClassAuth, ozon.ClassInvalidRequest, ozon.ClassNotReady} {
-		r.Observe(refA, ep, &ozon.APIError{Class: class})
+	for _, class := range []apierr.Class{apierr.ClassTransient, apierr.ClassAuth, apierr.ClassInvalidRequest, apierr.ClassNotReady} {
+		r.Observe(refA, ep, &apierr.APIError{Class: class})
 	}
 	assert.InDelta(t, 1.0, r.Rate(refA, ep), 1e-9)
 	assert.Empty(t, ch.list)
@@ -225,7 +225,7 @@ func TestWaitIsCanceledByContext(t *testing.T) {
 	assert.ErrorIs(t, r.Wait(ctx, refA, ep), context.Canceled)
 
 	// Токен-бакет тоже уважает отмену: 0.1 запроса/с, второй токен — через 10 с.
-	slow := New(Config{Fallback: EndpointLimit{Start: 0.1, Floor: 0.1, Ceiling: 0.1}}, time.Now, ozon.SleepContext, nil)
+	slow := New(Config{Fallback: EndpointLimit{Start: 0.1, Floor: 0.1, Ceiling: 0.1}}, time.Now, sleepContext, nil)
 	require.NoError(t, slow.Wait(context.Background(), refA, "/x"))
 	short, cancelShort := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancelShort()
@@ -233,7 +233,7 @@ func TestWaitIsCanceledByContext(t *testing.T) {
 }
 
 func TestConcurrentUseIsRaceFree(t *testing.T) {
-	r := New(Config{Fallback: EndpointLimit{Start: 100000, Floor: 50000, Ceiling: 200000}, GrowAfter: 5, IncreaseStep: 1}, time.Now, ozon.SleepContext, nil)
+	r := New(Config{Fallback: EndpointLimit{Start: 100000, Floor: 50000, Ceiling: 200000}, GrowAfter: 5, IncreaseStep: 1}, time.Now, sleepContext, nil)
 	var wg sync.WaitGroup
 	for i := range 16 {
 		wg.Add(1)
@@ -255,16 +255,6 @@ func TestConcurrentUseIsRaceFree(t *testing.T) {
 	}
 	wg.Wait()
 	assert.Positive(t, r.Rate(refA, "/x"))
-}
-
-func TestDefaultConfigMatchesApiDoc(t *testing.T) {
-	cfg := DefaultConfig()
-	assert.Equal(t, EndpointLimit{Start: 0.3, Floor: 0.05, Ceiling: 2, DefaultPause: 10 * time.Second}, cfg.Endpoints[ozon.EndpointAccrualByDay])
-	for endpoint, l := range cfg.Endpoints {
-		assert.LessOrEqual(t, l.Floor, l.Start, endpoint)
-		assert.LessOrEqual(t, l.Start, l.Ceiling, endpoint)
-		assert.Positive(t, l.DefaultPause, endpoint)
-	}
 }
 
 type storms struct {
@@ -373,17 +363,6 @@ func TestNoStormAlertConfiguredIsSilent(t *testing.T) {
 	assert.InDelta(t, 0.1, r.Rate(refA, ep), 1e-9)
 }
 
-func TestDefaultConfigCoversPostingLists(t *testing.T) {
-	cfg := DefaultConfig()
-	for _, endpoint := range []string{ozon.EndpointPostingFBOList, ozon.EndpointPostingFBSList, ozon.EndpointAccrualPostings} {
-		limit, ok := cfg.Endpoints[endpoint]
-		require.True(t, ok, endpoint)
-		assert.LessOrEqual(t, limit.Start, 0.2, "ключ кабинета общий с Symfony — старт не выше 0,2 запроса/с")
-		assert.Positive(t, limit.Floor)
-		assert.Positive(t, limit.DefaultPause)
-	}
-}
-
 func TestSharedQuotaRateLimitOnlyPauses(t *testing.T) {
 	r, clock, st := stormRegistry()
 	for range 10 {
@@ -412,14 +391,13 @@ func TestSharedQuotaSavedRateBelowFloorIsRaised(t *testing.T) {
 	assert.InDelta(t, 0.2, r.Rate(refA, ep3), 1e-9, "темп, сохранённый до общей квоты, поднимается до пола")
 }
 
-func TestDefaultConfigSnapshotsShareKeyQuota(t *testing.T) {
-	cfg := DefaultConfig()
-	for _, endpoint := range []string{ozon.EndpointPrices, ozon.EndpointWarehouseStocks, ozon.EndpointSearchQueries, ozon.EndpointSearchQueriesDetails, ozon.EndpointReturns,
-		ozon.EndpointActions, ozon.EndpointActionProducts, ozon.EndpointActionCandidates, ozon.EndpointSupplyOrderList,
-		ozon.EndpointSupplyOrderGet, ozon.EndpointSupplyOrderBundle, ozon.EndpointClusters} {
-		limit, ok := cfg.Endpoints[endpoint]
-		require.True(t, ok, endpoint)
-		assert.True(t, limit.SharedQuota, "квота ключа общая — 429 только пауза: %s", endpoint)
-		assert.LessOrEqual(t, limit.Start, 0.2, endpoint)
+func sleepContext(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
 	}
 }
