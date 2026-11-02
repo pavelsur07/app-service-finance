@@ -71,10 +71,12 @@ services:
         autowire: false
         arguments: []
 
-    # Billing: потребители (админка, страница тарифа) появятся на этапах 2–3
-    # (docs/tasks/billing); до них сервисы ни от кого не зависят и без public
-    # вырезаются из контейнера.
+    # Billing: integration-тесты берут Action и Facade из контейнера напрямую;
+    # без public контейнер инлайнит их в контроллеры и не отдаёт тесту.
     App\Billing\Application\RegisterPaymentAction:
+        public: true
+
+    App\Billing\Application\AssignTariffAction:
         public: true
 
     App\Billing\Facade\BillingFacadeInterface:

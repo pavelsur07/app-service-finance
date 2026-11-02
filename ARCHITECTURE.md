@@ -1779,8 +1779,9 @@ manage — только владелец. Новые права автомати
 
 ### Billing: тарифы и оплаченный период (`billing_*`)
 
-План задачи — `docs/tasks/billing/TASK.md`. Сейчас есть ядро (этап 1): UI,
-пробного периода и ограничения доступа нет.
+План задачи — `docs/tasks/billing/TASK.md`. Есть ядро и админка (этапы 1–2);
+страницы клиента, пробного периода и ограничения доступа нет. Всем кабинетам,
+существовавшим на 01.11.2026, назначен «Друг» (`Version20261101230000`).
 
 - `Tariff` (`billing_tariffs`): `TariffCode` (`start`, `base`, `pro` —
   публичные; `friend`, `support`, `outsourcer` — скрытые), `isPublic`,
@@ -1803,14 +1804,27 @@ manage — только владелец. Новые права автомати
   `none` — подписки нет.
 - `BillingFacadeInterface::accessFor(string $companyId, DateTimeImmutable
   $now): BillingAccessDTO` — статус, код и название тарифа, `paidUntil`, дней
-  до окончания.
+  до окончания; `accessForCompanies(list<string> $companyIds, $now):
+  array<string, BillingAccessDTO>` — то же для списка кабинетов одним запросом
+  (страница «Пользователи» в админке).
+- Админка: `/admin/billing/companies/{companyId}` (`src/Billing/Controller/Admin/`,
+  exempt в `ModuleAccessMap`, гейт — firewall `admin` + `ROLE_ADMIN`) — тариф,
+  статус, назначение тарифа, отметка оплаты по счёту, история оплат; плашка
+  тарифа со ссылкой — в строке кабинета на `/admin/users`.
 - Запись: `RegisterPaymentAction` — точка входа, коммитит сама одним
   `wrapInTransaction()` под `pg_advisory_xact_lock(hashtextextended(
   'billing_subscription:'||companyId, 0))`; повтор по `id` или `(source,
   external_id)` возвращает исходную оплату; `UniqueConstraintViolation` —
   поиск DBAL после rollback. Оплата другого тарифа при действующем платном
   периоде — `TariffChangeNotSupportedException`; бессрочный и отключённый
-  тарифы не оплачиваются.
+  тарифы не оплачиваются. `AssignTariffAction` — назначение тарифа
+  администратором (бессрочный — без даты окончания, остальные — с периодом),
+  коммитит сам под той же блокировкой. Ввод обоих Action и правила тарифа
+  (смена при действующем периоде, снятие «Друга» без
+  `RegisterPaymentCommand::$confirmLeavePerpetual` →
+  `PerpetualTariffChangeNotConfirmedException`) проверяются до транзакции,
+  чтобы EM вызывающего оставался открытым, и повторно под блокировкой —
+  против гонки (тогда исключение закрывает EM). Сумма ≤ `INT` колонки.
 
 ### Company: общий минимальный остаток
 
@@ -4522,6 +4536,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.111 | 2026-11-01 | Billing: админка тарифа кабинета, `AssignTariffAction`, `BillingFacadeInterface::accessForCompanies()`; всем кабинетам — «Друг» (`Version20261101230000`); заглушка `/admin/billing` удалена |
 | 2.110 | 2026-11-01 | Billing: новый модуль — `Tariff`, `TariffPrice`, `CompanySubscription`, `BillingPayment`, `RegisterPaymentAction`, `BillingFacadeInterface::accessFor()` (`Version20261101210000`) |
 | 2.109 | 2026-11-01 | Billing: старый модуль `src/Billing/` и таблицы `billing_*` удалены (`Version20261101200000`), новый — `docs/tasks/billing` |
 | 2.108 | 2026-11-01 | Company: колонка `companies.tax_system` удалена миграцией `Version20261101180000` |

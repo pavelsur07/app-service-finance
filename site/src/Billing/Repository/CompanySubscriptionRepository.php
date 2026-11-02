@@ -22,4 +22,36 @@ final class CompanySubscriptionRepository extends ServiceEntityRepository
     {
         return $this->findOneBy(['companyId' => $companyId]);
     }
+
+    /**
+     * Подписки кабинетов одним запросом (с тарифом), ключ — companyId.
+     *
+     * @companyScopeExempt выборка по явному списку кабинетов (админка, страница пользователей): ограничение — сам список
+     *
+     * @param list<string> $companyIds
+     *
+     * @return array<string, CompanySubscription>
+     */
+    public function findByCompanyIds(array $companyIds): array
+    {
+        if ([] === $companyIds) {
+            return [];
+        }
+
+        /** @var list<CompanySubscription> $rows */
+        $rows = $this->createQueryBuilder('s')
+            ->addSelect('t')
+            ->join('s.tariff', 't')
+            ->andWhere('s.companyId IN (:companyIds)')
+            ->setParameter('companyIds', array_values(array_unique($companyIds)))
+            ->getQuery()
+            ->getResult();
+
+        $byCompany = [];
+        foreach ($rows as $subscription) {
+            $byCompany[$subscription->getCompanyId()] = $subscription;
+        }
+
+        return $byCompany;
+    }
 }

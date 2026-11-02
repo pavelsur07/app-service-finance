@@ -8,11 +8,13 @@ use App\Admin\Application\DTO\UserListFilter;
 use App\Admin\Form\AdminAccountCreateType;
 use App\Admin\Infrastructure\Query\UserAdminQuery;
 use App\Admin\Service\UserDeletionService;
+use App\Billing\Facade\BillingFacadeInterface;
 use App\Company\Entity\User;
 use App\Company\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -31,6 +33,12 @@ final class UserController extends AbstractController
         'ROLE_COMPANY_OWNER' => 'Владелец компании',
         'ROLE_COMPANY_USER' => 'Сотрудник компании',
     ];
+
+    public function __construct(
+        private readonly BillingFacadeInterface $billing,
+        private readonly ClockInterface $clock,
+    ) {
+    }
 
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(
@@ -70,6 +78,16 @@ final class UserController extends AbstractController
         $users = iterator_to_array($pager->getCurrentPageResults());
 
         $userIds = array_values(array_map(static fn (User $user): string => (string) $user->getId(), $users));
+        $userCabinets = $userAdminQuery->cabinetsByUserIds($userIds);
+
+        // Тариф кабинетов страницы — один запрос в Billing.
+        $cabinetIds = [];
+        foreach ($userCabinets as $cabinets) {
+            foreach ($cabinets as $cabinet) {
+                $cabinetIds[$cabinet->id] = true;
+            }
+        }
+        $cabinetAccess = $this->billing->accessForCompanies(array_keys($cabinetIds), $this->clock->now());
 
         return $this->render('admin/users/index.html.twig', [
             'title' => 'Зарегистрированные пользователи',
@@ -80,7 +98,8 @@ final class UserController extends AbstractController
             'accountForm' => $accountForm,
             'showAccountModal' => $showAccountModal,
             'roleLabels' => self::ROLE_LABELS,
-            'userCabinets' => $userAdminQuery->cabinetsByUserIds($userIds),
+            'userCabinets' => $userCabinets,
+            'cabinetAccess' => $cabinetAccess,
             'cabinetChoices' => $userAdminQuery->cabinetChoices(),
             'filter' => $filter,
         ]);

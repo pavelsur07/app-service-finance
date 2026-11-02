@@ -7,6 +7,7 @@ namespace App\Billing\Repository;
 use App\Billing\Entity\BillingPayment;
 use App\Billing\Enum\PaymentSource;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -27,5 +28,19 @@ final class BillingPaymentRepository extends ServiceEntityRepository
     public function findOneByExternalId(string $companyId, PaymentSource $source, string $externalId): ?BillingPayment
     {
         return $this->findOneBy(['companyId' => $companyId, 'source' => $source, 'externalId' => $externalId]);
+    }
+
+    /**
+     * История оплат кабинета для Pagerfanta: новые сверху.
+     */
+    public function createByCompanyQueryBuilder(string $companyId): QueryBuilder
+    {
+        return $this->createQueryBuilder('p')
+            ->addSelect('t')
+            ->join('p.tariff', 't')
+            ->andWhere('p.companyId = :companyId')
+            ->setParameter('companyId', $companyId)
+            ->orderBy('p.receivedAt', \SortDirection::Descending)
+            ->addOrderBy('p.id', \SortDirection::Descending);
     }
 }

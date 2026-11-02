@@ -118,4 +118,29 @@ final class BillingEntitiesTest extends TestCase
             }
         }
     }
+
+    public function testAssignPerpetualDropsEndDateAndDatedTariffNeedsValidPeriod(): void
+    {
+        $friend = TariffBuilder::aTariff()->perpetual()->build();
+        $support = TariffBuilder::aTariff()->withId(self::OTHER_TARIFF_ID)->withCode(TariffCode::SUPPORT, 'На сопровождении')->build();
+
+        $subscription = CompanySubscription::assignNew(CompanySubscriptionBuilder::DEFAULT_ID, $friend, new \DateTimeImmutable('2026-11-01'), null, new \DateTimeImmutable());
+        self::assertNull($subscription->getPaidUntil());
+
+        $subscription->assign($support, new \DateTimeImmutable('2026-12-01'), new \DateTimeImmutable('2027-11-30'), new \DateTimeImmutable());
+        self::assertSame(TariffCode::SUPPORT, $subscription->getTariff()->getCode());
+        self::assertSame('2027-11-30', $subscription->getPaidUntil()?->format('Y-m-d'));
+
+        foreach ([
+            'perpetual with end date' => fn () => $subscription->assign($friend, new \DateTimeImmutable('2026-11-01'), new \DateTimeImmutable('2027-01-01'), new \DateTimeImmutable()),
+            'dated without end' => fn () => $subscription->assign($support, new \DateTimeImmutable('2026-11-01'), null, new \DateTimeImmutable()),
+            'reversed dates' => fn () => $subscription->assign($support, new \DateTimeImmutable('2027-02-01'), new \DateTimeImmutable('2027-01-31'), new \DateTimeImmutable()),
+        ] as $case => $call) {
+            try {
+                $call();
+                self::fail($case.' must be rejected');
+            } catch (\InvalidArgumentException) {
+            }
+        }
+    }
 }
