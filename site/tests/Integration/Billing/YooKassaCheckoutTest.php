@@ -9,6 +9,9 @@ use App\Billing\Application\DTO\RegisterPaymentCommand;
 use App\Billing\Application\DTO\StartCheckoutCommand;
 use App\Billing\Application\RegisterPaymentAction;
 use App\Billing\Application\StartCheckoutAction;
+use App\Billing\Domain\PaidPeriod;
+use App\Billing\Domain\PaymentPlan;
+use App\Billing\Domain\PaymentPlanKind;
 use App\Billing\Entity\BillingCheckout;
 use App\Billing\Entity\Tariff;
 use App\Billing\Enum\CheckoutStatus;
@@ -21,6 +24,7 @@ use App\Billing\Message\ApplyYooKassaPaymentMessage;
 use App\Billing\MessageHandler\ApplyYooKassaPaymentHandler;
 use App\Billing\Repository\TariffRepository;
 use App\Tests\Builders\Billing\BillingCheckoutBuilder;
+use App\Tests\Builders\Billing\BillingPaymentBuilder;
 use App\Tests\Builders\Billing\CompanySubscriptionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -109,21 +113,74 @@ final class YooKassaCheckoutTest extends IntegrationTestCase
         self::assertSame(YooKassaResponses::PAYMENT_ID, $this->connection->fetchOne('SELECT provider_payment_id FROM billing_checkouts WHERE id = ?', [$checkoutId]));
     }
 
-    public function testPerpetualTariffAndTariffChangeDuringPaidPeriodAreRefusedBeforeAnyPayment(): void
+    public function testPerpetualTariffAndBlockedTariffChangeAreRefusedBeforeAnyPayment(): void
     {
         $this->em->persist(CompanySubscriptionBuilder::aSubscription()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId)->onTariff($this->tariff(TariffCode::FRIEND))->perpetualFrom('2026-11-01')->build());
         $this->em->flush();
         $this->assertRefused(fn () => $this->start(Uuid::uuid7()->toString(), TariffCode::START, 1), 'бессрочный');
 
+        // Запланирован переход «Профи» → «Старт» с 01.04: до него онлайн — только «Старт».
         $paidCompany = $this->company();
-        $this->em->persist(CompanySubscriptionBuilder::aSubscription()->withId(Uuid::uuid7()->toString())->forCompany($paidCompany)->onTariff($this->tariff(TariffCode::START))->paid('2027-03-01', '2027-03-31')->build());
+        $switching = CompanySubscriptionBuilder::aSubscription()->withId(Uuid::uuid7()->toString())->forCompany($paidCompany)->onTariff($this->tariff(TariffCode::PRO))->paid('2027-03-01', '2027-03-31')->build();
+        $switching->applyPlan($this->tariff(TariffCode::START), new PaymentPlan(PaymentPlanKind::DOWNGRADE, new PaidPeriod(new \DateTimeImmutable('2027-04-01'), new \DateTimeImmutable('2027-04-30'))), new \DateTimeImmutable('2027-03-05'), new \DateTimeImmutable('2027-03-05'));
+        $this->em->persist($switching);
         $this->em->flush();
-        $this->assertRefused(fn () => $this->start(Uuid::uuid7()->toString(), TariffCode::BASE, 1, $paidCompany), 'только тариф «Старт»');
+        $this->assertRefused(fn () => $this->start(Uuid::uuid7()->toString(), TariffCode::BASE, 1, $paidCompany), 'Уже запланирован переход на тариф «Старт» с 01.04.2027');
         $this->assertRefused(fn () => $this->start(Uuid::uuid7()->toString(), TariffCode::SUPPORT, 1), 'нельзя оплатить онлайн');
         $this->assertRefused(fn () => $this->start(Uuid::uuid7()->toString(), TariffCode::START, 2), 'нет цены');
 
         self::assertSame([], $this->yooKassa->requests);
         self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM billing_checkouts'));
+    }
+
+    public function testOtherTariffDuringPaidPeriodCanBeStartedOnline(): void
+    {
+        $start = $this->tariff(TariffCode::START);
+        $this->em->persist(CompanySubscriptionBuilder::aSubscription()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId)->onTariff($start)->paid('2027-03-01', '2027-03-31')->build());
+        $this->em->persist(BillingPaymentBuilder::aPayment()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId)->onTariff($start)->forPeriod('2027-03-01', '2027-03-31')->build());
+        $this->em->flush();
+        $checkoutId = Uuid::uuid7()->toString();
+        $this->yooKassa->then(YooKassaResponses::payment('pending', 995000, $this->metadata($checkoutId)));
+
+        self::assertStringStartsWith('https://yoomoney.ru/checkout/', $this->start($checkoutId, TariffCode::BASE, 1));
+        self::assertSame(995000, (int) $this->connection->fetchOne('SELECT amount_kopecks FROM billing_checkouts WHERE id = ?', [$checkoutId]));
+    }
+
+    public function testOpenCheckoutOfOtherTariffBlocksNewOneForAnHour(): void
+    {
+        $this->em->persist(CompanySubscriptionBuilder::aSubscription()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId)->onTariff($this->tariff(TariffCode::PRO))->paid('2027-03-01', '2027-03-31')->build());
+        $this->em->flush();
+        $first = Uuid::uuid7()->toString();
+        $this->yooKassa->then(YooKassaResponses::payment('pending', self::START_1_MONTH, $this->metadata($first)));
+        $this->start($first, TariffCode::START, 1);
+
+        $this->assertRefused(fn () => $this->start(Uuid::uuid7()->toString(), TariffCode::BASE, 1), 'Незавершённая онлайн-оплата другого тарифа');
+        self::assertCount(1, $this->yooKassa->requests);
+    }
+
+    public function testCheckoutWithoutLinkAlsoBlocksOtherTariffAndRetryRechecks(): void
+    {
+        $this->em->persist(CompanySubscriptionBuilder::aSubscription()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId)->onTariff($this->tariff(TariffCode::PRO))->paid('2027-03-01', '2027-03-31')->build());
+        // Попытка «Старта» без ссылки (ЮKassa падала) 30 минут назад — по ней ещё можно получить ссылку повтором.
+        $fresh = BillingCheckoutBuilder::aCheckout()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId)->onTariff($this->tariff(TariffCode::START), 1, self::START_1_MONTH)->withProviderPayment(null)->createdAt('2027-03-10 09:30:00')->build();
+        $this->em->persist($fresh);
+        $this->em->flush();
+
+        $this->assertRefused(fn () => $this->start(Uuid::uuid7()->toString(), TariffCode::BASE, 1), 'Незавершённая онлайн-оплата другого тарифа');
+
+        // Повтор попытки «Старта» той же формой при открытой попытке «Базы» (создана 20 минут назад) — отказ.
+        $base = BillingCheckoutBuilder::aCheckout()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId)->onTariff($this->tariff(TariffCode::BASE), 1, 995000)->withProviderPayment(null)->createdAt('2027-03-10 09:40:00')->build();
+        $this->em->persist($base);
+        $this->em->flush();
+        $this->assertRefused(fn () => $this->start($fresh->getId(), TariffCode::START, 1), 'Незавершённая онлайн-оплата другого тарифа');
+
+        // Попытка без ссылки старше часа ссылку уже не получит — нужна новая форма.
+        $stale = BillingCheckoutBuilder::aCheckout()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId)->onTariff($this->tariff(TariffCode::START), 1, self::START_1_MONTH)->withProviderPayment(null)->createdAt('2027-03-10 08:00:00')->build();
+        $this->em->persist($stale);
+        $this->em->flush();
+        $this->assertRefused(fn () => $this->start($stale->getId(), TariffCode::START, 1), 'Форма устарела');
+
+        self::assertSame([], $this->yooKassa->requests);
     }
 
     public function testDisabledWithoutKeys(): void

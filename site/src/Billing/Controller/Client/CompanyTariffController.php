@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Billing\Controller\Client;
 
 use App\Billing\Application\ApplyYooKassaPaymentAction;
+use App\Billing\Application\PaymentPlanResolver;
+use App\Billing\Domain\PaidPeriodCalculator;
+use App\Billing\Domain\PaymentPlan;
 use App\Billing\Entity\BillingCheckout;
 use App\Billing\Entity\Tariff;
 use App\Billing\Enum\CheckoutStatus;
-use App\Billing\Exception\TariffChangeNotSupportedException;
 use App\Billing\Exception\YooKassaRequestFailedException;
 use App\Billing\Exception\YooKassaUnavailableException;
 use App\Billing\Facade\BillingFacadeInterface;
@@ -57,6 +59,7 @@ final class CompanyTariffController extends AbstractController
         private readonly CompanySubscriptionRepository $subscriptions,
         private readonly BillingCheckoutRepository $checkouts,
         private readonly ApplyYooKassaPaymentAction $applyYooKassaPayment,
+        private readonly PaymentPlanResolver $planResolver,
         private readonly YooKassaConfig $yooKassa,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
@@ -160,12 +163,13 @@ final class CompanyTariffController extends AbstractController
     }
 
     /**
-     * Что можно оплатить онлайн: те же правила, что у `StartCheckoutAction`. null — онлайн-оплата
-     * этому кабинету не нужна или недоступна (бессрочный тариф).
+     * Что можно оплатить онлайн и что произойдёт при оплате: те же правила, что у
+     * `StartCheckoutAction` и зачисления (`PaymentPlanResolver`). null — онлайн-оплата этому
+     * кабинету не нужна или недоступна (бессрочный тариф).
      *
      * @param list<array{tariff: Tariff, prices: array<int, array{total: int, perMonth: int, discountPercent: int}>}> $offers
      *
-     * @return array{checkoutId: string, offers: list<array{tariff: Tariff, prices: array<int, array{total: int, perMonth: int, discountPercent: int}>}>, onlyCurrent: bool}|null
+     * @return array{checkoutId: string, offers: list<array{tariff: Tariff, prices: array<int, array{total: int, perMonth: int, discountPercent: int}>}>, selected: string, plans: array<string, PaymentPlan>, unavailable: list<string>}|null
      */
     private function onlinePayment(string $companyId, array $offers): ?array
     {
@@ -174,24 +178,44 @@ final class CompanyTariffController extends AbstractController
             return null;
         }
 
-        $now = $this->clock->now();
+        $options = [];
+        $keys = [];
+        foreach ($offers as $index => $offer) {
+            foreach (array_keys($offer['prices']) as $months) {
+                $options[] = [$offer['tariff'], $months];
+                $keys[] = [$index, $offer['tariff']->getCode()->value.':'.$months];
+            }
+        }
+
         $payable = [];
-        foreach ($offers as $offer) {
-            try {
-                $subscription?->renewalBase($offer['tariff'], $now);
-                $payable[] = $offer;
-            } catch (TariffChangeNotSupportedException) {
-                continue;
+        $plans = [];
+        $unavailable = [];
+        foreach ($this->planResolver->planMany($subscription, $this->clock->now(), $options) as $i => $result) {
+            [$index, $key] = $keys[$i];
+            if ($result instanceof PaymentPlan) {
+                $payable[$index] = $offers[$index];
+                $plans[$key] = $result;
+            } elseif (!\in_array($result->getMessage(), $unavailable, true)) {
+                $unavailable[] = $result->getMessage();
             }
         }
         if ([] === $payable) {
             return null;
         }
+        $payable = array_values($payable);
+
+        // По умолчанию — запланированный тариф (до перехода можно оплатить только его) или текущий.
+        $day = PaidPeriodCalculator::day($this->clock->now());
+        $preferred = ($subscription?->scheduledTariffAfter($day) ?? $subscription?->tariffOn($day))?->getCode()->value;
+        $codes = array_map(static fn (array $offer): string => $offer['tariff']->getCode()->value, $payable);
+        $selected = null !== $preferred && \in_array($preferred, $codes, true) ? $preferred : $codes[0];
 
         return [
             'checkoutId' => Uuid::uuid7()->toString(),
             'offers' => $payable,
-            'onlyCurrent' => \count($payable) < \count($offers),
+            'selected' => $selected,
+            'plans' => $plans,
+            'unavailable' => $unavailable,
         ];
     }
 }

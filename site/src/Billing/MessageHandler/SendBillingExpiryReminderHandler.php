@@ -71,7 +71,7 @@ final class SendBillingExpiryReminderHandler
                     'paidUntil' => $paidUntil,
                     'daysBefore' => $message->daysBefore,
                     'trial' => $message->trial,
-                    'tariffName' => $subscription->getTariff()->getName(),
+                    'tariffName' => $subscription->tariffOn($paidUntil)->getName(),
                 ],
             ));
         } catch (\Throwable $e) {

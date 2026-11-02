@@ -94,18 +94,191 @@ final class RegisterPaymentActionTest extends IntegrationTestCase
         self::assertSame(1, $this->paymentCount());
     }
 
-    public function testOtherTariffDuringActivePeriodIsRejectedAndWritesNothing(): void
+    public function testUpgradeSwitchesAtOnceAndCarriesUnusedBalanceAsDays(): void
+    {
+        $this->pay(TariffCode::START, '2027-01-15 15:00:00'); // 15.01–14.02, 31 дн, 4 970 ₽
+        // 01.02: не использовано 14 дн → 4 970 × 14 / 31 = 2 244,51 ₽; «Профи» 01.02–28.02 (28 дн)
+        // за 14 790 ₽ → 2 244,51 × 28 / 14 790 = 4,25 → +4 дн.
+        $paymentId = $this->pay(TariffCode::PRO, '2027-02-01 10:00:00', amount: 1479000);
+
+        self::assertSame(
+            ['period_from' => '2027-02-01', 'period_until' => '2027-03-04', 'carried_days' => 4, 'carried_kopecks' => 224451],
+            $this->connection->fetchAssociative('SELECT period_from, period_until, carried_days, carried_kopecks FROM billing_payments WHERE id = ?', [$paymentId]),
+        );
+        $subscription = $this->subscription();
+        self::assertSame(TariffCode::PRO, $subscription->getTariff()->getCode());
+        self::assertSame('2027-02-01', $subscription->getPaidFrom()->format('Y-m-d'));
+        self::assertSame('2027-03-04', $subscription->getPaidUntil()?->format('Y-m-d'));
+
+        // Повтор той же оплаты — та же запись, без второго пересчёта.
+        self::assertSame($paymentId, $this->pay(TariffCode::PRO, '2027-02-01 10:00:00', amount: 1479000, paymentId: $paymentId));
+        self::assertSame(2, $this->paymentCount());
+        self::assertSame('2027-03-04', $this->subscription()->getPaidUntil()?->format('Y-m-d'));
+    }
+
+    public function testSecondUpgradeCountsCarriedPartOfPreviousOne(): void
     {
         $this->pay(TariffCode::START, '2027-01-15 15:00:00');
-        $this->em->clear();
+        // «База» 01.02: остаток 2 244,51 ₽ × 28 / 9 950 = 6,31 → 01.02–06.03 (34 дн).
+        $this->pay(TariffCode::BASE, '2027-02-01 10:00:00', amount: 995000);
+        // «Профи» 10.02: от «Базы» не использовано 25 дн из 34 → (9 950 + 2 244,51) × 25 / 34 = 8 966,55 ₽;
+        // 10.02–09.03 (28 дн) → 8 966,55 × 28 / 14 790 = 16,97 → +16 дн.
+        $paymentId = $this->pay(TariffCode::PRO, '2027-02-10 10:00:00', amount: 1479000);
+
+        self::assertSame(
+            ['period_until' => '2027-03-25', 'carried_days' => 16, 'carried_kopecks' => 896655],
+            $this->connection->fetchAssociative('SELECT period_until, carried_days, carried_kopecks FROM billing_payments WHERE id = ?', [$paymentId]),
+        );
+        self::assertSame('2027-03-25', $this->subscription()->getPaidUntil()?->format('Y-m-d'));
+    }
+
+    public function testDowngradeStartsAfterPaidPeriodAndBlocksOtherTariffsUntilThen(): void
+    {
+        $this->pay(TariffCode::PRO, '2027-01-15 15:00:00', amount: 1479000); // 15.01–14.02
+        $paymentId = $this->pay(TariffCode::START, '2027-02-01 10:00:00');
+
+        self::assertSame(
+            ['period_from' => '2027-02-15', 'period_until' => '2027-03-14', 'carried_days' => 0],
+            $this->connection->fetchAssociative('SELECT period_from, period_until, carried_days FROM billing_payments WHERE id = ?', [$paymentId]),
+        );
+        $subscription = $this->subscription();
+        self::assertSame(TariffCode::PRO, $subscription->tariffOn(new \DateTimeImmutable('2027-02-14'))->getCode());
+        self::assertSame(TariffCode::START, $subscription->tariffOn(new \DateTimeImmutable('2027-02-15'))->getCode());
+        self::assertSame('2027-03-14', $subscription->getPaidUntil()?->format('Y-m-d'));
 
         try {
-            $this->pay(TariffCode::PRO, '2027-02-01 10:00:00', amount: 1479000);
-            self::fail('tariff change during active period must be rejected');
+            $this->pay(TariffCode::BASE, '2027-02-05 10:00:00', amount: 995000);
+            self::fail('other tariff while switch is scheduled must be rejected');
         } catch (TariffChangeNotSupportedException) {
         }
+        self::assertSame(2, $this->paymentCount());
 
-        self::assertSame(1, $this->paymentCount());
+        // Продление запланированного тарифа — после окончания его первого периода.
+        $this->pay(TariffCode::START, '2027-02-05 10:00:00');
+        self::assertSame('2027-04-14', $this->subscription()->getPaidUntil()?->format('Y-m-d'));
+    }
+
+    public function testUpgradeDowngradeUpgradeDoesNotCarrySamePaymentTwice(): void
+    {
+        // «Старт» оплачен вперёд четырьмя оплатами: 15.01–14.05.
+        foreach (['2027-01-15', '2027-01-16', '2027-01-17', '2027-01-18'] as $day) {
+            $this->pay(TariffCode::START, $day.' 15:00:00');
+        }
+        // 01.02 «Профи»: 2 244,51 + 3 × 4 970 = 17 154,51 ₽ × 28 / 14 790 = 32,47 → по 01.04.
+        $first = $this->pay(TariffCode::PRO, '2027-02-01 10:00:00', amount: 1479000);
+        self::assertSame(4, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM billing_payments WHERE superseded_by_payment_id = ?', [$first]));
+        // 05.02 «Старт» — понижение: 02.04–01.05.
+        $this->pay(TariffCode::START, '2027-02-05 10:00:00');
+        // 10.04 снова «Профи»: остаток — только от понижения, 4 970 × 22 / 30 = 3 644,66 ₽ (оплата 15.04–14.05
+        // уже перенесена первым повышением и второй раз не считается).
+        $second = $this->pay(TariffCode::PRO, '2027-04-10 10:00:00', amount: 1479000);
+
+        self::assertSame(
+            ['carried_days' => 7, 'carried_kopecks' => 364466],
+            $this->connection->fetchAssociative('SELECT carried_days, carried_kopecks FROM billing_payments WHERE id = ?', [$second]),
+        );
+    }
+
+    public function testCarriedBalanceAboveIntRangeIsStored(): void
+    {
+        $max = RegisterPaymentAction::MAX_AMOUNT_KOPECKS;
+        $this->pay(TariffCode::START, '2027-01-15 15:00:00', amount: $max);
+        $this->pay(TariffCode::START, '2027-01-16 15:00:00', amount: $max);
+        $paymentId = $this->pay(TariffCode::PRO, '2027-02-01 10:00:00', amount: 1479000);
+
+        self::assertGreaterThan($max, (int) $this->connection->fetchOne('SELECT carried_kopecks FROM billing_payments WHERE id = ?', [$paymentId]));
+    }
+
+    public function testRepeatAfterLaterTariffChangeReturnsOriginalPayment(): void
+    {
+        $original = $this->pay(TariffCode::PRO, '2027-01-15 15:00:00', amount: 1479000, externalId: 'INV-1');
+        $this->pay(TariffCode::START, '2027-02-01 10:00:00'); // понижение запланировано — «Профи» сейчас был бы отказом
+
+        self::assertSame($original, $this->pay(TariffCode::PRO, '2027-01-15 15:00:00', amount: 1479000, paymentId: $original));
+        self::assertSame($original, $this->pay(TariffCode::PRO, '2027-01-15 15:00:00', amount: 1479000, externalId: 'INV-1'));
+        self::assertSame(2, $this->paymentCount());
+    }
+
+    public function testPaymentReceivedBeforeAlreadyAppliedTariffChangeIsRejected(): void
+    {
+        $this->pay(TariffCode::START, '2027-01-10 15:00:00');
+        $this->pay(TariffCode::PRO, '2027-01-20 10:00:00', amount: 1479000);
+
+        try {
+            $this->pay(TariffCode::BASE, '2027-01-15 10:00:00', amount: 995000);
+            self::fail('payment older than applied tariff change must be rejected');
+        } catch (TariffChangeNotSupportedException $exception) {
+            self::assertStringContainsString('получена раньше', $exception->getMessage());
+        }
+        self::assertSame(2, $this->paymentCount());
+    }
+
+    public function testInvoiceDatedSameDayAsEarlierOnlinePaymentIsAccepted(): void
+    {
+        $this->pay(TariffCode::START, '2027-01-10 15:00:00');
+        $this->pay(TariffCode::START, '2027-01-20 10:00:00'); // утром онлайн — продление
+        // Счёт за «Профи» той же датой: форма админки даёт полночь — это не «раньше смены тарифа».
+        $this->pay(TariffCode::PRO, '2027-01-20 00:00:00', amount: 1479000);
+
+        self::assertSame(TariffCode::PRO, $this->subscription()->getTariff()->getCode());
+    }
+
+    public function testUpgradeAfterAdminShortenedPeriodIsRejected(): void
+    {
+        $this->pay(TariffCode::START, '2027-01-01 15:00:00'); // 01.01–31.01
+        $subscription = $this->subscription();
+        $subscription->assign($subscription->getTariff(), new \DateTimeImmutable('2027-01-01'), new \DateTimeImmutable('2027-01-15'), new \DateTimeImmutable()); // частичный возврат
+        $this->em->flush();
+
+        foreach (['2027-01-10', '2027-01-20'] as $day) {
+            if ('2027-01-20' === $day) {
+                $this->pay(TariffCode::START, '2027-01-10 11:00:00'); // продление поверх: 16.01–15.02
+            }
+            try {
+                $this->pay(TariffCode::PRO, $day.' 12:00:00', amount: 1479000);
+                self::fail('upgrade over shortened period must be rejected: '.$day);
+            } catch (TariffChangeNotSupportedException $exception) {
+                self::assertStringContainsString('изменён вручную', $exception->getMessage());
+            }
+        }
+        self::assertSame(2, $this->paymentCount());
+    }
+
+    public function testUpgradeWithDetachedLaterPaymentIsRejected(): void
+    {
+        $this->pay(TariffCode::START, '2027-01-01 15:00:00'); // 01.01–31.01
+        $subscription = $this->subscription();
+        $subscription->assign($subscription->getTariff(), new \DateTimeImmutable('2027-01-01'), new \DateTimeImmutable('2027-02-28'), new \DateTimeImmutable());
+        $this->em->flush();
+        $this->pay(TariffCode::START, '2027-01-05 10:00:00'); // 01.03–31.03
+        $subscription = $this->subscription();
+        $subscription->assign($subscription->getTariff(), new \DateTimeImmutable('2027-01-01'), new \DateTimeImmutable('2027-01-31'), new \DateTimeImmutable()); // возврат
+        $this->em->flush();
+
+        try {
+            $this->pay(TariffCode::PRO, '2027-01-15 10:00:00', amount: 1479000);
+            self::fail('upgrade with detached payment must be rejected');
+        } catch (TariffChangeNotSupportedException $exception) {
+            self::assertStringContainsString('изменён вручную', $exception->getMessage());
+        }
+        self::assertSame(2, $this->paymentCount());
+        self::assertSame('2027-01-31', $this->subscription()->getPaidUntil()?->format('Y-m-d'));
+    }
+
+    public function testUpgradeOfPeriodAssignedWithoutPaymentIsRejected(): void
+    {
+        $start = self::getContainer()->get(TariffRepository::class)->findOneByCode(TariffCode::START);
+        self::assertNotNull($start);
+        $this->em->persist(CompanySubscriptionBuilder::aSubscription()->withId(Uuid::uuid7()->toString())->forCompany(self::COMPANY_ID)->onTariff($start)->paid('2027-01-01', '2027-10-31')->build());
+        $this->em->flush();
+
+        try {
+            $this->pay(TariffCode::PRO, '2027-01-15 10:00:00', amount: 0);
+            self::fail('upgrade of unpaid days must be rejected');
+        } catch (TariffChangeNotSupportedException) {
+        }
+        self::assertSame('2027-10-31', $this->subscription()->getPaidUntil()?->format('Y-m-d'));
+        self::assertSame(0, $this->paymentCount());
     }
 
     public function testPerpetualTariffIsNotPayable(): void

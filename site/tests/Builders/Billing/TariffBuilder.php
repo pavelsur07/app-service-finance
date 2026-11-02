@@ -43,6 +43,15 @@ final class TariffBuilder
         return $clone;
     }
 
+    /** Скрытый тариф с периодом (не в публичном прайсе). */
+    public function hidden(): self
+    {
+        $clone = clone $this;
+        $clone->public = false;
+
+        return $clone;
+    }
+
     public function perpetual(): self
     {
         $clone = clone $this;

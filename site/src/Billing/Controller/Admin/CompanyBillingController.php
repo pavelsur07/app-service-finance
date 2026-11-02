@@ -56,19 +56,22 @@ final class CompanyBillingController extends AbstractController
             self::PAYMENTS_PER_PAGE,
         );
 
-        $currentTariff = $subscription?->getTariff();
+        $today = PaidPeriodCalculator::day($this->clock->now());
+        $currentTariff = $subscription?->tariffOn($today);
 
         return $this->render('billing/admin/company.html.twig', [
             'company' => $company,
             'access' => $this->billing->accessFor($companyId, $this->clock->now()),
             'subscription' => $subscription,
+            'currentTariff' => $currentTariff,
+            'paidFrom' => $subscription?->paidFromOn($today),
             'tariffs' => $this->tariffs->findActiveOrdered(),
             'pricesByTariff' => $this->prices->amountsByTariffCode(),
             'payments' => $pager,
             'failedCheckouts' => $this->checkouts->findNeedingAttentionByCompanyId($companyId, $this->clock->now()->modify('-24 hours')),
             'paymentFormId' => Uuid::uuid7()->toString(),
             'defaultPaymentTariff' => null !== $currentTariff && !$currentTariff->isPerpetual() ? $currentTariff->getCode()->value : 'start',
-            'today' => PaidPeriodCalculator::day($this->clock->now())->format('Y-m-d'),
+            'today' => $today->format('Y-m-d'),
         ]);
     }
 }

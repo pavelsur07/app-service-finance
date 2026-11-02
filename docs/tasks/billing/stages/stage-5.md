@@ -73,7 +73,7 @@
 - [x] routing сообщения, cron-строка, `access_control` для уведомления
 - [x] PHPStan, CS, strict_types; unit / integration / functional по затронутому
 - [x] `ARCHITECTURE.md`, `TASK.md`, `yookassa-setup.md`
-- [ ] после деплоя: ключей нет → кнопки нет, ошибок нет
+- [x] после деплоя: ключей нет → кнопки нет, ошибок нет (02.11.2026 10:12: попыток 0, webhook 200, новых событий GlitchTip нет)
 
 ## Итог
 

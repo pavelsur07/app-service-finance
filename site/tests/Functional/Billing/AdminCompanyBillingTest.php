@@ -125,7 +125,23 @@ final class AdminCompanyBillingTest extends WebTestCaseBase
         self::assertSame(TariffCode::START, $this->subscription()->getTariff()->getCode());
     }
 
-    public function testOtherPaidTariffDuringActivePeriodShowsError(): void
+    public function testCheaperTariffDuringActivePeriodIsScheduledAndShown(): void
+    {
+        $pro = static::getContainer()->get(TariffRepository::class)->findOneByCode(TariffCode::PRO);
+        self::assertNotNull($pro);
+        $this->em()->persist(CompanySubscriptionBuilder::aSubscription()->forCompany((string) $this->company->getId())->onTariff($pro)->paid('2027-01-01', '2099-01-31')->build());
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $this->submit('Зачислить оплату', ['tariff' => 'start', 'months' => '1', 'amount' => '4970', 'received_on' => '2027-01-15']);
+
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('[data-billing-next-tariff]', 'С 01.02.2099 — тариф «Старт»');
+        self::assertSame(TariffCode::PRO, $this->subscription()->getTariff()->getCode());
+        self::assertSame('2099-02-28', $this->subscription()->getPaidUntil()?->format('Y-m-d'));
+    }
+
+    public function testHiddenTariffDuringActivePeriodShowsError(): void
     {
         $start = static::getContainer()->get(TariffRepository::class)->findOneByCode(TariffCode::START);
         self::assertNotNull($start);
@@ -133,9 +149,9 @@ final class AdminCompanyBillingTest extends WebTestCaseBase
         $this->em()->flush();
         $this->em()->clear();
 
-        $this->submit('Зачислить оплату', ['tariff' => 'pro', 'months' => '1', 'amount' => '14790', 'received_on' => '2027-01-15']);
+        $this->submit('Зачислить оплату', ['tariff' => 'support', 'months' => '12', 'amount' => '100000', 'received_on' => '2027-01-15']);
 
-        self::assertStringContainsString('другого тарифа при действующем', $this->followedContent());
+        self::assertStringContainsString('можно только через администратора', $this->followedContent());
         self::assertSame(0, $this->paymentCount());
     }
 
