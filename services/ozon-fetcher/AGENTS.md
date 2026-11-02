@@ -38,7 +38,7 @@ backoff, запись raw в S3 без перезаписи, журнал заг
   техническое состояние, без сумм, ПДн, ключей. `00001`: `sync_job`,
   `checkpoint`, `outbox_batch` (выдача фактов, позже); `00002_ingestion`:
   `fetch_task`, `fetch_attempt`, `raw_object`, `connection_limit` (этап 7
-  плана). Миграции — `internal/store/migrations`, прогон —
+  плана). Миграции — `internal/ozonstore/migrations` (история сервиса; схема совпадает с ядром `shared/fetchkit/store`, проверяет `TestSchemaMatchesFetchkitCore`), прогон —
   `make ozon-fetcher-migrate`. Дисциплина — `services/AGENTS.md` §9.
 - S3: бакет `vashfindir-services-raw` (Timeweb), raw immutable — новый объект
   на каждую загрузку, sha256 и размер в `raw_object`; ключи S3 —

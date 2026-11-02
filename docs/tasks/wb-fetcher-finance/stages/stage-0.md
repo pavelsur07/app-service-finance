@@ -80,15 +80,15 @@ spec-wb §5 запрещает копировать ядро ozon-fetcher в wb-
 
 ## 6. Чек-лист готовности
 
-- [ ] golden-тесты сняты на старом коде и закоммичены отдельно
-- [ ] `services/shared/fetchkit/go.mod`, `replace` в ozon-fetcher, `services/go.work`
-- [ ] в fetchkit нет `import …/ozon-fetcher/…` и строк `ozon` вне `_test.go` (гейт в Makefile)
-- [ ] все прежние тесты ozon-fetcher зелёные без правки ожиданий; golden совпадают
-- [ ] интеграционные тесты store на локальном Postgres (`TEST_DB_DSN`) зелёные в fetchkit и ozon-fetcher
-- [ ] миграции ozon-fetcher не изменены: остаются в `internal/store/migrations`, `git diff` по ним пуст
-- [ ] Dockerfile ozon-fetcher собирается из `services/`; compose dev/prod и deploy.yml указывают новый контекст
-- [ ] `go vet`, `golangci-lint`, `go test -race` по fetchkit и ozon-fetcher (по пакету, контейнер с лимитом памяти)
-- [ ] документы: README/AGENTS ozon-fetcher, `services/README.md`, `services/go.md`
+- [x] golden-тесты сняты на старом коде и закоммичены отдельно (284bc13e4)
+- [x] `services/shared/fetchkit/go.mod`, `replace` в ozon-fetcher; `go.work` не заводим — replace достаточно, сборка с `GOWORK=off` (`services/go.md` «Монорепо»)
+- [x] в fetchkit нет импортов сервисов и литералов провайдеров вне `_test.go` — гейт тестом `fetchkit/internal/boundary` (красный на подставленном нарушении), идёт в CI с тестами ядра
+- [x] все прежние тесты ozon-fetcher зелёные без правки ожиданий; golden совпадают
+- [x] интеграционные тесты на PostgreSQL 15 (`TEST_DB_DSN`): fetchkit/store, ozonstore, dispatcher, executor (132 PASS, 1 SKIP — нужен S3, как на базе)
+- [x] миграции ozon-fetcher не изменены: перенесены в `internal/ozonstore/migrations` rename 100% (goose ведёт версии по номеру, не пути); схема ядра сверяется `TestSchemaMatchesFetchkitCore`
+- [x] Dockerfile ozon-fetcher собирается из `services/` (локальная сборка образа ок); compose dev и deploy.yml указывают новый контекст; prod-compose берёт готовый образ — без правок
+- [x] `go vet`, `golangci-lint` (0 issues), `go test -race` по fetchkit и ozon-fetcher (по пакету, контейнер с лимитом памяти)
+- [x] документы: README/AGENTS ozon-fetcher, `services/README.md`, `services/go.md`, `shared/fetchkit/README.md`
 - [ ] внутреннее ревью diff от `62dda3879`, внешнее ревью (Codex), BLOCKER/IMPORTANT закрыты
 - [ ] после деплоя (в рамках handoff задачи): ночь без новых ERROR в GlitchTip ozon-fetcher, покрытие месяца не изменилось
 

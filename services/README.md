@@ -17,6 +17,7 @@ source normalization маркетплейсов. Symfony остаётся вла
 | Сервис | Язык | Назначение | Статус |
 |---|---|---|---|
 | [ozon-fetcher](ozon-fetcher/README.md) | Go | Получение финансовых данных Ozon Seller API, публикация source facts | scaffold |
+| [shared/fetchkit](shared/fetchkit/README.md) | Go | Общее ядро загрузчиков маркетплейсов: очередь задач, исполнитель, лимитер, raw в S3, HTTP API | библиотека, в ozon-fetcher |
 | [ai-service](ai-service/README.md) | Python | ИИ-задачи для Symfony: pipeline с проверками, несколько LLM | каркас, не в проде |
 
 ## Запуск (dev)
@@ -27,6 +28,7 @@ source normalization маркетплейсов. Symfony остаётся вла
 ```bash
 make ozon-fetcher-build   # сборка образа
 make ozon-fetcher-up      # запуск в dev-окружении
+make fetchkit-test        # гейты общего ядра (также fetchkit-vet, fetchkit-lint)
 ```
 
 ## Как добавить новый сервис
