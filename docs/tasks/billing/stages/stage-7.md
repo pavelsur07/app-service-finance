@@ -70,4 +70,4 @@
 - [x] миграция up/down/up
 - [x] PHPStan, CS, strict_types; unit / integration / functional по затронутому
 - [x] `ARCHITECTURE.md`, `TASK.md`
-- [ ] после деплоя: FK `RESTRICT` на проде, подписок 21, ошибок нет
+- [x] после деплоя: FK `RESTRICT` на проде, подписок 21, ошибок нет (02.11)
