@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 5 — прод (deploy-матрица, prod compose, env, allowlist эталонного кабинета)
-**Status:** stages 3–4 done, stage 5 планируется
-**Stage base commit:** (коммит этапа 3)
+**Phase:** handoff — PR, «merge and deploy», затем проверки этапа 5 после деплоя
+**Status:** код этапов 0–5 готов; внешнее ревью green; ждёт секреты/переменные Владельца и merge
+**Stage base commit:** 62dda3879 (ветка), этап 5 — e2dc136ff, правки ревью — d84d68ffd
 
 ### Completed
 - Phase 0: plan.md, stages/stage-0..5.md, решения Владельца В1 (S3 — тот же пользователь/бакет, префикс) и В2 (план этапа перед работой)
@@ -10,18 +10,20 @@
 - Stage 1 (Symfony, provider=wildberries): eeeceaa73; внешнее ревью REVIEW_GREEN
 - Stage 2 (wb-fetcher, дневной отчёт): 04d328aa7, 2628390ae; стенд с моком пройден
 - Stage 3 (недельный отчёт, сверка): реальная проба period=weekly тестовым токеном Владельца (токен нигде не сохранён); контракт service-coverage v1.1.0 (574df6063)
-- Stage 4 (вкладки Ozon | Wildberries, многосервисное покрытие): визуальная проверка на стенде пройдена
+- Stage 4 (вкладки Ozon | Wildberries, многосервисное покрытие): визуальная проверка на стенде пройдена (21dfcb7fb)
+- Stage 5 (прод за WB_FETCHER_ENABLED): e2dc136ff; замер «до» 27.10–02.11 — 447 / failed 0 / retried 0
+- Ревью handoff: site — REVIEW_GREEN; services — раунд 1 BLOCKER (пагинация) + 2 IMPORTANT (общий лимит с Symfony, память) исправлены в d84d68ffd (квота wb-finance-quota v1), раунд 2 — REVIEW_GREEN, 2 MINOR закрыты
 
 ### Checks and baseline
 - Go: unit -race fetchkit/ozon-fetcher зелёные; интеграционные PG15 зелёные (1 SKIP — S3, как на базе); golangci-lint 0
-- PHP: Marketplace unit 1040 / functional 267 зелёные; PHPStan/CS по изменённым файлам — ок
+- PHP (02.11, handoff): полный набор 7932 — 1 падение (новые маршруты без ROUTE_POLICY), исправлено, гейт зелёный; unit 4383 OK; CS всех файлов 0; strict_types 0; PHPStan по изменённым файлам 0. Полный PHPStan локально: только «unmatched ignore» baseline в файлах вне ветки (локальное окружение; master на merge-base в CI зелёный)
 - wb-fetcher: unit + интеграционный PG15 зелёные, golangci-lint 0, образ собирается
 
 ### Review status
-- Stage 0: internal + Codex green; Stage 1: Codex green
+- Stage 0: internal + Codex green; Stage 1: Codex green; handoff (этапы 2–5): Codex green со 2-го раунда
 
 ### Exact next action
-- Stage 5: детальный план stage-5.md; прод-изменения (compose, секреты, allowlist) — по docs/maintenance/ozon-fetcher-prod.md
+- после «merge and deploy»: проверки stage-5.md §4 «После деплоя» (codex-docker-ps, витрина, perf-report), 3 ночи, сверка, снять allowlist
 
 ### Окружение (снести в конце)
 - контейнеры vf-fetchkit-pg (сеть vf-fetchkit-test), asfwb-pg + asfwb-redis (сеть asfwb-net; БД app_dev — стенд этапа 4); worktree scratchpad/base; стенд wbstand-* снесён
