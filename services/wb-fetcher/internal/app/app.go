@@ -91,6 +91,7 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 	s3Client := rawstore.NewS3Client(cfg.S3Endpoint, cfg.S3Region, cfg.S3AccessKeyID, cfg.S3SecretAccessKey)
 	raw := rawstore.New(s3Client, cfg.S3Bucket, cfg.MaxParallelConnections*2)
 	execCfg := executor.DefaultConfig()
+	execCfg.Location = loc
 	exec := executor.New(execCfg, tasks, raw, report, cabinets, logger, now, jitter)
 
 	plannerCfg := planner.DefaultConfig(loc)

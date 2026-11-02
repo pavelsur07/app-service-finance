@@ -62,6 +62,13 @@ final class ServiceCoverageV1ParserTest extends TestCase
         self::assertNull($report->rows[2]->lastSuccessAt);
     }
 
+    public function testParsesIsoWeekPeriodKey(): void
+    {
+        $report = (new ServiceCoverageV1Parser())->parse(self::decoded(self::withRow(self::fixture(), ['period_key' => '2026-W44'])));
+
+        self::assertSame('2026-W44', $report->rows[0]->periodKey);
+    }
+
     public function testParsesEmptyRows(): void
     {
         $data = self::fixture();
@@ -90,6 +97,9 @@ final class ServiceCoverageV1ParserTest extends TestCase
         yield 'float total' => [static fn (array $d): mixed => ['cabinets_total' => 4.5] + $d, '$.cabinets_total'];
         yield 'rows not list' => [static fn (array $d): mixed => ['rows' => ['a' => 1]] + $d, '$.rows'];
         yield 'bad period key' => [static fn (array $d): mixed => self::withRow($d, ['period_key' => '2026-10-17T00']), '$.rows[0].period_key'];
+        yield 'short week key' => [static fn (array $d): mixed => self::withRow($d, ['period_key' => '2026-W4']), '$.rows[0].period_key'];
+        yield 'week zero' => [static fn (array $d): mixed => self::withRow($d, ['period_key' => '2026-W00']), '$.rows[0].period_key'];
+        yield 'week 54' => [static fn (array $d): mixed => self::withRow($d, ['period_key' => '2026-W54']), '$.rows[0].period_key'];
         yield 'empty resource' => [static fn (array $d): mixed => self::withRow($d, ['resource_type' => '']), '$.rows[0].resource_type'];
         yield 'extra row key' => [static fn (array $d): mixed => self::withRow($d, ['company_id' => 'x']), '$.rows[0]'];
         yield 'missing status' => [static fn (array $d): mixed => self::withRow($d, ['by_status' => ['done' => 1]]), '$.rows[0].by_status'];

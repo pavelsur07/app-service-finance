@@ -13,15 +13,23 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/executor"
 )
 
-// Приоритеты: вчерашний день раньше хвоста.
+// Приоритеты: вчерашний день раньше прошлой недели, неделя раньше хвостов.
 const (
 	PriorityYesterday = 10
+	PriorityWeek      = 7
 	PriorityTail      = 5
 )
 
 // KindDailyTail — суточное перечитывание вчера и хвоста: WB дописывает строки
 // отчёта задним числом (Symfony перечитывает 14 дней каждый час).
 const KindDailyTail = "wb_daily_tail"
+
+// KindWeeklyTail — суточное перечитывание трёх последних недель: недельный
+// отчёт — эталон сверки, WB правит его задним числом.
+const KindWeeklyTail = "wb_weekly_tail"
+
+// RefreshWeeks — последних полных недель в загрузке и перечитывании.
+const RefreshWeeks = 3
 
 // DefaultTailDays — дней перед вчера в окне загрузки и перечитывания.
 const DefaultTailDays = 14
@@ -51,29 +59,51 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) schedule.P
 	if now.After(start) {
 		start = now
 	}
+	// Понедельник прошлой недели и самой старой перечитываемой.
+	lastWeek := today.AddDate(0, 0, -(int(today.Weekday())+6)%7-7)
+	oldestWeek := lastWeek.AddDate(0, 0, -7*(RefreshWeeks-1))
 
 	var plan schedule.Plan
 	for _, cab := range cabinets {
-		if !cab.Supports(executor.ResourceDaily) {
-			continue
-		}
-		tail := schedule.Refresh{Kind: KindDailyTail, RunDate: runDate, ConnectionRef: cab.Ref}
-		for i := 0; i <= cfg.TailDays; i++ {
-			day := yesterday.AddDate(0, 0, -i).Format(time.DateOnly)
-			ensure := store.TaskSpec{TaskKey: key(cab.Ref, day), Priority: PriorityTail, RunAt: now}
-			if i == 0 {
-				ensure.Priority, ensure.RunAt = PriorityYesterday, start
+		weekly := cab.Supports(executor.ResourceWeekly)
+		if cab.Supports(executor.ResourceDaily) {
+			// Обе стороны сверки недели свежие одновременно: дневное окно не
+			// короче перечитываемых недель.
+			days := cfg.TailDays
+			if back := int(yesterday.Sub(oldestWeek).Hours()/24 + 0.5); weekly && back > days {
+				days = back
 			}
-			plan.Ensure = append(plan.Ensure, ensure)
-			tail.Specs = append(tail.Specs, store.TaskSpec{TaskKey: key(cab.Ref, day), Priority: ensure.Priority, Refresh: true, RunAt: start})
+			tail := schedule.Refresh{Kind: KindDailyTail, RunDate: runDate, ConnectionRef: cab.Ref}
+			for i := 0; i <= days; i++ {
+				k := key(cab.Ref, executor.ResourceDaily, yesterday.AddDate(0, 0, -i).Format(time.DateOnly))
+				ensure := store.TaskSpec{TaskKey: k, Priority: PriorityTail, RunAt: now}
+				if i == 0 {
+					ensure.Priority, ensure.RunAt = PriorityYesterday, start
+				}
+				plan.Ensure = append(plan.Ensure, ensure)
+				tail.Specs = append(tail.Specs, store.TaskSpec{TaskKey: k, Priority: ensure.Priority, Refresh: true, RunAt: start})
+			}
+			plan.Refreshes = append(plan.Refreshes, tail)
 		}
-		plan.Refreshes = append(plan.Refreshes, tail)
+		if weekly {
+			tail := schedule.Refresh{Kind: KindWeeklyTail, RunDate: runDate, ConnectionRef: cab.Ref}
+			for i := 0; i < RefreshWeeks; i++ {
+				k := key(cab.Ref, executor.ResourceWeekly, executor.WeekKey(lastWeek.AddDate(0, 0, -7*i)))
+				ensure := store.TaskSpec{TaskKey: k, Priority: PriorityTail, RunAt: now}
+				if i == 0 {
+					ensure.Priority, ensure.RunAt = PriorityWeek, start
+				}
+				plan.Ensure = append(plan.Ensure, ensure)
+				tail.Specs = append(tail.Specs, store.TaskSpec{TaskKey: k, Priority: ensure.Priority, Refresh: true, RunAt: start})
+			}
+			plan.Refreshes = append(plan.Refreshes, tail)
+		}
 	}
 	return plan
 }
 
-func key(ref, day string) store.TaskKey {
-	return store.TaskKey{ConnectionRef: ref, ResourceType: executor.ResourceDaily, PeriodKey: day}
+func key(ref, resource, period string) store.TaskKey {
+	return store.TaskKey{ConnectionRef: ref, ResourceType: resource, PeriodKey: period}
 }
 
 // NewScheduler — цикл планировщика ядра с планом WB.

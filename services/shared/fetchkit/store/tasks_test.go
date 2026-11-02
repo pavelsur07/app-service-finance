@@ -825,6 +825,32 @@ func TestCoverageCountsActiveCabinetsWithinWindow(t *testing.T) {
 	assert.Empty(t, empty)
 }
 
+func TestCoverageIncludesISOWeeksOverlappingWindow(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{
+		spec("ref-a", "weekly", "2026-W39", 0), // 21.09–27.09 — до окна
+		spec("ref-a", "weekly", "2026-W40", 0), // 28.09–04.10 — пересекает начало окна
+		spec("ref-a", "weekly", "2026-W44", 0), // 26.10–01.11 — пересекает конец окна
+		spec("ref-a", "weekly", "2026-W45", 0), // 02.11–08.11 — после окна
+	}))
+
+	rows, err := tasks.Coverage(ctx, []string{"ref-a"}, "2026-10-01", "2026-10-31")
+	require.NoError(t, err)
+
+	got := make([]string, 0, len(rows))
+	for _, r := range rows {
+		got = append(got, r.PeriodKey)
+	}
+	assert.Equal(t, []string{"2026-W40", "2026-W44"}, got)
+}
+
+func TestCoverageWeeksAcrossYearBoundary(t *testing.T) {
+	assert.Equal(t, []string{"2026-W53", "2027-W01"}, coverageWeeks("2026-12-31", "2027-01-04"))
+	assert.Equal(t, []string{"2026-W44"}, coverageWeeks("2026-10-26", "2026-11-01"))
+	assert.Empty(t, coverageWeeks("bad", "2026-11-01"))
+}
+
 func TestRateLimitedTaskYieldsToReadyTaskOfSamePriority(t *testing.T) {
 	tasks := testTasks(t)
 	ctx := context.Background()

@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/apierr"
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/fetch"
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/connections"
@@ -43,6 +45,7 @@ type Config struct {
 	NotReadyDelay   map[string]time.Duration
 	MaxPages        int
 	PageLimit       int
+	Location        *time.Location // пояс периодов: Europe/Moscow
 }
 
 // DefaultConfig — как у ozon-fetcher; lease покрывает ожидание лимита (70 с) и
@@ -53,7 +56,7 @@ func DefaultConfig() Config {
 		BackoffBase: time.Minute, BackoffMax: 6 * time.Hour,
 		RateLimitPause: wb.DefaultRateLimitPause, AuthRetryPause: 10 * time.Minute, AuthSuspend: 6 * time.Hour,
 		NoCredentialsIn: time.Hour, NotReadyDelay: map[string]time.Duration{},
-		MaxPages: DefaultMaxPages, PageLimit: wb.PageLimit,
+		MaxPages: DefaultMaxPages, PageLimit: wb.PageLimit, Location: moscow,
 	}
 }
 
@@ -62,11 +65,15 @@ type Executor struct {
 	core   *fetch.Executor[connections.Cabinet]
 	cfg    Config
 	report Report
+	now    func() time.Time
 }
 
 func New(cfg Config, tasks fetch.TaskStore, raw fetch.RawStore, report Report, refresher fetch.Refresher, logger *slog.Logger,
 	now func() time.Time, jitter func(time.Duration) time.Duration) *Executor {
-	e := &Executor{cfg: cfg, report: report}
+	if cfg.Location == nil {
+		cfg.Location = moscow
+	}
+	e := &Executor{cfg: cfg, report: report, now: now}
 	e.core = fetch.New[connections.Cabinet](fetch.Config{
 		Provider: wb.Source, Lease: cfg.Lease, FinishTimeout: cfg.FinishTimeout,
 		BackoffBase: cfg.BackoffBase, BackoffMax: cfg.BackoffMax, RateLimitPause: cfg.RateLimitPause,
@@ -83,25 +90,36 @@ func (e *Executor) Run(ctx context.Context, task store.Task, cabinet connections
 
 // Fetch — fetch.Adapter.
 func (e *Executor) Fetch(ctx context.Context, run *fetch.Run, cab connections.Cabinet) error {
-	if run.Task.ResourceType != ResourceDaily {
-		return fmt.Errorf("%w: %q", fetch.ErrUnknownResource, run.Task.ResourceType)
+	resource := run.Task.ResourceType
+	if resource != ResourceDaily && resource != ResourceWeekly {
+		return fmt.Errorf("%w: %q", fetch.ErrUnknownResource, resource)
 	}
 	if cab.Token == "" {
 		return fetch.ErrNoCredentials
 	}
-	if !cab.Supports(run.Task.ResourceType) {
+	if !cab.Supports(resource) {
 		return fetch.ErrResourceNotEnabled
+	}
+	if resource == ResourceWeekly {
+		monday, err := ParseWeek(run.Task.PeriodKey, e.cfg.Location)
+		if err != nil {
+			return fmt.Errorf("%w: %q", fetch.ErrBadPeriod, run.Task.PeriodKey)
+		}
+		return e.pages(ctx, run, cab, wb.PeriodWeekly, monday.Format(time.DateOnly), monday.AddDate(0, 0, 6).Format(time.DateOnly),
+			monday.Add(WeekReadyAfter))
 	}
 	day, err := time.Parse(time.DateOnly, run.Task.PeriodKey)
 	if err != nil {
 		return fmt.Errorf("%w: %q", fetch.ErrBadPeriod, run.Task.PeriodKey)
 	}
-	return e.pages(ctx, run, cab, wb.PeriodDaily, day.Format(time.DateOnly), day.Format(time.DateOnly))
+	return e.pages(ctx, run, cab, wb.PeriodDaily, day.Format(time.DateOnly), day.Format(time.DateOnly), time.Time{})
 }
 
 // pages — с курсора задачи до страницы короче limit; каждая страница с
-// курсором продолжения пишется до запроса следующей.
-func (e *Executor) pages(ctx context.Context, run *fetch.Run, cab connections.Cabinet, period, from, to string) error {
+// курсором продолжения пишется до запроса следующей. readyAt — крайний срок
+// формирования отчёта: пустая первая страница раньше него — not_ready
+// (нулевой readyAt — пустой ответ всегда означает пустой период).
+func (e *Executor) pages(ctx context.Context, run *fetch.Run, cab connections.Cabinet, period, from, to string, readyAt time.Time) error {
 	if run.Cursor == "" && len(run.Hashes) > 0 {
 		return nil // все страницы сохранены прошлой попыткой, не записан только итог
 	}
@@ -122,6 +140,10 @@ func (e *Executor) pages(ctx context.Context, run *fetch.Run, cab connections.Ca
 			DateFrom: from, DateTo: to, Period: period, RrdID: cursor, Limit: e.cfg.PageLimit})
 		if err != nil {
 			return err
+		}
+		if page.Rows == 0 && cursor == 0 && run.Pages == started && e.now().Before(readyAt) {
+			return &apierr.APIError{Source: wb.Source, Class: apierr.ClassNotReady, Endpoint: wb.EndpointSalesReport, Status: http.StatusOK,
+				Err: fmt.Errorf("%s report %s..%s is not formed yet (deadline %s)", period, from, to, readyAt.Format(time.RFC3339))}
 		}
 		next := ""
 		if page.More {

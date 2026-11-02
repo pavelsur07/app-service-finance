@@ -19,8 +19,8 @@ type CoverageRow struct {
 }
 
 // Coverage — сводка задач активных кабинетов (connectionRefs) за окно
-// [from; to] (YYYY-MM-DD): дни окна, месяцы, на которые оно попадает, и
-// справочники (period_key = 'ref'). Один запрос, без идентификаторов кабинетов
+// [from; to] (YYYY-MM-DD): дни окна, месяцы и ISO-недели (YYYY-Www), на
+// которые оно попадает, и справочники (period_key = 'ref'). Один запрос, без идентификаторов кабинетов
 // в результате.
 func (t *Tasks) Coverage(ctx context.Context, connectionRefs []string, from, to string) ([]CoverageRow, error) {
 	if len(connectionRefs) == 0 {
@@ -32,9 +32,10 @@ func (t *Tasks) Coverage(ctx context.Context, connectionRefs []string, from, to 
 		WHERE connection_ref = ANY($1)
 		  AND (period_key = 'ref'
 		       OR (length(period_key) = 10 AND period_key BETWEEN $2 AND $3)
-		       OR (length(period_key) = 7 AND period_key BETWEEN left($2, 7) AND left($3, 7)))
+		       OR (length(period_key) = 7 AND period_key BETWEEN left($2, 7) AND left($3, 7))
+		       OR period_key = ANY($4))
 		GROUP BY resource_type, period_key, status`,
-		connectionRefs, from, to)
+		connectionRefs, from, to, coverageWeeks(from, to))
 	if err != nil {
 		return nil, fmt.Errorf("store: coverage: %w", err)
 	}
@@ -77,4 +78,20 @@ func (t *Tasks) Coverage(ctx context.Context, connectionRefs []string, from, to 
 		return out[i].PeriodKey < out[j].PeriodKey
 	})
 	return out, nil
+}
+
+// coverageWeeks — ключи ISO-недель (YYYY-Www), пересекающих окно [from; to];
+// неразборное окно — пусто.
+func coverageWeeks(from, to string) []string {
+	start, err1 := time.Parse(time.DateOnly, from)
+	end, err2 := time.Parse(time.DateOnly, to)
+	if err1 != nil || err2 != nil || start.After(end) {
+		return []string{}
+	}
+	out := []string{}
+	for d := start.AddDate(0, 0, -(int(start.Weekday())+6)%7); !d.After(end); d = d.AddDate(0, 0, 7) {
+		y, w := d.ISOWeek()
+		out = append(out, fmt.Sprintf("%04d-W%02d", y, w))
+	}
+	return out
 }

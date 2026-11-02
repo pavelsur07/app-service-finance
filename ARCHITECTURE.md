@@ -405,7 +405,8 @@
   `max_duration` 5 с, `X-Trace-Id`. Повторов внутри вызова нет — повтор
   делает cron. Пустые адрес или токен — обновление выключено.
 - Разбор `ServiceCoverageV1Parser` строгий: лишний или недостающий ключ, тип,
-  формат, дубль строки → `ContractViolationException`. Транспорт, таймаут,
+  формат (`period_key` — `YYYY-MM-DD`, `YYYY-MM`, ISO-неделя `YYYY-Www` или
+  `ref`), дубль строки → `ContractViolationException`. Транспорт, таймаут,
   ответ не 200 → `ServiceUnavailableException`.
 - Витрина: `service_coverage_snapshot` (одна строка на сервис: `generated_at`,
   `refreshed_at`, окно, `cabinets_total`) и `service_coverage_row`
@@ -4694,6 +4695,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.118 | 2026-11-02 | ServiceGateway: `ServiceCoverageV1Parser` принимает недельный `period_key` `YYYY-Www` (контракт `service-coverage` v1.1.0, задача wb-fetcher-finance, этап 3) |
 | 2.117 | 2026-11-02 | Marketplace: `/internal/marketplace-connections?provider=wildberries` — `WbConnectionsSnapshotBuilder`, параметр `wb_fetcher.finance_companies` (задача wb-fetcher-finance, этап 1) |
 | 2.116 | 2026-11-02 | Billing: подтверждение сокращения оплаченного периода при назначении тарифа, `CancelScheduledTariffAction`, FK журнала оплат и попыток на `companies` — `RESTRICT` (`Version20261102170000`) |
 | 2.115 | 2026-11-02 | Billing: смена тарифа при действующем периоде — `PaymentPlanner`/`PaymentPlanResolver`, запланированный переход у подписки, перенесённый остаток и `superseded_by_payment_id` у оплаты, `BillingAccessDTO::nextTariffName/nextTariffFrom` (`Version20261102150000`) |

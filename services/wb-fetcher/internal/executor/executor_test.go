@@ -102,13 +102,18 @@ type harness struct {
 
 func run(t *testing.T, rep *fakeReport, tk store.Task, c connections.Cabinet, mutate ...func(*Config)) (fetch.Result, *harness) {
 	t.Helper()
+	return runAt(t, t0, rep, tk, c, mutate...)
+}
+
+func runAt(t *testing.T, now time.Time, rep *fakeReport, tk store.Task, c connections.Cabinet, mutate ...func(*Config)) (fetch.Result, *harness) {
+	t.Helper()
 	h := &harness{tasks: &fakeTasks{}, raw: &fakeRaw{}, logs: &bytes.Buffer{}}
 	cfg := DefaultConfig()
 	for _, m := range mutate {
 		m(&cfg)
 	}
 	exec := New(cfg, h.tasks, h.raw, rep, noRefresh{}, slog.New(slog.NewJSONHandler(h.logs, nil)),
-		func() time.Time { return t0 }, func(time.Duration) time.Duration { return 0 })
+		func() time.Time { return now }, func(time.Duration) time.Duration { return 0 })
 	return exec.Run(context.Background(), tk, c, "trace"), h
 }
 

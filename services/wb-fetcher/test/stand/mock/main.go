@@ -43,7 +43,7 @@ func main() {
 		}
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		n := requests.Add(1)
-		log.Printf("report request #%d auth=%t period=%s from=%s to=%s rrdId=%d limit=%d", n,
+		log.Printf("report request #%d auth=%t period=%q from=%q to=%q rrdId=%d limit=%d", n, //nolint:gosec // стенд: %q экранирует ввод
 			r.Header.Get("Authorization") == "stand-token", req.Period, req.DateFrom, req.DateTo, req.RrdID, req.Limit)
 		if n == 1 {
 			w.Header().Set("X-Ratelimit-Retry", "5")
@@ -65,7 +65,7 @@ func main() {
 			_, _ = w.Write([]byte(b.String()))
 		default:
 			time.Sleep(delay)
-			fmt.Fprintf(w, `[{"rrdId":%d,"day":"%s"},{"rrdId":%d,"day":"%s"}]`, req.RrdID+1, day, req.RrdID+2, day)
+			_, _ = fmt.Fprintf(w, `[{"rrdId":%d,"day":"%s"},{"rrdId":%d,"day":"%s"}]`, req.RrdID+1, day, req.RrdID+2, day)
 		}
 	})
 	log.Fatal(http.ListenAndServe(":8090", mux)) //nolint:gosec // G114: стендовый мок
