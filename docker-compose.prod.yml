@@ -41,6 +41,9 @@ x-php-env: &php-env
     APP_MAIL_REPLY_TO: "support@vashfindir.ru"
     FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
     WB_LEGACY_RECONCILE_ENABLED: ${WB_LEGACY_RECONCILE_ENABLED:-0}
+    # Billing, этап 4: режим «только чтение» после льготного периода. Выключен — гейт только пишет
+    # в журнал «заблокировал бы». Включить: BILLING_READ_ONLY_ENFORCED=true в host-env + деплой.
+    BILLING_READ_ONLY_ENFORCED: ${BILLING_READ_ONLY_ENFORCED:-false}
     # Диагностика производительности Marketplace M1 (структурированные замеры этапов →
     # var/log/performance-<дата>.jsonl в томе site_var_log, отчёт app:marketplace:perf-report).
     # Выключить: MARKETPLACE_PERF_DIAGNOSTICS=0 в host-env и пересоздать PHP-контейнеры (флаг

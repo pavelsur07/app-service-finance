@@ -1784,7 +1784,8 @@ manage — только владелец. Новые права автомати
 ### Billing: тарифы и оплаченный период (`billing_*`)
 
 План задачи — `docs/tasks/billing/TASK.md`. Есть ядро, админка, страница
-клиента, пробный период и напоминания (этапы 1–3); ограничения доступа нет.
+клиента, пробный период, напоминания и режим «только чтение» за флагом
+(этапы 1–4); онлайн-оплаты нет.
 Всем кабинетам, существовавшим на 01.11.2026, назначен «Друг»
 (`Version20261101230000`).
 
@@ -1837,6 +1838,17 @@ manage — только владелец. Новые права автомати
   Twig-функцию `billing_notice()` (`ExpiryNotice`): за 7 дней до «оплачено
   по» и в сам этот день (`daysLeft` ≤ 8), в льготные дни и в «только чтение»;
   истёкший пробный — свои тексты.
+- Режим «только чтение»: `ReadOnlyModeSubscriber` (`KernelEvents::CONTROLLER`,
+  main-request, firewall `main`) отклоняет `POST`/`PUT`/`PATCH`/`DELETE`
+  кабинета в статусе `read_only` (`ReadOnlyRule`; `grace` и `none` не
+  ограничиваются); белый список маршрутов — `ReadOnlyRule::ALLOWED_ROUTES`
+  (вход/выход, пароль, тема, переключение/создание/удаление компании,
+  приглашение, пересчёт и предпросмотр отчётов). Ответ: HTML — 303 на
+  `/company/price` с flash; JSON/XHR/`/api/` — 403
+  `{"error":{"code":"billing_read_only"}}`. Флаг `BILLING_READ_ONLY_ENFORCED`
+  (по умолчанию `false`; в `.env.test` — `true`): выключен — только `info`
+  «заблокировал бы». Внешнее API (`/api/external/v1`), админка и фоновые
+  загрузки не ограничиваются.
 - Напоминания: `app:billing:expiry-reminders` (cron 10:00) →
   `ScheduleExpiryRemindersAction`: оплаченный период — за 7/3/1/0 дней,
   пробный — за 3/0; уже отправленные пропускает, сбой постановки — ERROR,
@@ -4574,6 +4586,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.113 | 2026-11-02 | Billing: режим «только чтение» после льготного периода — `ReadOnlyModeSubscriber`, `ReadOnlyRule`, флаг `BILLING_READ_ONLY_ENFORCED` (по умолчанию выключен) |
 | 2.112 | 2026-11-02 | Billing: страница клиента `/company/price` на справочнике, баннер `billing_notice()`, пробный период 14 дней на «Базе» по `CompanyCreatedEvent` и backfill, напоминания `app:billing:expiry-reminders` (`Version20261102100000`) |
 | 2.111 | 2026-11-01 | Billing: админка тарифа кабинета, `AssignTariffAction`, `BillingFacadeInterface::accessForCompanies()`; всем кабинетам — «Друг» (`Version20261101230000`); заглушка `/admin/billing` удалена |
 | 2.110 | 2026-11-01 | Billing: новый модуль — `Tariff`, `TariffPrice`, `CompanySubscription`, `BillingPayment`, `RegisterPaymentAction`, `BillingFacadeInterface::accessFor()` (`Version20261101210000`) |
