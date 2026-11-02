@@ -20,6 +20,10 @@ final class BillingPaymentBuilder
     private int $months = 1;
     private int $amountKopecks = 497000;
     private ?string $externalId = null;
+    private string $periodFrom = '2027-01-01';
+    private string $periodUntil = '2027-01-31';
+    private int $carriedDays = 0;
+    private int $carriedKopecks = 0;
 
     public static function aPayment(): self
     {
@@ -67,6 +71,24 @@ final class BillingPaymentBuilder
         return $clone;
     }
 
+    public function forPeriod(string $from, string $until): self
+    {
+        $clone = clone $this;
+        $clone->periodFrom = $from;
+        $clone->periodUntil = $until;
+
+        return $clone;
+    }
+
+    public function withCarried(int $days, int $kopecks): self
+    {
+        $clone = clone $this;
+        $clone->carriedDays = $days;
+        $clone->carriedKopecks = $kopecks;
+
+        return $clone;
+    }
+
     public function build(): BillingPayment
     {
         return new BillingPayment(
@@ -76,10 +98,12 @@ final class BillingPaymentBuilder
             $this->months,
             $this->amountKopecks,
             new \DateTimeImmutable('2027-01-01 15:00:00'),
-            new PaidPeriod(new \DateTimeImmutable('2027-01-01'), new \DateTimeImmutable('2027-01-31')),
+            new PaidPeriod(new \DateTimeImmutable($this->periodFrom), new \DateTimeImmutable($this->periodUntil)),
             PaymentSource::MANUAL_INVOICE,
             $this->externalId,
             new \DateTimeImmutable('2027-01-01 15:00:01'),
+            $this->carriedDays,
+            $this->carriedKopecks,
         );
     }
 }

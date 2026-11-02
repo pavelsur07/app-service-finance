@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Billing\Repository;
 
+use App\Billing\Domain\PaidPeriodCalculator;
 use App\Billing\Entity\BillingPayment;
+use App\Billing\Entity\Tariff;
 use App\Billing\Enum\PaymentSource;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -37,6 +40,53 @@ final class BillingPaymentRepository extends ServiceEntityRepository
     public function findOneByCompanyAndExternalIdAnySource(string $companyId, string $externalId): ?BillingPayment
     {
         return $this->findOneBy(['companyId' => $companyId, 'externalId' => $externalId]);
+    }
+
+    /**
+     * Оплаты тарифа в текущем отрезке подписки, период которых не закончился к дню `$day` и остаток
+     * которых ещё не перенесён в повышение, — основа остатка при повышении тарифа.
+     *
+     * @return list<BillingPayment>
+     */
+    public function findUnexpiredInSegment(string $companyId, Tariff $tariff, \DateTimeImmutable $segmentFrom, \DateTimeImmutable $day): array
+    {
+        /* @var list<BillingPayment> */
+        return $this->createQueryBuilder('p')
+            ->andWhere('p.companyId = :companyId')
+            ->andWhere('p.tariff = :tariff')
+            ->andWhere('p.periodFrom >= :segmentFrom')
+            ->andWhere('p.periodUntil >= :day')
+            ->andWhere('p.supersededByPaymentId IS NULL')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('tariff', $tariff)
+            ->setParameter('segmentFrom', $segmentFrom, Types::DATE_IMMUTABLE)
+            ->setParameter('day', $day, Types::DATE_IMMUTABLE)
+            ->orderBy('p.periodFrom', \SortDirection::Ascending)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Есть ли зачисленная оплата другого тарифа, полученная в более поздний день (МСК), чем
+     * `$receivedAt`: оплату, пришедшую после смены тарифа, но полученную раньше неё, автоматически не
+     * пересчитать. По дням, не по моментам: оплата по счёту вводится датой (полночь), а план и так
+     * считается по дню зачисления.
+     */
+    public function existsReceivedAfterWithOtherTariff(string $companyId, \DateTimeImmutable $receivedAt, Tariff $tariff): bool
+    {
+        $nextDay = PaidPeriodCalculator::day($receivedAt)->modify('+1 day');
+
+        return null !== $this->createQueryBuilder('p')
+            ->select('1')
+            ->andWhere('p.companyId = :companyId')
+            ->andWhere('p.receivedAt >= :nextDay')
+            ->andWhere('p.tariff <> :tariff')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('nextDay', $nextDay, Types::DATETIME_IMMUTABLE)
+            ->setParameter('tariff', $tariff)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     /**

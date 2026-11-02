@@ -6,6 +6,7 @@ namespace App\Billing\Repository;
 
 use App\Billing\Entity\BillingCheckout;
 use App\Billing\Entity\BillingPayment;
+use App\Billing\Entity\Tariff;
 use App\Billing\Enum\CheckoutStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -56,6 +57,33 @@ final class BillingCheckoutRepository extends ServiceEntityRepository
             ->getResult();
 
         return $rows;
+    }
+
+    /**
+     * Есть ли у компании незавершённая попытка другого тарифа, созданная после `$createdAfter`
+     * (кроме `$exceptId`): по ней клиент может заплатить — со ссылкой сейчас, без ссылки после повтора.
+     * По дате создания, не `updatedAt`: его двигает и cron-сверка, брошенная попытка блокировала бы вечно.
+     */
+    public function hasOpenForOtherTariff(string $companyId, Tariff $tariff, \DateTimeImmutable $createdAfter, ?string $exceptId = null): bool
+    {
+        $qb = $this->createQueryBuilder('c')
+            ->select('1')
+            ->andWhere('c.companyId = :companyId')
+            ->andWhere('c.status = :status')
+            ->andWhere('c.tariff <> :tariff')
+            ->andWhere('c.createdAt > :after');
+        if (null !== $exceptId) {
+            $qb->andWhere('c.id <> :exceptId')->setParameter('exceptId', $exceptId);
+        }
+
+        return null !== $qb
+            ->setParameter('companyId', $companyId)
+            ->setParameter('status', CheckoutStatus::PENDING)
+            ->setParameter('tariff', $tariff)
+            ->setParameter('after', $createdAfter)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     /**

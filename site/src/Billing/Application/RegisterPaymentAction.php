@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Billing\Application;
 
 use App\Billing\Application\DTO\RegisterPaymentCommand;
-use App\Billing\Domain\PaidPeriodCalculator;
+use App\Billing\Domain\PaymentPlanKind;
 use App\Billing\Entity\BillingPayment;
 use App\Billing\Entity\CompanySubscription;
 use App\Billing\Entity\Tariff;
 use App\Billing\Exception\InvalidBillingInputException;
 use App\Billing\Exception\PerpetualTariffChangeNotConfirmedException;
+use App\Billing\Exception\TariffChangeNotSupportedException;
 use App\Billing\Exception\TariffNotPayableException;
 use App\Billing\Repository\BillingPaymentRepository;
 use App\Billing\Repository\CompanySubscriptionRepository;
@@ -22,7 +23,8 @@ use Symfony\Component\Clock\ClockInterface;
 use Webmozart\Assert\Assert;
 
 /**
- * Зачисляет оплату: запись в журнал + создание или продление подписки компании.
+ * Зачисляет оплату: запись в журнал + подписка по плану оплаты (`PaymentPlanner`: новый период,
+ * продление, повышение тарифа с переносом остатка, понижение со следующего периода).
  *
  * Точка входа, сама коммитит. Одна транзакция под блокировкой компании
  * (`pg_advisory_xact_lock`, существует и до первой строки подписки). Повтор с тем же
@@ -39,7 +41,7 @@ final class RegisterPaymentAction
         private readonly TariffRepository $tariffs,
         private readonly CompanySubscriptionRepository $subscriptions,
         private readonly BillingPaymentRepository $payments,
-        private readonly PaidPeriodCalculator $calculator,
+        private readonly PaymentPlanResolver $planResolver,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
     ) {
@@ -70,10 +72,19 @@ final class RegisterPaymentAction
             throw new TariffNotPayableException($command->tariffCode);
         }
 
+        // Повтор — исходная оплата, даже если подписка с тех пор изменилась (переход запланирован,
+        // тариф повышен) и та же оплата сейчас была бы отказом. Под блокировкой проверяется ещё раз.
+        $repeated = $this->findRepeated($command);
+        if (null !== $repeated) {
+            return $repeated->getId();
+        }
+
         $current = $this->subscriptions->findOneByCompanyId($command->companyId);
         if (null !== $current) {
+            // Отказы — до транзакции.
             $this->assertMayLeavePerpetual($current, $command);
-            $current->renewalBase($tariff, $command->receivedAt); // смена тарифа при действующем периоде — отказ до транзакции
+            $this->assertNotOlderThanTariffChange($command, $tariff);
+            $this->planResolver->plan($current, $tariff, $command->receivedAt, $command->months);
         }
 
         try {
@@ -91,10 +102,8 @@ final class RegisterPaymentAction
             ['key' => 'billing_subscription:'.$command->companyId],
         );
 
-        // Номер сверяется без учёта способа: онлайн-оплату ЮKassa администратор мог уже отметить
-        // вручную с её ID в номере (и наоборот) — повтор под той же блокировкой, второго продления нет.
-        $repeated = $this->payments->findOneByIdAndCompanyId($command->paymentId, $command->companyId)
-            ?? (null === $command->externalId ? null : $this->payments->findOneByCompanyAndExternalIdAnySource($command->companyId, $command->externalId));
+        // Повтор под блокировкой — второго продления нет.
+        $repeated = $this->findRepeated($command);
         if (null !== $repeated) {
             if ($repeated->getTariff()->getCode() !== $command->tariffCode
                 || $repeated->getMonths() !== $command->months
@@ -117,12 +126,16 @@ final class RegisterPaymentAction
             $this->entityManager->refresh($subscription);
             // Повтор под блокировкой: «Друга» могли назначить между проверкой выше и блокировкой.
             $this->assertMayLeavePerpetual($subscription, $command);
+            $this->assertNotOlderThanTariffChange($command, $tariff);
         }
-        $period = $this->calculator->next(
-            $subscription?->renewalBase($tariff, $command->receivedAt),
-            $command->receivedAt,
-            $command->months,
-        );
+        // Под блокировкой: подписка и журнал оплат уже не изменятся до commit.
+        $plan = $this->planResolver->plan($subscription, $tariff, $command->receivedAt, $command->months);
+        $period = $plan->period;
+        // Остаток этих оплат уходит в дни повышения — повторно в остаток они не войдут. Считать до applyPlan():
+        // тот меняет тариф и начало отрезка.
+        $superseded = null !== $subscription && PaymentPlanKind::UPGRADE === $plan->kind
+            ? $this->planResolver->counted($subscription, $command->receivedAt)
+            : [];
 
         $this->entityManager->persist(new BillingPayment(
             $command->paymentId,
@@ -135,12 +148,17 @@ final class RegisterPaymentAction
             $command->source,
             $command->externalId,
             $now,
+            $plan->carriedDays,
+            $plan->carriedKopecks,
         ));
 
         if (null === $subscription) {
             $this->entityManager->persist(CompanySubscription::startPaid($command->companyId, $tariff, $period, $now));
         } else {
-            $subscription->applyPaidPeriod($tariff, $period, $now);
+            $subscription->applyPlan($tariff, $plan, $command->receivedAt, $now);
+        }
+        foreach ($superseded as $payment) {
+            $payment->supersede($command->paymentId);
         }
 
         $this->logger->info('Billing: оплата зачислена', [
@@ -148,11 +166,33 @@ final class RegisterPaymentAction
             'paymentId' => $command->paymentId,
             'tariff' => $tariff->getCode()->value,
             'months' => $command->months,
+            'plan' => $plan->kind->value,
+            'carriedDays' => $plan->carriedDays,
             'periodFrom' => $period->from->format('Y-m-d'),
             'periodUntil' => $period->until->format('Y-m-d'),
         ]);
 
         return $command->paymentId;
+    }
+
+    private function findRepeated(RegisterPaymentCommand $command): ?BillingPayment
+    {
+        // Номер сверяется без учёта способа: онлайн-оплату ЮKassa администратор мог уже отметить
+        // вручную с её ID в номере (и наоборот).
+        return $this->payments->findOneByIdAndCompanyId($command->paymentId, $command->companyId)
+            ?? (null === $command->externalId ? null : $this->payments->findOneByCompanyAndExternalIdAnySource($command->companyId, $command->externalId));
+    }
+
+    /**
+     * Оплата, полученная раньше уже зачисленной оплаты другого тарифа (уведомления пришли не по
+     * порядку, счёт отмечен с опозданием), считалась бы от более позднего тарифа — отказ, решает
+     * администратор.
+     */
+    private function assertNotOlderThanTariffChange(RegisterPaymentCommand $command, Tariff $tariff): void
+    {
+        if ($this->payments->existsReceivedAfterWithOtherTariff($command->companyId, $command->receivedAt, $tariff)) {
+            throw new TariffChangeNotSupportedException('Оплата получена раньше уже зачисленной оплаты другого тарифа — зачислите её вручную через «Назначить тариф».');
+        }
     }
 
     private function assertMayLeavePerpetual(CompanySubscription $subscription, RegisterPaymentCommand $command): void

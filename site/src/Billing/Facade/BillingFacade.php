@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Billing\Facade;
 
+use App\Billing\Domain\PaidPeriodCalculator;
 use App\Billing\Domain\SubscriptionAccessPolicy;
 use App\Billing\Entity\CompanySubscription;
 use App\Billing\Facade\DTO\BillingAccessDTO;
@@ -36,7 +37,10 @@ final class BillingFacade implements BillingFacadeInterface
 
     private function toDto(?CompanySubscription $subscription, \DateTimeImmutable $now): BillingAccessDTO
     {
-        $tariff = $subscription?->getTariff();
+        $day = PaidPeriodCalculator::day($now);
+        $tariff = $subscription?->tariffOn($day);
+        $next = $subscription?->scheduledTariffAfter($day);
+        $nextFrom = null !== $subscription && null !== $next ? $subscription->getNextTariffFrom() : null;
 
         return new BillingAccessDTO(
             $this->policy->statusOn($subscription, $now),
@@ -45,6 +49,8 @@ final class BillingFacade implements BillingFacadeInterface
             $subscription?->getPaidUntil(),
             $this->policy->daysLeft($subscription, $now),
             $subscription?->isTrial() ?? false,
+            $next?->getName(),
+            $nextFrom,
         );
     }
 }

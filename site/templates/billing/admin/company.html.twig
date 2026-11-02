@@ -34,7 +34,7 @@
       </div>
       <div>
         <div class="form-hint">Оплачено с</div>
-        <div style="font-variant-numeric:tabular-nums;">{{ subscription ? subscription.paidFrom|date('d.m.Y') : '—' }}</div>
+        <div style="font-variant-numeric:tabular-nums;">{{ paidFrom ? paidFrom|date('d.m.Y') : '—' }}</div>
       </div>
       <div>
         <div class="form-hint">Оплачено по</div>
@@ -42,6 +42,12 @@
           {% if subscription is null %}—{% elseif access.paidUntil is null %}бессрочно{% else %}{{ access.paidUntil|date('d.m.Y') }}{% endif %}
         </div>
       </div>
+      {% if access.nextTariffName is not null %}
+        <div data-billing-next-tariff>
+          <div class="form-hint">Запланировано</div>
+          <div>С {{ access.nextTariffFrom|date('d.m.Y') }} — тариф «{{ access.nextTariffName }}»</div>
+        </div>
+      {% endif %}
       {% if access.daysLeft is not null %}
         <div>
           <div class="form-hint">Осталось дней</div>
@@ -62,7 +68,7 @@
           <label class="form-label" for="assign-tariff">Тариф</label>
           <select id="assign-tariff" name="tariff" class="select" required>
             {% for tariff in tariffs %}
-              <option value="{{ tariff.code.value }}" {% if subscription and subscription.tariff.code == tariff.code %}selected{% endif %}>
+              <option value="{{ tariff.code.value }}" {% if currentTariff and currentTariff.code == tariff.code %}selected{% endif %}>
                 {{ tariff.name }}{% if not tariff.public %} (скрытый){% endif %}{% if tariff.perpetual %} — бессрочно{% endif %}
               </option>
             {% endfor %}
@@ -71,14 +77,14 @@
         <div style="display:flex; gap:var(--s-3);">
           <div class="form-field u-flex-1">
             <label class="form-label" for="assign-from">С</label>
-            <input id="assign-from" type="date" name="from" class="input" value="{{ subscription ? subscription.paidFrom|date('Y-m-d') : today }}" required>
+            <input id="assign-from" type="date" name="from" class="input" value="{{ paidFrom ? paidFrom|date('Y-m-d') : today }}" required>
           </div>
           <div class="form-field u-flex-1">
             <label class="form-label" for="assign-until">По (включительно)</label>
             <input id="assign-until" type="date" name="until" class="input" value="{{ subscription and subscription.paidUntil ? subscription.paidUntil|date('Y-m-d') : '' }}">
           </div>
         </div>
-        <div class="form-hint" style="margin-bottom:var(--s-3);">Для бессрочного тарифа дата «По» не учитывается.</div>
+        <div class="form-hint" style="margin-bottom:var(--s-3);">Для бессрочного тарифа дата «По» не учитывается. Назначение снимает запланированный переход.</div>
         <button type="submit" class="btn btn-md btn-primary">Назначить</button>
       </form>
     </section>
@@ -86,7 +92,7 @@
     {# Отметить оплату #}
     <section class="card">
       <h2 style="font-size:var(--font-15); margin:0 0 var(--s-1);">Отметить оплату по счёту</h2>
-      <p class="form-hint" style="margin:0 0 var(--s-3);">Период считается от даты зачисления; оплата до окончания продлевает текущий период.</p>
+      <p class="form-hint" style="margin:0 0 var(--s-3);">Период считается от даты зачисления; оплата до окончания продлевает текущий период. Другой тариф: дороже — сразу, остаток пересчитывается в дни; дешевле — со следующего периода.</p>
       <form method="post" action="{{ path('admin_billing_company_payment', { companyId: company.id }) }}">
         <input type="hidden" name="_token" value="{{ csrf_token('billing_payment_' ~ company.id) }}">
         <input type="hidden" name="payment_id" value="{{ paymentFormId }}">
@@ -209,7 +215,7 @@
               <td>{{ payment.tariff.name }}</td>
               <td class="t-cell--right">{{ payment.months }} мес</td>
               <td class="t-cell--right" style="font-variant-numeric:tabular-nums;">{{ payment.amountKopecks|vf_minor|vf_money }}</td>
-              <td style="font-variant-numeric:tabular-nums;">{{ payment.periodFrom|date('d.m.Y') }} — {{ payment.periodUntil|date('d.m.Y') }}</td>
+              <td style="font-variant-numeric:tabular-nums;">{{ payment.periodFrom|date('d.m.Y') }} — {{ payment.periodUntil|date('d.m.Y') }}{% if payment.carriedDays > 0 %}<div class="form-hint" data-billing-carried>+{{ payment.carriedDays }} дн. за остаток ({{ payment.carriedKopecks|vf_minor|vf_money }})</div>{% endif %}</td>
               <td>{{ payment.source.label }}</td>
               <td style="word-break:break-all;">{{ payment.externalId ?? '—' }}</td>
             </tr>

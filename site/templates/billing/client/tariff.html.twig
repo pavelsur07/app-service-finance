@@ -51,6 +51,12 @@
             {% if access.tariffName is null %}—{% elseif access.paidUntil is null %}бессрочно{% else %}{{ access.paidUntil|date('d.m.Y') }}{% endif %}
           </div>
         </div>
+        {% if access.nextTariffName is not null %}
+          <div class="col-sm-auto" data-billing-next-tariff>
+            <div class="text-secondary small">Запланировано</div>
+            <div>С {{ access.nextTariffFrom|date('d.m.Y') }} — тариф «{{ access.nextTariffName }}»</div>
+          </div>
+        {% endif %}
         {% if access.daysLeft is not null and access.daysLeft > 0 %}
           <div class="col-sm-auto">
             <div class="text-secondary small">Осталось дней</div>
@@ -108,7 +114,7 @@
             <label class="form-label" for="billing-online-tariff">Тариф</label>
             <select class="form-select" id="billing-online-tariff" name="tariff" required>
               {% for offer in online.offers %}
-                <option value="{{ offer.tariff.code.value }}"{% if access.tariffName == offer.tariff.name %} selected{% endif %}>{{ offer.tariff.name }}</option>
+                <option value="{{ offer.tariff.code.value }}"{% if online.selected == offer.tariff.code.value %} selected{% endif %}>{{ offer.tariff.name }}</option>
               {% endfor %}
             </select>
           </div>
@@ -122,7 +128,37 @@
             <button type="submit" class="btn btn-primary">Оплатить онлайн</button>
           </div>
         </form>
-        <p class="text-secondary small mt-2 mb-0">Картой, СБП или другим способом на странице ЮKassa. Сумма — по таблице выше.{% if online.onlyCurrent %} Пока действует оплаченный период, онлайн можно продлить только текущий тариф.{% endif %}</p>
+        {# Что произойдёт при оплате сегодня: показывается подсказка выбранных тарифа и срока #}
+        {% set defaultKey = online.selected ~ ':1' %}
+        {% for key, plan in online.plans %}
+          {% set tariffName = (online.offers|filter(o => o.tariff.code.value == key|split(':')|first)|first).tariff.name %}
+          <p class="small mt-2 mb-0" data-billing-plan="{{ key }}" data-billing-plan-kind="{{ plan.kind.value }}"{% if key != defaultKey %} hidden{% endif %}>
+            {% if plan.kind.value == 'renewal' %}
+              Продлим тариф «{{ tariffName }}» до {{ plan.period.until|date('d.m.Y') }} — новый период начнётся {{ plan.period.from|date('d.m.Y') }}.
+            {% elseif plan.kind.value == 'upgrade' %}
+              Тариф «{{ tariffName }}» начнёт действовать сразу — по {{ plan.period.until|date('d.m.Y') }}{% if plan.carriedDays > 0 %}, включая +{{ plan.carriedDays }} дн. за неиспользованный остаток текущего тарифа{% endif %}.
+            {% elseif plan.kind.value == 'downgrade' %}
+              До {{ access.paidUntil|date('d.m.Y') }} остаётся текущий тариф, с {{ plan.period.from|date('d.m.Y') }} по {{ plan.period.until|date('d.m.Y') }} — «{{ tariffName }}».
+            {% else %}
+              Тариф «{{ tariffName }}» с {{ plan.period.from|date('d.m.Y') }} по {{ plan.period.until|date('d.m.Y') }}.
+            {% endif %}
+          </p>
+        {% endfor %}
+        <p class="text-secondary small mt-2 mb-0">Картой, СБП или другим способом на странице ЮKassa. Сумма — по таблице выше. Расчёт — на день оплаты.{% for reason in online.unavailable %} {{ reason }}{% endfor %}</p>
+        <script>
+          (() => {
+            const card = document.currentScript.closest('[data-billing-online]');
+            const tariff = card.querySelector('[name="tariff"]');
+            const months = card.querySelector('[name="months"]');
+            const update = () => {
+              const key = tariff.value + ':' + months.value;
+              card.querySelectorAll('[data-billing-plan]').forEach((el) => { el.hidden = el.dataset.billingPlan !== key; });
+            };
+            tariff.addEventListener('change', update);
+            months.addEventListener('change', update);
+            update();
+          })();
+        </script>
       </div>
     </div>
   {% endif %}
@@ -132,7 +168,7 @@
     <div class="card-body">
       <h3 class="card-title">{{ online ? 'Оплатить по счёту' : 'Как оплатить' }}</h3>
       <p class="mb-1">Напишите на <a href="mailto:{{ billingEmail }}?subject={{ ('Счёт на оплату: ' ~ company.name)|url_encode }}">{{ billingEmail }}</a>: тариф, срок и реквизиты компании. Мы выставим счёт.</p>
-      <p class="text-secondary mb-0">Срок считается со дня зачисления оплаты. Если оплатить до окончания текущего периода (или пробного), новый начнётся сразу после него — оплаченные дни не теряются.</p>
+      <p class="text-secondary mb-0">Срок считается со дня зачисления оплаты. Если оплатить до окончания текущего периода (или пробного), новый начнётся сразу после него — оплаченные дни не теряются. Переход на тариф дороже — сразу, неиспользованный остаток пересчитаем в дни нового тарифа; на тариф дешевле — со следующего периода.</p>
     </div>
   </div>
 
@@ -161,7 +197,7 @@
                   <td>{{ payment.tariff.name }}</td>
                   <td class="text-end">{{ payment.months }} мес</td>
                   <td class="text-end" style="font-variant-numeric:tabular-nums;">{{ payment.amountKopecks|vf_minor|vf_money }}</td>
-                  <td style="font-variant-numeric:tabular-nums;">{{ payment.periodFrom|date('d.m.Y') }} — {{ payment.periodUntil|date('d.m.Y') }}</td>
+                  <td style="font-variant-numeric:tabular-nums;">{{ payment.periodFrom|date('d.m.Y') }} — {{ payment.periodUntil|date('d.m.Y') }}{% if payment.carriedDays > 0 %}<div class="text-secondary small" data-billing-carried>+{{ payment.carriedDays }} дн. за остаток прежнего тарифа</div>{% endif %}</td>
                   <td>{{ payment.source.label }}</td>
                   <td class="text-break">{{ payment.externalId ?? '—' }}</td>
                 </tr>

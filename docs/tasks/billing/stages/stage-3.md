@@ -85,7 +85,7 @@
 - [x] routing сообщения (`MessengerRoutingTest`), cron-строка, `ModuleAccessMap` для нового контроллера
 - [x] PHPStan, CS, strict_types; unit / integration / functional по затронутому
 - [x] `ARCHITECTURE.md`, Changelog, `TASK.md`
-- [ ] после деплоя: подписок без пробного = 21, без подписки 0; cron отработал 10:00 без ошибок
+- [x] после деплоя: подписок без пробного = 21, без подписки 0; cron отработал 10:00 без ошибок (сверено 02.11.2026)
 
 ## Итог
 

@@ -27,7 +27,8 @@ use Webmozart\Assert\Assert;
 /**
  * Начинает онлайн-оплату тарифа: попытка оплаты → платёж в ЮKassa → ссылка на страницу оплаты.
  *
- * Точка входа, сама коммитит. Фазы: (1) запись попытки — `flush`; (2) создание платежа в ЮKassa
+ * Точка входа, сама коммитит. Фазы: (1) запись попытки под блокировкой компании (нет
+ * незавершённой попытки другого тарифа) — `wrapInTransaction`; (2) создание платежа в ЮKassa
  * вне транзакции, `Idempotence-Key` = ID попытки; (3) привязка платежа и ссылки — `flush`.
  * Упала фаза 2 или 3 — попытка остаётся `pending` без ссылки, повтор той же формы проходит
  * фазы 2–3 заново, ЮKassa по тому же ключу вернёт тот же платёж. Деньги не списаны, пока клиент
@@ -35,6 +36,14 @@ use Webmozart\Assert\Assert;
  */
 final class StartCheckoutAction
 {
+    /**
+     * Сколько часов с создания незавершённая попытка блокирует попытку другого тарифа; попытка без
+     * ссылки старше этого срока ссылку уже не получает.
+     */
+    public const OPEN_CHECKOUT_HOURS = 1;
+
+    private const OPEN_OTHER_TARIFF_MESSAGE = 'Незавершённая онлайн-оплата другого тарифа ещё действует — завершите её или выберите другой тариф через час.';
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly YooKassaConfig $config,
@@ -42,6 +51,7 @@ final class StartCheckoutAction
         private readonly TariffRepository $tariffs,
         private readonly TariffPriceRepository $prices,
         private readonly CompanySubscriptionRepository $subscriptions,
+        private readonly PaymentPlanResolver $planResolver,
         private readonly BillingCheckoutRepository $checkouts,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
@@ -75,8 +85,14 @@ final class StartCheckoutAction
             if (null !== $checkout->getConfirmationUrl()) {
                 return $checkout->getConfirmationUrl();
             }
-            // Ссылки нет (ЮKassa падала): правила продления могли измениться — проверить до денег.
-            $this->assertRenewalAllowed($checkout->getCompanyId(), $checkout->getTariff(), $this->clock->now());
+            // Ссылки нет (ЮKassa падала). Старше окна блокировки — новая форма: иначе ссылка появилась бы
+            // у попытки, которую проверка других тарифов уже не видит.
+            if ($checkout->getCreatedAt() <= $this->clock->now()->modify('-'.self::OPEN_CHECKOUT_HOURS.' hours')) {
+                throw new OnlinePaymentNotAvailableException('Форма устарела — обновите страницу и выберите тариф ещё раз.');
+            }
+            // Правила продления и другие попытки могли измениться — проверить до денег.
+            $this->assertRenewalAllowed($checkout->getCompanyId(), $checkout->getTariff(), $checkout->getMonths(), $this->clock->now());
+            $this->assertNoOpenOtherTariff($checkout->getCompanyId(), $checkout->getTariff(), $this->clock->now(), $checkout->getId());
         } else {
             $checkout = $this->createCheckout($command);
         }
@@ -131,7 +147,8 @@ final class StartCheckoutAction
         }
 
         $now = $this->clock->now();
-        $this->assertRenewalAllowed($command->companyId, $tariff, $now);
+        $this->assertRenewalAllowed($command->companyId, $tariff, $command->months, $now);
+        $this->assertNoOpenOtherTariff($command->companyId, $tariff, $now);
         // ID попытки станет ID оплаты: занятый (подмена скрытого поля) дал бы ложный «повтор».
         // Проверка по всем компаниям: первичные ключи общие, чужой ID тоже занят.
         if (false !== $this->entityManager->getConnection()->fetchOne(
@@ -142,21 +159,53 @@ final class StartCheckoutAction
         }
 
         $checkout = new BillingCheckout($command->checkoutId, $command->companyId, $tariff, $command->months, $amount, $now);
-        $this->entityManager->persist($checkout);
         try {
-            $this->entityManager->flush();
+            // Проверка «нет попытки другого тарифа» и запись — под блокировкой компании: две параллельные
+            // формы разных тарифов не создадут две попытки. Отказ возвращается, а не бросается, —
+            // исключение внутри транзакции закрыло бы EntityManager.
+            $created = $this->entityManager->wrapInTransaction(function () use ($checkout, $tariff, $now): bool {
+                $this->entityManager->getConnection()->executeStatement(
+                    'SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))',
+                    ['key' => 'billing_checkout:'.$checkout->getCompanyId()],
+                );
+                if ($this->hasOpenOtherTariff($checkout->getCompanyId(), $tariff, $now)) {
+                    return false;
+                }
+                $this->entityManager->persist($checkout);
+
+                return true;
+            });
         } catch (UniqueConstraintViolationException) {
             // Параллельная отправка той же формы: строка уже есть, EntityManager закрыт.
             throw new OnlinePaymentNotAvailableException('Оплата уже создаётся — обновите страницу через несколько секунд.');
+        }
+        if (!$created) {
+            throw new OnlinePaymentNotAvailableException(self::OPEN_OTHER_TARIFF_MESSAGE);
         }
 
         return $checkout;
     }
 
     /**
+     * Две незавершённые оплаты разных тарифов: первая зачисленная поменяет подписку, вторая может
+     * стать недопустимой уже после списания денег (например, второе понижение).
+     */
+    private function hasOpenOtherTariff(string $companyId, Tariff $tariff, \DateTimeImmutable $now, ?string $exceptId = null): bool
+    {
+        return $this->checkouts->hasOpenForOtherTariff($companyId, $tariff, $now->modify('-'.self::OPEN_CHECKOUT_HOURS.' hours'), $exceptId);
+    }
+
+    private function assertNoOpenOtherTariff(string $companyId, Tariff $tariff, \DateTimeImmutable $now, ?string $exceptId = null): void
+    {
+        if ($this->hasOpenOtherTariff($companyId, $tariff, $now, $exceptId)) {
+            throw new OnlinePaymentNotAvailableException(self::OPEN_OTHER_TARIFF_MESSAGE);
+        }
+    }
+
+    /**
      * Те же правила, что у зачисления (`RegisterPaymentAction`), — до того, как клиент заплатит.
      */
-    private function assertRenewalAllowed(string $companyId, Tariff $tariff, \DateTimeImmutable $now): void
+    private function assertRenewalAllowed(string $companyId, Tariff $tariff, int $months, \DateTimeImmutable $now): void
     {
         $subscription = $this->subscriptions->findOneByCompanyId($companyId);
         if (null === $subscription) {
@@ -166,9 +215,9 @@ final class StartCheckoutAction
             throw new OnlinePaymentNotAvailableException(sprintf('У кабинета бессрочный тариф «%s» — онлайн-оплата не нужна.', $subscription->getTariff()->getName()));
         }
         try {
-            $subscription->renewalBase($tariff, $now);
-        } catch (TariffChangeNotSupportedException) {
-            throw new OnlinePaymentNotAvailableException(sprintf('Пока действует оплаченный период, онлайн можно продлить только тариф «%s». Сменить тариф — напишите нам.', $subscription->getTariff()->getName()));
+            $this->planResolver->plan($subscription, $tariff, $now, $months);
+        } catch (TariffChangeNotSupportedException $exception) {
+            throw new OnlinePaymentNotAvailableException($exception->getMessage());
         }
     }
 }

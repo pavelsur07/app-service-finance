@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Billing;
 
+use App\Billing\Domain\PaidPeriod;
+use App\Billing\Domain\PaymentPlan;
+use App\Billing\Domain\PaymentPlanKind;
 use App\Billing\Entity\Tariff;
 use App\Billing\Enum\TariffCode;
 use App\Billing\Infrastructure\YooKassa\YooKassaConfig;
@@ -13,6 +16,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
 use App\Tests\Builders\Billing\BillingCheckoutBuilder;
+use App\Tests\Builders\Billing\BillingPaymentBuilder;
 use App\Tests\Builders\Billing\CompanySubscriptionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
@@ -185,15 +189,46 @@ final class OnlinePaymentTest extends WebTestCaseBase
         self::assertSelectorTextContains('[data-billing-how-to-pay]', 'Как оплатить');
     }
 
-    public function testPaidPeriodOffersOnlyCurrentTariff(): void
+    public function testPaidPeriodOffersAllTariffsWithPlanHintAndCarriedDaysInHistory(): void
     {
-        $this->subscribe(CompanySubscriptionBuilder::aSubscription()->onTariff($this->tariff(TariffCode::START))->paid('2027-03-01', '2027-03-31'));
+        $start = $this->tariff(TariffCode::START);
+        $this->subscribe(CompanySubscriptionBuilder::aSubscription()->onTariff($start)->paid('2027-03-01', '2027-03-31'));
+        $this->em()->persist(BillingPaymentBuilder::aPayment()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId())->onTariff($start)->forPeriod('2027-03-01', '2027-03-31')->withCarried(3, 50000)->build());
+        $this->em()->flush();
         $this->login($this->owner);
 
         $crawler = $this->client->request('GET', '/company/price');
 
+        self::assertSame(['start', 'base', 'pro'], $crawler->filter('#billing-online-tariff option')->each(static fn ($o): string => (string) $o->attr('value')));
+        self::assertSame('start', $crawler->filter('#billing-online-tariff option[selected]')->attr('value'));
+        // Видна подсказка выбранного по умолчанию «Старт, 1 мес»; остальные скрыты до выбора.
+        $renewal = $crawler->filter('[data-billing-plan="start:1"]');
+        self::assertNull($renewal->attr('hidden'));
+        self::assertStringContainsString('Продлим тариф «Старт» до 30.04.2027', $renewal->text());
+        // «База» 10.03: не использовано 22 дн из 31 → (4 970 + 500) × 22 / 31 = 3 881,93 ₽;
+        // 10.03–09.04 (31 дн) за 9 950 ₽ → +12 дн.
+        $upgrade = $crawler->filter('[data-billing-plan="base:1"]');
+        self::assertNotNull($upgrade->attr('hidden'));
+        self::assertSame('upgrade', $upgrade->attr('data-billing-plan-kind'));
+        self::assertStringContainsString('начнёт действовать сразу — по 21.04.2027, включая +12 дн.', $upgrade->text());
+        self::assertSelectorTextContains('[data-billing-carried]', '+3 дн. за остаток прежнего тарифа');
+    }
+
+    public function testScheduledSwitchIsShownAndOnlyItsTariffIsOffered(): void
+    {
+        $subscription = CompanySubscriptionBuilder::aSubscription()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId())->onTariff($this->tariff(TariffCode::PRO))->paid('2027-03-01', '2027-03-31')->build();
+        $subscription->applyPlan($this->tariff(TariffCode::START), new PaymentPlan(PaymentPlanKind::DOWNGRADE, new PaidPeriod(new \DateTimeImmutable('2027-04-01'), new \DateTimeImmutable('2027-04-30'))), new \DateTimeImmutable('2027-03-05'), new \DateTimeImmutable('2027-03-05'));
+        $this->em()->persist($subscription);
+        $this->em()->flush();
+        $this->login($this->owner);
+
+        $crawler = $this->client->request('GET', '/company/price');
+
+        self::assertSelectorTextContains('[data-billing-current]', 'Профи');
+        self::assertSelectorTextContains('[data-billing-next-tariff]', 'С 01.04.2027 — тариф «Старт»');
         self::assertSame(['start'], $crawler->filter('#billing-online-tariff option')->each(static fn ($o): string => (string) $o->attr('value')));
-        self::assertSelectorTextContains('[data-billing-online]', 'только текущий тариф');
+        self::assertStringContainsString('Продлим тариф «Старт» до 31.05.2027', $crawler->filter('[data-billing-plan="start:1"]')->text());
+        self::assertSelectorTextContains('[data-billing-online]', 'Уже запланирован переход на тариф «Старт» с 01.04.2027');
     }
 
     public function testCheckoutWorksInReadOnlyMode(): void
