@@ -1,6 +1,6 @@
-### Stage 2: `wb-fetcher` — каркас и ежедневный отчёт — TODO
+### Stage 2: `wb-fetcher` — каркас и ежедневный отчёт — IN PROGRESS
 
-**Risk:** MEDIUM · **Branch:** `feat/wb-fetcher-daily`
+**Risk:** MEDIUM · **Ветка:** `feat/wb-fetcher-finance` (одна на задачу, PR на handoff)
 **Внешнее ревью:** нет (на handoff)
 
 ## 1. Какую задачу решаем
@@ -8,72 +8,101 @@
 Нужен сервис, который по WB-кабинетам из Symfony грузит дневной детальный отчёт о
 реализации в raw S3 с журналом и отдаёт покрытие.
 
-## 2. Что будет результатом работы
+## 2. Факты (02.11.2026, из `WbFinanceSalesReportClient` и этапов 0–1)
 
-`services/wb-fetcher` по `services/README.md` «Как добавить новый сервис»:
+- `POST {base}/api/finance/v1/sales-reports/detailed`, заголовок `Authorization: <токен>` (без `Bearer`),
+  тело `{"dateFrom","dateTo","limit":100000,"rrdId","period":"daily"}`, таймаут 120 с.
+- Ответ: 200 — JSON-список объектов; 204 — пусто. Курсор — поле **`rrdId`** последней строки
+  (camelCase); следующая страница запрашивается только если строк `>= limit`. `rrdId` последней
+  строки `<=` текущего курсора — нарушение формы (Symfony бросает invalid response).
+- 429: пауза из `X-Ratelimit-Retry` / `Retry-After` / `X-Ratelimit-Reset`, иначе 70 с.
+  401/403 — ключ; 400 — запрос; 5xx и транспорт — временная; иной статус — временная (как Symfony).
+- `GET {base}/ping` — проверка доступа (в этапе 2 не нужна; `/ready` сервиса — БД и S3).
+- Кабинет из снимка: `connection_ref` = id подключения = `seller.client_id` (этап 1);
+  ресурсы — по `resource_types`.
+- Ядро: `fetchkit` (этап 0): `store`, `fetch.Adapter`, `dispatcher`, `schedule`, `httpapi`,
+  `ratelimit`, `rawstore` с `Provider: "wb"` → ключ `wb/{ref}/{resource}/{period}/…`.
 
-- `cmd/wb-fetcher/main.go` — wiring `fetchkit` + адаптер WB, graceful shutdown;
-- `internal/config` — env: `DB_DSN`, `S3_*`, `SYMFONY_INTERNAL_BASE_URL`, `INTERNAL_AUTH_TOKEN`,
-  `SERVICE_API_TOKEN`, `SENTRY_*`, `CONNECTION_ALLOWLIST`, `MAX_PARALLEL_CONNECTIONS`,
-  `WB_FINANCE_BASE_URL` (по умолчанию `https://finance-api.wildberries.ru`), `WB_DAILY_TAIL_DAYS` (14, 1…30),
-  `WB_FINANCE_MIN_INTERVAL` (70s), `PLAN_EVERY` (1h);
-- `internal/wb` — клиент `finance-api`: `POST /api/finance/v1/sales-reports/detailed`,
-  `Authorization: <токен>`, тело `{dateFrom, dateTo, limit: 100000, rrdId, period}`, пагинация по `rrdId`,
-  классификация ответов (200/204/400/401/403/404/410/429/5xx), разбор `Retry-After` / `X-Ratelimit-Retry` / `X-Ratelimit-Reset`;
-- `internal/resources` — описание `wb.finance.sales-report.daily` и расписание: вчера каждый проход,
-  хвост 14 дней раз в сутки, пропуск минут :10 и :20 (решение 3 плана);
-- `internal/store/migrations` — схема, совместимая с `fetchkit` (одна начальная миграция);
-- `docs/wb-api.md` — хост, категория токена «Финансы», метод, запрос, пагинация, лимит, тип, расписание;
-- `AGENTS.md`, `README.md`, `docker/Dockerfile`, `.env.example`, `.golangci.yml`;
-- dev: `services-wb-fetcher`, `-dev`, `-lint` в `docker-compose.yml` (профиль `services`),
-  БД и роль в `services/docker/postgres/init/`, таргеты `make wb-fetcher-*`;
-- мок `finance-api` для стенда (`test/stand/mock`).
+## 3. Что будет результатом работы
 
-## 3. Что считаем выполненной работой
+| Пакет / файл | Что |
+|---|---|
+| `cmd/wb-fetcher/main.go` | wiring: config → БД/миграции → S3 → кабинеты → планировщик, диспетчер, HTTP; graceful shutdown; `-migrate` |
+| `internal/config` | env (§4), валидация, fail fast |
+| `internal/wb` | клиент finance-api: страница отчёта, классификация ответов в `apierr` (`Source: "wb"`), разбор пауз 429; токен не попадает в ошибки и логи |
+| `internal/connections` | `Cabinet{Ref, CompanyID, UpdatedAt, Token, ResourceTypes}` + `Decoder` поверх `fetchkit/connections`, `Provider = "wildberries"` |
+| `internal/planner` | `Build(now, cabinets)`: вчера (МСК) каждым проходом, хвост `WB_DAILY_TAIL_DAYS` раз в сутки; `period_key = YYYY-MM-DD` |
+| `internal/executor` | `fetch.Adapter[Cabinet]`: пагинация по `rrdId` с курсором задачи, предел страниц, лимитер «1 запрос / `WB_FINANCE_MIN_INTERVAL`» на кабинет (`ratelimit`), окно :10/:20 |
+| `internal/wbstore` | миграция `00001` = `fetchkit/store.CoreMigrations()` (своя история goose), `Migrate`, `NewTasks` без отдельного слота |
+| `internal/httpapi` | обёртка `fetchkit/httpapi`: `Service = "wb-fetcher"`, ожидания покрытия из снимка |
+| `docs/wb-api.md` | хост, категория токена «Финансы», метод, тело, пагинация, лимит, статусы, расписание |
+| `AGENTS.md`, `README.md`, `.env.example`, `.golangci.yml`, `docker/Dockerfile` (+`.dockerignore`, контекст `services/`) | по `services/go.md` |
+| `docker-compose.yml` | `services-wb-fetcher`, `-dev`, `-lint` (профиль `services`) |
+| `services/docker/postgres/init/03-wb-fetcher.sql` | dev-БД `wb_fetcher`, роль `svc_wb_fetcher` |
+| `Makefile` | `wb-fetcher-build/-up/-test/-vet/-lint/-migrate` |
+| CI `deploy.yml` | фильтр `services/wb-fetcher/**`, цикл гейтов по модулям — `+ wb-fetcher`; образ в матрицу — **этап 5** (вместе с прод-compose) |
+| `services/README.md` | строка в таблице «Сервисы» |
 
-На стенде с моком сервис забирает кабинеты из локального Symfony, планирует дни,
-грузит страницы в S3 (`wb/…`), пишет журнал; `/internal/coverage` показывает день
-как `done`; 429 переводит задачу в повтор с паузой из заголовка; рестарт посреди
-пагинации продолжает с сохранённого `rrdId`.
+Окно :10/:20 — диспетчер не выдаёт задачи WB finance в минуты `:10` и `:20` часа (cron Symfony
+03:10 и `orchestrate` в :20 — решение 3 плана): проверка в адаптере перед запросом, задача
+возвращается в очередь `pending` с `next_run_at` = конец окна, без попытки к WB.
 
-## 4. TDD — тесты пишутся первыми
+## 4. Переменные окружения
+
+`LISTEN_ADDR`, `DB_DSN`, `S3_ENDPOINT/REGION/BUCKET/ACCESS_KEY_ID/SECRET_ACCESS_KEY`,
+`SYMFONY_INTERNAL_BASE_URL`, `INTERNAL_AUTH_TOKEN`, `SERVICE_API_TOKEN`, `SENTRY_*`,
+`CONNECTION_ALLOWLIST`, `CONNECTIONS_POLL_INTERVAL` (5m), `MAX_PARALLEL_CONNECTIONS` (2),
+`WB_FINANCE_BASE_URL` (`https://finance-api.wildberries.ru`), `WB_DAILY_TAIL_DAYS` (14, 1…30),
+`WB_FINANCE_MIN_INTERVAL` (70s, ≥ 60s), `PLAN_EVERY` (1h). Имена S3 — те же, что у ozon-fetcher
+(решение В1: тот же пользователь и бакет).
+
+## 5. TDD — тесты пишутся первыми
 
 Клиент (`internal/wb`, `httptest.Server`):
-- [ ] запрос: метод, путь, заголовок `Authorization`, тело с `period=daily`, `dateFrom=dateTo`
-- [ ] 200 со списком → строки и `nextRrdId` = `rrd_id` последней строки
-- [ ] страница ровно `limit` строк → `hasMore=true`; меньше — `false`
+- [ ] запрос: метод, путь, `Authorization: <токен>`, тело `period=daily`, `dateFrom=dateTo`, `limit`, `rrdId`
+- [ ] 200 со списком → тело страницы, `next` = `rrdId` последней строки, `more` = (строк ≥ limit)
 - [ ] 204 и `[]` → пустая страница, конец
-- [ ] `rrd_id` последней строки ≤ текущего курсора → ошибка формы (не тихая обрезка)
-- [ ] 429 с `X-Ratelimit-Retry: 30` → rate_limited, пауза 30 с; с `Retry-After`; без заголовков → 70 с
-- [ ] 401/403 → auth (пауза ресурса кабинета); 400 → permanent; 5xx и таймаут → retryable
-- [ ] 404/410 или текст о выводе метода → `obsolete_endpoint`
-- [ ] не-JSON и не-список → ошибка формы, raw всё равно сохраняется
-- [ ] токен отсутствует в логах и в тексте ошибок (тестовый `slog` handler)
+- [ ] `rrdId` последней строки ≤ курсора → `invalid_response`
+- [ ] 429 с `X-Ratelimit-Retry: 30` → `rate_limit`, 30 с; с `Retry-After`; без заголовков → 70 с
+- [ ] 401/403 → `auth`; 400 → `invalid_request`; 5xx, транспорт, иной статус → `transient`
+- [ ] не-JSON, не-список, элемент не объект → `invalid_response`
+- [ ] токен не встречается в тексте ошибок
 
-Расписание (`internal/resources`, фиксированные часы):
-- [ ] 03:00 МСК → задача на вчера; хвост 14 дней — один раз за сутки
-- [ ] второй проход в те же сутки хвост не ставит, вчера — ставит, если не `done`
-- [ ] граница суток по МСК, не UTC (проход 00:30 МСК = 21:30 UTC)
-- [ ] кабинет без ресурса в `resource_types` → задач нет
-- [ ] слот :10 / :20 → диспетчер не берёт задачи WB finance
+Кабинеты (`internal/connections`):
+- [ ] запись WB → `Cabinet` с токеном из `seller.api_key`; без seller → отвергнута; `%v` кабинета не печатает токен
 
-Исполнитель (интеграция, `storetest` + мок S3):
-- [ ] «первая страница и тишина»: 1 полная страница, затем 204 → 2 запроса, 1 raw, `done`
-- [ ] 3 страницы → 3 raw, курсор после каждой в одной транзакции с raw
-- [ ] падение после страницы 2, рестарт → запрос с курсором страницы 2, дублей raw нет
-- [ ] перезагрузка дня с тем же содержимым → `unchanged`, ревизия не растёт; с другим → ревизия +1
-- [ ] предел страниц превышен → `failed_permanent`, ERROR
-- [ ] два кабинета одного продавца → не чаще 1 запроса / `WB_FINANCE_MIN_INTERVAL`
+Расписание (`internal/planner`, фиксированные часы):
+- [ ] 03:00 МСК → вчера + хвост 14 дней (Ensure), `period_key` по МСК
+- [ ] 00:30 МСК (= 21:30 UTC предыдущего дня) → «вчера» — по МСК
+- [ ] кабинет без `wb.finance.sales-report.daily` → задач нет
+- [ ] перечитывание: вчера и хвост выдаются как Refresh раз в сутки (повтор `done` → проверка `unchanged`)
+
+Исполнитель (`internal/executor`, фейковый клиент + `fetch` ядра):
+- [ ] одна неполная страница → 1 запрос, 1 raw, `done`
+- [ ] полная страница + неполная → 2 запроса, курсор второго = `rrdId` первой
+- [ ] задача с сохранённым курсором → первый запрос с этим курсором (продолжение после рестарта)
+- [ ] предел страниц превышен → `failed_permanent`
+- [ ] минута :10 или :20 → запроса нет, задача `pending` до конца окна
+- [ ] два запроса одного кабинета → второй ждёт `WB_FINANCE_MIN_INTERVAL` (лимитер)
+- [ ] 429 → `pending` с паузой из заголовка (сквозь таблицу исходов ядра)
+
+Интеграция (PG15 `TEST_DB_DSN`):
+- [ ] `wbstore.Migrate` на пустой БД; схема совпадает с ядром (`TestSchemaMatchesFetchkitCore`)
+- [ ] сквозной прогон исполнителя: задача → страницы в фейковом raw → `done`, `content_hash`; повтор тем же содержимым → `unchanged`
 
 HTTP API:
-- [ ] `/internal/coverage` с днём `done` → строка `wb.finance.sales-report.daily`, `cabinets_expected` из снимка; без токена → 401
+- [ ] `/internal/coverage` → `service: "wb-fetcher"`, строка дня, `cabinets_expected` по ресурсу из снимка; без токена → 401
 
-## 5. Чек-лист приёмки
+Config:
+- [ ] значения по умолчанию; `WB_DAILY_TAIL_DAYS` вне 1…30 и `WB_FINANCE_MIN_INTERVAL` < 60s → ошибка старта
 
-- [ ] все тесты §4 были красными до реализации
-- [ ] раскладка и файлы по `services/go.md`, чек-лист `services/README.md`
-- [ ] `wb-fetcher` использует `fetchkit`, ядро не скопировано
-- [ ] `docs/wb-api.md` заполнен; версия метода сверена с документацией WB на дату этапа
-- [ ] стенд: мок + локальный Symfony → raw в seaweedfs (`wb/…`), журнал, покрытие (память «Локальный S3»)
-- [ ] гейты `go vet`, `golangci-lint`, `go test -race` (по пакету, память OOM)
+## 6. Чек-лист приёмки
+
+- [ ] тесты §5 были красными до реализации
+- [ ] `wb-fetcher` использует `fetchkit`; гейт `internal/boundary` ядра зелёный; ядро не скопировано
+- [ ] раскладка и файлы по `services/go.md`; чек-лист `services/README.md`
+- [ ] `docs/wb-api.md` заполнен
+- [ ] стенд: мок finance-api + локальный кабинет → raw в seaweedfs с префиксом `wb/`, журнал, покрытие; 429 мока → пауза; рестарт посреди пагинации продолжает с курсора
+- [ ] образ собирается из `services/`
+- [ ] гейты `go vet`, `golangci-lint`, `go test -race` для fetchkit, ozon-fetcher, wb-fetcher (по пакету, память OOM)
 - [ ] строка в таблице «Сервисы» `services/README.md`

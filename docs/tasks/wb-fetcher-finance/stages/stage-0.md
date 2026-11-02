@@ -65,18 +65,18 @@ spec-wb §5 запрещает копировать ядро ozon-fetcher в wb-
 ## 5. TDD — тесты пишутся первыми
 
 Фиксация поведения (на текущем коде, зелёные до переноса, остаются зелёными после):
-- [ ] `planner`: golden `Build(now, cabinets, cfg)` — кабинеты: seller+performance со всеми ресурсами, только seller с базовыми, кабинет без ключа; моменты: пн 06:00, вт 03:00, 1-е число 00:30, вс 23:30 МСК → `testdata/plan_*.golden.json`
-- [ ] `httpapi`: golden-ответ `/internal/coverage` (фейковые `Coverage` и кабинеты) — тело побайтно
-- [ ] `rawstore`: формат ключа `ozon/{ref}/{res}/{period}/{ts}_{attempt}_p002_{sha8}.json.gz` (есть, сохраняется)
+- [x] `planner`: golden `Build(now, cabinets, cfg)` — кабинеты: seller+performance со всеми ресурсами, только seller с базовыми, кабинет без ключа; моменты: пн 06:00, вт 03:00, 1-е число 00:30, вс 23:30 МСК → `testdata/plan_*.golden.json`
+- [x] `httpapi`: golden-ответ `/internal/coverage` (фейковые `Coverage` и кабинеты) — тело побайтно
+- [x] `rawstore`: формат ключа `ozon/{ref}/{res}/{period}/{ts}_{attempt}_p002_{sha8}.json.gz` (есть, сохраняется)
 
 Новые тесты fetchkit (красные до реализации):
-- [ ] `rawstore`: `Provider: "wb"` → ключ `wb/…`; пустой `Provider` → ошибка `Put`
-- [ ] `store` (интеграционный): `SeparateSlotPrefix=""` — у кабинета не больше одной running-задачи на все ресурсы; `"ozon.ads."` — реклама и продажи в разных слотах, пауза кабинета не держит рекламу (текущие тесты, теперь с параметром)
-- [ ] `store`: схема после `CoreMigrations` и после миграций ozon-fetcher совпадает по таблицам и колонкам (тест в ozon-fetcher)
-- [ ] `connections`: `provider=wildberries` уходит в query; запись чужого провайдера отбрасывается; функция разбора адаптера вызывается на каждую запись
-- [ ] `dispatcher`: работает с произвольным типом кабинета (фейковый тип)
-- [ ] `fetch`: фейковый адаптер — «первая страница и тишина» (2 страницы → 2 raw, `done`); повтор того же содержимого → `unchanged`; `Classify` адаптера перехватывает свою ошибку раньше общей таблицы; `apierr.ClassRateLimit` с `RetryAfter` → `pending` через паузу; `ClassObsoleteEndpoint` → `StopResource` + `failed_permanent`; `ClassAuth` → `RecordAuthFailure`, вторая подряд — ERROR
-- [ ] `httpapi`: `Service` из `Deps` в ответе coverage и в логах
+- [x] `rawstore`: `Provider: "wb"` → ключ `wb/…`; пустой `Provider` → ошибка `Put`
+- [x] `store` (интеграционный): `SeparateSlotPrefix=""` — у кабинета не больше одной running-задачи на все ресурсы; `"ozon.ads."` — реклама и продажи в разных слотах, пауза кабинета не держит рекламу (текущие тесты, теперь с параметром)
+- [x] `store`: схема после `CoreMigrations` и после миграций ozon-fetcher совпадает по таблицам и колонкам (тест в ozon-fetcher)
+- [x] `connections`: `provider=wildberries` уходит в query; запись чужого провайдера отбрасывается; функция разбора адаптера вызывается на каждую запись
+- [x] `dispatcher`: работает с произвольным типом кабинета (фейковый тип)
+- [x] `fetch`: фейковый адаптер — «первая страница и тишина» (2 страницы → 2 raw, `done`); повтор того же содержимого → `unchanged`; `Classify` адаптера перехватывает свою ошибку раньше общей таблицы; `apierr.ClassRateLimit` с `RetryAfter` → `pending` через паузу; `ClassObsoleteEndpoint` → `StopResource` + `failed_permanent`; `ClassAuth` → `RecordAuthFailure`, вторая подряд — ERROR
+- [x] `httpapi`: `Service` из `Deps` в ответе coverage (тест ядра); в логах имя сервиса несёт `observability.Setup(service)`
 
 ## 6. Чек-лист готовности
 
@@ -89,7 +89,7 @@ spec-wb §5 запрещает копировать ядро ozon-fetcher в wb-
 - [x] Dockerfile ozon-fetcher собирается из `services/` (локальная сборка образа ок); compose dev и deploy.yml указывают новый контекст; prod-compose берёт готовый образ — без правок
 - [x] `go vet`, `golangci-lint` (0 issues), `go test -race` по fetchkit и ozon-fetcher (по пакету, контейнер с лимитом памяти)
 - [x] документы: README/AGENTS ozon-fetcher, `services/README.md`, `services/go.md`, `shared/fetchkit/README.md`
-- [ ] внутреннее ревью diff от `62dda3879`, внешнее ревью (Codex), BLOCKER/IMPORTANT закрыты
+- [x] внутреннее ревью diff от `62dda3879`, внешнее ревью (Codex): раунд 1 — IMPORTANT (типы credentials проверялись после фильтрации записи) исправлен в 43846f0df с регрессионным тестом; раунд 2 — REVIEW_GREEN
 - [ ] после деплоя (в рамках handoff задачи): ночь без новых ERROR в GlitchTip ozon-fetcher, покрытие месяца не изменилось
 
 ## Baseline (02.11.2026)
