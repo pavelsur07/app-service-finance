@@ -322,7 +322,7 @@
 
                         {% set company_price_active = current_route starts with 'company_price_' %}
                         <a class="dropdown-item {{ company_price_active ? 'active' : '' }}" href="{{ path('company_price_index') }}">
-                            <span>Тарифы</span>
+                            <span>Тариф и оплата</span>
                         </a>
 
                         {% if active_company and active_company.user.id == app.user.id %}

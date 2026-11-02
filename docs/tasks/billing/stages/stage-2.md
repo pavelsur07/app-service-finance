@@ -76,7 +76,7 @@
 - [x] заглушка `/admin/billing` удалена, ссылок на `admin_billing_index` нет
 - [x] PHPStan, CS, strict_types; unit / integration / functional по затронутому
 - [x] `ARCHITECTURE.md` (Facade, Action, кто коммитит), Changelog; `TASK.md`
-- [ ] после деплоя: подписок «Друг» = числу компаний (21), оплат 0
+- [x] после деплоя: подписок «Друг» = числу компаний (21), оплат 0 — сверено 02.11.2026 после миграции (PR #2854, деплой без даунтайма)
 
 ## Итог
 

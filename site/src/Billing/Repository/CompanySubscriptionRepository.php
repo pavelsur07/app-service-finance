@@ -54,4 +54,33 @@ final class CompanySubscriptionRepository extends ServiceEntityRepository
 
         return $byCompany;
     }
+
+    /**
+     * Подписки с датой окончания, у которых «оплачено по» — одна из дат (cron напоминаний).
+     *
+     * @companyScopeExempt обход всех кабинетов cron-командой напоминаний; ограничение — список дат окончания
+     *
+     * @param list<\DateTimeImmutable> $paidUntilDates
+     *
+     * @return list<CompanySubscription>
+     */
+    public function findEndingOn(array $paidUntilDates): array
+    {
+        if ([] === $paidUntilDates) {
+            return [];
+        }
+
+        /** @var list<CompanySubscription> $rows */
+        $rows = $this->createQueryBuilder('s')
+            ->addSelect('t')
+            ->join('s.tariff', 't')
+            ->andWhere('s.paidUntil IN (:dates)')
+            ->setParameter('dates', array_map(static fn (\DateTimeImmutable $d): string => $d->format('Y-m-d'), $paidUntilDates))
+            ->orderBy('s.paidUntil')
+            ->addOrderBy('s.companyId')
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
+    }
 }

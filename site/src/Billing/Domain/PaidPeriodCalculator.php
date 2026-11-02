@@ -35,6 +35,17 @@ final readonly class PaidPeriodCalculator
     }
 
     /**
+     * Пробный период: $days дней, включая день начала (по Москве).
+     */
+    public function trial(\DateTimeImmutable $startedAt, int $days): PaidPeriod
+    {
+        Assert::greaterThanEq($days, 1, 'Пробный период — не меньше дня.');
+        $from = self::day($startedAt);
+
+        return new PaidPeriod($from, $from->modify('+'.($days - 1).' days'));
+    }
+
+    /**
      * Календарная дата момента по Москве, полночь в часовом поясе Москвы.
      */
     public static function day(\DateTimeImmutable $moment): \DateTimeImmutable

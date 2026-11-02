@@ -44,6 +44,7 @@ final class BillingFacade implements BillingFacadeInterface
             $tariff?->getName(),
             $subscription?->getPaidUntil(),
             $this->policy->daysLeft($subscription, $now),
+            $subscription?->isTrial() ?? false,
         );
     }
 }

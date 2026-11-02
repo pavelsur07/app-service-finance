@@ -37,7 +37,7 @@ final class BackfillCompanyOnboardingCommandTest extends IntegrationTestCase
         self::assertSame(Command::SUCCESS, $tester->execute([], ['verbosity' => OutputInterface::VERBOSITY_VERBOSE]));
 
         $display = $tester->getDisplay();
-        self::assertStringContainsString((string) $bare->getId().' balance_accounts=2, balance_structure=1, money_accounts=2, pl_categories=72', $display);
+        self::assertStringContainsString((string) $bare->getId().' balance_accounts=2, balance_structure=1, billing_trial=1, money_accounts=2, pl_categories=72', $display);
         self::assertStringNotContainsString((string) $complete->getId(), $display);
         self::assertSame($before, $this->counts((string) $bare->getId()));
     }
@@ -52,7 +52,7 @@ final class BackfillCompanyOnboardingCommandTest extends IntegrationTestCase
         self::assertSame(Command::INVALID, $tester->execute(['--company' => $companyId, '--execute' => true, '--expected-count' => '2']));
         self::assertStringContainsString('ожидалось 2', $tester->getDisplay());
 
-        self::assertSame(['money' => 0, 'pl' => 0, 'balance_articles' => 0, 'balance_accounts' => 0], $this->counts($companyId));
+        self::assertSame(['money' => 0, 'pl' => 0, 'balance_articles' => 0, 'balance_accounts' => 0, 'billing' => 0], $this->counts($companyId));
     }
 
     public function testExecuteFillsGapsOnceAndKeepsOwnData(): void
@@ -75,8 +75,9 @@ final class BackfillCompanyOnboardingCommandTest extends IntegrationTestCase
         self::assertSame(Command::SUCCESS, $tester->execute(['--company' => $configuredId, '--execute' => true, '--expected-count' => '1']));
         self::assertStringContainsString('Дозаполнено компаний: 1.', $tester->getDisplay());
 
-        self::assertSame(['money' => 2, 'pl' => 72, 'balance_articles' => 33, 'balance_accounts' => 2], $this->counts($bare));
-        self::assertSame(['money' => 2, 'pl' => 1, 'balance_articles' => 33, 'balance_accounts' => 1], $this->counts($configuredId));
+        self::assertSame(['money' => 2, 'pl' => 72, 'balance_articles' => 33, 'balance_accounts' => 2, 'billing' => 1], $this->counts($bare));
+        self::assertSame(['money' => 2, 'pl' => 1, 'balance_articles' => 33, 'balance_accounts' => 1, 'billing' => 1], $this->counts($configuredId));
+        self::assertSame('base:true', $this->connection->fetchOne("SELECT t.code || ':' || s.is_trial FROM billing_company_subscriptions s JOIN billing_tariffs t ON t.id = s.tariff_id WHERE s.company_id = ?", [$bare]));
         self::assertSame(['bank:Основной счет', 'cash:Основная'], $this->connection->fetchFirstColumn("SELECT type || ':' || name FROM money_account WHERE company_id=? ORDER BY type", [$configuredId]));
 
         foreach ([$bare, $configuredId] as $companyId) {
@@ -107,7 +108,7 @@ final class BackfillCompanyOnboardingCommandTest extends IntegrationTestCase
         self::assertMatchesRegularExpression('/completed\s+0/', $tester->getDisplay());
         self::assertStringContainsString('новый dry-run', $tester->getDisplay());
 
-        $empty = ['money' => 0, 'pl' => 0, 'balance_articles' => 0, 'balance_accounts' => 0];
+        $empty = ['money' => 0, 'pl' => 0, 'balance_articles' => 0, 'balance_accounts' => 0, 'billing' => 0];
         self::assertSame($empty, $this->counts($failing));
         self::assertSame($empty, $this->counts($untouched));
     }
@@ -170,12 +171,12 @@ final class BackfillCompanyOnboardingCommandTest extends IntegrationTestCase
     }
 
     /**
-     * @return array{money: int, pl: int, balance_articles: int, balance_accounts: int}
+     * @return array{money: int, pl: int, balance_articles: int, balance_accounts: int, billing: int}
      */
     private function counts(string $companyId): array
     {
         $count = fn (string $table): int => (int) $this->connection->fetchOne(sprintf('SELECT COUNT(*) FROM %s WHERE company_id = ?', $table), [$companyId]);
 
-        return ['money' => $count('money_account'), 'pl' => $count('pl_categories'), 'balance_articles' => $count('balance_articles'), 'balance_accounts' => $count('balance_accounts')];
+        return ['money' => $count('money_account'), 'pl' => $count('pl_categories'), 'balance_articles' => $count('balance_articles'), 'balance_accounts' => $count('balance_accounts'), 'billing' => $count('billing_company_subscriptions')];
     }
 }

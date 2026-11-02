@@ -9,6 +9,7 @@ use App\Billing\Entity\CompanySubscription;
 use App\Billing\Entity\TariffPrice;
 use App\Billing\Enum\TariffCode;
 use App\Billing\Exception\TariffChangeNotSupportedException;
+use App\Tests\Builders\Billing\BillingExpiryReminderBuilder;
 use App\Tests\Builders\Billing\BillingPaymentBuilder;
 use App\Tests\Builders\Billing\CompanySubscriptionBuilder;
 use App\Tests\Builders\Billing\TariffBuilder;
@@ -142,5 +143,57 @@ final class BillingEntitiesTest extends TestCase
             } catch (\InvalidArgumentException) {
             }
         }
+    }
+
+    public function testTrialNeedsDatedTariff(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        CompanySubscriptionBuilder::aSubscription()->onTariff(TariffBuilder::aTariff()->perpetual()->build())->trial('2027-01-01', '2027-01-14')->build();
+    }
+
+    public function testPaymentDuringTrialContinuesFromTrialEndEvenForOtherTariff(): void
+    {
+        $base = TariffBuilder::aTariff()->withCode(TariffCode::BASE, 'База')->build();
+        $pro = TariffBuilder::aTariff()->withId(self::OTHER_TARIFF_ID)->withCode(TariffCode::PRO, 'Профи')->build();
+        $subscription = CompanySubscriptionBuilder::aSubscription()->onTariff($base)->trial('2027-01-01', '2027-01-14')->build();
+        self::assertTrue($subscription->isTrial());
+
+        // Другой тариф во время пробного — не отказ, продолжение от конца пробного.
+        $base = $subscription->renewalBase($pro, new \DateTimeImmutable('2027-01-05 12:00:00', new \DateTimeZone('Europe/Moscow')));
+        self::assertSame('2027-01-14', $base?->format('Y-m-d'));
+
+        $subscription->applyPaidPeriod($pro, new PaidPeriod(new \DateTimeImmutable('2027-01-15'), new \DateTimeImmutable('2027-02-14')), new \DateTimeImmutable());
+        self::assertFalse($subscription->isTrial());
+        self::assertSame(TariffCode::PRO, $subscription->getTariff()->getCode());
+        self::assertSame('2027-01-15', $subscription->getPaidFrom()->format('Y-m-d'), 'оплаченный отрезок начинается после пробного');
+        self::assertSame('2027-02-14', $subscription->getPaidUntil()?->format('Y-m-d'));
+    }
+
+    public function testPaymentAfterExpiredTrialStartsFromReceivedDay(): void
+    {
+        $subscription = CompanySubscriptionBuilder::aSubscription()->trial('2027-01-01', '2027-01-14')->build();
+
+        self::assertNull($subscription->renewalBase(TariffBuilder::aTariff()->withId(self::OTHER_TARIFF_ID)->build(), new \DateTimeImmutable('2027-01-20 10:00:00', new \DateTimeZone('Europe/Moscow'))));
+    }
+
+    public function testAssignEndsTrial(): void
+    {
+        $subscription = CompanySubscriptionBuilder::aSubscription()->trial('2027-01-01', '2027-01-14')->build();
+
+        $subscription->assign(TariffBuilder::aTariff()->perpetual()->build(), new \DateTimeImmutable('2027-01-03'), null, new \DateTimeImmutable());
+
+        self::assertFalse($subscription->isTrial());
+        self::assertNull($subscription->getPaidUntil());
+    }
+
+    public function testExpiryReminderKeepsDateAndRejectsNegativeDays(): void
+    {
+        $reminder = BillingExpiryReminderBuilder::aReminder()->before('2027-03-17', 0)->build();
+        self::assertSame('2027-03-17', $reminder->getPaidUntil()->format('Y-m-d'));
+        self::assertSame(0, $reminder->getDaysBefore());
+
+        $this->expectException(\InvalidArgumentException::class);
+        BillingExpiryReminderBuilder::aReminder()->before('2027-03-17', -1)->build();
     }
 }

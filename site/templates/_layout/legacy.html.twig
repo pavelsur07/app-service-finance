@@ -45,6 +45,7 @@
                     <div class="content-max mx-auto">
                         {% block breadcrumbs %}{% endblock %}
                         {{ include('@Partials/_flash.html.twig') }}
+                        {% include 'billing/_partials/expiry_notice.html.twig' with {variant: 'legacy'} only %}
                         {% block content %}{% block body %}{% endblock %}{% endblock %}
                     </div>
                 </div>
