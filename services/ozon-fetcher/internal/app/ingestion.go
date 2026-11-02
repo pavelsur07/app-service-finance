@@ -20,8 +20,8 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonperf"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/planner"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ratelimit"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/rawstore"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/rawstore"
 )
 
 // Ingestion — запущенная цепочка; Wait возвращается после остановки всех частей.

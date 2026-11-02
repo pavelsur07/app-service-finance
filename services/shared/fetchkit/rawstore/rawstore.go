@@ -40,9 +40,13 @@ func (s *Store) Ping(ctx context.Context) error {
 	return nil
 }
 
+// ErrNoProvider — объект без провайдера: сервисы делят один бакет и одного
+// пользователя, разделяет их только префикс ключа (решение 02.11.2026).
+var ErrNoProvider = errors.New("rawstore: object has no provider")
+
 // Object — страница ответа источника.
 type Object struct {
-	Provider      string // ozon
+	Provider      string // префикс ключа: ozon, wb — сервисы делят бакет только им
 	ConnectionRef string
 	ResourceType  string
 	PeriodKey     string
@@ -89,6 +93,9 @@ func (s *Store) WithPutTimeout(d time.Duration) *Store {
 // ключ — те же байты, поэтому повтор после сбоя идемпотентен, а
 // существующий объект (412 на If-None-Match) — успех, а не перезапись.
 func (s *Store) Put(ctx context.Context, obj Object) (Stored, error) {
+	if obj.Provider == "" {
+		return Stored{}, ErrNoProvider
+	}
 	sum := sha256.Sum256(obj.Body)
 	digest := hex.EncodeToString(sum[:])
 	key := Key(obj, digest)

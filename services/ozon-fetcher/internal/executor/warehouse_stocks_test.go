@@ -13,8 +13,8 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/rawstore"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/rawstore"
 )
 
 func (f *fakeOzon) FetchWarehouseStocks(_ context.Context, creds ozon.Credentials, _ string, skus []int64) (ozon.Page, ozon.WarehouseStocks, error) {

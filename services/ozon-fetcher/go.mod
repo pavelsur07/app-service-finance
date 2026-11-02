@@ -3,6 +3,7 @@ module github.com/pavelsur07/app-service-finance/services/ozon-fetcher
 go 1.27
 
 require (
+	github.com/pavelsur07/app-service-finance/services/shared/fetchkit v0.0.0
 	github.com/aws/aws-sdk-go-v2 v1.47.3
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.9
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.3
@@ -35,3 +36,6 @@ require (
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 )
+
+// Общее ядро загрузчиков (services/go.md «Монорепо»).
+replace github.com/pavelsur07/app-service-finance/services/shared/fetchkit => ../shared/fetchkit

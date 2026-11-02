@@ -207,7 +207,7 @@ func (c *Client) requestToken(ctx context.Context, creds Credentials, connection
 		ExpiresIn   int    `json:"expires_in"`
 	}
 	if err := json.Unmarshal(resp.Body, &body); err != nil || body.AccessToken == "" {
-		return token{}, &ozon.APIError{Class: ozon.ClassInvalidResponse, Endpoint: EndpointToken, Status: resp.Status, Err: errors.New("no access_token")}
+		return token{}, &ozon.APIError{Source: ozon.Source, Class: ozon.ClassInvalidResponse, Endpoint: EndpointToken, Status: resp.Status, Err: errors.New("no access_token")}
 	}
 	ttl := defaultTokenTTL
 	if body.ExpiresIn > 0 {
@@ -267,7 +267,7 @@ func (c *Client) send(ctx context.Context, connectionRef, endpoint, method, targ
 		}
 		c.log(ctx, connectionRef, endpoint, 0, duration, string(ozon.ClassTransient))
 		// Ошибка транспорта несёт URL с query — в журнал только endpoint.
-		return ozon.Response{}, &ozon.APIError{Class: ozon.ClassTransient, Endpoint: endpoint, Err: errors.New("request failed")}
+		return ozon.Response{}, &ozon.APIError{Source: ozon.Source, Class: ozon.ClassTransient, Endpoint: endpoint, Err: errors.New("request failed")}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -279,11 +279,11 @@ func (c *Client) send(ctx context.Context, connectionRef, endpoint, method, targ
 			return ozon.Response{}, ctxErr
 		}
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(ozon.ClassTransient))
-		return ozon.Response{}, &ozon.APIError{Class: ozon.ClassTransient, Endpoint: endpoint, Status: resp.StatusCode, Err: err}
+		return ozon.Response{}, &ozon.APIError{Source: ozon.Source, Class: ozon.ClassTransient, Endpoint: endpoint, Status: resp.StatusCode, Err: err}
 	}
 	if len(raw) > ozon.MaxBodyBytes {
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(ozon.ClassInvalidResponse))
-		return ozon.Response{}, &ozon.APIError{Class: ozon.ClassInvalidResponse, Endpoint: endpoint, Status: resp.StatusCode, Err: ozon.ErrBodyTooLarge}
+		return ozon.Response{}, &ozon.APIError{Source: ozon.Source, Class: ozon.ClassInvalidResponse, Endpoint: endpoint, Status: resp.StatusCode, Err: ozon.ErrBodyTooLarge}
 	}
 	if apiErr := ozon.Classify(endpoint, resp.StatusCode, resp.Header, raw, c.now()); apiErr != nil {
 		apiErr.Message = safeMessage(raw, secrets...)

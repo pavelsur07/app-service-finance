@@ -16,6 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Service — имя сервиса в тестах.
+const Service = "ozon-fetcher"
+
 type captured struct {
 	mu     sync.Mutex
 	events []*sentry.Event
@@ -30,7 +33,7 @@ func (c *captured) capture(e *sentry.Event) {
 func newLogger() (*slog.Logger, *bytes.Buffer, *captured) {
 	out := &bytes.Buffer{}
 	c := &captured{}
-	return slog.New(NewHandler(slog.NewJSONHandler(out, nil), c.capture)).With(slog.String("service", Service)), out, c
+	return slog.New(NewHandler(Service, slog.NewJSONHandler(out, nil), c.capture)).With(slog.String("service", Service)), out, c
 }
 
 func TestOnlyErrorsGoToGlitchTip(t *testing.T) {
@@ -71,7 +74,7 @@ func TestAttrsFromWithAndGroupsAreKept(t *testing.T) {
 
 func TestSetupWithoutDSNSendsNothing(t *testing.T) {
 	out := &bytes.Buffer{}
-	logger, flush, err := Setup(out, "", "sha", "prod")
+	logger, flush, err := Setup(out, Service, "", "sha", "prod")
 	require.NoError(t, err)
 	logger.Error("boom")
 	flush()
@@ -80,7 +83,7 @@ func TestSetupWithoutDSNSendsNothing(t *testing.T) {
 
 func TestBrokenDSNKeepsServiceLogging(t *testing.T) {
 	out := &bytes.Buffer{}
-	logger, flush, err := Setup(out, "not a dsn", "", "")
+	logger, flush, err := Setup(out, Service, "not a dsn", "", "")
 	require.Error(t, err)
 	require.NotNil(t, logger, "сбой телеметрии не останавливает сервис")
 	logger.Error("still logged")
@@ -116,7 +119,7 @@ func TestSetupSendsErrorEventToGlitchTip(t *testing.T) {
 	defer srv.Close()
 	dsn := strings.Replace(srv.URL, "http://", "http://publickey@", 1) + "/42"
 
-	logger, flush, err := Setup(&bytes.Buffer{}, dsn, "sha-1", "prod")
+	logger, flush, err := Setup(&bytes.Buffer{}, Service, dsn, "sha-1", "prod")
 	require.NoError(t, err)
 	logger.Warn("ozon request", slog.String("outcome", "rate_limit"))
 	logger.Error("fetch task finish failed", slog.String("stage", "fetch"), slog.String("error_class", "store"))

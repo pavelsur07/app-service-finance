@@ -16,9 +16,6 @@ import (
 	"github.com/getsentry/sentry-go"
 )
 
-// Service — имя сервиса в логах и тег в GlitchTip.
-const Service = "ozon-fetcher"
-
 // FlushTimeout — сколько ждать отправки событий при остановке.
 const FlushTimeout = 2 * time.Second
 
@@ -36,9 +33,10 @@ type Capturer func(*sentry.Event)
 // вызывать при остановке, до выхода процесса. Ошибка инициализации GlitchTip
 // не останавливает сервис (services/AGENTS.md §6): возвращается рабочий
 // логгер без отправки и ошибка — для записи в лог.
-func Setup(out io.Writer, dsn, release, environment string) (*slog.Logger, func(), error) {
+// service — имя сервиса в логах и тег в GlitchTip (ozon-fetcher, wb-fetcher).
+func Setup(out io.Writer, service, dsn, release, environment string) (*slog.Logger, func(), error) {
 	base := slog.NewJSONHandler(out, nil)
-	plain := slog.New(base).With(slog.String("service", Service))
+	plain := slog.New(base).With(slog.String("service", service))
 	if dsn == "" {
 		return plain, func() {}, nil
 	}
@@ -46,25 +44,26 @@ func Setup(out io.Writer, dsn, release, environment string) (*slog.Logger, func(
 		Dsn:         dsn,
 		Release:     release,
 		Environment: environment,
-		ServerName:  Service,
+		ServerName:  service,
 	}); err != nil {
 		return plain, func() {}, fmt.Errorf("observability: sentry init: %w", err)
 	}
 	capture := func(e *sentry.Event) { sentry.CaptureEvent(e) }
-	logger := slog.New(NewHandler(base, capture)).With(slog.String("service", Service))
+	logger := slog.New(NewHandler(service, base, capture)).With(slog.String("service", service))
 	return logger, func() { sentry.Flush(FlushTimeout) }, nil
 }
 
 // Handler пишет всё в next и отдаёт записи ERROR в capture.
 type Handler struct {
+	service string
 	next    slog.Handler
 	capture Capturer
 	attrs   []slog.Attr
 	group   string
 }
 
-func NewHandler(next slog.Handler, capture Capturer) *Handler {
-	return &Handler{next: next, capture: capture}
+func NewHandler(service string, next slog.Handler, capture Capturer) *Handler {
+	return &Handler{service: service, next: next, capture: capture}
 }
 
 func (h *Handler) Enabled(ctx context.Context, l slog.Level) bool { return h.next.Enabled(ctx, l) }
@@ -112,8 +111,8 @@ func (h *Handler) event(r slog.Record) *sentry.Event {
 	e.Level = sentry.LevelError
 	e.Message = r.Message
 	e.Timestamp = r.Time
-	e.Logger = Service
-	e.Tags = map[string]string{"service": Service}
+	e.Logger = h.service
+	e.Tags = map[string]string{"service": h.service}
 	extra := sentry.Context{}
 
 	add := func(a slog.Attr) {
@@ -140,7 +139,7 @@ func (h *Handler) event(r slog.Record) *sentry.Event {
 
 	// Поля записи, кроме тегов, — в контекст «log» события.
 	e.Contexts = map[string]sentry.Context{"log": extra}
-	e.Fingerprint = []string{Service, r.Message, e.Tags["stage"], e.Tags["error_class"]}
+	e.Fingerprint = []string{h.service, r.Message, e.Tags["stage"], e.Tags["error_class"]}
 	return e
 }
 

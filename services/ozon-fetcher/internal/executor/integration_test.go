@@ -18,9 +18,9 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/rawstore"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store/storetest"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/rawstore"
 )
 
 // Интеграция: настоящие postgres (TEST_DB_DSN) и S3 (TEST_S3_ENDPOINT,

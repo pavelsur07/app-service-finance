@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -230,4 +231,26 @@ func TestHungPutIsBoundedByTimeout(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.Less(t, time.Since(started), time.Second)
+}
+
+func TestProviderIsKeyPrefix(t *testing.T) {
+	putter := &fakePutter{}
+	obj := page(`{"rows":[]}`)
+	obj.Provider, obj.ResourceType = "wb", "wb.finance.sales-report.daily"
+
+	stored, err := New(putter, "vashfindir-services-raw", 1).Put(context.Background(), obj)
+
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(stored.Key, "wb/0193-ref/wb.finance.sales-report.daily/2026-10-15/"), stored.Key)
+}
+
+func TestEmptyProviderIsRejected(t *testing.T) {
+	putter := &fakePutter{}
+	obj := page(`{}`)
+	obj.Provider = ""
+
+	_, err := New(putter, "b", 1).Put(context.Background(), obj)
+
+	require.ErrorIs(t, err, ErrNoProvider)
+	assert.Empty(t, putter.objects, "без провайдера в бакет не пишем: объекты сервисов делит только префикс")
 }
