@@ -39,6 +39,7 @@ final readonly class ReadOnlyRule
         'company_new',
         'company_delete',
         'company_invite_accept',
+        'company_price_checkout', // оплата тарифа снимает «только чтение»
         'finance_report_preview_recalc',
         'report_account_balances_recalc',
         'marketplace_cost_pl_mapping_default_preview',

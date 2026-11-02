@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Company\Security;
 
 use App\Billing\Controller\Client\CompanyTariffController;
+use App\Billing\Controller\Client\StartCheckoutController;
 use App\Company\Controller\Api\CounterpartySearchController;
 use App\Company\Controller\CompanyController;
 use App\Company\Controller\Counterparty\ApplyCounterpartyDisplayNameController;
@@ -77,6 +78,7 @@ final class ModuleAccessMap
         CompanyController::class,   // список/создание/переключение компаний; работает и без активной компании, свои owner-проверки
         HomeRedirectController::class, // роутер лендинга «/», доступен любому участнику; сам проверяет права через is_granted
         CompanyTariffController::class, // тариф и оплата активного кабинета (только чтение) — любому участнику; историю оплат видит владелец
+        StartCheckoutController::class, // онлайн-оплата тарифа активного кабинета — сам проверяет владельца
         // Общий company-scoped справочник контрагентов: его использует и форма сделки в Deals,
         // и финансовые экраны, поэтому модульный read-гейт подписчика выбрал бы один модуль
         // из двух. Exemption снимает только автоматический гейт: сам контроллер требует

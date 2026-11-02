@@ -9,10 +9,14 @@ use App\Billing\Enum\TariffCode;
 use App\Billing\Repository\TariffRepository;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Tests\Builders\Billing\BillingCheckoutBuilder;
+use App\Tests\Builders\Billing\BillingPaymentBuilder;
 use App\Tests\Builders\Billing\CompanySubscriptionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\Billing\YooKassaResponses;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\DomCrawler\Field\ChoiceFormField;
 
@@ -159,6 +163,30 @@ final class AdminCompanyBillingTest extends WebTestCaseBase
         self::assertCount(1, $badge);
         self::assertStringContainsString('База · по 14.11.2099', trim($badge->text()));
         self::assertSame($this->url(), $badge->attr('href'));
+    }
+
+    public function testFailedOnlinePaymentIsListedUntilRegisteredManually(): void
+    {
+        $tariff = static::getContainer()->get(TariffRepository::class)->findOneByCode(TariffCode::START);
+        self::assertNotNull($tariff);
+        $checkout = BillingCheckoutBuilder::aCheckout()->forCompany((string) $this->company->getId())->onTariff($tariff, 1, 497000)->build();
+        $this->em()->persist($checkout);
+        $this->em()->flush();
+        $this->em()->getConnection()->executeStatement("UPDATE billing_checkouts SET status = 'failed_to_apply', failure_reason = 'ЮKassa: 100 RUB, ожидалось 497000 RUB' WHERE id = ?", [$checkout->getId()]);
+        $this->em()->clear();
+
+        $crawler = $this->openPage();
+        self::assertStringContainsString(YooKassaResponses::PAYMENT_ID, $crawler->filter('[data-billing-failed-checkouts]')->text());
+        self::assertStringContainsString('ожидалось 497000 RUB', $crawler->filter('[data-billing-failed-checkouts]')->text());
+
+        $tariff = static::getContainer()->get(TariffRepository::class)->findOneByCode(TariffCode::START);
+        self::assertNotNull($tariff);
+        $this->em()->persist(BillingPaymentBuilder::aPayment()->withId(Uuid::uuid7()->toString())->forCompany((string) $this->company->getId())->onTariff($tariff)->withExternalId(YooKassaResponses::PAYMENT_ID)->build());
+        $this->em()->flush();
+
+        $crawler = $this->openPage();
+        self::assertCount(0, $crawler->filter('[data-billing-failed-checkouts]'), 'отмеченная вручную оплата из списка уходит');
+        self::assertStringContainsString('Счёт', $crawler->filter('table')->last()->text());
     }
 
     private function url(): string

@@ -150,6 +150,40 @@
     </section>
   </div>
 
+  {# Онлайн-оплаты, которые не зачислились сами: деньги получены — зачислить вручную формой выше или вернуть #}
+  {% if failedCheckouts is not empty %}
+    <section class="card u-p-0" style="overflow-x:auto; margin-bottom:var(--s-4);" data-billing-failed-checkouts>
+      <div style="padding:var(--s-4) var(--s-4) 0;">
+        <h2 style="font-size:var(--font-15); margin:0;">Онлайн-оплаты без зачисления</h2>
+        <p class="u-text-muted" style="margin:var(--s-1) 0 0;">ЮKassa списала деньги, но продлить автоматически не удалось. Отметьте оплату вручную (номер — ID платежа ЮKassa) или оформите возврат в кабинете ЮKassa.</p>
+      </div>
+      <table class="t-table">
+        <thead>
+          <tr>
+            <th>Создана</th>
+            <th>Тариф</th>
+            <th class="t-cell--right">Срок</th>
+            <th class="t-cell--right">Сумма, ₽</th>
+            <th>ID платежа ЮKassa</th>
+            <th>Причина</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in failedCheckouts %}
+            <tr>
+              <td style="font-variant-numeric:tabular-nums;">{{ c.createdAt|date('d.m.Y H:i') }}</td>
+              <td>{{ c.tariff.name }}</td>
+              <td class="t-cell--right">{{ c.months }} мес</td>
+              <td class="t-cell--right" style="font-variant-numeric:tabular-nums;">{{ c.amountKopecks|vf_minor|vf_money }}</td>
+              <td style="word-break:break-all;">{{ c.providerPaymentId ?? '—' }}</td>
+              <td>{{ c.failureReason ?? '—' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  {% endif %}
+
   {# История оплат #}
   <section class="card u-p-0" style="overflow-x:auto;">
     <div style="padding:var(--s-4) var(--s-4) 0;">
@@ -164,7 +198,8 @@
             <th class="t-cell--right">Срок</th>
             <th class="t-cell--right">Сумма, ₽</th>
             <th>Период</th>
-            <th>Счёт</th>
+            <th>Способ</th>
+            <th>Номер</th>
           </tr>
         </thead>
         <tbody>
@@ -175,7 +210,8 @@
               <td class="t-cell--right">{{ payment.months }} мес</td>
               <td class="t-cell--right" style="font-variant-numeric:tabular-nums;">{{ payment.amountKopecks|vf_minor|vf_money }}</td>
               <td style="font-variant-numeric:tabular-nums;">{{ payment.periodFrom|date('d.m.Y') }} — {{ payment.periodUntil|date('d.m.Y') }}</td>
-              <td>{{ payment.externalId ?? '—' }}</td>
+              <td>{{ payment.source.label }}</td>
+              <td style="word-break:break-all;">{{ payment.externalId ?? '—' }}</td>
             </tr>
           {% endfor %}
         </tbody>

@@ -57,15 +57,15 @@ follow-up в `TASK.md`.
 
 ## Чек-лист приёмки
 
-- [ ] unit: решение гейта — метод, статус, белый список, firewall, флаг
-- [ ] functional: `read_only` + флаг → POST формы → redirect на тариф, данные не изменились; JSON → 403 `billing_read_only`
-- [ ] functional: `read_only` → GET страницы 200; `grace`, «Друг», «нет тарифа» → POST проходит
-- [ ] functional: белый список (переключение компании, тема, выход) проходит в `read_only`
-- [ ] functional: флаг выключен → POST проходит
-- [ ] functional: после оплаты в админке запись снова работает
-- [ ] PHPStan, CS, strict_types; unit / integration / functional по затронутому
-- [ ] `ARCHITECTURE.md`, `TASK.md`
-- [ ] после деплоя: флаг выключен, кабинетов `read_only` 0, ошибок нет
+- [x] unit: решение гейта — метод, статус, белый список, firewall, флаг
+- [x] functional: `read_only` + флаг → POST формы → redirect на тариф, данные не изменились; JSON → 403 `billing_read_only`
+- [x] functional: `read_only` → GET страницы 200; `grace`, «Друг», «нет тарифа» → POST проходит
+- [x] functional: белый список (переключение компании, тема, выход) проходит в `read_only`
+- [x] functional: флаг выключен → POST проходит
+- [x] functional: после оплаты в админке запись снова работает
+- [x] PHPStan, CS, strict_types; unit / integration / functional по затронутому
+- [x] `ARCHITECTURE.md`, `TASK.md`
+- [x] после деплоя: флаг выключен, кабинетов `read_only` 0, ошибок нет — сверено 02.11.2026 09:25 МСК: подписок 21 (все «Друг»), новых событий в GlitchTip нет
 
 ## Итог
 
@@ -95,3 +95,7 @@ follow-up в `TASK.md`.
   данные старого кабинета в нём недоступны; GET-страницы, создающие
   стартовую структуру (Баланс, маппинг затрат), не блокируются — это не ввод
   учёта.
+
+**Поправка (этап 5)**: флаг не доходил до прода — переменные хоста compose не
+читает, деплой прокидывает только перечисленные в `deploy.yml`. С этапа 5
+включение — GitHub variable `BILLING_READ_ONLY_ENFORCED=true` + деплой.
