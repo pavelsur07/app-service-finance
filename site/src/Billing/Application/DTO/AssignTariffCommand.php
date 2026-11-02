@@ -8,6 +8,7 @@ use App\Billing\Enum\TariffCode;
 
 /**
  * Назначение тарифа кабинету администратором. `until` = null — только для бессрочного тарифа.
+ * `confirmShorten` — администратор подтвердил, что новое окончание раньше последнего оплаченного дня.
  */
 final readonly class AssignTariffCommand
 {
@@ -16,6 +17,7 @@ final readonly class AssignTariffCommand
         public TariffCode $tariffCode,
         public \DateTimeImmutable $from,
         public ?\DateTimeImmutable $until,
+        public bool $confirmShorten = false,
     ) {
     }
 }

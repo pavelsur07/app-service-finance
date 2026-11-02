@@ -135,6 +135,7 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         'admin_telegram_bot_webhook_set' => ['firewall', 'App\Telegram\Controller\Admin\TelegramBotController::webhookSet'],
         'admin_billing_company_assign' => ['firewall', 'App\Billing\Controller\Admin\AssignCompanyTariffController::__invoke'],
         'admin_billing_company_payment' => ['firewall', 'App\Billing\Controller\Admin\RegisterCompanyPaymentController::__invoke'],
+        'admin_billing_company_cancel_next' => ['firewall', 'App\Billing\Controller\Admin\CancelScheduledTariffController::__invoke'],
         'admin_ingestion_external_categories_confirm_ozon_type' => ['firewall', 'App\Admin\Controller\IngestionExternalCategoriesController::confirmOzonType'],
         'admin_ingestion_external_categories_discover' => ['firewall', 'App\Admin\Controller\IngestionExternalCategoriesController::discover'],
         'admin_ingestion_external_categories_import_ozon_details' => ['firewall', 'App\Admin\Controller\IngestionExternalCategoriesController::importOzonDetails'],

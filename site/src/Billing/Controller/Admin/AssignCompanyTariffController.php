@@ -40,6 +40,7 @@ final class AssignCompanyTariffController extends AbstractController
                 AdminBillingForm::tariff($request),
                 AdminBillingForm::date($request, 'from', 'дату начала'),
                 AdminBillingForm::optionalDate($request, 'until', 'дату окончания'),
+                $request->request->getBoolean('confirm_shorten'),
             ));
             $this->addFlash('success', 'Тариф назначен.');
         } catch (InvalidBillingInputException $exception) {

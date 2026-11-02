@@ -205,6 +205,18 @@ class CompanySubscription
         $this->updatedAt = $now;
     }
 
+    /**
+     * Отмена запланированного перехода администратором: до «оплачено по» остаётся текущий тариф.
+     * Переход должен быть и ещё не наступить к дню `$day`.
+     */
+    public function cancelScheduled(\DateTimeImmutable $day, \DateTimeImmutable $now): void
+    {
+        Assert::notNull($this->scheduledTariffAfter($day), 'Запланированного перехода нет или он уже наступил.');
+
+        $this->clearScheduled();
+        $this->updatedAt = $now;
+    }
+
     private function promoteScheduled(\DateTimeImmutable $day): void
     {
         if (null === $this->nextTariff || null === $this->nextTariffFrom || $day < PaidPeriodCalculator::date($this->nextTariffFrom)) {

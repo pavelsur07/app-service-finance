@@ -6,8 +6,11 @@ namespace App\Tests\Integration\Billing;
 
 use App\Billing\Application\AssignTariffAction;
 use App\Billing\Application\DTO\AssignTariffCommand;
+use App\Billing\Application\DTO\RegisterPaymentCommand;
+use App\Billing\Application\RegisterPaymentAction;
 use App\Billing\Entity\CompanySubscription;
 use App\Billing\Enum\AccessStatus;
+use App\Billing\Enum\PaymentSource;
 use App\Billing\Enum\TariffCode;
 use App\Billing\Exception\InvalidBillingInputException;
 use App\Billing\Facade\BillingFacadeInterface;
@@ -69,6 +72,44 @@ final class AssignTariffActionTest extends IntegrationTestCase
         self::assertTrue($this->em->isOpen());
     }
 
+    public function testShorteningPaidPeriodNeedsConfirmation(): void
+    {
+        $this->payStart('2027-01-15 12:00:00'); // оплачено 15.01–14.02
+
+        try {
+            $this->assign(TariffCode::START, '2027-01-15', '2027-01-31');
+            self::fail('shortening without confirmation must be rejected');
+        } catch (InvalidBillingInputException $exception) {
+            self::assertStringContainsString('оплатил по 14.02.2027', $exception->getMessage());
+        }
+        self::assertSame('2027-02-14', $this->subscription()->getPaidUntil()?->format('Y-m-d'));
+
+        // Не сокращение: окончание не раньше оплаченного, бессрочный тариф.
+        $this->assign(TariffCode::SUPPORT, '2027-01-15', '2027-02-14');
+        $this->assign(TariffCode::FRIEND, '2027-01-15', null);
+        self::assertNull($this->subscription()->getPaidUntil());
+
+        $this->assign(TariffCode::START, '2027-01-15', '2027-01-31', confirmShorten: true);
+        self::assertSame('2027-01-31', $this->subscription()->getPaidUntil()?->format('Y-m-d'));
+
+        // Уже снятые подтверждённым сокращением дни флажка повторно не требуют.
+        $this->assign(TariffCode::SUPPORT, '2027-01-15', '2027-01-31');
+        self::assertSame(TariffCode::SUPPORT, $this->subscription()->getTariff()->getCode());
+    }
+
+    public function testPaymentCarriedIntoUpgradeDoesNotCountAsPaidDays(): void
+    {
+        $this->payStart('2027-01-15 12:00:00', months: 12, amount: 4771000); // 15.01.2027–14.01.2028
+        $this->pay(TariffCode::PRO, '2027-01-20 12:00:00', 1, 1479000); // остаток «Старта» перенесён в дни «Профи»
+        $paidUntil = $this->subscription()->getPaidUntil()?->format('Y-m-d');
+        self::assertNotNull($paidUntil);
+        self::assertLessThan('2027-12-31', $paidUntil);
+
+        // Продление «Профи» до 31.12.2027 не сокращает: «по» перенесённой оплаты «Старта» не в счёт.
+        $this->assign(TariffCode::PRO, '2027-01-20', '2027-12-31');
+        self::assertSame('2027-12-31', $this->subscription()->getPaidUntil()?->format('Y-m-d'));
+    }
+
     public function testFacadeReturnsAccessForSeveralCompaniesAtOnce(): void
     {
         $this->assign(TariffCode::SUPPORT, '2027-01-01', '2027-01-31');
@@ -86,7 +127,7 @@ final class AssignTariffActionTest extends IntegrationTestCase
         self::assertSame(AccessStatus::NONE, $access[$missing]->status);
     }
 
-    private function assign(TariffCode $code, string $from, ?string $until): void
+    private function assign(TariffCode $code, string $from, ?string $until, bool $confirmShorten = false): void
     {
         $zone = new \DateTimeZone('Europe/Moscow');
         self::getContainer()->get(AssignTariffAction::class)(new AssignTariffCommand(
@@ -94,6 +135,25 @@ final class AssignTariffActionTest extends IntegrationTestCase
             $code,
             new \DateTimeImmutable($from, $zone),
             null === $until ? null : new \DateTimeImmutable($until, $zone),
+            $confirmShorten,
+        ));
+    }
+
+    private function payStart(string $receivedAt, int $months = 1, int $amount = 497000): void
+    {
+        $this->pay(TariffCode::START, $receivedAt, $months, $amount);
+    }
+
+    private function pay(TariffCode $tariff, string $receivedAt, int $months, int $amount): void
+    {
+        self::getContainer()->get(RegisterPaymentAction::class)(new RegisterPaymentCommand(
+            Uuid::uuid7()->toString(),
+            self::COMPANY_ID,
+            $tariff,
+            $months,
+            $amount,
+            new \DateTimeImmutable($receivedAt, new \DateTimeZone('Europe/Moscow')),
+            PaymentSource::MANUAL_INVOICE,
         ));
     }
 

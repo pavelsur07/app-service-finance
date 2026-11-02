@@ -135,6 +135,29 @@ final class BillingEntitiesTest extends TestCase
         $subscription->applyPlan($pro, self::plan(PaymentPlanKind::RENEWAL, '2027-03-01', '2027-03-31'), self::at('2027-01-25'), self::at('2027-01-25'));
     }
 
+    public function testCancelScheduledKeepsCurrentTariffAndNeedsPendingSwitch(): void
+    {
+        $subscription = CompanySubscriptionBuilder::aSubscription()->onTariff(self::pro())->paid('2027-01-01', '2027-01-31')->build();
+
+        try {
+            $subscription->cancelScheduled(self::at('2027-01-20'), self::at('2027-01-20'));
+            self::fail('nothing to cancel must be rejected');
+        } catch (\InvalidArgumentException) {
+        }
+
+        $subscription->applyPlan(TariffBuilder::aTariff()->build(), self::plan(PaymentPlanKind::DOWNGRADE, '2027-02-01', '2027-02-28'), self::at('2027-01-20'), self::at('2027-01-20'));
+        try {
+            $subscription->cancelScheduled(self::at('2027-02-01'), self::at('2027-02-01'));
+            self::fail('switch already started must not be cancelled');
+        } catch (\InvalidArgumentException) {
+        }
+
+        $subscription->cancelScheduled(self::at('2027-01-25'), self::at('2027-01-25'));
+        self::assertNull($subscription->getNextTariff());
+        self::assertSame(TariffCode::PRO, $subscription->tariffOn(self::at('2027-02-10'))->getCode());
+        self::assertSame('2027-02-28', $subscription->getPaidUntil()?->format('Y-m-d'));
+    }
+
     public function testNewPeriodAndAssignClearScheduledSwitch(): void
     {
         $start = TariffBuilder::aTariff()->build();
