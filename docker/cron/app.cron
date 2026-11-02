@@ -295,6 +295,8 @@
 # Billing: напоминания владельцам кабинетов об окончании оплаты (за 7/3/1/0 дней, пробный — 3/0).
 # 10:00 MSK — рабочее время получателя. Повтор в тот же день писем не дублирует: handler застолбляет billing_expiry_reminders.
 0 10 * * * cd /app && php bin/console app:billing:expiry-reminders --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+# Каждые 10 минут — сверка незавершённых онлайн-оплат с ЮKassa (потерянное уведомление). Без ключей выходит сразу.
+*/10 * * * * cd /app && php bin/console app:billing:yookassa-sync --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
 # Раз в сутки в 07:32 (read-only гейт, ничего не повторяет и не удаляет): очередь `failed` Messenger.
 # ERROR (logger->error → GlitchTip + exit 1) — самое старое сообщение пролежало ≥ 12 ч или в очереди ≥ 10 сообщений;

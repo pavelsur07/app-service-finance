@@ -15,6 +15,20 @@
     <div class="text-secondary">{{ company.name }}</div>
   </div>
 
+  {# Итог онлайн-оплаты после возврата с ЮKassa #}
+  {% if checkout %}
+    {% set checkoutView = {
+      pending: { cls: 'info', text: 'Платёж обрабатывается. Если вы уже оплатили, обновите страницу через минуту — срок продлится автоматически.' },
+      succeeded: { cls: 'success', text: 'Оплата прошла, тариф продлён.' },
+      canceled: { cls: 'warning', text: 'Оплата не прошла или отменена. Деньги не списаны — можно попробовать ещё раз.' },
+      failed_to_apply: { cls: 'danger', text: 'Оплата получена, но не зачислена автоматически. Мы уже видим её и продлим тариф вручную — писать не нужно.' },
+    } %}
+    {% set cv = checkoutView[checkout.status.value] %}
+    <div class="alert alert-{{ cv.cls }}" role="alert" data-billing-checkout-status="{{ checkout.status.value }}">
+      {{ cv.text }}
+    </div>
+  {% endif %}
+
   {# Текущий тариф #}
   {% set view = statusView[access.status.value] %}
   <div class="card mb-3" data-billing-current>
@@ -82,10 +96,41 @@
     </div>
   {% endif %}
 
+  {# Онлайн-оплата — владельцу, если ключи ЮKassa заданы и продление допустимо #}
+  {% if online %}
+    <div class="card mb-3" data-billing-online>
+      <div class="card-body">
+        <h3 class="card-title">Оплатить онлайн</h3>
+        <form method="post" action="{{ path('company_price_checkout') }}" class="row g-2 align-items-end">
+          <input type="hidden" name="_token" value="{{ csrf_token('billing_checkout') }}">
+          <input type="hidden" name="checkout_id" value="{{ online.checkoutId }}">
+          <div class="col-sm-auto">
+            <label class="form-label" for="billing-online-tariff">Тариф</label>
+            <select class="form-select" id="billing-online-tariff" name="tariff" required>
+              {% for offer in online.offers %}
+                <option value="{{ offer.tariff.code.value }}"{% if access.tariffName == offer.tariff.name %} selected{% endif %}>{{ offer.tariff.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-sm-auto">
+            <label class="form-label" for="billing-online-months">Срок</label>
+            <select class="form-select" id="billing-online-months" name="months" required>
+              {% for m in months %}<option value="{{ m }}">{{ m }} мес</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-sm-auto">
+            <button type="submit" class="btn btn-primary">Оплатить онлайн</button>
+          </div>
+        </form>
+        <p class="text-secondary small mt-2 mb-0">Картой, СБП или другим способом на странице ЮKassa. Сумма — по таблице выше.{% if online.onlyCurrent %} Пока действует оплаченный период, онлайн можно продлить только текущий тариф.{% endif %}</p>
+      </div>
+    </div>
+  {% endif %}
+
   {# Как оплатить #}
   <div class="card mb-3" data-billing-how-to-pay>
     <div class="card-body">
-      <h3 class="card-title">Как оплатить</h3>
+      <h3 class="card-title">{{ online ? 'Оплатить по счёту' : 'Как оплатить' }}</h3>
       <p class="mb-1">Напишите на <a href="mailto:{{ billingEmail }}?subject={{ ('Счёт на оплату: ' ~ company.name)|url_encode }}">{{ billingEmail }}</a>: тариф, срок и реквизиты компании. Мы выставим счёт.</p>
       <p class="text-secondary mb-0">Срок считается со дня зачисления оплаты. Если оплатить до окончания текущего периода (или пробного), новый начнётся сразу после него — оплаченные дни не теряются.</p>
     </div>
@@ -105,7 +150,8 @@
                 <th class="text-end">Срок</th>
                 <th class="text-end">Сумма</th>
                 <th>Период</th>
-                <th>Счёт</th>
+                <th>Способ</th>
+                <th>Номер</th>
               </tr>
             </thead>
             <tbody>
@@ -116,7 +162,8 @@
                   <td class="text-end">{{ payment.months }} мес</td>
                   <td class="text-end" style="font-variant-numeric:tabular-nums;">{{ payment.amountKopecks|vf_minor|vf_money }}</td>
                   <td style="font-variant-numeric:tabular-nums;">{{ payment.periodFrom|date('d.m.Y') }} — {{ payment.periodUntil|date('d.m.Y') }}</td>
-                  <td>{{ payment.externalId ?? '—' }}</td>
+                  <td>{{ payment.source.label }}</td>
+                  <td class="text-break">{{ payment.externalId ?? '—' }}</td>
                 </tr>
               {% endfor %}
             </tbody>

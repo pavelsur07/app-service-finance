@@ -88,6 +88,8 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         'balance_structure_seed' => ['balance-manage', 'App\Balance\Controller\BalanceStructureSeedController::__invoke'],
         'balance_account_target' => ['balance-prepare', 'App\Balance\Controller\BalanceTargetController::__invoke'],
 
+        // Онлайн-оплата тарифа: только владелец кабинета (OnlinePaymentTest — участнику 403).
+        'company_price_checkout' => ['owner', 'App\Billing\Controller\Client\StartCheckoutController::__invoke'],
         'settings_api_permissions' => ['owner', 'App\Api\Controller\Settings\PermissionsController::__invoke'],
         'settings_api_create' => ['owner', 'App\Api\Controller\Settings\CreateController::__invoke'],
         'settings_api_rename' => ['owner', 'App\Api\Controller\Settings\RenameController::__invoke'],

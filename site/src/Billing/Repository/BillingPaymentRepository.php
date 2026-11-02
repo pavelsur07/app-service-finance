@@ -31,6 +31,15 @@ final class BillingPaymentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Оплата кабинета с этим номером любым способом: ID платежа ЮKassa, отмеченный администратором
+     * вручную (`manual_invoice`), и автоматическое зачисление (`yookassa`) — одни и те же деньги.
+     */
+    public function findOneByCompanyAndExternalIdAnySource(string $companyId, string $externalId): ?BillingPayment
+    {
+        return $this->findOneBy(['companyId' => $companyId, 'externalId' => $externalId]);
+    }
+
+    /**
      * История оплат кабинета для Pagerfanta: новые сверху.
      */
     public function createByCompanyQueryBuilder(string $companyId): QueryBuilder

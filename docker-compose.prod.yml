@@ -42,8 +42,14 @@ x-php-env: &php-env
     FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
     WB_LEGACY_RECONCILE_ENABLED: ${WB_LEGACY_RECONCILE_ENABLED:-0}
     # Billing, этап 4: режим «только чтение» после льготного периода. Выключен — гейт только пишет
-    # в журнал «заблокировал бы». Включить: BILLING_READ_ONLY_ENFORCED=true в host-env + деплой.
+    # в журнал «заблокировал бы». Включить: GitHub variable BILLING_READ_ONLY_ENFORCED=true + деплой
+    # (переменные хоста до compose не доходят — их прокидывает .github/workflows/deploy.yml).
     BILLING_READ_ONLY_ENFORCED: ${BILLING_READ_ONLY_ENFORCED:-false}
+    # Billing, этап 5: онлайн-оплата ЮKassa. Пустые ключи — оплата скрыта. Заводятся в GitHub
+    # (variables YOOKASSA_SHOP_ID, YOOKASSA_RECEIPT_VAT_CODE; secret YOOKASSA_SECRET_KEY) — docs/tasks/billing/yookassa-setup.md.
+    YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-}
+    YOOKASSA_SECRET_KEY: ${YOOKASSA_SECRET_KEY:-}
+    YOOKASSA_RECEIPT_VAT_CODE: ${YOOKASSA_RECEIPT_VAT_CODE:-}
     # Диагностика производительности Marketplace M1 (структурированные замеры этапов →
     # var/log/performance-<дата>.jsonl в томе site_var_log, отчёт app:marketplace:perf-report).
     # Выключить: MARKETPLACE_PERF_DIAGNOSTICS=0 в host-env и пересоздать PHP-контейнеры (флаг
@@ -509,6 +515,11 @@ services:
             AI_SERVICE_BASE_URL: http://ai-service:8080
             AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
             AI_SERVICE_COMPANY_ALLOWLIST: ${AI_SERVICE_COMPANY_ALLOWLIST:-}
+            # Billing: cron сверки онлайн-оплат app:billing:yookassa-sync (как в x-php-env).
+            # Пусто = онлайн-оплата выключена, команда выходит сразу.
+            YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-}
+            YOOKASSA_SECRET_KEY: ${YOOKASSA_SECRET_KEY:-}
+            YOOKASSA_RECEIPT_VAT_CODE: ${YOOKASSA_RECEIPT_VAT_CODE:-}
             APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
             APP_MAIL_REPLY_TO: "support@vashfindir.ru"
             FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}

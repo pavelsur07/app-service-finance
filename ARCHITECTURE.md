@@ -1784,8 +1784,8 @@ manage — только владелец. Новые права автомати
 ### Billing: тарифы и оплаченный период (`billing_*`)
 
 План задачи — `docs/tasks/billing/TASK.md`. Есть ядро, админка, страница
-клиента, пробный период, напоминания и режим «только чтение» за флагом
-(этапы 1–4); онлайн-оплаты нет.
+клиента, пробный период, напоминания, режим «только чтение» за флагом и
+онлайн-оплата через ЮKassa (этапы 1–5; без ключей магазина оплата скрыта).
 Всем кабинетам, существовавшим на 01.11.2026, назначен «Друг»
 (`Version20261101230000`).
 
@@ -1865,8 +1865,9 @@ manage — только владелец. Новые права автомати
   базового URL).
 - Запись: `RegisterPaymentAction` — точка входа, коммитит сама одним
   `wrapInTransaction()` под `pg_advisory_xact_lock(hashtextextended(
-  'billing_subscription:'||companyId, 0))`; повтор по `id` или `(source,
-  external_id)` возвращает исходную оплату; `UniqueConstraintViolation` —
+  'billing_subscription:'||companyId, 0))`; повтор по `id` или по `external_id`
+  в компании при любом `source` (ручная отметка онлайн-платежа и
+  автозачисление — одни деньги) возвращает исходную оплату; `UniqueConstraintViolation` —
   поиск DBAL после rollback. Оплата другого тарифа при действующем платном
   периоде — `TariffChangeNotSupportedException`; бессрочный и отключённый
   тарифы не оплачиваются. `AssignTariffAction` — назначение тарифа
@@ -1877,6 +1878,51 @@ manage — только владелец. Новые права автомати
   `PerpetualTariffChangeNotConfirmedException`) проверяются до транзакции,
   чтобы EM вызывающего оставался открытым, и повторно под блокировкой —
   против гонки (тогда исключение закрывает EM). Сумма ≤ `INT` колонки.
+- Онлайн-оплата ЮKassa (`docs/tasks/billing/yookassa-setup.md`):
+  `YooKassaConfig` — `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY` (пусто —
+  выключено: кнопки нет, cron выходит сразу, проверка платежа не ходит в
+  ЮKassa), `YOOKASSA_RECEIPT_VAT_CODE` (чек 54-ФЗ; пусто — без чека).
+  `YooKassaClient` (`Infrastructure/YooKassa`, HTTP-клиент
+  `billing.yookassa.http_client` без профайлера): `POST /v3/payments`
+  (`capture: true`, redirect, `Idempotence-Key`, metadata `checkout_id`,
+  `company_id`) и `GET /v3/payments/{id}`; 202/408/429/5xx/сеть —
+  `YooKassaUnavailableException`, прочие отказы и нечитаемый ответ —
+  `YooKassaRequestFailedException`. В лог — без тела, ключей и ID платежа в
+  адресе.
+- `BillingCheckout` (`billing_checkouts`): попытка онлайн-оплаты; `id` —
+  скрытый UUIDv7 формы (каноническая запись), он же `Idempotence-Key` и ID
+  будущей `BillingPayment`; сумма — из справочника при создании; статус
+  `pending` → `succeeded` / `canceled` / `failed_to_apply` (переходы — DBAL
+  `UPDATE … WHERE status = 'pending'` в `ApplyYooKassaPaymentAction`);
+  `updated_at` — время последней проверки; unique `provider_payment_id`.
+- `StartCheckoutAction` — точка входа (`POST /company/price/checkout`,
+  `company_price_checkout`, только владелец, CSRF; в белом списке
+  «только чтение»): проверки до денег (публичный тариф с ценой за срок, не
+  бессрочный тариф у кабинета, без смены тарифа при действующем платном
+  периоде; ID формы не занят оплатой или попыткой) → `flush` попытки → HTTP
+  вне транзакции → `flush` ссылки. Повтор той же формы — та же ссылка; с
+  другим тарифом или сроком — отказ «форма устарела»; упавшая ЮKassa
+  оставляет попытку без ссылки, повтор проверяет правила заново и проходит с
+  тем же ключом. Страница тарифа — `Cache-Control: no-store`.
+- `ApplyYooKassaPaymentAction` — точка входа; статус попытки читается из БД;
+  истина — `GET` платежа. Фазы: `RegisterPaymentAction` (`source =
+  yookassa`, `externalId` — ID платежа, `paymentId` — ID попытки,
+  `receivedAt` — `captured_at` по Москве) → отметка `succeeded`; оплата с ID
+  попытки или с ID платежа в номере уже есть (сбой между фазами, ручная
+  отметка администратором) — сразу отметка, без повторных правил тарифа. `canceled` → `canceled`; `pending` — только время проверки.
+  Сумма или валюта не совпали, доменный отказ зачисления, metadata не
+  совпала, платежа нет в магазине (404) — `failed_to_apply` + `error`.
+  Админка кабинета показывает `failed_to_apply` и `pending` с платежом
+  старше суток, пока оплату с ID платежа ЮKassa в номере не отметят
+  вручную. Вызовы: `ApplyYooKassaPaymentMessage` → `async_sync` (из
+  уведомления `POST /billing/yookassa/webhook` — `#[PublicAccess]`,
+  `PUBLIC_ACCESS` в `access_control`, тело не доверяется; в очередь — только
+  ID незавершённой попытки, остальное — 200 без действий, не-JSON — 400; и
+  из cron `app:billing:yookassa-sync` каждые 10 мин — `pending` со ссылкой
+  старше 5 мин без ограничения возраста, давно не проверенные первыми, до
+  200); синхронно — при возврате на `/company/price?checkout={id}`.
+  Handler: недоступность ЮKassa — обычное исключение (повторы по
+  `retry_strategy`), отказ — `Unrecoverable`.
 
 ### Company: общий минимальный остаток
 
@@ -4539,7 +4585,7 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 
 | Транспорт | Воркер (`messenger:consume`) | Что идёт |
 |---|---|---|
-| `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad, постановка задач ai-service (`SubmitAiTaskMessage`) |
+| `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad, постановка задач ai-service (`SubmitAiTaskMessage`), проверка платежей ЮKassa (`ApplyYooKassaPaymentMessage`) |
 | `async_pipeline` | `async_pipeline` | Локальная DB-обработка: Process*-сообщения Marketplace, Ads raw, нормализация inventory, auto-rules, ImportProducts |
 | `async_wb_finance` | `async_wb_finance` | `SyncWbFinancialReportDayMessage` (retry до 20 раз) |
 | `async_ads` | `async_ads` | Ozon Performance polling (`LoadOzonAdStatisticsRangeMessage`, `FetchOzonAdStatisticsMessage`, `RequestOzonAdBatchMessage`) |
@@ -4589,6 +4635,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.114 | 2026-11-02 | Billing: онлайн-оплата ЮKassa — `BillingCheckout`, `StartCheckoutAction`, `ApplyYooKassaPaymentAction`, уведомление `/billing/yookassa/webhook`, cron `app:billing:yookassa-sync`, `PaymentSource::YOOKASSA` (`Version20261102120000`); без ключей выключено |
 | 2.113 | 2026-11-02 | Billing: режим «только чтение» после льготного периода — `ReadOnlyModeSubscriber`, `ReadOnlyRule`, флаг `BILLING_READ_ONLY_ENFORCED` (по умолчанию выключен) |
 | 2.112 | 2026-11-02 | Billing: страница клиента `/company/price` на справочнике, баннер `billing_notice()`, пробный период 14 дней на «Базе» по `CompanyCreatedEvent` и backfill, напоминания `app:billing:expiry-reminders` (`Version20261102100000`) |
 | 2.111 | 2026-11-01 | Billing: админка тарифа кабинета, `AssignTariffAction`, `BillingFacadeInterface::accessForCompanies()`; всем кабинетам — «Друг» (`Version20261101230000`); заглушка `/admin/billing` удалена |

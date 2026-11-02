@@ -82,6 +82,24 @@ services:
     App\Billing\Application\StartTrialAction:
         public: true
 
+    App\Billing\Application\StartCheckoutAction:
+        public: true
+
+    App\Billing\Application\ApplyYooKassaPaymentAction:
+        public: true
+
+    App\Billing\MessageHandler\ApplyYooKassaPaymentHandler:
+        public: true
+
     App\Billing\Facade\BillingFacadeInterface:
         alias: App\Billing\Facade\BillingFacade
+        public: true
+
+    # ЮKassa в тестах — без сети: тест задаёт ответы через setResponseFactory() в формате API v3.
+    billing.yookassa.http_client:
+        class: Symfony\Component\HttpClient\MockHttpClient
+        public: true
+
+    # Тест «ключей нет — кнопки нет» подменяет настройки магазина.
+    App\Billing\Infrastructure\YooKassa\YooKassaConfig:
         public: true

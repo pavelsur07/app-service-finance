@@ -764,6 +764,10 @@ jobs:
                   ALFA_SANDBOX_CLIENT_ID: ${{ secrets.ALFA_SANDBOX_CLIENT_ID }}
                   ALFA_SANDBOX_CLIENT_SECRET: ${{ secrets.ALFA_SANDBOX_CLIENT_SECRET }}
                   ALFA_SANDBOX_ID_SIGNING_CERT_PATH: ${{ secrets.ALFA_SANDBOX_ID_SIGNING_CERT_PATH }}
+                  BILLING_READ_ONLY_ENFORCED: ${{ vars.BILLING_READ_ONLY_ENFORCED }}
+                  YOOKASSA_SHOP_ID: ${{ vars.YOOKASSA_SHOP_ID }}
+                  YOOKASSA_SECRET_KEY: ${{ secrets.YOOKASSA_SECRET_KEY }}
+                  YOOKASSA_RECEIPT_VAT_CODE: ${{ vars.YOOKASSA_RECEIPT_VAT_CODE }}
               run: |
                   # case по всей строке, а не grep: grep смотрит построчно и пропустил бы перевод
                   # строки (значение с «\nEOF\n» закрыло бы heredoc ниже).
@@ -801,6 +805,20 @@ jobs:
                     *[!A-Za-z0-9,_-]*)
                       echo "❌ OZON_FETCHER_CONNECTION_ALLOWLIST: разрешены A-Za-z0-9,_-"
                       exit 1 ;;
+                  esac
+                  # Billing (docs/tasks/billing): флаг «только чтение» и магазин ЮKassa.
+                  case "$BILLING_READ_ONLY_ENFORCED" in
+                    ''|true|false) ;;
+                    *) echo "❌ BILLING_READ_ONLY_ENFORCED: true, false или пусто"; exit 1 ;;
+                  esac
+                  case "$YOOKASSA_SHOP_ID" in
+                    *[!0-9]*) echo "❌ YOOKASSA_SHOP_ID: только цифры"; exit 1 ;;
+                  esac
+                  case "$YOOKASSA_SECRET_KEY" in
+                    *[!A-Za-z0-9_-]*) echo "❌ YOOKASSA_SECRET_KEY: разрешены A-Za-z0-9_-"; exit 1 ;;
+                  esac
+                  case "$YOOKASSA_RECEIPT_VAT_CODE" in
+                    *[!0-9]*) echo "❌ YOOKASSA_RECEIPT_VAT_CODE: только цифры"; exit 1 ;;
                   esac
                   # Allowlist ai-service: UUID компаний через запятую или «*» — все.
                   case "$AI_SERVICE_COMPANY_ALLOWLIST" in
@@ -882,6 +900,12 @@ jobs:
                     export ALFA_SANDBOX_ID_SIGNING_CERT_PATH='${{ secrets.ALFA_SANDBOX_ID_SIGNING_CERT_PATH }}'
                     export ALFA_SECRETS_DIR="$(cd .. && pwd)/shared/alfa"
                     mkdir -p "$ALFA_SECRETS_DIR"
+                    # Billing (docs/tasks/billing/yookassa-setup.md): пусто → «только чтение» выключен,
+                    # онлайн-оплата скрыта. Символы проверены шагом выше.
+                    export BILLING_READ_ONLY_ENFORCED='${{ vars.BILLING_READ_ONLY_ENFORCED }}'
+                    export YOOKASSA_SHOP_ID='${{ vars.YOOKASSA_SHOP_ID }}'
+                    export YOOKASSA_SECRET_KEY='${{ secrets.YOOKASSA_SECRET_KEY }}'
+                    export YOOKASSA_RECEIPT_VAT_CODE='${{ vars.YOOKASSA_RECEIPT_VAT_CODE }}'
                     for v in INTERNAL_AUTH_TOKEN OZON_FETCHER_API_TOKEN OZON_FETCHER_DB_PASSWORD OZON_FETCHER_S3_ACCESS_KEY_ID OZON_FETCHER_S3_SECRET_ACCESS_KEY AI_SERVICE_API_TOKEN AI_SERVICE_DB_PASSWORD AI_GATEWAY_TOKEN; do
                       eval "val=\${$v}"
                       case "$val" in

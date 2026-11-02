@@ -6,6 +6,7 @@ namespace App\Billing\Controller\Admin;
 
 use App\Billing\Domain\PaidPeriodCalculator;
 use App\Billing\Facade\BillingFacadeInterface;
+use App\Billing\Repository\BillingCheckoutRepository;
 use App\Billing\Repository\BillingPaymentRepository;
 use App\Billing\Repository\CompanySubscriptionRepository;
 use App\Billing\Repository\TariffPriceRepository;
@@ -39,6 +40,7 @@ final class CompanyBillingController extends AbstractController
         private readonly TariffRepository $tariffs,
         private readonly TariffPriceRepository $prices,
         private readonly BillingPaymentRepository $payments,
+        private readonly BillingCheckoutRepository $checkouts,
         private readonly ClockInterface $clock,
     ) {
     }
@@ -63,6 +65,7 @@ final class CompanyBillingController extends AbstractController
             'tariffs' => $this->tariffs->findActiveOrdered(),
             'pricesByTariff' => $this->prices->amountsByTariffCode(),
             'payments' => $pager,
+            'failedCheckouts' => $this->checkouts->findNeedingAttentionByCompanyId($companyId, $this->clock->now()->modify('-24 hours')),
             'paymentFormId' => Uuid::uuid7()->toString(),
             'defaultPaymentTariff' => null !== $currentTariff && !$currentTariff->isPerpetual() ? $currentTariff->getCode()->value : 'start',
             'today' => PaidPeriodCalculator::day($this->clock->now())->format('Y-m-d'),

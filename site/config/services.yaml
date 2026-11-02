@@ -572,6 +572,15 @@ services:
         arguments:
             $httpClient: '@moysklad.http_client'
 
+    # ЮKassa: отдельный клиент без профайлера — Basic-ключ магазина не попадает в профиль запроса.
+    billing.yookassa.http_client:
+        class: Symfony\Contracts\HttpClient\HttpClientInterface
+        factory: ['Symfony\Component\HttpClient\HttpClient', 'create']
+
+    App\Billing\Infrastructure\YooKassa\YooKassaClient:
+        arguments:
+            $httpClient: '@billing.yookassa.http_client'
+
     # Клиент Альфы: mTLS и CA Минцифры только у него (AlfaTlsConfig). Ленивый — без
     # сертификата в окружении приложение работает, падает только запрос к Альфе.
     bank_sync.alfa.http_client:
