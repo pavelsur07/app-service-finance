@@ -6,7 +6,7 @@ namespace App\Tests\Unit\ServiceGateway\Infrastructure\Client;
 
 use App\ServiceGateway\Exception\ContractViolationException;
 use App\ServiceGateway\Exception\ServiceUnavailableException;
-use App\ServiceGateway\Infrastructure\Client\OzonFetcherCoverageClient;
+use App\ServiceGateway\Infrastructure\Client\ServiceCoverageHttpClient;
 use App\ServiceGateway\Infrastructure\Client\ServiceCoverageV1Parser;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
@@ -15,7 +15,7 @@ use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
-final class OzonFetcherCoverageClientTest extends TestCase
+final class ServiceCoverageHttpClientTest extends TestCase
 {
     private const TOKEN = 'symfony-to-service-token-0123456789abcdef';
 
@@ -123,9 +123,38 @@ final class OzonFetcherCoverageClientTest extends TestCase
         self::assertSame('ozon-fetcher', $this->client($http)->service());
     }
 
-    private function client(MockHttpClient $http, ?string $baseUrl = 'http://ozon-fetcher:8080/', ?string $token = self::TOKEN): OzonFetcherCoverageClient
+    public function testWbFetcherClientUsesItsServiceNameAndAcceptsWeeks(): void
     {
-        return new OzonFetcherCoverageClient($http, new ServiceCoverageV1Parser(), new Logger('test', [$this->logs]), $baseUrl, $token);
+        $seenUrl = '';
+        $data = ['service' => 'wb-fetcher'] + ServiceCoverageV1ParserTest::fixture();
+        $data['rows'][0]['period_key'] = '2026-W44';
+        $http = new MockHttpClient(static function (string $method, string $url) use (&$seenUrl, $data): MockResponse {
+            $seenUrl = $url;
+
+            return new MockResponse(json_encode($data, \JSON_THROW_ON_ERROR), ['http_code' => 200]);
+        });
+
+        $client = $this->client($http, 'http://wb-fetcher:8080', service: 'wb-fetcher');
+        $report = $client->fetchCoverage();
+
+        self::assertSame('wb-fetcher', $client->service());
+        self::assertSame('http://wb-fetcher:8080/internal/coverage', $seenUrl);
+        self::assertSame('2026-W44', $report->rows[0]->periodKey);
+        self::assertSame('wb-fetcher', $this->logs->getRecords()[0]->context['service']);
+    }
+
+    public function testWbFetcherClientRejectsOzonReport(): void
+    {
+        $http = new MockHttpClient(new MockResponse(json_encode(ServiceCoverageV1ParserTest::fixture(), \JSON_THROW_ON_ERROR), ['http_code' => 200]));
+
+        $this->expectException(ContractViolationException::class);
+        $this->expectExceptionMessage('expected wb-fetcher');
+        $this->client($http, 'http://wb-fetcher:8080', service: 'wb-fetcher')->fetchCoverage();
+    }
+
+    private function client(MockHttpClient $http, ?string $baseUrl = 'http://ozon-fetcher:8080/', ?string $token = self::TOKEN, string $service = 'ozon-fetcher'): ServiceCoverageHttpClient
+    {
+        return new ServiceCoverageHttpClient($http, new ServiceCoverageV1Parser(), new Logger('test', [$this->logs]), $service, $baseUrl, $token);
     }
 
     private function assertTokenNotLogged(): void

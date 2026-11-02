@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\ServiceGateway\Infrastructure\Query;
 
+use App\ServiceGateway\Application\DTO\IsoWeek;
 use App\ServiceGateway\Application\DTO\ServiceCoverageMonth;
 use App\ServiceGateway\Application\DTO\ServiceCoverageMonthCell;
 use App\ServiceGateway\Application\DTO\ServiceCoverageSnapshotView;
 use App\ServiceGateway\Application\DTO\ServiceCoverageStatusCounts;
+use App\ServiceGateway\Application\Service\IsoWeeks;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Webmozart\Assert\Assert;
 
@@ -39,10 +42,17 @@ final readonly class ServiceCoverageMonthQuery
                FROM service_coverage_snapshot s
                LEFT JOIN service_coverage_row r
                       ON r.service = s.service
-                     AND (r.period_key = 'ref' OR r.period_key = :month OR (length(r.period_key) = 10 AND left(r.period_key, 7) = :month))
+                     AND (r.period_key = 'ref' OR r.period_key = :month OR (length(r.period_key) = 10 AND left(r.period_key, 7) = :month)
+                          OR r.period_key IN (:weeks))
               WHERE s.service = :service
               ORDER BY r.resource_type, r.period_key",
-            ['service' => $service, 'month' => $month],
+            [
+                'service' => $service,
+                'month' => $month,
+                // ISO-недели, пересекающие месяц (недельные ресурсы, контракт v1.1).
+                'weeks' => array_map(static fn (IsoWeek $w): string => $w->key, IsoWeeks::ofMonth($month)),
+            ],
+            ['weeks' => ArrayParameterType::STRING],
         );
         $snapshot = $joined[0] ?? false;
         $rows = array_values(array_filter($joined, static fn (array $row): bool => null !== $row['resource_type']));

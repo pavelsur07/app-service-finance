@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** Stage 4 — покрытие в админке, вкладки Ozon | Wildberries
-**Status:** stage 3 done, stage 4 планируется
+**Phase:** Stage 5 — прод (deploy-матрица, prod compose, env, allowlist эталонного кабинета)
+**Status:** stages 3–4 done, stage 5 планируется
 **Stage base commit:** (коммит этапа 3)
 
 ### Completed
@@ -9,7 +9,8 @@
 - Stage 0 (fetchkit): 284bc13e4 … 43846f0df; внешнее ревью — раунд 1 IMPORTANT исправлен, раунд 2 REVIEW_GREEN
 - Stage 1 (Symfony, provider=wildberries): eeeceaa73; внешнее ревью REVIEW_GREEN
 - Stage 2 (wb-fetcher, дневной отчёт): 04d328aa7, 2628390ae; стенд с моком пройден
-- Stage 3 (недельный отчёт, сверка): реальная проба period=weekly тестовым токеном Владельца (токен нигде не сохранён); контракт service-coverage v1.1.0
+- Stage 3 (недельный отчёт, сверка): реальная проба period=weekly тестовым токеном Владельца (токен нигде не сохранён); контракт service-coverage v1.1.0 (574df6063)
+- Stage 4 (вкладки Ozon | Wildberries, многосервисное покрытие): визуальная проверка на стенде пройдена
 
 ### Checks and baseline
 - Go: unit -race fetchkit/ozon-fetcher зелёные; интеграционные PG15 зелёные (1 SKIP — S3, как на базе); golangci-lint 0
@@ -20,10 +21,10 @@
 - Stage 0: internal + Codex green; Stage 1: Codex green
 
 ### Exact next action
-- Stage 4: детальный план stage-4.md (страница /admin/services/coverage?service=…, 301 со старого URL, недельные строки на витрине), затем TDD
+- Stage 5: детальный план stage-5.md; прод-изменения (compose, секреты, allowlist) — по docs/maintenance/ozon-fetcher-prod.md
 
 ### Окружение (снести в конце)
-- контейнеры vf-fetchkit-pg (сеть vf-fetchkit-test), asfwb-pg + asfwb-redis (сеть asfwb-net); worktree scratchpad/base; стенд wbstand-* снесён
+- контейнеры vf-fetchkit-pg (сеть vf-fetchkit-test), asfwb-pg + asfwb-redis (сеть asfwb-net; БД app_dev — стенд этапа 4); worktree scratchpad/base; стенд wbstand-* снесён
 
 ### Files to inspect first on resume
-- docs/tasks/wb-fetcher-finance/stages/stage-4.md
+- docs/tasks/wb-fetcher-finance/stages/stage-5.md

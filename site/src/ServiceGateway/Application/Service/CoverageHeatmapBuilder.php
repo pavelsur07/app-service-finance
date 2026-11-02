@@ -13,15 +13,16 @@ use App\ServiceGateway\Application\DTO\ServiceCoverageMonthCell;
 
 /**
  * Витрина месяца → тепловая карта: строки — отчёты сервиса, столбцы — дни.
- * Месячные отчёты и справочник — одной ячейкой на месяц. Без БД и HTTP.
+ * Месячные отчёты и справочник — одной ячейкой на месяц, недельные — ячейкой
+ * на ISO-неделю шириной в её дни внутри месяца. Без БД и HTTP.
  *
  * Цвет ячейки:
  * - err — есть failed_permanent (нужен человек);
  * - ok — done = cabinets_expected;
  * - partial — загружено не всё, остальное в работе / в очереди / повторится;
  * - empty — задач нет;
- * - future — день ещё не наступил (или месячный отчёт текущего месяца ещё не
- *   формируется).
+ * - future — день ещё не наступил, неделя не закончилась (или месячный отчёт
+ *   текущего месяца ещё не формируется).
  */
 final readonly class CoverageHeatmapBuilder
 {
@@ -30,13 +31,20 @@ final readonly class CoverageHeatmapBuilder
     private const STEP_DAY = 'day';
     private const STEP_MONTH = 'month';
     private const STEP_REF = 'ref';
+    private const STEP_WEEK = 'week';
 
-    /** Известные отчёты ozon-fetcher в порядке показа: название и шаг строки. */
+    /** Обязательные отчёты сервиса в порядке показа (строка есть и без задач): название и шаг. */
     private const RESOURCES = [
-        'ozon.finance.accrual-by-day' => ['Начисления по дням', self::STEP_DAY],
-        'ozon.finance.realization' => ['Реализация', self::STEP_MONTH],
-        'ozon.finance.mutual-settlement' => ['Взаиморасчёты', self::STEP_MONTH],
-        'ozon.finance.accrual-types' => ['Типы начислений (справочник)', self::STEP_REF],
+        'ozon-fetcher' => [
+            'ozon.finance.accrual-by-day' => ['Начисления по дням', self::STEP_DAY],
+            'ozon.finance.realization' => ['Реализация', self::STEP_MONTH],
+            'ozon.finance.mutual-settlement' => ['Взаиморасчёты', self::STEP_MONTH],
+            'ozon.finance.accrual-types' => ['Типы начислений (справочник)', self::STEP_REF],
+        ],
+        'wb-fetcher' => [
+            'wb.finance.sales-report.daily' => ['Отчёт о реализации — день', self::STEP_DAY],
+            'wb.finance.sales-report.weekly' => ['Отчёт о реализации — неделя', self::STEP_WEEK],
+        ],
     ];
 
     /**
@@ -98,7 +106,8 @@ final readonly class CoverageHeatmapBuilder
             $byResource[$cell->resourceType][$cell->periodKey] = $cell;
         }
 
-        $order = array_keys(self::RESOURCES);
+        $required = self::RESOURCES[$month->service] ?? [];
+        $order = array_keys($required);
         foreach (array_keys($byResource) as $resourceType) {
             if (!\in_array($resourceType, $order, true)) {
                 $order[] = $resourceType;
@@ -110,7 +119,7 @@ final readonly class CoverageHeatmapBuilder
         $expected = 0;
         foreach ($order as $resourceType) {
             $cells = $byResource[$resourceType] ?? [];
-            [$title, $step] = self::RESOURCES[$resourceType] ?? self::OPTIONAL_RESOURCES[$resourceType] ?? [$resourceType, $this->guessStep($cells)];
+            [$title, $step] = $required[$resourceType] ?? self::OPTIONAL_RESOURCES[$resourceType] ?? [$resourceType, $this->guessStep($cells)];
             $firstLoaded = isset(self::OPTIONAL_RESOURCES[$resourceType]) && [] !== $cells ? min(array_map('strval', array_keys($cells))) : null;
             $perDay = self::STEP_DAY === $step;
             $built = [];
@@ -125,13 +134,23 @@ final readonly class CoverageHeatmapBuilder
                         $periods[] = $cells[$key] ?? null;
                     }
                 }
+            } elseif (self::STEP_WEEK === $step) {
+                foreach (IsoWeeks::ofMonth($month->month) as $week) {
+                    // Неделя «наступила», когда закончилась: отчёт за неё формируется после воскресенья.
+                    $isFuture = $week->sunday->format('Y-m-d') >= $today;
+                    $period = sprintf('неделя %s (%s–%s)', $week->key, $week->monday->format('d.m'), $week->sunday->format('d.m'));
+                    $built[] = $this->cell($title, $period, $cells[$week->key] ?? null, $isFuture, $week->daysInMonth, $week->key);
+                    if (!$isFuture) {
+                        $periods[] = $cells[$week->key] ?? null;
+                    }
+                }
             } else {
                 $isRef = self::STEP_REF === $step;
                 $key = $isRef ? 'ref' : $month->month;
                 $period = $isRef ? 'справочник' : 'месяц '.$month->month;
                 // Месячный отчёт за текущий месяц источник ещё не формирует; справочник от месяца не зависит.
                 $isFuture = $currentMonth && !$isRef;
-                $built[] = $this->cell($title, $period, $cells[$key] ?? null, $isFuture);
+                $built[] = $this->cell($title, $period, $cells[$key] ?? null, $isFuture, $daysInMonth);
                 if (!$isFuture) {
                     $periods[] = $cells[$key] ?? null;
                 }
@@ -170,17 +189,17 @@ final readonly class CoverageHeatmapBuilder
         );
     }
 
-    private function cell(string $title, string $period, ?ServiceCoverageMonthCell $cell, bool $isFuture): CoverageHeatmapCell
+    private function cell(string $title, string $period, ?ServiceCoverageMonthCell $cell, bool $isFuture, int $span = 1, ?string $week = null): CoverageHeatmapCell
     {
         if (null === $cell) {
             return $isFuture
-                ? new CoverageHeatmapCell(CoverageHeatmapCell::FUTURE, '', sprintf("%s · %s\nПериод ещё не наступил", $title, $period))
-                : new CoverageHeatmapCell(CoverageHeatmapCell::EMPTY, '—', sprintf("%s · %s\nЗадач нет", $title, $period));
+                ? new CoverageHeatmapCell(CoverageHeatmapCell::FUTURE, '', sprintf("%s · %s\nПериод ещё не наступил", $title, $period), $span, $week)
+                : new CoverageHeatmapCell(CoverageHeatmapCell::EMPTY, '—', sprintf("%s · %s\nЗадач нет", $title, $period), $span, $week);
         }
 
         $counts = $cell->byStatus;
         if (0 === $cell->cabinetsExpected && 0 === $counts->total()) {
-            return new CoverageHeatmapCell(CoverageHeatmapCell::EMPTY, '—', sprintf("%s · %s\nЗадач нет", $title, $period));
+            return new CoverageHeatmapCell(CoverageHeatmapCell::EMPTY, '—', sprintf("%s · %s\nЗадач нет", $title, $period), $span, $week);
         }
 
         $state = match (true) {
@@ -207,7 +226,7 @@ final readonly class CoverageHeatmapBuilder
             ? 'Успешной загрузки ещё не было'
             : 'Последняя успешная: '.$cell->lastSuccessAt->format('d.m.Y H:i');
 
-        return new CoverageHeatmapCell($state, sprintf('%d/%d', $counts->done, $cell->cabinetsExpected), implode("\n", $hint));
+        return new CoverageHeatmapCell($state, sprintf('%d/%d', $counts->done, $cell->cabinetsExpected), implode("\n", $hint), $span, $week);
     }
 
     /**
@@ -221,6 +240,9 @@ final readonly class CoverageHeatmapBuilder
         foreach ($keys as $key) {
             if (10 === \strlen($key)) {
                 return self::STEP_DAY;
+            }
+            if (1 === preg_match('/^\d{4}-W\d{2}$/D', $key)) {
+                return self::STEP_WEEK;
             }
         }
 

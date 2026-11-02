@@ -604,3 +604,22 @@ services:
         class: App\BankSync\Infrastructure\OAuth\OAuthTokenEndpointClient
         arguments:
             $httpClient: '@bank_sync.alfa.http_client'
+
+    # Покрытие сервисов загрузки (ServiceGateway): клиент GET /internal/coverage на
+    # каждый сервис, обходит команда app:service-gateway:coverage:refresh.
+    # Пустые адрес или токен — обновление сервиса выключено.
+    app.service_gateway.coverage_client.ozon_fetcher:
+        class: App\ServiceGateway\Infrastructure\Client\ServiceCoverageHttpClient
+        arguments:
+            $service: 'ozon-fetcher'
+            $baseUrl: '%env(default::OZON_FETCHER_BASE_URL)%'
+            $token: '%env(default::OZON_FETCHER_API_TOKEN)%'
+        tags: [{ name: 'app.service_coverage_client', priority: 20 }]
+
+    app.service_gateway.coverage_client.wb_fetcher:
+        class: App\ServiceGateway\Infrastructure\Client\ServiceCoverageHttpClient
+        arguments:
+            $service: 'wb-fetcher'
+            $baseUrl: '%env(default::WB_FETCHER_BASE_URL)%'
+            $token: '%env(default::WB_FETCHER_API_TOKEN)%'
+        tags: [{ name: 'app.service_coverage_client', priority: 10 }]

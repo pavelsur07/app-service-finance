@@ -9,20 +9,19 @@ use App\ServiceGateway\Exception\ContractViolationException;
 use App\ServiceGateway\Exception\ServiceUnavailableException;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * GET /internal/coverage сервиса ozon-fetcher по внутренней сети.
+ * GET /internal/coverage одного сервиса по внутренней сети; экземпляр на сервис
+ * (`config/services.yaml`, тег `app.service_coverage_client`).
  *
- * Токен — направления «Symfony → сервис» (`OZON_FETCHER_API_TOKEN`), не
- * `INTERNAL_AUTH_TOKEN` (service-gateway.md §2.9). Повторов внутри вызова нет:
- * повтор — следующий запуск cron через 10 минут.
+ * Токен — направления «Symfony → сервис» (`OZON_FETCHER_API_TOKEN`,
+ * `WB_FETCHER_API_TOKEN`), не `INTERNAL_AUTH_TOKEN` (service-gateway.md §2.9).
+ * Повторов внутри вызова нет: повтор — следующий запуск cron через 10 минут.
  */
-final readonly class OzonFetcherCoverageClient implements ServiceCoverageClientInterface
+final readonly class ServiceCoverageHttpClient implements ServiceCoverageClientInterface
 {
-    public const SERVICE = 'ozon-fetcher';
     private const IDLE_TIMEOUT_SECONDS = 2.0;
     private const MAX_DURATION_SECONDS = 5.0;
 
@@ -30,16 +29,15 @@ final readonly class OzonFetcherCoverageClient implements ServiceCoverageClientI
         private HttpClientInterface $httpClient,
         private ServiceCoverageV1Parser $parser,
         private LoggerInterface $logger,
-        #[Autowire('%env(default::OZON_FETCHER_BASE_URL)%')]
+        private string $service,
         private ?string $baseUrl,
-        #[Autowire('%env(default::OZON_FETCHER_API_TOKEN)%')]
         private ?string $token,
     ) {
     }
 
     public function service(): string
     {
-        return self::SERVICE;
+        return $this->service;
     }
 
     public function isEnabled(): bool
@@ -52,7 +50,7 @@ final readonly class OzonFetcherCoverageClient implements ServiceCoverageClientI
         $url = rtrim((string) $this->baseUrl, '/').'/internal/coverage';
         $traceId = Uuid::uuid7()->toString();
         $startedAt = microtime(true);
-        $context = ['service' => self::SERVICE, 'method' => 'GET', 'url' => $url, 'traceId' => $traceId];
+        $context = ['service' => $this->service, 'method' => 'GET', 'url' => $url, 'traceId' => $traceId];
 
         try {
             $response = $this->httpClient->request('GET', $url, [
@@ -69,7 +67,7 @@ final readonly class OzonFetcherCoverageClient implements ServiceCoverageClientI
             if (200 !== $status) {
                 $this->logger->warning('Service coverage request failed.', $context);
 
-                throw ServiceUnavailableException::status(self::SERVICE, $status);
+                throw ServiceUnavailableException::status($this->service, $status);
             }
             $body = $response->getContent(false);
         } catch (ExceptionInterface $e) {
@@ -78,7 +76,7 @@ final readonly class OzonFetcherCoverageClient implements ServiceCoverageClientI
                 'exceptionClass' => $e::class,
             ]);
 
-            throw ServiceUnavailableException::transport(self::SERVICE, $e);
+            throw ServiceUnavailableException::transport($this->service, $e);
         }
 
         try {
@@ -88,8 +86,8 @@ final readonly class OzonFetcherCoverageClient implements ServiceCoverageClientI
             throw ContractViolationException::at(ServiceCoverageV1Parser::CONTRACT, '$', 'response is not JSON');
         }
         $report = $this->parser->parse($data);
-        if (self::SERVICE !== $report->service) {
-            throw ContractViolationException::at(ServiceCoverageV1Parser::CONTRACT, '$.service', sprintf('expected %s', self::SERVICE));
+        if ($this->service !== $report->service) {
+            throw ContractViolationException::at(ServiceCoverageV1Parser::CONTRACT, '$.service', sprintf('expected %s', $this->service));
         }
         $this->logger->info('Service coverage fetched.', $context + ['rows' => \count($report->rows)]);
 

@@ -15,6 +15,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Command\LockableTrait;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 /**
  * Фоновое обновление витрины покрытия сервисов (cron каждые 10 минут). Страница читает
@@ -28,8 +29,12 @@ final class ServiceCoverageRefreshCommand extends Command
 {
     use LockableTrait;
 
+    /**
+     * @param iterable<ServiceCoverageClientInterface> $clients по экземпляру на сервис (тег app.service_coverage_client)
+     */
     public function __construct(
-        private readonly ServiceCoverageClientInterface $client,
+        #[AutowireIterator('app.service_coverage_client')]
+        private readonly iterable $clients,
         private readonly RefreshServiceCoverageAction $refresh,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
@@ -39,14 +44,29 @@ final class ServiceCoverageRefreshCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $service = $this->client->service();
-        if (!$this->client->isEnabled()) {
+        $exitCode = self::SUCCESS;
+        // Сервисы независимы: сбой одного не мешает обновить остальные.
+        foreach ($this->clients as $client) {
+            if (self::FAILURE === $this->refreshService($client, $output)) {
+                $exitCode = self::FAILURE;
+            }
+        }
+
+        return $exitCode;
+    }
+
+    private function refreshService(ServiceCoverageClientInterface $client, OutputInterface $output): int
+    {
+        $service = $client->service();
+        if (!$client->isEnabled()) {
             $this->logger->info('Service coverage refresh is disabled.', ['service' => $service]);
             $output->writeln(sprintf('%s: disabled (base URL or token is empty)', $service));
 
             return self::SUCCESS;
         }
-        if (!$this->lock()) {
+
+        // Lock на сервис: зависший вызов одного сервиса не держит остальные.
+        if (!$this->lock($this->getName().':'.$service)) {
             $output->writeln(sprintf('%s: another refresh is running, skipping', $service));
 
             return self::SUCCESS;
@@ -54,7 +74,7 @@ final class ServiceCoverageRefreshCommand extends Command
 
         try {
             $this->logger->info('Service coverage refresh started.', ['service' => $service]);
-            $result = ($this->refresh)($this->client, $this->clock->now());
+            $result = ($this->refresh)($client, $this->clock->now());
             $this->logger->info('Service coverage refresh finished.', [
                 'service' => $service,
                 'rows' => $result->rows,

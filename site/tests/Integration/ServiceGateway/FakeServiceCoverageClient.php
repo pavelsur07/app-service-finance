@@ -19,12 +19,13 @@ final class FakeServiceCoverageClient implements ServiceCoverageClientInterface
     public function __construct(
         private array|ServiceCoverageReport|\Throwable|null $response = null,
         private bool $enabled = true,
+        private string $service = 'ozon-fetcher',
     ) {
     }
 
     public function service(): string
     {
-        return 'ozon-fetcher';
+        return $this->service;
     }
 
     public function isEnabled(): bool
@@ -42,6 +43,6 @@ final class FakeServiceCoverageClient implements ServiceCoverageClientInterface
             return $this->response;
         }
 
-        return (new ServiceCoverageV1Parser())->parse(ServiceCoverageV1ParserTest::decoded($this->response ?? ServiceCoverageV1ParserTest::fixture()));
+        return (new ServiceCoverageV1Parser())->parse(ServiceCoverageV1ParserTest::decoded($this->response ?? ['service' => $this->service] + ServiceCoverageV1ParserTest::fixture()));
     }
 }

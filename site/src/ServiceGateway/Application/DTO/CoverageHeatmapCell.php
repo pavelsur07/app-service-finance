@@ -16,6 +16,8 @@ final readonly class CoverageHeatmapCell
         public string $state,
         public string $label,
         public string $hint,
+        public int $span = 1, // дней сетки под ячейкой: день — 1, неделя — её дни в месяце, месяц — все
+        public ?string $week = null, // YYYY-Www у ячейки недельного отчёта
     ) {
     }
 }

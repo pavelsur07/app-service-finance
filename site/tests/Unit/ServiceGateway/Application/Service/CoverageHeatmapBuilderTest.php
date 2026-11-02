@@ -15,6 +15,8 @@ use PHPUnit\Framework\TestCase;
 final class CoverageHeatmapBuilderTest extends TestCase
 {
     private const BY_DAY = 'ozon.finance.accrual-by-day';
+    private const WB_DAY = 'wb.finance.sales-report.daily';
+    private const WB_WEEK = 'wb.finance.sales-report.weekly';
 
     private static function now(string $at = '2026-10-18 09:10:00'): \DateTimeImmutable
     {
@@ -136,11 +138,67 @@ final class CoverageHeatmapBuilderTest extends TestCase
     /**
      * @param list<ServiceCoverageMonthCell> $cells
      */
-    private static function month(string $month, array $cells, ?\DateTimeImmutable $refreshedAt = null): ServiceCoverageMonth
+    private static function month(string $month, array $cells, ?\DateTimeImmutable $refreshedAt = null, string $service = 'ozon-fetcher'): ServiceCoverageMonth
     {
         $snapshot = new ServiceCoverageSnapshotView(self::now(), $refreshedAt ?? self::now('2026-10-18 09:05:00'), new \DateTimeImmutable('2026-08-01'), new \DateTimeImmutable('2026-10-31'), 4);
 
-        return new ServiceCoverageMonth('ozon-fetcher', $month, $snapshot, $cells);
+        return new ServiceCoverageMonth($service, $month, $snapshot, $cells);
+    }
+
+    public function testWbTabShowsDailyAndWeeklyRowsWithoutOzonRows(): void
+    {
+        $heatmap = (new CoverageHeatmapBuilder())->build(self::month('2026-11', [
+            self::cell(self::WB_DAY, '2026-11-01', 1, 1),
+            self::cell(self::WB_WEEK, '2026-W44', 1, 1),
+        ], service: 'wb-fetcher'), self::now('2026-11-02 09:00:00'));
+
+        self::assertSame([self::WB_DAY, self::WB_WEEK], array_map(static fn ($r) => $r->resourceType, $heatmap->rows));
+        self::assertSame(['Отчёт о реализации — день', 'Отчёт о реализации — неделя'], array_map(static fn ($r) => $r->title, $heatmap->rows));
+    }
+
+    public function testWeeklyRowHasCellPerWeekSpanningItsDaysOfMonth(): void
+    {
+        $heatmap = (new CoverageHeatmapBuilder())->build(self::month('2026-11', [
+            self::cell(self::WB_WEEK, '2026-W44', 1, 1),
+        ], service: 'wb-fetcher'), self::now('2026-11-02 09:00:00'));
+
+        $week = $heatmap->rows[1];
+        self::assertFalse($week->perDay);
+        self::assertSame([1, 7, 7, 7, 7, 1], array_map(static fn (CoverageHeatmapCell $c): int => $c->span, $week->cells));
+        self::assertCount(array_sum(array_map(static fn (CoverageHeatmapCell $c): int => $c->span, $week->cells)), $heatmap->days);
+        self::assertSame(CoverageHeatmapCell::OK, $week->cells[0]->state);
+        self::assertSame('1/1', $week->cells[0]->label);
+        self::assertSame(['2026-W44', '2026-W45', '2026-W46', '2026-W47', '2026-W48', '2026-W49'], array_map(static fn (CoverageHeatmapCell $c): ?string => $c->week, $week->cells));
+        self::assertStringContainsString('неделя 2026-W44 (26.10–01.11)', $week->cells[0]->hint);
+        foreach (\array_slice($week->cells, 1) as $cell) {
+            self::assertSame(CoverageHeatmapCell::FUTURE, $cell->state, 'неделя не закончилась');
+        }
+    }
+
+    public function testFinishedWeekWithoutTaskIsGapAndLowersCoverage(): void
+    {
+        $heatmap = (new CoverageHeatmapBuilder())->build(self::month('2026-11', [
+            self::cell(self::WB_DAY, '2026-11-01', 1, 1),
+        ], service: 'wb-fetcher'), self::now('2026-11-10 09:00:00'));
+
+        $week = $heatmap->rows[1];
+        self::assertSame(CoverageHeatmapCell::EMPTY, $week->cells[0]->state);
+        self::assertSame(CoverageHeatmapCell::EMPTY, $week->cells[1]->state, 'W45 закончилась 08.11');
+        self::assertSame(CoverageHeatmapCell::FUTURE, $week->cells[2]->state);
+        // день: 1 из 9 наступивших дней; неделя: 0 из 2 закончившихся × 4 кабинета снимка
+        self::assertSame((int) floor(1 * 100 / (9 + 2 * 4)), $heatmap->coveragePercent);
+    }
+
+    public function testOzonTabKeepsOzonRowsOnly(): void
+    {
+        $heatmap = (new CoverageHeatmapBuilder())->build(self::month('2026-10', []), self::now());
+
+        $resources = array_map(static fn ($r) => $r->resourceType, $heatmap->rows);
+        self::assertSame([self::BY_DAY, 'ozon.finance.realization', 'ozon.finance.mutual-settlement', 'ozon.finance.accrual-types'], $resources);
+        foreach ($heatmap->rows[0]->cells as $cell) {
+            self::assertSame(1, $cell->span);
+        }
+        self::assertSame(31, $heatmap->rows[1]->cells[0]->span, 'месячная ячейка — на все дни');
     }
 
     public function testDailyRowHasCellPerDayWithAllStates(): void

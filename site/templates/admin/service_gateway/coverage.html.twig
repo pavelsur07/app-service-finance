@@ -5,8 +5,9 @@
 {% block admin_styles %}
   {# Только раскладка: цвета и состояния — классы кита coverage.css. #}
   <style>
-    .sgw-cov-span { grid-column: span var(--cov-days); justify-content: flex-start; padding-left: var(--s-1); }
+    .sgw-cov-span { grid-column: span var(--cov-span); justify-content: flex-start; padding-left: var(--s-1); }
     .sgw-cov-cell-wide { max-width: 96px; }
+    .sgw-cov-cell-week { max-width: none; margin: 0 3px; } /* неделя — полосой на свои дни */
     .sgw-cov-tabs-gap { margin-bottom: var(--s-4); }
     .sgw-cov-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-3); margin: var(--s-4) 0 var(--s-3); }
   </style>
@@ -17,13 +18,21 @@
   {% set state_labels = {'ok': 'загружено всё', 'partial': 'загружено частично', 'err': 'есть ошибки', 'empty': 'задач нет'} %}
 
   <div class="wz-head">
-    <h1 class="wz-title">Покрытие Сервис GO <span class="wz-sub">ozon-fetcher · все кабинеты сводно</span></h1>
+    <h1 class="wz-title">Покрытие Сервис GO <span class="wz-sub">{{ service }} · все кабинеты сводно</span></h1>
+  </div>
+
+  {% set service_tabs = [] %}
+  {% for name, meta in services %}
+    {% set service_tabs = service_tabs|merge([{label: meta.tab, href: path('admin_service_gateway_coverage', {service: name, month: heatmap.month}), active: name == service}]) %}
+  {% endfor %}
+  <div class="sgw-cov-tabs-gap">
+    {% include 'app/_ui/_tabs.html.twig' with {label: 'Сервис', tabs: service_tabs} only %}
   </div>
 
   {% set month_tabs = [] %}
   {% for m in months|reverse %}
     {% set parts = m|split('-') %}
-    {% set month_tabs = month_tabs|merge([{label: month_names[parts[1] - 1] ~ ' ' ~ parts[0], href: path('admin_service_gateway_ozon_fetcher_coverage', {month: m}), active: m == heatmap.month}]) %}
+    {% set month_tabs = month_tabs|merge([{label: month_names[parts[1] - 1] ~ ' ' ~ parts[0], href: path('admin_service_gateway_coverage', {service: service, month: m}), active: m == heatmap.month}]) %}
   {% endfor %}
   <div class="sgw-cov-tabs-gap">
     {% include 'app/_ui/_tabs.html.twig' with {label: 'Месяц', tabs: month_tabs} only %}
@@ -32,7 +41,7 @@
   {% if heatmap.empty %}
     <div class="empty" data-coverage-empty>
       <div class="empty-title">Данных о покрытии ещё нет</div>
-      <p class="empty-text">Витрина обновляется из сервиса раз в 10 минут. Если пусто дольше — проверьте, что ozon-fetcher запущен и задан OZON_FETCHER_API_TOKEN.</p>
+      <p class="empty-text">Витрина обновляется из сервиса раз в 10 минут. Если пусто дольше — проверьте, что {{ service }} запущен и задан {{ services[service].tokenEnv }}.</p>
     </div>
   {% else %}
     <div class="wz-kpi-row">
@@ -65,7 +74,7 @@
 
     <div class="coverage">
       <div class="coverage-scroll">
-        <div class="coverage-grid" style="--cov-days: {{ heatmap.days|length }}" role="table" aria-label="Покрытие ozon-fetcher за {{ heatmap.month }}">
+        <div class="coverage-grid" style="--cov-days: {{ heatmap.days|length }}" role="table" aria-label="Покрытие {{ service }} за {{ heatmap.month }}">
           <div class="cov-corner" role="columnheader">Отчёт</div>
           {% for day in heatmap.days %}
             <div class="cov-day{% if day.weekend %} cov-day--weekend{% endif %}{% if day.today %} cov-day--today{% endif %}" role="columnheader">{{ day.day }}</div>
@@ -83,10 +92,11 @@
               </div>
             </div>
             {% for cell in row.cells %}
-              <div class="cov-cellwrap{% if not row.perDay %} sgw-cov-span{% endif %}" role="cell">
-                <span class="cov-cell cov-cell--{{ cell.state }}{% if not row.perDay %} sgw-cov-cell-wide{% endif %}" title="{{ cell.hint }}" data-coverage-cell="{{ cell.state }}">
-                  {#- Месячный отчёт текущего месяца: пустая широкая ячейка выглядела бы как пропуск строки. -#}
-                  {{- cell.state == 'future' and not row.perDay ? 'ещё нет' : cell.label -}}
+              {#- Месячная ячейка — на все дни, недельная — на свои дни внутри месяца (--cov-span). -#}
+              <div class="cov-cellwrap{% if not row.perDay %} sgw-cov-span{% endif %}" role="cell"{% if not row.perDay %} style="--cov-span: {{ cell.span }}"{% endif %}>
+                <span class="cov-cell cov-cell--{{ cell.state }}{% if cell.week %} sgw-cov-cell-week{% elseif not row.perDay %} sgw-cov-cell-wide{% endif %}" title="{{ cell.hint }}" data-coverage-cell="{{ cell.state }}"{% if cell.week %} data-coverage-week="{{ cell.week }}"{% endif %}>
+                  {#- Широкая ячейка будущего периода: пустая выглядела бы как пропуск строки. -#}
+                  {{- cell.state == 'future' and not row.perDay and cell.span >= 3 ? 'ещё нет' : cell.label -}}
                   {% if cell.state == 'err' %}<span class="cov-cell-dot cov-cell-dot--err"></span>{% endif %}
                 </span>
               </div>
