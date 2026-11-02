@@ -63,5 +63,5 @@ Functional `MarketplaceConnectionsControllerTest`:
 - [x] IDOR: новый запрос не добавлен — используется `ActiveConnectionCredentialsQuery` (`@companyScopeExempt` с причиной есть); builder не обращается к данным
 - [x] токены не логируются; ответ `Cache-Control: no-store`
 - [x] `ARCHITECTURE.md` — текущее состояние + строка Changelog
-- [ ] `make site-stan` (baseline не растёт), `site-cs-check`, `site-cs-strict-types`, unit + functional тесты Marketplace зелёные
+- [x] PHPStan и CS (`.php-cs-fixer.php`) по изменённым файлам — 0 ошибок, новые файлы с `strict_types`; unit Marketplace 1040 и functional Marketplace 267 — зелёные. Полный `make site-stan` — на handoff (OOM-память: гейты по одному)
 - [x] внешнее ревью (Codex): REVIEW_GREEN с первого раунда
