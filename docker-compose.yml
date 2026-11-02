@@ -172,8 +172,9 @@ services:
     # ───────────────────────────────────────────────────────────────
     services-ozon-fetcher:
         build:
-            context: services/ozon-fetcher
-            dockerfile: docker/Dockerfile
+            # контекст — services/: общее ядро shared/fetchkit (replace в go.mod)
+            context: services
+            dockerfile: ozon-fetcher/docker/Dockerfile
         restart: unless-stopped
         environment:
             <<: *tz-env
@@ -194,27 +195,31 @@ services:
     services-ozon-fetcher-dev:
         # debian-образ: go test -race требует cgo (в alpine нет gcc)
         image: golang:1.27
-        working_dir: /src
+        working_dir: /services/ozon-fetcher
         environment:
             <<: *tz-env
+            GOWORK: "off"
             CGO_ENABLED: "1"
             # dev-only DSN на services-postgres; продакшен-значение — только env сервиса.
             DB_DSN: "postgres://svc_ozon_fetcher:ozon_fetcher_dev@services-postgres:5432/ozon_fetcher?sslmode=disable"
         depends_on:
             services-postgres:
                 condition: service_healthy
+        # services/ целиком: модуль подключает ../shared/fetchkit через replace;
+        # гейты ядра — тот же контейнер с -w /services/shared/fetchkit.
         volumes:
-            - ./services/ozon-fetcher:/src
+            - ./services:/services
         profiles:
             - services
 
     services-ozon-fetcher-lint:
         image: golangci/golangci-lint:v2.14.0-alpine
-        working_dir: /src
+        working_dir: /services/ozon-fetcher
         environment:
             <<: *tz-env
+            GOWORK: "off"
         volumes:
-            - ./services/ozon-fetcher:/src
+            - ./services:/services
         profiles:
             - services
 

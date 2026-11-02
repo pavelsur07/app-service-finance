@@ -234,6 +234,16 @@ ozon-fetcher-vet:
 ozon-fetcher-lint:
 	$(DOCKER_COMPOSE) --profile services run --rm services-ozon-fetcher-lint run ./...
 
+# Общее ядро Go-сервисов (services/shared/fetchkit): тулчейн-контейнеры ozon-fetcher.
+fetchkit-test:
+	$(DOCKER_COMPOSE) --profile services run --rm -w /services/shared/fetchkit services-ozon-fetcher-dev go test -race ./...
+
+fetchkit-vet:
+	$(DOCKER_COMPOSE) --profile services run --rm -w /services/shared/fetchkit services-ozon-fetcher-dev go vet ./...
+
+fetchkit-lint:
+	$(DOCKER_COMPOSE) --profile services run --rm -w /services/shared/fetchkit services-ozon-fetcher-lint run ./...
+
 ozon-fetcher-migrate:
 	$(DOCKER_COMPOSE) --profile services run --rm services-ozon-fetcher-dev go run ./cmd/ozon-fetcher -migrate
 

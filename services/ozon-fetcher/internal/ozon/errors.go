@@ -3,11 +3,12 @@ package ozon
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/apierr"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/apierr"
 )
 
 // Class — класс ответа Ozon; определяет реакцию исполнителя

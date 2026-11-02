@@ -1,13 +1,16 @@
 # syntax=docker/dockerfile:1
 # multi-stage: сборка в golang, рантайм в alpine, non-root (services/go.md «Docker»).
-# Контекст сборки — services/ozon-fetcher.
+# Контекст сборки — services/ (общее ядро shared/fetchkit подключено replace
+# в go.mod); что попадает в контекст — docker/Dockerfile.dockerignore.
 FROM golang:1.27-alpine AS build
-WORKDIR /src
-ENV CGO_ENABLED=0 GOFLAGS=-p=2
-COPY go.mod go.sum ./
+WORKDIR /src/ozon-fetcher
+ENV CGO_ENABLED=0 GOFLAGS=-p=2 GOWORK=off
+COPY shared/fetchkit/go.mod shared/fetchkit/go.sum /src/shared/fetchkit/
+COPY ozon-fetcher/go.mod ozon-fetcher/go.sum ./
 RUN go mod download
-COPY cmd ./cmd
-COPY internal ./internal
+COPY shared/fetchkit /src/shared/fetchkit
+COPY ozon-fetcher/cmd ./cmd
+COPY ozon-fetcher/internal ./internal
 RUN go build -trimpath -ldflags="-s -w" -o /out/ozon-fetcher ./cmd/ozon-fetcher
 
 FROM alpine:3.20

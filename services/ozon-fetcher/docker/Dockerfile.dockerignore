@@ -1,0 +1,9 @@
+# Контекст — services/; в образ только то, что нужно сборке (docker/Dockerfile).
+*
+!ozon-fetcher/go.mod
+!ozon-fetcher/go.sum
+!ozon-fetcher/cmd
+!ozon-fetcher/internal
+!shared/fetchkit
+**/*.md
+**/testdata

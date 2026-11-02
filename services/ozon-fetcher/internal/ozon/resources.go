@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/fetch"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/fetch"
 )
 
 // Endpoints ресурсов первой волны (docs/ozon-api.md).

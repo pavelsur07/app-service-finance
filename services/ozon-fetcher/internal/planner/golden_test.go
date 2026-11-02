@@ -49,10 +49,10 @@ func TestBuildGolden(t *testing.T) {
 			require.NoError(t, err)
 			path := filepath.Join("testdata", "plan_"+name+".golden.json")
 			if *updateGolden {
-				require.NoError(t, os.MkdirAll("testdata", 0o755))
+				require.NoError(t, os.MkdirAll("testdata", 0o750))
 				require.NoError(t, os.WriteFile(path, got, 0o600))
 			}
-			want, err := os.ReadFile(path)
+			want, err := os.ReadFile(path) //nolint:gosec // G304: путь из имени сценария теста
 			require.NoError(t, err)
 			assert.JSONEq(t, string(want), string(got))
 		})

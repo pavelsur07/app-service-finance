@@ -77,6 +77,7 @@ jobs:
                       # Go-сервис загрузки Ozon (docs/tasks/ozon-fetcher-ingestion).
                       services:
                         - 'services/ozon-fetcher/**'
+                        - 'services/shared/fetchkit/**'
                       # Python-сервис ИИ-задач (docs/tasks/ai, docs/maintenance/ai-service-prod.md).
                       ai_service:
                         - 'services/ai-service/**'
@@ -161,7 +162,7 @@ jobs:
                     items+=('{"service":"landing","context":"./landing","file":"./landing/docker/production/nginx/Dockerfile","image":"land-nginx"}')
                   fi
                   if [ "$sv" = "true" ]; then
-                    items+=('{"service":"ozon-fetcher","context":"./services/ozon-fetcher","file":"./services/ozon-fetcher/docker/Dockerfile","image":"ozon-fetcher"}')
+                    items+=('{"service":"ozon-fetcher","context":"./services","file":"./services/ozon-fetcher/docker/Dockerfile","image":"ozon-fetcher"}')
                   fi
                   if [ "$ai" = "true" ]; then
                     items+=('{"service":"ai-service","context":"./services/ai-service","file":"./services/ai-service/docker/Dockerfile","image":"ai-service"}')
@@ -577,7 +578,7 @@ jobs:
     #   -race требует cgo — образ golang:1.27 (debian), не alpine.
     #   Интеграционные тесты (TEST_DB_DSN, TEST_S3_ENDPOINT) здесь пропускаются.
     services-go:
-        name: 🐹 ozon-fetcher gates
+        name: 🐹 Go services gates (fetchkit, ozon-fetcher)
         needs: changes
         if: ${{ needs.changes.outputs.services == 'true' }}
         runs-on: ubuntu-latest
@@ -585,14 +586,25 @@ jobs:
             - name: 📦 Checkout repository
               uses: actions/checkout@v6
 
+            # services/ целиком: модули подключают ../shared/fetchkit через replace.
             - name: 🔍 go vet
-              run: docker run --rm -v "$PWD/services/ozon-fetcher:/src" -w /src golang:1.27 go vet ./...
+              run: |
+                  for m in shared/fetchkit ozon-fetcher; do
+                    docker run --rm -e GOWORK=off -v "$PWD/services:/services" -w "/services/$m" golang:1.27 go vet ./...
+                  done
 
             - name: 🧹 golangci-lint
-              run: docker run --rm -v "$PWD/services/ozon-fetcher:/src" -w /src golangci/golangci-lint:v2.14.0-alpine golangci-lint run ./...
+              run: |
+                  for m in shared/fetchkit ozon-fetcher; do
+                    docker run --rm -e GOWORK=off -v "$PWD/services:/services" -w "/services/$m" golangci/golangci-lint:v2.14.0-alpine golangci-lint run ./...
+                  done
 
+            # Ядро первым: в нём гейт «fetchkit не знает о провайдерах» (internal/boundary).
             - name: 🧪 go test -race
-              run: docker run --rm -e CGO_ENABLED=1 -v "$PWD/services/ozon-fetcher:/src" -w /src golang:1.27 go test -race ./...
+              run: |
+                  for m in shared/fetchkit ozon-fetcher; do
+                    docker run --rm -e GOWORK=off -e CGO_ENABLED=1 -v "$PWD/services:/services" -w "/services/$m" golang:1.27 go test -race ./...
+                  done
 
     # Гейты Python-сервиса ИИ (services/python.md): dev-цель того же Dockerfile, что локально
     # (`make ai-service-lint ai-service-test`); интеграционные тесты — на своей PostgreSQL с
