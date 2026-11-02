@@ -54,7 +54,7 @@ class BillingPayment
     private int $carriedDays = 0;
 
     /** Остаток прежнего тарифа в копейках, пересчитанный в `carriedDays`. */
-    #[ORM\Column(name: 'carried_kopecks', type: 'bigint', options: ['default' => 0])]
+    #[ORM\Column(name: 'carried_kopecks', type: 'money_amount_minor', options: ['default' => 0])]
     private int $carriedKopecks = 0;
 
     /**
