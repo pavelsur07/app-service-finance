@@ -101,6 +101,18 @@ func (c *Client[C]) Fetch(ctx context.Context) ([]C, []string, error) {
 	return Parse(raw, c.provider, c.decode)
 }
 
+// contractCredentials — форма credentials контракта v1 (типы полей).
+type contractCredentials *struct {
+	Seller *struct {
+		ClientID string `json:"client_id"`
+		APIKey   string `json:"api_key"`
+	} `json:"seller"`
+	Performance *struct {
+		ClientID     string `json:"client_id"`
+		ClientSecret string `json:"client_secret"`
+	} `json:"performance"`
+}
+
 // Parse — проверка снимка v1: кабинеты провайдера и ref'ы отвергнутых.
 func Parse[C Cabinet[C]](raw []byte, provider string, decode Decoder[C]) ([]C, []string, error) {
 	var snap wireSnapshot
@@ -115,6 +127,19 @@ func Parse[C Cabinet[C]](raw []byte, provider string, decode Decoder[C]) ([]C, [
 	}
 	if snap.Connections == nil {
 		return nil, nil, fmt.Errorf("%w: no connections array", ErrInvalidSnapshot)
+	}
+
+	// Форма credentials (контракт v1, общая для провайдеров) проверяется у
+	// каждой записи до фильтрации: неверный тип ключа — нарушение контракта,
+	// снимок отвергается целиком, кэш остаётся на последнем успешном.
+	for _, w := range snap.Connections {
+		if len(w.Credentials) == 0 {
+			continue
+		}
+		var creds contractCredentials
+		if err := json.Unmarshal(w.Credentials, &creds); err != nil {
+			return nil, nil, fmt.Errorf("%w: credentials of %q", ErrInvalidSnapshot, w.ConnectionRef)
+		}
 	}
 
 	cabinets := make([]C, 0, len(snap.Connections))

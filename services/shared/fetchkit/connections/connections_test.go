@@ -86,3 +86,34 @@ func TestCacheAllowlistAndDeepCopies(t *testing.T) {
 	_, ok = cache.Get("b")
 	assert.False(t, ok, "вне allowlist")
 }
+
+// Регрессия выноса ядра (ревью Codex): форма credentials по контракту v1
+// проверяется у каждой записи до фильтрации — неверный тип ключа в любой
+// записи (даже чужого провайдера или с битым updated_at) отвергает снимок
+// целиком, и кэш остаётся на последнем успешном.
+func TestCredentialsOfWrongTypeRejectWholeSnapshotEvenInSkippedRecord(t *testing.T) {
+	bad := `{"schema_version":"1","generated_at":"2026-11-02T12:00:00+03:00","connections":[
+  {"connection_ref":"wb-a","company_id":"c1","provider":"wildberries","updated_at":"2026-11-01T09:00:00+03:00","credentials":{"seller":{"client_id":"s","api_key":"t"},"performance":null},"resource_types":[]},
+  {"connection_ref":"x","company_id":"c2","provider":"ozon","updated_at":"yesterday","credentials":{"seller":{"client_id":"1","api_key":123},"performance":null},"resource_types":[]}
+]}`
+	var calls []string
+	_, _, err := Parse([]byte(bad), "wildberries", decodeWB(&calls))
+	require.ErrorIs(t, err, ErrInvalidSnapshot)
+
+	cache := NewCache[cab](rawSource{body: snapshot, calls: &calls}, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Now)
+	require.NoError(t, cache.Refresh(context.Background()))
+	cache.source = rawSource{body: bad, calls: &calls}
+	require.ErrorIs(t, cache.Refresh(context.Background()), ErrInvalidSnapshot)
+	_, ok := cache.Get("wb-a")
+	assert.True(t, ok, "кэш остался на последнем успешном снимке")
+	assert.Len(t, cache.List(), 2)
+}
+
+type rawSource struct {
+	body  string
+	calls *[]string
+}
+
+func (s rawSource) Fetch(context.Context) ([]cab, []string, error) {
+	return Parse([]byte(s.body), "wildberries", decodeWB(s.calls))
+}
