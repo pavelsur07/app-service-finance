@@ -26,7 +26,8 @@ use Webmozart\Assert\Assert;
  *
  * Точка входа, сама коммитит. Одна транзакция под блокировкой компании
  * (`pg_advisory_xact_lock`, существует и до первой строки подписки). Повтор с тем же
- * `paymentId` или тем же `(source, externalId)` возвращает исходную оплату и ничего не пишет.
+ * `paymentId` или тем же `externalId` в компании (любым способом оплаты) возвращает исходную
+ * оплату и ничего не пишет.
  */
 final class RegisterPaymentAction
 {
@@ -90,8 +91,10 @@ final class RegisterPaymentAction
             ['key' => 'billing_subscription:'.$command->companyId],
         );
 
+        // Номер сверяется без учёта способа: онлайн-оплату ЮKassa администратор мог уже отметить
+        // вручную с её ID в номере (и наоборот) — повтор под той же блокировкой, второго продления нет.
         $repeated = $this->payments->findOneByIdAndCompanyId($command->paymentId, $command->companyId)
-            ?? (null === $command->externalId ? null : $this->payments->findOneByExternalId($command->companyId, $command->source, $command->externalId));
+            ?? (null === $command->externalId ? null : $this->payments->findOneByCompanyAndExternalIdAnySource($command->companyId, $command->externalId));
         if (null !== $repeated) {
             if ($repeated->getTariff()->getCode() !== $command->tariffCode
                 || $repeated->getMonths() !== $command->months

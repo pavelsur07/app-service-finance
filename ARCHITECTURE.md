@@ -1865,8 +1865,9 @@ manage — только владелец. Новые права автомати
   базового URL).
 - Запись: `RegisterPaymentAction` — точка входа, коммитит сама одним
   `wrapInTransaction()` под `pg_advisory_xact_lock(hashtextextended(
-  'billing_subscription:'||companyId, 0))`; повтор по `id` или `(source,
-  external_id)` возвращает исходную оплату; `UniqueConstraintViolation` —
+  'billing_subscription:'||companyId, 0))`; повтор по `id` или по `external_id`
+  в компании при любом `source` (ручная отметка онлайн-платежа и
+  автозачисление — одни деньги) возвращает исходную оплату; `UniqueConstraintViolation` —
   поиск DBAL после rollback. Оплата другого тарифа при действующем платном
   периоде — `TariffChangeNotSupportedException`; бессрочный и отключённый
   тарифы не оплачиваются. `AssignTariffAction` — назначение тарифа
@@ -1907,8 +1908,8 @@ manage — только владелец. Новые права автомати
   истина — `GET` платежа. Фазы: `RegisterPaymentAction` (`source =
   yookassa`, `externalId` — ID платежа, `paymentId` — ID попытки,
   `receivedAt` — `captured_at` по Москве) → отметка `succeeded`; оплата с ID
-  попытки уже есть (сбой между фазами) — сразу отметка, без повторных правил
-  тарифа. `canceled` → `canceled`; `pending` — только время проверки.
+  попытки или с ID платежа в номере уже есть (сбой между фазами, ручная
+  отметка администратором) — сразу отметка, без повторных правил тарифа. `canceled` → `canceled`; `pending` — только время проверки.
   Сумма или валюта не совпали, доменный отказ зачисления, metadata не
   совпала, платежа нет в магазине (404) — `failed_to_apply` + `error`.
   Админка кабинета показывает `failed_to_apply` и `pending` с платежом

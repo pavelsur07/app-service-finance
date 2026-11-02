@@ -176,6 +176,39 @@ final class YooKassaCheckoutTest extends IntegrationTestCase
         self::assertSame('succeeded', $this->connection->fetchOne('SELECT status FROM billing_checkouts WHERE id = ?', [$checkout->getId()]));
     }
 
+    public function testManualRecoveryThenReconciliationCreditsOnce(): void
+    {
+        $checkout = $this->checkout(TariffCode::START, 1, self::START_1_MONTH);
+        // Администратор отметил зависшую онлайн-оплату вручную: номер — ID платежа ЮKassa.
+        self::getContainer()->get(RegisterPaymentAction::class)(new RegisterPaymentCommand(
+            Uuid::uuid7()->toString(), $this->companyId, TariffCode::START, 1, self::START_1_MONTH,
+            new \DateTimeImmutable('2027-03-10 10:05:00'), PaymentSource::MANUAL_INVOICE, YooKassaResponses::PAYMENT_ID,
+        ));
+        $paidUntil = $this->connection->fetchOne('SELECT paid_until FROM billing_company_subscriptions WHERE company_id = ?', [$this->companyId]);
+        $this->yooKassa->then(YooKassaResponses::payment('succeeded', self::START_1_MONTH, $this->metadata($checkout->getId())));
+
+        self::assertSame(CheckoutStatus::SUCCEEDED, $this->apply());
+
+        self::assertSame(1, $this->paymentCount());
+        self::assertSame($paidUntil, $this->connection->fetchOne('SELECT paid_until FROM billing_company_subscriptions WHERE company_id = ?', [$this->companyId]), 'второго продления нет');
+    }
+
+    public function testRegisterRecognizesSameExternalIdFromOtherSource(): void
+    {
+        $register = self::getContainer()->get(RegisterPaymentAction::class);
+        $first = $register(new RegisterPaymentCommand(
+            Uuid::uuid7()->toString(), $this->companyId, TariffCode::START, 1, self::START_1_MONTH,
+            new \DateTimeImmutable('2027-03-10 10:05:00'), PaymentSource::YOOKASSA, YooKassaResponses::PAYMENT_ID,
+        ));
+        $second = $register(new RegisterPaymentCommand(
+            Uuid::uuid7()->toString(), $this->companyId, TariffCode::START, 1, self::START_1_MONTH,
+            new \DateTimeImmutable('2027-03-10 11:00:00'), PaymentSource::MANUAL_INVOICE, YooKassaResponses::PAYMENT_ID,
+        ));
+
+        self::assertSame($first, $second);
+        self::assertSame(1, $this->paymentCount());
+    }
+
     public function testCanceledPaymentMarksCheckoutCanceledAndRegistersNothing(): void
     {
         $checkout = $this->checkout(TariffCode::START, 1, self::START_1_MONTH);

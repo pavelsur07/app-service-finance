@@ -110,7 +110,9 @@ final class ApplyYooKassaPaymentAction
 
         // Добор после сбоя между фазами: оплата уже зачислена — не прогонять правила тарифа заново
         // (тариф могли отключить или назначить «Друга» после зачисления).
-        if (null !== $this->payments->findOneByIdAndCompanyId($checkout->getId(), $checkout->getCompanyId())) {
+        // То же, если администратор уже отметил этот платёж вручную (ID платежа ЮKassa в номере).
+        if (null !== $this->payments->findOneByIdAndCompanyId($checkout->getId(), $checkout->getCompanyId())
+            || null !== $this->payments->findOneByCompanyAndExternalIdAnySource($checkout->getCompanyId(), $payment->id)) {
             return $this->transition($checkout, CheckoutStatus::SUCCEEDED, null);
         }
 
