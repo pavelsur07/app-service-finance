@@ -34,10 +34,10 @@
 
 | Что | Где |
 |---|---|
-| Сервис `wb-fetcher` (профиль `wb-fetcher`, без ingress, сеть default, healthcheck `/health`, 256M), env по образцу ozon-fetcher, S3 — ключи `OZON_FETCHER_S3_*` | `docker-compose.prod.yml` |
+| Сервис `wb-fetcher` (профиль `wb-fetcher`, без ingress, сеть default, healthcheck `/health`, 512M), env по образцу ozon-fetcher, S3 — ключи `OZON_FETCHER_S3_*` | `docker-compose.prod.yml` |
 | scheduler: `WB_FETCHER_BASE_URL=http://wb-fetcher:8080`, `WB_FETCHER_API_TOKEN` | `docker-compose.prod.yml` |
 | БД `wb_fetcher` и роль `svc_wb_fetcher`, идемпотентно | `docker/wb-fetcher/db-bootstrap.sql` |
-| Образ `wb-fetcher` в матрице сборки; экспорт секретов/переменных; проверка алфавита; шаг `[4c/5]` (bootstrap → pull → `-migrate < /dev/null` → `up --wait`), выключено — `stop` | `.github/workflows/deploy.yml` |
+| Образ `wb-fetcher` в матрице сборки; экспорт секретов/переменных; проверка алфавита; шаг `[4b2/5]` (bootstrap → pull → `-migrate < /dev/null` → `up --wait`), выключено — `stop` | `.github/workflows/deploy.yml` |
 | Гейт деплой-скрипта: wb-fetcher run/exec со своим stdin (существующий тест покрывает), профиль — проверка | `tests/shell/deploy-workflow-test.sh` (прогон) |
 | `wb_fetcher.finance_companies: ['*']` | `site/config/services.yaml` |
 | Инструкция: включение, проверка, откат, сверка, все кабинеты | `docs/maintenance/wb-fetcher-prod.md` |
@@ -61,6 +61,23 @@
 - [ ] 3 ночи без ERROR, прошлая неделя `done` в понедельник/вторник
 - [ ] сверка эталона за 14 дней (число дней `done` сервиса против `sales_report success` Symfony)
 - [ ] все кабинеты: Владелец очищает `WB_FETCHER_CONNECTION_ALLOWLIST` и деплоит; первая ночь чистая
+
+## 4a. Внешнее ревью на handoff (02.11.2026)
+
+site/ (`external-review.sh`, вся ветка) — REVIEW_GREEN. services/compose/.github (Codex, diff от
+`eeeceaa73`, этапы 2–5) — раунд 1:
+
+| Уровень | Замечание | Решение |
+|---|---|---|
+| BLOCKER | пагинация останавливалась на странице `< limit`, а документация WB велит продолжать до 204 / `[]` — неполный отчёт мог стать `done` | `More` после каждой непустой страницы; регрессия `TestShortPageStillAsksNextUntilEmpty`, интеграционные тесты с `[]` в конце |
+| IMPORTANT | минуты :10/:20 не защищают общий лимит продавца: очередь Symfony работает и вне минут cron | слот в лимитере Symfony перед каждым запросом и 429 → общий cooldown: эндпоинты `/internal/wb-finance/sales-reports/slot`, `…/rate-limited` (контракт `wb-finance-quota` v1, `WbFinanceThrottleFacade`, бакет `connection:<id>`); без ответа квоты — запроса нет; окно :10/:20 удалено. Тесты: functional Symfony 7 (в т. ч. слот виден импорту, cooldown виден импорту), Go `quota` и `executor` |
+| IMPORTANT | страница 100 000 строк (≈ 150 МБ) ×2 параллельно с копией при разборе не помещается в 512M | страница 20 000 строк (≈ 30 МБ), потолок тела 64 МБ, предел страниц 250 (тот же потолок 5 млн строк) |
+
+Раунд 2 — REVIEW_GREEN; два MINOR закрыты: отказ квоты Symfony логируется WARN
+(`symfony_quota_unavailable`), ответ `rate-limited` без `cooldown_seconds ≥ 1` — ошибка.
+
+Цена правки пагинации — один лишний запрос (`[]`) на период; с общей квотой он не отнимает
+лимит у импорта Symfony сверх слота.
 
 ## 5. Чек-лист приёмки
 

@@ -21,9 +21,9 @@ import (
 // ResourceDaily — детальный отчёт о реализации за день МСК (period_key YYYY-MM-DD).
 const ResourceDaily = "wb.finance.sales-report.daily"
 
-// DefaultMaxPages — предел страниц дня: 50 × 100 000 строк — заведомо больше
-// реального дня; превышение — зацикливание курсора, а не данные.
-const DefaultMaxPages = 50
+// DefaultMaxPages — предел страниц периода: 250 × 20 000 строк (5 млн) —
+// заведомо больше реального отчёта; превышение — зацикливание курсора, а не данные.
+const DefaultMaxPages = 250
 
 var errTooManyPages = errors.New("executor: page limit exceeded")
 
@@ -164,10 +164,14 @@ func (e *Executor) pages(ctx context.Context, run *fetch.Run, cab connections.Ca
 
 // Classify — свои исходы WB раньше общей таблицы ядра.
 func (e *Executor) Classify(c *fetch.Classification) (store.Outcome, bool) {
-	var we *WindowError
+	var qe *QuotaWaitError
 	switch {
-	case errors.As(c.Err, &we):
-		return store.Outcome{Status: store.StatusPending, Label: "symfony_window", ErrorClass: "symfony_window", KeepCursor: true, NextRunAt: we.Until}, true
+	case errors.As(c.Err, &qe):
+		label := "symfony_quota"
+		if qe.Unavailable {
+			label = "symfony_quota_unavailable"
+		}
+		return store.Outcome{Status: store.StatusPending, Label: label, ErrorClass: label, KeepCursor: true, NextRunAt: qe.Until}, true
 	case errors.Is(c.Err, errTooManyPages):
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "too_many_pages", ErrorClass: "too_many_pages", NextRunAt: c.Now}, true
 	}
@@ -177,5 +181,11 @@ func (e *Executor) Classify(c *fetch.Classification) (store.Outcome, bool) {
 // ResumesConnection — успех снимает паузу кабинета после 401.
 func (e *Executor) ResumesConnection(string) bool { return true }
 
-// LogLevel — уровни по умолчанию ядра.
-func (e *Executor) LogLevel(store.Outcome) (slog.Level, bool) { return 0, false }
+// LogLevel — квота Symfony не отвечает — WARN (повтор сам, но долгий отказ
+// останавливает загрузку); остальное — уровни ядра.
+func (e *Executor) LogLevel(o store.Outcome) (slog.Level, bool) {
+	if o.Label == "symfony_quota_unavailable" {
+		return slog.LevelWarn, true
+	}
+	return 0, false
+}

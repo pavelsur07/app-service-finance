@@ -2571,7 +2571,7 @@ reserveSalesReportsSlot(string $sellerBucketId): ?WbFinanceThrottleDTO
 registerSalesReportsRemote429(string $sellerBucketId, ?int $retryAfterSeconds, int $defaultSeconds): int
 // WbFinanceThrottleDTO (Application/DTO): waitSeconds, sharedCooldown
 ```
-Потребитель: `Ingestion` (`WbFinanceReportClient`).
+Потребители: `Ingestion` (`WbFinanceReportClient`), внутренние эндпоинты квоты для wb-fetcher (`WbFinanceSalesReports*Controller`, контракт `wb-finance-quota` v1).
 
 ### `CostCategoryCatalogFacade` (`src/Marketplace/Facade/CostCategoryCatalogFacade.php`)
 ```php
@@ -4063,6 +4063,11 @@ internal_api → stateless, /internal/* для сервисов services/
   `wb_fetcher.finance_companies` (`['*']` — всем, `[]` — никому), остальным `[]`. На проде `['*']`:
   кабинеты ограничивает allowlist wb-fetcher (`vars.WB_FETCHER_CONNECTION_ALLOWLIST`, `docs/maintenance/wb-fetcher-prod.md`).
   Другие провайдеры — 422 `unsupported_provider`.
+- `POST /internal/wb-finance/sales-reports/slot` и `POST /internal/wb-finance/sales-reports/rate-limited`
+  (`WbFinanceSalesReportsSlotController`, `WbFinanceSalesReportsRateLimitedController`) — общая с
+  wb-fetcher квота WB finance (контракт `services/_contracts/wb-finance-quota/v1`): слот и 429 через
+  `WbFinanceThrottleFacade` в бакете `connection:<connection_ref>` — тот же, что у
+  `SyncWbFinancialReportDayHandler` и Ingestion. Неверный вход — 422 `invalid_request`.
 
 Иерархия ролей: `ROLE_USER → ROLE_COMPANY_USER → ROLE_COMPANY_OWNER`
 Admin-роли: `ROLE_ADMIN → ROLE_SUPER_ADMIN`
@@ -4704,6 +4709,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.121 | 2026-11-02 | Marketplace: `/internal/wb-finance/sales-reports/slot` и `…/rate-limited` — общая квота WB finance для wb-fetcher (контракт `wb-finance-quota` v1) вместо пропуска минут :10/:20; wb-fetcher читает отчёт до пустой страницы, страница 20 000 строк (задача wb-fetcher-finance, внешнее ревью этапа 5) |
 | 2.120 | 2026-11-02 | Прод: сервис `wb-fetcher` за `WB_FETCHER_ENABLED` (compose-профиль, БД `wb_fetcher`, S3 — ключи ozon-fetcher), scheduler — `WB_FETCHER_BASE_URL/_API_TOKEN`; `wb_fetcher.finance_companies: ['*']` (задача wb-fetcher-finance, этап 5) |
 | 2.119 | 2026-11-02 | ServiceGateway: покрытие нескольких сервисов — `ServiceCoverageHttpClient` на сервис (`WB_FETCHER_BASE_URL/_API_TOKEN`), команда обновления обходит все клиенты, страница `/admin/services/coverage` с вкладками Ozon \| Wildberries, недельные ячейки; прежний адрес — 301 (задача wb-fetcher-finance, этап 4) |
 | 2.118 | 2026-11-02 | ServiceGateway: `ServiceCoverageV1Parser` принимает недельный `period_key` `YYYY-Www` (контракт `service-coverage` v1.1.0, задача wb-fetcher-finance, этап 3) |

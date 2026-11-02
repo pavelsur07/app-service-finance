@@ -20,6 +20,7 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/executor"
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/planner"
+	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/quota"
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/wb"
 )
 
@@ -87,7 +88,8 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 	}
 
 	report := wb.NewClient(cfg.WBFinanceBaseURL, &http.Client{Timeout: wb.DefaultTimeout}, now).
-		WithLimiter(executor.NewWindowLimiter(limits, executor.DefaultBlockedMinutes, now))
+		WithLimiter(executor.NewSharedLimiter(limits,
+			quota.New(cfg.SymfonyBaseURL, cfg.InternalAuthToken, &http.Client{Timeout: quota.DefaultTimeout}), now, logger))
 	s3Client := rawstore.NewS3Client(cfg.S3Endpoint, cfg.S3Region, cfg.S3AccessKeyID, cfg.S3SecretAccessKey)
 	raw := rawstore.New(s3Client, cfg.S3Bucket, cfg.MaxParallelConnections*2)
 	execCfg := executor.DefaultConfig()

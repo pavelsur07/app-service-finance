@@ -14,7 +14,8 @@
   Ядро не копировать и не править под WB: провайдерская специфика — здесь.
 - `cmd/wb-fetcher/` — только wiring. `internal/wb` — клиент finance-api;
   `internal/connections` — кабинеты из Symfony; `internal/planner` — что ставить;
-  `internal/executor` — адаптер `fetch.Adapter` (пагинация `rrdId`, окно :10/:20);
+  `internal/executor` — адаптер `fetch.Adapter` (пагинация `rrdId`, общая квота Symfony);
+  `internal/quota` — клиент квоты `wb-finance-quota` v1;
   `internal/app` — сборка цепочки, лимиты, миграции; `internal/httpapi` — имя
   сервиса и ожидания покрытия.
 - Гейты: `make wb-fetcher-lint wb-fetcher-vet wb-fetcher-test`; при правке
@@ -36,7 +37,9 @@
 - Токен WB — только в памяти (`connections.Token` печатается скрытым); в тексте
   ошибок и логах его нет (тесты `wb`, `connections`, `executor`).
 - Не чаще одного запроса отчёта на кабинет за `WB_FINANCE_MIN_INTERVAL`
-  (≥ 60 с — лимит WB 1/мин на продавца); минуты :10 и :20 часа — Symfony.
+  (≥ 60 с — лимит WB 1/мин на продавца) и только со слотом общей квоты Symfony
+  (`wb-finance-quota` v1, бакет `connection:<id>` импорта Symfony); квота не ответила —
+  запроса нет, повтор через минуту; 429 от WB передаётся в Symfony общим cooldown.
 - Миграции — миграции ядра (`store.CoreMigrations()`); своя схема БД не
   заводится. Изменение схемы — в ядре новой миграцией и в ozon-fetcher.
 - Ключ S3: `wb/{connection_ref}/{resource_type}/{period_key}/…` — бакет и

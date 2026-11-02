@@ -75,16 +75,18 @@ func TestFullPageHasMoreAndCursorFromLastRrdID(t *testing.T) {
 	assert.Equal(t, []byte(body), page.Body, "raw — байты ответа как есть")
 	assert.Equal(t, 3, page.Rows)
 	assert.Equal(t, int64(9), page.NextRrdID)
-	assert.True(t, page.More, "строк = limit — есть следующая страница")
+	assert.True(t, page.More, "непустая страница — есть следующая")
 }
 
-func TestShortPageIsLast(t *testing.T) {
+// Регрессия ревью: страница короче limit — не конец отчёта. WB велит
+// продолжать с rrdId последней строки до 204 или [].
+func TestShortPageStillAsksNextUntilEmpty(t *testing.T) {
 	c, _ := serve(t, func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, `[{"rrdId":11}]`) })
 
 	page, err := c.SalesReportPage(context.Background(), req(9))
 
 	require.NoError(t, err)
-	assert.False(t, page.More)
+	assert.True(t, page.More, "строк меньше limit, но страница непустая")
 	assert.Equal(t, int64(11), page.NextRrdID)
 }
 

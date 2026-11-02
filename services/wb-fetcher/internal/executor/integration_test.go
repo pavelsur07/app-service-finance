@@ -35,7 +35,8 @@ func TestDailyReportResumesFromCursorAndDetectsUnchanged(t *testing.T) {
 	require.NoError(t, err)
 	tasks := store.NewTasks(pool, store.Options{})
 
-	pages := map[int64]string{0: `[{"rrdId":10},{"rrdId":20}]`, 20: `[{"rrdId":30}]`}
+	// Неполная страница (rrdId 30) — не конец: конец отчёта — [] (документация WB).
+	pages := map[int64]string{0: `[{"rrdId":10},{"rrdId":20}]`, 20: `[{"rrdId":30}]`, 30: `[]`}
 	var cursor20 atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -76,7 +77,7 @@ func TestDailyReportResumesFromCursorAndDetectsUnchanged(t *testing.T) {
 	assert.Equal(t, 2, second.NextPageNo)
 	res := exec.Run(ctx, second, c, "t2")
 	assert.Equal(t, "done", res.Outcome)
-	assert.Len(t, raw.keys, 2, "страница 1 не перезаписана")
+	assert.Len(t, raw.keys, 3, "страница 1 не перезаписана; третья — [] конца отчёта")
 
 	require.NoError(t, tasks.Upsert(ctx, []store.TaskSpec{{TaskKey: key, Refresh: true, RunAt: now}}))
 	again := exec.Run(ctx, claim(now, "00000000-0000-7000-8000-000000000003"), c, "t3")
@@ -102,6 +103,14 @@ func TestWeeklyReportNotReadyThenRevisedAndYieldsToYesterday(t *testing.T) {
 	var seen atomic.Value
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
+		var req struct {
+			RrdID int64 `json:"rrdId"`
+		}
+		require.NoError(t, json.Unmarshal(b, &req))
+		if req.RrdID > 0 {
+			_, _ = io.WriteString(w, `[]`) // конец отчёта
+			return
+		}
 		seen.Store(string(b))
 		_, _ = io.WriteString(w, body.Load().(string))
 	}))
@@ -124,7 +133,7 @@ func TestWeeklyReportNotReadyThenRevisedAndYieldsToYesterday(t *testing.T) {
 	require.NoError(t, tasks.Upsert(ctx, []store.TaskSpec{{TaskKey: week, Priority: 7, RunAt: now}}))
 	res := exec.Run(ctx, claim(now), c, "t1")
 	assert.Equal(t, store.StatusNotReady, res.Outcome)
-	assert.JSONEq(t, `{"dateFrom":"2026-10-26","dateTo":"2026-11-01","limit":100000,"rrdId":0,"period":"weekly"}`, seen.Load().(string))
+	assert.JSONEq(t, `{"dateFrom":"2026-10-26","dateTo":"2026-11-01","limit":20000,"rrdId":0,"period":"weekly"}`, seen.Load().(string))
 	assert.Empty(t, raw.keys)
 	_, err = tasks.ClaimNext(ctx, []string{"wb-int"}, "w", "00000000-0000-7000-8000-000000000199", "trace", now.Add(59*time.Minute), time.Minute)
 	assert.ErrorIs(t, err, store.ErrNoTask, "повтор not_ready — через час")

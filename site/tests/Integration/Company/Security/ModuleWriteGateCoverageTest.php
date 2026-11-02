@@ -50,7 +50,7 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
      * `delegated-owner`   — экшен тонкий, владельца сверяет Action (DisableCompanyMemberAction и др.).
      * `inline-owner`      — сверка владельца сравнением `$company->getUser()` прямо в теле.
      * `authenticated-self`— личная настройка пользователя, компания не при чём.
-     * `firewall`          — доступ ограничен access_control в security.yaml (админка).
+     * `firewall`          — доступ ограничен access_control в security.yaml (админка, `/internal/*`).
      * `balance-*`         — свежий FINANCE_WRITE + конкретное право BalanceAccess;
      *                       `balance-disabled` — старый endpoint всегда отвечает 410.
      *                       Точный actor-вызов дополнительно проверяется по PHP-токенам.
@@ -134,6 +134,10 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         'admin_telegram_bot_toggle' => ['firewall', 'App\Telegram\Controller\Admin\TelegramBotController::toggle'],
         'admin_telegram_bot_webhook_set' => ['firewall', 'App\Telegram\Controller\Admin\TelegramBotController::webhookSet'],
         'admin_billing_company_assign' => ['firewall', 'App\Billing\Controller\Admin\AssignCompanyTariffController::__invoke'],
+        // firewall internal_api (Bearer INTERNAL_AUTH_TOKEN + IP-allowlist, ROLE_INTERNAL_SERVICE):
+        // квота WB finance для wb-fetcher, данных компаний не меняет (контракт wb-finance-quota v1).
+        'internal_wb_finance_sales_reports_slot' => ['firewall', 'App\Marketplace\Controller\Internal\WbFinanceSalesReportsSlotController::__invoke'],
+        'internal_wb_finance_sales_reports_rate_limited' => ['firewall', 'App\Marketplace\Controller\Internal\WbFinanceSalesReportsRateLimitedController::__invoke'],
         'admin_billing_company_payment' => ['firewall', 'App\Billing\Controller\Admin\RegisterCompanyPaymentController::__invoke'],
         'admin_billing_company_cancel_next' => ['firewall', 'App\Billing\Controller\Admin\CancelScheduledTariffController::__invoke'],
         'admin_ingestion_external_categories_confirm_ozon_type' => ['firewall', 'App\Admin\Controller\IngestionExternalCategoriesController::confirmOzonType'],

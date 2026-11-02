@@ -26,8 +26,11 @@ const (
 	DefaultBaseURL = "https://finance-api.wildberries.ru"
 	// EndpointSalesReport — детальный отчёт о реализации (день или неделя).
 	EndpointSalesReport = "/api/finance/v1/sales-reports/detailed"
-	// PageLimit — строк на страницу (максимум метода, как в Symfony).
-	PageLimit = 100000
+	// PageLimit — строк на страницу. Максимум метода — 100 000 (≈ 150 МБ тела);
+	// 20 000 (≈ 30 МБ) держит две параллельные страницы с копией строк при
+	// разборе в лимите памяти контейнера. Маленький кабинет — всё равно одна
+	// страница с данными.
+	PageLimit = 20000
 	// DefaultTimeout — таймаут запроса страницы (как в Symfony).
 	DefaultTimeout = 120 * time.Second
 	// DefaultRateLimitPause — пауза после 429 без заголовков паузы.
@@ -36,8 +39,8 @@ const (
 	PeriodDaily  = "daily"
 	PeriodWeekly = "weekly"
 
-	// maxBodyBytes — потолок страницы: 100 000 строк отчёта ≈ 150 МБ.
-	maxBodyBytes = 256 << 20
+	// maxBodyBytes — потолок страницы: 20 000 строк отчёта ≈ 30 МБ, запас ×2.
+	maxBodyBytes = 64 << 20
 	excerptRunes = 200
 )
 
@@ -83,7 +86,7 @@ type ReportPage struct {
 	Body      []byte
 	Rows      int
 	NextRrdID int64 // rrdId последней строки; 0 — строк нет
-	More      bool  // строк не меньше limit — запросить следующую страницу
+	More      bool  // страница непустая — запросить следующую (конец отчёта — 204 или [])
 }
 
 // SalesReportPage — одна страница детального отчёта.
@@ -156,12 +159,14 @@ func (c *Client) salesReportPage(ctx context.Context, r ReportRequest) (ReportPa
 	if int64(len(body)) > c.maxBody {
 		return ReportPage{}, invalid(resp.StatusCode, fmt.Errorf("body exceeds %d bytes", c.maxBody))
 	}
-	return parsePage(resp.StatusCode, body, r.RrdID, r.Limit)
+	return parsePage(resp.StatusCode, body, r.RrdID)
 }
 
 // parsePage проверяет форму: JSON-список объектов, rrdId последней строки
-// растёт относительно курсора.
-func parsePage(status int, body []byte, cursor int64, limit int) (ReportPage, error) {
+// растёт относительно курсора. Документация WB: запрашивать с rrdId последней
+// строки, пока ответ не станет 204 или []; неполная страница концом не
+// считается.
+func parsePage(status int, body []byte, cursor int64) (ReportPage, error) {
 	var rows []json.RawMessage
 	if err := json.Unmarshal(body, &rows); err != nil || rows == nil {
 		return ReportPage{}, invalid(status, errors.New("body is not a JSON list"))
@@ -183,7 +188,7 @@ func parsePage(status int, body []byte, cursor int64, limit int) (ReportPage, er
 	if *last.RrdID <= cursor {
 		return ReportPage{}, invalid(status, fmt.Errorf("rrdId %d does not grow after cursor %d", *last.RrdID, cursor))
 	}
-	return ReportPage{Body: body, Rows: len(rows), NextRrdID: *last.RrdID, More: limit > 0 && len(rows) >= limit}, nil
+	return ReportPage{Body: body, Rows: len(rows), NextRrdID: *last.RrdID, More: true}, nil
 }
 
 func invalid(status int, err error) *apierr.APIError {

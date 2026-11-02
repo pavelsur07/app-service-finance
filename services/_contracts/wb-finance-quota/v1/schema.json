@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "wb-finance-quota/v1",
+  "title": "Общая квота WB finance sales-reports (Symfony ↔ wb-fetcher)",
+  "$defs": {
+    "connectionRef": {"type": "string", "format": "uuid"},
+    "slotRequest": {
+      "type": "object",
+      "required": ["connection_ref"],
+      "properties": {"connection_ref": {"$ref": "#/$defs/connectionRef"}}
+    },
+    "slotResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["granted"],
+          "properties": {"granted": {"const": true}},
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["granted", "wait_seconds", "shared_cooldown"],
+          "properties": {
+            "granted": {"const": false},
+            "wait_seconds": {"type": "integer", "minimum": 1},
+            "shared_cooldown": {"type": "boolean"}
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "rateLimitedRequest": {
+      "type": "object",
+      "required": ["connection_ref", "retry_after_seconds"],
+      "properties": {
+        "connection_ref": {"$ref": "#/$defs/connectionRef"},
+        "retry_after_seconds": {"type": ["integer", "null"], "minimum": 1, "maximum": 86400}
+      }
+    },
+    "rateLimitedResponse": {
+      "type": "object",
+      "required": ["cooldown_seconds"],
+      "properties": {"cooldown_seconds": {"type": "integer", "minimum": 1}}
+    },
+    "error": {
+      "type": "object",
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "object",
+          "required": ["code", "message"],
+          "properties": {"code": {"const": "invalid_request"}, "message": {"type": "string"}}
+        }
+      }
+    }
+  }
+}

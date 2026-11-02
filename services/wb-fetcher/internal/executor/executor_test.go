@@ -191,18 +191,25 @@ func TestRateLimitWaitsForHeaderPause(t *testing.T) {
 	assert.True(t, out.KeepCursor)
 }
 
-func TestSymfonyWindowDefersWithoutError(t *testing.T) {
-	until := t0.Add(45 * time.Second)
-	rep := &fakeReport{err: &WindowError{Until: until}}
+func TestSymfonyQuotaDefersWithoutError(t *testing.T) {
+	for label, qe := range map[string]*QuotaWaitError{
+		"symfony_quota":             {Until: t0.Add(45 * time.Second)},
+		"symfony_quota_unavailable": {Until: t0.Add(time.Minute), Unavailable: true},
+	} {
+		rep := &fakeReport{err: qe}
 
-	_, h := run(t, rep, task("2026-11-01"), cab)
+		_, h := run(t, rep, task("2026-11-01"), cab)
 
-	out := h.tasks.finished[0]
-	assert.Equal(t, store.StatusPending, out.Status)
-	assert.Equal(t, "symfony_window", out.Label)
-	assert.Equal(t, until, out.NextRunAt)
-	assert.True(t, out.KeepCursor)
-	assert.NotContains(t, h.logs.String(), `"level":"ERROR"`)
+		out := h.tasks.finished[0]
+		assert.Equal(t, store.StatusPending, out.Status, label)
+		assert.Equal(t, label, out.Label)
+		assert.Equal(t, qe.Until, out.NextRunAt, label)
+		assert.True(t, out.KeepCursor, label)
+		assert.NotContains(t, h.logs.String(), `"level":"ERROR"`, label)
+		if qe.Unavailable {
+			assert.Contains(t, h.logs.String(), `"level":"WARN"`, "отказ квоты виден мониторингу")
+		}
+	}
 }
 
 func TestCabinetChecks(t *testing.T) {

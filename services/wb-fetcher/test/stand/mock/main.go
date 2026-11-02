@@ -1,7 +1,7 @@
 // Мок для стенда wb-fetcher (docs/tasks/wb-fetcher-finance/stages/stage-2.md):
 // снимок кабинетов Symfony и finance-api WB. Первый запрос отчёта — 429 с
-// X-Ratelimit-Retry; первая страница дня — ровно 100 000 строк (пагинация),
-// вторая отвечает с задержкой PAGE2_DELAY (окно для остановки сервиса).
+// X-Ratelimit-Retry; первая страница дня — ровно limit строк (пагинация),
+// вторая отвечает с задержкой PAGE2_DELAY (окно для остановки сервиса), третья — [].
 package main
 
 import (
@@ -35,6 +35,21 @@ func main() {
 				"credentials": map[string]any{"seller": map[string]string{"client_id": "wb-stand", "api_key": "stand-token"}, "performance": nil}},
 		}})
 	})
+	// Квота Symfony (wb-finance-quota v1): стенд один, слот выдаётся всегда.
+	mux.HandleFunc("POST /internal/wb-finance/sales-reports/slot", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+token {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		writeJSON(w, map[string]any{"granted": true})
+	})
+	mux.HandleFunc("POST /internal/wb-finance/sales-reports/rate-limited", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+token {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		writeJSON(w, map[string]any{"cooldown_seconds": 85})
+	})
 	mux.HandleFunc("POST /api/finance/v1/sales-reports/detailed", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			DateFrom, DateTo, Period string
@@ -64,6 +79,10 @@ func main() {
 			b.WriteString("]")
 			_, _ = w.Write([]byte(b.String()))
 		default:
+			if req.RrdID > int64(req.Limit) { // после второй страницы — конец отчёта
+				_, _ = w.Write([]byte("[]"))
+				return
+			}
 			time.Sleep(delay)
 			_, _ = fmt.Fprintf(w, `[{"rrdId":%d,"day":"%s"},{"rrdId":%d,"day":"%s"}]`, req.RrdID+1, day, req.RrdID+2, day)
 		}
