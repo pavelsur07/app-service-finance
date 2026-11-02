@@ -8,7 +8,8 @@ use App\Billing\Enum\AccessStatus;
 use App\Billing\Facade\DTO\BillingAccessDTO;
 
 /**
- * Предупреждение клиенту об окончании оплаты: за NOTICE_DAYS дней до конца периода
+ * Предупреждение клиенту об окончании оплаты: за NOTICE_DAYS дней до «оплачено по» (и в сам
+ * этот день — `daysLeft` считает его, поэтому порог NOTICE_DAYS + 1) до конца периода
  * (или пробного), в льготные дни и в «только чтение». Бессрочный тариф и «нет тарифа» — без него.
  */
 final readonly class ExpiryNotice
@@ -26,6 +27,8 @@ final readonly class ExpiryNotice
         public int $daysLeft,
         /** Последний льготный день: после него — только чтение. */
         public \DateTimeImmutable $graceUntil,
+        /** Период был пробным — тексты без «оплаченного». */
+        public bool $trial,
     ) {
     }
 
@@ -36,7 +39,7 @@ final readonly class ExpiryNotice
         }
 
         $kind = match ($access->status) {
-            AccessStatus::ACTIVE => $access->daysLeft <= self::NOTICE_DAYS
+            AccessStatus::ACTIVE => $access->daysLeft <= self::NOTICE_DAYS + 1
                 ? ($access->trial ? self::KIND_TRIAL_ENDING : self::KIND_ENDING)
                 : null,
             AccessStatus::GRACE => self::KIND_GRACE,
@@ -49,6 +52,6 @@ final readonly class ExpiryNotice
 
         $paidUntil = PaidPeriodCalculator::date($access->paidUntil);
 
-        return new self($kind, $paidUntil, $access->daysLeft, $paidUntil->modify('+'.SubscriptionAccessPolicy::GRACE_DAYS.' days'));
+        return new self($kind, $paidUntil, $access->daysLeft, $paidUntil->modify('+'.SubscriptionAccessPolicy::GRACE_DAYS.' days'), $access->trial);
     }
 }

@@ -120,6 +120,15 @@ final class ClientTariffPageTest extends WebTestCaseBase
         self::assertSelectorTextContains('[data-billing-notice]', 'До 12.03.2027 всё работает');
     }
 
+    public function testOutOfRangeHistoryPageIsNotFound(): void
+    {
+        $this->login($this->owner);
+
+        $this->client->request('GET', '/company/price?page=2');
+
+        self::assertResponseStatusCodeSame(404);
+    }
+
     private function login(User $user): void
     {
         $this->client->loginUser($user);

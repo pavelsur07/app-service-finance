@@ -16,15 +16,18 @@ final class ExpiryNoticeTest extends TestCase
     {
         self::assertNull(ExpiryNotice::forAccess(new BillingAccessDTO(AccessStatus::ACTIVE, TariffCode::FRIEND, 'Друг', null, null)));
         self::assertNull(ExpiryNotice::forAccess(new BillingAccessDTO(AccessStatus::NONE, null, null, null, null)));
-        self::assertNull(ExpiryNotice::forAccess($this->access(AccessStatus::ACTIVE, 8)));
+        // За 8 дней до «оплачено по» (daysLeft = 9, считая сегодня) — ещё рано.
+        self::assertNull(ExpiryNotice::forAccess($this->access(AccessStatus::ACTIVE, 9)));
     }
 
     public function testEndingWithinNoticeDays(): void
     {
-        $notice = ExpiryNotice::forAccess($this->access(AccessStatus::ACTIVE, ExpiryNotice::NOTICE_DAYS));
+        // За 7 дней до «оплачено по» — daysLeft = 8 (сегодня тоже оплачен): баннер уже есть, как и письмо.
+        $notice = ExpiryNotice::forAccess($this->access(AccessStatus::ACTIVE, ExpiryNotice::NOTICE_DAYS + 1));
 
         self::assertSame(ExpiryNotice::KIND_ENDING, $notice?->kind);
-        self::assertSame(7, $notice->daysLeft);
+        self::assertSame(8, $notice->daysLeft);
+        self::assertFalse($notice->trial);
         self::assertSame('2027-01-31', $notice->paidUntil->format('Y-m-d'));
     }
 
@@ -40,6 +43,7 @@ final class ExpiryNoticeTest extends TestCase
         self::assertSame('2027-02-05', $grace->graceUntil->format('Y-m-d'));
 
         self::assertSame(ExpiryNotice::KIND_READ_ONLY, ExpiryNotice::forAccess($this->access(AccessStatus::READ_ONLY, 0))?->kind);
+        self::assertTrue(ExpiryNotice::forAccess($this->access(AccessStatus::GRACE, 0, trial: true))?->trial, 'истёкший пробный — тексты без «оплаченного»');
     }
 
     private function access(AccessStatus $status, int $daysLeft, bool $trial = false): BillingAccessDTO

@@ -11,9 +11,9 @@
     {%- elseif notice.kind == 'ending' -%}
       Тариф оплачен по {{ notice.paidUntil|date('d.m.Y') }}, осталось дней: {{ notice.daysLeft }}. Продлите его заранее.
     {%- elseif notice.kind == 'grace' -%}
-      Оплаченный период закончился {{ notice.paidUntil|date('d.m.Y') }}. До {{ notice.graceUntil|date('d.m.Y') }} всё работает, затем кабинет перейдёт в режим «только чтение».
+      {{ notice.trial ? 'Пробный период закончился' : 'Оплаченный период закончился' }} {{ notice.paidUntil|date('d.m.Y') }}. До {{ notice.graceUntil|date('d.m.Y') }} всё работает, затем кабинет перейдёт в режим «только чтение».
     {%- else -%}
-      Оплаченный период закончился {{ notice.paidUntil|date('d.m.Y') }}. Продлите тариф, чтобы снова вносить изменения.
+      {{ notice.trial ? 'Пробный период закончился' : 'Оплаченный период закончился' }} {{ notice.paidUntil|date('d.m.Y') }}. {{ notice.trial ? 'Выберите тариф' : 'Продлите тариф' }}, чтобы снова вносить изменения.
     {%- endif -%}
   {% endset %}
   {% if variant|default('legacy') == 'app' %}

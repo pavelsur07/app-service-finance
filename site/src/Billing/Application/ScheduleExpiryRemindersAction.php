@@ -16,10 +16,10 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * Ставит в очередь напоминания об окончании оплаты на сегодня (по Москве).
  *
  * Оплаченный период — за PAID_DAYS дней до «оплачено по», пробный — за TRIAL_DAYS (реже:
- * адрес нового кабинета не подтверждён). Каждое напоминание сначала застолбляется строкой
- * `billing_expiry_reminders` (unique), письмо ставится только для новой строки: повтор прогона
- * второго письма не даёт. Сбой постановки после записи теряет одно письмо — для напоминания
- * это лучше дубля; такой сбой — ERROR в журнале.
+ * адрес нового кабинета не подтверждён). Уже отправленные (строка `billing_expiry_reminders`)
+ * пропускаются; «не больше одного письма» держит handler, застолбляя строку перед SMTP, —
+ * поэтому повтор прогона или двойная постановка дубля не дают, а сбой постановки ничего
+ * не застолбляет и лечится повторным запуском. Сбой постановки — ERROR в журнале.
  */
 final readonly class ScheduleExpiryRemindersAction
 {
@@ -60,7 +60,7 @@ final readonly class ScheduleExpiryRemindersAction
 
             $companyId = $subscription->getCompanyId();
             try {
-                if (!$this->reminders->claim($companyId, $paidUntil, $daysBefore, $now)) {
+                if ($this->reminders->isSent($companyId, $paidUntil, $daysBefore)) {
                     ++$result['skipped'];
                     continue;
                 }

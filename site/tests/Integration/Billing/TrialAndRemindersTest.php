@@ -110,11 +110,18 @@ final class TrialAndRemindersTest extends IntegrationTestCase
             self::assertArrayNotHasKey($companyId, $sent);
         }
 
-        // Повтор прогона в тот же день: строки уже застолблены, писем нет.
+        // Постановка ничего не застолбляет: повтор до отправки ставит снова (дубль отсеет handler).
+        self::assertSame(0, $this->reminders()->countByCompanyId($paid7));
         $transport->reset();
-        self::assertSame(['due' => 3, 'queued' => 0, 'skipped' => 3, 'failed' => 0], $this->schedule()());
-        self::assertSame([], $this->sentReminders($transport));
-        self::assertSame(1, $this->reminders()->countByCompanyId($paid7));
+        self::assertSame(3, $this->schedule()()['queued']);
+
+        // Отправленные (отметка handler'а) повторный прогон пропускает.
+        $now = new \DateTimeImmutable(self::NOW);
+        $this->reminders()->claim($paid0, new \DateTimeImmutable('2027-03-10'), 0, $now);
+        $this->reminders()->claim($paid7, new \DateTimeImmutable('2027-03-17'), 7, $now);
+        $transport->reset();
+        self::assertSame(['due' => 3, 'queued' => 1, 'skipped' => 2, 'failed' => 0], $this->schedule()());
+        self::assertSame([$trial3 => [3, true]], $this->sentReminders($transport));
     }
 
     public function testHandlerSendsToOwnerAndSkipsRenewedSubscription(): void
@@ -137,9 +144,57 @@ final class TrialAndRemindersTest extends IntegrationTestCase
         self::assertStringContainsString('заканчивается 17.03.2027, осталось дней: 8', $html);
         self::assertStringContainsString('«Тариф и оплата»', $twig->render((string) $email->textTemplate, $email->vars));
 
+        // Повторная доставка того же сообщения (воркер упал до ACK) — второго письма нет.
+        $handler(new SendBillingExpiryReminderMessage($companyId, '2027-03-17', 7, false));
+        self::assertCount(1, $sent);
+        self::assertSame(1, $this->reminders()->countByCompanyId($companyId));
+
         // Продлили — «оплачено по» другое: письмо по старой дате не уходит.
         $handler(new SendBillingExpiryReminderMessage($companyId, '2027-03-10', 0, false));
         self::assertCount(1, $sent);
+    }
+
+    public function testFailedSendReleasesMarkSoRetrySends(): void
+    {
+        $companyId = $this->companyWith(fn (string $id) => $this->paid($id, '2027-02-11', '2027-03-17'));
+        $sent = new \ArrayObject();
+
+        try {
+            ($this->handler($sent, fail: true))(new SendBillingExpiryReminderMessage($companyId, '2027-03-17', 7, false));
+            self::fail('сбой SMTP должен пробрасываться для retry');
+        } catch (\RuntimeException $e) {
+            self::assertSame('smtp down', $e->getMessage());
+        }
+        self::assertSame(0, $this->reminders()->countByCompanyId($companyId));
+
+        ($this->handler($sent))(new SendBillingExpiryReminderMessage($companyId, '2027-03-17', 7, false));
+        self::assertCount(1, $sent);
+    }
+
+    public function testTrialIsOnePerOwnerAndSkippedWhenTariffUnavailable(): void
+    {
+        $owner = UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail(Uuid::uuid7()->toString().'@example.test')->build();
+        $first = CompanyBuilder::aCompany()->withId(Uuid::uuid7()->toString())->withOwner($owner)->build();
+        $second = CompanyBuilder::aCompany()->withId(Uuid::uuid7()->toString())->withOwner($owner)->build();
+        $this->em->persist($owner);
+        $this->em->persist($first);
+        $this->em->persist($second);
+        $this->em->persist(CompanySubscriptionBuilder::aSubscription()->withId(Uuid::uuid7()->toString())->forCompany((string) $first->getId())->onTariff($this->tariff(TariffCode::FRIEND))->perpetualFrom('2026-11-01')->build());
+        $this->em->flush();
+        $startTrial = self::getContainer()->get(StartTrialAction::class);
+
+        self::assertSame(0, $startTrial((string) $second->getId(), dryRun: true));
+        self::assertSame(0, $startTrial((string) $second->getId()));
+        $this->em->flush();
+        self::assertSame(0, $this->subscriptionCount((string) $second->getId()), 'у владельца уже есть кабинет с тарифом');
+
+        // Тариф пробного периода отключён — компания создаётся, но без пробного.
+        $lonely = $this->company();
+        $this->connection->executeStatement("UPDATE billing_tariffs SET is_active = false WHERE code = 'base'");
+        $this->em->clear();
+        self::assertSame(0, $startTrial($lonely));
+        $this->em->flush();
+        self::assertSame(0, $this->subscriptionCount($lonely));
     }
 
     private function schedule(): ScheduleExpiryRemindersAction
@@ -156,11 +211,11 @@ final class TrialAndRemindersTest extends IntegrationTestCase
     /**
      * @param \ArrayObject<int, EmailMessage> $sent
      */
-    private function handler(\ArrayObject $sent): SendBillingExpiryReminderHandler
+    private function handler(\ArrayObject $sent, bool $fail = false): SendBillingExpiryReminderHandler
     {
-        $sender = new class($sent) implements NotificationSenderInterface {
+        $sender = new class($sent, $fail) implements NotificationSenderInterface {
             /** @param \ArrayObject<int, EmailMessage> $sent */
-            public function __construct(private readonly \ArrayObject $sent)
+            public function __construct(private readonly \ArrayObject $sent, private readonly bool $fail)
             {
             }
 
@@ -172,6 +227,9 @@ final class TrialAndRemindersTest extends IntegrationTestCase
             public function send(object $message, NotificationContext $ctx): bool
             {
                 \assert($message instanceof EmailMessage);
+                if ($this->fail) {
+                    throw new \RuntimeException('smtp down');
+                }
                 $this->sent[] = $message;
 
                 return true;
@@ -180,9 +238,11 @@ final class TrialAndRemindersTest extends IntegrationTestCase
 
         return new SendBillingExpiryReminderHandler(
             self::getContainer()->get(CompanySubscriptionRepository::class),
+            $this->reminders(),
             self::getContainer()->get(CompanyFacade::class),
             new NotificationRouter([$sender]),
             new NullLogger(),
+            new MockClock(new \DateTimeImmutable(self::NOW, new \DateTimeZone('Europe/Moscow'))),
         );
     }
 

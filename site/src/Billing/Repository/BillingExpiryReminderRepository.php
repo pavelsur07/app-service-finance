@@ -20,9 +20,9 @@ final class BillingExpiryReminderRepository extends ServiceEntityRepository
     }
 
     /**
-     * Застолбить напоминание: true — строки не было и она записана (письмо надо отправить),
-     * false — уже отправляли. Один атомарный INSERT … ON CONFLICT DO NOTHING (autocommit,
-     * если вызывающий не держит транзакцию) — повтор прогона второго письма не даёт.
+     * Застолбить отправку письма: true — строки не было и она записана (письмо надо отправить),
+     * false — уже отправлено или отправляется. Один атомарный INSERT … ON CONFLICT DO NOTHING
+     * (autocommit) — повторная доставка сообщения и повтор прогона второго письма не дают.
      */
     public function claim(string $companyId, \DateTimeImmutable $paidUntil, int $daysBefore, \DateTimeImmutable $now): bool
     {
@@ -40,6 +40,25 @@ final class BillingExpiryReminderRepository extends ServiceEntityRepository
         );
 
         return 1 === $inserted;
+    }
+
+    /**
+     * Снять отметку, если письмо не ушло (сбой SMTP до приёма): повтор сообщения отправит его.
+     */
+    public function release(string $companyId, \DateTimeImmutable $paidUntil, int $daysBefore): void
+    {
+        $this->getEntityManager()->getConnection()->executeStatement(
+            'DELETE FROM billing_expiry_reminders WHERE company_id = :companyId AND paid_until = :paidUntil AND days_before = :daysBefore',
+            ['companyId' => $companyId, 'paidUntil' => $paidUntil->format('Y-m-d'), 'daysBefore' => $daysBefore],
+        );
+    }
+
+    public function isSent(string $companyId, \DateTimeImmutable $paidUntil, int $daysBefore): bool
+    {
+        return false !== $this->getEntityManager()->getConnection()->fetchOne(
+            'SELECT 1 FROM billing_expiry_reminders WHERE company_id = :companyId AND paid_until = :paidUntil AND days_before = :daysBefore',
+            ['companyId' => $companyId, 'paidUntil' => $paidUntil->format('Y-m-d'), 'daysBefore' => $daysBefore],
+        );
     }
 
     public function countByCompanyId(string $companyId): int

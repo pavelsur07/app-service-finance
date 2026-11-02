@@ -1219,6 +1219,10 @@ findCounterpartyByIdAndCompany(string $counterpartyId, string $companyId): ?Coun
 // @return list<array{id: string, name: string}>
 listAccessibleCompaniesForUser(string $userId): array
 
+// ID компаний, которыми пользователь владеет (без членства); не UUID → []. Billing: пробный период — один на владельца.
+// @return list<string>
+ownedCompanyIds(string $userId): array
+
 // Владелец компании либо активный CompanyMember — иначе доступа нет.
 userHasAccess(string $companyId, string $userId): bool
 
@@ -1807,9 +1811,12 @@ manage — только владелец. Новые права автомати
   `CompanyCreatedEvent` и `CompanyOnboardingBackfillEvent` (пункт
   `billing_trial`). Не точка входа: только `persist()` под той же
   advisory-блокировкой, коммитит транзакция создания компании или backfill;
-  подписка есть — ничего. Оплата во время пробного — любой платный тариф,
-  период от конца пробного (`renewalBase`), оплаченный отрезок начинается
-  после него.
+  подписка есть — ничего. Один на владельца: у владельца есть другой кабинет
+  с подпиской (`CompanyFacade::ownedCompanyIds`) — новый кабинет остаётся без
+  тарифа, его назначает админ. Тариф пробного отсутствует или отключён —
+  `error`, без пробного, создание компании не ломается. Оплата во время
+  пробного — любой платный тариф, период от конца пробного (`renewalBase`):
+  `paidFrom` до конца пробного лежит в будущем, тариф уже платный.
 - Статус — `SubscriptionAccessPolicy` (не хранится): `active` (оплачено или
   бессрочный) → `grace` (`GRACE_DAYS` = 5 после `paidUntil`) → `read_only`;
   `none` — подписки нет.
@@ -1827,15 +1834,18 @@ manage — только владелец. Новые права автомати
   участнику) — тариф и статус, цены публичных тарифов за 1/3/6/12 мес, «как
   оплатить» (`APP_MAIL_REPLY_TO`); история оплат — только владельцу.
   Баннер `billing/_partials/expiry_notice.html.twig` в обоих layout'ах через
-  Twig-функцию `billing_notice()` (`ExpiryNotice`): за 7 дней до конца
-  периода или пробного, в льготные дни и в «только чтение».
+  Twig-функцию `billing_notice()` (`ExpiryNotice`): за 7 дней до «оплачено
+  по» и в сам этот день (`daysLeft` ≤ 8), в льготные дни и в «только чтение»;
+  истёкший пробный — свои тексты.
 - Напоминания: `app:billing:expiry-reminders` (cron 10:00) →
   `ScheduleExpiryRemindersAction`: оплаченный период — за 7/3/1/0 дней,
-  пробный — за 3/0. Строка `billing_expiry_reminders` (unique `(company_id,
-  paid_until, days_before)`) пишется до постановки письма — повтор прогона
-  писем не дублирует, сбой постановки теряет одно письмо (ERROR).
-  `SendBillingExpiryReminderMessage` → `async_sync`; handler шлёт владельцу
-  кабинета и пропускает, если «оплачено по» изменилось. В письме нет названия
+  пробный — за 3/0; уже отправленные пропускает, сбой постановки — ERROR,
+  лечится повторным запуском. `SendBillingExpiryReminderMessage` →
+  `async_sync`; handler пропускает, если «оплачено по» изменилось, и перед
+  SMTP застолбляет строку `billing_expiry_reminders` (unique `(company_id,
+  paid_until, days_before)`): повторная доставка и двойная постановка второго
+  письма не дают; сбой SMTP снимает отметку и уходит в retry. Письмо —
+  владельцу кабинета. В письме нет названия
   компании и ссылок (адрес нового кабинета не подтверждён; у воркера нет
   базового URL).
 - Запись: `RegisterPaymentAction` — точка входа, коммитит сама одним
@@ -4470,7 +4480,7 @@ config/
 | `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (`AI_SERVICE_ENABLED`, адрес, токен) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
 | `app:cash:ai-categorize --all-enabled` | `25 * * * *` | Компании allowlist ai-service с операциями за 90 дней: автоприменение по флагу компании, затем постановка ИИ-подсказок статей ДДС; сбой компании — ERROR, остальные идут дальше |
 | `app:storage:healthcheck` | `*/5 * * * *` | Синтетическая проверка объектного хранилища (write→read→delete); сбой → `error` → GlitchTip |
-| `app:billing:expiry-reminders` | `0 10 * * *` | Напоминания владельцам об окончании оплаты (7/3/1/0 дней, пробный — 3/0) → `async_sync`; повтор в тот же день писем не дублирует (`billing_expiry_reminders`); сбой постановки — exit 1 + один `error` |
+| `app:billing:expiry-reminders` | `0 10 * * *` | Напоминания владельцам об окончании оплаты (7/3/1/0 дней, пробный — 3/0) → `async_sync`; отправленные пропускает, дубль отсекает handler (`billing_expiry_reminders`); сбой постановки — exit 1 + один `error`, повторный запуск безопасен |
 | `app:mailer:healthcheck` | `7 * * * *` | Проверка SMTP без отправки письма; сбой → `error` + exit 1 |
 | `app:directories:integrity-check` | `37 7 * * *` | Read-only гейт справочников: соседние статьи ОПиУ, ДДС и Баланса с одинаковым названием; exit 1 + один агрегированный `error`; деревья ОПиУ без кодов шаблона — справочный `info` |
 | `app:messenger:failed-queue-check` | `32 7 * * *` | Read-only гейт очереди `failed`: глубина и возраст; ERROR при возрасте ≥ 12 ч или глубине ≥ 10 |

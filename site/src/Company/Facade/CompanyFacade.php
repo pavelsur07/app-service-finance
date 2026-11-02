@@ -178,6 +178,20 @@ final class CompanyFacade
     }
 
     /**
+     * ID компаний, которыми пользователь владеет (без компаний, где он только участник).
+     *
+     * @return list<string>
+     */
+    public function ownedCompanyIds(string $userId): array
+    {
+        if (!Uuid::isValid($userId)) {
+            return [];
+        }
+
+        return array_values(array_map(static fn (Company $company): string => (string) $company->getId(), $this->repository->findByUserId($userId)));
+    }
+
+    /**
      * Владелец компании либо активный CompanyMember — единственные, у кого
      * есть доступ к данным компании.
      */

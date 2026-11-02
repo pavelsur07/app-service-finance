@@ -10,6 +10,7 @@ use App\Billing\Repository\TariffPriceRepository;
 use App\Billing\Repository\TariffRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Exception\OutOfRangeCurrentPageException;
 use Pagerfanta\Pagerfanta;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Clock\ClockInterface;
@@ -53,11 +54,15 @@ final class CompanyTariffController extends AbstractController
 
         $payments = null;
         if ($isOwner) {
-            $payments = Pagerfanta::createForCurrentPageWithMaxPerPage(
-                new QueryAdapter($this->payments->createByCompanyQueryBuilder($companyId)),
-                max(1, $request->query->getInt('page', 1)),
-                self::PAYMENTS_PER_PAGE,
-            );
+            try {
+                $payments = Pagerfanta::createForCurrentPageWithMaxPerPage(
+                    new QueryAdapter($this->payments->createByCompanyQueryBuilder($companyId)),
+                    max(1, $request->query->getInt('page', 1)),
+                    self::PAYMENTS_PER_PAGE,
+                );
+            } catch (OutOfRangeCurrentPageException $exception) {
+                throw $this->createNotFoundException('Страница истории оплат не найдена.', $exception);
+            }
         }
 
         $amounts = $this->prices->amountsByTariffCode();
