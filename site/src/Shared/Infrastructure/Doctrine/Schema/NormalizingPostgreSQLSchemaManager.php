@@ -41,19 +41,28 @@ final class NormalizingPostgreSQLSchemaManager extends PostgreSQLSchemaManager
         $completeType = array_change_key_case($tableColumn, \CASE_LOWER)['complete_type'] ?? null;
         $typeName = \is_string($completeType) ? (self::TYPE_BY_PRECISION[$completeType] ?? null) : null;
 
-        if (null !== $typeName) {
-            $column->setType(Type::getType($typeName));
-        }
-
         if (Type::getType($column->getTypeName()) instanceof JsonType && true === ($column->getPlatformOptions()['jsonb'] ?? false)) {
-            $column->setType(Type::getType(Types::JSONB));
-            $column->setPlatformOptions([]);
+            // edit() не переносит platform-опцию jsonb — тип её заменяет.
+            $typeName = Types::JSONB;
         }
 
-        if ('now()' === $column->getDefault()) {
-            $column->setDefault(new CurrentTimestamp());
+        $nowDefault = 'now()' === $column->getDefault();
+
+        if (null === $typeName && !$nowDefault) {
+            return $column;
         }
 
-        return $column;
+        // Column::set*() устарели в DBAL 4.5 (dbal#7381): колонку пересобираем через редактор.
+        $editor = $column->edit();
+
+        if (null !== $typeName) {
+            $editor->setTypeName($typeName);
+        }
+
+        if ($nowDefault) {
+            $editor->setDefaultValue(new CurrentTimestamp());
+        }
+
+        return $editor->create();
     }
 }
