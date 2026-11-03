@@ -13,6 +13,8 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: MarketplaceReturnRepository::class)]
 #[ORM\Table(name: 'marketplace_returns')]
+#[ORM\Index(columns: ['listing_id'], name: 'idx_marketplace_returns_listing')]
+#[ORM\Index(columns: ['document_id'], name: 'idx_return_document')]
 #[ORM\Index(columns: ['company_id', 'return_date'], name: 'idx_company_return_date')]
 #[ORM\Index(columns: ['sale_id'], name: 'idx_return_sale')]
 #[ORM\UniqueConstraint(

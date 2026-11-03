@@ -92,7 +92,7 @@ class FinancialTransaction implements TenantOwnedInterface
     /**
      * @var array<string, mixed>
      */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB)]
     private array $sourceData;
 
     #[ORM\Column(type: Types::GUID)]

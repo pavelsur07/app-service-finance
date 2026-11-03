@@ -53,7 +53,7 @@ class MoneyAccount
     private string $currentBalance = '0.00';
 
     // Коментарий: Неснижаемый остаток (ватерлиния) для конкретного счёта.
-    #[ORM\Column(type: 'decimal', precision: 14, scale: 2)]
+    #[ORM\Column(type: 'decimal', precision: 14, scale: 2, options: ['default' => '0.00'])]
     private string $minimumSafeBalance = '0.00';
 
     #[ORM\Column(type: 'integer')]

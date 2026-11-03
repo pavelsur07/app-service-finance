@@ -34,10 +34,10 @@ class MarketplaceJobLog
     #[ORM\Column(type: 'guid')]
     private string $companyId;
 
-    #[ORM\Column(type: 'string', enumType: JobType::class)]
+    #[ORM\Column(type: 'string', enumType: JobType::class, length: 50)]
     private JobType $jobType;
 
-    #[ORM\Column(type: 'string', enumType: JobStatus::class)]
+    #[ORM\Column(type: 'string', enumType: JobStatus::class, length: 20)]
     private JobStatus $status;
 
     #[ORM\Column(type: 'datetime_immutable')]

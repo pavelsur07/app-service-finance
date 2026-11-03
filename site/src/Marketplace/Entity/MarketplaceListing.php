@@ -23,7 +23,7 @@ use Webmozart\Assert\Assert;
 #[ORM\UniqueConstraint(
     name: 'uniq_marketplace_listing_company_variant',
     columns: ['company_id', 'marketplace', 'marketplace_variant_id'],
-    options: ['where' => 'marketplace_variant_id IS NOT NULL'],
+    options: ['where' => '(marketplace_variant_id IS NOT NULL)'],
 )]
 #[ORM\HasLifecycleCallbacks]
 class MarketplaceListing
@@ -52,7 +52,7 @@ class MarketplaceListing
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $supplierSku = null; // sa_name от WB (артикул производителя)
 
-    #[ORM\Column(length: 50, nullable: false)]
+    #[ORM\Column(length: 50, nullable: false, options: ['default' => 'UNKNOWN'])]
     private string $size = 'UNKNOWN'; // ts_name от WB (размер, 'UNKNOWN' если не указан)
 
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]

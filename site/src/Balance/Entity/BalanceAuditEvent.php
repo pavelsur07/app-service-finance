@@ -34,7 +34,7 @@ class BalanceAuditEvent
     private ?string $authorId;
 
     /** @var array<string, mixed> */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB)]
     private array $changes;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]

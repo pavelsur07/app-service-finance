@@ -298,7 +298,8 @@ INFO/DEBUG.
 `ControllerEntityArgumentRule`), `flush()` вне Action/Handler/Command
 (`FlushOutsideTransactionBoundaryRule`), `EntityType` с чужой сущностью
 (`ForeignEntityTypeRule`), `(float)` от сумм в Cash (`MoneyFloatCastRule`),
-routing каждого сообщения (`MessengerRoutingTest`), PHPStan level 8 с baseline.
+routing каждого сообщения (`MessengerRoutingTest`), синхронность маппинга со схемой
+после миграций (`SchemaInSyncWithMigrationsTest`), PHPStan level 8 с baseline.
 Остальное — ревью. Из «Транзакций» и «Идемпотентности» гейт видит только место
 `flush()`/`wrapInTransaction()` по имени класса; владение транзакцией
 вложенным Action, блокировка вне транзакции, порядок блокировок, `dispatch()`

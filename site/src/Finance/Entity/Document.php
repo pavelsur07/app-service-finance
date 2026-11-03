@@ -66,10 +66,10 @@ class Document
     #[ORM\OneToMany(mappedBy: 'document', targetEntity: DocumentOperation::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $operations;
 
-    #[ORM\Column(enumType: PLDocumentSource::class, nullable: true)]
+    #[ORM\Column(enumType: PLDocumentSource::class, nullable: true, length: 32)]
     private ?PLDocumentSource $source = null;
 
-    #[ORM\Column(enumType: PLDocumentStream::class, nullable: true)]
+    #[ORM\Column(enumType: PLDocumentStream::class, nullable: true, length: 32)]
     private ?PLDocumentStream $stream = null;
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]

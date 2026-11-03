@@ -59,7 +59,7 @@ class PLCategory
     #[ORM\Column(enumType: PLFlow::class, options: ['default' => 'NONE'])]
     private PLFlow $flow = PLFlow::NONE;
 
-    #[ORM\Column(enumType: PLExpenseType::class, options: ['default' => 'other'])]
+    #[ORM\Column(enumType: PLExpenseType::class, options: ['default' => 'other'], length: 20)]
     private PLExpenseType $expenseType = PLExpenseType::OTHER;
 
     #[ORM\Column(type: 'decimal', precision: 10, scale: 4, options: ['default' => '1.0000'])]

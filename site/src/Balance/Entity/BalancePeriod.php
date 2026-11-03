@@ -24,7 +24,7 @@ class BalancePeriod
     #[ORM\Column(type: Types::DATE_IMMUTABLE)]
     private \DateTimeImmutable $month;
 
-    #[ORM\Column(type: Types::BOOLEAN)]
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     private bool $isClosed = false;
 
     #[ORM\Column(type: Types::GUID)]

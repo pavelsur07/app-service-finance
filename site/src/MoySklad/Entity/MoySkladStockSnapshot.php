@@ -11,9 +11,9 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: MoySkladStockSnapshotRepository::class)]
 #[ORM\Table(name: 'moysklad_stock_snapshots')]
-#[ORM\Index(columns: ['company_id', 'connection_id', 'completed_at'], name: 'idx_moysklad_stock_snapshots_completed', options: ['where' => "status = 'completed'"])]
+#[ORM\Index(columns: ['company_id', 'connection_id', 'completed_at'], name: 'idx_moysklad_stock_snapshots_completed', options: ['where' => "((status)::text = 'completed'::text)"])]
 #[ORM\UniqueConstraint(name: 'uniq_moysklad_stock_snapshots_tenant_id', columns: ['company_id', 'connection_id', 'id'])]
-#[ORM\UniqueConstraint(name: 'uniq_moysklad_stock_snapshots_building', columns: ['connection_id'], options: ['where' => "status = 'building'"])]
+#[ORM\UniqueConstraint(name: 'uniq_moysklad_stock_snapshots_building', columns: ['connection_id'], options: ['where' => "((status)::text = 'building'::text)"])]
 class MoySkladStockSnapshot
 {
     #[ORM\Id]

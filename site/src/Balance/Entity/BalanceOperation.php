@@ -39,7 +39,7 @@ class BalanceOperation
     #[ORM\Column(type: Types::DATE_IMMUTABLE)]
     private \DateTimeImmutable $operationDate;
 
-    #[ORM\Column(length: 20, enumType: BalanceOperationStatus::class)]
+    #[ORM\Column(length: 20, enumType: BalanceOperationStatus::class, options: ['default' => 'draft'])]
     private BalanceOperationStatus $status = BalanceOperationStatus::DRAFT;
 
     #[ORM\Column(type: Types::TEXT)]
@@ -66,7 +66,7 @@ class BalanceOperation
     #[ORM\Column(length: 64)]
     private string $requestHash;
 
-    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 1])]
     private int $version = 1;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]

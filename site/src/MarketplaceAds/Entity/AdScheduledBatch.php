@@ -6,6 +6,7 @@ namespace App\MarketplaceAds\Entity;
 
 use App\MarketplaceAds\Enum\AdScheduledBatchState;
 use App\MarketplaceAds\Repository\AdScheduledBatchRepository;
+use Doctrine\DBAL\Schema\DefaultExpression\CurrentTimestamp;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -53,7 +54,7 @@ class AdScheduledBatch
     /**
      * @var list<string>
      */
-    #[ORM\Column(type: 'json')]
+    #[ORM\Column(type: 'jsonb')]
     private array $campaignIds;
 
     #[ORM\Column(type: 'date_immutable')]
@@ -68,7 +69,7 @@ class AdScheduledBatch
     #[ORM\Column(type: 'string', length: 32, enumType: AdScheduledBatchState::class, options: ['default' => 'PLANNED'])]
     private AdScheduledBatchState $state;
 
-    #[ORM\Column(type: 'datetime_immutable', options: ['default' => 'CURRENT_TIMESTAMP'])]
+    #[ORM\Column(type: 'datetime_immutable', options: ['default' => new CurrentTimestamp()])]
     private \DateTimeImmutable $scheduledAt;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
@@ -95,10 +96,10 @@ class AdScheduledBatch
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $lastError = null;
 
-    #[ORM\Column(type: 'datetime_immutable', options: ['default' => 'CURRENT_TIMESTAMP'])]
+    #[ORM\Column(type: 'datetime_immutable', options: ['default' => new CurrentTimestamp()])]
     private \DateTimeImmutable $createdAt;
 
-    #[ORM\Column(type: 'datetime_immutable', options: ['default' => 'CURRENT_TIMESTAMP'])]
+    #[ORM\Column(type: 'datetime_immutable', options: ['default' => new CurrentTimestamp()])]
     private \DateTimeImmutable $updatedAt;
 
     /**

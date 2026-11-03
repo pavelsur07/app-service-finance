@@ -25,6 +25,7 @@ use Webmozart\Assert\Assert;
  */
 #[ORM\Entity(repositoryClass: MarketplaceSaleMappingRepository::class)]
 #[ORM\Table(name: 'marketplace_sale_mappings')]
+#[ORM\Index(columns: ['project_direction_id'], name: 'idx_mapping_project_direction')]
 #[ORM\UniqueConstraint(
     name: 'uniq_sale_mapping',
     columns: ['company_id', 'marketplace', 'operation_type', 'amount_source', 'pl_category_id']

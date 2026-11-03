@@ -38,7 +38,7 @@ class MarketplaceMonthClose
     #[ORM\Column(type: 'guid')]
     private string $companyId;
 
-    #[ORM\Column(type: 'string', enumType: MarketplaceType::class)]
+    #[ORM\Column(type: 'string', enumType: MarketplaceType::class, length: 50)]
     private MarketplaceType $marketplace;
 
     #[ORM\Column(type: 'smallint')]
@@ -49,7 +49,7 @@ class MarketplaceMonthClose
 
     // --- Этап 1: Продажи и возвраты ---
 
-    #[ORM\Column(type: 'string', enumType: MonthCloseStageStatus::class)]
+    #[ORM\Column(type: 'string', enumType: MonthCloseStageStatus::class, length: 20, options: ['default' => 'pending'])]
     private MonthCloseStageStatus $stageSalesReturnsStatus = MonthCloseStageStatus::PENDING;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
@@ -68,7 +68,7 @@ class MarketplaceMonthClose
 
     // --- Этап 2: Затраты ---
 
-    #[ORM\Column(type: 'string', enumType: MonthCloseStageStatus::class)]
+    #[ORM\Column(type: 'string', enumType: MonthCloseStageStatus::class, length: 20, options: ['default' => 'pending'])]
     private MonthCloseStageStatus $stageCostsStatus = MonthCloseStageStatus::PENDING;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]

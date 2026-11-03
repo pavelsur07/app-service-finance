@@ -14,7 +14,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: LocationRepository::class)]
 #[ORM\Table(name: 'inventory_locations')]
-#[ORM\UniqueConstraint(name: 'uniq_inventory_location_company_external', columns: ['company_id', 'external_system', 'external_id'], options: ['where' => 'external_id IS NOT NULL'])]
+#[ORM\UniqueConstraint(name: 'uniq_inventory_location_company_external', columns: ['company_id', 'external_system', 'external_id'], options: ['where' => '(external_id IS NOT NULL)'])]
 #[ORM\Index(columns: ['company_id', 'type', 'is_active'], name: 'idx_inventory_locations_company_type_active')]
 #[ORM\Index(columns: ['company_id', 'external_system'], name: 'idx_inventory_locations_company_external_system')]
 class Location
@@ -44,7 +44,7 @@ class Location
     #[ORM\Column(type: Types::BOOLEAN, options: ['default' => true])]
     private bool $isActive = true;
 
-    #[ORM\Column(type: Types::JSON, nullable: true, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB, nullable: true)]
     private ?array $metadata = null;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]

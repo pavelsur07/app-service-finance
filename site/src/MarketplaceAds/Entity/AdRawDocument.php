@@ -61,7 +61,7 @@ class AdRawDocument
     #[ORM\Column(type: 'string', length: 512, nullable: true)]
     private ?string $storagePath = null;
 
-    #[ORM\Column(type: 'string', length: 64, nullable: true)]
+    #[ORM\Column(type: 'string', length: 64, nullable: true, options: ['fixed' => true])]
     private ?string $fileHash = null;
 
     // bigint_string гидрирует BIGINT строкой на любой версии DBAL (StringBigIntType) —

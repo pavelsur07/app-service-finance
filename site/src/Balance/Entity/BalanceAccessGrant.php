@@ -24,16 +24,16 @@ class BalanceAccessGrant
     #[ORM\Column(type: Types::GUID)]
     private string $userId;
 
-    #[ORM\Column(type: Types::BOOLEAN)]
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     private bool $canPrepare = false;
 
-    #[ORM\Column(type: Types::BOOLEAN)]
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     private bool $canPost = false;
 
-    #[ORM\Column(type: Types::BOOLEAN)]
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     private bool $canManagePeriods = false;
 
-    #[ORM\Column(type: Types::BOOLEAN)]
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     private bool $canReopenPeriods = false;
 
     public function __construct(string $companyId, string $userId, bool $canPrepare = false, bool $canPost = false, bool $canManagePeriods = false, bool $canReopenPeriods = false)

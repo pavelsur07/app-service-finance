@@ -13,7 +13,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'moysklad_sync_runs')]
 #[ORM\Index(columns: ['company_id', 'connection_id', 'entity_type', 'started_at'], name: 'idx_moysklad_sync_runs_company_history')]
 #[ORM\Index(columns: ['connection_id'], name: 'idx_moysklad_sync_runs_connection')]
-#[ORM\UniqueConstraint(name: 'uniq_moysklad_sync_runs_running', columns: ['connection_id', 'entity_type'], options: ['where' => "status = 'running'"])]
+#[ORM\UniqueConstraint(name: 'uniq_moysklad_sync_runs_running', columns: ['connection_id', 'entity_type'], options: ['where' => "((status)::text = 'running'::text)"])]
 class MoySkladSyncRun
 {
     public const ERROR_CATEGORIES = ['auth', 'forbidden', 'rate_limited', 'temporary', 'invalid_request', 'invalid_response', 'internal'];

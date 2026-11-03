@@ -14,7 +14,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity(repositoryClass: MarketplaceAdvertisingCostRepository::class)]
 #[ORM\Table(name: 'marketplace_advertising_costs')]
 #[ORM\UniqueConstraint(
-    name: 'uniq_mp_adv_cost',
+    name: 'uq_mp_adv_cost_company_listing_date_type_campaign',
     columns: ['company_id', 'listing_id', 'date', 'advertising_type', 'external_campaign_id'],
 )]
 #[ORM\Index(columns: ['company_id'], name: 'idx_mp_adv_cost_company')]
@@ -32,25 +32,25 @@ class MarketplaceAdvertisingCost
     #[ORM\Column(type: 'guid')]
     private string $listingId;
 
-    #[ORM\Column(type: 'string', enumType: MarketplaceType::class)]
+    #[ORM\Column(type: 'string', enumType: MarketplaceType::class, length: 50)]
     private MarketplaceType $marketplace;
 
     #[ORM\Column(type: 'date_immutable')]
     private \DateTimeImmutable $date;
 
-    #[ORM\Column(type: 'string', enumType: AdvertisingType::class)]
+    #[ORM\Column(type: 'string', enumType: AdvertisingType::class, length: 50)]
     private AdvertisingType $advertisingType;
 
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2, options: ['default' => '0.00'])]
     private string $amount;
 
-    #[ORM\Column(type: 'json', options: ['default' => '{}'])]
+    #[ORM\Column(type: 'jsonb', options: ['default' => '{}'])]
     private array $analyticsData;
 
     #[ORM\Column(type: 'string', length: 255, options: ['default' => ''])]
     private string $externalCampaignId;
 
-    #[ORM\Column(type: 'json', nullable: true)]
+    #[ORM\Column(type: 'jsonb', nullable: true)]
     private ?array $rawData;
 
     #[ORM\Column(type: 'datetime_immutable')]

@@ -22,7 +22,7 @@ class MarketplaceBarcodeCatalog
     #[ORM\Column(type: 'guid')]
     private string $companyId;
 
-    #[ORM\Column(type: 'string', enumType: MarketplaceType::class)]
+    #[ORM\Column(type: 'string', enumType: MarketplaceType::class, length: 50)]
     private MarketplaceType $marketplace;
 
     /** nm_id для WB, product_id для Ozon и т.д. */

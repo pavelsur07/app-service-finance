@@ -4020,6 +4020,27 @@ $money->amountMinor(): int;  $money->currency(): string
 строку на любой версии DBAL. Штатный `Types::BIGINT` для `string`-свойства не использовать:
 в DBAL 4 он отдаёт `int`, и UnitOfWork видит изменение у каждой загруженной сущности.
 
+**Схема БД: миграции — источник истины.** Прод, CI и тесты создают схему только миграциями.
+Маппинг сущностей обязан совпадать с БД после миграций; сверку держит гейт
+`tests/Integration/Shared/Doctrine/SchemaInSyncWithMigrationsTest` (CI, integration).
+
+- Объекты, которых нет в атрибутах, модуль описывает в
+  `src/{Module}/Infrastructure/Doctrine/{Module}SchemaExtension` (`SchemaExtension`, тег
+  `app.doctrine_schema_extension`, применяет `SchemaExtensionListener` на `postGenerateSchema`):
+  DBAL-таблицы (`deals_deal_sequence`, `product_import_sequences`,
+  `marketplace_listing_tag_assignments`), последовательность `companies_public_id_seq`, внешние
+  ключи на строковые ссылки (`string $companyId`), составные ключи `(company_id, …)` Баланса и
+  МойСклад, частичные индексы и индексы по выражению, хранение `timestamp(6)` у колонок Ingestion и
+  Inventory, объявленных `datetime_immutable`.
+- Индекс по выражению описывается так, как его видит интроспекция DBAL: обычные колонки и `WHERE`
+  без выражения; `WHERE` — в нормализованном виде `pg_get_expr()` (`((status)::text = 'x'::text)`).
+  Так же — в атрибутах сущностей.
+- Атрибут повторяет миграцию: `default`, длина, `Types::JSONB` для `jsonb`, имя индекса.
+- `doctrine.dbal.schema_manager_factory` → `NormalizingSchemaManagerFactory`: интроспекция
+  возвращает `timestamp(3)/(6)` их типы (`datetime_immutable_utc_ms` / `_us`), `now()` — как
+  `CurrentTimestamp`, `jsonb` — как тип `jsonb`. Только сравнение схемы; runtime-запросы не затронуты.
+- Известные расхождения, которые закрывает миграция, — `KNOWN_DRIFT` гейта; список только сокращается.
+
 ---
 
 ## Tagged Services — текущие группы
@@ -4747,6 +4768,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.125 | 2026-11-03 | Shared: синхронность схемы с миграциями — `SchemaExtension` модулей, `NormalizingSchemaManagerFactory`, гейт `SchemaInSyncWithMigrationsTest` (задача `doctrine-schema-sync`, этапы 1–2) |
 | 2.124 | 2026-11-03 | Marketplace: предпросмотр ОПиУ — переключатель колонок «Теги / Проекты» (`PlPreviewColumnMode`, `PlPreviewColumnKind::PROJECT/NO_PROJECT`), проект факта — правило, иначе подключение; выгрузка строками v1.1; `CompanyFacade::listProjectDirections()` (задача `marketplace-pl-preview-by-projects`) |
 | 2.123 | 2026-11-03 | MarketplaceAnalytics: ABC-анализ в расширенной юнит-экономике — `AbcClass`, `AbcClassificationPolicy`, поля `abcRevenue`/`abcProfit` (80/15/5, D — убыток) |
 | 2.122 | 2026-11-03 | Marketplace, Ingestion: отчёт WB о реализации читается до 204 / `[]`, неполная страница больше не конец дня (задача `wb-finance-symfony-pagination`) |

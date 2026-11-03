@@ -32,10 +32,10 @@ class BalanceAccount
     #[ORM\Column(length: 255)]
     private string $name;
 
-    #[ORM\Column(type: Types::BOOLEAN)]
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     private bool $allowNegative = false;
 
-    #[ORM\Column(type: Types::BOOLEAN)]
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     private bool $isArchived = false;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
