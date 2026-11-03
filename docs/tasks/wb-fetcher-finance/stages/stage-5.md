@@ -1,4 +1,4 @@
-### Stage 5: прод — эталонный кабинет «Вумджой», затем все — IN PROGRESS
+### Stage 5: прод — эталонный кабинет «Вумджой», затем все — DONE (замер первой ночи — 04.11)
 
 **Risk:** HIGH-EXTERNAL (прод-compose, деплой, секреты) · **Ветка:** `feat/wb-fetcher-finance` (одна на задачу, PR на handoff)
 **Внешнее ревью:** Codex на handoff (вся ветка)
@@ -55,12 +55,12 @@
 - [x] functional Symfony: снимок `provider=wildberries` отдаёт оба ресурса (`MarketplaceConnectionsControllerTest` 7/7)
 
 После деплоя (Владелец ставит переменные; проверка — агент):
-- [ ] деплой дошёл до «Деплой завершён»; `wb-fetcher` `healthy` (`codex-docker-ps`)
-- [ ] через ≤ 10 минут витрина `wb-fetcher` заполнена: `cabinets_total = 1`, дни и недели Вумджой
-- [ ] после ночи: `perf-report` — retried/failed `SyncWbFinancialReportDayMessage` не выше «до» (0)
-- [ ] 3 ночи без ERROR, прошлая неделя `done` в понедельник/вторник
-- [ ] сверка эталона за 14 дней (число дней `done` сервиса против `sales_report success` Symfony)
-- [ ] все кабинеты: Владелец очищает `WB_FETCHER_CONNECTION_ALLOWLIST` и деплоит; первая ночь чистая
+- [x] деплой дошёл до «Деплой завершён»; `wb-fetcher` `healthy` (`codex-docker-ps`) — 03.11, merge d7c624ee5, run 41571063443; failed-очередь 0
+- [ ] витрина `wb-fetcher` заполнена — смотрит Владелец (вкладка Wildberries): `codex-console` не пускает `dbal:run-sql`, чтение БД прода агенту закрыто
+- [ ] после ночи 03→04.11: `perf-report` — retried/failed `SyncWbFinancialReportDayMessage` не выше «до» (0), `api_fetch` errors 0 (429 считаются там); с #2862 сообщений ≈ 2 × `ProcessDayReportMessage`
+- [ ] ~~3 ночи без ERROR на эталоне~~ — заменено решением Владельца 03.11 (сразу все кабинеты); ERROR сервиса — GlitchTip `wb-fetcher` (`WB_FETCHER_SENTRY_DSN` с 03.11)
+- [ ] сверка Вумджой за 14 дней (дни `done` сервиса против `sales_report success` Symfony) — после первой ночи, не блокирует закрытие
+- [x] все кабинеты: 03.11 по решению Владельца («включай всех, компаний немного») allowlist удалён, redeploy run 41577483447, `wb-fetcher` healthy; первая ночь — замер 04.11
 
 ## 4a. Внешнее ревью на handoff (02.11.2026)
 
@@ -81,7 +81,14 @@ site/ (`external-review.sh`, вся ветка) — REVIEW_GREEN. services/compo
 
 ## 5. Чек-лист приёмки
 
-- [ ] секреты `WB_FETCHER_API_TOKEN`, `WB_FETCHER_DB_PASSWORD` — **Владелец**: `gh secret set` агенту запрещён классификатором auto mode (Secret-Store Writes, 02.11)
+- [x] секреты `WB_FETCHER_API_TOKEN`, `WB_FETCHER_DB_PASSWORD`, `WB_FETCHER_SENTRY_DSN` (03.11) — **Владелец**: `gh secret set` агенту запрещён классификатором auto mode (Secret-Store Writes, 02.11)
 - [x] compose, deploy.yml, bootstrap БД; выключенный сервис не стартует и не трогает БД (ветка `else` — `stop`)
 - [x] `docs/maintenance/wb-fetcher-prod.md`; `ARCHITECTURE.md` (параметр и Changelog 2.120)
-- [ ] откат: `WB_FETCHER_ENABLED` ≠ `true` → деплой останавливает контейнер; Symfony-путь не затронут
+- [x] откат: `WB_FETCHER_ENABLED` ≠ `true` → деплой останавливает контейнер (ветка `else` проверена до включения); Symfony-путь не затронут
+
+## 6. Итог (03.11.2026)
+
+- Прод: PR #2861 (merge d7c624ee5) — сервис на эталоне; в тот же день — все кабинеты WB (allowlist снят, run 41577483447).
+- Открытый вопрос handoff (Symfony останавливала пагинацию на странице `< limit`) закрыт PR #2862 —
+  задача `docs/tasks/wb-finance-symfony-pagination`.
+- Осталось: замер первой ночи 04.11 (`perf-report`), витрина — Владелец, сверка Вумджой за 14 дней.

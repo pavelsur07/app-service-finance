@@ -1,6 +1,6 @@
 # wb-fetcher-finance: загрузка финансовых отчётов WB в Go-сервисе
 
-Статус: **план на согласование**, 02.11.2026.
+Статус: **закрыта** 03.11.2026 — на проде PR #2861 (сервис) и #2862 (пагинация Symfony до `[]`), все кабинеты WB с 03.11; замер первой ночи — 04.11 (`handoff.md`). План согласован 02.11.2026.
 Основание: `docs/tasks/marketplace-data-ingestion/spec-wb.md` (§2 группа 3, §4, §5),
 образец — `services/ozon-fetcher` и задача `docs/tasks/ozon-fetcher-coverage-admin`.
 

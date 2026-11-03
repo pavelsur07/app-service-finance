@@ -23,7 +23,7 @@
 
    | Имя | Значение |
    |---|---|
-   | `WB_FETCHER_CONNECTION_ALLOWLIST` | `19621cff-b028-45d9-9193-11f47ad9a8b2` (компания «Вумджой ООО» — эталон); принимает `company_id` или id подключения через запятую; пусто — все кабинеты WB |
+   | `WB_FETCHER_CONNECTION_ALLOWLIST` | не задана с 03.11.2026 — все кабинеты WB; принимает `company_id` или id подключения через запятую (эталон при включении — «Вумджой ООО», `19621cff-b028-45d9-9193-11f47ad9a8b2`) |
    | `WB_FETCHER_ENABLED` | `true` |
 
 3. **Деплой** (merge в master или `production_action=deploy`). Шаг `[4b2/5]` создаёт
@@ -57,8 +57,9 @@
 
 ## Все кабинеты
 
-После 3 ночей на эталоне без ERROR и со сверкой — очистить `WB_FETCHER_CONNECTION_ALLOWLIST`
-(оставить `WB_FETCHER_ENABLED=true`) и задеплоить.
+С 03.11.2026 сервис на всех кабинетах: `WB_FETCHER_CONNECTION_ALLOWLIST` удалена (решение Владельца,
+без трёх ночей на эталоне), `WB_FETCHER_ENABLED=true`. Сузить обратно — задать allowlist и задеплоить
+(`production_action=deploy`).
 
 ## Откат
 
