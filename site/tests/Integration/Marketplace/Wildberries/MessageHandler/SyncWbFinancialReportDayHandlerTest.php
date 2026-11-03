@@ -61,10 +61,12 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         $bus = $this->swapBusSpy();
         $company = $this->createCompany(9202);
         $connection = $this->createWbSellerConnection($company, 9202);
-        $this->swapWbClient([new MockResponse('[{"rrdId":11},{"rrdId":12}]', ['http_code' => 200])]);
+        $this->swapWbClient([
+            new MockResponse('[{"rrdId":11},{"rrdId":12}]', ['http_code' => 200]),
+            new MockResponse('[]', ['http_code' => 200]),
+        ]);
 
-        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
-        $handler($this->message($company->getId(), $connection->getId(), false));
+        $this->handleUntilReportEnd($bus, $this->message($company->getId(), $connection->getId(), false), $company->getId());
 
         $status = $this->findStatus($connection->getId(), $company->getId(), '2026-05-19');
         self::assertNotNull($status);
@@ -76,6 +78,39 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
 
         $messages = $this->filterProcessMessages($bus->messages);
         self::assertCount(1, $messages);
+        self::assertSame($raw->getId(), $messages[0]->rawDocumentId);
+    }
+
+    /**
+     * Регрессия: страница короче limit — не конец отчёта. Документация WB велит
+     * запрашивать дальше с rrdId последней строки до 204 или []; раньше handler
+     * завершал день на первой неполной странице и терял хвост.
+     */
+    public function testShortPageIsNotLastAndTailIsLoadedUntilEmptyPage(): void
+    {
+        $bus = $this->swapBusSpy();
+        $company = $this->createCompany(9220);
+        $companyId = (string) $company->getId();
+        $connection = $this->createWbSellerConnection($company, 9220);
+        $pages = ['[{"rrdId":11},{"rrdId":12}]', '[{"rrdId":13}]', '[]'];
+        $this->swapWbClient(static function () use (&$pages): MockResponse {
+            return new MockResponse((string) array_shift($pages), ['http_code' => 200]);
+        });
+
+        $sent = $this->handleUntilReportEnd($bus, $this->message($companyId, $connection->getId(), false), $companyId);
+
+        self::assertSame([], $pages, 'все три страницы запрошены, конец — пустой ответ');
+        $raw = $this->findRawDocument($companyId, '2026-05-19');
+        self::assertNotNull($raw);
+        self::assertSame([['rrdId' => 11], ['rrdId' => 12], ['rrdId' => 13]], $raw->getRawData());
+        self::assertSame(3, $raw->getRecordsCount());
+
+        $status = $this->findStatus($connection->getId(), $companyId, '2026-05-19');
+        self::assertNotNull($status);
+        self::assertSame(FinancialReportSyncStatus::PROCESSING, $status->getStatus());
+
+        $messages = $this->filterProcessMessages($sent);
+        self::assertCount(1, $messages, 'день уходит в обработку один раз — после пустой страницы');
         self::assertSame($raw->getId(), $messages[0]->rawDocumentId);
     }
 
@@ -229,10 +264,12 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         $bus = $this->swapBusSpy();
         $company = $this->createCompany(9205);
         $connection = $this->createWbSellerConnection($company, 9205);
-        $this->swapWbClient([new MockResponse('[{"rrdId":2}]', ['http_code' => 200])]);
+        $this->swapWbClient([
+            new MockResponse('[{"rrdId":2}]', ['http_code' => 200]),
+            new MockResponse('[]', ['http_code' => 200]),
+        ]);
 
-        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
-        $handler($this->message($company->getId(), $connection->getId(), true));
+        $this->handleUntilReportEnd($bus, $this->message($company->getId(), $connection->getId(), true), $company->getId());
 
         $messages = $this->filterProcessMessages($bus->messages);
         self::assertCount(1, $messages);
@@ -245,10 +282,12 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         $company = $this->createCompany(9206);
         $connection = $this->createWbSellerConnection($company, 9206);
         $existing = $this->createRaw($company, new \DateTimeImmutable('2026-05-19'), [['rrdId' => 100]], 1, PipelineStatus::COMPLETED);
-        $this->swapWbClient([new MockResponse('[{"rrdId":200}]', ['http_code' => 200])]);
+        $this->swapWbClient([
+            new MockResponse('[{"rrdId":200}]', ['http_code' => 200]),
+            new MockResponse('[]', ['http_code' => 200]),
+        ]);
 
-        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
-        $handler($this->message($company->getId(), $connection->getId(), false));
+        $this->handleUntilReportEnd($bus, $this->message($company->getId(), $connection->getId(), false), $company->getId());
 
         $raw = $this->findRawDocument($company->getId(), '2026-05-19');
         self::assertNotNull($raw);
@@ -607,6 +646,31 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
 
         self::assertSame(0, $requestCount);
         self::assertCount(1, $this->filterSyncMessages($bus->messages));
+    }
+
+    /**
+     * Прогоняет день как воркер: первый вызов и все continuation до пустой страницы.
+     * Continuation в проде приходят после задержки — next_retry_at сдвигается в прошлое.
+     */
+    /** @return list<object> все сообщения, отправленные за прогон */
+    private function handleUntilReportEnd(object $bus, SyncWbFinancialReportDayMessage $message, ?string $companyId): array
+    {
+        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        $handler($message);
+
+        for ($handled = 0; $handled < 10; ++$handled) {
+            /** @var list<object> $messages */
+            $messages = get_object_vars($bus)['messages'];
+            $continuations = $this->filterSyncMessages($messages);
+            if (\count($continuations) <= $handled) {
+                return $messages;
+            }
+
+            $this->makeStatusRetryDue((string) $companyId, $message->businessDate);
+            $handler($continuations[$handled]);
+        }
+
+        self::fail('Отчёт не дошёл до пустой страницы за 10 continuation.');
     }
 
     private function message(string $companyId, string $connectionId, bool $forceRefresh): SyncWbFinancialReportDayMessage

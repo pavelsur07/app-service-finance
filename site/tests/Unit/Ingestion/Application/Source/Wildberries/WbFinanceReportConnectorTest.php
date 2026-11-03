@@ -101,6 +101,26 @@ final class WbFinanceReportConnectorTest extends TestCase
         ], $client->calls);
     }
 
+    /**
+     * Конец отчёта дня — пустая страница после данных (документация WB: до 204 или []):
+     * курсор уходит на следующий день, страница фиксируется маркером пустоты.
+     */
+    public function testEmptyPageAfterDataEndsDayAndAdvancesIncrementalCursor(): void
+    {
+        $client = $this->client(new WbFinanceReportPage(rows: [], nextRrdId: null, hasMore: false, metadata: ['date' => '2026-06-20']));
+        $connector = $this->connector($client, now: '2026-06-22T00:00:00+00:00');
+
+        $result = $connector->pull($this->request(cursorValue: '{"date":"2026-06-20","rrdId":100}'));
+
+        self::assertSame('2026-06-21', $result->nextCursorValue);
+        self::assertTrue($result->hasMore, 'следующий день уже наступил — обход продолжается');
+        $rawBatch = $result->rawBatch;
+        self::assertNotNull($rawBatch);
+        self::assertSame('wb-sales-report-detailed:2026-06-20:rrd-100', $rawBatch->externalId);
+        $rows = [...$rawBatch->rows];
+        self::assertTrue($rows[0]['_ingestion_empty'] ?? false);
+    }
+
     public function testPullEmptyPageStoresEmptyMarker(): void
     {
         $connector = $this->connector($this->client(new WbFinanceReportPage(

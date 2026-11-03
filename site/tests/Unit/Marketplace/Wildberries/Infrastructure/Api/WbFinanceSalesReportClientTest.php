@@ -27,7 +27,7 @@ use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class WbFinanceSalesReportClientTest extends TestCase
 {
-    public function test200WithOneRowIsLastPageAndMakesSingleRequest(): void
+    public function testShortPageIsNotLastPageAndMakesSingleRequest(): void
     {
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
@@ -40,7 +40,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $page = $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 0);
 
         self::assertCount(1, $page->rows);
-        self::assertFalse($page->hasNextPage);
+        self::assertTrue($page->hasNextPage, 'неполная страница — не конец отчёта: конец только 204 или []');
         self::assertSame(10, $page->nextRrdId);
         self::assertCount(1, $captured);
         self::assertSame(0, $captured[0]['rrdId'] ?? null);
@@ -207,6 +207,19 @@ final class WbFinanceSalesReportClientTest extends TestCase
             self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:'.$connectionB));
             self::assertNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:global'));
         }
+    }
+
+    public function testEmptyListReturnsEmptyLastPage(): void
+    {
+        $client = new WbFinanceSalesReportClient(new MockHttpClient([
+            new MockResponse('[]', ['http_code' => 200]),
+        ]), $this->createRateLimiter());
+
+        $page = $client->fetchDetailedDayPage('connection-id', 'token', new \DateTimeImmutable('2026-01-01'), 10);
+
+        self::assertSame([], $page->rows);
+        self::assertNull($page->nextRrdId);
+        self::assertFalse($page->hasNextPage);
     }
 
     public function test204ReturnsEmptyLastPage(): void
