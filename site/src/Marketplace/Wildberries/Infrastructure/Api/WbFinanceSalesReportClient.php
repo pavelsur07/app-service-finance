@@ -194,7 +194,9 @@ final readonly class WbFinanceSalesReportClient
             throw new MarketplaceInvalidApiResponseException('WB API pagination rrdId must grow monotonically.', $statusCode, $excerpt, $dateFrom, $dateTo);
         }
 
-        return new WbFinanceSalesReportPage($decoded, $nextRrdId, $recordsReceived >= $limit);
+        // Конец отчёта — только 204 или `[]`: документация WB велит продолжать с rrdId
+        // последней строки после каждой непустой страницы, неполная страница концом не считается.
+        return new WbFinanceSalesReportPage($decoded, $nextRrdId, true);
     }
 
     public function probeAccess(string $apiKey, ?string $sellerBucketId = null): bool

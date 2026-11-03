@@ -4480,6 +4480,12 @@ Payload (только scalar):
 Message/worker:
 - Message: `App\Marketplace\Message\SyncWbFinancialReportDayMessage`;
 - Worker: `App\Marketplace\Wildberries\MessageHandler\SyncWbFinancialReportDayHandler`.
+- Пагинация `sales-reports/detailed` (и в `WbFinanceSalesReportClient`, и в Ingestion `WbFinanceReportClient`):
+  после **каждой** непустой страницы — следующая с `rrdId` последней строки, через
+  `wb_finance.rate_limit_interval_seconds`; конец отчёта дня — только 204 или `[]`, неполная страница
+  концом не считается (документация WB). День с данными — минимум два запроса; в обработку
+  (`ProcessDayReportMessage`) уходит один раз, после пустой страницы. В Ingestion пустая страница
+  конца дня — сырьё `wb-sales-report-detailed:<день>:rrd-<последний rrdId>` с маркером `_ingestion_empty`.
 
 ---
 
@@ -4709,6 +4715,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.122 | 2026-11-03 | Marketplace, Ingestion: отчёт WB о реализации читается до 204 / `[]`, неполная страница больше не конец дня (задача `wb-finance-symfony-pagination`) |
 | 2.121 | 2026-11-02 | Marketplace: `/internal/wb-finance/sales-reports/slot` и `…/rate-limited` — общая квота WB finance для wb-fetcher (контракт `wb-finance-quota` v1) вместо пропуска минут :10/:20; wb-fetcher читает отчёт до пустой страницы, страница 20 000 строк (задача wb-fetcher-finance, внешнее ревью этапа 5) |
 | 2.120 | 2026-11-02 | Прод: сервис `wb-fetcher` за `WB_FETCHER_ENABLED` (compose-профиль, БД `wb_fetcher`, S3 — ключи ozon-fetcher), scheduler — `WB_FETCHER_BASE_URL/_API_TOKEN`; `wb_fetcher.finance_companies: ['*']` (задача wb-fetcher-finance, этап 5) |
 | 2.119 | 2026-11-02 | ServiceGateway: покрытие нескольких сервисов — `ServiceCoverageHttpClient` на сервис (`WB_FETCHER_BASE_URL/_API_TOKEN`), команда обновления обходит все клиенты, страница `/admin/services/coverage` с вкладками Ozon \| Wildberries, недельные ячейки; прежний адрес — 301 (задача wb-fetcher-finance, этап 4) |

@@ -117,7 +117,8 @@ final readonly class WbFinanceReportClient implements WbFinanceReportClientInter
         return new WbFinanceReportPage(
             rows: $rows,
             nextRrdId: $nextRrdId,
-            hasMore: count($rows) >= $limit,
+            // Конец отчёта — только 204 или `[]` (документация WB): неполная страница концом не считается.
+            hasMore: true,
             metadata: $this->metadata($dateString, $rrdId, $limit, count($rows), $statusCode, $nextRrdId),
         );
     }

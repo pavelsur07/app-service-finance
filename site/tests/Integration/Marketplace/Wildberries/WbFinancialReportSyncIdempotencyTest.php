@@ -98,8 +98,10 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         [$company, $connection] = $this->createCompanyAndConnection(303);
         $this->swapWbClient([
             new MockResponse('[{"rrdId":1,"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-1","nm_id":"100","quantity":1,"retail_price_withdisc_rub":100,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]', ['http_code' => 200]),
+            new MockResponse('[]', ['http_code' => 200]),
             new MockResponse('[{"rrdId":1,"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-1","nm_id":"100","quantity":1,"retail_price_withdisc_rub":100,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]', ['http_code' => 200]),
-        ]);
+            new MockResponse('[]', ['http_code' => 200]),
+        ], rateLimit: 4);
 
         $bus = $this->swapBusSpy();
         $syncHandler = $this->syncHandler($bus);
@@ -107,10 +109,10 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         $stepHandler = self::getContainer()->get(ProcessRawDocumentStepMessageHandler::class);
         $msg = new SyncWbFinancialReportDayMessage($company->getId(), $connection->getId(), '2026-05-19', FinancialReportSyncMode::REFRESH_14D->value, true);
 
-        $syncHandler($msg);
+        $this->syncDay($syncHandler, $bus, $msg, $company->getId());
         $this->runDispatchedPipeline($bus, $processDayHandler, $stepHandler);
 
-        $syncHandler($msg);
+        $this->syncDay($syncHandler, $bus, $msg, $company->getId());
         $this->runDispatchedPipeline($bus, $processDayHandler, $stepHandler);
 
         self::assertSame(1, $this->countRawDocuments($company->getId(), '2026-05-19'));
@@ -127,8 +129,10 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         $payload = '[{"rrdId":1,"doc_type_name":"Возврат","supplier_oper_name":"Возврат покупателем","srid":"RET-1","nm_id":"200","quantity":1,"retail_price_withdisc_rub":123.45,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]';
         $this->swapWbClient([
             new MockResponse($payload, ['http_code' => 200]),
+            new MockResponse('[]', ['http_code' => 200]),
             new MockResponse($payload, ['http_code' => 200]),
-        ]);
+            new MockResponse('[]', ['http_code' => 200]),
+        ], rateLimit: 4);
 
         $this->runRefreshTwiceThroughFullFlow($company->getId(), $connection->getId(), '2026-05-19');
 
@@ -146,8 +150,10 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         $payload = '[{"rrdId":5001,"doc_type_name":"Услуги","supplier_oper_name":"Логистика","srid":"COST-1","sale_dt":"2026-05-19 12:00:00","delivery_amount":1,"return_amount":0,"delivery_rub":50}]';
         $this->swapWbClient([
             new MockResponse($payload, ['http_code' => 200]),
+            new MockResponse('[]', ['http_code' => 200]),
             new MockResponse($payload, ['http_code' => 200]),
-        ]);
+            new MockResponse('[]', ['http_code' => 200]),
+        ], rateLimit: 4);
 
         $this->runRefreshTwiceThroughFullFlow($company->getId(), $connection->getId(), '2026-05-19');
 
@@ -198,11 +204,15 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
     public function testRawProcessingCompletedMarksStatusSuccess(): void
     {
         [$company, $connection] = $this->createCompanyAndConnection(306);
-        $this->swapWbClient([new MockResponse('[{"rrdId":1,"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-2","nm_id":"101","quantity":1,"retail_price_withdisc_rub":200,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]', ['http_code' => 200])]);
+        $this->swapWbClient([
+            new MockResponse('[{"rrdId":1,"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-2","nm_id":"101","quantity":1,"retail_price_withdisc_rub":200,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]', ['http_code' => 200]),
+            new MockResponse('[]', ['http_code' => 200]),
+        ], rateLimit: 2);
 
-        $syncHandler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        $bus = $this->swapBusSpy();
+        $syncHandler = $this->syncHandler($bus);
         $stepHandler = self::getContainer()->get(ProcessRawDocumentStepMessageHandler::class);
-        $syncHandler(new SyncWbFinancialReportDayMessage($company->getId(), $connection->getId(), '2026-05-19', FinancialReportSyncMode::DAILY->value, false));
+        $this->syncDay($syncHandler, $bus, new SyncWbFinancialReportDayMessage($company->getId(), $connection->getId(), '2026-05-19', FinancialReportSyncMode::DAILY->value, false), $company->getId());
 
         $rawId = (string) $this->connection->fetchOne('SELECT id FROM marketplace_raw_documents WHERE company_id=:c AND period_from=:d', ['c' => $company->getId(), 'd' => '2026-05-19 00:00:00']);
         foreach (['sales', 'returns', 'costs'] as $step) {
@@ -229,10 +239,13 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         $secondPayload = '[{"rrdId":1,"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-LINKED","nm_id":"400","quantity":1,"retail_price_withdisc_rub":111,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"},'
             .'{"rrdId":2,"doc_type_name":"Продажа","supplier_oper_name":"Продажа","srid":"SR-OPEN","nm_id":"400","quantity":1,"retail_price_withdisc_rub":222,"sale_dt":"2026-05-19 12:00:00","rr_dt":"2026-05-19 12:00:00"}]';
 
-        // Лимитер по умолчанию отдаёт один токен: второму refresh нужен свой.
+        // Лимитер по умолчанию отдаёт один токен: каждому запросу (данные и пустая страница
+        // конца отчёта, по два на refresh) нужен свой.
         $this->swapWbClient([
             new MockResponse($firstPayload, ['http_code' => 200]),
+            new MockResponse('[]', ['http_code' => 200]),
             new MockResponse($secondPayload, ['http_code' => 200]),
+            new MockResponse('[]', ['http_code' => 200]),
         ], rateLimit: 4);
 
         $bus = $this->swapBusSpy();
@@ -241,7 +254,7 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         $stepHandler = self::getContainer()->get(ProcessRawDocumentStepMessageHandler::class);
         $message = new SyncWbFinancialReportDayMessage($company->getId(), $connection->getId(), '2026-05-19', FinancialReportSyncMode::REFRESH_14D->value, true);
 
-        $syncHandler($message);
+        $this->syncDay($syncHandler, $bus, $message, $company->getId());
         $this->runDispatchedPipeline($bus, $dayHandler, $stepHandler);
 
         // Закрываем период: одна строка попадает в финансовый документ и становится неизменяемой.
@@ -254,7 +267,7 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         );
         $this->em->clear();
 
-        $syncHandler($message);
+        $this->syncDay($syncHandler, $bus, $message, $company->getId());
         $this->runDispatchedPipeline($bus, $dayHandler, $stepHandler);
 
         self::assertSame('success', $this->statusValue($company->getId(), $connection->getId(), '2026-05-19'));
@@ -479,6 +492,32 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         }
     }
 
+    /**
+     * Загрузка дня как у воркера: первый вызов и continuation до пустой страницы WB.
+     * Continuation в проде приходит после задержки — next_retry_at сдвигается в прошлое.
+     */
+    private function syncDay(SyncWbFinancialReportDayHandler $syncHandler, SpyMessageBus $bus, SyncWbFinancialReportDayMessage $message, string $companyId): void
+    {
+        $syncHandler($message);
+
+        for ($i = 0; $i < 10; ++$i) {
+            $continuations = array_values(array_filter($bus->messages, static fn (object $m): bool => $m instanceof SyncWbFinancialReportDayMessage));
+            if ([] === $continuations) {
+                return;
+            }
+
+            $bus->messages = array_values(array_filter($bus->messages, static fn (object $m): bool => !$m instanceof SyncWbFinancialReportDayMessage));
+            $this->connection->executeStatement(
+                'UPDATE marketplace_financial_report_sync_statuses SET next_retry_at = :ts WHERE company_id = :c AND business_date = :d',
+                ['ts' => (new \DateTimeImmutable('-5 minutes'))->format('Y-m-d H:i:s'), 'c' => $companyId, 'd' => $message->businessDate],
+            );
+            $this->em->clear();
+            $syncHandler($continuations[array_key_last($continuations)]);
+        }
+
+        self::fail('Отчёт не дошёл до пустой страницы за 10 continuation.');
+    }
+
     private function runRefreshTwiceThroughFullFlow(string $companyId, string $connectionId, string $businessDate): void
     {
         $bus = $this->swapBusSpy();
@@ -487,10 +526,10 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         $stepHandler = self::getContainer()->get(ProcessRawDocumentStepMessageHandler::class);
         $msg = new SyncWbFinancialReportDayMessage($companyId, $connectionId, $businessDate, FinancialReportSyncMode::REFRESH_14D->value, true);
 
-        $syncHandler($msg);
+        $this->syncDay($syncHandler, $bus, $msg, $companyId);
         $this->runDispatchedPipeline($bus, $processDayHandler, $stepHandler);
 
-        $syncHandler($msg);
+        $this->syncDay($syncHandler, $bus, $msg, $companyId);
         $this->runDispatchedPipeline($bus, $processDayHandler, $stepHandler);
     }
 

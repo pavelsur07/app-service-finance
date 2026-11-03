@@ -51,7 +51,7 @@ final class WbFinanceReportClientTest extends TestCase
         self::assertSame(['Authorization: wb-token'], $capturedOptions['normalized_headers']['authorization'] ?? null);
         self::assertSame([['rrdId' => 10, 'docTypeName' => 'Продажа']], $page->rows);
         self::assertSame(10, $page->nextRrdId);
-        self::assertFalse($page->hasMore);
+        self::assertTrue($page->hasMore, 'неполная страница — не конец отчёта: конец только 204 или []');
     }
 
     public function testFullPageReturnsHasMore(): void
@@ -67,6 +67,21 @@ final class WbFinanceReportClientTest extends TestCase
 
         self::assertTrue($page->hasMore);
         self::assertSame(11, $page->nextRrdId);
+    }
+
+    public function testEmptyListAfterDataReturnsLastPage(): void
+    {
+        $http = new MockHttpClient(new MockResponse('[]', ['http_code' => 200]));
+        $page = $this->client($http)->fetchDetailedDayPage(
+            '0192f0c2-0000-7000-8000-000000000001',
+            'connection-1',
+            new \DateTimeImmutable('2026-06-20'),
+            10,
+        );
+
+        self::assertSame([], $page->rows);
+        self::assertNull($page->nextRrdId);
+        self::assertFalse($page->hasMore);
     }
 
     public function testNoContentReturnsEmptyPage(): void
