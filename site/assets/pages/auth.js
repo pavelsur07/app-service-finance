@@ -14,8 +14,10 @@ import '../styles/pages/auth.css';
 import './cookie_consent.js';
 
 const ERROR_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>';
-// Не строже серверного Assert::email (Unicode разрешён): только форма «что-то@что-то.зона».
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
+// Не строже серверного Assert::email (FILTER_VALIDATE_EMAIL + Unicode): локальная часть — что угодно
+// до последнего «@» (в кавычках допустим «@»), домен — с точкой или IP в скобках. Остальное ловит сервер.
+// Сверено с Assert::email на выборке: "a@b"@example.com, a@[127.0.0.1], иван@example.com, user+tag@sub.example.co.
+const EMAIL_RE = /^.+@(?:[^\s@]+\.[^\s@]+|\[[^\]\s]+\])$/su;
 const LABELS = ['', 'Слабый', 'Средний', 'Хороший', 'Надёжный'];
 
 function fieldError(input) {
