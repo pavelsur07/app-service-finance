@@ -7,8 +7,8 @@
 - [x] гейты Go: `fetchkit`, `ozon-fetcher`, `wb-fetcher` — `go vet`, `golangci-lint` 0, `go test -race` с PG15
 - [x] внешнее ревью (Codex): site — REVIEW_GREEN; services — раунд 1: 1 BLOCKER + 2 IMPORTANT исправлены (d84d68ffd), раунд 2 — REVIEW_GREEN
 - [x] `ARCHITECTURE.md` (2.117–2.121), `service-gateway.md`, `services/README.md`, README и AGENTS сервиса, контракты `service-coverage` v1.1.0 и `wb-finance-quota` v1
-- [ ] PR, запрос «merge and deploy»
-- [ ] после деплоя: проверки этапа 5, цифры «до/после»
+- [x] PR #2861, «merge and deploy» 03.11 — merge d7c624ee5, деплой зелёный; все кабинеты — 03.11 (решение Владельца)
+- [ ] после деплоя: проверки этапа 5 — `healthy` и failed-очередь 0 сделаны 03.11; ночь и цифры «до/после» — 04.11
 
 ## Итог
 

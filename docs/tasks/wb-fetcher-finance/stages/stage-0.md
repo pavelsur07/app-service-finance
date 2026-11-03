@@ -1,4 +1,4 @@
-### Stage 0: вынос ядра в `services/shared/fetchkit` — IN PROGRESS
+### Stage 0: вынос ядра в `services/shared/fetchkit` — DONE (ночь ozon-fetcher после деплоя — замер 04.11)
 
 **Risk:** HIGH-LOCAL (рефакторинг работающего прод-сервиса) · **Branch:** `feat/wb-fetcher-finance`
 **Stage base commit:** `62dda3879` · **Внешнее ревью:** да (Codex, по итогу этапа — diff > 500 строк)

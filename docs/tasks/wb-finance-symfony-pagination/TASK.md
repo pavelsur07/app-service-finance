@@ -1,4 +1,4 @@
-# WB finance в Symfony: отчёт о реализации до пустой страницы — IN PROGRESS
+# WB finance в Symfony: отчёт о реализации до пустой страницы — DONE (замер ночи — 04.11)
 
 **Risk:** MEDIUM (поведение внешнего импорта, без миграций) · **Ветка:** `fix/wb-finance-symfony-pagination`
 **Решение Владельца 03.11.2026:** «делай пагинацию всё равно» — превентивно, дефект в данных не подтверждён.
@@ -41,4 +41,5 @@
 - [x] handler: день из двух запросов (данные + `[]`) доходит до `ProcessDayReportMessage` один раз
 - [x] коннектор Ingestion: после `[]` курсор переходит к следующему дню
 - [x] unit + integration зелёные, PHPStan/CS по изменённым файлам 0
-- [ ] после деплоя: perf-report за ночь без failed/retried
+- [x] PR #2862 на проде 03.11 (merge f7e0fea34, деплой зелёный)
+- [ ] после ночи 04.11: perf-report без failed/retried, `SyncWbFinancialReportDayMessage` ≈ 2 × `ProcessDayReportMessage`

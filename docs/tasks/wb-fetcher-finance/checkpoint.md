@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** handoff — PR, «merge and deploy», затем проверки этапа 5 после деплоя
-**Status:** код этапов 0–5 готов; внешнее ревью green; ждёт секреты/переменные Владельца и merge
+**Phase:** закрыта 03.11.2026 — на проде (#2861, #2862), все кабинеты WB
+**Status:** done; остался замер первой ночи 04.11
 **Stage base commit:** 62dda3879 (ветка), этап 5 — e2dc136ff, правки ревью — d84d68ffd
 
 ### Completed
@@ -23,10 +23,10 @@
 - Stage 0: internal + Codex green; Stage 1: Codex green; handoff (этапы 2–5): Codex green со 2-го раунда
 
 ### Exact next action
-- после «merge and deploy»: проверки stage-5.md §4 «После деплоя» (codex-docker-ps, витрина, perf-report), 3 ночи, сверка, снять allowlist
+- 04.11: `perf-report` за ночь (stage-5.md §4), сверка Вумджой за 14 дней; витрина — Владелец
 
 ### Окружение (снести в конце)
-- контейнеры vf-fetchkit-pg (сеть vf-fetchkit-test), asfwb-pg + asfwb-redis (сеть asfwb-net; БД app_dev — стенд этапа 4); worktree scratchpad/base; стенд wbstand-* снесён
+- снесено 03.11: vf-fetchkit-pg, asfwb-*, worktree scratchpad/base, стенд wbstand-*
 
 ### Files to inspect first on resume
 - docs/tasks/wb-fetcher-finance/stages/stage-5.md
