@@ -121,7 +121,7 @@ func (c *Client) post(ctx context.Context, creds Credentials, connectionRef, met
 			return Response{}, ctxErr
 		}
 		c.log(ctx, connectionRef, endpoint, 0, duration, string(ClassTransient))
-		return Response{}, &APIError{Class: ClassTransient, Endpoint: endpoint, Err: err}
+		return Response{}, &APIError{Source: Source, Class: ClassTransient, Endpoint: endpoint, Err: err}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -133,11 +133,11 @@ func (c *Client) post(ctx context.Context, creds Credentials, connectionRef, met
 			return Response{}, ctxErr
 		}
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(ClassTransient))
-		return Response{}, &APIError{Class: ClassTransient, Endpoint: endpoint, Status: resp.StatusCode, Err: err}
+		return Response{}, &APIError{Source: Source, Class: ClassTransient, Endpoint: endpoint, Status: resp.StatusCode, Err: err}
 	}
 	if len(raw) > MaxBodyBytes {
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(ClassInvalidResponse))
-		return Response{}, &APIError{Class: ClassInvalidResponse, Endpoint: endpoint, Status: resp.StatusCode, Err: ErrBodyTooLarge}
+		return Response{}, &APIError{Source: Source, Class: ClassInvalidResponse, Endpoint: endpoint, Status: resp.StatusCode, Err: ErrBodyTooLarge}
 	}
 
 	if apiErr := Classify(endpoint, resp.StatusCode, resp.Header, raw, c.now()); apiErr != nil {

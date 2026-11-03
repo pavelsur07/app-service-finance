@@ -11,7 +11,7 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
 func (f *fakeOzon) FetchSearchPage(_ context.Context, creds ozon.Credentials, _ string, details bool, day time.Time, skus []int64, page int) (ozon.Page, ozon.SearchPage, error) {

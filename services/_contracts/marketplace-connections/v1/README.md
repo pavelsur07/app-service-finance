@@ -1,6 +1,6 @@
 # marketplace-connections v1
 
-Ответ внутреннего endpoint'а Symfony `GET /internal/marketplace-connections?provider=ozon`.
+Ответ внутреннего endpoint'а Symfony `GET /internal/marketplace-connections?provider=ozon|wildberries`.
 Сервисы `services/` периодически опрашивают его и работают автономно
 (механика — `services/AGENTS.md` §3). Schema: [schema.json](schema.json).
 История: [CHANGELOG.md](CHANGELOG.md).
@@ -10,14 +10,28 @@
 `ActiveOzonPerformanceConnectionsQuery` и кодеком ключей
 (`ConnectionApiKeyCodec`).
 
+## Wildberries (`provider=wildberries`, с 02.11.2026)
+
+`WbConnectionsSnapshotBuilder`; потребитель — `wb-fetcher`.
+
+- Кабинет = активное seller-подключение WB (у компании не больше одного):
+  `connection_ref` — id подключения, `performance: null`.
+- `seller.client_id` — **id подключения**, не идентификатор WB: у WB есть
+  только токен. Это единица лимита отчёта WB (та же, что бакет Symfony
+  `connection:<id>`), сервис ведёт лимитер по ней. `seller.api_key` — токен.
+- Токен, который не расшифровался или пуст, — кабинет не выдаётся.
+- `resource_types`: `wb.finance.sales-report.daily`,
+  `wb.finance.sales-report.weekly` — компаниям из `wb_fetcher.finance_companies`
+  (`['*']` — всем, `[]` — никому); остальным — `[]`.
+
 ## Реализация в Symfony
 
 `site/src/Marketplace/Controller/Internal/MarketplaceConnectionsController.php`
 (firewall `internal_api`, этап 2 `docs/tasks/ozon-fetcher-ingestion/plan.md`).
 
-- Поддерживается только `provider=ozon` (по умолчанию): `seller` требует
-  `client_id`, у WB его нет. Другой провайдер — 422 `unsupported_provider`.
-- **Кабинет = компания.** Seller- и performance-подключение одной компании —
+- Поддерживаются `provider=ozon` (по умолчанию) и `provider=wildberries`
+  (раздел «Wildberries» ниже). Другой провайдер — 422 `unsupported_provider`.
+- **Ozon: кабинет = компания.** Seller- и performance-подключение одной компании —
   один элемент. `connection_ref` — id seller-подключения, без него — id
   performance. Новое подключение даёт новый ref; правка ключей того же
   подключения ref не меняет.

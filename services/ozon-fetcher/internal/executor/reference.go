@@ -25,23 +25,23 @@ var errSnapshotRestart = errors.New("executor: interrupted snapshot restarts fro
 // (ozon-11-actions-supplies-clusters.md): каждая страница — в raw по порядку,
 // последняя — без курсора.
 func (r *taskRun) referenceSnapshot(ctx context.Context, creds ozon.Credentials) error {
-	if r.cursor == "" && len(r.hashes) > 0 {
+	if r.Cursor == "" && len(r.Hashes) > 0 {
 		// Все страницы сохранены прежней попыткой.
 		return nil
 	}
-	if r.cursor != "" {
+	if r.Cursor != "" {
 		return errSnapshotRestart
 	}
-	return r.withinSnapshot(ctx, StocksWindowStart[r.task.ResourceType], func(ctx context.Context) error {
+	return r.withinSnapshot(ctx, StocksWindowStart[r.Task.ResourceType], func(ctx context.Context) error {
 		var pending *ozon.Page
 		count := 0
 		emit := func(p ozon.Page) error {
 			if count++; count > MaxReferencePages {
-				return ozon.InvalidResponse(r.task.ResourceType, fmt.Sprintf("snapshot has more than %d pages", MaxReferencePages))
+				return ozon.InvalidResponse(r.Task.ResourceType, fmt.Sprintf("snapshot has more than %d pages", MaxReferencePages))
 			}
 			if pending != nil {
-				pending.No, pending.Cursor = r.nextPage, referenceMore
-				if err := r.store(ctx, *pending); err != nil {
+				pending.No, pending.Cursor = r.NextPage, referenceMore
+				if err := r.Store(ctx, *pending); err != nil {
 					return err
 				}
 			}
@@ -52,8 +52,8 @@ func (r *taskRun) referenceSnapshot(ctx context.Context, creds ozon.Credentials)
 		if err != nil {
 			return err
 		}
-		pending.No, pending.Cursor = r.nextPage, ""
-		if err := r.store(ctx, *pending); err != nil {
+		pending.No, pending.Cursor = r.NextPage, ""
+		if err := r.Store(ctx, *pending); err != nil {
 			return err
 		}
 		attrs := []any{slog.String("stage", "fetch"), slog.Int("pages", count)}
@@ -66,15 +66,15 @@ func (r *taskRun) referenceSnapshot(ctx context.Context, creds ozon.Credentials)
 		}) {
 			attrs = append(attrs, slog.Int(k, stats[k]))
 		}
-		r.log.Info("reference snapshot read", attrs...)
+		r.Log.Info("reference snapshot read", attrs...)
 		return nil
 	})
 }
 
 func (r *taskRun) referenceSteps(ctx context.Context, creds ozon.Credentials, emit func(ozon.Page) error) (map[string]int, error) {
-	e, ref := r.exec, r.task.ConnectionRef
+	e, ref := r.exec, r.Task.ConnectionRef
 	stats := map[string]int{}
-	switch r.task.ResourceType {
+	switch r.Task.ResourceType {
 	case ResourceActions:
 		p, ids, err := e.ozon.FetchActions(ctx, creds, ref)
 		if err != nil {
@@ -190,7 +190,7 @@ func (r *taskRun) referenceSteps(ctx context.Context, creds ozon.Credentials, em
 			stats["warehouses"] += page.Warehouses
 		}
 	default:
-		return nil, fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)
+		return nil, fmt.Errorf("%w: %s", errUnknownResource, r.Task.ResourceType)
 	}
 	return stats, nil
 }

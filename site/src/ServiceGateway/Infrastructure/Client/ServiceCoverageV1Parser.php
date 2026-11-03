@@ -27,7 +27,7 @@ final readonly class ServiceCoverageV1Parser
     private const TOP_KEYS = ['schema_version', 'service', 'generated_at', 'from', 'to', 'cabinets_total', 'rows'];
     private const ROW_KEYS = ['resource_type', 'period_key', 'cabinets_expected', 'by_status', 'last_success_at'];
     private const STATUS_KEYS = ['done', 'running', 'pending', 'not_ready', 'failed_retryable', 'failed_permanent'];
-    private const PERIOD_KEY = '/^(\d{4}-\d{2}-\d{2}|\d{4}-\d{2}|ref)$/D';
+    private const PERIOD_KEY = '/^(\d{4}-\d{2}-\d{2}|\d{4}-\d{2}|\d{4}-W(0[1-9]|[1-4]\d|5[0-3])|ref)$/D';
 
     public function parse(mixed $data): ServiceCoverageReport
     {
@@ -68,7 +68,7 @@ final readonly class ServiceCoverageV1Parser
         $row = $this->object($row, $path, self::ROW_KEYS);
         $periodKey = $this->nonEmptyString($row['period_key'], $path.'.period_key');
         if (1 !== preg_match(self::PERIOD_KEY, $periodKey)) {
-            throw $this->violation($path.'.period_key', 'must be YYYY-MM-DD, YYYY-MM or ref');
+            throw $this->violation($path.'.period_key', 'must be YYYY-MM-DD, YYYY-MM, YYYY-Www or ref');
         }
 
         $status = $this->object($row['by_status'], $path.'.by_status', self::STATUS_KEYS);

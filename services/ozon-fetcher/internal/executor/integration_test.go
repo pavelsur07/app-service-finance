@@ -18,9 +18,10 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/rawstore"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store/storetest"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonstore"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/rawstore"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store/storetest"
 )
 
 // Интеграция: настоящие postgres (TEST_DB_DSN) и S3 (TEST_S3_ENDPOINT,
@@ -32,13 +33,13 @@ func TestByDayFailureMidPaginationResumesWithoutDuplicates(t *testing.T) {
 	}
 	dsn := storetest.DSN(t, "executor")
 	ctx := context.Background()
-	require.NoError(t, store.Migrate(ctx, dsn))
+	require.NoError(t, ozonstore.Migrate(ctx, dsn))
 	pool, err := store.Open(ctx, dsn, store.PoolSize(4))
 	require.NoError(t, err)
 	defer pool.Close()
 	_, err = pool.Exec(ctx, `TRUNCATE raw_object, fetch_attempt, fetch_task, connection_state, connection_limit, resource_stop`)
 	require.NoError(t, err)
-	tasks := store.NewTasks(pool)
+	tasks := ozonstore.NewTasks(pool)
 
 	s3client := rawstore.NewS3Client(endpoint, "us-east-1", "any", "any")
 	_, _ = s3client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String(bucket)})

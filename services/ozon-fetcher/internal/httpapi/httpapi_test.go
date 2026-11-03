@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
 const token = "status-token-0123456789abcdef0123" //nolint:gosec // G101: фиктивный токен теста

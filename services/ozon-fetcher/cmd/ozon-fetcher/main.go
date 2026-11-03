@@ -15,9 +15,13 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/app"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/config"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/httpapi"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/observability"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonstore"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/observability"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
+
+// service — имя сервиса в логах и тег в GlitchTip.
+const service = "ozon-fetcher"
 
 func main() {
 	flush := func() {}
@@ -32,7 +36,7 @@ func main() {
 }
 
 func run(setFlush func(func())) error {
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)).With(slog.String("service", observability.Service)))
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)).With(slog.String("service", service)))
 	migrate := flag.Bool("migrate", false, "apply database migrations and exit")
 	flag.Parse()
 
@@ -40,7 +44,7 @@ func run(setFlush func(func())) error {
 	if err != nil {
 		return err
 	}
-	logger, flush, sentryErr := observability.Setup(os.Stdout, cfg.SentryDSN, cfg.SentryRelease, cfg.SentryEnvironment)
+	logger, flush, sentryErr := observability.Setup(os.Stdout, service, cfg.SentryDSN, cfg.SentryRelease, cfg.SentryEnvironment)
 	slog.SetDefault(logger)
 	setFlush(flush)
 	if sentryErr != nil {
@@ -54,7 +58,7 @@ func run(setFlush func(func())) error {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		return store.Migrate(ctx, cfg.DBDSN)
+		return ozonstore.Migrate(ctx, cfg.DBDSN)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

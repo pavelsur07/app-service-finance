@@ -74,7 +74,7 @@ func isArray(raw json.RawMessage) bool {
 }
 
 func invalid(endpoint string, status int, reason string) error {
-	return &ozon.APIError{Class: ozon.ClassInvalidResponse, Endpoint: endpoint, Status: status, Err: errors.New(reason)}
+	return &ozon.APIError{Source: ozon.Source, Class: ozon.ClassInvalidResponse, Endpoint: endpoint, Status: status, Err: errors.New(reason)}
 }
 
 // Shape — имена полей ответа без значений: ключи верхнего уровня и ключи

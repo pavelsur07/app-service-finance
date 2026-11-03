@@ -148,7 +148,7 @@ func (c *Client) DownloadReport(ctx context.Context, creds Credentials, connecti
 // getPath — GET по пути (UUID в пути); endpoint — шаблон для лимитера и журнала.
 func (c *Client) getPath(ctx context.Context, creds Credentials, connectionRef, endpoint, path string, query url.Values) (ozon.Response, error) {
 	if !strings.HasPrefix(path, "/") {
-		return ozon.Response{}, &ozon.APIError{Class: ozon.ClassInvalidResponse, Endpoint: endpoint, Status: http.StatusOK, Err: errors.New("bad path")}
+		return ozon.Response{}, &ozon.APIError{Source: ozon.Source, Class: ozon.ClassInvalidResponse, Endpoint: endpoint, Status: http.StatusOK, Err: errors.New("bad path")}
 	}
 	target := c.baseURL + path
 	if len(query) > 0 {

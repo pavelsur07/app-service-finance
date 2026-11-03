@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/fetch"
 )
 
 // Endpoints ресурсов первой волны (docs/ozon-api.md).
@@ -27,12 +29,7 @@ const (
 const MaxAccrualPages = 100
 
 // Page — страница ответа: исходные байты без перекодирования.
-type Page struct {
-	No          int    // с 1
-	Body        []byte // как прислал Ozon
-	Cursor      string // курсор следующей страницы; "" — последняя
-	ContentType string
-}
+type Page = fetch.Page
 
 // PageHandler сохраняет страницу до запроса следующей. Ошибка останавливает обход.
 type PageHandler func(Page) error
@@ -42,11 +39,11 @@ type PageHandler func(Page) error
 func InvalidResponse(endpoint, reason string) *APIError { return invalidResponse(endpoint, reason) }
 
 func invalidResponse(endpoint, reason string) *APIError {
-	return &APIError{Class: ClassInvalidResponse, Endpoint: endpoint, Status: http.StatusOK, Err: errors.New(reason)}
+	return &APIError{Source: Source, Class: ClassInvalidResponse, Endpoint: endpoint, Status: http.StatusOK, Err: errors.New(reason)}
 }
 
 func notReady(endpoint string, status int, reason string) *APIError {
-	return &APIError{Class: ClassNotReady, Endpoint: endpoint, Status: status, Err: errors.New(reason)}
+	return &APIError{Source: Source, Class: ClassNotReady, Endpoint: endpoint, Status: status, Err: errors.New(reason)}
 }
 
 // FetchAccrualByDay выгружает начисления дня (YYYY-MM-DD) постранично, начиная
@@ -201,7 +198,7 @@ func (c *Client) FetchMutualSettlement(ctx context.Context, creds Credentials, c
 			}
 			return c.download(ctx, connectionRef, file)
 		case "failed", "error":
-			return Page{}, &APIError{Class: ClassTransient, Endpoint: EndpointReportInfo, Status: info.Status, Err: errors.New("report generation failed")}
+			return Page{}, &APIError{Source: Source, Class: ClassTransient, Endpoint: EndpointReportInfo, Status: info.Status, Err: errors.New("report generation failed")}
 		}
 
 		if waited >= poll.Deadline || pollCtx.Err() != nil {
@@ -230,7 +227,7 @@ func (c *Client) download(ctx context.Context, connectionRef, link string) (Page
 			return Page{}, ctxErr
 		}
 		c.log(ctx, connectionRef, endpoint, 0, c.now().Sub(started), string(ClassTransient))
-		return Page{}, &APIError{Class: ClassTransient, Endpoint: endpoint, Err: withoutURL(err)}
+		return Page{}, &APIError{Source: Source, Class: ClassTransient, Endpoint: endpoint, Err: withoutURL(err)}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -242,13 +239,13 @@ func (c *Client) download(ctx context.Context, connectionRef, link string) (Page
 			return Page{}, ctxErr
 		}
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(ClassTransient))
-		return Page{}, &APIError{Class: ClassTransient, Endpoint: endpoint, Status: resp.StatusCode, Err: withoutURL(err)}
+		return Page{}, &APIError{Source: Source, Class: ClassTransient, Endpoint: endpoint, Status: resp.StatusCode, Err: withoutURL(err)}
 	case len(raw) > MaxBodyBytes:
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(ClassInvalidResponse))
-		return Page{}, &APIError{Class: ClassInvalidResponse, Endpoint: endpoint, Status: resp.StatusCode, Err: ErrBodyTooLarge}
+		return Page{}, &APIError{Source: Source, Class: ClassInvalidResponse, Endpoint: endpoint, Status: resp.StatusCode, Err: ErrBodyTooLarge}
 	case resp.StatusCode >= 500:
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(ClassTransient))
-		return Page{}, &APIError{Class: ClassTransient, Endpoint: endpoint, Status: resp.StatusCode, Err: errors.New("report file download failed")}
+		return Page{}, &APIError{Source: Source, Class: ClassTransient, Endpoint: endpoint, Status: resp.StatusCode, Err: errors.New("report file download failed")}
 	case resp.StatusCode != http.StatusOK:
 		// Истёкшая pre-signed ссылка: отчёт заказывается заново на следующей попытке.
 		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(ClassNotReady))

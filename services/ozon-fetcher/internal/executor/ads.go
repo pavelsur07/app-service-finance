@@ -53,32 +53,32 @@ func (r *taskRun) fetchAds(ctx context.Context, cabinet connections.Cabinet) err
 	if cabinet.Performance == nil || r.exec.perf == nil {
 		return errNoCredentials
 	}
-	if !cabinet.Supports(r.task.ResourceType) {
+	if !cabinet.Supports(r.Task.ResourceType) {
 		return errResourceNotEnabled
 	}
 	creds := *cabinet.Performance
-	ref := r.task.ConnectionRef
+	ref := r.Task.ConnectionRef
 	perf := r.exec.perf
-	switch r.task.ResourceType {
+	switch r.Task.ResourceType {
 	case ResourceAdsCampaigns:
-		if len(r.hashes) > 0 {
+		if len(r.Hashes) > 0 {
 			return nil
 		}
 		return r.withinSnapshotDay(ctx, func(ctx context.Context) error {
-			return r.single(ctx, r.logShape(func() (ozon.Page, error) { return perf.FetchCampaigns(ctx, creds, ref) }))
+			return r.Single(ctx, r.logShape(func() (ozon.Page, error) { return perf.FetchCampaigns(ctx, creds, ref) }))
 		})
 	case ResourceAdsExpense, ResourceAdsDaily:
-		if _, err := time.Parse(time.DateOnly, r.task.PeriodKey); err != nil {
-			return fmt.Errorf("%w: %q", errBadPeriod, r.task.PeriodKey)
+		if _, err := time.Parse(time.DateOnly, r.Task.PeriodKey); err != nil {
+			return fmt.Errorf("%w: %q", errBadPeriod, r.Task.PeriodKey)
 		}
-		if r.task.ResourceType == ResourceAdsExpense {
-			return r.single(ctx, r.logShape(func() (ozon.Page, error) { return perf.FetchExpense(ctx, creds, ref, r.task.PeriodKey) }))
+		if r.Task.ResourceType == ResourceAdsExpense {
+			return r.Single(ctx, r.logShape(func() (ozon.Page, error) { return perf.FetchExpense(ctx, creds, ref, r.Task.PeriodKey) }))
 		}
-		return r.single(ctx, r.logShape(func() (ozon.Page, error) { return perf.FetchDaily(ctx, creds, ref, r.task.PeriodKey) }))
+		return r.Single(ctx, r.logShape(func() (ozon.Page, error) { return perf.FetchDaily(ctx, creds, ref, r.Task.PeriodKey) }))
 	case ResourceAdsStatistics, ResourceAdsStatisticsTail:
 		return r.adsReports(ctx, creds, cabinet)
 	}
-	return fmt.Errorf("%w: %s", errUnknownResource, r.task.ResourceType)
+	return fmt.Errorf("%w: %s", errUnknownResource, r.Task.ResourceType)
 }
 
 // logShape пишет в журнал имена полей ответа (без значений): живая форма
@@ -87,7 +87,7 @@ func (r *taskRun) logShape(fetch func() (ozon.Page, error)) func() (ozon.Page, e
 	return func() (ozon.Page, error) {
 		page, err := fetch()
 		if err == nil {
-			r.log.Info("ads page shape", slog.String("stage", "fetch"), slog.String("shape", ozonperf.Shape(page.Body)),
+			r.Log.Info("ads page shape", slog.String("stage", "fetch"), slog.String("shape", ozonperf.Shape(page.Body)),
 				slog.Int("bytes", len(page.Body)), slog.String("content_type", page.ContentType))
 		}
 		return page, err

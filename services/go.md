@@ -142,13 +142,22 @@ outbox, immutable raw, dev-контейнер `services-postgres`).
 - multi-stage: build в `golang:1.27-alpine` → рантайм `alpine` или
   `gcr.io/distroless/static`, non-root; `-trimpath -ldflags="-s -w"`.
 - `.dockerignore` в контексте сервиса; healthcheck через `/health`.
+  Сервис на общем ядре собирается с контекстом `services/` (иначе `replace
+  ../shared/...` недоступен); исключения — `docker/Dockerfile.dockerignore`
+  рядом с Dockerfile, по белому списку (образец — `ozon-fetcher`).
 
 ## Монорепо
 
 - У каждого сервиса свой `go.mod` — независимые релизы и версии.
 - Общий Go-код — `services/shared/` (свой `go.mod`), подключение через
-  `replace`-директиву; для локальной разработки — `go.work` на уровне
-  `services/`.
+  `require … v0.0.0` + `replace => ../shared/<module>`. `go.work` не заводим:
+  replace достаточно, сборка и гейты идут с `GOWORK=off`; версии общих
+  зависимостей (pgx, x/time, goose) держать одинаковыми в ядре и сервисах.
+- `services/shared/fetchkit` — ядро загрузчиков маркетплейсов
+  ([README](shared/fetchkit/README.md)). Ядро не знает о провайдерах: имена
+  ресурсов, коды ошибок и лимиты конкретного API — в сервисе; гейт —
+  `fetchkit/internal/boundary`. Гейты ядра — `make fetchkit-test`,
+  `fetchkit-vet`, `fetchkit-lint`; в CI — тот же job, что у сервисов.
 - Каталоги с префиксом `_`/`.` игнорируются go tool: `_contracts/` — только
   не-Go артефакты (JSON Schema, OpenAPI); Go-код туда класть нельзя.
 - Новый сервис — по чек-листу `services/README.md` «Как добавить новый сервис».

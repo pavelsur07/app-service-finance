@@ -18,33 +18,33 @@ var errReturnsRestart = errors.New("executor: interrupted returns day restarts f
 // returns — возвраты дня МСК по дате логистического возврата постранично
 // (ozon-10-returns.md); журнал — число возвратов этой попытки.
 func (r *taskRun) returns(ctx context.Context, creds ozon.Credentials) error {
-	if r.cursor == "" && len(r.hashes) > 0 {
+	if r.Cursor == "" && len(r.Hashes) > 0 {
 		// Все страницы дня уже сохранены прежней попыткой.
 		return nil
 	}
-	if r.cursor != "" {
+	if r.Cursor != "" {
 		return errReturnsRestart
 	}
-	from, err := time.ParseInLocation(time.DateOnly, r.task.PeriodKey, r.exec.cfg.Location)
+	from, err := time.ParseInLocation(time.DateOnly, r.Task.PeriodKey, r.exec.cfg.Location)
 	if err != nil {
-		return fmt.Errorf("%w: %q", errBadPeriod, r.task.PeriodKey)
+		return fmt.Errorf("%w: %q", errBadPeriod, r.Task.PeriodKey)
 	}
 	to := from.AddDate(0, 0, 1)
 	count, pages := 0, 0
 	var drift ozon.Drift
 	defer func() { r.warnDrift(ozon.EndpointReturns, drift) }()
-	err = r.exec.ozon.FetchReturns(ctx, creds, r.task.ConnectionRef, from, to, r.cursor, r.nextPage, func(p ozon.Page) error {
+	err = r.exec.ozon.FetchReturns(ctx, creds, r.Task.ConnectionRef, from, to, r.Cursor, r.NextPage, func(p ozon.Page) error {
 		if page, err := ozon.ParseReturnsPage(p.Body, nil, from, to); err == nil {
 			count += page.Returns
 			pages++
 		}
 		drift.Add(ozon.ReturnsDrift(p.Body))
-		return r.store(ctx, p)
+		return r.Store(ctx, p)
 	})
 	if err != nil {
 		return err
 	}
-	r.log.Info("returns read", slog.String("stage", "fetch"), slog.Int("pages", pages), slog.Int("returns", count),
-		slog.Bool("continued", r.task.Cursor != ""))
+	r.Log.Info("returns read", slog.String("stage", "fetch"), slog.Int("pages", pages), slog.Int("returns", count),
+		slog.Bool("continued", r.Task.Cursor != ""))
 	return nil
 }

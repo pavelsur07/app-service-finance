@@ -52,6 +52,26 @@ final class ServiceCoverageMonthQueryTest extends IntegrationTestCase
         self::assertNull($month->cells[0]->lastSuccessAt);
     }
 
+    public function testReturnsIsoWeeksOverlappingMonth(): void
+    {
+        $this->em->persist(ServiceCoverageSnapshotBuilder::aSnapshot()->withService('wb-fetcher')->build());
+        foreach (['2026-W43', '2026-W44', '2026-W46', '2026-W49', '2026-W50'] as $week) {
+            $this->em->persist(ServiceCoverageRowBuilder::aRow()->withService('wb-fetcher')->withResourceType('wb.finance.sales-report.weekly')->withPeriodKey($week)->build());
+        }
+        $this->em->persist(ServiceCoverageRowBuilder::aRow()->withService('wb-fetcher')->withResourceType('wb.finance.sales-report.daily')->withPeriodKey('2026-11-01')->build());
+        $this->em->flush();
+        $this->em->clear();
+
+        $month = $this->query()->fetch('wb-fetcher', '2026-11');
+
+        self::assertSame([
+            'wb.finance.sales-report.daily 2026-11-01',
+            'wb.finance.sales-report.weekly 2026-W44', // 26.10–01.11 — захватывает 1 ноября
+            'wb.finance.sales-report.weekly 2026-W46',
+            'wb.finance.sales-report.weekly 2026-W49', // 30.11–06.12
+        ], array_map(static fn ($c): string => $c->resourceType.' '.$c->periodKey, $month->cells));
+    }
+
     public function testEmptyReadModel(): void
     {
         $month = $this->query()->fetch('ozon-fetcher', '2026-10');

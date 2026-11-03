@@ -8,7 +8,8 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/executor"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/schedule"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
 // Приоритеты задач.
@@ -110,19 +111,10 @@ func DefaultConfig(loc *time.Location) Config {
 }
 
 // Refresh — проход с перезагрузкой кабинета, выполняемый один раз за RunDate.
-type Refresh struct {
-	Kind          string
-	RunDate       string // YYYY-MM-DD (МСК)
-	ConnectionRef string
-	Specs         []store.TaskSpec
-}
+type Refresh = schedule.Refresh
 
-// Plan — результат прохода: Ensure ставится всегда (идемпотентно), каждый
-// Refresh — один раз за свою дату.
-type Plan struct {
-	Ensure    []store.TaskSpec
-	Refreshes []Refresh
-}
+// Plan — результат прохода (fetchkit/schedule).
+type Plan = schedule.Plan
 
 // Build — задачи для активных кабинетов на момент now.
 func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {

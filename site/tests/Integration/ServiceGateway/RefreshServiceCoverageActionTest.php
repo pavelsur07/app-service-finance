@@ -50,6 +50,19 @@ final class RefreshServiceCoverageActionTest extends IntegrationTestCase
         ], $rows, 'старая строка сервиса удалена, чужой сервис не тронут');
     }
 
+    public function testStoresWeeklyRowsOfWbFetcher(): void
+    {
+        $data = ['service' => 'wb-fetcher'] + ServiceCoverageV1ParserTest::fixture();
+        $rows = $data['rows'];
+        \assert(\is_array($rows) && \is_array($rows[0]));
+        $rows[0]['period_key'] = '2026-W44';
+        $data['rows'] = $rows;
+
+        ($this->action())(new FakeServiceCoverageClient($data, service: 'wb-fetcher'), new \DateTimeImmutable('2026-11-02 09:10:00'));
+
+        self::assertSame(1, (int) $this->connection->fetchOne("SELECT count(*) FROM service_coverage_row WHERE service = 'wb-fetcher' AND period_key = '2026-W44'"));
+    }
+
     public function testEmptyReportKeepsSnapshotTime(): void
     {
         $data = ServiceCoverageV1ParserTest::fixture();

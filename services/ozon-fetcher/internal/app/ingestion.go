@@ -16,18 +16,20 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/dispatcher"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/executor"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/limits"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonperf"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozonstore"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/planner"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ratelimit"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/rawstore"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/ratelimit"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/rawstore"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
 // Ingestion — запущенная цепочка; Wait возвращается после остановки всех частей.
 type Ingestion struct {
 	Cabinets *connections.Cache
-	Tasks    *store.Tasks
+	Tasks    *ozonstore.Tasks
 	Raw      *rawstore.Store
 	Location *time.Location
 	wg       sync.WaitGroup
@@ -42,14 +44,14 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 	if err != nil {
 		return nil, fmt.Errorf("app: load Europe/Moscow: %w", err)
 	}
-	tasks := store.NewTasks(pool)
+	tasks := ozonstore.NewTasks(pool)
 	now := time.Now
 
 	cabinets := connections.NewCache(
 		connections.NewClient(cfg.SymfonyBaseURL, cfg.InternalAuthToken, &http.Client{Timeout: 30 * time.Second}),
 		logger, now).WithAllowlist(cfg.ConnectionAllowlist)
 
-	limits := ratelimit.New(ratelimit.DefaultConfig(), now, ozon.SleepContext, func(ref, endpoint string, rps float64) {
+	limits := ratelimit.New(limits.DefaultConfig(), now, ozon.SleepContext, func(ref, endpoint string, rps float64) {
 		go func() {
 			saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 			defer cancel()

@@ -18,7 +18,7 @@ use Webmozart\Assert\Assert;
 #[ORM\UniqueConstraint(name: 'uq_service_coverage_row_key', columns: ['service', 'resource_type', 'period_key'])]
 class ServiceCoverageRow
 {
-    private const PERIOD_KEY = '/^(\d{4}-\d{2}-\d{2}|\d{4}-\d{2}|ref)$/D';
+    private const PERIOD_KEY = '/^(\d{4}-\d{2}-\d{2}|\d{4}-\d{2}|\d{4}-W(0[1-9]|[1-4]\d|5[0-3])|ref)$/D'; // как в ServiceCoverageV1Parser
 
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]

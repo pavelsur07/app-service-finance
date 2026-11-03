@@ -14,7 +14,8 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/fetch"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
 // emptyAccrualPostingsPage — служебная страница дня без отправлений: день
@@ -36,7 +37,7 @@ var (
 // ozon.MaxAccrualPostingNumbers. Курсор — последний номер сохранённой порции:
 // продолжение после сбоя идёт со следующего номера.
 func (r *taskRun) accrualPostings(ctx context.Context, creds ozon.Credentials, cabinet connections.Cabinet) error {
-	if r.cursor == "" && len(r.hashes) > 0 {
+	if r.Cursor == "" && len(r.Hashes) > 0 {
 		// Все порции уже сохранены прежней попыткой.
 		return nil
 	}
@@ -47,10 +48,10 @@ func (r *taskRun) accrualPostings(ctx context.Context, creds ozon.Credentials, c
 	fp := numbersFingerprint(numbers)
 
 	start := 0
-	if r.cursor != "" {
+	if r.Cursor != "" {
 		// Курсор — «отпечаток списка:последний номер»: продолжение только по
 		// тому же списку, иначе новый номер меньше курсора был бы пропущен.
-		cursorFP, last, ok := strings.Cut(r.cursor, ":")
+		cursorFP, last, ok := strings.Cut(r.Cursor, ":")
 		if !ok || cursorFP != fp {
 			return errOrdersRevised
 		}
@@ -60,19 +61,19 @@ func (r *taskRun) accrualPostings(ctx context.Context, creds ozon.Credentials, c
 		}
 	}
 	if len(numbers) == 0 {
-		return r.store(ctx, ozon.Page{No: r.nextPage, Body: []byte(emptyAccrualPostingsPage), ContentType: "application/json"})
+		return r.Store(ctx, ozon.Page{No: r.NextPage, Body: []byte(emptyAccrualPostingsPage), ContentType: "application/json"})
 	}
 	for i := start; i < len(numbers); i += ozon.MaxAccrualPostingNumbers {
 		chunk := numbers[i:min(i+ozon.MaxAccrualPostingNumbers, len(numbers))]
-		page, err := r.exec.ozon.FetchAccrualPostings(ctx, creds, r.task.ConnectionRef, chunk)
+		page, err := r.exec.ozon.FetchAccrualPostings(ctx, creds, r.Task.ConnectionRef, chunk)
 		if err != nil {
 			return err
 		}
-		page.No = r.nextPage
+		page.No = r.NextPage
 		if i+len(chunk) < len(numbers) {
 			page.Cursor = fp + ":" + chunk[len(chunk)-1]
 		}
-		if err := r.store(ctx, page); err != nil {
+		if err := r.Store(ctx, page); err != nil {
 			return err
 		}
 	}
@@ -95,17 +96,17 @@ func (r *taskRun) orderPostingNumbers(ctx context.Context, cabinet connections.C
 			continue
 		}
 		sources++
-		key := store.TaskKey{ConnectionRef: r.task.ConnectionRef, ResourceType: resource, PeriodKey: r.task.PeriodKey}
+		key := store.TaskKey{ConnectionRef: r.Task.ConnectionRef, ResourceType: resource, PeriodKey: r.Task.PeriodKey}
 		content, err := e.tasks.ContentPages(ctx, key)
 		if errors.Is(err, store.ErrNoContent) {
 			// Заказы дня загружены до появления списка страниц ревизии
 			// (миграция 00004) — перезагрузить, иначе ждать пришлось бы вечно.
 			reloaded, reloadErr := e.tasks.ReloadWithoutContent(ctx, key, e.now())
 			if reloadErr != nil {
-				return nil, &storeError{reloadErr}
+				return nil, fetch.StoreError(reloadErr)
 			}
 			if reloaded {
-				r.log.Info("orders of the day requeued: loaded before content_pages", slog.String("stage", "fetch"), slog.String("orders_resource", resource))
+				r.Log.Info("orders of the day requeued: loaded before content_pages", slog.String("stage", "fetch"), slog.String("orders_resource", resource))
 			}
 			return nil, fmt.Errorf("%w: %s", errOrdersNotLoaded, resource)
 		}
@@ -113,14 +114,14 @@ func (r *taskRun) orderPostingNumbers(ctx context.Context, cabinet connections.C
 			return nil, fmt.Errorf("%w: %v", errOrdersRawInvalid, err)
 		}
 		if err != nil {
-			return nil, &storeError{err}
+			return nil, fetch.StoreError(err)
 		}
 		// Ревизия заказов должна быть загружена целиком после конца дня — с
 		// первой страницы, не дочитана по страницам до полуночи: иначе в ней нет
 		// отправлений после последней загрузки «сегодня».
-		dayStart, err := time.ParseInLocation(time.DateOnly, r.task.PeriodKey, e.cfg.Location)
+		dayStart, err := time.ParseInLocation(time.DateOnly, r.Task.PeriodKey, e.cfg.Location)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %q", errBadPeriod, r.task.PeriodKey)
+			return nil, fmt.Errorf("%w: %q", errBadPeriod, r.Task.PeriodKey)
 		}
 		if content.StartedAt.Before(dayStart.AddDate(0, 0, 1)) {
 			return nil, fmt.Errorf("%w: %s revision started before the day ended", errOrdersNotLoaded, resource)

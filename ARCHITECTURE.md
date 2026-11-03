@@ -399,13 +399,17 @@
 Правило — `docs/architecture/service-gateway.md` (§2.6: экран читает витрину, не сервис).
 
 - Источник — `GET /internal/coverage` сервиса по контракту
-  `services/_contracts/service-coverage/v1`. Клиент `OzonFetcherCoverageClient`:
-  `OZON_FETCHER_BASE_URL`, токен направления «Symfony → сервис»
-  `OZON_FETCHER_API_TOKEN` (не `INTERNAL_AUTH_TOKEN`), `timeout` 2 с,
-  `max_duration` 5 с, `X-Trace-Id`. Повторов внутри вызова нет — повтор
-  делает cron. Пустые адрес или токен — обновление выключено.
+  `services/_contracts/service-coverage/v1`. Клиент `ServiceCoverageHttpClient`
+  — экземпляр на сервис в `config/services.yaml` (тег `app.service_coverage_client`):
+  `ozon-fetcher` — `OZON_FETCHER_BASE_URL` / `OZON_FETCHER_API_TOKEN`, `wb-fetcher` —
+  `WB_FETCHER_BASE_URL` / `WB_FETCHER_API_TOKEN`; токен направления «Symfony →
+  сервис» (не `INTERNAL_AUTH_TOKEN`), `timeout` 2 с, `max_duration` 5 с,
+  `X-Trace-Id`, `$.service` ответа = имя сервиса. Повторов внутри вызова нет —
+  повтор делает cron. Пустые адрес или токен — обновление сервиса выключено.
+  Вкладки страницы — реестр `CoverageServices` (имя → вкладка, env токена).
 - Разбор `ServiceCoverageV1Parser` строгий: лишний или недостающий ключ, тип,
-  формат, дубль строки → `ContractViolationException`. Транспорт, таймаут,
+  формат (`period_key` — `YYYY-MM-DD`, `YYYY-MM`, ISO-неделя `YYYY-Www` или
+  `ref`), дубль строки → `ContractViolationException`. Транспорт, таймаут,
   ответ не 200 → `ServiceUnavailableException`.
 - Витрина: `service_coverage_snapshot` (одна строка на сервис: `generated_at`,
   `refreshed_at`, окно, `cabinets_total`) и `service_coverage_row`
@@ -415,17 +419,22 @@
 - `RefreshServiceCoverageAction` вызывает сервис до транзакции и заменяет
   снимок сервиса одной транзакцией (`wrapInTransaction`): сбой вызова или
   контракта оставляет витрину прежней.
-- `app:service-gateway:coverage:refresh` (lock): выключено → INFO, exit 0;
-  недоступен → WARNING, exit 0 (supercronic шлёт ненулевой exit в GlitchTip);
-  нарушение контракта → ERROR, exit 1.
-- Страница «Покрытие Сервис GO» — `OzonFetcherCoverageController`,
-  `admin_service_gateway_ozon_fetcher_coverage` → `GET /admin/services/ozon-fetcher/coverage?month=YYYY-MM`,
-  `ROLE_ADMIN`, exempt в `ModuleAccessMap`. Месяцы — только M, M-1, M-2 (МСК), иначе redirect с flash.
-  Сетку строит `CoverageHeatmapBuilder` (без БД): начисления по дням — ячейка на день, реализация,
-  взаиморасчёты и справочник — одна ячейка; цвета `ok`/`partial`/`err`/`empty`/`future`
-  (`kit/components/coverage.css`); «устарело» — снимок старше 30 минут.
+- `app:service-gateway:coverage:refresh` обходит все клиенты, lock на сервис;
+  сбой одного сервиса не мешает остальным. На сервис: выключено → INFO;
+  недоступен → WARNING (supercronic шлёт ненулевой exit в GlitchTip);
+  нарушение контракта → ERROR, итог команды — exit 1, остальные сервисы обновлены.
+- Страница «Покрытие Сервис GO» — `ServiceCoverageController`,
+  `admin_service_gateway_coverage` → `GET /admin/services/coverage?service=ozon-fetcher|wb-fetcher&month=YYYY-MM`,
+  вкладки Ozon | Wildberries (месяц сохраняется), без `service` — Ozon, неизвестный → 404;
+  `ROLE_ADMIN`, exempt в `ModuleAccessMap`. Месяцы — только M, M-1, M-2 (МСК), иначе redirect с flash
+  на тот же сервис. Прежний адрес `/admin/services/ozon-fetcher/coverage`
+  (`admin_service_gateway_ozon_fetcher_coverage`, `LegacyOzonFetcherCoverageController`) — 301 на вкладку Ozon.
+  Сетку строит `CoverageHeatmapBuilder` (без БД), обязательные строки — по сервису: дневные отчёты —
+  ячейка на день; недельные (`YYYY-Www`) — ячейка на ISO-неделю шириной в её дни внутри месяца
+  (`IsoWeeks`), «будущая», пока неделя не закончилась; месячные и справочник — одна ячейка на месяц;
+  цвета `ok`/`partial`/`err`/`empty`/`future` (`kit/components/coverage.css`); «устарело» — снимок старше 30 минут.
 - Чтение — `ServiceCoverageMonthQuery::fetch($service, 'YYYY-MM')`: снимок и
-  строки месяца (дни месяца, ключ месяца, `ref`) одним запросом —
+  строки месяца (дни месяца, ключ месяца, ISO-недели, пересекающие месяц, `ref`) одним запросом —
   согласованный снимок при параллельной замене.
 
 ### ServiceGateway: ai-service
@@ -2562,7 +2571,7 @@ reserveSalesReportsSlot(string $sellerBucketId): ?WbFinanceThrottleDTO
 registerSalesReportsRemote429(string $sellerBucketId, ?int $retryAfterSeconds, int $defaultSeconds): int
 // WbFinanceThrottleDTO (Application/DTO): waitSeconds, sharedCooldown
 ```
-Потребитель: `Ingestion` (`WbFinanceReportClient`).
+Потребители: `Ingestion` (`WbFinanceReportClient`), внутренние эндпоинты квоты для wb-fetcher (`WbFinanceSalesReports*Controller`, контракт `wb-finance-quota` v1).
 
 ### `CostCategoryCatalogFacade` (`src/Marketplace/Facade/CostCategoryCatalogFacade.php`)
 ```php
@@ -4045,7 +4054,20 @@ internal_api → stateless, /internal/* для сервисов services/
   рекламы performance (`ozon.ads.campaigns`, `ozon.ads.expense`, `ozon.ads.daily`) — компаниям
   `ozon_fetcher.ads_companies`, отчёты по товарам (`ozon.ads.statistics`,
   `ozon.ads.statistics.tail`) — из них компаниям `ozon_fetcher.ads_reports_companies`.
+- `GET /internal/marketplace-connections?provider=wildberries` — снимок активных
+  WB-кабинетов для wb-fetcher (тот же контроллер и Query → `WbConnectionsSnapshotBuilder`):
+  кабинет = seller-подключение WB, `connection_ref` и `seller.client_id` — id подключения
+  (единица лимита отчёта WB, как бакет `connection:<id>` в `WbFinanceRateLimiter`),
+  `performance: null`; без пригодного токена не выдаётся. Ресурсы
+  `wb.finance.sales-report.daily`, `wb.finance.sales-report.weekly` — компаниям из
+  `wb_fetcher.finance_companies` (`['*']` — всем, `[]` — никому), остальным `[]`. На проде `['*']`:
+  кабинеты ограничивает allowlist wb-fetcher (`vars.WB_FETCHER_CONNECTION_ALLOWLIST`, `docs/maintenance/wb-fetcher-prod.md`).
   Другие провайдеры — 422 `unsupported_provider`.
+- `POST /internal/wb-finance/sales-reports/slot` и `POST /internal/wb-finance/sales-reports/rate-limited`
+  (`WbFinanceSalesReportsSlotController`, `WbFinanceSalesReportsRateLimitedController`) — общая с
+  wb-fetcher квота WB finance (контракт `services/_contracts/wb-finance-quota/v1`): слот и 429 через
+  `WbFinanceThrottleFacade` в бакете `connection:<connection_ref>` — тот же, что у
+  `SyncWbFinancialReportDayHandler` и Ingestion. Неверный вход — 422 `invalid_request`.
 
 Иерархия ролей: `ROLE_USER → ROLE_COMPANY_USER → ROLE_COMPANY_OWNER`
 Admin-роли: `ROLE_ADMIN → ROLE_SUPER_ADMIN`
@@ -4687,6 +4709,11 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.121 | 2026-11-02 | Marketplace: `/internal/wb-finance/sales-reports/slot` и `…/rate-limited` — общая квота WB finance для wb-fetcher (контракт `wb-finance-quota` v1) вместо пропуска минут :10/:20; wb-fetcher читает отчёт до пустой страницы, страница 20 000 строк (задача wb-fetcher-finance, внешнее ревью этапа 5) |
+| 2.120 | 2026-11-02 | Прод: сервис `wb-fetcher` за `WB_FETCHER_ENABLED` (compose-профиль, БД `wb_fetcher`, S3 — ключи ozon-fetcher), scheduler — `WB_FETCHER_BASE_URL/_API_TOKEN`; `wb_fetcher.finance_companies: ['*']` (задача wb-fetcher-finance, этап 5) |
+| 2.119 | 2026-11-02 | ServiceGateway: покрытие нескольких сервисов — `ServiceCoverageHttpClient` на сервис (`WB_FETCHER_BASE_URL/_API_TOKEN`), команда обновления обходит все клиенты, страница `/admin/services/coverage` с вкладками Ozon \| Wildberries, недельные ячейки; прежний адрес — 301 (задача wb-fetcher-finance, этап 4) |
+| 2.118 | 2026-11-02 | ServiceGateway: `ServiceCoverageV1Parser` принимает недельный `period_key` `YYYY-Www` (контракт `service-coverage` v1.1.0, задача wb-fetcher-finance, этап 3) |
+| 2.117 | 2026-11-02 | Marketplace: `/internal/marketplace-connections?provider=wildberries` — `WbConnectionsSnapshotBuilder`, параметр `wb_fetcher.finance_companies` (задача wb-fetcher-finance, этап 1) |
 | 2.116 | 2026-11-02 | Billing: подтверждение сокращения оплаченного периода при назначении тарифа, `CancelScheduledTariffAction`, FK журнала оплат и попыток на `companies` — `RESTRICT` (`Version20261102170000`) |
 | 2.115 | 2026-11-02 | Billing: смена тарифа при действующем периоде — `PaymentPlanner`/`PaymentPlanResolver`, запланированный переход у подписки, перенесённый остаток и `superseded_by_payment_id` у оплаты, `BillingAccessDTO::nextTariffName/nextTariffFrom` (`Version20261102150000`) |
 | 2.114 | 2026-11-02 | Billing: онлайн-оплата ЮKassa — `BillingCheckout`, `StartCheckoutAction`, `ApplyYooKassaPaymentAction`, уведомление `/billing/yookassa/webhook`, cron `app:billing:yookassa-sync`, `PaymentSource::YOOKASSA` (`Version20261102120000`); без ключей выключено |

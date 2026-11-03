@@ -12,7 +12,7 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
 func (f *fakeOzon) FetchStocks(ctx context.Context, creds ozon.Credentials, _, cursor string, firstPageNo int, onPage ozon.PageHandler) error {

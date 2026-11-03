@@ -13,6 +13,7 @@ use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Monolog\Handler\TestHandler;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 /**
@@ -32,6 +33,8 @@ final class MarketplaceConnectionsControllerTest extends WebTestCaseBase
     private const WB_SELLER = '01930000-0000-7000-8000-00000000c001';
     private const SELLER_LEGACY = '01930000-0000-7000-8000-00000000d001';
     private const SELLER_BROKEN = '01930000-0000-7000-8000-00000000e001';
+    private const WB_INACTIVE = '01930000-0000-7000-8000-00000000c002';
+    private const WB_BROKEN = '01930000-0000-7000-8000-00000000c003';
 
     private KernelBrowser $client;
 
@@ -100,12 +103,75 @@ final class MarketplaceConnectionsControllerTest extends WebTestCaseBase
         self::assertArrayNotHasKey(self::SELLER_BROKEN, $byRef);
     }
 
-    public function testOtherProvidersAreNotServedInV1(): void
+    public function testServesActiveWildberriesCabinetsByContract(): void
     {
+        $wbCompany = $this->company(9888);
+        $this->connection(self::WB_SELLER, $wbCompany, MarketplaceConnectionType::SELLER, null, 'wb-token-never-logged', encrypted: true, marketplace: MarketplaceType::WILDBERRIES);
+        $this->connection(self::WB_INACTIVE, $this->company(9889), MarketplaceConnectionType::SELLER, null, 'wb-inactive', encrypted: true, active: false, marketplace: MarketplaceType::WILDBERRIES);
+        $this->connection(self::SELLER_A, $this->company(9890), MarketplaceConnectionType::SELLER, 'client-a', 'ozon-key', encrypted: true);
+        $this->em()->flush();
+        $this->em()->clear();
+        /** @var TestHandler $logs */
+        $logs = static::getContainer()->get(TestHandler::class);
+        $logs->clear();
+
         $this->get('/internal/marketplace-connections?provider=wildberries');
+
+        self::assertResponseStatusCodeSame(200);
+        self::assertResponseHeaderSame('Cache-Control', 'no-store, private');
+        $body = $this->json();
+        self::assertSame(['schema_version', 'generated_at', 'connections'], array_keys($body));
+        $byRef = $this->byRef($body);
+        self::assertSame([self::WB_SELLER], array_keys($byRef), 'только активные кабинеты WB, без Ozon');
+
+        $cabinet = $byRef[self::WB_SELLER];
+        self::assertSame(['connection_ref', 'company_id', 'provider', 'updated_at', 'credentials', 'resource_types'], array_keys($cabinet));
+        self::assertSame((string) $wbCompany->getId(), $cabinet['company_id']);
+        self::assertSame('wildberries', $cabinet['provider']);
+        self::assertSame(['client_id' => self::WB_SELLER, 'api_key' => 'wb-token-never-logged'], $cabinet['credentials']['seller']);
+        self::assertNull($cabinet['credentials']['performance']);
+        // `wb_fetcher.finance_companies: ['*']` — оба ресурса каждому кабинету; кабинеты
+        // ограничивает allowlist сервиса (docs/maintenance/wb-fetcher-prod.md).
+        self::assertSame(['wb.finance.sales-report.daily', 'wb.finance.sales-report.weekly'], $cabinet['resource_types']);
+
+        foreach ($logs->getRecords() as $record) {
+            self::assertStringNotContainsString('wb-token-never-logged', $record->message.json_encode($record->context, \JSON_PARTIAL_OUTPUT_ON_ERROR));
+        }
+        self::assertTrue($logs->hasInfoThatContains('Internal connections snapshot served'));
+    }
+
+    public function testUndecryptableWildberriesTokenDropsOnlyItsCabinet(): void
+    {
+        $this->connection(self::WB_SELLER, $this->company(9891), MarketplaceConnectionType::SELLER, null, 'wb-a', encrypted: true, marketplace: MarketplaceType::WILDBERRIES);
+        $broken = $this->connection(self::WB_BROKEN, $this->company(9892), MarketplaceConnectionType::SELLER, null, 'wb-e', encrypted: true, marketplace: MarketplaceType::WILDBERRIES);
+        $broken->setEncryptedApiKey('not-a-ciphertext', 'v1');
+        $broken->setApiKey('');
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $this->get('/internal/marketplace-connections?provider=wildberries');
+
+        self::assertResponseStatusCodeSame(200);
+        self::assertSame([self::WB_SELLER], array_keys($this->byRef($this->json())));
+    }
+
+    public function testUnknownProviderIsRejected(): void
+    {
+        $this->get('/internal/marketplace-connections?provider=yandex');
 
         self::assertResponseStatusCodeSame(422);
         self::assertSame('unsupported_provider', $this->json()['error']['code'] ?? null);
+    }
+
+    public function testWildberriesWithoutTokenNothingIsServed(): void
+    {
+        $this->connection(self::WB_SELLER, $this->company(9893), MarketplaceConnectionType::SELLER, null, 'wb-secret-never-leaks', encrypted: true, marketplace: MarketplaceType::WILDBERRIES);
+        $this->em()->flush();
+
+        $this->client->request('GET', '/internal/marketplace-connections?provider=wildberries', server: ['REMOTE_ADDR' => self::SERVICE_IP]);
+
+        self::assertResponseStatusCodeSame(401);
+        self::assertStringNotContainsString('wb-secret-never-leaks', (string) $this->client->getResponse()->getContent());
     }
 
     public function testWithoutTokenNothingIsServed(): void

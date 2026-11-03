@@ -28,6 +28,15 @@ S3, журнал загрузок в своей БД; выдача фактов 
 [`docs/tasks/ozon-fetcher-ingestion/plan.md`](../../docs/tasks/ozon-fetcher-ingestion/plan.md);
 ресурсы и лимиты Ozon — [`docs/ozon-api.md`](docs/ozon-api.md).
 
+Код: очередь задач, исполнитель, диспетчер, цикл планировщика, лимитер,
+снимок кабинетов, raw в S3, HTTP API и наблюдаемость — общее ядро
+[`services/shared/fetchkit`](../shared/fetchkit/README.md) (с 02.11.2026). Здесь —
+только Ozon: клиенты `internal/ozon`, `internal/ozonperf`, ресурсы и адаптер
+исполнителя (`internal/executor`), план (`internal/planner`), лимиты
+(`internal/limits`), миграции и слот рекламы (`internal/ozonstore`). Пакеты
+`dispatcher`, `httpapi`, `connections`, `planner/scheduler.go` — тонкие обёртки
+над ядром с прежним API.
+
 Границы: сервис не пишет в БД Symfony, не решает об идемпотентности по
 состоянию БД, не назначает категории ОПиУ, периоды и проводки
 (`services/AGENTS.md` §1). Хранение — по `services/AGENTS.md` §9.
@@ -50,7 +59,7 @@ Dev-БД: контейнер `services-postgres` (compose-профиль `servic
 ## Схема БД
 
 Только техническое состояние (`services/AGENTS.md` §9). Миграции —
-`internal/store/migrations`, прогон — `make ozon-fetcher-migrate`.
+`internal/ozonstore/migrations`, прогон — `make ozon-fetcher-migrate`.
 
 | Таблица | Назначение |
 |---|---|
@@ -70,10 +79,11 @@ Dev-БД: контейнер `services-postgres` (compose-профиль `servic
 индекс); страница и курсор пишутся одной транзакцией; просроченный lease
 возвращает задачу в `pending` с сохранённым курсором.
 
-Интеграционные тесты `internal/store`: `TEST_DB_DSN` — пустая БД; без
+Интеграционные тесты `shared/fetchkit/store` и `internal/ozonstore`
+(а также `dispatcher`, `executor`): `TEST_DB_DSN` — пустая БД; без
 переменной тесты пропускаются.
 
-**Raw в S3** (`internal/rawstore`): ключ
+**Raw в S3** (`shared/fetchkit/rawstore`): ключ
 `ozon/{connection_ref}/{resource_type}/{period_key}/{fetched_at}_{attempt}_p{NNN}_{sha8}.{ext}.gz`,
 gzip исходных байтов, `If-None-Match: *`, sha256 несжатых — в метаданных и
 `raw_object`. Интеграционный тест — `TEST_S3_ENDPOINT`, `TEST_S3_BUCKET`.

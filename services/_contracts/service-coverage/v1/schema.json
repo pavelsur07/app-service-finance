@@ -23,8 +23,8 @@
                     "resource_type": {"type": "string", "minLength": 1},
                     "period_key": {
                         "type": "string",
-                        "pattern": "^(\\d{4}-\\d{2}-\\d{2}|\\d{4}-\\d{2}|ref)$",
-                        "description": "YYYY-MM-DD — дневной ресурс, YYYY-MM — месячный, ref — справочник"
+                        "pattern": "^(\\d{4}-\\d{2}-\\d{2}|\\d{4}-\\d{2}|\\d{4}-W(0[1-9]|[1-4]\\d|5[0-3])|ref)$",
+                        "description": "YYYY-MM-DD — дневной ресурс, YYYY-MM — месячный, YYYY-Www — недельный (ISO-неделя МСК), ref — справочник"
                     },
                     "cabinets_expected": {"type": "integer", "minimum": 0, "description": "Активные кабинеты, у которых есть этот ресурс"},
                     "by_status": {

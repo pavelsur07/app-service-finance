@@ -12,8 +12,9 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/ozon"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/rawstore"
-	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/store"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/fetch"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/rawstore"
+	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
 // emptyProductInfoPage — служебная страница пустого каталога: Ozon отвергает
@@ -53,14 +54,14 @@ func (r *taskRun) withinSnapshotDay(ctx context.Context, load func(ctx context.C
 // (остатки — с 05:00): раньше начала — snapshotEarlyError, в Ozon не ходим.
 func (r *taskRun) withinSnapshot(ctx context.Context, from time.Duration, load func(ctx context.Context) error) error {
 	loc := r.exec.cfg.Location
-	day, err := time.ParseInLocation(time.DateOnly, r.task.PeriodKey, loc)
+	day, err := time.ParseInLocation(time.DateOnly, r.Task.PeriodKey, loc)
 	if err != nil {
-		return fmt.Errorf("%w: %q", errBadPeriod, r.task.PeriodKey)
+		return fmt.Errorf("%w: %q", errBadPeriod, r.Task.PeriodKey)
 	}
 	now := r.exec.now().In(loc)
 	end := day.AddDate(0, 0, 1)
 	if now.Before(day) || !now.Before(end) {
-		return fmt.Errorf("%w: %s", errSnapshotMissed, r.task.PeriodKey)
+		return fmt.Errorf("%w: %s", errSnapshotMissed, r.Task.PeriodKey)
 	}
 	if start := day.Add(from); now.Before(start) {
 		return &snapshotEarlyError{at: start}
@@ -69,20 +70,20 @@ func (r *taskRun) withinSnapshot(ctx context.Context, from time.Duration, load f
 	defer cancel()
 	err = load(dayCtx)
 	if err != nil && ctx.Err() == nil && errors.Is(context.Cause(dayCtx), errSnapshotMissed) {
-		return fmt.Errorf("%w: %s ended during the load", errSnapshotMissed, r.task.PeriodKey)
+		return fmt.Errorf("%w: %s ended during the load", errSnapshotMissed, r.Task.PeriodKey)
 	}
 	return err
 }
 
 // productList — список всех товаров кабинета по last_id до пустой страницы.
 func (r *taskRun) productList(ctx context.Context, creds ozon.Credentials) error {
-	if r.cursor == "" && len(r.hashes) > 0 {
+	if r.Cursor == "" && len(r.Hashes) > 0 {
 		// Все страницы уже сохранены прежней попыткой.
 		return nil
 	}
 	return r.withinSnapshotDay(ctx, func(ctx context.Context) error {
-		return r.exec.ozon.FetchProductList(ctx, creds, r.task.ConnectionRef, r.cursor, r.nextPage, func(p ozon.Page) error {
-			return r.store(ctx, p)
+		return r.exec.ozon.FetchProductList(ctx, creds, r.Task.ConnectionRef, r.Cursor, r.NextPage, func(p ozon.Page) error {
+			return r.Store(ctx, p)
 		})
 	})
 }
@@ -91,7 +92,7 @@ func (r *taskRun) productList(ctx context.Context, creds ozon.Credentials) error
 // дублей по возрастанию, порции по ozon.MaxProductInfoIDs. Курсор —
 // «отпечаток списка:последний id» сохранённой порции.
 func (r *taskRun) productInfo(ctx context.Context, creds ozon.Credentials, cabinet connections.Cabinet) error {
-	if r.cursor == "" && len(r.hashes) > 0 {
+	if r.Cursor == "" && len(r.Hashes) > 0 {
 		return nil
 	}
 	return r.withinSnapshotDay(ctx, func(ctx context.Context) error { return r.loadProductInfo(ctx, creds, cabinet) })
@@ -109,8 +110,8 @@ func (r *taskRun) loadProductInfo(ctx context.Context, creds ozon.Credentials, c
 	fp := numbersFingerprint(keys)
 
 	start := 0
-	if r.cursor != "" {
-		cursorFP, last, ok := strings.Cut(r.cursor, ":")
+	if r.Cursor != "" {
+		cursorFP, last, ok := strings.Cut(r.Cursor, ":")
 		lastID, parseErr := strconv.ParseInt(last, 10, 64)
 		if !ok || cursorFP != fp || parseErr != nil {
 			return errCatalogRevised
@@ -121,27 +122,27 @@ func (r *taskRun) loadProductInfo(ctx context.Context, creds ozon.Credentials, c
 		}
 	}
 	if len(ids) == 0 {
-		return r.store(ctx, ozon.Page{No: r.nextPage, Body: []byte(emptyProductInfoPage), ContentType: "application/json"})
+		return r.Store(ctx, ozon.Page{No: r.NextPage, Body: []byte(emptyProductInfoPage), ContentType: "application/json"})
 	}
 	missing := 0
 	for i := start; i < len(ids); i += ozon.MaxProductInfoIDs {
 		chunk := ids[i:min(i+ozon.MaxProductInfoIDs, len(ids))]
-		page, chunkMissing, err := r.exec.ozon.FetchProductInfo(ctx, creds, r.task.ConnectionRef, chunk)
+		page, chunkMissing, err := r.exec.ozon.FetchProductInfo(ctx, creds, r.Task.ConnectionRef, chunk)
 		if err != nil {
 			return err
 		}
 		missing += chunkMissing
-		page.No = r.nextPage
+		page.No = r.NextPage
 		if i+len(chunk) < len(ids) {
 			page.Cursor = fp + ":" + keys[i+len(chunk)-1]
 		}
-		if err := r.store(ctx, page); err != nil {
+		if err := r.Store(ctx, page); err != nil {
 			return err
 		}
 	}
 	if missing > 0 {
 		// Ozon молча пропускает удалённые между списком и подробностями товары.
-		r.log.Warn("product info: products of the list missing in response", slog.String("stage", "fetch"),
+		r.Log.Warn("product info: products of the list missing in response", slog.String("stage", "fetch"),
 			slog.Int("missing", missing), slog.Int("requested", len(ids)-start))
 	}
 	return nil
@@ -154,7 +155,7 @@ func (r *taskRun) catalogProductIDs(ctx context.Context, cabinet connections.Cab
 		// Список снят с кабинета — подробностям не из чего брать товары.
 		return nil, errResourceNotEnabled
 	}
-	key := store.TaskKey{ConnectionRef: r.task.ConnectionRef, ResourceType: ResourceProductsList, PeriodKey: r.task.PeriodKey}
+	key := store.TaskKey{ConnectionRef: r.Task.ConnectionRef, ResourceType: ResourceProductsList, PeriodKey: r.Task.PeriodKey}
 	content, err := e.tasks.ContentPages(ctx, key)
 	if errors.Is(err, store.ErrNoContent) {
 		return nil, errCatalogNotLoaded
@@ -163,7 +164,7 @@ func (r *taskRun) catalogProductIDs(ctx context.Context, cabinet connections.Cab
 		return nil, fmt.Errorf("%w: %v", errCatalogRawInvalid, err)
 	}
 	if err != nil {
-		return nil, &storeError{err}
+		return nil, fetch.StoreError(err)
 	}
 	set := map[int64]bool{}
 	listed, total := 0, int64(-1)
@@ -186,10 +187,10 @@ func (r *taskRun) catalogProductIDs(ctx context.Context, cabinet connections.Cab
 		return nil, err
 	}
 	// Число товаров снимка — для сверки с листингами Symfony (raw на проде не читается).
-	r.log.Info("product list read", slog.String("stage", "fetch"), slog.Int("listed", listed), slog.Int("unique", len(set)), slog.Int64("total", total))
+	r.Log.Info("product list read", slog.String("stage", "fetch"), slog.Int("listed", listed), slog.Int("unique", len(set)), slog.Int64("total", total))
 	if total >= 0 && int64(listed) != total {
 		// Каталог менялся во время обхода; повтор зациклился бы у активного продавца.
-		r.log.Warn("product list: item count differs from total", slog.String("stage", "fetch"),
+		r.Log.Warn("product list: item count differs from total", slog.String("stage", "fetch"),
 			slog.Int("listed", listed), slog.Int64("total", total))
 	}
 	out := make([]int64, 0, len(set))
@@ -217,7 +218,7 @@ func (r *taskRun) readContent(ctx context.Context, content store.Content, resour
 			if errors.Is(err, rawstore.ErrObjectInvalid) || errors.Is(err, rawstore.ErrObjectNotFound) {
 				return fmt.Errorf("%w: %s page %d: %v", invalid, resource, p.PageNo, err)
 			}
-			return &storeError{err}
+			return fetch.StoreError(err)
 		}
 		if err := parse(body); err != nil {
 			return fmt.Errorf("%w: %s page %d: %v", invalid, resource, p.PageNo, err)
