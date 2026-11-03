@@ -36,6 +36,7 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'marketplace' => 'ozon',
                 'revenue' => 1000.0,
                 'quantity' => 5,
+                'averageCheckRub' => 237.5,
                 'returnsTotal' => 50.0,
                 'returnsQuantity' => 1,
                 'costPriceTotal' => 400.0,
@@ -64,6 +65,7 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'marketplace' => 'ozon',
                 'revenue' => 500.0,
                 'quantity' => 2,
+                'averageCheckRub' => 250.0,
                 'returnsTotal' => 0.0,
                 'returnsQuantity' => 0,
                 'costPriceTotal' => 200.0,
@@ -92,6 +94,7 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'marketplace' => 'wildberries',
                 'revenue' => 0.0,
                 'quantity' => 0,
+                'averageCheckRub' => null,
                 'returnsTotal' => 0.0,
                 'returnsQuantity' => 0,
                 'costPriceTotal' => 0.0,
@@ -117,6 +120,7 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         $totals = [
             'revenue' => 1500.0,
             'quantity' => 7,
+            'averageCheckRub' => 241.67,
             'returnsTotal' => 50.0,
             'returnsQuantity' => 1,
             'costPriceTotal' => 600.0,
@@ -205,6 +209,12 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         $returnsQuantityColumnIndex = $returnsTotalColumnIndex + 1;
         self::assertSame('Кол-во', $header[$returnsQuantityColumnIndex] ?? null, '"Кол-во" возвратов должно идти сразу после "Возвраты"');
         self::assertSame('Кол-во', $header[$revenueColumnIndex + 1] ?? null, '"Кол-во" продаж остаётся сразу после "Выручка"');
+        $averageCheckColumnIndex = $revenueColumnIndex + 2;
+        self::assertSame('Сред. чек', $header[$averageCheckColumnIndex] ?? null, '"Сред. чек" идёт сразу после "Кол-во" продаж');
+        self::assertSame($averageCheckColumnIndex + 1, $returnsTotalColumnIndex);
+        self::assertSame('237.5', (string) ($dataRows[0][$averageCheckColumnIndex] ?? ''));
+        self::assertSame('', (string) ($dataRows[2][$averageCheckColumnIndex] ?? ''), 'Нет нетто-продаж — пустая ячейка, не ноль');
+        self::assertSame('241.67', (string) ($rows[$headerRowIndex + 4][$averageCheckColumnIndex] ?? ''));
         self::assertSame('1', (string) ($dataRows[0][$returnsQuantityColumnIndex] ?? ''));
         self::assertSame('0', (string) ($dataRows[1][$returnsQuantityColumnIndex] ?? ''));
         self::assertSame('1', (string) ($rows[$headerRowIndex + 4][$returnsQuantityColumnIndex] ?? ''));
