@@ -1,6 +1,6 @@
 # Синхронность схемы БД с маппингом Doctrine
 
-Ветка этапов 1–2: `fix/doctrine-schema-sync`. Устройство — `ARCHITECTURE.md`,
+Этапы 1–2 — PR #2869 (на проде 03.11.2026), этап 3 — ветка `fix/doctrine-schema-sync-stage3`. Устройство — `ARCHITECTURE.md`,
 «Схема БД: миграции — источник истины»; гейт — `docs/maintenance/quality-gates.md`.
 
 ## Задача
@@ -61,21 +61,31 @@
 `document_counterparty_repair_backup` 5. `document_operations` без существующего проекта — 0;
 очередь failed (`messenger_messages`) — 0.
 
-## Этап 3 — миграция (решение Владельца)
+## Этап 3 — миграция `Version20261103150000`
 
-1. Вернуть ключ `document_operations.project_direction_id → project_directions` (сирот 0).
-2. На проде добавить недостающие `FK_LISTING_PRODUCT`, `FK_SALE_LISTING` и индексы
-   `project_direction_id` — идемпотентно (`IF NOT EXISTS`), на БД после миграций — no-op.
-3. Удалить дубли индексов `idx_month_close_lookup`, `idx_marketplace_order`,
+Решение Владельца 03.11.2026: пустые таблицы удалить, остальные — с бэкапом.
+
+1. Внешние ключи: `document_operations.project_direction_id` (везде), на проде — `fk_listing_product`,
+   `fk_sale_listing` (проверка «уже есть» по колонке, не по имени). Индексы `project_direction_id`.
+2. Удалены дубли индексов `idx_month_close_lookup`, `idx_marketplace_order`,
    `idx_moysklad_connections_company_name` и их атрибуты.
-4. Снять пустые комментарии `(DC2Type:…)`.
-5. Привести `messenger_messages` к схеме транспорта (очередь пуста).
-6. Удалить с бэкапом, по решению Владельца: `balance_categories`, `balance_category_links`,
-   `document_counterparty_repair_backup`; прод-остатки `bank_connection`, `bank_import_cursor`,
-   `marketplace_raw_processing_step_runs`, `repair_backup_*_20260527`.
-7. Очистить `KNOWN_DRIFT`.
+3. Сняты комментарии `(DC2Type:…)` (на проде 190 колонок).
+4. `messenger_messages` — identity и составной индекс по схеме doctrine-транспорта.
+5. `telegram_bots.updated_at` без default (на проде появился вне миграций).
+6. Удалены таблицы: пустые `bank_connection`, `bank_import_cursor` (миграция прерывается, если в них
+   появились строки); с бэкапом — `balance_categories`, `balance_category_links`,
+   `document_counterparty_repair_backup`, `marketplace_raw_processing_step_runs`,
+   `repair_backup_ad_load_jobs_20260527`, `repair_backup_ad_scheduled_batches_20260527`.
+7. `KNOWN_DRIFT` удалён: гейт без исключений.
 
-Релиз — «run the migration and deploy #N», `production_action=migrations`, затем `deploy`.
+Миграция необратима (`down()` — `IrreversibleMigration`). Бэкап — `backup-production.sh` от root на
+проде до `production_action=migrations`: pg_dump восьми таблиц в `/var/backups/app-service-finance/`,
+счётчики строк, проверка архива и sha256. Тест — `SchemaSyncStage3MigrationTest` (состояние «как на
+проде», повторный прогон, отказ на непустой таблице).
+
+Релиз — «run the migration and deploy #N», затем `production_action=migrations`, проверка схемы,
+`deploy`. После — сверить на проде: ключи есть, таблиц нет, комментариев DC2Type 0, дифф прода с БД
+после миграций пуст.
 
 ## Чек-лист приёмки
 
@@ -85,6 +95,7 @@
 - [x] Частичные уникальные индексы описаны; составные ключи Баланса и МойСклад — составные.
 - [x] Этапы 1–2 без миграций.
 - [x] Гейт красный при откате правки этапа 1 (убрана DBAL-таблица и `WHERE` в атрибуте — 4 строки).
-- [ ] PHPStan без роста baseline, CS, strict_types, unit + integration + functional зелёные.
+- [x] PHPStan без роста baseline, CS, strict_types, unit + integration + functional зелёные (#2869).
 - [x] ARCHITECTURE.md, quality-gates.md, CLAUDE.md.
-- [ ] Этап 3: решения Владельца, бэкап, счётчики до/после, гейт схемы прода зелёный.
+- [x] Этап 3: решение Владельца по таблицам (03.11.2026), миграция и тест, гейт без исключений.
+- [ ] Этап 3 на проде: бэкап снят, счётчики до совпали, миграция применена, сверка после.

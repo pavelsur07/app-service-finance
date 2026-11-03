@@ -1,0 +1,124 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DoctrineMigrations;
+
+use Doctrine\DBAL\Schema\Schema;
+use Doctrine\Migrations\AbstractMigration;
+
+/**
+ * Схема БД = маппинг Doctrine (docs/tasks/doctrine-schema-sync, этап 3).
+ *
+ * Закрывает KNOWN_DRIFT гейта SchemaInSyncWithMigrationsTest и расхождения прода с миграциями.
+ * Шаги, которые на проде и на БД после миграций выглядят по-разному, идемпотентны (IF [NOT] EXISTS).
+ *
+ * Необратима: удаляет таблицы с данными (решение Владельца 03.11.2026, бэкап перед запуском —
+ * docs/tasks/doctrine-schema-sync/backup-production.sh). Откат — восстановление из бэкапа.
+ */
+final class Version20261103150000 extends AbstractMigration
+{
+    /** Пустые на проде: удаляются, только пока пусты. */
+    private const EMPTY_LEGACY_TABLES = ['bank_connection', 'bank_import_cursor'];
+
+    /** Удаляются с бэкапом; кода и сущностей нет. Порядок — с учётом внешних ключей. */
+    private const DROPPED_TABLES = [
+        'balance_category_links',
+        'balance_categories',
+        'document_counterparty_repair_backup',
+        'marketplace_raw_processing_step_runs',
+        'repair_backup_ad_load_jobs_20260527',
+        'repair_backup_ad_scheduled_batches_20260527',
+    ];
+
+    public function getDescription(): string
+    {
+        return 'Schema sync stage 3: lost FKs, duplicate indexes, DC2Type comments, messenger_messages, drop unused tables';
+    }
+
+    public function up(Schema $schema): void
+    {
+        foreach (self::EMPTY_LEGACY_TABLES as $table) {
+            if (null === $this->connection->fetchOne('SELECT to_regclass(:table)', ['table' => $table])) {
+                continue;
+            }
+            $rows = (int) $this->connection->fetchOne(sprintf('SELECT count(*) FROM %s', $table));
+            $this->abortIf(0 !== $rows, sprintf('%s не пуста (%d строк): удаление согласовано только для пустой таблицы.', $table, $rows));
+        }
+
+        // 1. Внешние ключи (на проде сирот 0 — замер 03.11.2026; проверка marketplace_sales ~250 тыс. строк — секунды).
+        //    document_operations.project_direction_id — ключ потерян в Version20260115105426 (везде).
+        //    FK_LISTING_PRODUCT, FK_SALE_LISTING — на проде их не создали условные миграции
+        //    Version20260321120000 / Version20260318130000; на БД после миграций — уже есть.
+        $this->addForeignKeyIfMissing('document_operations', 'fk_doc_ops_project_direction', 'project_direction_id', 'project_directions');
+        $this->addForeignKeyIfMissing('marketplace_listings', 'fk_listing_product', 'product_id', 'products');
+        $this->addForeignKeyIfMissing('marketplace_sales', 'fk_sale_listing', 'listing_id', 'marketplace_listings');
+
+        // Индексы ключей project_direction_id: на проде Version20260115105426 их не переименовала — их не было.
+        $this->addSql('CREATE INDEX IF NOT EXISTS IDX_89D7F81E85D43DF4 ON document_operations (project_direction_id)');
+        $this->addSql('CREATE INDEX IF NOT EXISTS IDX_A2B0728885D43DF4 ON documents (project_direction_id)');
+
+        // На проде default now() появился вне миграций; ORM всегда пишет updated_at сам.
+        $this->addSql('ALTER TABLE telegram_bots ALTER updated_at DROP DEFAULT');
+
+        // 2. Дубли уникальных индексов по тем же колонкам.
+        $this->addSql('DROP INDEX IF EXISTS idx_month_close_lookup');          // = uniq_month_close
+        $this->addSql('DROP INDEX IF EXISTS idx_marketplace_order');           // = uniq_marketplace_srid
+        $this->addSql('DROP INDEX IF EXISTS idx_moysklad_connections_company_name'); // = uniq_moysklad_connections_company_name
+
+        // 3. Комментарии «(DC2Type:…)» DBAL 3 — DBAL 4 их не пишет и не читает.
+        $this->addSql(<<<'SQL'
+            DO $$
+            DECLARE r record;
+            BEGIN
+                FOR r IN
+                    SELECT c.relname AS tbl, a.attname AS col
+                    FROM pg_description d
+                    JOIN pg_class c ON c.oid = d.objoid
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = d.objsubid
+                    WHERE n.nspname = 'public' AND d.objsubid > 0 AND d.description LIKE '(DC2Type:%'
+                LOOP
+                    EXECUTE format('COMMENT ON COLUMN %I.%I IS NULL', r.tbl, r.col);
+                END LOOP;
+            END $$
+            SQL);
+
+        // 4. messenger_messages (очередь failed) — схема doctrine-транспорта Symfony: identity и составной индекс.
+        $isIdentity = 'd' === $this->connection->fetchOne("SELECT attidentity FROM pg_attribute WHERE attrelid = 'messenger_messages'::regclass AND attname = 'id'");
+        if (!$isIdentity) {
+            $this->addSql('ALTER TABLE messenger_messages ALTER id DROP DEFAULT');
+            $this->addSql('DROP SEQUENCE IF EXISTS messenger_messages_id_seq');
+            $this->addSql('ALTER TABLE messenger_messages ALTER id ADD GENERATED BY DEFAULT AS IDENTITY');
+            $this->addSql("SELECT setval(pg_get_serial_sequence('messenger_messages', 'id'), COALESCE((SELECT MAX(id) FROM messenger_messages), 0) + 1, false)");
+        }
+        $this->addSql('DROP INDEX IF EXISTS idx_75ea56e0fb7336f0');
+        $this->addSql('DROP INDEX IF EXISTS idx_75ea56e0e3bd61ce');
+        $this->addSql('DROP INDEX IF EXISTS idx_75ea56e016ba31db');
+        $this->addSql('CREATE INDEX IF NOT EXISTS IDX_75EA56E0FB7336F0E3BD61CE16BA31DBBF396750 ON messenger_messages (queue_name, available_at, delivered_at, id)');
+
+        // 5. Неиспользуемые таблицы (sequence serial-колонок удаляются вместе с таблицей).
+        foreach ([...self::EMPTY_LEGACY_TABLES, ...self::DROPPED_TABLES] as $table) {
+            $this->addSql(sprintf('DROP TABLE IF EXISTS %s', $table));
+        }
+    }
+
+    public function down(Schema $schema): void
+    {
+        $this->throwIrreversibleMigrationException('Удалены таблицы с данными: откат — восстановление из бэкапа (docs/tasks/doctrine-schema-sync/backup-production.sh).');
+    }
+
+    private function addForeignKeyIfMissing(string $table, string $name, string $column, string $target): void
+    {
+        $exists = $this->connection->fetchOne(
+            'SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass(:table) AND contype = \'f\' AND conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = to_regclass(:table) AND attname = :column)]::smallint[]',
+            ['table' => $table, 'column' => $column],
+        );
+
+        if (false !== $exists) {
+            return;
+        }
+
+        $this->addSql(sprintf('ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s (id) NOT DEFERRABLE INITIALLY IMMEDIATE', $table, $name, $column, $target));
+    }
+}

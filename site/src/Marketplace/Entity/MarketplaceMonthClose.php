@@ -28,7 +28,6 @@ use Webmozart\Assert\Assert;
     name: 'uniq_month_close',
     columns: ['company_id', 'marketplace', 'year', 'month'],
 )]
-#[ORM\Index(columns: ['company_id', 'marketplace', 'year', 'month'], name: 'idx_month_close_lookup')]
 class MarketplaceMonthClose
 {
     #[ORM\Id]

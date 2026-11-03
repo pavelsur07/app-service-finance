@@ -12,7 +12,6 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity(repositoryClass: MoySkladConnectionWriteRepository::class)]
 #[ORM\Table(name: 'moysklad_connections')]
 #[ORM\Index(columns: ['company_id', 'is_active'], name: 'idx_moysklad_connections_company_active')]
-#[ORM\Index(columns: ['company_id', 'name'], name: 'idx_moysklad_connections_company_name')]
 #[ORM\UniqueConstraint(name: 'uniq_moysklad_connections_company_name', columns: ['company_id', 'name'])]
 #[ORM\UniqueConstraint(name: 'uniq_moysklad_connections_account', columns: ['account_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_moysklad_connections_company_id', columns: ['company_id', 'id'])]
