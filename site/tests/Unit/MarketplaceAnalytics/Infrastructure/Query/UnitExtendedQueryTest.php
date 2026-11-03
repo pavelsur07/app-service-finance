@@ -335,6 +335,27 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertSame(60.0, $tagB['marginPercent']);
     }
 
+    public function testTagSummaryAverageCheckIsComputedFromBucketSums(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-1', 'Первый', 'SKU-1', 'ozon', '1000.00', 5, '300.00', 5),
+            new ListingSalesAggregateDTO('l-2', 'Второй', 'SKU-2', 'ozon', '300.00', 3, '90.00', 3),
+        ]);
+        $this->stubReturns([
+            new ListingReturnAggregateDTO('l-1', '100.00', 1),
+        ]);
+        $this->stubTags([
+            'l-1' => ['t-a'],
+            'l-2' => ['t-a'],
+        ]);
+
+        $tagA = $this->findTagSummaryRow($this->execute(withTagSummary: true)['tagSummary'], 't-a');
+
+        self::assertNotNull($tagA);
+        // (1300 − 100) / (8 − 1), а не среднее построчных чеков (225 и 100 → 162.5).
+        self::assertSame(171.43, $tagA['averageCheckRub']);
+    }
+
     public function testTagSummarySortedByRevenueWithUntaggedLast(): void
     {
         $this->stubSales([
@@ -475,6 +496,9 @@ final class UnitExtendedQueryTest extends TestCase
 
         self::assertNotNull($row);
         self::assertSame(1, $row['returnsQuantity']);
+        // Средний чек — нетто: (1000 − 100) / (5 − 1).
+        self::assertSame(225.0, $row['averageCheckRub']);
+        self::assertSame(225.0, $result['totals']['averageCheckRub']);
         self::assertSame(25.0, $row['commissionAverageRub']);
         self::assertSame(20.0, $row['cacRub']);
         self::assertSame(1, $result['totals']['returnsQuantity']);
@@ -502,6 +526,8 @@ final class UnitExtendedQueryTest extends TestCase
         $row = $this->findRow($result['items'], 'l-zero-net');
 
         self::assertNotNull($row);
+        self::assertNull($row['averageCheckRub']);
+        self::assertNull($result['totals']['averageCheckRub']);
         self::assertNull($row['commissionAverageRub']);
         self::assertNull($row['cacRub']);
         self::assertNull($result['totals']['commissionAverageRub']);

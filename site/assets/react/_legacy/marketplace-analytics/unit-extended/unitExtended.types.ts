@@ -27,6 +27,8 @@ export interface UnitExtendedItem {
     marketplace: string;
     revenue: number;
     quantity: number;
+    /** (Выручка − возвраты) / (продано − возвращено, шт.); null = нетто-продаж нет. */
+    averageCheckRub: number | null;
     returnsTotal: number;
     returnsQuantity: number;
     costPriceTotal: number;
@@ -56,6 +58,8 @@ export interface UnitExtendedItem {
 export interface UnitExtendedTotals {
     revenue: number;
     quantity: number;
+    /** (Выручка − возвраты) / (продано − возвращено, шт.); null = нетто-продаж нет. */
+    averageCheckRub: number | null;
     returnsTotal: number;
     returnsQuantity: number;
     costPriceTotal: number;
@@ -79,6 +83,8 @@ export interface TagSummaryRow {
     listingsCount: number;
     revenue: number;
     quantity: number;
+    /** (Выручка − возвраты) / (продано − возвращено, шт.); null = нетто-продаж нет. */
+    averageCheckRub: number | null;
     returnsTotal: number;
     returnsQuantity: number;
     costPriceTotal: number;

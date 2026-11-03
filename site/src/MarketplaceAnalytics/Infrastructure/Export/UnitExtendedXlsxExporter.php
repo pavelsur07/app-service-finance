@@ -36,6 +36,7 @@ final readonly class UnitExtendedXlsxExporter
         ['label' => 'Теги',            'field' => 'tags',           'type' => 'tags'],
         ['label' => 'Выручка',         'field' => 'revenue',        'type' => 'money'],
         ['label' => 'Кол-во',          'field' => 'quantity',       'type' => 'integer'],
+        ['label' => 'Сред. чек',       'field' => 'averageCheckRub', 'type' => 'money'],
         ['label' => 'Возвраты',        'field' => 'returnsTotal',   'type' => 'money'],
         ['label' => 'Кол-во',          'field' => 'returnsQuantity', 'type' => 'integer'],
         ['label' => 'Себестоимость',   'field' => 'costPriceTotal', 'type' => 'money'],

@@ -234,6 +234,7 @@ final readonly class UnitExtendedQuery
                 'marketplace' => $mp,
                 'revenue' => round($revenue, 2),
                 'quantity' => $quantity,
+                'averageCheckRub' => $this->averagePerNetSoldQty($revenue - $returnsTotal, $netSoldQty),
                 'returnsTotal' => round($returnsTotal, 2),
                 'returnsQuantity' => $returnsQuantity,
                 'costPriceTotal' => round($costPriceTotal, 2),
@@ -322,6 +323,10 @@ final readonly class UnitExtendedQuery
 
         $totals['adSpend'] = $effectiveAdSpend;
         $totalsNetSoldQty = $totals['quantity'] - $totals['returnsQuantity'];
+        $totals['averageCheckRub'] = $this->averagePerNetSoldQty(
+            (float) $totals['revenue'] - (float) $totals['returnsTotal'],
+            $totalsNetSoldQty,
+        );
         $totals['commissionAverageRub'] = $this->averagePerNetSoldQty((float) $totals['commission'], $totalsNetSoldQty);
         $totals['cacRub'] = $this->averagePerNetSoldQty($effectiveAdSpend, $totalsNetSoldQty);
         $totals['drrPercent'] = $totals['revenue'] > 0
@@ -412,6 +417,7 @@ final readonly class UnitExtendedQuery
                 'listingsCount' => $bucket['listingsCount'],
                 'revenue' => $revenue,
                 'quantity' => $bucket['quantity'],
+                'averageCheckRub' => $this->averagePerNetSoldQty($revenue - $returnsTotal, $netSoldQty),
                 'returnsTotal' => $returnsTotal,
                 'returnsQuantity' => $bucket['returnsQuantity'],
                 'costPriceTotal' => $costPriceTotal,

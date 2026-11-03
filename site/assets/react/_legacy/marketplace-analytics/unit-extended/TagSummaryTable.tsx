@@ -49,6 +49,12 @@ const TagSummaryTable: React.FC<TagSummaryTableProps> = ({ rows, isLoading }) =>
                             <th className="text-end">Листингов</th>
                             <th className="text-end">Выручка</th>
                             <th className="text-end">Кол-во</th>
+                            <th
+                                className="text-end"
+                                title="Средний чек: (выручка − возвраты) / (продано − возвращено, шт.)"
+                            >
+                                Сред. чек
+                            </th>
                             <th className="text-end">Себест.</th>
                             <th
                                 className="text-end"
@@ -73,6 +79,7 @@ const TagSummaryTable: React.FC<TagSummaryTableProps> = ({ rows, isLoading }) =>
                                 <td className="text-end">{row.listingsCount.toLocaleString('ru-RU')}</td>
                                 <td className="text-end">{formatMoney(row.revenue)}</td>
                                 <td className="text-end">{row.quantity.toLocaleString('ru-RU')}</td>
+                                <td className="text-end">{formatMoney(row.averageCheckRub)}</td>
                                 <td className="text-end">{formatMoney(row.costPriceTotal)}</td>
                                 <td className="text-end">
                                     {formatMoney(row.stockCapitalRub)}
