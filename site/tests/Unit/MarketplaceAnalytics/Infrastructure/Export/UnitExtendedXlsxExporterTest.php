@@ -32,6 +32,8 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'listingId' => 'l-1',
                 'title' => 'Товар А',
                 'sku' => 'SKU-A',
+                'abcRevenue' => 'A',
+                'abcProfit' => 'A',
                 'sellerArticle' => 'ART-A',
                 'marketplace' => 'ozon',
                 'revenue' => 1000.0,
@@ -61,6 +63,8 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'listingId' => 'l-2',
                 'title' => 'Товар Б',
                 'sku' => 'SKU-B',
+                'abcRevenue' => 'B',
+                'abcProfit' => 'B',
                 'sellerArticle' => 'ART-B',
                 'marketplace' => 'ozon',
                 'revenue' => 500.0,
@@ -90,6 +94,8 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'listingId' => 'l-3',
                 'title' => 'Товар В',
                 'sku' => 'SKU-C',
+                'abcRevenue' => 'C',
+                'abcProfit' => 'D',
                 'sellerArticle' => '',
                 'marketplace' => 'wildberries',
                 'revenue' => 0.0,
@@ -209,6 +215,19 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         $returnsQuantityColumnIndex = $returnsTotalColumnIndex + 1;
         self::assertSame('Кол-во', $header[$returnsQuantityColumnIndex] ?? null, '"Кол-во" возвратов должно идти сразу после "Возвраты"');
         self::assertSame('Кол-во', $header[$revenueColumnIndex + 1] ?? null, '"Кол-во" продаж остаётся сразу после "Выручка"');
+        $tagsColumnIndex = array_search('Теги', $header, true);
+        self::assertNotFalse($tagsColumnIndex);
+        $abcRevenueColumnIndex = $tagsColumnIndex + 1;
+        $abcProfitColumnIndex = $tagsColumnIndex + 2;
+        self::assertSame('ABC выр.', $header[$abcRevenueColumnIndex] ?? null);
+        self::assertSame('ABC приб.', $header[$abcProfitColumnIndex] ?? null);
+        self::assertSame($abcProfitColumnIndex + 1, $revenueColumnIndex);
+        self::assertSame('A', (string) ($dataRows[0][$abcRevenueColumnIndex] ?? ''));
+        self::assertSame('C', (string) ($dataRows[2][$abcRevenueColumnIndex] ?? ''));
+        self::assertSame('D', (string) ($dataRows[2][$abcProfitColumnIndex] ?? ''));
+        // Класс — свойство листинга, в итоге его нет.
+        self::assertSame('', (string) ($rows[$headerRowIndex + 4][$abcRevenueColumnIndex] ?? ''));
+        self::assertSame('', (string) ($rows[$headerRowIndex + 4][$abcProfitColumnIndex] ?? ''));
         $averageCheckColumnIndex = $revenueColumnIndex + 2;
         self::assertSame('Сред. чек', $header[$averageCheckColumnIndex] ?? null, '"Сред. чек" идёт сразу после "Кол-во" продаж');
         self::assertSame($averageCheckColumnIndex + 1, $returnsTotalColumnIndex);

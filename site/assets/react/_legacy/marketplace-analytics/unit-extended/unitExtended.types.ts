@@ -19,6 +19,9 @@ export interface CostGroupBreakdown {
     categories: CostCategory[];
 }
 
+/** A/B/C — доля во вкладе 80/15/5 по накопленной сумме, D — убыток (только прибыль). */
+export type AbcClass = 'A' | 'B' | 'C' | 'D';
+
 export interface UnitExtendedItem {
     listingId: string;
     title: string;
@@ -53,6 +56,10 @@ export interface UnitExtendedItem {
     otherCostsBreakdown: CostGroupBreakdown[];
     allCostsBreakdown: CostGroupBreakdown[];
     tags: ListingTag[];
+    /** По нетто-выручке (выручка − возвраты) всего набора; ≤ 0 → C. */
+    abcRevenue: AbcClass;
+    /** По прибыли всего набора; ≤ 0 → D. */
+    abcProfit: AbcClass;
 }
 
 export interface UnitExtendedTotals {

@@ -10,6 +10,8 @@ use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
+use App\MarketplaceAnalytics\Domain\Service\AbcClassificationPolicy;
+use App\MarketplaceAnalytics\Enum\AbcClass;
 
 final readonly class UnitExtendedQuery
 {
@@ -19,6 +21,7 @@ final readonly class UnitExtendedQuery
         private InventoryFacade $inventoryFacade,
         private MarketplaceCostAnalyticsGroupResolver $groupResolver,
         private ListingTagFacade $listingTagFacade,
+        private AbcClassificationPolicy $abcPolicy,
     ) {
     }
 
@@ -121,6 +124,10 @@ final readonly class UnitExtendedQuery
 
         $items = [];
         $summaryRows = [];
+        // База ABC — все листинги набора (как totals), до поиска и лимита: иначе класс
+        // менялся бы при вводе в поиск.
+        $abcRevenueBase = [];
+        $abcProfitBase = [];
         $totals = [
             'revenue' => 0.0,
             'quantity' => 0,
@@ -226,6 +233,9 @@ final readonly class UnitExtendedQuery
             $otherBreakdown = $this->buildBreakdown($allCategoriesRaw, true);
             $allBreakdown = $this->buildBreakdown($allCategoriesRaw, false);
 
+            $abcRevenueBase[$listingId] = $revenue - $returnsTotal;
+            $abcProfitBase[$listingId] = $profit;
+
             $row = [
                 'listingId' => $listingId,
                 'title' => $title,
@@ -259,6 +269,8 @@ final readonly class UnitExtendedQuery
                     static fn (ListingTagDTO $tag): array => $tag->toArray(),
                     $tagsByListing[$listingId] ?? [],
                 ),
+                'abcRevenue' => null,
+                'abcProfit' => null,
             ];
 
             // Totals accumulate across ALL listings (not limited).
@@ -298,6 +310,13 @@ final readonly class UnitExtendedQuery
             if (null === $normalizedSearch || $this->matchesSearch($row, $normalizedSearch)) {
                 $items[] = $row;
             }
+        }
+
+        $abcRevenue = $this->abcPolicy->classify($abcRevenueBase, AbcClass::C);
+        $abcProfit = $this->abcPolicy->classify($abcProfitBase, AbcClass::D);
+        foreach ($items as $index => $item) {
+            $items[$index]['abcRevenue'] = $abcRevenue[$item['listingId']]->value;
+            $items[$index]['abcProfit'] = $abcProfit[$item['listingId']]->value;
         }
 
         // Sort by revenue DESC
