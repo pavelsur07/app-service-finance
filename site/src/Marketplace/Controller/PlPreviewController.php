@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller;
 
+use App\Company\Facade\CompanyFacade;
 use App\Company\Security\ModuleAccess;
 use App\Marketplace\Application\Action\BuildMarketplacePlPreviewAction;
 use App\Marketplace\Application\PlPreview\PlPreviewFilter;
@@ -19,8 +20,8 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Вкладка «Предпросмотр ОПиУ»: что покажет ОПиУ по тегам товара, если провести данные периода по
- * текущему маппингу. Ничего не пишет.
+ * Вкладка «Предпросмотр ОПиУ»: что покажет ОПиУ по тегам товара или по проектам, если провести
+ * данные периода по текущему маппингу. Ничего не пишет.
  */
 #[Route('/marketplace/pl-preview', name: 'marketplace_pl_preview_index', methods: ['GET'])]
 #[IsGranted('ROLE_USER')]
@@ -34,6 +35,7 @@ final class PlPreviewController extends AbstractController
         private readonly BuildMarketplacePlPreviewAction $buildPreview,
         private readonly MarketplaceListingTagRepository $tagRepository,
         private readonly ClockInterface $clock,
+        private readonly CompanyFacade $companyFacade,
     ) {
     }
 
@@ -59,6 +61,7 @@ final class PlPreviewController extends AbstractController
             'report' => $report,
             'error' => $error,
             'tags' => $this->tagRepository->listForCompany($companyId),
+            'projects' => $this->companyFacade->listProjectDirections($companyId),
             'marketplaces' => MarketplaceType::cases(),
         ]);
     }

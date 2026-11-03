@@ -8,5 +8,7 @@ enum PlPreviewColumnKind: string
 {
     case TAG = 'tag';
     case COMMON = 'common';
+    case PROJECT = 'project';
+    case NO_PROJECT = 'no_project';
     case TOTAL = 'total';
 }

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Marketplace\Controller;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
+use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -13,6 +16,7 @@ use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingTagBuilder;
 use App\Tests\Integration\Marketplace\PlPreview\PlPreviewFixture;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 final class PlPreviewControllerTest extends WebTestCaseBase
@@ -66,6 +70,33 @@ final class PlPreviewControllerTest extends WebTestCaseBase
         $sidebar = $crawler->filter('.dropdown-menu-column a.dropdown-item.active');
         self::assertSame(['Предпросмотр ОПиУ'], $sidebar->each(static fn ($a): string => trim($a->text())));
         self::assertSame('/marketplace/pl-preview', $sidebar->attr('href'));
+    }
+
+    public function testShowsPreviewByProjects(): void
+    {
+        $client = static::createClient();
+        $fixture = new PlPreviewFixture($this->em(), 451);
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $fixture->company, 'Вайлдберриз');
+        $wb = new MarketplaceConnection(Uuid::uuid4()->toString(), $fixture->company, MarketplaceType::WILDBERRIES);
+        $wb->setApiKey('test-key');
+        $wb->setProjectDirectionId($project->getId());
+        $this->em()->persist($project);
+        $this->em()->persist($wb);
+        $this->em()->flush();
+        $this->em()->clear();
+        $this->login($client, $fixture->owner, $fixture->company);
+
+        $crawler = $client->request('GET', self::URL.'&columns=projects');
+
+        self::assertResponseIsSuccessful();
+        self::assertSame('projects', $crawler->filter('[data-testid="pl-preview-columns"] option[selected]')->attr('value'));
+        self::assertSame(['Вайлдберриз'], $crawler->filter('[data-testid="pl-preview-projects"] .form-check-label')->each(static fn ($l): string => trim($l->text())));
+        $headers = $crawler->filter('[data-testid="pl-preview-table"] thead th')->each(static fn ($th): string => trim($th->text()));
+        // Реализация Ozon без проекта: ни правила, ни подключения.
+        self::assertSame(['Статья', 'Вайлдберриз', 'Без проекта', 'Итого'], $headers);
+        $revenue = $crawler->filter('[data-testid="pl-preview-table"] tr[data-row-code="REV"] td')->each(static fn ($td): string => (string) $td->attr('title'));
+        self::assertSame(['REV', '1 300,00', '0,00', '1 300,00'], $this->normalizeSpaces($revenue));
+        self::assertStringContainsString('columns=projects', (string) $crawler->filter('[data-testid="pl-preview-xlsx"]')->attr('href'));
     }
 
     public function testOtherCompanySeesNothingOfThisOne(): void

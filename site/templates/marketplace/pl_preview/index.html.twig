@@ -139,8 +139,16 @@
                     {% endfor %}
                 </select>
             </div>
+            {% set projects_mode = filter.mode.value == 'projects' %}
+            <div>
+                <label class="form-label" for="pl-preview-columns">Колонки</label>
+                <select class="form-select" id="pl-preview-columns" name="columns" data-pl-columns-mode data-testid="pl-preview-columns">
+                    <option value="tags" {{ not projects_mode ? 'selected' }}>По тегам</option>
+                    <option value="projects" {{ projects_mode ? 'selected' }}>По проектам</option>
+                </select>
+            </div>
             {% if tags is not empty %}
-                <div class="dropdown">
+                <div class="dropdown" data-pl-columns-for="tags" {{ projects_mode ? 'hidden' }}>
                     <span class="form-label d-block" id="pl-preview-tags-label">Теги</span>
                     <input type="hidden" name="tags_set" value="1">
                     <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" id="pl-preview-tags-button" aria-labelledby="pl-preview-tags-label pl-preview-tags-button">
@@ -152,6 +160,24 @@
                                 <input class="form-check-input" type="checkbox" name="tags[]" value="{{ tag.id }}"
                                        {{ filter.tagIds is null or tag.id in filter.tagIds ? 'checked' }}>
                                 <span class="form-check-label">{{ tag.name }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+            {% if projects is not empty %}
+                <div class="dropdown" data-pl-columns-for="projects" {{ not projects_mode ? 'hidden' }}>
+                    <span class="form-label d-block" id="pl-preview-projects-label">Проекты</span>
+                    <input type="hidden" name="projects_set" value="1">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" id="pl-preview-projects-button" aria-labelledby="pl-preview-projects-label pl-preview-projects-button">
+                        {{ filter.projectIds is null ? 'Все проекты' : 'Выбрано: ' ~ filter.projectIds|length }}
+                    </button>
+                    <div class="dropdown-menu p-2 pl-preview-tags" data-testid="pl-preview-projects">
+                        {% for project in projects %}
+                            <label class="form-check dropdown-item">
+                                <input class="form-check-input" type="checkbox" name="projects[]" value="{{ project.id }}"
+                                       {{ filter.projectIds is null or project.id in filter.projectIds ? 'checked' }}>
+                                <span class="form-check-label">{% if project.level > 1 %}{% for i in 2..project.level %}— {% endfor %}{% endif %}{{ project.name }}</span>
                             </label>
                         {% endfor %}
                     </div>
@@ -171,11 +197,11 @@
                     <div class="dropdown-menu dropdown-menu-end" aria-labelledby="pl-preview-export-button">
                         <a class="dropdown-item flex-column align-items-start" href="{{ path('marketplace_pl_preview_xlsx', base_query) }}" data-testid="pl-preview-xlsx">
                             <span>Таблица как на экране</span>
-                            <small class="text-secondary">Статьи × теги — для просмотра и печати</small>
+                            <small class="text-secondary">Статьи × {{ projects_mode ? 'проекты' : 'теги' }} — для просмотра и печати</small>
                         </a>
                         <a class="dropdown-item flex-column align-items-start" href="{{ path('marketplace_pl_preview_rows_xlsx', base_query) }}" data-testid="pl-preview-rows-xlsx">
                             <span>Строками для план-факта</span>
-                            <small class="text-secondary">Одна сумма — одна строка, по каналам и тегам</small>
+                            <small class="text-secondary">Одна сумма — одна строка, по каналам и {{ projects_mode ? 'проектам' : 'тегам' }}</small>
                         </a>
                     </div>
                 </div>
@@ -208,8 +234,12 @@
                 {% set ad_labels = {ozon: 'Ozon (клики)', wildberries: 'WB («Продвижение»)'} %}
                 <p class="text-secondary small mb-2" data-testid="pl-preview-ads-note">
                     Реклама {{ report.adReconciliation|map(a => ad_labels[a.marketplace.value] ?? a.marketplace.displayName)|join(' и ') }}
-                    в колонках тегов — по рекламной статистике; реклама без товара и разница с учётом — в «Общих».
-                    «Итого» — по учёту.
+                    {% if projects_mode %}
+                        в колонках проектов и в «Итого» — по учёту, на проект подключения маркетплейса.
+                    {% else %}
+                        в колонках тегов — по рекламной статистике; реклама без товара и разница с учётом — в «Общих».
+                        «Итого» — по учёту.
+                    {% endif %}
                 </p>
             {% endif %}
 
@@ -232,7 +262,7 @@
                         <tr>
                             <th>Статья</th>
                             {% for column in report.columns %}
-                                <th class="text-end{{ column.kind.value == 'total' ? ' pl-cell-total' }}" title="{{ column.label }}" data-column="{{ column.key }}">{{ column.label }}</th>
+                                <th class="text-end{{ column.kind.value == 'total' ? ' pl-cell-total' }}" title="{{ column.indentedLabel }}" data-column="{{ column.key }}">{{ column.indentedLabel }}</th>
                             {% endfor %}
                         </tr>
                     </thead>
@@ -425,6 +455,17 @@
     </div>
 
     <script>
+    {# Переключатель «Колонки» показывает список своего разреза; оба списка уходят в ссылку. #}
+    document.addEventListener('DOMContentLoaded', function () {
+        var mode = document.querySelector('[data-pl-columns-mode]');
+        if (!mode) { return; }
+        mode.addEventListener('change', function () {
+            document.querySelectorAll('[data-pl-columns-for]').forEach(function (el) {
+                el.hidden = el.getAttribute('data-pl-columns-for') !== mode.value;
+            });
+        });
+    });
+
     {# Дерево открывается свёрнутым до уровня 1; клик по статье раскрывает её прямых потомков,
        повторный — сворачивает всю ветку. Без JS таблица остаётся развёрнутой. #}
     document.addEventListener('DOMContentLoaded', function () {

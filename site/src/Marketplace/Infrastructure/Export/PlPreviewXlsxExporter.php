@@ -9,6 +9,7 @@ use App\Marketplace\Application\Action\BuildMarketplacePlPreviewAction;
 use App\Marketplace\Application\DTO\MarketplacePlPreviewReport;
 use App\Marketplace\Application\DTO\PlPreviewCostCoverageDTO;
 use App\Marketplace\Enum\PlPreviewColumnKind;
+use App\Marketplace\Enum\PlPreviewColumnMode;
 use OpenSpout\Common\Entity\Cell;
 use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
@@ -51,7 +52,7 @@ final readonly class PlPreviewXlsxExporter
     private function writeReportSheet(Writer $writer, MarketplacePlPreviewReport $report, bool $showEmptyRows): void
     {
         $sheet = $writer->getCurrentSheet();
-        $sheet->setName('ОПиУ по тегам');
+        $sheet->setName(PlPreviewColumnMode::PROJECTS === $report->mode ? 'ОПиУ по проектам' : 'ОПиУ по тегам');
         $sheet->setColumnWidth(45, 1);
         $sheet->setColumnWidthForRange(18, 2, 1 + \count($report->columns));
 
@@ -68,7 +69,7 @@ final readonly class PlPreviewXlsxExporter
 
         $headers = ['Статья'];
         foreach ($report->columns as $column) {
-            $headers[] = $column->label;
+            $headers[] = $column->indentedLabel();
         }
         $writer->addRow($this->headerRow($headers));
 
@@ -150,7 +151,9 @@ final readonly class PlPreviewXlsxExporter
 
         if ([] !== $report->adReconciliation) {
             $writer->addRow(Row::fromValues([]));
-            $writer->addRow(new Row([self::text('Реклама: учёт и статистика (в колонках тегов — по статистике)')], (new Style())->setFontBold()));
+            $writer->addRow(new Row([self::text(PlPreviewColumnMode::PROJECTS === $report->mode
+                ? 'Реклама: учёт и статистика (в колонках проектов — по учёту)'
+                : 'Реклама: учёт и статистика (в колонках тегов — по статистике)')], (new Style())->setFontBold()));
             $writer->addRow($this->headerRow(['Маркетплейс', 'Учёт, ₽', 'Статистика, ₽', 'На товарах, ₽', 'Без товара, ₽', 'Расхождение, ₽']));
             foreach ($report->adReconciliation as $ads) {
                 $writer->addRow(new Row([

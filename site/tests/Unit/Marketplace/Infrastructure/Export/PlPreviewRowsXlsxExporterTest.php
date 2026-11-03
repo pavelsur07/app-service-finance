@@ -17,6 +17,7 @@ use App\Marketplace\Application\DTO\PlPreviewRowsExport;
 use App\Marketplace\Application\DTO\PlPreviewSalesCoverageDTO;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PlPreviewColumnKind;
+use App\Marketplace\Enum\PlPreviewColumnMode;
 use App\Marketplace\Enum\PlPreviewCostStatus;
 use App\Marketplace\Enum\PlPreviewSalesKind;
 use App\Marketplace\Infrastructure\Export\PlPreviewRowsXlsxExporter;
@@ -30,6 +31,8 @@ use PHPUnit\Framework\TestCase;
 final class PlPreviewRowsXlsxExporterTest extends TestCase
 {
     private const string TAG_ID = '0199f000-0000-7000-8000-000000000001';
+    private const string PROJECT_ID = '0199f000-0000-7000-8000-000000000002';
+    private const string CHILD_ID = '0199f000-0000-7000-8000-000000000003';
     private const string REV_ID = '0199f000-0000-7000-8000-0000000000a1';
     private const string COST_ID = '0199f000-0000-7000-8000-0000000000a2';
     private const string MARGIN_ID = '0199f000-0000-7000-8000-0000000000a3';
@@ -88,7 +91,7 @@ final class PlPreviewRowsXlsxExporterTest extends TestCase
         self::assertEqualsWithDelta(100.13, self::v($first[15]), 1e-9);
         self::assertInstanceOf(DateTimeCell::class, $first[16]);
         self::assertSame('2026-10-20 09:15:00', self::v($first[16]));
-        self::assertSame('1.0', self::v($first[17]));
+        self::assertSame(PlPreviewRowsXlsxExporter::FORMAT_VERSION, self::v($first[17]));
 
         $costNoCode = $rows[1];
         self::assertSame(['', 2, 2, 'LEAF_INPUT', 'MONEY'], [self::v($costNoCode[9]), self::v($costNoCode[10]), self::v($costNoCode[11]), self::v($costNoCode[13]), self::v($costNoCode[14])]);
@@ -124,7 +127,7 @@ final class PlPreviewRowsXlsxExporterTest extends TestCase
         self::assertSame('ozon;wildberries', self::v($passport['marketplaces']));
         self::assertSame(self::TAG_ID.'==Склад', self::v($passport['tags']));
         self::assertSame(1, self::v($passport['tags_overlap']));
-        self::assertSame('1.0', self::v($passport['format_ver']));
+        self::assertSame(PlPreviewRowsXlsxExporter::FORMAT_VERSION, self::v($passport['format_ver']));
         self::assertSame('2026-W42', self::v($passport['iso_week']));
         self::assertEqualsWithDelta(-120.5, self::v($passport['cost_total_wildberries']), 1e-9);
         self::assertEqualsWithDelta(-100.0, self::v($passport['cost_mapped_wildberries']), 1e-9);
@@ -244,6 +247,45 @@ final class PlPreviewRowsXlsxExporterTest extends TestCase
 
         self::assertCount(1, $sheets['Реклама']);
         self::assertCount(1, $sheets['Предупреждения']);
+    }
+
+    public function testProjectColumnsCarryProjectIdInColumnFields(): void
+    {
+        $from = new \DateTimeImmutable('2026-10-12');
+        $to = new \DateTimeImmutable('2026-10-18');
+        $report = new MarketplacePlPreviewReport(
+            from: $from,
+            to: $to,
+            marketplace: MarketplaceType::OZON,
+            columns: [
+                new MarketplacePlPreviewColumn('project:'.self::PROJECT_ID, 'Маркетплейсы', PlPreviewColumnKind::PROJECT),
+                new MarketplacePlPreviewColumn('project:'.self::CHILD_ID, 'Ozon', PlPreviewColumnKind::PROJECT, 2),
+                new MarketplacePlPreviewColumn('no_project', 'Без проекта', PlPreviewColumnKind::NO_PROJECT),
+                new MarketplacePlPreviewColumn('total', 'Итого', PlPreviewColumnKind::TOTAL),
+            ],
+            rows: [new PlPreviewRow(self::REV_ID, 'REV', 'Выручка', 1, PLCategoryType::LEAF_INPUT, PLValueFormat::MONEY, ['project:'.self::PROJECT_ID => 70.0, 'no_project' => 30.0, 'total' => 100.0])],
+            tagsOverlap: false,
+            unplaced: [],
+            costCoverage: [],
+            costTotal: '0.00',
+            costReconciliationDelta: '0.00',
+            salesCoverage: [],
+            warnings: [],
+            mode: PlPreviewColumnMode::PROJECTS,
+        );
+
+        $sheets = $this->export(new PlPreviewRowsExport($from, $to, [$report], null));
+
+        self::assertSame(
+            [['project', self::PROJECT_ID, 'Маркетплейсы', 70.0], ['project', self::CHILD_ID, 'Ozon', 0.0], ['no_project', '', 'Без проекта', 30.0], ['total', '', 'Итого', 100.0]],
+            array_map(static fn (array $r): array => [self::v($r[5]), self::v($r[6]), self::v($r[7]), (float) self::v($r[15])], array_slice($sheets['Данные'], 1)),
+        );
+        $passport = [];
+        foreach (array_slice($sheets['Паспорт'], 1) as $row) {
+            $passport[self::v($row[0])] = self::v($row[1]);
+        }
+        self::assertSame(self::PROJECT_ID.'=Маркетплейсы;'.self::CHILD_ID.'=Ozon', $passport['projects']);
+        self::assertSame('', $passport['tags']);
     }
 
     private function twoChannels(?\DateTimeImmutable $from = null, ?\DateTimeImmutable $to = null): PlPreviewRowsExport

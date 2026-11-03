@@ -45,6 +45,8 @@ final readonly class BuildPlPreviewRowsExportAction
                 $command->to,
                 $marketplace,
                 $command->tagIds,
+                $command->mode,
+                $command->projectIds,
             ));
         }
 
