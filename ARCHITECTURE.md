@@ -3758,6 +3758,20 @@ enum SnapshotRecalcScope: string
 }
 ```
 
+### `src/MarketplaceAnalytics/Enum/AbcClass.php`
+```php
+enum AbcClass: string
+{
+    case A = 'A'; // накопленная доля до листинга < 80%
+    case B = 'B'; // < 95%
+    case C = 'C'; // остальные; для выручки — и значение ≤ 0
+    case D = 'D'; // убыток: прибыль ≤ 0 (только ABC по прибыли)
+}
+```
+Классы считает `Domain\Service\AbcClassificationPolicy` (в копейках, равные значения — по ID).
+`UnitExtendedQuery` отдаёт `abcRevenue` (база — выручка − возвраты) и `abcProfit` по всему
+набору периода/маркетплейса/тегов — до поиска и лимита строк.
+
 ### `src/Marketplace/Enum/PipelineStatus.php`
 ```php
 enum PipelineStatus: string
@@ -4715,6 +4729,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.123 | 2026-11-03 | MarketplaceAnalytics: ABC-анализ в расширенной юнит-экономике — `AbcClass`, `AbcClassificationPolicy`, поля `abcRevenue`/`abcProfit` (80/15/5, D — убыток) |
 | 2.122 | 2026-11-03 | Marketplace, Ingestion: отчёт WB о реализации читается до 204 / `[]`, неполная страница больше не конец дня (задача `wb-finance-symfony-pagination`) |
 | 2.121 | 2026-11-02 | Marketplace: `/internal/wb-finance/sales-reports/slot` и `…/rate-limited` — общая квота WB finance для wb-fetcher (контракт `wb-finance-quota` v1) вместо пропуска минут :10/:20; wb-fetcher читает отчёт до пустой страницы, страница 20 000 строк (задача wb-fetcher-finance, внешнее ревью этапа 5) |
 | 2.120 | 2026-11-02 | Прод: сервис `wb-fetcher` за `WB_FETCHER_ENABLED` (compose-профиль, БД `wb_fetcher`, S3 — ключи ozon-fetcher), scheduler — `WB_FETCHER_BASE_URL/_API_TOKEN`; `wb_fetcher.finance_companies: ['*']` (задача wb-fetcher-finance, этап 5) |

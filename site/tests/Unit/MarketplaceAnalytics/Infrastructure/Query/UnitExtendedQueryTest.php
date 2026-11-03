@@ -16,6 +16,7 @@ use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
+use App\MarketplaceAnalytics\Domain\Service\AbcClassificationPolicy;
 use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
 use DG\BypassFinals;
 use PHPUnit\Framework\TestCase;
@@ -81,6 +82,7 @@ final class UnitExtendedQueryTest extends TestCase
             $this->inventoryFacade,
             new MarketplaceCostAnalyticsGroupResolver(new CostCategoryCatalogFacade()),
             $this->listingTagFacade,
+            new AbcClassificationPolicy(),
         );
 
         $this->listingTagFacade->method('list')->willReturn([]);
@@ -333,6 +335,48 @@ final class UnitExtendedQueryTest extends TestCase
         // profit t-b = 1000 - 0 - 300 - 0 - 0 - 0 - adSpend(100) = 600; margin = 60%.
         self::assertSame(600.0, $tagB['profit']);
         self::assertSame(60.0, $tagB['marginPercent']);
+    }
+
+    public function testAbcClassesUseNetRevenueAndProfitOverWholeSetBeforeSearch(): void
+    {
+        $this->stubSales([
+            // Нетто-выручка: l-big 900, l-mid 100, l-loss 50. Прибыль: 600, 30, −150.
+            new ListingSalesAggregateDTO('l-big', 'Большой', 'SKU-BIG', 'ozon', '1000.00', 10, '300.00', 10),
+            new ListingSalesAggregateDTO('l-mid', 'Средний', 'SKU-MID', 'ozon', '100.00', 2, '70.00', 2),
+            new ListingSalesAggregateDTO('l-loss', 'Убыточный', 'SKU-LOSS', 'ozon', '50.00', 1, '200.00', 1),
+        ]);
+        $this->stubReturns([
+            new ListingReturnAggregateDTO('l-big', '100.00', 1),
+        ]);
+        $this->stubStockQty(['l-stock' => 5.0]);
+
+        $result = $this->execute();
+        $big = $this->findRow($result['items'], 'l-big');
+        $mid = $this->findRow($result['items'], 'l-mid');
+        $loss = $this->findRow($result['items'], 'l-loss');
+        $stock = $this->findRow($result['items'], 'l-stock');
+
+        self::assertNotNull($big);
+        self::assertNotNull($mid);
+        self::assertNotNull($loss);
+        self::assertNotNull($stock);
+        // Выручка: доля до l-mid = 900/1050 ≈ 85.7% → B, до l-loss ≈ 95.2% → C.
+        self::assertSame('A', $big['abcRevenue']);
+        self::assertSame('B', $mid['abcRevenue']);
+        self::assertSame('C', $loss['abcRevenue']);
+        // Без продаж — вклада нет.
+        self::assertSame('C', $stock['abcRevenue']);
+        // Прибыль: доля до l-mid = 600/630 ≈ 95.2% → C; убыток и ноль — D.
+        self::assertSame('A', $big['abcProfit']);
+        self::assertSame('C', $mid['abcProfit']);
+        self::assertSame('D', $loss['abcProfit']);
+        self::assertSame('D', $stock['abcProfit']);
+
+        // Поиск сужает строки, но не базу классов.
+        $searched = $this->execute(search: 'SKU-MID');
+        self::assertCount(1, $searched['items']);
+        self::assertSame('B', $searched['items'][0]['abcRevenue']);
+        self::assertSame('C', $searched['items'][0]['abcProfit']);
     }
 
     public function testTagSummaryAverageCheckIsComputedFromBucketSums(): void
@@ -1008,13 +1052,14 @@ final class UnitExtendedQueryTest extends TestCase
      *
      * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>, tagSummary: list<array<string, mixed>>, stock: array{snapshotDateBySource: array<string, string>, staleSources: array<string, string>}}
      */
-    private function execute(array $tagIds = [], bool $tagsMatchAll = false, bool $withTagSummary = false): array
+    private function execute(array $tagIds = [], bool $tagsMatchAll = false, bool $withTagSummary = false, ?string $search = null): array
     {
         return $this->query->execute(
             self::COMPANY_ID,
             'ozon',
             self::PERIOD_FROM,
             self::PERIOD_TO,
+            search: $search,
             tagIds: $tagIds,
             tagsMatchAll: $tagsMatchAll,
             withTagSummary: $withTagSummary,

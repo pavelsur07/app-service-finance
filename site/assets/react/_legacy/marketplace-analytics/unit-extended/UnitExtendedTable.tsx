@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import type { ListingTag, UnitExtendedItem, UnitExtendedTotals } from './unitExtended.types';
+import type { AbcClass, ListingTag, UnitExtendedItem, UnitExtendedTotals } from './unitExtended.types';
 import CostsBreakdown from './CostsBreakdown';
 import { formatMoney, formatQty } from '../utils/utils';
 import { useFixedHeader } from './useFixedHeader';
@@ -10,6 +10,8 @@ type SortField =
     | 'title'
     | 'sellerArticle'
     | 'tags'
+    | 'abcRevenue'
+    | 'abcProfit'
     | 'revenue'
     | 'quantity'
     | 'averageCheckRub'
@@ -183,6 +185,8 @@ const HEADERS: { field: SortField; label: React.ReactNode; align?: string; toolt
     { field: 'title', label: 'Наименование' },
     { field: 'sellerArticle', label: 'Артикул' },
     { field: 'tags', label: 'Теги', className: 'ue-ext-tags' },
+    { field: 'abcRevenue', label: 'ABC выр.', align: 'text-center', tooltip: 'ABC по нетто-выручке (выручка − возвраты): A — первые 80% выручки, B — следующие 15%, C — остальные 5% и товары без выручки' },
+    { field: 'abcProfit', label: 'ABC приб.', align: 'text-center', tooltip: 'ABC по прибыли: A — первые 80% прибыли, B — следующие 15%, C — остальные 5%, D — убыток (прибыль ≤ 0)' },
     { field: 'revenue', label: 'Выручка', align: 'text-end' },
     { field: 'quantity', label: 'Кол-во', align: 'text-end' },
     { field: 'averageCheckRub', label: 'Сред. чек', align: 'text-end', tooltip: 'Средний чек: (выручка − возвраты) / (продано − возвращено, шт.)' },
@@ -218,6 +222,10 @@ function comparator(a: UnitExtendedItem, b: UnitExtendedItem, field: SortField):
     if (field === 'title') {
         return a.title.localeCompare(b.title, 'ru');
     }
+    if (field === 'abcRevenue' || field === 'abcProfit') {
+        // Обратный порядок букв: первый клик (desc), как у чисел, ставит лучших — A — сверху.
+        return b[field].localeCompare(a[field]);
+    }
     if (field === 'sku') {
         return a.sku.localeCompare(b.sku, 'ru');
     }
@@ -244,6 +252,30 @@ function roiColor(v: number | null): string {
 function formatPercent(v: number | null): React.ReactNode {
     if (v === null) return '—';
     return `${v.toFixed(1)}%`;
+}
+
+const ABC_BADGE_COLOR: Record<AbcClass, string> = {
+    A: 'success',
+    B: 'warning',
+    C: 'secondary',
+    D: 'red',
+};
+
+const ABC_TITLE: Record<AbcClass, string> = {
+    A: 'Класс A — первые 80%',
+    B: 'Класс B — следующие 15%',
+    C: 'Класс C — остальные 5% или без вклада',
+    D: 'Класс D — убыток',
+};
+
+function AbcCell({ value }: { value: AbcClass }): React.ReactElement {
+    return (
+        <td className="text-center">
+            <span className={`badge bg-${ABC_BADGE_COLOR[value]}-lt`} title={ABC_TITLE[value]}>
+                {value}
+            </span>
+        </td>
+    );
 }
 
 const MAX_VISIBLE_TAGS = 2;
@@ -609,6 +641,8 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                             selectedTagIds={selectedTagIds}
                                             onToggleTag={onToggleTag}
                                         />
+                                        <AbcCell value={row.abcRevenue} />
+                                        <AbcCell value={row.abcProfit} />
                                         <td className="text-end">{formatMoney(row.revenue)}</td>
                                         <td className="text-end">{row.quantity.toLocaleString('ru-RU')}</td>
                                         <td className="text-end">{formatMoney(row.averageCheckRub)}</td>
@@ -696,6 +730,8 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                 <td className="ue-ext-frozen ue-ext-frozen-title">Итого</td>
                                 <td></td>
                                 <td className="ue-ext-tags"></td>
+                                <td></td>
+                                <td></td>
                                 <td className="text-end">{formatMoney(totals.revenue)}</td>
                                 <td className="text-end">{totals.quantity.toLocaleString('ru-RU')}</td>
                                 <td className="text-end">{formatMoney(totals.averageCheckRub)}</td>
