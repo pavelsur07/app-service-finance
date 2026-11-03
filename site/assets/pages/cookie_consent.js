@@ -5,7 +5,8 @@
  *
  * Аналитика и маркетинговые скрипты не грузятся до «Принять все». Подключать их только так:
  *   document.addEventListener('vf:cookie-consent', (e) => { if (e.detail.level === 'all') loadAnalytics(); });
- * Событие срабатывает и при загрузке страницы, если выбор уже сохранён. Сейчас таких скриптов нет.
+ * Событие срабатывает и при загрузке страницы, если выбор уже сохранён; скрипт, подключённый позже,
+ * читает уровень из <html data-cookie-consent>. Сейчас таких скриптов нет.
  */
 const NAME = 'vf_cookie_consent';
 const DAYS = 180;
@@ -22,6 +23,8 @@ function write(level) {
 }
 
 function emit(level) {
+    // Для скриптов, подключённых позже события: уровень согласия читается с <html data-cookie-consent>.
+    document.documentElement.dataset.cookieConsent = level;
     document.dispatchEvent(new CustomEvent('vf:cookie-consent', { detail: { level } }));
 }
 

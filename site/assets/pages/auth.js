@@ -20,7 +20,9 @@ const LABELS = ['', 'Слабый', 'Средний', 'Хороший', 'Над�
 
 function fieldError(input) {
     const checks = (input.dataset.check || '').split(/\s+/).filter(Boolean);
-    const value = input.type === 'checkbox' ? '' : input.value.trim();
+    // Пароль не обрезаем: серверный NotBlank принимает пароль из пробелов, клиент не должен быть строже.
+    const raw = /password/.test(input.autocomplete);
+    const value = input.type === 'checkbox' ? '' : (raw ? input.value : input.value.trim());
     for (const check of checks) {
         if (check === 'checked' && !input.checked) return input.dataset.msgChecked;
         if (check === 'required' && value === '') return input.dataset.msgRequired;

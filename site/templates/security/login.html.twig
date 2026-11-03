@@ -11,7 +11,9 @@
     <p class="vf-auth__subtitle">Рады видеть снова. Введите email и пароль.</p>
 
     {% if error %}
-        {# Неверная пара email/пароль — одним текстом: не раскрываем, что именно неверно и есть ли аккаунт. #}
+        {# Неверная пара email/пароль — одним текстом: не раскрываем, что именно неверно и есть ли аккаунт.
+           Прочие ошибки (сейчас user_checker нет) тоже уходят в общий текст; появится блокировка аккаунта —
+           добавить её сообщение отдельной веткой. #}
         <div class="vf-auth__alert" role="alert">
             {{ auth.alert_icon() }}
             {% if error.messageKey starts with 'Too many failed login attempts' %}
@@ -30,7 +32,7 @@
             {# Текстовое поле, не type=email: адреса с кириллицей допустимы (см. UserEmailType). #}
             <input id="l-email" class="inp" type="text" name="_username" value="{{ last_username }}"
                    inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false"
-                   placeholder="name@company.ru" required aria-describedby="l-email-err"
+                   placeholder="name@company.ru" required aria-describedby="l-email-err"{{ error ? '' : ' autofocus' }}
                    aria-invalid="false"
                    data-check="required email"
                    data-msg-required="Укажите email"

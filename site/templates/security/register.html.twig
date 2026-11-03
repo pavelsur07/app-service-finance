@@ -32,7 +32,7 @@
     {% endfor %}
 
     <form class="vf-auth__form" name="{{ f.vars.name }}" method="post" action="{{ f.vars.action }}" novalidate
-          data-auth-form data-loading-text="Создаём аккаунт…">
+          data-auth-form>
 
         {% if f.companyName is defined %}
             {% set fld = f.companyName %}
@@ -147,7 +147,7 @@
             Регистрируясь, вы подтверждаете, что вам исполнилось 18 лет и вы вправе действовать от имени компании или индивидуального предпринимателя.
         </p>
 
-        <button class="btn btn-primary btn-lg" type="submit">Создать аккаунт</button>
+        <button class="btn btn-primary btn-lg" type="submit" data-loading-text="Создаём аккаунт…">Создать аккаунт</button>
 
         {# Honeypot против ботов: скрыт, вне порядка табуляции (RegistrationFormType::website). #}
         {{ form_widget(f.website) }}
