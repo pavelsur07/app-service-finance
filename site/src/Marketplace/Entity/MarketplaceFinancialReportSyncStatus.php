@@ -58,7 +58,10 @@ class MarketplaceFinancialReportSyncStatus
     #[ORM\Column(type: 'guid', nullable: true)]
     private ?string $stagingRawDocumentId = null;
 
-    #[ORM\Column(type: 'integer', nullable: true)]
+    // BIGINT: rrd_id WB перерос int4 (3 137 233 657 015 на 03.11.2026). Тип —
+    // money_amount_minor: это BIGINT, гидрируемый в int (штатный bigint запрещён гейтом
+    // DoctrineMappingTypesTest); к деньгам поле отношения не имеет.
+    #[ORM\Column(type: 'money_amount_minor', nullable: true)]
     private ?int $nextRrdId = null;
 
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
