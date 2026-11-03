@@ -34,6 +34,7 @@ final class PublicRegistrationFlowTest extends WebTestCaseBase
             'registration_form[email]' => $email,
             'registration_form[plainPassword]' => 'password123',
             'registration_form[agreeTerms]' => 1,
+            'registration_form[agreePersonalData]' => 1,
             'registration_form[website]' => '',
         ]);
         $client->submit($form);
@@ -110,6 +111,7 @@ final class PublicRegistrationFlowTest extends WebTestCaseBase
                 'registration_form[email]' => $email,
                 'registration_form[plainPassword]' => 'password123',
                 'registration_form[agreeTerms]' => 1,
+                'registration_form[agreePersonalData]' => 1,
                 'registration_form[website]' => '',
             ]);
             $crawler = $client->submit($form);
@@ -148,6 +150,7 @@ final class PublicRegistrationFlowTest extends WebTestCaseBase
                 'registration_form[email]' => sprintf('spam-%s@example.test', $case),
                 'registration_form[plainPassword]' => 'password123',
                 'registration_form[agreeTerms]' => 1,
+                'registration_form[agreePersonalData]' => 1,
                 'registration_form[website]' => '',
             ]);
             $crawler = $client->submit($form);
@@ -183,12 +186,77 @@ final class PublicRegistrationFlowTest extends WebTestCaseBase
             'registration_form[email]' => 'иван@example.com',
             'registration_form[plainPassword]' => 'password123',
             'registration_form[agreeTerms]' => 1,
+            'registration_form[agreePersonalData]' => 1,
             'registration_form[website]' => '',
         ]);
         $client->submit($form);
 
         self::assertTrue($client->getResponse()->isRedirect());
         self::assertNotNull($this->em()->getRepository(User::class)->findOneBy(['email' => 'иван@example.com']));
+    }
+
+    /**
+     * Согласие на обработку ПДн — отдельное и обязательное (AUTH-SPEC §5): без него
+     * аккаунт не создаётся, даже если условия приняты.
+     */
+    public function testRegistrationWithoutPersonalDataConsentIsRejected(): void
+    {
+        $client = static::createClient();
+        $client->getContainer()->set(RegistrationRateLimiter::class, new RegistrationRateLimiter());
+        $client->setServerParameter('REMOTE_ADDR', $this->uniqueClientIp());
+
+        $crawler = $client->request('GET', '/register');
+        $form = $crawler->selectButton('Создать аккаунт')->form([
+            'registration_form[companyName]' => 'No Consent LLC',
+            'registration_form[email]' => 'no-consent@example.test',
+            'registration_form[plainPassword]' => 'password123',
+            'registration_form[agreeTerms]' => 1,
+            'registration_form[website]' => '',
+        ]);
+        $crawler = $client->submit($form);
+
+        self::assertSame(422, $client->getResponse()->getStatusCode());
+        self::assertSame(
+            'Нужно согласие на обработку персональных данных',
+            trim($crawler->filter('#registration_form_agreePersonalData_error1')->text()),
+        );
+        self::assertSame('true', $crawler->filter('#registration_form_agreePersonalData')->attr('aria-invalid'));
+        self::assertSame(0, $this->em()->getRepository(User::class)->count([]));
+    }
+
+    /**
+     * Занятый email — плашка над формой со ссылкой на вход, а не ошибка у поля;
+     * второй аккаунт не создаётся.
+     */
+    public function testTakenEmailShowsAlertAndCreatesNoSecondAccount(): void
+    {
+        $client = static::createClient();
+        $client->getContainer()->set(RegistrationRateLimiter::class, new RegistrationRateLimiter());
+        $fields = [
+            'registration_form[companyName]' => 'Taken Email LLC',
+            'registration_form[email]' => 'taken@example.test',
+            'registration_form[plainPassword]' => 'password123',
+            'registration_form[agreeTerms]' => 1,
+            'registration_form[agreePersonalData]' => 1,
+            'registration_form[website]' => '',
+        ];
+
+        $client->setServerParameter('REMOTE_ADDR', $this->uniqueClientIp());
+        $client->submit($client->request('GET', '/register')->selectButton('Создать аккаунт')->form($fields));
+        self::assertTrue($client->getResponse()->isRedirect());
+        $client->request('GET', '/logout');
+
+        $client->setServerParameter('REMOTE_ADDR', $this->uniqueClientIp());
+        $crawler = $client->submit($client->request('GET', '/register')->selectButton('Создать аккаунт')->form($fields));
+
+        self::assertSame(422, $client->getResponse()->getStatusCode());
+        $alert = $crawler->filter('.vf-auth__alert');
+        self::assertCount(1, $alert);
+        self::assertStringContainsString('Этот email уже зарегистрирован', $alert->text());
+        self::assertSame('/login', $alert->filter('a')->attr('href'));
+        self::assertCount(0, $crawler->filter('#registration_form_email_error1'));
+        self::assertSame('true', $crawler->filter('#registration_form_email')->attr('aria-invalid'));
+        self::assertSame(1, $this->em()->getRepository(User::class)->count(['email' => 'taken@example.test']));
     }
 
     private function uniqueClientIp(): string

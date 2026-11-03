@@ -19,6 +19,9 @@ use Symfony\Component\Validator\Constraints\Regex;
 
 class RegistrationFormType extends AbstractType
 {
+    /** Минимальная длина пароля: правило сервера и подсказка на странице регистрации. */
+    public const PASSWORD_MIN_LENGTH = 6;
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         if (!$options['is_invite']) {
@@ -41,11 +44,21 @@ class RegistrationFormType extends AbstractType
         $builder
             ->add('email', UserEmailType::class)
             ->add('agreeTerms', CheckboxType::class, [
-                'label' => 'Я принимаю Пользовательское соглашение и Политику конфиденциальности',
+                'label' => 'Принимаю Пользовательское соглашение, Публичную оферту и Политику конфиденциальности',
                 'mapped' => false,
                 'constraints' => [
                     new IsTrue([
-                        'message' => 'You should agree to our terms.',
+                        'message' => 'Без принятия условий мы не можем создать аккаунт',
+                    ]),
+                ],
+            ])
+            // Отдельное обязательное согласие на обработку ПДн (AUTH-SPEC §5): не объединять с agreeTerms.
+            ->add('agreePersonalData', CheckboxType::class, [
+                'label' => 'Даю согласие на обработку персональных данных',
+                'mapped' => false,
+                'constraints' => [
+                    new IsTrue([
+                        'message' => 'Нужно согласие на обработку персональных данных',
                     ]),
                 ],
             ])
@@ -53,7 +66,7 @@ class RegistrationFormType extends AbstractType
                 // instead of being set onto the object directly,
                 // this is read and encoded in the controller
                 'mapped' => false,
-                'attr' => ['autocomplete' => 'new-password'],
+                'attr' => ['autocomplete' => 'new-password', 'data-min' => self::PASSWORD_MIN_LENGTH],
                 'constraints' => self::plainPasswordConstraints(),
             ])
             ->add('website', TextType::class, [
@@ -100,11 +113,11 @@ class RegistrationFormType extends AbstractType
     {
         return [
             new NotBlank([
-                'message' => 'Please enter a password',
+                'message' => 'Введите пароль',
             ]),
             new Length([
-                'min' => 6,
-                'minMessage' => 'Your password should be at least {{ limit }} characters',
+                'min' => self::PASSWORD_MIN_LENGTH,
+                'minMessage' => 'Пароль — не короче {{ limit }} символов',
                 // max length allowed by Symfony for security reasons
                 'max' => 4096,
             ]),
