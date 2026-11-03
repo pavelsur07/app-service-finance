@@ -58,7 +58,8 @@ class MarketplaceFinancialReportSyncStatus
     #[ORM\Column(type: 'guid', nullable: true)]
     private ?string $stagingRawDocumentId = null;
 
-    #[ORM\Column(type: 'integer', nullable: true)]
+    // bigint: rrd_id WB перерос int4 (3 137 233 657 015 на 03.11.2026).
+    #[ORM\Column(type: 'bigint', nullable: true)]
     private ?int $nextRrdId = null;
 
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
