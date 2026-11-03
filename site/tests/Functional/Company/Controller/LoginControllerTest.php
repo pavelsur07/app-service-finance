@@ -50,7 +50,7 @@ final class LoginControllerTest extends WebTestCaseBase
         $this->client->followRedirect();
 
         // Ensure we do not reveal if the user exists or not.
-        self::assertSelectorTextContains('.alert--danger', 'Invalid credentials.');
+        self::assertSelectorTextContains('.vf-auth__alert', 'Неверный email или пароль.');
 
         // Denied - Can't login with invalid password.
         $this->client->request('GET', '/login');
@@ -65,7 +65,7 @@ final class LoginControllerTest extends WebTestCaseBase
         $this->client->followRedirect();
 
         // Ensure we do not reveal the user exists but the password is wrong.
-        self::assertSelectorTextContains('.alert--danger', 'Invalid credentials.');
+        self::assertSelectorTextContains('.vf-auth__alert', 'Неверный email или пароль.');
 
         // Success - Login with valid credentials is allowed.
         $this->client->submitForm('Войти', [
@@ -80,7 +80,7 @@ final class LoginControllerTest extends WebTestCaseBase
         self::assertResponseRedirects('/finance');
         $this->client->followRedirect();
 
-        self::assertSelectorNotExists('.alert--danger');
+        self::assertSelectorNotExists('.vf-auth__alert');
         self::assertResponseIsSuccessful();
     }
 }
