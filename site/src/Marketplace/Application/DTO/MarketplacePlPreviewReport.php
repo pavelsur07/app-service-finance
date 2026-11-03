@@ -8,6 +8,7 @@ use App\Finance\Application\DTO\PlPreviewRow;
 use App\Finance\Application\DTO\PlPreviewUnplacedAmount;
 use App\Finance\Enum\PLValueFormat;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\PlPreviewColumnMode;
 use App\Marketplace\Enum\PlPreviewCostStatus;
 
 /**
@@ -39,6 +40,7 @@ final readonly class MarketplacePlPreviewReport
         public array $salesCoverage,
         public array $warnings,
         public array $adReconciliation = [],
+        public PlPreviewColumnMode $mode = PlPreviewColumnMode::TAGS,
     ) {
     }
 

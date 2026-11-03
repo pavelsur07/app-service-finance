@@ -28,6 +28,9 @@ final class PlPreviewFactsQuery
     /**
      * @param list<string> $excludedCostCategoryIds категории затрат, которые не брать из учёта
      *                                              (реклама, которую предпросмотр берёт из статистики)
+     * @param bool $byProject разрез по маркетплейсу и проекту правила маппинга
+     *                        (у затрат проекта правила нет — null); фолбэк на
+     *                        проект подключения — у вызывающего, как при проведении
      *
      * @return list<PlPreviewFactDTO>
      */
@@ -38,14 +41,18 @@ final class PlPreviewFactsQuery
         ?MarketplaceType $marketplace,
         bool $byListing,
         array $excludedCostCategoryIds = [],
+        bool $byProject = false,
     ): array {
         $listing = static fn (string $alias): string => $byListing ? $alias.'.listing_id' : 'CAST(NULL AS UUID)';
+        $project = static fn (string $marketplaceSql, string $projectSql): string => $byProject
+            ? sprintf('CAST(%s AS TEXT) AS marketplace, CAST(%s AS TEXT) AS project_id', $marketplaceSql, $projectSql)
+            : 'CAST(NULL AS TEXT) AS marketplace, CAST(NULL AS TEXT) AS project_id';
         $marketplaceFilter = static fn (string $alias): string => null === $marketplace ? '' : "AND $alias.marketplace = :marketplace";
         $sign = 'CASE WHEN m.is_negative THEN -1 ELSE 1 END';
 
         $branches = [
             sprintf(
-                "SELECT m.pl_category_id, %s AS listing_id, %s * (%s) AS amount
+                "SELECT m.pl_category_id, %s AS listing_id, %s, %s * (%s) AS amount
                  FROM marketplace_sales s
                  INNER JOIN marketplace_sale_mappings m
                      ON m.company_id = s.company_id
@@ -57,12 +64,13 @@ final class PlPreviewFactsQuery
                      AND s.sale_date <= :periodTo
                      %s",
                 $listing('s'),
+                $project('s.marketplace', 'm.project_direction_id'),
                 $sign,
                 MarketplacePlAmountSql::saleAmount(null),
                 $marketplaceFilter('s'),
             ),
             sprintf(
-                "SELECT m.pl_category_id, %s AS listing_id, %s * (%s) AS amount
+                "SELECT m.pl_category_id, %s AS listing_id, %s, %s * (%s) AS amount
                  FROM marketplace_returns r
                  LEFT JOIN marketplace_sales ms ON ms.id = r.sale_id
                  INNER JOIN marketplace_sale_mappings m
@@ -76,6 +84,7 @@ final class PlPreviewFactsQuery
                      AND r.return_date <= :periodTo
                      %s",
                 $listing('r'),
+                $project('r.marketplace', 'm.project_direction_id'),
                 $sign,
                 MarketplacePlAmountSql::returnAmount(),
                 $marketplaceFilter('r'),
@@ -84,11 +93,11 @@ final class PlPreviewFactsQuery
             // своя группа, знак как у начисления). Доля листинга — его сумма со знаком итога
             // группы: доли складываются ровно в модуль, разрез по листингам остаётся линейным.
             sprintf(
-                "SELECT g.pl_category_id, g.listing_id,
+                "SELECT g.pl_category_id, g.listing_id, g.marketplace, g.project_id,
                      g.sign * g.listing_sum
-                         * SIGN(SUM(g.listing_sum) OVER (PARTITION BY g.pl_category_id, g.category_id, g.storno_key, g.sign)) AS amount
+                         * SIGN(SUM(g.listing_sum) OVER (PARTITION BY g.pl_category_id, g.marketplace, g.category_id, g.storno_key, g.sign)) AS amount
                  FROM (
-                     SELECT m.pl_category_id, %s AS listing_id, c.category_id,
+                     SELECT m.pl_category_id, %s AS listing_id, %s, c.category_id,
                             (c.operation_type = 'storno') AS storno_key,
                             CASE WHEN m.is_negative <> COALESCE(c.operation_type = 'storno', false) THEN -1 ELSE 1 END AS sign,
                             SUM(c.amount) AS listing_sum
@@ -103,19 +112,21 @@ final class PlPreviewFactsQuery
                          AND m.pl_category_id IS NOT NULL
                          %s
                          %s
-                     GROUP BY m.pl_category_id, %s c.category_id, (c.operation_type = 'storno'), m.is_negative
+                     GROUP BY m.pl_category_id, %s %s c.category_id, (c.operation_type = 'storno'), m.is_negative
                  ) g",
                 $listing('c'),
+                $project('c.marketplace', 'NULL'),
                 $marketplaceFilter('c'),
                 [] === $excludedCostCategoryIds ? '' : 'AND c.category_id NOT IN (:excludedCostCategoryIds)',
                 $byListing ? 'c.listing_id,' : '',
+                $byProject ? 'c.marketplace,' : '',
             ),
         ];
 
         if (null === $marketplace || MarketplaceType::OZON === $marketplace) {
             foreach (['sale_realization' => 'r.total_amount', 'return_realization' => 'r.return_amount'] as $amountSource => $amount) {
                 $branches[] = sprintf(
-                    "SELECT m.pl_category_id, %s AS listing_id, %s * %s AS amount
+                    "SELECT m.pl_category_id, %s AS listing_id, %s, %s * %s AS amount
                      FROM marketplace_ozon_realizations r
                      INNER JOIN marketplace_sale_mappings m
                          ON m.company_id = r.company_id
@@ -127,6 +138,7 @@ final class PlPreviewFactsQuery
                          AND r.period_to <= :periodTo
                          AND %s IS NOT NULL",
                     $listing('r'),
+                    $project("'".MarketplaceType::OZON->value."'", 'm.project_direction_id'),
                     $sign,
                     $amount,
                     MarketplaceType::OZON->value,
@@ -137,11 +149,11 @@ final class PlPreviewFactsQuery
         }
 
         $sql = sprintf(
-            'SELECT facts.pl_category_id, facts.listing_id, SUM(facts.amount) AS amount
+            'SELECT facts.pl_category_id, facts.listing_id, facts.marketplace, facts.project_id, SUM(facts.amount) AS amount
              FROM (%s) facts
-             GROUP BY facts.pl_category_id, facts.listing_id
+             GROUP BY facts.pl_category_id, facts.listing_id, facts.marketplace, facts.project_id
              HAVING SUM(facts.amount) <> 0
-             ORDER BY facts.pl_category_id, facts.listing_id',
+             ORDER BY facts.pl_category_id, facts.listing_id, facts.marketplace, facts.project_id',
             implode("\nUNION ALL\n", $branches),
         );
 
@@ -165,6 +177,8 @@ final class PlPreviewFactsQuery
                 (string) $row['pl_category_id'],
                 null === $row['listing_id'] ? null : (string) $row['listing_id'],
                 (string) $row['amount'],
+                null === $row['marketplace'] ? null : MarketplaceType::from((string) $row['marketplace']),
+                null === $row['project_id'] ? null : (string) $row['project_id'],
             );
         }
 

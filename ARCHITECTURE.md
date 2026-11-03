@@ -780,15 +780,18 @@ CSRF для repair привязан к active company: `ozon_pl_mapping_repair_<
 - Рекламные удержания WB с постоянным текстом («WB Медиа», подписка «Джем», аванс «Баллы за отзывы») внесены в `WbCostCategory` под теми же кодами, что даёт слугификация: `forDeductionName()` для них не нужен, группа аналитики — «Продвижение и реклама». «Добровольная выплата за товары» намеренно без правила ОПиУ (решение Владельца 26.09.2026).
 - Услуги Ozon by-day разбираются по `OzonCostCategory::$accrualTypeNames`. Каждая услуга снимка справочника `tests/Fixtures/Marketplace/Ozon/accrual_types.json` либо размечена, либо стоит в `OzonCostCategoryTest::AWAITING_CLASSIFICATION` — тест падает на услуге без решения. Размечать только при однозначной категории, которая уже получала деньги; сомнительная услуга остаётся `ozon_unknown_<id>`: видимая очередь безопаснее тихой ошибки в строке ОПиУ.
 
-### Marketplace: предпросмотр ОПиУ по тегам
+### Marketplace: предпросмотр ОПиУ по тегам и проектам
 
 Отчёт «что покажет ОПиУ, если провести нормализованные данные периода по текущему маппингу» с
-колонками по тегам листингов. Ничего не пишет: ни документов ОПиУ, ни `pl_daily_totals`, ни
+колонками по тегам листингов или по проектам ОПиУ (переключатель). Ничего не пишет: ни документов ОПиУ, ни `pl_daily_totals`, ни
 `document_id` у строк. Постановка — `docs/plan/marketplace-pl-preview-by-tags.md`.
 
 - Факты — `Infrastructure\Query\PlPreviewFactsQuery::fetch(companyId, from, to, ?marketplace,
-  byListing)`: `list<PlPreviewFactDTO(plCategoryId, ?listingId, amount)>`, сумма в знаке строки
-  документа `marketplace_pl`. Источники, правила и знаки — как у `CloseMonthStageAction`: продажи
+  byListing, excludedCostCategoryIds = [], byProject = false)`: `list<PlPreviewFactDTO(plCategoryId,
+  ?listingId, amount, ?marketplace, ?projectId)>`, сумма в знаке строки документа `marketplace_pl`.
+  `byProject` — разрез по маркетплейсу и проекту правила (`marketplace_sale_mappings.project_direction_id`;
+  у затрат проекта правила нет — `null`), группы затрат при этом делятся и по маркетплейсу, как у
+  проведения по маркетплейсу. Источники, правила и знаки — как у `CloseMonthStageAction`: продажи
   и возвраты (`MarketplacePlAmountSql`), затраты (модуль суммы группы «категория затрат × сторно»,
   у сторно знак правила обратный), «Реализация» Ozon (документ входит, если целиком внутри
   периода). Берутся **все** строки периода, проведённые или нет; `preliminary`-фильтры не
@@ -819,7 +822,15 @@ CSRF для repair привязан к active company: `ozon_pl_mapping_repair_<
   (учёт, статистика, на товарах, без товара, расхождение) в `MarketplacePlPreviewReport::$adReconciliation`.
   На экране — пометка над таблицей и блок «Реклама: учёт и статистика», в xlsx — раздел листа «Сверка».
 - Сборка — `Application\Action\BuildMarketplacePlPreviewAction(BuildMarketplacePlPreviewCommand(companyId,
-  from, to, ?marketplace, ?tagIds))` → `MarketplacePlPreviewReport`. Колонки (`PlPreviewColumnKind`):
+  from, to, ?marketplace, ?tagIds, mode = PlPreviewColumnMode::TAGS, ?projectIds))` →
+  `MarketplacePlPreviewReport` (`mode` — режим колонок). Режим `PROJECTS`: колонки `project:<id>` —
+  выбранные проекты компании (`CompanyFacade::listProjectDirections()`, порядок дерева, подпись с
+  отступом «— » по уровню, без свёртки сумм в родителя; чужие id отбрасываются); проект факта —
+  проект правила, иначе проект SELLER-подключения маркетплейса (как `CloseMonthStageAction`);
+  `no_project` («Без проекта») — только если в ней есть ненулевая сумма; сумма невыбранного проекта
+  не выводится. Реклама в этом режиме — учётной суммой (без раскладки по статистике), сверка
+  `adReconciliation` считается в обоих режимах. Все проекты выбраны → колонки = «Итого». Режим
+  `TAGS` — колонки (`PlPreviewColumnKind`):
   `tag:<id>` — полная сумма листинга в каждый его тег (`tagsOverlap`, если листинг попал в два
   выбранных тега); `common` — факты без листинга и листингов без единого тега компании (не зависит
   от фильтра тегов); `total` — факты без разреза по листингам. Дерево — один вызов
@@ -833,16 +844,17 @@ CSRF для repair привязан к active company: `ozon_pl_mapping_repair_<
   «Маркетплейсы → Предпросмотр ОПиУ» (`partials/_sidebar_marketplace`): `GET /marketplace/pl-preview`
   (`marketplace_pl_preview_index`, `PlPreviewController`, `MARKETPLACE_READ`). Параметры —
   `Application\PlPreview\PlPreviewFilter::fromQuery()`: `dateFrom`, `dateTo` (по умолчанию —
-  текущий месяц по сегодня, МСК), `marketplace`, `tags[]` (нет параметра — все теги; `tags_set=1` без `tags[]` — ни одного), `empty=1`;
+  текущий месяц по сегодня, МСК), `marketplace`, `columns=tags|projects` (по умолчанию `tags`), `tags[]` (нет параметра — все теги; `tags_set=1` без `tags[]` — ни одного), `projects[]`/`projects_set=1` — так же для проектов, `empty=1`;
   мусор — значения по умолчанию. Ошибка периода — сообщение на странице, не 500.
 - Выгрузка — `GET /marketplace/pl-preview/xlsx` (`marketplace_pl_preview_xlsx`,
   `PlPreviewXlsxController`, `Infrastructure\Export\PlPreviewXlsxExporter`): тот же фильтр и
-  тот же отчёт, листы «ОПиУ по тегам», «Не попадёт в ОПиУ», «Исключено», «Сверка»; суммы — числами
+  тот же отчёт, листы «ОПиУ по тегам» («ОПиУ по проектам» в режиме проектов), «Не попадёт в ОПиУ», «Исключено», «Сверка»; суммы — числами
   с форматом выгрузки ОПиУ, названия — текстовыми ячейками (строка на «=» не становится формулой).
   Ошибка периода — flash и redirect на вкладку.
 - Выгрузка строками для план-факта — `GET /marketplace/pl-preview/rows-xlsx`
   (`marketplace_pl_preview_rows_xlsx`, `PlPreviewRowsXlsxController`, `MARKETPLACE_READ`), формат
-  `PlPreviewRowsXlsxExporter::FORMAT_VERSION` = `1.0`, постановка — `docs/plan/TZ_vygruzka_plan_fakt.md`.
+  `PlPreviewRowsXlsxExporter::FORMAT_VERSION` = `1.1` (в режиме проектов `column_kind` =
+  `project`/`no_project`, `tag_id`/`tag_name` несут id и название проекта; «Паспорт» — `projects`), постановка — `docs/plan/TZ_vygruzka_plan_fakt.md`.
   `Application\Action\BuildPlPreviewRowsExportAction` → `Application\DTO\PlPreviewRowsExport`
   (`from`, `to`, `channels`, `?all`): канал задан — один отчёт, `all = null`; не задан — общий
   отчёт и по отчёту `BuildMarketplacePlPreviewAction` на канал из объединения SELLER-подключений
@@ -1244,6 +1256,10 @@ findDefaultProjectDirection(string $companyId): ?ProjectDirection
 // Проекты компании для пикера в формах с legacy-ассоциацией ProjectDirection:
 // $treeOrder — обход дерева, иначе по названию.
 listProjectDirectionEntities(string $companyId, bool $treeOrder): list<ProjectDirection>
+
+// Проекты компании в порядке дерева для отчётов и фильтров чужих модулей;
+// level — 1 у корня. Нет компании — пустой список.
+listProjectDirections(string $companyId): list<Application\DTO\ProjectDirectionDTO(id, name, level)>
 ```
 
 `Shared\Form\Type\ProjectDirectionPickerType` с этапа 7.5b плана Cash — `ChoiceType`
@@ -4729,6 +4745,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.124 | 2026-11-03 | Marketplace: предпросмотр ОПиУ — переключатель колонок «Теги / Проекты» (`PlPreviewColumnMode`, `PlPreviewColumnKind::PROJECT/NO_PROJECT`), проект факта — правило, иначе подключение; выгрузка строками v1.1; `CompanyFacade::listProjectDirections()` (задача `marketplace-pl-preview-by-projects`) |
 | 2.123 | 2026-11-03 | MarketplaceAnalytics: ABC-анализ в расширенной юнит-экономике — `AbcClass`, `AbcClassificationPolicy`, поля `abcRevenue`/`abcProfit` (80/15/5, D — убыток) |
 | 2.122 | 2026-11-03 | Marketplace, Ingestion: отчёт WB о реализации читается до 204 / `[]`, неполная страница больше не конец дня (задача `wb-finance-symfony-pagination`) |
 | 2.121 | 2026-11-02 | Marketplace: `/internal/wb-finance/sales-reports/slot` и `…/rate-limited` — общая квота WB finance для wb-fetcher (контракт `wb-finance-quota` v1) вместо пропуска минут :10/:20; wb-fetcher читает отчёт до пустой страницы, страница 20 000 строк (задача wb-fetcher-finance, внешнее ревью этапа 5) |

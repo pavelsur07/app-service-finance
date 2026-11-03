@@ -6,6 +6,7 @@ namespace App\Marketplace\Infrastructure\Export;
 
 use App\Finance\Enum\PLValueFormat;
 use App\Marketplace\Application\Action\BuildMarketplacePlPreviewAction;
+use App\Marketplace\Application\DTO\MarketplacePlPreviewColumn;
 use App\Marketplace\Application\DTO\MarketplacePlPreviewReport;
 use App\Marketplace\Application\DTO\PlPreviewRowsExport;
 use App\Marketplace\Enum\PlPreviewColumnKind;
@@ -26,7 +27,7 @@ use OpenSpout\Writer\XLSX\Writer;
  */
 final readonly class PlPreviewRowsXlsxExporter
 {
-    public const string FORMAT_VERSION = '1.0';
+    public const string FORMAT_VERSION = '1.1';
     private const string DATE_FORMAT = 'yyyy-mm-dd';
     private const string DATETIME_FORMAT = 'yyyy-mm-dd hh:mm:ss';
 
@@ -37,9 +38,9 @@ final readonly class PlPreviewRowsXlsxExporter
         'period_key' => 'Ключ периода',
         'iso_week' => 'ISO-неделя, если период — ровно пн–вс',
         'marketplace' => 'Канал',
-        'column_kind' => 'Вид колонки: tag — тег, common — общие / без тега, total — итого',
-        'tag_id' => 'ID тега',
-        'tag_name' => 'Тег / колонка',
+        'column_kind' => 'Вид колонки: tag — тег, common — общие / без тега, project — проект, no_project — без проекта, total — итого',
+        'tag_id' => 'ID тега или проекта (по column_kind)',
+        'tag_name' => 'Тег / проект / колонка',
         'pl_category_id' => 'ID статьи ОПиУ',
         'pl_code' => 'Код статьи ОПиУ',
         'row_order' => 'Номер строки в дереве ОПиУ',
@@ -90,7 +91,7 @@ final readonly class PlPreviewRowsXlsxExporter
             $marketplace = self::marketplace($report);
             $rowsByChannel[$marketplace] = 0;
             foreach ($report->columns as $column) {
-                $tagId = PlPreviewColumnKind::TAG === $column->kind ? substr($column->key, \strlen('tag:')) : '';
+                $tagId = self::columnEntityId($column);
                 foreach ($report->rows as $index => $row) {
                     $writer->addRow(new Row([
                         self::date($export->from),
@@ -131,9 +132,12 @@ final readonly class PlPreviewRowsXlsxExporter
         };
 
         $tags = [];
+        $projects = [];
         foreach ($export->channels[0]->columns ?? [] as $column) {
             if (PlPreviewColumnKind::TAG === $column->kind) {
-                $tags[] = substr($column->key, \strlen('tag:')).'='.$column->label;
+                $tags[] = self::columnEntityId($column).'='.$column->label;
+            } elseif (PlPreviewColumnKind::PROJECT === $column->kind) {
+                $projects[] = self::columnEntityId($column).'='.preg_replace('/^(— )+/u', '', $column->label);
             }
         }
         $tagsOverlap = false;
@@ -149,6 +153,7 @@ final readonly class PlPreviewRowsXlsxExporter
         $add('iso_week', self::text(self::isoWeek($export)), self::DATA_FIELDS['iso_week']);
         $add('marketplaces', self::text(implode(';', array_keys($rowsByChannel))), 'Каналы в файле');
         $add('tags', self::text(implode(';', $tags)), 'Теги в файле: <id>=<название> через «;»; название может содержать «;» — делить перед UUID');
+        $add('projects', self::text(implode(';', $projects)), 'Проекты в файле: <id>=<название> через «;»; пусто — колонки по тегам');
         $add('tags_overlap', new NumericCell($tagsOverlap ? 1 : 0, null), 'Листинг с несколькими тегами входит в каждый полной суммой: сумма тегов и «Общих» не равна «Итого»');
         $add('rows_count', new NumericCell(array_sum($rowsByChannel), null), 'Строк в листе «Данные»');
         foreach ($rowsByChannel as $marketplace => $count) {
@@ -335,6 +340,17 @@ final readonly class PlPreviewRowsXlsxExporter
      * Пользовательские названия (теги, статьи) — всегда текст: Cell::fromValue() делает формулу из
      * строки на «=».
      */
+    /**
+     * UUID тега или проекта из ключа колонки (`tag:<id>`, `project:<id>`); у прочих колонок — пусто.
+     */
+    private static function columnEntityId(MarketplacePlPreviewColumn $column): string
+    {
+        return match ($column->kind) {
+            PlPreviewColumnKind::TAG, PlPreviewColumnKind::PROJECT => substr($column->key, (int) strpos($column->key, ':') + 1),
+            default => '',
+        };
+    }
+
     private static function text(string $value): StringCell
     {
         return new StringCell($value, null);

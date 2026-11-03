@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Company\Facade;
 
 use App\Company\Application\CreateCompanyOwnerAccountAction;
+use App\Company\Application\DTO\ProjectDirectionDTO;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\Counterparty;
@@ -233,6 +234,23 @@ final class CompanyFacade
             : $this->projectDirectionRepository->findBy(['company' => $company], ['name' => 'ASC']));
 
         return $projects;
+    }
+
+    /**
+     * Проекты компании в порядке дерева — для отчётов и фильтров без legacy-ассоциаций.
+     *
+     * @return list<ProjectDirectionDTO>
+     */
+    public function listProjectDirections(string $companyId): array
+    {
+        return array_map(
+            static fn (ProjectDirection $project): ProjectDirectionDTO => new ProjectDirectionDTO(
+                (string) $project->getId(),
+                $project->getName(),
+                $project->getLevel(),
+            ),
+            $this->listProjectDirectionEntities($companyId, treeOrder: true),
+        );
     }
 
     /**

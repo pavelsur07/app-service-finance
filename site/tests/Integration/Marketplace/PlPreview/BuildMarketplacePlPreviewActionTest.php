@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Marketplace\PlPreview;
 
 use App\Company\Entity\ProjectDirection;
+use App\Company\Facade\CompanyFacade;
 use App\Finance\Facade\FinanceFacade;
 use App\Marketplace\Application\Action\BuildMarketplacePlPreviewAction;
 use App\Marketplace\Application\Command\BuildMarketplacePlPreviewCommand;
@@ -16,6 +17,7 @@ use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PlPreviewColumnKind;
+use App\Marketplace\Enum\PlPreviewColumnMode;
 use App\Marketplace\Enum\PlPreviewCostStatus;
 use App\Marketplace\Exception\MarketplacePlPreviewPeriodException;
 use App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository;
@@ -71,6 +73,7 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
             new PlPreviewAdLedgerQuery($connection),
             new PlPreviewAdSpendProvider($container->get(MarketplaceAdsFacade::class)),
             new OzonPlMappingWarningsQuery($connection),
+            $container->get(CompanyFacade::class),
         );
     }
 
@@ -304,6 +307,153 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
         $this->expectException(MarketplacePlPreviewPeriodException::class);
 
         ($this->action)(new BuildMarketplacePlPreviewCommand($this->companyId(), new \DateTimeImmutable('2025-01-01'), new \DateTimeImmutable('2026-01-02')));
+    }
+
+    public function testProjectColumnsTakeRuleProjectThenConnectionProject(): void
+    {
+        $wb = $this->project('Вайлдберриз');
+        $child = $this->project('Дочерний', $wb);
+        $ozon = $this->project('Озон');
+        $this->connection(MarketplaceType::WILDBERRIES, $wb);
+        $this->ozonMappingsProject($ozon);
+        $this->em->flush();
+
+        $report = $this->buildProjects();
+
+        self::assertSame(PlPreviewColumnMode::PROJECTS, $report->mode);
+        self::assertSame(
+            [['project:'.$wb->getId(), 'Вайлдберриз', PlPreviewColumnKind::PROJECT], ['project:'.$child->getId(), '— Дочерний', PlPreviewColumnKind::PROJECT], ['project:'.$ozon->getId(), 'Озон', PlPreviewColumnKind::PROJECT], ['total', 'Итого', PlPreviewColumnKind::TOTAL]],
+            array_map(static fn ($c): array => [$c->key, $c->label, $c->kind], $report->columns),
+            '«Без проекта» пуста — колонки нет; дочерний проект с отступом, без свёртки сумм в родителя.',
+        );
+        $wbKey = 'project:'.$wb->getId();
+        $childKey = 'project:'.$child->getId();
+        $ozonKey = 'project:'.$ozon->getId();
+        // WB: правила без проекта → проект подключения, затраты — всегда проект подключения.
+        self::assertSame([
+            'COST' => [$wbKey => -190.0, $childKey => 0.0, $ozonKey => 0.0, 'total' => -190.0],
+            'REAL' => [$wbKey => 0.0, $childKey => 0.0, $ozonKey => 300.0, 'total' => 300.0],
+            'RET' => [$wbKey => -200.0, $childKey => 0.0, $ozonKey => 0.0, 'total' => -200.0],
+            'REV' => [$wbKey => 1300.0, $childKey => 0.0, $ozonKey => 0.0, 'total' => 1300.0],
+        ], $this->values($report));
+        self::assertFalse($report->tagsOverlap);
+    }
+
+    public function testRuleProjectWinsOverConnectionProject(): void
+    {
+        $wb = $this->project('Вайлдберриз');
+        $rule = $this->project('Правило');
+        $this->connection(MarketplaceType::WILDBERRIES, $wb);
+        foreach ($this->mappings(MarketplaceType::WILDBERRIES) as $mapping) {
+            $mapping->setProjectDirection($rule);
+        }
+        $this->em->flush();
+
+        $values = $this->values($this->buildProjects());
+
+        self::assertSame(1300.0, $values['REV']['project:'.$rule->getId()]);
+        self::assertSame(0.0, $values['REV']['project:'.$wb->getId()]);
+        self::assertSame(-190.0, $values['COST']['project:'.$wb->getId()], 'У затрат проекта правила нет.');
+    }
+
+    public function testAmountsWithoutProjectGoToNoProjectColumnAndColumnsAddUpToTotal(): void
+    {
+        $ozon = $this->project('Озон');
+        $this->ozonMappingsProject($ozon);
+        $this->em->flush();
+
+        $report = $this->buildProjects();
+
+        self::assertSame(['project:'.$ozon->getId(), 'no_project', 'total'], array_map(static fn ($c): string => $c->key, $report->columns));
+        self::assertSame('Без проекта', $report->columns[1]->label);
+        self::assertSame(PlPreviewColumnKind::NO_PROJECT, $report->columns[1]->kind);
+        foreach ($this->values($report) as $code => $row) {
+            self::assertEqualsWithDelta($row['total'], $row['project:'.$ozon->getId()] + $row['no_project'], 0.001, $code);
+        }
+        self::assertSame(1300.0, $this->values($report)['REV']['no_project']);
+    }
+
+    public function testProjectFilterDropsForeignAndUnselectedProjects(): void
+    {
+        $wb = $this->project('Вайлдберриз');
+        $ozon = $this->project('Озон');
+        $foreign = new ProjectDirection(Uuid::uuid4()->toString(), $this->fixture->foreign, 'Чужой');
+        $this->em->persist($foreign);
+        $this->connection(MarketplaceType::WILDBERRIES, $wb);
+        $this->ozonMappingsProject($ozon);
+        $this->em->flush();
+
+        $report = $this->buildProjects([(string) $ozon->getId(), (string) $foreign->getId()]);
+
+        self::assertSame(['project:'.$ozon->getId(), 'total'], array_map(static fn ($c): string => $c->key, $report->columns), 'Сумма невыбранного проекта не уходит в «Без проекта».');
+    }
+
+    public function testAdsGoToConnectionProjectFromLedgerInProjectMode(): void
+    {
+        $wb = $this->project('Вайлдберриз');
+        $this->connection(MarketplaceType::WILDBERRIES, $wb);
+        $this->em->flush();
+        $this->wbPromotion(includeInPl: true, ledger: '1000.00');
+        $this->adStatistics(['wbA' => '600.00', 'wbB' => '300.00'], unallocated: '50.00');
+
+        $report = $this->buildProjects();
+
+        self::assertSame(['project:'.$wb->getId() => -1190.0, 'no_project' => 0.0, 'total' => -1190.0], $this->values($report)['COST']);
+        self::assertCount(1, $report->adReconciliation, 'Сверка учёта со статистикой — в обоих режимах.');
+    }
+
+    private function project(string $name, ?ProjectDirection $parent = null): ProjectDirection
+    {
+        $project = new ProjectDirection(Uuid::uuid4()->toString(), $this->fixture->company, $name);
+        $project->setParent($parent);
+        $this->em->persist($project);
+
+        return $project;
+    }
+
+    private function connection(MarketplaceType $marketplace, ProjectDirection $project): void
+    {
+        $connection = new MarketplaceConnection(Uuid::uuid4()->toString(), $this->fixture->company, $marketplace);
+        $connection->setApiKey('test-key');
+        $connection->setProjectDirectionId($project->getId());
+        $this->em->persist($connection);
+    }
+
+    private function ozonMappingsProject(ProjectDirection $project): void
+    {
+        foreach ($this->mappings(MarketplaceType::OZON) as $mapping) {
+            $mapping->setProjectDirection($project);
+        }
+    }
+
+    /**
+     * @return list<MarketplaceSaleMapping>
+     */
+    private function mappings(MarketplaceType $marketplace): array
+    {
+        /** @var list<MarketplaceSaleMapping> $mappings */
+        $mappings = $this->em->getRepository(MarketplaceSaleMapping::class)->findBy([
+            'company' => $this->fixture->company,
+            'marketplace' => $marketplace,
+        ]);
+
+        return $mappings;
+    }
+
+    /**
+     * @param list<string>|null $projectIds
+     */
+    private function buildProjects(?array $projectIds = null): MarketplacePlPreviewReport
+    {
+        return ($this->action)(new BuildMarketplacePlPreviewCommand(
+            $this->companyId(),
+            new \DateTimeImmutable('2026-01-01'),
+            new \DateTimeImmutable('2026-01-31'),
+            null,
+            null,
+            PlPreviewColumnMode::PROJECTS,
+            $projectIds,
+        ));
     }
 
     private function wbPromotion(bool $includeInPl, string $ledger): void

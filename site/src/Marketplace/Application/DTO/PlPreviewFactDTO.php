@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Application\DTO;
 
+use App\Marketplace\Enum\MarketplaceType;
+
 /**
  * Сумма, которую проведение отнесло бы на статью ОПиУ, — в знаке строки документа marketplace_pl
  * (is_negative уже применён). listingId = null: затрата или реализация без листинга либо факт
- * запрошен без разреза по листингам.
+ * запрошен без разреза по листингам. marketplace и projectId — только в разрезе по проектам;
+ * projectId — проект правила маппинга либо, после фолбэка у вызывающего, проект подключения.
  */
 final readonly class PlPreviewFactDTO
 {
@@ -15,6 +18,8 @@ final readonly class PlPreviewFactDTO
         public string $plCategoryId,
         public ?string $listingId,
         public string $amount,
+        public ?MarketplaceType $marketplace = null,
+        public ?string $projectId = null,
     ) {
     }
 }

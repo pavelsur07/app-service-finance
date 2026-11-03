@@ -83,9 +83,9 @@
 | 3 | `period_key` | текст | `YYYY-MM-DD_YYYY-MM-DD`, например `2026-10-12_2026-10-18` |
 | 4 | `iso_week` | текст | `YYYY-Www`, заполняется только если период — ровно понедельник–воскресенье одной ISO-недели; иначе пусто |
 | 5 | `marketplace` | текст | `MarketplaceType::value`: `ozon`, `wildberries`, … |
-| 6 | `column_kind` | текст | `tag` / `common` / `total` (`PlPreviewColumnKind`) |
-| 7 | `tag_id` | текст | UUID тега для `tag`, иначе пусто |
-| 8 | `tag_name` | текст | Название тега; для `common` — «Общие / без тега»; для `total` — «Итого» |
+| 6 | `column_kind` | текст | `tag` / `common` / `total`; в режиме проектов (`columns=projects`, с v1.1) — `project` / `no_project` / `total` (`PlPreviewColumnKind`) |
+| 7 | `tag_id` | текст | UUID тега для `tag`, UUID проекта для `project`, иначе пусто |
+| 8 | `tag_name` | текст | Название тега или проекта (у вложенного проекта — с префиксом «— » по уровню); для `common` — «Общие / без тега»; для `no_project` — «Без проекта»; для `total` — «Итого» |
 | 9 | `pl_category_id` | текст | `PlPreviewRow::$id` |
 | 10 | `pl_code` | текст | `PlPreviewRow::$code`, может быть пусто |
 | 11 | `row_order` | целое | Порядковый номер строки в дереве (с 1) |
@@ -95,7 +95,7 @@
 | 15 | `value_format` | текст | `PLValueFormat`: `MONEY`, `QTY`, `PERCENT`, `RATIO` |
 | 16 | `value` | число | `PlPreviewRow::$values[column_key]`; `MONEY`/`QTY` — до 2 знаков; `PERCENT` и `RATIO` — доля как есть (0,2773 = 27,73%), без округления до процентов |
 | 17 | `generated_at` | дата-время | Момент выгрузки, Europe/Moscow |
-| 18 | `format_ver` | текст | `1.0` |
+| 18 | `format_ver` | текст | `1.1` (v1.1 — режим проектов; набор и порядок полей те же, что в 1.0) |
 
 **Знак `value`** — как в отчёте (знак строки документа ОПиУ после `is_negative`): расходы отрицательные, доходы положительные. Своих перекодировок знака выгрузка не делает.
 
@@ -113,6 +113,7 @@
 | `period_from`, `period_to`, `period_key`, `iso_week` | как в «Данные» |
 | `marketplaces` | список каналов через `;` |
 | `tags` | список `<tag_id>=<tag_name>` через `;` (тот набор, что в файле) |
+| `projects` | список `<project_id>=<название>` через `;`; пусто — колонки по тегам |
 | `tags_overlap` | `1`, если `report->tagsOverlap` у какого-либо канала, иначе `0` |
 | `rows_count` | число строк листа «Данные», а также `rows_count_<marketplace>` по каналам |
 | `cost_total_<marketplace>` | `report->costTotal` |

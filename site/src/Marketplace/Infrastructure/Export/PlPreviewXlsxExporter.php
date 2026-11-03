@@ -9,6 +9,7 @@ use App\Marketplace\Application\Action\BuildMarketplacePlPreviewAction;
 use App\Marketplace\Application\DTO\MarketplacePlPreviewReport;
 use App\Marketplace\Application\DTO\PlPreviewCostCoverageDTO;
 use App\Marketplace\Enum\PlPreviewColumnKind;
+use App\Marketplace\Enum\PlPreviewColumnMode;
 use OpenSpout\Common\Entity\Cell;
 use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
@@ -51,7 +52,7 @@ final readonly class PlPreviewXlsxExporter
     private function writeReportSheet(Writer $writer, MarketplacePlPreviewReport $report, bool $showEmptyRows): void
     {
         $sheet = $writer->getCurrentSheet();
-        $sheet->setName('ОПиУ по тегам');
+        $sheet->setName(PlPreviewColumnMode::PROJECTS === $report->mode ? 'ОПиУ по проектам' : 'ОПиУ по тегам');
         $sheet->setColumnWidth(45, 1);
         $sheet->setColumnWidthForRange(18, 2, 1 + \count($report->columns));
 
