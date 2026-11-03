@@ -4039,7 +4039,7 @@ $money->amountMinor(): int;  $money->currency(): string
 - `doctrine.dbal.schema_manager_factory` → `NormalizingSchemaManagerFactory`: интроспекция
   возвращает `timestamp(3)/(6)` их типы (`datetime_immutable_utc_ms` / `_us`), `now()` — как
   `CurrentTimestamp`, `jsonb` — как тип `jsonb`. Только сравнение схемы; runtime-запросы не затронуты.
-- Известные расхождения, которые закрывает миграция, — `KNOWN_DRIFT` гейта; список только сокращается.
+- Гейт без исключений: расхождение закрывается миграцией или описанием в маппинге.
 
 ---
 
@@ -4768,6 +4768,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.126 | 2026-11-03 | Схема БД: миграция `Version20261103150000` — потерянные внешние ключи, дубли индексов, комментарии DC2Type, `messenger_messages` по схеме транспорта, удалены неиспользуемые таблицы; гейт схемы без исключений (задача `doctrine-schema-sync`, этап 3) |
 | 2.125 | 2026-11-03 | Shared: синхронность схемы с миграциями — `SchemaExtension` модулей, `NormalizingSchemaManagerFactory`, гейт `SchemaInSyncWithMigrationsTest` (задача `doctrine-schema-sync`, этапы 1–2) |
 | 2.124 | 2026-11-03 | Marketplace: предпросмотр ОПиУ — переключатель колонок «Теги / Проекты» (`PlPreviewColumnMode`, `PlPreviewColumnKind::PROJECT/NO_PROJECT`), проект факта — правило, иначе подключение; выгрузка строками v1.1; `CompanyFacade::listProjectDirections()` (задача `marketplace-pl-preview-by-projects`) |
 | 2.123 | 2026-11-03 | MarketplaceAnalytics: ABC-анализ в расширенной юнит-экономике — `AbcClass`, `AbcClassificationPolicy`, поля `abcRevenue`/`abcProfit` (80/15/5, D — убыток) |
