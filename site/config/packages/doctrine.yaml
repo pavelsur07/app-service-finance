@@ -12,6 +12,8 @@ doctrine:
         # DBAL спрашивает её у сервера при каждом подключении; serverVersion в
         # DATABASE_URL (.env.test, CI) имеет приоритет над этим значением.
         server_version: '15'
+        # Интроспекция с точностью timestamp(3)/(6) — иначе diff схемы вечно «меняет» такие колонки.
+        schema_manager_factory: App\Shared\Infrastructure\Doctrine\Schema\NormalizingSchemaManagerFactory
 
         profiling_collect_backtrace: '%kernel.debug%'
     orm:

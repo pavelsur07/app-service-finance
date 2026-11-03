@@ -21,6 +21,7 @@ use Webmozart\Assert\Assert;
  */
 #[ORM\Entity(repositoryClass: MarketplaceStagingRepository::class)]
 #[ORM\Table(name: 'marketplace_staging')]
+#[ORM\Index(columns: ['listing_id'], name: 'idx_staging_listing')]
 #[ORM\UniqueConstraint(name: 'uniq_marketplace_source_record', columns: ['marketplace', 'source_record_id'])]
 #[ORM\Index(columns: ['processing_batch_id', 'processing_status'], name: 'idx_staging_batch_status')]
 #[ORM\Index(columns: ['company_id', 'processing_status'], name: 'idx_staging_company_status')]

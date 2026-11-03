@@ -15,8 +15,8 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(columns: ['company_id', 'connection_id', 'store_external_id'], name: 'idx_moysklad_stock_lines_store')]
 #[ORM\Index(columns: ['company_id', 'connection_id', 'product_external_id'], name: 'idx_moysklad_stock_lines_product')]
 #[ORM\Index(columns: ['company_id', 'connection_id', 'variant_external_id'], name: 'idx_moysklad_stock_lines_variant')]
-#[ORM\UniqueConstraint(name: 'uniq_moysklad_stock_lines_product', columns: ['snapshot_id', 'store_external_id', 'product_external_id'], options: ['where' => 'product_external_id IS NOT NULL'])]
-#[ORM\UniqueConstraint(name: 'uniq_moysklad_stock_lines_variant', columns: ['snapshot_id', 'store_external_id', 'variant_external_id'], options: ['where' => 'variant_external_id IS NOT NULL'])]
+#[ORM\UniqueConstraint(name: 'uniq_moysklad_stock_lines_product', columns: ['snapshot_id', 'store_external_id', 'product_external_id'], options: ['where' => '(product_external_id IS NOT NULL)'])]
+#[ORM\UniqueConstraint(name: 'uniq_moysklad_stock_lines_variant', columns: ['snapshot_id', 'store_external_id', 'variant_external_id'], options: ['where' => '(variant_external_id IS NOT NULL)'])]
 class MoySkladStockSnapshotLine
 {
     #[ORM\Id]

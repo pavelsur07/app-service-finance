@@ -22,7 +22,7 @@ class CashFileImportProfile
     private string $id;
 
     #[ORM\ManyToOne(targetEntity: Company::class, inversedBy: null)]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(nullable: false)]
     private Company $company;
 
     #[ORM\Column(length: 255)]

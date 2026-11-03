@@ -95,11 +95,11 @@ class MarketplaceRawDocument
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $processedAt = null;
 
-    #[ORM\Column(type: 'json', nullable: true)]
+    #[ORM\Column(type: 'jsonb', nullable: true)]
     private ?array $failedSteps = null;
     // ['sales', 'costs'] — из PipelineStep values
 
-    #[ORM\Column(type: 'json', nullable: true)]
+    #[ORM\Column(type: 'jsonb', nullable: true)]
     private ?array $succeededSteps = null;
     // ['sales', 'returns'] — какие шаги прошли успешно
 

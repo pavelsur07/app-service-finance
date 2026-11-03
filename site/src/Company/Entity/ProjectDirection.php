@@ -12,6 +12,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: ProjectDirectionRepository::class)]
 #[ORM\Table(name: 'project_directions')]
+#[ORM\Index(name: 'idx_project_directions_parent', columns: ['parent_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_project_direction_company_system_code', columns: ['company_id', 'system_code'])]
 #[ORM\HasLifecycleCallbacks]
 class ProjectDirection
@@ -29,13 +30,14 @@ class ProjectDirection
     #[ORM\Column(length: 255)]
     private string $name;
 
-    #[ORM\Column(type: 'integer')]
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
     private int $sort = 0;
 
     #[ORM\Column(length: 64, nullable: true)]
     private ?string $systemCode = null;
 
     #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'children')]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
     private ?self $parent = null;
 
     #[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parent')]

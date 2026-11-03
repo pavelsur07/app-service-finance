@@ -16,7 +16,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(columns: ['company_id', 'source', 'fetched_at'], name: 'idx_inventory_raw_company_source_fetched')]
 #[ORM\Index(columns: ['company_id', 'snapshot_session_id'], name: 'idx_inventory_raw_company_session')]
 #[ORM\Index(columns: ['snapshot_session_id', 'page_number'], name: 'idx_inventory_raw_session_page')]
-#[ORM\Index(columns: ['is_processed'], name: 'idx_inventory_raw_unprocessed', options: ['where' => 'is_processed = false'])]
+#[ORM\Index(columns: ['is_processed'], name: 'idx_inventory_raw_unprocessed', options: ['where' => '(is_processed = false)'])]
 #[ORM\Index(columns: ['correlation_id'], name: 'idx_inventory_raw_correlation')]
 class InventoryRawSnapshot
 {
@@ -37,14 +37,14 @@ class InventoryRawSnapshot
     private string $sourceEndpoint;
 
     /** @var array<string, mixed> */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB)]
     private array $requestParams;
 
     #[ORM\Column(type: Types::INTEGER)]
     private int $responseStatus;
 
     /** @var array<string, mixed> */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB)]
     private array $responseBody;
 
     #[ORM\Column(type: Types::INTEGER, nullable: true)]

@@ -51,14 +51,14 @@ class MarketplaceCostPLMapping
      * Включать ли в расчёт ОПиУ.
      * false — исключить даже если plCategoryId заполнен.
      */
-    #[ORM\Column(type: 'boolean')]
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
     private bool $includeInPl = true;
 
     /** Затраты всегда отрицательные в ОПиУ */
-    #[ORM\Column(type: 'boolean')]
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
     private bool $isNegative = true;
 
-    #[ORM\Column(type: 'smallint')]
+    #[ORM\Column(type: 'smallint', options: ['default' => 0])]
     private int $sortOrder = 0;
 
     #[ORM\Column(type: 'datetime_immutable')]

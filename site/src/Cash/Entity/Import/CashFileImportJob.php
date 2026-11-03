@@ -11,6 +11,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity]
 #[ORM\Table(name: '`cash_file_import_jobs`')]
+#[ORM\Index(name: 'idx_cash_file_import_jobs_import_log', columns: ['import_log_id'])]
 #[ORM\Index(name: 'idx_cash_file_import_jobs_status', columns: ['status'])]
 #[ORM\Index(name: 'idx_cash_file_import_jobs_filehash', columns: ['file_hash'])]
 #[ORM\Index(name: 'idx_cash_file_import_jobs_company', columns: ['company_id'])]
@@ -61,7 +62,7 @@ class CashFileImportJob
     #[ORM\Column(type: 'json')]
     private array $mapping;
 
-    #[ORM\Column(type: 'json')]
+    #[ORM\Column(type: 'json', options: ['default' => '[]'])]
     private array $options = [];
 
     #[ORM\ManyToOne(targetEntity: ImportLog::class)]

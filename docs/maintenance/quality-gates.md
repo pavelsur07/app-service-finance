@@ -99,6 +99,19 @@ Baseline только сокращается: исправили все вызо
 `@internal` `Event\Facade::emitter()` PHPUnit 11.5: после обновления PHPUnit
 перепроверить внедрённым `Deprecation::trigger()` в пробном тесте (exit 1).
 
+## Синхронность схемы БД с маппингом
+
+`site/tests/Integration/Shared/Doctrine/SchemaInSyncWithMigrationsTest` (набор integration):
+на БД, накатанной миграциями, `SchemaTool::getUpdateSchemaSql()` по всем сущностям проекта
+(без `tests/Fixtures`) должен быть пуст. Исключения — `KNOWN_DRIFT` (то, что закрывает миграция
+задачи `docs/tasks/doctrine-schema-sync`) и пустые комментарии `(DC2Type:…)`; второй тест
+падает, если запись `KNOWN_DRIFT` больше не воспроизводится, — список только сокращается.
+
+Без гейта `doctrine:migrations:diff` копил ложные расхождения (409 строк на 03.11.2026), и
+сгенерированная миграция удаляла живые таблицы, ключи и частичные уникальные индексы. Что
+делать при падении — в docblock теста; устройство — `ARCHITECTURE.md`, «Схема БД: миграции —
+источник истины».
+
 ## Branch protection на `master`
 
 Обязательные проверки заданы в защите ветки, а не в коде: `🔬 Static analysis`,

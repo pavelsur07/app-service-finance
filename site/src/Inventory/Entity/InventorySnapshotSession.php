@@ -17,7 +17,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'inventory_snapshot_sessions')]
 #[ORM\Index(columns: ['company_id', 'source', 'started_at'], name: 'idx_inventory_sessions_company_source_started')]
 #[ORM\Index(columns: ['company_id', 'status', 'started_at'], name: 'idx_inventory_sessions_company_status_started')]
-#[ORM\Index(columns: ['status'], name: 'idx_inventory_sessions_active', options: ['where' => "status IN ('pending', 'in_progress')"])]
+#[ORM\Index(columns: ['status'], name: 'idx_inventory_sessions_active', options: ['where' => "((status)::text = ANY ((ARRAY['pending'::character varying, 'in_progress'::character varying])::text[]))"])]
 #[ORM\Index(columns: ['correlation_id'], name: 'idx_inventory_sessions_correlation')]
 class InventorySnapshotSession
 {

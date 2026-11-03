@@ -37,7 +37,7 @@ class NormalizationIssue implements TenantOwnedInterface
     /**
      * @var array<string, mixed>
      */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB)]
     private array $details;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]

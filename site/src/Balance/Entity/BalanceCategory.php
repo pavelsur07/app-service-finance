@@ -48,10 +48,10 @@ class BalanceCategory
     #[ORM\Column(type: Types::INTEGER, options: ['default' => 1])]
     private int $level = 1;
 
-    #[ORM\Column(length: 20)]
+    #[ORM\Column(length: 20, options: ['default' => 'article'])]
     private string $kind = 'group';
 
-    #[ORM\Column(type: Types::BOOLEAN)]
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     private bool $isArchived = false;
 
     #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]

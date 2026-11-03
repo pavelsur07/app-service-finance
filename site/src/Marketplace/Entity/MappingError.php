@@ -39,16 +39,16 @@ class MappingError
     #[ORM\Column(type: 'text')]
     private string $serviceName;
 
-    #[ORM\Column(type: 'text')]
+    #[ORM\Column(type: 'text', options: ['default' => ''])]
     private string $operationType;
 
-    #[ORM\Column(type: 'decimal', precision: 14, scale: 2)]
+    #[ORM\Column(type: 'decimal', precision: 14, scale: 2, options: ['default' => '0'])]
     private string $totalAmount;
 
-    #[ORM\Column(type: 'integer')]
+    #[ORM\Column(type: 'integer', options: ['default' => 1])]
     private int $rowsCount;
 
-    #[ORM\Column(type: 'json', nullable: true)]
+    #[ORM\Column(type: 'jsonb', nullable: true)]
     private ?array $sampleRawJson;
 
     #[ORM\Column(type: 'datetime_immutable')]

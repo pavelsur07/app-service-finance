@@ -35,13 +35,13 @@ class ExternalCategoryMappingAudit
     /**
      * @var array<string, mixed>|null
      */
-    #[ORM\Column(type: Types::JSON, nullable: true, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB, nullable: true)]
     private ?array $oldValues;
 
     /**
      * @var array<string, mixed>
      */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB)]
     private array $newValues;
 
     #[ORM\Column(type: Types::GUID, nullable: true)]

@@ -28,16 +28,16 @@ class BalanceBook
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $startDate = null;
 
-    #[ORM\Column(type: Types::BOOLEAN)]
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     private bool $initialized = false;
 
-    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
     private int $version = 0;
 
-    #[ORM\Column(type: StringBigIntType::NAME)]
+    #[ORM\Column(type: StringBigIntType::NAME, options: ['default' => 1])]
     private string $nextDocumentNumber = '1';
 
-    #[ORM\Column(type: StringBigIntType::NAME)]
+    #[ORM\Column(type: StringBigIntType::NAME, options: ['default' => 1])]
     private string $nextPostingSequence = '1';
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]

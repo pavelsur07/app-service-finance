@@ -81,7 +81,7 @@ class CashflowCategory
     #[ORM\Column(type: 'string', length: 32, nullable: true)]
     private ?string $systemCode = null;
 
-    #[ORM\Column(enumType: CashflowFlowKind::class)]
+    #[ORM\Column(enumType: CashflowFlowKind::class, options: ['default' => 'OPERATING'])]
     private CashflowFlowKind $flowKind;
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]

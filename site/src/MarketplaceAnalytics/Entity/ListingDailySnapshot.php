@@ -11,7 +11,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity]
 #[ORM\Table(name: 'listing_daily_snapshots')]
 #[ORM\UniqueConstraint(
-    name: 'uniq_snapshot_company_listing_date',
+    name: 'uq_snapshot_company_listing_date',
     columns: ['company_id', 'listing_id', 'snapshot_date'],
 )]
 #[ORM\Index(columns: ['company_id'], name: 'idx_snapshot_company')]
@@ -63,13 +63,13 @@ class ListingDailySnapshot
     #[ORM\Column(type: 'decimal', precision: 15, scale: 2, nullable: true)]
     private ?string $totalCostPrice = null;
 
-    #[ORM\Column(type: 'json', options: ['default' => '{}'])]
+    #[ORM\Column(type: 'jsonb', options: ['default' => '{}'])]
     private array $costBreakdown = [];
 
-    #[ORM\Column(type: 'json', options: ['default' => '{}'])]
+    #[ORM\Column(type: 'jsonb', options: ['default' => '{}'])]
     private array $advertisingDetails = [];
 
-    #[ORM\Column(type: 'json', options: ['default' => '[]'])]
+    #[ORM\Column(type: 'jsonb', options: ['default' => '[]'])]
     private array $dataQuality = [];
 
     #[ORM\Column(type: 'datetime_immutable')]

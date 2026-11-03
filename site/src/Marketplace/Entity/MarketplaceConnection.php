@@ -29,7 +29,7 @@ class MarketplaceConnection
     #[ORM\Column(type: 'string', enumType: MarketplaceType::class)]
     private MarketplaceType $marketplace;
 
-    #[ORM\Column(type: 'string', length: 20, enumType: MarketplaceConnectionType::class)]
+    #[ORM\Column(type: 'string', length: 20, enumType: MarketplaceConnectionType::class, options: ['default' => 'seller'])]
     private MarketplaceConnectionType $connectionType = MarketplaceConnectionType::SELLER;
 
     #[ORM\Column(type: 'text')]

@@ -25,10 +25,10 @@ class BalanceAccountState
     #[ORM\Column(type: Types::GUID)]
     private string $accountId;
 
-    #[ORM\Column(type: StringBigIntType::NAME)]
+    #[ORM\Column(type: StringBigIntType::NAME, options: ['default' => 0])]
     private string $balance = '0';
 
-    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
     private int $journalVersion = 0;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]

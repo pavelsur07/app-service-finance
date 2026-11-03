@@ -23,7 +23,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity(repositoryClass: CashCategorySuggestionRepository::class)]
 #[ORM\Table(name: 'cash_category_suggestion')]
 #[ORM\UniqueConstraint(name: 'uniq_cash_category_suggestion_task_tx', columns: ['task_id', 'transaction_id'])]
-#[ORM\UniqueConstraint(name: 'uniq_cash_category_suggestion_open', columns: ['transaction_id'], options: ['where' => "status IN ('requested', 'suggested')"])]
+#[ORM\UniqueConstraint(name: 'uniq_cash_category_suggestion_open', columns: ['transaction_id'], options: ['where' => "((status)::text = ANY ((ARRAY['requested'::character varying, 'suggested'::character varying])::text[]))"])]
 #[ORM\Index(name: 'idx_cash_category_suggestion_company_tx', columns: ['company_id', 'transaction_id'])]
 #[ORM\Index(name: 'idx_cash_category_suggestion_company_status', columns: ['company_id', 'status', 'requested_at'])]
 class CashCategorySuggestion

@@ -46,7 +46,7 @@ class MoySkladVariant
     private ?string $article;
 
     /** @var list<array{id: string, name: string, value: string}> */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB)]
     private array $characteristics;
 
     #[ORM\Column(type: Types::BOOLEAN)]

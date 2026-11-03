@@ -11,13 +11,14 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity]
 #[ORM\Table(name: '`companies`')]
+#[ORM\UniqueConstraint(name: 'uniq_companies_public_id', columns: ['public_id'])]
 class Company
 {
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
     private ?string $id = null;
 
-    #[ORM\Column(name: 'public_id', type: 'integer', unique: true, insertable: false, updatable: false, options: ['default' => "nextval('companies_public_id_seq'::regclass)"], generated: 'INSERT')]
+    #[ORM\Column(name: 'public_id', type: 'integer', insertable: false, updatable: false, options: ['default' => "nextval('companies_public_id_seq'::regclass)"], generated: 'INSERT')]
     private int $publicId;
 
     #[ORM\Column(length: 255)]

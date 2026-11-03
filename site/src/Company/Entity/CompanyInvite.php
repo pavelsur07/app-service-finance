@@ -9,6 +9,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'company_invites')]
+#[ORM\UniqueConstraint(name: 'uniq_company_invites_token_hash', columns: ['token_hash'])]
 class CompanyInvite
 {
     public const STATUS_PENDING = 'PENDING';
@@ -30,7 +31,7 @@ class CompanyInvite
     #[ORM\Column(length: 32)]
     private string $role;
 
-    #[ORM\Column(length: 255, unique: true)]
+    #[ORM\Column(length: 255)]
     private string $tokenHash;
 
     #[ORM\Column(type: 'datetime_immutable')]
@@ -50,7 +51,7 @@ class CompanyInvite
     private ?\DateTimeImmutable $revokedAt = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
-    #[ORM\JoinColumn(nullable: true)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $acceptedByUser = null;
 
     /**

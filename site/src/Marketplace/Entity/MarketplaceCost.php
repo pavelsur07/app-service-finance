@@ -14,6 +14,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: MarketplaceCostRepository::class)]
 #[ORM\Table(name: 'marketplace_costs')]
+#[ORM\Index(columns: ['document_id'], name: 'idx_cost_document')]
 #[ORM\Index(columns: ['company_id', 'cost_date'], name: 'idx_company_cost_date')]
 #[ORM\Index(columns: ['category_id'], name: 'idx_cost_category')]
 #[ORM\Index(columns: ['listing_id'], name: 'idx_cost_listing')]

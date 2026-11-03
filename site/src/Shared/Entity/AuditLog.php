@@ -28,7 +28,7 @@ class AuditLog
     #[ORM\Column(name: 'entity_id', length: 255)]
     private string $entityId;
 
-    #[ORM\Column(enumType: AuditLogAction::class)]
+    #[ORM\Column(enumType: AuditLogAction::class, length: 16)]
     private AuditLogAction $action;
 
     #[ORM\Column(type: 'json', nullable: true)]

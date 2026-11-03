@@ -14,7 +14,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity(repositoryClass: MarketplaceOrderRepository::class)]
 #[ORM\Table(name: 'marketplace_orders')]
 #[ORM\UniqueConstraint(
-    name: 'uniq_mp_order',
+    name: 'uq_mp_order_marketplace_external_id',
     columns: ['company_id', 'marketplace', 'external_order_id'],
 )]
 #[ORM\Index(columns: ['company_id'], name: 'idx_mp_order_company')]
@@ -33,7 +33,7 @@ class MarketplaceOrder
     #[ORM\Column(type: 'guid')]
     private string $listingId;
 
-    #[ORM\Column(type: 'string', enumType: MarketplaceType::class)]
+    #[ORM\Column(type: 'string', enumType: MarketplaceType::class, length: 50)]
     private MarketplaceType $marketplace;
 
     #[ORM\Column(type: 'string', length: 100)]
@@ -45,13 +45,13 @@ class MarketplaceOrder
     #[ORM\Column(type: 'integer')]
     private int $quantity;
 
-    #[ORM\Column(type: 'string', enumType: OrderStatus::class)]
+    #[ORM\Column(type: 'string', enumType: OrderStatus::class, length: 50)]
     private OrderStatus $status;
 
     #[ORM\Column(type: 'guid', nullable: true)]
     private ?string $rawDocumentId;
 
-    #[ORM\Column(type: 'json', nullable: true)]
+    #[ORM\Column(type: 'jsonb', nullable: true)]
     private ?array $rawData;
 
     #[ORM\Column(type: 'datetime_immutable')]
