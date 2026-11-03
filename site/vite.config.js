@@ -26,7 +26,7 @@ export default defineConfig({
                 legacy_app: "./assets/legacy-app.js",
                 admin_shell_runtime: "./assets/admin_shell_runtime.js",
                 design_tokens: "./assets/styles/design-tokens.css",
-                login: "./assets/styles/pages/login.css",
+                auth: "./assets/pages/auth.js",
                 admin_shell: "./assets/styles/pages/admin-shell.css",
                 vf_custom_classes: "./assets/styles/vf-custom-classes.css",
                 marketplace_coverage: "./assets/styles/pages/marketplace-coverage.css",

@@ -1,0 +1,8 @@
+{# Логотип. Параметры: variant = 'full' (по умолчанию) | 'mark' | 'full-white'; href — ссылка (по умолчанию главная).
+   Файлы: docs/design-system/brand/*.svg → скопировать в public/brand/ (или assets/ с версионированием). #}
+{% set _v = variant|default('full') %}
+{% set _files = {full: 'logo-full.svg', mark: 'logo-mark.svg', 'full-white': 'logo-full-white.svg'} %}
+{% set _size = _v == 'mark' ? {w: 32, h: 32} : {w: 145, h: 32} %}
+<a href="{{ href|default(path('app_home')) }}" class="vf-logo" style="display:inline-flex;align-items:center;text-decoration:none" aria-label="Ваш Финдир — на главную">
+  <img src="{{ asset('brand/' ~ _files[_v]) }}" width="{{ _size.w }}" height="{{ _size.h }}" alt="Ваш Финдир" decoding="async">
+</a>

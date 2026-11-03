@@ -1,22 +1,31 @@
 <!DOCTYPE html>
-<html lang="RU">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Welcome!{% endblock %}</title>
-    <link rel="icon" type="image/svg+xml" href="{{ asset('static/favicon.svg') }}">
+    <title>{% block title %}Ваш Финдир{% endblock %}</title>
+    {% block meta %}{% endblock %}
+    <link rel="icon" type="image/svg+xml" href="{{ asset('brand/favicon.svg') }}">
+    <link rel="apple-touch-icon" href="{{ asset('brand/logo-mark-192.png') }}">
+    <meta property="og:site_name" content="Ваш Финдир">
+    <meta property="og:image" content="{{ absolute_url(asset('brand/logo-mark-512.png')) }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-    {% block stylesheets %}
-        {# Подключаем CSS, который Vite собрал для точки входа 'app' #}
-        {{ vite_entry_link_tags('app') }}
-    {% endblock %}
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    {{ vite_entry_link_tags('design_tokens') }}
+    {{ vite_entry_link_tags('auth') }}
+    {{ vite_entry_script_tags('auth') }}
 </head>
-<body class="uikit-base">
-{% block body %}{% endblock %}
-{% block javascripts %}
-    {{ vite_entry_script_tags('app') }}
-{% endblock %}
+{# Страницы входа и регистрации (AUTH-SPEC): шапка → карточка → подвал → баннер cookie. #}
+<body class="vf-auth">
+    <header class="vf-auth__header">
+        {% include 'security/_auth/_logo.html.twig' %}
+        <div class="vf-auth__switch">{% block header_switch %}{% endblock %}</div>
+    </header>
+    <main class="vf-auth__main">
+        {% block body %}{% endblock %}
+    </main>
+    {% include 'security/_auth/_legal_footer.html.twig' %}
+    {% include 'security/_auth/_cookie_banner.html.twig' %}
 </body>
 </html>

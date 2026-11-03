@@ -152,7 +152,7 @@ aside.navbar.navbar-vertical .navbar-brand {
 }
 
 .navbar-brand img {
-    height: 40px;
+    height: 32px; /* brand/README-logo.md: логотип в меню — 32 px */
     width: auto;
 }
 

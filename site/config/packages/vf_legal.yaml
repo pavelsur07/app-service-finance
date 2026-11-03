@@ -1,0 +1,52 @@
+# Реквизиты и юридические документы для страниц входа и регистрации
+# (подвал «Сведения о компании», баннер cookie, согласия). Источник — SPEC
+# docs/design-system/AUTH-SPEC.md §6; пример заполнения — docs/design-system/components/auth/legal.example.yaml.
+#
+# Настоящие значения не придуманы: пустая строка скрывает строку подвала, пустое
+# company_name — весь блок «Сведения о компании»; пустой URL документа — название
+# без ссылки (мёртвых ссылок нет). Заполняет Владелец после проверки юристом.
+parameters:
+    vf_legal:
+        company_name: ''
+        inn: ''
+        kpp: ''
+        ogrn: ''
+        address: ''
+        support_email: ''
+        support_phone: ''
+        support_phone_href: ''
+        privacy_email: ''
+        software_registry: ''   # запись в реестре российского ПО
+        rkn_registry: ''        # рег. номер в реестре операторов ПДн Роскомнадзора
+        documents:
+            offer: ''           # Публичная оферта
+            terms: ''           # Пользовательское соглашение
+            privacy: ''         # Политика конфиденциальности
+            personal_data: ''   # Обработка персональных данных
+            cookies: ''         # Политика cookie
+
+# DEMO: значения макета, только для локальной сверки вида с эталоном. Не настоящие.
+when@dev:
+    parameters:
+        vf_legal:
+            company_name: 'ООО «Финдир Софт» (DEMO)'
+            inn: '7700000000'
+            kpp: '770001001'
+            ogrn: '1230000000000'
+            address: '101000, г. Москва, ул. Примерная, д. 1, офис 100'
+            support_email: 'support@findir.example'
+            support_phone: '+7 (800) 000-00-00'
+            support_phone_href: '+78000000000'
+            privacy_email: 'privacy@findir.example'
+            software_registry: 'Запись № 00000 от 01.01.2026'
+            rkn_registry: 'Рег. № 77-00-000000'
+            documents:
+                offer: ''
+                terms: ''
+                privacy: ''
+                personal_data: ''
+                cookies: ''
+
+twig:
+    globals:
+        legal: '%vf_legal%'

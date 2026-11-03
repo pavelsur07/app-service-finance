@@ -1,219 +1,157 @@
-{# templates/security/register.html.twig #}
-<!doctype html>
-<html lang="ru">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Fin-Plan — Регистрация аккаунта</title>
-    <meta name="description" content="Создайте аккаунт Fin-Plan: финансовый учёт для e-commerce и SMB. 7 дней бесплатно, без карты и обязательств.">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+{% extends 'security/base_auth.html.twig' %}
+{% import 'security/_auth/_macros.html.twig' as auth %}
 
-    <style>
-        :root{
-            --brand-primary:#0A1548; --brand-secondary:#101940; --accent:#FF1F1F;
-            --text:#1C1C1C; --muted:#6c757d; --bg:#ffffff; --bg-soft:#f7f8fb;
-        }
-        html,body{
-            height:100%;
-            background:
-                radial-gradient(1200px 500px at 80% -50%, rgba(255,31,31,.08), transparent 60%),
-                radial-gradient(1000px 600px at -20% -40%, rgba(10,21,72,.18), transparent 60%),
-                var(--bg-soft);
-            color:var(--text);
-        }
-        .auth-wrapper{min-height:100vh;display:flex;align-items:center;}
-        .auth-card{background:#fff;border:1px solid #e7eaf3;box-shadow:0 10px 30px rgba(16,25,64,.08);border-radius:1rem}
-        .btn-accent{--bs-btn-bg:var(--accent);--bs-btn-border-color:var(--accent);--bs-btn-hover-bg:#e11a1a;--bs-btn-hover-border-color:#e11a1a;--bs-btn-color:#fff}
-        .section-title{font-weight:800;letter-spacing:-.01em}
-        .password-meter{height:6px;background:#e9ecef;border-radius:8px;overflow:hidden}
-        .password-meter>div{height:100%;width:0;transition:width .25s}
-        .profile-card{display:block;height:100%;padding:.85rem 1rem;border:1px solid #e7eaf3;border-radius:.75rem;background:#fff;cursor:pointer;transition:border-color .15s,box-shadow .15s}
-        .profile-card:hover{border-color:#c9cfe2}
-        .btn-check:checked + .profile-card{border-color:var(--brand-primary);box-shadow:0 0 0 2px rgba(10,21,72,.12);background:var(--bg-soft)}
-        .btn-check:focus-visible + .profile-card{outline:2px solid var(--brand-primary);outline-offset:2px}
-    </style>
-</head>
-<body>
-<main class="auth-wrapper">
-    <div class="container py-5">
-        <div class="row justify-content-center">
-            <div class="col-12 col-md-10 col-lg-8 col-xxl-6">
+{% block title %}Регистрация · Ваш Финдир{% endblock %}
+{% block meta %}<meta name="description" content="Создайте аккаунт «Ваш Финдир»: финансовый учёт для e-commerce и малого бизнеса. 7 дней бесплатно, без карты и обязательств.">{% endblock %}
 
-                <div class="auth-card p-4 p-md-5">
-                    <div class="mb-4 text-center">
-                        <h1 class="section-title mb-2">Создание аккаунта</h1>
-                        <p class="text-muted mb-0">7 дней бесплатно • без карты и обязательств</p>
-                    </div>
+{% block header_switch %}Уже есть аккаунт? <a href="{{ path('app_login') }}">Войти</a>{% endblock %}
 
-                    {# ——— ФОРМА SYMFONY ——— #}
-                    {{ form_start(registrationForm, {
-                        attr: { id: 'signupForm', class: 'needs-validation', novalidate: 'novalidate' }
-                    }) }}
-                    {% if registrationForm.vars.errors|length > 0 %}
-                        <div class="alert alert-danger" role="alert">
-                            {{ form_errors(registrationForm) }}
-                        </div>
-                    {% endif %}
-                    <div class="row g-3">
+{% block body %}
+{% set f = registrationForm %}
+{% set not_unique = constant('Symfony\\Bridge\\Doctrine\\Validator\\Constraints\\UniqueEntity::NOT_UNIQUE_ERROR') %}
+{% set email_taken = f.email.vars.errors|filter(e => e.cause.code|default(null) == not_unique)|length > 0 %}
+{% set email_errors = f.email.vars.errors|filter(e => e.cause.code|default(null) != not_unique)|map(e => e.message) %}
+{% set pw_min = f.plainPassword.vars.attr['data-min'] %}
 
-                        {% if registrationForm.companyName is defined %}
-                        <div class="col-12">
+<div class="vf-auth__card vf-auth__card--wide">
+    <h1 class="vf-auth__title">Создайте аккаунт</h1>
+    <p class="vf-auth__subtitle">7 дней бесплатно · без карты и обязательств</p>
 
-                            {{ form_label(registrationForm.companyName, 'Имя компании', { label_attr: { class: 'form-label small' } }) }}
-                            {{ form_widget(registrationForm.companyName, {
-                                attr: { class: 'form-control', placeholder: 'ООО Ромашка', required: true }
-                            }) }}
-                            {% if registrationForm.companyName.vars.errors is empty %}
-                            <div class="invalid-feedback">Введите имя компании</div>
-                            {% endif %}
-                            {{ form_errors(registrationForm.companyName) }}
-                        </div>
-                        {% endif %}
+    {% if email_taken %}
+        {# Ссылки «восстановить пароль» нет: сброса пароля в сервисе пока нет. #}
+        <div class="vf-auth__alert" role="alert">
+            {{ auth.alert_icon() }}
+            <div><strong>Этот email уже зарегистрирован.</strong> <a href="{{ path('app_login') }}">Войти</a></div>
+        </div>
+    {% endif %}
+    {% for error in f.vars.errors %}
+        <div class="vf-auth__alert" role="alert">
+            {{ auth.alert_icon() }}
+            <div>{{ error.message }}</div>
+        </div>
+    {% endfor %}
 
-                        {% if registrationForm.businessProfile is defined %}
-                        <div class="col-12">
-                            <div class="form-label small" id="businessProfileLabel">Как вы продаёте?</div>
-                            <div class="row g-2" role="radiogroup" aria-labelledby="businessProfileLabel">
-                                {% for choice in registrationForm.businessProfile %}
-                                <div class="col-12 col-sm-6">
-                                    <input type="radio" class="btn-check" autocomplete="off"
-                                           id="{{ choice.vars.id }}" name="{{ choice.vars.full_name }}" value="{{ choice.vars.value }}"
-                                           {{ choice.vars.checked ? 'checked' }}>
-                                    <label class="profile-card" for="{{ choice.vars.id }}">
-                                        <span class="d-block fw-semibold">{{ choice.vars.label }}</span>
-                                        <span class="d-block small text-muted">{{ choice.vars.attr['data-description'] }}</span>
-                                    </label>
-                                </div>
-                                {% do choice.setRendered %}
-                                {% endfor %}
-                            </div>
-                            <div class="form-text">От ответа зависят стартовые статьи учёта, их можно поменять позже</div>
-                            {{ form_errors(registrationForm.businessProfile) }}
-                        </div>
-                        {% endif %}
+    <form class="vf-auth__form" name="{{ f.vars.name }}" method="post" action="{{ f.vars.action }}" novalidate
+          data-auth-form>
 
-                        <div class="col-12">
-                            {{ form_label(registrationForm.email, 'Email', { label_attr: { class: 'form-label small' } }) }}
-                            {{ form_widget(registrationForm.email, {
-                                attr: { class: 'form-control', placeholder: 'ivan@company.ru' }
-                            }) }}
-                            <div class="invalid-feedback">Введите корректный email</div>
-                            {{ form_errors(registrationForm.email) }}
-                        </div>
+        {% if f.companyName is defined %}
+            {% set fld = f.companyName %}
+            <div>
+                <label class="lbl" for="{{ fld.vars.id }}">Название компании</label>
+                <input id="{{ fld.vars.id }}" class="inp" type="text" name="{{ fld.vars.full_name }}" value="{{ fld.vars.value }}"
+                       autocomplete="organization" placeholder="Например, ООО «Ромашка» или ИП Иванов" required maxlength="120"
+                       aria-describedby="{{ fld.vars.id }}-err" aria-invalid="{{ fld.vars.errors|length ? 'true' : 'false' }}"
+                       data-check="required" data-msg-required="Укажите название компании">
+                {{ auth.field_errors(fld.vars.id, fld.vars.errors|map(e => e.message)) }}
+            </div>
+            {% do fld.setRendered %}
+        {% endif %}
 
-                        <div class="col-12">
-                            {{ form_label(registrationForm.plainPassword, 'Пароль', { label_attr: { class: 'form-label small' } }) }}
-                            <div class="input-group">
-                                {# ДАЁМ единый id="password", чтобы JS-скрипт работал стабильно #}
-                                {{ form_widget(registrationForm.plainPassword, {
-                                    attr: { class: 'form-control', id: 'password', placeholder: '••••••••', minlength: 8, autocomplete: 'new-password' }
-                                }) }}
-                                <button class="btn btn-outline-secondary" type="button" id="togglePass">
-                                    <i class="bi bi-eye"></i>
-                                </button>
-                                <div class="invalid-feedback">Минимум 8 символов</div>
-                            </div>
-                            <div class="password-meter mt-2" aria-hidden="true"><div id="meterFill"></div></div>
-                            <div class="form-text">Используйте буквы разного регистра, цифры и символы</div>
-                            {{ form_errors(registrationForm.plainPassword) }}
-                        </div>
-
-                        <div class="col-12">
-                            <div class="form-check">
-                                {{ form_widget(registrationForm.agreeTerms, {
-                                    attr: { class: 'form-check-input', id: registrationForm.agreeTerms.vars.id }
-                                }) }}
-                                {#<label class="form-check-label" for="{{ registrationForm.agreeTerms.vars.id }}">
-                                    Я принимаю Пользовательское соглашение и Политику конфиденциальности
-                                </label>#}
-                                <div class="invalid-feedback">Нужно подтвердить согласие</div>
-                            </div>
-                            {{ form_errors(registrationForm.agreeTerms) }}
-                        </div>
-
-                        <div class="col-12 d-grid mt-2">
-                            <button type="submit" class="btn btn-accent btn-lg">Создать аккаунт</button>
-                        </div>
-
-                        <div class="col-12 text-center">
-                            <div class="form-text">Регистрируясь, вы соглашаетесь на обработку персональных данных</div>
-                        </div>
-                    </div>
-                    {{ form_end(registrationForm) }}
-
-                    <div class="text-center mt-4">
-                        <span class="text-muted">Уже есть аккаунт?</span>
-                        <a href="{{ path('app_login') }}" class="ms-1">Войти</a>
-                    </div>
+        {% if f.businessProfile is defined %}
+            <fieldset class="vf-auth__fieldset">
+                <legend class="lbl" id="businessProfileLabel">Как вы продаёте?</legend>
+                <div class="vf-auth__radios">
+                    {% for choice in f.businessProfile %}
+                        <label class="rc" for="{{ choice.vars.id }}">
+                            <input type="radio" id="{{ choice.vars.id }}" name="{{ choice.vars.full_name }}" value="{{ choice.vars.value }}"
+                                   aria-describedby="{{ f.businessProfile.vars.id }}-hint"{{ choice.vars.checked ? ' checked' }}>
+                            <span class="dot" aria-hidden="true"></span>
+                            <span class="rc__body">
+                                <span class="rc__title">{{ choice.vars.label }}</span>
+                                <span class="rc__desc">{{ choice.vars.attr['data-description']|default('') }}</span>
+                            </span>
+                        </label>
+                        {% do choice.setRendered %}
+                    {% endfor %}
                 </div>
+                <div class="hint" id="{{ f.businessProfile.vars.id }}-hint">От выбора зависят стартовые статьи учёта. Их можно изменить позже.</div>
+                {{ auth.field_errors(f.businessProfile.vars.id, f.businessProfile.vars.errors|map(e => e.message)) }}
+            </fieldset>
+            {% do f.businessProfile.setRendered %}
+        {% endif %}
 
-                <p class="small text-center text-muted mt-3">© {{ "now"|date("Y") }} Fin-Plan. Все права защищены.</p>
+        {% set fld = f.email %}
+        <div>
+            <label class="lbl" for="{{ fld.vars.id }}">Email</label>
+            {# Текстовое поле, не type=email: адреса с кириллицей допустимы (см. UserEmailType). #}
+            <input id="{{ fld.vars.id }}" class="inp" type="text" name="{{ fld.vars.full_name }}" value="{{ fld.vars.value }}"
+                   inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false"
+                   placeholder="name@company.ru" required
+                   aria-describedby="{{ fld.vars.id }}-err" aria-invalid="{{ fld.vars.errors|length ? 'true' : 'false' }}"
+                   data-check="required email" data-msg-required="Укажите email"
+                   data-msg-email="Проверьте адрес: нужен формат name@company.ru">
+            {{ auth.field_errors(fld.vars.id, email_errors) }}
+        </div>
+        {% do fld.setRendered %}
+
+        {% set fld = f.plainPassword %}
+        <div>
+            <label class="lbl" for="{{ fld.vars.id }}">Пароль</label>
+            <div class="vf-auth__pw">
+                <input id="{{ fld.vars.id }}" class="inp inp--pw" type="password" name="{{ fld.vars.full_name }}"
+                       autocomplete="new-password" placeholder="Придумайте пароль" required
+                       aria-describedby="{{ fld.vars.id }}-err {{ fld.vars.id }}-rules"
+                       aria-invalid="{{ fld.vars.errors|length ? 'true' : 'false' }}"
+                       data-check="required minlen" data-min="{{ pw_min }}"
+                       data-msg-required="Введите пароль" data-msg-minlen="Пароль — не короче {{ pw_min }} символов">
+                {{ auth.pw_toggle(fld.vars.id) }}
+            </div>
+            {{ auth.field_errors(fld.vars.id, fld.vars.errors|map(e => e.message)) }}
+            <div class="vf-auth__meter" data-pw-meter="{{ fld.vars.id }}" data-min="{{ pw_min }}" data-score="0">
+                <div class="vf-auth__segs" aria-hidden="true">
+                    <div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div>
+                </div>
+                <div class="vf-auth__meter-row" aria-live="polite"><span>Надёжность пароля</span><span class="vf-auth__meter-label" data-pw-label></span></div>
+                {# Правило — серверное (RegistrationFormType::PASSWORD_MIN_LENGTH); остальное — совет, не требование. #}
+                <ul class="vf-auth__rules" id="{{ fld.vars.id }}-rules">
+                    <li class="rule" data-pw-rule="len" data-min="{{ pw_min }}" data-ok="false"{% if fld.vars.errors|length %} data-error="true"{% endif %}>
+                        <span class="rule__icon" aria-hidden="true"></span><span>Не короче {{ pw_min }} символов</span><span class="sr-only" data-sr></span>
+                    </li>
+                </ul>
+                <div class="hint">Для надёжности сочетайте строчные и заглавные буквы, цифры и символ, например ! или №.</div>
             </div>
         </div>
-    </div>
-</main>
+        {% do fld.setRendered %}
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-<script>
-    (function() {
-        const initPasswordMeter = function () {
-            const form   = document.getElementById('signupForm');
-            const toggle = form ? form.querySelector('#togglePass') : document.getElementById('togglePass');
-            const pwd    = form ? form.querySelector('input[type="password"]') : document.getElementById('password');
-            const meter  = form ? form.querySelector('.password-meter > div') : document.getElementById('meterFill');
+        <div class="vf-auth__consents">
+            {% set fld = f.agreeTerms %}
+            <div>
+                <label class="chk">
+                    <input type="checkbox" id="{{ fld.vars.id }}" name="{{ fld.vars.full_name }}" value="1"{{ fld.vars.checked ? ' checked' }}
+                           aria-describedby="{{ fld.vars.id }}-err" aria-invalid="{{ fld.vars.errors|length ? 'true' : 'false' }}"
+                           data-check="checked" data-msg-checked="Без принятия условий мы не можем создать аккаунт">
+                    <span>Принимаю {{ auth.doc('terms', 'Пользовательское соглашение') }}, {{ auth.doc('offer', 'Публичную оферту') }} и {{ auth.doc('privacy', 'Политику конфиденциальности') }}</span>
+                </label>
+                {{ auth.field_errors(fld.vars.id, fld.vars.errors|map(e => e.message), 'err--indent') }}
+            </div>
+            {% do fld.setRendered %}
 
-            if (toggle && !toggle.dataset.boundToggle && pwd) {
-                toggle.addEventListener('click', function(){
-                    const isPwd = pwd.type === 'password';
-                    pwd.type = isPwd ? 'text' : 'password';
-                    this.innerHTML = isPwd ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
-                });
-                toggle.dataset.boundToggle = 'true';
-            }
+            {% set fld = f.agreePersonalData %}
+            <div>
+                <label class="chk">
+                    <input type="checkbox" id="{{ fld.vars.id }}" name="{{ fld.vars.full_name }}" value="1"{{ fld.vars.checked ? ' checked' }}
+                           aria-describedby="{{ fld.vars.id }}-err" aria-invalid="{{ fld.vars.errors|length ? 'true' : 'false' }}"
+                           data-check="checked" data-msg-checked="Нужно согласие на обработку персональных данных">
+                    <span>Даю {{ auth.doc('personal_data', 'согласие на обработку персональных данных') }}</span>
+                </label>
+                {{ auth.field_errors(fld.vars.id, fld.vars.errors|map(e => e.message), 'err--indent') }}
+            </div>
+            {% do fld.setRendered %}
+        </div>
 
-            function score(p){
-                let s = 0;
-                if(p.length >= 8) s += 25;
-                if(/[A-Z]/.test(p)) s += 25;
-                if(/[0-9]/.test(p)) s += 25;
-                if(/[^A-Za-z0-9]/.test(p)) s += 25;
-                return s;
-            }
+        {# Необязательное согласие на рассылку (SPEC §5) не выводится: хранить его негде — вопрос владельцу (SPEC §10.3). #}
+        <p class="legal-note">
+            {%- if legal.company_name %}Оператор персональных данных — {{ legal.company_name }}. {% endif -%}
+            Данные хранятся на серверах в России.
+            {% if legal.privacy_email %}Согласие можно отозвать, написав на <a href="mailto:{{ legal.privacy_email }}">{{ legal.privacy_email }}</a>.{% else %}Согласие можно отозвать в любой момент.{% endif %}
+            Регистрируясь, вы подтверждаете, что вам исполнилось 18 лет и вы вправе действовать от имени компании или индивидуального предпринимателя.
+        </p>
 
-            if (pwd && meter && !pwd.dataset.boundMeter) {
-                const updateMeter = function(value){
-                    const sc = score(value);
-                    meter.style.width = sc + '%';
-                    meter.style.background = sc < 50 ? '#ef4444' : (sc < 75 ? '#f59e0b' : '#16a34a');
-                };
+        <button class="btn btn-primary btn-lg" type="submit" data-loading-text="Создаём аккаунт…">Создать аккаунт</button>
 
-                pwd.addEventListener('input', function(){
-                    updateMeter(this.value);
-                });
-                updateMeter(pwd.value || '');
-                pwd.dataset.boundMeter = 'true';
-            }
-
-            if (form && !form.dataset.boundValidation) {
-                form.addEventListener('submit', function (e) {
-                    if (!form.checkValidity()) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                    }
-                    form.classList.add('was-validated');
-                }, false);
-                form.dataset.boundValidation = 'true';
-            }
-        };
-
-        document.addEventListener('DOMContentLoaded', initPasswordMeter);
-        document.addEventListener('turbo:load', initPasswordMeter);
-
-        if (document.readyState !== 'loading') {
-            initPasswordMeter();
-        }
-    })();
-</script>
-</body>
-</html>
+        {# Honeypot против ботов: скрыт, вне порядка табуляции (RegistrationFormType::website). #}
+        {{ form_widget(f.website) }}
+        {{ form_rest(f) }}
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,17 @@
+# config/packages/twig.yaml — реквизиты для подвала страниц входа и регистрации.
+# В макете ДЕМО-ДАННЫЕ: заменить настоящими значениями до запуска. Значения не хардкодить в шаблонах.
+twig:
+    globals:
+        legal:
+            company_name: 'ООО «Финдир Софт»'
+            inn: '7700000000'
+            kpp: '770001001'
+            ogrn: '1230000000000'
+            address: '101000, г. Москва, ул. Примерная, д. 1, офис 100'
+            support_email: 'support@findir.example'
+            support_phone: '+7 (800) 000-00-00'
+            support_phone_href: '+78000000000'
+            privacy_email: 'privacy@findir.example'
+            software_registry: 'Запись № 00000 от 01.01.2026'      # реестр российского ПО; null — скрыть строку
+            rkn_registry: 'Рег. № 77-00-000000'                    # реестр операторов ПДн Роскомнадзора; null — скрыть строку
+            year: 2026

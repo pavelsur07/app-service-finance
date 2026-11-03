@@ -198,6 +198,7 @@ final class BusinessProfileOnCreationTest extends WebTestCaseBase
             'registration_form[email]' => $email,
             'registration_form[plainPassword]' => 'password123',
             'registration_form[agreeTerms]' => 1,
+            'registration_form[agreePersonalData]' => 1,
             'registration_form[website]' => '',
         ];
     }

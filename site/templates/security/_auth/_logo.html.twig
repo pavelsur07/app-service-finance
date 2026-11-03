@@ -1,0 +1,7 @@
+{# Логотип «Ваш Финдир» (docs/design-system/brand/README-logo.md). variant: 'full' | 'full-white' | 'mark'.
+   Ссылка на главную несёт aria-label, alt у картинки пустой — без дублирования для скринридера. #}
+{% set _variant = variant|default('full') %}
+{% set _file = {full: 'logo-full.svg', 'full-white': 'logo-full-white.svg', mark: 'logo-mark.svg'}[_variant] %}
+<a href="{{ path('app_home_index') }}" class="vf-auth__logo" aria-label="Ваш Финдир — на главную">
+    <img src="{{ asset('brand/' ~ _file) }}" width="{{ _variant == 'mark' ? 32 : 145 }}" height="32" alt="" decoding="async">
+</a>

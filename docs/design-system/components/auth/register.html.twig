@@ -1,0 +1,114 @@
+{# Эталонный Twig страницы регистрации. Имена полей формы (FormType), роуты, CSRF, серверную валидацию и логику
+   регистрации НЕ менять — только вид. Ниже поля названы условно; подставь реальные имена из RegistrationFormType.
+   Поля: company, businessType (radio: marketplace|base), email, plainPassword, agreeTerms, agreePersonalData,
+   agreeMarketing (НЕобязательный, отдельный от обязательных согласий; без него регистрация проходит). #}
+{% extends 'base_auth.html.twig' %}
+{% block title %}Регистрация{% endblock %}
+{% block body %}
+{% macro err(text, id) %}<div id="{{ id }}" class="err" role="alert"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg><span>{{ text }}</span></div>{% endmacro %}
+{% import _self as m %}
+<div class="vf-auth">
+  <header class="hdr" style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 40px">
+    {% include 'auth/_logo.html.twig' %}
+    <div style="font-size:14px;color:var(--muted)">Уже есть аккаунт? <a href="{{ path('app_login') }}" style="font-weight:600">Войти</a></div>
+  </header>
+
+  <main class="main" style="flex:1;display:flex;justify-content:center;align-items:flex-start;padding:16px 16px 40px">
+    <div class="card" style="width:100%;max-width:520px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:36px 40px 32px;box-shadow:0 1px 2px rgba(11,16,32,.04),0 8px 24px rgba(11,16,32,.04)">
+      <h1 class="ttl" style="margin:0;font-size:28px;line-height:34px;font-weight:700;letter-spacing:-.01em;text-align:center">Создайте аккаунт</h1>
+      <p style="margin:8px 0 28px;text-align:center;font-size:14px;line-height:20px;color:var(--muted)">7 дней бесплатно · без карты и обязательств</p>
+
+      {% if emailTaken %}{# ошибка «email занят» из UniqueEntity/валидатора #}
+        <div role="alert" style="display:flex;gap:10px;align-items:flex-start;margin:0 0 20px;padding:12px 14px;border:1px solid #efb6bd;border-radius:4px;background:var(--danger-bg);color:var(--danger);font-size:13px;line-height:18px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>
+          <div><strong style="font-weight:600">Этот email уже зарегистрирован.</strong> <a href="{{ path('app_login') }}" style="color:var(--danger);font-weight:600">Войти</a> или <a href="{{ path('app_forgot_password') }}" style="color:var(--danger);font-weight:600">восстановить пароль</a>.</div>
+        </div>
+      {% endif %}
+
+      {{ form_start(form, {attr: {novalidate: 'novalidate', 'data-auth-form': '', 'data-loading-text': 'Создаём аккаунт…', style: 'display:flex;flex-direction:column;gap:20px'}}) }}
+        <div>
+          <label class="lbl" for="{{ form.company.vars.id }}">Название компании</label>
+          {{ form_widget(form.company, {attr: {class: 'inp', placeholder: 'Например, ООО «Ромашка» или ИП Иванов', autocomplete: 'organization', 'aria-invalid': form.company.vars.errors|length ? 'true' : 'false'}}) }}
+          {% for e in form.company.vars.errors %}{{ m.err(e.message, form.company.vars.id ~ '-d') }}{% endfor %}
+        </div>
+
+        <fieldset style="margin:0;padding:0;border:0;min-width:0">
+          <legend class="lbl" style="padding:0">Как вы продаёте?</legend>
+          <div role="radiogroup" style="display:grid;grid-template-columns:1fr;gap:10px">
+            {% set descs = {marketplace: 'Продаю на Wildberries, Ozon или в своём интернет-магазине', base: 'Другой бизнес: услуги, опт, розница, производство'} %}
+            {% set titles = {marketplace: 'Маркетплейсы и e-com', base: 'Базовый'} %}
+            {% for ch in form.businessType %}
+              <label class="rc">
+                {{ form_widget(ch) }}{# <input type="radio" …>: визуально скрыт классом .rc input #}
+                <span class="dot" aria-hidden="true"></span>
+                <span style="min-width:0"><span style="display:block;font-size:14px;font-weight:600;line-height:20px">{{ titles[ch.vars.value]|default(ch.vars.label) }}</span><span style="display:block;margin-top:2px;font-size:13px;line-height:18px;color:var(--muted)">{{ descs[ch.vars.value]|default('') }}</span></span>
+              </label>
+            {% endfor %}
+          </div>
+          <div class="hint">От выбора зависят стартовые статьи учёта. Их можно изменить позже.</div>
+        </fieldset>
+
+        <div>
+          <label class="lbl" for="{{ form.email.vars.id }}">Email</label>
+          {{ form_widget(form.email, {attr: {class: 'inp', placeholder: 'name@company.ru', autocomplete: 'email', inputmode: 'email', 'aria-invalid': form.email.vars.errors|length ? 'true' : 'false'}}) }}
+          {% for e in form.email.vars.errors %}{{ m.err(e.message, form.email.vars.id ~ '-d') }}{% endfor %}
+        </div>
+
+        <div data-pw-meter>
+          <label class="lbl" for="{{ form.plainPassword.vars.id }}">Пароль</label>
+          <div style="position:relative">
+            {{ form_widget(form.plainPassword, {attr: {class: 'inp', 'data-pw-input': '', placeholder: 'Придумайте пароль', autocomplete: 'new-password', style: 'padding-right:44px', 'aria-invalid': form.plainPassword.vars.errors|length ? 'true' : 'false'}}) }}
+            <button class="eye" type="button" aria-label="Показать пароль" aria-pressed="false" data-pw-toggle="#{{ form.plainPassword.vars.id }}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          {% for e in form.plainPassword.vars.errors %}{{ m.err(e.message, form.plainPassword.vars.id ~ '-d') }}{% endfor %}
+          <div style="margin-top:10px">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px" aria-hidden="true">
+              <div class="seg" data-pw-seg></div><div class="seg" data-pw-seg></div><div class="seg" data-pw-seg></div><div class="seg" data-pw-seg></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:12px;margin-top:6px;font-size:12px;line-height:16px;color:var(--muted)" aria-live="polite"><span>Надёжность пароля</span><span data-pw-label style="font-weight:600"></span></div>
+            <ul style="list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px">
+              <li class="rule" data-pw-rule="len"><span>Не короче 8 символов</span><span data-sr style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"></span></li>
+              <li class="rule" data-pw-rule="case"><span>Строчные и заглавные буквы</span><span data-sr style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"></span></li>
+              <li class="rule" data-pw-rule="digit"><span>Хотя бы одна цифра</span><span data-sr style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"></span></li>
+            </ul>
+            <div class="hint" style="margin-top:8px">Для надёжности добавьте символ, например ! или №.</div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div>
+            <label class="chk">
+              {{ form_widget(form.agreeTerms, {attr: {'aria-invalid': form.agreeTerms.vars.errors|length ? 'true' : 'false'}}) }}
+              <span>Принимаю <a href="{{ path('legal_terms') }}" target="_blank" rel="noopener">Пользовательское соглашение</a>, <a href="{{ path('legal_offer') }}" target="_blank" rel="noopener">Публичную оферту</a> и <a href="{{ path('legal_privacy') }}" target="_blank" rel="noopener">Политику конфиденциальности</a></span>
+            </label>
+            {% for e in form.agreeTerms.vars.errors %}<div style="margin-left:28px">{{ m.err(e.message, 'r-agree-d') }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="chk">
+              {{ form_widget(form.agreePersonalData, {attr: {'aria-invalid': form.agreePersonalData.vars.errors|length ? 'true' : 'false'}}) }}
+              <span>Даю <a href="{{ path('legal_personal_data') }}" target="_blank" rel="noopener">согласие на обработку персональных данных</a></span>
+            </label>
+            {% for e in form.agreePersonalData.vars.errors %}<div style="margin-left:28px">{{ m.err(e.message, 'r-pd-d') }}</div>{% endfor %}
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px;margin-top:-4px">
+          <label class="chk">
+            {{ form_widget(form.agreeMarketing) }}
+            <span>Хочу получать новости сервиса и советы по учёту на email <span style="color:var(--muted)">(необязательно, отписаться можно в любой момент)</span></span>
+          </label>
+          <p class="legal-note">Оператор персональных данных — {{ legal.company_name }}. Данные хранятся на серверах в России. Согласие можно отозвать, написав на <a href="mailto:{{ legal.privacy_email }}">{{ legal.privacy_email }}</a>. Регистрируясь, вы подтверждаете, что вам исполнилось 18 лет и вы вправе действовать от имени компании или индивидуального предпринимателя.</p>
+        </div>
+
+        <button class="btn btn-primary btn-lg" type="submit">Создать аккаунт</button>
+        {{ form_rest(form) }}{# CSRF и скрытые поля #}
+      {{ form_end(form, {render_rest: false}) }}
+    </div>
+  </main>
+
+  {% include 'auth/_legal_footer.html.twig' %}
+  {% include 'auth/_cookie_banner.html.twig' %}
+</div>
+{% endblock %}

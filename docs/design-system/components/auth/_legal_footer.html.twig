@@ -1,0 +1,27 @@
+{# Подвал страниц входа/регистрации: документы + сведения о компании. Данные — из twig-глобала `legal`. #}
+<footer style="padding:8px 16px 32px">
+  <div style="max-width:720px;margin:0 auto">
+    <nav aria-label="Юридические документы" style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px 20px">
+      <a class="flink" href="{{ path('legal_offer') }}" target="_blank" rel="noopener">Публичная оферта</a>
+      <a class="flink" href="{{ path('legal_terms') }}" target="_blank" rel="noopener">Пользовательское соглашение</a>
+      <a class="flink" href="{{ path('legal_privacy') }}" target="_blank" rel="noopener">Политика конфиденциальности</a>
+      <a class="flink" href="{{ path('legal_personal_data') }}" target="_blank" rel="noopener">Обработка персональных данных</a>
+      <a class="flink" href="{{ path('legal_cookies') }}" target="_blank" rel="noopener">Политика cookie</a>
+    </nav>
+    <section aria-labelledby="req-h" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+      <h2 id="req-h" style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center">Сведения о компании</h2>
+      <dl class="req">
+        <div><dt>Правообладатель и оператор</dt><dd>{{ legal.company_name }}</dd></div>
+        <div><dt>ИНН / КПП</dt><dd>{{ legal.inn }} / {{ legal.kpp }}</dd></div>
+        <div><dt>ОГРН</dt><dd>{{ legal.ogrn }}</dd></div>
+        <div><dt>Юридический адрес</dt><dd>{{ legal.address }}</dd></div>
+        <div><dt>Поддержка</dt><dd><a href="mailto:{{ legal.support_email }}">{{ legal.support_email }}</a> · <a href="tel:{{ legal.support_phone_href }}">{{ legal.support_phone }}</a></dd></div>
+        <div><dt>Вопросы по персональным данным</dt><dd><a href="mailto:{{ legal.privacy_email }}">{{ legal.privacy_email }}</a></dd></div>
+        {% if legal.software_registry %}<div><dt>Реестр российского ПО</dt><dd>{{ legal.software_registry }}</dd></div>{% endif %}
+        {% if legal.rkn_registry %}<div><dt>Реестр операторов ПДн (Роскомнадзор)</dt><dd>{{ legal.rkn_registry }}</dd></div>{% endif %}
+      </dl>
+      <p class="legal-note" style="margin-top:14px;text-align:center">Персональные данные граждан РФ обрабатываются и хранятся на серверах на территории Российской Федерации. Сервис не является финансовой, юридической или налоговой консультацией: решения принимает пользователь.</p>
+    </section>
+    <div style="margin-top:16px;text-align:center;font-size:12px;color:var(--muted)">© {{ legal.year }} {{ legal.company_name }}. Все права защищены.</div>
+  </div>
+</footer>
