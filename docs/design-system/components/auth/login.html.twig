@@ -1,0 +1,56 @@
+{# Эталонный Twig страницы входа. Адаптируй под существующий шаблон security/login: имена полей, роуты, CSRF и
+   `error`/`last_username` из AuthenticationUtils НЕ менять. Базовый шаблон — тот, что сейчас у страницы входа (legacy-слой). #}
+{% extends 'base_auth.html.twig' %}   {# заменить на реальный layout; он должен подключать auth.css, auth.js, cookie-consent.js #}
+{% block title %}Вход в сервис{% endblock %}
+{% block body %}
+<div class="vf-auth">
+  <header class="hdr" style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 40px">
+    {% include 'auth/_logo.html.twig' %}
+    <div style="font-size:14px;color:var(--muted)">Нет аккаунта? <a href="{{ path('app_register') }}" style="font-weight:600">Создать</a></div>
+  </header>
+
+  <main class="main" style="flex:1;display:flex;justify-content:center;align-items:flex-start;padding:16px 16px 40px">
+    <div class="card" style="width:100%;max-width:440px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:36px 40px 32px;box-shadow:0 1px 2px rgba(11,16,32,.04),0 8px 24px rgba(11,16,32,.04)">
+      <h1 class="ttl" style="margin:0;font-size:28px;line-height:34px;font-weight:700;letter-spacing:-.01em;text-align:center">Вход в сервис</h1>
+      <p style="margin:8px 0 28px;text-align:center;font-size:14px;line-height:20px;color:var(--muted)">Рады видеть снова. Введите email и пароль.</p>
+
+      {% if error %}
+        <div role="alert" style="display:flex;gap:10px;align-items:flex-start;margin:0 0 20px;padding:12px 14px;border:1px solid #efb6bd;border-radius:4px;background:var(--danger-bg);color:var(--danger);font-size:13px;line-height:18px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>
+          <div><strong style="font-weight:600">Неверный email или пароль.</strong> Проверьте раскладку и Caps Lock или <a href="{{ path('app_forgot_password') }}" style="color:var(--danger);font-weight:600">восстановите пароль</a>.</div>
+        </div>
+      {% endif %}
+
+      <form method="post" novalidate data-auth-form style="display:flex;flex-direction:column;gap:20px">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+        <div>
+          <label class="lbl" for="l-email">Email</label>
+          <input id="l-email" class="inp" type="email" name="_username" value="{{ last_username }}" inputmode="email" autocomplete="username" placeholder="name@company.ru" required>
+        </div>
+        <div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 6px">
+            <label class="lbl" for="l-pw" style="margin:0">Пароль</label>
+            <a href="{{ path('app_forgot_password') }}" style="font-size:13px;font-weight:500">Забыли пароль?</a>
+          </div>
+          <div style="position:relative">
+            <input id="l-pw" class="inp" type="password" name="_password" autocomplete="current-password" placeholder="Ваш пароль" required style="padding-right:44px">
+            <button class="eye" type="button" aria-label="Показать пароль" aria-pressed="false" data-pw-toggle="#l-pw">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <label class="chk" style="align-items:center">
+          <input type="checkbox" name="_remember_me" checked style="margin:0"><span>Запомнить меня на этом устройстве</span>
+        </label>
+        <button class="btn btn-primary btn-lg" type="submit" data-loading-text="Входим…">Войти</button>
+      </form>
+
+      <p class="legal-note" style="margin-top:16px;text-align:center">Входя в сервис, вы подтверждаете, что ознакомились с <a href="{{ path('legal_terms') }}" target="_blank" rel="noopener">Пользовательским соглашением</a> и <a href="{{ path('legal_privacy') }}" target="_blank" rel="noopener">Политикой конфиденциальности</a>.</p>
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);text-align:center;font-size:14px;color:var(--muted)">Ещё нет аккаунта? <a href="{{ path('app_register') }}" style="font-weight:600">Создать — 7 дней бесплатно</a></div>
+    </div>
+  </main>
+
+  {% include 'auth/_legal_footer.html.twig' %}
+  {% include 'auth/_cookie_banner.html.twig' %}
+</div>
+{% endblock %}

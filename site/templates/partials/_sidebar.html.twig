@@ -13,8 +13,9 @@
         <span class="navbar-toggler-icon"></span>
     </button>
     <h1 class="navbar-brand navbar-brand-autodark mb-0">
-        <a href="{{ path('app_home_index') }}">
-            <img src="{{ asset('static/logo-vf-001.png') }}" alt="Ваш ФинДир" />
+        {# Меню легаси светлое: тёмный вариант логотипа, белый (logo-full-white.svg) — для тёмного фона. #}
+        <a href="{{ path('app_home_index') }}" aria-label="Ваш Финдир — на главную">
+            <img src="{{ asset('brand/logo-full.svg') }}" width="145" height="32" alt="" />
         </a>
     </h1>
     <div class="collapse navbar-collapse d-flex flex-column vf-sidebar" id="sidebar-menu">

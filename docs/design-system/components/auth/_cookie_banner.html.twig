@@ -1,0 +1,8 @@
+{# Баннер cookie. По умолчанию скрыт (hidden); cookie-consent.js показывает, если выбор ещё не сделан. #}
+<div class="ck" role="region" aria-label="Файлы cookie" data-cookie-banner hidden>
+  <p class="legal-note" style="flex:1 1 360px;font-size:13px;line-height:20px;color:var(--text)">Мы используем файлы cookie: необходимые для работы сервиса и аналитические, чтобы его улучшать. Подробнее — в <a href="{{ path('legal_cookies') }}" target="_blank" rel="noopener" style="color:var(--primary)">Политике cookie</a>.</p>
+  <div class="ck-b" style="display:flex;flex-wrap:wrap;gap:8px">
+    <button class="btn btn-sm" type="button" data-cookie="necessary">Только необходимые</button>
+    <button class="btn btn-sm btn-primary" type="button" data-cookie="all">Принять все</button>
+  </div>
+</div>

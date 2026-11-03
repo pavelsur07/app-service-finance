@@ -1,0 +1,44 @@
+{# Подвал страниц входа и регистрации (AUTH-SPEC §6). Данные — twig-глобал `legal` (config/packages/vf_legal.yaml):
+   пустые значения скрывают строку, пустое company_name — блок «Сведения о компании» и копирайт. #}
+{% import 'security/_auth/_macros.html.twig' as auth %}
+{% set _docs = [
+    {key: 'offer', title: 'Публичная оферта'},
+    {key: 'terms', title: 'Пользовательское соглашение'},
+    {key: 'privacy', title: 'Политика конфиденциальности'},
+    {key: 'personal_data', title: 'Обработка персональных данных'},
+    {key: 'cookies', title: 'Политика cookie'},
+]|filter(d => legal.documents[d.key]|default('')) %}
+<footer class="vf-auth__footer">
+    <div class="vf-auth__footer-inner">
+        {% if _docs is not empty %}
+            <nav class="vf-auth__docs" aria-label="Юридические документы">
+                {% for d in _docs %}{{ auth.doc(d.key, d.title, 'flink') }}{% endfor %}
+            </nav>
+        {% endif %}
+        <section class="vf-auth__req-section"{% if legal.company_name %} aria-labelledby="vf-auth-req-title"{% endif %}>
+            {% if legal.company_name %}
+                <h2 class="vf-auth__req-title" id="vf-auth-req-title">Сведения о компании</h2>
+                <dl class="req">
+                    <div><dt>Правообладатель и оператор</dt><dd>{{ legal.company_name }}</dd></div>
+                    {% if legal.inn %}<div><dt>ИНН{% if legal.kpp %} / КПП{% endif %}</dt><dd>{{ legal.inn }}{% if legal.kpp %} / {{ legal.kpp }}{% endif %}</dd></div>{% endif %}
+                    {% if legal.ogrn %}<div><dt>ОГРН</dt><dd>{{ legal.ogrn }}</dd></div>{% endif %}
+                    {% if legal.address %}<div><dt>Юридический адрес</dt><dd>{{ legal.address }}</dd></div>{% endif %}
+                    {% if legal.support_email or legal.support_phone %}
+                        <div><dt>Поддержка</dt><dd>
+                            {%- if legal.support_email %}<a href="mailto:{{ legal.support_email }}">{{ legal.support_email }}</a>{% endif -%}
+                            {%- if legal.support_email and legal.support_phone %} · {% endif -%}
+                            {%- if legal.support_phone %}<a href="tel:{{ legal.support_phone_href }}">{{ legal.support_phone }}</a>{% endif -%}
+                        </dd></div>
+                    {% endif %}
+                    {% if legal.privacy_email %}<div><dt>Вопросы по персональным данным</dt><dd><a href="mailto:{{ legal.privacy_email }}">{{ legal.privacy_email }}</a></dd></div>{% endif %}
+                    {% if legal.software_registry %}<div><dt>Реестр российского ПО</dt><dd>{{ legal.software_registry }}</dd></div>{% endif %}
+                    {% if legal.rkn_registry %}<div><dt>Реестр операторов ПДн (Роскомнадзор)</dt><dd>{{ legal.rkn_registry }}</dd></div>{% endif %}
+                </dl>
+            {% endif %}
+            <p class="legal-note vf-auth__disclaimer">Персональные данные граждан РФ обрабатываются и хранятся на серверах на территории Российской Федерации. Сервис не является финансовой, юридической или налоговой консультацией: решения принимает пользователь.</p>
+        </section>
+        {% if legal.company_name %}
+            <div class="vf-auth__copyright">© {{ 'now'|date('Y') }} {{ legal.company_name }}. Все права защищены.</div>
+        {% endif %}
+    </div>
+</footer>

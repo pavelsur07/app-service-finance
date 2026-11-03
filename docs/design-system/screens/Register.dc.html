@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Регистрация</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+:root{--primary:#1d4ed8;--bg:#f7f8fc;--surface:#ffffff;--text:#0b1020;--muted:#525b78;--border:#dde1ec;--border-strong:#c3c8d6;--head-bg:#f4f6fb;--warn-bg:#fff4e5;--warn-text:#9a4a00;--ok-bg:#e4f5e7;--ok-text:#1d7a30;--danger:#9a001b;--danger-bg:#fdecee}
+body{margin:0;background:var(--bg)}
+*{box-sizing:border-box}
+button,input{font-family:inherit;font-size:14px;color:var(--text)}
+a{color:var(--primary);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+a:hover{text-decoration-thickness:2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 14px;border-radius:4px;border:1px solid var(--border-strong);background:var(--surface);cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{background:#eef1f8}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-primary:hover{background:#1a40b0}
+.btn-lg{height:44px;font-size:15px;font-weight:600;width:100%}
+.inp{font-family:inherit;width:100%;height:40px;padding:0 12px;border:1px solid var(--border-strong);border-radius:4px;background:var(--surface);font-size:15px;line-height:20px}
+.inp::placeholder{color:#8a92ab}
+.inp[aria-invalid=true]{border-color:var(--danger);box-shadow:inset 0 0 0 1px var(--danger)}
+.lbl{display:block;margin:0 0 6px;font-size:13px;font-weight:600;color:var(--text)}
+.err{display:flex;align-items:flex-start;gap:6px;margin-top:6px;font-size:13px;line-height:18px;color:var(--danger)}
+.hint{margin-top:6px;font-size:13px;line-height:18px;color:var(--muted)}
+.rc{position:relative;display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--border-strong);border-radius:4px;background:var(--surface);cursor:pointer}
+.rc:hover{background:#f4f6fb}
+.rc input{position:absolute;opacity:0;width:1px;height:1px}
+.rc .dot{flex:none;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-top:1px;border:1.5px solid var(--border-strong);border-radius:50%;background:#fff}
+.rc:has(input:checked){border-color:var(--primary);background:#e8effd;box-shadow:inset 0 0 0 1px var(--primary)}
+.rc:has(input:checked) .dot{border-color:var(--primary);background:var(--primary)}
+.rc:has(input:checked) .dot::after{content:"";width:6px;height:6px;border-radius:50%;background:#fff}
+.rc:has(input:focus-visible){outline:2px solid var(--primary);outline-offset:2px}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:20px;color:var(--text)}
+.chk input{flex:none;width:18px;height:18px;margin:1px 0 0;accent-color:var(--primary)}
+.chk input[aria-invalid=true]{outline:2px solid var(--danger);outline-offset:1px}
+.eye{position:absolute;right:4px;top:4px;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:4px;background:transparent;color:var(--muted);cursor:pointer}
+.eye:hover{background:rgba(11,16,32,.07);color:var(--text)}
+.seg{height:4px;border-radius:2px;background:var(--border)}
+.rule{display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px}
+.flink{color:var(--muted);text-decoration:none;font-size:13px}
+.flink:hover{color:var(--text);text-decoration:underline}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (max-width:560px){.card{padding:24px 20px !important;border-radius:0 !important;border-left:0 !important;border-right:0 !important;box-shadow:none !important}.hdr{padding:16px 20px !important}.ttl{font-size:24px !important}.main{padding:0 0 24px !important}}
+.btn-sm{height:32px;padding:0 12px;font-size:13px}
+.legal-note{margin:0;font-size:12px;line-height:18px;color:var(--muted)}
+.legal-note a{color:var(--muted);text-decoration:underline}
+.legal-note a:hover{color:var(--text)}
+.req{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 32px;margin:0;padding:0;text-align:left}
+.req>div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.req dt{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.req dd{margin:0;font-size:13px;line-height:18px;color:var(--text);overflow-wrap:anywhere}
+.req dd a{color:var(--text);text-decoration:underline}
+.ck{position:sticky;bottom:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:14px 40px;background:var(--surface);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(11,16,32,.08)}
+@media (max-width:560px){.req{grid-template-columns:minmax(0,1fr)}.ck{padding:14px 20px}.ck .ck-b{width:100%}.ck .ck-b .btn{flex:1}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</helmet>
+
+<div style="min-height:100%;display:flex;flex-direction:column;background:var(--bg);font-family:'Inter',system-ui,sans-serif;color:var(--text)">
+
+  <header class="hdr" style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 40px">
+    <a href="#" onClick="{{noNav}}" style="display:flex;align-items:center;gap:10px;color:var(--text);text-decoration:none">
+      <span style="width:32px;height:32px;border-radius:8px;background:#b00020;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">ВФ</span>
+      <span style="font-weight:700;font-size:16px">Ваш Финдир</span>
+    </a>
+    <div style="font-size:14px;color:var(--muted)">Уже есть аккаунт? <a href="Login.dc.html" style="font-weight:600">Войти</a></div>
+  </header>
+
+  <main class="main" style="flex:1;display:flex;justify-content:center;align-items:flex-start;padding:16px 16px 40px">
+    <div class="card" style="width:100%;max-width:520px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:36px 40px 32px;box-shadow:0 1px 2px rgba(11,16,32,.04),0 8px 24px rgba(11,16,32,.04)">
+
+      <sc-if value="{{isForm}}" hint-placeholder-val="{{ true }}">
+      <div>
+        <h1 class="ttl" style="margin:0;font-size:28px;line-height:34px;font-weight:700;letter-spacing:-.01em;text-align:center">Создайте аккаунт</h1>
+        <p style="margin:8px 0 28px;text-align:center;font-size:14px;line-height:20px;color:var(--muted)">7 дней бесплатно · без карты и обязательств</p>
+
+        <sc-if value="{{taken}}" hint-placeholder-val="{{ false }}">
+          <div role="alert" style="display:flex;gap:10px;align-items:flex-start;margin:0 0 20px;padding:12px 14px;border:1px solid #efb6bd;border-radius:4px;background:var(--danger-bg);color:var(--danger);font-size:13px;line-height:18px">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>
+            <div><strong style="font-weight:600">Этот email уже зарегистрирован.</strong> <a href="Login.dc.html" style="color:var(--danger);font-weight:600">Войти</a> или <a href="#" onClick="{{noNav}}" style="color:var(--danger);font-weight:600">восстановить пароль</a>.</div>
+          </div>
+        </sc-if>
+
+        <form novalidate="true" onSubmit="{{submit}}" style="display:flex;flex-direction:column;gap:20px">
+
+          <div>
+            <label class="lbl" for="r-company">Название компании</label>
+            <input id="r-company" class="inp" type="text" autocomplete="organization" placeholder="Например, ООО «Ромашка» или ИП Иванов" value="{{company}}" aria-invalid="{{companyErr}}" aria-describedby="r-company-d" onInput="{{onCompany}}" onChange="{{touchCompany}}">
+            <sc-if value="{{companyErr}}" hint-placeholder-val="{{ false }}"><div id="r-company-d" class="err" role="alert"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg><span>Укажите название компании</span></div></sc-if>
+          </div>
+
+          <fieldset style="margin:0;padding:0;border:0;min-width:0">
+            <legend class="lbl" style="padding:0">Как вы продаёте?</legend>
+            <div role="radiogroup" style="display:grid;grid-template-columns:1fr;gap:10px">
+              <sc-for list="{{bizOpts}}" as="o" hint-placeholder-count="2">
+                <label class="rc">
+                  <input type="radio" name="biz" value="{{o.id}}" checked="{{o.sel}}" onChange="{{o.pick}}">
+                  <span class="dot" aria-hidden="true"></span>
+                  <span style="min-width:0"><span style="display:block;font-size:14px;font-weight:600;line-height:20px">{{o.title}}</span><span style="display:block;margin-top:2px;font-size:13px;line-height:18px;color:var(--muted)">{{o.desc}}</span></span>
+                </label>
+              </sc-for>
+            </div>
+            <div class="hint">От выбора зависят стартовые статьи учёта. Их можно изменить позже.</div>
+          </fieldset>
+
+          <div>
+            <label class="lbl" for="r-email">Email</label>
+            <input id="r-email" class="inp" type="email" inputmode="email" autocomplete="email" placeholder="name@company.ru" value="{{email}}" aria-invalid="{{emailErr}}" aria-describedby="r-email-d" onInput="{{onEmail}}" onChange="{{touchEmail}}">
+            <sc-if value="{{emailErr}}" hint-placeholder-val="{{ false }}"><div id="r-email-d" class="err" role="alert"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg><span>{{emailMsg}}</span></div></sc-if>
+          </div>
+
+          <div>
+            <label class="lbl" for="r-pw">Пароль</label>
+            <div style="position:relative">
+              <input id="r-pw" class="inp" type="{{pwType}}" autocomplete="new-password" placeholder="Придумайте пароль" value="{{pw}}" aria-invalid="{{pwErr}}" aria-describedby="r-pw-d" onInput="{{onPw}}" style="padding-right:44px">
+              <button class="eye" type="button" aria-label="{{eyeLabel}}" aria-pressed="{{showPw}}" onClick="{{toggleShow}}">
+                <sc-if value="{{showPw}}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3.1 4M6.6 6.6A16.6 16.6 0 0 0 2.5 12S6 19 12 19a9.6 9.6 0 0 0 4.3-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></sc-if>
+                <sc-if value="{{hidePw}}" hint-placeholder-val="{{ true }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"/><circle cx="12" cy="12" r="3"/></svg></sc-if>
+              </button>
+            </div>
+            <div id="r-pw-d" style="margin-top:10px">
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px" aria-hidden="true">
+                <sc-for list="{{segs}}" as="g" hint-placeholder-count="4"><div class="seg" style="{{g.style}}"></div></sc-for>
+              </div>
+              <div style="display:flex;justify-content:space-between;gap:12px;margin-top:6px;font-size:12px;line-height:16px;color:var(--muted)" aria-live="polite"><span>Надёжность пароля</span><span style="{{strengthStyle}};font-weight:600">{{strengthLabel}}</span></div>
+              <ul style="list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px">
+                <sc-for list="{{rules}}" as="r" hint-placeholder-count="3">
+                  <li class="rule" style="{{r.style}}">
+                    <sc-if value="{{r.ok}}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></sc-if>
+                    <sc-if value="{{r.no}}" hint-placeholder-val="{{ true }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="flex:none"><circle cx="12" cy="12" r="7"/></svg></sc-if>
+                    <span>{{r.text}}</span><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">{{r.sr}}</span>
+                  </li>
+                </sc-for>
+              </ul>
+              <div class="hint" style="margin-top:8px">Для надёжности добавьте символ, например ! или №.</div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div>
+              <label class="chk">
+                <input type="checkbox" checked="{{agree}}" aria-invalid="{{agreeErr}}" aria-describedby="r-agree-d" onChange="{{toggleAgree}}">
+                <span>Принимаю <a href="/legal/terms" target="_blank" rel="noopener" onClick="{{noNav}}">Пользовательское соглашение</a>, <a href="/legal/offer" target="_blank" rel="noopener" onClick="{{noNav}}">Публичную оферту</a> и <a href="/legal/privacy" target="_blank" rel="noopener" onClick="{{noNav}}">Политику конфиденциальности</a></span>
+              </label>
+              <sc-if value="{{agreeErr}}" hint-placeholder-val="{{ false }}"><div id="r-agree-d" class="err" role="alert" style="margin-left:28px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg><span>Без принятия условий мы не можем создать аккаунт</span></div></sc-if>
+            </div>
+            <div>
+              <label class="chk">
+                <input type="checkbox" checked="{{pd}}" aria-invalid="{{pdErr}}" aria-describedby="r-pd-d" onChange="{{togglePd}}">
+                <span>Даю <a href="/legal/personal-data" target="_blank" rel="noopener" onClick="{{noNav}}">согласие на обработку персональных данных</a></span>
+              </label>
+              <sc-if value="{{pdErr}}" hint-placeholder-val="{{ false }}"><div id="r-pd-d" class="err" role="alert" style="margin-left:28px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg><span>Нужно согласие на обработку персональных данных</span></div></sc-if>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:-4px">
+            <label class="chk">
+              <input type="checkbox" checked="{{mail}}" onChange="{{toggleMail}}">
+              <span>Хочу получать новости сервиса и советы по учёту на email <span style="color:var(--muted)">(необязательно, отписаться можно в любой момент)</span></span>
+            </label>
+            <p class="legal-note">Оператор персональных данных — ООО «Финдир Софт». Данные хранятся на серверах в России. Согласие можно отозвать, написав на <a href="mailto:privacy@findir.example" onClick="{{noNav}}">privacy@findir.example</a>. Регистрируясь, вы подтверждаете, что вам исполнилось 18 лет и вы вправе действовать от имени компании или индивидуального предпринимателя.</p>
+          </div>
+
+          <div>
+            <button class="btn btn-primary btn-lg" type="submit" disabled="{{loading}}" aria-busy="{{loading}}" style="{{btnStyle}}">
+              <sc-if value="{{loading}}" hint-placeholder-val="{{ false }}"><span class="spin" aria-hidden="true"></span></sc-if>
+              <span>{{btnText}}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{isDone}}" hint-placeholder-val="{{ false }}">
+      <div style="text-align:center;padding:12px 0 4px">
+        <div style="width:56px;height:56px;margin:0 auto 20px;border-radius:50%;background:#e8effd;color:var(--primary);display:flex;align-items:center;justify-content:center">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 7l8.5 6 8.5-6"/></svg>
+        </div>
+        <h1 class="ttl" style="margin:0;font-size:24px;line-height:30px;font-weight:700">Проверьте почту</h1>
+        <p style="margin:12px 0 0;font-size:15px;line-height:22px;color:var(--muted)">Мы отправили письмо со ссылкой для подтверждения на</p>
+        <p style="margin:2px 0 0;font-size:15px;line-height:22px;font-weight:600;word-break:break-all">{{email}}</p>
+        <p style="margin:16px 0 0;font-size:13px;line-height:18px;color:var(--muted)">Не пришло? Загляните в «Спам» или отправьте письмо ещё раз.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:24px">
+          <button class="btn" type="button" onClick="{{resend}}">Отправить ещё раз</button>
+          <button class="btn" type="button" onClick="{{back}}">Изменить email</button>
+        </div>
+        <div role="status" aria-live="polite" style="min-height:20px;margin-top:14px;font-size:13px;color:var(--ok-text)">{{note}}</div>
+      </div>
+      </sc-if>
+
+    </div>
+  </main>
+
+  <footer style="padding:8px 16px 32px">
+    <div style="max-width:720px;margin:0 auto">
+      <nav aria-label="Юридические документы" style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px 20px">
+        <a class="flink" href="/legal/offer" target="_blank" rel="noopener" onClick="{{noNav}}">Публичная оферта</a>
+        <a class="flink" href="/legal/terms" target="_blank" rel="noopener" onClick="{{noNav}}">Пользовательское соглашение</a>
+        <a class="flink" href="/legal/privacy" target="_blank" rel="noopener" onClick="{{noNav}}">Политика конфиденциальности</a>
+        <a class="flink" href="/legal/personal-data" target="_blank" rel="noopener" onClick="{{noNav}}">Обработка персональных данных</a>
+        <a class="flink" href="/legal/cookies" target="_blank" rel="noopener" onClick="{{noNav}}">Политика cookie</a>
+      </nav>
+      <section aria-labelledby="req-h" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+        <h2 id="req-h" style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center">Сведения о компании</h2>
+        <dl class="req">
+          <div><dt>Правообладатель и оператор</dt><dd>ООО «Финдир Софт»</dd></div>
+          <div><dt>ИНН / КПП</dt><dd>7700000000 / 770001001</dd></div>
+          <div><dt>ОГРН</dt><dd>1230000000000</dd></div>
+          <div><dt>Юридический адрес</dt><dd>101000, г. Москва, ул. Примерная, д. 1, офис 100</dd></div>
+          <div><dt>Поддержка</dt><dd><a href="mailto:support@findir.example" onClick="{{noNav}}">support@findir.example</a> · <a href="tel:+78000000000" onClick="{{noNav}}">+7 (800) 000-00-00</a></dd></div>
+          <div><dt>Вопросы по персональным данным</dt><dd><a href="mailto:privacy@findir.example" onClick="{{noNav}}">privacy@findir.example</a></dd></div>
+          <div><dt>Реестр российского ПО</dt><dd>Запись № 00000 от 01.01.2026</dd></div>
+          <div><dt>Реестр операторов ПДн (Роскомнадзор)</dt><dd>Рег. № 77-00-000000</dd></div>
+        </dl>
+        <p class="legal-note" style="margin-top:14px;text-align:center">Персональные данные граждан РФ обрабатываются и хранятся на серверах на территории Российской Федерации. Сервис не является финансовой, юридической или налоговой консультацией: решения принимает пользователь.</p>
+      </section>
+      <div style="margin-top:16px;text-align:center;font-size:12px;color:var(--muted)">© 2026 ООО «Финдир Софт». Все права защищены. Демо-данные в реквизитах.</div>
+    </div>
+  </footer>
+
+  <sc-if value="{{showCookie}}" hint-placeholder-val="{{ true }}">
+  <div class="ck" role="region" aria-label="Файлы cookie">
+    <p class="legal-note" style="flex:1 1 360px;font-size:13px;line-height:20px;color:var(--text)">Мы используем файлы cookie: необходимые для работы сервиса и аналитические, чтобы его улучшать. Подробнее — в <a href="/legal/cookies" target="_blank" rel="noopener" onClick="{{noNav}}" style="color:var(--primary)">Политике cookie</a>.</p>
+    <div class="ck-b" style="display:flex;flex-wrap:wrap;gap:8px">
+      <button class="btn btn-sm" type="button" onClick="{{cookieNecessary}}">Только необходимые</button>
+      <button class="btn btn-sm btn-primary" type="button" onClick="{{cookieAll}}">Принять все</button>
+    </div>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#1d4ed8","options":["#1d4ed8","#0b1020","#b00020"]},"$preview":{"width":1440,"height":1000}}'>
+const BIZ = [
+  { id: 'mp', title: 'Маркетплейсы и e-com', desc: 'Продаю на Wildberries, Ozon или в своём интернет-магазине' },
+  { id: 'base', title: 'Базовый', desc: 'Другой бизнес: услуги, опт, розница, производство' }
+];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const STRENGTH = [
+  { label: '', color: 'var(--muted)' },
+  { label: 'Слабый', color: '#b00020' },
+  { label: 'Средний', color: '#c77700' },
+  { label: 'Хороший', color: '#1d7a30' },
+  { label: 'Надёжный', color: '#1d7a30' }
+];
+
+function check(pw) {
+  const len = pw.length >= 8;
+  const cases = /[a-zа-яё]/.test(pw) && /[A-ZА-ЯЁ]/.test(pw);
+  const digit = /\d/.test(pw);
+  const sym = /[^\p{L}\d\s]/u.test(pw);
+  const met = (len ? 1 : 0) + (cases ? 1 : 0) + (digit ? 1 : 0);
+  const score = pw ? Math.min(4, met + (sym && met === 3 ? 1 : 0)) : 0;
+  return { len, cases, digit, sym, met, score, ok: len && cases && digit };
+}
+
+class Component extends DCLogic {
+  state = { cookieOk: false, company: '', biz: 'base', email: '', pw: '', showPw: false, agree: false, pd: false, mail: false, tc: false, te: false, submitted: false, loading: false, done: false, taken: false, note: '' };
+
+  componentWillUnmount() { clearTimeout(this._t); }
+
+  renderVals() {
+    const s = this.state;
+    const accent = this.props.accent ?? '#1d4ed8';
+    const pwc = check(s.pw);
+    const showC = s.submitted || s.tc;
+    const showE = s.submitted || s.te;
+    const companyErr = showC && !s.company.trim();
+    const emailEmpty = !s.email.trim();
+    const emailBad = !emailEmpty && !EMAIL_RE.test(s.email.trim());
+    const emailErr = showE && (emailEmpty || emailBad);
+    const pwErr = s.submitted && !pwc.ok;
+    const agreeErr = s.submitted && !s.agree;
+    const pdErr = s.submitted && !s.pd;
+    const st = STRENGTH[pwc.score];
+    const set = (p) => this.setState(Object.assign({ taken: false }, p));
+
+    const rules = [
+      { text: 'Не короче 8 символов', ok: pwc.len },
+      { text: 'Строчные и заглавные буквы', ok: pwc.cases },
+      { text: 'Хотя бы одна цифра', ok: pwc.digit }
+    ].map((r) => ({
+      text: r.text, ok: r.ok, no: !r.ok,
+      sr: r.ok ? ' — выполнено' : ' — не выполнено',
+      style: r.ok ? 'color:var(--ok-text)' : (pwErr ? 'color:var(--danger)' : 'color:var(--muted)')
+    }));
+    const segs = [0, 1, 2, 3].map((i) => ({ style: i < pwc.score ? 'background:' + st.color : '' }));
+
+    return {
+      accent, rowPy: 12,
+      showCookie: !s.cookieOk, cookieAll: () => this.setState({ cookieOk: true }), cookieNecessary: () => this.setState({ cookieOk: true }),
+      noNav: (e) => { if (e && e.preventDefault) e.preventDefault(); },
+      isForm: !s.done, isDone: s.done,
+      taken: s.taken,
+      company: s.company, companyErr, onCompany: (e) => set({ company: e.target.value }), touchCompany: () => this.setState({ tc: true }),
+      bizOpts: BIZ.map((b) => ({ id: b.id, title: b.title, desc: b.desc, sel: s.biz === b.id, pick: () => this.setState({ biz: b.id }) })),
+      email: s.email, emailErr, emailMsg: emailEmpty ? 'Укажите email' : 'Проверьте адрес: нужен формат name@company.ru',
+      onEmail: (e) => set({ email: e.target.value }), touchEmail: () => this.setState({ te: true }),
+      pw: s.pw, pwType: s.showPw ? 'text' : 'password', showPw: s.showPw, hidePw: !s.showPw,
+      eyeLabel: s.showPw ? 'Скрыть пароль' : 'Показать пароль',
+      toggleShow: () => this.setState((x) => ({ showPw: !x.showPw })),
+      onPw: (e) => this.setState({ pw: e.target.value }),
+      pwErr, segs, rules, strengthLabel: st.label, strengthStyle: 'color:' + st.color,
+      agree: s.agree, agreeErr, toggleAgree: () => this.setState((x) => ({ agree: !x.agree })),
+      mail: s.mail, toggleMail: () => this.setState((x) => ({ mail: !x.mail })),
+      pd: s.pd, pdErr, togglePd: () => this.setState((x) => ({ pd: !x.pd })),
+      loading: s.loading, btnText: s.loading ? 'Создаём аккаунт…' : 'Создать аккаунт',
+      btnStyle: s.loading ? 'opacity:.8;cursor:progress' : '',
+      submit: (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        if (s.loading) return;
+        const bad = !s.company.trim() || emailEmpty || emailBad || !pwc.ok || !s.agree || !s.pd;
+        if (bad) {
+          this.setState({ submitted: true, taken: false });
+          const id = !s.company.trim() ? 'r-company' : (emailEmpty || emailBad ? 'r-email' : (!pwc.ok ? 'r-pw' : null));
+          if (id) setTimeout(() => { const el = document.getElementById(id); if (el) el.focus(); }, 0);
+          return;
+        }
+        this.setState({ loading: true, submitted: true, taken: false });
+        clearTimeout(this._t);
+        this._t = setTimeout(() => {
+          if (s.email.trim().toLowerCase() === 'busy@company.ru') this.setState({ loading: false, taken: true });
+          else this.setState({ loading: false, done: true, note: '' });
+        }, 900);
+      },
+      resend: () => this.setState({ note: 'Письмо отправлено повторно' }),
+      back: () => this.setState({ done: false, note: '' }),
+      note: s.note
+    };
+  }
+}
+</script>
+</body>
+</html>

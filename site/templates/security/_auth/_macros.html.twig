@@ -1,0 +1,31 @@
+{# Ссылка на юридический документ из конфигурации (`legal.documents.<key>`, config/packages/vf_legal.yaml).
+   Пустой URL — название без ссылки: мёртвых ссылок на несуществующие страницы не выводим. #}
+{% macro doc(key, title, class) %}
+    {%- set url = legal.documents[key]|default('') -%}
+    {%- if url -%}
+        <a{% if class %} class="{{ class }}"{% endif %} href="{{ url }}" target="_blank" rel="noopener">{{ title }}</a>
+    {%- else -%}
+        <span{% if class %} class="{{ class }}"{% endif %}>{{ title }}</span>
+    {%- endif -%}
+{% endmacro %}
+
+{# Контейнер ошибки поля: серверные ошибки здесь же, клиентские (assets/pages/auth.js) — туда же. #}
+{% macro field_errors(id, errors, extra_class) %}
+    <div id="{{ id }}-err" data-err-for="{{ id }}"{% if extra_class %} class="{{ extra_class }}"{% endif %}>
+        {%- for error in errors -%}
+            <div class="err" id="{{ id }}_error{{ loop.index }}" role="alert">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>
+                <span>{{ error }}</span>
+            </div>
+        {%- endfor -%}
+    </div>
+{% endmacro %}
+
+{% macro alert_icon() %}<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>{% endmacro %}
+
+{% macro pw_toggle(target_id) %}
+    <button class="eye" type="button" aria-label="Показать пароль" aria-pressed="false" data-pw-toggle="{{ target_id }}">
+        <svg class="eye-on" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="eye-off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-6 0-9.5-7-9.5-7a17.6 17.6 0 0 1 4.56-5.5M9.9 5.24A9.12 9.12 0 0 1 12 5c6 0 9.5 7 9.5 7a17.5 17.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M3 3l18 18"/></svg>
+    </button>
+{% endmacro %}

@@ -1,0 +1,10 @@
+{# Баннер cookie (AUTH-SPEC §7). Скрыт по умолчанию: assets/pages/cookie_consent.js показывает его, пока выбор не сделан. #}
+{% import 'security/_auth/_macros.html.twig' as auth %}
+<div class="vf-auth__cookie" role="region" aria-label="Файлы cookie" data-cookie-banner hidden>
+    <p class="vf-auth__cookie-text">Мы используем файлы cookie: необходимые для работы сервиса и аналитические, чтобы его улучшать.
+        {%- if legal.documents.cookies|default('') %} Подробнее — в {{ auth.doc('cookies', 'Политике cookie', '') }}.{% endif %}</p>
+    <div class="vf-auth__cookie-actions">
+        <button class="btn btn-sm" type="button" data-cookie="necessary">Только необходимые</button>
+        <button class="btn btn-sm btn-primary" type="button" data-cookie="all">Принять все</button>
+    </div>
+</div>
