@@ -85,7 +85,7 @@
 | 5 | `marketplace` | текст | `MarketplaceType::value`: `ozon`, `wildberries`, … |
 | 6 | `column_kind` | текст | `tag` / `common` / `total`; в режиме проектов (`columns=projects`, с v1.1) — `project` / `no_project` / `total` (`PlPreviewColumnKind`) |
 | 7 | `tag_id` | текст | UUID тега для `tag`, UUID проекта для `project`, иначе пусто |
-| 8 | `tag_name` | текст | Название тега или проекта (у вложенного проекта — с префиксом «— » по уровню); для `common` — «Общие / без тега»; для `no_project` — «Без проекта»; для `total` — «Итого» |
+| 8 | `tag_name` | текст | Название тега или проекта (без отступа уровня); для `common` — «Общие / без тега»; для `no_project` — «Без проекта»; для `total` — «Итого» |
 | 9 | `pl_category_id` | текст | `PlPreviewRow::$id` |
 | 10 | `pl_code` | текст | `PlPreviewRow::$code`, может быть пусто |
 | 11 | `row_order` | целое | Порядковый номер строки в дереве (с 1) |

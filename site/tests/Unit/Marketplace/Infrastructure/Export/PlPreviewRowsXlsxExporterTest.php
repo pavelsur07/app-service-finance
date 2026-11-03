@@ -259,7 +259,7 @@ final class PlPreviewRowsXlsxExporterTest extends TestCase
             marketplace: MarketplaceType::OZON,
             columns: [
                 new MarketplacePlPreviewColumn('project:'.self::PROJECT_ID, 'Маркетплейсы', PlPreviewColumnKind::PROJECT),
-                new MarketplacePlPreviewColumn('project:'.self::CHILD_ID, '— Ozon', PlPreviewColumnKind::PROJECT),
+                new MarketplacePlPreviewColumn('project:'.self::CHILD_ID, 'Ozon', PlPreviewColumnKind::PROJECT, 2),
                 new MarketplacePlPreviewColumn('no_project', 'Без проекта', PlPreviewColumnKind::NO_PROJECT),
                 new MarketplacePlPreviewColumn('total', 'Итого', PlPreviewColumnKind::TOTAL),
             ],
@@ -277,7 +277,7 @@ final class PlPreviewRowsXlsxExporterTest extends TestCase
         $sheets = $this->export(new PlPreviewRowsExport($from, $to, [$report], null));
 
         self::assertSame(
-            [['project', self::PROJECT_ID, 'Маркетплейсы', 70.0], ['project', self::CHILD_ID, '— Ozon', 0.0], ['no_project', '', 'Без проекта', 30.0], ['total', '', 'Итого', 100.0]],
+            [['project', self::PROJECT_ID, 'Маркетплейсы', 70.0], ['project', self::CHILD_ID, 'Ozon', 0.0], ['no_project', '', 'Без проекта', 30.0], ['total', '', 'Итого', 100.0]],
             array_map(static fn (array $r): array => [self::v($r[5]), self::v($r[6]), self::v($r[7]), (float) self::v($r[15])], array_slice($sheets['Данные'], 1)),
         );
         $passport = [];

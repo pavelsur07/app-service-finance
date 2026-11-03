@@ -824,9 +824,11 @@ CSRF для repair привязан к active company: `ozon_pl_mapping_repair_<
 - Сборка — `Application\Action\BuildMarketplacePlPreviewAction(BuildMarketplacePlPreviewCommand(companyId,
   from, to, ?marketplace, ?tagIds, mode = PlPreviewColumnMode::TAGS, ?projectIds))` →
   `MarketplacePlPreviewReport` (`mode` — режим колонок). Режим `PROJECTS`: колонки `project:<id>` —
-  выбранные проекты компании (`CompanyFacade::listProjectDirections()`, порядок дерева, подпись с
-  отступом «— » по уровню, без свёртки сумм в родителя; чужие id отбрасываются); проект факта —
-  проект правила, иначе проект SELLER-подключения маркетплейса (как `CloseMonthStageAction`);
+  выбранные проекты компании (`CompanyFacade::listProjectDirections()`, порядок дерева,
+  `MarketplacePlPreviewColumn::$level`, отступ «— » — `indentedLabel()` на экране и в xlsx, без
+  свёртки сумм в родителя; чужие id отбрасываются); проект факта — проект правила, иначе проект
+  SELLER-подключения маркетплейса (как `CloseMonthStageAction`); проект, которого нет среди
+  проектов компании, — в `no_project` с предупреждением (проведение на нём падает);
   `no_project` («Без проекта») — только если в ней есть ненулевая сумма; сумма невыбранного проекта
   не выводится. Реклама в этом режиме — учётной суммой (без раскладки по статистике), сверка
   `adReconciliation` считается в обоих режимах. Все проекты выбраны → колонки = «Итого». Режим

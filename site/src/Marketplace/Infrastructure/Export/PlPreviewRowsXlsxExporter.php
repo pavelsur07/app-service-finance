@@ -137,7 +137,7 @@ final readonly class PlPreviewRowsXlsxExporter
             if (PlPreviewColumnKind::TAG === $column->kind) {
                 $tags[] = self::columnEntityId($column).'='.$column->label;
             } elseif (PlPreviewColumnKind::PROJECT === $column->kind) {
-                $projects[] = self::columnEntityId($column).'='.preg_replace('/^(— )+/u', '', $column->label);
+                $projects[] = self::columnEntityId($column).'='.$column->label;
             }
         }
         $tagsOverlap = false;

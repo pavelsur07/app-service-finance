@@ -69,7 +69,7 @@ final readonly class PlPreviewXlsxExporter
 
         $headers = ['Статья'];
         foreach ($report->columns as $column) {
-            $headers[] = $column->label;
+            $headers[] = $column->indentedLabel();
         }
         $writer->addRow($this->headerRow($headers));
 
@@ -151,7 +151,9 @@ final readonly class PlPreviewXlsxExporter
 
         if ([] !== $report->adReconciliation) {
             $writer->addRow(Row::fromValues([]));
-            $writer->addRow(new Row([self::text('Реклама: учёт и статистика (в колонках тегов — по статистике)')], (new Style())->setFontBold()));
+            $writer->addRow(new Row([self::text(PlPreviewColumnMode::PROJECTS === $report->mode
+                ? 'Реклама: учёт и статистика (в колонках проектов — по учёту)'
+                : 'Реклама: учёт и статистика (в колонках тегов — по статистике)')], (new Style())->setFontBold()));
             $writer->addRow($this->headerRow(['Маркетплейс', 'Учёт, ₽', 'Статистика, ₽', 'На товарах, ₽', 'Без товара, ₽', 'Расхождение, ₽']));
             foreach ($report->adReconciliation as $ads) {
                 $writer->addRow(new Row([

@@ -262,7 +262,7 @@
                         <tr>
                             <th>Статья</th>
                             {% for column in report.columns %}
-                                <th class="text-end{{ column.kind.value == 'total' ? ' pl-cell-total' }}" title="{{ column.label }}" data-column="{{ column.key }}">{{ column.label }}</th>
+                                <th class="text-end{{ column.kind.value == 'total' ? ' pl-cell-total' }}" title="{{ column.indentedLabel }}" data-column="{{ column.key }}">{{ column.indentedLabel }}</th>
                             {% endfor %}
                         </tr>
                     </thead>

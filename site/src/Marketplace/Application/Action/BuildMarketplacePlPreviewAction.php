@@ -90,8 +90,9 @@ final readonly class BuildMarketplacePlPreviewAction
         }
 
         $tagsOverlap = false;
+        $columnWarnings = [];
         if (PlPreviewColumnMode::PROJECTS === $command->mode) {
-            [$columns, $financeColumns] = $this->projectColumns($command, $from, $to);
+            [$columns, $financeColumns, $columnWarnings] = $this->projectColumns($command, $from, $to);
         } else {
             [$columns, $financeColumns, $tagsOverlap] = $this->tagColumns($command, $from, $to, $adLedgers, $adFacts);
         }
@@ -127,6 +128,7 @@ final readonly class BuildMarketplacePlPreviewAction
                 ...(null === $command->marketplace || MarketplaceType::OZON === $command->marketplace ? $this->mappingWarnings->fetch($companyId) : []),
                 ...$this->realizationWarnings($companyId, $from, $to, $command->marketplace),
                 ...$this->projectWarnings($companyId, $costCoverage, $salesCoverage),
+                ...$columnWarnings,
             ],
         );
     }
@@ -243,13 +245,20 @@ final readonly class BuildMarketplacePlPreviewAction
     /**
      * Реклама здесь — учётной суммой, как при проведении: раскладка по статистике нужна только
      * листингам. Проект суммы — проект правила, иначе проект Seller-подключения маркетплейса.
+     * Проект, которого нет среди проектов компании (удалён, чужой), — в «Без проекта» с
+     * предупреждением: проведение на нём упадёт, а тихий пропуск разошёлся бы с «Итого».
      *
-     * @return array{0: list<MarketplacePlPreviewColumn>, 1: list<PlPreviewColumn>}
+     * @return array{0: list<MarketplacePlPreviewColumn>, 1: list<PlPreviewColumn>, 2: list<string>}
      */
     private function projectColumns(BuildMarketplacePlPreviewCommand $command, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         $companyId = $command->companyId;
-        $projects = $this->selectedProjects($companyId, $command->projectIds);
+        $allProjects = $this->companyFacade->listProjectDirections($companyId);
+        $known = [];
+        foreach ($allProjects as $project) {
+            $known[$project->id] = true;
+        }
+        $projects = self::selectedProjects($allProjects, $command->projectIds);
         $facts = $this->factsQuery->fetch($companyId, $from, $to, $command->marketplace, false, [], true);
 
         $projectColumns = [];
@@ -258,6 +267,7 @@ final readonly class BuildMarketplacePlPreviewAction
         }
         $noProject = [];
         $connectionProjects = [];
+        $unknownProjectMarketplaces = [];
         foreach ($facts as $fact) {
             $projectId = $fact->projectId;
             if (null === $projectId && null !== $fact->marketplace) {
@@ -268,6 +278,13 @@ final readonly class BuildMarketplacePlPreviewAction
                         ?->getProjectDirectionId();
                 }
                 $projectId = $connectionProjects[$key];
+            }
+
+            if (null !== $projectId && !isset($known[$projectId])) {
+                if (null !== $fact->marketplace) {
+                    $unknownProjectMarketplaces[$fact->marketplace->value] = $fact->marketplace;
+                }
+                $projectId = null;
             }
 
             if (null === $projectId) {
@@ -281,8 +298,7 @@ final readonly class BuildMarketplacePlPreviewAction
         $financeColumns = [];
         foreach ($projects as $project) {
             $key = 'project:'.$project->id;
-            $label = str_repeat('— ', max(0, $project->level - 1)).$project->name;
-            $columns[] = new MarketplacePlPreviewColumn($key, $label, PlPreviewColumnKind::PROJECT);
+            $columns[] = new MarketplacePlPreviewColumn($key, $project->name, PlPreviewColumnKind::PROJECT, $project->level);
             $financeColumns[] = new PlPreviewColumn($key, $projectColumns[$project->id]);
         }
         if (array_filter($noProject, static fn (string $amount): bool => 0 !== bccomp($amount, '0', 2))) {
@@ -290,17 +306,26 @@ final readonly class BuildMarketplacePlPreviewAction
             $financeColumns[] = new PlPreviewColumn(self::NO_PROJECT_KEY, $noProject);
         }
 
-        return [$columns, $financeColumns];
+        ksort($unknownProjectMarketplaces);
+        $warnings = array_values(array_map(
+            static fn (MarketplaceType $marketplace): string => sprintf(
+                '%s: проект ОПиУ из правила или подключения не найден среди проектов компании — суммы показаны в «Без проекта», проведение на нём завершится ошибкой.',
+                $marketplace->getDisplayName(),
+            ),
+            $unknownProjectMarketplaces,
+        ));
+
+        return [$columns, $financeColumns, $warnings];
     }
 
     /**
+     * @param list<ProjectDirectionDTO> $projects
      * @param list<string>|null $projectIds
      *
      * @return list<ProjectDirectionDTO>
      */
-    private function selectedProjects(string $companyId, ?array $projectIds): array
+    private static function selectedProjects(array $projects, ?array $projectIds): array
     {
-        $projects = $this->companyFacade->listProjectDirections($companyId);
         if (null === $projectIds) {
             return $projects;
         }

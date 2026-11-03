@@ -322,10 +322,11 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
 
         self::assertSame(PlPreviewColumnMode::PROJECTS, $report->mode);
         self::assertSame(
-            [['project:'.$wb->getId(), 'Вайлдберриз', PlPreviewColumnKind::PROJECT], ['project:'.$child->getId(), '— Дочерний', PlPreviewColumnKind::PROJECT], ['project:'.$ozon->getId(), 'Озон', PlPreviewColumnKind::PROJECT], ['total', 'Итого', PlPreviewColumnKind::TOTAL]],
+            [['project:'.$wb->getId(), 'Вайлдберриз', PlPreviewColumnKind::PROJECT], ['project:'.$child->getId(), 'Дочерний', PlPreviewColumnKind::PROJECT], ['project:'.$ozon->getId(), 'Озон', PlPreviewColumnKind::PROJECT], ['total', 'Итого', PlPreviewColumnKind::TOTAL]],
             array_map(static fn ($c): array => [$c->key, $c->label, $c->kind], $report->columns),
             '«Без проекта» пуста — колонки нет; дочерний проект с отступом, без свёртки сумм в родителя.',
         );
+        self::assertSame('— Дочерний', $report->columns[1]->indentedLabel());
         $wbKey = 'project:'.$wb->getId();
         $childKey = 'project:'.$child->getId();
         $ozonKey = 'project:'.$ozon->getId();
@@ -386,6 +387,44 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
         $report = $this->buildProjects([(string) $ozon->getId(), (string) $foreign->getId()]);
 
         self::assertSame(['project:'.$ozon->getId(), 'total'], array_map(static fn ($c): string => $c->key, $report->columns), 'Сумма невыбранного проекта не уходит в «Без проекта».');
+    }
+
+    public function testUnknownConnectionProjectGoesToNoProjectWithWarning(): void
+    {
+        $ozon = $this->project('Озон');
+        $this->ozonMappingsProject($ozon);
+        $stale = new MarketplaceConnection(Uuid::uuid4()->toString(), $this->fixture->company, MarketplaceType::WILDBERRIES);
+        $stale->setApiKey('test-key');
+        $stale->setProjectDirectionId(Uuid::uuid4()->toString());
+        $this->em->persist($stale);
+        $this->em->flush();
+
+        $report = $this->buildProjects();
+
+        self::assertSame(['project:'.$ozon->getId(), 'no_project', 'total'], array_map(static fn ($c): string => $c->key, $report->columns));
+        self::assertSame(1300.0, $this->values($report)['REV']['no_project'], 'Сумма на несуществующем проекте не пропадает.');
+        $warnings = array_values(array_filter($report->warnings, static fn (string $w): bool => str_contains($w, 'не найден среди проектов')));
+        self::assertCount(1, $warnings);
+        self::assertStringStartsWith(MarketplaceType::WILDBERRIES->getDisplayName().':', $warnings[0]);
+    }
+
+    public function testProjectModeWithMarketplaceFilter(): void
+    {
+        $wb = $this->project('Вайлдберриз');
+        $this->connection(MarketplaceType::WILDBERRIES, $wb);
+        $this->em->flush();
+
+        $report = ($this->action)(new BuildMarketplacePlPreviewCommand(
+            $this->companyId(),
+            new \DateTimeImmutable('2026-01-01'),
+            new \DateTimeImmutable('2026-01-31'),
+            MarketplaceType::WILDBERRIES,
+            null,
+            PlPreviewColumnMode::PROJECTS,
+        ));
+
+        self::assertSame(['project:'.$wb->getId(), 'total'], array_map(static fn ($c): string => $c->key, $report->columns), 'Реализации Ozon нет — нет и «Без проекта».');
+        self::assertSame(1300.0, $this->values($report)['REV']['project:'.$wb->getId()]);
     }
 
     public function testAdsGoToConnectionProjectFromLedgerInProjectMode(): void
