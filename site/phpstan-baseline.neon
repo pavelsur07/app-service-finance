@@ -2799,48 +2799,6 @@ parameters:
 			path: src/Finance/Facade/FinanceFacade.php
 
 		-
-			message: '#^Call to an undefined method object\:\:getCode\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Finance/Facade/PLCategoryFacade.php
-
-		-
-			message: '#^Call to an undefined method object\:\:getCompany\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Finance/Facade/PLCategoryFacade.php
-
-		-
-			message: '#^Call to an undefined method object\:\:getId\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Finance/Facade/PLCategoryFacade.php
-
-		-
-			message: '#^Call to an undefined method object\:\:getLevel\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Finance/Facade/PLCategoryFacade.php
-
-		-
-			message: '#^Call to an undefined method object\:\:getName\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Finance/Facade/PLCategoryFacade.php
-
-		-
-			message: '#^Call to an undefined method object\:\:getParent\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Finance/Facade/PLCategoryFacade.php
-
-		-
-			message: '#^Call to an undefined method object\:\:getSortOrder\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Finance/Facade/PLCategoryFacade.php
-
-		-
 			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1

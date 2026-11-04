@@ -1,0 +1,2 @@
+{% set badge_class = {draft: 'bg-secondary-lt', approved: 'bg-success-lt', archived: 'bg-secondary-lt'}[status.value] %}
+<span class="badge {{ badge_class }} vf-status">{{ status.label }}</span>

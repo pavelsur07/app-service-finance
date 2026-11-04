@@ -1,0 +1,164 @@
+/*
+ * Сетка бюджета ОПиУ (ui-ux.md §3.4): закреплённые шапка и колонка статей,
+ * ячейка ввода. Только обёртки модуля, классы кита и Tabler не переопределяются.
+ * Цвета и отступы — токены легаси-слоя (assets/styles/design-tokens.css).
+ */
+.scroller {
+    overflow: auto;
+    max-height: 70vh;
+    border-top: 1px solid var(--vf-border);
+    outline: none;
+}
+
+.scroller:focus-visible {
+    box-shadow: var(--vf-shadow-focus);
+}
+
+.grid {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
+    font-variant-numeric: tabular-nums;
+}
+
+.grid th,
+.grid td {
+    padding: var(--vf-space-2) var(--vf-space-3);
+    border-bottom: 1px solid var(--vf-border);
+    background: var(--vf-surface);
+    white-space: nowrap;
+}
+
+.grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--vf-surface-alt);
+    color: var(--vf-text-secondary);
+    font-size: var(--vf-size-xs);
+    font-weight: var(--vf-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: var(--vf-tracking-wide);
+    text-align: right;
+}
+
+.grid .name {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    min-width: 16rem;
+    max-width: 22rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+    border-right: 1px solid var(--vf-border);
+}
+
+/* Отступ уровня дерева: --budget-level задаёт строка (0 — верхний уровень). */
+.grid tbody .name {
+    padding-left: calc(var(--vf-space-3) + var(--budget-level, 0) * 1.25rem);
+    font-weight: var(--vf-weight-regular);
+}
+
+.grid tbody .subtotal .name {
+    font-weight: var(--vf-weight-semibold);
+}
+
+.grid thead .name {
+    z-index: 3;
+}
+
+.toggle {
+    display: inline-flex;
+    width: 1.25rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--vf-text-muted);
+    cursor: pointer;
+}
+
+.togglePlaceholder {
+    display: inline-block;
+    width: 1.25rem;
+}
+
+.subtotal td,
+.subtotal th {
+    font-weight: var(--vf-weight-semibold);
+}
+
+.kpi td,
+.kpi th {
+    font-style: italic;
+    color: var(--vf-text-secondary);
+}
+
+.cell {
+    position: relative;
+    min-width: 7.5rem;
+    text-align: right;
+}
+
+.editable {
+    cursor: cell;
+}
+
+.readonlyCell {
+    color: var(--vf-text-secondary);
+}
+
+.active {
+    outline: 2px solid var(--vf-primary);
+    outline-offset: -2px;
+}
+
+.grid td.invalid {
+    background: var(--vf-danger-bg);
+    outline: 2px solid var(--vf-danger-border);
+    outline-offset: -2px;
+}
+
+.grid td.unsaved {
+    background: var(--vf-warn-bg);
+}
+
+.hasComment::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    border-style: solid;
+    border-width: 0 0.5rem 0.5rem 0;
+    border-color: transparent var(--vf-primary) transparent transparent;
+}
+
+.grid td.total {
+    background: var(--vf-surface-alt);
+}
+
+.input {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: right;
+    outline: none;
+}
+
+.commentPanel {
+    padding: var(--vf-space-3) var(--vf-space-4);
+    border-top: 1px solid var(--vf-border);
+    background: var(--vf-surface-alt);
+}
+
+/* Телефон (ui-ux.md §3.8): колонка статей уже, месяцы прокручиваются рядом. */
+@media (max-width: 576px) {
+    .grid .name {
+        min-width: 9rem;
+        max-width: 10rem;
+    }
+}

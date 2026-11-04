@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ version.name }} — бюджет {{ version.year }}{% endblock %}
+
+{% block importmap %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('budget_grid_page') }}
+{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    {{ vite_entry_link_tags('budget_grid_page') }}
+{% endblock %}
+
+{% block body %}
+{# Композиция раздела ОПиУ: vf-page-head с крошками, действия справа, сетка — React-остров (этап 2). ui-ux.md, экран 3. #}
+    {% set can_write = props.canWrite %}
+    <div class="vf-page-head">
+        <div class="vf-page-head__title">
+            <nav aria-label="Путь">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">Доходы и расходы</li>
+                    <li class="breadcrumb-item"><a href="{{ path('budget_index', {year: version.year}) }}">Бюджет ОПиУ · {{ version.year }}</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ version.name }}</li>
+                </ol>
+            </nav>
+            <h1 class="d-flex align-items-center gap-2">
+                {{ version.name }}
+                {% include 'budget/_status_badge.html.twig' with {status: version.status} only %}
+            </h1>
+        </div>
+        <div class="btn-list d-print-none">
+            {% include 'budget/_status_actions.html.twig' with {version: version, isOwner: isOwner, canWrite: can_write} only %}
+        </div>
+    </div>
+
+    {% if version.status.value == 'approved' %}
+        <div class="alert alert-info" data-budget-banner>
+            Вариант утверждён — изменения недоступны. Чтобы править, верните его в черновик{{ isOwner ? '' : ' (это может сделать владелец компании)' }}.
+        </div>
+    {% elseif version.status.value == 'archived' %}
+        <div class="alert alert-secondary" data-budget-banner>Вариант в архиве. Восстановите, чтобы править.</div>
+    {% endif %}
+
+    <div class="card vf-card mb-4">
+        <div data-island="budget-grid" data-props="{{ props|json_encode|e('html_attr') }}">
+            <noscript><div class="card-body">Для ввода плана нужен JavaScript.</div></noscript>
+        </div>
+    </div>
+
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'budget-confirm'} only %}
+{% endblock %}

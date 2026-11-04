@@ -1,0 +1,278 @@
+import type { ClipboardEvent, CSSProperties, KeyboardEvent, MouseEvent, RefObject } from 'react';
+import { cn } from '@/react/shared/lib/cn';
+import { formatValue } from './amount';
+import type { BudgetGridRow, BudgetPair, CellPosition, SaveState } from './budget-grid.types';
+import styles from './BudgetGrid.module.css';
+
+const MONTH_LABELS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+
+export interface VisibleRow {
+    row: BudgetGridRow;
+    hasChildren: boolean;
+    collapsed: boolean;
+}
+
+export interface CommentDraft {
+    title: string;
+    text: string;
+}
+
+export interface BudgetGridViewProps {
+    months: string[];
+    rows: VisibleRow[];
+    pairs: BudgetPair[];
+    /** `${projectId}|${centerId}` или `all` */
+    pairValue: string;
+    canEdit: boolean;
+    readOnlyHint: string | null;
+    active: CellPosition | null;
+    editing: { position: CellPosition; text: string } | null;
+    invalidKeys: Set<string>;
+    unsavedKeys: Set<string>;
+    saveState: SaveState;
+    saveError: string | null;
+    inputError: string | null;
+    pasteMessage: string | null;
+    warnings: string[];
+    lockedMessage: string | null;
+    unsavedLabels: string[];
+    comment: CommentDraft | null;
+    loading: boolean;
+    loadError: string | null;
+    scrollerRef: RefObject<HTMLDivElement>;
+    inputRef: RefObject<HTMLInputElement>;
+    onPairChange: (value: string) => void;
+    onRetry: () => void;
+    onToggle: (rowId: string) => void;
+    onCellMouseDown: (position: CellPosition) => void;
+    onCellDoubleClick: (position: CellPosition) => void;
+    onCellContextMenu: (position: CellPosition, event: MouseEvent) => void;
+    onGridKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
+    onPaste: (event: ClipboardEvent<HTMLDivElement>) => void;
+    onEditChange: (text: string) => void;
+    onEditKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+    onEditBlur: () => void;
+    onCommentChange: (text: string) => void;
+    onCommentSave: () => void;
+    onCommentCancel: () => void;
+}
+
+interface ValueProps {
+    value: string;
+    row: BudgetGridRow;
+    /** Пустая ячейка вместо нуля (лист без плана). */
+    blankZero: boolean;
+}
+
+function Value({ value, row, blankZero }: ValueProps): JSX.Element | null {
+    const formatted = formatValue(value, row.format);
+    if (formatted.zero && blankZero) {
+        return null;
+    }
+
+    return (
+        <span className={cn('vf-amount', formatted.zero && 'vf-amount--zero')}>
+            {formatted.whole}
+            {formatted.minor !== null && <span className="vf-amount__minor">{formatted.minor}</span>}
+        </span>
+    );
+}
+
+interface SaveIndicatorProps {
+    state: SaveState;
+    error: string | null;
+    locked: boolean;
+    onRetry: () => void;
+}
+
+function SaveIndicator({ state, error, locked, onRetry }: SaveIndicatorProps): JSX.Element {
+    if (locked) {
+        return <span className="text-danger" role="status">Не сохранено</span>;
+    }
+    if (state === 'saving') {
+        return <span className="text-secondary" role="status">Сохраняю…</span>;
+    }
+    if (state === 'failed') {
+        return (
+            <span className="text-danger" role="alert">
+                Не сохранено{error ? `: ${error}` : ''}{' '}
+                <button type="button" className="btn btn-sm btn-outline-secondary ms-1" onClick={onRetry}>Повторить</button>
+            </span>
+        );
+    }
+
+    return <span className="text-secondary" role="status">Сохранено</span>;
+}
+
+/** Сетка «статьи × 12 месяцев» (ui-ux.md §3). Только разметка: состояние и клавиатура — в BudgetGridWidget. */
+export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
+    const { months, rows, active, editing } = props;
+
+    return (
+        <div>
+            <div className="vf-card-bar d-print-none">
+                <div className="vf-card-bar__row">
+                    {props.pairs.length > 1 && (
+                        <label className="d-flex align-items-center gap-2 mb-0">
+                            <span className="text-secondary">Проект × ЦФО</span>
+                            {/* TODO(ds): лист DS не описывает выбор пары внутри React-острова; пилюли picker_core — Twig-ядро. */}
+                            <select
+                                className="form-select form-select-sm w-auto"
+                                value={props.pairValue}
+                                onChange={(event) => props.onPairChange(event.target.value)}
+                            >
+                                {props.pairs.map((pair) => (
+                                    <option key={`${pair.projectDirectionId}|${pair.responsibilityCenterId}`} value={`${pair.projectDirectionId}|${pair.responsibilityCenterId}`}>
+                                        {pair.label}
+                                    </option>
+                                ))}
+                                <option value="all">Все проекты (только просмотр)</option>
+                            </select>
+                        </label>
+                    )}
+                    <div className="ms-auto">
+                        <SaveIndicator state={props.saveState} error={props.saveError} locked={props.lockedMessage !== null} onRetry={props.onRetry} />
+                    </div>
+                </div>
+            </div>
+
+            {props.lockedMessage !== null && (
+                <div className="alert alert-warning m-3" role="alert" data-budget-locked>
+                    <div className="fw-semibold">{props.lockedMessage}</div>
+                    <div>Экран переключён в режим просмотра. Обновите страницу.</div>
+                    {props.unsavedLabels.length > 0 && (
+                        <div className="mt-1">Не сохранены: {props.unsavedLabels.join('; ')}.</div>
+                    )}
+                </div>
+            )}
+
+            {props.readOnlyHint !== null && props.lockedMessage === null && (
+                <div className="text-secondary px-3 py-2">{props.readOnlyHint}</div>
+            )}
+
+            {props.loadError !== null && <div className="alert alert-danger m-3" role="alert">{props.loadError}</div>}
+            {props.loading && rows.length === 0 && <div className="text-secondary p-3">Загружаю план…</div>}
+
+            {props.comment !== null && (
+                <div className={styles.commentPanel}>
+                    <label className="form-label" htmlFor="budget-comment">Комментарий: {props.comment.title}</label>
+                    <textarea
+                        id="budget-comment"
+                        className="form-control"
+                        rows={2}
+                        maxLength={500}
+                        autoFocus
+                        value={props.comment.text}
+                        onChange={(event) => props.onCommentChange(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Escape') {
+                                props.onCommentCancel();
+                            }
+                        }}
+                    />
+                    <div className="d-flex gap-2 mt-2">
+                        <button type="button" className="btn btn-sm btn-primary" onClick={props.onCommentSave}>Сохранить</button>
+                        <button type="button" className="btn btn-sm" onClick={props.onCommentCancel}>Отмена</button>
+                        <span className="text-secondary ms-auto">{props.comment.text.length} / 500</span>
+                    </div>
+                </div>
+            )}
+
+            {rows.length > 0 && (
+                <div
+                    ref={props.scrollerRef}
+                    className={styles.scroller}
+                    tabIndex={0}
+                    role="grid"
+                    aria-label="План по статьям ОПиУ и месяцам"
+                    onKeyDown={props.onGridKeyDown}
+                    onPaste={props.onPaste}
+                >
+                    <table className={styles.grid}>
+                        <thead>
+                            <tr>
+                                <th className={styles.name} scope="col">Статья, ₽</th>
+                                {months.map((month, index) => <th key={month} scope="col">{MONTH_LABELS[index]}</th>)}
+                                <th scope="col">Итого</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map(({ row, hasChildren, collapsed }, rowIndex) => (
+                                <tr key={row.id} className={cn(row.type === 'SUBTOTAL' && styles.subtotal, row.type === 'KPI' && styles.kpi)}>
+                                    <th className={styles.name} scope="row" title={row.name} style={{ '--budget-level': String(row.level - 1) } as CSSProperties}>
+                                        {hasChildren ? (
+                                            <button
+                                                type="button"
+                                                className={styles.toggle}
+                                                aria-expanded={!collapsed}
+                                                aria-label={collapsed ? `Развернуть «${row.name}»` : `Свернуть «${row.name}»`}
+                                                onClick={() => props.onToggle(row.id)}
+                                            >
+                                                {collapsed ? '▸' : '▾'}
+                                            </button>
+                                        ) : <span className={styles.togglePlaceholder} />}
+                                        {row.name}
+                                    </th>
+                                    {months.map((month, colIndex) => {
+                                        const key = `${row.id}|${month}`;
+                                        const isActive = active?.row === rowIndex && active.col === colIndex;
+                                        const isEditing = editing?.position.row === rowIndex && editing.position.col === colIndex;
+                                        const comment = row.comments[month];
+                                        const editableCell = row.editable && props.canEdit;
+
+                                        return (
+                                            <td
+                                                key={month}
+                                                role="gridcell"
+                                                aria-selected={isActive}
+                                                title={comment}
+                                                className={cn(
+                                                    styles.cell,
+                                                    editableCell ? styles.editable : row.editable && styles.readonlyCell,
+                                                    isActive && styles.active,
+                                                    props.invalidKeys.has(key) && styles.invalid,
+                                                    props.unsavedKeys.has(key) && styles.unsaved,
+                                                    comment !== undefined && styles.hasComment,
+                                                )}
+                                                onMouseDown={() => props.onCellMouseDown({ row: rowIndex, col: colIndex })}
+                                                onDoubleClick={() => props.onCellDoubleClick({ row: rowIndex, col: colIndex })}
+                                                onContextMenu={(event) => props.onCellContextMenu({ row: rowIndex, col: colIndex }, event)}
+                                            >
+                                                {isEditing && editing !== null ? (
+                                                    <input
+                                                        ref={props.inputRef}
+                                                        className={styles.input}
+                                                        inputMode="decimal"
+                                                        size={1}
+                                                        aria-label={`${row.name}, ${MONTH_LABELS[colIndex]}`}
+                                                        value={editing.text}
+                                                        onChange={(event) => props.onEditChange(event.target.value)}
+                                                        onKeyDown={props.onEditKeyDown}
+                                                        onBlur={props.onEditBlur}
+                                                    />
+                                                ) : (
+                                                    <Value value={row.values[month] ?? '0'} row={row} blankZero={row.editable} />
+                                                )}
+                                            </td>
+                                        );
+                                    })}
+                                    <td className={cn(styles.cell, styles.total)}>
+                                        <Value value={row.total} row={row} blankZero={false} />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {(props.inputError !== null || props.pasteMessage !== null || props.warnings.length > 0) && (
+                <div className="px-3 py-2">
+                    {props.inputError !== null && <div className="text-danger" role="alert">{props.inputError}</div>}
+                    {props.pasteMessage !== null && <div className="text-secondary" role="status">{props.pasteMessage}</div>}
+                    {props.warnings.map((warning) => <div key={warning} className="text-warning">{warning}</div>)}
+                </div>
+            )}
+        </div>
+    );
+}

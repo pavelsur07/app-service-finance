@@ -20,6 +20,7 @@
 | `Company` | Компании, пользователи, приглашения, тарифы | — (владелец) |
 | `Balance` | Автономный управленческий баланс, счета и журнал движений | `string $companyId` ✅ |
 | `Billing` | Тарифы, подписка компании, журнал оплат (`docs/tasks/billing`) | `string $companyId` ✅ |
+| `Budget` | Бюджет ОПиУ: варианты на год и плановые суммы (`docs/tasks/pl-budget`) | `string $companyId` ✅ |
 | `Loan` | Кредиты и займы | legacy |
 | `Telegram` | Telegram-бот, вебхуки | — |
 | `MoySklad` | Интеграция с МойСклад | `string $companyId` ✅ |
@@ -1462,6 +1463,7 @@ findTreeEntitiesByCompanyId(string $companyId): array
 // Найти одну категорию по ID с проверкой принадлежности компании
 findByIdAndCompany(string $categoryId, string $companyId): ?PLCategoryDTO
 ```
+`PLCategoryDTO`: `id`, `name`, `level`, `parentId`, `sortOrder`, `code`, `type` (`PLCategoryType`), `flow` (`PLFlow`), `isVisible`.
 
 ### `FinanceFacade` (`src/Finance/Facade/FinanceFacade.php`)
 ```php
@@ -1518,6 +1520,15 @@ calculatePlPreview(
     array $columns,                 // list<Application\DTO\PlPreviewColumn(key, amountsByCategoryId)>
     ?string $natureBaseColumn = null, // колонка-итог: знак статьи по ней, остальные — линейные доли
 ): PlPreviewResult                  // rows: list<PlPreviewRow(values[columnKey])>, unplaced, warnings
+
+// Дерево ОПиУ по колонкам из сумм в знаке значения отчёта (доход − расход): без перевода по
+// flow, формулы/KPI/вес в родителе — тем же PlReportCalculator. Потребитель — Budget (итоги плана).
+calculatePlTree(
+    string $companyId,
+    \DateTimeImmutable $from,
+    \DateTimeImmutable $to,
+    array $columns,                 // list<PlPreviewColumn(key, amountsByCategoryId)>
+): PlPreviewResult
 
 // Код строке ввода без кода (только persist, flush — у вызывающего). Отчёт ОПиУ берёт суммы по
 // коду: у листа без кода регистр есть, в отчёте — ноль. false — у статьи уже этот код.
@@ -2002,6 +2013,78 @@ manage — только владелец. Новые права автомати
   200); синхронно — при возврате на `/company/price?checkout={id}`.
   Handler: недоступность ЮKassa — обычное исключение (повторы по
   `retry_strategy`), отказ — `Unrecoverable`.
+
+### Budget: варианты бюджета ОПиУ и плановые суммы (`budget_*`)
+
+План задачи — `docs/tasks/pl-budget/TASK.md`, UI — `ui-ux.md`. Собственного
+Facade нет: план читает только сам модуль; Facade появится с первым
+потребителем (связка с ДДС). Доступ — модуль FINANCE (`ModuleAccessMap`
+`App\Budget\`), запись — `ModuleAccess::FINANCE_WRITE`.
+
+- `BudgetVersion` (`budget_versions`): вариант на календарный год (2000–2100),
+  `BudgetVersionStatus` `draft` / `approved` / `archived`, `copiedFromId` —
+  справочная ссылка без FK. Переходы — `BudgetVersionStatus::allowsTransitionTo()`:
+  черновик ↔ утверждён, черновик ↔ архив; утверждённый в архив — только через
+  черновик. Редактируется только черновик. Один утверждённый вариант на
+  `(company_id, year)` — частичный unique `uniq_budget_versions_approved_year`.
+- `BudgetLine` (`budget_lines`): ячейка «вариант × статья ОПиУ × месяц (1-е
+  число) × проект × ЦФО» — unique `uniq_budget_lines_cell`; `amount`
+  `NUMERIC(18,2)` строкой в знаке значения отчёта ОПиУ (доход − расход, как
+  `PLDailyTotalFactsProvider`); `BudgetLineSource` `manual` / `sales_plan`
+  (снимок плана продаж — после MVP); `comment` до 500 символов. Статья, проект и
+  ЦФО — строки без FK: удаление статьи в Finance не падает на плане. Строка
+  нулевой суммы без комментария не хранится.
+- FK `company_id` → `companies` ON DELETE CASCADE у обеих таблиц, строки → вариант
+  ON DELETE CASCADE (`BudgetSchemaExtension`).
+- Actions (каждое — точка входа, коммитит само):
+  - `CreateBudgetVersionAction(CreateBudgetVersionCommand)` — пустой черновик на
+    год или копия варианта своей компании (год исходника, строки с новыми
+    UUIDv7, одна транзакция). `versionId` задаёт вызывающий — повтор
+    возвращает существующий вариант.
+  - `ChangeBudgetVersionStatusAction(ChangeBudgetVersionStatusCommand)` —
+    утвердить / вернуть в черновик / архивировать / восстановить. Утверждение и
+    возврат утверждённого — только владелец компании (`CompanyFacade::isOwner`),
+    иначе `BudgetApprovalForbiddenException`; второй утверждённый на год —
+    `BudgetYearAlreadyApprovedException`. Повтор с тем же статусом — без
+    изменений.
+  - `SaveBudgetLinesAction(SaveBudgetLinesCommand)` — пачка до 5000 ячеек,
+    целиком или ничего: листовая статья (`PLCategoryType::LEAF_INPUT`) своей
+    компании, активная пара (`FinancialResponsibilityCenterFacade::getActivePairs`),
+    месяц года варианта, сумма; upsert `ON CONFLICT`, ноль без комментария
+    удаляет строку, одна ячейка дважды — последняя. Не черновик —
+    `BudgetVersionNotEditableException`.
+- Блокировка: `BudgetVersionLock` — `pg_advisory_xact_lock('budget_version:'||id)`;
+  смена статуса и сохранение ячеек одного варианта идут по очереди, статус
+  перечитывается под блокировкой. Порядок: вариант → строки.
+- Маршруты (`src/Budget/Controller/`, имена `budget_*`, страницы — легаси-слой в
+  DS раздела ОПиУ, пункт меню в группе «Доходы и расходы»):
+
+| Маршрут | Метод | Что | Доступ |
+|---|---|---|---|
+| `/finance/budget?year=` | GET | список вариантов года, архив отдельно | чтение |
+| `/finance/budget/versions` | POST | создать вариант (форма, CSRF `budget_version_create`, `versionId` из формы) | запись |
+| `/finance/budget/versions/{id}/status/{draft\|approved\|archived}` | POST | смена статуса (CSRF `budget_version_status{id}`) | запись; утверждение — владелец |
+| `/finance/budget/versions/{id}` | GET | экран варианта, React-остров `budget-grid` (entry `budget_grid_page`; props: `versionId`, `year`, `editable`, `canWrite`, `isOwner`, `pairs`, `gridUrl`, `cellsUrl`, `csrfToken`, `plCategoriesUrl`) | чтение |
+| `/finance/budget/versions/{id}/grid?project=&center=` | GET | JSON сетки `BudgetGridView`; без пары — сумма по всем парам | чтение |
+| `/finance/budget/versions/{id}/cells` | POST | JSON `{cells:[…]}` → `SaveBudgetLinesAction`, заголовок `X-CSRF-Token` (`budget_cells`) | запись |
+
+- Строка сетки (`BudgetGridRow`): `id`, `code`, `name`, `level`, `type`, `flow`
+  (`income`/`expense`/`none`), `format` (`PLValueFormat`; деньги — 2 знака,
+  показатели — 4), `editable`, `values` (`Y-m` → сумма), `total`, `comments`.
+- Остров (`assets/react/modules/budget/features/budget-grid/`): ввод в расходной
+  статье положительным числом, хранение с минусом (решение Владельца 04.11);
+  автосохранение пачкой через 1 с, правка хранит свою пару; итоги дерева —
+  перечитыванием `grid` после сохранения; 409 → только чтение.
+- Сетка: `BudgetGridBuilder` — 12 месяцев и колонка `total` (KPI года ≠ сумма
+  месяцев) через `FinanceFacade::calculatePlTree()`; лист показывает
+  сохранённую сумму, скрытые статьи пропускаются, лист без кода —
+  предупреждение (в итоги отчёта не попадает). Ячейки — `BudgetCellsQuery`.
+- Ошибки: `BudgetExceptionListener` для `/finance/budget*` — JSON
+  `{error:{code,message}}` для `/grid`, `/cells` и `Accept: application/json`:
+  404 `budget_version_not_found`, 422 `budget_invalid_input`, 409
+  `budget_version_not_editable` / `budget_year_already_approved` /
+  `budget_invalid_transition`, 403 `budget_approval_forbidden`; HTML-формы
+  показывают ошибку тостом.
 
 ### Company: общий минимальный остаток
 
@@ -4768,6 +4851,9 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.129 | 2026-11-04 | Budget: сетка ввода плана — React-остров `budget-grid`, `BudgetGridRow::$format`; фронт: `apiFetch` в `assets/api/client.ts` (задача `pl-budget`, этап 2) |
+| 2.128 | 2026-11-04 | Budget: страницы и JSON API (список, создание, смена статуса, экран варианта, сетка, сохранение ячеек), `BudgetExceptionListener`, доступ FINANCE; Finance: `calculatePlTree()`, `PLCategoryDTO::$flow`/`$isVisible` (задача `pl-budget`, этап 1) |
+| 2.127 | 2026-11-04 | Budget: новый модуль — `BudgetVersion`, `BudgetLine`, создание/копия варианта, смена статуса (утверждает владелец), сохранение ячеек; миграция `Version20261104090000`; `PLCategoryDTO::$type` (задача `pl-budget`, этап 0) |
 | 2.126 | 2026-11-03 | Схема БД: миграция `Version20261103150000` — потерянные внешние ключи, дубли индексов, комментарии DC2Type, `messenger_messages` по схеме транспорта, удалены неиспользуемые таблицы; гейт схемы без исключений (задача `doctrine-schema-sync`, этап 3) |
 | 2.125 | 2026-11-03 | Shared: синхронность схемы с миграциями — `SchemaExtension` модулей, `NormalizingSchemaManagerFactory`, гейт `SchemaInSyncWithMigrationsTest` (задача `doctrine-schema-sync`, этапы 1–2) |
 | 2.124 | 2026-11-03 | Marketplace: предпросмотр ОПиУ — переключатель колонок «Теги / Проекты» (`PlPreviewColumnMode`, `PlPreviewColumnKind::PROJECT/NO_PROJECT`), проект факта — правило, иначе подключение; выгрузка строками v1.1; `CompanyFacade::listProjectDirections()` (задача `marketplace-pl-preview-by-projects`) |

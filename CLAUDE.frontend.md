@@ -17,9 +17,10 @@ Fast Path / Small / Large, STOP-список §3.4, политика ревью 
 
 | Целевое | Факт |
 |---|---|
-| `assets/react/modules/<module>/features/*` | нет; весь React в `assets/react/_legacy/`, 100 файлов |
-| `assets/react/entrypoints/` | нет; entry указывают прямо на файлы `_legacy/` |
-| `mountIsland`, `AppProviders`, `ErrorBoundary` | не реализованы |
+| `assets/react/modules/<module>/features/*` | один модуль — `modules/budget/features/budget-grid/` (04.11.2026); остальной React в `assets/react/_legacy/`, 100 файлов |
+| `assets/react/entrypoints/` | один entry — `budget_grid_page.tsx`; остальные entry указывают прямо на файлы `_legacy/` |
+| `mountIsland`, `AppProviders`, `ErrorBoundary` | не реализованы; entry берёт `ErrorBoundary` из `_legacy/shared/ui/` |
+| `apiFetch` в `assets/api/client.ts` | есть с 04.11.2026: JSON, `X-CSRF-Token`, ошибка `{error:{code,message}}` → `ApiError`, 401 → вход |
 | `templates/_macros/ui-kit.html.twig` | нет |
 | React-обёртки кита | одна: `assets/react/ui-kit/Button/` |
 | `assets/react/shared/` | один файл `lib/cn.ts` |

@@ -194,6 +194,22 @@ final class FinanceFacade
     }
 
     /**
+     * Дерево ОПиУ компании по колонкам из сумм, которые уже значения отчёта (доход − расход) —
+     * например, плановые суммы бюджета. Итоги, формулы и KPI — тем же калькулятором, что отчёт;
+     * в отличие от calculatePlPreview() знак не переводится по flow статьи. Сумма на статье не
+     * своей компании, не строке ввода или без кода — в PlPreviewResult::$unplaced. Ничего не пишет.
+     *
+     * @param list<PlPreviewColumn> $columns
+     */
+    public function calculatePlTree(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, array $columns): PlPreviewResult
+    {
+        $company = $this->entityManager->getReference(Company::class, $companyId)
+            ?? throw new \InvalidArgumentException(sprintf('Компания %s не найдена.', $companyId));
+
+        return $this->plPreviewCalculator->calculate($company, PlReportPeriod::forRange($from, $to), $columns, reportValues: true);
+    }
+
+    /**
      * Присваивает код строке ввода ОПиУ без кода. Отчёт ОПиУ берёт суммы статьи по её коду: у
      * листа без кода суммы в регистре есть, а в отчёте — ноль.
      *
