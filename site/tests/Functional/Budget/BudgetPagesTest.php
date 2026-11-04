@@ -176,6 +176,57 @@ final class BudgetPagesTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(404);
     }
 
+    public function testFillPreviewDoesNotWriteApplyNeedsOverwriteConfirmation(): void
+    {
+        $id = $this->version('Черновик', BudgetVersionStatus::DRAFT);
+        $this->line($id, '2027-01-01', '500.00');
+        $this->login($this->writer);
+
+        $body = ['helper' => 'distribute', 'project' => self::PROJECT_ID, 'center' => $this->centerId, 'categoryIds' => [self::REVENUE_ID], 'params' => ['amount' => '1200']];
+        $this->postFill($id, $body);
+        self::assertResponseIsSuccessful();
+        $preview = json_decode((string) $this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertSame([12, 1, 0, false], [$preview['changed'], $preview['overwrite'], $preview['skipped'], $preview['applied']]);
+        self::assertSame(['plCategoryId' => self::REVENUE_ID, 'month' => '2027-01', 'amount' => '100.00', 'previous' => '500.00'], $preview['cells'][0]);
+        self::assertSame(1, $this->lineCount($id));
+
+        $this->postFill($id, $body + ['apply' => true]);
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame('budget_fill_overwrite_unconfirmed', $this->errorCode());
+        self::assertSame(1, $this->lineCount($id));
+
+        $this->postFill($id, $body + ['apply' => true, 'confirmOverwrite' => true]);
+        self::assertResponseIsSuccessful();
+        self::assertSame(12, $this->lineCount($id));
+
+        // Повтор: менять нечего, строк столько же.
+        $this->postFill($id, $body + ['apply' => true, 'confirmOverwrite' => true]);
+        $repeat = json_decode((string) $this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertSame([0, false], [$repeat['changed'], $repeat['applied']]);
+        self::assertSame(12, $this->lineCount($id));
+    }
+
+    public function testFillGuardsAccessCsrfStatusAndInput(): void
+    {
+        $draft = $this->version('Черновик', BudgetVersionStatus::DRAFT);
+        $approved = $this->version('Утверждённый', BudgetVersionStatus::APPROVED, 2028);
+        $body = ['helper' => 'distribute', 'project' => self::PROJECT_ID, 'center' => $this->centerId, 'categoryIds' => [self::REVENUE_ID], 'params' => ['amount' => '1200']];
+
+        $this->login($this->reader);
+        $this->postFill($draft, $body);
+        self::assertResponseStatusCodeSame(403);
+
+        $this->login($this->writer);
+        $this->postFill($draft, $body, 'bad-token');
+        self::assertSame('invalid_csrf', $this->errorCode());
+        $this->postFill($approved, $body);
+        self::assertSame('budget_version_not_editable', $this->errorCode());
+        $this->postFill($draft, ['helper' => 'magic'] + $body);
+        self::assertSame('budget_invalid_input', $this->errorCode());
+        $this->postFill($draft, ['project' => '', 'center' => ''] + $body);
+        self::assertSame('budget_invalid_pair', $this->errorCode());
+    }
+
     public function testCreateEmptyVersionRedirectsAndRepeatKeepsOneRow(): void
     {
         $this->login($this->writer);
@@ -355,6 +406,27 @@ final class BudgetPagesTest extends WebTestCaseBase
         $this->login($this->reader);
         $this->postCells($draft, [$this->cell('1')]);
         self::assertResponseStatusCodeSame(403);
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function postFill(string $versionId, array $body, ?string $token = null): void
+    {
+        $this->client->request(
+            'POST',
+            '/finance/budget/versions/'.$versionId.'/fill',
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_CSRF_TOKEN' => $token ?? $this->csrfToken($this->client, 'budget_cells'),
+            ],
+            content: json_encode($body, \JSON_THROW_ON_ERROR),
+        );
+    }
+
+    private function lineCount(string $versionId): int
+    {
+        return (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM budget_lines WHERE version_id = ?', [$versionId]);
     }
 
     private function line(string $versionId, string $month, string $amount): void

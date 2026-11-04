@@ -2078,6 +2078,7 @@ Facade нет: план читает только сам модуль; Facade п
 | `/finance/budget/versions/{id}/grid?project=&center=` | GET | JSON сетки `BudgetGridView`; без пары — сумма по всем парам | чтение |
 | `/finance/budget/plan-fact?year=&version=&project=&center=&show=&period=` | GET | вкладка «План–факт» (Twig): вариант по умолчанию — утверждённый, иначе первый неархивный с подсказкой; пара по умолчанию — вся компания; `show` plan/fact/diff/percent, `period` month/quarter; факт месяца — ссылка на `finance_report_preview` | чтение |
 | `/finance/budget/versions/{id}/plan-fact?project=&center=` | GET | JSON `BudgetPlanFactView`: план, факт, отклонение по месяцам и году; без пары — вся компания | чтение |
+| `/finance/budget/versions/{id}/fill` | POST | помощник заполнения: JSON `{helper, project, center, categoryIds, months, params, apply, confirmOverwrite}` → `{cells, changed, overwrite, skipped, applied}`; без `apply` — предпросмотр; `X-CSRF-Token` (`budget_cells`) | запись |
 | `/finance/budget/versions/{id}/cells` | POST | JSON `{cells:[…]}` → `SaveBudgetLinesAction`, заголовок `X-CSRF-Token` (`budget_cells`) | запись |
 
 - Строка сетки (`BudgetGridRow`): `id`, `code`, `name`, `level`, `type`, `flow`
@@ -2103,15 +2104,22 @@ Facade нет: план читает только сам модуль; Facade п
   `percent` = diff / |план|, `significant` при |%| > `THRESHOLD_PERCENT` = 10;
   план 0 при факте ≠ 0 — значимо без `%`; не-деньги — без `%` и пометки). Минус
   отклонения — хуже для прибыли и в доходах, и в расходах.
+- Помощники заполнения (`BudgetFillHelper`: `last_year_fact`, `average`,
+  `distribute`, `copy_right`, `percent_of`): `BudgetFillPlanner` считает
+  ячейки пары черновика (только изменяемые; `sales_plan` — пропуск;
+  комментарий сохраняется; арифметика — `Domain\BudgetFillMath`);
+  `FillBudgetCellsAction` пишет их одним вызовом `SaveBudgetLinesAction` (его
+  транзакция и блокировка). Перезапись заполненных — только с
+  `confirmOverwrite`, иначе 409 `budget_fill_overwrite_unconfirmed`.
 - Пара «проект × ЦФО» из запроса — `BudgetPairResolver`; неактивная или чужая —
   `InvalidBudgetPairException` (422 `budget_invalid_pair`).
 - «Итог года» в списке: `BudgetYearTotals::netProfit()` — один
   `calculatePlTree` на все варианты года (вариант = колонка), строка с кодом
   `NET_PROFIT`; нет такой строки в дереве компании — колонки нет.
 - Ошибки: `BudgetExceptionListener` для `/finance/budget*` — JSON
-  `{error:{code,message}}` для `/grid`, `/plan-fact`, `/cells` и `Accept: application/json`:
+  `{error:{code,message}}` для `/grid`, `/plan-fact`, `/cells`, `/fill` и `Accept: application/json`:
   404 `budget_version_not_found`, 422 `budget_invalid_input` /
-  `budget_invalid_pair`, 409
+  `budget_invalid_pair`, 409 `budget_fill_overwrite_unconfirmed` /
   `budget_version_not_editable` / `budget_year_already_approved` /
   `budget_invalid_transition`, 403 `budget_approval_forbidden`; HTML-формы
   показывают ошибку тостом.
@@ -4881,6 +4889,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.132 | 2026-11-04 | Budget: помощники заполнения плана (`/fill`, `BudgetFillPlanner`, `FillBudgetCellsAction`, `BudgetFillMath`), панель «Помощники» в острове `budget-grid`, prop `fillUrl` (задача `pl-budget`, этап 5) |
 | 2.131 | 2026-11-04 | Budget: вкладка «План–факт» (`budget_plan_fact`), колонки кварталов и «с начала года» (`BudgetPlanFactColumn`, `BudgetTreeCalculator::calculateColumns`), `BudgetPairResolver::options()` (задача `pl-budget`, этап 4) |
 | 2.130 | 2026-11-04 | Budget: план–факт (`/plan-fact`, `BudgetPlanFactBuilder`, `BudgetVariance`, порог 10%), «Итог года» в списке (`BudgetYearTotals`), `BudgetPairResolver`; Finance: `getPlFactAmountsByMonth()` (задача `pl-budget`, этап 3) |
 | 2.129 | 2026-11-04 | Budget: сетка ввода плана — React-остров `budget-grid`, `BudgetGridRow::$format`; фронт: `apiFetch` в `assets/api/client.ts` (задача `pl-budget`, этап 2) |

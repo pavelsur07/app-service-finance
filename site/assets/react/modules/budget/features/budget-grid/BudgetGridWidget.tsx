@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ClipboardEvent, KeyboardEvent, MouseEvent } from 'react';
 import { inputToStored, isZero, parseAmountInput, storedToInput } from './amount';
 import type { BudgetGridProps, BudgetGridRow, CellPosition, PendingCell, SelectedPair } from './budget-grid.types';
+import { BudgetFillPanel } from './BudgetFillPanel';
 import { BudgetGridView } from './BudgetGridView';
 import type { CommentDraft, VisibleRow } from './BudgetGridView';
 import { initialPair, useBudgetGrid } from './useBudgetGrid';
@@ -84,6 +85,8 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     const [comment, setComment] = useState<(CommentDraft & PendingTarget) | null>(null);
     const scrollerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const [fillOpen, setFillOpen] = useState(false);
+    const [fillMessage, setFillMessage] = useState<string | null>(null);
 
     const months = grid.data?.months ?? [];
     const rows = useMemo(() => visibleRows(grid.data?.rows ?? [], collapsed), [grid.data, collapsed]);
@@ -439,6 +442,53 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     });
     const noLeaves = grid.data !== null && !grid.data.rows.some((row) => row.editable);
 
+    // Помощники — только в черновике, с правом записи и выбранной парой (ui-ux.md, экран 4).
+    let fillDisabledReason: string | null = null;
+    if (!props.editable) {
+        fillDisabledReason = 'Вариант не черновик — помощники недоступны.';
+    } else if (!props.canWrite) {
+        fillDisabledReason = 'Нужно право записи в финансах.';
+    } else if (pair === null) {
+        fillDisabledReason = 'Выберите проект и ЦФО.';
+    } else if (grid.lockedMessage !== null || grid.data === null) {
+        fillDisabledReason = 'Сетка недоступна для правки.';
+    }
+    const fillButton = (
+        <span className="d-inline-flex align-items-center gap-2" title={fillDisabledReason ?? undefined}>
+            <button
+                type="button"
+                className="btn btn-sm"
+                disabled={fillDisabledReason !== null}
+                aria-expanded={fillOpen}
+                onClick={() => {
+                    setFillOpen((open) => !open);
+                    setFillMessage(null);
+                }}
+            >
+                <i className="ti ti-wand me-1" aria-hidden="true" />
+                Помощники
+            </button>
+            {fillMessage !== null && <span className="text-secondary" role="status" data-budget-fill-message>{fillMessage}</span>}
+        </span>
+    );
+    const fillPanel = fillOpen && fillDisabledReason === null && pair !== null && grid.data !== null ? (
+        <BudgetFillPanel
+            key={pairValueOf(pair)}
+            fillUrl={props.fillUrl}
+            csrfToken={props.csrfToken}
+            pair={pair}
+            months={grid.data.months}
+            rows={grid.data.rows}
+            busy={grid.saveState === 'saving' || grid.hasPending()}
+            onApplied={(changed) => {
+                setFillOpen(false);
+                setFillMessage(`Заполнено ${changed} ${plural(changed, 'ячейка', 'ячейки', 'ячеек')}.`);
+                grid.reloadAfterServerWrite();
+            }}
+            onClose={() => setFillOpen(false)}
+        />
+    ) : null;
+
     return (
         <>
             {noLeaves && (
@@ -466,6 +516,8 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
                 lockedMessage={grid.lockedMessage}
                 unsavedLabels={unsavedLabels}
                 comment={comment}
+                fillButton={fillButton}
+                fillPanel={fillPanel}
                 loading={grid.loading}
                 loadError={grid.loadError}
                 scrollerRef={scrollerRef}

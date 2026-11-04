@@ -14,6 +14,7 @@ final readonly class BudgetCellRow
         public string $month,
         public string $amount,
         public ?string $comment,
+        public string $source = 'manual',
     ) {
     }
 }

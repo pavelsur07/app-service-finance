@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** Stage 5 / planning
-**Status:** Stage 4 done; часть 1 (этапы 0–2) на проде с 04.11 (#2874)
+**Phase:** handoff (часть 2, этапы 3–5)
+**Status:** Stage 5 done; часть 1 (этапы 0–2) на проде с 04.11 (#2874)
 **Stage base commit:** `cf083d2e7` (ветка `feat/pl-budget-plan-fact`)
 
 ### Completed
@@ -21,6 +21,9 @@
 
 - Stage 4: вкладка «План–факт» (Twig), кварталы и «с начала года» —
   `stages/stage-4.md`.
+
+- Stage 5: помощники заполнения (`/fill`, панель в сетке) —
+  `stages/stage-5.md`.
 
 ### Checks and baseline
 - baseline: `AssignTariffActionTest` — OK (6).

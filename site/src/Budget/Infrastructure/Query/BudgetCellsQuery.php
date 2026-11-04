@@ -26,14 +26,14 @@ final readonly class BudgetCellsQuery
         $byPair = null !== $projectDirectionId && null !== $responsibilityCenterId;
         $rows = $byPair
             ? $this->connection->fetchAllAssociative(
-                "SELECT pl_category_id, to_char(month, 'YYYY-MM') AS month, amount::text AS amount, comment
+                "SELECT pl_category_id, to_char(month, 'YYYY-MM') AS month, amount::text AS amount, comment, source
                    FROM budget_lines
                   WHERE company_id = :companyId AND version_id = :versionId
                     AND project_direction_id = :projectId AND responsibility_center_id = :centerId",
                 ['companyId' => $companyId, 'versionId' => $versionId, 'projectId' => $projectDirectionId, 'centerId' => $responsibilityCenterId],
             )
             : $this->connection->fetchAllAssociative(
-                "SELECT pl_category_id, to_char(month, 'YYYY-MM') AS month, SUM(amount)::text AS amount, NULL AS comment
+                "SELECT pl_category_id, to_char(month, 'YYYY-MM') AS month, SUM(amount)::text AS amount, NULL AS comment, 'manual' AS source
                    FROM budget_lines
                   WHERE company_id = :companyId AND version_id = :versionId
                   GROUP BY pl_category_id, month",
@@ -46,6 +46,7 @@ final readonly class BudgetCellsQuery
                 (string) $row['month'],
                 (string) $row['amount'],
                 null === $row['comment'] ? null : (string) $row['comment'],
+                (string) $row['source'],
             ),
             $rows,
         );
