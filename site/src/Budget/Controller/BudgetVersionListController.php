@@ -61,7 +61,7 @@ final class BudgetVersionListController extends AbstractController
         $canWrite = $this->isGranted(ModuleAccess::FINANCE_WRITE);
         // «Из факта {год−1}»: доступно, только если факт прошлого года есть.
         $hasLastYearFact = $canWrite && $year - 1 >= BudgetVersion::MIN_YEAR
-            && [] !== $this->finance->getPlFactAmountsByMonth($companyId, $year - 1);
+            && $this->finance->hasPlFactInYear($companyId, $year - 1);
         // Ошибка окна «Новый вариант» (CreateBudgetVersionController): открыть окно снова с введённым.
         $newForm = $request->hasSession() ? $request->getSession()->remove(CreateBudgetVersionController::FORM_STATE) : null;
 

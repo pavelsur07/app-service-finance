@@ -1542,6 +1542,10 @@ getPlFactAmountsByMonth(
     bool $includeUnassignedCenter = false,
 ): array                            // array<string month, array<string categoryId, string amount>>
 
+// Есть ли ненулевой факт ОПиУ за год хотя бы в одной ячейке «проект × ЦФО × статья × месяц»
+// (встречные суммы разных пар не гасят друг друга). Потребитель — Budget («Заполнить из факта»).
+hasPlFactInYear(string $companyId, int $year): bool
+
 // Код строке ввода без кода (только persist, flush — у вызывающего). Отчёт ОПиУ берёт суммы по
 // коду: у листа без кода регистр есть, в отчёте — ноль. false — у статьи уже этот код.
 // PLCategoryCodeAssignmentException: статьи нет у компании, не LEAF_INPUT, другой код, код занят.
@@ -4933,7 +4937,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.137 | 2026-11-04 | Budget: экран «Варианты» по пакету DS (меню «⋯», карточки ≤ 760 px, пустой год), «Заполнить из факта» — `CreateBudgetVersionFromFactAction`, `method` формы создания (задача `pl-budget`, этап 10) |
+| 2.137 | 2026-11-04 | Budget: экран «Варианты» по пакету DS (меню «⋯», карточки ≤ 760 px, пустой год), «Заполнить из факта» — `CreateBudgetVersionFromFactAction`, `method` формы создания; Finance: `hasPlFactInYear()` (задача `pl-budget`, этап 10) |
 | 2.136 | 2026-11-04 | Budget: правило «X % от строки-базы» (`budget_rules`, миграция `Version20261104150000`, `BudgetRule`, `BudgetRuleCalculator`, `SetBudgetRuleAction`/`RemoveBudgetRuleAction`, `/rules`, `/rules/delete`), источник `rule`, `BudgetLinesWriter::validate(…, versionId, …)` (задача `pl-budget`, этап 8) |
 | 2.135 | 2026-11-04 | Budget: флаг статьи ОПиУ «скрыта» (`isVisible`) не учитывается — сетка, план–факт, помощники и загрузка из Excel показывают и принимают строки как отчёт ОПиУ (шаблоны скрывали «Выручку» REV_TOTAL) (задача `pl-budget`) |
 | 2.134 | 2026-11-04 | Budget: выгрузка и загрузка плана в Excel (`/export`, `/import`, `BudgetPlanXlsxWriter`/`Reader`, `BudgetImportPlanner`, `ImportBudgetCellsAction`), кнопки «Excel» и «Загрузить из Excel» в острове `budget-grid` (props `exportUrl`, `importUrl`); `apiFetch` принимает FormData (задача `pl-budget`, этапы 6–7) |

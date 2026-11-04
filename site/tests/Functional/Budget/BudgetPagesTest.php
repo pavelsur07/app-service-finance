@@ -351,6 +351,33 @@ final class BudgetPagesTest extends WebTestCaseBase
         self::assertSelectorNotExists('.budget-menu .vf-menu-item--reason');
     }
 
+    public function testFactOfOppositeSignInDifferentPairsStillOffersFillFromFact(): void
+    {
+        // Встречные суммы двух пар гасятся в сумме по компании, но заполнять есть что.
+        $shop = new ProjectDirection(Uuid::uuid7()->toString(), $this->company, 'Магазин');
+        $this->em()->persist($shop);
+        $this->em()->persist(new FinancialResponsibilityCenterProject(self::COMPANY_ID, $shop, $this->em()->find(FinancialResponsibilityCenter::class, $this->centerId) ?? throw new \LogicException()));
+        $category = $this->em()->getReference(PLCategory::class, self::REVENUE_ID);
+        $general = $this->em()->getReference(ProjectDirection::class, self::PROJECT_ID);
+        self::assertNotNull($general);
+        foreach ([[$general, '100.00', '0'], [$shop, '0', '100.00']] as [$project, $income, $expense]) {
+            $total = new PLDailyTotal(Uuid::uuid7()->toString(), $this->company, $project, new \DateTimeImmutable('2026-05-10'), $category);
+            $total->setAmountIncome($income);
+            $total->setAmountExpense($expense);
+            $total->setResponsibilityCenterId($this->centerId);
+            $this->em()->persist($total);
+        }
+        $this->em()->flush();
+        $this->login($this->writer);
+
+        $this->client->request('GET', '/finance/budget?year=2027');
+        self::assertSelectorExists('[data-budget-empty] button[data-budget-new="fact"]:not([disabled])');
+        $id = Uuid::uuid7()->toString();
+        $this->client->request('POST', '/finance/budget/versions', ['_token' => $this->csrfToken($this->client, 'budget_version_create'), 'versionId' => $id, 'name' => 'Из факта', 'year' => '2027', 'method' => 'fact']);
+        self::assertResponseRedirects('/finance/budget/versions/'.$id);
+        self::assertSame(2, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM budget_lines WHERE version_id = ?', [$id]));
+    }
+
     public function testReaderSeesEmptyYearButtonsDisabledWithReason(): void
     {
         $this->login($this->reader);
