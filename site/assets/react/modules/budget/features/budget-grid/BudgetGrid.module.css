@@ -162,3 +162,24 @@
         max-width: 10rem;
     }
 }
+
+/* Помощник заполнения — панель над сеткой, как комментарий. Списки статей и месяцев прокручиваются внутри. */
+.fillPanel {
+    padding: var(--vf-space-3) var(--vf-space-4);
+    border-bottom: 1px solid var(--vf-border);
+    background: var(--vf-surface-alt);
+}
+
+.fillList {
+    max-height: 14rem;
+    overflow-y: auto;
+    padding: var(--vf-space-2);
+    border: 1px solid var(--vf-border);
+    border-radius: var(--vf-radius-sm);
+}
+
+.fillMonths {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: var(--vf-space-2);
+}

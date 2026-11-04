@@ -16,6 +16,7 @@ export interface BudgetGridProps {
     pairs: BudgetPair[];
     gridUrl: string;
     cellsUrl: string;
+    fillUrl: string;
     csrfToken: string;
     plCategoriesUrl: string;
 }
@@ -67,4 +68,15 @@ export type SaveState = 'saved' | 'saving' | 'failed';
 export interface CellPosition {
     row: number;
     col: number;
+}
+
+export type BudgetFillHelper = 'last_year_fact' | 'average' | 'distribute' | 'copy_right' | 'percent_of';
+
+/** Ответ `POST …/fill` (FillBudgetCellsController). */
+export interface BudgetFillResult {
+    cells: { plCategoryId: string; month: string; amount: string; previous: string }[];
+    changed: number;
+    overwrite: number;
+    skipped: number;
+    applied: boolean;
 }

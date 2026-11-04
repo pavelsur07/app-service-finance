@@ -29,6 +29,7 @@ use App\Finance\Enum\PLDocumentSource;
 use App\Finance\Enum\PLDocumentStream;
 use App\Finance\Exception\PLCategoryCodeAssignmentException;
 use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
+use App\Finance\Infrastructure\Query\PlFactMonthlyAmountsQuery;
 use App\Finance\Report\PlPreviewCalculator;
 use App\Finance\Report\PlReportPeriod;
 use App\Finance\Repository\DocumentRepository;
@@ -59,6 +60,7 @@ final class FinanceFacade
         private readonly PlPreviewCalculator $plPreviewCalculator,
         private readonly DefaultPLCategoryTreeProvider $plTemplates,
         private readonly CompanyFacade $companyFacade,
+        private readonly PlFactMonthlyAmountsQuery $plFactMonthlyAmounts,
     ) {
     }
 
@@ -207,6 +209,18 @@ final class FinanceFacade
             ?? throw new \InvalidArgumentException(sprintf('Компания %s не найдена.', $companyId));
 
         return $this->plPreviewCalculator->calculate($company, PlReportPeriod::forRange($from, $to), $columns, reportValues: true);
+    }
+
+    /**
+     * Факт ОПиУ компании по статьям и месяцам календарного года — суммы в знаке значения
+     * отчёта (доход − расход), готовые для calculatePlTree(). Проект и ЦФО — точное совпадение
+     * (план бюджета хранится по точной паре; дочерний проект — своя пара); null — без фильтра. Месяцы и статьи без оборота не возвращаются.
+     *
+     * @return array<string, array<string, string>> `Y-m` → plCategoryId → сумма
+     */
+    public function getPlFactAmountsByMonth(string $companyId, int $year, ?string $projectDirectionId = null, ?string $responsibilityCenterId = null): array
+    {
+        return $this->plFactMonthlyAmounts->fetch($companyId, $year, $projectDirectionId, $responsibilityCenterId);
     }
 
     /**

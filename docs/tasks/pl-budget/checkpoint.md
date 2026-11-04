@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 3 / planning
-**Status:** Stage 2 done
-**Stage base commit:** `af9032dcc`
+**Phase:** handoff (часть 2, этапы 3–5) — ревью исправлено, тесты зелёные, PR
+**Status:** Stage 5 done; часть 1 (этапы 0–2) на проде с 04.11 (#2874)
+**Stage base commit:** `cf083d2e7` (ветка `feat/pl-budget-plan-fact`)
 
 ### Completed
 - Phase 0: `plan.md`, решения Владельца в `TASK.md`, `ui-ux.md` (ТЗ на экраны).
@@ -15,6 +15,15 @@
 
 - Stage 2: React-сетка `budget-grid`, `apiFetch`, `BudgetGridRow::$format`,
   решения Владельца 5–7 — `stages/stage-2.md`.
+
+- Stage 3: факт по месяцам (`getPlFactAmountsByMonth`), план–факт API,
+  `BudgetVariance`, «Итог года» в списке — `stages/stage-3.md`.
+
+- Stage 4: вкладка «План–факт» (Twig), кварталы и «с начала года» —
+  `stages/stage-4.md`.
+
+- Stage 5: помощники заполнения (`/fill`, панель в сетке) —
+  `stages/stage-5.md`.
 
 ### Checks and baseline
 - baseline: `AssignTariffActionTest` — OK (6).

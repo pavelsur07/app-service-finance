@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Budget\Controller;
 
 use App\Budget\Application\Service\BudgetGridBuilder;
+use App\Budget\Application\Service\BudgetPairResolver;
 use App\Budget\Exception\BudgetVersionNotFoundException;
 use App\Budget\Repository\BudgetVersionRepository;
-use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,7 +27,7 @@ final class BudgetGridController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly BudgetVersionRepository $versions,
-        private readonly FinancialResponsibilityCenterFacade $responsibilityCenters,
+        private readonly BudgetPairResolver $pairs,
         private readonly BudgetGridBuilder $gridBuilder,
     ) {
     }
@@ -37,18 +37,8 @@ final class BudgetGridController extends AbstractController
         $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
         $version = $this->versions->findOneByIdAndCompanyId($id, $companyId) ?? throw new BudgetVersionNotFoundException();
 
-        $project = $request->query->getString('project');
-        $center = $request->query->getString('center');
-        if ('' !== $project || '' !== $center) {
-            $allowed = false;
-            foreach ($this->responsibilityCenters->getActivePairs($companyId) as $pair) {
-                $allowed = $allowed || ($pair->projectDirectionId === $project && $pair->responsibilityCenterId === $center);
-            }
-            if (!$allowed) {
-                return new JsonResponse(['error' => ['code' => 'budget_invalid_pair', 'message' => 'Пара «проект × ЦФО» не найдена или не активна.']], 422);
-            }
-        }
+        $pair = $this->pairs->resolve($companyId, $request->query->getString('project'), $request->query->getString('center'));
 
-        return $this->json($this->gridBuilder->build($version, '' === $project ? null : $project, '' === $center ? null : $center));
+        return $this->json($this->gridBuilder->build($version, $pair?->projectDirectionId, $pair?->responsibilityCenterId));
     }
 }

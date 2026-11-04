@@ -37,6 +37,7 @@
         <div class="card-header">
             {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
                 {label: 'Варианты', href: path('budget_index', {year: year}), active: true, count: versions|length},
+                {label: 'План–факт', href: path('budget_plan_fact', {year: year}), active: false},
             ]} only %}
         </div>
 
@@ -53,13 +54,14 @@
         {% if versions is empty %}
             <div class="card-body text-secondary">На {{ year }} год вариантов нет.</div>
         {% else %}
-            <div class="table-responsive">
+            <div class="table-responsive position-relative">{# visually-hidden в шапке не раздвигает страницу на 360 px #}
                 <table class="table table-vcenter vf-table">
                     <thead>
                         <tr>
                             <th>Название</th>
                             <th>Статус</th>
                             <th>Изменён</th>
+                            {% if yearTotals is not null %}<th class="text-end text-nowrap" data-budget-year-total>Итог года, ₽</th>{% endif %}
                             <th class="text-end"><span class="visually-hidden">Действия</span></th>
                         </tr>
                     </thead>
@@ -74,6 +76,7 @@
                             </td>
                             <td>{% include 'budget/_status_badge.html.twig' with {status: version.status} only %}</td>
                             <td class="text-secondary">{{ version.updatedAt|date('d.m.Y H:i') }}</td>
+                            {% if yearTotals is not null %}<td class="text-end text-nowrap" data-budget-year-total>{{ yearTotals[version.id] is defined ? yearTotals[version.id]|vf_amount : '—' }}</td>{% endif %}
                             <td class="text-end">
                                 <div class="btn-list justify-content-end flex-nowrap">
                                     {% include 'budget/_status_actions.html.twig' with {version: version, isOwner: isOwner, canWrite: can_write, size: 'btn-sm'} only %}
@@ -90,7 +93,7 @@
     {% if archived is not empty %}
         <details class="card vf-card mb-4" data-budget-archive>
             <summary class="card-header">Архив ({{ archived|length }})</summary>
-            <div class="table-responsive">
+            <div class="table-responsive position-relative">{# visually-hidden в шапке не раздвигает страницу на 360 px #}
                 <table class="table table-vcenter vf-table">
                     <tbody>
                     {% for version in archived %}
@@ -103,6 +106,7 @@
                             </td>
                             <td>{% include 'budget/_status_badge.html.twig' with {status: version.status} only %}</td>
                             <td class="text-secondary">{{ version.updatedAt|date('d.m.Y H:i') }}</td>
+                            {% if yearTotals is not null %}<td class="text-end text-nowrap" data-budget-year-total>{{ yearTotals[version.id] is defined ? yearTotals[version.id]|vf_amount : '—' }}</td>{% endif %}
                             <td class="text-end">
                                 <div class="btn-list justify-content-end flex-nowrap">
                                     {% include 'budget/_status_actions.html.twig' with {version: version, isOwner: isOwner, canWrite: can_write, size: 'btn-sm'} only %}

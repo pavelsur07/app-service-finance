@@ -1,0 +1,216 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}План–факт — бюджет {{ year }}{% endblock %}
+
+{% macro value(amount, format) %}
+    {%- if amount is null -%}
+        —
+    {%- elseif format == 'MONEY' -%}
+        {{ amount|vf_amount(0) }}
+    {%- elseif format == 'PERCENT' -%}
+        {{ amount|vf_number(1) }}&nbsp;%
+    {%- elseif format == 'RATIO' -%}
+        {{ amount|vf_number(4) }}
+    {%- else -%}
+        {{ amount|vf_number(2) }}
+    {%- endif -%}
+{% endmacro %}
+
+{# Оценка отклонения: значок и текст — только у значимого (|%| > порога или факт без плана). Знак «−» — хуже для прибыли.
+   TODO(ds): в DS нет стиля значимого отклонения — пока полужирная ячейка и значок. #}
+{% macro mark(cell) %}
+    {%- if cell.significant and cell.diff is not null -%}
+        {%- set better = cell.diff starts with '-' ? false : true -%}
+        <i class="ti {{ better ? 'ti-caret-up' : 'ti-caret-down' }} me-1" aria-hidden="true" title="{{ better ? 'Лучше плана' : 'Хуже плана' }}"></i><span class="visually-hidden">{{ better ? 'лучше плана' : 'хуже плана' }}: </span>
+    {%- endif -%}
+{% endmacro %}
+
+{% macro diff(cell, format) %}
+    {%- if cell.diff is null -%}—{%- else -%}{{ _self.mark(cell) }}{{ _self.value(cell.diff, format) }}{%- endif -%}
+{% endmacro %}
+
+{% macro percent(cell) %}
+    {%- if cell.percent is null -%}—{%- else -%}{{ _self.mark(cell) }}{{ cell.percent|vf_number(1) }}&nbsp;%{%- endif -%}
+{% endmacro %}
+
+{% block body %}
+{# Композиция раздела ОПиУ: vf-page-head, vf-card со вкладками «Варианты» / «План–факт», vf-card-bar. ui-ux.md, экран 5; stages/stage-4.md. #}
+    {% set month_names = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'] %}
+    {% set quarter_names = ['I кв.', 'II кв.', 'III кв.', 'IV кв.'] %}
+    {% set show_labels = {plan: 'План', fact: 'Факт', diff: 'Отклонение', percent: '%'} %}
+    {% set pair_query = pair ? {project: pair.projectDirectionId, center: pair.responsibilityCenterId} : {} %}
+    {% set base_query = {year: year}|merge(version ? {version: version.id} : {})|merge(pair_query) %}
+
+    <div class="vf-page-head">
+        <div class="vf-page-head__title">
+            <nav aria-label="Путь">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">Доходы и расходы</li>
+                    <li class="breadcrumb-item"><a href="{{ path('budget_index', {year: year}) }}">Бюджет ОПиУ</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">План–факт</li>
+                </ol>
+            </nav>
+            <h1>План–факт {{ year }}</h1>
+            <p class="vf-page-head__lead">Где факт разошёлся с планом и насколько. Отклонение = факт − план в знаке отчёта ОПиУ: минус — хуже для прибыли. Итоги — только по закрытым месяцам.</p>
+        </div>
+    </div>
+
+    <div class="card vf-card mb-4" data-budget-plan-fact>
+        <div class="card-header">
+            {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
+                {label: 'Варианты', href: path('budget_index', {year: year}), active: false},
+                {label: 'План–факт', href: path('budget_plan_fact', {year: year}), active: true},
+            ]} only %}
+        </div>
+
+        <div class="vf-card-bar d-print-none">
+            <div class="vf-card-bar__row">
+                <div class="vf-seg" role="group" aria-label="Год">
+                    {% for y in years %}
+                        <a href="{{ path('budget_plan_fact', {year: y}) }}"{% if y == year %} class="active" aria-current="true"{% endif %}>{{ y }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% if version %}
+                <div class="vf-card-bar__row">
+                    <form method="get" action="{{ path('budget_plan_fact') }}" class="d-flex flex-wrap align-items-center gap-2" data-budget-plan-fact-filters>
+                        <input type="hidden" name="year" value="{{ year }}">
+                        <input type="hidden" name="show" value="{{ show }}">
+                        <input type="hidden" name="period" value="{{ period }}">
+                        <label class="visually-hidden" for="pf-version">Вариант</label>
+                        <select id="pf-version" name="version" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                            {% for v in versions|merge(archived) %}
+                                <option value="{{ v.id }}"{% if v.id == version.id %} selected{% endif %}>{{ v.name }} · {{ v.status.value == 'approved' ? 'утверждён' : (v.status.value == 'archived' ? 'архив' : 'черновик') }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if pairs|length > 1 %}
+                            <label class="visually-hidden" for="pf-pair">Проект × ЦФО</label>
+                            {# Пара — одним значением «проект|ЦФО»; скрытые поля заполняет обработчик ниже. #}
+                            <select id="pf-pair" class="form-select form-select-sm w-auto" data-pf-pair>
+                                <option value=""{% if pair is null %} selected{% endif %}>Вся компания</option>
+                                {% for p in pairs %}
+                                    <option value="{{ p.projectDirectionId }}|{{ p.responsibilityCenterId }}"{% if pair and pair.projectDirectionId == p.projectDirectionId and pair.responsibilityCenterId == p.responsibilityCenterId %} selected{% endif %}>{{ p.label }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="hidden" name="project" value="{{ pair ? pair.projectDirectionId : '' }}">
+                            <input type="hidden" name="center" value="{{ pair ? pair.responsibilityCenterId : '' }}">
+                        {% endif %}
+                        <noscript><button type="submit" class="btn btn-sm">Показать</button></noscript>
+                    </form>
+                    <div class="vf-seg" role="group" aria-label="Показатель">
+                        {% for key, label in show_labels %}
+                            <a href="{{ path('budget_plan_fact', base_query|merge({show: key, period: period})) }}"{% if key == show %} class="active" aria-current="true"{% endif %}>{{ label }}</a>
+                        {% endfor %}
+                    </div>
+                    <div class="vf-seg" role="group" aria-label="Период">
+                        <a href="{{ path('budget_plan_fact', base_query|merge({show: show, period: 'month'})) }}"{% if period == 'month' %} class="active" aria-current="true"{% endif %}>Месяцы</a>
+                        <a href="{{ path('budget_plan_fact', base_query|merge({show: show, period: 'quarter'})) }}"{% if period == 'quarter' %} class="active" aria-current="true"{% endif %}>Кварталы</a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        {% if version is null %}
+            <div class="card-body text-secondary" data-budget-plan-fact-empty>
+                На {{ year }} год вариантов нет. Создайте вариант на вкладке <a href="{{ path('budget_index', {year: year}) }}">«Варианты»</a>.
+            </div>
+        {% else %}
+            {% if not hasApproved %}
+                <div class="alert alert-info m-3" data-budget-no-approved>Утвердите вариант или выберите черновик: утверждённого варианта на {{ year }} год нет, показан «{{ version.name }}».</div>
+            {% endif %}
+            {% for warning in view.warnings %}
+                <div class="alert alert-warning m-3 mb-0">{{ warning }}</div>
+            {% endfor %}
+
+            <div class="table-responsive vf-pf">
+                <table class="table table-vcenter vf-table vf-pf__table">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" class="vf-pf__name">Статья</th>
+                            <th colspan="{{ periodColumns|length }}" class="text-center">{{ show_labels[show] }}{{ show == 'percent' ? ' отклонения' : ', ₽' }}</th>
+                            {% if ytd and ytd.months is not empty %}
+                                <th colspan="4" class="text-center">С начала года ({{ month_names[ytd.months|first|slice(5, 2) - 1] }}–{{ month_names[ytd.months|last|slice(5, 2) - 1] }}), ₽</th>
+                            {% endif %}
+                            <th rowspan="2" class="text-end text-nowrap">План года, ₽</th>
+                        </tr>
+                        <tr>
+                            {% for column in periodColumns %}
+                                {% if column.kind == 'quarter' %}
+                                    {% set index = column.key|slice(-1) - 1 %}
+                                    {% set label = quarter_names[index] %}
+                                    {% if column.state == 'partial' %}
+                                        {% set label = label ~ ' (' ~ month_names[column.months|first|slice(5, 2) - 1] ~ (column.months|length > 1 ? '–' ~ month_names[column.months|last|slice(5, 2) - 1] : '') ~ ')' %}
+                                    {% endif %}
+                                {% else %}
+                                    {% set label = month_names[column.key|slice(5, 2) - 1] %}
+                                {% endif %}
+                                <th class="text-end text-nowrap" data-pf-col="{{ column.key }}">
+                                    {{ label }}
+                                    {% if column.state == 'current' %}<div class="small text-secondary fw-normal">идёт</div>{% endif %}
+                                </th>
+                            {% endfor %}
+                            {% if ytd and ytd.months is not empty %}
+                                <th class="text-end">План</th>
+                                <th class="text-end">Факт</th>
+                                <th class="text-end">Откл.</th>
+                                <th class="text-end">%</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in view.rows %}
+                        <tr data-pf-row="{{ row.code }}" class="{{ row.type != 'LEAF_INPUT' ? 'fw-bold' : '' }}{{ row.type == 'KPI' ? ' fst-italic' : '' }}">
+                            <td class="vf-pf__name" style="padding-left: {{ 12 + (row.level - 1) * 20 }}px;">{{ row.name }}</td>
+                            {% for column in periodColumns %}
+                                {% set cell = row.cells[column.key] %}
+                                <td class="text-end text-nowrap{{ cell.significant and show in ['diff', 'percent'] ? ' fw-semibold' : '' }}" data-pf-cell="{{ column.key }}">
+                                    {%- if show == 'plan' -%}
+                                        {{ _self.value(cell.plan, row.format) }}
+                                    {%- elseif show == 'fact' -%}
+                                        {%- if reportLinkable and cell.fact is not null and column.kind == 'month' and row.format == 'MONEY' -%}
+                                            {%- set report_query = {from: column.key ~ '-01', to: (column.key ~ '-01')|date_modify('last day of this month')|date('Y-m-d')} -%}
+                                            {%- if pair -%}
+                                                {%- set report_query = report_query|merge({projectFiltersPresent: 1, projectDirectionIds: [pair.projectDirectionId], responsibilityCenterFiltersPresent: 1, responsibilityCenterIds: [pair.responsibilityCenterId]}) -%}
+                                            {%- endif -%}
+                                            <a href="{{ path('finance_report_preview', report_query) }}" title="Отчёт ОПиУ за месяц">{{ _self.value(cell.fact, row.format) }}</a>
+                                        {%- else -%}
+                                            {{ _self.value(cell.fact, row.format) }}
+                                        {%- endif -%}
+                                    {%- elseif show == 'diff' -%}
+                                        {{ _self.diff(cell, row.format) }}
+                                    {%- else -%}
+                                        {{ _self.percent(cell) }}
+                                    {%- endif -%}
+                                </td>
+                            {% endfor %}
+                            {% if ytd and ytd.months is not empty %}
+                                {% set cell = row.cells[ytd.key] %}
+                                <td class="text-end text-nowrap" data-pf-ytd="plan">{{ _self.value(cell.plan, row.format) }}</td>
+                                <td class="text-end text-nowrap" data-pf-ytd="fact">{{ _self.value(cell.fact, row.format) }}</td>
+                                <td class="text-end text-nowrap{{ cell.significant ? ' fw-semibold' : '' }}" data-pf-ytd="diff">{{ _self.diff(cell, row.format) }}</td>
+                                <td class="text-end text-nowrap" data-pf-ytd="percent">{{ _self.percent(cell) }}</td>
+                            {% endif %}
+                            <td class="text-end text-nowrap" data-pf-year>{{ _self.value(row.cells['total'].plan, row.format) }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer small text-secondary">
+                <i class="ti ti-caret-up" aria-hidden="true"></i> лучше плана, <i class="ti ti-caret-down" aria-hidden="true"></i> хуже плана — отклонение больше {{ view.thresholdPercent }}% или факт без плана. Текущий месяц не сравнивается, будущие — только план.{% if not reportLinkable %} Факт — по выбранному проекту без дочерних, поэтому ссылок на отчёт ОПиУ (он включает дочерние проекты) нет.{% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    {% if pairs|length > 1 and version %}
+        <script>
+            document.querySelector('[data-pf-pair]')?.addEventListener('change', function (event) {
+                var parts = event.target.value.split('|');
+                var form = event.target.form;
+                form.elements.project.value = parts[0] || '';
+                form.elements.center.value = parts[1] || '';
+                form.submit();
+            });
+        </script>
+    {% endif %}
+{% endblock %}

@@ -1530,6 +1530,16 @@ calculatePlTree(
     array $columns,                 // list<PlPreviewColumn(key, amountsByCategoryId)>
 ): PlPreviewResult
 
+// Факт ОПиУ по месяцам года из pl_daily_totals одним GROUP BY: 'Y-m' → categoryId → сумма в знаке
+// отчёта (доход − расход), нули отброшены. Проект и ЦФО — точное совпадение (без дочерних проектов:
+// у дочернего своя пара и свой план). Потребитель — Budget (план–факт).
+getPlFactAmountsByMonth(
+    string $companyId,
+    int $year,
+    ?string $projectDirectionId = null,
+    ?string $responsibilityCenterId = null,
+): array                            // array<string month, array<string categoryId, string amount>>
+
 // Код строке ввода без кода (только persist, flush — у вызывающего). Отчёт ОПиУ берёт суммы по
 // коду: у листа без кода регистр есть, в отчёте — ноль. false — у статьи уже этот код.
 // PLCategoryCodeAssignmentException: статьи нет у компании, не LEAF_INPUT, другой код, код занят.
@@ -2066,6 +2076,9 @@ Facade нет: план читает только сам модуль; Facade п
 | `/finance/budget/versions/{id}/status/{draft\|approved\|archived}` | POST | смена статуса (CSRF `budget_version_status{id}`) | запись; утверждение — владелец |
 | `/finance/budget/versions/{id}` | GET | экран варианта, React-остров `budget-grid` (entry `budget_grid_page`; props: `versionId`, `year`, `editable`, `canWrite`, `isOwner`, `pairs`, `gridUrl`, `cellsUrl`, `csrfToken`, `plCategoriesUrl`) | чтение |
 | `/finance/budget/versions/{id}/grid?project=&center=` | GET | JSON сетки `BudgetGridView`; без пары — сумма по всем парам | чтение |
+| `/finance/budget/plan-fact?year=&version=&project=&center=&show=&period=` | GET | вкладка «План–факт» (Twig): вариант по умолчанию — утверждённый, иначе первый неархивный с подсказкой; пара по умолчанию — вся компания; `show` plan/fact/diff/percent, `period` month/quarter; факт месяца — ссылка на `finance_report_preview` | чтение |
+| `/finance/budget/versions/{id}/plan-fact?project=&center=` | GET | JSON `BudgetPlanFactView`: план, факт, отклонение по месяцам и году; без пары — вся компания | чтение |
+| `/finance/budget/versions/{id}/fill` | POST | помощник заполнения: JSON `{helper, project, center, categoryIds, months, params, apply, confirmOverwrite}` → `{cells, changed, overwrite, skipped, applied}`; без `apply` — предпросмотр; `X-CSRF-Token` (`budget_cells`) | запись |
 | `/finance/budget/versions/{id}/cells` | POST | JSON `{cells:[…]}` → `SaveBudgetLinesAction`, заголовок `X-CSRF-Token` (`budget_cells`) | запись |
 
 - Строка сетки (`BudgetGridRow`): `id`, `code`, `name`, `level`, `type`, `flow`
@@ -2079,9 +2092,34 @@ Facade нет: план читает только сам модуль; Facade п
   месяцев) через `FinanceFacade::calculatePlTree()`; лист показывает
   сохранённую сумму, скрытые статьи пропускаются, лист без кода —
   предупреждение (в итоги отчёта не попадает). Ячейки — `BudgetCellsQuery`.
+  Дерево и колонки считает `BudgetTreeCalculator` (общий для сетки и план–факт).
+- План–факт: `BudgetPlanFactBuilder` — план (`BudgetCellsQuery`) и факт
+  (`FinanceFacade::getPlFactAmountsByMonth`) двумя прогонками калькулятора
+  (`BudgetTreeCalculator::calculateColumns`: колонка = набор месяцев, KPI
+  квартала — формула от сумм квартала). Колонки (`BudgetPlanFactColumn`):
+  12 месяцев, кварталы `Y-Qn`, `ytd`, `total`; месяц закрыт, если раньше
+  текущего по Москве; текущий — факт без отклонения, будущий и `total` —
+  только план; квартал и `ytd` сравнивают только закрытые месяцы;
+  ячейка — `Domain\BudgetVariance` (`plan`, `fact`, `diff` = факт − план,
+  `percent` = diff / |план|, `significant` при |%| > `THRESHOLD_PERCENT` = 10;
+  план 0 при факте ≠ 0 — значимо без `%`; не-деньги — без `%` и пометки). Минус
+  отклонения — хуже для прибыли и в доходах, и в расходах.
+- Помощники заполнения (`BudgetFillHelper`: `last_year_fact`, `average`,
+  `distribute`, `copy_right`, `percent_of`): `BudgetFillPlanner` считает
+  ячейки пары черновика (только изменяемые; `sales_plan` — пропуск;
+  комментарий сохраняется; арифметика — `Domain\BudgetFillMath`);
+  `FillBudgetCellsAction` пишет их одним вызовом `SaveBudgetLinesAction` (его
+  транзакция и блокировка). Перезапись заполненных — только с
+  `confirmOverwrite`, иначе 409 `budget_fill_overwrite_unconfirmed`.
+- Пара «проект × ЦФО» из запроса — `BudgetPairResolver`; неактивная или чужая —
+  `InvalidBudgetPairException` (422 `budget_invalid_pair`).
+- «Итог года» в списке: `BudgetYearTotals::netProfit()` — один
+  `calculatePlTree` на все варианты года (вариант = колонка), строка с кодом
+  `NET_PROFIT`; нет такой строки в дереве компании — колонки нет.
 - Ошибки: `BudgetExceptionListener` для `/finance/budget*` — JSON
-  `{error:{code,message}}` для `/grid`, `/cells` и `Accept: application/json`:
-  404 `budget_version_not_found`, 422 `budget_invalid_input`, 409
+  `{error:{code,message}}` для `/grid`, `/plan-fact`, `/cells`, `/fill` и `Accept: application/json`:
+  404 `budget_version_not_found`, 422 `budget_invalid_input` /
+  `budget_invalid_pair`, 409 `budget_fill_overwrite_unconfirmed` /
   `budget_version_not_editable` / `budget_year_already_approved` /
   `budget_invalid_transition`, 403 `budget_approval_forbidden`; HTML-формы
   показывают ошибку тостом.
@@ -4851,6 +4889,9 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.132 | 2026-11-04 | Budget: помощники заполнения плана (`/fill`, `BudgetFillPlanner`, `FillBudgetCellsAction`, `BudgetFillMath`), панель «Помощники» в острове `budget-grid`, prop `fillUrl` (задача `pl-budget`, этап 5) |
+| 2.131 | 2026-11-04 | Budget: вкладка «План–факт» (`budget_plan_fact`), колонки кварталов и «с начала года» (`BudgetPlanFactColumn`, `BudgetTreeCalculator::calculateColumns`), `BudgetPairResolver::options()` (задача `pl-budget`, этап 4) |
+| 2.130 | 2026-11-04 | Budget: план–факт (`/plan-fact`, `BudgetPlanFactBuilder`, `BudgetVariance`, порог 10%), «Итог года» в списке (`BudgetYearTotals`), `BudgetPairResolver`; Finance: `getPlFactAmountsByMonth()` (задача `pl-budget`, этап 3) |
 | 2.129 | 2026-11-04 | Budget: сетка ввода плана — React-остров `budget-grid`, `BudgetGridRow::$format`; фронт: `apiFetch` в `assets/api/client.ts` (задача `pl-budget`, этап 2) |
 | 2.128 | 2026-11-04 | Budget: страницы и JSON API (список, создание, смена статуса, экран варианта, сетка, сохранение ячеек), `BudgetExceptionListener`, доступ FINANCE; Finance: `calculatePlTree()`, `PLCategoryDTO::$flow`/`$isVisible` (задача `pl-budget`, этап 1) |
 | 2.127 | 2026-11-04 | Budget: новый модуль — `BudgetVersion`, `BudgetLine`, создание/копия варианта, смена статуса (утверждает владелец), сохранение ячеек; миграция `Version20261104090000`; `PLCategoryDTO::$type` (задача `pl-budget`, этап 0) |

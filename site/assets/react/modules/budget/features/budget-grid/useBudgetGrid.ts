@@ -19,6 +19,8 @@ export interface UseBudgetGridResult {
     retry: () => void;
     hasPending: () => boolean;
     flushNow: (keepalive: boolean) => void;
+    /** Сервер сам изменил ячейки пары (помощник): отправленные правки поверх ответа больше не держим. */
+    reloadAfterServerWrite: () => void;
 }
 
 export const pendingKey = (cell: PendingCell): string =>
@@ -268,7 +270,21 @@ export function useBudgetGrid(props: BudgetGridProps, pair: SelectedPair | null)
         [overlay, saveState, lockedMessage],
     );
 
-    return { data, loading, loadError, saveState, saveError, lockedMessage, unsaved, setCells, retry, hasPending, flushNow };
+    const reloadAfterServerWrite = useCallback((): void => {
+        updateOverlay((current) => {
+            const next = new Map(current);
+            for (const [key, cell] of current) {
+                if (!unsentRef.current.has(key) && samePair(cell, pair)) {
+                    next.delete(key);
+                }
+            }
+
+            return next;
+        });
+        void load();
+    }, [load, pair, updateOverlay]);
+
+    return { data, loading, loadError, saveState, saveError, lockedMessage, unsaved, setCells, retry, hasPending, flushNow, reloadAfterServerWrite };
 }
 
 /** Пара по умолчанию: из адреса, иначе системная «Общий × Общий», иначе первая. */

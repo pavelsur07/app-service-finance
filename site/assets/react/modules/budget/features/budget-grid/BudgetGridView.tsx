@@ -1,4 +1,4 @@
-import type { ClipboardEvent, CSSProperties, KeyboardEvent, MouseEvent, RefObject } from 'react';
+import type { ClipboardEvent, CSSProperties, KeyboardEvent, MouseEvent, ReactNode, RefObject } from 'react';
 import { cn } from '@/react/shared/lib/cn';
 import { formatValue } from './amount';
 import type { BudgetGridRow, BudgetPair, CellPosition, SaveState } from './budget-grid.types';
@@ -37,6 +37,9 @@ export interface BudgetGridViewProps {
     lockedMessage: string | null;
     unsavedLabels: string[];
     comment: CommentDraft | null;
+    /** Кнопка «Помощники» в панели и раскрытая панель помощника (BudgetFillPanel). */
+    fillButton: ReactNode;
+    fillPanel: ReactNode;
     loading: boolean;
     loadError: string | null;
     scrollerRef: RefObject<HTMLDivElement>;
@@ -130,11 +133,14 @@ export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
                             </select>
                         </label>
                     )}
+                    {props.fillButton}
                     <div className="ms-auto">
                         <SaveIndicator state={props.saveState} error={props.saveError} locked={props.lockedMessage !== null} onRetry={props.onRetry} />
                     </div>
                 </div>
             </div>
+
+            {props.fillPanel}
 
             {props.lockedMessage !== null && (
                 <div className="alert alert-warning m-3" role="alert" data-budget-locked>
