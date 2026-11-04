@@ -35,16 +35,22 @@ Fast Path / Small / Large, STOP-список §3.4, политика ревью 
 npm run lint                        # eslint, --max-warnings=0
 npm run build                       # vite build
 npm run api:types:check             # schema.d.ts синхронна с OpenAPI
+npm run test:unit                   # vitest: чистые функции, assets/**/*.test.ts
 ```
 
-**Скриптов `typecheck` и `test` в проекте нет, и тест-раннер не установлен.**
-Это зафиксированное состояние, а не забытая настройка: типы проверяются только
-тем, что `tsc` делает внутри `vite build`, а автотестов на фронте нет вовсе.
-Не писать в отчётах, что они прогнаны, и не добавлять их в команду закрытия.
-Пока их нет, обязательная проверка фронтового изменения — `lint` и `build`
-(плюс `api:types:check`, если менялся контракт API) и ручной smoke затронутой
-страницы. Проверок `check:ui-kit` и `check:uikit-react-mapping` больше нет:
-удалены вместе со старым UI Kit 2026-10-11, замена не ставилась.
+`test:unit` (vitest, окружение `node`, конфиг `vitest.config.ts`) — только для
+чистой логики без DOM и React-рендера: разбор и форматирование сумм, выбор
+разреза, расчёты острова. Тест лежит рядом с модулем (`amount.ts` →
+`amount.test.ts`); CI гоняет его в job `eslint-boundaries`. Чистую функцию с
+ветвлениями, вынесенную из компонента, покрывать тестом в том же PR. Тестов
+компонентов (jsdom, Testing Library) нет — не ставить без отдельного решения.
+
+Скрипта `typecheck` нет: типы проверяются только тем, что `tsc` делает внутри
+`vite build`. Не писать в отчётах, что он прогнан. Обязательная проверка
+фронтового изменения — `lint`, `build`, `test:unit` (плюс `api:types:check`,
+если менялся контракт API) и ручной smoke затронутой страницы. Проверок
+`check:ui-kit` и `check:uikit-react-mapping` больше нет: удалены вместе со
+старым UI Kit 2026-10-11, замена не ставилась.
 
 `tsconfig.json`: включён `strict`. Флагов `noUncheckedIndexedAccess`,
 `exactOptionalPropertyTypes`, `noImplicitReturns`,
