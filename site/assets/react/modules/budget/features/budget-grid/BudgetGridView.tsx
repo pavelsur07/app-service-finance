@@ -2,15 +2,10 @@ import type { ClipboardEvent, CSSProperties, KeyboardEvent, MouseEvent, ReactNod
 import { cn } from '@/react/shared/lib/cn';
 import { formatPercent, formatValue } from './amount';
 import type { BudgetGridRow, CellPosition } from './budget-grid.types';
+import type { VisibleRow } from './grid-logic';
 import styles from './BudgetGrid.module.css';
 
 const MONTH_LABELS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
-
-export interface VisibleRow {
-    row: BudgetGridRow;
-    hasChildren: boolean;
-    collapsed: boolean;
-}
 
 export interface CommentDraft {
     title: string;
@@ -37,6 +32,7 @@ export interface BudgetGridViewProps {
     fillPanel: ReactNode;
     loading: boolean;
     loadError: string | null;
+    onReload: () => void;
     scrollerRef: RefObject<HTMLDivElement>;
     inputRef: RefObject<HTMLInputElement>;
     onToggle: (rowId: string) => void;
@@ -74,12 +70,48 @@ function Value({ value, row, blankZero }: ValueProps): JSX.Element | null {
     );
 }
 
-/** Сетка «статьи × 12 месяцев» (ui-ux.md §3). Только разметка: состояние и клавиатура — в BudgetGridWidget. */
-export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
-    const { months, rows, active, editing } = props;
+const HOTKEYS = 'Клик или Enter — ввод · Enter/Tab — сохранить и дальше · Стрелки · Esc — отмена · Delete — очистить · Shift+Enter — комментарий · Ctrl+V — вставка из Excel';
+const SKELETON_ROWS = 8;
+
+/** Ширины колонок только фиксированные (BUDGET-SPEC §6): статьи, 12 месяцев, «Итого». */
+function Columns({ months }: { months: string[] }): JSX.Element {
+    return (
+        <colgroup>
+            <col className={styles.colName} />
+            {months.map((month) => <col key={month} className={styles.colMonth} />)}
+            <col className={styles.colTotal} />
+        </colgroup>
+    );
+}
+
+function Skeleton(): JSX.Element {
+    const months = Array.from({ length: 12 }, (_, index) => String(index));
 
     return (
-        <div>
+        <div className={styles.scroller} aria-busy="true" aria-label="Загружаю план" data-budget-skeleton>
+            <table className={styles.grid}>
+                <Columns months={months} />
+                <tbody>
+                    {Array.from({ length: SKELETON_ROWS }, (_, index) => (
+                        <tr key={index}>
+                            <th className={styles.name} scope="row"><span className={styles.skeletonBar} /></th>
+                            {months.map((month) => <td key={month} className={styles.cell}><span className={styles.skeletonBar} /></td>)}
+                            <td className={cn(styles.cell, styles.total)}><span className={styles.skeletonBar} /></td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+/** Сетка «статьи × 12 месяцев» (BUDGET-SPEC §5, refs 10, 11, 16–18). Только разметка: состояние и клавиатура — в BudgetGridWidget. */
+export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
+    const { months, rows, active, editing } = props;
+    const showSkeleton = props.loading && rows.length === 0 && props.loadError === null;
+
+    return (
+        <div className={styles.root}>
             {props.toolbar !== null && (
                 <div className="vf-card-bar d-print-none">
                     <div className="vf-card-bar__row">
@@ -106,30 +138,44 @@ export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
                 <div className="text-secondary px-3 py-2">{props.readOnlyHint}</div>
             )}
 
-            {props.loadError !== null && <div className="alert alert-danger m-3" role="alert">{props.loadError}</div>}
-            {props.loading && rows.length === 0 && <div className="text-secondary p-3">Загружаю план…</div>}
+            {props.loadError !== null && (
+                <div className="alert alert-danger m-3 d-flex flex-wrap align-items-center gap-3" role="alert" data-budget-load-error>
+                    <div>
+                        <strong>Не удалось загрузить план.</strong> {props.loadError}
+                    </div>
+                    <button type="button" className="btn btn-sm" onClick={props.onReload}>Повторить</button>
+                </div>
+            )}
+            {showSkeleton && <Skeleton />}
 
             {props.comment !== null && (
-                <div className={styles.commentPanel}>
+                <div className={styles.commentPopover} role="dialog" aria-label={`Комментарий: ${props.comment.title}`} data-budget-comment>
                     <label className="form-label" htmlFor="budget-comment">Комментарий: {props.comment.title}</label>
                     <textarea
                         id="budget-comment"
                         className="form-control"
-                        rows={2}
+                        rows={3}
                         maxLength={500}
                         autoFocus
                         value={props.comment.text}
                         onChange={(event) => props.onCommentChange(event.target.value)}
                         onKeyDown={(event) => {
                             if (event.key === 'Escape') {
+                                event.preventDefault();
                                 props.onCommentCancel();
+                            } else if (event.key === 'Enter' && !event.shiftKey) {
+                                event.preventDefault();
+                                props.onCommentSave();
                             }
                         }}
                     />
-                    <div className="d-flex gap-2 mt-2">
-                        <button type="button" className="btn btn-sm btn-primary" onClick={props.onCommentSave}>Сохранить</button>
+                    <div className={styles.commentHint}>
+                        <span>Enter — сохранить, Shift+Enter — новая строка, Esc — закрыть</span>
+                        <span>{props.comment.text.length}/500</span>
+                    </div>
+                    <div className="d-flex justify-content-end gap-2 mt-2">
                         <button type="button" className="btn btn-sm" onClick={props.onCommentCancel}>Отмена</button>
-                        <span className="text-secondary ms-auto">{props.comment.text.length} / 500</span>
+                        <button type="button" className="btn btn-sm btn-primary" onClick={props.onCommentSave}>Сохранить</button>
                     </div>
                 </div>
             )}
@@ -141,38 +187,51 @@ export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
                     tabIndex={0}
                     role="grid"
                     aria-label="План по статьям ОПиУ и месяцам"
+                    aria-rowcount={rows.length + 1}
                     onKeyDown={props.onGridKeyDown}
                     onPaste={props.onPaste}
                 >
                     <table className={styles.grid}>
+                        <Columns months={months} />
                         <thead>
                             <tr>
                                 <th className={styles.name} scope="col">Статья, ₽</th>
                                 {months.map((month, index) => <th key={month} scope="col">{MONTH_LABELS[index]}</th>)}
-                                <th scope="col">Итого</th>
+                                <th scope="col" className={styles.total}>Итого</th>
                             </tr>
                         </thead>
                         <tbody>
                             {rows.map(({ row, hasChildren, collapsed }, rowIndex) => (
-                                <tr key={row.id} className={cn(row.type === 'SUBTOTAL' && styles.subtotal, row.type === 'KPI' && styles.kpi)}>
+                                <tr
+                                    key={row.id}
+                                    className={cn(
+                                        hasChildren && styles.group,
+                                        !hasChildren && row.type === 'SUBTOTAL' && styles.calc,
+                                        row.type === 'KPI' && styles.kpi,
+                                    )}
+                                >
                                     <th className={styles.name} scope="row" title={row.name} style={{ '--budget-level': String(row.level - 1) } as CSSProperties}>
-                                        {hasChildren ? (
-                                            <button
-                                                type="button"
-                                                className={styles.toggle}
-                                                aria-expanded={!collapsed}
-                                                aria-label={collapsed ? `Развернуть «${row.name}»` : `Свернуть «${row.name}»`}
-                                                onClick={() => props.onToggle(row.id)}
-                                            >
-                                                {collapsed ? '▸' : '▾'}
-                                            </button>
-                                        ) : <span className={styles.togglePlaceholder} />}
-                                        {row.name}
-                                        {row.rule !== null && (
-                                            <span className={styles.ruleBadge} data-budget-rule>
-                                                {formatPercent(row.rule.percent)} от {row.rule.baseName}
+                                        <span className={styles.nameInner}>
+                                            {hasChildren ? (
+                                                <button
+                                                    type="button"
+                                                    className={styles.toggle}
+                                                    aria-expanded={!collapsed}
+                                                    aria-label={collapsed ? `Развернуть «${row.name}»` : `Свернуть «${row.name}»`}
+                                                    onClick={() => props.onToggle(row.id)}
+                                                >
+                                                    <i className={cn('ti', collapsed ? 'ti-chevron-right' : 'ti-chevron-down')} aria-hidden="true" />
+                                                </button>
+                                            ) : <span className={styles.togglePlaceholder} />}
+                                            <span className={styles.nameText}>
+                                                {row.name}
+                                                {row.rule !== null && (
+                                                    <span className={styles.ruleBadge} data-budget-rule>
+                                                        {formatPercent(row.rule.percent)} от {row.rule.baseName}
+                                                    </span>
+                                                )}
                                             </span>
-                                        )}
+                                        </span>
                                     </th>
                                     {months.map((month, colIndex) => {
                                         const key = `${row.id}|${month}`;
@@ -180,25 +239,27 @@ export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
                                         const isEditing = editing?.position.row === rowIndex && editing.position.col === colIndex;
                                         const comment = row.comments[month];
                                         const editableCell = row.editable && props.canEdit;
+                                        const unsaved = props.unsavedKeys.has(key);
 
                                         return (
                                             <td
                                                 key={month}
                                                 role="gridcell"
                                                 aria-selected={isActive}
+                                                aria-invalid={props.invalidKeys.has(key) || undefined}
                                                 title={row.rule !== null ? `Считается по правилу: ${formatPercent(row.rule.percent)} от «${row.rule.baseName}»` : comment}
                                                 className={cn(
                                                     styles.cell,
                                                     editableCell ? styles.editable : row.editable && styles.readonlyCell,
                                                     isActive && styles.active,
                                                     props.invalidKeys.has(key) && styles.invalid,
-                                                    props.unsavedKeys.has(key) && styles.unsaved,
-                                                    comment !== undefined && styles.hasComment,
                                                 )}
                                                 onMouseDown={() => props.onCellMouseDown({ row: rowIndex, col: colIndex })}
                                                 onDoubleClick={() => props.onCellDoubleClick({ row: rowIndex, col: colIndex })}
                                                 onContextMenu={(event) => props.onCellContextMenu({ row: rowIndex, col: colIndex }, event)}
                                             >
+                                                {unsaved && <span className={styles.unsavedDot} title="Не сохранено" data-budget-unsaved />}
+                                                {comment !== undefined && <span className={styles.commentMark} aria-hidden="true" data-budget-comment-mark />}
                                                 {isEditing && editing !== null ? (
                                                     <input
                                                         ref={props.inputRef}
@@ -227,11 +288,12 @@ export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
                 </div>
             )}
 
-            {(props.inputError !== null || props.pasteMessage !== null || props.warnings.length > 0) && (
-                <div className="px-3 py-2">
-                    {props.inputError !== null && <div className="text-danger" role="alert">{props.inputError}</div>}
-                    {props.pasteMessage !== null && <div className="text-secondary" role="status">{props.pasteMessage}</div>}
+            {rows.length > 0 && (
+                <div className={styles.footer}>
+                    {props.inputError !== null && <div className="text-danger" role="alert" data-budget-input-error>{props.inputError}</div>}
+                    {props.pasteMessage !== null && <div role="status" data-budget-paste-message>{props.pasteMessage}</div>}
                     {props.warnings.map((warning) => <div key={warning} className="text-warning">{warning}</div>)}
+                    {props.canEdit && <div className={styles.hotkeys}>{HOTKEYS}</div>}
                 </div>
             )}
         </div>

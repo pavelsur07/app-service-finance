@@ -105,6 +105,10 @@
   --vf-navy-100: #e8ecf7; /* чипы, выбранная строка, счётчик */
   --vf-navy-50: #f4f6fb; /* шапка таблицы, hover */
   --vf-hover-bg: #eef1f8; /* DS-Controls: hover вторичной кнопки и пункта меню */
+  --vf-table-group-bg: #f8f9fd; /* DS budget-pack: строка-группа таблицы, колонка «Итого» */
+  --vf-table-readonly-bg: #fafbfd; /* DS budget-pack: нередактируемая ячейка ввода */
+  --vf-cell-hover-bg: #f1f5ff; /* DS budget-pack: наведение на редактируемую ячейку */
+  --vf-marker: #d97706; /* DS budget-pack: маркеры ячейки — комментарий, «не сохранено» */
   --vf-ghost-hover-bg: rgba(11, 16, 32, 0.07); /* DS-Controls: hover Ghost-кнопки */
   --vf-neutral-text: #46525f; /* DS-Feedback: нейтральный бейдж «В архиве» */
   --vf-ok-text: var(--vf-green);
