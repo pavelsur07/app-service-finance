@@ -53,6 +53,14 @@ final class BudgetFillMathTest extends TestCase
         self::assertSame('0.00', BudgetFillMath::signByFlow('0.00', PLFlow::EXPENSE));
     }
 
+    public function testFromInputFollowsGridInputConvention(): void
+    {
+        self::assertSame('-1200.00', BudgetFillMath::fromInput('1200', PLFlow::EXPENSE));
+        self::assertSame('1200.00', BudgetFillMath::fromInput('-1200', PLFlow::EXPENSE));
+        self::assertSame('-1200.00', BudgetFillMath::fromInput('-1200', PLFlow::INCOME));
+        self::assertSame('-1200.00', BudgetFillMath::fromInput('-1200', PLFlow::NONE));
+    }
+
     public function testIsPercentAndAmountValidation(): void
     {
         self::assertTrue(BudgetFillMath::isPercent('12.5'));

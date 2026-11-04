@@ -49,6 +49,18 @@ final class BudgetFillMath
     }
 
     /**
+     * Сумма, введённая пользователем, → знак отчёта по правилу ввода (решение Владельца 04.11, как
+     * в сетке): в статье расхода число меняет знак (60 000 → −60 000), доход и статья без
+     * направления — как ввели.
+     */
+    public static function fromInput(string $amount, PLFlow $flow): string
+    {
+        $amount = bcadd($amount, '0', 2);
+
+        return PLFlow::EXPENSE === $flow ? bcsub('0', $amount, 2) : $amount;
+    }
+
+    /**
      * Знак суммы по направлению статьи: расход — минус, доход — плюс, без направления — как есть.
      */
     public static function signByFlow(string $amount, PLFlow $flow): string

@@ -100,6 +100,22 @@ final class BudgetFillPlannerTest extends BudgetIntegrationTestCase
         self::assertSame([[self::RENT_ID, '2027-01', '-100.00']], $this->cells($plan));
     }
 
+    public function testPercentOfTotalExcludesTargetsSoRepeatGivesSameAmounts(): void
+    {
+        // База — итог «Прибыль» (выручка + аренда), цель — аренда: аренда в базу не входит,
+        // 10% от 1000 = −100, и после записи −100 повтор считает то же самое.
+        $plan = $this->plan(BudgetFillHelper::PERCENT_OF, [self::RENT_ID], ['2027-01', '2027-02'], ['percent' => '10', 'baseCategoryId' => self::SUBTOTAL_ID]);
+
+        self::assertSame([[self::RENT_ID, '2027-01', '-100.00'], [self::RENT_ID, '2027-02', '0.00']], $this->cells($plan));
+    }
+
+    public function testDistributeKeepsEnteredSignForIncome(): void
+    {
+        $plan = $this->plan(BudgetFillHelper::DISTRIBUTE, [self::REVENUE_ID], [], ['amount' => '-1200']);
+
+        self::assertSame('-100.00', $plan->cells[1]->amount);
+    }
+
     public function testRejectsNonLeafCategoryBadParamsMissingPairAndApprovedVersion(): void
     {
         foreach ([
@@ -107,6 +123,7 @@ final class BudgetFillPlannerTest extends BudgetIntegrationTestCase
             [BudgetFillHelper::DISTRIBUTE, [self::RENT_ID], ['amount' => 'abc'], InvalidBudgetInputException::class],
             [BudgetFillHelper::AVERAGE, [self::RENT_ID], ['months' => 5], InvalidBudgetInputException::class],
             [BudgetFillHelper::PERCENT_OF, [self::RENT_ID], ['percent' => '10', 'baseCategoryId' => self::OTHER_COMPANY_LEAF_ID], InvalidBudgetInputException::class],
+            [BudgetFillHelper::PERCENT_OF, [self::RENT_ID], ['percent' => '10', 'baseCategoryId' => self::RENT_ID], InvalidBudgetInputException::class],
         ] as [$helper, $categories, $params, $exception]) {
             try {
                 $this->plan($helper, $categories, ['2027-01'], $params);

@@ -12,6 +12,7 @@ use App\Budget\Enum\BudgetVersionStatus;
 use App\Budget\Exception\BudgetVersionNotFoundException;
 use App\Budget\Exception\InvalidBudgetPairException;
 use App\Budget\Repository\BudgetVersionRepository;
+use App\Company\Facade\CompanyFacade;
 use App\Shared\Service\ActiveCompanyService;
 use Psr\Clock\ClockInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -41,6 +42,7 @@ final class BudgetPlanFactPageController extends AbstractController
         private readonly BudgetPairResolver $pairs,
         private readonly BudgetPlanFactBuilder $planFactBuilder,
         private readonly ClockInterface $clock,
+        private readonly CompanyFacade $companies,
     ) {
     }
 
@@ -80,6 +82,10 @@ final class BudgetPlanFactPageController extends AbstractController
         $view = null === $version ? null : $this->planFactBuilder->build($version, $pair?->projectDirectionId, $pair?->responsibilityCenterId);
         $periodKind = 'quarter' === $period ? BudgetPlanFactColumn::KIND_QUARTER : BudgetPlanFactColumn::KIND_MONTH;
 
+        // Отчёт ОПиУ берёт проект вместе с дочерними, план–факт — точный проект: ссылка на факт
+        // ведёт в отчёт, только когда суммы там совпадут (вся компания или проект без дочерних).
+        $reportLinkable = null === $pair || !$this->hasChildProjects($companyId, $pair->projectDirectionId);
+
         $years = array_values(array_unique([...$this->versions->findYearsByCompanyId($companyId), $currentYear, $currentYear + 1, $year]));
         sort($years);
 
@@ -96,8 +102,22 @@ final class BudgetPlanFactPageController extends AbstractController
             'period' => $period,
             'view' => $view,
             'periodColumns' => null === $view ? [] : array_values(array_filter($view->columns, static fn (BudgetPlanFactColumn $c): bool => $c->kind === $periodKind)),
+            'reportLinkable' => $reportLinkable,
             'ytd' => null === $view ? null : $this->column($view->columns, BudgetPlanFactColumn::YTD),
         ]);
+    }
+
+    private function hasChildProjects(string $companyId, string $projectDirectionId): bool
+    {
+        // Список — в порядке дерева: у проекта есть дочерние, если следующий за ним глубже.
+        $projects = $this->companies->listProjectDirections($companyId);
+        foreach ($projects as $index => $project) {
+            if ($project->id === $projectDirectionId) {
+                return isset($projects[$index + 1]) && $projects[$index + 1]->level > $project->level;
+            }
+        }
+
+        return false;
     }
 
     /**

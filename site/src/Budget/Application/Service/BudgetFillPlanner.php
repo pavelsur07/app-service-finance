@@ -141,7 +141,7 @@ final readonly class BudgetFillPlanner
                     throw new InvalidBudgetInputException('Годовая сумма — число с точкой, до двух знаков после неё.');
                 }
                 foreach ($request->categoryIds as $categoryId) {
-                    $parts = BudgetFillMath::distribute(BudgetFillMath::signByFlow($amount, $flows[$categoryId]), 12);
+                    $parts = BudgetFillMath::distribute(BudgetFillMath::fromInput($amount, $flows[$categoryId]), 12);
                     $targets[$categoryId] = array_combine(BudgetTreeCalculator::months($year), $parts);
                 }
                 break;
@@ -164,7 +164,17 @@ final readonly class BudgetFillPlanner
                 if (!BudgetFillMath::isPercent($percent)) {
                     throw new InvalidBudgetInputException(sprintf('Процент — число от 0 до %s, до двух знаков после точки.', BudgetFillMath::MAX_PERCENT));
                 }
-                $base = $this->tree->calculate($companyId, $year, $planAmounts)->byId()[$this->stringParam($request, 'baseCategoryId')] ?? null;
+                $baseId = $this->stringParam($request, 'baseCategoryId');
+                if (\in_array($baseId, $request->categoryIds, true)) {
+                    throw new InvalidBudgetInputException('Статья-база не может быть среди заполняемых статей.');
+                }
+                // База — без заполняемых статей: иначе итог-база, в который они входят, менялся бы от
+                // самого помощника, и повтор того же запроса давал бы другие суммы.
+                $baseAmounts = $planAmounts;
+                foreach ($baseAmounts as $month => $byCategory) {
+                    $baseAmounts[$month] = array_diff_key($byCategory, array_flip($request->categoryIds));
+                }
+                $base = $this->tree->calculate($companyId, $year, $baseAmounts)->byId()[$baseId] ?? null;
                 if (null === $base) {
                     throw new InvalidBudgetInputException('Статья-база не найдена.');
                 }

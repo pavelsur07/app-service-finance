@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ApiError, apiFetch } from '@/api/client';
 import { formatValue, parseAmountInput } from './amount';
 import type { BudgetFillHelper, BudgetFillResult, BudgetGridRow, SelectedPair } from './budget-grid.types';
@@ -50,13 +50,17 @@ export function BudgetFillPanel(props: BudgetFillPanelProps): JSX.Element {
     const [sourceMonth, setSourceMonth] = useState(props.months[0] ?? '');
     const [percent, setPercent] = useState('');
     const [baseId, setBaseId] = useState(() => (bases.find((row) => /выручк/i.test(row.name)) ?? bases[0])?.id ?? '');
-    const [preview, setPreview] = useState<BudgetFillResult | null>(null);
+    /** Предпросмотр и параметры, по которым он посчитан: «Применить» отправляет именно их. */
+    const [preview, setPreview] = useState<{ result: BudgetFillResult; body: Record<string, unknown> } | null>(null);
+    /** Номер запроса: ответ на запрос до изменения параметров отбрасывается. */
+    const seqRef = useRef(0);
     const [error, setError] = useState<string | null>(null);
     const [sending, setSending] = useState(false);
 
     const usesMonths = helper !== 'distribute' && helper !== 'copy_right';
     const names = useMemo(() => new Map(props.rows.map((row) => [row.id, row.name])), [props.rows]);
     const reset = (): void => {
+        seqRef.current += 1;
         setPreview(null);
         setError(null);
     };
@@ -92,7 +96,36 @@ export function BudgetFillPanel(props: BudgetFillPanelProps): JSX.Element {
         }
     };
 
-    const send = async (apply: boolean, confirmOverwrite: boolean): Promise<void> => {
+    const request = async (body: Record<string, unknown>, apply: boolean, confirmOverwrite: boolean): Promise<void> => {
+        const seq = ++seqRef.current;
+        setError(null);
+        setSending(true);
+        try {
+            const result = await apiFetch<BudgetFillResult>(props.fillUrl, {
+                method: 'POST',
+                csrfToken: props.csrfToken,
+                body: { ...body, apply, confirmOverwrite },
+            });
+            if (seq !== seqRef.current) {
+                return;
+            }
+            if (apply) {
+                props.onApplied(result.changed);
+            } else {
+                setPreview({ result, body });
+            }
+        } catch (caught) {
+            if (seq === seqRef.current) {
+                setError(caught instanceof ApiError ? caught.message : 'Не удалось выполнить помощник.');
+            }
+        } finally {
+            if (seq === seqRef.current) {
+                setSending(false);
+            }
+        }
+    };
+
+    const showPreview = (): void => {
         setError(null);
         if (categoryIds.size === 0) {
             setError('Выберите хотя бы одну статью.');
@@ -108,32 +141,14 @@ export function BudgetFillPanel(props: BudgetFillPanelProps): JSX.Element {
         if (helperParams === null) {
             return;
         }
-        setSending(true);
-        try {
-            const result = await apiFetch<BudgetFillResult>(props.fillUrl, {
-                method: 'POST',
-                csrfToken: props.csrfToken,
-                body: {
-                    helper,
-                    project: props.pair.projectDirectionId,
-                    center: props.pair.responsibilityCenterId,
-                    categoryIds: leaves.filter((row) => categoryIds.has(row.id)).map((row) => row.id),
-                    months: usesMonths ? props.months.filter((month) => months.has(month)) : [],
-                    params: helperParams,
-                    apply,
-                    confirmOverwrite,
-                },
-            });
-            if (apply) {
-                props.onApplied(result.changed);
-            } else {
-                setPreview(result);
-            }
-        } catch (caught) {
-            setError(caught instanceof ApiError ? caught.message : 'Не удалось выполнить помощник.');
-        } finally {
-            setSending(false);
-        }
+        void request({
+            helper,
+            project: props.pair.projectDirectionId,
+            center: props.pair.responsibilityCenterId,
+            categoryIds: leaves.filter((row) => categoryIds.has(row.id)).map((row) => row.id),
+            months: usesMonths ? props.months.filter((month) => months.has(month)) : [],
+            params: helperParams,
+        }, false, false);
     };
 
     const toggle = (set: Set<string>, value: string): Set<string> => {
@@ -154,7 +169,8 @@ export function BudgetFillPanel(props: BudgetFillPanelProps): JSX.Element {
                 <button type="button" className="btn btn-sm ms-auto" onClick={props.onClose}>Закрыть</button>
             </div>
 
-            <div className="row g-3">
+            {/* Пока идёт запрос, параметры не меняются: предпросмотр и применение — об одном и том же. */}
+            <fieldset disabled={sending} className="row g-3">
                 <div className="col-md-4">
                     <label className="form-label" htmlFor="budget-fill-helper">Помощник</label>
                     <select
@@ -240,29 +256,29 @@ export function BudgetFillPanel(props: BudgetFillPanelProps): JSX.Element {
                         </div>
                     </fieldset>
                 )}
-            </div>
+            </fieldset>
 
             {error !== null && <div className="text-danger mt-2" role="alert">{error}</div>}
             {props.busy && <div className="text-secondary mt-2" role="status">Дождитесь сохранения правок в сетке.</div>}
 
             {preview !== null && (
                 <div className="mt-3" role="status" data-budget-fill-preview>
-                    {preview.changed === 0 ? (
-                        <div>Менять нечего: суммы уже такие.{preview.skipped > 0 ? ` Пропущено ячеек плана продаж: ${preview.skipped}.` : ''}</div>
+                    {preview.result.changed === 0 ? (
+                        <div>Менять нечего: суммы уже такие.{preview.result.skipped > 0 ? ` Пропущено ячеек плана продаж: ${preview.result.skipped}.` : ''}</div>
                     ) : (
                         <>
                             <div className="fw-semibold">
-                                Будет изменено ячеек: {preview.changed}
-                                {preview.overwrite > 0 ? `, из них заполненных: ${preview.overwrite}` : ''}
-                                {preview.skipped > 0 ? `. Пропущено ячеек плана продаж: ${preview.skipped}` : ''}.
+                                Будет изменено ячеек: {preview.result.changed}
+                                {preview.result.overwrite > 0 ? `, из них заполненных: ${preview.result.overwrite}` : ''}
+                                {preview.result.skipped > 0 ? `. Пропущено ячеек плана продаж: ${preview.result.skipped}` : ''}.
                             </div>
                             <ul className="small text-secondary mb-0 mt-1">
-                                {preview.cells.slice(0, 8).map((cell) => (
+                                {preview.result.cells.slice(0, 8).map((cell) => (
                                     <li key={`${cell.plCategoryId}|${cell.month}`}>
                                         {names.get(cell.plCategoryId)} · {monthLabel(cell.month)}: {money(cell.previous)} → {money(cell.amount)}
                                     </li>
                                 ))}
-                                {preview.cells.length > 8 && <li>и ещё {preview.cells.length - 8}</li>}
+                                {preview.result.cells.length > 8 && <li>и ещё {preview.result.cells.length - 8}</li>}
                             </ul>
                         </>
                     )}
@@ -270,14 +286,14 @@ export function BudgetFillPanel(props: BudgetFillPanelProps): JSX.Element {
             )}
 
             <div className="d-flex flex-wrap gap-2 mt-3">
-                <button type="button" className="btn btn-sm" disabled={sending} onClick={() => void send(false, false)}>Показать изменения</button>
-                {preview !== null && preview.changed > 0 && (
-                    preview.overwrite > 0 ? (
-                        <button type="button" className="btn btn-sm btn-danger" disabled={sending || props.busy} onClick={() => void send(true, true)}>
-                            Перезаписать заполненные ({preview.overwrite}) и применить
+                <button type="button" className="btn btn-sm" disabled={sending} onClick={showPreview}>Показать изменения</button>
+                {preview !== null && preview.result.changed > 0 && (
+                    preview.result.overwrite > 0 ? (
+                        <button type="button" className="btn btn-sm btn-danger" disabled={sending || props.busy} onClick={() => void request(preview.body, true, true)}>
+                            Перезаписать заполненные ({preview.result.overwrite}) и применить
                         </button>
                     ) : (
-                        <button type="button" className="btn btn-sm btn-primary" disabled={sending || props.busy} onClick={() => void send(true, false)}>
+                        <button type="button" className="btn btn-sm btn-primary" disabled={sending || props.busy} onClick={() => void request(preview.body, true, false)}>
                             Применить
                         </button>
                     )

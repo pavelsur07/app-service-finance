@@ -148,6 +148,32 @@ final class BudgetPagesTest extends WebTestCaseBase
         self::assertStringContainsString('/finance/report/preview?from=2027-01-01&to=2027-01-31', (string) $link->attr('href'));
     }
 
+    public function testPlanFactFactLinksToReportOnlyWhenProjectHasNoChildren(): void
+    {
+        self::mockTime(new \DateTimeImmutable('2027-03-15 12:00', new \DateTimeZone('Europe/Moscow')));
+        $this->version('Утверждённый', BudgetVersionStatus::APPROVED);
+        $this->login($this->reader);
+        $url = sprintf('/finance/budget/plan-fact?year=2027&show=fact&project=%s&center=%s', self::PROJECT_ID, $this->centerId);
+
+        $this->client->request('GET', $url);
+        $href = (string) $this->client->getCrawler()->filter('[data-pf-row="REV"] [data-pf-cell="2027-01"] a')->attr('href');
+        self::assertStringContainsString('projectDirectionIds', urldecode($href));
+
+        $company = $this->em()->find(Company::class, self::COMPANY_ID);
+        $parent = $this->em()->find(ProjectDirection::class, self::PROJECT_ID);
+        self::assertNotNull($company);
+        self::assertNotNull($parent);
+        $child = new ProjectDirection(Uuid::uuid7()->toString(), $company, 'Магазин');
+        $child->setParent($parent);
+        $this->em()->persist($child);
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $this->client->request('GET', $url);
+        self::assertSelectorNotExists('[data-pf-row="REV"] [data-pf-cell="2027-01"] a');
+        self::assertSelectorTextContains('.card-footer', 'без дочерних');
+    }
+
     public function testPlanFactPageWithoutApprovedHintsAndWithoutVersionsIsEmpty(): void
     {
         $this->version('Черновик', BudgetVersionStatus::DRAFT);
