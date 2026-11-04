@@ -6,6 +6,7 @@ namespace App\Budget\Application\Service;
 
 use App\Budget\Application\DTO\BudgetPair;
 use App\Budget\Exception\InvalidBudgetPairException;
+use App\Company\Facade\CompanyFacade;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 
 /**
@@ -14,8 +15,37 @@ use App\Company\Facade\FinancialResponsibilityCenterFacade;
  */
 final readonly class BudgetPairResolver
 {
-    public function __construct(private FinancialResponsibilityCenterFacade $responsibilityCenters)
+    public function __construct(
+        private FinancialResponsibilityCenterFacade $responsibilityCenters,
+        private CompanyFacade $companies,
+    ) {
+    }
+
+    /**
+     * Активные пары компании для выбора на экранах (подпись «Проект × ЦФО»), системная — помечена.
+     *
+     * @return list<array{projectDirectionId: string, responsibilityCenterId: string, label: string, system: bool}>
+     */
+    public function options(string $companyId): array
     {
+        $projectNames = [];
+        foreach ($this->companies->listProjectDirections($companyId) as $project) {
+            $projectNames[$project->id] = $project->name;
+        }
+        $pairs = [];
+        foreach ($this->responsibilityCenters->getActivePairs($companyId) as $pair) {
+            if (!isset($projectNames[$pair->projectDirectionId])) {
+                continue;
+            }
+            $pairs[] = [
+                'projectDirectionId' => $pair->projectDirectionId,
+                'responsibilityCenterId' => $pair->responsibilityCenterId,
+                'label' => $projectNames[$pair->projectDirectionId].' × '.$pair->responsibilityCenterName,
+                'system' => $pair->system,
+            ];
+        }
+
+        return $pairs;
     }
 
     public function resolve(string $companyId, string $projectDirectionId, string $responsibilityCenterId): ?BudgetPair

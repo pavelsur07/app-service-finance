@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** Stage 4 / planning
-**Status:** Stage 3 done; часть 1 (этапы 0–2) на проде с 04.11 (#2874)
+**Phase:** Stage 5 / planning
+**Status:** Stage 4 done; часть 1 (этапы 0–2) на проде с 04.11 (#2874)
 **Stage base commit:** `cf083d2e7` (ветка `feat/pl-budget-plan-fact`)
 
 ### Completed
@@ -18,6 +18,9 @@
 
 - Stage 3: факт по месяцам (`getPlFactAmountsByMonth`), план–факт API,
   `BudgetVariance`, «Итог года» в списке — `stages/stage-3.md`.
+
+- Stage 4: вкладка «План–факт» (Twig), кварталы и «с начала года» —
+  `stages/stage-4.md`.
 
 ### Checks and baseline
 - baseline: `AssignTariffActionTest` — OK (6).

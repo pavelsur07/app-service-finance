@@ -36,15 +36,33 @@ final readonly class BudgetTreeCalculator
     public function calculate(string $companyId, int $year, array $amounts): BudgetTree
     {
         $months = self::months($year);
-        /** @var array<string, array<string, string>> $columns `Y-m`|total → plCategoryId → сумма */
-        $columns = array_fill_keys([...$months, self::TOTAL], []);
-        foreach ($amounts as $month => $byCategory) {
-            if (!isset($columns[$month]) || self::TOTAL === $month) {
-                continue;
-            }
-            foreach ($byCategory as $categoryId => $amount) {
-                $columns[$month][$categoryId] = $amount;
-                $columns[self::TOTAL][$categoryId] = bcadd($columns[self::TOTAL][$categoryId] ?? '0', $amount, 2);
+        $columns = [];
+        foreach ($months as $month) {
+            $columns[$month] = [$month];
+        }
+        $columns[self::TOTAL] = $months;
+
+        return $this->calculateColumns($companyId, $year, $amounts, $columns);
+    }
+
+    /**
+     * Колонки — суммы листьев за свои месяцы; итоги и KPI колонки считает калькулятор от этих
+     * сумм (KPI квартала — формула от сумм квартала, не сумма месячных KPI).
+     *
+     * @param array<string, array<string, string>> $amounts `Y-m` → plCategoryId → сумма в знаке отчёта
+     * @param array<string, list<string>> $columnMonths ключ колонки → её месяцы `Y-m`
+     */
+    public function calculateColumns(string $companyId, int $year, array $amounts, array $columnMonths): BudgetTree
+    {
+        $months = self::months($year);
+        /** @var array<string, array<string, string>> $columns ключ колонки → plCategoryId → сумма */
+        $columns = [];
+        foreach ($columnMonths as $key => $keyMonths) {
+            $columns[$key] = [];
+            foreach ($keyMonths as $month) {
+                foreach ($amounts[$month] ?? [] as $categoryId => $amount) {
+                    $columns[$key][$categoryId] = bcadd($columns[$key][$categoryId] ?? '0', $amount, 2);
+                }
             }
         }
 

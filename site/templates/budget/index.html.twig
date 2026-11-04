@@ -37,6 +37,7 @@
         <div class="card-header">
             {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
                 {label: 'Варианты', href: path('budget_index', {year: year}), active: true, count: versions|length},
+                {label: 'План–факт', href: path('budget_plan_fact', {year: year}), active: false},
             ]} only %}
         </div>
 
@@ -53,7 +54,7 @@
         {% if versions is empty %}
             <div class="card-body text-secondary">На {{ year }} год вариантов нет.</div>
         {% else %}
-            <div class="table-responsive">
+            <div class="table-responsive position-relative">{# visually-hidden в шапке не раздвигает страницу на 360 px #}
                 <table class="table table-vcenter vf-table">
                     <thead>
                         <tr>
@@ -92,7 +93,7 @@
     {% if archived is not empty %}
         <details class="card vf-card mb-4" data-budget-archive>
             <summary class="card-header">Архив ({{ archived|length }})</summary>
-            <div class="table-responsive">
+            <div class="table-responsive position-relative">{# visually-hidden в шапке не раздвигает страницу на 360 px #}
                 <table class="table table-vcenter vf-table">
                     <tbody>
                     {% for version in archived %}

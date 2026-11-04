@@ -10,7 +10,8 @@ namespace App\Budget\Domain;
  * минус — хуже для прибыли (недобор выручки или перерасход).
  *
  * `percent` = diff / |план| × 100 с одним знаком; при нулевом плане его нет. Значимо: |percent|
- * больше порога (решение Владельца 04.11 — 10%) либо факт без плана. Показатели (KPI, проценты,
+ * больше порога (решение Владельца 04.11 — 10%) либо факт без плана. Незакрытый период —
+ * notCompared(): отклонения нет. Показатели (KPI, проценты,
  * количества) — только разница, без процента и пометки.
  */
 final readonly class BudgetVariance
@@ -19,11 +20,19 @@ final readonly class BudgetVariance
 
     private function __construct(
         public string $plan,
-        public string $fact,
-        public string $diff,
+        public ?string $fact,
+        public ?string $diff,
         public ?string $percent,
         public bool $significant,
     ) {
+    }
+
+    /**
+     * Ячейка без сравнения: месяц идёт или впереди, план года. `fact` null — факт не показывается.
+     */
+    public static function notCompared(string $plan, ?string $fact): self
+    {
+        return new self($plan, $fact, null, null, false);
     }
 
     public static function of(string $plan, string $fact, bool $money): self

@@ -21,12 +21,15 @@ use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\Clock\Test\ClockSensitiveTrait;
 
 /**
  * Раздел «Бюджет ОПиУ»: список вариантов, создание, смена статуса, страница варианта, API сетки.
  */
 final class BudgetPagesTest extends WebTestCaseBase
 {
+    use ClockSensitiveTrait;
+
     private const COMPANY_ID = '0193eeee-0000-7000-8000-00000000c001';
     private const OTHER_COMPANY_ID = '0193eeee-0000-7000-8000-00000000c002';
     private const REVENUE_ID = '0193eeee-0000-7000-8000-00000000d002';
@@ -100,11 +103,7 @@ final class BudgetPagesTest extends WebTestCaseBase
     public function testListShowsYearNetProfitOnlyWhenTreeHasNetProfitRow(): void
     {
         $id = $this->version('Базовый', BudgetVersionStatus::DRAFT);
-        $this->em()->getConnection()->executeStatement(
-            "INSERT INTO budget_lines (id, company_id, version_id, pl_category_id, month, project_direction_id, responsibility_center_id, amount, source, comment, updated_at)
-             VALUES (?, ?, ?, ?, '2027-01-01', ?, ?, '1250000.00', 'manual', NULL, NOW())",
-            [Uuid::uuid7()->toString(), self::COMPANY_ID, $id, self::REVENUE_ID, self::PROJECT_ID, $this->centerId],
-        );
+        $this->line($id, '2027-01-01', '1250000.00');
         $this->login($this->reader);
 
         $this->client->request('GET', '/finance/budget?year=2027');
@@ -115,6 +114,66 @@ final class BudgetPagesTest extends WebTestCaseBase
         $this->client->request('GET', '/finance/budget?year=2027');
         self::assertSelectorTextContains('[data-budget-versions] th[data-budget-year-total]', 'Итог года');
         self::assertSelectorTextContains('[data-budget-versions] td[data-budget-year-total]', "1\u{00A0}250\u{00A0}000");
+    }
+
+    public function testPlanFactPageDefaultsToApprovedVersionAndShowsDeviation(): void
+    {
+        self::mockTime(new \DateTimeImmutable('2027-03-15 12:00', new \DateTimeZone('Europe/Moscow')));
+        $draft = $this->version('Черновик', BudgetVersionStatus::DRAFT);
+        $approved = $this->version('Утверждённый', BudgetVersionStatus::APPROVED);
+        $this->line($approved, '2027-01-01', '1000.00');
+        $this->line($draft, '2027-01-01', '5000.00');
+        $this->login($this->reader);
+
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.card-header-tabs .active', 'План–факт');
+        self::assertSelectorTextContains('select[name=version] option[selected]', 'Утверждённый');
+        self::assertSelectorNotExists('[data-budget-no-approved]');
+        // Январь закрыт: факта нет, отклонение −1 000 — хуже плана.
+        self::assertSelectorTextContains('[data-pf-row="REV"] [data-pf-cell="2027-01"]', "\u{2212}1\u{00A0}000");
+        self::assertSelectorTextContains('[data-pf-row="REV"] [data-pf-cell="2027-01"]', 'хуже плана');
+        // Март идёт, апрель впереди — отклонения нет.
+        self::assertSelectorTextSame('[data-pf-row="REV"] [data-pf-cell="2027-04"]', '—');
+        self::assertSelectorTextContains('[data-pf-row="REV"] [data-pf-ytd="plan"]', "1\u{00A0}000");
+
+        $this->client->request('GET', sprintf('/finance/budget/plan-fact?year=2027&version=%s&show=plan&period=quarter', $draft));
+        self::assertSelectorTextContains('select[name=version] option[selected]', 'Черновик');
+        self::assertSelectorTextContains('[data-pf-row="REV"] [data-pf-cell="2027-Q1"]', "5\u{00A0}000");
+        self::assertSelectorNotExists('[data-pf-cell="2027-01"]');
+
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027&show=fact');
+        $link = $this->client->getCrawler()->filter('[data-pf-row="REV"] [data-pf-cell="2027-01"] a');
+        self::assertCount(1, $link);
+        self::assertStringContainsString('/finance/report/preview?from=2027-01-01&to=2027-01-31', (string) $link->attr('href'));
+    }
+
+    public function testPlanFactPageWithoutApprovedHintsAndWithoutVersionsIsEmpty(): void
+    {
+        $this->version('Черновик', BudgetVersionStatus::DRAFT);
+        $this->login($this->reader);
+
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('[data-budget-no-approved]', 'Утвердите вариант или выберите черновик');
+        self::assertSelectorTextContains('select[name=version] option[selected]', 'Черновик');
+
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2030');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('[data-budget-plan-fact-empty]', 'На 2030 год вариантов нет');
+        self::assertSelectorNotExists('[data-pf-row]');
+
+        $this->client->request('GET', '/finance/budget?year=2027');
+        self::assertSelectorExists(sprintf('.card-header-tabs a[href="%s"]', '/finance/budget/plan-fact?year=2027'));
+    }
+
+    public function testPlanFactPageForeignVersionIsNotFound(): void
+    {
+        $foreign = $this->version('Чужой', BudgetVersionStatus::DRAFT, companyId: self::OTHER_COMPANY_ID);
+        $this->login($this->reader);
+
+        $this->client->request('GET', sprintf('/finance/budget/plan-fact?year=2027&version=%s', $foreign));
+        self::assertResponseStatusCodeSame(404);
     }
 
     public function testCreateEmptyVersionRedirectsAndRepeatKeepsOneRow(): void
@@ -230,6 +289,7 @@ final class BudgetPagesTest extends WebTestCaseBase
 
     public function testPlanFactJsonForPairWholeCompanyAndInvalidPair(): void
     {
+        self::mockTime(new \DateTimeImmutable('2028-02-01 12:00', new \DateTimeZone('Europe/Moscow')));
         $id = $this->version('Базовый', BudgetVersionStatus::DRAFT);
         $this->login($this->reader);
 
@@ -295,6 +355,15 @@ final class BudgetPagesTest extends WebTestCaseBase
         $this->login($this->reader);
         $this->postCells($draft, [$this->cell('1')]);
         self::assertResponseStatusCodeSame(403);
+    }
+
+    private function line(string $versionId, string $month, string $amount): void
+    {
+        $this->em()->getConnection()->executeStatement(
+            "INSERT INTO budget_lines (id, company_id, version_id, pl_category_id, month, project_direction_id, responsibility_center_id, amount, source, comment, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual', NULL, NOW())",
+            [Uuid::uuid7()->toString(), self::COMPANY_ID, $versionId, self::REVENUE_ID, $month, self::PROJECT_ID, $this->centerId, $amount],
+        );
     }
 
     private function version(string $name, BudgetVersionStatus $status, int $year = 2027, string $companyId = self::COMPANY_ID): string

@@ -2309,3 +2309,18 @@
 .vf-docform-leave {
   max-width: 440px;
 }
+
+/* Бюджет ОПиУ, «План–факт»: таблица шире карточки при любой ширине окна — прокрутка внутри
+   (общее правило выше снимает её с 1200 px), колонка статей закреплена. */
+.vf-card .table-responsive.vf-pf {
+  position: relative; /* visually-hidden в ячейках (position: absolute) иначе уходит из-под прокрутки и раздвигает страницу */
+  overflow-x: auto;
+}
+
+.vf-pf__table .vf-pf__name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 12rem;
+  background: var(--vf-surface);
+}
