@@ -11,6 +11,8 @@ use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Entity\User;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Entity\PLDailyTotal;
 use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLFlow;
 use App\Tests\Builders\Budget\BudgetVersionBuilder;
@@ -88,14 +90,16 @@ final class BudgetPagesTest extends WebTestCaseBase
         $crawler = $this->client->request('GET', '/finance/budget?year=2027');
 
         self::assertResponseIsSuccessful();
-        $active = $crawler->filter('[data-budget-versions]')->text();
+        $active = $crawler->filter('[data-budget-versions] tbody')->first()->text();
         self::assertLessThan(strpos($active, 'Черновик А'), strpos($active, 'Утверждённый Б'));
         self::assertStringNotContainsString('Архивный В', $active);
-        self::assertSelectorTextContains('[data-budget-archive]', 'Архивный В');
+        self::assertSelectorTextContains('[data-budget-archive]', 'Архив (1)');
+        self::assertSelectorTextContains('#budget-archive-rows', 'Архивный В');
         $page = (string) $this->client->getResponse()->getContent();
         self::assertStringNotContainsString('Прошлый год Г', $page);
         self::assertStringNotContainsString('Чужой Д', $page);
-        self::assertSelectorExists('[data-budget-versions] button[disabled]', 'действия у читателя видны неактивными');
+        self::assertSelectorTextContains('[data-budget-versions] .vf-menu-item--reason', 'Роль «Чтение»: изменять варианты нельзя', 'действия у читателя видны неактивными с причиной');
+        self::assertSelectorTextContains('#budget-new-reason', 'Роль «Чтение»');
         self::assertSelectorTextContains('.vf-page-head h1', 'Бюджет ОПиУ');
         self::assertSelectorExists('#navbar-pl a.dropdown-item.active[href="/finance/budget"]');
     }
@@ -112,7 +116,7 @@ final class BudgetPagesTest extends WebTestCaseBase
 
         $this->em()->getConnection()->executeStatement("UPDATE pl_categories SET code = 'NET_PROFIT' WHERE company_id = ? AND code = 'PROFIT'", [self::COMPANY_ID]);
         $this->client->request('GET', '/finance/budget?year=2027');
-        self::assertSelectorTextContains('[data-budget-versions] th[data-budget-year-total]', 'Итог года');
+        self::assertSelectorTextContains('[data-budget-versions] th[data-budget-year-total]', 'Чистая прибыль, ₽');
         self::assertSelectorTextContains('[data-budget-versions] td[data-budget-year-total]', "1\u{00A0}250\u{00A0}000");
     }
 
@@ -288,7 +292,73 @@ final class BudgetPagesTest extends WebTestCaseBase
 
         self::assertResponseRedirects('/finance/budget?year=1999');
         $this->client->followRedirect();
-        self::assertSelectorTextContains('.toast-body', 'Год бюджета');
+        self::assertSelectorExists('[data-budget-new-modal][data-budget-new-open]');
+        self::assertSelectorTextContains('[data-budget-new-error]', 'Год бюджета');
+    }
+
+    public function testCreateWithBlankNameReopensFormWithErrorUnderField(): void
+    {
+        $this->login($this->writer);
+        $this->client->request('POST', '/finance/budget/versions', ['_token' => $this->csrfToken($this->client, 'budget_version_create'), 'versionId' => Uuid::uuid7()->toString(), 'name' => '  ', 'year' => '2027', 'method' => 'empty']);
+
+        self::assertResponseRedirects('/finance/budget?year=2027');
+        $this->client->followRedirect();
+        self::assertSelectorExists('[data-budget-new-modal][data-budget-new-open]');
+        self::assertSelectorTextContains('[data-budget-new-name-error]', 'Укажите название');
+        self::assertSelectorExists('#budget-new-name.is-invalid');
+        $this->client->request('GET', '/finance/budget?year=2027');
+        self::assertSelectorNotExists('[data-budget-new-modal][data-budget-new-open]', 'ошибка показывается один раз');
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM budget_versions WHERE company_id = ?', [self::COMPANY_ID]));
+    }
+
+    public function testEmptyYearOffersBlankAndFactAndCreatesFromFact(): void
+    {
+        $this->login($this->writer);
+        $this->client->request('GET', '/finance/budget?year=2027');
+        self::assertSelectorTextContains('[data-budget-empty]', 'На 2027 год вариантов нет');
+        self::assertSelectorExists('[data-budget-empty] button[data-budget-new="fact"][disabled]');
+        self::assertSelectorTextContains('#budget-fact-reason', 'За 2026 год нет факта ОПиУ');
+
+        $project = $this->em()->getReference(ProjectDirection::class, self::PROJECT_ID);
+        self::assertNotNull($project);
+        $total = new PLDailyTotal(Uuid::uuid7()->toString(), $this->company, $project, new \DateTimeImmutable('2026-04-10'), $this->em()->getReference(PLCategory::class, self::REVENUE_ID));
+        $total->setAmountIncome('1500.00');
+        $total->setResponsibilityCenterId($this->centerId);
+        $this->em()->persist($total);
+        $this->em()->flush();
+
+        $this->client->request('GET', '/finance/budget?year=2027');
+        self::assertSelectorExists('[data-budget-empty] button[data-budget-new="fact"]:not([disabled])');
+        $id = Uuid::uuid7()->toString();
+        $this->client->request('POST', '/finance/budget/versions', ['_token' => $this->csrfToken($this->client, 'budget_version_create'), 'versionId' => $id, 'name' => 'Из факта', 'year' => '2027', 'method' => 'fact']);
+        self::assertResponseRedirects('/finance/budget/versions/'.$id);
+        self::assertSame('1500.00', $this->em()->getConnection()->fetchOne("SELECT amount FROM budget_lines WHERE version_id = ? AND month = '2027-04-01'", [$id]));
+    }
+
+    public function testRowMenuShowsOwnerOnlyActionsDisabledWithReasonForWriter(): void
+    {
+        $draft = $this->version('Черновик', BudgetVersionStatus::DRAFT);
+
+        $this->login($this->writer);
+        $this->client->request('GET', '/finance/budget?year=2027');
+        self::assertSelectorTextContains('.budget-menu .vf-menu-item--reason', 'Утверждает только владелец компании');
+        self::assertSelectorExists('.budget-menu button[data-budget-copy="'.$draft.'"]');
+        self::assertSelectorExists('.budget-menu button[data-confirm-action$="/status/archived"]');
+
+        $this->login($this->owner);
+        $this->client->request('GET', '/finance/budget?year=2027');
+        self::assertSelectorExists('.budget-menu button[data-confirm-action$="/status/approved"][data-confirm-title="Утвердить «Черновик»?"]');
+        self::assertSelectorNotExists('.budget-menu .vf-menu-item--reason');
+    }
+
+    public function testReaderSeesEmptyYearButtonsDisabledWithReason(): void
+    {
+        $this->login($this->reader);
+        $this->client->request('GET', '/finance/budget?year=2027');
+
+        self::assertSelectorExists('[data-budget-empty] button[data-budget-new="empty"][disabled]');
+        self::assertSelectorTextContains('#budget-fact-reason', 'Роль «Чтение»');
+        self::assertSelectorNotExists('#budget-new');
     }
 
     public function testReaderCannotCreateOrChangeStatus(): void

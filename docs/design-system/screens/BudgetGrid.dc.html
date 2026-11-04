@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Бюджет ОПиУ — ввод плана</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+:root{--primary:#1d4ed8;--bg:#f7f8fc;--surface:#ffffff;--text:#0b1020;--muted:#525b78;--border:#dde1ec;--border-strong:#c3c8d6;--head-bg:#f4f6fb;--sel:#e8effd;--warn-bg:#fff4e5;--warn-text:#9a4a00;--warn-bd:#f5d3a8;--ok-bg:#e4f5e7;--ok-text:#1d7a30;--danger:#9a001b;--danger-bg:#fdecee}
+body{margin:0;background:var(--bg)}
+*{box-sizing:border-box}
+button,input,select,textarea{font-family:inherit;font-size:14px;color:var(--text)}
+.nav{display:flex;align-items:center;gap:12px;padding:9px 12px;margin:1px 8px;color:#dfe3ef;text-decoration:none;border-radius:4px;font-size:14px;line-height:20px}
+.nav:hover{background:rgba(255,255,255,.07)}
+.nav[aria-current]{background:rgba(255,255,255,.12);color:#fff;font-weight:600}
+.nav.sub{padding:6px 12px 6px 42px;font-size:13px;color:#c3c8d6}
+.nav.sub[aria-current]{color:#fff}
+.nav svg{flex:none}
+.btn{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:4px;border:1px solid var(--border-strong);background:var(--surface);cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover:not(:disabled){background:#eef1f8}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-primary:hover:not(:disabled){background:#1a40b0}
+.btn-sm{height:30px;padding:0 10px;font-size:13px}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:4px;background:transparent;color:var(--muted);cursor:pointer}
+.icon-btn:hover{background:rgba(11,16,32,.07);color:var(--text)}
+button:disabled{opacity:.5;cursor:not-allowed!important}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.nav:focus-visible{outline-color:#fff}
+.inp{height:36px;width:100%;padding:0 12px;border:1px solid var(--border-strong);border-radius:4px;background:var(--surface)}
+.inp[aria-invalid=true]{border-color:var(--danger);box-shadow:0 0 0 1px var(--danger)}
+.err{color:var(--danger);font-size:13px;margin-top:4px}
+.lbl{font-size:13px;font-weight:600;margin-bottom:4px;display:block}
+.tab{display:inline-flex;align-items:center;gap:8px;padding:12px 14px;border:0;border-bottom:2px solid transparent;background:none;cursor:pointer;font-weight:500;color:var(--muted);margin-bottom:-1px}
+.tab:hover{color:var(--text)}
+.tab[aria-selected=true]{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.badge{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:4px;font-size:12px;font-weight:600;white-space:nowrap}
+.b-approved{background:var(--sel);color:#1a3fae}
+.b-draft{background:var(--head-bg);color:var(--muted);border:1px solid var(--border)}
+.b-archive{background:#eceef4;color:#5b6485}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.dim{color:#7a829c}
+.menu{position:absolute;z-index:40;min-width:260px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 32px rgba(11,16,32,.18);padding:4px 0}
+.mi{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:8px 16px;border:0;background:none;cursor:pointer;font-size:14px}
+.mi:hover:not(:disabled){background:var(--head-bg)}
+.mi small{font-size:12px;color:var(--muted)}
+.mi:disabled{opacity:1;color:#7a829c;cursor:not-allowed}
+.scrim{position:fixed;inset:0;background:rgba(11,16,32,.45);z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:64px 16px;overflow:auto}
+.dlg{background:var(--surface);border-radius:8px;box-shadow:0 24px 64px rgba(11,16,32,.3);width:100%;max-width:520px}
+.demo{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;padding:8px 32px;background:#fffbe8;border-bottom:1px dashed #e5d58a;font-size:12px;color:#6b5a00}
+.demo b{font-weight:700;margin-right:4px}
+.demo select{height:26px;font-size:12px;border:1px solid #d9c866;border-radius:4px;background:#fff;padding:0 6px}
+.demo button{height:26px;font-size:12px;border:1px solid #d9c866;border-radius:4px;background:#fff;padding:0 8px;cursor:pointer}
+.toast{position:fixed;right:24px;bottom:24px;z-index:80;background:#0b1020;color:#fff;padding:12px 16px;border-radius:6px;box-shadow:0 8px 24px rgba(11,16,32,.3);max-width:380px}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:4px;border:1px solid var(--warn-bd);background:var(--warn-bg);color:var(--warn-text)}
+.alert.err2{border-color:#e9a9b3;background:var(--danger-bg);color:var(--danger)}
+.alert.info{border-color:#b9cdf5;background:var(--sel);color:#1a3fae}
+.skel{background:linear-gradient(90deg,#eceef4 25%,#f6f7fb 50%,#eceef4 75%);background-size:200% 100%;animation:sk 1.4s infinite;border-radius:4px}
+@keyframes sk{to{background-position:-200% 0}}
+
+.grp-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--border-strong);border-radius:16px;background:var(--surface);cursor:pointer;font-weight:500;font-size:13px;white-space:nowrap}
+.pill:hover{background:#eef1f8}
+.opt{flex-direction:row}
+.link{background:none;border:0;padding:0;color:var(--primary);cursor:pointer}
+.link:hover{text-decoration:underline}
+.save{display:inline-flex;align-items:center;gap:8px;font-size:13px;margin-right:4px}
+.sdot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.gridwrap{overflow:auto;max-height:620px;position:relative}
+.gridwrap:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.gr{display:grid;grid-template-columns:300px repeat(12,98px) 128px;width:1604px}
+.gc{padding:0 10px;height:36px;display:flex;align-items:center;border-bottom:1px solid var(--border);border-right:1px solid #eceff6;background:var(--surface);position:relative;min-width:0}
+.gnum{justify-content:flex-end}
+.gh .gc{height:38px;background:var(--head-bg);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;z-index:3;border-bottom:1px solid var(--border-strong)}
+.gname{position:sticky;left:0;z-index:2;justify-content:flex-start;gap:6px;font-weight:500;border-right:1px solid var(--border-strong)}
+.gh .gh1.gname{z-index:4}
+.gname .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gtot{background:#f8f9fd;font-weight:600;border-left:1px solid var(--border-strong)}
+.g-group .gc{background:#f8f9fd;font-weight:600}
+.g-calc .gc{background:#eef1f8;font-weight:700}
+.g-kpi .gc{font-style:italic;color:var(--muted);font-weight:500}
+.g-kpi .gname{font-style:italic}
+.ed:hover{background:#f1f5ff}
+.cell{cursor:cell}
+.roc{background:#fafbfd !important;cursor:default}
+.sel{box-shadow:inset 0 0 0 2px var(--primary);z-index:1}
+.errc{box-shadow:inset 0 0 0 2px var(--danger);z-index:1}
+.ced{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff;text-align:right;padding:0 10px;font:inherit;font-variant-numeric:tabular-nums;box-shadow:inset 0 0 0 2px var(--primary);outline:none;z-index:2}
+.cmk{position:absolute;top:0;right:0;width:0;height:0;border-style:solid;border-width:0 9px 9px 0;border-color:transparent #d97706 transparent transparent}
+.usv{position:absolute;left:4px;top:4px;width:6px;height:6px;border-radius:50%;background:#d97706}
+.chv{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:0;border-radius:3px;background:transparent;color:var(--muted);cursor:pointer;flex:none;padding:0}
+.chv:hover{background:rgba(11,16,32,.08)}
+.chv-sp{width:18px;flex:none}
+.srcb{font-size:11px;font-weight:600;padding:1px 6px;border-radius:3px;background:var(--sel);color:#1a3fae;white-space:nowrap}
+.mchip{height:30px;min-width:48px;padding:0 10px;border:1px solid var(--border-strong);border-radius:15px;background:var(--surface);cursor:pointer;font-weight:500;font-size:13px}
+.mchip[aria-pressed=true]{background:var(--sel);border-color:var(--primary);color:#1a3fae;font-weight:600}
+.cpop{position:absolute;right:16px;top:64px;width:340px;max-width:calc(100% - 32px);z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 32px rgba(11,16,32,.2);padding:16px}
+@media (max-width:760px){.pad{padding:16px !important}.demo{padding:8px 16px}.gr{grid-template-columns:172px repeat(12,92px) 116px;width:1392px}.gname .srcb{display:none}.gname .nm{font-size:13px}.hide-sm{display:none !important}.cpop{position:fixed;left:16px;right:16px;top:auto;bottom:16px;width:auto;max-width:none}}
+
+.hpd{max-width:960px;display:flex;flex-direction:column;max-height:calc(100vh - 96px)}
+.steps{display:flex;gap:6px;list-style:none;margin:0;padding:0;font-size:13px}
+.steps li{padding:3px 10px;border-radius:12px;color:var(--muted);background:var(--head-bg)}
+.steps li[data-on=true]{background:var(--sel);color:#1a3fae;font-weight:600}
+.hpb{display:grid;grid-template-columns:250px minmax(0,1fr);overflow:auto;min-height:0}
+.hp-l{padding:16px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:8px;background:#fafbfd}
+.hcard{display:flex;flex-direction:column;gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer}
+.hcard span{font-size:12px;color:var(--muted)}
+.hcard:hover{background:#eef1f8}
+.hcard[aria-checked=true]{border-color:var(--primary);background:var(--sel);box-shadow:inset 0 0 0 1px var(--primary)}
+.hp-r{padding:16px 24px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.hp-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.hp-list{border:1px solid var(--border);border-radius:4px;max-height:210px;overflow:auto}
+.hp-row{display:flex;align-items:center;gap:10px;padding:6px 12px;border-bottom:1px solid #f1f3f9}
+.cbx{width:18px;height:18px;border:1.5px solid var(--border-strong);border-radius:3px;background:#fff;color:#fff;font-size:12px;font-weight:700;line-height:1;cursor:pointer;padding:0;flex:none}
+.cbx[data-s=on],.cbx[data-s=mixed]{background:var(--primary);border-color:var(--primary)}
+.hp-mgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.qk{min-width:0}
+.hpb2{padding:16px 24px;overflow:auto;min-height:0}
+.pvwrap{overflow:auto;border:1px solid var(--border);border-radius:4px;max-height:360px}
+.pvwrap .gname{width:auto}
+.same{opacity:.55}
+@media (max-width:760px){.hpb{grid-template-columns:1fr}.hp-l{border-right:0;border-bottom:1px solid var(--border);flex-direction:row;overflow:auto}.hcard{min-width:200px}.hp-mgrid{grid-template-columns:repeat(4,1fr)}}
+.pvr .gc{height:46px}
+.pvwrap .gr{display:grid}
+
+</style>
+</helmet>
+<div style="display:flex;flex-wrap:wrap;align-items:stretch;min-height:1100px;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:20px;color:var(--text);background:var(--bg)">
+<aside style="flex:0 0 240px;width:240px;background:#0b1020;color:#dfe3ef;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:10px;padding:18px 16px 14px">
+      <div style="width:32px;height:32px;border-radius:8px;background:#b00020;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">ВФ</div>
+      <div style="font-weight:700;font-size:16px;color:#fff">Ваш Финдир</div>
+    </div>
+    <nav aria-label="Основное меню" style="display:flex;flex-direction:column;padding:6px 0;flex:1">
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7M6 10v10h12V10"/></svg><span style="flex:1">Главная</span></a>
+      <a class="nav" href="#" style="font-weight:600;color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M16 13h2M3 10h18"/></svg><span style="flex:1">Деньги</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Операции ДДС</span></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Платёжный календарь</span></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Остатки и счета</span></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v14H7zM14 3v5h5M10 13h6M10 17h6"/></svg><span style="flex:1">Доходы и расходы</span></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9l1-5h14l1 5M4 9v11h16V9M4 9a3 3 0 006 0 3 3 0 006 0 3 3 0 004 0M10 20v-5h4v5"/></svg><span style="flex:1">Маркетплейсы</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V9l9-5 9 5v12M7 21v-7h10v7"/></svg><span style="flex:1">МойСклад</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#" style="font-weight:600;color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v9h9a9 9 0 11-9-9z"/></svg><span style="flex:1">Отчёты</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Отчёт ОПиУ</span></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Документы ОПиУ</span></a><a class="nav" href="#" aria-current="page" style="margin-left:20px;padding-left:28px"><span style="flex:1">Бюджет ОПиУ</span></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4 4 0 010-8 5 5 0 019.6-1A4.5 4.5 0 0117 18M12 12v7M9 15l3-3 3 3"/></svg><span style="flex:1">Загрузка данных</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M6 20h12M5 7h14M5 7l-3 7a3 3 0 006 0zM19 7l-3 7a3 3 0 006 0z"/></svg><span style="flex:1">Баланс</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h5v15H4zM10 5h5v15h-5zM17 6l3 .8-3.7 13.4-3-.8"/></svg><span style="flex:1">Справочники</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span style="flex:1">Импорт</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7l8 8M5 19l4-4M12 4l8 8-3 3-8-8z"/></svg><span style="flex:1">Интеграции</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4h9v17M14 9h5v12M9 8h1M9 12h1M9 16h1M3 21h18"/></svg><span style="flex:1">Компания и доступы</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 8a3 3 0 016 0v7a3 3 0 01-6 0zM4 13h5M15 13h5M5 7l3 2M19 7l-3 2M5 19l3-2M19 19l-3-2"/></svg><span style="flex:1">Отладка</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+    </nav>
+    <div style="border-top:1px solid rgba(255,255,255,.12);padding:14px 16px;display:flex;flex-direction:column;gap:2px">
+      <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#9aa3bd">КОМПАНИЯ</div>
+      <div style="font-weight:600;color:#fff">ИП Лазарева</div>
+      <a href="#" style="font-size:12px;color:#c3c8d6;text-decoration:none">Переключить →</a>
+    </div>
+  </aside>
+<div style="flex:999 1 720px;min-width:0;display:flex;flex-direction:column">
+<header style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 32px;background:var(--surface);border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:16px"><div style="font-size:18px;font-weight:600">Сервис</div><select aria-label="Компания" style="height:36px;padding:0 12px;border:1px solid var(--border);border-radius:4px;background:var(--surface)"><option>ИП Лазарева</option></select></div></header>
+<div class="demo" role="group" aria-label="Демо-переключатели (не часть интерфейса)">
+  <span><b>Демо:</b></span>
+  <label>Роль <select onChange="{{onRole}}"><option value="owner" selected="{{roleOwner}}">Владелец</option><option value="write" selected="{{roleWrite}}">Запись</option><option value="read" selected="{{roleRead}}">Чтение</option></select></label>
+  <label>Статус <select onChange="{{onStatus}}"><option value="draft" selected="{{stDraft}}">Черновик</option><option value="approved" selected="{{stApproved}}">Утверждён</option><option value="archive" selected="{{stArchive}}">Архив</option></select></label>
+  <label>Экран <select onChange="{{onView}}"><option value="ok" selected="{{viewOk}}">Данные</option><option value="loading" selected="{{viewLoading}}">Загрузка</option><option value="error" selected="{{viewError}}">Ошибка</option><option value="noleaf" selected="{{viewNoleaf}}">Нет статей ОПиУ</option></select></label>
+  <label>Разрезы <select onChange="{{onSlices}}"><option value="yes" selected="{{slicesYes}}">Есть</option><option value="no" selected="{{slicesNo}}">Нет (одна пара)</option></select></label>
+  <button type="button" aria-pressed="{{failNext}}" onClick="{{toggleFail}}">{{failLabel}}</button>
+  <button type="button" onClick="{{pasteDemo}}">Вставить пример из Excel</button>
+  <button type="button" onClick="{{otherTab}}">Утвердили в другой вкладке</button>
+</div>
+
+<main style="padding:20px 32px 40px;display:flex;flex-direction:column;gap:16px;max-width:1700px;width:100%" class="pad">
+
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:16px">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <nav aria-label="Путь" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px;color:var(--muted)"><a href="#" style="color:var(--muted);text-decoration:none">Бюджет ОПиУ</a><span aria-hidden="true">›</span><a href="#" style="color:var(--muted);text-decoration:none">{{year}}</a><span aria-hidden="true">›</span><span aria-current="page" style="color:var(--text);font-weight:500">«{{name}}»</span></nav>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+        <sc-if value="{{nameEditing}}" hint-placeholder-val="{{ false }}"><input id="name-ed" class="inp" aria-label="Название варианта" maxlength="120" value="{{nameDraft}}" onInput="{{onNameInput}}" onKeyDown="{{onNameKey}}" onBlur="{{saveName}}" style="width:320px;font-size:20px;font-weight:600;height:40px"></sc-if>
+        <sc-if value="{{nameStatic}}" hint-placeholder-val="{{ true }}"><h1 style="margin:0;font-size:24px;line-height:32px;font-weight:600">{{name}}</h1></sc-if>
+        <sc-if value="{{canRename}}" hint-placeholder-val="{{ true }}"><button class="icon-btn" type="button" aria-label="Изменить название" onClick="{{startName}}" title="Изменить название"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13 7l4 4"/></svg></button></sc-if>
+        <span class="{{badgeCls}}">{{badge}}</span>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;position:relative">
+        <div role="status" aria-live="polite" style="{{saveStyle}}" class="save"><span class="sdot" style="{{saveDot}}"></span><span>{{saveText}}</span><sc-if value="{{saveRetry}}" hint-placeholder-val="{{ false }}"><button class="link" type="button" onClick="{{retrySave}}" style="font-weight:600">Повторить</button></sc-if></div>
+        <sc-if value="{{showApprove}}" hint-placeholder-val="{{ true }}"><button class="btn btn-primary" type="button" disabled="{{approveDis}}" title="{{approveReason}}" onClick="{{askApprove}}">Утвердить</button></sc-if>
+        <sc-if value="{{showReturn}}" hint-placeholder-val="{{ false }}"><button class="btn" type="button" disabled="{{approveDis}}" title="{{approveReason}}" onClick="{{askReturn}}">Вернуть в черновик</button></sc-if>
+        <sc-if value="{{showRestore}}" hint-placeholder-val="{{ false }}"><button class="btn btn-primary" type="button" disabled="{{writeDis}}" title="{{writeReason}}" onClick="{{doRestore}}">Восстановить</button></sc-if>
+        <sc-if value="{{showHelpers}}" hint-placeholder-val="{{ true }}">
+          <div style="position:relative">
+            <button class="btn" type="button" aria-haspopup="menu" aria-expanded="{{menuHelpers}}" disabled="{{helpersDis}}" title="{{helpersReason}}" onClick="{{toggleHelpers}}">Помощники<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            <sc-if value="{{menuHelpers}}" hint-placeholder-val="{{ false }}"><div class="menu" role="menu" style="right:0;top:42px;min-width:300px">
+              <sc-for list="{{helperItems}}" as="h" hint-placeholder-count="5"><button class="mi" role="menuitem" type="button" onClick="{{h.go}}">{{h.label}}<small>{{h.hint}}</small></button></sc-for>
+            </div></sc-if>
+          </div>
+        </sc-if>
+        <div style="position:relative">
+          <button class="icon-btn" type="button" style="border:1px solid var(--border-strong);background:var(--surface)" aria-haspopup="menu" aria-expanded="{{menuMore}}" aria-label="Другие действия" onClick="{{toggleMore}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+          <sc-if value="{{menuMore}}" hint-placeholder-val="{{ false }}"><div class="menu" role="menu" style="right:0;top:42px;min-width:240px">
+            <button class="mi" role="menuitem" type="button" disabled="{{writeDis}}" onClick="{{doCopy}}">Копировать<sc-if value="{{writeDis}}" hint-placeholder-val="{{ false }}"><small>{{writeReason}}</small></sc-if></button>
+            <sc-if value="{{showArchive}}" hint-placeholder-val="{{ true }}"><button class="mi" role="menuitem" type="button" disabled="{{writeDis}}" onClick="{{doArchive}}">В архив<sc-if value="{{writeDis}}" hint-placeholder-val="{{ false }}"><small>{{writeReason}}</small></sc-if></button></sc-if>
+          </div></sc-if>
+        </div>
+      </div>
+      <sc-if value="{{reasonLine}}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:var(--muted)">{{reasonLine}}</div></sc-if>
+    </div>
+  </div>
+
+  <sc-if value="{{bannerApproved}}" hint-placeholder-val="{{ false }}"><div class="alert info" role="status"><span>{{bannerApprovedText}}</span></div></sc-if>
+  <sc-if value="{{bannerArchive}}" hint-placeholder-val="{{ false }}"><div class="alert info" role="status"><span>Вариант в архиве. Восстановите, чтобы править.</span></div></sc-if>
+  <sc-if value="{{bannerRead}}" hint-placeholder-val="{{ false }}"><div class="alert info" role="status"><span>У вас доступ только для просмотра — план править нельзя.</span></div></sc-if>
+  <sc-if value="{{conflict}}" hint-placeholder-val="{{ false }}"><div class="alert err2" role="alert"><div><b>Вариант утвердили в другой вкладке.</b> Экран переключён в режим чтения, изменения не сохранены.<div style="margin-top:4px">{{conflictCells}}</div></div></div></sc-if>
+
+  <section style="background:var(--surface);border:1px solid var(--border);border-radius:4px;box-shadow:0 1px 2px rgba(11,16,32,.04);min-width:0;position:relative">
+
+    <sc-if value="{{hasSlices}}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;padding:12px 16px;border-bottom:1px solid var(--border)">
+        <span class="grp-label">Разрез</span>
+        <div style="position:relative">
+          <button class="pill" type="button" aria-haspopup="listbox" aria-expanded="{{popP}}" onClick="{{togP}}"><span style="color:var(--muted)">Проект:</span> {{projLabel}}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          <sc-if value="{{popP}}" hint-placeholder-val="{{ false }}"><div class="menu" role="listbox" aria-label="Проект" style="left:0;top:40px;min-width:240px">
+            <sc-for list="{{projOpts}}" as="o" hint-placeholder-count="4"><button class="mi opt" role="option" aria-selected="{{o.selA}}" type="button" onClick="{{o.go}}"><span style="display:flex;align-items:center;gap:8px"><span style="width:16px;color:var(--primary)">{{o.mark}}</span>{{o.label}}</span></button></sc-for>
+          </div></sc-if>
+        </div>
+        <div style="position:relative">
+          <button class="pill" type="button" aria-haspopup="listbox" aria-expanded="{{popC}}" onClick="{{togC}}"><span style="color:var(--muted)">ЦФО:</span> {{cfoLabel}}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          <sc-if value="{{popC}}" hint-placeholder-val="{{ false }}"><div class="menu" role="listbox" aria-label="ЦФО" style="left:0;top:40px;min-width:240px">
+            <sc-for list="{{cfoOpts}}" as="o" hint-placeholder-count="3"><button class="mi opt" role="option" aria-selected="{{o.selA}}" type="button" onClick="{{o.go}}"><span style="display:flex;align-items:center;gap:8px"><span style="width:16px;color:var(--primary)">{{o.mark}}</span>{{o.label}}</span></button></sc-for>
+          </div></sc-if>
+        </div>
+        <span style="font-size:12px;color:var(--muted)" class="hide-sm">В адресе: <span class="num">?project={{qProject}}&amp;center={{qCenter}}</span></span>
+      </div>
+      <sc-if value="{{aggMode}}" hint-placeholder-val="{{ false }}"><div style="padding:8px 16px;background:var(--head-bg);border-bottom:1px solid var(--border);font-size:13px;color:var(--muted)">Выберите проект и ЦФО, чтобы вводить план. Сейчас показана сумма по {{aggPairs}} — только просмотр.</div></sc-if>
+    </sc-if>
+
+    <sc-if value="{{isLoading}}" hint-placeholder-val="{{ false }}">
+      <div aria-busy="true" aria-label="Загрузка сетки бюджета" style="padding:16px;display:flex;flex-direction:column;gap:10px"><div class="skel" style="height:36px"></div><div class="skel" style="height:32px"></div><div class="skel" style="height:32px"></div><div class="skel" style="height:32px"></div><div class="skel" style="height:32px"></div><div class="skel" style="height:32px"></div><div class="skel" style="height:32px"></div></div>
+    </sc-if>
+    <sc-if value="{{isError}}" hint-placeholder-val="{{ false }}">
+      <div style="padding:40px 16px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center"><div role="alert" style="color:var(--danger);font-weight:600">Не удалось загрузить план</div><div style="color:var(--muted);max-width:460px">Сервер не ответил. Введённые ранее значения сохранены — повторите попытку. Код: BUD-GRID-503.</div><button class="btn" type="button" onClick="{{retryLoad}}">Повторить</button></div>
+    </sc-if>
+    <sc-if value="{{isNoLeaf}}" hint-placeholder-val="{{ false }}">
+      <div style="padding:48px 16px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center"><div style="font-size:18px;font-weight:600">Сначала настройте статьи ОПиУ</div><div style="color:var(--muted);max-width:460px">В дереве ОПиУ нет статей, в которые можно вводить план.</div><a class="btn" href="#" style="text-decoration:none">Открыть справочник статей ОПиУ</a></div>
+    </sc-if>
+
+    <sc-if value="{{showGrid}}" hint-placeholder-val="{{ true }}">
+      <div id="grid" role="grid" aria-label="План по статьям ОПиУ, помесячно, рубли" aria-rowcount="{{rowCount}}" tabindex="0" onKeyDown="{{gridKey}}" onPaste="{{gridPaste}}" class="gridwrap">
+        <div role="row" class="gr gh">
+          <div role="columnheader" class="gc gname gh1">Статья, ₽</div>
+          <sc-for list="{{months}}" as="m" hint-placeholder-count="12"><div role="columnheader" class="gc gnum">{{m}}</div></sc-for>
+          <div role="columnheader" class="gc gnum gtot gh1" style="font-weight:700">Итого</div>
+        </div>
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
+          <div role="row" class="{{r.rowCls}}">
+            <div role="rowheader" class="{{r.nameCls}}" style="{{r.indent}}">
+              <sc-if value="{{r.isGroup}}" hint-placeholder-val="{{ false }}"><button type="button" class="chv" aria-expanded="{{r.open}}" aria-label="{{r.chevLabel}}" onClick="{{r.toggle}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="{{r.chevStyle}}"><path d="M9 6l6 6-6 6"/></svg></button></sc-if>
+              <sc-if value="{{r.noChev}}" hint-placeholder-val="{{ true }}"><span class="chv-sp" aria-hidden="true"></span></sc-if>
+              <span class="nm">{{r.name}}</span>
+              <sc-if value="{{r.src}}" hint-placeholder-val="{{ false }}"><span class="srcb" title="Строка заполняется из плана продаж">план продаж</span></sc-if>
+            </div>
+            <sc-for list="{{r.cells}}" as="c" hint-placeholder-count="12">
+              <div role="gridcell" class="{{c.cls}}" aria-selected="{{c.selA}}" aria-readonly="{{c.ro}}" title="{{c.title}}" onClick="{{c.click}}" onContextMenu="{{c.ctx}}">
+                <sc-if value="{{c.edit}}" hint-placeholder-val="{{ false }}"><input id="ed" class="ced" inputmode="decimal" autocomplete="off" aria-label="{{c.aria}}" value="{{c.draft}}" onInput="{{c.onInput}}" onKeyDown="{{c.onKey}}"></sc-if>
+                <sc-if value="{{c.show}}" hint-placeholder-val="{{ true }}"><span class="num cv">{{c.txt}}</span></sc-if>
+                <sc-if value="{{c.hasNote}}" hint-placeholder-val="{{ false }}"><span class="cmk" aria-label="Есть комментарий"></span></sc-if>
+                <sc-if value="{{c.unsaved}}" hint-placeholder-val="{{ false }}"><span class="usv" aria-label="Не сохранено"></span></sc-if>
+              </div>
+            </sc-for>
+            <div role="gridcell" class="{{r.totCls}}"><span class="num cv">{{r.total}}</span></div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding:10px 16px;border-top:1px solid var(--border);font-size:13px;min-height:42px;display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center">
+        <sc-if value="{{gridErr}}" hint-placeholder-val="{{ false }}"><span class="err" role="alert" style="margin:0">{{gridErr}}</span></sc-if>
+        <sc-if value="{{pasteMsg}}" hint-placeholder-val="{{ false }}"><span role="status" style="color:var(--ok-text);font-weight:600">{{pasteMsg}}</span></sc-if>
+        <span style="color:var(--muted)">{{hintLine}}</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{cmtOpen}}" hint-placeholder-val="{{ false }}">
+      <div role="dialog" aria-label="Комментарий к ячейке" class="cpop">
+        <div style="font-weight:600;margin-bottom:2px">Комментарий</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">{{cmtWhere}}</div>
+        <textarea id="cmt-t" class="inp" rows="4" maxlength="500" value="{{cmtText}}" onInput="{{onCmt}}" onKeyDown="{{cmtKey}}" style="height:auto;padding:8px 12px;line-height:20px;resize:vertical" aria-label="Текст комментария" disabled="{{cmtRO}}">{{cmtText}}</textarea>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin:4px 0 10px"><span>Enter — сохранить, Esc — закрыть</span><span>{{cmtLen}}/500</span></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" type="button" onClick="{{cmtDel}}" disabled="{{cmtNoDel}}">Удалить</button><button class="btn btn-sm" type="button" onClick="{{cmtClose}}">Закрыть</button><button class="btn btn-sm btn-primary" type="button" onClick="{{cmtSave}}" disabled="{{cmtRO}}">Сохранить</button></div>
+      </div>
+    </sc-if>
+  </section>
+
+  <sc-if value="{{ctxOpen}}" hint-placeholder-val="{{ false }}"><div class="menu" role="menu" style="{{ctxStyle}}">
+    <button class="mi" role="menuitem" type="button" onClick="{{ctxComment}}">Комментарий…<small>Shift+Enter</small></button>
+    <button class="mi" role="menuitem" type="button" disabled="{{ctxClearDis}}" onClick="{{ctxClear}}">Очистить ячейку<small>Delete</small></button>
+  </div></sc-if>
+</main>
+
+<sc-if value="{{modalHelper}}" hint-placeholder-val="{{ false }}">
+  <div class="scrim" onClick="{{closeModal}}">
+    <div class="dlg hpd" role="dialog" aria-modal="true" aria-labelledby="hp-t" onClick="{{stop}}">
+      <div style="padding:18px 24px 12px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:1px solid var(--border)">
+        <div><h2 id="hp-t" style="margin:0;font-size:18px;font-weight:600">{{hp.title}}</h2><div style="color:var(--muted);margin-top:2px">Разрез: <b style="color:var(--text)">{{projLabel}} × {{cfoLabel}}</b> · вариант «{{name}}» · {{year}}</div></div>
+        <div style="display:flex;align-items:center;gap:16px"><ol class="steps" aria-label="Шаги"><li data-on="{{hp.setup}}">1 Настройка</li><li data-on="{{hp.preview}}">2 Проверка</li></ol><button class="icon-btn" type="button" aria-label="Закрыть" onClick="{{closeModal}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      </div>
+
+      <sc-if value="{{hp.setup}}" hint-placeholder-val="{{ true }}">
+      <div class="hpb">
+        <div class="hp-l" role="radiogroup" aria-label="Что сделать">
+          <sc-for list="{{hp.helperList}}" as="o" hint-placeholder-count="5"><button type="button" role="radio" aria-checked="{{o.on}}" class="hcard" onClick="{{o.pick}}"><b>{{o.label}}</b><span>{{o.hint}}</span></button></sc-for>
+        </div>
+        <div class="hp-r">
+          <div style="color:var(--muted)">{{hp.desc}}</div>
+          <sc-if value="{{hp.hasN}}" hint-placeholder-val="{{ false }}"><div><label class="lbl" for="hp-n">За сколько последних закрытых месяцев</label><select id="hp-n" class="inp" style="max-width:200px" onChange="{{hpN}}"><sc-for list="{{hp.nOpts}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}" selected="{{o.sel}}">{{o.label}}</option></sc-for></select></div></sc-if>
+          <sc-if value="{{hp.hasSum}}" hint-placeholder-val="{{ false }}"><div><label class="lbl" for="hp-s">Годовая сумма на каждую выбранную статью, ₽</label><input id="hp-s" class="inp" inputmode="decimal" style="max-width:260px" value="{{hp.sum}}" onInput="{{hpSum}}" aria-invalid="{{hp.sumErr}}"><div class="err" role="alert">{{hp.sumErr}}</div><div style="font-size:12px;color:var(--muted);margin-top:4px">Делится поровну на 12 месяцев, остаток копеек — в декабрь.</div></div></sc-if>
+          <sc-if value="{{hp.hasSrcMonth}}" hint-placeholder-val="{{ false }}"><div><label class="lbl" for="hp-m">Исходный месяц</label><select id="hp-m" class="inp" style="max-width:200px" onChange="{{hpSrcM}}"><sc-for list="{{hp.mOpts}}" as="o" hint-placeholder-count="12"><option value="{{o.v}}" selected="{{o.sel}}">{{o.label}}</option></sc-for></select></div></sc-if>
+          <sc-if value="{{hp.hasPct}}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:16px"><div><label class="lbl" for="hp-p">Процент (X%)</label><input id="hp-p" class="inp" inputmode="decimal" style="width:120px" value="{{hp.pct}}" onInput="{{hpPct}}" aria-invalid="{{hp.pctErr}}"><div class="err" role="alert">{{hp.pctErr}}</div></div><div><label class="lbl" for="hp-b">От какой статьи</label><select id="hp-b" class="inp" style="min-width:220px" onChange="{{hpBase}}"><sc-for list="{{hp.baseOpts}}" as="o" hint-placeholder-count="2"><option value="{{o.v}}" selected="{{o.sel}}">{{o.label}}</option></sc-for></select></div></div></sc-if>
+
+          <div class="hp-sec">
+            <div class="hp-h"><span class="lbl" style="margin:0">Статьи <span style="color:var(--muted);font-weight:500">· {{hp.selText}}</span></span><span><button class="link" type="button" onClick="{{hp.allVis}}">все</button> <button class="link" type="button" onClick="{{hp.noneVis}}" style="margin-left:10px">ни одной</button></span></div>
+            <input type="search" class="inp" style="height:32px;margin-bottom:8px" placeholder="Найти статью" aria-label="Найти статью" value="{{hp.q}}" onInput="{{hp.onQ}}">
+            <div class="hp-list" role="group" aria-label="Статьи">
+              <sc-for list="{{hp.leafRows}}" as="r" hint-placeholder-count="14">
+                <div class="hp-row" style="{{r.rowStyle}}">
+                  <button type="button" role="checkbox" aria-checked="{{r.aria}}" aria-label="{{r.name}}" class="cbx" data-s="{{r.state}}" disabled="{{r.locked}}" onClick="{{r.toggle}}">{{r.mark}}</button>
+                  <span style="flex:1">{{r.name}}</span>
+                  <sc-if value="{{r.isHead}}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--muted);font-weight:500">{{r.count}}</span></sc-if>
+                  <sc-if value="{{r.locked}}" hint-placeholder-val="{{ false }}"><span class="srcb">план продаж</span></sc-if>
+                </div>
+              </sc-for>
+              <sc-if value="{{hp.noLeaves}}" hint-placeholder-val="{{ false }}"><div style="padding:16px;color:var(--muted)">Ничего не найдено</div></sc-if>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">{{hp.lockedNote}}</div>
+          </div>
+
+          <div class="hp-sec">
+            <div class="hp-h"><span class="lbl" style="margin:0">Месяцы</span></div>
+            <sc-if value="{{hp.noMonths}}" hint-placeholder-val="{{ false }}"><div style="color:var(--muted)">{{hp.monthsNote}}</div></sc-if>
+            <sc-if value="{{hp.noMonthsNot}}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"><sc-for list="{{hp.quick}}" as="m" hint-placeholder-count="6"><button type="button" class="mchip qk" aria-pressed="{{m.on}}" onClick="{{m.toggle}}">{{m.label}}</button></sc-for></div>
+              <div class="hp-mgrid"><sc-for list="{{hp.months}}" as="m" hint-placeholder-count="12"><button type="button" aria-pressed="{{m.on}}" onClick="{{m.toggle}}" class="mchip">{{m.label}}</button></sc-for></div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{hp.preview}}" hint-placeholder-val="{{ false }}">
+      <div class="hpb2">
+        <div style="font-weight:600;margin-bottom:8px">{{hp.pline}}</div>
+        <sc-if value="{{hp.pwarn}}" hint-placeholder-val="{{ false }}"><div class="alert" role="alert" style="margin-bottom:12px"><span>{{hp.pwarnText}}</span></div></sc-if>
+        <div class="pvwrap" role="table" aria-label="Предпросмотр изменений">
+          <div role="row" class="gr gh" style="{{hp.pgrid}}"><div role="columnheader" class="gc gname gh1" style="width:auto">Статья</div><sc-for list="{{hp.pcols}}" as="c" hint-placeholder-count="12"><div role="columnheader" class="gc gnum">{{c}}</div></sc-for><div role="columnheader" class="gc gnum gtot">Изменение</div></div>
+          <sc-for list="{{hp.prow}}" as="r" hint-placeholder-count="6"><div role="row" class="gr g-leaf pvr" style="{{hp.pgrid}}"><div role="rowheader" class="gc gname"><span class="nm">{{r.name}}</span></div><sc-for list="{{r.cells}}" as="c" hint-placeholder-count="12"><div role="cell" class="{{c.cls}}" style="flex-direction:column;align-items:flex-end;justify-content:center;gap:0;height:46px"><span class="num" style="font-weight:600">{{c.txt}}</span><sc-if value="{{c.old}}" hint-placeholder-val="{{ false }}"><span class="num" style="font-size:11px;color:var(--muted);text-decoration:line-through">{{c.old}}</span></sc-if><sc-if value="{{c.mark}}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;color:var(--muted)">{{c.mark}}</span></sc-if></div></sc-for><div role="cell" class="gc gnum gtot" style="height:46px"><span class="num">{{r.delta}}</span></div></div></sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <div style="padding:12px 24px 18px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--border)">
+        <div style="font-weight:500"><sc-if value="{{hp.setup}}" hint-placeholder-val="{{ true }}">{{hp.sumLine}}</sc-if></div>
+        <div style="display:flex;gap:8px">
+          <sc-if value="{{hp.preview}}" hint-placeholder-val="{{ false }}"><button class="btn" type="button" onClick="{{hpBack}}">← Назад</button></sc-if>
+          <button class="btn" type="button" onClick="{{closeModal}}">Отмена</button>
+          <button class="btn btn-primary" type="button" disabled="{{hp.dis}}" onClick="{{hpApply}}">{{hp.nextLabel}}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{modalConfirm}}" hint-placeholder-val="{{ false }}">
+  <div class="scrim" onClick="{{closeModal}}">
+    <div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="cf-t" aria-describedby="cf-d" onClick="{{stop}}" style="max-width:460px">
+      <div style="padding:20px 24px 8px"><h2 id="cf-t" style="margin:0;font-size:18px;font-weight:600">{{cf.title}}</h2></div>
+      <div id="cf-d" style="padding:0 24px 8px;color:var(--muted)">{{cf.text}}</div>
+      <div style="padding:16px 24px 20px;display:flex;justify-content:flex-end;gap:8px"><button class="btn" type="button" onClick="{{closeModal}}">Отмена</button><button class="btn btn-primary" type="button" onClick="{{doConfirm}}">{{cf.ok}}</button></div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{toast}}" hint-placeholder-val="{{ false }}"><div class="toast" role="status">{{toast}}</div></sc-if>
+
+</div></div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+const MON = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+const MONF = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+const TREE = [
+  { id: 'rev', t: 'group', name: 'Выручка', kids: [
+    { id: 'rev_wb', t: 'leaf', name: 'Выручка WB', flow: 'INCOME', src: true },
+    { id: 'rev_oz', t: 'leaf', name: 'Выручка Ozon', flow: 'INCOME' },
+    { id: 'rev_site', t: 'leaf', name: 'Выручка сайт', flow: 'INCOME' } ] },
+  { id: 'var', t: 'group', name: 'Переменные расходы', kids: [
+    { id: 'cogs', t: 'leaf', name: 'Себестоимость товаров', flow: 'EXPENSE' },
+    { id: 'log', t: 'leaf', name: 'Логистика и доставка', flow: 'EXPENSE' },
+    { id: 'com', t: 'leaf', name: 'Комиссии маркетплейсов', flow: 'EXPENSE' },
+    { id: 'ads', t: 'leaf', name: 'Реклама и продвижение', flow: 'EXPENSE' } ] },
+  { id: 'gp', t: 'calc', name: 'Валовая прибыль', sum: ['rev', 'var'] },
+  { id: 'gm', t: 'kpi', name: 'Валовая рентабельность, %', num: 'gp', den: 'rev' },
+  { id: 'fix', t: 'group', name: 'Постоянные расходы', kids: [
+    { id: 'sal', t: 'leaf', name: 'Зарплата и взносы', flow: 'EXPENSE' },
+    { id: 'rent', t: 'leaf', name: 'Аренда', flow: 'EXPENSE' },
+    { id: 'oth', t: 'leaf', name: 'Прочие расходы', flow: 'EXPENSE' } ] },
+  { id: 'fx', t: 'leaf', name: 'Курсовые разницы', flow: 'NONE' },
+  { id: 'op', t: 'calc', name: 'Операционная прибыль', sum: ['gp', 'fix', 'fx'] },
+  { id: 'tax', t: 'leaf', name: 'Налоги', flow: 'EXPENSE' },
+  { id: 'np', t: 'calc', name: 'Чистая прибыль', sum: ['op', 'tax'] },
+  { id: 'nm', t: 'kpi', name: 'Рентабельность по чистой прибыли, %', num: 'np', den: 'rev' }
+];
+const PAIRS = [
+  { p: 'Общий', c: 'Общий', f: 0.40 }, { p: 'Интернет-магазин', c: 'Продажи', f: 0.35 },
+  { p: 'Шоурум', c: 'Продажи', f: 0.20 }, { p: 'Шоурум', c: 'Склад', f: 0.05 }
+];
+const SEAS = [0.85, 0.85, 0.9, 0.95, 1, 1, 0.95, 0.95, 1.05, 1.1, 1.25, 1.15];
+const BASE = { rev_wb: 3200000, rev_oz: 2100000, rev_site: 1400000, cogs: 2700000, log: 550000, com: 800000, ads: 450000, sal: 550000, rent: 180000, oth: 200000, fx: 40000, tax: 220000 };
+const NODES = {}; const LEAVES = [];
+(function walk(list, depth, parent) { list.forEach((n) => { n.depth = depth; n.parent = parent; NODES[n.id] = n; if (n.t === 'leaf') LEAVES.push(n); if (n.kids) walk(n.kids, depth + 1, n.id); }); })(TREE, 0, null);
+const hsh = (id) => id.split('').reduce((a, ch) => a + ch.charCodeAt(0), 0);
+const sgn = (l, m) => (l.flow === 'EXPENSE' ? -1 : l.flow === 'NONE' ? (m % 3 === 0 ? -1 : 1) : 1);
+const planSeed = (pi, l, m) => sgn(l, m) * Math.round((BASE[l.id] * SEAS[m] * PAIRS[pi].f * (1 + (((m * 37 + hsh(l.id)) % 7) - 3) / 100)) / 1000) * 1000;
+const factSeed = (pi, l, m) => sgn(l, m) * Math.round((BASE[l.id] * SEAS[m] * PAIRS[pi].f * (1 + (((m * 53 + hsh(l.id) * 7) % 13) - 6) / 45)) / 1000) * 1000;
+const NB = ' ', MINUS = '−';
+const grp = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, NB);
+const money = (v) => { const r = Math.round(Math.abs(v)); return v < 0 && r !== 0 ? MINUS + grp(r) : grp(r); };
+const pctTxt = (x) => (x == null ? '—' : (x < 0 ? MINUS : '') + Math.abs(x).toFixed(1).replace('.', ',') + NB + '%');
+const zero12 = () => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+const add12 = (a, b) => a.map((v, i) => v + b[i]);
+// считает значения всех узлов дерева: getLeaf(id) -> массив из 12
+function computeAll(getLeaf) {
+  const V = {};
+  const go = (n) => {
+    if (n.t === 'leaf') V[n.id] = getLeaf(n.id);
+    else if (n.t === 'group') V[n.id] = n.kids.reduce((a, k) => { go(k); return add12(a, V[k.id]); }, zero12());
+    else if (n.t === 'calc') V[n.id] = n.sum.reduce((a, id) => add12(a, V[id]), zero12());
+    else V[n.id] = V[n.num].map((v, i) => (V[n.den][i] ? (v / V[n.den][i]) * 100 : null));
+  };
+  TREE.forEach(go);
+  // KPI «итого» считаем отдельно (по итогам года)
+  return V;
+}
+const totalOf = (V, n) => {
+  if (n.t === 'kpi') { const a = V[n.num].reduce((x, y) => x + y, 0), b = V[n.den].reduce((x, y) => x + y, 0); return b ? (a / b) * 100 : null; }
+  return V[n.id].reduce((x, y) => x + y, 0);
+};
+const flatVisible = (collapsed) => { const out = []; (function w(list) { list.forEach((n) => { out.push(n); if (n.kids && !collapsed[n.id]) w(n.kids); }); })(TREE); return out; };
+
+const YEAR = 2027;
+const buildPlan = () => PAIRS.map((_, pi) => { const o = {}; LEAVES.forEach((l) => { o[l.id] = MON.map((__, m) => planSeed(pi, l, m)); }); return o; });
+const parseNum = (text) => { const t = String(text).replace(/[\s ]/g, '').replace(/−/g, '-').replace(',', '.'); if (t === '') return 0; return /^[-+]?\d+(\.\d{1,2})?$/.test(t) ? Number(t) : NaN; };
+const signed = (l, v) => (l.flow === 'EXPENSE' ? -Math.abs(v) : v);
+const editTxt = (l, v) => { if (!v) return ''; const a = l.flow === 'EXPENSE' ? Math.abs(v) : v; return String(a).replace('.', ','); };
+const plural = (n, a, b, c) => { const k = n % 100; if (k > 10 && k < 20) return c; const j = n % 10; return j === 1 ? a : j > 1 && j < 5 ? b : c; };
+const SAMPLE = '3500000\t3600000\t3400000\n2200000\t2250000\t2300000\n1500000\tabc\t1600000';
+const HELPERS = [
+  { id: 'lastYear', label: 'Из факта прошлого года', hint: 'Факт того же месяца 2026 года в этой паре', desc: 'Подставит в выбранные ячейки факт того же месяца прошлого года.' },
+  { id: 'avg', label: 'Среднее за N месяцев', hint: 'Среднее факта за последние закрытые месяцы', desc: 'Среднее факта за последние N закрытых месяцев — в выбранные месяцы.' },
+  { id: 'distribute', label: 'Распределить годовую сумму', hint: 'Поровну на 12 месяцев', desc: 'Разложит годовую сумму поровну по 12 месяцам.' },
+  { id: 'copyRight', label: 'Копировать месяц вправо', hint: 'Значение месяца — во все месяцы правее', desc: 'Скопирует значение исходного месяца во все месяцы правее.' },
+  { id: 'pct', label: 'X% от выручки', hint: 'Разово считает суммы от плана базы', desc: 'Один раз посчитает суммы как процент от плана статьи-базы.' }
+];
+
+class Component extends DCLogic {
+  state = { role: 'owner', status: 'draft', view: 'ok', slices: 'yes', project: 'Общий', center: 'Общий', pop: '', collapsed: {}, plan: buildPlan(), comments: { 'rent:0': 'Индексация аренды с марта — по договору' }, sel: { id: 'rev_wb', m: 0 }, editing: false, draft: '', pending: {}, errKey: '', gridErr: '', pasteMsg: '', save: 'saved', failNext: false, conflict: false, conflictCells: '', name: 'Базовый', nameEditing: false, nameDraft: '', menuHelpers: false, menuMore: false, modal: '', cf: null, hp: null, cmt: null, ctx: null, toastT: '' };
+
+  componentDidMount() {
+    this._c = () => this.setState((s) => (s.pop || s.menuHelpers || s.menuMore || s.ctx ? { pop: '', menuHelpers: false, menuMore: false, ctx: null } : null));
+    this._k = (e) => { if (e.key === 'Escape') this.setState((s) => (s.modal ? { modal: '', hp: null } : s.cmt ? { cmt: null } : s.pop || s.menuHelpers || s.menuMore || s.ctx ? { pop: '', menuHelpers: false, menuMore: false, ctx: null } : null)); };
+    if (typeof document !== 'undefined') { document.addEventListener('click', this._c); document.addEventListener('keydown', this._k); }
+  }
+  componentWillUnmount() { if (typeof document !== 'undefined') { document.removeEventListener('click', this._c); document.removeEventListener('keydown', this._k); } clearTimeout(this._t); }
+  componentDidUpdate(prev) {
+    if (typeof document === 'undefined') return;
+    const s = this.state, k = (x) => x.sel.id + ':' + x.sel.m;
+    if (s.editing && (!prev.editing || k(s) !== k(prev))) setTimeout(() => { const el = document.getElementById('ed'); if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (e) {} } }, 0);
+    else if (!s.editing && (prev.editing || k(s) !== k(prev)) && !s.cmt && !s.modal && !s.nameEditing) setTimeout(() => { const el = document.getElementById('grid'); if (el && document.activeElement !== el && !(document.activeElement && document.activeElement.tagName === 'INPUT')) el.focus(); }, 0);
+    if (s.cmt && !prev.cmt) setTimeout(() => { const el = document.getElementById('cmt-t'); if (el) el.focus(); }, 0);
+    if (s.nameEditing && !prev.nameEditing) setTimeout(() => { const el = document.getElementById('name-ed'); if (el) el.focus(); }, 0);
+  }
+  toast(t) { this.setState({ toastT: t }); setTimeout(() => this.setState({ toastT: '' }), 3200); }
+
+  // ---- контекст
+  ctxInfo() {
+    const s = this.state, single = s.slices === 'no';
+    const pair = single ? 0 : (s.project && s.center ? PAIRS.findIndex((p) => p.p === s.project && p.c === s.center) : -1);
+    const locked = s.status !== 'draft' || s.role === 'read' || s.conflict;
+    const pairsSel = single ? [0] : PAIRS.map((p, i) => i).filter((i) => (!s.project || PAIRS[i].p === s.project) && (!s.center || PAIRS[i].c === s.center));
+    return { single, pair, locked, pairsSel };
+  }
+  editable(id) { const x = this.ctxInfo(); return NODES[id].t === 'leaf' && !x.locked && x.pair >= 0; }
+  vis() { return flatVisible(this.state.collapsed); }
+
+  // ---- ввод
+  setCells(list) { // list: [{id,m,v}] — в выбранной паре
+    const x = this.ctxInfo();
+    this.setState((s) => {
+      const plan = s.plan.slice(); const pl = Object.assign({}, plan[x.pair]); plan[x.pair] = pl;
+      const pending = Object.assign({}, s.pending);
+      list.forEach((c) => { const arr = pl[c.id].slice(); arr[c.m] = c.v; pl[c.id] = arr; pending[c.id + ':' + c.m] = true; });
+      return { plan, pending, save: 'saving' };
+    });
+    clearTimeout(this._t); this._t = setTimeout(() => this.flush(), 1000);
+  }
+  flush() {
+    if (this.state.failNext) this.setState({ save: 'error' });
+    else this.setState({ save: 'saved', pending: {} });
+  }
+  startEdit(id, m, init) {
+    if (!this.editable(id)) { this.setState({ sel: { id, m }, editing: false }); return; }
+    const l = NODES[id], v = this.state.plan[this.ctxInfo().pair][id][m];
+    this.setState({ sel: { id, m }, editing: true, draft: init != null ? init : editTxt(l, v), errKey: '', gridErr: '', pasteMsg: '' });
+  }
+  commit() {
+    const s = this.state; if (!s.editing) return true;
+    const { id, m } = s.sel, l = NODES[id], n = parseNum(s.draft);
+    if (isNaN(n)) { this.setState({ editing: false, errKey: id + ':' + m, gridErr: 'Не удалось разобрать «' + s.draft + '» (' + l.name + ', ' + MONF[m] + '). Введите число: 600000, 600 000 или 600000,50. Значение не сохранено.' }); return false; }
+    this.setState({ editing: false });
+    const cur = s.plan[this.ctxInfo().pair][id][m], val = signed(l, n);
+    if (val !== cur) this.setCells([{ id, m, v: val }]);
+    return true;
+  }
+  move(dr, dc) {
+    const vis = this.vis(), s = this.state; let i = vis.findIndex((n) => n.id === s.sel.id); if (i < 0) i = 0;
+    const r = Math.max(0, Math.min(vis.length - 1, i + dr)), m = Math.max(0, Math.min(11, s.sel.m + dc));
+    this.setState({ sel: { id: vis[r].id, m }, editing: false });
+  }
+  clearCell() { const s = this.state; if (this.editable(s.sel.id)) this.setCells([{ id: s.sel.id, m: s.sel.m, v: 0 }]); }
+  gridKey(e) {
+    const s = this.state; if (s.editing || s.modal || s.cmt) return;
+    const k = e.key;
+    if (k === 'ArrowDown') { e.preventDefault(); this.move(1, 0); }
+    else if (k === 'ArrowUp') { e.preventDefault(); this.move(-1, 0); }
+    else if (k === 'ArrowRight') { e.preventDefault(); this.move(0, 1); }
+    else if (k === 'ArrowLeft') { e.preventDefault(); this.move(0, -1); }
+    else if (k === 'Tab') { /* Tab в режиме просмотра уходит из сетки */ }
+    else if (k === 'Enter' && e.shiftKey) { e.preventDefault(); this.openCmt(s.sel.id, s.sel.m); }
+    else if (k === 'Enter' || k === 'F2') { e.preventDefault(); this.startEdit(s.sel.id, s.sel.m); }
+    else if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); this.clearCell(); }
+    else if (k.length === 1 && /[0-9\-,.−]/.test(k) && !e.ctrlKey && !e.metaKey) { e.preventDefault(); this.startEdit(s.sel.id, s.sel.m, k); }
+  }
+  inputKey(e) {
+    e.stopPropagation(); const k = e.key;
+    if (k === 'Enter') { e.preventDefault(); const ok = this.commit(); if (ok) this.move(e.shiftKey ? -1 : 1, 0); }
+    else if (k === 'Tab') { e.preventDefault(); const ok = this.commit(); if (ok) this.move(0, e.shiftKey ? -1 : 1); }
+    else if (k === 'Escape') { e.preventDefault(); this.setState({ editing: false }); }
+  }
+  paste(text) {
+    const x = this.ctxInfo(), s = this.state;
+    if (x.locked || x.pair < 0) { this.setState({ gridErr: 'Вставка недоступна: ' + (x.locked ? 'план нельзя править' : 'выберите проект и ЦФО'), pasteMsg: '' }); return; }
+    const lines = text.replace(/\r/g, '').split('\n'); while (lines.length && lines[lines.length - 1] === '') lines.pop();
+    const vis = this.vis(); let ri = vis.findIndex((n) => n.id === s.sel.id); const list = []; let skipped = 0;
+    lines.forEach((ln, i) => { const node = vis[ri + i]; if (!node) return; ln.split('\t').forEach((cell, j) => { const m = s.sel.m + j; if (m > 11) return;
+      if (node.t !== 'leaf') { skipped++; return; } const n = parseNum(cell); if (isNaN(n) || cell.trim() === '') { skipped++; return; } list.push({ id: node.id, m, v: signed(node, n) }); }); });
+    if (list.length) this.setCells(list);
+    this.setState({ pasteMsg: 'Вставлено ' + list.length + ' ' + plural(list.length, 'ячейка', 'ячейки', 'ячеек') + ', пропущено ' + skipped, gridErr: '', errKey: '' });
+  }
+  openCmt(id, m) { const s = this.state; this.setState({ cmt: { id, m, text: s.comments[id + ':' + m] || '' }, ctx: null }); }
+  saveCmt() { const s = this.state, c = s.cmt; if (!c) return; const key = c.id + ':' + c.m; const cm = Object.assign({}, s.comments); const t = c.text.trim(); if (t) cm[key] = t; else delete cm[key]; this.setState({ comments: cm, cmt: null }); this.toast(t ? 'Комментарий сохранён' : 'Комментарий удалён'); }
+
+  // ---- помощники
+  openHelper(kind) {
+    const leaves = {}; const base = LEAVES.filter((l) => !l.src);
+    if (kind === 'lastYear' || kind === 'avg') base.forEach((l) => { leaves[l.id] = true; });
+    else leaves[kind === 'distribute' ? 'rent' : kind === 'copyRight' ? 'sal' : 'ads'] = true;
+    const months = {}; MON.forEach((_, m) => { months[m] = true; });
+    this.setState({ modal: 'helper', menuHelpers: false, hp: { kind, leaves, months, n: 6, sum: '2400000', srcM: 0, pct: '5', base: 'rev', step: 0, q: '' } });
+  }
+  hpTargets(hp) {
+    const ids = LEAVES.filter((l) => hp.leaves[l.id] && !l.src).map((l) => l.id);
+    let ms = MON.map((_, m) => m).filter((m) => hp.months[m]);
+    if (hp.kind === 'distribute') ms = MON.map((_, m) => m);
+    if (hp.kind === 'copyRight') ms = MON.map((_, m) => m).filter((m) => m > hp.srcM);
+    return { ids, ms };
+  }
+  hpValue(hp, l, m, pi, V) {
+    if (hp.kind === 'lastYear') return factSeed(pi, l, m);
+    if (hp.kind === 'avg') { const to = 9, from = Math.max(0, to - Number(hp.n) + 1); let sum = 0; for (let k = from; k <= to; k++) sum += factSeed(pi, l, k); return Math.round(sum / (to - from + 1)); }
+    if (hp.kind === 'distribute') { const a = Math.abs(parseNum(hp.sum)) || 0; const per = Math.floor((a * 100) / 12) / 100; const v = m === 11 ? Math.round((a - per * 11) * 100) / 100 : per; return signed(l, v); }
+    if (hp.kind === 'copyRight') return this.state.plan[pi][l.id][hp.srcM];
+    const x = parseNum(hp.pct) || 0; return signed(l, Math.round((x / 100) * Math.abs(V[hp.base][m])));
+  }
+  hpChanges(hp) {
+    const s = this.state, x = this.ctxInfo(); const t = this.hpTargets(hp);
+    const V = computeAll((id) => s.plan[x.pair][id]); const list = [];
+    t.ids.forEach((id) => t.ms.forEach((m) => { const old = s.plan[x.pair][id][m], nv = this.hpValue(hp, NODES[id], m, x.pair, V); list.push({ id, m, v: nv, old, changed: nv !== old, over: old !== 0 && nv !== old }); }));
+    return { list, t };
+  }
+  hpApply() {
+    const hp = this.state.hp;
+    if (hp.step === 0) { this.setState({ hp: Object.assign({}, hp, { step: 2 }) }); return; }
+    const ch = this.hpChanges(hp).list.filter((c) => c.changed);
+    if (ch.length) this.setCells(ch.map((c) => ({ id: c.id, m: c.m, v: c.v })));
+    this.setState({ modal: '', hp: null }); this.toast(ch.length ? 'Заполнено ' + ch.length + ' ' + plural(ch.length, 'ячейка', 'ячейки', 'ячеек') : 'Изменений нет — значения уже совпадают');
+  }
+
+  renderVals() {
+    const s = this.state, x = this.ctxInfo(), role = s.role, st = s.status;
+    const owner = role === 'owner', readRole = role === 'read';
+    const locked = x.locked;
+    const showGrid = s.view === 'ok';
+    // значения
+    const getLeaf = (id) => { const a = zero12(); x.pairsSel.forEach((pi) => { s.plan[pi][id].forEach((v, m) => { a[m] += v; }); }); return a; };
+    const V = computeAll(getLeaf);
+    const vis = flatVisible(s.collapsed);
+    const sk = s.sel.id + ':' + s.sel.m;
+    const rows = vis.map((n) => {
+      const isLeaf = n.t === 'leaf', isGroup = n.t === 'group';
+      const arr = V[n.id];
+      const cells = arr.map((v, m) => {
+        const key = n.id + ':' + m; const ed = isLeaf && !locked && x.pair >= 0; const isSel = key === sk;
+        const hasNote = !!s.comments[key] && x.pair >= 0 && isLeaf;
+        let txt = '';
+        if (n.t === 'kpi') txt = pctTxt(v); else if (isLeaf) txt = v === 0 ? '' : money(v); else txt = money(v);
+        const cls = ['gc gnum', isLeaf ? 'cell' : '', ed ? 'ed' : '', isLeaf && !ed ? 'roc' : '', isSel ? 'sel' : '', s.errKey === key ? 'errc' : ''].filter(Boolean).join(' ');
+        const editingHere = s.editing && isSel && ed;
+        return {
+          cls, selA: isSel ? 'true' : 'false', ro: ed ? 'false' : 'true', title: hasNote ? s.comments[key] : '', txt, show: !editingHere, edit: editingHere, draft: s.draft,
+          aria: n.name + ', ' + MONF[m], hasNote, unsaved: !!s.pending[key] && (s.save === 'error' || s.save === 'saving' || s.conflict),
+          onInput: (e) => this.setState({ draft: e.target.value }), onKey: (e) => this.inputKey(e),
+          click: (e) => { if (this.state.editing && (this.state.sel.id !== n.id || this.state.sel.m !== m)) this.commit(); if (isLeaf) this.startEdit(n.id, m); else this.setState({ sel: { id: n.id, m }, editing: false }); },
+          ctx: (e) => { e.preventDefault(); const r = typeof document !== 'undefined' ? { x: e.clientX, y: e.clientY } : { x: 0, y: 0 }; this.setState({ sel: { id: n.id, m }, editing: false, ctx: isLeaf ? { x: r.x, y: r.y, id: n.id, m } : null }); }
+        };
+      });
+      const tot = totalOf(V, n);
+      return {
+        rowCls: 'gr ' + (isGroup ? 'g-group' : n.t === 'calc' ? 'g-calc' : n.t === 'kpi' ? 'g-kpi' : 'g-leaf'),
+        nameCls: 'gc gname', indent: 'padding-left:' + (10 + n.depth * 18) + 'px',
+        name: n.name, isGroup, noChev: !isGroup, src: !!n.src && isLeaf, open: isGroup ? (!s.collapsed[n.id] ? 'true' : 'false') : '',
+        chevLabel: (s.collapsed[n.id] ? 'Развернуть ' : 'Свернуть ') + n.name, chevStyle: 'transition:transform .12s;transform:rotate(' + (s.collapsed[n.id] ? 0 : 90) + 'deg)',
+        toggle: () => this.setState((q) => ({ collapsed: Object.assign({}, q.collapsed, { [n.id]: !q.collapsed[n.id] }) })),
+        cells, total: n.t === 'kpi' ? pctTxt(tot) : (isLeaf && tot === 0 ? '' : money(tot)), totCls: 'gc gnum gtot'
+      };
+    });
+    // разрез
+    const projects = Array.from(new Set(PAIRS.map((p) => p.p))), cfos = Array.from(new Set(PAIRS.map((p) => p.c)));
+    const projAvail = projects.filter((p) => !s.center || PAIRS.some((q) => q.p === p && q.c === s.center));
+    const cfoAvail = cfos.filter((c) => !s.project || PAIRS.some((q) => q.c === c && q.p === s.project));
+    const setP = (p) => this.setState((q) => ({ project: p, center: p && q.center && !PAIRS.some((z) => z.p === p && z.c === q.center) ? '' : q.center, pop: '', editing: false, errKey: '', gridErr: '' }));
+    const setC = (c) => this.setState({ center: c, pop: '', editing: false, errKey: '', gridErr: '' });
+    const mkOpt = (label, cur, go) => ({ label, mark: cur ? '✓' : '', selA: cur ? 'true' : 'false', go: (e) => { e.stopPropagation(); go(); } });
+    const projOpts = [mkOpt('Все проекты', !s.project, () => setP(''))].concat(projAvail.map((p) => mkOpt(p, s.project === p, () => setP(p))));
+    const cfoOpts = [mkOpt('Все ЦФО', !s.center, () => setC(''))].concat(cfoAvail.map((c) => mkOpt(c, s.center === c, () => setC(c))));
+    const aggMode = !x.single && x.pair < 0;
+
+    // шапка
+    const BADGES = { draft: ['badge b-draft', 'Черновик'], approved: ['badge b-approved', 'Утверждён'], archive: ['badge b-archive', 'Архив'] };
+    const reasonLine = st === 'draft' && !owner ? 'Утверждает только владелец компании' : st === 'approved' && !owner ? 'Возвращает в черновик только владелец компании' : readRole ? 'Роль «Чтение»: изменять варианты нельзя' : '';
+    const helpersReason = readRole ? 'Роль «Чтение»: править план нельзя' : st !== 'draft' ? 'Помощники работают только в черновике' : x.pair < 0 ? 'Выберите проект и ЦФО, чтобы заполнять план' : '';
+    const saveMap = { saved: ['Сохранено', 'var(--ok-text)', 'color:var(--muted)'], saving: ['Сохраняю…', 'var(--primary)', 'color:var(--muted)'], error: ['Не сохранено —', '#d97706', 'color:var(--danger);font-weight:600'] };
+    const sv = saveMap[s.save];
+    const pendingList = Object.keys(s.pending).map((k) => { const [id, m] = k.split(':'); return NODES[id].name + ' · ' + MONF[Number(m)]; });
+
+    // модалка быстрого заполнения
+    let hpv = { title: '', desc: '' };
+    if (s.hp) {
+      const hp = s.hp, h = HELPERS.filter((q) => q.id === hp.kind)[0], t = this.hpTargets(hp);
+      const upd = (p) => this.setState({ hp: Object.assign({}, hp, p, { step: 0 }) });
+      const q = (hp.q || '').trim().toLowerCase();
+      const GROUPS = TREE.filter((n) => n.t === 'group').map((g) => ({ name: g.name, leaves: g.kids })).concat([{ name: 'Прочее', leaves: TREE.filter((n) => n.t === 'leaf') }]);
+      const selectable = LEAVES.filter((l) => !l.src);
+      const visLeaves = selectable.filter((l) => !q || l.name.toLowerCase().indexOf(q) >= 0);
+      const setMany = (ls, on) => { const lv = Object.assign({}, hp.leaves); ls.forEach((l) => { if (on) lv[l.id] = true; else delete lv[l.id]; }); upd({ leaves: lv }); };
+      const leafRows = [];
+      GROUPS.forEach((g) => {
+        const ls = g.leaves.filter((l) => !q || l.name.toLowerCase().indexOf(q) >= 0); if (!ls.length) return;
+        const sel = ls.filter((l) => hp.leaves[l.id] && !l.src), free = ls.filter((l) => !l.src);
+        const st = !free.length ? 'off' : sel.length === 0 ? 'off' : sel.length === free.length ? 'on' : 'mixed';
+        leafRows.push({ isHead: true, name: g.name, state: st, aria: st === 'on' ? 'true' : st === 'mixed' ? 'mixed' : 'false', mark: st === 'on' ? '✓' : st === 'mixed' ? '–' : '', count: sel.length + ' из ' + free.length, locked: !free.length, toggle: () => setMany(free, st !== 'on'), rowStyle: 'background:#f8f9fd;font-weight:600' });
+        ls.forEach((l) => { const on = !!hp.leaves[l.id] && !l.src; leafRows.push({ isHead: false, name: l.name, state: on ? 'on' : 'off', aria: on ? 'true' : 'false', mark: on ? '✓' : '', locked: !!l.src, toggle: () => setMany([l], !on), rowStyle: 'padding-left:36px;' + (l.src ? 'color:#7a829c' : '') }); });
+      });
+      const nSel = selectable.filter((l) => hp.leaves[l.id]).length;
+      const noMonths = hp.kind === 'distribute' || hp.kind === 'copyRight';
+      const Q = [['1 кв.', [0, 1, 2]], ['2 кв.', [3, 4, 5]], ['3 кв.', [6, 7, 8]], ['4 кв.', [9, 10, 11]]];
+      const setMonths = (ms, on) => { const mm = Object.assign({}, hp.months); ms.forEach((m) => { if (on) mm[m] = true; else delete mm[m]; }); upd({ months: mm }); };
+      const sumBad = hp.kind === 'distribute' && isNaN(parseNum(hp.sum)), pctBad = hp.kind === 'pct' && isNaN(parseNum(hp.pct));
+      const cnt = x.pair >= 0 ? t.ids.length * t.ms.length : 0;
+      hpv = {
+        title: 'Быстрое заполнение', desc: h.desc, setup: hp.step === 0, preview: hp.step === 2,
+        helperList: HELPERS.map((o) => ({ label: o.label, hint: o.hint, on: o.id === hp.kind ? 'true' : 'false', pick: () => this.setState({ hp: Object.assign({}, hp, { kind: o.id, step: 0 }) }) })),
+        hasN: hp.kind === 'avg', hasSum: hp.kind === 'distribute', hasSrcMonth: hp.kind === 'copyRight', hasPct: hp.kind === 'pct',
+        nOpts: [3, 6, 12].map((n) => ({ v: n, label: n + ' мес.', sel: Number(hp.n) === n })), sum: hp.sum, pct: hp.pct, sumErr: sumBad ? 'Введите число, например 2400000' : '', pctErr: pctBad ? 'Введите число, например 5 или 7,5' : '',
+        mOpts: MON.map((_, m) => ({ v: m, label: MONF[m], sel: m === hp.srcM })), baseOpts: [['rev', 'Выручка'], ['gp', 'Валовая прибыль']].map((o) => ({ v: o[0], label: o[1], sel: hp.base === o[0] })),
+        q: hp.q || '', onQ: (e) => this.setState({ hp: Object.assign({}, hp, { q: e.target.value }) }),
+        leafRows, selText: 'Выбрано ' + nSel + ' из ' + selectable.length, noLeaves: leafRows.length === 0,
+        allVis: () => setMany(visLeaves, true), noneVis: () => setMany(visLeaves, false), lockedNote: LEAVES.some((l) => l.src) ? 'Статьи из плана продаж (Выручка WB) не изменяются' : '',
+        noMonths, noMonthsNot: !noMonths, monthsNote: hp.kind === 'distribute' ? 'Сумма делится на все 12 месяцев.' : 'Месяцы определяются исходным месяцем: все правее него.',
+        months: MON.map((mm, m) => ({ label: mm, on: !!hp.months[m] ? 'true' : 'false', toggle: () => setMonths([m], !hp.months[m]) })),
+        quick: Q.map((qq) => { const all = qq[1].every((m) => hp.months[m]); return { label: qq[0], on: all ? 'true' : 'false', toggle: () => setMonths(qq[1], !all) }; }).concat([{ label: 'Все', on: MON.every((_, m) => hp.months[m]) ? 'true' : 'false', toggle: () => setMonths(MON.map((_, m) => m), true) }, { label: 'Сбросить', on: 'false', toggle: () => setMonths(MON.map((_, m) => m), false) }]),
+        sumLine: cnt ? 'Будет затронуто ' + cnt + ' ' + plural(cnt, 'ячейка', 'ячейки', 'ячеек') + ': ' + t.ids.length + ' ' + plural(t.ids.length, 'статья', 'статьи', 'статей') + ' × ' + t.ms.length + ' ' + plural(t.ms.length, 'месяц', 'месяца', 'месяцев') : 'Выберите хотя бы одну статью' + (noMonths ? '' : ' и месяц'),
+        dis: cnt === 0 || sumBad || pctBad, nextLabel: 'Показать изменения'
+      };
+      if (hp.step === 2) {
+        const ch = this.hpChanges(hp); const cols = t.ms;
+        const byId = {}; ch.list.forEach((c) => { (byId[c.id] = byId[c.id] || {})[c.m] = c; });
+        const prow = t.ids.map((id) => { let delta = 0; const cells = cols.map((m) => { const c = byId[id][m]; delta += c.v - c.old; return { txt: money(c.v), old: c.changed && c.old !== 0 ? 'было ' + money(c.old) : '', cls: 'gc gnum' + (c.over ? ' hl' : '') + (!c.changed ? ' same' : ''), mark: !c.changed ? 'без изменений' : '' }; });
+          return { name: NODES[id].name, cells, delta: (delta > 0 ? '+' : '') + money(delta) }; });
+        const changed = ch.list.filter((c) => c.changed).length, over = ch.list.filter((c) => c.over).length;
+        Object.assign(hpv, { prow, pcols: cols.map((m) => MON[m]), pgrid: 'grid-template-columns:220px repeat(' + cols.length + ',104px) minmax(120px,1fr);min-width:' + (340 + cols.length * 104) + 'px;width:100%', pchanged: changed, pover: over,
+          pline: 'Изменится ' + changed + ' ' + plural(changed, 'ячейка', 'ячейки', 'ячеек') + (over ? ', из них перезапишет заполненные: ' + over : ''), pwarn: over > 0, pwarnText: 'Перезаписать ' + over + ' ' + plural(over, 'заполненную ячейку', 'заполненные ячейки', 'заполненных ячеек') + '? Отмены нет — прежние значения видны в ячейках «было …», вернуться можно только кнопкой «Назад».',
+          nextLabel: changed ? 'Применить (' + changed + ')' : 'Закрыть без изменений', dis: false });
+      }
+    }
+    const cmt = s.cmt;
+    return Object.assign({
+      roleOwner: owner, roleWrite: role === 'write', roleRead: readRole,
+      onRole: (e) => this.setState({ role: e.target.value, editing: false }),
+      stDraft: st === 'draft', stApproved: st === 'approved', stArchive: st === 'archive', onStatus: (e) => this.setState({ status: e.target.value, editing: false, conflict: false, menuMore: false, menuHelpers: false }),
+      viewOk: s.view === 'ok', viewLoading: s.view === 'loading', viewError: s.view === 'error', viewNoleaf: s.view === 'noleaf', onView: (e) => this.setState({ view: e.target.value, editing: false }),
+      slicesYes: s.slices === 'yes', slicesNo: s.slices === 'no', onSlices: (e) => this.setState({ slices: e.target.value }),
+      failNext: s.failNext ? 'true' : 'false', failLabel: s.failNext ? 'Сбой сохранения: ВКЛ' : 'Сбой сохранения: выкл', toggleFail: () => this.setState({ failNext: !s.failNext }),
+      otherTab: () => this.setState({ status: 'approved', conflict: true, editing: false, conflictCells: pendingList.length ? 'Несохранённые ячейки: ' + pendingList.join('; ') + '.' : 'Несохранённых ячеек нет.', save: s.save === 'saving' ? 'error' : s.save }),
+      year: YEAR, name: s.name, badge: BADGES[st][1], badgeCls: BADGES[st][0],
+      canRename: st === 'draft' && !readRole && !s.nameEditing, nameEditing: s.nameEditing, nameStatic: !s.nameEditing, nameDraft: s.nameDraft,
+      startName: () => this.setState({ nameEditing: true, nameDraft: s.name }), onNameInput: (e) => this.setState({ nameDraft: e.target.value }),
+      onNameKey: (e) => { if (e.key === 'Enter') { e.preventDefault(); this.saveName(); } else if (e.key === 'Escape') { e.stopPropagation(); this.setState({ nameEditing: false }); } },
+      saveName: () => { this.setState((q) => (q.nameEditing ? { nameEditing: false, name: q.nameDraft.trim() || q.name } : null)); },
+      saveStyle: sv[2], saveDot: 'background:' + sv[1], saveText: sv[0], saveRetry: s.save === 'error', retrySave: () => { this.setState({ save: 'saving' }); setTimeout(() => this.flush(), 600); },
+      showApprove: st === 'draft', showReturn: st === 'approved', showRestore: st === 'archive', showHelpers: st === 'draft', showArchive: st === 'draft',
+      approveDis: !owner, approveReason: !owner ? (st === 'draft' ? 'Утверждает только владелец компании' : 'Возвращает в черновик только владелец компании') : '',
+      writeDis: readRole, writeReason: readRole ? 'Роль «Чтение»: изменять варианты нельзя' : '', reasonLine,
+      askApprove: () => this.setState({ modal: 'confirm', cf: { act: 'approve', title: 'Утвердить вариант «' + s.name + '»?', text: 'После утверждения изменения недоступны, пока вы не вернёте вариант в черновик. Он станет основой для сравнения план–факт за ' + YEAR + ' год.', ok: 'Утвердить' } }),
+      askReturn: () => this.setState({ modal: 'confirm', cf: { act: 'draft', title: 'Вернуть «' + s.name + '» в черновик?', text: 'Вариант снова можно будет править. План–факт не будет использовать его, пока он не утверждён.', ok: 'Вернуть в черновик' } }),
+      doRestore: () => { this.setState({ status: 'draft' }); this.toast('Вариант восстановлен как черновик'); },
+      doCopy: () => { this.setState({ menuMore: false }); this.toast('Создана копия «' + s.name + '» — открывается экран бюджета'); },
+      doArchive: () => { this.setState({ status: 'archive', menuMore: false }); this.toast('Вариант перенесён в архив'); },
+      menuMore: s.menuMore, toggleMore: (e) => { e.stopPropagation(); this.setState({ menuMore: !s.menuMore, menuHelpers: false, pop: '' }); },
+      menuHelpers: s.menuHelpers, helpersDis: locked || x.pair < 0, helpersReason, toggleHelpers: (e) => { e.stopPropagation(); this.setState({ menuHelpers: !s.menuHelpers, menuMore: false, pop: '' }); },
+      helperItems: HELPERS.map((h) => ({ label: h.label, hint: h.hint, go: () => this.openHelper(h.id) })),
+      bannerApproved: st === 'approved' && !s.conflict, bannerApprovedText: 'Вариант утверждён — изменения недоступны. Чтобы править, верните его в черновик' + (owner ? '.' : ' — это может сделать владелец компании.'),
+      bannerArchive: st === 'archive', bannerRead: readRole && st === 'draft', conflict: s.conflict, conflictCells: s.conflictCells,
+      hasSlices: !x.single, popP: s.pop === 'p', popC: s.pop === 'c', togP: (e) => { e.stopPropagation(); this.setState({ pop: s.pop === 'p' ? '' : 'p', menuMore: false, menuHelpers: false }); }, togC: (e) => { e.stopPropagation(); this.setState({ pop: s.pop === 'c' ? '' : 'c', menuMore: false, menuHelpers: false }); },
+      projLabel: s.project || 'Все проекты', cfoLabel: s.center || 'Все ЦФО', projOpts, cfoOpts, qProject: s.project || 'all', qCenter: s.center || 'all',
+      aggMode, aggPairs: (s.project ? '«' + s.project + '»' : 'всем проектам') + (s.center ? ' × «' + s.center + '»' : ''),
+      isLoading: s.view === 'loading', isError: s.view === 'error', isNoLeaf: s.view === 'noleaf', retryLoad: () => { this.setState({ view: 'loading' }); setTimeout(() => this.setState({ view: 'ok' }), 900); },
+      showGrid, rowCount: vis.length + 1, months: MON, rows, gridKey: (e) => this.gridKey(e),
+      gridPaste: (e) => { if (this.state.editing) return; e.preventDefault(); this.paste(e.clipboardData ? e.clipboardData.getData('text') : ''); },
+      gridErr: s.gridErr, pasteMsg: s.pasteMsg,
+      hintLine: locked ? 'Только просмотр.' : x.pair < 0 ? 'Только просмотр суммы по выбранным разрезам.' : 'Клик или Enter — ввод · Enter/Tab — сохранить и дальше · Стрелки · Esc — отмена · Delete — очистить · Shift+Enter — комментарий · Ctrl+V — вставка из Excel',
+      pasteDemo: () => this.paste(SAMPLE),
+      cmtOpen: !!cmt, cmtText: cmt ? cmt.text : '', cmtLen: cmt ? cmt.text.length : 0, cmtWhere: cmt ? NODES[cmt.id].name + ' · ' + MONF[cmt.m] + ' ' + YEAR : '', cmtRO: locked, cmtNoDel: locked || !cmt || !s.comments[cmt.id + ':' + cmt.m],
+      onCmt: (e) => this.setState({ cmt: Object.assign({}, cmt, { text: e.target.value }) }),
+      cmtKey: (e) => { e.stopPropagation(); if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!locked) this.saveCmt(); } else if (e.key === 'Escape') this.setState({ cmt: null }); },
+      cmtClose: () => this.setState({ cmt: null }), cmtSave: () => this.saveCmt(),
+      cmtDel: () => { const c = this.state.cmt; if (!c) return; const cm = Object.assign({}, this.state.comments); delete cm[c.id + ':' + c.m]; this.setState({ comments: cm, cmt: null }); this.toast('Комментарий удалён'); },
+      ctxOpen: !!s.ctx, ctxStyle: s.ctx ? 'position:fixed;left:' + s.ctx.x + 'px;top:' + s.ctx.y + 'px;min-width:220px' : '', ctxClearDis: locked || x.pair < 0,
+      ctxComment: (e) => { e.stopPropagation(); this.openCmt(s.ctx.id, s.ctx.m); }, ctxClear: (e) => { e.stopPropagation(); this.setState({ ctx: null }); this.clearCell(); },
+      modalHelper: s.modal === 'helper', modalConfirm: s.modal === 'confirm', cf: s.cf || { title: '', text: '', ok: '' }, hp: hpv,
+      stop: (e) => e.stopPropagation(), closeModal: () => this.setState({ modal: '', hp: null, cf: null }),
+      hpN: (e) => this.setState({ hp: Object.assign({}, s.hp, { n: e.target.value, step: 0 }) }), hpSum: (e) => this.setState({ hp: Object.assign({}, s.hp, { sum: e.target.value, step: 0 }) }),
+      hpSrcM: (e) => this.setState({ hp: Object.assign({}, s.hp, { srcM: Number(e.target.value), step: 0 }) }), hpPct: (e) => this.setState({ hp: Object.assign({}, s.hp, { pct: e.target.value, step: 0 }) }), hpBase: (e) => this.setState({ hp: Object.assign({}, s.hp, { base: e.target.value, step: 0 }) }),
+      hpAllLeaves: () => { const on = !LEAVES.filter((l) => !l.src).every((l) => s.hp.leaves[l.id]); const lv = {}; LEAVES.forEach((l) => { if (on && !l.src) lv[l.id] = true; }); this.setState({ hp: Object.assign({}, s.hp, { leaves: lv, step: 0 }) }); },
+      hpAllMonths: () => { const on = !MON.every((_, m) => s.hp.months[m]); const ms = {}; MON.forEach((_, m) => { if (on) ms[m] = true; }); this.setState({ hp: Object.assign({}, s.hp, { months: ms, step: 0 }) }); },
+      hpApply: () => this.hpApply(), hpBack: () => this.setState({ hp: Object.assign({}, s.hp, { step: 0 }) }),
+      doConfirm: () => { const c = s.cf; if (!c) return; if (c.act === 'approve') { this.setState({ status: 'approved', modal: '', cf: null, editing: false }); this.toast('Вариант «' + s.name + '» утверждён'); } else { this.setState({ status: 'draft', modal: '', cf: null }); this.toast('Вариант «' + s.name + '» возвращён в черновик'); } },
+      toast: s.toastT
+    });
+  }
+}
+
+</script>
+</body>
+</html>

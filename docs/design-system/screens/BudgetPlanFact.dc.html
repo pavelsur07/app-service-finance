@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Бюджет ОПиУ — план–факт</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+:root{--primary:#1d4ed8;--bg:#f7f8fc;--surface:#ffffff;--text:#0b1020;--muted:#525b78;--border:#dde1ec;--border-strong:#c3c8d6;--head-bg:#f4f6fb;--sel:#e8effd;--warn-bg:#fff4e5;--warn-text:#9a4a00;--warn-bd:#f5d3a8;--ok-bg:#e4f5e7;--ok-text:#1d7a30;--danger:#9a001b;--danger-bg:#fdecee}
+body{margin:0;background:var(--bg)}
+*{box-sizing:border-box}
+button,input,select,textarea{font-family:inherit;font-size:14px;color:var(--text)}
+.nav{display:flex;align-items:center;gap:12px;padding:9px 12px;margin:1px 8px;color:#dfe3ef;text-decoration:none;border-radius:4px;font-size:14px;line-height:20px}
+.nav:hover{background:rgba(255,255,255,.07)}
+.nav[aria-current]{background:rgba(255,255,255,.12);color:#fff;font-weight:600}
+.nav.sub{padding:6px 12px 6px 42px;font-size:13px;color:#c3c8d6}
+.nav.sub[aria-current]{color:#fff}
+.nav svg{flex:none}
+.btn{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:4px;border:1px solid var(--border-strong);background:var(--surface);cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover:not(:disabled){background:#eef1f8}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-primary:hover:not(:disabled){background:#1a40b0}
+.btn-sm{height:30px;padding:0 10px;font-size:13px}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:4px;background:transparent;color:var(--muted);cursor:pointer}
+.icon-btn:hover{background:rgba(11,16,32,.07);color:var(--text)}
+button:disabled{opacity:.5;cursor:not-allowed!important}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.nav:focus-visible{outline-color:#fff}
+.inp{height:36px;width:100%;padding:0 12px;border:1px solid var(--border-strong);border-radius:4px;background:var(--surface)}
+.inp[aria-invalid=true]{border-color:var(--danger);box-shadow:0 0 0 1px var(--danger)}
+.err{color:var(--danger);font-size:13px;margin-top:4px}
+.lbl{font-size:13px;font-weight:600;margin-bottom:4px;display:block}
+.tab{display:inline-flex;align-items:center;gap:8px;padding:12px 14px;border:0;border-bottom:2px solid transparent;background:none;cursor:pointer;font-weight:500;color:var(--muted);margin-bottom:-1px}
+.tab:hover{color:var(--text)}
+.tab[aria-selected=true]{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.badge{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:4px;font-size:12px;font-weight:600;white-space:nowrap}
+.b-approved{background:var(--sel);color:#1a3fae}
+.b-draft{background:var(--head-bg);color:var(--muted);border:1px solid var(--border)}
+.b-archive{background:#eceef4;color:#5b6485}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.dim{color:#7a829c}
+.menu{position:absolute;z-index:40;min-width:260px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 32px rgba(11,16,32,.18);padding:4px 0}
+.mi{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:8px 16px;border:0;background:none;cursor:pointer;font-size:14px}
+.mi:hover:not(:disabled){background:var(--head-bg)}
+.mi small{font-size:12px;color:var(--muted)}
+.mi:disabled{opacity:1;color:#7a829c;cursor:not-allowed}
+.scrim{position:fixed;inset:0;background:rgba(11,16,32,.45);z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:64px 16px;overflow:auto}
+.dlg{background:var(--surface);border-radius:8px;box-shadow:0 24px 64px rgba(11,16,32,.3);width:100%;max-width:520px}
+.demo{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;padding:8px 32px;background:#fffbe8;border-bottom:1px dashed #e5d58a;font-size:12px;color:#6b5a00}
+.demo b{font-weight:700;margin-right:4px}
+.demo select{height:26px;font-size:12px;border:1px solid #d9c866;border-radius:4px;background:#fff;padding:0 6px}
+.demo button{height:26px;font-size:12px;border:1px solid #d9c866;border-radius:4px;background:#fff;padding:0 8px;cursor:pointer}
+.toast{position:fixed;right:24px;bottom:24px;z-index:80;background:#0b1020;color:#fff;padding:12px 16px;border-radius:6px;box-shadow:0 8px 24px rgba(11,16,32,.3);max-width:380px}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:4px;border:1px solid var(--warn-bd);background:var(--warn-bg);color:var(--warn-text)}
+.alert.err2{border-color:#e9a9b3;background:var(--danger-bg);color:var(--danger)}
+.alert.info{border-color:#b9cdf5;background:var(--sel);color:#1a3fae}
+.skel{background:linear-gradient(90deg,#eceef4 25%,#f6f7fb 50%,#eceef4 75%);background-size:200% 100%;animation:sk 1.4s infinite;border-radius:4px}
+@keyframes sk{to{background-position:-200% 0}}
+
+.pill{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--border-strong);border-radius:16px;background:var(--surface);cursor:pointer;font-weight:500;font-size:13px;white-space:nowrap}
+.pill:hover{background:#eef1f8}
+.seg{height:30px;padding:0 12px;border:0;border-right:1px solid var(--border-strong);background:var(--surface);cursor:pointer;font-size:13px;font-weight:500}
+.seg:last-child{border-right:0}
+.seg[aria-pressed=true]{background:var(--sel);color:#1a3fae;font-weight:600}
+.gridwrap{overflow:auto;max-height:640px;position:relative}
+.gr{display:grid}
+.gc{padding:0 10px;height:36px;display:flex;align-items:center;border-bottom:1px solid var(--border);border-right:1px solid #eceff6;background:var(--surface);min-width:0;gap:4px}
+.gnum{justify-content:flex-end}
+.gh .gc{height:38px;background:var(--head-bg);font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;z-index:3;border-bottom:1px solid var(--border-strong)}
+.gname{position:sticky;left:0;z-index:2;justify-content:flex-start;gap:6px;font-weight:500;border-right:1px solid var(--border-strong)}
+.gh .gh1.gname{z-index:4}
+.gname .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gtot{background:#f8f9fd;font-weight:600}
+.g-group .gc{background:#f8f9fd;font-weight:600}
+.g-group .gc.hl{background:var(--warn-bg)}
+.g-calc .gc{background:#eef1f8;font-weight:700}
+.g-kpi .gc{font-style:italic;color:var(--muted);font-weight:500}
+.gc.hl{background:var(--warn-bg)}
+.ico{font-size:11px;font-weight:700;color:var(--muted);width:12px;display:inline-block;text-align:center}
+.lnk{background:none;border:0;padding:0;cursor:pointer;color:inherit;font:inherit}
+.lnk:hover{color:var(--primary);text-decoration:underline}
+.chv{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:0;border-radius:3px;background:transparent;color:var(--muted);cursor:pointer;flex:none;padding:0}
+.chv:hover{background:rgba(11,16,32,.08)}
+.chv-sp{width:18px;flex:none}
+@media (max-width:760px){.pad{padding:16px !important}.demo{padding:8px 16px}.hide-sm{display:none !important}.hide-sm-c{display:none !important}.mob-hide{display:none !important}.gr{grid-template-columns:140px 106px 106px 108px 70px !important;width:530px !important}.gc{padding:0 8px}}
+.mtag{margin-left:auto;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;flex:none}
+.gsep{border-left:1px solid var(--border-strong)}
+.mplan{color:var(--muted);font-weight:400}
+.gh .gsep{text-align:center;justify-content:center}
+.rr-a .gc,.rr-b .gc{border-bottom-color:#f1f3f9}
+.rr-a .gname,.rr-b .gname{border-bottom-color:#f1f3f9}
+.tc1{border-left:1px solid var(--border-strong)}
+
+</style>
+</helmet>
+<div style="display:flex;flex-wrap:wrap;align-items:stretch;min-height:1000px;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:20px;color:var(--text);background:var(--bg)">
+<aside style="flex:0 0 240px;width:240px;background:#0b1020;color:#dfe3ef;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:10px;padding:18px 16px 14px">
+      <div style="width:32px;height:32px;border-radius:8px;background:#b00020;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">ВФ</div>
+      <div style="font-weight:700;font-size:16px;color:#fff">Ваш Финдир</div>
+    </div>
+    <nav aria-label="Основное меню" style="display:flex;flex-direction:column;padding:6px 0;flex:1">
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7M6 10v10h12V10"/></svg><span style="flex:1">Главная</span></a>
+      <a class="nav" href="#" style="font-weight:600;color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M16 13h2M3 10h18"/></svg><span style="flex:1">Деньги</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Операции ДДС</span></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Платёжный календарь</span></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Остатки и счета</span></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v14H7zM14 3v5h5M10 13h6M10 17h6"/></svg><span style="flex:1">Доходы и расходы</span></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9l1-5h14l1 5M4 9v11h16V9M4 9a3 3 0 006 0 3 3 0 006 0 3 3 0 004 0M10 20v-5h4v5"/></svg><span style="flex:1">Маркетплейсы</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V9l9-5 9 5v12M7 21v-7h10v7"/></svg><span style="flex:1">МойСклад</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#" style="font-weight:600;color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v9h9a9 9 0 11-9-9z"/></svg><span style="flex:1">Отчёты</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Отчёт ОПиУ</span></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Документы ОПиУ</span></a><a class="nav" href="#" aria-current="page" style="margin-left:20px;padding-left:28px"><span style="flex:1">Бюджет ОПиУ</span></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4 4 0 010-8 5 5 0 019.6-1A4.5 4.5 0 0117 18M12 12v7M9 15l3-3 3 3"/></svg><span style="flex:1">Загрузка данных</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M6 20h12M5 7h14M5 7l-3 7a3 3 0 006 0zM19 7l-3 7a3 3 0 006 0z"/></svg><span style="flex:1">Баланс</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h5v15H4zM10 5h5v15h-5zM17 6l3 .8-3.7 13.4-3-.8"/></svg><span style="flex:1">Справочники</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span style="flex:1">Импорт</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7l8 8M5 19l4-4M12 4l8 8-3 3-8-8z"/></svg><span style="flex:1">Интеграции</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4h9v17M14 9h5v12M9 8h1M9 12h1M9 16h1M3 21h18"/></svg><span style="flex:1">Компания и доступы</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 8a3 3 0 016 0v7a3 3 0 01-6 0zM4 13h5M15 13h5M5 7l3 2M19 7l-3 2M5 19l3-2M19 19l-3-2"/></svg><span style="flex:1">Отладка</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+    </nav>
+    <div style="border-top:1px solid rgba(255,255,255,.12);padding:14px 16px;display:flex;flex-direction:column;gap:2px">
+      <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#9aa3bd">КОМПАНИЯ</div>
+      <div style="font-weight:600;color:#fff">ИП Лазарева</div>
+      <a href="#" style="font-size:12px;color:#c3c8d6;text-decoration:none">Переключить →</a>
+    </div>
+  </aside>
+<div style="flex:999 1 720px;min-width:0;display:flex;flex-direction:column">
+<header style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 32px;background:var(--surface);border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:16px"><div style="font-size:18px;font-weight:600">Сервис</div><select aria-label="Компания" style="height:36px;padding:0 12px;border:1px solid var(--border);border-radius:4px;background:var(--surface)"><option>ИП Лазарева</option></select></div></header>
+<div class="demo" role="group" aria-label="Демо-переключатели (не часть интерфейса)">
+  <span><b>Демо:</b></span>
+  <label>Экран <select onChange="{{onView}}"><option value="ok" selected="{{viewOk}}">Данные</option><option value="loading" selected="{{viewLoading}}">Загрузка</option><option value="error" selected="{{viewError}}">Ошибка</option></select></label>
+</div>
+<main style="padding:24px 32px 40px;display:flex;flex-direction:column;gap:16px;max-width:1700px;width:100%" class="pad">
+  <div style="display:flex;flex-direction:column;gap:4px">
+    <nav aria-label="Путь" style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)"><a href="#" style="color:var(--muted);text-decoration:none">Деньги и отчёты</a><span aria-hidden="true">/</span><span aria-current="page" style="color:var(--text);font-weight:500">Бюджет ОПиУ</span></nav>
+    <h1 style="margin:0;font-size:24px;line-height:32px;font-weight:600">План–факт</h1>
+    <div style="color:var(--muted);max-width:680px">Где факт разошёлся с планом и насколько. Факт совпадает с отчётом ОПиУ за тот же период и фильтры.</div>
+  </div>
+
+  <section style="background:var(--surface);border:1px solid var(--border);border-radius:4px;box-shadow:0 1px 2px rgba(11,16,32,.04);min-width:0">
+    <div role="tablist" aria-label="Разделы бюджета" style="display:flex;gap:4px;padding:0 16px;border-bottom:1px solid var(--border)">
+      <button class="tab" role="tab" type="button" aria-selected="false">Варианты</button>
+      <button class="tab" role="tab" type="button" aria-selected="true">План–факт</button>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;padding:12px 16px;border-bottom:1px solid var(--border)">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)">Год <select class="inp" style="width:90px;height:32px" onChange="{{onYear}}"><sc-for list="{{yearOpts}}" as="y" hint-placeholder-count="2"><option value="{{y.v}}" selected="{{y.sel}}">{{y.v}}</option></sc-for></select></label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)">Вариант <select class="inp" style="width:250px;height:32px" onChange="{{onVariant}}"><sc-for list="{{varOpts}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}" selected="{{o.sel}}">{{o.label}}</option></sc-for></select></label>
+      <div style="position:relative">
+        <button class="pill" type="button" aria-haspopup="listbox" aria-expanded="{{popP}}" onClick="{{togP}}"><span style="color:var(--muted)">Проект:</span> {{projLabel}}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+        <sc-if value="{{popP}}" hint-placeholder-val="{{ false }}"><div class="menu" role="listbox" aria-multiselectable="true" style="left:0;top:40px;min-width:260px"><sc-for list="{{projOpts}}" as="o" hint-placeholder-count="3"><label class="mi" style="flex-direction:row;align-items:center;gap:10px" onClick="{{stop}}"><input type="checkbox" checked="{{o.on}}" onChange="{{o.toggle}}" style="accent-color:var(--primary);width:16px;height:16px;margin:0">{{o.label}}</label></sc-for><div style="padding:6px 16px;font-size:12px;color:var(--muted)">Включая вложенные проекты</div></div></sc-if>
+      </div>
+      <div style="position:relative">
+        <button class="pill" type="button" aria-haspopup="listbox" aria-expanded="{{popC}}" onClick="{{togC}}"><span style="color:var(--muted)">ЦФО:</span> {{cfoLabel}}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+        <sc-if value="{{popC}}" hint-placeholder-val="{{ false }}"><div class="menu" role="listbox" aria-multiselectable="true" style="left:0;top:40px;min-width:260px"><sc-for list="{{cfoOpts}}" as="o" hint-placeholder-count="4"><label class="mi" style="flex-direction:row;align-items:center;gap:10px" onClick="{{stop}}"><input type="checkbox" checked="{{o.on}}" onChange="{{o.toggle}}" style="accent-color:var(--primary);width:16px;height:16px;margin:0">{{o.label}}</label></sc-for></div></sc-if>
+      </div>
+      <div role="group" aria-label="Период" style="display:flex;border:1px solid var(--border-strong);border-radius:4px;overflow:hidden">
+        <button type="button" aria-pressed="{{perMonths}}" onClick="{{pickMonths}}" class="seg">Месяцы</button><button type="button" aria-pressed="{{perQuarters}}" onClick="{{pickQuarters}}" class="seg">Кварталы</button>
+      </div>
+      <div class="hide-sm" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-left:auto">
+        <sc-if value="{{isAll}}" hint-placeholder-val="{{ false }}"><div role="group" aria-label="Раскладка показателей" style="display:flex;border:1px solid var(--border-strong);border-radius:4px;overflow:hidden"><button type="button" aria-pressed="{{layCols}}" onClick="{{pickCols}}" class="seg" title="План, Факт и Отклонение рядом в колонках">Колонками</button><button type="button" aria-pressed="{{layRows}}" onClick="{{pickRows}}" class="seg" title="Три строки на статью: План, Факт, Отклонение">Строками</button></div></sc-if>
+        <div role="group" aria-label="Показатель в колонках периода" style="display:flex;border:1px solid var(--border-strong);border-radius:4px;overflow:hidden">
+          <sc-for list="{{inds}}" as="i" hint-placeholder-count="5"><button type="button" aria-pressed="{{i.on}}" onClick="{{i.pick}}" class="seg">{{i.label}}</button></sc-for>
+        </div>
+      </div>
+    </div>
+
+    <sc-if value="{{noApproved}}" hint-placeholder-val="{{ false }}"><div style="padding:48px 16px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center"><div style="font-size:18px;font-weight:600">Нет утверждённого варианта на {{year}} год</div><div style="color:var(--muted)">Утвердите вариант или выберите черновик в списке «Вариант».</div></div></sc-if>
+    <sc-if value="{{isLoading}}" hint-placeholder-val="{{ false }}"><div aria-busy="true" style="padding:16px;display:flex;flex-direction:column;gap:10px"><div class="skel" style="height:36px"></div><div class="skel" style="height:32px"></div><div class="skel" style="height:32px"></div><div class="skel" style="height:32px"></div><div class="skel" style="height:32px"></div></div></sc-if>
+    <sc-if value="{{isError}}" hint-placeholder-val="{{ false }}"><div style="padding:40px 16px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center"><div role="alert" style="color:var(--danger);font-weight:600">Не удалось загрузить план–факт</div><div style="color:var(--muted)">Сервер не ответил. Повторите попытку. Код: BUD-PF-503.</div><button class="btn" type="button" onClick="{{retry}}">Повторить</button></div></sc-if>
+
+    <sc-if value="{{showTable}}" hint-placeholder-val="{{ true }}">
+      <div role="table" aria-label="План–факт по статьям ОПиУ" class="gridwrap">
+        <div role="row" class="gr gh" style="{{gridCols}}">
+          <div role="columnheader" class="gc gname gh1">Статья, ₽</div>
+          <sc-for list="{{hdr1}}" as="p" hint-placeholder-count="12"><div role="columnheader" class="{{p.cls}}" style="{{p.style}}">{{p.label}}</div></sc-for>
+          <div role="columnheader" class="gc gnum gtot tc1">План</div><div role="columnheader" class="gc gnum gtot tc2">Факт</div><div role="columnheader" class="gc gnum gtot tc3">Откл.</div><div role="columnheader" class="gc gnum gtot tc4">%</div>
+        </div>
+        <sc-if value="{{showSub}}" hint-placeholder-val="{{ false }}">
+        <div role="row" class="gr gh gh2" style="{{gridCols}}">
+          <div role="columnheader" class="gc gname gh1" style="top:38px"></div>
+          <sc-for list="{{hdr2}}" as="p" hint-placeholder-count="36"><div role="columnheader" class="{{p.cls}}" style="top:38px">{{p.label}}</div></sc-for>
+          <div class="gc gtot tc1" style="top:38px"></div><div class="gc gtot tc2" style="top:38px"></div><div class="gc gtot tc3" style="top:38px"></div><div class="gc gtot tc4" style="top:38px"></div>
+        </div>
+        </sc-if>
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="12">
+          <div role="row" class="{{r.rowCls}}" style="{{gridCols}}">
+            <div role="rowheader" class="gc gname" style="{{r.indent}}">
+              <sc-if value="{{r.isGroup}}" hint-placeholder-val="{{ false }}"><button type="button" class="chv" aria-expanded="{{r.open}}" aria-label="{{r.chevLabel}}" onClick="{{r.toggle}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="{{r.chevStyle}}"><path d="M9 6l6 6-6 6"/></svg></button></sc-if>
+              <sc-if value="{{r.noChev}}" hint-placeholder-val="{{ true }}"><span class="chv-sp" aria-hidden="true"></span></sc-if>
+              <span class="nm">{{r.name}}</span><sc-if value="{{r.hasMetric}}" hint-placeholder-val="{{ false }}"><span class="mtag">{{r.metric}}</span></sc-if>
+            </div>
+            <sc-for list="{{r.cells}}" as="c" hint-placeholder-count="12">
+              <div role="cell" class="{{c.cls}}" title="{{c.title}}">
+                <sc-if value="{{c.link}}" hint-placeholder-val="{{ false }}"><button type="button" class="lnk num" onClick="{{c.open}}">{{c.txt}}</button></sc-if>
+                <sc-if value="{{c.plain}}" hint-placeholder-val="{{ true }}"><span class="num">{{c.txt}}</span></sc-if>
+                <sc-if value="{{c.icon}}" hint-placeholder-val="{{ false }}"><span class="ico" aria-label="{{c.iconLabel}}">{{c.icon}}</span></sc-if>
+              </div>
+            </sc-for>
+            <div role="cell" class="gc gnum gtot tc1"><span class="num">{{r.tPlan}}</span></div>
+            <div role="cell" class="gc gnum gtot tc2"><button type="button" class="lnk num" onClick="{{r.openTotal}}">{{r.tFact}}</button></div>
+            <div role="cell" class="{{r.tDevCls}}"><span class="num">{{r.tDev}}</span><span class="ico" aria-label="{{r.tIconLabel}}">{{r.tIcon}}</span></div>
+            <div role="cell" class="gc gnum gtot tc4"><span class="num">{{r.tPct}}</span></div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding:10px 16px;border-top:1px solid var(--border);font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 20px">
+        <span>▲ лучше плана · ▼ хуже плана (для расходов лучше — меньше по модулю)</span><span>Подсветка: отклонение больше 10% от плана</span><span>{{periodNote}}</span>
+      </div>
+    </sc-if>
+  </section>
+</main>
+<sc-if value="{{toast}}" hint-placeholder-val="{{ false }}"><div class="toast" role="status">{{toast}}</div></sc-if>
+
+</div></div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+const MON = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+const MONF = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+const TREE = [
+  { id: 'rev', t: 'group', name: 'Выручка', kids: [
+    { id: 'rev_wb', t: 'leaf', name: 'Выручка WB', flow: 'INCOME', src: true },
+    { id: 'rev_oz', t: 'leaf', name: 'Выручка Ozon', flow: 'INCOME' },
+    { id: 'rev_site', t: 'leaf', name: 'Выручка сайт', flow: 'INCOME' } ] },
+  { id: 'var', t: 'group', name: 'Переменные расходы', kids: [
+    { id: 'cogs', t: 'leaf', name: 'Себестоимость товаров', flow: 'EXPENSE' },
+    { id: 'log', t: 'leaf', name: 'Логистика и доставка', flow: 'EXPENSE' },
+    { id: 'com', t: 'leaf', name: 'Комиссии маркетплейсов', flow: 'EXPENSE' },
+    { id: 'ads', t: 'leaf', name: 'Реклама и продвижение', flow: 'EXPENSE' } ] },
+  { id: 'gp', t: 'calc', name: 'Валовая прибыль', sum: ['rev', 'var'] },
+  { id: 'gm', t: 'kpi', name: 'Валовая рентабельность, %', num: 'gp', den: 'rev' },
+  { id: 'fix', t: 'group', name: 'Постоянные расходы', kids: [
+    { id: 'sal', t: 'leaf', name: 'Зарплата и взносы', flow: 'EXPENSE' },
+    { id: 'rent', t: 'leaf', name: 'Аренда', flow: 'EXPENSE' },
+    { id: 'oth', t: 'leaf', name: 'Прочие расходы', flow: 'EXPENSE' } ] },
+  { id: 'fx', t: 'leaf', name: 'Курсовые разницы', flow: 'NONE' },
+  { id: 'op', t: 'calc', name: 'Операционная прибыль', sum: ['gp', 'fix', 'fx'] },
+  { id: 'tax', t: 'leaf', name: 'Налоги', flow: 'EXPENSE' },
+  { id: 'np', t: 'calc', name: 'Чистая прибыль', sum: ['op', 'tax'] },
+  { id: 'nm', t: 'kpi', name: 'Рентабельность по чистой прибыли, %', num: 'np', den: 'rev' }
+];
+const PAIRS = [
+  { p: 'Общий', c: 'Общий', f: 0.40 }, { p: 'Интернет-магазин', c: 'Продажи', f: 0.35 },
+  { p: 'Шоурум', c: 'Продажи', f: 0.20 }, { p: 'Шоурум', c: 'Склад', f: 0.05 }
+];
+const SEAS = [0.85, 0.85, 0.9, 0.95, 1, 1, 0.95, 0.95, 1.05, 1.1, 1.25, 1.15];
+const BASE = { rev_wb: 3200000, rev_oz: 2100000, rev_site: 1400000, cogs: 2700000, log: 550000, com: 800000, ads: 450000, sal: 550000, rent: 180000, oth: 200000, fx: 40000, tax: 220000 };
+const NODES = {}; const LEAVES = [];
+(function walk(list, depth, parent) { list.forEach((n) => { n.depth = depth; n.parent = parent; NODES[n.id] = n; if (n.t === 'leaf') LEAVES.push(n); if (n.kids) walk(n.kids, depth + 1, n.id); }); })(TREE, 0, null);
+const hsh = (id) => id.split('').reduce((a, ch) => a + ch.charCodeAt(0), 0);
+const sgn = (l, m) => (l.flow === 'EXPENSE' ? -1 : l.flow === 'NONE' ? (m % 3 === 0 ? -1 : 1) : 1);
+const planSeed = (pi, l, m) => sgn(l, m) * Math.round((BASE[l.id] * SEAS[m] * PAIRS[pi].f * (1 + (((m * 37 + hsh(l.id)) % 7) - 3) / 100)) / 1000) * 1000;
+const factSeed = (pi, l, m) => sgn(l, m) * Math.round((BASE[l.id] * SEAS[m] * PAIRS[pi].f * (1 + (((m * 53 + hsh(l.id) * 7) % 13) - 6) / 45)) / 1000) * 1000;
+const NB = ' ', MINUS = '−';
+const grp = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, NB);
+const money = (v) => { const r = Math.round(Math.abs(v)); return v < 0 && r !== 0 ? MINUS + grp(r) : grp(r); };
+const pctTxt = (x) => (x == null ? '—' : (x < 0 ? MINUS : '') + Math.abs(x).toFixed(1).replace('.', ',') + NB + '%');
+const zero12 = () => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+const add12 = (a, b) => a.map((v, i) => v + b[i]);
+// считает значения всех узлов дерева: getLeaf(id) -> массив из 12
+function computeAll(getLeaf) {
+  const V = {};
+  const go = (n) => {
+    if (n.t === 'leaf') V[n.id] = getLeaf(n.id);
+    else if (n.t === 'group') V[n.id] = n.kids.reduce((a, k) => { go(k); return add12(a, V[k.id]); }, zero12());
+    else if (n.t === 'calc') V[n.id] = n.sum.reduce((a, id) => add12(a, V[id]), zero12());
+    else V[n.id] = V[n.num].map((v, i) => (V[n.den][i] ? (v / V[n.den][i]) * 100 : null));
+  };
+  TREE.forEach(go);
+  // KPI «итого» считаем отдельно (по итогам года)
+  return V;
+}
+const totalOf = (V, n) => {
+  if (n.t === 'kpi') { const a = V[n.num].reduce((x, y) => x + y, 0), b = V[n.den].reduce((x, y) => x + y, 0); return b ? (a / b) * 100 : null; }
+  return V[n.id].reduce((x, y) => x + y, 0);
+};
+const flatVisible = (collapsed) => { const out = []; (function w(list) { list.forEach((n) => { out.push(n); if (n.kids && !collapsed[n.id]) w(n.kids); }); })(TREE); return out; };
+
+const CLOSED = { 2026: 10, 2027: 0 };
+const VARS = { 2026: [{ v: 'a', label: 'Бюджет 2026 · утверждён', k: 1, appr: true }, { v: 'b', label: 'Осторожный · черновик', k: 0.93 }], 2027: [{ v: 'c', label: 'Базовый · утверждён', k: 1.12, appr: true }, { v: 'd', label: 'Оптимистичный · черновик', k: 1.25 }] };
+const sumIdx = (arr, ms) => ms.reduce((a, m) => a + arr[m], 0);
+const PCT_T = (plan, fact) => (plan ? (fact / plan) * 100 : null);
+const sgnTxt = (v) => (v > 0 ? '+' + money(v) : money(v));
+
+class Component extends DCLogic {
+  state = { view: 'ok', year: 2026, variant: 'a', projSel: {}, cfoSel: {}, pop: '', per: 'months', ind: 'dev', lay: 'cols', collapsed: {}, toastT: '' };
+  componentDidMount() { this._c = () => this.setState((s) => (s.pop ? { pop: '' } : null)); if (typeof document !== 'undefined') document.addEventListener('click', this._c); }
+  componentWillUnmount() { if (typeof document !== 'undefined') document.removeEventListener('click', this._c); }
+  toast(t) { this.setState({ toastT: t }); setTimeout(() => this.setState({ toastT: '' }), 3200); }
+
+  renderVals() {
+    const s = this.state;
+    const closed = CLOSED[s.year] != null ? CLOSED[s.year] : 12;
+    const vlist = VARS[s.year] || [];
+    const cur = vlist.filter((o) => o.v === s.variant)[0];
+    const k = cur ? cur.k : 1;
+    const projects = Array.from(new Set(PAIRS.map((p) => p.p))), cfos = Array.from(new Set(PAIRS.map((p) => p.c)));
+    const pSel = projects.filter((p) => s.projSel[p]), cSel = cfos.filter((c) => s.cfoSel[c]);
+    const pairs = PAIRS.map((p, i) => i).filter((i) => (!pSel.length || pSel.indexOf(PAIRS[i].p) >= 0) && (!cSel.length || cSel.indexOf(PAIRS[i].c) >= 0));
+    const leafPlan = (id) => { const a = zero12(); pairs.forEach((pi) => MON.forEach((_, m) => { a[m] += Math.round(planSeed(pi, NODES[id], m) * k / 1000) * 1000; })); return a; };
+    const leafFact = (id) => { const a = zero12(); pairs.forEach((pi) => MON.forEach((_, m) => { a[m] += factSeed(pi, NODES[id], m); })); return a; };
+    const VP = computeAll(leafPlan), VF = computeAll(leafFact);
+    const quarters = s.per === 'quarters';
+    const periods = quarters ? [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]] : MON.map((_, m) => [m]);
+    const pcols = quarters ? ['I кв.', 'II кв.', 'III кв.', 'IV кв.'] : MON;
+    const allM = MON.map((_, m) => m), closedM = allM.filter((m) => m < closed);
+    // агрегат по набору месяцев для узла
+    const agg = (V, n, ms) => { if (n.t === 'kpi') { const a = sumIdx(V[n.num], ms), b = sumIdx(V[n.den], ms); return b ? (a / b) * 100 : null; } return sumIdx(V[n.id], ms); };
+    const calc = (n, ms) => { // план по всем ms, факт и отклонение — по закрытым
+      const cl = ms.filter((m) => m < closed);
+      const plan = agg(VP, n, ms); const planCl = cl.length ? agg(VP, n, cl) : null; const fact = cl.length ? agg(VF, n, cl) : null;
+      const dev = cl.length && plan != null && fact != null && planCl != null ? fact - planCl : null;
+      const pc = n.t === 'kpi' || !cl.length ? null : PCT_T(planCl, fact);
+      return { plan, fact, dev, pc, planCl, kpi: n.t === 'kpi' };
+    };
+    const fmt = (n, v) => (v == null ? '' : n.t === 'kpi' ? pctTxt(v) : money(v));
+    const devTxt = (n, d) => (d == null ? '' : n.t === 'kpi' ? (d > 0 ? '+' : d < 0 ? MINUS : '') + Math.abs(d).toFixed(1).replace('.', ',') + NB + 'п.п.' : sgnTxt(d));
+    const rate = (n, r) => { if (r.dev == null || Math.abs(r.dev) < 0.0001) return { icon: '', label: '', hl: false }; const hl = n.t !== 'kpi' && r.planCl ? Math.abs(r.dev) / Math.abs(r.planCl) > 0.1 : false; return { icon: r.dev > 0 ? '▲' : '▼', label: r.dev > 0 ? 'лучше плана' : 'хуже плана', hl }; };
+    const monthsRu = (ms) => (ms.length === 1 ? MONF[ms[0]] + ' ' + s.year : 'период ' + MONF[ms[0]] + '–' + MONF[ms[ms.length - 1]] + ' ' + s.year);
+    const vis = flatVisible(s.collapsed);
+    const isAll = s.ind === 'all', rowsLay = isAll && s.lay === 'rows', colsLay = isAll && !rowsLay;
+    const METL = { plan: 'План', fact: 'Факт', dev: 'Откл.', pct: '%' };
+    const mets = colsLay ? (quarters ? ['plan', 'fact', 'dev', 'pct'] : ['plan', 'fact', 'dev']) : [isAll ? 'dev' : s.ind];
+    const mk = (n, ms, metric, first) => {
+      const r = calc(n, ms), q = rate(n, r);
+      let txt = '', link = false, icon = '', iconLabel = '';
+      if (metric === 'plan') txt = fmt(n, r.plan);
+      else if (metric === 'fact') { txt = fmt(n, r.fact); link = n.t !== 'kpi' && r.fact != null; }
+      else if (metric === 'dev') { txt = devTxt(n, r.dev); icon = q.icon; iconLabel = q.label; }
+      else txt = n.t === 'kpi' || r.pc == null ? '' : pctTxt(r.pc);
+      const hl = q.hl && metric !== 'plan' && metric !== 'pct' || (q.hl && metric === 'pct');
+      return { cls: 'gc gnum mob-hide' + (metric === 'plan' && colsLay ? ' mplan' : '') + (hl ? ' hl' : '') + (first && colsLay ? ' gsep' : ''), title: q.hl ? 'Отклонение больше 10% от плана' : '', txt, link, plain: !link, icon, iconLabel, open: () => this.toast('Открывается отчёт ОПиУ за ' + monthsRu(ms) + ' с теми же фильтрами') };
+    };
+    const buildRow = (n, metric, part) => { // part: undefined | 0 | 1 | 2 (строки раскладки «Строками»)
+      const isGroup = n.t === 'group', head = part === undefined || part === 0;
+      const cells = [];
+      periods.forEach((ms) => { (rowsLay ? [metric] : mets).forEach((mt, j) => cells.push(mk(n, ms, mt, j === 0))); });
+      const t = calc(n, allM), tq = rate(n, t);
+      const only = (m, v) => (rowsLay && metric !== m ? '' : v);
+      return {
+        rowCls: 'gr ' + (isGroup ? 'g-group' : n.t === 'calc' ? 'g-calc' : n.t === 'kpi' ? 'g-kpi' : 'g-leaf') + (part === 0 ? ' rr-a' : part === 1 ? ' rr-b' : ''),
+        indent: 'padding-left:' + (10 + n.depth * 18) + 'px', name: head ? n.name : '', isGroup: isGroup && head, noChev: !(isGroup && head), hasMetric: rowsLay, metric: rowsLay ? METL[metric] : '', open: isGroup ? (!s.collapsed[n.id] ? 'true' : 'false') : '',
+        chevLabel: (s.collapsed[n.id] ? 'Развернуть ' : 'Свернуть ') + n.name, chevStyle: 'transition:transform .12s;transform:rotate(' + (s.collapsed[n.id] ? 0 : 90) + 'deg)',
+        toggle: () => this.setState((q) => ({ collapsed: Object.assign({}, q.collapsed, { [n.id]: !q.collapsed[n.id] }) })),
+        cells, tPlan: only('plan', fmt(n, t.planCl != null ? t.planCl : t.plan)), tFact: only('fact', fmt(n, t.fact)), tDev: only('dev', devTxt(n, t.dev)), tIcon: only('dev', tq.icon), tIconLabel: tq.label,
+        tDevCls: 'gc gnum gtot tc3' + (tq.hl && (!rowsLay || metric === 'dev') ? ' hl' : ''), tPct: n.t === 'kpi' || t.pc == null || (rowsLay && metric !== 'dev') ? '' : pctTxt(t.pc),
+        openTotal: () => this.toast('Открывается отчёт ОПиУ за ' + (closedM.length ? monthsRu(closedM) : String(s.year)) + ' с теми же фильтрами')
+      };
+    };
+    const rows = [];
+    vis.forEach((n) => { if (rowsLay) ['plan', 'fact', 'dev'].forEach((m, i) => rows.push(buildRow(n, m, i))); else rows.push(buildRow(n, mets[0])); });
+    const colsN = periods.length * (rowsLay ? 1 : mets.length);
+    const hdr1 = pcols.map((p) => ({ label: p, cls: 'gc gnum' + (colsLay ? ' gsep' : ' mob-hide'), style: colsLay ? 'grid-column:span ' + mets.length : '' }));
+    if (colsLay) hdr1.forEach((h) => { h.cls += ' mob-hide'; });
+    const hdr2 = []; if (colsLay) pcols.forEach(() => mets.forEach((mt, j) => hdr2.push({ label: METL[mt], cls: 'gc gnum mob-hide' + (j === 0 ? ' gsep' : '') })));
+    const cw = colsLay ? (quarters ? 116 : 104) : quarters ? 140 : 100;
+    const gridCols = 'grid-template-columns:260px repeat(' + colsN + ',' + cw + 'px) 118px 118px 118px 82px;width:' + (260 + colsN * cw + 436) + 'px';
+    const mkOpts = (list, sel, key) => list.map((x) => ({ label: x, on: !!sel[x], toggle: () => this.setState((q) => ({ [key]: Object.assign({}, q[key], { [x]: !q[key][x] }) })) }));
+    const lab = (sel, all) => (sel.length === 0 ? all : sel.length === 1 ? sel[0] : sel.length + ' выбрано');
+    const noApproved = !cur;
+    return {
+      viewOk: s.view === 'ok', viewLoading: s.view === 'loading', viewError: s.view === 'error', onView: (e) => this.setState({ view: e.target.value }),
+      year: s.year, yearOpts: [2026, 2027].map((y) => ({ v: y, sel: y === s.year })), onYear: (e) => { const y = Number(e.target.value); this.setState({ year: y, variant: VARS[y][0].v }); },
+      varOpts: [{ v: '', label: 'Выберите вариант', sel: !cur }].concat(vlist.map((o) => ({ v: o.v, label: o.label, sel: o.v === s.variant }))), onVariant: (e) => this.setState({ variant: e.target.value }),
+      popP: s.pop === 'p', popC: s.pop === 'c', stop: (e) => e.stopPropagation(),
+      togP: (e) => { e.stopPropagation(); this.setState({ pop: s.pop === 'p' ? '' : 'p' }); }, togC: (e) => { e.stopPropagation(); this.setState({ pop: s.pop === 'c' ? '' : 'c' }); },
+      projLabel: lab(pSel, 'Все'), cfoLabel: lab(cSel, 'Все'), projOpts: mkOpts(projects, s.projSel, 'projSel'), cfoOpts: mkOpts(cfos.concat(['Не задано']), s.cfoSel, 'cfoSel'),
+      perMonths: !quarters, perQuarters: quarters, pickMonths: () => this.setState({ per: 'months' }), pickQuarters: () => this.setState({ per: 'quarters' }),
+      inds: [['all', 'Все показатели'], ['plan', 'План'], ['fact', 'Факт'], ['dev', 'Отклонение'], ['pct', '%']].map((o) => ({ label: o[1], on: s.ind === o[0], pick: () => this.setState({ ind: o[0] }) })),
+      noApproved, isLoading: s.view === 'loading', isError: s.view === 'error', retry: () => { this.setState({ view: 'loading' }); setTimeout(() => this.setState({ view: 'ok' }), 900); },
+      isAll, layCols: !rowsLay, layRows: rowsLay, pickCols: () => this.setState({ lay: 'cols' }), pickRows: () => this.setState({ lay: 'rows' }), showSub: colsLay, hdr1, hdr2,
+      showTable: s.view === 'ok' && !noApproved, gridCols, rows,
+      periodNote: closed === 0 ? 'За ' + s.year + ' год факта ещё нет — показан только план.' : closed < 12 ? 'Итого — по закрытым месяцам: янв–' + MON[closed - 1].toLowerCase() + '. Будущие месяцы: факт пустой, отклонение не считается.' : 'Итого за год.',
+      toast: s.toastT
+    };
+  }
+}
+
+</script>
+</body>
+</html>
