@@ -21,6 +21,9 @@ export interface BudgetGridProps {
     exportUrl: string;
     /** Загрузка плана пары из xlsx: POST multipart, ответ — BudgetImportResult. */
     importUrl: string;
+    /** Правило «X % от строки»: задать (`rulesUrl`) и снять (`rulesDeleteUrl`), POST JSON. */
+    rulesUrl: string;
+    rulesDeleteUrl: string;
     csrfToken: string;
     plCategoriesUrl: string;
 }
@@ -43,6 +46,15 @@ export interface BudgetGridRow {
     total: string;
     /** `Y-m` → комментарий */
     comments: Record<string, string>;
+    /** Правило «X % от строки» в выбранной паре: строка считается сама и не редактируется. */
+    rule: BudgetGridRule | null;
+}
+
+export interface BudgetGridRule {
+    /** Процент строкой с точкой: `12.50`. */
+    percent: string;
+    baseCategoryId: string;
+    baseName: string;
 }
 
 export interface BudgetGridData {

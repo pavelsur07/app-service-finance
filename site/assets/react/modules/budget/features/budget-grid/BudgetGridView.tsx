@@ -1,6 +1,6 @@
 import type { ClipboardEvent, CSSProperties, KeyboardEvent, MouseEvent, ReactNode, RefObject } from 'react';
 import { cn } from '@/react/shared/lib/cn';
-import { formatValue } from './amount';
+import { formatPercent, formatValue } from './amount';
 import type { BudgetGridRow, BudgetPair, CellPosition, SaveState } from './budget-grid.types';
 import styles from './BudgetGrid.module.css';
 
@@ -218,6 +218,11 @@ export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
                                             </button>
                                         ) : <span className={styles.togglePlaceholder} />}
                                         {row.name}
+                                        {row.rule !== null && (
+                                            <span className={styles.ruleBadge} data-budget-rule>
+                                                {formatPercent(row.rule.percent)} от {row.rule.baseName}
+                                            </span>
+                                        )}
                                     </th>
                                     {months.map((month, colIndex) => {
                                         const key = `${row.id}|${month}`;
@@ -231,7 +236,7 @@ export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
                                                 key={month}
                                                 role="gridcell"
                                                 aria-selected={isActive}
-                                                title={comment}
+                                                title={row.rule !== null ? `Считается по правилу: ${formatPercent(row.rule.percent)} от «${row.rule.baseName}»` : comment}
                                                 className={cn(
                                                     styles.cell,
                                                     editableCell ? styles.editable : row.editable && styles.readonlyCell,
@@ -257,7 +262,7 @@ export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
                                                         onBlur={props.onEditBlur}
                                                     />
                                                 ) : (
-                                                    <Value value={row.values[month] ?? '0'} row={row} blankZero={row.editable} />
+                                                    <Value value={row.values[month] ?? '0'} row={row} blankZero={row.editable || row.rule !== null} />
                                                 )}
                                             </td>
                                         );

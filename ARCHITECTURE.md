@@ -2147,7 +2147,8 @@ Facade нет: план читает только сам модуль; Facade п
   правилом; цель — база другого правила. `BudgetLinesWriter::validate()`
   отклоняет ручную запись в статью с правилом; помощники и импорт её пропускают
   (`skipped`). Снятие: `rule` → `manual`. Копия варианта копирует правила.
-  Сетка: у строки `rule {percent, baseCategoryId, baseName}`, `editable: false`.
+  Сетка: у строки `rule {percent, baseCategoryId, baseName}`, `editable: false`;
+  остров — метка правила и панель «Правило %» (props `rulesUrl`, `rulesDeleteUrl`).
 - Пара «проект × ЦФО» из запроса — `BudgetPairResolver`; неактивная или чужая —
   `InvalidBudgetPairException` (422 `budget_invalid_pair`).
 - «Итог года» в списке: `BudgetYearTotals::netProfit()` — один
