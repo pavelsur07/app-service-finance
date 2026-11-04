@@ -1,6 +1,6 @@
 ## Current checkpoint
 
-**Phase:** handoff (часть 2, этапы 3–5)
+**Phase:** handoff (часть 2, этапы 3–5) — ревью исправлено, тесты зелёные, PR
 **Status:** Stage 5 done; часть 1 (этапы 0–2) на проде с 04.11 (#2874)
 **Stage base commit:** `cf083d2e7` (ветка `feat/pl-budget-plan-fact`)
 
