@@ -1,0 +1,246 @@
+/* Бюджет ОПиУ — экран «Варианты» (BUDGET-SPEC §4, refs 01–09). Только токены --vf-*. */
+
+.budget-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--vf-space-3);
+}
+
+/* Переключатель года «‹ 2027 ▾ ›» */
+.budget-year {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  border: 1px solid var(--vf-border-control);
+  border-radius: var(--vf-radius-sm);
+  background: var(--vf-surface);
+}
+
+.budget-year__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 100%;
+  color: var(--vf-text);
+}
+
+.budget-year__step:hover {
+  background: var(--vf-hover-bg);
+}
+
+.budget-year__step.disabled {
+  color: var(--vf-text-disabled);
+  pointer-events: none;
+}
+
+.budget-year__select {
+  height: 100%;
+  padding: 0 var(--vf-space-2);
+  border: 0;
+  background: transparent;
+  font-weight: var(--vf-weight-semibold);
+  color: var(--vf-text);
+}
+
+.budget-year__select:focus-visible,
+.budget-year__step:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: -2px;
+}
+
+/* Недоступная кнопка — причина текстом под ней (BUDGET-SPEC §4) */
+.budget-disabled {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--vf-space-1);
+}
+
+.budget-disabled__reason,
+.vf-menu-item__reason {
+  font-size: var(--vf-size-xs);
+  color: var(--vf-text-muted);
+  white-space: normal;
+}
+
+.budget-menu {
+  min-width: 15rem;
+}
+
+.vf-menu-item--reason {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 16rem;
+  white-space: normal;
+}
+
+.vf-menu-item--reason .vf-menu-item__reason {
+  margin-top: 2px;
+}
+
+/* Таблица вариантов */
+.budget-versions__total-unit {
+  display: none;
+}
+
+.budget-versions__menu {
+  width: 1%;
+}
+
+.budget-archive-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vf-space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  font-weight: var(--vf-weight-semibold);
+  color: var(--vf-text);
+}
+
+.budget-archive-toggle .ti {
+  transition: transform var(--vf-duration-fast) var(--vf-ease);
+}
+
+.budget-archive-toggle[aria-expanded='true'] .ti {
+  transform: rotate(90deg);
+}
+
+.budget-archive-toggle:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 2px;
+  border-radius: var(--vf-radius-sm);
+}
+
+.budget-versions__archive-toggle td {
+  background: var(--vf-surface-alt);
+}
+
+/* Окно «Новый вариант»: ошибка слева, счётчик справа под полем */
+.budget-field-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--vf-space-2);
+  min-height: 1.25rem;
+}
+
+.budget-field-foot .invalid-feedback {
+  margin-top: 0.25rem;
+}
+
+.budget-field-foot__count {
+  margin-top: 0.25rem;
+  font-size: var(--vf-size-xs);
+  color: var(--vf-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+#budget-new fieldset legend {
+  float: none;
+  width: auto;
+  margin-bottom: var(--vf-space-2);
+}
+
+/* ≤ 760 px: строки — карточки (название + «⋯», бейдж + «₽ за год»), «Изменён» скрыт */
+@media (max-width: 760px) {
+  .budget-head-actions {
+    width: 100%;
+  }
+
+  .budget-versions thead {
+    display: none;
+  }
+
+  .budget-versions,
+  .budget-versions tbody,
+  .budget-versions tr,
+  .budget-versions td {
+    display: block;
+    width: 100%;
+  }
+
+  .budget-versions tbody[hidden] {
+    display: none;
+  }
+
+  .budget-versions .budget-versions__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name menu'
+      'status total';
+    align-items: center;
+    gap: var(--vf-space-2) var(--vf-space-3);
+    padding: var(--vf-space-3) var(--vf-space-4);
+    border-bottom: 1px solid var(--vf-border);
+  }
+
+  .budget-versions .budget-versions__row td {
+    width: auto;
+    padding: 0;
+    border: 0;
+  }
+
+  .budget-versions__name {
+    grid-area: name;
+    min-width: 0;
+  }
+
+  .budget-versions__menu {
+    grid-area: menu;
+  }
+
+  .budget-versions__status {
+    grid-area: status;
+  }
+
+  .budget-versions__total {
+    grid-area: total;
+  }
+
+  .budget-versions__total-unit {
+    display: inline;
+    font-size: var(--vf-size-xs);
+    color: var(--vf-text-muted);
+  }
+
+  .budget-versions__updated {
+    display: none !important;
+  }
+}
+
+.budget-versions__link {
+  font-weight: var(--vf-weight-semibold);
+  color: var(--vf-primary);
+}
+
+.vf-row-muted .budget-versions__link {
+  color: var(--vf-text);
+}
+
+/* Бейджи статуса варианта (BUDGET-SPEC §3) */
+.badge.budget-status {
+  height: 22px;
+  border-radius: var(--vf-radius-sm);
+  font-size: var(--vf-size-xs);
+  font-weight: var(--vf-weight-semibold);
+}
+
+.badge.budget-status--approved {
+  background: var(--vf-primary-lt);
+  color: var(--vf-info-text);
+}
+
+.badge.budget-status--draft {
+  background: var(--vf-navy-50);
+  color: var(--vf-text-muted);
+  border: 1px solid var(--vf-border);
+}
+
+.badge.budget-status--archived {
+  background: var(--vf-navy-100);
+  color: var(--vf-navy-500);
+}

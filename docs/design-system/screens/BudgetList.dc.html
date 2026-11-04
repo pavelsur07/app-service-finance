@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Бюджет ОПиУ — варианты</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+:root{--primary:#1d4ed8;--bg:#f7f8fc;--surface:#ffffff;--text:#0b1020;--muted:#525b78;--border:#dde1ec;--border-strong:#c3c8d6;--head-bg:#f4f6fb;--sel:#e8effd;--warn-bg:#fff4e5;--warn-text:#9a4a00;--warn-bd:#f5d3a8;--ok-bg:#e4f5e7;--ok-text:#1d7a30;--danger:#9a001b;--danger-bg:#fdecee}
+body{margin:0;background:var(--bg)}
+*{box-sizing:border-box}
+button,input,select,textarea{font-family:inherit;font-size:14px;color:var(--text)}
+.nav{display:flex;align-items:center;gap:12px;padding:9px 12px;margin:1px 8px;color:#dfe3ef;text-decoration:none;border-radius:4px;font-size:14px;line-height:20px}
+.nav:hover{background:rgba(255,255,255,.07)}
+.nav[aria-current]{background:rgba(255,255,255,.12);color:#fff;font-weight:600}
+.nav.sub{padding:6px 12px 6px 42px;font-size:13px;color:#c3c8d6}
+.nav.sub[aria-current]{color:#fff}
+.nav svg{flex:none}
+.btn{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:4px;border:1px solid var(--border-strong);background:var(--surface);cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover:not(:disabled){background:#eef1f8}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-primary:hover:not(:disabled){background:#1a40b0}
+.btn-sm{height:30px;padding:0 10px;font-size:13px}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:4px;background:transparent;color:var(--muted);cursor:pointer}
+.icon-btn:hover{background:rgba(11,16,32,.07);color:var(--text)}
+button:disabled{opacity:.5;cursor:not-allowed!important}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.nav:focus-visible{outline-color:#fff}
+.inp{height:36px;width:100%;padding:0 12px;border:1px solid var(--border-strong);border-radius:4px;background:var(--surface)}
+.inp[aria-invalid=true]{border-color:var(--danger);box-shadow:0 0 0 1px var(--danger)}
+.err{color:var(--danger);font-size:13px;margin-top:4px}
+.lbl{font-size:13px;font-weight:600;margin-bottom:4px;display:block}
+.tab{display:inline-flex;align-items:center;gap:8px;padding:12px 14px;border:0;border-bottom:2px solid transparent;background:none;cursor:pointer;font-weight:500;color:var(--muted);margin-bottom:-1px}
+.tab:hover{color:var(--text)}
+.tab[aria-selected=true]{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.badge{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:4px;font-size:12px;font-weight:600;white-space:nowrap}
+.b-approved{background:var(--sel);color:#1a3fae}
+.b-draft{background:var(--head-bg);color:var(--muted);border:1px solid var(--border)}
+.b-archive{background:#eceef4;color:#5b6485}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.dim{color:#7a829c}
+.menu{position:absolute;z-index:40;min-width:260px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 32px rgba(11,16,32,.18);padding:4px 0}
+.mi{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:8px 16px;border:0;background:none;cursor:pointer;font-size:14px}
+.mi:hover:not(:disabled){background:var(--head-bg)}
+.mi small{font-size:12px;color:var(--muted)}
+.mi:disabled{opacity:1;color:#7a829c;cursor:not-allowed}
+.scrim{position:fixed;inset:0;background:rgba(11,16,32,.45);z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:64px 16px;overflow:auto}
+.dlg{background:var(--surface);border-radius:8px;box-shadow:0 24px 64px rgba(11,16,32,.3);width:100%;max-width:520px}
+.demo{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;padding:8px 32px;background:#fffbe8;border-bottom:1px dashed #e5d58a;font-size:12px;color:#6b5a00}
+.demo b{font-weight:700;margin-right:4px}
+.demo select{height:26px;font-size:12px;border:1px solid #d9c866;border-radius:4px;background:#fff;padding:0 6px}
+.demo button{height:26px;font-size:12px;border:1px solid #d9c866;border-radius:4px;background:#fff;padding:0 8px;cursor:pointer}
+.toast{position:fixed;right:24px;bottom:24px;z-index:80;background:#0b1020;color:#fff;padding:12px 16px;border-radius:6px;box-shadow:0 8px 24px rgba(11,16,32,.3);max-width:380px}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:4px;border:1px solid var(--warn-bd);background:var(--warn-bg);color:var(--warn-text)}
+.alert.err2{border-color:#e9a9b3;background:var(--danger-bg);color:var(--danger)}
+.alert.info{border-color:#b9cdf5;background:var(--sel);color:#1a3fae}
+.skel{background:linear-gradient(90deg,#eceef4 25%,#f6f7fb 50%,#eceef4 75%);background-size:200% 100%;animation:sk 1.4s infinite;border-radius:4px}
+@keyframes sk{to{background-position:-200% 0}}
+
+.vr{display:grid;grid-template-columns:minmax(220px,1fr) 140px 200px 170px 56px;align-items:center;gap:12px;padding:0 16px}
+.vh{height:40px;background:var(--head-bg);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.vd{min-height:60px;padding-top:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.vd:hover{background:#f4f6fb}
+.r{text-align:right;justify-content:flex-end}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.m-cap{display:none}
+.link{background:none;border:0;padding:0;color:var(--primary);cursor:pointer}
+@media (max-width:760px){
+  .pad{padding:16px !important}
+  .vh{display:none}
+  .vr{grid-template-columns:1fr auto;grid-template-areas:"n a" "s p";row-gap:8px;padding:12px 16px}
+  .c-name{grid-area:n}.c-ac{grid-area:a}.c-st{grid-area:s}.c-pr{grid-area:p}
+  .hide-sm{display:none !important}
+  .m-cap{display:inline;color:var(--muted);font-size:12px}
+  .demo{padding:8px 16px}
+}
+
+.c-pr{padding-right:12px}
+@media (max-width:760px){.c-pr{padding-right:0}}
+
+</style>
+</helmet>
+<div style="display:flex;flex-wrap:wrap;align-items:stretch;min-height:1000px;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:20px;color:var(--text);background:var(--bg)">
+<aside style="flex:0 0 240px;width:240px;background:#0b1020;color:#dfe3ef;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:10px;padding:18px 16px 14px">
+      <div style="width:32px;height:32px;border-radius:8px;background:#b00020;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">ВФ</div>
+      <div style="font-weight:700;font-size:16px;color:#fff">Ваш Финдир</div>
+    </div>
+    <nav aria-label="Основное меню" style="display:flex;flex-direction:column;padding:6px 0;flex:1">
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7M6 10v10h12V10"/></svg><span style="flex:1">Главная</span></a>
+      <a class="nav" href="#" style="font-weight:600;color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M16 13h2M3 10h18"/></svg><span style="flex:1">Деньги</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Операции ДДС</span></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Платёжный календарь</span></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Остатки и счета</span></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v14H7zM14 3v5h5M10 13h6M10 17h6"/></svg><span style="flex:1">Доходы и расходы</span></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9l1-5h14l1 5M4 9v11h16V9M4 9a3 3 0 006 0 3 3 0 006 0 3 3 0 004 0M10 20v-5h4v5"/></svg><span style="flex:1">Маркетплейсы</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V9l9-5 9 5v12M7 21v-7h10v7"/></svg><span style="flex:1">МойСклад</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#" style="font-weight:600;color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v9h9a9 9 0 11-9-9z"/></svg><span style="flex:1">Отчёты</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Отчёт ОПиУ</span></a><a class="nav" href="#" style="margin-left:20px;padding-left:28px"><span style="flex:1">Документы ОПиУ</span></a><a class="nav" href="#" aria-current="page" style="margin-left:20px;padding-left:28px"><span style="flex:1">Бюджет ОПиУ</span></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4 4 0 010-8 5 5 0 019.6-1A4.5 4.5 0 0117 18M12 12v7M9 15l3-3 3 3"/></svg><span style="flex:1">Загрузка данных</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M6 20h12M5 7h14M5 7l-3 7a3 3 0 006 0zM19 7l-3 7a3 3 0 006 0z"/></svg><span style="flex:1">Баланс</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h5v15H4zM10 5h5v15h-5zM17 6l3 .8-3.7 13.4-3-.8"/></svg><span style="flex:1">Справочники</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span style="flex:1">Импорт</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7l8 8M5 19l4-4M12 4l8 8-3 3-8-8z"/></svg><span style="flex:1">Интеграции</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4h9v17M14 9h5v12M9 8h1M9 12h1M9 16h1M3 21h18"/></svg><span style="flex:1">Компания и доступы</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+      <a class="nav" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 8a3 3 0 016 0v7a3 3 0 01-6 0zM4 13h5M15 13h5M5 7l3 2M19 7l-3 2M5 19l3-2M19 19l-3-2"/></svg><span style="flex:1">Отладка</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+    </nav>
+    <div style="border-top:1px solid rgba(255,255,255,.12);padding:14px 16px;display:flex;flex-direction:column;gap:2px">
+      <div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#9aa3bd">КОМПАНИЯ</div>
+      <div style="font-weight:600;color:#fff">ИП Лазарева</div>
+      <a href="#" style="font-size:12px;color:#c3c8d6;text-decoration:none">Переключить →</a>
+    </div>
+  </aside>
+<div style="flex:999 1 720px;min-width:0;display:flex;flex-direction:column">
+<header style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 32px;background:var(--surface);border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:16px"><div style="font-size:18px;font-weight:600">Сервис</div><select aria-label="Компания" style="height:36px;padding:0 12px;border:1px solid var(--border);border-radius:4px;background:var(--surface)"><option>ИП Лазарева</option></select></div></header>
+<div class="demo" role="group" aria-label="Демо-переключатели (не часть интерфейса)">
+  <span><b>Демо:</b></span>
+  <label>Роль <select onChange="{{onRole}}"><option value="owner" selected="{{roleOwner}}">Владелец компании</option><option value="write" selected="{{roleWrite}}">Запись</option><option value="read" selected="{{roleRead}}">Чтение</option></select></label>
+  <label>Состояние <select onChange="{{onView}}"><option value="ok" selected="{{viewOk}}">Данные</option><option value="loading" selected="{{viewLoading}}">Загрузка</option><option value="error" selected="{{viewError}}">Ошибка сервера</option></select></label>
+</div>
+<main style="padding:24px 32px 40px;display:flex;flex-direction:column;gap:20px;max-width:1500px;width:100%" class="pad">
+
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px">
+    <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+      <nav aria-label="Путь" style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)"><a href="#" style="color:var(--muted);text-decoration:none">Деньги и отчёты</a><span aria-hidden="true">/</span><span aria-current="page" style="color:var(--text);font-weight:500">Бюджет ОПиУ</span></nav>
+      <h1 style="margin:0;font-size:24px;line-height:32px;font-weight:600">Бюджет ОПиУ</h1>
+      <div style="color:var(--muted);max-width:640px">Плановые показатели по статьям ОПиУ на год. Утверждённый вариант — основа для сравнения план–факт.</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+      <div role="group" aria-label="Год" style="display:flex;align-items:center;border:1px solid var(--border-strong);border-radius:4px;background:var(--surface)">
+        <button class="icon-btn" type="button" aria-label="Предыдущий год" onClick="{{prevYear}}" disabled="{{prevDis}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <select aria-label="Год бюджета" onChange="{{onYear}}" style="border:0;background:transparent;height:34px;font-weight:600;padding:0 4px;text-align:center">
+          <sc-for list="{{yearOpts}}" as="y" hint-placeholder-count="3"><option value="{{y.v}}" selected="{{y.sel}}">{{y.label}}</option></sc-for>
+        </select>
+        <button class="icon-btn" type="button" aria-label="Следующий год" onClick="{{nextYear}}" disabled="{{nextDis}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
+      <button class="btn btn-primary" type="button" onClick="{{openNew}}" disabled="{{cantEdit}}" title="{{editReason}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Новый вариант</button>
+    </div>
+  </div>
+  <sc-if value="{{cantEdit}}" hint-placeholder-val="{{ false }}"><div style="margin-top:-12px;font-size:13px;color:var(--muted);text-align:right">{{editReason}}</div></sc-if>
+
+  <sc-if value="{{refusal}}" hint-placeholder-val="{{ false }}">
+    <div class="alert err2" role="alert"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg><span style="flex:1">{{refusal}}</span><button class="link" type="button" onClick="{{closeRefusal}}" style="background:none;border:0;color:inherit;cursor:pointer;font-weight:600">Закрыть</button></div>
+  </sc-if>
+
+  <section style="background:var(--surface);border:1px solid var(--border);border-radius:4px;box-shadow:0 1px 2px rgba(11,16,32,.04)">
+    <div role="tablist" aria-label="Разделы бюджета" style="display:flex;gap:4px;padding:0 16px;border-bottom:1px solid var(--border)">
+      <button class="tab" role="tab" type="button" aria-selected="true">Варианты</button>
+      <button class="tab" role="tab" type="button" aria-selected="false">План–факт</button>
+    </div>
+
+    <sc-if value="{{isLoading}}" hint-placeholder-val="{{ false }}">
+      <div aria-busy="true" aria-label="Загрузка вариантов" style="padding:16px;display:flex;flex-direction:column;gap:14px">
+        <div class="skel" style="height:20px;width:30%"></div>
+        <div class="skel" style="height:44px"></div><div class="skel" style="height:44px"></div><div class="skel" style="height:44px"></div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isError}}" hint-placeholder-val="{{ false }}">
+      <div style="padding:40px 16px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center">
+        <div role="alert" style="color:var(--danger);font-weight:600">Не удалось загрузить варианты бюджета</div>
+        <div style="color:var(--muted);max-width:460px">Сервер не ответил. Данные не потеряны — повторите попытку. Если ошибка повторяется, сообщите код: BUD-LIST-503.</div>
+        <button class="btn" type="button" onClick="{{retry}}">Повторить</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isEmpty}}" hint-placeholder-val="{{ false }}">
+      <div style="padding:48px 16px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center">
+        <div style="font-size:18px;font-weight:600">{{emptyTitle}}</div>
+        <div style="color:var(--muted);max-width:480px">Создайте вариант и заполните план по статьям ОПиУ на 12 месяцев.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">
+          <button class="btn btn-primary" type="button" onClick="{{openNew}}" disabled="{{cantEdit}}" title="{{editReason}}">Создать пустой</button>
+          <button class="btn" type="button" disabled="true" title="Появится позже: заполнение плана из факта прошлого года">{{fromFactLabel}}</button>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">Заполнение из факта станет доступно на следующем этапе.</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{hasRows}}" hint-placeholder-val="{{ true }}">
+      <div role="table" aria-label="Варианты бюджета" style="display:flex;flex-direction:column">
+        <div role="row" class="vr vh">
+          <div role="columnheader">Название</div><div role="columnheader">Статус</div><div role="columnheader" class="r hide-sm">{{profitHead}}</div><div role="columnheader" class="hide-sm">Изменён</div><div role="columnheader" class="r"><span class="sr">Действия</span></div>
+        </div>
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="3">
+          <div role="row" class="vr vd">
+            <div role="cell" class="c-name"><a href="#" style="color:var(--primary);font-weight:600;text-decoration:none">{{r.name}}</a><sc-if value="{{r.hasCopy}}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:var(--muted)">копия «{{r.copyOf}}»</div></sc-if></div>
+            <div role="cell" class="c-st"><span class="{{r.badgeCls}}">{{r.badge}}</span></div>
+            <div role="cell" class="c-pr r"><span class="num" style="font-weight:600">{{r.int}}<span class="dim">{{r.dec}}</span></span><span class="m-cap"> ₽ за год</span></div>
+            <div role="cell" class="c-ch hide-sm" style="color:var(--muted)">{{r.changed}}</div>
+            <div role="cell" class="c-ac r" style="position:relative">
+              <button class="icon-btn" type="button" aria-haspopup="menu" aria-expanded="{{r.open}}" aria-label="Действия с вариантом «{{r.name}}»" onClick="{{r.toggle}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+              <sc-if value="{{r.open}}" hint-placeholder-val="{{ false }}">
+                <div class="menu" role="menu" style="right:8px;top:44px;text-align:left">
+                  <sc-for list="{{r.items}}" as="it" hint-placeholder-count="4">
+                    <button class="mi" role="menuitem" type="button" disabled="{{it.dis}}" onClick="{{it.go}}">{{it.label}}<sc-if value="{{it.dis}}" hint-placeholder-val="{{ false }}"><small>{{it.reason}}</small></sc-if></button>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+
+        <sc-if value="{{hasArchive}}" hint-placeholder-val="{{ true }}">
+          <button type="button" aria-expanded="{{archOpen}}" onClick="{{toggleArch}}" style="display:flex;align-items:center;gap:8px;padding:12px 16px;border:0;border-top:1px solid var(--border);background:var(--head-bg);cursor:pointer;font-weight:600;color:var(--muted);text-align:left">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="{{archChev}}"><path d="M9 6l6 6-6 6"/></svg>Архив ({{archCount}})
+          </button>
+          <sc-if value="{{archOpen}}" hint-placeholder-val="{{ false }}">
+            <sc-for list="{{archRows}}" as="r" hint-placeholder-count="1">
+              <div role="row" class="vr vd" style="background:#fafbfd">
+                <div role="cell" class="c-name"><a href="#" style="color:var(--muted);font-weight:600;text-decoration:none">{{r.name}}</a></div>
+                <div role="cell" class="c-st"><span class="badge b-archive">Архив</span></div>
+                <div role="cell" class="c-pr r"><span class="num" style="font-weight:600;color:var(--muted)">{{r.int}}<span class="dim">{{r.dec}}</span></span><span class="m-cap"> ₽ за год</span></div>
+                <div role="cell" class="c-ch hide-sm" style="color:var(--muted)">{{r.changed}}</div>
+                <div role="cell" class="c-ac r" style="position:relative">
+                  <button class="icon-btn" type="button" aria-haspopup="menu" aria-expanded="{{r.open}}" aria-label="Действия с вариантом «{{r.name}}»" onClick="{{r.toggle}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+                  <sc-if value="{{r.open}}" hint-placeholder-val="{{ false }}">
+                    <div class="menu" role="menu" style="right:8px;top:44px;text-align:left">
+                      <sc-for list="{{r.items}}" as="it" hint-placeholder-count="3">
+                        <button class="mi" role="menuitem" type="button" disabled="{{it.dis}}" onClick="{{it.go}}">{{it.label}}<sc-if value="{{it.dis}}" hint-placeholder-val="{{ false }}"><small>{{it.reason}}</small></sc-if></button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </sc-if>
+        </sc-if>
+      </div>
+      <div style="padding:10px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">{{footNote}}</div>
+    </sc-if>
+  </section>
+</main>
+
+<sc-if value="{{modalNew}}" hint-placeholder-val="{{ false }}">
+  <div class="scrim" onClick="{{closeModal}}">
+    <form class="dlg" role="dialog" aria-modal="true" aria-labelledby="nv-t" onClick="{{stop}}" onSubmit="{{submitNew}}" style="max-width:520px" novalidate>
+      <div style="padding:20px 24px 4px;display:flex;justify-content:space-between;align-items:center"><h2 id="nv-t" style="margin:0;font-size:18px;font-weight:600">Новый вариант бюджета</h2><button class="icon-btn" type="button" aria-label="Закрыть" onClick="{{closeModal}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <input type="hidden" name="request_id" value="{{reqId}}">
+      <div style="padding:12px 24px 8px;display:flex;flex-direction:column;gap:16px">
+        <div>
+          <label class="lbl" for="nv-name">Название</label>
+          <input id="nv-name" class="inp" maxlength="130" value="{{nv.name}}" onInput="{{onName}}" aria-invalid="{{nameInvalid}}" aria-describedby="nv-name-e nv-cnt">
+          <div style="display:flex;justify-content:space-between;gap:12px"><div id="nv-name-e" class="err" role="alert">{{nameErr}}</div><div id="nv-cnt" style="font-size:12px;color:var(--muted);margin-top:4px">{{nameLen}}/120</div></div>
+        </div>
+        <fieldset style="border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:8px">
+          <legend class="lbl" style="padding:0">Способ</legend>
+          <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="radio" name="how" checked="{{howEmpty}}" onChange="{{pickEmpty}}" style="accent-color:var(--primary);width:16px;height:16px;margin:0">Пустой</label>
+          <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="radio" name="how" checked="{{howCopy}}" onChange="{{pickCopy}}" style="accent-color:var(--primary);width:16px;height:16px;margin:0">Копия варианта</label>
+        </fieldset>
+        <sc-if value="{{howEmpty}}" hint-placeholder-val="{{ true }}">
+          <div><label class="lbl" for="nv-year">Год</label>
+            <select id="nv-year" class="inp" onChange="{{onNvYear}}"><sc-for list="{{nvYears}}" as="y" hint-placeholder-count="3"><option value="{{y.v}}" selected="{{y.sel}}">{{y.label}}</option></sc-for></select></div>
+        </sc-if>
+        <sc-if value="{{howCopy}}" hint-placeholder-val="{{ false }}">
+          <div><label class="lbl" for="nv-src">Вариант-источник</label>
+            <select id="nv-src" class="inp" onChange="{{onSrc}}" aria-invalid="{{srcInvalid}}"><sc-for list="{{srcOpts}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}" selected="{{o.sel}}">{{o.label}}</option></sc-for></select>
+            <div class="err" role="alert">{{srcErr}}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">Год копии берётся из источника — {{copyYear}}, изменить его нельзя.</div></div>
+        </sc-if>
+        <sc-if value="{{formErr}}" hint-placeholder-val="{{ false }}"><div class="alert err2" role="alert">{{formErr}}</div></sc-if>
+      </div>
+      <div style="padding:16px 24px 20px;display:flex;justify-content:flex-end;gap:8px"><button class="btn" type="button" onClick="{{closeModal}}">Отмена</button><button class="btn btn-primary" type="submit" disabled="{{creating}}">{{createLabel}}</button></div>
+    </form>
+  </div>
+</sc-if>
+
+<sc-if value="{{modalConfirm}}" hint-placeholder-val="{{ false }}">
+  <div class="scrim" onClick="{{closeModal}}">
+    <div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="cf-t" aria-describedby="cf-d" onClick="{{stop}}" style="max-width:460px">
+      <div style="padding:20px 24px 8px"><h2 id="cf-t" style="margin:0;font-size:18px;font-weight:600">{{cf.title}}</h2></div>
+      <div id="cf-d" style="padding:0 24px 8px;color:var(--muted)">{{cf.text}}</div>
+      <div style="padding:16px 24px 20px;display:flex;justify-content:flex-end;gap:8px"><button class="btn" type="button" onClick="{{closeModal}}">Отмена</button><button class="btn btn-primary" type="button" onClick="{{doConfirm}}">{{cf.ok}}</button></div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{toast}}" hint-placeholder-val="{{ false }}"><div class="toast" role="status">{{toast}}</div></sc-if>
+
+</div></div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+const V0 = [
+  { id: 1, year: 2027, name: 'Базовый', status: 'approved', profit: 12480000.0, changed: '03.11.2026 14:20' },
+  { id: 2, year: 2027, name: 'Оптимистичный', status: 'draft', copyOf: 'Базовый', profit: 18950320.5, changed: '02.11.2026 18:05' },
+  { id: 3, year: 2027, name: 'Стресс-сценарий', status: 'draft', copyOf: 'Базовый', profit: -2310450.0, changed: '28.10.2026 11:42' },
+  { id: 4, year: 2027, name: 'Первый набросок', status: 'archive', profit: 9120000.0, changed: '14.09.2026 09:10' },
+  { id: 5, year: 2026, name: 'Бюджет 2026', status: 'approved', profit: 10860000.0, changed: '12.01.2026 10:00' },
+  { id: 6, year: 2026, name: 'Осторожный', status: 'draft', copyOf: 'Бюджет 2026', profit: 8400000.0, changed: '09.01.2026 16:30' }
+];
+const BADGE = { approved: ['badge b-approved', 'Утверждён'], draft: ['badge b-draft', 'Черновик'], archive: ['badge b-archive', 'Архив'] };
+const NB = ' ', MINUS = '−';
+const grp = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, NB);
+const parts = (v) => { const a = Math.abs(v); const i = Math.floor(a + 0.005); const c = Math.round((a - i) * 100); return { int: (v < 0 ? MINUS : '') + grp(i), dec: ',' + (c < 10 ? '0' : '') + c }; };
+const key = (d) => d.slice(6, 10) + d.slice(3, 5) + d.slice(0, 2) + d.slice(11);
+const NOW = '04.11.2026 06:23';
+
+class Component extends DCLogic {
+  state = { year: 2027, role: 'owner', view: 'ok', variants: V0, menu: 0, archOpen: false, modal: '', cf: null, refusal: '', toast: '', nv: { name: 'Вариант 4', how: 'empty', year: 2027, src: 1 }, nvTry: false, creating: false, nextId: 7 };
+
+  componentDidMount() {
+    this._k = (e) => { if (e.key === 'Escape') this.setState((s) => (s.modal ? { modal: '' } : s.menu ? { menu: 0 } : null)); };
+    this._c = () => this.setState((s) => (s.menu ? { menu: 0 } : null));
+    if (typeof document !== 'undefined') { document.addEventListener('keydown', this._k); document.addEventListener('click', this._c); }
+  }
+  componentWillUnmount() { if (typeof document !== 'undefined') { document.removeEventListener('keydown', this._k); document.removeEventListener('click', this._c); } }
+
+  toast(t) { this.setState({ toast: t }); setTimeout(() => this.setState({ toast: '' }), 3200); }
+
+  renderVals() {
+    const s = this.state, role = s.role;
+    const isOwner = role === 'owner', canEdit = role !== 'read';
+    const inYear = s.variants.filter((v) => v.year === s.year);
+    const approved = inYear.filter((v) => v.status === 'approved');
+    const drafts = inYear.filter((v) => v.status === 'draft').sort((a, b) => (key(a.changed) < key(b.changed) ? 1 : -1));
+    const arch = inYear.filter((v) => v.status === 'archive');
+    const main = approved.concat(drafts);
+    const years = Array.from(new Set([2026, 2027, 2028].concat(s.variants.map((v) => v.year)))).sort();
+    const YEAR_CUR = 2026;
+    const R_EDIT = 'Роль «Чтение»: изменять варианты нельзя';
+    const R_OWN = 'Утверждает только владелец компании';
+    const R_RET = 'Возвращает в черновик только владелец компании';
+
+    const itemsFor = (v) => {
+      const its = [{ label: 'Открыть', go: () => this.toast('Открывается экран бюджета «' + v.name + '»') }];
+      const mk = (label, dis, reason, fn) => ({ label, dis, reason, go: fn });
+      its.push(mk('Копировать', !canEdit, R_EDIT, () => this.copy(v)));
+      if (v.status === 'draft') its.push(mk('Утвердить', !isOwner, R_OWN, () => this.setState({ modal: 'confirm', menu: 0, cf: { id: v.id, act: 'approve', title: 'Утвердить вариант «' + v.name + '»?', text: 'Вариант станет основным для ' + v.year + ' года и для сравнения план–факт. После утверждения изменения недоступны, пока вы не вернёте его в черновик.', ok: 'Утвердить' } })));
+      if (v.status === 'approved') its.push(mk('Вернуть в черновик', !isOwner, R_RET, () => this.setState({ modal: 'confirm', menu: 0, cf: { id: v.id, act: 'draft', title: 'Вернуть «' + v.name + '» в черновик?', text: 'Вариант снова можно будет править. Сравнение план–факт по умолчанию перестанет использовать этот вариант, пока не будет утверждён другой.', ok: 'Вернуть в черновик' } })));
+      if (v.status === 'draft') its.push(mk('В архив', !canEdit, R_EDIT, () => this.setStatus(v.id, 'archive', 'Вариант «' + v.name + '» перенесён в архив')));
+      if (v.status === 'archive') its.push(mk('Восстановить', !canEdit, R_EDIT, () => this.setStatus(v.id, 'draft', 'Вариант «' + v.name + '» восстановлен как черновик')));
+      return its;
+    };
+    const mapRow = (v) => {
+      const p = parts(v.profit), b = BADGE[v.status];
+      return { name: v.name, hasCopy: !!v.copyOf, copyOf: v.copyOf || '', badge: b[1], badgeCls: b[0], int: p.int, dec: p.dec, changed: v.changed,
+        open: s.menu === v.id, toggle: (e) => { e.stopPropagation(); this.setState({ menu: s.menu === v.id ? 0 : v.id }); }, items: itemsFor(v) };
+    };
+    const rows = main.map(mapRow), archRows = arch.map(mapRow);
+
+    // форма «Новый вариант»
+    const nv = s.nv;
+    const nameT = nv.name.trim();
+    const nameErr = !s.nvTry ? '' : (nameT === '' ? 'Введите название варианта' : nameT.length > 120 ? 'Не больше 120 символов' : '');
+    const nameLenErr = nv.name.length > 120;
+    const srcVar = s.variants.filter((v) => v.id === Number(nv.src))[0];
+    const srcList = inYear.length ? s.variants.filter((v) => v.status !== 'archive') : [];
+    const srcOpts = s.variants.filter((v) => v.status !== 'archive').sort((a, b) => (a.status === 'approved' ? -1 : 0) - (b.status === 'approved' ? -1 : 0) || a.year - b.year).map((v) => ({ v: v.id, label: v.name + ' · ' + v.year + (v.status === 'approved' ? ' · утверждён' : ''), sel: v.id === Number(nv.src) }));
+    const srcErr = s.nvTry && nv.how === 'copy' && !srcVar ? 'Выберите вариант, который копируем' : '';
+    const emptyYearTitle = 'На ' + s.year + ' год вариантов нет';
+
+    return {
+      roleOwner: role === 'owner', roleWrite: role === 'write', roleRead: role === 'read',
+      onRole: (e) => this.setState({ role: e.target.value, menu: 0 }),
+      viewOk: s.view === 'ok', viewLoading: s.view === 'loading', viewError: s.view === 'error',
+      onView: (e) => this.setState({ view: e.target.value, menu: 0 }),
+      yearOpts: years.map((y) => ({ v: y, label: String(y), sel: y === s.year })),
+      onYear: (e) => this.setState({ year: Number(e.target.value), menu: 0, refusal: '' }),
+      prevYear: () => this.setState({ year: s.year - 1, menu: 0, refusal: '' }), nextYear: () => this.setState({ year: s.year + 1, menu: 0, refusal: '' }),
+      prevDis: s.year <= years[0] - 0 && s.year <= 2025, nextDis: s.year >= 2029,
+      cantEdit: !canEdit, editReason: canEdit ? '' : R_EDIT,
+      openNew: () => this.setState({ modal: 'new', nvTry: false, creating: false, nv: { name: 'Вариант ' + (inYear.length + 1), how: 'empty', year: s.year, src: (approved[0] || s.variants[0]).id } }),
+      refusal: s.refusal, closeRefusal: () => this.setState({ refusal: '' }),
+      isLoading: s.view === 'loading', isError: s.view === 'error', retry: () => this.setState({ view: 'loading' }, () => setTimeout(() => this.setState({ view: 'ok' }), 900)),
+      isEmpty: s.view === 'ok' && inYear.length === 0, emptyTitle: emptyYearTitle, fromFactLabel: 'Заполнить из факта ' + (s.year - 1),
+      hasRows: s.view === 'ok' && inYear.length > 0, rows, profitHead: 'Чистая прибыль, ₽',
+      hasArchive: arch.length > 0, archOpen: s.archOpen, archCount: arch.length, archRows,
+      archChev: 'transition:transform .15s;transform:rotate(' + (s.archOpen ? 90 : 0) + 'deg)',
+      toggleArch: () => this.setState({ archOpen: !s.archOpen }),
+      footNote: approved.length ? 'Утверждённый вариант показан первым. «Итог года» — строка «Чистая прибыль» дерева ОПиУ.' : 'За ' + s.year + ' год нет утверждённого варианта — план–факт предложит выбрать черновик.',
+      // модалки
+      modalNew: s.modal === 'new', modalConfirm: s.modal === 'confirm', cf: s.cf || { title: '', text: '', ok: '' },
+      stop: (e) => e.stopPropagation(), closeModal: () => this.setState({ modal: '', cf: null }),
+      reqId: 'f3b1c2e0-' + s.nextId + 'a7d-4c11-9e55-0a1d3b7c92f4',
+      nv: nv, nameErr, nameInvalid: nameErr ? 'true' : 'false', nameLen: nv.name.length,
+      onName: (e) => this.setState({ nv: Object.assign({}, nv, { name: e.target.value }) }),
+      howEmpty: nv.how === 'empty', howCopy: nv.how === 'copy',
+      pickEmpty: () => this.setState({ nv: Object.assign({}, nv, { how: 'empty' }) }), pickCopy: () => this.setState({ nv: Object.assign({}, nv, { how: 'copy' }) }),
+      nvYears: [s.year - 1, s.year, s.year + 1].filter((y) => y >= 2025).map((y) => ({ v: y, label: String(y), sel: y === nv.year })),
+      onNvYear: (e) => this.setState({ nv: Object.assign({}, nv, { year: Number(e.target.value) }) }),
+      srcOpts, onSrc: (e) => this.setState({ nv: Object.assign({}, nv, { src: e.target.value }) }), srcErr, srcInvalid: srcErr ? 'true' : 'false',
+      copyYear: srcVar ? srcVar.year : '—',
+      formErr: s.formErr || '', creating: s.creating, createLabel: s.creating ? 'Создаю…' : 'Создать',
+      submitNew: (e) => {
+        e.preventDefault();
+        if (s.creating) return;
+        if (nameT === '' || nameT.length > 120 || (nv.how === 'copy' && !srcVar)) { this.setState({ nvTry: true }); return; }
+        this.setState({ creating: true });
+        setTimeout(() => {
+          const id = this.state.nextId; const year = nv.how === 'copy' ? srcVar.year : nv.year;
+          const row = { id, year, name: nameT, status: 'draft', copyOf: nv.how === 'copy' ? srcVar.name : undefined, profit: nv.how === 'copy' ? srcVar.profit : 0, changed: NOW };
+          this.setState({ variants: this.state.variants.concat([row]), nextId: id + 1, modal: '', creating: false, year });
+          this.toast('Вариант «' + nameT + '» создан — открывается экран бюджета');
+        }, 700);
+      },
+      doConfirm: () => {
+        const c = s.cf; if (!c) return;
+        const v = s.variants.filter((x) => x.id === c.id)[0];
+        if (c.act === 'approve') {
+          const other = s.variants.filter((x) => x.year === v.year && x.status === 'approved' && x.id !== v.id)[0];
+          if (other) { this.setState({ modal: '', cf: null, refusal: 'На ' + v.year + ' год уже утверждён «' + other.name + '». Сначала верните его в черновик.' }); return; }
+          this.setStatus(v.id, 'approved', 'Вариант «' + v.name + '» утверждён'); this.setState({ modal: '', cf: null, refusal: '' });
+        } else { this.setStatus(v.id, 'draft', 'Вариант «' + v.name + '» возвращён в черновик'); this.setState({ modal: '', cf: null, refusal: '' }); }
+      },
+      toast: s.toast
+    };
+  }
+
+  setStatus(id, status, msg) {
+    this.setState((st) => ({ variants: st.variants.map((v) => (v.id === id ? Object.assign({}, v, { status, changed: NOW }) : v)), menu: 0 }));
+    this.toast(msg);
+  }
+  copy(v) {
+    this.setState((st) => ({ variants: st.variants.concat([{ id: st.nextId, year: v.year, name: v.name + ' (копия)', status: 'draft', copyOf: v.name, profit: v.profit, changed: NOW }]), nextId: st.nextId + 1, menu: 0 }));
+    this.toast('Создана копия «' + v.name + '»');
+  }
+}
+
+</script>
+</body>
+</html>

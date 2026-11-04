@@ -63,4 +63,22 @@ final readonly class PlFactMonthlyAmountsQuery
 
         return $result;
     }
+
+    /**
+     * Есть ли за год ненулевой факт хотя бы в одной ячейке «проект × ЦФО × статья × месяц».
+     * Сумма по всей компании не годится: встречные суммы разных пар гасят друг друга.
+     */
+    public function hasAmounts(string $companyId, int $year): bool
+    {
+        return false !== $this->connection->fetchOne(<<<'SQL'
+            SELECT 1
+              FROM pl_daily_totals dt
+             WHERE dt.company_id = :company
+               AND dt.date BETWEEN :from AND :to
+               AND dt.pl_category_id IS NOT NULL
+             GROUP BY dt.project_direction_id, dt.responsibility_center_id, dt.pl_category_id, DATE_TRUNC('month', dt.date)
+            HAVING SUM(dt.amount_income) - SUM(dt.amount_expense) <> 0
+             LIMIT 1
+            SQL, ['company' => $companyId, 'from' => sprintf('%04d-01-01', $year), 'to' => sprintf('%04d-12-31', $year)]);
+    }
 }

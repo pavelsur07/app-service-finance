@@ -1,0 +1,44 @@
+{#
+  Меню «⋯» строки варианта (BUDGET-SPEC §4): Открыть, Копировать, Утвердить / Вернуть в черновик,
+  В архив / Восстановить. Недоступный пункт не прячется: неактивен, причина — строкой под ним.
+  Параметры: version, isOwner, canWrite.
+#}
+{% set status = version.status.value %}
+{% set read_only_hint = 'Роль «Чтение»: изменять варианты нельзя' %}
+{% macro item(version, target, label, title, body, submit, enabled, hint) %}
+    {% if enabled %}
+        <button type="button" class="dropdown-item"
+                data-bs-toggle="modal" data-bs-target="#budget-confirm"
+                data-confirm-action="{{ path('budget_version_status', {id: version.id, target: target}) }}"
+                data-confirm-token="{{ csrf_token('budget_version_status' ~ version.id) }}"
+                data-confirm-title="{{ title }}"
+                data-confirm-body="{{ body }}"
+                data-confirm-submit="{{ submit }}">{{ label }}</button>
+    {% else %}
+        <span class="dropdown-item disabled vf-menu-item--reason" aria-disabled="true">
+            {{ label }}
+            <span class="vf-menu-item__reason">{{ hint }}</span>
+        </span>
+    {% endif %}
+{% endmacro %}
+<div class="dropdown">
+    <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Действия с вариантом «{{ version.name }}»">
+        <i class="ti ti-dots" aria-hidden="true"></i>
+    </button>
+    <div class="dropdown-menu dropdown-menu-end budget-menu">
+        <a class="dropdown-item" href="{{ path('budget_version_show', {id: version.id}) }}">Открыть</a>
+        {% if canWrite %}
+            <button type="button" class="dropdown-item" data-budget-copy="{{ version.id }}">Копировать</button>
+        {% else %}
+            <span class="dropdown-item disabled vf-menu-item--reason" aria-disabled="true">Копировать<span class="vf-menu-item__reason">{{ read_only_hint }}</span></span>
+        {% endif %}
+        {% if status == 'draft' %}
+            {{ _self.item(version, 'approved', 'Утвердить', 'Утвердить «' ~ version.name ~ '»?', 'Утверждённый вариант не редактируется; с ним сравнивается факт.', 'Утвердить', canWrite and isOwner, canWrite ? 'Утверждает только владелец компании' : read_only_hint) }}
+            {{ _self.item(version, 'archived', 'В архив', 'Отправить «' ~ version.name ~ '» в архив?', 'Архивный вариант можно восстановить.', 'В архив', canWrite, read_only_hint) }}
+        {% elseif status == 'approved' %}
+            {{ _self.item(version, 'draft', 'Вернуть в черновик', 'Вернуть «' ~ version.name ~ '» в черновик?', 'Вариант снова можно будет править; утверждённого варианта на год не останется.', 'Вернуть в черновик', canWrite and isOwner, canWrite ? 'Возвращает в черновик только владелец компании' : read_only_hint) }}
+        {% else %}
+            {{ _self.item(version, 'draft', 'Восстановить', 'Восстановить «' ~ version.name ~ '»?', 'Вариант вернётся в черновики.', 'Восстановить', canWrite, read_only_hint) }}
+        {% endif %}
+    </div>
+</div>

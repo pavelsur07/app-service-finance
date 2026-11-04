@@ -1,6 +1,7 @@
 import './styles/legacy-app.css';
 import './styles/components/dds-pickers.css';
 import './styles/pages/dds-operation.css';
+import './styles/pages/budget.css';
 import './bootstrap.js';
 import './project_direction_picker.js';
 import './counterparty_picker.js';
@@ -8,6 +9,7 @@ import './picker_pill.js';
 import './confirm_modal.js';
 import { initDdsTreePickers, observeDdsTreePickers } from './dds_tree_picker.js';
 import { initDdsOperation } from './pages/dds_operation.js';
+import { initBudgetVersions } from './pages/budget_versions.js';
 
 // Keep connection verification as a regular POST while preventing duplicate clicks.
 document.addEventListener('submit', (event) => {
@@ -61,6 +63,7 @@ const initDds = () => {
   initDdsTreePickers();
   observeDdsTreePickers();
   initDdsOperation();
+  initBudgetVersions();
 };
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initDds);

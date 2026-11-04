@@ -1,2 +1,3 @@
-{% set badge_class = {draft: 'bg-secondary-lt', approved: 'bg-success-lt', archived: 'bg-secondary-lt'}[status.value] %}
-<span class="badge {{ badge_class }} vf-status">{{ status.label }}</span>
+{# Бейдж статуса варианта (BUDGET-SPEC §3): «Утверждён» — акцент, «Черновик» — нейтральный с рамкой, «Архив» — приглушённый. #}
+{% set badge_class = {draft: 'budget-status--draft', approved: 'budget-status--approved', archived: 'budget-status--archived'}[status.value] %}
+<span class="badge vf-status budget-status {{ badge_class }}">{{ status.label }}</span>

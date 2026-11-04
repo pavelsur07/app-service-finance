@@ -11,6 +11,7 @@ use App\Budget\Repository\BudgetVersionRepository;
 use App\Company\Entity\User;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Security\ModuleAccess;
+use App\Finance\Facade\FinanceFacade;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -33,6 +34,7 @@ final class BudgetVersionListController extends AbstractController
         private readonly ClockInterface $clock,
         private readonly CompanyFacade $companies,
         private readonly BudgetYearTotals $yearTotals,
+        private readonly FinanceFacade $finance,
     ) {
     }
 
@@ -56,6 +58,12 @@ final class BudgetVersionListController extends AbstractController
         }
         $user = $this->getUser();
         $yearTotals = [] === $all ? null : $this->yearTotals->netProfit($companyId, $year, array_keys($names));
+        $canWrite = $this->isGranted(ModuleAccess::FINANCE_WRITE);
+        // «Из факта {год−1}»: доступно, только если факт прошлого года есть.
+        $hasLastYearFact = $canWrite && $year - 1 >= BudgetVersion::MIN_YEAR
+            && $this->finance->hasPlFactInYear($companyId, $year - 1);
+        // Ошибка окна «Новый вариант» (CreateBudgetVersionController): открыть окно снова с введённым.
+        $newForm = $request->hasSession() ? $request->getSession()->remove(CreateBudgetVersionController::FORM_STATE) : null;
 
         return $this->render('budget/index.html.twig', [
             'year' => $year,
@@ -64,7 +72,9 @@ final class BudgetVersionListController extends AbstractController
             'archived' => $archived,
             'names' => $names,
             'yearTotals' => $yearTotals,
-            'canWrite' => $this->isGranted(ModuleAccess::FINANCE_WRITE),
+            'canWrite' => $canWrite,
+            'hasLastYearFact' => $hasLastYearFact,
+            'newForm' => \is_array($newForm) ? $newForm : null,
             'isOwner' => $user instanceof User && $this->companies->isOwner($companyId, (string) $user->getId()),
             'newVersionId' => Uuid::uuid7()->toString(),
         ]);

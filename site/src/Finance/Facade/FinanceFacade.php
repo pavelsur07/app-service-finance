@@ -226,6 +226,15 @@ final class FinanceFacade
     }
 
     /**
+     * Есть ли у компании ненулевой факт ОПиУ за календарный год хотя бы в одной ячейке
+     * «проект × ЦФО × статья × месяц» (Budget: доступность «Заполнить из факта»).
+     */
+    public function hasPlFactInYear(string $companyId, int $year): bool
+    {
+        return $this->plFactMonthlyAmounts->hasAmounts($companyId, $year);
+    }
+
+    /**
      * Присваивает код строке ввода ОПиУ без кода. Отчёт ОПиУ берёт суммы статьи по её коду: у
      * листа без кода суммы в регистре есть, а в отчёте — ноль.
      *

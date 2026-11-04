@@ -3,8 +3,11 @@
 {% block title %}Бюджет ОПиУ — {{ year }}{% endblock %}
 
 {% block body %}
-{# Композиция раздела ОПиУ («Документы ОПиУ»): vf-page-head, vf-card со вкладками, vf-card-bar. ui-ux.md, экран 1. #}
+{# Экран «Варианты» по пакету DS budget-pack (BUDGET-SPEC §4, refs 01–09): vf-page-head, vf-card со вкладками, меню «⋯». #}
     {% set can_write = canWrite %}
+    {% set approved = versions|filter(v => v.status.value == 'approved')|first %}
+    {% set new_form = newForm ?? {} %}
+    <div data-budget-page="versions">
     <div class="vf-page-head">
         <div class="vf-page-head__title">
             <nav aria-label="Путь">
@@ -14,21 +17,43 @@
                 </ol>
             </nav>
             <h1>Бюджет ОПиУ</h1>
-            <p class="vf-page-head__lead">Варианты плана доходов и расходов на год. Утверждённый вариант — один на год, с ним сравнивается факт.</p>
+            <p class="vf-page-head__lead">Плановые показатели по статьям ОПиУ на год. Утверждённый вариант — основа для сравнения план–факт.</p>
         </div>
-        <div class="btn-list d-print-none">
+        <div class="budget-head-actions d-print-none">
+            <form class="budget-year" method="get" action="{{ path('budget_index') }}" aria-label="Год бюджета">
+                {% set prev_year = years|filter(y => y < year)|last %}
+                {% set next_year = years|filter(y => y > year)|first %}
+                {% if prev_year %}
+                    <a class="budget-year__step" href="{{ path('budget_index', {year: prev_year}) }}" aria-label="Предыдущий год, {{ prev_year }}"><i class="ti ti-chevron-left" aria-hidden="true"></i></a>
+                {% else %}
+                    <span class="budget-year__step disabled" aria-hidden="true"><i class="ti ti-chevron-left"></i></span>
+                {% endif %}
+                <label class="visually-hidden" for="budget-year">Год</label>
+                <select id="budget-year" name="year" class="budget-year__select" data-budget-year>
+                    {% for y in years %}
+                        <option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+                {% if next_year %}
+                    <a class="budget-year__step" href="{{ path('budget_index', {year: next_year}) }}" aria-label="Следующий год, {{ next_year }}"><i class="ti ti-chevron-right" aria-hidden="true"></i></a>
+                {% else %}
+                    <span class="budget-year__step disabled" aria-hidden="true"><i class="ti ti-chevron-right"></i></span>
+                {% endif %}
+                <noscript><button type="submit" class="btn btn-sm">Показать</button></noscript>
+            </form>
             {% if can_write %}
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#budget-new">
+                <button type="button" class="btn btn-primary" data-budget-new="{{ versions is empty and archived is empty ? 'empty' : '' }}">
                     <i class="ti ti-plus me-1" aria-hidden="true"></i>
                     Новый вариант
                 </button>
             {% else %}
-                <span class="d-inline-block" tabindex="0" title="Нужно право записи в финансах">
-                    <button type="button" class="btn btn-primary" disabled>
+                <div class="budget-disabled">
+                    <button type="button" class="btn btn-primary" disabled aria-describedby="budget-new-reason">
                         <i class="ti ti-plus me-1" aria-hidden="true"></i>
                         Новый вариант
                     </button>
-                </span>
+                    <span class="budget-disabled__reason" id="budget-new-reason">Роль «Чтение»: изменять варианты нельзя</span>
+                </div>
             {% endif %}
         </div>
     </div>
@@ -41,119 +66,161 @@
             ]} only %}
         </div>
 
-        <div class="vf-card-bar d-print-none">
-            <div class="vf-card-bar__row">
-                <div class="vf-seg" role="group" aria-label="Год">
-                    {% for y in years %}
-                        <a href="{{ path('budget_index', {year: y}) }}"{% if y == year %} class="active" aria-current="true"{% endif %}>{{ y }}</a>
-                    {% endfor %}
+        {% if versions is empty and archived is empty %}
+            <div class="vf-empty" data-budget-empty>
+                <div class="vf-empty__title">На {{ year }} год вариантов нет</div>
+                <p class="text-secondary mb-2">Создайте вариант и заполните план по статьям ОПиУ на 12 месяцев.</p>
+                <div class="btn-list justify-content-center">
+                    <button type="button" class="btn btn-primary" data-budget-new="empty"{% if not can_write %} disabled{% endif %}>Создать пустой</button>
+                    <button type="button" class="btn" data-budget-new="fact"{% if not can_write or not hasLastYearFact %} disabled aria-describedby="budget-fact-reason"{% endif %}>Заполнить из факта {{ year - 1 }}</button>
                 </div>
+                {% if not can_write %}
+                    <p class="small text-secondary mb-0" id="budget-fact-reason">Роль «Чтение»: изменять варианты нельзя.</p>
+                {% elseif not hasLastYearFact %}
+                    <p class="small text-secondary mb-0" id="budget-fact-reason">За {{ year - 1 }} год нет факта ОПиУ — заполнять нечем.</p>
+                {% else %}
+                    <p class="small text-secondary mb-0">«Заполнить из факта» подставит факт ОПиУ каждого месяца {{ year - 1 }} года во все пары «проект × ЦФО».</p>
+                {% endif %}
             </div>
-        </div>
-
-        {% if versions is empty %}
-            <div class="card-body text-secondary">На {{ year }} год вариантов нет.</div>
         {% else %}
             <div class="table-responsive position-relative">{# visually-hidden в шапке не раздвигает страницу на 360 px #}
-                <table class="table table-vcenter vf-table">
+                <table class="table table-vcenter vf-table budget-versions">
                     <thead>
                         <tr>
                             <th>Название</th>
                             <th>Статус</th>
-                            <th>Изменён</th>
-                            {% if yearTotals is not null %}<th class="text-end text-nowrap" data-budget-year-total>Итог года, ₽</th>{% endif %}
+                            {% if yearTotals is not null %}<th class="text-end text-nowrap" data-budget-year-total>Чистая прибыль, ₽</th>{% endif %}
+                            <th class="budget-versions__updated">Изменён</th>
                             <th class="text-end"><span class="visually-hidden">Действия</span></th>
                         </tr>
                     </thead>
                     <tbody>
                     {% for version in versions %}
-                        <tr>
-                            <td>
-                                <a class="vf-strong" href="{{ path('budget_version_show', {id: version.id}) }}">{{ version.name }}</a>
-                                {% if version.copiedFromId and names[version.copiedFromId] is defined %}
-                                    <div class="small text-secondary">копия «{{ names[version.copiedFromId] }}»</div>
-                                {% endif %}
-                            </td>
-                            <td>{% include 'budget/_status_badge.html.twig' with {status: version.status} only %}</td>
-                            <td class="text-secondary">{{ version.updatedAt|date('d.m.Y H:i') }}</td>
-                            {% if yearTotals is not null %}<td class="text-end text-nowrap" data-budget-year-total>{{ yearTotals[version.id] is defined ? yearTotals[version.id]|vf_amount : '—' }}</td>{% endif %}
-                            <td class="text-end">
-                                <div class="btn-list justify-content-end flex-nowrap">
-                                    {% include 'budget/_status_actions.html.twig' with {version: version, isOwner: isOwner, canWrite: can_write, size: 'btn-sm'} only %}
-                                </div>
-                            </td>
-                        </tr>
+                        {{ _self.row(version, names, yearTotals, isOwner, can_write, false) }}
                     {% endfor %}
+                    {% if versions is empty %}
+                        <tr class="budget-versions__none"><td colspan="5" class="text-secondary">Активных вариантов нет — все в архиве.</td></tr>
+                    {% endif %}
                     </tbody>
+                    {% if archived is not empty %}
+                        <tbody class="budget-versions__archive" data-budget-archive>
+                            <tr class="budget-versions__archive-toggle">
+                                <td colspan="5">
+                                    <button type="button" class="budget-archive-toggle" aria-expanded="false" aria-controls="budget-archive-rows" data-budget-archive-toggle>
+                                        <i class="ti ti-chevron-right" aria-hidden="true"></i>
+                                        Архив ({{ archived|length }})
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tbody id="budget-archive-rows" hidden>
+                            {% for version in archived %}
+                                {{ _self.row(version, names, yearTotals, isOwner, can_write, true) }}
+                            {% endfor %}
+                        </tbody>
+                    {% endif %}
                 </table>
+            </div>
+            <div class="card-footer text-secondary small">
+                Утверждённый вариант показан первым.{% if yearTotals is not null %} «Чистая прибыль» — строка «Чистая прибыль» (код NET_PROFIT) дерева ОПиУ за год.{% endif %}
             </div>
         {% endif %}
     </div>
 
-    {% if archived is not empty %}
-        <details class="card vf-card mb-4" data-budget-archive>
-            <summary class="card-header">Архив ({{ archived|length }})</summary>
-            <div class="table-responsive position-relative">{# visually-hidden в шапке не раздвигает страницу на 360 px #}
-                <table class="table table-vcenter vf-table">
-                    <tbody>
-                    {% for version in archived %}
-                        <tr class="vf-row-muted">
-                            <td>
-                                <a class="vf-strong" href="{{ path('budget_version_show', {id: version.id}) }}">{{ version.name }}</a>
-                                {% if version.copiedFromId and names[version.copiedFromId] is defined %}
-                                    <div class="small text-secondary">копия «{{ names[version.copiedFromId] }}»</div>
-                                {% endif %}
-                            </td>
-                            <td>{% include 'budget/_status_badge.html.twig' with {status: version.status} only %}</td>
-                            <td class="text-secondary">{{ version.updatedAt|date('d.m.Y H:i') }}</td>
-                            {% if yearTotals is not null %}<td class="text-end text-nowrap" data-budget-year-total>{{ yearTotals[version.id] is defined ? yearTotals[version.id]|vf_amount : '—' }}</td>{% endif %}
-                            <td class="text-end">
-                                <div class="btn-list justify-content-end flex-nowrap">
-                                    {% include 'budget/_status_actions.html.twig' with {version: version, isOwner: isOwner, canWrite: can_write, size: 'btn-sm'} only %}
-                                </div>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </details>
-    {% endif %}
-
     {% include 'partials/_confirm_modal.html.twig' with {id: 'budget-confirm'} only %}
 
     {% if can_write %}
-        <div class="modal fade" id="budget-new" tabindex="-1" aria-hidden="true" aria-labelledby="budget-new-title">
+        {% set all_versions = versions|merge(archived) %}
+        {% set form_method = new_form.method ?? 'empty' %}
+        {% set default_source = new_form.copyFrom ?? (approved ? approved.id : (all_versions is not empty ? (all_versions|first).id : '')) %}
+        <div class="modal fade" id="budget-new" tabindex="-1" aria-hidden="true" aria-labelledby="budget-new-title" data-budget-new-modal{% if new_form is not empty %} data-budget-new-open{% endif %}>
             <div class="modal-dialog modal-dialog-centered">
-                <form class="modal-content" method="post" action="{{ path('budget_version_create') }}">
+                <form class="modal-content" method="post" action="{{ path('budget_version_create') }}" novalidate data-budget-new-form>
                     <input type="hidden" name="_token" value="{{ csrf_token('budget_version_create') }}">
                     <input type="hidden" name="versionId" value="{{ newVersionId }}">
                     <input type="hidden" name="year" value="{{ year }}">
                     <div class="modal-header">
-                        <h2 class="modal-title" id="budget-new-title">Новый вариант на {{ year }}</h2>
+                        <h2 class="modal-title" id="budget-new-title">Новый вариант бюджета</h2>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
                     </div>
                     <div class="modal-body">
+                        {% if (new_form.field ?? '') == 'form' %}
+                            <div class="alert alert-danger" role="alert" data-budget-new-error>{{ new_form.error }}</div>
+                        {% endif %}
+                        {% set name_error = (new_form.field ?? '') == 'name' ? new_form.error : null %}
                         <div class="mb-3">
                             <label class="form-label required" for="budget-new-name">Название</label>
-                            <input id="budget-new-name" name="name" class="form-control" required maxlength="120" value="Вариант {{ versions|length + archived|length + 1 }}">
+                            <input id="budget-new-name" name="name" class="form-control{% if name_error %} is-invalid{% endif %}" required maxlength="120"
+                                   value="{{ new_form.name ?? ('Вариант ' ~ (all_versions|length + 1)) }}"
+                                   aria-describedby="budget-new-name-error budget-new-name-count" data-budget-new-name>
+                            <div class="budget-field-foot">
+                                <div class="invalid-feedback d-block" id="budget-new-name-error" role="alert" data-budget-new-name-error>{{ name_error }}</div>
+                                <span class="budget-field-foot__count" id="budget-new-name-count" data-budget-new-count>0/120</span>
+                            </div>
                         </div>
-                        <div>
-                            <label class="form-label" for="budget-new-copy">Способ</label>
-                            <select id="budget-new-copy" name="copyFrom" class="form-select">
-                                <option value="">Пустой</option>
-                                {% for version in versions %}
-                                    <option value="{{ version.id }}">Копия «{{ version.name }}»</option>
+                        <fieldset class="mb-3">
+                            <legend class="form-label">Способ</legend>
+                            <label class="form-check">
+                                <input class="form-check-input" type="radio" name="method" value="empty"{% if form_method == 'empty' %} checked{% endif %} data-budget-method>
+                                <span class="form-check-label">Пустой</span>
+                            </label>
+                            <label class="form-check">
+                                <input class="form-check-input" type="radio" name="method" value="copy"{% if form_method == 'copy' %} checked{% endif %}{% if all_versions is empty %} disabled{% endif %} data-budget-method>
+                                <span class="form-check-label">Копия варианта{% if all_versions is empty %} <span class="text-secondary small">— на {{ year }} год копировать нечего</span>{% endif %}</span>
+                            </label>
+                            <label class="form-check">
+                                <input class="form-check-input" type="radio" name="method" value="fact"{% if form_method == 'fact' %} checked{% endif %}{% if not hasLastYearFact %} disabled{% endif %} data-budget-method>
+                                <span class="form-check-label">Из факта {{ year - 1 }}{% if not hasLastYearFact %} <span class="text-secondary small">— факта ОПиУ за {{ year - 1 }} год нет</span>{% endif %}</span>
+                            </label>
+                        </fieldset>
+                        <div class="mb-1" data-budget-method-panel="empty">
+                            <span class="form-label">Год</span>
+                            <div>{{ year }} <span class="text-secondary small">— год выбран на странице</span></div>
+                        </div>
+                        <div class="mb-1" data-budget-method-panel="copy" hidden>
+                            {% set source_error = (new_form.field ?? '') == 'copyFrom' ? new_form.error : null %}
+                            <label class="form-label" for="budget-new-source">Вариант-источник</label>
+                            <select id="budget-new-source" name="copyFrom" class="form-select{% if source_error %} is-invalid{% endif %}" data-budget-new-source>
+                                {% for version in all_versions %}
+                                    <option value="{{ version.id }}"{% if version.id == default_source %} selected{% endif %}>{{ version.name }} · {{ version.year }} · {{ version.status.value == 'approved' ? 'утверждён' : (version.status.value == 'archived' ? 'архив' : 'черновик') }}</option>
                                 {% endfor %}
                             </select>
+                            <div class="form-hint">Год копии берётся из источника — {{ year }}, изменить его нельзя.</div>
+                            {% if source_error %}<div class="invalid-feedback d-block" role="alert">{{ source_error }}</div>{% endif %}
+                        </div>
+                        <div class="mb-1" data-budget-method-panel="fact" hidden>
+                            <span class="form-label">Год</span>
+                            <div>{{ year }} <span class="text-secondary small">— план каждого месяца = факт ОПиУ того же месяца {{ year - 1 }} года во всех парах «проект × ЦФО»</span></div>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-primary">Создать</button>
+                        <button type="submit" class="btn btn-primary" data-budget-new-submit>Создать</button>
                     </div>
                 </form>
             </div>
         </div>
     {% endif %}
+    </div>
 {% endblock %}
+
+{% macro row(version, names, yearTotals, isOwner, canWrite, archived) %}
+    <tr class="budget-versions__row{% if archived %} vf-row-muted{% endif %}">
+        <td class="budget-versions__name">
+            <a class="budget-versions__link" href="{{ path('budget_version_show', {id: version.id}) }}">{{ version.name }}</a>
+            {% if version.copiedFromId and names[version.copiedFromId] is defined %}
+                <div class="small text-secondary">копия «{{ names[version.copiedFromId] }}»</div>
+            {% endif %}
+        </td>
+        <td class="budget-versions__status">{% include 'budget/_status_badge.html.twig' with {status: version.status} only %}</td>
+        {% if yearTotals is not null %}
+            <td class="text-end text-nowrap budget-versions__total" data-budget-year-total>
+                {{ yearTotals[version.id] is defined ? yearTotals[version.id]|vf_amount : '—' }}<span class="budget-versions__total-unit"> ₽ за год</span>
+            </td>
+        {% endif %}
+        <td class="text-secondary text-nowrap budget-versions__updated">{{ version.updatedAt|date('d.m.Y H:i') }}</td>
+        <td class="text-end budget-versions__menu">
+            {% include 'budget/_version_menu.html.twig' with {version: version, isOwner: isOwner, canWrite: canWrite} only %}
+        </td>
+    </tr>
+{% endmacro %}
