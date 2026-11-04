@@ -2043,11 +2043,16 @@ Facade нет: план читает только сам модуль; Facade п
   число) × проект × ЦФО» — unique `uniq_budget_lines_cell`; `amount`
   `NUMERIC(18,2)` строкой в знаке значения отчёта ОПиУ (доход − расход, как
   `PLDailyTotalFactsProvider`); `BudgetLineSource` `manual` / `sales_plan`
-  (снимок плана продаж — после MVP); `comment` до 500 символов. Статья, проект и
+  (снимок плана продаж — после MVP) / `rule` (считает правило, вручную не
+  пишется); `comment` до 500 символов. Статья, проект и
   ЦФО — строки без FK: удаление статьи в Finance не падает на плане. Строка
   нулевой суммы без комментария не хранится.
-- FK `company_id` → `companies` ON DELETE CASCADE у обеих таблиц, строки → вариант
-  ON DELETE CASCADE (`BudgetSchemaExtension`).
+- `BudgetRule` (`budget_rules`): правило «X % от строки-базы» статьи в паре
+  варианта — unique `uniq_budget_rules_target` (вариант × статья × проект × ЦФО),
+  `base_category_id` (лист или итог дерева ОПиУ, денежный), `percent`
+  `NUMERIC(6,2)` 0 < X ≤ 1000. Пишется DBAL под блокировкой варианта.
+- FK `company_id` → `companies` ON DELETE CASCADE у всех таблиц, строки и правила →
+  вариант ON DELETE CASCADE (`BudgetSchemaExtension`).
 - Actions (каждое — точка входа, коммитит само):
   - `CreateBudgetVersionAction(CreateBudgetVersionCommand)` — пустой черновик на
     год или копия варианта своей компании (год исходника, строки с новыми
@@ -2083,6 +2088,8 @@ Facade нет: план читает только сам модуль; Facade п
 | `/finance/budget/versions/{id}/fill` | POST | помощник заполнения: JSON `{helper, project, center, categoryIds, months, params, apply, confirmOverwrite}` → `{cells, changed, overwrite, skipped, applied}`; без `apply` — предпросмотр; `X-CSRF-Token` (`budget_cells`) | запись |
 | `/finance/budget/versions/{id}/export` | GET | xlsx варианта (`?project=&center=` — пара, без них — вся компания); лист «План» по `Infrastructure\Xlsx\BudgetPlanSheet` | чтение |
 | `/finance/budget/versions/{id}/import` | POST | загрузка плана пары из xlsx: multipart `file` (≤ 2 МБ, .xlsx), `project`, `center`, `apply`, `confirmOverwrite` (`1`) → ответ `/fill` + `warnings`, `ignored`; `X-CSRF-Token` (`budget_cells`) | запись |
+| `/finance/budget/versions/{id}/rules` | POST | правило статьи пары: JSON `{project, center, categoryId, baseCategoryId, percent}` → `{changed}` (пересчитанные ячейки); `X-CSRF-Token` (`budget_cells`) | запись |
+| `/finance/budget/versions/{id}/rules/delete` | POST | снять правило: `{project, center, categoryId}` → `{removed}`; суммы остаются ручными | запись |
 | `/finance/budget/versions/{id}/cells` | POST | JSON `{cells:[…]}` → `SaveBudgetLinesAction`, заголовок `X-CSRF-Token` (`budget_cells`) | запись |
 
 - Строка сетки (`BudgetGridRow`): `id`, `code`, `name`, `level`, `type`, `flow`
@@ -2130,13 +2137,24 @@ Facade нет: план читает только сам модуль; Facade п
   комментарий, перезапись); итоги, неизвестные строки, другая пара или год —
   в `warnings`/`ignored`. `ImportBudgetCellsAction` — предпросмотр или запись
   под `BudgetVersionLock` тем же путём, что `FillBudgetCellsAction`.
+- Правило «X % от строки»: `SetBudgetRuleAction` / `RemoveBudgetRuleAction`
+  (точки входа, блокировка варианта). `BudgetRuleCalculator::recalculate()` —
+  база по плану пары **без статей с правилом** (циклов и цепочек нет), X % по
+  месяцам, знак по направлению статьи, источник `rule`; без своей транзакции —
+  вызывают `SetBudgetRuleAction`, `SaveBudgetLinesAction`,
+  `FillBudgetCellsAction`, `ImportBudgetCellsAction` в своей транзакции после
+  записи (производные — в транзакции источника). Запреты: база — статья с
+  правилом; цель — база другого правила. `BudgetLinesWriter::validate()`
+  отклоняет ручную запись в статью с правилом; помощники и импорт её пропускают
+  (`skipped`). Снятие: `rule` → `manual`. Копия варианта копирует правила.
+  Сетка: у строки `rule {percent, baseCategoryId, baseName}`, `editable: false`.
 - Пара «проект × ЦФО» из запроса — `BudgetPairResolver`; неактивная или чужая —
   `InvalidBudgetPairException` (422 `budget_invalid_pair`).
 - «Итог года» в списке: `BudgetYearTotals::netProfit()` — один
   `calculatePlTree` на все варианты года (вариант = колонка), строка с кодом
   `NET_PROFIT`; нет такой строки в дереве компании — колонки нет.
 - Ошибки: `BudgetExceptionListener` для `/finance/budget*` — JSON
-  `{error:{code,message}}` для `/grid`, `/plan-fact`, `/cells`, `/fill`, `/export`, `/import` и `Accept: application/json`:
+  `{error:{code,message}}` для `/grid`, `/plan-fact`, `/cells`, `/fill`, `/export`, `/import`, `/rules` и `Accept: application/json`:
   404 `budget_version_not_found`, 422 `budget_invalid_input` /
   `budget_invalid_pair`, 409 `budget_fill_overwrite_unconfirmed` /
   `budget_version_not_editable` / `budget_year_already_approved` /
@@ -4908,6 +4926,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.135 | 2026-11-04 | Budget: правило «X % от строки-базы» (`budget_rules`, миграция `Version20261104150000`, `BudgetRule`, `BudgetRuleCalculator`, `SetBudgetRuleAction`/`RemoveBudgetRuleAction`, `/rules`, `/rules/delete`), источник `rule`, `BudgetLinesWriter::validate(…, versionId, …)` (задача `pl-budget`, этап 8) |
 | 2.134 | 2026-11-04 | Budget: выгрузка и загрузка плана в Excel (`/export`, `/import`, `BudgetPlanXlsxWriter`/`Reader`, `BudgetImportPlanner`, `ImportBudgetCellsAction`), кнопки «Excel» и «Загрузить из Excel» в острове `budget-grid` (props `exportUrl`, `importUrl`); `apiFetch` принимает FormData (задача `pl-budget`, этапы 6–7) |
 | 2.133 | 2026-11-04 | Budget: факт пары с системным ЦФО «Общий» включает строки без ЦФО (`BudgetPairResolver::isGeneralCenter`), ссылка на отчёт для неё скрыта; Finance: `getPlFactAmountsByMonth(..., includeUnassignedCenter)` (задача `pl-budget`, вариант A) |
 | 2.132 | 2026-11-04 | Budget: помощники заполнения плана (`/fill`, `BudgetFillPlanner`, `FillBudgetCellsAction`, `BudgetFillMath`), панель «Помощники» в острове `budget-grid`, prop `fillUrl` (задача `pl-budget`, этап 5) |

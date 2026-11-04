@@ -26,6 +26,8 @@ final readonly class BudgetGridRow
         public array $values,
         public string $total,
         public array $comments,
+        /** Правило «X % от строки-базы» статьи в выбранной паре; такая строка не редактируется. */
+        public ?BudgetGridRule $rule = null,
     ) {
     }
 }

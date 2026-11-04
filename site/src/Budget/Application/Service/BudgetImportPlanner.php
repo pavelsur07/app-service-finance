@@ -16,6 +16,7 @@ use App\Budget\Exception\BudgetVersionNotEditableException;
 use App\Budget\Exception\InvalidBudgetInputException;
 use App\Budget\Exception\InvalidBudgetPairException;
 use App\Budget\Infrastructure\Query\BudgetCellsQuery;
+use App\Budget\Infrastructure\Query\BudgetRulesQuery;
 use App\Finance\Enum\PLCategoryType;
 use App\Finance\Facade\PLCategoryFacade;
 
@@ -24,7 +25,7 @@ use App\Finance\Facade\PLCategoryFacade;
  * «ID статьи» (есть ID — только по нему), без ID — по коду; загружаются только видимые листья ввода. Сумма файла — в знаке
  * ввода (BudgetFillMath::fromInput), пустая ячейка — 0: файл задаёт весь год статьи; не сумма в
  * загружаемой строке — отказ с адресом ячейки, в пропускаемой (итог, KPI) — не мешает. Правила те же,
- * что у помощников: только изменяемые ячейки, `sales_plan` — пропуск, комментарий сохраняется,
+ * что у помощников: только изменяемые ячейки, `sales_plan` и статьи с правилом — пропуск, комментарий сохраняется,
  * перезапись считается. Только расчёт; запись — ImportBudgetCellsAction.
  */
 final readonly class BudgetImportPlanner
@@ -34,6 +35,7 @@ final readonly class BudgetImportPlanner
 
     public function __construct(
         private BudgetCellsQuery $cells,
+        private BudgetRulesQuery $rules,
         private BudgetPairResolver $pairs,
         private PLCategoryFacade $categories,
     ) {
@@ -74,6 +76,8 @@ final readonly class BudgetImportPlanner
             $existing[$cell->plCategoryId][$cell->month] = $cell;
         }
 
+        // Статьи с правилом «% от строки» считает BudgetRuleCalculator — загрузка их не трогает.
+        $ruleTargets = $this->rules->targetsOfPair($companyId, $version->getId(), $pair->projectDirectionId, $pair->responsibilityCenterId);
         $ignored = [];
         $errors = [];
         $totals = 0;
@@ -111,6 +115,12 @@ final readonly class BudgetImportPlanner
                 $month = sprintf('%d-%02d', $year, $monthNumber);
                 $amount = BudgetFillMath::fromInput($input, $category->flow);
                 $current = $existing[$category->id][$month] ?? null;
+                if (isset($ruleTargets[$category->id])) {
+                    if (0 !== bccomp($amount, $current->amount ?? '0', 2)) {
+                        ++$skipped;
+                    }
+                    continue;
+                }
                 if (null !== $current && BudgetLineSource::SALES_PLAN->value === $current->source) {
                     if (0 !== bccomp($amount, $current->amount, 2)) {
                         ++$skipped;

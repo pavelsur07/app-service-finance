@@ -71,7 +71,13 @@ final class CreateBudgetVersionAction
                 // Строки копии ссылаются на вариант внешним ключом — сначала он.
                 $this->entityManager->flush();
 
-                return null === $source ? 0 : $this->copyLines($source->getId(), $command, $now);
+                if (null === $source) {
+                    return 0;
+                }
+                $copied = $this->copyLines($source->getId(), $command, $now);
+                $this->copyRules($source->getId(), $command, $now);
+
+                return $copied;
             });
         } catch (UniqueConstraintViolationException $exception) {
             // Параллельный повтор: транзакция откачена, EM закрыт — проверяем DBAL.
@@ -132,5 +138,35 @@ final class CreateBudgetVersionAction
         }
 
         return \count($rows);
+    }
+
+    /**
+     * Правила «% от строки» копии — те же, что у источника; их строки (`rule`) уже скопированы.
+     */
+    private function copyRules(string $sourceId, CreateBudgetVersionCommand $command, \DateTimeImmutable $now): void
+    {
+        $connection = $this->entityManager->getConnection();
+        $rows = $connection->fetchAllAssociative(
+            'SELECT pl_category_id, project_direction_id, responsibility_center_id, base_category_id, percent
+               FROM budget_rules WHERE version_id = :versionId AND company_id = :companyId',
+            ['versionId' => $sourceId, 'companyId' => $command->companyId],
+        );
+        foreach ($rows as $row) {
+            $connection->executeStatement(
+                'INSERT INTO budget_rules (id, company_id, version_id, pl_category_id, project_direction_id, responsibility_center_id, base_category_id, percent, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    Uuid::uuid7()->toString(),
+                    $command->companyId,
+                    $command->versionId,
+                    $row['pl_category_id'],
+                    $row['project_direction_id'],
+                    $row['responsibility_center_id'],
+                    $row['base_category_id'],
+                    $row['percent'],
+                    $now->format('Y-m-d H:i:s'),
+                ],
+            );
+        }
     }
 }

@@ -9,6 +9,7 @@ use App\Budget\Domain\BudgetAmount;
 use App\Budget\Entity\BudgetLine;
 use App\Budget\Enum\BudgetLineSource;
 use App\Budget\Exception\InvalidBudgetInputException;
+use App\Budget\Infrastructure\Query\BudgetRulesQuery;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\Finance\Enum\PLCategoryType;
 use App\Finance\Facade\PLCategoryFacade;
@@ -18,7 +19,8 @@ use Symfony\Component\Clock\ClockInterface;
 
 /**
  * Проверка и запись пачки ячеек плана (DBAL, без своей транзакции): upsert по ячейке, ноль без
- * комментария удаляет строку. Пачка принимается целиком или отклоняется целиком. Вызывающая
+ * комментария удаляет строку. Статья с правилом пары (BudgetRule) вручную не пишется — её суммы
+ * пишет BudgetRuleCalculator с источником `rule`. Пачка принимается целиком или отклоняется целиком. Вызывающая
  * точка входа (SaveBudgetLinesAction, FillBudgetCellsAction) держит транзакцию и блокировку
  * варианта ({@see \App\Budget\Application\BudgetVersionLock}).
  */
@@ -31,6 +33,7 @@ final readonly class BudgetLinesWriter
         private Connection $connection,
         private PLCategoryFacade $plCategories,
         private FinancialResponsibilityCenterFacade $responsibilityCenters,
+        private BudgetRulesQuery $rules,
         private ClockInterface $clock,
     ) {
     }
@@ -40,7 +43,7 @@ final readonly class BudgetLinesWriter
      *
      * @return array<string, array{category: string, month: string, project: string, center: string, amount: string, comment: ?string}> ключ — ячейка
      */
-    public function validate(string $companyId, int $year, array $cells): array
+    public function validate(string $companyId, string $versionId, int $year, array $cells): array
     {
         if (\count($cells) > self::MAX_CELLS) {
             throw new InvalidBudgetInputException(sprintf('За один раз — не больше %d ячеек.', self::MAX_CELLS));
@@ -57,9 +60,16 @@ final readonly class BudgetLinesWriter
             $pairs[$pair->projectDirectionId.'|'.$pair->responsibilityCenterId] = true;
         }
 
+        $ruleTargets = [];
+        foreach ($this->rules->fetch($companyId, $versionId) as $rule) {
+            $ruleTargets[$rule->plCategoryId.'|'.$rule->projectDirectionId.'|'.$rule->responsibilityCenterId] = true;
+        }
+
         $result = [];
         foreach ($cells as $index => $cell) {
-            $error = $this->cellError($cell, $year, $leafIds, $pairs);
+            $error = isset($ruleTargets[$cell->plCategoryId.'|'.$cell->projectDirectionId.'|'.$cell->responsibilityCenterId])
+                ? 'статья считается по правилу «% от строки» — снимите правило, чтобы ввести сумму.'
+                : $this->cellError($cell, $year, $leafIds, $pairs);
             if (null !== $error) {
                 throw new InvalidBudgetInputException(sprintf('Ячейка %d: %s', $index + 1, $error));
             }
@@ -106,7 +116,7 @@ final readonly class BudgetLinesWriter
     /**
      * @param array<string, array{category: string, month: string, project: string, center: string, amount: string, comment: ?string}> $cells
      */
-    public function write(string $companyId, string $versionId, array $cells): void
+    public function write(string $companyId, string $versionId, array $cells, BudgetLineSource $source = BudgetLineSource::MANUAL): void
     {
         $connection = $this->connection;
         $now = $this->clock->now()->format('Y-m-d H:i:s');
@@ -148,7 +158,7 @@ final readonly class BudgetLinesWriter
                     $cell['project'],
                     $cell['center'],
                     $cell['amount'],
-                    BudgetLineSource::MANUAL->value,
+                    $source->value,
                     $cell['comment'],
                     $now,
                 );
