@@ -17,6 +17,7 @@ use App\Budget\Exception\BudgetVersionNotEditableException;
 use App\Budget\Exception\InvalidBudgetInputException;
 use App\Budget\Exception\InvalidBudgetPairException;
 use App\Budget\Infrastructure\Query\BudgetCellsQuery;
+use App\Budget\Infrastructure\Query\BudgetRulesQuery;
 use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLFlow;
 use App\Finance\Facade\FinanceFacade;
@@ -36,6 +37,7 @@ final readonly class BudgetFillPlanner
 
     public function __construct(
         private BudgetCellsQuery $cells,
+        private BudgetRulesQuery $rules,
         private BudgetPairResolver $pairs,
         private BudgetTreeCalculator $tree,
         private PLCategoryFacade $categories,
@@ -76,6 +78,8 @@ final readonly class BudgetFillPlanner
         }
 
         $months = $this->months($request, $year);
+        // Статьи с правилом «% от строки» считает BudgetRuleCalculator — помощник их не трогает.
+        $ruleTargets = $this->rules->targetsOfPair($companyId, $version->getId(), $pair->projectDirectionId, $pair->responsibilityCenterId);
         $targets = $this->targets($request, $companyId, $year, $months, $flows, $planAmounts, $pair->projectDirectionId, $pair->responsibilityCenterId, $withUnassigned);
 
         $cells = [];
@@ -84,7 +88,7 @@ final readonly class BudgetFillPlanner
         foreach ($request->categoryIds as $categoryId) {
             foreach ($targets[$categoryId] ?? [] as $month => $amount) {
                 $current = $existing[$categoryId][$month] ?? null;
-                if (null !== $current && BudgetLineSource::SALES_PLAN->value === $current->source) {
+                if (isset($ruleTargets[$categoryId]) || (null !== $current && BudgetLineSource::SALES_PLAN->value === $current->source)) {
                     ++$skipped;
                     continue;
                 }

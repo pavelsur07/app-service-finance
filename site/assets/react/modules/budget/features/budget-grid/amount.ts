@@ -96,3 +96,10 @@ export function formatValue(value: string, format: BudgetValueFormat): Formatted
         zero,
     };
 }
+
+/** Процент правила `12.50` → `12,5 %` (без лишних нулей, разделитель — запятая). */
+export function formatPercent(value: string): string {
+    const trimmed = value.includes('.') ? value.replace(/0+$/, '').replace(/\.$/, '') : value;
+
+    return `${trimmed.replace('.', ',')}${NBSP}%`;
+}

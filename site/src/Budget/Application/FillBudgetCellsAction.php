@@ -8,6 +8,7 @@ use App\Budget\Application\DTO\BudgetCellInput;
 use App\Budget\Application\DTO\FillBudgetCellsCommand;
 use App\Budget\Application\Service\BudgetFillPlanner;
 use App\Budget\Application\Service\BudgetLinesWriter;
+use App\Budget\Application\Service\BudgetRuleCalculator;
 use App\Budget\Application\View\BudgetFillCell;
 use App\Budget\Application\View\BudgetFillPlan;
 use App\Budget\Enum\BudgetVersionStatus;
@@ -24,7 +25,8 @@ use Webmozart\Assert\Assert;
  *
  * Запись: под блокировкой варианта ({@see BudgetVersionLock}) в одной транзакции перечитывается
  * статус, заново считается план помощника по текущим ячейкам (sales_plan, комментарии,
- * перезапись) и пишется BudgetLinesWriter — между проверкой и записью другая правка не вклинится.
+ * перезапись) и пишется BudgetLinesWriter — между проверкой и записью другая правка не вклинится;
+ * правила «% от строки» пары пересчитываются там же.
  * Повтор того же запроса считает те же суммы: ячейки уже такие — менять нечего.
  */
 final class FillBudgetCellsAction
@@ -34,6 +36,7 @@ final class FillBudgetCellsAction
         private readonly BudgetVersionRepository $versions,
         private readonly BudgetFillPlanner $planner,
         private readonly BudgetLinesWriter $writer,
+        private readonly BudgetRuleCalculator $rules,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -67,12 +70,14 @@ final class FillBudgetCellsAction
             $request = $command->request;
             $this->writer->write($command->companyId, $version->getId(), $this->writer->validate(
                 $command->companyId,
+                $version->getId(),
                 $version->getYear(),
                 array_map(
                     static fn (BudgetFillCell $cell): BudgetCellInput => new BudgetCellInput($cell->plCategoryId, $cell->month, $request->projectDirectionId, $request->responsibilityCenterId, $cell->amount, $cell->comment),
                     $plan->cells,
                 ),
             ));
+            $this->rules->recalculate($command->companyId, $version->getId(), $version->getYear(), $request->projectDirectionId, $request->responsibilityCenterId);
 
             return [$plan, null];
         });

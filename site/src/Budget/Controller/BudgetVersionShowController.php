@@ -54,6 +54,8 @@ final class BudgetVersionShowController extends AbstractController
                 'cellsUrl' => $this->generateUrl('budget_version_cells', ['id' => $version->getId()]),
                 'fillUrl' => $this->generateUrl('budget_version_fill', ['id' => $version->getId()]),
                 'importUrl' => $this->generateUrl('budget_version_import', ['id' => $version->getId()]),
+                'rulesUrl' => $this->generateUrl('budget_version_rule_set', ['id' => $version->getId()]),
+                'rulesDeleteUrl' => $this->generateUrl('budget_version_rule_delete', ['id' => $version->getId()]),
                 'exportUrl' => $this->generateUrl('budget_version_export', ['id' => $version->getId()]),
                 'plCategoriesUrl' => $this->generateUrl('pl_category_index'),
                 'csrfToken' => $this->container->get('security.csrf.token_manager')->getToken('budget_cells')->getValue(),

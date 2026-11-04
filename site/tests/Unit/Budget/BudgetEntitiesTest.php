@@ -8,6 +8,7 @@ use App\Budget\Enum\BudgetLineSource;
 use App\Budget\Enum\BudgetVersionStatus;
 use App\Budget\Exception\InvalidBudgetVersionTransitionException;
 use App\Tests\Builders\Budget\BudgetLineBuilder;
+use App\Tests\Builders\Budget\BudgetRuleBuilder;
 use App\Tests\Builders\Budget\BudgetVersionBuilder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -127,5 +128,33 @@ final class BudgetEntitiesTest extends TestCase
 
         $line = BudgetLineBuilder::aLine()->withComment(' 2 менеджера × 80 ')->build();
         self::assertSame('2 менеджера × 80', $line->getComment());
+    }
+
+    public function testRuleTakesCompanyFromVersion(): void
+    {
+        $version = BudgetVersionBuilder::aVersion()->build();
+        $rule = BudgetRuleBuilder::aRule()->inVersion($version)->withPercent('12.5')->build();
+
+        self::assertSame($version->getCompanyId(), $rule->getCompanyId());
+        self::assertSame('12.5', $rule->getPercent());
+        self::assertSame(BudgetRuleBuilder::DEFAULT_BASE_CATEGORY_ID, $rule->getBaseCategoryId());
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function invalidRules(): iterable
+    {
+        yield 'база — сама статья' => [BudgetRuleBuilder::DEFAULT_PL_CATEGORY_ID, '10'];
+        yield 'процент больше 1000' => [BudgetRuleBuilder::DEFAULT_BASE_CATEGORY_ID, '1000.01'];
+        yield 'три знака' => [BudgetRuleBuilder::DEFAULT_BASE_CATEGORY_ID, '1.234'];
+        yield 'отрицательный' => [BudgetRuleBuilder::DEFAULT_BASE_CATEGORY_ID, '-5'];
+    }
+
+    #[DataProvider('invalidRules')]
+    public function testRuleRejectsSelfBaseAndBadPercent(string $baseCategoryId, string $percent): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        BudgetRuleBuilder::aRule()->fromBase($baseCategoryId)->withPercent($percent)->build();
     }
 }

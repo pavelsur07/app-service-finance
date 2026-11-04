@@ -6,6 +6,7 @@ namespace App\Budget\Application;
 
 use App\Budget\Application\DTO\SaveBudgetLinesCommand;
 use App\Budget\Application\Service\BudgetLinesWriter;
+use App\Budget\Application\Service\BudgetRuleCalculator;
 use App\Budget\Enum\BudgetVersionStatus;
 use App\Budget\Exception\BudgetVersionNotEditableException;
 use App\Budget\Exception\BudgetVersionNotFoundException;
@@ -23,7 +24,8 @@ use Webmozart\Assert\Assert;
  * той же пачки даёт те же строки. Одна и та же ячейка в пачке — побеждает последняя.
  *
  * Точка входа, коммитит сама; под блокировкой варианта ({@see BudgetVersionLock}) статус
- * перечитывается — в параллельно утверждённый вариант ничего не пишется. Только DBAL.
+ * перечитывается — в параллельно утверждённый вариант ничего не пишется. Правила «% от строки»
+ * затронутых пар пересчитываются в той же транзакции (BudgetRuleCalculator). Только DBAL.
  */
 final class SaveBudgetLinesAction
 {
@@ -33,6 +35,7 @@ final class SaveBudgetLinesAction
         private readonly EntityManagerInterface $entityManager,
         private readonly BudgetVersionRepository $versions,
         private readonly BudgetLinesWriter $writer,
+        private readonly BudgetRuleCalculator $rules,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -57,9 +60,8 @@ final class SaveBudgetLinesAction
             return 0;
         }
 
-        $cells = $this->writer->validate($command->companyId, $version->getYear(), $command->cells);
-
-        $status = $this->entityManager->wrapInTransaction(function () use ($command, $version, $cells): ?BudgetVersionStatus {
+        /** @var BudgetVersionStatus|InvalidBudgetInputException|int $result */
+        $result = $this->entityManager->wrapInTransaction(function () use ($command, $version): BudgetVersionStatus|InvalidBudgetInputException|int {
             $connection = $this->entityManager->getConnection();
             BudgetVersionLock::acquire($connection, $version->getId());
             $status = BudgetVersionStatus::from((string) $connection->fetchOne(
@@ -69,20 +71,38 @@ final class SaveBudgetLinesAction
             if (BudgetVersionStatus::DRAFT !== $status) {
                 return $status;
             }
+            // Проверка — под блокировкой: правило, установленное, пока запрос ждал её, тоже отклонит
+            // ручную запись. Отказ возвращается, а не бросается: исключение закрыло бы EntityManager.
+            try {
+                $cells = $this->writer->validate($command->companyId, $version->getId(), $version->getYear(), $command->cells);
+            } catch (InvalidBudgetInputException $exception) {
+                return $exception;
+            }
             $this->writer->write($command->companyId, $command->versionId, $cells);
+            // Правила «% от строки» затронутых пар — в той же транзакции: база и производные не расходятся.
+            $pairs = [];
+            foreach ($cells as $cell) {
+                $pairs[$cell['project'].'|'.$cell['center']] = [$cell['project'], $cell['center']];
+            }
+            foreach ($pairs as [$project, $center]) {
+                $this->rules->recalculate($command->companyId, $command->versionId, $version->getYear(), $project, $center);
+            }
 
-            return null;
+            return \count($cells);
         });
-        if (null !== $status) {
-            throw new BudgetVersionNotEditableException($status);
+        if ($result instanceof BudgetVersionStatus) {
+            throw new BudgetVersionNotEditableException($result);
+        }
+        if ($result instanceof InvalidBudgetInputException) {
+            throw $result;
         }
 
         $this->logger->info('Budget: ячейки плана сохранены', [
             'companyId' => $command->companyId,
             'versionId' => $command->versionId,
-            'cells' => \count($cells),
+            'cells' => $result,
         ]);
 
-        return \count($cells);
+        return $result;
     }
 }

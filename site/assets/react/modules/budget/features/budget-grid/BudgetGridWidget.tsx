@@ -4,6 +4,7 @@ import { inputToStored, isZero, parseAmountInput, storedToInput } from './amount
 import type { BudgetGridProps, BudgetGridRow, CellPosition, PendingCell, SelectedPair } from './budget-grid.types';
 import { BudgetFillPanel } from './BudgetFillPanel';
 import { BudgetImportPanel } from './BudgetImportPanel';
+import { BudgetRulePanel } from './BudgetRulePanel';
 import { BudgetGridView } from './BudgetGridView';
 import type { CommentDraft, VisibleRow } from './BudgetGridView';
 import { initialPair, useBudgetGrid } from './useBudgetGrid';
@@ -89,6 +90,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     const [fillOpen, setFillOpen] = useState(false);
     const [fillMessage, setFillMessage] = useState<string | null>(null);
     const [importOpen, setImportOpen] = useState(false);
+    const [rulesOpen, setRulesOpen] = useState(false);
 
     const months = grid.data?.months ?? [];
     const rows = useMemo(() => visibleRows(grid.data?.rows ?? [], collapsed), [grid.data, collapsed]);
@@ -447,7 +449,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     // Помощники — только в черновике, с правом записи и выбранной парой (ui-ux.md, экран 4).
     let fillDisabledReason: string | null = null;
     if (!props.editable) {
-        fillDisabledReason = 'Вариант не черновик — помощники и загрузка недоступны.';
+        fillDisabledReason = 'Вариант не черновик — помощники, загрузка и правила недоступны.';
     } else if (!props.canWrite) {
         fillDisabledReason = 'Нужно право записи в финансах.';
     } else if (pair === null) {
@@ -473,6 +475,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
                     onClick={() => {
                         setFillOpen((open) => !open);
                         setImportOpen(false);
+                        setRulesOpen(false);
                         setFillMessage(null);
                     }}
                 >
@@ -490,11 +493,30 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
                     onClick={() => {
                         setImportOpen((open) => !open);
                         setFillOpen(false);
+                        setRulesOpen(false);
                         setFillMessage(null);
                     }}
                 >
                     <i className="ti ti-upload me-1" aria-hidden="true" />
                     Загрузить из Excel
+                </button>
+            </span>
+            <span className="d-inline-flex" title={fillDisabledReason ?? undefined}>
+                <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={fillDisabledReason !== null}
+                    aria-expanded={rulesOpen}
+                    data-budget-rules-toggle
+                    onClick={() => {
+                        setRulesOpen((open) => !open);
+                        setFillOpen(false);
+                        setImportOpen(false);
+                        setFillMessage(null);
+                    }}
+                >
+                    <i className="ti ti-percentage me-1" aria-hidden="true" />
+                    Правило %
                 </button>
             </span>
             {fillMessage !== null && <span className="text-secondary" role="status" data-budget-fill-message>{fillMessage}</span>}
@@ -517,7 +539,23 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
             onClose={() => setImportOpen(false)}
         />
     ) : null;
-    const fillPanel = importPanel ?? (fillOpen && fillDisabledReason === null && pair !== null && grid.data !== null ? (
+    const rulesPanel = rulesOpen && fillDisabledReason === null && pair !== null && grid.data !== null ? (
+        <BudgetRulePanel
+            key={pairValueOf(pair)}
+            rulesUrl={props.rulesUrl}
+            rulesDeleteUrl={props.rulesDeleteUrl}
+            csrfToken={props.csrfToken}
+            pair={pair}
+            rows={grid.data.rows}
+            busy={grid.saveState === 'saving' || grid.hasPending()}
+            onChanged={(message) => {
+                setFillMessage(message);
+                grid.reloadAfterServerWrite();
+            }}
+            onClose={() => setRulesOpen(false)}
+        />
+    ) : null;
+    const fillPanel = rulesPanel ?? importPanel ?? (fillOpen && fillDisabledReason === null && pair !== null && grid.data !== null ? (
         <BudgetFillPanel
             key={pairValueOf(pair)}
             fillUrl={props.fillUrl}

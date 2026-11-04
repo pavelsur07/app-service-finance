@@ -8,6 +8,7 @@ use App\Budget\Application\DTO\BudgetCellInput;
 use App\Budget\Application\DTO\ImportBudgetCellsCommand;
 use App\Budget\Application\Service\BudgetImportPlanner;
 use App\Budget\Application\Service\BudgetLinesWriter;
+use App\Budget\Application\Service\BudgetRuleCalculator;
 use App\Budget\Application\View\BudgetFillCell;
 use App\Budget\Application\View\BudgetImportPlan;
 use App\Budget\Enum\BudgetVersionStatus;
@@ -23,7 +24,8 @@ use Webmozart\Assert\Assert;
  * Загрузка плана из файла: предпросмотр или запись. Точка входа, коммитит сама.
  *
  * Запись — как у помощников (FillBudgetCellsAction): под блокировкой варианта в одной транзакции
- * перечитывается статус, заново считается план по текущим ячейкам и пишется BudgetLinesWriter.
+ * перечитывается статус, заново считается план по текущим ячейкам и пишется BudgetLinesWriter;
+ * правила «% от строки» пары пересчитываются там же.
  * Повтор того же файла ничего не меняет: ячейки уже такие.
  */
 final class ImportBudgetCellsAction
@@ -33,6 +35,7 @@ final class ImportBudgetCellsAction
         private readonly BudgetVersionRepository $versions,
         private readonly BudgetImportPlanner $planner,
         private readonly BudgetLinesWriter $writer,
+        private readonly BudgetRuleCalculator $rules,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -65,12 +68,14 @@ final class ImportBudgetCellsAction
             }
             $this->writer->write($command->companyId, $version->getId(), $this->writer->validate(
                 $command->companyId,
+                $version->getId(),
                 $version->getYear(),
                 array_map(
                     static fn (BudgetFillCell $cell): BudgetCellInput => new BudgetCellInput($cell->plCategoryId, $cell->month, $command->projectDirectionId, $command->responsibilityCenterId, $cell->amount, $cell->comment),
                     $plan->fill->cells,
                 ),
             ));
+            $this->rules->recalculate($command->companyId, $version->getId(), $version->getYear(), $command->projectDirectionId, $command->responsibilityCenterId);
 
             return [$plan, null];
         });

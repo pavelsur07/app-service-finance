@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Budget\Application\Service;
 
 use App\Budget\Application\View\BudgetGridRow;
+use App\Budget\Application\View\BudgetGridRule;
 use App\Budget\Application\View\BudgetGridView;
 use App\Budget\Entity\BudgetVersion;
 use App\Budget\Infrastructure\Query\BudgetCellsQuery;
+use App\Budget\Infrastructure\Query\BudgetRulesQuery;
 use App\Finance\Enum\PLCategoryType;
 
 /**
@@ -21,6 +23,7 @@ final readonly class BudgetGridBuilder
     public function __construct(
         private BudgetCellsQuery $cells,
         private BudgetTreeCalculator $tree,
+        private BudgetRulesQuery $rules,
     ) {
     }
 
@@ -38,6 +41,14 @@ final readonly class BudgetGridBuilder
         }
 
         $tree = $this->tree->calculate($version->getCompanyId(), $version->getYear(), $amounts);
+        $rules = null !== $projectDirectionId && null !== $responsibilityCenterId
+            ? $this->rules->targetsOfPair($version->getCompanyId(), $version->getId(), $projectDirectionId, $responsibilityCenterId)
+            : [];
+        $names = [];
+        foreach ($tree->rows as $treeRow) {
+            $names[$treeRow->row->id] = $treeRow->row->name;
+        }
+
         $rows = [];
         foreach ($tree->rows as $treeRow) {
             $row = $treeRow->row;
@@ -52,10 +63,13 @@ final readonly class BudgetGridBuilder
                 type: $row->type->value,
                 flow: strtolower($treeRow->category->flow->value),
                 format: $row->format->value,
-                editable: PLCategoryType::LEAF_INPUT === $row->type,
+                editable: PLCategoryType::LEAF_INPUT === $row->type && !isset($rules[$row->id]),
                 values: $values,
                 total: $total,
                 comments: $comments[$row->id] ?? [],
+                rule: isset($rules[$row->id])
+                    ? new BudgetGridRule($rules[$row->id]->percent, $rules[$row->id]->baseCategoryId, $names[$rules[$row->id]->baseCategoryId] ?? 'строка удалена')
+                    : null,
             );
         }
 
