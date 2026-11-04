@@ -3,6 +3,7 @@ import type { ClipboardEvent, KeyboardEvent, MouseEvent } from 'react';
 import { inputToStored, isZero, parseAmountInput, storedToInput } from './amount';
 import type { BudgetGridProps, BudgetGridRow, CellPosition, PendingCell, SelectedPair } from './budget-grid.types';
 import { BudgetFillPanel } from './BudgetFillPanel';
+import { BudgetImportPanel } from './BudgetImportPanel';
 import { BudgetGridView } from './BudgetGridView';
 import type { CommentDraft, VisibleRow } from './BudgetGridView';
 import { initialPair, useBudgetGrid } from './useBudgetGrid';
@@ -87,6 +88,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     const inputRef = useRef<HTMLInputElement>(null);
     const [fillOpen, setFillOpen] = useState(false);
     const [fillMessage, setFillMessage] = useState<string | null>(null);
+    const [importOpen, setImportOpen] = useState(false);
 
     const months = grid.data?.months ?? [];
     const rows = useMemo(() => visibleRows(grid.data?.rows ?? [], collapsed), [grid.data, collapsed]);
@@ -445,7 +447,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     // Помощники — только в черновике, с правом записи и выбранной парой (ui-ux.md, экран 4).
     let fillDisabledReason: string | null = null;
     if (!props.editable) {
-        fillDisabledReason = 'Вариант не черновик — помощники недоступны.';
+        fillDisabledReason = 'Вариант не черновик — помощники и загрузка недоступны.';
     } else if (!props.canWrite) {
         fillDisabledReason = 'Нужно право записи в финансах.';
     } else if (pair === null) {
@@ -453,25 +455,69 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     } else if (grid.lockedMessage !== null || grid.data === null) {
         fillDisabledReason = 'Сетка недоступна для правки.';
     }
+    const exportHref = pair === null
+        ? props.exportUrl
+        : `${props.exportUrl}?${new URLSearchParams({ project: pair.projectDirectionId, center: pair.responsibilityCenterId }).toString()}`;
     const fillButton = (
-        <span className="d-inline-flex align-items-center gap-2" title={fillDisabledReason ?? undefined}>
-            <button
-                type="button"
-                className="btn btn-sm"
-                disabled={fillDisabledReason !== null}
-                aria-expanded={fillOpen}
-                onClick={() => {
-                    setFillOpen((open) => !open);
-                    setFillMessage(null);
-                }}
-            >
-                <i className="ti ti-wand me-1" aria-hidden="true" />
-                Помощники
-            </button>
+        <span className="d-inline-flex flex-wrap align-items-center gap-2">
+            <a className="btn btn-sm" href={exportHref} data-budget-export title={pair === null ? 'Выгрузить в Excel всю компанию' : 'Выгрузить в Excel выбранную пару'}>
+                <i className="ti ti-file-spreadsheet me-1" aria-hidden="true" />
+                Excel
+            </a>
+            <span className="d-inline-flex" title={fillDisabledReason ?? undefined}>
+                <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={fillDisabledReason !== null}
+                    aria-expanded={fillOpen}
+                    onClick={() => {
+                        setFillOpen((open) => !open);
+                        setImportOpen(false);
+                        setFillMessage(null);
+                    }}
+                >
+                    <i className="ti ti-wand me-1" aria-hidden="true" />
+                    Помощники
+                </button>
+            </span>
+            <span className="d-inline-flex" title={fillDisabledReason ?? undefined}>
+                <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={fillDisabledReason !== null}
+                    aria-expanded={importOpen}
+                    data-budget-import-toggle
+                    onClick={() => {
+                        setImportOpen((open) => !open);
+                        setFillOpen(false);
+                        setFillMessage(null);
+                    }}
+                >
+                    <i className="ti ti-upload me-1" aria-hidden="true" />
+                    Загрузить из Excel
+                </button>
+            </span>
             {fillMessage !== null && <span className="text-secondary" role="status" data-budget-fill-message>{fillMessage}</span>}
         </span>
     );
-    const fillPanel = fillOpen && fillDisabledReason === null && pair !== null && grid.data !== null ? (
+    const importPanel = importOpen && fillDisabledReason === null && pair !== null && grid.data !== null ? (
+        <BudgetImportPanel
+            key={pairValueOf(pair)}
+            importUrl={props.importUrl}
+            csrfToken={props.csrfToken}
+            pair={pair}
+            pairLabel={props.pairs.find((item) => pairValueOf(item) === pairValueOf(pair))?.label ?? ''}
+            rows={grid.data.rows}
+            busy={grid.saveState === 'saving' || grid.hasPending()}
+            onApplied={(changed) => {
+                setImportOpen(false);
+                setFillMessage(`Загружено ${changed} ${plural(changed, 'ячейка', 'ячейки', 'ячеек')}.`);
+                grid.reloadAfterServerWrite();
+            }}
+            onClose={() => setImportOpen(false)}
+        />
+    ) : null;
+    const fillPanel = importPanel ?? (fillOpen && fillDisabledReason === null && pair !== null && grid.data !== null ? (
         <BudgetFillPanel
             key={pairValueOf(pair)}
             fillUrl={props.fillUrl}
@@ -487,7 +533,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
             }}
             onClose={() => setFillOpen(false)}
         />
-    ) : null;
+    ) : null);
 
     return (
         <>

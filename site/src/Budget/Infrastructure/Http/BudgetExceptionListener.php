@@ -19,7 +19,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
- * Доменные исключения бюджета под `/finance/budget`: API варианта (`/versions/{id}/grid|cells|fill|plan-fact`; страница `/finance/budget/plan-fact` — HTML) и запросы с
+ * Доменные исключения бюджета под `/finance/budget`: API варианта (`/versions/{id}/grid|cells|fill|plan-fact|export|import`; страница `/finance/budget/plan-fact` — HTML) и запросы с
  * `Accept: application/json` — `{error: {code, message}}` со статусом;
  * HTML — «вариант не найден» как 404 (остальное HTML-контроллеры показывают flash сами).
  */
@@ -54,7 +54,7 @@ final readonly class BudgetExceptionListener implements EventSubscriberInterface
         }
 
         // API сетки отвечает JSON всегда, остальное — по заголовку Accept.
-        $api = 1 === preg_match('#^/finance/budget/versions/[^/]+/(grid|cells|fill|plan-fact)$#', $path);
+        $api = 1 === preg_match('#^/finance/budget/versions/[^/]+/(grid|cells|fill|plan-fact|export|import)$#', $path);
         if ($api || str_contains($request->headers->get('Accept', ''), 'application/json')) {
             $event->setResponse(new JsonResponse(['error' => ['code' => $code, 'message' => $exception->getMessage()]], $status));
 

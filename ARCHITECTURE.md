@@ -2081,6 +2081,8 @@ Facade нет: план читает только сам модуль; Facade п
 | `/finance/budget/plan-fact?year=&version=&project=&center=&show=&period=` | GET | вкладка «План–факт» (Twig): вариант по умолчанию — утверждённый, иначе первый неархивный с подсказкой; пара по умолчанию — вся компания; `show` plan/fact/diff/percent, `period` month/quarter; факт месяца — ссылка на `finance_report_preview` | чтение |
 | `/finance/budget/versions/{id}/plan-fact?project=&center=` | GET | JSON `BudgetPlanFactView`: план, факт, отклонение по месяцам и году; без пары — вся компания | чтение |
 | `/finance/budget/versions/{id}/fill` | POST | помощник заполнения: JSON `{helper, project, center, categoryIds, months, params, apply, confirmOverwrite}` → `{cells, changed, overwrite, skipped, applied}`; без `apply` — предпросмотр; `X-CSRF-Token` (`budget_cells`) | запись |
+| `/finance/budget/versions/{id}/export` | GET | xlsx варианта (`?project=&center=` — пара, без них — вся компания); лист «План» по `Infrastructure\Xlsx\BudgetPlanSheet` | чтение |
+| `/finance/budget/versions/{id}/import` | POST | загрузка плана пары из xlsx: multipart `file` (≤ 2 МБ, .xlsx), `project`, `center`, `apply`, `confirmOverwrite` (`1`) → ответ `/fill` + `warnings`, `ignored`; `X-CSRF-Token` (`budget_cells`) | запись |
 | `/finance/budget/versions/{id}/cells` | POST | JSON `{cells:[…]}` → `SaveBudgetLinesAction`, заголовок `X-CSRF-Token` (`budget_cells`) | запись |
 
 - Строка сетки (`BudgetGridRow`): `id`, `code`, `name`, `level`, `type`, `flow`
@@ -2118,13 +2120,23 @@ Facade нет: план читает только сам модуль; Facade п
   `FillBudgetCellsAction` пишет их одним вызовом `SaveBudgetLinesAction` (его
   транзакция и блокировка). Перезапись заполненных — только с
   `confirmOverwrite`, иначе 409 `budget_fill_overwrite_unconfirmed`.
+- Excel: `BudgetPlanXlsxWriter` пишет сетку (`BudgetGridBuilder`) на лист
+  «План» — шапка, служебная строка `year=…;project=…;center=…`, таблица «Код ·
+  Статья · 12 месяцев · Год · ID статьи»; листья-расходы — в знаке ввода
+  (положительные), итоги и показатели — как на экране. `BudgetPlanXlsxReader`
+  читает тот же формат (заголовок — по колонке «ID статьи», пустое = 0, ≤ 2000
+  строк). `BudgetImportPlanner` — статья по ID, без ID — по коду; только
+  видимые листья ввода; остальное по правилам помощников (`sales_plan`,
+  комментарий, перезапись); итоги, неизвестные строки, другая пара или год —
+  в `warnings`/`ignored`. `ImportBudgetCellsAction` — предпросмотр или запись
+  под `BudgetVersionLock` тем же путём, что `FillBudgetCellsAction`.
 - Пара «проект × ЦФО» из запроса — `BudgetPairResolver`; неактивная или чужая —
   `InvalidBudgetPairException` (422 `budget_invalid_pair`).
 - «Итог года» в списке: `BudgetYearTotals::netProfit()` — один
   `calculatePlTree` на все варианты года (вариант = колонка), строка с кодом
   `NET_PROFIT`; нет такой строки в дереве компании — колонки нет.
 - Ошибки: `BudgetExceptionListener` для `/finance/budget*` — JSON
-  `{error:{code,message}}` для `/grid`, `/plan-fact`, `/cells`, `/fill` и `Accept: application/json`:
+  `{error:{code,message}}` для `/grid`, `/plan-fact`, `/cells`, `/fill`, `/export`, `/import` и `Accept: application/json`:
   404 `budget_version_not_found`, 422 `budget_invalid_input` /
   `budget_invalid_pair`, 409 `budget_fill_overwrite_unconfirmed` /
   `budget_version_not_editable` / `budget_year_already_approved` /
@@ -4896,6 +4908,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.134 | 2026-11-04 | Budget: выгрузка и загрузка плана в Excel (`/export`, `/import`, `BudgetPlanXlsxWriter`/`Reader`, `BudgetImportPlanner`, `ImportBudgetCellsAction`), кнопки «Excel» и «Загрузить из Excel» в острове `budget-grid` (props `exportUrl`, `importUrl`); `apiFetch` принимает FormData (задача `pl-budget`, этапы 6–7) |
 | 2.133 | 2026-11-04 | Budget: факт пары с системным ЦФО «Общий» включает строки без ЦФО (`BudgetPairResolver::isGeneralCenter`), ссылка на отчёт для неё скрыта; Finance: `getPlFactAmountsByMonth(..., includeUnassignedCenter)` (задача `pl-budget`, вариант A) |
 | 2.132 | 2026-11-04 | Budget: помощники заполнения плана (`/fill`, `BudgetFillPlanner`, `FillBudgetCellsAction`, `BudgetFillMath`), панель «Помощники» в острове `budget-grid`, prop `fillUrl` (задача `pl-budget`, этап 5) |
 | 2.131 | 2026-11-04 | Budget: вкладка «План–факт» (`budget_plan_fact`), колонки кварталов и «с начала года» (`BudgetPlanFactColumn`, `BudgetTreeCalculator::calculateColumns`), `BudgetPairResolver::options()` (задача `pl-budget`, этап 4) |
