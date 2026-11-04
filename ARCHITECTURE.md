@@ -2064,10 +2064,17 @@ Facade нет: план читает только сам модуль; Facade п
 | `/finance/budget?year=` | GET | список вариантов года, архив отдельно | чтение |
 | `/finance/budget/versions` | POST | создать вариант (форма, CSRF `budget_version_create`, `versionId` из формы) | запись |
 | `/finance/budget/versions/{id}/status/{draft\|approved\|archived}` | POST | смена статуса (CSRF `budget_version_status{id}`) | запись; утверждение — владелец |
-| `/finance/budget/versions/{id}` | GET | экран варианта, props React-острова `budget-grid` | чтение |
+| `/finance/budget/versions/{id}` | GET | экран варианта, React-остров `budget-grid` (entry `budget_grid_page`; props: `versionId`, `year`, `editable`, `canWrite`, `isOwner`, `pairs`, `gridUrl`, `cellsUrl`, `csrfToken`, `plCategoriesUrl`) | чтение |
 | `/finance/budget/versions/{id}/grid?project=&center=` | GET | JSON сетки `BudgetGridView`; без пары — сумма по всем парам | чтение |
 | `/finance/budget/versions/{id}/cells` | POST | JSON `{cells:[…]}` → `SaveBudgetLinesAction`, заголовок `X-CSRF-Token` (`budget_cells`) | запись |
 
+- Строка сетки (`BudgetGridRow`): `id`, `code`, `name`, `level`, `type`, `flow`
+  (`income`/`expense`/`none`), `format` (`PLValueFormat`; деньги — 2 знака,
+  показатели — 4), `editable`, `values` (`Y-m` → сумма), `total`, `comments`.
+- Остров (`assets/react/modules/budget/features/budget-grid/`): ввод в расходной
+  статье положительным числом, хранение с минусом (решение Владельца 04.11);
+  автосохранение пачкой через 1 с, правка хранит свою пару; итоги дерева —
+  перечитыванием `grid` после сохранения; 409 → только чтение.
 - Сетка: `BudgetGridBuilder` — 12 месяцев и колонка `total` (KPI года ≠ сумма
   месяцев) через `FinanceFacade::calculatePlTree()`; лист показывает
   сохранённую сумму, скрытые статьи пропускаются, лист без кода —
@@ -4844,6 +4851,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.129 | 2026-11-04 | Budget: сетка ввода плана — React-остров `budget-grid`, `BudgetGridRow::$format`; фронт: `apiFetch` в `assets/api/client.ts` (задача `pl-budget`, этап 2) |
 | 2.128 | 2026-11-04 | Budget: страницы и JSON API (список, создание, смена статуса, экран варианта, сетка, сохранение ячеек), `BudgetExceptionListener`, доступ FINANCE; Finance: `calculatePlTree()`, `PLCategoryDTO::$flow`/`$isVisible` (задача `pl-budget`, этап 1) |
 | 2.127 | 2026-11-04 | Budget: новый модуль — `BudgetVersion`, `BudgetLine`, создание/копия варианта, смена статуса (утверждает владелец), сохранение ячеек; миграция `Version20261104090000`; `PLCategoryDTO::$type` (задача `pl-budget`, этап 0) |
 | 2.126 | 2026-11-03 | Схема БД: миграция `Version20261103150000` — потерянные внешние ключи, дубли индексов, комментарии DC2Type, `messenger_messages` по схеме транспорта, удалены неиспользуемые таблицы; гейт схемы без исключений (задача `doctrine-schema-sync`, этап 3) |

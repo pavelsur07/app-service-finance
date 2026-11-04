@@ -173,6 +173,7 @@ final class BudgetPagesTest extends WebTestCaseBase
         self::assertTrue($props['canWrite']);
         self::assertFalse($props['isOwner']);
         self::assertTrue($props['editable']);
+        self::assertSame('/pl-categories/', $props['plCategoriesUrl']);
         self::assertSame([['projectDirectionId' => self::PROJECT_ID, 'responsibilityCenterId' => $this->centerId, 'label' => 'Общий × Общий', 'system' => true]], $props['pairs']);
     }
 

@@ -39,6 +39,7 @@ export default defineConfig({
                 ingestion_verification_reconciliation_page: "./assets/react/_legacy/ingestion-verification-reconciliation-page.tsx",
                 ingestion_verification_issues_page: "./assets/react/_legacy/ingestion-verification-issues-page.tsx",
                 ingestion_verification_financial_summary_page: "./assets/react/_legacy/ingestion-verification-financial-summary-page.tsx",
+                budget_grid_page: "./assets/react/entrypoints/budget_grid_page.tsx",
             },
         }
     },

@@ -10,6 +10,8 @@ use App\Budget\Application\View\BudgetGridView;
 use App\Budget\Entity\BudgetVersion;
 use App\Company\Entity\Company;
 use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PLValueFormat;
 use App\Tests\Builders\Budget\BudgetLineBuilder;
 use App\Tests\Builders\Budget\BudgetVersionBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
@@ -19,6 +21,7 @@ final class BudgetGridBuilderTest extends BudgetIntegrationTestCase
     private const VERSION_ID = '0193cccc-0000-7000-8000-0000000f4001';
     private const NO_CODE_ID = '0193cccc-0000-7000-8000-00000000d004';
     private const HIDDEN_ID = '0193cccc-0000-7000-8000-00000000d005';
+    private const RATIO_ID = '0193cccc-0000-7000-8000-00000000d006';
 
     private BudgetVersion $version;
 
@@ -94,6 +97,27 @@ final class BudgetGridBuilderTest extends BudgetIntegrationTestCase
         self::assertNotContains(self::HIDDEN_ID, array_map(static fn (BudgetGridRow $row): string => $row->id, $grid->rows));
         self::assertCount(1, $grid->warnings);
         self::assertStringContainsString('Прочее', $grid->warnings[0]);
+    }
+
+    public function testRowsCarryValueFormatAndKpiKeepsItsPrecision(): void
+    {
+        $company = $this->em->find(Company::class, self::COMPANY_ID);
+        self::assertNotNull($company);
+        $ratio = PLCategoryBuilder::aPLCategory()->withId(self::RATIO_ID)->forCompany($company)->withName('Доля')->withCode('SHARE')->withType(PLCategoryType::KPI)->build();
+        $ratio->setFormula('REV / 3');
+        $ratio->setFormat(PLValueFormat::RATIO);
+        $ratio->setSortOrder(5);
+        $this->em->persist($ratio);
+        $this->em->flush();
+        $this->em->clear();
+
+        $grid = $this->build(self::GENERAL_PROJECT_ID, $this->generalCenterId);
+
+        self::assertSame('MONEY', $this->row($grid, self::REVENUE_ID)->format);
+        self::assertSame('MONEY', $this->row($grid, self::SUBTOTAL_ID)->format);
+        self::assertSame('1000.00', $this->row($grid, self::SUBTOTAL_ID)->values['2027-01']);
+        self::assertSame('RATIO', $this->row($grid, self::RATIO_ID)->format);
+        self::assertSame('333.3333', $this->row($grid, self::RATIO_ID)->values['2027-01']);
     }
 
     private function build(?string $projectId, ?string $centerId): BudgetGridView

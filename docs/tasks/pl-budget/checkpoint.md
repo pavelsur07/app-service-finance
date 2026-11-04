@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 / planning
-**Status:** Stage 1 done
-**Stage base commit:** `b19c6a138`
+**Phase:** Stage 3 / planning
+**Status:** Stage 2 done
+**Stage base commit:** `af9032dcc`
 
 ### Completed
 - Phase 0: `plan.md`, решения Владельца в `TASK.md`, `ui-ux.md` (ТЗ на экраны).
@@ -13,10 +13,14 @@
 - Stage 1: доступ, `calculatePlTree`, сетка, страницы и JSON API, DS раздела
   ОПиУ, меню «Доходы и расходы» — `stages/stage-1.md`.
 
+- Stage 2: React-сетка `budget-grid`, `apiFetch`, `BudgetGridRow::$format`,
+  решения Владельца 5–7 — `stages/stage-2.md`.
+
 ### Checks and baseline
 - baseline: `AssignTariffActionTest` — OK (6).
 - Budget + Finance + Shared/Doctrine — OK (430 тестов), Budget — 53.
 - Stage 1: связанный набор — OK (558).
+- Stage 2: Budget — OK (70); lint/build зелёные; smoke со скриншотами.
 - PHPStan по изменённым файлам — OK; baseline −7 (PLCategoryFacade).
 - php-cs-fixer (`.php-cs-fixer.php`, без кеша) — OK.
 
@@ -26,11 +30,14 @@
 - external: round 1 — IMPORTANT (регистр UUID в ключе блокировки) исправлен, fixed without re-run.
 
 ### Exact next action
-- Stage 1 закоммичен; написать `stages/stage-2.md` (React-сетка, `ui-ux.md` §3), затем TDD.
+- Stage 2 закоммичен; написать `stages/stage-3.md` (план–факт backend + итог года), затем TDD.
 
 ### Files to inspect first on resume
 - `docs/tasks/pl-budget/stages/stage-0.md`, `site/src/Budget/`.
 
 ### Test environment
+- стенд smoke: `asfb-fpm` + `asfb-nginx` в `asfb-net`, база `app_dev` в `asfb-pg`
+  (фикстуры, владельцу выдан `ROLE_COMPANY_OWNER` — только в этой базе);
+  скрипты puppeteer — в `$CLAUDE_JOB_DIR/tmp/shot`.
 - запуск: `site/var/pl-budget/t.sh <команда>`; своя пара `asfb-pg` / `asfb-redis` в сети `asfb-net`; после задачи —
-  `docker rm -f asfb-pg asfb-redis; docker network rm asfb-net`.
+  `docker rm -f asfb-pg asfb-redis asfb-fpm asfb-nginx; docker network rm asfb-net`.

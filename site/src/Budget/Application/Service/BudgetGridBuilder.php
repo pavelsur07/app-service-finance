@@ -11,6 +11,7 @@ use App\Budget\Infrastructure\Query\BudgetCellsQuery;
 use App\Finance\Application\DTO\PlPreviewColumn;
 use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PlPreviewUnplacedReason;
+use App\Finance\Enum\PLValueFormat;
 use App\Finance\Facade\FinanceFacade;
 use App\Finance\Facade\PLCategoryFacade;
 
@@ -75,12 +76,13 @@ final readonly class BudgetGridBuilder
                 continue;
             }
             $leaf = PLCategoryType::LEAF_INPUT === $row->type;
+            $digits = PLValueFormat::MONEY === $row->format ? 2 : 4;
             $values = [];
             foreach ([...$months, self::TOTAL] as $key) {
                 // Лист показывает сумму плана (и без кода, когда калькулятор её не берёт).
                 $values[$key] = $leaf
                     ? bcadd($amounts[$key][$row->id] ?? '0', '0', 2)
-                    : number_format($row->values[$key] ?? 0.0, 2, '.', '');
+                    : number_format($row->values[$key] ?? 0.0, $digits, '.', '');
             }
             $total = $values[self::TOTAL];
             unset($values[self::TOTAL]);
@@ -91,6 +93,7 @@ final readonly class BudgetGridBuilder
                 level: $row->level,
                 type: $row->type->value,
                 flow: strtolower($category->flow->value),
+                format: $row->format->value,
                 editable: $leaf,
                 values: $values,
                 total: $total,

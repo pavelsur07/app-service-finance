@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Budget\Application\View;
 
 /**
- * Строка сетки бюджета: статья дерева ОПиУ. Суммы — строки с двумя знаками в знаке отчёта.
+ * Строка сетки бюджета: статья дерева ОПиУ. Суммы — строки в знаке отчёта: деньги с двумя
+ * знаками, показатели (`format` не `MONEY`) — с четырьмя. `format` — `PLValueFormat`.
  */
 final readonly class BudgetGridRow
 {
@@ -20,6 +21,7 @@ final readonly class BudgetGridRow
         public int $level,
         public string $type,
         public string $flow,
+        public string $format,
         public bool $editable,
         public array $values,
         public string $total,

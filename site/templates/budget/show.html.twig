@@ -2,6 +2,16 @@
 
 {% block title %}{{ version.name }} — бюджет {{ version.year }}{% endblock %}
 
+{% block importmap %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('budget_grid_page') }}
+{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    {{ vite_entry_link_tags('budget_grid_page') }}
+{% endblock %}
+
 {% block body %}
 {# Композиция раздела ОПиУ: vf-page-head с крошками, действия справа, сетка — React-остров (этап 2). ui-ux.md, экран 3. #}
     {% set can_write = props.canWrite %}
@@ -33,10 +43,8 @@
     {% endif %}
 
     <div class="card vf-card mb-4">
-        <div class="card-body"
-             data-island="budget-grid"
-             data-props="{{ props|json_encode|e('html_attr') }}">
-            <noscript>Для ввода плана нужен JavaScript.</noscript>
+        <div data-island="budget-grid" data-props="{{ props|json_encode|e('html_attr') }}">
+            <noscript><div class="card-body">Для ввода плана нужен JavaScript.</div></noscript>
         </div>
     </div>
 
