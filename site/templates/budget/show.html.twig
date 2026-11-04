@@ -13,33 +13,96 @@
 {% endblock %}
 
 {% block body %}
-{# Композиция раздела ОПиУ: vf-page-head с крошками, действия справа, сетка — React-остров (этап 2). ui-ux.md, экран 3. #}
+{# Шапка экрана варианта по пакету DS (BUDGET-SPEC §5, refs 10–15): название с карандашом, индикатор
+   сохранения и «Помощники ▾» — слоты, которые остров заполняет порталом; «⋯», баннеры. #}
     {% set can_write = props.canWrite %}
-    <div class="vf-page-head">
+    {% set status = version.status.value %}
+    {% set read_only_hint = 'Роль «Чтение»: изменять варианты нельзя' %}
+    {% set owner_only = status != 'archived' %}
+    {% set status_enabled = can_write and (isOwner or not owner_only) %}
+    {% if not can_write %}
+        {% set status_reason = read_only_hint %}
+    {% elseif not status_enabled %}
+        {% set status_reason = status == 'draft' ? 'Утверждает только владелец компании' : 'Возвращает в черновик только владелец компании' %}
+    {% else %}
+        {% set status_reason = null %}
+    {% endif %}
+    <div class="vf-page-head budget-head" data-budget-page="version">
         <div class="vf-page-head__title">
             <nav aria-label="Путь">
                 <ol class="breadcrumb">
-                    <li class="breadcrumb-item">Доходы и расходы</li>
-                    <li class="breadcrumb-item"><a href="{{ path('budget_index', {year: version.year}) }}">Бюджет ОПиУ · {{ version.year }}</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">{{ version.name }}</li>
+                    <li class="breadcrumb-item"><a href="{{ path('budget_index', {year: version.year}) }}">Бюджет ОПиУ</a></li>
+                    <li class="breadcrumb-item"><a href="{{ path('budget_index', {year: version.year}) }}">{{ version.year }}</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">«<span data-budget-name-crumb>{{ version.name }}</span>»</li>
                 </ol>
             </nav>
-            <h1 class="d-flex align-items-center gap-2">
-                {{ version.name }}
+            <div class="budget-title">
+                <h1 class="budget-title__name" data-budget-name>{{ version.name }}</h1>
+                {% if version.editable and can_write %}
+                    <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-budget-rename aria-label="Переименовать вариант">
+                        <i class="ti ti-pencil" aria-hidden="true"></i>
+                    </button>
+                    <form class="budget-title__form" data-budget-rename-form hidden novalidate
+                          data-url="{{ path('budget_version_rename', {id: version.id}) }}" data-token="{{ props.csrfToken }}">
+                        <label class="visually-hidden" for="budget-rename-input">Название варианта</label>
+                        <input id="budget-rename-input" class="form-control" maxlength="120" value="{{ version.name }}"
+                               aria-describedby="budget-rename-error budget-rename-help" data-budget-rename-input>
+                        <div class="budget-title__help" id="budget-rename-help">Enter — сохранить, Esc — отмена</div>
+                        <div class="invalid-feedback d-block" id="budget-rename-error" role="alert" data-budget-rename-error></div>
+                    </form>
+                {% endif %}
                 {% include 'budget/_status_badge.html.twig' with {status: version.status} only %}
-            </h1>
+            </div>
         </div>
-        <div class="btn-list d-print-none">
-            {% include 'budget/_status_actions.html.twig' with {version: version, isOwner: isOwner, canWrite: can_write} only %}
+        <div class="budget-head__side d-print-none">
+            <div class="budget-head-actions">
+                <div data-budget-head-slot="save"></div>
+                {% include 'budget/_status_actions.html.twig' with {version: version, enabled: status_enabled} only %}
+                {% if status == 'draft' %}<div data-budget-head-slot="helpers"></div>{% endif %}
+                <div class="dropdown">
+                    <button type="button" class="btn btn-icon" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Ещё действия с вариантом">
+                        <i class="ti ti-dots" aria-hidden="true"></i>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end budget-menu">
+                        {% if can_write %}
+                            <a class="dropdown-item" href="{{ path('budget_index', {year: version.year, copy: version.id}) }}" data-budget-copy-link>Копировать</a>
+                        {% else %}
+                            <span class="dropdown-item disabled vf-menu-item--reason" aria-disabled="true">Копировать<span class="vf-menu-item__reason">{{ read_only_hint }}</span></span>
+                        {% endif %}
+                        <a class="dropdown-item" href="{{ props.exportUrl }}" data-budget-export-link>Выгрузить в Excel</a>
+                        {% if status == 'draft' %}
+                            {% if can_write %}
+                                <button type="button" class="dropdown-item"
+                                        data-bs-toggle="modal" data-bs-target="#budget-confirm"
+                                        data-confirm-action="{{ path('budget_version_status', {id: version.id, target: 'archived'}) }}"
+                                        data-confirm-token="{{ csrf_token('budget_version_status' ~ version.id) }}"
+                                        data-confirm-title="Отправить «{{ version.name }}» в архив?"
+                                        data-confirm-body="Архивный вариант можно восстановить."
+                                        data-confirm-submit="В архив">В архив</button>
+                            {% else %}
+                                <span class="dropdown-item disabled vf-menu-item--reason" aria-disabled="true">В архив<span class="vf-menu-item__reason">{{ read_only_hint }}</span></span>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% if status_reason %}
+                <div class="budget-disabled__reason" id="budget-status-reason" data-budget-status-reason>{{ status_reason }}</div>
+            {% endif %}
         </div>
     </div>
 
-    {% if version.status.value == 'approved' %}
-        <div class="alert alert-info" data-budget-banner>
-            Вариант утверждён — изменения недоступны. Чтобы править, верните его в черновик{{ isOwner ? '' : ' (это может сделать владелец компании)' }}.
+    {% if status == 'approved' %}
+        <div class="alert alert-info" data-budget-banner="approved">
+            Вариант утверждён — изменения недоступны. Чтобы править, верните его в черновик{{ isOwner ? '' : ' — это может сделать владелец компании' }}.
         </div>
-    {% elseif version.status.value == 'archived' %}
-        <div class="alert alert-secondary" data-budget-banner>Вариант в архиве. Восстановите, чтобы править.</div>
+    {% elseif status == 'archived' %}
+        <div class="alert alert-info" data-budget-banner="archived">Вариант в архиве. Восстановите, чтобы править.</div>
+    {% endif %}
+    {% if not can_write %}
+        <div class="alert alert-info" data-budget-banner="read-only">
+            У вас доступ только для просмотра: вводить план и менять статус может роль с правом записи в финансах.
+        </div>
     {% endif %}
 
     <div class="card vf-card mb-4">

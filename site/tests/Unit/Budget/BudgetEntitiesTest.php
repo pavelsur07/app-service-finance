@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Budget;
 
 use App\Budget\Enum\BudgetLineSource;
 use App\Budget\Enum\BudgetVersionStatus;
+use App\Budget\Exception\BudgetVersionNotEditableException;
 use App\Budget\Exception\InvalidBudgetVersionTransitionException;
 use App\Tests\Builders\Budget\BudgetLineBuilder;
 use App\Tests\Builders\Budget\BudgetRuleBuilder;
@@ -81,6 +82,19 @@ final class BudgetEntitiesTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         BudgetVersionBuilder::aVersion()->withYear($year)->build();
+    }
+
+    public function testOnlyDraftIsRenamedAndNameIsNormalized(): void
+    {
+        $version = BudgetVersionBuilder::aVersion()->build();
+        $later = new \DateTimeImmutable('2027-02-01 10:00:00');
+        $version->rename('  Оптимистичный ', $later);
+        self::assertSame('Оптимистичный', $version->getName());
+        self::assertEquals($later, $version->getUpdatedAt());
+
+        $approved = BudgetVersionBuilder::aVersion()->withStatus(BudgetVersionStatus::APPROVED)->build();
+        $this->expectException(BudgetVersionNotEditableException::class);
+        $approved->rename('Другое', $later);
     }
 
     public function testVersionNameIsRequired(): void

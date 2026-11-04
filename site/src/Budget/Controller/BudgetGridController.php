@@ -17,8 +17,9 @@ use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Сетка варианта: `?project=&center=` — одна активная пара (с комментариями), без них — сумма
- * всех пар. GET /finance/budget/versions/{id}/grid.
+ * Сетка варианта: `?project=&center=` — одна активная пара (с комментариями); одно измерение
+ * (другое пусто или `all`) — сумма пар этого проекта / ЦФО; без них — сумма всех пар.
+ * GET /finance/budget/versions/{id}/grid.
  */
 #[Route('/finance/budget/versions/{id}/grid', name: 'budget_version_grid', requirements: ['id' => Requirement::UUID], methods: ['GET'])]
 #[IsGranted('ROLE_USER')]
@@ -37,8 +38,8 @@ final class BudgetGridController extends AbstractController
         $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
         $version = $this->versions->findOneByIdAndCompanyId($id, $companyId) ?? throw new BudgetVersionNotFoundException();
 
-        $pair = $this->pairs->resolve($companyId, $request->query->getString('project'), $request->query->getString('center'));
+        [$project, $center] = $this->pairs->resolveSlice($companyId, $request->query->getString('project'), $request->query->getString('center'));
 
-        return $this->json($this->gridBuilder->build($version, $pair?->projectDirectionId, $pair?->responsibilityCenterId));
+        return $this->json($this->gridBuilder->build($version, $project, $center));
     }
 }

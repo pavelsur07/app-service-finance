@@ -10,7 +10,7 @@ use Doctrine\DBAL\Connection;
 
 /**
  * Плановые суммы варианта по статье × месяцу: одной пары «проект × ЦФО» (с комментариями) или
- * сумма по всем парам (комментариев нет — их несколько).
+ * сумма по парам одного проекта, одного ЦФО либо всем парам (комментариев нет — их несколько).
  */
 final readonly class BudgetCellsQuery
 {
@@ -23,22 +23,32 @@ final readonly class BudgetCellsQuery
      */
     public function fetch(string $companyId, string $versionId, ?string $projectDirectionId, ?string $responsibilityCenterId): array
     {
-        $byPair = null !== $projectDirectionId && null !== $responsibilityCenterId;
-        $rows = $byPair
-            ? $this->connection->fetchAllAssociative(
+        if (null !== $projectDirectionId && null !== $responsibilityCenterId) {
+            $rows = $this->connection->fetchAllAssociative(
                 "SELECT pl_category_id, to_char(month, 'YYYY-MM') AS month, amount::text AS amount, comment, source
                    FROM budget_lines
                   WHERE company_id = :companyId AND version_id = :versionId
                     AND project_direction_id = :projectId AND responsibility_center_id = :centerId",
                 ['companyId' => $companyId, 'versionId' => $versionId, 'projectId' => $projectDirectionId, 'centerId' => $responsibilityCenterId],
-            )
-            : $this->connection->fetchAllAssociative(
+            );
+        } else {
+            $filter = '';
+            $params = ['companyId' => $companyId, 'versionId' => $versionId];
+            if (null !== $projectDirectionId) {
+                $filter = ' AND project_direction_id = :projectId';
+                $params['projectId'] = $projectDirectionId;
+            } elseif (null !== $responsibilityCenterId) {
+                $filter = ' AND responsibility_center_id = :centerId';
+                $params['centerId'] = $responsibilityCenterId;
+            }
+            $rows = $this->connection->fetchAllAssociative(
                 "SELECT pl_category_id, to_char(month, 'YYYY-MM') AS month, SUM(amount)::text AS amount, NULL AS comment, 'manual' AS source
                    FROM budget_lines
-                  WHERE company_id = :companyId AND version_id = :versionId
+                  WHERE company_id = :companyId AND version_id = :versionId{$filter}
                   GROUP BY pl_category_id, month",
-                ['companyId' => $companyId, 'versionId' => $versionId],
+                $params,
             );
+        }
 
         return array_map(
             static fn (array $row): BudgetCellRow => new BudgetCellRow(

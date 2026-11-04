@@ -10,6 +10,7 @@ import './confirm_modal.js';
 import { initDdsTreePickers, observeDdsTreePickers } from './dds_tree_picker.js';
 import { initDdsOperation } from './pages/dds_operation.js';
 import { initBudgetVersions } from './pages/budget_versions.js';
+import { initBudgetVersion } from './pages/budget_version.js';
 
 // Keep connection verification as a regular POST while preventing duplicate clicks.
 document.addEventListener('submit', (event) => {
@@ -64,6 +65,7 @@ const initDds = () => {
   observeDdsTreePickers();
   initDdsOperation();
   initBudgetVersions();
+  initBudgetVersion();
 };
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initDds);

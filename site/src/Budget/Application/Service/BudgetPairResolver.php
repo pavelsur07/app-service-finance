@@ -24,7 +24,7 @@ final readonly class BudgetPairResolver
     /**
      * Активные пары компании для выбора на экранах (подпись «Проект × ЦФО»), системная — помечена.
      *
-     * @return list<array{projectDirectionId: string, responsibilityCenterId: string, label: string, system: bool}>
+     * @return list<array{projectDirectionId: string, responsibilityCenterId: string, label: string, projectName: string, centerName: string, system: bool}>
      */
     public function options(string $companyId): array
     {
@@ -41,6 +41,8 @@ final readonly class BudgetPairResolver
                 'projectDirectionId' => $pair->projectDirectionId,
                 'responsibilityCenterId' => $pair->responsibilityCenterId,
                 'label' => $projectNames[$pair->projectDirectionId].' × '.$pair->responsibilityCenterName,
+                'projectName' => $projectNames[$pair->projectDirectionId],
+                'centerName' => (string) $pair->responsibilityCenterName,
                 'system' => $pair->system,
             ];
         }
@@ -56,6 +58,33 @@ final readonly class BudgetPairResolver
         foreach ($this->responsibilityCenters->getActivePairs($companyId) as $pair) {
             if ($pair->projectDirectionId === $projectDirectionId && $pair->responsibilityCenterId === $responsibilityCenterId) {
                 return new BudgetPair($projectDirectionId, $responsibilityCenterId);
+            }
+        }
+
+        throw new InvalidBudgetPairException();
+    }
+
+    /**
+     * Разрез сетки (`?project=&center=`): пусто или `all` — все по измерению. Обе заданы — активная
+     * пара; одна — значение должно встречаться в активных парах, иначе InvalidBudgetPairException.
+     *
+     * @return array{0: ?string, 1: ?string} [projectDirectionId, responsibilityCenterId]
+     */
+    public function resolveSlice(string $companyId, string $projectDirectionId, string $responsibilityCenterId): array
+    {
+        $project = '' === $projectDirectionId || 'all' === $projectDirectionId ? null : $projectDirectionId;
+        $center = '' === $responsibilityCenterId || 'all' === $responsibilityCenterId ? null : $responsibilityCenterId;
+        if (null === $project && null === $center) {
+            return [null, null];
+        }
+        if (null !== $project && null !== $center) {
+            $pair = $this->resolve($companyId, $project, $center);
+
+            return [$pair?->projectDirectionId, $pair?->responsibilityCenterId];
+        }
+        foreach ($this->responsibilityCenters->getActivePairs($companyId) as $pair) {
+            if ((null !== $project && $pair->projectDirectionId === $project) || (null !== $center && $pair->responsibilityCenterId === $center)) {
+                return [$project, $center];
             }
         }
 

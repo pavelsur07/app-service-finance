@@ -6,7 +6,7 @@ import styles from './BudgetGrid.module.css';
 
 const MONTH_LABELS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
-const HELPERS: { value: BudgetFillHelper; label: string; hint: string }[] = [
+export const HELPERS: { value: BudgetFillHelper; label: string; hint: string }[] = [
     { value: 'last_year_fact', label: 'Из факта прошлого года', hint: 'Факт того же месяца прошлого года в этой паре.' },
     { value: 'average', label: 'Среднее за N месяцев', hint: 'Среднее факта за последние закрытые месяцы; месяц без факта считается нулём.' },
     { value: 'distribute', label: 'Распределить годовую сумму', hint: 'Поровну на 12 месяцев, остаток копеек — в декабрь. Расход вводите положительным.' },
@@ -20,6 +20,8 @@ export interface BudgetFillPanelProps {
     pair: SelectedPair;
     months: string[];
     rows: BudgetGridRow[];
+    /** Помощник, выбранный в меню «Помощники ▾». */
+    initialHelper?: BudgetFillHelper;
     /** Есть неотправленные правки или идёт сохранение — помощник ждёт. */
     busy: boolean;
     onApplied: (changed: number) => void;
@@ -42,7 +44,7 @@ const money = (value: string): string => {
 export function BudgetFillPanel(props: BudgetFillPanelProps): JSX.Element {
     const leaves = useMemo(() => props.rows.filter((row) => row.editable), [props.rows]);
     const bases = useMemo(() => props.rows.filter((row) => row.format === 'MONEY'), [props.rows]);
-    const [helper, setHelper] = useState<BudgetFillHelper>('last_year_fact');
+    const [helper, setHelper] = useState<BudgetFillHelper>(props.initialHelper ?? 'last_year_fact');
     const [categoryIds, setCategoryIds] = useState<Set<string>>(() => new Set(leaves.map((row) => row.id)));
     const [months, setMonths] = useState<Set<string>>(() => new Set(props.months));
     const [average, setAverage] = useState(3);

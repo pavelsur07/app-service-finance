@@ -4,6 +4,8 @@ export interface BudgetPair {
     projectDirectionId: string;
     responsibilityCenterId: string;
     label: string;
+    projectName: string;
+    centerName: string;
     system: boolean;
 }
 

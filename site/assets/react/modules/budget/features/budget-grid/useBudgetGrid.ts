@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, apiFetch } from '@/api/client';
 import { addAmounts } from './amount';
-import type { BudgetGridData, BudgetGridProps, BudgetPair, PendingCell, SaveState, SelectedPair } from './budget-grid.types';
+import type { BudgetGridData, BudgetGridProps, PendingCell, SaveState, SelectedPair } from './budget-grid.types';
+import type { BudgetSlice } from './slice';
+import { sliceParams, sliceToPair } from './slice';
 
 const SAVE_DELAY_MS = 1000;
 
@@ -30,13 +32,15 @@ const samePair = (cell: PendingCell, pair: SelectedPair | null): boolean =>
     pair !== null && cell.projectDirectionId === pair.projectDirectionId && cell.responsibilityCenterId === pair.responsibilityCenterId;
 
 /**
- * Данные сетки варианта для пары и автосохранение правок.
+ * Данные сетки варианта для разреза и автосохранение правок.
  *
  * Правка хранит свою пару «проект × ЦФО» и живёт в overlay поверх ответа сервера,
  * пока перечитанный ответ её не подтвердит: перезагрузка итогов после сохранения
  * и смена пары не теряют введённое. Повтор пачки безопасен — сервер делает upsert.
  */
-export function useBudgetGrid(props: BudgetGridProps, pair: SelectedPair | null): UseBudgetGridResult {
+export function useBudgetGrid(props: BudgetGridProps, slice: BudgetSlice): UseBudgetGridResult {
+    // Пара — только при обоих измерениях; сумма по одному измерению или всем — просмотр.
+    const pair = useMemo(() => sliceToPair(slice), [slice]);
     const [server, setServer] = useState<BudgetGridData | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -56,13 +60,12 @@ export function useBudgetGrid(props: BudgetGridProps, pair: SelectedPair | null)
     pairRef.current = pair;
 
     const gridUrl = useMemo((): string => {
-        if (pair === null) {
+        if (slice.project === null && slice.center === null) {
             return props.gridUrl;
         }
-        const query = new URLSearchParams({ project: pair.projectDirectionId, center: pair.responsibilityCenterId });
 
-        return `${props.gridUrl}?${query.toString()}`;
-    }, [props.gridUrl, pair]);
+        return `${props.gridUrl}?${new URLSearchParams(sliceParams(slice)).toString()}`;
+    }, [props.gridUrl, slice]);
 
     const updateOverlay = useCallback((change: (current: Map<string, PendingCell>) => Map<string, PendingCell>): void => {
         const next = change(overlayRef.current);
@@ -285,18 +288,4 @@ export function useBudgetGrid(props: BudgetGridProps, pair: SelectedPair | null)
     }, [load, pair, updateOverlay]);
 
     return { data, loading, loadError, saveState, saveError, lockedMessage, unsaved, setCells, retry, hasPending, flushNow, reloadAfterServerWrite };
-}
-
-/** Пара по умолчанию: из адреса, иначе системная «Общий × Общий», иначе первая. */
-export function initialPair(pairs: BudgetPair[], search: string): SelectedPair | null {
-    const query = new URLSearchParams(search);
-    if (query.get('all') === '1' && pairs.length > 1) {
-        return null;
-    }
-    const project = query.get('project');
-    const center = query.get('center');
-    const fromUrl = pairs.find((candidate) => candidate.projectDirectionId === project && candidate.responsibilityCenterId === center);
-    const chosen = fromUrl ?? pairs.find((candidate) => candidate.system) ?? pairs[0];
-
-    return chosen === undefined ? null : { projectDirectionId: chosen.projectDirectionId, responsibilityCenterId: chosen.responsibilityCenterId };
 }

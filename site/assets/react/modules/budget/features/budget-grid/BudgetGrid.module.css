@@ -195,3 +195,70 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* Меню острова (BudgetDropdown): без Popper — позиция от обёртки .dropdown. */
+.menu {
+    top: calc(100% + 4px);
+    left: 0;
+    margin: 0;
+}
+
+.menuEnd {
+    right: 0;
+    left: auto;
+}
+
+/* Панель разреза: «РАЗРЕЗ» + пилюли «Проект: …», «ЦФО: …» (ref 10). */
+.sliceLabel {
+    font-size: var(--vf-size-xs);
+    font-weight: var(--vf-weight-semibold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--vf-text-muted);
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--vf-space-1);
+    height: 32px;
+    padding: 0 var(--vf-space-3);
+    border: 1px solid var(--vf-border-control);
+    border-radius: 999px;
+    background: var(--vf-surface);
+    color: var(--vf-text-muted);
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.pill:hover {
+    background: var(--vf-hover-bg);
+}
+
+.pill:focus-visible {
+    outline: 2px solid var(--vf-primary);
+    outline-offset: 2px;
+}
+
+.pillValue {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: var(--vf-weight-semibold);
+    color: var(--vf-text);
+}
+
+.pillMenu {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.menuItemActive {
+    font-weight: var(--vf-weight-semibold);
+}
+
+.menuReason {
+    max-width: 18rem;
+    white-space: normal;
+    font-size: var(--vf-size-xs);
+    color: var(--vf-text-muted);
+}
