@@ -17,6 +17,8 @@ export interface BudgetGridProps {
     gridUrl: string;
     cellsUrl: string;
     fillUrl: string;
+    /** xlsx варианта: `?project=&center=` — пара, без них — вся компания. */
+    exportUrl: string;
     csrfToken: string;
     plCategoriesUrl: string;
 }

@@ -453,21 +453,30 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     } else if (grid.lockedMessage !== null || grid.data === null) {
         fillDisabledReason = 'Сетка недоступна для правки.';
     }
+    const exportHref = pair === null
+        ? props.exportUrl
+        : `${props.exportUrl}?${new URLSearchParams({ project: pair.projectDirectionId, center: pair.responsibilityCenterId }).toString()}`;
     const fillButton = (
-        <span className="d-inline-flex align-items-center gap-2" title={fillDisabledReason ?? undefined}>
-            <button
-                type="button"
-                className="btn btn-sm"
-                disabled={fillDisabledReason !== null}
-                aria-expanded={fillOpen}
-                onClick={() => {
-                    setFillOpen((open) => !open);
-                    setFillMessage(null);
-                }}
-            >
-                <i className="ti ti-wand me-1" aria-hidden="true" />
-                Помощники
-            </button>
+        <span className="d-inline-flex align-items-center gap-2">
+            <a className="btn btn-sm" href={exportHref} data-budget-export title={pair === null ? 'Выгрузить в Excel всю компанию' : 'Выгрузить в Excel выбранную пару'}>
+                <i className="ti ti-file-spreadsheet me-1" aria-hidden="true" />
+                Excel
+            </a>
+            <span className="d-inline-flex" title={fillDisabledReason ?? undefined}>
+                <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={fillDisabledReason !== null}
+                    aria-expanded={fillOpen}
+                    onClick={() => {
+                        setFillOpen((open) => !open);
+                        setFillMessage(null);
+                    }}
+                >
+                    <i className="ti ti-wand me-1" aria-hidden="true" />
+                    Помощники
+                </button>
+            </span>
             {fillMessage !== null && <span className="text-secondary" role="status" data-budget-fill-message>{fillMessage}</span>}
         </span>
     );
