@@ -46,6 +46,7 @@ final class PLCategoryFacade
                 parentId: $cat->getParent()?->getId(),
                 sortOrder: $cat->getSortOrder(),
                 code: $cat->getCode(),
+                type: $cat->getType(),
             ),
             $entities,
         );
@@ -77,7 +78,7 @@ final class PLCategoryFacade
         }
 
         $cat = $this->repository->find($categoryId);
-        if (null === $cat || (string) $cat->getCompany()->getId() !== $companyId) {
+        if (!$cat instanceof PLCategory || (string) $cat->getCompany()->getId() !== $companyId) {
             return null;
         }
 
@@ -88,6 +89,7 @@ final class PLCategoryFacade
             parentId: $cat->getParent()?->getId(),
             sortOrder: $cat->getSortOrder(),
             code: $cat->getCode(),
+            type: $cat->getType(),
         );
     }
 }

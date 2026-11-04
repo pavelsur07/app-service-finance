@@ -106,3 +106,8 @@ services:
     # Тест «ключей нет — кнопки нет» подменяет настройки магазина.
     App\Billing\Infrastructure\YooKassa\YooKassaConfig:
         public: true
+
+    # Budget: integration-тесты берут Action из контейнера напрямую (иначе инлайнятся).
+    App\Budget\Application\:
+        resource: '../src/Budget/Application/*Action.php'
+        public: true
