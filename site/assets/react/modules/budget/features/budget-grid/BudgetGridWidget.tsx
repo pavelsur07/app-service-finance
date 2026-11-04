@@ -54,6 +54,11 @@ interface EditState {
     selectAll: boolean;
 }
 
+interface PendingTarget extends SelectedPair {
+    rowId: string;
+    month: string;
+}
+
 const pairValueOf = (pair: SelectedPair | null): string =>
     pair === null ? 'all' : `${pair.projectDirectionId}|${pair.responsibilityCenterId}`;
 
@@ -75,7 +80,8 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     };
     const [invalid, setInvalid] = useState<Map<string, string>>(() => new Map());
     const [pasteMessage, setPasteMessage] = useState<string | null>(null);
-    const [comment, setComment] = useState<(CommentDraft & { position: CellPosition }) | null>(null);
+    /** Черновик комментария привязан к статье, месяцу и паре, а не к номеру видимой строки. */
+    const [comment, setComment] = useState<(CommentDraft & PendingTarget) | null>(null);
     const scrollerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -177,6 +183,9 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
         return true;
     };
 
+    const commitTextRef = useRef(commitText);
+    commitTextRef.current = commitText;
+
     const startEdit = (position: CellPosition, text?: string): void => {
         const row = rowAt(position);
         const month = months[position.col];
@@ -214,26 +223,53 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
         if (row === undefined || month === undefined || !cellEditable(position)) {
             return;
         }
+        if (pair === null) {
+            return;
+        }
         setActive(position);
-        setComment({ position, title: `${row.name}, ${MONTH_NAMES[position.col]}`, text: row.comments[month] ?? '' });
+        setComment({ ...pair, rowId: row.id, month, title: `${row.name}, ${MONTH_NAMES[position.col]}`, text: row.comments[month] ?? '' });
     };
 
     const saveComment = (): void => {
         if (comment === null) {
             return;
         }
-        const row = rowAt(comment.position);
-        const month = months[comment.position.col];
-        if (row !== undefined && month !== undefined) {
+        const row = grid.data?.rows.find((candidate) => candidate.id === comment.rowId);
+        const samePair = pair !== null && pair.projectDirectionId === comment.projectDirectionId && pair.responsibilityCenterId === comment.responsibilityCenterId;
+        if (row !== undefined && samePair) {
             const text = comment.text.trim();
-            const cell = pendingFor(row, month, row.values[month] ?? '0.00', text === '' ? null : text);
-            if (cell !== null) {
-                grid.setCells([cell]);
-            }
+            grid.setCells([{
+                rowId: row.id,
+                month: comment.month,
+                amount: row.values[comment.month] ?? '0.00',
+                comment: text === '' ? null : text,
+                projectDirectionId: comment.projectDirectionId,
+                responsibilityCenterId: comment.responsibilityCenterId,
+            }]);
         }
         setComment(null);
         focusGrid();
     };
+
+    // Уход со страницы: дописать открытый ввод в очередь, доотправить её и предупредить.
+    useEffect(() => {
+        const onBeforeUnload = (event: BeforeUnloadEvent): void => {
+            const current = editingRef.current;
+            if (current !== null) {
+                setEditing(null);
+                commitTextRef.current(current.position, current.text);
+            }
+            if (!grid.hasPending()) {
+                return;
+            }
+            grid.flushNow(true);
+            event.preventDefault();
+            event.returnValue = '';
+        };
+        window.addEventListener('beforeunload', onBeforeUnload);
+
+        return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    }, [grid.hasPending, grid.flushNow]);
 
     const onGridKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
         if (editing !== null || event.target !== event.currentTarget) {
@@ -366,7 +402,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
             return next;
         });
         setActive(null);
-        setEditing(null);
+        onEditBlur();
     };
 
     const onPairChange = (value: string): void => {
@@ -374,8 +410,8 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
             ? null
             : props.pairs.find((candidate) => `${candidate.projectDirectionId}|${candidate.responsibilityCenterId}` === value) ?? null;
         const selected = next === null ? null : { projectDirectionId: next.projectDirectionId, responsibilityCenterId: next.responsibilityCenterId };
+        onEditBlur();
         setPair(selected);
-        setEditing(null);
         setComment(null);
         setInvalid(new Map());
         const url = new URL(window.location.href);

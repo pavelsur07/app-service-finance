@@ -55,7 +55,8 @@ export interface ApiFetchOptions {
 /**
  * JSON-запрос к эндпоинтам вне OpenAPI-схемы (session cookie, `X-CSRF-Token`).
  * Ответ не 2xx → `ApiError` с кодом из тела; сбой сети → `ApiError(0, 'network_error')`;
- * 401 (сессия истекла) — переход на страницу входа.
+ * 401 или редирект на вход (сессия истекла) — переход на страницу входа; не-JSON
+ * ответ 2xx — `ApiError('invalid_response')`, а не успех.
  */
 export async function apiFetch<T>(url: string, options: ApiFetchOptions = {}): Promise<T> {
     const headers: Record<string, string> = { Accept: 'application/json' };
@@ -79,14 +80,24 @@ export async function apiFetch<T>(url: string, options: ApiFetchOptions = {}): P
         throw new ApiError(0, 'network_error', 'Нет связи с сервером.');
     }
 
-    if (response.status === 401) {
-        // Сессия истекла — на страницу входа.
+    // Истёкшая сессия: form_login отвечает редиректом на /login, fetch идёт по нему и получает HTML 200.
+    const toLogin = response.redirected && new URL(response.url).pathname.startsWith('/login');
+    if (response.status === 401 || toLogin) {
         window.location.assign('/login');
+        throw new ApiError(401, 'unauthenticated', 'Сессия истекла — войдите снова.');
     }
-    const data: unknown = await response.json().catch(() => null);
+    let data: unknown;
+    try {
+        data = await response.json();
+    } catch {
+        data = undefined;
+    }
     if (!response.ok) {
         const error = isErrorBody(data) ? data.error : null;
         throw new ApiError(response.status, error?.code ?? 'http_error', error?.message ?? `Ошибка сервера (${response.status}).`);
+    }
+    if (data === undefined) {
+        throw new ApiError(response.status, 'invalid_response', 'Сервер вернул неожиданный ответ.');
     }
 
     return data as T;

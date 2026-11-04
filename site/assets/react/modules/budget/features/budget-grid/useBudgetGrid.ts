@@ -17,6 +17,8 @@ export interface UseBudgetGridResult {
     unsaved: PendingCell[];
     setCells: (cells: PendingCell[]) => void;
     retry: () => void;
+    hasPending: () => boolean;
+    flushNow: (keepalive: boolean) => void;
 }
 
 export const pendingKey = (cell: PendingCell): string =>
@@ -104,7 +106,9 @@ export function useBudgetGrid(props: BudgetGridProps, pair: SelectedPair | null)
         }
     }, [gridUrl, pair, updateOverlay]);
 
+    // Смена пары: данные прежней пары не показываются и не правятся, пока не придут новые.
     useEffect(() => {
+        setServer(null);
         setLoading(true);
         void load();
     }, [load]);
@@ -209,24 +213,22 @@ export function useBudgetGrid(props: BudgetGridProps, pair: SelectedPair | null)
         void flushRef.current();
     }, []);
 
-    // Уход со страницы: доотправить очередь и предупредить, если есть несохранённое.
-    useEffect(() => {
-        const onBeforeUnload = (event: BeforeUnloadEvent): void => {
-            if (unsentRef.current.size === 0 && !savingRef.current) {
-                return;
-            }
-            void flushRef.current(true);
-            event.preventDefault();
-            event.returnValue = '';
-        };
-        window.addEventListener('beforeunload', onBeforeUnload);
+    /** Есть правки, которые ещё не подтвердил сервер (очередь или запрос в пути). */
+    const hasPending = useCallback((): boolean => unsentRef.current.size > 0 || savingRef.current, []);
 
-        return () => {
-            window.removeEventListener('beforeunload', onBeforeUnload);
-            if (timerRef.current !== null) {
-                window.clearTimeout(timerRef.current);
-            }
-        };
+    /** Отправить очередь сейчас; `keepalive` — при уходе со страницы. */
+    const flushNow = useCallback((keepalive: boolean): void => {
+        if (timerRef.current !== null) {
+            window.clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+        void flushRef.current(keepalive);
+    }, []);
+
+    useEffect(() => () => {
+        if (timerRef.current !== null) {
+            window.clearTimeout(timerRef.current);
+        }
     }, []);
 
     const data = useMemo((): BudgetGridData | null => {
@@ -266,7 +268,7 @@ export function useBudgetGrid(props: BudgetGridProps, pair: SelectedPair | null)
         [overlay, saveState, lockedMessage],
     );
 
-    return { data, loading, loadError, saveState, saveError, lockedMessage, unsaved, setCells, retry };
+    return { data, loading, loadError, saveState, saveError, lockedMessage, unsaved, setCells, retry, hasPending, flushNow };
 }
 
 /** Пара по умолчанию: из адреса, иначе системная «Общий × Общий», иначе первая. */
