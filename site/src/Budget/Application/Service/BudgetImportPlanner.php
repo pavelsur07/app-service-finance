@@ -21,13 +21,17 @@ use App\Finance\Facade\PLCategoryFacade;
 
 /**
  * Ячейки пары черновика из файла плана (задача pl-budget, часть 4). Строка файла — статья по
- * «ID статьи», без ID — по коду; загружаются только видимые листья ввода. Сумма файла — в знаке
- * ввода (BudgetFillMath::fromInput), пустая ячейка — 0: файл задаёт весь год статьи. Правила те же,
+ * «ID статьи» (есть ID — только по нему), без ID — по коду; загружаются только видимые листья ввода. Сумма файла — в знаке
+ * ввода (BudgetFillMath::fromInput), пустая ячейка — 0: файл задаёт весь год статьи; не сумма в
+ * загружаемой строке — отказ с адресом ячейки, в пропускаемой (итог, KPI) — не мешает. Правила те же,
  * что у помощников: только изменяемые ячейки, `sales_plan` — пропуск, комментарий сохраняется,
  * перезапись считается. Только расчёт; запись — ImportBudgetCellsAction.
  */
 final readonly class BudgetImportPlanner
 {
+    private const int MAX_ERRORS = 10;
+    private const array MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
     public function __construct(
         private BudgetCellsQuery $cells,
         private BudgetPairResolver $pairs,
@@ -71,14 +75,17 @@ final readonly class BudgetImportPlanner
         }
 
         $ignored = [];
+        $errors = [];
         $totals = 0;
         $seen = [];
         $cells = [];
         $overwrite = 0;
         $skipped = 0;
         foreach ($file->rows as $row) {
-            $category = (null !== $row->plCategoryId ? $byId[$row->plCategoryId] ?? null : null)
-                ?? (null !== $row->code ? $byCode[$row->code] ?? null : null);
+            // Есть ID — только по ID (строка удалённой статьи не должна попасть в чужую с тем же кодом).
+            $category = null !== $row->plCategoryId
+                ? $byId[$row->plCategoryId] ?? null
+                : (null !== $row->code ? $byCode[$row->code] ?? null : null);
             if (null === $category) {
                 $ignored[] = sprintf('строка %d «%s» — статья не найдена', $row->line, $row->name);
                 continue;
@@ -97,6 +104,10 @@ final readonly class BudgetImportPlanner
             $seen[$category->id] = $row->line;
 
             foreach ($row->amounts as $monthNumber => $input) {
+                if (null === $input) {
+                    $errors[] = sprintf('строка %d, %s — не число или больше двух знаков после запятой', $row->line, self::MONTH_NAMES[$monthNumber - 1] ?? $monthNumber);
+                    continue;
+                }
                 $month = sprintf('%d-%02d', $year, $monthNumber);
                 $amount = BudgetFillMath::fromInput($input, $category->flow);
                 $current = $existing[$category->id][$month] ?? null;
@@ -115,6 +126,11 @@ final readonly class BudgetImportPlanner
                 }
                 $cells[] = new BudgetFillCell($category->id, $month, $amount, $previous, $current?->comment);
             }
+        }
+        if ([] !== $errors) {
+            $shown = \array_slice($errors, 0, self::MAX_ERRORS);
+            $more = \count($errors) - \count($shown);
+            throw new InvalidBudgetInputException('Не удалось прочитать суммы: '.implode('; ', $shown).($more > 0 ? sprintf('; и ещё %d', $more) : '').'.');
         }
         if ($totals > 0) {
             $warnings[] = sprintf('Итоги и показатели не загружаются — они считаются из статей (строк: %d).', $totals);

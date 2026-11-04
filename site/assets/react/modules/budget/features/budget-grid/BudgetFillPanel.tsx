@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, apiFetch } from '@/api/client';
 import { formatValue, parseAmountInput } from './amount';
 import type { BudgetFillHelper, BudgetFillResult, BudgetGridRow, SelectedPair } from './budget-grid.types';
@@ -54,6 +54,11 @@ export function BudgetFillPanel(props: BudgetFillPanelProps): JSX.Element {
     const [preview, setPreview] = useState<{ result: BudgetFillResult; body: Record<string, unknown> } | null>(null);
     /** Номер запроса: ответ на запрос до изменения параметров отбрасывается. */
     const seqRef = useRef(0);
+    // Панель размонтирована (сменили пару, закрыли): поздний ответ не должен вызвать onApplied —
+    // его замыкание перечитало бы сетку прежней пары под выбранной новой.
+    useEffect(() => () => {
+        seqRef.current += 1;
+    }, []);
     const [error, setError] = useState<string | null>(null);
     const [sending, setSending] = useState(false);
 

@@ -75,14 +75,25 @@ final class BudgetImportPlannerTest extends BudgetIntegrationTestCase
             $this->row(7, self::SUBTOTAL_ID, 'PROFIT', 'Прибыль', [1 => '5.00']),
             $this->row(8, self::OTHER_COMPANY_LEAF_ID, null, 'Чужая', [1 => '5.00']),
             $this->row(9, null, 'NOPE', 'Неизвестная', [1 => '5.00']),
+            $this->row(10, '0193cccc-0000-7000-8000-0000000fa0de', 'RENT', 'Удалённая', [1 => '5.00']),
+            $this->row(11, self::SUBTOTAL_ID, 'PROFIT', 'KPI с дробью', [1 => null]),
         ]));
 
         self::assertSame([], $plan->fill->cells);
-        self::assertSame(['строка 8 «Чужая» — статья не найдена', 'строка 9 «Неизвестная» — статья не найдена'], $plan->ignored);
+        self::assertSame(['строка 8 «Чужая» — статья не найдена', 'строка 9 «Неизвестная» — статья не найдена', 'строка 10 «Удалённая» — статья не найдена'], $plan->ignored, 'неизвестный ID не ищется по коду');
         self::assertCount(3, $plan->warnings);
         self::assertStringContainsString('2026', $plan->warnings[0]);
         self::assertStringContainsString('другой пары', $plan->warnings[1]);
         self::assertStringContainsString('Итоги и показатели', $plan->warnings[2]);
+    }
+
+    public function testRejectsNonAmountInLoadedRowWithCellReference(): void
+    {
+        $this->expectException(InvalidBudgetInputException::class);
+        $this->expectExceptionMessage('строка 7, Февраль — не число');
+        $this->plan(new BudgetPlanFile(2027, self::GENERAL_PROJECT_ID, $this->generalCenterId, [
+            $this->row(7, self::RENT_ID, null, 'Аренда', [2 => null]),
+        ]));
     }
 
     public function testRejectsDuplicateCategoryMissingPairAndApprovedVersion(): void
@@ -113,13 +124,13 @@ final class BudgetImportPlannerTest extends BudgetIntegrationTestCase
     }
 
     /**
-     * @param array<int, string> $amounts месяц 1–12 → сумма; остальные — 0
+     * @param array<int, ?string> $amounts месяц 1–12 → сумма (null — не сумма); остальные — 0
      */
     private function row(int $line, ?string $id, ?string $code, string $name, array $amounts): BudgetPlanFileRow
     {
         $full = [];
         for ($month = 1; $month <= 12; ++$month) {
-            $full[$month] = $amounts[$month] ?? '0.00';
+            $full[$month] = \array_key_exists($month, $amounts) ? $amounts[$month] : '0.00';
         }
 
         return new BudgetPlanFileRow($line, $id, $code, $name, $full);

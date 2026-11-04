@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, apiFetch } from '@/api/client';
 import { formatValue } from './amount';
 import type { BudgetGridRow, BudgetImportResult, SelectedPair } from './budget-grid.types';
@@ -32,6 +32,11 @@ export function BudgetImportPanel(props: BudgetImportPanelProps): JSX.Element {
     const [error, setError] = useState<string | null>(null);
     const [sending, setSending] = useState(false);
     const seqRef = useRef(0);
+    // Панель размонтирована (сменили пару, закрыли): поздний ответ не должен вызвать onApplied —
+    // его замыкание перечитало бы сетку прежней пары под выбранной новой.
+    useEffect(() => () => {
+        seqRef.current += 1;
+    }, []);
     const names = useMemo(() => new Map(props.rows.map((row) => [row.id, row.name])), [props.rows]);
 
     const request = async (apply: boolean, confirmOverwrite: boolean): Promise<void> => {

@@ -14,13 +14,13 @@ use OpenSpout\Reader\XLSX\Reader;
 /**
  * Читает файл плана в раскладке BudgetPlanSheet: лист «План» (нет такого — первый), служебная
  * строка, заголовок таблицы (ищется по колонке «ID статьи»), строки статей. Суммы — числа или
- * текст «1 200,50», пустая ячейка — 0; больше двух знаков после запятой, текст и формулы — ошибка
- * с адресом ячейки. Что за статья и куда писать — решает BudgetImportPlanner.
+ * текст «1 200,50», пустая ячейка — 0; не сумма (текст, формула, больше двух знаков) — null:
+ * ошибка только для строки, которая загружается (KPI с четырьмя знаками в выгрузке — норма).
+ * Что за статья и куда писать — решает BudgetImportPlanner.
  */
 final readonly class BudgetPlanXlsxReader
 {
     public const int MAX_ROWS = 2000;
-    private const int MAX_ERRORS = 10;
     private const int HEADER_SEARCH_ROWS = 30;
 
     public function read(string $path): BudgetPlanFile
@@ -65,7 +65,6 @@ final readonly class BudgetPlanXlsxReader
         $meta = ['year' => null, 'project' => null, 'center' => null];
         $headerFound = false;
         $result = [];
-        $errors = [];
         foreach ($rows as $line => $row) {
             $cells = array_map(static fn ($cell): mixed => $cell->getValue(), $row->getCells());
             if (!$headerFound) {
@@ -91,24 +90,14 @@ final readonly class BudgetPlanXlsxReader
             }
 
             $amounts = [];
-            foreach (BudgetPlanSheet::MONTH_NAMES as $offset => $monthName) {
-                $amount = self::amount($cells[BudgetPlanSheet::COL_FIRST_MONTH + $offset] ?? null);
-                if (null === $amount) {
-                    $errors[] = sprintf('строка %d, %s — не число или больше двух знаков после запятой', $line, $monthName);
-                    $amount = '0.00';
-                }
-                $amounts[$offset + 1] = $amount;
+            foreach (array_keys(BudgetPlanSheet::MONTH_NAMES) as $offset) {
+                $amounts[$offset + 1] = self::amount($cells[BudgetPlanSheet::COL_FIRST_MONTH + $offset] ?? null);
             }
             $result[] = new BudgetPlanFileRow($line, '' === $id ? null : $id, '' === $code ? null : $code, $name, $amounts);
         }
 
         if (!$headerFound) {
             throw new InvalidBudgetInputException('Не найдена таблица плана: нужна строка заголовка с колонкой «ID статьи» — выгрузите план кнопкой «Excel».');
-        }
-        if ([] !== $errors) {
-            $shown = \array_slice($errors, 0, self::MAX_ERRORS);
-            $more = \count($errors) - \count($shown);
-            throw new InvalidBudgetInputException('Не удалось прочитать суммы: '.implode('; ', $shown).($more > 0 ? sprintf('; и ещё %d', $more) : '').'.');
         }
 
         return new BudgetPlanFile($meta['year'], $meta['project'], $meta['center'], $result);

@@ -79,17 +79,13 @@ final class BudgetPlanXlsxReaderTest extends TestCase
         (new BudgetPlanXlsxReader())->read($file);
     }
 
-    public function testRejectsNonNumbersWithCellReference(): void
+    public function testNonAmountsBecomeNullForPlannerToDecide(): void
     {
-        $file = $this->xlsx('План', [$this->header(), ['RENT', 'Аренда', 'сто', 1.234]]);
+        $file = $this->xlsx('План', [$this->header(), ['RENT', 'Аренда', 'сто', 1.234, 333.3333]]);
 
-        try {
-            (new BudgetPlanXlsxReader())->read($file);
-            self::fail('ожидалась ошибка');
-        } catch (InvalidBudgetInputException $e) {
-            self::assertStringContainsString('строка 2, Январь', $e->getMessage());
-            self::assertStringContainsString('строка 2, Февраль', $e->getMessage(), 'больше двух знаков после запятой');
-        }
+        $plan = (new BudgetPlanXlsxReader())->read($file);
+
+        self::assertSame([null, null, null, '0.00'], \array_slice(array_values($plan->rows[0]->amounts), 0, 4));
     }
 
     public function testRejectsNotXlsx(): void
