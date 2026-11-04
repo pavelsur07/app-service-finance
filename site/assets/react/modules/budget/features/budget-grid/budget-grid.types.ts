@@ -19,6 +19,8 @@ export interface BudgetGridProps {
     fillUrl: string;
     /** xlsx варианта: `?project=&center=` — пара, без них — вся компания. */
     exportUrl: string;
+    /** Загрузка плана пары из xlsx: POST multipart, ответ — BudgetImportResult. */
+    importUrl: string;
     csrfToken: string;
     plCategoriesUrl: string;
 }
@@ -81,4 +83,10 @@ export interface BudgetFillResult {
     overwrite: number;
     skipped: number;
     applied: boolean;
+}
+
+/** Ответ `POST …/import`: как у помощника, плюс предупреждения и строки файла, которые не загружаются. */
+export interface BudgetImportResult extends BudgetFillResult {
+    warnings: string[];
+    ignored: string[];
 }

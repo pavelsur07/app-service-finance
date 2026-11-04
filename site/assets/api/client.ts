@@ -53,14 +53,17 @@ export interface ApiFetchOptions {
 }
 
 /**
- * JSON-запрос к эндпоинтам вне OpenAPI-схемы (session cookie, `X-CSRF-Token`).
+ * JSON-запрос к эндпоинтам вне OpenAPI-схемы (session cookie, `X-CSRF-Token`); `body` —
+ * объект (JSON) или FormData (multipart, загрузка файла).
  * Ответ не 2xx → `ApiError` с кодом из тела; сбой сети → `ApiError(0, 'network_error')`;
  * 401 или редирект на вход (сессия истекла) — переход на страницу входа; не-JSON
  * ответ 2xx — `ApiError('invalid_response')`, а не успех.
  */
 export async function apiFetch<T>(url: string, options: ApiFetchOptions = {}): Promise<T> {
     const headers: Record<string, string> = { Accept: 'application/json' };
-    if (options.body !== undefined) {
+    // FormData (загрузка файла) уходит как multipart: границу в Content-Type ставит браузер.
+    const multipart = options.body instanceof FormData;
+    if (options.body !== undefined && !multipart) {
         headers['Content-Type'] = 'application/json';
     }
     if (options.csrfToken) {
@@ -73,7 +76,7 @@ export async function apiFetch<T>(url: string, options: ApiFetchOptions = {}): P
             method: options.method ?? 'GET',
             credentials: 'include',
             headers,
-            body: options.body === undefined ? undefined : JSON.stringify(options.body),
+            body: options.body === undefined ? undefined : (multipart ? options.body as FormData : JSON.stringify(options.body)),
             keepalive: options.keepalive,
         });
     } catch {

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Budget;
 
 use App\Budget\Enum\BudgetVersionStatus;
-use App\Company\Entity\Company;
 use App\Company\Entity\CompanyRole;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
@@ -19,10 +18,14 @@ use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use OpenSpout\Common\Entity\Cell\StringCell;
+use OpenSpout\Common\Entity\Row;
 use OpenSpout\Reader\XLSX\Options;
 use OpenSpout\Reader\XLSX\Reader;
+use OpenSpout\Writer\XLSX\Writer;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 /**
  * Бюджет ОПиУ в Excel: выгрузка варианта (этап 6) и загрузка обратно (этап 7).
@@ -43,6 +46,8 @@ final class BudgetExcelTest extends WebTestCaseBase
     private User $reader;
     private string $centerId;
     private ?string $lastFile = null;
+    /** @var list<string> */
+    private array $extraFiles = [];
 
     protected function setUp(): void
     {
@@ -142,6 +147,72 @@ final class BudgetExcelTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(422);
     }
 
+    public function testImportRoundTripPreviewApplyRepeatAndOverwriteConfirmation(): void
+    {
+        $id = $this->version('Базовый', BudgetVersionStatus::DRAFT);
+        $this->line($id, self::REVENUE_ID, self::PROJECT_ID, '2027-01-01', '1000.50');
+        $this->line($id, self::RENT_ID, self::PROJECT_ID, '2027-01-01', '-300.00');
+        $this->login($this->writer);
+        $pair = sprintf('?project=%s&center=%s', self::PROJECT_ID, $this->centerId);
+
+        $this->export($id, $pair);
+        $exported = (string) $this->lastFile;
+        $this->postImport($id, $exported, apply: true);
+        self::assertResponseIsSuccessful();
+        self::assertSame(0, $this->json()['changed'], 'выгрузил → загрузил: изменений нет');
+        self::assertContains('Итоги и показатели не загружаются — они считаются из статей (строк: 1).', $this->json()['warnings']);
+
+        // Правка в файле: аренда в феврале 50 (положительная, как при вводе), январь аренды — пусто.
+        $edited = $this->editedFile($exported, self::RENT_ID, [1 => '', 2 => 50]);
+        $this->postImport($id, $edited);
+        self::assertResponseIsSuccessful();
+        self::assertSame([2, 1], [$this->json()['changed'], $this->json()['overwrite']]);
+        self::assertSame(2, $this->lineCount($id), 'предпросмотр не пишет');
+
+        $this->postImport($id, $edited, apply: true);
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame('budget_fill_overwrite_unconfirmed', $this->errorCode());
+
+        $this->postImport($id, $edited, apply: true, confirm: true);
+        self::assertResponseIsSuccessful();
+        self::assertTrue($this->json()['applied']);
+        self::assertSame('-50.00', $this->amount($id, self::RENT_ID, '2027-02-01'));
+        self::assertSame('0.00', $this->amount($id, self::RENT_ID, '2027-01-01') ?? '0.00', 'пустая ячейка — 0');
+
+        $this->postImport($id, $edited, apply: true, confirm: true);
+        self::assertSame(0, $this->json()['changed'], 'повтор — без изменений');
+    }
+
+    public function testImportRejectsBadRequests(): void
+    {
+        $draft = $this->version('Черновик', BudgetVersionStatus::DRAFT);
+        $approved = $this->version('Утверждённый', BudgetVersionStatus::APPROVED);
+        $this->login($this->writer);
+        $this->export($draft, sprintf('?project=%s&center=%s', self::PROJECT_ID, $this->centerId));
+        $file = (string) $this->lastFile;
+
+        $this->postImport($approved, $file);
+        self::assertResponseStatusCodeSame(409);
+
+        $this->postImport($draft, $file, token: 'bad');
+        self::assertResponseStatusCodeSame(403);
+
+        $text = (string) tempnam(sys_get_temp_dir(), 'budget_txt_');
+        file_put_contents($text, 'не xlsx');
+        $this->postImport($draft, $text, name: 'plan.xlsx');
+        self::assertResponseStatusCodeSame(422);
+        $this->postImport($draft, $file, name: 'plan.csv');
+        self::assertResponseStatusCodeSame(422);
+        unlink($text);
+
+        $this->postImport($draft, $file, project: '');
+        self::assertResponseStatusCodeSame(422);
+
+        $this->login($this->reader);
+        $this->postImport($draft, $file);
+        self::assertResponseStatusCodeSame(403);
+    }
+
     /**
      * @return array<int, list<mixed>> номер строки листа с 1 → значения
      */
@@ -162,7 +233,7 @@ final class BudgetExcelTest extends WebTestCaseBase
         foreach ($reader->getSheetIterator() as $sheet) {
             self::assertSame('План', $sheet->getName());
             foreach ($sheet->getRowIterator() as $index => $row) {
-                $rows[$index] = array_map(static fn ($cell): mixed => $cell->getValue(), $row->getCells());
+                $rows[$index] = array_values(array_map(static fn ($cell): mixed => $cell->getValue(), $row->getCells()));
             }
             break;
         }
@@ -184,10 +255,92 @@ final class BudgetExcelTest extends WebTestCaseBase
 
     protected function tearDown(): void
     {
-        if (null !== $this->lastFile && is_file($this->lastFile)) {
-            unlink($this->lastFile);
+        foreach ([$this->lastFile, ...$this->extraFiles] as $file) {
+            if (null !== $file && is_file($file)) {
+                unlink($file);
+            }
         }
         parent::tearDown();
+    }
+
+    private function postImport(string $versionId, string $path, bool $apply = false, bool $confirm = false, ?string $token = null, string $name = 'budget.xlsx', ?string $project = null): void
+    {
+        $copy = sys_get_temp_dir().'/'.uniqid('budget_upload_', true);
+        copy($path, $copy);
+        $this->client->request(
+            'POST',
+            '/finance/budget/versions/'.$versionId.'/import',
+            ['project' => $project ?? self::PROJECT_ID, 'center' => $this->centerId, 'apply' => $apply ? '1' : '', 'confirmOverwrite' => $confirm ? '1' : ''],
+            ['file' => new UploadedFile($copy, $name, null, null, true)],
+            ['HTTP_X_CSRF_TOKEN' => $token ?? $this->csrfToken($this->client, 'budget_cells')],
+        );
+    }
+
+    /**
+     * Копия выгрузки, где у статьи заменены месяцы (номер 1–12 → значение).
+     *
+     * @param array<int, int|float|string> $months
+     */
+    private function editedFile(string $exported, string $categoryId, array $months): string
+    {
+        $options = new Options();
+        $options->SHOULD_PRESERVE_EMPTY_ROWS = true;
+        $reader = new Reader($options);
+        $reader->open($exported);
+        $rows = [];
+        foreach ($reader->getSheetIterator() as $sheet) {
+            foreach ($sheet->getRowIterator() as $row) {
+                $values = array_map(static fn ($cell): mixed => $cell->getValue(), $row->getCells());
+                if ($categoryId === ($values[15] ?? null)) {
+                    foreach ($months as $month => $value) {
+                        $values[1 + $month] = $value;
+                    }
+                }
+                $rows[] = $values;
+            }
+            break;
+        }
+        $reader->close();
+
+        $file = sys_get_temp_dir().'/'.uniqid('budget_edited_', true).'.xlsx';
+        $writer = new Writer();
+        $writer->openToFile($file);
+        $writer->getCurrentSheet()->setName('План');
+        foreach ($rows as $values) {
+            $writer->addRow([] === $values ? new Row([new StringCell('', null)]) : Row::fromValues(array_values($values)));
+        }
+        $writer->close();
+        $this->extraFiles[] = $file;
+
+        return $file;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function json(): array
+    {
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertIsArray($body);
+
+        return $body;
+    }
+
+    private function errorCode(): ?string
+    {
+        return $this->json()['error']['code'] ?? null;
+    }
+
+    private function lineCount(string $versionId): int
+    {
+        return (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM budget_lines WHERE version_id = ?', [$versionId]);
+    }
+
+    private function amount(string $versionId, string $categoryId, string $month): ?string
+    {
+        $amount = $this->em()->getConnection()->fetchOne('SELECT amount FROM budget_lines WHERE version_id = ? AND pl_category_id = ? AND month = ?', [$versionId, $categoryId, $month]);
+
+        return false === $amount ? null : (string) $amount;
     }
 
     private function line(string $versionId, string $categoryId, string $projectId, string $month, string $amount): void

@@ -65,7 +65,7 @@ final readonly class BudgetPlanXlsxWriter
                 if (!$leaf) {
                     $style->setFontBold();
                 }
-                $expense = $leaf && 'expense' === $row->flow && PLValueFormat::MONEY === $format;
+                $expense = $leaf && 'expense' === $row->flow;
                 $cells = [
                     new StringCell($row->code ?? '', null),
                     new StringCell(str_repeat('    ', max(0, $row->level - 1)).$row->name, $leaf ? null : (new Style())->setFontBold()),
