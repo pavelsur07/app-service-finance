@@ -441,7 +441,68 @@ final class BudgetPagesTest extends WebTestCaseBase
         self::assertFalse($props['isOwner']);
         self::assertTrue($props['editable']);
         self::assertSame('/pl-categories/', $props['plCategoriesUrl']);
-        self::assertSame([['projectDirectionId' => self::PROJECT_ID, 'responsibilityCenterId' => $this->centerId, 'label' => 'Общий × Общий', 'system' => true]], $props['pairs']);
+        self::assertSame([['projectDirectionId' => self::PROJECT_ID, 'responsibilityCenterId' => $this->centerId, 'label' => 'Общий × Общий', 'projectName' => 'Общий', 'centerName' => 'Общий', 'system' => true]], $props['pairs']);
+
+        // Шапка черновика для записи без владения: карандаш, слоты острова, «Утвердить» неактивна с причиной текстом.
+        self::assertSelectorExists('[data-budget-rename]');
+        self::assertSelectorExists('[data-budget-rename-form][data-url="/finance/budget/versions/'.$id.'/name"]');
+        self::assertSelectorExists('[data-budget-head-slot="save"]');
+        self::assertSelectorExists('[data-budget-head-slot="helpers"]');
+        self::assertSelectorTextContains('[data-budget-status-action][disabled]', 'Утвердить');
+        self::assertSelectorTextContains('[data-budget-status-reason]', 'Утверждает только владелец компании');
+        self::assertSelectorExists('a[data-budget-copy-link][href="/finance/budget?year=2027&copy='.$id.'"]');
+        self::assertSelectorExists('[data-confirm-action$="/status/archived"]');
+        self::assertSelectorExists('a[data-budget-export-link]');
+        self::assertSelectorNotExists('[data-budget-banner]');
+    }
+
+    public function testVersionHeaderByStatusAndRole(): void
+    {
+        $approved = $this->version('Утверждённый', BudgetVersionStatus::APPROVED);
+        $archived = $this->version('Старый', BudgetVersionStatus::ARCHIVED);
+        $draft = $this->version('Черновик', BudgetVersionStatus::DRAFT);
+
+        $this->login($this->writer);
+        $this->client->request('GET', '/finance/budget/versions/'.$approved);
+        self::assertSelectorTextContains('[data-budget-banner="approved"]', 'это может сделать владелец компании');
+        self::assertSelectorTextContains('[data-budget-status-action][disabled]', 'Вернуть в черновик');
+        self::assertSelectorTextContains('[data-budget-status-reason]', 'Возвращает в черновик только владелец компании');
+        self::assertSelectorNotExists('[data-budget-rename]');
+        self::assertSelectorNotExists('[data-budget-head-slot="helpers"]');
+        self::assertSelectorNotExists('[data-confirm-action$="/status/archived"]');
+
+        $this->client->request('GET', '/finance/budget/versions/'.$archived);
+        self::assertSelectorTextContains('[data-budget-banner="archived"]', 'Восстановите, чтобы править');
+        self::assertSelectorTextContains('[data-budget-status-action][data-confirm-action$="/status/draft"]', 'Восстановить');
+        self::assertSelectorNotExists('[data-budget-status-reason]');
+
+        $this->login($this->owner);
+        $this->client->request('GET', '/finance/budget/versions/'.$approved);
+        self::assertSelectorTextNotContains('[data-budget-banner="approved"]', 'владелец');
+        self::assertSelectorExists('[data-budget-status-action][data-confirm-action$="/status/draft"]');
+
+        $this->login($this->reader);
+        $this->client->request('GET', '/finance/budget/versions/'.$draft);
+        self::assertSelectorTextContains('[data-budget-banner="read-only"]', 'доступ только для просмотра');
+        self::assertSelectorNotExists('[data-budget-rename]');
+        self::assertSelectorTextContains('[data-budget-status-reason]', 'Роль «Чтение»');
+        self::assertSelectorNotExists('[data-budget-copy-link]');
+        self::assertSelectorTextContains('.budget-menu .vf-menu-item--reason', 'Копировать');
+    }
+
+    public function testCopyFromVersionMenuOpensNewVersionFormWithSource(): void
+    {
+        $source = $this->version('Базовый', BudgetVersionStatus::DRAFT);
+        $this->version('Другой', BudgetVersionStatus::APPROVED);
+        $this->login($this->writer);
+
+        $this->client->request('GET', '/finance/budget?year=2027&copy='.$source);
+        self::assertSelectorExists('#budget-new[data-budget-new-open]');
+        self::assertSelectorExists('input[name="method"][value="copy"][checked]');
+        self::assertSelectorExists('#budget-new-source option[value="'.$source.'"][selected]');
+
+        $this->client->request('GET', '/finance/budget?year=2027&copy='.Uuid::uuid7()->toString());
+        self::assertSelectorNotExists('#budget-new[data-budget-new-open]');
     }
 
     public function testForeignVersionIsNotFoundEverywhere(): void

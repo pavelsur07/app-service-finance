@@ -1,7 +1,7 @@
 import type { ClipboardEvent, CSSProperties, KeyboardEvent, MouseEvent, ReactNode, RefObject } from 'react';
 import { cn } from '@/react/shared/lib/cn';
 import { formatPercent, formatValue } from './amount';
-import type { BudgetGridRow, BudgetPair, CellPosition, SaveState } from './budget-grid.types';
+import type { BudgetGridRow, CellPosition } from './budget-grid.types';
 import styles from './BudgetGrid.module.css';
 
 const MONTH_LABELS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
@@ -20,32 +20,25 @@ export interface CommentDraft {
 export interface BudgetGridViewProps {
     months: string[];
     rows: VisibleRow[];
-    pairs: BudgetPair[];
-    /** `${projectId}|${centerId}` или `all` */
-    pairValue: string;
     canEdit: boolean;
     readOnlyHint: string | null;
     active: CellPosition | null;
     editing: { position: CellPosition; text: string } | null;
     invalidKeys: Set<string>;
     unsavedKeys: Set<string>;
-    saveState: SaveState;
-    saveError: string | null;
     inputError: string | null;
     pasteMessage: string | null;
     warnings: string[];
     lockedMessage: string | null;
     unsavedLabels: string[];
     comment: CommentDraft | null;
-    /** Кнопка «Помощники» в панели и раскрытая панель помощника (BudgetFillPanel). */
-    fillButton: ReactNode;
+    /** Панель над сеткой: разрез и итог помощника; раскрытая панель помощника (BudgetFillPanel). */
+    toolbar: ReactNode;
     fillPanel: ReactNode;
     loading: boolean;
     loadError: string | null;
     scrollerRef: RefObject<HTMLDivElement>;
     inputRef: RefObject<HTMLInputElement>;
-    onPairChange: (value: string) => void;
-    onRetry: () => void;
     onToggle: (rowId: string) => void;
     onCellMouseDown: (position: CellPosition) => void;
     onCellDoubleClick: (position: CellPosition) => void;
@@ -81,73 +74,30 @@ function Value({ value, row, blankZero }: ValueProps): JSX.Element | null {
     );
 }
 
-interface SaveIndicatorProps {
-    state: SaveState;
-    error: string | null;
-    locked: boolean;
-    onRetry: () => void;
-}
-
-function SaveIndicator({ state, error, locked, onRetry }: SaveIndicatorProps): JSX.Element {
-    if (locked) {
-        return <span className="text-danger" role="status">Не сохранено</span>;
-    }
-    if (state === 'saving') {
-        return <span className="text-secondary" role="status">Сохраняю…</span>;
-    }
-    if (state === 'failed') {
-        return (
-            <span className="text-danger" role="alert">
-                Не сохранено{error ? `: ${error}` : ''}{' '}
-                <button type="button" className="btn btn-sm btn-outline-secondary ms-1" onClick={onRetry}>Повторить</button>
-            </span>
-        );
-    }
-
-    return <span className="text-secondary" role="status">Сохранено</span>;
-}
-
 /** Сетка «статьи × 12 месяцев» (ui-ux.md §3). Только разметка: состояние и клавиатура — в BudgetGridWidget. */
 export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
     const { months, rows, active, editing } = props;
 
     return (
         <div>
-            <div className="vf-card-bar d-print-none">
-                <div className="vf-card-bar__row">
-                    {props.pairs.length > 1 && (
-                        <label className="d-flex align-items-center gap-2 mb-0">
-                            <span className="text-secondary">Проект × ЦФО</span>
-                            {/* TODO(ds): лист DS не описывает выбор пары внутри React-острова; пилюли picker_core — Twig-ядро. */}
-                            <select
-                                className="form-select form-select-sm w-auto"
-                                value={props.pairValue}
-                                onChange={(event) => props.onPairChange(event.target.value)}
-                            >
-                                {props.pairs.map((pair) => (
-                                    <option key={`${pair.projectDirectionId}|${pair.responsibilityCenterId}`} value={`${pair.projectDirectionId}|${pair.responsibilityCenterId}`}>
-                                        {pair.label}
-                                    </option>
-                                ))}
-                                <option value="all">Все проекты (только просмотр)</option>
-                            </select>
-                        </label>
-                    )}
-                    {props.fillButton}
-                    <div className="ms-auto">
-                        <SaveIndicator state={props.saveState} error={props.saveError} locked={props.lockedMessage !== null} onRetry={props.onRetry} />
+            {props.toolbar !== null && (
+                <div className="vf-card-bar d-print-none">
+                    <div className="vf-card-bar__row">
+                        {props.toolbar}
                     </div>
                 </div>
-            </div>
+            )}
 
             {props.fillPanel}
 
             {props.lockedMessage !== null && (
-                <div className="alert alert-warning m-3" role="alert" data-budget-locked>
-                    <div className="fw-semibold">{props.lockedMessage}</div>
-                    <div>Экран переключён в режим просмотра. Обновите страницу.</div>
+                <div className="alert alert-danger m-3" role="alert" data-budget-locked>
+                    <div>
+                        <strong>{props.lockedMessage}</strong>{' '}
+                        Экран переключён в режим чтения, изменения не сохранены. Обновите страницу.
+                    </div>
                     {props.unsavedLabels.length > 0 && (
-                        <div className="mt-1">Не сохранены: {props.unsavedLabels.join('; ')}.</div>
+                        <div className="mt-1">Несохранённые ячейки: {props.unsavedLabels.join('; ')}.</div>
                     )}
                 </div>
             )}

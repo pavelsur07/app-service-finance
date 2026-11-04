@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Budget\Entity;
 
 use App\Budget\Enum\BudgetVersionStatus;
+use App\Budget\Exception\BudgetVersionNotEditableException;
 use App\Budget\Exception\InvalidBudgetVersionTransitionException;
 use App\Budget\Repository\BudgetVersionRepository;
 use Doctrine\ORM\Mapping as ORM;
@@ -95,6 +96,18 @@ class BudgetVersion
     public function archive(\DateTimeImmutable $now): void
     {
         $this->changeStatus(BudgetVersionStatus::ARCHIVED, 'архивировать', $now);
+    }
+
+    /**
+     * Только черновик: название утверждённого — часть решения владельца.
+     */
+    public function rename(string $name, \DateTimeImmutable $now): void
+    {
+        if (!$this->isEditable()) {
+            throw new BudgetVersionNotEditableException($this->status);
+        }
+        $this->name = self::normalizeName($name);
+        $this->updatedAt = $now;
     }
 
     public function isEditable(): bool

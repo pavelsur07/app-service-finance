@@ -244,3 +244,131 @@
   background: var(--vf-navy-100);
   color: var(--vf-navy-500);
 }
+
+/* Экран варианта — шапка (BUDGET-SPEC §5, refs 10–15) */
+.budget-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--vf-space-2);
+  min-width: 0;
+}
+
+.budget-title__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.budget-title__form {
+  flex: 1 1 320px;
+  max-width: 480px;
+}
+
+.budget-title__form .form-control {
+  font-size: var(--vf-size-h2);
+  font-weight: var(--vf-weight-semibold);
+}
+
+.budget-title__help {
+  margin-top: 2px;
+  font-size: var(--vf-size-xs);
+  color: var(--vf-text-muted);
+}
+
+.budget-head {
+  align-items: flex-start;
+}
+
+.budget-head__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--vf-space-1);
+  max-width: 100%;
+}
+
+.budget-head__side .budget-head-actions {
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.budget-head__side .budget-disabled__reason {
+  text-align: right;
+}
+
+/* Индикатор сохранения (портал острова в слот шапки) */
+.budget-save {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vf-space-2);
+  font-size: var(--vf-size-sm);
+  color: var(--vf-text-muted);
+  white-space: nowrap;
+}
+
+.budget-save__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--vf-green);
+}
+
+.budget-save--saving .budget-save__dot {
+  background: var(--vf-text-muted);
+}
+
+.budget-save--failed {
+  color: var(--vf-danger-text);
+}
+
+.budget-save--failed .budget-save__dot {
+  background: var(--vf-danger-text);
+}
+
+.budget-save__retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--vf-primary);
+  font-weight: var(--vf-weight-semibold);
+  text-decoration: underline;
+}
+
+/* Меню «Помощники ▾»: подпись пункта второй строкой */
+.budget-helpers-menu {
+  min-width: 18rem;
+}
+
+.budget-helpers-menu .dropdown-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  white-space: normal;
+}
+
+.budget-menu-item__hint {
+  font-size: var(--vf-size-xs);
+  color: var(--vf-text-muted);
+}
+
+@media (max-width: 760px) {
+  .budget-head__side {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .budget-head__side .budget-head-actions {
+    justify-content: flex-start;
+  }
+
+  .budget-head__side .budget-disabled__reason {
+    text-align: left;
+  }
+
+  /* Кнопка «Помощники» у левого края — меню раскрывается вправо, не за экран. */
+  .budget-head .dropdown-menu.budget-helpers-menu {
+    right: auto;
+    left: 0;
+    max-width: calc(100vw - 32px);
+  }
+}

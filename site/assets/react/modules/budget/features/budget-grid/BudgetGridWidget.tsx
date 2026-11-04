@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ClipboardEvent, KeyboardEvent, MouseEvent } from 'react';
 import { inputToStored, isZero, parseAmountInput, storedToInput } from './amount';
-import type { BudgetGridProps, BudgetGridRow, CellPosition, PendingCell, SelectedPair } from './budget-grid.types';
+import type { BudgetFillHelper, BudgetGridProps, BudgetGridRow, CellPosition, PendingCell, SelectedPair } from './budget-grid.types';
 import { BudgetFillPanel } from './BudgetFillPanel';
 import { BudgetImportPanel } from './BudgetImportPanel';
 import { BudgetRulePanel } from './BudgetRulePanel';
 import { BudgetGridView } from './BudgetGridView';
 import type { CommentDraft, VisibleRow } from './BudgetGridView';
-import { initialPair, useBudgetGrid } from './useBudgetGrid';
+import { BudgetSlicePills } from './BudgetSlicePills';
+import { HeadSlot, HelpersMenu, SaveIndicator } from './BudgetHeadControls';
+import type { BudgetSlice } from './slice';
+import { initialSlice, sliceKey, sliceParams, sliceSumLabel, sliceToPair } from './slice';
+import { useBudgetGrid } from './useBudgetGrid';
 
 const COLLAPSED_STORAGE_KEY = 'vf.budget.collapsed';
 const MONTH_NAMES = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
@@ -66,12 +70,14 @@ const pairValueOf = (pair: SelectedPair | null): string =>
     pair === null ? 'all' : `${pair.projectDirectionId}|${pair.responsibilityCenterId}`;
 
 /**
- * Smart-часть сетки бюджета: выбор ячейки, клавиатура, вставка из Excel,
- * комментарий, свёртка групп, пара «проект × ЦФО» в адресе (ui-ux.md §3).
+ * Smart-часть сетки бюджета: выбор ячейки, клавиатура, вставка из Excel, комментарий, свёртка
+ * групп, разрез «проект / ЦФО» в адресе; индикатор сохранения и «Помощники ▾» — порталом в шапку
+ * страницы (BUDGET-SPEC §5).
  */
 export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
-    const [pair, setPair] = useState<SelectedPair | null>(() => initialPair(props.pairs, window.location.search));
-    const grid = useBudgetGrid(props, pair);
+    const [slice, setSlice] = useState<BudgetSlice>(() => initialSlice(props.pairs, window.location.search));
+    const pair = useMemo(() => sliceToPair(slice), [slice]);
+    const grid = useBudgetGrid(props, slice);
     const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsed);
     const [active, setActive] = useState<CellPosition | null>(null);
     const [editing, setEditingState] = useState<EditState | null>(null);
@@ -88,6 +94,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     const scrollerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const [fillOpen, setFillOpen] = useState(false);
+    const [fillHelper, setFillHelper] = useState<BudgetFillHelper>('last_year_fact');
     const [fillMessage, setFillMessage] = useState<string | null>(null);
     const [importOpen, setImportOpen] = useState(false);
     const [rulesOpen, setRulesOpen] = useState(false);
@@ -96,13 +103,10 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     const rows = useMemo(() => visibleRows(grid.data?.rows ?? [], collapsed), [grid.data, collapsed]);
 
     const canEdit = props.editable && props.canWrite && pair !== null && grid.lockedMessage === null;
+    // Не черновик и роль «Чтение» — баннеры страницы; здесь только режим суммы.
     let readOnlyHint: string | null = null;
-    if (!props.editable) {
-        readOnlyHint = null; // причина — баннером страницы (утверждён / архив)
-    } else if (!props.canWrite) {
-        readOnlyHint = 'Только просмотр: нужно право записи в финансах.';
-    } else if (pair === null) {
-        readOnlyHint = 'Выберите проект и ЦФО, чтобы вводить план. Сейчас показана сумма по всем парам.';
+    if (props.editable && props.canWrite && pair === null) {
+        readOnlyHint = `Выберите проект и ЦФО, чтобы вводить план. Сейчас показана сумма ${sliceSumLabel(props.pairs, slice)} — только просмотр.`;
     }
 
     const rowAt = (position: CellPosition): BudgetGridRow | undefined => rows[position.row]?.row;
@@ -412,27 +416,30 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
         onEditBlur();
     };
 
-    const onPairChange = (value: string): void => {
-        const next = value === 'all'
-            ? null
-            : props.pairs.find((candidate) => `${candidate.projectDirectionId}|${candidate.responsibilityCenterId}` === value) ?? null;
-        const selected = next === null ? null : { projectDirectionId: next.projectDirectionId, responsibilityCenterId: next.responsibilityCenterId };
+    const onSliceChange = (next: BudgetSlice): void => {
         onEditBlur();
-        setPair(selected);
+        setSlice(next);
+        setActive(null);
         setComment(null);
         setInvalid(new Map());
         const url = new URL(window.location.href);
-        url.searchParams.delete('project');
-        url.searchParams.delete('center');
         url.searchParams.delete('all');
-        if (selected === null) {
-            url.searchParams.set('all', '1');
-        } else {
-            url.searchParams.set('project', selected.projectDirectionId);
-            url.searchParams.set('center', selected.responsibilityCenterId);
+        for (const [key, value] of Object.entries(sliceParams(next))) {
+            url.searchParams.set(key, value);
         }
         window.history.replaceState(null, '', url.toString());
     };
+
+    // «Выгрузить в Excel» живёт в Twig-меню «⋯»: адрес — выбранная пара, иначе вся компания.
+    useEffect(() => {
+        const link = document.querySelector<HTMLAnchorElement>('[data-budget-export-link]');
+        if (link === null) {
+            return;
+        }
+        link.href = pair === null
+            ? props.exportUrl
+            : `${props.exportUrl}?${new URLSearchParams({ project: pair.projectDirectionId, center: pair.responsibilityCenterId }).toString()}`;
+    }, [pair, props.exportUrl]);
 
     const unsavedForPair = new Set(
         grid.unsaved.filter((cell) => pair !== null && cell.projectDirectionId === pair.projectDirectionId && cell.responsibilityCenterId === pair.responsibilityCenterId)
@@ -442,7 +449,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     const unsavedLabels = grid.unsaved.map((cell) => {
         const monthIndex = Number(cell.month.slice(5, 7)) - 1;
 
-        return `${names.get(cell.rowId) ?? 'статья'}, ${MONTH_NAMES[monthIndex] ?? cell.month}`;
+        return `${names.get(cell.rowId) ?? 'статья'} · ${MONTH_NAMES[monthIndex] ?? cell.month}`;
     });
     const noLeaves = grid.data !== null && !grid.data.rows.some((row) => row.editable);
 
@@ -457,74 +464,22 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     } else if (grid.lockedMessage !== null || grid.data === null) {
         fillDisabledReason = 'Сетка недоступна для правки.';
     }
-    const exportHref = pair === null
-        ? props.exportUrl
-        : `${props.exportUrl}?${new URLSearchParams({ project: pair.projectDirectionId, center: pair.responsibilityCenterId }).toString()}`;
-    const fillButton = (
-        <span className="d-inline-flex flex-wrap align-items-center gap-2">
-            <a className="btn btn-sm" href={exportHref} data-budget-export title={pair === null ? 'Выгрузить в Excel всю компанию' : 'Выгрузить в Excel выбранную пару'}>
-                <i className="ti ti-file-spreadsheet me-1" aria-hidden="true" />
-                Excel
-            </a>
-            <span className="d-inline-flex" title={fillDisabledReason ?? undefined}>
-                <button
-                    type="button"
-                    className="btn btn-sm"
-                    disabled={fillDisabledReason !== null}
-                    aria-expanded={fillOpen}
-                    onClick={() => {
-                        setFillOpen((open) => !open);
-                        setImportOpen(false);
-                        setRulesOpen(false);
-                        setFillMessage(null);
-                    }}
-                >
-                    <i className="ti ti-wand me-1" aria-hidden="true" />
-                    Помощники
-                </button>
-            </span>
-            <span className="d-inline-flex" title={fillDisabledReason ?? undefined}>
-                <button
-                    type="button"
-                    className="btn btn-sm"
-                    disabled={fillDisabledReason !== null}
-                    aria-expanded={importOpen}
-                    data-budget-import-toggle
-                    onClick={() => {
-                        setImportOpen((open) => !open);
-                        setFillOpen(false);
-                        setRulesOpen(false);
-                        setFillMessage(null);
-                    }}
-                >
-                    <i className="ti ti-upload me-1" aria-hidden="true" />
-                    Загрузить из Excel
-                </button>
-            </span>
-            <span className="d-inline-flex" title={fillDisabledReason ?? undefined}>
-                <button
-                    type="button"
-                    className="btn btn-sm"
-                    disabled={fillDisabledReason !== null}
-                    aria-expanded={rulesOpen}
-                    data-budget-rules-toggle
-                    onClick={() => {
-                        setRulesOpen((open) => !open);
-                        setFillOpen(false);
-                        setImportOpen(false);
-                        setFillMessage(null);
-                    }}
-                >
-                    <i className="ti ti-percentage me-1" aria-hidden="true" />
-                    Правило %
-                </button>
-            </span>
+    const openPanel = (panel: 'fill' | 'import' | 'rules'): void => {
+        setFillOpen(panel === 'fill');
+        setImportOpen(panel === 'import');
+        setRulesOpen(panel === 'rules');
+        setFillMessage(null);
+    };
+    const toolbar = props.pairs.length <= 1 && fillMessage === null ? null : (
+        <span className="d-inline-flex flex-wrap align-items-center gap-3">
+            {props.pairs.length > 1 && <BudgetSlicePills pairs={props.pairs} slice={slice} onChange={onSliceChange} />}
             {fillMessage !== null && <span className="text-secondary" role="status" data-budget-fill-message>{fillMessage}</span>}
         </span>
     );
+    const panelKey = pair === null ? 'all' : sliceKey(slice);
     const importPanel = importOpen && fillDisabledReason === null && pair !== null && grid.data !== null ? (
         <BudgetImportPanel
-            key={pairValueOf(pair)}
+            key={panelKey}
             importUrl={props.importUrl}
             csrfToken={props.csrfToken}
             pair={pair}
@@ -541,7 +496,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     ) : null;
     const rulesPanel = rulesOpen && fillDisabledReason === null && pair !== null && grid.data !== null ? (
         <BudgetRulePanel
-            key={pairValueOf(pair)}
+            key={panelKey}
             rulesUrl={props.rulesUrl}
             rulesDeleteUrl={props.rulesDeleteUrl}
             csrfToken={props.csrfToken}
@@ -557,7 +512,8 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
     ) : null;
     const fillPanel = rulesPanel ?? importPanel ?? (fillOpen && fillDisabledReason === null && pair !== null && grid.data !== null ? (
         <BudgetFillPanel
-            key={pairValueOf(pair)}
+            key={`${panelKey}|${fillHelper}`}
+            initialHelper={fillHelper}
             fillUrl={props.fillUrl}
             csrfToken={props.csrfToken}
             pair={pair}
@@ -581,33 +537,41 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
                     <a href={props.plCategoriesUrl}>Справочник статей</a>
                 </div>
             )}
+            <HeadSlot name="save">
+                <SaveIndicator state={grid.saveState} error={grid.saveError} locked={grid.lockedMessage !== null} onRetry={grid.retry} />
+            </HeadSlot>
+            <HeadSlot name="helpers">
+                <HelpersMenu
+                    disabledReason={fillDisabledReason}
+                    onHelper={(helper) => {
+                        setFillHelper(helper);
+                        openPanel('fill');
+                    }}
+                    onRule={() => openPanel('rules')}
+                    onImport={() => openPanel('import')}
+                />
+            </HeadSlot>
             <BudgetGridView
                 months={months}
                 rows={rows}
-                pairs={props.pairs}
-                pairValue={pairValueOf(pair)}
                 canEdit={canEdit}
                 readOnlyHint={readOnlyHint}
                 active={active}
                 editing={editing}
                 invalidKeys={new Set(invalid.keys())}
                 unsavedKeys={unsavedForPair}
-                saveState={grid.saveState}
-                saveError={grid.saveError}
                 inputError={[...invalid.values()].at(-1) ?? null}
                 pasteMessage={pasteMessage}
                 warnings={grid.data?.warnings ?? []}
                 lockedMessage={grid.lockedMessage}
                 unsavedLabels={unsavedLabels}
                 comment={comment}
-                fillButton={fillButton}
+                toolbar={toolbar}
                 fillPanel={fillPanel}
                 loading={grid.loading}
                 loadError={grid.loadError}
                 scrollerRef={scrollerRef}
                 inputRef={inputRef}
-                onPairChange={onPairChange}
-                onRetry={grid.retry}
                 onToggle={onToggle}
                 onCellMouseDown={onCellMouseDown}
                 onCellDoubleClick={(position) => startEdit(position)}

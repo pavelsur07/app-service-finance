@@ -64,6 +64,11 @@ final class BudgetVersionListController extends AbstractController
             && $this->finance->hasPlFactInYear($companyId, $year - 1);
         // Ошибка окна «Новый вариант» (CreateBudgetVersionController): открыть окно снова с введённым.
         $newForm = $request->hasSession() ? $request->getSession()->remove(CreateBudgetVersionController::FORM_STATE) : null;
+        // «Копировать» из «⋯» экрана варианта: окно «Новый вариант» открыто с этим источником.
+        $copy = $request->query->getString('copy');
+        if (!\is_array($newForm) && $canWrite && isset($names[$copy])) {
+            $newForm = ['method' => 'copy', 'copyFrom' => $copy];
+        }
 
         return $this->render('budget/index.html.twig', [
             'year' => $year,

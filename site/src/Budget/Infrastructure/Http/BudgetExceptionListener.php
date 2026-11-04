@@ -54,7 +54,7 @@ final readonly class BudgetExceptionListener implements EventSubscriberInterface
         }
 
         // API сетки отвечает JSON всегда, остальное — по заголовку Accept.
-        $api = 1 === preg_match('#^/finance/budget/versions/[^/]+/(grid|cells|fill|plan-fact|export|import|rules|rules/delete)$#', $path);
+        $api = 1 === preg_match('#^/finance/budget/versions/[^/]+/(grid|cells|name|fill|plan-fact|export|import|rules|rules/delete)$#', $path);
         if ($api || str_contains($request->headers->get('Accept', ''), 'application/json')) {
             $event->setResponse(new JsonResponse(['error' => ['code' => $code, 'message' => $exception->getMessage()]], $status));
 

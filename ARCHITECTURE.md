@@ -2074,6 +2074,10 @@ Facade нет: план читает только сам модуль; Facade п
     иначе `BudgetApprovalForbiddenException`; второй утверждённый на год —
     `BudgetYearAlreadyApprovedException`. Повтор с тем же статусом — без
     изменений.
+  - `RenameBudgetVersionAction(RenameBudgetVersionCommand)` → итоговое название —
+    переименовать черновик (≤ 120 символов, пробелы по краям срезаются); статус
+    перечитывается под блокировкой варианта, не черновик —
+    `BudgetVersionNotEditableException`. Повтор с тем же названием — без изменений.
   - `SaveBudgetLinesAction(SaveBudgetLinesCommand)` — пачка до 5000 ячеек,
     целиком или ничего: листовая статья (`PLCategoryType::LEAF_INPUT`) своей
     компании, активная пара (`FinancialResponsibilityCenterFacade::getActivePairs`),
@@ -2088,11 +2092,12 @@ Facade нет: план читает только сам модуль; Facade п
 
 | Маршрут | Метод | Что | Доступ |
 |---|---|---|---|
-| `/finance/budget?year=` | GET | список вариантов года, архив отдельно | чтение |
+| `/finance/budget?year=&copy=` | GET | список вариантов года, архив отдельно; `copy` — вариант этого года: окно «Новый вариант» открыто способом «Копия» с ним (право записи) | чтение |
 | `/finance/budget/versions` | POST | создать вариант: `method` = `empty` / `copy` (`copyFrom`) / `fact` (форма, CSRF `budget_version_create`, `versionId` из формы); ошибка ввода — в сессию `budget_new_form`, список открывает окно снова | запись |
 | `/finance/budget/versions/{id}/status/{draft\|approved\|archived}` | POST | смена статуса (CSRF `budget_version_status{id}`) | запись; утверждение — владелец |
-| `/finance/budget/versions/{id}` | GET | экран варианта, React-остров `budget-grid` (entry `budget_grid_page`; props: `versionId`, `year`, `editable`, `canWrite`, `isOwner`, `pairs`, `gridUrl`, `cellsUrl`, `csrfToken`, `plCategoriesUrl`) | чтение |
-| `/finance/budget/versions/{id}/grid?project=&center=` | GET | JSON сетки `BudgetGridView`; без пары — сумма по всем парам | чтение |
+| `/finance/budget/versions/{id}` | GET | экран варианта: шапка Twig (название с карандашом, кнопка статуса с причиной недоступности текстом, «⋯» — Копировать, Выгрузить в Excel, В архив; баннеры статуса и роли «Чтение»), React-остров `budget-grid` (entry `budget_grid_page`; props: `versionId`, `year`, `editable`, `canWrite`, `isOwner`, `pairs` с `projectName`/`centerName`, `gridUrl`, `cellsUrl`, `csrfToken`, `plCategoriesUrl`); остров рисует порталом в слоты шапки `data-budget-head-slot` индикатор сохранения и «Помощники ▾», разрез — пилюли «Проект»/«ЦФО» в адресе `?project=&center=` (`all` — все) | чтение |
+| `/finance/budget/versions/{id}/grid?project=&center=` | GET | JSON сетки `BudgetGridView`: пара — с комментариями и правилами; одно измерение (другое пусто или `all`) — сумма пар этого проекта / ЦФО; без обоих — сумма всех пар (`BudgetPairResolver::resolveSlice`, неизвестное значение — 422 `budget_invalid_pair`) | чтение |
+| `/finance/budget/versions/{id}/name` | POST | переименовать черновик: JSON `{name}` → `{name}`, `X-CSRF-Token` (`budget_cells`) | запись |
 | `/finance/budget/plan-fact?year=&version=&project=&center=&show=&period=` | GET | вкладка «План–факт» (Twig): вариант по умолчанию — утверждённый, иначе первый неархивный с подсказкой; пара по умолчанию — вся компания; `show` plan/fact/diff/percent, `period` month/quarter; факт месяца — ссылка на `finance_report_preview` | чтение |
 | `/finance/budget/versions/{id}/plan-fact?project=&center=` | GET | JSON `BudgetPlanFactView`: план, факт, отклонение по месяцам и году; без пары — вся компания | чтение |
 | `/finance/budget/versions/{id}/fill` | POST | помощник заполнения: JSON `{helper, project, center, categoryIds, months, params, apply, confirmOverwrite}` → `{cells, changed, overwrite, skipped, applied}`; без `apply` — предпросмотр; `X-CSRF-Token` (`budget_cells`) | запись |
@@ -4937,6 +4942,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.138 | 2026-11-04 | Budget: шапка экрана варианта по пакету DS — переименование черновика (`RenameBudgetVersionAction`, `/name`), кнопка статуса с причиной, «⋯», баннеры, индикатор сохранения и «Помощники ▾» порталом острова, пилюли разреза; сетка по одному измерению (`resolveSlice`, `BudgetCellsQuery`), `?copy=` списка (задача `pl-budget`, этап 11) |
 | 2.137 | 2026-11-04 | Budget: экран «Варианты» по пакету DS (меню «⋯», карточки ≤ 760 px, пустой год), «Заполнить из факта» — `CreateBudgetVersionFromFactAction`, `method` формы создания; Finance: `hasPlFactInYear()` (задача `pl-budget`, этап 10) |
 | 2.136 | 2026-11-04 | Budget: правило «X % от строки-базы» (`budget_rules`, миграция `Version20261104150000`, `BudgetRule`, `BudgetRuleCalculator`, `SetBudgetRuleAction`/`RemoveBudgetRuleAction`, `/rules`, `/rules/delete`), источник `rule`, `BudgetLinesWriter::validate(…, versionId, …)` (задача `pl-budget`, этап 8) |
 | 2.135 | 2026-11-04 | Budget: флаг статьи ОПиУ «скрыта» (`isVisible`) не учитывается — сетка, план–факт, помощники и загрузка из Excel показывают и принимают строки как отчёт ОПиУ (шаблоны скрывали «Выручку» REV_TOTAL) (задача `pl-budget`) |
