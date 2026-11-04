@@ -8,7 +8,7 @@ final readonly class BudgetGridView
 {
     /**
      * @param list<string> $months `Y-m`, 12 месяцев года
-     * @param list<BudgetGridRow> $rows дерево ОПиУ в порядке отчёта, без скрытых статей
+     * @param list<BudgetGridRow> $rows дерево ОПиУ в порядке и составе отчёта
      * @param list<string> $warnings листья без кода, ошибки формул дерева
      */
     public function __construct(

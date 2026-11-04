@@ -235,7 +235,7 @@ final readonly class BudgetFillPlanner
     {
         $flows = [];
         foreach ($this->categories->getTreeByCompanyId($companyId) as $category) {
-            if (PLCategoryType::LEAF_INPUT === $category->type && $category->isVisible) {
+            if (PLCategoryType::LEAF_INPUT === $category->type) {
                 $flows[$category->id] = $category->flow;
             }
         }

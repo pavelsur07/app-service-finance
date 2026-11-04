@@ -94,10 +94,6 @@ final readonly class BudgetImportPlanner
                 ++$totals;
                 continue;
             }
-            if (!$category->isVisible) {
-                $ignored[] = sprintf('строка %d «%s» — статья скрыта', $row->line, $row->name);
-                continue;
-            }
             if (isset($seen[$category->id])) {
                 throw new InvalidBudgetInputException(sprintf('Статья «%s» встречается в файле дважды (строки %d и %d).', $category->name, $seen[$category->id], $row->line));
             }
