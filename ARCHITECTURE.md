@@ -2133,7 +2133,7 @@ Facade нет: план читает только сам модуль; Facade п
   (положительные), итоги и показатели — как на экране. `BudgetPlanXlsxReader`
   читает тот же формат (заголовок — по колонке «ID статьи», пустое = 0, ≤ 2000
   строк). `BudgetImportPlanner` — статья по ID, без ID — по коду; только
-  видимые листья ввода; остальное по правилам помощников (`sales_plan`,
+  листья ввода; остальное по правилам помощников (`sales_plan`,
   комментарий, перезапись); итоги, неизвестные строки, другая пара или год —
   в `warnings`/`ignored`. `ImportBudgetCellsAction` — предпросмотр или запись
   под `BudgetVersionLock` тем же путём, что `FillBudgetCellsAction`.
@@ -4927,7 +4927,8 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.135 | 2026-11-04 | Budget: правило «X % от строки-базы» (`budget_rules`, миграция `Version20261104150000`, `BudgetRule`, `BudgetRuleCalculator`, `SetBudgetRuleAction`/`RemoveBudgetRuleAction`, `/rules`, `/rules/delete`), источник `rule`, `BudgetLinesWriter::validate(…, versionId, …)` (задача `pl-budget`, этап 8) |
+| 2.136 | 2026-11-04 | Budget: правило «X % от строки-базы» (`budget_rules`, миграция `Version20261104150000`, `BudgetRule`, `BudgetRuleCalculator`, `SetBudgetRuleAction`/`RemoveBudgetRuleAction`, `/rules`, `/rules/delete`), источник `rule`, `BudgetLinesWriter::validate(…, versionId, …)` (задача `pl-budget`, этап 8) |
+| 2.135 | 2026-11-04 | Budget: флаг статьи ОПиУ «скрыта» (`isVisible`) не учитывается — сетка, план–факт, помощники и загрузка из Excel показывают и принимают строки как отчёт ОПиУ (шаблоны скрывали «Выручку» REV_TOTAL) (задача `pl-budget`) |
 | 2.134 | 2026-11-04 | Budget: выгрузка и загрузка плана в Excel (`/export`, `/import`, `BudgetPlanXlsxWriter`/`Reader`, `BudgetImportPlanner`, `ImportBudgetCellsAction`), кнопки «Excel» и «Загрузить из Excel» в острове `budget-grid` (props `exportUrl`, `importUrl`); `apiFetch` принимает FormData (задача `pl-budget`, этапы 6–7) |
 | 2.133 | 2026-11-04 | Budget: факт пары с системным ЦФО «Общий» включает строки без ЦФО (`BudgetPairResolver::isGeneralCenter`), ссылка на отчёт для неё скрыта; Finance: `getPlFactAmountsByMonth(..., includeUnassignedCenter)` (задача `pl-budget`, вариант A) |
 | 2.132 | 2026-11-04 | Budget: помощники заполнения плана (`/fill`, `BudgetFillPlanner`, `FillBudgetCellsAction`, `BudgetFillMath`), панель «Помощники» в острове `budget-grid`, prop `fillUrl` (задача `pl-budget`, этап 5) |

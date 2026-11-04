@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Budget\Application\Service;
 
 /**
- * Результат BudgetTreeCalculator: дерево ОПиУ в порядке отчёта без скрытых статей.
+ * Результат BudgetTreeCalculator: дерево ОПиУ в порядке и составе отчёта.
  */
 final readonly class BudgetTree
 {

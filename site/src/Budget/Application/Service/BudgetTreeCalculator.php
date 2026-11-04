@@ -18,7 +18,8 @@ use App\Finance\Facade\PLCategoryFacade;
  *
  * Лист показывает свою сумму как есть (и без кода, хотя в итоги отчёта она не попадает);
  * итоговые строки и показатели — значения калькулятора: деньги с двумя знаками, прочие
- * форматы — с четырьмя. Скрытые в отчёте статьи пропускаются.
+ * форматы — с четырьмя. Флаг статьи «скрыта» не учитывается — строки те же, что в отчёте ОПиУ
+ * (шаблоны ставят его, например, «Выручке» REV_TOTAL, а отчёт её показывает).
  */
 final readonly class BudgetTreeCalculator
 {
@@ -86,7 +87,7 @@ final readonly class BudgetTreeCalculator
         $rows = [];
         foreach ($tree->rows as $row) {
             $category = $categories[$row->id] ?? null;
-            if (null === $category || !$category->isVisible) {
+            if (null === $category) {
                 continue;
             }
             $leaf = PLCategoryType::LEAF_INPUT === $row->type;

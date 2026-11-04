@@ -29,7 +29,7 @@ use Webmozart\Assert\Assert;
  * Задаёт (или меняет) правило «X % от строки-базы» статьи в паре черновика и сразу пересчитывает
  * её суммы. Точка входа, коммитит сама.
  *
- * Цель — видимый лист ввода; база — денежная строка дерева (лист или итог), не сама цель. Под
+ * Цель — лист ввода; база — денежная строка дерева (лист или итог), не сама цель. Под
  * блокировкой варианта: статус — черновик; база не считается по правилу этой пары, а цель не служит
  * базой другому правилу (цепочек нет). Upsert по `uniq_budget_rules_target`; повтор — те же строки.
  * Отказ под блокировкой возвращается из транзакции, а не бросается в ней: исключение внутри
@@ -69,7 +69,7 @@ final class SetBudgetRuleAction
         }
         $target = null;
         foreach ($this->categories->getTreeByCompanyId($command->companyId) as $category) {
-            if ($category->id === $command->plCategoryId && PLCategoryType::LEAF_INPUT === $category->type && $category->isVisible) {
+            if ($category->id === $command->plCategoryId && PLCategoryType::LEAF_INPUT === $category->type) {
                 $target = $category;
             }
         }

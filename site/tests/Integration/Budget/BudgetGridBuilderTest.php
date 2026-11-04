@@ -73,7 +73,7 @@ final class BudgetGridBuilderTest extends BudgetIntegrationTestCase
         self::assertSame('1200.00', $this->row($grid, self::SUBTOTAL_ID)->total);
     }
 
-    public function testLeafWithoutCodeIsShownButLeftOutOfSubtotalsAndHiddenRowIsSkipped(): void
+    public function testLeafWithoutCodeIsShownButLeftOutOfSubtotalsAndHiddenFlagIsIgnoredLikeReport(): void
     {
         $company = $this->em->find(Company::class, self::COMPANY_ID);
         self::assertNotNull($company);
@@ -83,6 +83,9 @@ final class BudgetGridBuilderTest extends BudgetIntegrationTestCase
         $hidden = PLCategoryBuilder::aPLCategory()->withId(self::HIDDEN_ID)->forCompany($company)->withName('Скрытая')->withCode('HIDDEN')->withParent($subtotal)->build();
         $hidden->setSortOrder(3);
         $hidden->setIsVisible(false);
+        // Шаблоны ОПиУ ставят «Выручке» (REV_TOTAL) флаг «скрыта»; отчёт ОПиУ его не учитывает.
+        \assert(null !== $subtotal);
+        $subtotal->setIsVisible(false);
         $this->em->persist($noCode);
         $this->em->persist($hidden);
         $this->em->flush();
@@ -94,7 +97,7 @@ final class BudgetGridBuilderTest extends BudgetIntegrationTestCase
 
         self::assertSame('-50.00', $this->row($grid, self::NO_CODE_ID)->values['2027-03']);
         self::assertSame('0.00', $this->row($grid, self::SUBTOTAL_ID)->values['2027-03']);
-        self::assertNotContains(self::HIDDEN_ID, array_map(static fn (BudgetGridRow $row): string => $row->id, $grid->rows));
+        self::assertTrue($this->row($grid, self::HIDDEN_ID)->editable, 'строка с флагом «скрыта» — как в отчёте ОПиУ');
         self::assertCount(1, $grid->warnings);
         self::assertStringContainsString('Прочее', $grid->warnings[0]);
     }
