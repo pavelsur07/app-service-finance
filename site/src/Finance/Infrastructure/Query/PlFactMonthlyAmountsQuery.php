@@ -21,7 +21,7 @@ final readonly class PlFactMonthlyAmountsQuery
     /**
      * @return array<string, array<string, string>> `Y-m` → plCategoryId → сумма; пустые месяцы не возвращаются
      */
-    public function fetch(string $companyId, int $year, ?string $projectDirectionId, ?string $responsibilityCenterId): array
+    public function fetch(string $companyId, int $year, ?string $projectDirectionId, ?string $responsibilityCenterId, bool $includeUnassignedCenter = false): array
     {
         $params = [
             'company' => $companyId,
@@ -35,7 +35,9 @@ final readonly class PlFactMonthlyAmountsQuery
         }
         $centerFilter = '';
         if (null !== $responsibilityCenterId) {
-            $centerFilter = 'AND dt.responsibility_center_id = :center';
+            $centerFilter = $includeUnassignedCenter
+                ? 'AND (dt.responsibility_center_id = :center OR dt.responsibility_center_id IS NULL)'
+                : 'AND dt.responsibility_center_id = :center';
             $params['center'] = $responsibilityCenterId;
         }
 

@@ -98,6 +98,15 @@ final class PlFactAmountsByMonthTest extends IntegrationTestCase
         );
     }
 
+    public function testUnassignedCenterJoinsWhenAsked(): void
+    {
+        // Факт без ЦФО (1000 и 40−10 в «Общем») добавляется к ЦФО, только если вызывающий просит.
+        self::assertSame(
+            ['2027-01' => [self::REV_ID => '1000.00'], '2027-02' => [self::REV_ID => '30.00', self::RENT_ID => '-300.00']],
+            $this->facade()->getPlFactAmountsByMonth(self::COMPANY_ID, 2027, self::GENERAL_ID, $this->centerId, includeUnassignedCenter: true),
+        );
+    }
+
     public function testForeignProjectGivesNothing(): void
     {
         self::assertSame([], $this->facade()->getPlFactAmountsByMonth(self::COMPANY_ID, 2027, self::OTHER_PROJECT_ID));

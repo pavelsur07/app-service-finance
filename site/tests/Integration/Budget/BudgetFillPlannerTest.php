@@ -48,6 +48,7 @@ final class BudgetFillPlannerTest extends BudgetIntegrationTestCase
         $this->line($version, self::REVENUE_ID, '2027-05', '7777.00', source: BudgetLineSource::SALES_PLAN);
 
         $this->fact(self::REVENUE_ID, '2026-01-10', income: '500.00');
+        $this->fact(self::REVENUE_ID, '2026-01-20', income: '25.00', center: false);
         $this->fact(self::REVENUE_ID, '2026-12-10', income: '300.00');
         $this->fact(self::REVENUE_ID, '2027-01-10', income: '600.00');
         $this->fact(self::RENT_ID, '2027-02-10', expense: '90.00');
@@ -60,8 +61,8 @@ final class BudgetFillPlannerTest extends BudgetIntegrationTestCase
     {
         $plan = $this->plan(BudgetFillHelper::LAST_YEAR_FACT, [self::REVENUE_ID], ['2027-01', '2027-02']);
 
-        // 2027-01: 1000 → 500 (перезапись), 2027-02: факта нет, ячейка пустая — не меняется.
-        self::assertSame([[self::REVENUE_ID, '2027-01', '500.00']], $this->cells($plan));
+        // 2027-01: 1000 → 525 (500 + 25 без ЦФО — системный ЦФО их забирает), 2027-02: факта нет — не меняется.
+        self::assertSame([[self::REVENUE_ID, '2027-01', '525.00']], $this->cells($plan));
         self::assertSame([1, 1, 0], [$plan->changed, $plan->overwrite, $plan->skipped]);
     }
 
@@ -179,7 +180,7 @@ final class BudgetFillPlannerTest extends BudgetIntegrationTestCase
         $this->em->persist(BudgetLineBuilder::aLine()->withId(sprintf('0193cccc-0000-7000-8000-0000000f9%03d', 100 + ++$this->n))->inVersion($version)->forCategory($categoryId)->forMonth($month)->forPair(self::GENERAL_PROJECT_ID, $this->generalCenterId)->withAmount($amount)->withComment($comment)->withSource($source)->build());
     }
 
-    private function fact(string $categoryId, string $date, string $income = '0', string $expense = '0'): void
+    private function fact(string $categoryId, string $date, string $income = '0', string $expense = '0', bool $center = true): void
     {
         $company = $this->em->getReference(Company::class, self::COMPANY_ID);
         $project = $this->em->getReference(ProjectDirection::class, self::GENERAL_PROJECT_ID);
@@ -189,7 +190,7 @@ final class BudgetFillPlannerTest extends BudgetIntegrationTestCase
         $total = new PLDailyTotal(sprintf('0193cccc-0000-7000-8000-0000000f9%03d', 500 + ++$this->n), $company, $project, new \DateTimeImmutable($date), $category);
         $total->setAmountIncome($income);
         $total->setAmountExpense($expense);
-        $total->setResponsibilityCenterId($this->generalCenterId);
+        $total->setResponsibilityCenterId($center ? $this->generalCenterId : null);
         $this->em->persist($total);
     }
 }

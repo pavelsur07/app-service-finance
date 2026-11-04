@@ -1532,12 +1532,14 @@ calculatePlTree(
 
 // Факт ОПиУ по месяцам года из pl_daily_totals одним GROUP BY: 'Y-m' → categoryId → сумма в знаке
 // отчёта (доход − расход), нули отброшены. Проект и ЦФО — точное совпадение (без дочерних проектов:
-// у дочернего своя пара и свой план). Потребитель — Budget (план–факт).
+// у дочернего своя пара и свой план); includeUnassignedCenter — к ЦФО добавить строки без ЦФО
+// (Budget передаёт true для системного ЦФО «Общий»). Потребитель — Budget (план–факт, помощники).
 getPlFactAmountsByMonth(
     string $companyId,
     int $year,
     ?string $projectDirectionId = null,
     ?string $responsibilityCenterId = null,
+    bool $includeUnassignedCenter = false,
 ): array                            // array<string month, array<string categoryId, string amount>>
 
 // Код строке ввода без кода (только persist, flush — у вызывающего). Отчёт ОПиУ берёт суммы по
@@ -2104,6 +2106,11 @@ Facade нет: план читает только сам модуль; Facade п
   `percent` = diff / |план|, `significant` при |%| > `THRESHOLD_PERCENT` = 10;
   план 0 при факте ≠ 0 — значимо без `%`; не-деньги — без `%` и пометки). Минус
   отклонения — хуже для прибыли и в доходах, и в расходах.
+- Факт пары с системным ЦФО «Общий» (`BudgetPairResolver::isGeneralCenter`)
+  включает строки регистра без ЦФО (решение Владельца 04.11, вариант A) — в
+  план–факте и в помощниках «из факта». Отчёт ОПиУ при фильтре по ЦФО строки
+  без ЦФО не показывает, поэтому ссылки «факт → отчёт» для такой пары нет; их
+  нет и для проекта с дочерними (отчёт включает дочерние).
 - Помощники заполнения (`BudgetFillHelper`: `last_year_fact`, `average`,
   `distribute`, `copy_right`, `percent_of`): `BudgetFillPlanner` считает
   ячейки пары черновика (только изменяемые; `sales_plan` — пропуск;
@@ -4889,6 +4896,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.133 | 2026-11-04 | Budget: факт пары с системным ЦФО «Общий» включает строки без ЦФО (`BudgetPairResolver::isGeneralCenter`), ссылка на отчёт для неё скрыта; Finance: `getPlFactAmountsByMonth(..., includeUnassignedCenter)` (задача `pl-budget`, вариант A) |
 | 2.132 | 2026-11-04 | Budget: помощники заполнения плана (`/fill`, `BudgetFillPlanner`, `FillBudgetCellsAction`, `BudgetFillMath`), панель «Помощники» в острове `budget-grid`, prop `fillUrl` (задача `pl-budget`, этап 5) |
 | 2.131 | 2026-11-04 | Budget: вкладка «План–факт» (`budget_plan_fact`), колонки кварталов и «с начала года» (`BudgetPlanFactColumn`, `BudgetTreeCalculator::calculateColumns`), `BudgetPairResolver::options()` (задача `pl-budget`, этап 4) |
 | 2.130 | 2026-11-04 | Budget: план–факт (`/plan-fact`, `BudgetPlanFactBuilder`, `BudgetVariance`, порог 10%), «Итог года» в списке (`BudgetYearTotals`), `BudgetPairResolver`; Finance: `getPlFactAmountsByMonth()` (задача `pl-budget`, этап 3) |

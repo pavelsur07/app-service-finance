@@ -148,16 +148,30 @@ final class BudgetPagesTest extends WebTestCaseBase
         self::assertStringContainsString('/finance/report/preview?from=2027-01-01&to=2027-01-31', (string) $link->attr('href'));
     }
 
-    public function testPlanFactFactLinksToReportOnlyWhenProjectHasNoChildren(): void
+    public function testPlanFactFactLinksToReportOnlyWhenSumsMatchReport(): void
     {
         self::mockTime(new \DateTimeImmutable('2027-03-15 12:00', new \DateTimeZone('Europe/Moscow')));
         $this->version('Утверждённый', BudgetVersionStatus::APPROVED);
+        $project = $this->em()->find(ProjectDirection::class, self::PROJECT_ID);
+        self::assertNotNull($project);
+        $sales = new FinancialResponsibilityCenter(self::COMPANY_ID, 'CFO_SALES', 'Продажи');
+        $this->em()->persist($sales);
+        $this->em()->persist(new FinancialResponsibilityCenterProject(self::COMPANY_ID, $project, $sales));
+        $this->em()->flush();
+        $salesId = $sales->getId();
+        $this->em()->clear();
         $this->login($this->reader);
-        $url = sprintf('/finance/budget/plan-fact?year=2027&show=fact&project=%s&center=%s', self::PROJECT_ID, $this->centerId);
+        $cell = '[data-pf-row="REV"] [data-pf-cell="2027-01"] a';
 
+        // Системный «Общий» включает факт без ЦФО — отчёт с фильтром по ЦФО его не покажет.
+        $this->client->request('GET', sprintf('/finance/budget/plan-fact?year=2027&show=fact&project=%s&center=%s', self::PROJECT_ID, $this->centerId));
+        self::assertSelectorNotExists($cell);
+        self::assertSelectorTextContains('.card-footer', 'операции без ЦФО');
+
+        $url = sprintf('/finance/budget/plan-fact?year=2027&show=fact&project=%s&center=%s', self::PROJECT_ID, $salesId);
         $this->client->request('GET', $url);
-        $href = (string) $this->client->getCrawler()->filter('[data-pf-row="REV"] [data-pf-cell="2027-01"] a')->attr('href');
-        self::assertStringContainsString('projectDirectionIds', urldecode($href));
+        $href = (string) $this->client->getCrawler()->filter($cell)->attr('href');
+        self::assertStringContainsString('responsibilityCenterIds', urldecode($href));
 
         $company = $this->em()->find(Company::class, self::COMPANY_ID);
         $parent = $this->em()->find(ProjectDirection::class, self::PROJECT_ID);
@@ -170,7 +184,7 @@ final class BudgetPagesTest extends WebTestCaseBase
         $this->em()->clear();
 
         $this->client->request('GET', $url);
-        self::assertSelectorNotExists('[data-pf-row="REV"] [data-pf-cell="2027-01"] a');
+        self::assertSelectorNotExists($cell);
         self::assertSelectorTextContains('.card-footer', 'без дочерних');
     }
 

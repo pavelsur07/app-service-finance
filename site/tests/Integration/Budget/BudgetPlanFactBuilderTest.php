@@ -71,6 +71,19 @@ final class BudgetPlanFactBuilderTest extends BudgetIntegrationTestCase
         self::assertCount(18, $this->row($view, self::SUBTOTAL_ID)->cells);
     }
 
+    public function testGeneralCenterPairIncludesFactWithoutCenter(): void
+    {
+        $this->fact(self::REVENUE_ID, self::GENERAL_PROJECT_ID, null, '2027-01-25', income: '7.00');
+        $this->fact(self::REVENUE_ID, self::SHOP_PROJECT_ID, null, '2027-01-26', income: '9.00');
+        $this->em->flush();
+        $this->em->clear();
+
+        // Системный ЦФО «Общий»: факт без ЦФО того же проекта — его (решение Владельца 04.11, вариант A).
+        self::assertSame('1157.00', $this->row($this->build(self::GENERAL_PROJECT_ID, $this->generalCenterId), self::REVENUE_ID)->cells['2027-01']->fact);
+        // Обычный ЦФО — только свои строки.
+        self::assertSame('100.00', $this->row($this->build(self::SHOP_PROJECT_ID, $this->salesCenterId), self::REVENUE_ID)->cells['2027-01']->fact);
+    }
+
     public function testWithoutPairWholeCompany(): void
     {
         $jan = $this->row($this->build(null, null), self::REVENUE_ID)->cells['2027-01'];
@@ -145,7 +158,7 @@ final class BudgetPlanFactBuilderTest extends BudgetIntegrationTestCase
         $this->em->persist(BudgetLineBuilder::aLine()->withId(sprintf('0193cccc-0000-7000-8000-0000000f7%03d', ++$this->n))->inVersion($version)->forCategory($categoryId)->forMonth($month)->forPair($projectId, $centerId)->withAmount($amount)->build());
     }
 
-    private function fact(string $categoryId, string $projectId, string $centerId, string $date, string $income = '0', string $expense = '0'): void
+    private function fact(string $categoryId, string $projectId, ?string $centerId, string $date, string $income = '0', string $expense = '0'): void
     {
         $company = $this->em->getReference(Company::class, self::COMPANY_ID);
         $project = $this->em->getReference(ProjectDirection::class, $projectId);

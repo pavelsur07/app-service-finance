@@ -54,6 +54,9 @@ final readonly class BudgetFillPlanner
         $pair = $this->pairs->resolve($companyId, $request->projectDirectionId, $request->responsibilityCenterId)
             ?? throw new InvalidBudgetPairException();
 
+        // Системный ЦФО «Общий» принимает факт без ЦФО (вариант A, 04.11).
+        $withUnassigned = $this->pairs->isGeneralCenter($companyId, $pair->responsibilityCenterId);
+
         $flows = $this->leafFlows($companyId);
         if ([] === $request->categoryIds) {
             throw new InvalidBudgetInputException('Выберите статьи.');
@@ -73,7 +76,7 @@ final readonly class BudgetFillPlanner
         }
 
         $months = $this->months($request, $year);
-        $targets = $this->targets($request, $companyId, $year, $months, $flows, $planAmounts, $pair->projectDirectionId, $pair->responsibilityCenterId);
+        $targets = $this->targets($request, $companyId, $year, $months, $flows, $planAmounts, $pair->projectDirectionId, $pair->responsibilityCenterId, $withUnassigned);
 
         $cells = [];
         $overwrite = 0;
@@ -106,12 +109,12 @@ final readonly class BudgetFillPlanner
      *
      * @return array<string, array<string, string>> plCategoryId → `Y-m` → новая сумма
      */
-    private function targets(BudgetFillRequest $request, string $companyId, int $year, array $months, array $flows, array $planAmounts, string $project, string $center): array
+    private function targets(BudgetFillRequest $request, string $companyId, int $year, array $months, array $flows, array $planAmounts, string $project, string $center, bool $withUnassigned): array
     {
         $targets = [];
         switch ($request->helper) {
             case BudgetFillHelper::LAST_YEAR_FACT:
-                $facts = $this->finance->getPlFactAmountsByMonth($companyId, $year - 1, $project, $center);
+                $facts = $this->finance->getPlFactAmountsByMonth($companyId, $year - 1, $project, $center, $withUnassigned);
                 foreach ($request->categoryIds as $categoryId) {
                     foreach ($months as $month) {
                         $targets[$categoryId][$month] = bcadd($facts[($year - 1).substr($month, 4)][$categoryId] ?? '0', '0', 2);
@@ -126,7 +129,7 @@ final readonly class BudgetFillPlanner
                 $closed = $this->lastClosedMonths($count);
                 $facts = [];
                 foreach (array_unique(array_map(static fn (string $m): int => (int) substr($m, 0, 4), $closed)) as $factYear) {
-                    $facts += $this->finance->getPlFactAmountsByMonth($companyId, $factYear, $project, $center);
+                    $facts += $this->finance->getPlFactAmountsByMonth($companyId, $factYear, $project, $center, $withUnassigned);
                 }
                 foreach ($request->categoryIds as $categoryId) {
                     $values = array_map(static fn (string $m): string => $facts[$m][$categoryId] ?? '0', $closed);
