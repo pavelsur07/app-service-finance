@@ -26,7 +26,10 @@ use App\Budget\Enum\BudgetFillHelper;
 use App\Budget\Enum\BudgetVersionStatus;
 use App\Budget\Exception\BudgetVersionNotEditableException;
 use App\Budget\Exception\InvalidBudgetInputException;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLFlow;
 use App\Tests\Builders\Budget\BudgetVersionBuilder;
+use App\Tests\Builders\Finance\PLCategoryBuilder;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
 
@@ -91,9 +94,62 @@ final class BudgetRuleTest extends BudgetIntegrationTestCase
     {
         $this->setRule(self::RENT_ID, self::REVENUE_ID, '10');
 
-        $this->expectException(InvalidBudgetInputException::class);
-        $this->expectExceptionMessage('считается по правилу');
-        $this->save([[self::RENT_ID, '2027-05', '-1.00']]);
+        try {
+            $this->save([[self::RENT_ID, '2027-05', '-1.00']]);
+            self::fail('ручная запись в статью с правилом должна отклоняться');
+        } catch (InvalidBudgetInputException $e) {
+            self::assertStringContainsString('считается по правилу', $e->getMessage());
+        }
+        // Проверка идёт под блокировкой варианта, отказ возвращается из транзакции: EM открыт.
+        self::assertTrue($this->em->isOpen());
+        self::assertSame([['2027-01', '-100.00', 'rule'], ['2027-02', '-200.01', 'rule']], $this->rentLines());
+    }
+
+    public function testRemovedRuleTargetReturnsToBaseOfOtherRules(): void
+    {
+        $commissionId = '0193cccc-0000-7000-8000-00000000d004';
+        $parent = $this->em->find(PLCategory::class, self::SUBTOTAL_ID);
+        self::assertNotNull($parent);
+        $commission = PLCategoryBuilder::aPLCategory()->withId($commissionId)->forCompany($parent->getCompany())->withName('Комиссия')->withCode('FEE')->withFlow(PLFlow::EXPENSE)->withParent($parent)->build();
+        $commission->setSortOrder(2);
+        $this->em->persist($commission);
+        $this->em->flush();
+        $this->em->clear();
+
+        $this->setRule(self::RENT_ID, self::REVENUE_ID, '10');
+        $this->setRule($commissionId, self::SUBTOTAL_ID, '10');
+        self::assertSame([['2027-01', '-100.00'], ['2027-02', '-200.01']], $this->amounts($commissionId), 'аренда с правилом вне базы');
+
+        $this->removeRule(self::RENT_ID);
+
+        // База «Прибыль» = 1000 − 100 и 2000,05 − 200,01: комиссия пересчитана при снятии.
+        self::assertSame([['2027-01', '-90.00'], ['2027-02', '-180.00']], $this->amounts($commissionId));
+    }
+
+    public function testCopyWaitsForSourceVersionLock(): void
+    {
+        // Источник — отдельный черновик: блокировку VERSION_ID держит транзакция теста.
+        $sourceId = '0193cccc-0000-7000-8000-0000000fb005';
+        $this->em->persist(BudgetVersionBuilder::aVersion()->withId($sourceId)->forCompany(self::COMPANY_ID)->withYear(2027)->build());
+        $this->em->flush();
+        $worker = DriverManager::getConnection($this->connection->getParams());
+        try {
+            $worker->executeStatement("SET lock_timeout = '2s'");
+            $worker->beginTransaction();
+            $worker->executeStatement('SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))', ['key' => 'budget_version:'.$sourceId]);
+            $this->connection->executeStatement("SET lock_timeout = '300ms'");
+
+            try {
+                self::getContainer()->get(CreateBudgetVersionAction::class)(new CreateBudgetVersionCommand('0193cccc-0000-7000-8000-0000000fb006', self::COMPANY_ID, 'Копия', copyFromVersionId: $sourceId));
+                self::fail('копия должна ждать блокировку источника');
+            } catch (DriverException $exception) {
+                self::assertSame('55P03', $exception->getSQLState(), 'lock timeout');
+            }
+        } finally {
+            $this->connection->executeStatement('SET lock_timeout = 0');
+            $worker->rollBack();
+            $worker->close();
+        }
     }
 
     public function testChainsSelfBaseZeroPercentAndApprovedAreRejected(): void
@@ -226,6 +282,21 @@ final class BudgetRuleTest extends BudgetIntegrationTestCase
             true,
             true,
         ));
+    }
+
+    /**
+     * @return list<array{string, string}>
+     */
+    private function amounts(string $categoryId): array
+    {
+        $result = [];
+        foreach ($this->lines(self::VERSION_ID) as $line) {
+            if ($categoryId === $line['pl_category_id']) {
+                $result[] = [substr((string) $line['month'], 0, 7), (string) $line['amount']];
+            }
+        }
+
+        return $result;
     }
 
     /**

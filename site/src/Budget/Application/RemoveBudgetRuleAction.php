@@ -6,6 +6,7 @@ namespace App\Budget\Application;
 
 use App\Budget\Application\DTO\RemoveBudgetRuleCommand;
 use App\Budget\Application\Service\BudgetPairResolver;
+use App\Budget\Application\Service\BudgetRuleCalculator;
 use App\Budget\Enum\BudgetLineSource;
 use App\Budget\Enum\BudgetVersionStatus;
 use App\Budget\Exception\BudgetVersionNotEditableException;
@@ -19,7 +20,8 @@ use Webmozart\Assert\Assert;
 
 /**
  * Снимает правило статьи в паре черновика: суммы остаются, источник `rule` → `manual`. Точка
- * входа, коммитит сама, под блокировкой варианта. Нет правила — ничего не меняется (повтор безопасен).
+ * входа, коммитит сама, под блокировкой варианта. Статья возвращается в базу остальных правил
+ * пары — они пересчитываются в той же транзакции. Нет правила — ничего не меняется (повтор безопасен).
  */
 final class RemoveBudgetRuleAction
 {
@@ -27,6 +29,7 @@ final class RemoveBudgetRuleAction
         private readonly EntityManagerInterface $entityManager,
         private readonly BudgetVersionRepository $versions,
         private readonly BudgetPairResolver $pairs,
+        private readonly BudgetRuleCalculator $rules,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
     ) {
@@ -77,6 +80,7 @@ final class RemoveBudgetRuleAction
                     AND project_direction_id = :projectId AND responsibility_center_id = :centerId AND source = :rule',
                 $params + ['manual' => BudgetLineSource::MANUAL->value, 'rule' => BudgetLineSource::RULE->value],
             );
+            $this->rules->recalculate($command->companyId, $version->getId(), $version->getYear(), $pair->projectDirectionId, $pair->responsibilityCenterId);
             $connection->executeStatement(
                 'UPDATE budget_versions SET updated_at = :now WHERE id = :versionId AND company_id = :companyId',
                 ['now' => $this->clock->now()->format('Y-m-d H:i:s'), 'versionId' => $version->getId(), 'companyId' => $command->companyId],

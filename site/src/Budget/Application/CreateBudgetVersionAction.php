@@ -74,6 +74,9 @@ final class CreateBudgetVersionAction
                 if (null === $source) {
                     return 0;
                 }
+                // Строки и правила источника — одним согласованным снимком: правку источника между
+                // ними (новое правило к старым суммам) блокировка варианта не пропустит.
+                BudgetVersionLock::acquire($this->entityManager->getConnection(), $source->getId());
                 $copied = $this->copyLines($source->getId(), $command, $now);
                 $this->copyRules($source->getId(), $command, $now);
 
