@@ -197,7 +197,7 @@
                 </table>
             </div>
             <div class="card-footer small text-secondary">
-                <i class="ti ti-caret-up" aria-hidden="true"></i> лучше плана, <i class="ti ti-caret-down" aria-hidden="true"></i> хуже плана — отклонение больше {{ view.thresholdPercent }}% или факт без плана. Текущий месяц не сравнивается, будущие — только план.{% if not reportLinkable %} Факт — по выбранному проекту без дочерних, поэтому ссылок на отчёт ОПиУ (он включает дочерние проекты) нет.{% endif %}
+                <i class="ti ti-caret-up" aria-hidden="true"></i> лучше плана, <i class="ti ti-caret-down" aria-hidden="true"></i> хуже плана — отклонение больше {{ view.thresholdPercent }}% или факт без плана. Текущий месяц не сравнивается, будущие — только план.{% if generalCenter %} Факт ЦФО «Общий» включает операции без ЦФО, поэтому ссылок на отчёт ОПиУ (при фильтре по ЦФО он их не показывает) нет.{% elseif not reportLinkable %} Факт — по выбранному проекту без дочерних, поэтому ссылок на отчёт ОПиУ (он включает дочерние проекты) нет.{% endif %}
             </div>
         {% endif %}
     </div>

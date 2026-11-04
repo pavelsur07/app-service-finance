@@ -59,7 +59,7 @@
       ссылка факта вела в отчёт ОПиУ с дочерними проектами (ссылка — только когда суммы совпадут).
       Тест блокировки (`FillBudgetCellsActionTest`) подтверждает ожидание блокировки; порядок «расчёт под блокировкой» — по коду.
 - [x] `ARCHITECTURE.md` 2.130–2.132
-- [ ] «merge and deploy #N»
+- [x] «merge and deploy #2875» — 04.11: влит (`7ecdb845e`), деплой push-прогоном 41795785522 зелёный, «Деплой завершён без даунтайма», контейнеры на новом образе
 
 ## Итог
 
@@ -79,7 +79,26 @@
 
 ## Открытые вопросы
 
-- Факт без ЦФО: отчёт ОПиУ и план–факт показывают его только во «Всей
-  компании». Если на проде факт в основном без ЦФО, план–факт по паре и
-  помощники «из факта» для пар будут пустыми — проверить долю строк
-  `pl_daily_totals` без ЦФО (нужно разрешение на SQL на проде).
+- Факт без ЦФО — решено 04.11. Замер на проде (12 мес., с разрешения
+  Владельца): без ЦФО 97,9% оборота у b57d7682, 50,2% у 3f4d87cc, 100% у
+  19621cff. Владелец выбрал вариант A: системный ЦФО «Общий» принимает факт
+  без ЦФО в план–факте и помощниках «из факта»; ссылки на отчёт для такой пары
+  нет. Сделано отдельным PR (часть 3 ниже).
+
+## Часть 3: факт без ЦФО → «Общий» (вариант A)
+
+**Risk:** MEDIUM (чтение факта; миграций нет)
+
+- `FinanceFacade::getPlFactAmountsByMonth(..., includeUnassignedCenter)` —
+  `responsibility_center_id = :center OR IS NULL`.
+- `BudgetPairResolver::isGeneralCenter()` (системный ЦФО компании);
+  `BudgetPlanFactBuilder` и `BudgetFillPlanner` (`last_year_fact`, `average`)
+  передают флаг.
+- Вкладка «План–факт»: для пары с «Общим» ссылок «факт → отчёт» нет, в
+  подвале — причина.
+- Тесты: Finance `testUnassignedCenterJoinsWhenAsked`; Budget
+  `testGeneralCenterPairIncludesFactWithoutCenter`,
+  `testLastYearFactTakesSameMonthOfPreviousYear` (факт без ЦФО учтён),
+  functional `testPlanFactFactLinksToReportOnlyWhenSumsMatchReport`.
+- `ARCHITECTURE.md` 2.133.
+

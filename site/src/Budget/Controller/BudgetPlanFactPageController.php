@@ -82,9 +82,11 @@ final class BudgetPlanFactPageController extends AbstractController
         $view = null === $version ? null : $this->planFactBuilder->build($version, $pair?->projectDirectionId, $pair?->responsibilityCenterId);
         $periodKind = 'quarter' === $period ? BudgetPlanFactColumn::KIND_QUARTER : BudgetPlanFactColumn::KIND_MONTH;
 
-        // Отчёт ОПиУ берёт проект вместе с дочерними, план–факт — точный проект: ссылка на факт
-        // ведёт в отчёт, только когда суммы там совпадут (вся компания или проект без дочерних).
-        $reportLinkable = null === $pair || !$this->hasChildProjects($companyId, $pair->projectDirectionId);
+        // Ссылка на факт ведёт в отчёт ОПиУ, только когда суммы там совпадут. Отчёт берёт проект
+        // вместе с дочерними, а при фильтре по ЦФО не показывает строки без ЦФО; план–факт — точный
+        // проект, а системному «Общему» добавляет факт без ЦФО.
+        $generalCenter = null !== $pair && $this->pairs->isGeneralCenter($companyId, $pair->responsibilityCenterId);
+        $reportLinkable = null === $pair || (!$generalCenter && !$this->hasChildProjects($companyId, $pair->projectDirectionId));
 
         $years = array_values(array_unique([...$this->versions->findYearsByCompanyId($companyId), $currentYear, $currentYear + 1, $year]));
         sort($years);
@@ -103,6 +105,7 @@ final class BudgetPlanFactPageController extends AbstractController
             'view' => $view,
             'periodColumns' => null === $view ? [] : array_values(array_filter($view->columns, static fn (BudgetPlanFactColumn $c): bool => $c->kind === $periodKind)),
             'reportLinkable' => $reportLinkable,
+            'generalCenter' => $generalCenter,
             'ytd' => null === $view ? null : $this->column($view->columns, BudgetPlanFactColumn::YTD),
         ]);
     }

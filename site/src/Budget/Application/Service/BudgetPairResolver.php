@@ -61,4 +61,19 @@ final readonly class BudgetPairResolver
 
         throw new InvalidBudgetPairException();
     }
+
+    /**
+     * ЦФО — системный «Общий» компании: факт без ЦФО Budget считает его (решение Владельца 04.11,
+     * вариант A), поэтому факт такой пары шире фильтра отчёта ОПиУ по ЦФО.
+     */
+    public function isGeneralCenter(string $companyId, ?string $responsibilityCenterId): bool
+    {
+        if (null === $responsibilityCenterId || '' === $responsibilityCenterId) {
+            return false;
+        }
+
+        $center = $this->responsibilityCenters->findByIdAndCompany($responsibilityCenterId, $companyId);
+
+        return null !== $center && $center->system;
+    }
 }

@@ -17,7 +17,8 @@ use Psr\Clock\ClockInterface;
 /**
  * План–факт варианта: план (ячейки бюджета) и факт (регистр ОПиУ через Finance) считаются одним
  * калькулятором дерева, отклонение — BudgetVariance. Пара «проект × ЦФО» фильтрует оба одинаково
- * (точная пара); без пары — вся компания. Только чтение.
+ * (точная пара); без пары — вся компания. Исключение — системный ЦФО «Общий»: факт без ЦФО
+ * считается его (BudgetPairResolver::isGeneralCenter). Только чтение.
  *
  * Колонки — месяцы, кварталы, «с начала года» и год (BudgetPlanFactColumn). Закрыт месяц раньше
  * текущего по Москве; итоговые колонки сравнивают только закрытые месяцы, год — только план.
@@ -28,6 +29,7 @@ final readonly class BudgetPlanFactBuilder
         private BudgetCellsQuery $cells,
         private BudgetTreeCalculator $tree,
         private FinanceFacade $finance,
+        private BudgetPairResolver $pairs,
         private ClockInterface $clock,
     ) {
     }
@@ -42,7 +44,13 @@ final readonly class BudgetPlanFactBuilder
         foreach ($this->cells->fetch($companyId, $version->getId(), $projectDirectionId, $responsibilityCenterId) as $cell) {
             $planAmounts[$cell->month][$cell->plCategoryId] = $cell->amount;
         }
-        $factAmounts = $this->finance->getPlFactAmountsByMonth($companyId, $year, $projectDirectionId, $responsibilityCenterId);
+        $factAmounts = $this->finance->getPlFactAmountsByMonth(
+            $companyId,
+            $year,
+            $projectDirectionId,
+            $responsibilityCenterId,
+            $this->pairs->isGeneralCenter($companyId, $responsibilityCenterId),
+        );
 
         $currentMonth = $this->clock->now()->setTimezone(new \DateTimeZone('Europe/Moscow'))->format('Y-m');
         $columns = $this->columns($year, $currentMonth);

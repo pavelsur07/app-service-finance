@@ -215,12 +215,14 @@ final class FinanceFacade
      * Факт ОПиУ компании по статьям и месяцам календарного года — суммы в знаке значения
      * отчёта (доход − расход), готовые для calculatePlTree(). Проект и ЦФО — точное совпадение
      * (план бюджета хранится по точной паре; дочерний проект — своя пара); null — без фильтра. Месяцы и статьи без оборота не возвращаются.
+     * `includeUnassignedCenter` — к ЦФО добавить строки без ЦФО (вызывающий решает, что ЦФО их
+     * принимает: Budget — для системного «Общего»).
      *
      * @return array<string, array<string, string>> `Y-m` → plCategoryId → сумма
      */
-    public function getPlFactAmountsByMonth(string $companyId, int $year, ?string $projectDirectionId = null, ?string $responsibilityCenterId = null): array
+    public function getPlFactAmountsByMonth(string $companyId, int $year, ?string $projectDirectionId = null, ?string $responsibilityCenterId = null, bool $includeUnassignedCenter = false): array
     {
-        return $this->plFactMonthlyAmounts->fetch($companyId, $year, $projectDirectionId, $responsibilityCenterId);
+        return $this->plFactMonthlyAmounts->fetch($companyId, $year, $projectDirectionId, $responsibilityCenterId, $includeUnassignedCenter);
     }
 
     /**
