@@ -1,0 +1,29 @@
+{#
+  Действия статуса варианта через общий диалог подтверждения. Параметры: version, isOwner, canWrite, size (необязательно, 'btn-sm' для строки таблицы).
+  Недоступное по правам — видно неактивным с причиной (ui-ux.md §0).
+#}
+{% set status = version.status.value %}
+{% set owner_hint = 'Утверждает и возвращает утверждённый вариант в черновик только владелец компании' %}
+{% macro trigger(version, target, label, title, body, submit, enabled, hint, variant, size) %}
+    {% if enabled %}
+        <button type="button" class="btn {{ size }} {{ variant|default('btn-outline-secondary') }}"
+                data-bs-toggle="modal" data-bs-target="#budget-confirm"
+                data-confirm-action="{{ path('budget_version_status', {id: version.id, target: target}) }}"
+                data-confirm-token="{{ csrf_token('budget_version_status' ~ version.id) }}"
+                data-confirm-title="{{ title }}"
+                data-confirm-body="{{ body }}"
+                data-confirm-submit="{{ submit }}">{{ label }}</button>
+    {% else %}
+        <span class="d-inline-block" tabindex="0" title="{{ hint }}">
+            <button type="button" class="btn {{ size }} {{ variant|default('btn-outline-secondary') }}" disabled>{{ label }}</button>
+        </span>
+    {% endif %}
+{% endmacro %}
+{% if status == 'draft' %}
+    {{ _self.trigger(version, 'approved', 'Утвердить', 'Утвердить «' ~ version.name ~ '»?', 'Утверждённый вариант не редактируется; с ним сравнивается факт.', 'Утвердить', canWrite and isOwner, canWrite ? owner_hint : 'Нужно право записи в финансах', 'btn-primary', size|default('')) }}
+    {{ _self.trigger(version, 'archived', 'В архив', 'Отправить «' ~ version.name ~ '» в архив?', 'Архивный вариант можно восстановить.', 'В архив', canWrite, 'Нужно право записи в финансах', null, size|default('')) }}
+{% elseif status == 'approved' %}
+    {{ _self.trigger(version, 'draft', 'Вернуть в черновик', 'Вернуть «' ~ version.name ~ '» в черновик?', 'Вариант снова можно будет править; утверждённого варианта на год не останется.', 'Вернуть в черновик', canWrite and isOwner, canWrite ? owner_hint : 'Нужно право записи в финансах', null, size|default('')) }}
+{% else %}
+    {{ _self.trigger(version, 'draft', 'Восстановить', 'Восстановить «' ~ version.name ~ '»?', 'Вариант вернётся в черновики.', 'Восстановить', canWrite, 'Нужно право записи в финансах', null, size|default('')) }}
+{% endif %}

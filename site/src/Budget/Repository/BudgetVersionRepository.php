@@ -28,4 +28,37 @@ final class BudgetVersionRepository extends ServiceEntityRepository
     {
         return $this->findOneBy(['companyId' => $companyId, 'year' => $year, 'status' => BudgetVersionStatus::APPROVED]);
     }
+
+    /**
+     * Варианты года: утверждённый первым, затем по дате изменения.
+     *
+     * @return list<BudgetVersion>
+     */
+    public function findByCompanyIdAndYear(string $companyId, int $year): array
+    {
+        /** @var list<BudgetVersion> $versions */
+        $versions = $this->createQueryBuilder('v')
+            ->andWhere('v.companyId = :companyId')
+            ->andWhere('v.year = :year')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('year', $year)
+            ->orderBy('v.updatedAt', \SortDirection::Descending)
+            ->addOrderBy('v.id', \SortDirection::Descending)
+            ->getQuery()
+            ->getResult();
+        usort($versions, static fn (BudgetVersion $a, BudgetVersion $b): int => (int) (BudgetVersionStatus::APPROVED !== $a->getStatus()) <=> (int) (BudgetVersionStatus::APPROVED !== $b->getStatus()));
+
+        return $versions;
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function findYearsByCompanyId(string $companyId): array
+    {
+        return array_map('intval', $this->getEntityManager()->getConnection()->fetchFirstColumn(
+            'SELECT DISTINCT year FROM budget_versions WHERE company_id = :companyId ORDER BY year',
+            ['companyId' => $companyId],
+        ));
+    }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Finance;
 
 use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PLFlow;
 use App\Finance\Facade\PLCategoryFacade;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -36,6 +37,10 @@ final class PLCategoryFacadeTest extends IntegrationTestCase
             $types[$category->id] = $category->type;
         }
         self::assertSame([self::SUBTOTAL_ID => PLCategoryType::SUBTOTAL, self::LEAF_ID => PLCategoryType::LEAF_INPUT], $types);
-        self::assertSame(PLCategoryType::LEAF_INPUT, $facade->findByIdAndCompany(self::LEAF_ID, self::COMPANY_ID)?->type);
+        $single = $facade->findByIdAndCompany(self::LEAF_ID, self::COMPANY_ID);
+        self::assertNotNull($single);
+        self::assertSame(PLCategoryType::LEAF_INPUT, $single->type);
+        self::assertSame(PLFlow::EXPENSE, $single->flow);
+        self::assertTrue($single->isVisible);
     }
 }

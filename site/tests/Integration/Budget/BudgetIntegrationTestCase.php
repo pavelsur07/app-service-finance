@@ -8,6 +8,7 @@ use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
 use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PLFlow;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
@@ -47,9 +48,10 @@ abstract class BudgetIntegrationTestCase extends IntegrationTestCase
         $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->withOwner($owner)->build();
         $this->persistAll($owner, $member, $company);
 
-        $subtotal = PLCategoryBuilder::aPLCategory()->withId(self::SUBTOTAL_ID)->forCompany($company)->withName('Прибыль')->withType(PLCategoryType::SUBTOTAL)->build();
-        $revenue = PLCategoryBuilder::aPLCategory()->withId(self::REVENUE_ID)->forCompany($company)->withName('Выручка')->withParent($subtotal)->build();
-        $rent = PLCategoryBuilder::aPLCategory()->withId(self::RENT_ID)->forCompany($company)->withName('Аренда')->withParent($subtotal)->build();
+        $subtotal = PLCategoryBuilder::aPLCategory()->withId(self::SUBTOTAL_ID)->forCompany($company)->withName('Прибыль')->withCode('PROFIT')->withType(PLCategoryType::SUBTOTAL)->build();
+        $revenue = PLCategoryBuilder::aPLCategory()->withId(self::REVENUE_ID)->forCompany($company)->withName('Выручка')->withCode('REV')->withFlow(PLFlow::INCOME)->withParent($subtotal)->build();
+        $rent = PLCategoryBuilder::aPLCategory()->withId(self::RENT_ID)->forCompany($company)->withName('Аренда')->withCode('RENT')->withFlow(PLFlow::EXPENSE)->withParent($subtotal)->build();
+        $rent->setSortOrder(1);
         $this->persistAll($subtotal, $revenue, $rent);
 
         $general = new ProjectDirection(self::GENERAL_PROJECT_ID, $company, 'Общий', ProjectDirection::CODE_GENERAL);

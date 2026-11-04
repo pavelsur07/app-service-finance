@@ -38,8 +38,10 @@ final class PlPreviewCalculator
      *                                      сумме и одинаково применяются ко всем колонкам —
      *                                      колонки-доли складываются в итог; null — каждая
      *                                      колонка как отдельный документ
+     * @param bool $reportValues суммы — уже значения отчёта (доход − расход): в факт
+     *                           как есть, без перевода по flow (бюджет ОПиУ)
      */
-    public function calculate(Company $company, PlReportPeriod $period, array $columns, ?string $natureBaseColumn = null): PlPreviewResult
+    public function calculate(Company $company, PlReportPeriod $period, array $columns, ?string $natureBaseColumn = null, bool $reportValues = false): PlPreviewResult
     {
         if ([] === $columns) {
             throw new \InvalidArgumentException('Предпросмотр ОПиУ требует хотя бы одну колонку.');
@@ -96,7 +98,9 @@ final class PlPreviewCalculator
 
                 /** @var PLCategory $category */
                 $code = (string) $category->getCode();
-                $facts[$code] = ($facts[$code] ?? 0.0) + self::factValue($category, $amount, $baseAmounts[$categoryId] ?? null, null !== $baseAmounts);
+                $facts[$code] = ($facts[$code] ?? 0.0) + ($reportValues
+                    ? (float) $amount
+                    : self::factValue($category, $amount, $baseAmounts[$categoryId] ?? null, null !== $baseAmounts));
             }
 
             $result = $this->calculator->withFacts(new InMemoryFactsProvider($facts))->calculate($company, $period);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Finance\DTO;
 
 use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PLFlow;
 
 /**
  * Scalar DTO категории ОПиУ для межмодульного общения.
@@ -20,6 +21,8 @@ final class PLCategoryDTO
         public readonly int $sortOrder,
         public readonly ?string $code,
         public readonly PLCategoryType $type,
+        public readonly PLFlow $flow,
+        public readonly bool $isVisible,
     ) {
     }
 

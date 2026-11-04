@@ -47,6 +47,8 @@ final class PLCategoryFacade
                 sortOrder: $cat->getSortOrder(),
                 code: $cat->getCode(),
                 type: $cat->getType(),
+                flow: $cat->getFlow(),
+                isVisible: $cat->isVisible(),
             ),
             $entities,
         );
@@ -90,6 +92,8 @@ final class PLCategoryFacade
             sortOrder: $cat->getSortOrder(),
             code: $cat->getCode(),
             type: $cat->getType(),
+            flow: $cat->getFlow(),
+            isVisible: $cat->isVisible(),
         );
     }
 }

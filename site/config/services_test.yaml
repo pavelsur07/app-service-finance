@@ -111,3 +111,6 @@ services:
     App\Budget\Application\:
         resource: '../src/Budget/Application/*Action.php'
         public: true
+
+    App\Budget\Application\Service\BudgetGridBuilder:
+        public: true

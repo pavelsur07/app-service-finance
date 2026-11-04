@@ -1,0 +1,155 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Бюджет ОПиУ — {{ year }}{% endblock %}
+
+{% block body %}
+{# Композиция раздела ОПиУ («Документы ОПиУ»): vf-page-head, vf-card со вкладками, vf-card-bar. ui-ux.md, экран 1. #}
+    {% set can_write = canWrite %}
+    <div class="vf-page-head">
+        <div class="vf-page-head__title">
+            <nav aria-label="Путь">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">Доходы и расходы</li>
+                    <li class="breadcrumb-item active" aria-current="page">Бюджет ОПиУ</li>
+                </ol>
+            </nav>
+            <h1>Бюджет ОПиУ</h1>
+            <p class="vf-page-head__lead">Варианты плана доходов и расходов на год. Утверждённый вариант — один на год, с ним сравнивается факт.</p>
+        </div>
+        <div class="btn-list d-print-none">
+            {% if can_write %}
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#budget-new">
+                    <i class="ti ti-plus me-1" aria-hidden="true"></i>
+                    Новый вариант
+                </button>
+            {% else %}
+                <span class="d-inline-block" tabindex="0" title="Нужно право записи в финансах">
+                    <button type="button" class="btn btn-primary" disabled>
+                        <i class="ti ti-plus me-1" aria-hidden="true"></i>
+                        Новый вариант
+                    </button>
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card vf-card mb-4" data-budget-versions>
+        <div class="card-header">
+            {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
+                {label: 'Варианты', href: path('budget_index', {year: year}), active: true, count: versions|length},
+            ]} only %}
+        </div>
+
+        <div class="vf-card-bar d-print-none">
+            <div class="vf-card-bar__row">
+                <div class="vf-seg" role="group" aria-label="Год">
+                    {% for y in years %}
+                        <a href="{{ path('budget_index', {year: y}) }}"{% if y == year %} class="active" aria-current="true"{% endif %}>{{ y }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        {% if versions is empty %}
+            <div class="card-body text-secondary">На {{ year }} год вариантов нет.</div>
+        {% else %}
+            <div class="table-responsive">
+                <table class="table table-vcenter vf-table">
+                    <thead>
+                        <tr>
+                            <th>Название</th>
+                            <th>Статус</th>
+                            <th>Изменён</th>
+                            <th class="text-end"><span class="visually-hidden">Действия</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for version in versions %}
+                        <tr>
+                            <td>
+                                <a class="vf-strong" href="{{ path('budget_version_show', {id: version.id}) }}">{{ version.name }}</a>
+                                {% if version.copiedFromId and names[version.copiedFromId] is defined %}
+                                    <div class="small text-secondary">копия «{{ names[version.copiedFromId] }}»</div>
+                                {% endif %}
+                            </td>
+                            <td>{% include 'budget/_status_badge.html.twig' with {status: version.status} only %}</td>
+                            <td class="text-secondary">{{ version.updatedAt|date('d.m.Y H:i') }}</td>
+                            <td class="text-end">
+                                <div class="btn-list justify-content-end flex-nowrap">
+                                    {% include 'budget/_status_actions.html.twig' with {version: version, isOwner: isOwner, canWrite: can_write, size: 'btn-sm'} only %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if archived is not empty %}
+        <details class="card vf-card mb-4" data-budget-archive>
+            <summary class="card-header">Архив ({{ archived|length }})</summary>
+            <div class="table-responsive">
+                <table class="table table-vcenter vf-table">
+                    <tbody>
+                    {% for version in archived %}
+                        <tr class="vf-row-muted">
+                            <td>
+                                <a class="vf-strong" href="{{ path('budget_version_show', {id: version.id}) }}">{{ version.name }}</a>
+                                {% if version.copiedFromId and names[version.copiedFromId] is defined %}
+                                    <div class="small text-secondary">копия «{{ names[version.copiedFromId] }}»</div>
+                                {% endif %}
+                            </td>
+                            <td>{% include 'budget/_status_badge.html.twig' with {status: version.status} only %}</td>
+                            <td class="text-secondary">{{ version.updatedAt|date('d.m.Y H:i') }}</td>
+                            <td class="text-end">
+                                <div class="btn-list justify-content-end flex-nowrap">
+                                    {% include 'budget/_status_actions.html.twig' with {version: version, isOwner: isOwner, canWrite: can_write, size: 'btn-sm'} only %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    {% endif %}
+
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'budget-confirm'} only %}
+
+    {% if can_write %}
+        <div class="modal fade" id="budget-new" tabindex="-1" aria-hidden="true" aria-labelledby="budget-new-title">
+            <div class="modal-dialog modal-dialog-centered">
+                <form class="modal-content" method="post" action="{{ path('budget_version_create') }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('budget_version_create') }}">
+                    <input type="hidden" name="versionId" value="{{ newVersionId }}">
+                    <input type="hidden" name="year" value="{{ year }}">
+                    <div class="modal-header">
+                        <h2 class="modal-title" id="budget-new-title">Новый вариант на {{ year }}</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label required" for="budget-new-name">Название</label>
+                            <input id="budget-new-name" name="name" class="form-control" required maxlength="120" value="Вариант {{ versions|length + archived|length + 1 }}">
+                        </div>
+                        <div>
+                            <label class="form-label" for="budget-new-copy">Способ</label>
+                            <select id="budget-new-copy" name="copyFrom" class="form-select">
+                                <option value="">Пустой</option>
+                                {% for version in versions %}
+                                    <option value="{{ version.id }}">Копия «{{ version.name }}»</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Создать</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
