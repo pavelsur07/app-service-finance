@@ -72,8 +72,12 @@
     left: 0;
     z-index: 2;
     text-align: left;
-    font-weight: var(--vf-weight-medium);
     border-right: 1px solid var(--vf-border-strong);
+}
+
+/* Вес названия статьи — низкой специфичности: группа, итог и шапка его переопределяют. */
+:where(.grid tbody) .name {
+    font-weight: var(--vf-weight-medium);
 }
 
 .grid thead .name {
@@ -149,10 +153,7 @@
     text-align: right;
 }
 
-/* Сумму не сокращать многоточием. */
-.grid td.cell {
-    text-overflow: clip;
-}
+/* Не поместившаяся сумма — с многоточием; полная — в подсказке ячейки (title). */
 
 .editable {
     cursor: cell;

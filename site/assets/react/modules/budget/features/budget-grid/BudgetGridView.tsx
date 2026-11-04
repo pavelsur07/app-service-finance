@@ -73,6 +73,20 @@ function Value({ value, row, blankZero }: ValueProps): JSX.Element | null {
 const HOTKEYS = 'Клик или Enter — ввод · Enter/Tab — сохранить и дальше · Стрелки · Esc — отмена · Delete — очистить · Shift+Enter — комментарий · Ctrl+V — вставка из Excel';
 const SKELETON_ROWS = 8;
 
+/** Подсказка ячейки: полная сумма (узкая колонка может её сократить), правило, комментарий. */
+function cellTitle(row: BudgetGridRow, value: string, comment: string | undefined): string | undefined {
+    const formatted = formatValue(value, row.format);
+    const parts = formatted.zero ? [] : [`${formatted.whole}${formatted.minor ?? ''}`];
+    if (row.rule !== null) {
+        parts.push(`Считается по правилу: ${formatPercent(row.rule.percent)} от «${row.rule.baseName}»`);
+    }
+    if (comment !== undefined) {
+        parts.push(comment);
+    }
+
+    return parts.length === 0 ? undefined : parts.join('\n');
+}
+
 /** Ширины колонок только фиксированные (BUDGET-SPEC §6): статьи, 12 месяцев, «Итого». */
 function Columns({ months }: { months: string[] }): JSX.Element {
     return (
@@ -247,7 +261,7 @@ export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
                                                 role="gridcell"
                                                 aria-selected={isActive}
                                                 aria-invalid={props.invalidKeys.has(key) || undefined}
-                                                title={row.rule !== null ? `Считается по правилу: ${formatPercent(row.rule.percent)} от «${row.rule.baseName}»` : comment}
+                                                title={cellTitle(row, row.values[month] ?? '0', comment)}
                                                 className={cn(
                                                     styles.cell,
                                                     editableCell ? styles.editable : row.editable && styles.readonlyCell,
@@ -278,7 +292,7 @@ export function BudgetGridView(props: BudgetGridViewProps): JSX.Element {
                                             </td>
                                         );
                                     })}
-                                    <td className={cn(styles.cell, styles.total)}>
+                                    <td className={cn(styles.cell, styles.total)} title={cellTitle(row, row.total, undefined)}>
                                         <Value value={row.total} row={row} blankZero={false} />
                                     </td>
                                 </tr>
