@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Budget\Controller;
 
+use App\Budget\Application\Service\BudgetYearTotals;
 use App\Budget\Entity\BudgetVersion;
 use App\Budget\Enum\BudgetVersionStatus;
 use App\Budget\Repository\BudgetVersionRepository;
@@ -31,6 +32,7 @@ final class BudgetVersionListController extends AbstractController
         private readonly BudgetVersionRepository $versions,
         private readonly ClockInterface $clock,
         private readonly CompanyFacade $companies,
+        private readonly BudgetYearTotals $yearTotals,
     ) {
     }
 
@@ -53,6 +55,7 @@ final class BudgetVersionListController extends AbstractController
             $names[$version->getId()] = $version->getName();
         }
         $user = $this->getUser();
+        $yearTotals = [] === $all ? null : $this->yearTotals->netProfit($companyId, $year, array_keys($names));
 
         return $this->render('budget/index.html.twig', [
             'year' => $year,
@@ -60,6 +63,7 @@ final class BudgetVersionListController extends AbstractController
             'versions' => $active,
             'archived' => $archived,
             'names' => $names,
+            'yearTotals' => $yearTotals,
             'canWrite' => $this->isGranted(ModuleAccess::FINANCE_WRITE),
             'isOwner' => $user instanceof User && $this->companies->isOwner($companyId, (string) $user->getId()),
             'newVersionId' => Uuid::uuid7()->toString(),

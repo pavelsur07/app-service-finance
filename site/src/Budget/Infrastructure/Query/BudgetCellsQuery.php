@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Budget\Infrastructure\Query;
 
 use App\Budget\Application\DTO\BudgetCellRow;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -48,5 +49,34 @@ final readonly class BudgetCellsQuery
             ),
             $rows,
         );
+    }
+
+    /**
+     * Годовые суммы вариантов по статьям — по всем парам и месяцам.
+     *
+     * @param list<string> $versionIds
+     *
+     * @return array<string, array<string, string>> versionId → plCategoryId → сумма
+     */
+    public function yearTotalsByVersion(string $companyId, array $versionIds): array
+    {
+        if ([] === $versionIds) {
+            return [];
+        }
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT version_id, pl_category_id, SUM(amount)::text AS amount
+               FROM budget_lines
+              WHERE company_id = :companyId AND version_id IN (:versionIds)
+              GROUP BY version_id, pl_category_id',
+            ['companyId' => $companyId, 'versionIds' => $versionIds],
+            ['versionIds' => ArrayParameterType::STRING],
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[(string) $row['version_id']][(string) $row['pl_category_id']] = (string) $row['amount'];
+        }
+
+        return $result;
     }
 }

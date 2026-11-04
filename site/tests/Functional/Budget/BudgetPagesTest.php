@@ -97,6 +97,26 @@ final class BudgetPagesTest extends WebTestCaseBase
         self::assertSelectorExists('#navbar-pl a.dropdown-item.active[href="/finance/budget"]');
     }
 
+    public function testListShowsYearNetProfitOnlyWhenTreeHasNetProfitRow(): void
+    {
+        $id = $this->version('Базовый', BudgetVersionStatus::DRAFT);
+        $this->em()->getConnection()->executeStatement(
+            "INSERT INTO budget_lines (id, company_id, version_id, pl_category_id, month, project_direction_id, responsibility_center_id, amount, source, comment, updated_at)
+             VALUES (?, ?, ?, ?, '2027-01-01', ?, ?, '1250000.00', 'manual', NULL, NOW())",
+            [Uuid::uuid7()->toString(), self::COMPANY_ID, $id, self::REVENUE_ID, self::PROJECT_ID, $this->centerId],
+        );
+        $this->login($this->reader);
+
+        $this->client->request('GET', '/finance/budget?year=2027');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists('[data-budget-year-total]');
+
+        $this->em()->getConnection()->executeStatement("UPDATE pl_categories SET code = 'NET_PROFIT' WHERE company_id = ? AND code = 'PROFIT'", [self::COMPANY_ID]);
+        $this->client->request('GET', '/finance/budget?year=2027');
+        self::assertSelectorTextContains('[data-budget-versions] th[data-budget-year-total]', 'Итог года');
+        self::assertSelectorTextContains('[data-budget-versions] td[data-budget-year-total]', "1\u{00A0}250\u{00A0}000");
+    }
+
     public function testCreateEmptyVersionRedirectsAndRepeatKeepsOneRow(): void
     {
         $this->login($this->writer);
@@ -206,6 +226,31 @@ final class BudgetPagesTest extends WebTestCaseBase
         $this->client->request('GET', sprintf('/finance/budget/versions/%s/grid?project=%s&center=%s', $id, self::PROJECT_ID, Uuid::uuid7()->toString()), server: ['HTTP_ACCEPT' => 'application/json']);
         self::assertResponseStatusCodeSame(422);
         self::assertSame('budget_invalid_pair', $this->errorCode());
+    }
+
+    public function testPlanFactJsonForPairWholeCompanyAndInvalidPair(): void
+    {
+        $id = $this->version('Базовый', BudgetVersionStatus::DRAFT);
+        $this->login($this->reader);
+
+        $this->client->request('GET', sprintf('/finance/budget/versions/%s/plan-fact?project=%s&center=%s', $id, self::PROJECT_ID, $this->centerId));
+        self::assertResponseIsSuccessful();
+        $view = json_decode((string) $this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertSame(10, $view['thresholdPercent']);
+        self::assertSame(['PROFIT', 'REV'], array_column($view['rows'], 'code'));
+        self::assertSame(['plan' => '0.00', 'fact' => '0.00', 'diff' => '0.00', 'percent' => null, 'significant' => false], $view['rows'][1]['cells']['2027-01']);
+        self::assertArrayHasKey('total', $view['rows'][1]['cells']);
+
+        $this->client->request('GET', sprintf('/finance/budget/versions/%s/plan-fact', $id));
+        self::assertResponseIsSuccessful();
+
+        $this->client->request('GET', sprintf('/finance/budget/versions/%s/plan-fact?project=%s&center=%s', $id, self::PROJECT_ID, Uuid::uuid7()->toString()));
+        self::assertResponseStatusCodeSame(422);
+        self::assertSame('budget_invalid_pair', $this->errorCode());
+
+        $this->client->request('GET', sprintf('/finance/budget/versions/%s/plan-fact', Uuid::uuid7()->toString()));
+        self::assertResponseStatusCodeSame(404);
+        self::assertSame('budget_version_not_found', $this->errorCode());
     }
 
     public function testSaveCellsJson(): void

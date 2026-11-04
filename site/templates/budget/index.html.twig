@@ -60,6 +60,7 @@
                             <th>Название</th>
                             <th>Статус</th>
                             <th>Изменён</th>
+                            {% if yearTotals is not null %}<th class="text-end text-nowrap" data-budget-year-total>Итог года, ₽</th>{% endif %}
                             <th class="text-end"><span class="visually-hidden">Действия</span></th>
                         </tr>
                     </thead>
@@ -74,6 +75,7 @@
                             </td>
                             <td>{% include 'budget/_status_badge.html.twig' with {status: version.status} only %}</td>
                             <td class="text-secondary">{{ version.updatedAt|date('d.m.Y H:i') }}</td>
+                            {% if yearTotals is not null %}<td class="text-end text-nowrap" data-budget-year-total>{{ yearTotals[version.id] is defined ? yearTotals[version.id]|vf_amount : '—' }}</td>{% endif %}
                             <td class="text-end">
                                 <div class="btn-list justify-content-end flex-nowrap">
                                     {% include 'budget/_status_actions.html.twig' with {version: version, isOwner: isOwner, canWrite: can_write, size: 'btn-sm'} only %}
@@ -103,6 +105,7 @@
                             </td>
                             <td>{% include 'budget/_status_badge.html.twig' with {status: version.status} only %}</td>
                             <td class="text-secondary">{{ version.updatedAt|date('d.m.Y H:i') }}</td>
+                            {% if yearTotals is not null %}<td class="text-end text-nowrap" data-budget-year-total>{{ yearTotals[version.id] is defined ? yearTotals[version.id]|vf_amount : '—' }}</td>{% endif %}
                             <td class="text-end">
                                 <div class="btn-list justify-content-end flex-nowrap">
                                     {% include 'budget/_status_actions.html.twig' with {version: version, isOwner: isOwner, canWrite: can_write, size: 'btn-sm'} only %}

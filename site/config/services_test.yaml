@@ -114,3 +114,9 @@ services:
 
     App\Budget\Application\Service\BudgetGridBuilder:
         public: true
+
+    App\Budget\Application\Service\BudgetPlanFactBuilder:
+        public: true
+
+    App\Budget\Application\Service\BudgetYearTotals:
+        public: true
