@@ -38,10 +38,11 @@ function initRename(root) {
   const apply = (oldName, name) => {
     title.textContent = name;
     if (crumb) crumb.textContent = name;
-    document.title = document.title.replace(oldName, name);
+    // Функция замены: `$&` и подобные в названии — обычный текст.
+    document.title = document.title.replace(oldName, () => name);
     // Заголовки подтверждений в шапке несут название — обновить, чтобы не показывать старое.
     for (const el of document.querySelectorAll('[data-confirm-title]')) {
-      el.dataset.confirmTitle = el.dataset.confirmTitle.replace(`«${oldName}»`, `«${name}»`);
+      el.dataset.confirmTitle = el.dataset.confirmTitle.replace(`«${oldName}»`, () => `«${name}»`);
     }
   };
 
@@ -65,12 +66,17 @@ function initRename(root) {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-Token': form.dataset.token },
         body: JSON.stringify({ name }),
       });
+      // Истёкшая сессия: form_login отвечает редиректом на /login, fetch получает HTML 200.
+      if (response.status === 401 || (response.redirected && new URL(response.url).pathname.startsWith('/login'))) {
+        window.location.assign('/login');
+        return;
+      }
       const body = await response.json().catch(() => null);
-      if (!response.ok) {
+      if (!response.ok || typeof body?.name !== 'string') {
         setError(body?.error?.message ?? 'Не удалось переименовать. Повторите.');
         return;
       }
-      apply(oldName, body?.name ?? name);
+      apply(oldName, body.name);
       close();
     } catch {
       setError('Нет связи с сервером. Повторите.');
