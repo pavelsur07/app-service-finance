@@ -24,6 +24,7 @@ use App\Tests\Support\Kernel\WebTestCaseBase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\Clock\Test\ClockSensitiveTrait;
+use Symfony\Component\DomCrawler\Crawler;
 
 /**
  * Раздел «Бюджет ОПиУ»: список вариантов, создание, смена статуса, страница варианта, API сетки.
@@ -146,7 +147,8 @@ final class BudgetPagesTest extends WebTestCaseBase
         self::assertSelectorTextContains('[data-pf-row="REV"] [data-pf-cell="2027-Q1"]', "5\u{00A0}000");
         self::assertSelectorNotExists('[data-pf-cell="2027-01"]');
 
-        $this->client->request('GET', '/finance/budget/plan-fact?year=2027&show=fact');
+        // Период запоминается в сессии — месяцы задаём явно.
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027&show=fact&period=month');
         $link = $this->client->getCrawler()->filter('[data-pf-row="REV"] [data-pf-cell="2027-01"] a');
         self::assertCount(1, $link);
         self::assertStringContainsString('/finance/report/preview?from=2027-01-01&to=2027-01-31', (string) $link->attr('href'));
@@ -209,6 +211,86 @@ final class BudgetPagesTest extends WebTestCaseBase
 
         $this->client->request('GET', '/finance/budget?year=2027');
         self::assertSelectorExists(sprintf('.card-header-tabs a[href="%s"]', '/finance/budget/plan-fact?year=2027'));
+    }
+
+    public function testPlanFactAllIndicatorsByColumnsAndByRows(): void
+    {
+        self::mockTime(new \DateTimeImmutable('2027-03-15 12:00', new \DateTimeZone('Europe/Moscow')));
+        $approved = $this->version('Утверждённый', BudgetVersionStatus::APPROVED);
+        $this->line($approved, '2027-01-01', '1000.00');
+        $this->line($approved, '2027-02-01', '1000.00');
+        $project = $this->em()->getReference(ProjectDirection::class, self::PROJECT_ID);
+        self::assertNotNull($project);
+        $company = $this->em()->getReference(Company::class, self::COMPANY_ID);
+        self::assertNotNull($company);
+        $total = new PLDailyTotal(Uuid::uuid7()->toString(), $company, $project, new \DateTimeImmutable('2027-02-10'), $this->em()->getReference(PLCategory::class, self::REVENUE_ID));
+        $total->setAmountIncome('1050.00');
+        $total->setResponsibilityCenterId($this->centerId);
+        $this->em()->persist($total);
+        $this->em()->flush();
+        $this->login($this->reader);
+
+        // Колонками: над каждым месяцем — План · Факт · Откл.; «Итого» по закрытым месяцам в конце.
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027&show=all&layout=columns&period=month');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('[data-pf-mode="all-columns"]');
+        self::assertSelectorTextContains('[data-pf-show] a.active', 'Все показатели');
+        self::assertSelectorTextContains('[data-pf-layout] a.active', 'Колонками');
+        self::assertCount(12 * 3 + 4, $this->client->getCrawler()->filter('.vf-pf__table thead tr')->eq(1)->filter('th'));
+        self::assertSelectorTextContains('[data-pf-total-head]', 'Итого (янв–фев)');
+        $cell = '[data-pf-row="REV"] td[data-pf-cell="2027-01"][data-pf-cell-metric="%s"]';
+        self::assertSelectorTextContains(sprintf($cell, 'plan'), "1\u{00A0}000");
+        // Факта нет: отклонение −100 % — значимое, подсвечено и помечено «хуже плана».
+        self::assertSelectorTextContains(sprintf($cell, 'diff'), 'хуже плана');
+        self::assertSelectorExists(sprintf($cell, 'diff').'.vf-pf__hl');
+        self::assertSelectorNotExists(sprintf($cell, 'plan').'.vf-pf__hl');
+        // Февраль: факт 1 050 при плане 1 000 — «+50», лучше плана, 5 % — без подсветки.
+        $february = '[data-pf-row="REV"] td[data-pf-cell="2027-02"][data-pf-cell-metric="diff"]';
+        self::assertSelectorTextContains($february, '+50');
+        self::assertSelectorTextContains($february, 'лучше плана');
+        self::assertSelectorNotExists($february.'.vf-pf__hl');
+
+        // Кварталы колонками — ещё и %.
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027&show=all&layout=columns&period=quarter');
+        self::assertCount(4 * 4 + 4, $this->client->getCrawler()->filter('.vf-pf__table thead tr')->eq(1)->filter('th'));
+
+        // Строками: три строки на статью; «Итого» — каждая строка в своей колонке.
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027&show=all&layout=rows&period=month');
+        self::assertSelectorExists('[data-pf-mode="all-rows"]');
+        $rows = $this->client->getCrawler()->filter('[data-pf-row="REV"] tr');
+        self::assertSame(['plan', 'fact', 'diff'], $rows->each(static fn (Crawler $row): string => (string) $row->attr('data-pf-metric')));
+        // Итого янв–фев: план 2 000, факт 1 050 → −950, −47,5 %.
+        self::assertStringContainsString("2\u{00A0}000", $rows->eq(0)->filter('[data-pf-ytd="plan"]')->text());
+        self::assertSame('', trim($rows->eq(1)->filter('[data-pf-ytd="plan"]')->text()));
+        self::assertStringContainsString('хуже плана', $rows->eq(2)->filter('[data-pf-ytd="diff"]')->text());
+        self::assertStringContainsString("\u{2212}47,5", $rows->eq(2)->filter('[data-pf-ytd="percent"]')->text());
+    }
+
+    public function testPlanFactRemembersViewAndDefaultsLayoutByPeriod(): void
+    {
+        self::mockTime(new \DateTimeImmutable('2027-03-15 12:00', new \DateTimeZone('Europe/Moscow')));
+        $this->version('Утверждённый', BudgetVersionStatus::APPROVED);
+        $this->login($this->reader);
+
+        // Раскладка не выбрана: кварталы — колонками, месяцы — строками.
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027&show=all&period=quarter');
+        self::assertSelectorExists('[data-pf-mode="all-columns"]');
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027');
+        self::assertSelectorExists('[data-pf-mode="all-columns"]');
+        self::assertSelectorTextContains('[aria-label="Период"] a.active', 'Кварталы');
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027&period=month');
+        self::assertSelectorExists('[data-pf-mode="all-rows"]');
+
+        // Выбранная раскладка помнится и при смене периода.
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027&layout=columns');
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027&period=month');
+        self::assertSelectorExists('[data-pf-mode="all-columns"]');
+
+        // Неизвестное значение не запоминается: показатель по умолчанию — отклонение.
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027&show=diff');
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027&show=bogus');
+        self::assertSelectorExists('[data-pf-mode="diff"]');
+        self::assertSelectorNotExists('[data-pf-layout]');
     }
 
     public function testPlanFactPageForeignVersionIsNotFound(): void

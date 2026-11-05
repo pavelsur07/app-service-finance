@@ -23,18 +23,22 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
  * Вкладка «План–факт» раздела «Бюджет ОПиУ» (ui-ux.md, экран 5). Только чтение.
- * GET /finance/budget/plan-fact?year=&version=&project=&center=&show=&period=.
+ * GET /finance/budget/plan-fact?year=&version=&project=&center=&show=&layout=&period=.
  *
  * Вариант по умолчанию — утверждённый на год, без него — первый неархивный; пара по умолчанию —
- * вся компания. Показатель колонок периода: plan / fact / diff (по умолчанию) / percent;
- * период: month (по умолчанию) / quarter.
+ * вся компания. Показатель колонок периода: plan / fact / diff (по умолчанию) / percent / all
+ * («Все показатели»); раскладка «Все показатели»: columns / rows (по умолчанию: месяцы — rows,
+ * кварталы — columns); период: month (по умолчанию) / quarter. Показатель, раскладка и период
+ * запоминаются в сессии (BUDGET-SPEC §6: выбор запоминается).
  */
 #[Route('/finance/budget/plan-fact', name: 'budget_plan_fact', methods: ['GET'])]
 #[IsGranted('ROLE_USER')]
 final class BudgetPlanFactPageController extends AbstractController
 {
-    private const array SHOW = ['plan', 'fact', 'diff', 'percent'];
+    private const array SHOW = ['plan', 'fact', 'diff', 'percent', 'all'];
+    private const array LAYOUT = ['columns', 'rows'];
     private const array PERIOD = ['month', 'quarter'];
+    private const string SESSION_KEY = 'budget_plan_fact_view';
 
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
@@ -77,8 +81,13 @@ final class BudgetPlanFactPageController extends AbstractController
             $pair = null;
         }
 
-        $show = \in_array($request->query->getString('show'), self::SHOW, true) ? $request->query->getString('show') : 'diff';
-        $period = \in_array($request->query->getString('period'), self::PERIOD, true) ? $request->query->getString('period') : 'month';
+        $remembered = $request->getSession()->get(self::SESSION_KEY, []);
+        $remembered = \is_array($remembered) ? $remembered : [];
+        $show = $this->pick($request, $remembered, 'show', self::SHOW) ?? 'diff';
+        $period = $this->pick($request, $remembered, 'period', self::PERIOD) ?? 'month';
+        $layout = $this->pick($request, $remembered, 'layout', self::LAYOUT);
+        $request->getSession()->set(self::SESSION_KEY, array_filter(['show' => $show, 'period' => $period, 'layout' => $layout]));
+        $layout ??= 'quarter' === $period ? 'columns' : 'rows';
         $view = null === $version ? null : $this->planFactBuilder->build($version, $pair?->projectDirectionId, $pair?->responsibilityCenterId);
         $periodKind = 'quarter' === $period ? BudgetPlanFactColumn::KIND_QUARTER : BudgetPlanFactColumn::KIND_MONTH;
 
@@ -101,6 +110,7 @@ final class BudgetPlanFactPageController extends AbstractController
             'pairs' => $pairOptions,
             'pair' => $pair,
             'show' => $show,
+            'layout' => $layout,
             'period' => $period,
             'view' => $view,
             'periodColumns' => null === $view ? [] : array_values(array_filter($view->columns, static fn (BudgetPlanFactColumn $c): bool => $c->kind === $periodKind)),
@@ -108,6 +118,19 @@ final class BudgetPlanFactPageController extends AbstractController
             'generalCenter' => $generalCenter,
             'ytd' => null === $view ? null : $this->column($view->columns, BudgetPlanFactColumn::YTD),
         ]);
+    }
+
+    /**
+     * Значение из адреса, иначе запомненное в сессии; неизвестное — null.
+     *
+     * @param array<mixed> $remembered
+     * @param list<string> $allowed
+     */
+    private function pick(Request $request, array $remembered, string $key, array $allowed): ?string
+    {
+        $value = $request->query->has($key) ? $request->query->getString($key) : ($remembered[$key] ?? null);
+
+        return \is_string($value) && \in_array($value, $allowed, true) ? $value : null;
     }
 
     private function hasChildProjects(string $companyId, string $projectDirectionId): bool
