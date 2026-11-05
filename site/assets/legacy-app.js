@@ -11,6 +11,7 @@ import { initDdsTreePickers, observeDdsTreePickers } from './dds_tree_picker.js'
 import { initDdsOperation } from './pages/dds_operation.js';
 import { initBudgetVersions } from './pages/budget_versions.js';
 import { initBudgetVersion } from './pages/budget_version.js';
+import { initBudgetPlanFact } from './pages/budget_plan_fact.js';
 
 // Keep connection verification as a regular POST while preventing duplicate clicks.
 document.addEventListener('submit', (event) => {
@@ -66,6 +67,7 @@ const initDds = () => {
   initDdsOperation();
   initBudgetVersions();
   initBudgetVersion();
+  initBudgetPlanFact();
 };
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initDds);

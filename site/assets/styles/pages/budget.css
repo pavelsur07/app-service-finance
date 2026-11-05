@@ -372,3 +372,305 @@
     max-width: calc(100vw - 32px);
   }
 }
+
+/* ===== План–факт (BUDGET-SPEC §6, refs 19–25) ===== */
+.vf-pf-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vf-space-2);
+}
+
+.vf-pf-bar__filters,
+.vf-pf-bar__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--vf-space-2) var(--vf-space-3);
+}
+
+.vf-pf-bar__field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vf-space-2);
+  margin: 0;
+}
+
+.vf-pf-bar__label {
+  margin: 0;
+  font-size: var(--vf-size-sm);
+  color: var(--vf-text-muted);
+}
+
+.vf-pf-bar__views {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--vf-space-2);
+}
+
+/* Таблица: ширины фиксированные (colgroup + table-layout), прокрутка внутри карточки,
+   шапка и колонка статей закреплены; «Итого» в конце не закрепляется. */
+.vf-card .vf-pf {
+  position: relative; /* visually-hidden в ячейках (position: absolute) не раздвигает страницу */
+  max-height: 640px;
+  overflow: auto;
+  border-top: 1px solid var(--vf-border);
+}
+
+.vf-pf__table {
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--vf-size-base);
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vf-pf__table th,
+.vf-pf__table td {
+  height: 36px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--vf-border);
+  background: var(--vf-surface);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vf-pf__table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: 38px;
+  background: var(--vf-table-group-bg);
+  border-bottom-color: var(--vf-border-strong);
+  font-size: var(--vf-size-xs);
+  font-weight: var(--vf-weight-bold);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--vf-text-muted);
+}
+
+/* Вторая строка шапки — под первой (38 px). */
+.vf-pf__table thead tr + tr th {
+  top: 38px;
+}
+
+.vf-pf__table .vf-pf__name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  border-right: 1px solid var(--vf-border-strong);
+  text-align: left;
+  font-weight: var(--vf-weight-medium);
+}
+
+.vf-pf__table thead .vf-pf__name {
+  z-index: 4;
+}
+
+.vf-pf__name-in {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.vf-pf__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vf-pf__title--mobile,
+.vf-pf__chev--mobile {
+  display: none;
+}
+
+.vf-pf__chev,
+.vf-pf__chev-sp {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.vf-pf__chev {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--vf-radius-sm);
+  background: transparent;
+  color: var(--vf-text-muted);
+}
+
+.vf-pf__chev:hover {
+  background: var(--vf-hover-bg);
+}
+
+.vf-pf__chev:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: 1px;
+}
+
+.vf-pf__chev .ti {
+  transition: transform var(--vf-duration-fast) var(--vf-ease);
+}
+
+.vf-pf__chev[aria-expanded='false'] .ti {
+  transform: rotate(-90deg);
+}
+
+.vf-pf__tag {
+  flex: none;
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: var(--vf-weight-semibold);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--vf-text-muted);
+}
+
+.vf-pf__state {
+  font-weight: var(--vf-weight-regular);
+  text-transform: none;
+}
+
+.vf-pf__group-start {
+  border-left: 1px solid var(--vf-border-strong);
+}
+
+.vf-pf__table thead th.vf-pf__group-start[colspan] {
+  text-align: center;
+}
+
+/* Строки дерева: группа, расчётный итог, KPI — как в сетке плана. Специфичность выше базовых
+   th/td и колонки статей; подсветка (.vf-pf__hl, ниже) — ещё сильнее по порядку. */
+.vf-pf__table .vf-pf__row--group > * {
+  background: var(--vf-table-group-bg);
+  font-weight: var(--vf-weight-semibold);
+}
+
+.vf-pf__table .vf-pf__row--calc > * {
+  background: var(--vf-hover-bg);
+  font-weight: var(--vf-weight-bold);
+}
+
+.vf-pf__table .vf-pf__row--kpi > * {
+  font-style: italic;
+  font-weight: var(--vf-weight-medium);
+  color: var(--vf-text-muted);
+}
+
+.vf-pf__table td.vf-pf__plan {
+  font-weight: var(--vf-weight-regular);
+  color: var(--vf-text-muted);
+}
+
+.vf-pf__table .vf-pf__hl {
+  background: var(--vf-warn-bg);
+}
+
+.vf-pf__mark {
+  margin-left: 3px;
+  font-size: 11px;
+  color: var(--vf-text-muted);
+}
+
+/* «Строками»: строки статьи разделены светлой линией, статьи — обычной. */
+.vf-pf--rows .vf-pf__metric--plan > *,
+.vf-pf--rows .vf-pf__metric--fact > * {
+  border-bottom-color: var(--vf-table-group-bg);
+}
+
+.vf-pf-legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vf-space-1);
+}
+
+.vf-pf-legend__hl {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+  vertical-align: -1px;
+  border: 1px solid var(--vf-warn-border);
+  border-radius: 2px;
+  background: var(--vf-warn-bg);
+}
+
+/* ≤ 760 px: только «Итого», «Откл.» и «%» видны без прокрутки. */
+@media (max-width: 760px) {
+  .vf-pf-bar__views {
+    justify-content: flex-start;
+  }
+
+  .vf-pf__period,
+  .vf-pf__mhide {
+    display: none;
+  }
+
+  /* Остаются статья, «Откл.» и «%»: обычная раскладка таблицы, статья забирает остаток ширины. */
+  .vf-pf__table {
+    table-layout: auto;
+    width: 100% !important;
+  }
+
+  .vf-pf__table col {
+    width: auto !important;
+  }
+
+  .vf-pf__table .vf-pf__name {
+    width: 100%;
+    max-width: 0;
+  }
+
+  .vf-pf-bar__views .vf-seg {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .vf-pf-bar__group,
+  .vf-pf-bar__field {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .vf-pf-bar__field .form-select {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .vf-pf__table th,
+  .vf-pf__table td {
+    padding: 0 8px;
+  }
+
+  .vf-pf__table tbody .vf-pf__name {
+    font-size: var(--vf-size-sm);
+  }
+
+  .vf-pf--rows .vf-pf__metric--plan,
+  .vf-pf--rows .vf-pf__metric--fact {
+    display: none;
+  }
+
+  .vf-pf--rows .vf-pf__title--mobile {
+    display: block;
+  }
+
+  .vf-pf--rows .vf-pf__chev--mobile {
+    display: inline-flex;
+  }
+
+  .vf-pf--rows .vf-pf__chev-sp--desktop {
+    display: none;
+  }
+
+  .vf-pf--rows .vf-pf__tag {
+    display: none;
+  }
+}

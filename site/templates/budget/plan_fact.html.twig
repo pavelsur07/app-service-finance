@@ -16,30 +16,65 @@
     {%- endif -%}
 {% endmacro %}
 
-{# Оценка отклонения: значок и текст — только у значимого (|%| > порога или факт без плана). Знак «−» — хуже для прибыли.
-   TODO(ds): в DS нет стиля значимого отклонения — пока полужирная ячейка и значок. #}
-{% macro mark(cell) %}
-    {%- if cell.significant and cell.diff is not null -%}
-        {%- set better = cell.diff starts with '-' ? false : true -%}
-        <i class="ti {{ better ? 'ti-caret-up' : 'ti-caret-down' }} me-1" aria-hidden="true" title="{{ better ? 'Лучше плана' : 'Хуже плана' }}"></i><span class="visually-hidden">{{ better ? 'лучше плана' : 'хуже плана' }}: </span>
+{# Отклонение со знаком «+» у положительного; у показателя в процентах — п. п. (BUDGET-SPEC §6). #}
+{% macro signed(amount, format) %}
+    {%- if format == 'MONEY' -%}
+        {{ amount|vf_amount(0, signed: true) }}
+    {%- else -%}
+        {%- set digits = format == 'PERCENT' ? 1 : (format == 'RATIO' ? 4 : 2) -%}
+        {{- (amount starts with '-' or amount|round(digits) == 0) ? '' : '+' -}}{{ amount|vf_number(digits) }}{{ format == 'PERCENT' ? '&nbsp;п.&nbsp;п.' : '' }}
     {%- endif -%}
 {% endmacro %}
 
-{% macro diff(cell, format) %}
-    {%- if cell.diff is null -%}—{%- else -%}{{ _self.mark(cell) }}{{ _self.value(cell.diff, format) }}{%- endif -%}
+{# ▲/▼ у каждого ненулевого сравниваемого отклонения; минус — хуже для прибыли. #}
+{% macro mark(cell) %}
+    {%- if cell.diff is not null and cell.diff|round(4) != 0 -%}
+        {%- set better = not (cell.diff starts with '-') -%}
+        <span class="vf-pf__mark vf-pf__mark--{{ better ? 'up' : 'down' }}" aria-hidden="true">{{ better ? '▲' : '▼' }}</span><span class="visually-hidden"> {{ better ? 'лучше плана' : 'хуже плана' }}</span>
+    {%- endif -%}
 {% endmacro %}
 
-{% macro percent(cell) %}
-    {%- if cell.percent is null -%}—{%- else -%}{{ _self.mark(cell) }}{{ cell.percent|vf_number(1) }}&nbsp;%{%- endif -%}
+{# Содержимое ячейки показателя metric (plan/fact/diff/percent). ctx: link — адрес отчёта ОПиУ для факта или null. #}
+{% macro content(metric, cell, format, link) %}
+    {%- if metric == 'plan' -%}
+        {{ _self.value(cell.plan, format) }}
+    {%- elseif metric == 'fact' -%}
+        {%- if link and cell.fact is not null -%}
+            <a href="{{ link }}" title="Отчёт ОПиУ за месяц">{{ _self.value(cell.fact, format) }}</a>
+        {%- else -%}
+            {{ _self.value(cell.fact, format) }}
+        {%- endif -%}
+    {%- elseif metric == 'diff' -%}
+        {%- if cell.diff is null -%}—{%- else -%}{{ _self.signed(cell.diff, format) }}{{ _self.mark(cell) }}{%- endif -%}
+    {%- else -%}
+        {%- if cell.percent is null -%}—{%- else -%}{{ (cell.percent starts with '-' or cell.percent|round(1) == 0) ? '' : '+' }}{{ cell.percent|vf_number(1) }}&nbsp;%{{ _self.mark(cell) }}{%- endif -%}
+    {%- endif -%}
 {% endmacro %}
+
+{# Подсветка значимого отклонения (> порога или факт без плана): у факта, отклонения и %. #}
+{% macro hl(metric, cell) %}{{ cell.significant and metric != 'plan' ? ' vf-pf__hl' : '' }}{% endmacro %}
 
 {% block body %}
-{# Композиция раздела ОПиУ: vf-page-head, vf-card со вкладками «Варианты» / «План–факт», vf-card-bar. ui-ux.md, экран 5; stages/stage-4.md. #}
+{# Композиция раздела ОПиУ: vf-page-head, vf-card со вкладками «Варианты» / «План–факт», vf-card-bar. BUDGET-SPEC §6, refs 19–25; stages/stage-14.md. #}
     {% set month_names = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'] %}
-    {% set quarter_names = ['I кв.', 'II кв.', 'III кв.', 'IV кв.'] %}
-    {% set show_labels = {plan: 'План', fact: 'Факт', diff: 'Отклонение', percent: '%'} %}
+    {% set quarter_names = ['1 кв.', '2 кв.', '3 кв.', '4 кв.'] %}
+    {% set show_labels = {all: 'Все показатели', plan: 'План', fact: 'Факт', diff: 'Отклонение', percent: '%'} %}
+    {% set metric_labels = {plan: 'План', fact: 'Факт', diff: 'Откл.', percent: '%'} %}
     {% set pair_query = pair ? {project: pair.projectDirectionId, center: pair.responsibilityCenterId} : {} %}
     {% set base_query = {year: year}|merge(version ? {version: version.id} : {})|merge(pair_query) %}
+
+    {% set all = show == 'all' %}
+    {% set by_columns = all and layout == 'columns' %}
+    {% set by_rows = all and layout == 'rows' %}
+    {% set quarter = period == 'quarter' %}
+    {# Подколонки периода в «Колонками»: кварталы — ещё и %. #}
+    {% set metrics = by_columns ? (quarter ? ['plan', 'fact', 'diff', 'percent'] : ['plan', 'fact', 'diff']) : [show] %}
+    {% set row_metrics = by_rows ? ['plan', 'fact', 'diff'] : [null] %}
+    {% set has_total = ytd and ytd.months is not empty %}
+    {# Ширины — только фиксированные (SPEC §6): статьи 260; «Итого» 118·118·118·82; «План года» 118. Период шире
+       макета (100 / 140, подколонка 104 / 116): «−1 493 000 ▼» иначе обрезается — суммы компаний в миллионах. #}
+    {% set period_width = by_columns ? (quarter ? 120 : 112) : (quarter ? 140 : 112) %}
+    {% set table_width = 260 + periodColumns|length * metrics|length * period_width + (has_total ? 436 : 0) + 118 %}
 
     <div class="vf-page-head">
         <div class="vf-page-head__title">
@@ -51,7 +86,7 @@
                 </ol>
             </nav>
             <h1>План–факт {{ year }}</h1>
-            <p class="vf-page-head__lead">Где факт разошёлся с планом и насколько. Отклонение = факт − план в знаке отчёта ОПиУ: минус — хуже для прибыли. Итоги — только по закрытым месяцам.</p>
+            <p class="vf-page-head__lead">Где факт разошёлся с планом и насколько. Отклонение = факт − план в знаке отчёта ОПиУ: минус — хуже для прибыли.</p>
         </div>
     </div>
 
@@ -63,48 +98,65 @@
             ]} only %}
         </div>
 
-        <div class="vf-card-bar d-print-none">
-            <div class="vf-card-bar__row">
-                <div class="vf-seg" role="group" aria-label="Год">
-                    {% for y in years %}
-                        <a href="{{ path('budget_plan_fact', {year: y}) }}"{% if y == year %} class="active" aria-current="true"{% endif %}>{{ y }}</a>
-                    {% endfor %}
-                </div>
-            </div>
-            {% if version %}
-                <div class="vf-card-bar__row">
-                    <form method="get" action="{{ path('budget_plan_fact') }}" class="d-flex flex-wrap align-items-center gap-2" data-budget-plan-fact-filters>
+        <div class="vf-card-bar d-print-none vf-pf-bar">
+            <div class="vf-pf-bar__filters">
+                {# Год — отдельной формой: смена года сбрасывает вариант. #}
+                <form method="get" action="{{ path('budget_plan_fact') }}" class="vf-pf-bar__field">
+                    <label class="vf-pf-bar__label" for="pf-year">Год</label>
+                    <select id="pf-year" name="year" class="form-select w-auto" onchange="this.form.submit()" data-pf-year>
+                        {% for y in years %}
+                            <option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                    <noscript><button type="submit" class="btn btn-sm">Показать</button></noscript>
+                </form>
+                {% if version %}
+                    <form method="get" action="{{ path('budget_plan_fact') }}" class="vf-pf-bar__group" data-budget-plan-fact-filters>
                         <input type="hidden" name="year" value="{{ year }}">
                         <input type="hidden" name="show" value="{{ show }}">
                         <input type="hidden" name="period" value="{{ period }}">
-                        <label class="visually-hidden" for="pf-version">Вариант</label>
-                        <select id="pf-version" name="version" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
-                            {% for v in versions|merge(archived) %}
-                                <option value="{{ v.id }}"{% if v.id == version.id %} selected{% endif %}>{{ v.name }} · {{ v.status.value == 'approved' ? 'утверждён' : (v.status.value == 'archived' ? 'архив' : 'черновик') }}</option>
-                            {% endfor %}
-                        </select>
-                        {% if pairs|length > 1 %}
-                            <label class="visually-hidden" for="pf-pair">Проект × ЦФО</label>
-                            {# Пара — одним значением «проект|ЦФО»; скрытые поля заполняет обработчик ниже. #}
-                            <select id="pf-pair" class="form-select form-select-sm w-auto" data-pf-pair>
-                                <option value=""{% if pair is null %} selected{% endif %}>Вся компания</option>
-                                {% for p in pairs %}
-                                    <option value="{{ p.projectDirectionId }}|{{ p.responsibilityCenterId }}"{% if pair and pair.projectDirectionId == p.projectDirectionId and pair.responsibilityCenterId == p.responsibilityCenterId %} selected{% endif %}>{{ p.label }}</option>
+                        <div class="vf-pf-bar__field">
+                            <label class="vf-pf-bar__label" for="pf-version">Вариант</label>
+                            <select id="pf-version" name="version" class="form-select w-auto" onchange="this.form.submit()">
+                                {% for v in versions|merge(archived) %}
+                                    <option value="{{ v.id }}"{% if v.id == version.id %} selected{% endif %}>{{ v.name }} · {{ v.status.value == 'approved' ? 'утверждён' : (v.status.value == 'archived' ? 'архив' : 'черновик') }}</option>
                                 {% endfor %}
                             </select>
-                            <input type="hidden" name="project" value="{{ pair ? pair.projectDirectionId : '' }}">
-                            <input type="hidden" name="center" value="{{ pair ? pair.responsibilityCenterId : '' }}">
+                        </div>
+                        {% if pairs|length > 1 %}
+                            <div class="vf-pf-bar__field">
+                                <label class="vf-pf-bar__label" for="pf-pair">Проект × ЦФО</label>
+                                {# Пара — одним значением «проект|ЦФО»; скрытые поля заполняет budget_plan_fact.js. #}
+                                <select id="pf-pair" class="form-select w-auto" data-pf-pair>
+                                    <option value=""{% if pair is null %} selected{% endif %}>Вся компания</option>
+                                    {% for p in pairs %}
+                                        <option value="{{ p.projectDirectionId }}|{{ p.responsibilityCenterId }}"{% if pair and pair.projectDirectionId == p.projectDirectionId and pair.responsibilityCenterId == p.responsibilityCenterId %} selected{% endif %}>{{ p.label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="hidden" name="project" value="{{ pair ? pair.projectDirectionId : '' }}">
+                                <input type="hidden" name="center" value="{{ pair ? pair.responsibilityCenterId : '' }}">
+                            </div>
                         {% endif %}
                         <noscript><button type="submit" class="btn btn-sm">Показать</button></noscript>
                     </form>
-                    <div class="vf-seg" role="group" aria-label="Показатель">
-                        {% for key, label in show_labels %}
-                            <a href="{{ path('budget_plan_fact', base_query|merge({show: key, period: period})) }}"{% if key == show %} class="active" aria-current="true"{% endif %}>{{ label }}</a>
-                        {% endfor %}
-                    </div>
                     <div class="vf-seg" role="group" aria-label="Период">
                         <a href="{{ path('budget_plan_fact', base_query|merge({show: show, period: 'month'})) }}"{% if period == 'month' %} class="active" aria-current="true"{% endif %}>Месяцы</a>
                         <a href="{{ path('budget_plan_fact', base_query|merge({show: show, period: 'quarter'})) }}"{% if period == 'quarter' %} class="active" aria-current="true"{% endif %}>Кварталы</a>
+                    </div>
+                {% endif %}
+            </div>
+            {% if version %}
+                <div class="vf-pf-bar__views">
+                    {% if all %}
+                        <div class="vf-seg" role="group" aria-label="Раскладка" data-pf-layout>
+                            <a href="{{ path('budget_plan_fact', base_query|merge({show: 'all', period: period, layout: 'columns'})) }}"{% if by_columns %} class="active" aria-current="true"{% endif %}>Колонками</a>
+                            <a href="{{ path('budget_plan_fact', base_query|merge({show: 'all', period: period, layout: 'rows'})) }}"{% if by_rows %} class="active" aria-current="true"{% endif %}>Строками</a>
+                        </div>
+                    {% endif %}
+                    <div class="vf-seg" role="group" aria-label="Показатель" data-pf-show>
+                        {% for key, label in show_labels %}
+                            <a href="{{ path('budget_plan_fact', base_query|merge({show: key, period: period})) }}"{% if key == show %} class="active" aria-current="true"{% endif %}>{{ label }}</a>
+                        {% endfor %}
                     </div>
                 </div>
             {% endif %}
@@ -122,95 +174,129 @@
                 <div class="alert alert-warning m-3 mb-0">{{ warning }}</div>
             {% endfor %}
 
-            <div class="table-responsive vf-pf">
-                <table class="table table-vcenter vf-table vf-pf__table">
+            {% set total_label = 'Итого' %}
+            {% if has_total %}
+                {% set first_month = month_names[ytd.months|first|slice(5, 2) - 1] %}
+                {% set last_month = month_names[ytd.months|last|slice(5, 2) - 1] %}
+                {% set total_label = ytd.months|length == 12 ? 'Итого за год' : 'Итого (' ~ first_month ~ (ytd.months|length > 1 ? '–' ~ last_month : '') ~ ')' %}
+            {% endif %}
+
+            <div class="vf-pf{{ by_rows ? ' vf-pf--rows' : '' }}{{ by_columns ? ' vf-pf--columns' : '' }}" data-pf-mode="{{ all ? 'all-' ~ layout : show }}">
+                <table class="vf-pf__table" style="width: {{ table_width }}px;">
+                    <colgroup>
+                        <col style="width: 260px;">
+                        {% for column in periodColumns %}
+                            {% for metric in metrics %}<col class="vf-pf__period" style="width: {{ period_width }}px;">{% endfor %}
+                        {% endfor %}
+                        {% if has_total %}
+                            <col class="vf-pf__mhide" style="width: 118px;"><col class="vf-pf__mhide" style="width: 118px;"><col style="width: 118px;"><col style="width: 82px;">
+                        {% endif %}
+                        <col class="vf-pf__mhide" style="width: 118px;">
+                    </colgroup>
                     <thead>
                         <tr>
-                            <th rowspan="2" class="vf-pf__name">Статья</th>
-                            <th colspan="{{ periodColumns|length }}" class="text-center">{{ show_labels[show] }}{{ show == 'percent' ? ' отклонения' : ', ₽' }}</th>
-                            {% if ytd and ytd.months is not empty %}
-                                <th colspan="4" class="text-center">С начала года ({{ month_names[ytd.months|first|slice(5, 2) - 1] }}–{{ month_names[ytd.months|last|slice(5, 2) - 1] }}), ₽</th>
-                            {% endif %}
-                            <th rowspan="2" class="text-end text-nowrap">План года, ₽</th>
-                        </tr>
-                        <tr>
+                            <th rowspan="2" class="vf-pf__name" scope="col">Статья, ₽</th>
                             {% for column in periodColumns %}
                                 {% if column.kind == 'quarter' %}
-                                    {% set index = column.key|slice(-1) - 1 %}
-                                    {% set label = quarter_names[index] %}
+                                    {% set label = quarter_names[column.key|slice(-1) - 1] %}
                                     {% if column.state == 'partial' %}
                                         {% set label = label ~ ' (' ~ month_names[column.months|first|slice(5, 2) - 1] ~ (column.months|length > 1 ? '–' ~ month_names[column.months|last|slice(5, 2) - 1] : '') ~ ')' %}
                                     {% endif %}
                                 {% else %}
                                     {% set label = month_names[column.key|slice(5, 2) - 1] %}
                                 {% endif %}
-                                <th class="text-end text-nowrap" data-pf-col="{{ column.key }}">
-                                    {{ label }}
-                                    {% if column.state == 'current' %}<div class="small text-secondary fw-normal">идёт</div>{% endif %}
+                                <th class="vf-pf__period{{ by_columns ? ' vf-pf__group-start text-center' : '' }}" scope="col" data-pf-col="{{ column.key }}"{% if by_columns %} colspan="{{ metrics|length }}"{% else %} rowspan="2"{% endif %}>
+                                    {{ label }}{% if column.state == 'current' %} <span class="vf-pf__state">идёт</span>{% endif %}
                                 </th>
                             {% endfor %}
-                            {% if ytd and ytd.months is not empty %}
-                                <th class="text-end">План</th>
-                                <th class="text-end">Факт</th>
-                                <th class="text-end">Откл.</th>
-                                <th class="text-end">%</th>
+                            {% if has_total %}
+                                <th colspan="4" class="vf-pf__group-start text-center" scope="colgroup" data-pf-total-head>{{ total_label }}</th>
+                            {% endif %}
+                            <th rowspan="2" class="vf-pf__mhide vf-pf__group-start" scope="col">План года</th>
+                        </tr>
+                        <tr>
+                            {% if by_columns %}
+                                {% for column in periodColumns %}
+                                    {% for metric in metrics %}
+                                        <th class="vf-pf__period{{ loop.first ? ' vf-pf__group-start' : '' }}" scope="col">{{ metric_labels[metric] }}</th>
+                                    {% endfor %}
+                                {% endfor %}
+                            {% endif %}
+                            {% if has_total %}
+                                <th class="vf-pf__mhide vf-pf__group-start" scope="col">План</th>
+                                <th class="vf-pf__mhide" scope="col">Факт</th>
+                                <th scope="col">Откл.</th>
+                                <th scope="col">%</th>
                             {% endif %}
                         </tr>
                     </thead>
-                    <tbody>
                     {% for row in view.rows %}
-                        <tr data-pf-row="{{ row.code }}" class="{{ row.type != 'LEAF_INPUT' ? 'fw-bold' : '' }}{{ row.type == 'KPI' ? ' fst-italic' : '' }}">
-                            <td class="vf-pf__name" style="padding-left: {{ 12 + (row.level - 1) * 20 }}px;">{{ row.name }}</td>
-                            {% for column in periodColumns %}
-                                {% set cell = row.cells[column.key] %}
-                                <td class="text-end text-nowrap{{ cell.significant and show in ['diff', 'percent'] ? ' fw-semibold' : '' }}" data-pf-cell="{{ column.key }}">
-                                    {%- if show == 'plan' -%}
-                                        {{ _self.value(cell.plan, row.format) }}
-                                    {%- elseif show == 'fact' -%}
-                                        {%- if reportLinkable and cell.fact is not null and column.kind == 'month' and row.format == 'MONEY' -%}
-                                            {%- set report_query = {from: column.key ~ '-01', to: (column.key ~ '-01')|date_modify('last day of this month')|date('Y-m-d')} -%}
-                                            {%- if pair -%}
-                                                {%- set report_query = report_query|merge({projectFiltersPresent: 1, projectDirectionIds: [pair.projectDirectionId], responsibilityCenterFiltersPresent: 1, responsibilityCenterIds: [pair.responsibilityCenterId]}) -%}
-                                            {%- endif -%}
-                                            <a href="{{ path('finance_report_preview', report_query) }}" title="Отчёт ОПиУ за месяц">{{ _self.value(cell.fact, row.format) }}</a>
-                                        {%- else -%}
-                                            {{ _self.value(cell.fact, row.format) }}
-                                        {%- endif -%}
-                                    {%- elseif show == 'diff' -%}
-                                        {{ _self.diff(cell, row.format) }}
-                                    {%- else -%}
-                                        {{ _self.percent(cell) }}
-                                    {%- endif -%}
-                                </td>
-                            {% endfor %}
-                            {% if ytd and ytd.months is not empty %}
-                                {% set cell = row.cells[ytd.key] %}
-                                <td class="text-end text-nowrap" data-pf-ytd="plan">{{ _self.value(cell.plan, row.format) }}</td>
-                                <td class="text-end text-nowrap" data-pf-ytd="fact">{{ _self.value(cell.fact, row.format) }}</td>
-                                <td class="text-end text-nowrap{{ cell.significant ? ' fw-semibold' : '' }}" data-pf-ytd="diff">{{ _self.diff(cell, row.format) }}</td>
-                                <td class="text-end text-nowrap" data-pf-ytd="percent">{{ _self.percent(cell) }}</td>
-                            {% endif %}
-                            <td class="text-end text-nowrap" data-pf-year>{{ _self.value(row.cells['total'].plan, row.format) }}</td>
-                        </tr>
+                        {% set next = view.rows[loop.index] ?? null %}
+                        {% set has_children = next is not null and next.level > row.level %}
+                        {% set row_class = has_children ? 'vf-pf__row--group' : (row.type == 'SUBTOTAL' ? 'vf-pf__row--calc' : (row.type == 'KPI' ? 'vf-pf__row--kpi' : '')) %}
+                        <tbody data-pf-row="{{ row.code }}" data-pf-id="{{ row.id }}" data-pf-level="{{ row.level }}"{% if has_children %} data-pf-group{% endif %}>
+                        {% for row_metric in row_metrics %}
+                            <tr class="{{ row_class }}{{ row_metric ? ' vf-pf__metric vf-pf__metric--' ~ row_metric : '' }}"{% if row_metric %} data-pf-metric="{{ row_metric }}"{% endif %}>
+                                <th scope="row" class="vf-pf__name">
+                                    <span class="vf-pf__name-in" style="padding-left: {{ (row.level - 1) * 20 }}px;">
+                                        {% if loop.first %}
+                                            {% if has_children %}
+                                                <button type="button" class="vf-pf__chev" aria-expanded="true" aria-label="Свернуть «{{ row.name }}»" data-pf-toggle><i class="ti ti-chevron-down" aria-hidden="true"></i></button>
+                                            {% else %}
+                                                <span class="vf-pf__chev-sp" aria-hidden="true"></span>
+                                            {% endif %}
+                                            <span class="vf-pf__title" title="{{ row.name }}">{{ row.name }}</span>
+                                        {% else %}
+                                            {# В «Строками» на телефоне видна только строка «Откл.» — название и шеврон дублируются в ней. #}
+                                            {% if row_metric == 'diff' and has_children %}
+                                                <button type="button" class="vf-pf__chev vf-pf__chev--mobile" aria-expanded="true" aria-label="Свернуть «{{ row.name }}»" data-pf-toggle><i class="ti ti-chevron-down" aria-hidden="true"></i></button>
+                                            {% endif %}
+                                            <span class="vf-pf__chev-sp{{ row_metric == 'diff' and has_children ? ' vf-pf__chev-sp--desktop' : '' }}" aria-hidden="true"></span>
+                                            {% if row_metric == 'diff' %}<span class="vf-pf__title vf-pf__title--mobile">{{ row.name }}</span>{% endif %}
+                                            <span class="visually-hidden">{{ row.name }}</span>
+                                        {% endif %}
+                                        {% if row_metric %}<span class="vf-pf__tag">{{ metric_labels[row_metric] }}</span>{% endif %}
+                                    </span>
+                                </th>
+                                {% for column in periodColumns %}
+                                    {% set cell = row.cells[column.key] %}
+                                    {% set link = null %}
+                                    {% if reportLinkable and column.kind == 'month' and row.format == 'MONEY' %}
+                                        {% set report_query = {from: column.key ~ '-01', to: (column.key ~ '-01')|date_modify('last day of this month')|date('Y-m-d')} %}
+                                        {% if pair %}
+                                            {% set report_query = report_query|merge({projectFiltersPresent: 1, projectDirectionIds: [pair.projectDirectionId], responsibilityCenterFiltersPresent: 1, responsibilityCenterIds: [pair.responsibilityCenterId]}) %}
+                                        {% endif %}
+                                        {% set link = path('finance_report_preview', report_query) %}
+                                    {% endif %}
+                                    {% for metric in (row_metric ? [row_metric] : metrics) %}
+                                        <td class="vf-pf__period{{ by_columns and loop.first ? ' vf-pf__group-start' : '' }}{{ metric == 'plan' and all ? ' vf-pf__plan' : '' }}{{ _self.hl(metric, cell) }}" data-pf-cell="{{ column.key }}"{% if all %} data-pf-cell-metric="{{ metric }}"{% endif %}>{{ _self.content(metric, cell, row.format, link) }}</td>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% if has_total %}
+                                    {% set cell = row.cells[ytd.key] %}
+                                    {% for metric in ['plan', 'fact', 'diff', 'percent'] %}
+                                        {% set filled = row_metric is null or row_metric == metric or (row_metric == 'diff' and metric == 'percent') %}
+                                        <td class="{{ metric in ['plan', 'fact'] ? 'vf-pf__mhide' : '' }}{{ loop.first ? ' vf-pf__group-start' : '' }}{{ metric == 'plan' ? ' vf-pf__plan' : '' }}{{ filled ? _self.hl(metric, cell) : '' }}" data-pf-ytd="{{ metric }}">
+                                            {%- if filled -%}{{ _self.content(metric, cell, row.format, null) }}{%- endif -%}
+                                        </td>
+                                    {% endfor %}
+                                {% endif %}
+                                <td class="vf-pf__mhide vf-pf__group-start vf-pf__plan" data-pf-year>{% if row_metric is null or row_metric == 'plan' %}{{ _self.value(row.cells['total'].plan, row.format) }}{% endif %}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
                     {% endfor %}
-                    </tbody>
                 </table>
             </div>
-            <div class="card-footer small text-secondary">
-                <i class="ti ti-caret-up" aria-hidden="true"></i> лучше плана, <i class="ti ti-caret-down" aria-hidden="true"></i> хуже плана — отклонение больше {{ view.thresholdPercent }}% или факт без плана. Текущий месяц не сравнивается, будущие — только план.{% if generalCenter %} Факт ЦФО «Общий» включает операции без ЦФО, поэтому ссылок на отчёт ОПиУ (при фильтре по ЦФО он их не показывает) нет.{% elseif not reportLinkable %} Факт — по выбранному проекту без дочерних, поэтому ссылок на отчёт ОПиУ (он включает дочерние проекты) нет.{% endif %}
+            <div class="card-footer small text-secondary vf-pf-legend" data-pf-legend>
+                <div><span class="vf-pf__mark vf-pf__mark--up" aria-hidden="true">▲</span> лучше плана · <span class="vf-pf__mark vf-pf__mark--down" aria-hidden="true">▼</span> хуже плана (для расходов лучше — меньше по модулю). У показателей в процентах отклонение — в п.&nbsp;п.</div>
+                <div><span class="vf-pf-legend__hl" aria-hidden="true"></span> Подсветка: отклонение больше {{ view.thresholdPercent }}% от плана или факт без плана.</div>
+                <div>
+                    {% if has_total %}{{ total_label }} — по закрытым месяцам.{% else %}За {{ year }} год закрытых месяцев нет — итог не считается.{% endif %}
+                    Текущий месяц не сравнивается; будущие месяцы: факт пустой, отклонение не считается.
+                    {% if generalCenter %} Факт ЦФО «Общий» включает операции без ЦФО, поэтому ссылок на отчёт ОПиУ (при фильтре по ЦФО он их не показывает) нет.{% elseif not reportLinkable %} Факт — по выбранному проекту без дочерних, поэтому ссылок на отчёт ОПиУ (он включает дочерние проекты) нет.{% endif %}
+                </div>
             </div>
         {% endif %}
     </div>
-
-    {% if pairs|length > 1 and version %}
-        <script>
-            document.querySelector('[data-pf-pair]')?.addEventListener('change', function (event) {
-                var parts = event.target.value.split('|');
-                var form = event.target.form;
-                form.elements.project.value = parts[0] || '';
-                form.elements.center.value = parts[1] || '';
-                form.submit();
-            });
-        </script>
-    {% endif %}
 {% endblock %}
