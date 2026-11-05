@@ -47,7 +47,15 @@ final class SendBillingExpiryReminderHandler
             return;
         }
 
-        $email = $this->companies->findById($message->companyId)?->getUser()?->getEmail();
+        $company = $this->companies->findById($message->companyId);
+        // Сообщение могло ждать в очереди, пока владелец запросил удаление компании.
+        if (null !== $company && $company->isDeletionRequested()) {
+            $this->logger->info('Billing: напоминание не нужно — компания помечена к удалению', $context);
+
+            return;
+        }
+
+        $email = $company?->getUser()?->getEmail();
         if (null === $email || '' === $email) {
             $this->logger->warning('Billing: напоминание не отправлено — нет адреса владельца', $context);
 

@@ -14,6 +14,7 @@ use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankAuthorizationRejectedException;
 use App\BankSync\Exception\BankAuthorizationStateInvalidException;
 use App\BankSync\Exception\BankChannelNotConfiguredException;
+use App\BankSync\Exception\BankCompanyDeletionRequestedException;
 use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Exception\BankConnectionNotFoundException;
 use App\BankSync\Exception\BankEnvironmentNotAllowedException;
@@ -58,6 +59,7 @@ final readonly class CompleteBankAuthorizationAction
      * @return string ID подключения
      *
      * @throws BankAuthorizationStateInvalidException
+     * @throws BankCompanyDeletionRequestedException компанию пометили к удалению во время входа
      * @throws BankAuthorizationDeniedException
      * @throws BankAuthorizationRejectedException код или verifier отвергнут банком
      * @throws BankIdTokenInvalidException `id_token` не прошёл проверку
@@ -162,6 +164,16 @@ final readonly class CompleteBankAuthorizationAction
         $externalSubject = $grant->externalSubject;
 
         $this->entityManager->wrapInTransaction(function () use ($pending, $credentials, $externalSubject): void {
+            // Удаление компании могло быть запрошено, пока шёл обмен кода в банке. FOR SHARE
+            // сериализует сохранение с запросом удаления (он берёт FOR UPDATE той же строки).
+            $deletionRequestedAt = $this->entityManager->getConnection()->fetchOne(
+                'SELECT deletion_requested_at FROM companies WHERE id = ? FOR SHARE',
+                [$pending->companyId],
+            );
+            if (null !== $deletionRequestedAt && false !== $deletionRequestedAt) {
+                throw new BankCompanyDeletionRequestedException($pending->companyId);
+            }
+
             // Под блокировкой строку никто не менял с проверки выше; удалить подключение
             // блокировка не мешает — тогда NotFound и откат.
             $connection = $this->connections->findOneByIdAndCompanyId($pending->connectionId, $pending->companyId);

@@ -226,4 +226,22 @@ class MarketplaceConnectionRepository extends ServiceEntityRepository
 
         return $this->find($id);
     }
+
+    /**
+     * Включённые подключения компании — для отключения при запросе удаления компании.
+     *
+     * @return list<MarketplaceConnection>
+     */
+    public function findActiveByCompanyId(string $companyId): array
+    {
+        /** @var list<MarketplaceConnection> $connections */
+        $connections = $this->createQueryBuilder('c')
+            ->where('IDENTITY(c.company) = :companyId')
+            ->andWhere('c.isActive = true')
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getResult();
+
+        return $connections;
+    }
 }

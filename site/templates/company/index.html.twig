@@ -45,10 +45,7 @@
                             </td>
                             <td>
                                 <a href="{{ path('company_edit', {'id': company.id}) }}" class="btn btn-sm btn-warning">✏️</a>
-                                <form method="post" action="{{ path('company_delete', {'id': company.id}) }}" style="display:inline;" onsubmit="return confirm('Вы уверены?');">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ company.id) }}">
-                                    <button class="btn btn-sm btn-danger">🗑</button>
-                                </form>
+                                <a href="{{ path('company_delete', {'id': company.id}) }}" class="btn btn-sm btn-danger" title="Удалить">🗑</a>
                             </td>
                         </tr>
                     {% else %}
@@ -58,5 +55,35 @@
                 </table>
             </div>
         </div>
+        {% if deletionRequested is not empty %}
+            <div class="card mt-3">
+                <div class="card-header"><b>Будут удалены</b></div>
+                <div class="card-body">
+                    <table class="table table-vcenter">
+                        <thead>
+                        <tr>
+                            <th>Наименование</th>
+                            <th>Данные будут удалены</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for company in deletionRequested %}
+                            <tr>
+                                <td>{{ company.name }}</td>
+                                <td>{{ company.deletionDueAt|date('d.m.Y') }}</td>
+                                <td>
+                                    <form method="post" action="{{ path('company_restore', {'id': company.id}) }}" style="display:inline;">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('restore' ~ company.id) }}">
+                                        <button class="btn btn-sm btn-outline-primary">Восстановить</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
     </div>
 {% endblock %}

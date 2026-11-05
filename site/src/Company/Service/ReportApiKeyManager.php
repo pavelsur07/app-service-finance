@@ -91,6 +91,10 @@ class ReportApiKeyManager
             if ($exp && $exp < $now) {
                 continue;
             }
+            // Компания помечена владельцем к удалению: отчёты по ключу не отдаём.
+            if ($keyEntity->getCompany()->isDeletionRequested()) {
+                return null;
+            }
 
             $keyEntity->markAsUsed($now);
             $this->em->flush();

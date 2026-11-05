@@ -38,6 +38,7 @@ final readonly class ReadOnlyRule
         'company_set_active',
         'company_new',
         'company_delete',
+        'company_restore',
         'company_invite_accept',
         'company_price_checkout', // оплата тарифа снимает «только чтение»
         'finance_report_preview_recalc',

@@ -113,6 +113,32 @@ final class ExternalAuthenticationTest extends WebTestCaseBase
         self::assertSame('2026-09-13 12:00:00', $this->lastUsed());
     }
 
+    public function testCompanyMarkedForDeletionIsForbiddenUntilRestored(): void
+    {
+        self::assertSame(200, $this->request()->getStatusCode());
+        $this->em()->getConnection()->executeStatement('UPDATE companies SET deletion_requested_at = ? WHERE id = ?', ['2026-09-13 12:00:01', $this->company->getId()]);
+        $this->em()->clear();
+        $this->assertProblem($this->request(), 403);
+
+        $this->em()->getConnection()->executeStatement('UPDATE companies SET deletion_requested_at = NULL WHERE id = ?', [$this->company->getId()]);
+        $this->em()->clear();
+        self::assertSame(200, $this->request()->getStatusCode());
+    }
+
+    public function testLegacyReportKeyOfCompanyMarkedForDeletionIsUnauthorized(): void
+    {
+        $raw = 'rk_live_'.bin2hex(random_bytes(16));
+        $this->em()->persist(new ReportApiKey($this->company, 'rk_live_', password_hash($raw, \PASSWORD_ARGON2ID)));
+        $this->em()->flush();
+        $this->client->request('GET', '/api/public/reports/cashflow.json', ['token' => $raw], server: ['REMOTE_ADDR' => self::IP]);
+        self::assertNotSame(401, $this->client->getResponse()->getStatusCode());
+
+        $this->em()->getConnection()->executeStatement('UPDATE companies SET deletion_requested_at = now() WHERE id = ?', [$this->company->getId()]);
+        $this->em()->clear();
+        $this->client->request('GET', '/api/public/reports/cashflow.json', ['token' => $raw], server: ['REMOTE_ADDR' => self::IP]);
+        self::assertResponseStatusCodeSame(401);
+    }
+
     public function testQueryTokensNeverAuthenticate(): void
     {
         $this->assertProblem($this->request(authorization: '', query: ['token' => $this->token, 'access_token' => $this->token]), 401);
