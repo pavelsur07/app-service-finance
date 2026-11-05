@@ -56,6 +56,12 @@ function initPickers(root) {
     picker.addEventListener('toggle', () => {
       if (!picker.open) return;
       pickers.filter((other) => other !== picker).forEach((other) => { other.open = false; });
+      // Меню не выходит за правый край панели фильтров (пилюля ЦФО на телефоне — справа).
+      const menu = picker.querySelector('[data-pf-pick-form]');
+      menu.style.left = '';
+      const bar = picker.closest('.vf-pf-bar') ?? document.documentElement;
+      const overflow = menu.getBoundingClientRect().right - bar.getBoundingClientRect().right;
+      if (overflow > 0) menu.style.left = `${-overflow}px`;
     });
   }
   document.addEventListener('click', (event) => {
