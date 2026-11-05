@@ -1606,13 +1606,13 @@ parameters:
 		-
 			message: '#^Call to an undefined method object\:\:getId\(\)\.$#'
 			identifier: method.notFound
-			count: 2
+			count: 1
 			path: src/Company/Controller/CompanyController.php
 
 		-
 			message: '#^Call to an undefined method object\:\:getUser\(\)\.$#'
 			identifier: method.notFound
-			count: 4
+			count: 3
 			path: src/Company/Controller/CompanyController.php
 
 		-
@@ -1621,11 +1621,6 @@ parameters:
 			count: 1
 			path: src/Company/Controller/CompanyController.php
 
-		-
-			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Company/Controller/CompanyController.php
 
 		-
 			message: '#^Call to an undefined method object\:\:getId\(\)\.$#'
@@ -12942,7 +12937,7 @@ parameters:
 		-
 			message: '#^flush\(\) в App\\Company\\Controller\\CompanyController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
 			identifier: vashfindir.flushOutsideBoundary
-			count: 3
+			count: 2
 			path: src/Company/Controller/CompanyController.php
 
 		-
