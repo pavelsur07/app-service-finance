@@ -135,6 +135,7 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         'admin_telegram_bot_toggle' => ['firewall', 'App\Telegram\Controller\Admin\TelegramBotController::toggle'],
         'admin_telegram_bot_webhook_set' => ['firewall', 'App\Telegram\Controller\Admin\TelegramBotController::webhookSet'],
         'admin_billing_company_assign' => ['firewall', 'App\Billing\Controller\Admin\AssignCompanyTariffController::__invoke'],
+        'admin_ai_company_access' => ['firewall', 'App\ServiceGateway\Controller\Admin\AiCompanyAccessController::__invoke'],
         // firewall internal_api (Bearer INTERNAL_AUTH_TOKEN + IP-allowlist, ROLE_INTERNAL_SERVICE):
         // квота WB finance для wb-fetcher, данных компаний не меняет (контракт wb-finance-quota v1).
         'internal_wb_finance_sales_reports_slot' => ['firewall', 'App\Marketplace\Controller\Internal\WbFinanceSalesReportsSlotController::__invoke'],
