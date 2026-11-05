@@ -18,7 +18,8 @@ SET NULL 26.
 
 ## Результат
 
-Ветка от этапа 1, отдельный PR (в нём миграция — снятие FK биллинга).
+Ветка от `master` (этап 1 влит, #2888), отдельный PR с миграцией — снятие
+FK биллинга; релиз по `docs/workflow/release.md`.
 
 1. **Реестр** `Company\Infrastructure\Deletion\CompanyDataRegistry`:
    - `RETAIN` — `billing_payments`, `billing_checkouts` (журнал оплат);
