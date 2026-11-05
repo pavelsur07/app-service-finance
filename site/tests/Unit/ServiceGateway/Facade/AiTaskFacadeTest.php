@@ -7,6 +7,7 @@ namespace App\Tests\Unit\ServiceGateway\Facade;
 use App\ServiceGateway\Application\Service\AiServiceAccess;
 use App\ServiceGateway\Facade\AiTaskFacade;
 use App\ServiceGateway\Message\SubmitAiTaskMessage;
+use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
@@ -73,10 +74,21 @@ final class AiTaskFacadeTest extends TestCase
         });
 
         return new AiTaskFacade(
-            new AiServiceAccess(true, $allowlist, 'http://ai', 'token'),
+            $this->access('*' === $allowlist ? '*' : []),
             $bus,
             new MockClock(new \DateTimeImmutable('2026-10-30T12:00:00+03:00')),
             new NullLogger(),
         );
+    }
+
+    /** @param list<string>|'*' $granted '*' — подключены все */
+    private function access(array|string $granted): AiServiceAccess
+    {
+        $db = $this->createStub(Connection::class);
+        $db->method('fetchFirstColumn')->willReturnCallback(
+            static fn (string $sql, array $params): array => '*' === $granted ? $params['ids'] : array_values(array_intersect($params['ids'], $granted)),
+        );
+
+        return new AiServiceAccess(true, 'http://ai', 'token', $db);
     }
 }

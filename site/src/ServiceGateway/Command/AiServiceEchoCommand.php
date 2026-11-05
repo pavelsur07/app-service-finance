@@ -31,7 +31,7 @@ final class AiServiceEchoCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('company-id', null, InputOption::VALUE_REQUIRED, 'Company UUID (must be in AI_SERVICE_COMPANY_ALLOWLIST)')
+            ->addOption('company-id', null, InputOption::VALUE_REQUIRED, 'Company UUID (must be connected to AI in /admin/users)')
             ->addOption('text', null, InputOption::VALUE_REQUIRED, 'Text to echo', 'проверка связи');
     }
 
@@ -51,7 +51,7 @@ final class AiServiceEchoCommand extends Command
             idempotencyKey: Uuid::uuid7()->toString(),
         );
         if (null === $taskId) {
-            $output->writeln('ai-service: disabled for the company (AI_SERVICE_ENABLED, allowlist, URL or token)');
+            $output->writeln('ai-service: disabled for the company (AI_SERVICE_ENABLED, admin access, URL or token)');
 
             return self::SUCCESS;
         }

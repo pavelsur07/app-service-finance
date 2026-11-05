@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\ServiceGateway\Application\Service;
 
 use App\ServiceGateway\Application\Service\AiServiceAccess;
+use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 
 final class AiServiceAccessTest extends TestCase
@@ -14,29 +15,41 @@ final class AiServiceAccessTest extends TestCase
 
     public function testDisabledByFlagUrlOrToken(): void
     {
-        self::assertFalse((new AiServiceAccess(false, '*', 'http://ai', 'token'))->isEnabledForCompany(self::COMPANY));
-        self::assertFalse((new AiServiceAccess(true, '*', '', 'token'))->isEnabledForCompany(self::COMPANY));
-        self::assertFalse((new AiServiceAccess(true, '*', 'http://ai', null))->isEnabled());
+        $db = $this->createStub(Connection::class);
+        $db->method('fetchFirstColumn')->willReturn([self::COMPANY]);
+
+        self::assertFalse((new AiServiceAccess(false, 'http://ai', 'token', $db))->isEnabledForCompany(self::COMPANY));
+        self::assertFalse((new AiServiceAccess(true, '', 'token', $db))->isEnabledForCompany(self::COMPANY));
+        self::assertFalse((new AiServiceAccess(true, 'http://ai', null, $db))->isEnabled());
+        // Админка видит подключение и при выключенном сервисе.
+        self::assertSame([self::COMPANY], (new AiServiceAccess(false, 'http://ai', 'token', $db))->grantedCompanyIds([self::COMPANY]));
     }
 
-    public function testEmptyAllowlistAdmitsNobody(): void
+    public function testNoGrantAdmitsNobody(): void
     {
-        $access = new AiServiceAccess(true, '', 'http://ai', 'token');
+        $access = $this->access([]);
 
         self::assertTrue($access->isEnabled());
         self::assertFalse($access->isEnabledForCompany(self::COMPANY));
     }
 
-    public function testAllowlistByIdIgnoresCaseAndSpaces(): void
+    public function testGrantedCompanyOnlyIgnoringCase(): void
     {
-        $access = new AiServiceAccess(true, ' '.strtoupper(self::COMPANY).' , other', 'http://ai', 'token');
+        $access = $this->access([self::COMPANY]);
 
-        self::assertTrue($access->isEnabledForCompany(self::COMPANY));
+        self::assertTrue($access->isEnabledForCompany(strtoupper(self::COMPANY)));
         self::assertFalse($access->isEnabledForCompany(self::OTHER));
+        self::assertSame([self::COMPANY], $access->enabledCompanyIds([self::OTHER, self::COMPANY]));
     }
 
-    public function testWildcardAdmitsAll(): void
+    /** @param list<string> $granted */
+    private function access(array $granted): AiServiceAccess
     {
-        self::assertTrue((new AiServiceAccess(true, '*', 'http://ai', 'token'))->isEnabledForCompany(self::OTHER));
+        $db = $this->createStub(Connection::class);
+        $db->method('fetchFirstColumn')->willReturnCallback(
+            static fn (string $sql, array $params): array => array_values(array_intersect($params['ids'], $granted)),
+        );
+
+        return new AiServiceAccess(true, 'http://ai', 'token', $db);
     }
 }

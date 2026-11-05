@@ -15,7 +15,7 @@ make ai-service-lint ai-service-test ai-service-evals
 ```
 
 Symfony (dev): `AI_SERVICE_ENABLED=true`, `AI_SERVICE_BASE_URL=http://services-ai-service:8080`,
-`AI_SERVICE_API_TOKEN=dev-only-ai-service-token`, `AI_SERVICE_COMPANY_ALLOWLIST=<uuid>`, затем
+`AI_SERVICE_API_TOKEN=dev-only-ai-service-token`, компания подключена в `/admin/users` (отметка «ИИ»), затем
 
 ```bash
 php bin/console app:ai-service:echo --company-id=<uuid>

@@ -25,7 +25,7 @@ use Webmozart\Assert\Assert;
  * автоприменение уверенных подсказок, если ворота компании открыты (по умолчанию закрыты:
  * без флага операции не меняются). Выключенный ИИ-сервис для компании — ничего не ставит.
  *
- * `--all-enabled` (cron) — по очереди все компании allowlist с операциями за окно
+ * `--all-enabled` (cron) — по очереди все подключённые к ИИ компании с операциями за окно
  * кандидатов; сбой одной компании пишется в лог и не останавливает остальные: после него
  * EntityManager пересоздаётся.
  */
@@ -80,10 +80,8 @@ final class CashAiCategorizeCommand extends Command
         }
 
         $since = $this->clock->now()->modify(sprintf('-%d days', RequestCashAiCategorizationAction::LOOKBACK_DAYS));
-        $enabled = array_values(array_filter(
-            $this->companies->withTransactionsSince($since),
-            $this->aiTasks->isEnabledForCompany(...),
-        ));
+        $enabled = $this->aiTasks->enabledCompanyIds($this->companies->withTransactionsSince($since));
+        sort($enabled);
         $failed = 0;
         foreach ($enabled as $id) {
             try {

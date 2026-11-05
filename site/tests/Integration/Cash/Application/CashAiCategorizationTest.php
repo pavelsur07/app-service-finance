@@ -488,4 +488,19 @@ final class RecordingAiTaskFacade implements AiTaskFacadeInterface
     {
         return $this->enabled;
     }
+
+    public function enabledCompanyIds(array $companyIds): array
+    {
+        return $this->enabled ? $companyIds : [];
+    }
+
+    public function isServiceEnabled(): bool
+    {
+        return $this->enabled;
+    }
+
+    public function grantedCompanyIds(array $companyIds): array
+    {
+        return $this->enabledCompanyIds($companyIds);
+    }
 }

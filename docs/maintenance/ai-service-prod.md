@@ -34,7 +34,6 @@
    | Имя | Значение |
    |---|---|
    | `AI_SERVICE_ENABLED` | `true` — деплой поднимает сервис, Symfony его видит |
-   | `AI_SERVICE_COMPANY_ALLOWLIST` | UUID компаний через запятую; пусто — ни одной, `*` — все |
 
 4. **Деплой** (merge в master или `production_action=deploy`). Шаг `[4c/5]`
    сам создаёт роль `svc_ai_service` и БД `ai_service`
@@ -45,15 +44,15 @@
 
 ## Включение по шагам
 
-1. `AI_SERVICE_ENABLED=true`, allowlist пуст, деплой. В логе деплоя —
+1. `AI_SERVICE_ENABLED=true`, ни одна компания не подключена, деплой. В логе деплоя —
    `deepseek: ok 200/401`, `openai: ok 200/401`; `docker ps` — `ai-service`
    `healthy`, `ai-service-worker` `Up`.
 2. Связь с моделями (по команде Владельца — доли копейки):
    `docker exec ai-service python -m ai_service llm-ping` — `ok <модель> <мс>` у
    каждого провайдера. Затем `evals-compare` на синтетике в том же контейнере —
    порядок моделей маршрута.
-3. Путь Symfony → сервис → Symfony без моделей: allowlist — одна компания,
-   деплой, затем
+3. Путь Symfony → сервис → Symfony без моделей: подключить одну компанию
+   (`/admin/users`, отметка «ИИ» у кабинета), затем
    `docker exec scheduler php bin/console app:ai-service:echo --company-id=<uuid>`,
    через минуту `docker exec scheduler php bin/console app:ai-service:import-results`
    — `1 received, 1 acked`.
@@ -63,7 +62,7 @@
    включено командой `app:cash:ai-auto-apply --company-id= --enable` после
    ворот качества (этап 2.3).
 5. Метки точности — `app:cash:ai-categorize-stats --company-id=`; остальные
-   компании — дописать в allowlist и задеплоить.
+   компании — подключить в `/admin/users` (без деплоя; попадут в ближайший cron :25).
 
 ## Проверка после деплоя
 
@@ -80,7 +79,7 @@
 перестаёт ставить задачи; уже показанные подсказки остаются, принять их можно.
 Быстро без деплоя: `docker stop ai-service-worker ai-service` — постановка
 задач уходит в повторы Messenger, импорт пишет WARNING «unavailable».
-Одну компанию — убрать из allowlist и задеплоить.
+Одну компанию — отключить в `/admin/users` (отметка «ИИ вкл» → «Отключить»), без деплоя.
 
 ## Ротация
 

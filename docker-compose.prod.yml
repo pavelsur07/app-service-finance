@@ -58,12 +58,11 @@ x-php-env: &php-env
     # См. docs/architecture/marketplace-audit/09-m1-diagnostics.md.
     MARKETPLACE_PERF_DIAGNOSTICS: ${MARKETPLACE_PERF_DIAGNOSTICS:-1}
     # ─── ai-service (docs/maintenance/ai-service-prod.md) ───
-    # Выключено, пока не заданы AI_SERVICE_ENABLED=true и токен; пустой allowlist — ни одной компании,
-    # `*` — все. Задачи ставит воркер async_sync, результаты забирает cron (scheduler).
+    # Выключено, пока не заданы AI_SERVICE_ENABLED=true и токен; компании подключает администратор
+    # (/admin/users, таблица ai_company_access). Задачи ставит воркер async_sync, результаты забирает cron (scheduler).
     AI_SERVICE_ENABLED: ${AI_SERVICE_ENABLED:-false}
     AI_SERVICE_BASE_URL: http://ai-service:8080
     AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
-    AI_SERVICE_COMPANY_ALLOWLIST: ${AI_SERVICE_COMPANY_ALLOWLIST:-}
     # Публичный URL вебхука Telegram — точка приёма апдейтов (шлюз tg-gateway)
     TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-https://tg.vashfindir.ru/telegram/webhook}
     # Секрет вебхука: задать случайным значением в host-env и переустановить webhook (пусто = проверка выключена)
@@ -517,7 +516,6 @@ services:
             AI_SERVICE_ENABLED: ${AI_SERVICE_ENABLED:-false}
             AI_SERVICE_BASE_URL: http://ai-service:8080
             AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
-            AI_SERVICE_COMPANY_ALLOWLIST: ${AI_SERVICE_COMPANY_ALLOWLIST:-}
             # Billing: cron сверки онлайн-оплат app:billing:yookassa-sync (как в x-php-env).
             # Пусто = онлайн-оплата выключена, команда выходит сразу.
             YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-}
