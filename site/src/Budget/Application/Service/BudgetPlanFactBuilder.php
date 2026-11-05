@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Budget\Application\Service;
 
+use App\Budget\Application\DTO\BudgetCellRow;
 use App\Budget\Application\View\BudgetPlanFactColumn;
+use App\Budget\Application\View\BudgetPlanFactFilter;
 use App\Budget\Application\View\BudgetPlanFactRow;
 use App\Budget\Application\View\BudgetPlanFactView;
 use App\Budget\Domain\BudgetVariance;
@@ -16,9 +18,9 @@ use Psr\Clock\ClockInterface;
 
 /**
  * План–факт варианта: план (ячейки бюджета) и факт (регистр ОПиУ через Finance) считаются одним
- * калькулятором дерева, отклонение — BudgetVariance. Пара «проект × ЦФО» фильтрует оба одинаково
- * (точная пара); без пары — вся компания. Исключение — системный ЦФО «Общий»: факт без ЦФО
- * считается его (BudgetPairResolver::isGeneralCenter). Только чтение.
+ * калькулятором дерева, отклонение — BudgetVariance. `build` — точная пара «проект × ЦФО» (JSON
+ * API), `buildFiltered` — мультивыбор страницы (проекты с дочерними, списки ЦФО); без фильтра —
+ * вся компания. Системный ЦФО «Общий» включает факт без ЦФО (вариант A). Только чтение.
  *
  * Колонки — месяцы, кварталы, «с начала года» и год (BudgetPlanFactColumn). Закрыт месяц раньше
  * текущего по Москве; итоговые колонки сравнивают только закрытые месяцы, год — только план.
@@ -37,20 +39,49 @@ final readonly class BudgetPlanFactBuilder
     public function build(BudgetVersion $version, ?string $projectDirectionId, ?string $responsibilityCenterId): BudgetPlanFactView
     {
         $companyId = $version->getCompanyId();
-        $year = $version->getYear();
-
-        /** @var array<string, array<string, string>> $planAmounts */
-        $planAmounts = [];
-        foreach ($this->cells->fetch($companyId, $version->getId(), $projectDirectionId, $responsibilityCenterId) as $cell) {
-            $planAmounts[$cell->month][$cell->plCategoryId] = $cell->amount;
-        }
         $factAmounts = $this->finance->getPlFactAmountsByMonth(
             $companyId,
-            $year,
+            $version->getYear(),
             $projectDirectionId,
             $responsibilityCenterId,
             $this->pairs->isGeneralCenter($companyId, $responsibilityCenterId),
         );
+
+        return $this->view($version, $this->cells->fetch($companyId, $version->getId(), $projectDirectionId, $responsibilityCenterId), $factAmounts);
+    }
+
+    /**
+     * Срез мультивыбора: план — сумма пар фильтра, факт — те же проекты (с дочерними) и ЦФО, с
+     * «Общим» среди ЦФО — и факт без ЦФО.
+     */
+    public function buildFiltered(BudgetVersion $version, BudgetPlanFactFilter $filter): BudgetPlanFactView
+    {
+        $companyId = $version->getCompanyId();
+        $factAmounts = $this->finance->getPlFactAmountsByMonthForSlice(
+            $companyId,
+            $version->getYear(),
+            $filter->projectIds,
+            $filter->centerIds,
+            $filter->includeUnassigned,
+        );
+
+        return $this->view($version, $this->cells->fetchSlice($companyId, $version->getId(), $filter->projectIds, $filter->centerIds), $factAmounts);
+    }
+
+    /**
+     * @param list<BudgetCellRow> $planCells
+     * @param array<string, array<string, string>> $factAmounts
+     */
+    private function view(BudgetVersion $version, array $planCells, array $factAmounts): BudgetPlanFactView
+    {
+        $companyId = $version->getCompanyId();
+        $year = $version->getYear();
+
+        /** @var array<string, array<string, string>> $planAmounts */
+        $planAmounts = [];
+        foreach ($planCells as $cell) {
+            $planAmounts[$cell->month][$cell->plCategoryId] = $cell->amount;
+        }
 
         $currentMonth = $this->clock->now()->setTimezone(new \DateTimeZone('Europe/Moscow'))->format('Y-m');
         $columns = $this->columns($year, $currentMonth);

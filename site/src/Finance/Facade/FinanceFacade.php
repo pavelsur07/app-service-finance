@@ -226,6 +226,21 @@ final class FinanceFacade
     }
 
     /**
+     * Факт ОПиУ по статьям и месяцам года для среза «списки проектов × списки ЦФО» (Budget: план–факт
+     * с мультивыбором). Проекты — точные id, поддерево разворачивает вызывающий; null — без фильтра,
+     * пустой список — ничего. `includeUnassignedCenter` — плюс операции без ЦФО (системный «Общий»).
+     *
+     * @param list<string>|null $projectDirectionIds
+     * @param list<string>|null $responsibilityCenterIds
+     *
+     * @return array<string, array<string, string>> `Y-m` → plCategoryId → сумма в знаке отчёта
+     */
+    public function getPlFactAmountsByMonthForSlice(string $companyId, int $year, ?array $projectDirectionIds, ?array $responsibilityCenterIds, bool $includeUnassignedCenter = false): array
+    {
+        return $this->plFactMonthlyAmounts->fetchSlice($companyId, $year, $projectDirectionIds, $responsibilityCenterIds, $includeUnassignedCenter);
+    }
+
+    /**
      * Есть ли у компании ненулевой факт ОПиУ за календарный год хотя бы в одной ячейке
      * «проект × ЦФО × статья × месяц» (Budget: доступность «Заполнить из факта»).
      */

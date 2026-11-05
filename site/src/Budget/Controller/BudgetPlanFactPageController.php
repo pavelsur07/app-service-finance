@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace App\Budget\Controller;
 
-use App\Budget\Application\Service\BudgetPairResolver;
 use App\Budget\Application\Service\BudgetPlanFactBuilder;
+use App\Budget\Application\Service\BudgetPlanFactFilterResolver;
 use App\Budget\Application\View\BudgetPlanFactColumn;
 use App\Budget\Entity\BudgetVersion;
 use App\Budget\Enum\BudgetVersionStatus;
 use App\Budget\Exception\BudgetVersionNotFoundException;
-use App\Budget\Exception\InvalidBudgetPairException;
 use App\Budget\Repository\BudgetVersionRepository;
-use App\Company\Facade\CompanyFacade;
 use App\Shared\Service\ActiveCompanyService;
 use Psr\Clock\ClockInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,10 +21,11 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
  * Вкладка «План–факт» раздела «Бюджет ОПиУ» (ui-ux.md, экран 5). Только чтение.
- * GET /finance/budget/plan-fact?year=&version=&project=&center=&show=&layout=&period=.
+ * GET /finance/budget/plan-fact?year=&version=&projects[]=&centers[]=&show=&layout=&period=.
  *
- * Вариант по умолчанию — утверждённый на год, без него — первый неархивный; пара по умолчанию —
- * вся компания. Показатель колонок периода: plan / fact / diff (по умолчанию) / percent / all
+ * Вариант по умолчанию — утверждённый на год, без него — первый неархивный. Проекты (с дочерними)
+ * и ЦФО — мультивыбор, по умолчанию вся компания; старый `?project=&center=` читается как списки
+ * из одного значения (BudgetPlanFactFilterResolver). Показатель колонок периода: plan / fact / diff (по умолчанию) / percent / all
  * («Все показатели»); раскладка «Все показатели»: columns / rows (по умолчанию: месяцы — rows,
  * кварталы — columns); период: month (по умолчанию) / quarter. Показатель, раскладка и период
  * запоминаются в сессии (BUDGET-SPEC §6: выбор запоминается).
@@ -43,10 +42,9 @@ final class BudgetPlanFactPageController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly BudgetVersionRepository $versions,
-        private readonly BudgetPairResolver $pairs,
+        private readonly BudgetPlanFactFilterResolver $filters,
         private readonly BudgetPlanFactBuilder $planFactBuilder,
         private readonly ClockInterface $clock,
-        private readonly CompanyFacade $companies,
     ) {
     }
 
@@ -70,16 +68,7 @@ final class BudgetPlanFactPageController extends AbstractController
         $version ??= $active[0] ?? null;
         $hasApproved = [] !== $active && BudgetVersionStatus::APPROVED === $active[0]->getStatus();
 
-        $pairOptions = $this->pairs->options($companyId);
-        $project = $request->query->getString('project');
-        $center = $request->query->getString('center');
-        try {
-            $pair = $this->pairs->resolve($companyId, $project, $center);
-        } catch (InvalidBudgetPairException) {
-            // Пара могла стать неактивной после того, как ссылку сохранили: показываем всю компанию.
-            $this->addFlash('warning', 'Выбранная пара «проект × ЦФО» недоступна — показана вся компания.');
-            $pair = null;
-        }
+        $filter = $this->filters->resolve($companyId, $this->ids($request, 'projects', 'project'), $this->ids($request, 'centers', 'center'));
 
         $remembered = $request->getSession()->get(self::SESSION_KEY, []);
         $remembered = \is_array($remembered) ? $remembered : [];
@@ -88,14 +77,8 @@ final class BudgetPlanFactPageController extends AbstractController
         $layout = $this->pick($request, $remembered, 'layout', self::LAYOUT);
         $request->getSession()->set(self::SESSION_KEY, array_filter(['show' => $show, 'period' => $period, 'layout' => $layout]));
         $layout ??= 'quarter' === $period ? 'columns' : 'rows';
-        $view = null === $version ? null : $this->planFactBuilder->build($version, $pair?->projectDirectionId, $pair?->responsibilityCenterId);
+        $view = null === $version ? null : $this->planFactBuilder->buildFiltered($version, $filter);
         $periodKind = 'quarter' === $period ? BudgetPlanFactColumn::KIND_QUARTER : BudgetPlanFactColumn::KIND_MONTH;
-
-        // Ссылка на факт ведёт в отчёт ОПиУ, только когда суммы там совпадут. Отчёт берёт проект
-        // вместе с дочерними, а при фильтре по ЦФО не показывает строки без ЦФО; план–факт — точный
-        // проект, а системному «Общему» добавляет факт без ЦФО.
-        $generalCenter = null !== $pair && $this->pairs->isGeneralCenter($companyId, $pair->responsibilityCenterId);
-        $reportLinkable = null === $pair || (!$generalCenter && !$this->hasChildProjects($companyId, $pair->projectDirectionId));
 
         $years = array_values(array_unique([...$this->versions->findYearsByCompanyId($companyId), $currentYear, $currentYear + 1, $year]));
         sort($years);
@@ -107,15 +90,12 @@ final class BudgetPlanFactPageController extends AbstractController
             'archived' => array_values(array_filter($all, static fn (BudgetVersion $v): bool => BudgetVersionStatus::ARCHIVED === $v->getStatus())),
             'version' => $version,
             'hasApproved' => $hasApproved,
-            'pairs' => $pairOptions,
-            'pair' => $pair,
+            'filter' => $filter,
             'show' => $show,
             'layout' => $layout,
             'period' => $period,
             'view' => $view,
             'periodColumns' => null === $view ? [] : array_values(array_filter($view->columns, static fn (BudgetPlanFactColumn $c): bool => $c->kind === $periodKind)),
-            'reportLinkable' => $reportLinkable,
-            'generalCenter' => $generalCenter,
             'ytd' => null === $view ? null : $this->column($view->columns, BudgetPlanFactColumn::YTD),
         ]);
     }
@@ -133,17 +113,16 @@ final class BudgetPlanFactPageController extends AbstractController
         return \is_string($value) && \in_array($value, $allowed, true) ? $value : null;
     }
 
-    private function hasChildProjects(string $companyId, string $projectDirectionId): bool
+    /**
+     * Список id из адреса (`?projects[]=`), иначе старый одиночный параметр (`?project=`).
+     *
+     * @return list<string>
+     */
+    private function ids(Request $request, string $listKey, string $legacyKey): array
     {
-        // Список — в порядке дерева: у проекта есть дочерние, если следующий за ним глубже.
-        $projects = $this->companies->listProjectDirections($companyId);
-        foreach ($projects as $index => $project) {
-            if ($project->id === $projectDirectionId) {
-                return isset($projects[$index + 1]) && $projects[$index + 1]->level > $project->level;
-            }
-        }
+        $raw = $request->query->has($listKey) ? $request->query->all($listKey) : [$request->query->get($legacyKey)];
 
-        return false;
+        return array_values(array_filter($raw, static fn (mixed $id): bool => \is_string($id) && '' !== $id));
     }
 
     /**

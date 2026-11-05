@@ -401,6 +401,102 @@
   color: var(--vf-text-muted);
 }
 
+/* Пилюли мультивыбора «Проект» / «ЦФО». */
+.vf-pf-pick {
+  position: relative;
+}
+
+.vf-pf-pick__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: 36px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--vf-border);
+  border-radius: var(--vf-radius-pill);
+  background: var(--vf-surface);
+  font-size: var(--vf-size-sm);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.vf-pf-pick__pill::-webkit-details-marker {
+  display: none;
+}
+
+.vf-pf-pick[open] > .vf-pf-pick__pill,
+.vf-pf-pick__pill:hover {
+  border-color: var(--vf-primary);
+}
+
+.vf-pf-pick__label {
+  color: var(--vf-text-muted);
+}
+
+.vf-pf-pick__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.vf-pf-pick__menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  padding: 12px;
+  border: 1px solid var(--vf-border);
+  border-radius: var(--vf-radius-lg);
+  background: var(--vf-surface);
+  box-shadow: var(--vf-shadow-md);
+}
+
+.vf-pf-pick__head,
+.vf-pf-pick__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vf-space-2);
+  font-size: var(--vf-size-sm);
+}
+
+.vf-pf-pick__head > span:first-child {
+  font-weight: 600;
+}
+
+.vf-pf-pick__list {
+  max-height: 260px;
+  margin: 8px 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 0;
+  min-width: 0;
+}
+
+.vf-pf-pick__option {
+  margin: 0;
+  padding: 4px 0 4px calc(1.75rem + var(--vf-pick-level, 0) * 16px);
+  font-size: var(--vf-size-sm);
+}
+
+.vf-pf-pick__option .form-check-input {
+  margin-left: -1.75rem;
+}
+
+.vf-pf-pick__note,
+.vf-pf-pick__hint {
+  color: var(--vf-text-muted);
+  font-size: var(--vf-size-xs, 12px);
+}
+
+.vf-pf-pick__note {
+  margin-bottom: 8px;
+}
+
 .vf-pf-bar__views {
   display: flex;
   flex-wrap: wrap;
