@@ -13,6 +13,7 @@ import {
     freeLeafIds,
     groupState,
     helperParams,
+    isInputLeaf,
     isLocked,
     monthIndex,
     plural,
@@ -65,7 +66,7 @@ const signedMoney = (value: string): string => (isZero(value) || value.startsWit
 export function BudgetFillDialog(props: BudgetFillDialogProps): JSX.Element {
     const groups = useMemo(() => fillGroups(props.rows), [props.rows]);
     const bases = useMemo(() => props.rows.filter((row) => row.format === 'MONEY'), [props.rows]);
-    const lockedNames = useMemo(() => props.rows.filter((row) => row.editable && isLocked(row)).map((row) => row.name), [props.rows]);
+    const lockedNames = useMemo(() => props.rows.filter((row) => isInputLeaf(row) && isLocked(row)).map((row) => row.name), [props.rows]);
     const [helper, setHelper] = useState<BudgetFillHelper>(props.initialHelper);
     const [step, setStep] = useState<'setup' | 'preview'>('setup');
     const [categoryIds, setCategoryIds] = useState<Set<string>>(() => new Set(freeLeafIds(groups)));
@@ -81,6 +82,8 @@ export function BudgetFillDialog(props: BudgetFillDialogProps): JSX.Element {
     const [error, setError] = useState<string | null>(null);
     const [sending, setSending] = useState(false);
     const seqRef = useRef(0);
+    /** Идёт запись: окно не закрывается и «Назад» неактивна — иначе ответ потеряется и сетка не перечитается. */
+    const applyingRef = useRef(false);
     const dialogRef = useRef<HTMLDivElement>(null);
     const cardsRef = useRef<HTMLDivElement>(null);
 
@@ -100,8 +103,7 @@ export function BudgetFillDialog(props: BudgetFillDialogProps): JSX.Element {
 
     // Esc и Tab — на уровне документа: после смены шага нажатая кнопка исчезает и фокус может
     // оказаться на body, окно всё равно должно закрываться и держать фокус внутри.
-    const onCloseRef = useRef(props.onClose);
-    onCloseRef.current = props.onClose;
+    const onCloseRef = useRef<() => void>(() => undefined);
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent): void => {
             const dialog = dialogRef.current;
@@ -124,7 +126,8 @@ export function BudgetFillDialog(props: BudgetFillDialogProps): JSX.Element {
             }
             const first = focusable[0];
             const last = focusable[focusable.length - 1];
-            const inside = dialog.contains(document.activeElement);
+            // Сам контейнер (фокус после перехода на шаг 2) — тоже граница: Shift+Tab ведёт на последний элемент.
+            const inside = dialog.contains(document.activeElement) && document.activeElement !== dialog;
             if (event.shiftKey && (document.activeElement === first || !inside)) {
                 event.preventDefault();
                 last.focus();
@@ -165,6 +168,7 @@ export function BudgetFillDialog(props: BudgetFillDialogProps): JSX.Element {
 
     const request = async (body: Record<string, unknown>, apply: boolean, confirmOverwrite: boolean): Promise<void> => {
         const seq = ++seqRef.current;
+        applyingRef.current = apply;
         setError(null);
         setSending(true);
         try {
@@ -188,6 +192,7 @@ export function BudgetFillDialog(props: BudgetFillDialogProps): JSX.Element {
             }
         } finally {
             if (seq === seqRef.current) {
+                applyingRef.current = false;
                 setSending(false);
             }
         }
@@ -207,7 +212,17 @@ export function BudgetFillDialog(props: BudgetFillDialogProps): JSX.Element {
         }, false, false);
     };
 
+    const close = (): void => {
+        if (!applyingRef.current) {
+            props.onClose();
+        }
+    };
+    onCloseRef.current = close;
+
     const back = (): void => {
+        if (applyingRef.current) {
+            return;
+        }
         seqRef.current += 1;
         setSending(false);
         setError(null);
@@ -232,8 +247,9 @@ export function BudgetFillDialog(props: BudgetFillDialogProps): JSX.Element {
     const changed = preview?.result.changed ?? 0;
     const overwrite = preview?.result.overwrite ?? 0;
 
+    // Пока считается предпросмотр, настройка не меняется: иначе шаг 2 покажет и применит прежний выбор.
     const setup = (
-        <div className={styles.fillBody}>
+        <fieldset className={styles.fillBody} disabled={sending}>
             <div className={styles.fillCards} role="radiogroup" aria-label="Помощник" ref={cardsRef} onKeyDown={onCardsKeyDown}>
                 {HELPERS.map((item) => (
                     <button
@@ -424,7 +440,7 @@ export function BudgetFillDialog(props: BudgetFillDialogProps): JSX.Element {
                     )}
                 </section>
             </div>
-        </div>
+        </fieldset>
     );
 
     const previewStep = preview !== null && table !== null && (
@@ -487,7 +503,7 @@ export function BudgetFillDialog(props: BudgetFillDialogProps): JSX.Element {
             className={styles.fillScrim}
             onMouseDown={(event) => {
                 if (event.target === event.currentTarget) {
-                    props.onClose();
+                    close();
                 }
             }}
         >
@@ -512,7 +528,7 @@ export function BudgetFillDialog(props: BudgetFillDialogProps): JSX.Element {
                             <li aria-current={step === 'setup' ? 'step' : undefined}>1 Настройка</li>
                             <li aria-current={step === 'preview' ? 'step' : undefined}>2 Проверка</li>
                         </ol>
-                        <button type="button" className="btn-close" aria-label="Закрыть" onClick={props.onClose} />
+                        <button type="button" className="btn-close" aria-label="Закрыть" disabled={sending && step === 'preview'} onClick={close} />
                     </div>
                 </div>
 
@@ -525,14 +541,14 @@ export function BudgetFillDialog(props: BudgetFillDialogProps): JSX.Element {
                         {step === 'preview' && props.busy && changed > 0 && <div className="text-secondary" role="status">Дождитесь сохранения правок в сетке.</div>}
                     </div>
                     <div className="d-flex flex-wrap gap-2">
-                        {step === 'preview' && <button type="button" className="btn" onClick={back}>← Назад</button>}
-                        <button type="button" className="btn" onClick={props.onClose}>Отмена</button>
+                        {step === 'preview' && <button type="button" className="btn" disabled={sending} onClick={back}>← Назад</button>}
+                        <button type="button" className="btn" disabled={sending && step === 'preview'} onClick={close}>Отмена</button>
                         {step === 'setup' ? (
                             <button type="button" className="btn btn-primary" disabled={sending || !check.ok || cellCount === 0} onClick={showPreview}>
                                 {sending ? 'Считаю…' : 'Показать изменения'}
                             </button>
                         ) : changed === 0 ? (
-                            <button type="button" className="btn btn-primary" onClick={props.onClose}>Закрыть без изменений</button>
+                            <button type="button" className="btn btn-primary" onClick={close}>Закрыть без изменений</button>
                         ) : (
                             <button
                                 type="button"

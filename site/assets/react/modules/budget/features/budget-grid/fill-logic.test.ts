@@ -31,7 +31,8 @@ const row = (id: string, level: number, editable = true, name = id): BudgetGridR
     rule: null,
 });
 
-const ruled = (base: BudgetGridRow): BudgetGridRow => ({ ...base, rule: { percent: '5.00', baseCategoryId: 'wb', baseName: 'WB' } });
+// Как отдаёт сервер (BudgetGridBuilder): статья с правилом — LEAF_INPUT, но editable: false.
+const ruled = (base: BudgetGridRow): BudgetGridRow => ({ ...base, editable: false, rule: { percent: '5.00', baseCategoryId: 'wb', baseName: 'WB' } });
 
 // Выручка ▾ (WB, Ozon), Расходы ▾ (Аренда, Склад ▾ (Хранение)), Курсовые (лист без группы), Прибыль.
 const ROWS = [
@@ -78,8 +79,9 @@ describe('groupState и выбор', () => {
         expect(groupState(revenue, new Set(['wb', 'ozon']))).toEqual({ state: 'on', selected: 2, total: 2 });
     });
 
-    it('статья с правилом не считается и не выбирается', () => {
+    it('статья с правилом остаётся в списке, но не считается и не выбирается', () => {
         const groups = fillGroups([ROWS[0], ruled(ROWS[1]), ROWS[2]]);
+        expect(groups[0].leaves.map((r) => r.id)).toEqual(['wb', 'ozon']);
         expect(groupState(groups[0], new Set(['ozon']))).toEqual({ state: 'on', selected: 1, total: 1 });
         expect(freeLeafIds(groups)).toEqual(['ozon']);
     });

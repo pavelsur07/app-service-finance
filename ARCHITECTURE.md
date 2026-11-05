@@ -2141,7 +2141,10 @@ Facade нет: план читает только сам модуль; Facade п
   комментарий сохраняется; арифметика — `Domain\BudgetFillMath`);
   `FillBudgetCellsAction` пишет их одним вызовом `SaveBudgetLinesAction` (его
   транзакция и блокировка). Перезапись заполненных — только с
-  `confirmOverwrite`, иначе 409 `budget_fill_overwrite_unconfirmed`.
+  `confirmOverwrite`, иначе 409 `budget_fill_overwrite_unconfirmed`. В острове —
+  окно «Быстрое заполнение» (`BudgetFillDialog`, чистая логика выбора и
+  предпросмотра — `fill-logic.ts`): настройка → предпросмотр без `apply` →
+  применение тем же телом запроса.
 - Excel: `BudgetPlanXlsxWriter` пишет сетку (`BudgetGridBuilder`) на лист
   «План» — шапка, служебная строка `year=…;project=…;center=…`, таблица «Код ·
   Статья · 12 месяцев · Год · ID статьи»; листья-расходы — в знаке ввода
@@ -4942,6 +4945,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.139 | 2026-11-05 | Budget: окно «Быстрое заполнение» в два шага вместо панели помощников (`BudgetFillDialog`, `fill-logic.ts`); статьи с правилом показываются неактивными; контракт `/fill` без изменений (задача `pl-budget`, этап 13) |
 | 2.138 | 2026-11-04 | Budget: шапка экрана варианта по пакету DS — переименование черновика (`RenameBudgetVersionAction`, `/name`), кнопка статуса с причиной, «⋯», баннеры, индикатор сохранения и «Помощники ▾» порталом острова, пилюли разреза; сетка по одному измерению (`resolveSlice`, `BudgetCellsQuery`), `?copy=` списка (задача `pl-budget`, этап 11) |
 | 2.137 | 2026-11-04 | Budget: экран «Варианты» по пакету DS (меню «⋯», карточки ≤ 760 px, пустой год), «Заполнить из факта» — `CreateBudgetVersionFromFactAction`, `method` формы создания; Finance: `hasPlFactInYear()` (задача `pl-budget`, этап 10) |
 | 2.136 | 2026-11-04 | Budget: правило «X % от строки-базы» (`budget_rules`, миграция `Version20261104150000`, `BudgetRule`, `BudgetRuleCalculator`, `SetBudgetRuleAction`/`RemoveBudgetRuleAction`, `/rules`, `/rules/delete`), источник `rule`, `BudgetLinesWriter::validate(…, versionId, …)` (задача `pl-budget`, этап 8) |

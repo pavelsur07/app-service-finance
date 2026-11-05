@@ -30,8 +30,11 @@ export interface FillGroup {
 
 export const OTHER_GROUP_ID = '__other';
 
-/** Статья с правилом «% от строки» считается сама: сервер помощником её не меняет. */
-export const isLocked = (row: BudgetGridRow): boolean => row.rule !== null;
+/** Статья ввода в дереве: показывается в списке окна, даже если менять её нельзя. */
+export const isInputLeaf = (row: BudgetGridRow): boolean => row.type === 'LEAF_INPUT';
+
+/** Статья ввода, которую помощник не меняет: правило «% от строки» (сервер отдаёт её `editable: false`). */
+export const isLocked = (row: BudgetGridRow): boolean => !row.editable;
 
 /**
  * Статьи ввода по группам ОПиУ: группа — ближайшая строка выше с меньшим уровнем (родитель).
@@ -45,7 +48,7 @@ export function fillGroups(rows: BudgetGridRow[]): FillGroup[] {
         while (ancestors.length > 0 && ancestors[ancestors.length - 1].level >= row.level) {
             ancestors.pop();
         }
-        if (row.editable) {
+        if (isInputLeaf(row)) {
             const parent = ancestors[ancestors.length - 1];
             if (parent === undefined) {
                 other.leaves.push(row);
@@ -132,7 +135,7 @@ export function fillTargets(
     selectedMonths: ReadonlySet<string>,
     sourceMonth: string,
 ): FillTargets {
-    const categoryIds = rows.filter((row) => row.editable && !isLocked(row) && selectedCategories.has(row.id)).map((row) => row.id);
+    const categoryIds = rows.filter((row) => isInputLeaf(row) && !isLocked(row) && selectedCategories.has(row.id)).map((row) => row.id);
     let targetMonths: string[];
     if (helper === 'distribute') {
         targetMonths = months;
