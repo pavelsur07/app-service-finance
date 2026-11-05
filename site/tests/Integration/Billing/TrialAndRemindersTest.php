@@ -157,6 +157,22 @@ final class TrialAndRemindersTest extends IntegrationTestCase
         self::assertCount(1, $sent);
     }
 
+    public function testQueuedReminderIsNotSentAfterCompanyMarkedForDeletion(): void
+    {
+        $companyId = $this->companyWith(fn (string $id) => $this->paid($id, '2027-02-11', '2027-03-17'), 'owner-deleting@example.test');
+        /** @var \ArrayObject<int, EmailMessage> $sent */
+        $sent = new \ArrayObject();
+        $message = new SendBillingExpiryReminderMessage($companyId, '2027-03-17', 7, false);
+
+        // Сообщение поставлено до запроса удаления, обрабатывается после.
+        $this->connection->executeStatement('UPDATE companies SET deletion_requested_at = now() WHERE id = ?', [$companyId]);
+        $this->em->clear();
+        $this->handler($sent)($message);
+
+        self::assertCount(0, $sent);
+        self::assertSame(0, $this->reminders()->countByCompanyId($companyId));
+    }
+
     public function testFailedSendReleasesMarkSoRetrySends(): void
     {
         $companyId = $this->companyWith(fn (string $id) => $this->paid($id, '2027-02-11', '2027-03-17'));

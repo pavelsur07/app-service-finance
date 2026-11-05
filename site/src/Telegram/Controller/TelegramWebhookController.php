@@ -206,6 +206,20 @@ final class TelegramWebhookController extends AbstractController
                 return $this->respondWithMessage($bot, $message, 'Ссылка уже использована. Создайте новую.');
             }
 
+            // Компания помечена к удалению — новые привязки запрещены. FOR SHARE сериализует
+            // проверку с запросом удаления (он берёт FOR UPDATE той же строки).
+            $deletionRequestedAt = $conn->fetchOne(
+                'SELECT deletion_requested_at FROM companies WHERE id = ? FOR SHARE',
+                [(string) $botLink->getCompany()->getId()],
+            );
+            if (null !== $deletionRequestedAt && false !== $deletionRequestedAt) {
+                if ($conn->isTransactionActive()) {
+                    $conn->rollBack();
+                }
+
+                return $this->respondWithMessage($bot, $message, 'Компания удалена, ссылка недействительна.');
+            }
+
             $from = $message['from'] ?? [];
             $telegramUser = $this->syncTelegramUser($from);
             if (!$telegramUser) {

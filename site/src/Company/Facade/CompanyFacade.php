@@ -205,7 +205,7 @@ final class CompanyFacade
 
     /**
      * Владелец компании либо активный CompanyMember — единственные, у кого
-     * есть доступ к данным компании.
+     * есть доступ к данным компании. Помеченная к удалению компания недоступна.
      */
     public function userHasAccess(string $companyId, string $userId): bool
     {
@@ -287,6 +287,10 @@ final class CompanyFacade
 
         $byId = [];
         foreach ([...$owned, ...$memberCompanies] as $company) {
+            // Помеченная к удалению компания недоступна никому, кроме пути восстановления у владельца.
+            if ($company->isDeletionRequested()) {
+                continue;
+            }
             $byId[$company->getId()] = $company;
         }
 

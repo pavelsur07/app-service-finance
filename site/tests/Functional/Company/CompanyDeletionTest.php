@@ -7,6 +7,7 @@ namespace App\Tests\Functional\Company;
 use App\BankSync\Enum\BankConnectionStatus;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Company\Facade\CompanyFacade;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Telegram\Entity\ClientBinding;
@@ -14,6 +15,7 @@ use App\Telegram\Entity\ReportSubscription;
 use App\Telegram\Entity\TelegramBot;
 use App\Telegram\Entity\TelegramUser;
 use App\Tests\Builders\BankSync\BankConnectionBuilder;
+use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MoySklad\MoySkladConnectionBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
@@ -146,6 +148,38 @@ final class CompanyDeletionTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertCount(1, $crawler->filter('form[action="/company/'.$onlyId.'/restore"]'));
         self::assertCount(0, $crawler->filter('select[name="company_id"] option'));
+    }
+
+    /** Участник помеченной компании теряет доступ и в межкомпанийных сценариях (импорт статей и т.п.). */
+    public function testMemberLosesCrossCompanyAccessToCompanyMarkedForDeletion(): void
+    {
+        $client = static::createClient();
+        $owner = $this->owner();
+        $client->loginUser($owner);
+        $companyId = $this->createCompanyThroughForm($client, 'Компания с сотрудником');
+        $member = $this->owner();
+        $em = $this->em();
+        $company = $em->find(Company::class, $companyId);
+        self::assertInstanceOf(Company::class, $company);
+        $em->persist(CompanyMemberBuilder::aMember()->withId(Uuid::uuid7()->toString())->withCompany($company)->withUser($member)->build());
+        $em->flush();
+
+        /** @var CompanyFacade $facade */
+        $facade = $client->getContainer()->get(CompanyFacade::class);
+        self::assertTrue($facade->userHasAccess($companyId, (string) $member->getId()));
+
+        $client->request('POST', '/company/'.$companyId.'/delete', [
+            '_token' => $this->csrfToken($client, 'delete'.$companyId),
+            'confirm_name' => 'Компания с сотрудником',
+        ]);
+        self::assertResponseRedirects('/company/');
+        $this->em()->clear();
+
+        /** @var CompanyFacade $facade */
+        $facade = $client->getContainer()->get(CompanyFacade::class);
+        self::assertFalse($facade->userHasAccess($companyId, (string) $member->getId()));
+        self::assertFalse($facade->userHasAccess($companyId, (string) $owner->getId()));
+        self::assertNotContains($companyId, array_column($facade->listAccessibleCompaniesForUser((string) $member->getId()), 'id'));
     }
 
     private function owner(): User

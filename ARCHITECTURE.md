@@ -1243,7 +1243,7 @@ getCompaniesByIds(array $companyIds): array
 findCounterpartyByIdAndCompany(string $counterpartyId, string $companyId): ?Counterparty
 
 // Компании, доступные пользователю: которыми он владеет либо в которых
-// состоит активным CompanyMember. Для выбора компании при межкомпанийных
+// состоит активным CompanyMember; помеченные к удалению не входят. Для выбора компании при межкомпанийных
 // операциях (например, импорт справочников).
 // @return list<array{id: string, name: string}>
 listAccessibleCompaniesForUser(string $userId): array
@@ -2311,14 +2311,16 @@ dry-run; каждая компания — своя транзакция; ост
 | Marketplace `DeactivateConnectionsOnCompanyDeletionRequested` | `marketplace_connections.is_active = false` (Seller и Performance) |
 | MoySklad `DeactivateConnectionsOnCompanyDeletionRequested` | `moysklad_connections.is_active = false` |
 | BankSync `DisableConnectionsOnCompanyDeletionRequested` | `ACTIVE`/`NEEDS_REAUTH` → `DISABLED`; согласие в банке не отзывается |
-| Telegram `BlockBindingsOnCompanyDeletionRequested` | привязки клиентов → `blocked`, подписки на отчёты выключаются |
+| Telegram `BlockBindingsOnCompanyDeletionRequested` | привязки клиентов → `blocked`, подписки на отчёты выключаются; новая привязка по ранее выданной ссылке отклоняется в `/start` (`FOR SHARE` строки компании) |
 
 Помеченная компания: не попадает в список компаний (отдельный блок «Будут удалены» с кнопкой
 «Восстановить»), переключатель, `company_set_active` (404), `ActiveCompanyService` (из сессии
 игнорируется, выбирается другая компания владельца или участника), `getAllActiveCompanyIds()` /
 `getAllActiveCompanyProfiles()` (обход компаний cron-командами) и напоминания биллинга; внешний API
 (`AuthenticateApiKeyAction`) отвечает 403, ключ отчётов (`ReportApiKeyManager::findCompanyByRawKey`) не
-находит компанию — доступ возвращается восстановлением.
+находит компанию; `CompanyFacade::userHasAccess()` / `listAccessibleCompaniesForUser()` её не видят
+(межкомпанийный импорт, права Баланса); напоминание биллинга из очереди не отправляется
+(`SendBillingExpiryReminderHandler`) — доступ возвращается восстановлением.
 Восстановление — `POST /company/{id}/restore` (`RestoreCompanyDeletionAction`, та же блокировка
 строки): пометка снимается, подключения остаются выключенными — их включает пользователь. Оба
 контроллера — в `ModuleAccessMap::EXEMPT_EXACT` (работают без активной компании) и в белом списке
