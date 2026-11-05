@@ -162,18 +162,23 @@ class CompanyController extends AbstractController
         ]);
     }
 
+    /**
+     * Временная заглушка (#458): удаление строки компании упирается в FK зависимых таблиц
+     * и отвечало 500. До двухшагового удаления (docs/tasks/company-deletion) данные не
+     * трогаем — пользователь получает сообщение, запрос пишется в журнал для поддержки.
+     */
     #[Route('/{id}/delete', name: 'company_delete', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
-    public function delete(string $id, Request $request, CompanyRepository $companyRepository, EntityManagerInterface $em): Response
+    public function delete(string $id, Request $request, CompanyRepository $companyRepository, LoggerInterface $logger): Response
     {
         $company = $companyRepository->find($id);
 
-        if (!$company || $company->getUser() !== $this->getUser()) {
+        if (!$company instanceof Company || $company->getUser() !== $this->getUser()) {
             throw $this->createNotFoundException();
         }
 
-        if ($this->isCsrfTokenValid('delete'.$company->getId(), $request->request->get('_token'))) {
-            $em->remove($company);
-            $em->flush();
+        if ($this->isCsrfTokenValid('delete'.$company->getId(), (string) $request->request->get('_token'))) {
+            $logger->info('Company deletion requested via stub', ['companyId' => $id]);
+            $this->addFlash('warning', 'Удаление компании временно выполняется через поддержку. Напишите нам — удалим компанию вручную.');
         }
 
         return $this->redirectToRoute('company_index');

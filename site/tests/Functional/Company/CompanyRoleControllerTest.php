@@ -411,7 +411,7 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
 
     public function testCompanyDeletionStillCascadesUnassignedRoles(): void
     {
-        $client = static::createClient();
+        static::createClient();
 
         $owner = UserBuilder::aUser()->withEmail('owner@example.test')->build();
         $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
@@ -430,16 +430,10 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
         $companyId = (string) $company->getId();
         $roleId = (string) $customRole->getId();
 
-        $client->loginUser($owner);
-        $this->setClientSessionValue($client, 'active_company_id', $companyId);
-
         // company_members.role_id переведён в RESTRICT, но company_role.company_id остаётся
-        // CASCADE: удаление компании без участников обязано по-прежнему сносить её шаблоны.
-        $client->request('POST', sprintf('/company/%s/delete', $companyId), [
-            '_token' => $this->csrfToken($client, 'delete'.$companyId),
-        ]);
-
-        self::assertTrue($client->getResponse()->isRedirect());
+        // CASCADE: удаление строки компании без участников обязано по-прежнему сносить её шаблоны.
+        // Кнопка «удалить» строку больше не удаляет (#458), поэтому проверяем схему напрямую.
+        $em->getConnection()->executeStatement('DELETE FROM companies WHERE id = ?', [$companyId]);
 
         $this->em()->clear();
         self::assertNull($this->em()->find(CompanyRole::class, $roleId));
