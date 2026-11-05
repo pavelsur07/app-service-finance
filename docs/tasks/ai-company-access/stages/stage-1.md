@@ -16,12 +16,15 @@
 Код и миграция в ветке `feat/ai-company-access`, тесты зелёные, `ARCHITECTURE.md` обновлён.
 
 ## Чек-лист приёмки
-- [ ] миграция up/down на тестовой БД, схема в синхроне (`SchemaInSyncWithMigrationsTest`)
-- [ ] перенос Вумджой идемпотентен, на БД без компании не падает
-- [ ] unit `AiServiceAccessTest`: выключатель, нет строки, есть строка, пакетная выборка
-- [ ] cron `ai-categorize --all-enabled` берёт компании одним запросом
-- [ ] `grep -r AI_SERVICE_COMPANY_ALLOWLIST` пуст вне истории задач
-- [ ] PHPStan, CS, strict_types зелёные; baseline не вырос
+- [x] миграция up/down на тестовой БД, схема в синхроне (`SchemaInSyncWithMigrationsTest`)
+- [x] перенос Вумджой идемпотентен, на БД без компании не падает
+- [x] unit `AiServiceAccessTest`: выключатель, нет строки, есть строка, пакетная выборка
+- [x] cron `ai-categorize --all-enabled` берёт компании одним запросом
+- [x] `grep -r AI_SERVICE_COMPANY_ALLOWLIST` пуст вне истории задач
+- [x] PHPStan, CS, strict_types зелёные; baseline не вырос
 
 ## Итог
-_дописывается после выполнения_
+Выполнено 05.11.2026, коммит в PR #2891. Отклонение от плана: отдельного Repository нет —
+`AiServiceAccess` читает таблицу через DBAL (стаб final-репозитория в unit-тестах ломал PHPStan),
+Entity — только для схемы. Миграция `Version20261105120000` down/up локально; PHPStan без новых
+ошибок; CI #2891 зелёный (unit, integration, functional, static, migrations-empty-db).
