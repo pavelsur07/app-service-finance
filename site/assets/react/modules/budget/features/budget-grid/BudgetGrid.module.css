@@ -3,163 +3,326 @@
  * ячейка ввода. Только обёртки модуля, классы кита и Tabler не переопределяются.
  * Цвета и отступы — токены легаси-слоя (assets/styles/design-tokens.css).
  */
+.root {
+    position: relative;
+}
+
 .scroller {
     overflow: auto;
-    max-height: 70vh;
+    max-height: 620px;
     border-top: 1px solid var(--vf-border);
     outline: none;
 }
 
 .scroller:focus-visible {
-    box-shadow: var(--vf-shadow-focus);
+    box-shadow: inset 0 0 0 2px var(--vf-primary);
 }
 
+/* Ширины только фиксированные (BUDGET-SPEC §6): статьи 300, месяц 98, «Итого» 128. */
 .grid {
+    table-layout: fixed;
     border-collapse: separate;
     border-spacing: 0;
-    width: max-content;
-    min-width: 100%;
+    /* Общая ширина явно: 300 + 12 × 98 + 128. */
+    width: 1604px;
     font-variant-numeric: tabular-nums;
+}
+
+.colName {
+    width: 300px;
+}
+
+.colMonth {
+    width: 98px;
+}
+
+.colTotal {
+    width: 128px;
 }
 
 .grid th,
 .grid td {
-    padding: var(--vf-space-2) var(--vf-space-3);
+    height: 36px;
+    padding: 0 10px;
     border-bottom: 1px solid var(--vf-border);
+    border-right: 1px solid var(--vf-navy-50);
     background: var(--vf-surface);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .grid thead th {
     position: sticky;
     top: 0;
-    z-index: 2;
-    background: var(--vf-surface-alt);
-    color: var(--vf-text-secondary);
+    z-index: 3;
+    height: 38px;
+    background: var(--vf-navy-50);
+    border-bottom: 1px solid var(--vf-border-strong);
+    color: var(--vf-text-muted);
     font-size: var(--vf-size-xs);
-    font-weight: var(--vf-weight-semibold);
+    font-weight: var(--vf-weight-bold);
     text-transform: uppercase;
-    letter-spacing: var(--vf-tracking-wide);
+    letter-spacing: 0.03em;
     text-align: right;
 }
 
 .grid .name {
     position: sticky;
     left: 0;
-    z-index: 1;
-    min-width: 16rem;
-    max-width: 22rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    z-index: 2;
     text-align: left;
-    border-right: 1px solid var(--vf-border);
+    border-right: 1px solid var(--vf-border-strong);
 }
 
-/* Отступ уровня дерева: --budget-level задаёт строка (0 — верхний уровень). */
-.grid tbody .name {
-    padding-left: calc(var(--vf-space-3) + var(--budget-level, 0) * 1.25rem);
-    font-weight: var(--vf-weight-regular);
-}
-
-.grid tbody .subtotal .name {
-    font-weight: var(--vf-weight-semibold);
+/* Вес названия статьи — низкой специфичности: группа, итог и шапка его переопределяют. */
+:where(.grid tbody) .name {
+    font-weight: var(--vf-weight-medium);
 }
 
 .grid thead .name {
-    z-index: 3;
+    z-index: 4;
+}
+
+/* Отступ уровня дерева — 18 px (--budget-level задаёт строка, 0 — верхний уровень). */
+.nameInner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding-left: calc(var(--budget-level, 0) * 18px);
+}
+
+.nameText {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .toggle {
     display: inline-flex;
-    width: 1.25rem;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
     padding: 0;
     border: 0;
-    background: none;
+    border-radius: 3px;
+    background: transparent;
     color: var(--vf-text-muted);
     cursor: pointer;
 }
 
-.togglePlaceholder {
-    display: inline-block;
-    width: 1.25rem;
+.toggle:hover {
+    background: var(--vf-ghost-hover-bg);
 }
 
-.subtotal td,
-.subtotal th {
+.toggle:focus-visible {
+    outline: 2px solid var(--vf-primary);
+    outline-offset: 1px;
+}
+
+.togglePlaceholder {
+    flex: none;
+    width: 18px;
+}
+
+/* Группа (есть дочерние), итог без дочерних, KPI — BUDGET-SPEC §5. */
+.group th,
+.group td {
+    background: var(--vf-table-group-bg);
     font-weight: var(--vf-weight-semibold);
 }
 
-.kpi td,
-.kpi th {
+.calc th,
+.calc td {
+    background: var(--vf-hover-bg);
+    font-weight: var(--vf-weight-bold);
+}
+
+.kpi th,
+.kpi td {
     font-style: italic;
-    color: var(--vf-text-secondary);
+    font-weight: var(--vf-weight-medium);
+    color: var(--vf-text-muted);
 }
 
 .cell {
     position: relative;
-    min-width: 7.5rem;
     text-align: right;
 }
+
+/* Не поместившаяся сумма — с многоточием; полная — в подсказке ячейки (title). */
 
 .editable {
     cursor: cell;
 }
 
-.readonlyCell {
-    color: var(--vf-text-secondary);
+.grid td.editable:hover {
+    background: var(--vf-cell-hover-bg);
 }
 
-.active {
-    outline: 2px solid var(--vf-primary);
-    outline-offset: -2px;
+/* Лист, который сейчас не правится (режим суммы, не черновик, чтение). */
+.grid td.readonlyCell {
+    background: var(--vf-table-readonly-bg);
+    cursor: default;
+}
+
+.grid td.active {
+    z-index: 1;
+    box-shadow: inset 0 0 0 2px var(--vf-primary);
 }
 
 .grid td.invalid {
-    background: var(--vf-danger-bg);
-    outline: 2px solid var(--vf-danger-border);
-    outline-offset: -2px;
+    z-index: 1;
+    box-shadow: inset 0 0 0 2px var(--vf-danger-text);
 }
 
-.grid td.unsaved {
-    background: var(--vf-warn-bg);
+.grid td.total,
+.grid thead th.total {
+    background: var(--vf-table-group-bg);
+    font-weight: var(--vf-weight-semibold);
+    border-left: 1px solid var(--vf-border-strong);
 }
 
-.hasComment::after {
-    content: '';
+.grid thead th.total {
+    background: var(--vf-navy-50);
+}
+
+.calc td.total {
+    background: var(--vf-hover-bg);
+}
+
+/* Маркеры: комментарий — уголок справа сверху, «не сохранено» — точка слева сверху. */
+.commentMark {
     position: absolute;
     top: 0;
     right: 0;
     border-style: solid;
-    border-width: 0 0.5rem 0.5rem 0;
-    border-color: transparent var(--vf-primary) transparent transparent;
+    border-width: 0 9px 9px 0;
+    border-color: transparent var(--vf-marker) transparent transparent;
 }
 
-.grid td.total {
-    background: var(--vf-surface-alt);
+.unsavedDot {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--vf-marker);
 }
 
 .input {
+    position: absolute;
+    inset: 0;
     width: 100%;
-    padding: 0;
+    height: 100%;
+    padding: 0 10px;
     border: 0;
-    background: transparent;
+    background: var(--vf-surface);
     color: inherit;
     font: inherit;
+    font-variant-numeric: tabular-nums;
     text-align: right;
+    box-shadow: inset 0 0 0 2px var(--vf-primary);
     outline: none;
 }
 
-.commentPanel {
+.footer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vf-space-1);
     padding: var(--vf-space-3) var(--vf-space-4);
     border-top: 1px solid var(--vf-border);
-    background: var(--vf-surface-alt);
+    font-size: var(--vf-size-sm);
 }
 
-/* Телефон (ui-ux.md §3.8): колонка статей уже, месяцы прокручиваются рядом. */
-@media (max-width: 576px) {
-    .grid .name {
-        min-width: 9rem;
-        max-width: 10rem;
+.hotkeys {
+    color: var(--vf-text-muted);
+    font-size: var(--vf-size-xs);
+}
+
+/* Комментарий — поповер у правого верхнего угла карточки сетки. */
+.commentPopover {
+    position: absolute;
+    top: var(--vf-space-4);
+    right: var(--vf-space-4);
+    z-index: 30;
+    width: 340px;
+    max-width: calc(100% - 32px);
+    padding: var(--vf-space-4);
+    border: 1px solid var(--vf-border);
+    border-radius: var(--vf-radius-md);
+    background: var(--vf-surface);
+    box-shadow: var(--vf-shadow-lg);
+}
+
+.commentHint {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--vf-space-2);
+    margin-top: var(--vf-space-1);
+    font-size: var(--vf-size-xs);
+    color: var(--vf-text-muted);
+}
+
+.skeletonBar {
+    display: block;
+    height: 10px;
+    border-radius: 4px;
+    background: var(--vf-navy-100);
+    animation: budgetSkeleton 1.2s var(--vf-ease) infinite alternate;
+}
+
+@keyframes budgetSkeleton {
+    from { opacity: 0.45; }
+    to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skeletonBar {
+        animation: none;
+    }
+}
+
+/* ≤ 760 px: статьи 172, месяц 92, «Итого» 116; название 13 px; бейджи статьи скрыты. */
+@media (max-width: 760px) {
+    .grid {
+        width: 1392px; /* 172 + 12 × 92 + 116 */
+    }
+
+    .colName {
+        width: 172px;
+    }
+
+    .colMonth {
+        width: 92px;
+    }
+
+    .colTotal {
+        width: 116px;
+    }
+
+    .grid tbody .name {
+        font-size: 13px;
+    }
+
+    /* Месяц 92 px: «−12 345 678» помещается при 13 px и полях 4 px. */
+    .grid td.cell {
+        padding: 0 4px;
+        font-size: 13px;
+    }
+
+    .commentPopover {
+        position: fixed;
+        top: auto;
+        right: var(--vf-space-4);
+        bottom: var(--vf-space-4);
+        left: var(--vf-space-4);
+        width: auto;
+        max-width: none;
     }
 }
 
@@ -184,12 +347,12 @@
     column-gap: var(--vf-space-2);
 }
 
-/* Метка правила «X % от строки» под названием статьи — с отступом стрелки, как название. */
+/* Метка правила «X % от строки» под названием статьи. */
 .ruleBadge {
     display: block;
-    padding-left: 1.25rem;
-    font-size: 0.75rem;
-    font-weight: 400;
+    font-size: var(--vf-size-xs);
+    font-weight: var(--vf-weight-regular);
+    font-style: normal;
     color: var(--vf-text-muted);
     white-space: nowrap;
     overflow: hidden;

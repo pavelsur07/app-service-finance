@@ -6,7 +6,8 @@ import { BudgetFillPanel } from './BudgetFillPanel';
 import { BudgetImportPanel } from './BudgetImportPanel';
 import { BudgetRulePanel } from './BudgetRulePanel';
 import { BudgetGridView } from './BudgetGridView';
-import type { CommentDraft, VisibleRow } from './BudgetGridView';
+import type { CommentDraft } from './BudgetGridView';
+import { planPaste, visibleRows } from './grid-logic';
 import { BudgetSlicePills } from './BudgetSlicePills';
 import { HeadSlot, HelpersMenu, SaveIndicator } from './BudgetHeadControls';
 import type { BudgetSlice } from './slice';
@@ -33,26 +34,6 @@ function writeCollapsed(ids: Set<string>): void {
     } catch {
         // Свёртка — удобство: без хранилища просто не запоминается.
     }
-}
-
-/** Строки с учётом свёрнутых групп: потомки — строки ниже с уровнем больше, до первой не глубже. */
-function visibleRows(rows: BudgetGridRow[], collapsed: Set<string>): VisibleRow[] {
-    const result: VisibleRow[] = [];
-    let hideDeeperThan: number | null = null;
-    rows.forEach((row, index) => {
-        if (hideDeeperThan !== null && row.level > hideDeeperThan) {
-            return;
-        }
-        hideDeeperThan = null;
-        const hasChildren = (rows[index + 1]?.level ?? 0) > row.level;
-        const isCollapsed = hasChildren && collapsed.has(row.id);
-        if (isCollapsed) {
-            hideDeeperThan = row.level;
-        }
-        result.push({ row, hasChildren, collapsed: isCollapsed });
-    });
-
-    return result;
 }
 
 interface EditState {
@@ -176,7 +157,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
         const key = `${row.id}|${month}`;
         const parsed = parseAmountInput(text);
         if (parsed === null) {
-            setInvalid((current) => new Map(current).set(key, `«${text.trim()}» — не сумма (${row.name}, ${MONTH_NAMES[position.col]}). Примеры: 600000, 600 000, 600000,50.`));
+            setInvalid((current) => new Map(current).set(key, `Не удалось разобрать «${text.trim()}» (${row.name}, ${MONTH_NAMES[position.col]}). Введите число: 600000, 600 000 или 600000,50. Значение не сохранено.`));
 
             return false;
         }
@@ -357,29 +338,15 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
             return;
         }
         event.preventDefault();
-        const lines = text.replace(/\r/g, '').split('\n');
-        if (lines[lines.length - 1] === '') {
-            lines.pop();
+        const plan = planPaste(text, active, rows.map((visible) => visible.row), months, cellEditable);
+        const cells = plan.cells
+            .map((cell) => pendingFor(cell.row, cell.month, cell.amount, cell.row.comments[cell.month] ?? null))
+            .filter((cell): cell is PendingCell => cell !== null);
+        const skipped = plan.skipped;
+        // Вставленное значение заменяет ошибочный ввод — пометка ошибки снимается.
+        for (const cell of plan.cells) {
+            clearInvalid(`${cell.row.id}|${cell.month}`);
         }
-        const cells: PendingCell[] = [];
-        let skipped = 0;
-        lines.forEach((line, lineIndex) => {
-            line.split('\t').forEach((value, valueIndex) => {
-                const position = { row: active.row + lineIndex, col: active.col + valueIndex };
-                const row = rowAt(position);
-                const month = months[position.col];
-                const parsed = parseAmountInput(value);
-                if (row === undefined || month === undefined || !cellEditable(position) || parsed === null) {
-                    skipped += 1;
-
-                    return;
-                }
-                const cell = pendingFor(row, month, inputToStored(parsed, row.flow), row.comments[month] ?? null);
-                if (cell !== null) {
-                    cells.push(cell);
-                }
-            });
-        });
         grid.setCells(cells);
         setPasteMessage(`Вставлено ${cells.length} ${plural(cells.length, 'ячейка', 'ячейки', 'ячеек')}, пропущено ${skipped}.`);
     };
@@ -570,6 +537,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
                 fillPanel={fillPanel}
                 loading={grid.loading}
                 loadError={grid.loadError}
+                onReload={grid.reload}
                 scrollerRef={scrollerRef}
                 inputRef={inputRef}
                 onToggle={onToggle}

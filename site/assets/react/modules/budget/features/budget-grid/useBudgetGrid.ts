@@ -19,6 +19,8 @@ export interface UseBudgetGridResult {
     unsaved: PendingCell[];
     setCells: (cells: PendingCell[]) => void;
     retry: () => void;
+    /** Перечитать сетку после ошибки загрузки. */
+    reload: () => void;
     hasPending: () => boolean;
     flushNow: (keepalive: boolean) => void;
     /** Сервер сам изменил ячейки пары (помощник): отправленные правки поверх ответа больше не держим. */
@@ -214,6 +216,12 @@ export function useBudgetGrid(props: BudgetGridProps, slice: BudgetSlice): UseBu
         }, SAVE_DELAY_MS);
     }, [updateOverlay]);
 
+    const reload = useCallback((): void => {
+        setLoadError(null);
+        setLoading(true);
+        void loadRef.current();
+    }, []);
+
     const retry = useCallback((): void => {
         void flushRef.current();
     }, []);
@@ -287,5 +295,5 @@ export function useBudgetGrid(props: BudgetGridProps, slice: BudgetSlice): UseBu
         void load();
     }, [load, pair, updateOverlay]);
 
-    return { data, loading, loadError, saveState, saveError, lockedMessage, unsaved, setCells, retry, hasPending, flushNow, reloadAfterServerWrite };
+    return { data, loading, loadError, saveState, saveError, lockedMessage, unsaved, setCells, retry, reload, hasPending, flushNow, reloadAfterServerWrite };
 }
