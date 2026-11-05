@@ -1542,6 +1542,17 @@ getPlFactAmountsByMonth(
     bool $includeUnassignedCenter = false,
 ): array                            // array<string month, array<string categoryId, string amount>>
 
+// То же для среза мультивыбора: проекты — списки точных id (поддерево разворачивает вызывающий),
+// ЦФО — список; null — без фильтра по измерению, пустой список — пустой результат;
+// includeUnassignedCenter — плюс строки без ЦФО. Потребитель — Budget (страница «План–факт»).
+getPlFactAmountsByMonthForSlice(
+    string $companyId,
+    int $year,
+    ?array $projectDirectionIds,     // list<string>|null
+    ?array $responsibilityCenterIds, // list<string>|null
+    bool $includeUnassignedCenter = false,
+): array                            // array<string month, array<string categoryId, string amount>>
+
 // Есть ли ненулевой факт ОПиУ за год хотя бы в одной ячейке «проект × ЦФО × статья × месяц»
 // (встречные суммы разных пар не гасят друг друга). Потребитель — Budget («Заполнить из факта»).
 hasPlFactInYear(string $companyId, int $year): bool
@@ -2098,7 +2109,7 @@ Facade нет: план читает только сам модуль; Facade п
 | `/finance/budget/versions/{id}` | GET | экран варианта: шапка Twig (название с карандашом, кнопка статуса с причиной недоступности текстом, «⋯» — Копировать, Выгрузить в Excel, В архив; баннеры статуса и роли «Чтение»), React-остров `budget-grid` (entry `budget_grid_page`; props: `versionId`, `year`, `editable`, `canWrite`, `isOwner`, `pairs` с `projectName`/`centerName`, `gridUrl`, `cellsUrl`, `csrfToken`, `plCategoriesUrl`); остров рисует порталом в слоты шапки `data-budget-head-slot` индикатор сохранения и «Помощники ▾», разрез — пилюли «Проект»/«ЦФО» в адресе `?project=&center=` (`all` — все) | чтение |
 | `/finance/budget/versions/{id}/grid?project=&center=` | GET | JSON сетки `BudgetGridView`: пара — с комментариями и правилами; одно измерение (другое пусто или `all`) — сумма пар этого проекта / ЦФО; без обоих — сумма всех пар (`BudgetPairResolver::resolveSlice`, неизвестное значение — 422 `budget_invalid_pair`) | чтение |
 | `/finance/budget/versions/{id}/name` | POST | переименовать черновик: JSON `{name}` → `{name}`, `X-CSRF-Token` (`budget_cells`) | запись |
-| `/finance/budget/plan-fact?year=&version=&project=&center=&show=&layout=&period=` | GET | вкладка «План–факт» (Twig): вариант по умолчанию — утверждённый, иначе первый неархивный с подсказкой; пара по умолчанию — вся компания; `show` plan/fact/diff/percent/all («Все показатели»), `layout` columns/rows (по умолчанию: месяцы — rows, кварталы — columns), `period` month/quarter; показатель, раскладка и период помнятся в сессии (`budget_plan_fact_view`); блок «Итого» по закрытым месяцам и «План года»; факт месяца — ссылка на `finance_report_preview` | чтение |
+| `/finance/budget/plan-fact?year=&version=&projects[]=&centers[]=&show=&layout=&period=` | GET | вкладка «План–факт» (Twig): вариант по умолчанию — утверждённый, иначе первый неархивный с подсказкой; проекты (с дочерними) и ЦФО — мультивыбор пилюлями, по умолчанию и при полном выборе — вся компания, неизвестные id отбрасываются, старый `?project=&center=` — списки из одного значения (`BudgetPlanFactFilterResolver`); `show` plan/fact/diff/percent/all («Все показатели»), `layout` columns/rows (по умолчанию: месяцы — rows, кварталы — columns), `period` month/quarter; показатель, раскладка и период помнятся в сессии (`budget_plan_fact_view`); блок «Итого» по закрытым месяцам и «План года»; факт месяца — ссылка на `finance_report_preview` с теми же фильтрами | чтение |
 | `/finance/budget/versions/{id}/plan-fact?project=&center=` | GET | JSON `BudgetPlanFactView`: план, факт, отклонение по месяцам и году; без пары — вся компания | чтение |
 | `/finance/budget/versions/{id}/fill` | POST | помощник заполнения: JSON `{helper, project, center, categoryIds, months, params, apply, confirmOverwrite}` → `{cells, changed, overwrite, skipped, applied}`; без `apply` — предпросмотр; `X-CSRF-Token` (`budget_cells`) | запись |
 | `/finance/budget/versions/{id}/export` | GET | xlsx варианта (`?project=&center=` — пара, без них — вся компания); лист «План» по `Infrastructure\Xlsx\BudgetPlanSheet` | чтение |
@@ -2130,11 +2141,17 @@ Facade нет: план читает только сам модуль; Facade п
   `percent` = diff / |план|, `significant` при |%| > `THRESHOLD_PERCENT` = 10;
   план 0 при факте ≠ 0 — значимо без `%`; не-деньги — без `%` и пометки). Минус
   отклонения — хуже для прибыли и в доходах, и в расходах.
-- Факт пары с системным ЦФО «Общий» (`BudgetPairResolver::isGeneralCenter`)
-  включает строки регистра без ЦФО (решение Владельца 04.11, вариант A) — в
-  план–факте и в помощниках «из факта». Отчёт ОПиУ при фильтре по ЦФО строки
-  без ЦФО не показывает, поэтому ссылки «факт → отчёт» для такой пары нет; их
-  нет и для проекта с дочерними (отчёт включает дочерние).
+- Страница «План–факт» — срез мультивыбора (`BudgetPlanFactFilter`,
+  `BudgetPlanFactBuilder::buildFiltered`): проект — с дочерними, как отчёт ОПиУ;
+  план — сумма пар среза (`BudgetCellsQuery::fetchSlice`), факт —
+  `FinanceFacade::getPlFactAmountsByMonthForSlice`. JSON `/versions/{id}/plan-fact`
+  и помощники — точная пара (`build`, `getPlFactAmountsByMonth`).
+- Системный ЦФО «Общий» (`BudgetPairResolver::isGeneralCenter`, в срезе — среди
+  выбранных ЦФО) включает строки регистра без ЦФО (решение Владельца 04.11,
+  вариант A) — в план–факте и в помощниках «из факта»; в фильтре подписан
+  «Общий (включая «Не задано»)». Отчёт ОПиУ при фильтре по ЦФО строки без ЦФО не
+  показывает, поэтому при «Общем» в фильтре ЦФО ссылок «факт → отчёт» нет;
+  в остальных случаях ссылка несёт те же проекты и ЦФО, суммы совпадают.
 - Помощники заполнения (`BudgetFillHelper`: `last_year_fact`, `average`,
   `distribute`, `copy_right`, `percent_of`): `BudgetFillPlanner` считает
   ячейки пары черновика (только изменяемые; `sales_plan` — пропуск;
@@ -4945,6 +4962,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.141 | 2026-11-05 | Budget: план–факт — мультивыбор проектов (с дочерними) и ЦФО пилюлями (`BudgetPlanFactFilterResolver`, `buildFiltered`, `BudgetCellsQuery::fetchSlice`), ссылка в отчёт ОПиУ с теми же фильтрами; Finance: `getPlFactAmountsByMonthForSlice()` (задача `pl-budget`, этап 15) |
 | 2.140 | 2026-11-05 | Budget: план–факт по пакету DS — «Все показатели» колонками и строками, память вида в сессии, «Итого», подсветка > 10 %, п. п. у KPI, сворачивание групп, мобильная только с итогом (задача `pl-budget`, этап 14) |
 | 2.139 | 2026-11-05 | Budget: окно «Быстрое заполнение» в два шага вместо панели помощников (`BudgetFillDialog`, `fill-logic.ts`); статьи с правилом показываются неактивными; контракт `/fill` без изменений (задача `pl-budget`, этап 13) |
 | 2.138 | 2026-11-04 | Budget: шапка экрана варианта по пакету DS — переименование черновика (`RenameBudgetVersionAction`, `/name`), кнопка статуса с причиной, «⋯», баннеры, индикатор сохранения и «Помощники ▾» порталом острова, пилюли разреза; сетка по одному измерению (`resolveSlice`, `BudgetCellsQuery`), `?copy=` списка (задача `pl-budget`, этап 11) |

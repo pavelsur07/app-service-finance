@@ -63,6 +63,48 @@ final readonly class BudgetCellsQuery
     }
 
     /**
+     * Сумма плана по парам среза (план–факт с мультивыбором): проекты и ЦФО — списки точных id,
+     * null — без фильтра по измерению, пустой список — ничего.
+     *
+     * @param list<string>|null $projectDirectionIds
+     * @param list<string>|null $responsibilityCenterIds
+     *
+     * @return list<BudgetCellRow>
+     */
+    public function fetchSlice(string $companyId, string $versionId, ?array $projectDirectionIds, ?array $responsibilityCenterIds): array
+    {
+        if ([] === $projectDirectionIds || [] === $responsibilityCenterIds) {
+            return [];
+        }
+        $filter = '';
+        $params = ['companyId' => $companyId, 'versionId' => $versionId];
+        $types = [];
+        if (null !== $projectDirectionIds) {
+            $filter .= ' AND project_direction_id IN (:projectIds)';
+            $params['projectIds'] = array_values(array_unique($projectDirectionIds));
+            $types['projectIds'] = ArrayParameterType::STRING;
+        }
+        if (null !== $responsibilityCenterIds) {
+            $filter .= ' AND responsibility_center_id IN (:centerIds)';
+            $params['centerIds'] = array_values(array_unique($responsibilityCenterIds));
+            $types['centerIds'] = ArrayParameterType::STRING;
+        }
+        $rows = $this->connection->fetchAllAssociative(
+            "SELECT pl_category_id, to_char(month, 'YYYY-MM') AS month, SUM(amount)::text AS amount
+               FROM budget_lines
+              WHERE company_id = :companyId AND version_id = :versionId{$filter}
+              GROUP BY pl_category_id, month",
+            $params,
+            $types,
+        );
+
+        return array_map(
+            static fn (array $row): BudgetCellRow => new BudgetCellRow((string) $row['pl_category_id'], (string) $row['month'], (string) $row['amount'], null, 'manual'),
+            $rows,
+        );
+    }
+
+    /**
      * Годовые суммы вариантов по статьям — по всем парам и месяцам.
      *
      * @param list<string> $versionIds

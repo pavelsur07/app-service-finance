@@ -154,44 +154,66 @@ final class BudgetPagesTest extends WebTestCaseBase
         self::assertStringContainsString('/finance/report/preview?from=2027-01-01&to=2027-01-31', (string) $link->attr('href'));
     }
 
-    public function testPlanFactFactLinksToReportOnlyWhenSumsMatchReport(): void
+    public function testPlanFactFiltersProjectsWithChildrenAndCentersAndLinksReportWithSameFilters(): void
     {
         self::mockTime(new \DateTimeImmutable('2027-03-15 12:00', new \DateTimeZone('Europe/Moscow')));
-        $this->version('Утверждённый', BudgetVersionStatus::APPROVED);
+        $versionId = $this->version('Утверждённый', BudgetVersionStatus::APPROVED);
+        $company = $this->em()->find(Company::class, self::COMPANY_ID);
         $project = $this->em()->find(ProjectDirection::class, self::PROJECT_ID);
+        self::assertNotNull($company);
         self::assertNotNull($project);
+        $child = new ProjectDirection(Uuid::uuid7()->toString(), $company, 'Магазин');
+        $child->setParent($project);
+        $site = new ProjectDirection(Uuid::uuid7()->toString(), $company, 'Сайт');
         $sales = new FinancialResponsibilityCenter(self::COMPANY_ID, 'CFO_SALES', 'Продажи');
+        $this->em()->persist($child);
+        $this->em()->persist($site);
         $this->em()->persist($sales);
-        $this->em()->persist(new FinancialResponsibilityCenterProject(self::COMPANY_ID, $project, $sales));
+        $this->em()->persist(new FinancialResponsibilityCenterProject(self::COMPANY_ID, $child, $sales));
+        $this->em()->persist(new FinancialResponsibilityCenterProject(self::COMPANY_ID, $site, $sales));
         $this->em()->flush();
-        $salesId = $sales->getId();
+        [$childId, $siteId, $salesId] = [(string) $child->getId(), (string) $site->getId(), $sales->getId()];
         $this->em()->clear();
+        $this->line($versionId, '2027-01-01', '1000.00');
+        $this->lineFor($versionId, $childId, $salesId, '200.00');
+        $this->lineFor($versionId, $siteId, $salesId, '30.00');
         $this->login($this->reader);
-        $cell = '[data-pf-row="REV"] [data-pf-cell="2027-01"] a';
+        $cell = '[data-pf-row="REV"] [data-pf-cell="2027-01"]';
 
-        // Системный «Общий» включает факт без ЦФО — отчёт с фильтром по ЦФО его не покажет.
-        $this->client->request('GET', sprintf('/finance/budget/plan-fact?year=2027&show=fact&project=%s&center=%s', self::PROJECT_ID, $this->centerId));
-        self::assertSelectorNotExists($cell);
+        // По умолчанию — вся компания, пилюли «Все».
+        $this->client->request('GET', '/finance/budget/plan-fact?year=2027&show=plan&period=month');
+        self::assertSelectorTextContains($cell, "1\u{00A0}230");
+        self::assertSelectorTextSame('[data-pf-pick="projects"] [data-pf-pick-value]', 'Все');
+        self::assertSelectorTextSame('[data-pf-pick="centers"] [data-pf-pick-value]', 'Все');
+        self::assertCount(3, $this->client->getCrawler()->filter('[data-pf-pick="projects"] input[type=checkbox]:checked'));
+        self::assertSelectorTextContains('[data-pf-pick="centers"]', 'Общий (включая «Не задано»)');
+        self::assertSelectorTextContains('[data-pf-pick="projects"]', 'включая вложенные');
+
+        // Проект — вместе с дочерним; пилюля ЦФО несёт выбор проектов, ссылка в отчёт — те же фильтры.
+        $this->client->request('GET', sprintf('/finance/budget/plan-fact?year=2027&show=plan&period=month&projects[]=%s', self::PROJECT_ID));
+        self::assertSelectorTextContains($cell, "1\u{00A0}200");
+        self::assertSelectorTextSame('[data-pf-pick="projects"] [data-pf-pick-value]', 'Общий');
+        self::assertCount(1, $this->client->getCrawler()->filter(sprintf('[data-pf-pick="centers"] input[type=hidden][name="projects[]"][value="%s"]', self::PROJECT_ID)));
+        $this->client->request('GET', sprintf('/finance/budget/plan-fact?year=2027&show=fact&period=month&projects[]=%s&centers[]=%s', self::PROJECT_ID, $salesId));
+        $href = urldecode((string) $this->client->getCrawler()->filter($cell.' a')->attr('href'));
+        self::assertStringContainsString('projectDirectionIds[0]='.self::PROJECT_ID, $href);
+        self::assertStringContainsString('responsibilityCenterIds[0]='.$salesId, $href);
+        self::assertStringNotContainsString($childId, $href);
+
+        // Несколько ЦФО — «N из M»; с «Общим» в фильтре ЦФО ссылок на отчёт нет, и это объяснено.
+        $this->client->request('GET', sprintf('/finance/budget/plan-fact?year=2027&show=plan&period=month&projects[]=%s&projects[]=%s', $childId, $siteId));
+        self::assertSelectorTextContains($cell, '230');
+        self::assertSelectorTextSame('[data-pf-pick="projects"] [data-pf-pick-value]', '2 из 3');
+        $this->client->request('GET', sprintf('/finance/budget/plan-fact?year=2027&show=fact&period=month&centers[]=%s', $this->centerId));
+        self::assertSelectorNotExists($cell.' a');
         self::assertSelectorTextContains('.card-footer', 'операции без ЦФО');
 
-        $url = sprintf('/finance/budget/plan-fact?year=2027&show=fact&project=%s&center=%s', self::PROJECT_ID, $salesId);
-        $this->client->request('GET', $url);
-        $href = (string) $this->client->getCrawler()->filter($cell)->attr('href');
-        self::assertStringContainsString('responsibilityCenterIds', urldecode($href));
-
-        $company = $this->em()->find(Company::class, self::COMPANY_ID);
-        $parent = $this->em()->find(ProjectDirection::class, self::PROJECT_ID);
-        self::assertNotNull($company);
-        self::assertNotNull($parent);
-        $child = new ProjectDirection(Uuid::uuid7()->toString(), $company, 'Магазин');
-        $child->setParent($parent);
-        $this->em()->persist($child);
-        $this->em()->flush();
-        $this->em()->clear();
-
-        $this->client->request('GET', $url);
-        self::assertSelectorNotExists($cell);
-        self::assertSelectorTextContains('.card-footer', 'без дочерних');
+        // Старые ссылки `?project=&center=` читаются как списки из одного значения.
+        $this->client->request('GET', sprintf('/finance/budget/plan-fact?year=2027&show=plan&period=month&project=%s&center=%s', $siteId, $salesId));
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains($cell, '30');
+        self::assertSelectorTextSame('[data-pf-pick="projects"] [data-pf-pick-value]', 'Сайт');
+        self::assertSelectorTextSame('[data-pf-pick="centers"] [data-pf-pick-value]', 'Продажи');
     }
 
     public function testPlanFactPageWithoutApprovedHintsAndWithoutVersionsIsEmpty(): void
@@ -715,6 +737,15 @@ final class BudgetPagesTest extends WebTestCaseBase
             "INSERT INTO budget_lines (id, company_id, version_id, pl_category_id, month, project_direction_id, responsibility_center_id, amount, source, comment, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual', NULL, NOW())",
             [Uuid::uuid7()->toString(), self::COMPANY_ID, $versionId, self::REVENUE_ID, $month, self::PROJECT_ID, $this->centerId, $amount],
+        );
+    }
+
+    private function lineFor(string $versionId, string $projectId, string $centerId, string $amount): void
+    {
+        $this->em()->getConnection()->executeStatement(
+            "INSERT INTO budget_lines (id, company_id, version_id, pl_category_id, month, project_direction_id, responsibility_center_id, amount, source, comment, updated_at)
+             VALUES (?, ?, ?, ?, '2027-01-01', ?, ?, ?, 'manual', NULL, NOW())",
+            [Uuid::uuid7()->toString(), self::COMPANY_ID, $versionId, self::REVENUE_ID, $projectId, $centerId, $amount],
         );
     }
 

@@ -52,6 +52,45 @@
 {% endmacro %}
 
 {# Подсветка значимого отклонения (> порога или факт без плана): у факта, отклонения и %. #}
+{# Скрытые поля из параметров адреса; списки — `name[]`. #}
+{% macro hidden(query) %}
+    {%- for key, value in query -%}
+        {%- if value is iterable -%}
+            {%- for item in value %}<input type="hidden" name="{{ key }}[]" value="{{ item }}">{% endfor -%}
+        {%- else -%}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {%- endif -%}
+    {%- endfor -%}
+{% endmacro %}
+
+{# Пилюля мультивыбора (BUDGET-SPEC §6): меню с флажками, «все / ни одной», «Применить» (budget_plan_fact.js). #}
+{% macro picker(name, label, value, options, query, note) %}
+    <details class="vf-pf-pick" data-pf-pick="{{ name }}">
+        <summary class="vf-pf-pick__pill"><span class="vf-pf-pick__label">{{ label }}:</span> <span class="vf-pf-pick__value" data-pf-pick-value>{{ value }}</span><i class="ti ti-chevron-down" aria-hidden="true"></i></summary>
+        <form method="get" action="{{ path('budget_plan_fact') }}" class="vf-pf-pick__menu" data-pf-pick-form>
+            {{ _self.hidden(query) }}
+            <div class="vf-pf-pick__head">
+                <span>{{ label }}</span>
+                <span class="vf-pf-pick__bulk"><button type="button" class="btn btn-link btn-sm p-0" data-pf-pick-all>все</button> / <button type="button" class="btn btn-link btn-sm p-0" data-pf-pick-none>ни одной</button></span>
+            </div>
+            <fieldset class="vf-pf-pick__list">
+                <legend class="visually-hidden">{{ label }}</legend>
+                {% for option in options %}
+                    <label class="form-check vf-pf-pick__option" style="--vf-pick-level: {{ (option.level ?? 1) - 1 }}">
+                        <input class="form-check-input" type="checkbox" name="{{ name }}[]" value="{{ option.id }}" data-pf-level="{{ option.level ?? 1 }}"{% if option.selected %} checked{% endif %}>
+                        <span class="form-check-label">{{ option.system ?? false ? option.name ~ ' (включая «Не задано»)' : option.name }}</span>
+                    </label>
+                {% endfor %}
+            </fieldset>
+            {% if note %}<div class="vf-pf-pick__note">{{ note }}</div>{% endif %}
+            <div class="vf-pf-pick__foot">
+                <span class="vf-pf-pick__hint" data-pf-pick-hint hidden>Выберите хотя бы одно значение.</span>
+                <button type="submit" class="btn btn-primary btn-sm" data-pf-pick-apply>Применить</button>
+            </div>
+        </form>
+    </details>
+{% endmacro %}
+
 {% macro hl(metric, cell) %}{{ cell.significant and metric != 'plan' ? ' vf-pf__hl' : '' }}{% endmacro %}
 
 {% block body %}
@@ -60,8 +99,10 @@
     {% set quarter_names = ['1 кв.', '2 кв.', '3 кв.', '4 кв.'] %}
     {% set show_labels = {all: 'Все показатели', plan: 'План', fact: 'Факт', diff: 'Отклонение', percent: '%'} %}
     {% set metric_labels = {plan: 'План', fact: 'Факт', diff: 'Откл.', percent: '%'} %}
-    {% set pair_query = pair ? {project: pair.projectDirectionId, center: pair.responsibilityCenterId} : {} %}
-    {% set base_query = {year: year}|merge(version ? {version: version.id} : {})|merge(pair_query) %}
+    {% set filter_query = filter.query() %}
+    {% set base_query = {year: year}|merge(version ? {version: version.id} : {})|merge(filter_query) %}
+    {% set report_filters = filter.reportQuery() %}
+    {% set report_linkable = filter.reportLinkable() %}
 
     {% set all = show == 'all' %}
     {% set by_columns = all and layout == 'columns' %}
@@ -123,22 +164,15 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        {% if pairs|length > 1 %}
-                            <div class="vf-pf-bar__field">
-                                <label class="vf-pf-bar__label" for="pf-pair">Проект × ЦФО</label>
-                                {# Пара — одним значением «проект|ЦФО»; скрытые поля заполняет budget_plan_fact.js. #}
-                                <select id="pf-pair" class="form-select w-auto" data-pf-pair>
-                                    <option value=""{% if pair is null %} selected{% endif %}>Вся компания</option>
-                                    {% for p in pairs %}
-                                        <option value="{{ p.projectDirectionId }}|{{ p.responsibilityCenterId }}"{% if pair and pair.projectDirectionId == p.projectDirectionId and pair.responsibilityCenterId == p.responsibilityCenterId %} selected{% endif %}>{{ p.label }}</option>
-                                    {% endfor %}
-                                </select>
-                                <input type="hidden" name="project" value="{{ pair ? pair.projectDirectionId : '' }}">
-                                <input type="hidden" name="center" value="{{ pair ? pair.responsibilityCenterId : '' }}">
-                            </div>
-                        {% endif %}
+                        {{ _self.hidden(filter_query) }}
                         <noscript><button type="submit" class="btn btn-sm">Показать</button></noscript>
                     </form>
+                    {% if filter.projectOptions|length > 1 %}
+                        {{ _self.picker('projects', 'Проект', filter.projectLabel(), filter.projectOptions, {year: year, version: version.id, show: show, period: period}|merge(filter_query|filter((v, k) => k != 'projects')), 'Проект выбирается включая вложенные.') }}
+                    {% endif %}
+                    {% if filter.centerOptions|length > 1 %}
+                        {{ _self.picker('centers', 'ЦФО', filter.centerLabel(), filter.centerOptions, {year: year, version: version.id, show: show, period: period}|merge(filter_query|filter((v, k) => k != 'centers')), null) }}
+                    {% endif %}
                     <div class="vf-seg" role="group" aria-label="Период">
                         <a href="{{ path('budget_plan_fact', base_query|merge({show: show, period: 'month'})) }}"{% if period == 'month' %} class="active" aria-current="true"{% endif %}>Месяцы</a>
                         <a href="{{ path('budget_plan_fact', base_query|merge({show: show, period: 'quarter'})) }}"{% if period == 'quarter' %} class="active" aria-current="true"{% endif %}>Кварталы</a>
@@ -261,12 +295,8 @@
                                 {% for column in periodColumns %}
                                     {% set cell = row.cells[column.key] %}
                                     {% set link = null %}
-                                    {% if reportLinkable and column.kind == 'month' and row.format == 'MONEY' %}
-                                        {% set report_query = {from: column.key ~ '-01', to: (column.key ~ '-01')|date_modify('last day of this month')|date('Y-m-d')} %}
-                                        {% if pair %}
-                                            {% set report_query = report_query|merge({projectFiltersPresent: 1, projectDirectionIds: [pair.projectDirectionId], responsibilityCenterFiltersPresent: 1, responsibilityCenterIds: [pair.responsibilityCenterId]}) %}
-                                        {% endif %}
-                                        {% set link = path('finance_report_preview', report_query) %}
+                                    {% if report_linkable and column.kind == 'month' and row.format == 'MONEY' %}
+                                        {% set link = path('finance_report_preview', {from: column.key ~ '-01', to: (column.key ~ '-01')|date_modify('last day of this month')|date('Y-m-d')}|merge(report_filters)) %}
                                     {% endif %}
                                     {% for metric in (row_metric ? [row_metric] : metrics) %}
                                         <td class="vf-pf__period{{ by_columns and loop.first ? ' vf-pf__group-start' : '' }}{{ metric == 'plan' and all ? ' vf-pf__plan' : '' }}{{ _self.hl(metric, cell) }}" data-pf-cell="{{ column.key }}"{% if all %} data-pf-cell-metric="{{ metric }}"{% endif %}>{{ _self.content(metric, cell, row.format, link) }}</td>
@@ -294,7 +324,7 @@
                 <div>
                     {% if has_total %}{{ total_label }} — по закрытым месяцам.{% else %}За {{ year }} год закрытых месяцев нет — итог не считается.{% endif %}
                     Текущий месяц не сравнивается; будущие месяцы: факт пустой, отклонение не считается.
-                    {% if generalCenter %} Факт ЦФО «Общий» включает операции без ЦФО, поэтому ссылок на отчёт ОПиУ (при фильтре по ЦФО он их не показывает) нет.{% elseif not reportLinkable %} Факт — по выбранному проекту без дочерних, поэтому ссылок на отчёт ОПиУ (он включает дочерние проекты) нет.{% endif %}
+                    {% if not report_linkable %} ЦФО «Общий» включает операции без ЦФО, а отчёт ОПиУ при фильтре по ЦФО их не показывает, поэтому ссылок на отчёт нет.{% endif %}
                 </div>
             </div>
         {% endif %}

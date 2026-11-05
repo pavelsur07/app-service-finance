@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Budget;
 
 use App\Budget\Application\Service\BudgetPlanFactBuilder;
+use App\Budget\Application\Service\BudgetPlanFactFilterResolver;
 use App\Budget\Application\View\BudgetPlanFactColumn;
+use App\Budget\Application\View\BudgetPlanFactFilter;
 use App\Budget\Application\View\BudgetPlanFactRow;
 use App\Budget\Application\View\BudgetPlanFactView;
 use App\Budget\Entity\BudgetVersion;
@@ -91,6 +93,76 @@ final class BudgetPlanFactBuilderTest extends BudgetIntegrationTestCase
         self::assertSame(['1200.00', '1250.00'], [$jan->plan, $jan->fact]);
     }
 
+    public function testFilterProjectIncludesChildrenInPlanAndFact(): void
+    {
+        $childId = $this->childProject(self::SHOP_PROJECT_ID, 'Витрина');
+        $version = $this->em->find(BudgetVersion::class, self::VERSION_ID);
+        self::assertNotNull($version);
+        $this->line($version, self::REVENUE_ID, '2027-01', '50.00', $childId, $this->salesCenterId);
+        $this->fact(self::REVENUE_ID, $childId, $this->salesCenterId, '2027-01-21', income: '30.00');
+        $this->em->flush();
+        $this->em->clear();
+
+        $filter = $this->filter([self::SHOP_PROJECT_ID], []);
+        self::assertSame([self::SHOP_PROJECT_ID], $filter->selectedProjectIds);
+        self::assertSame([self::SHOP_PROJECT_ID, $childId], $filter->projectIds);
+        self::assertTrue($filter->reportLinkable());
+        self::assertSame(['projectFiltersPresent' => 1, 'projectDirectionIds' => [self::SHOP_PROJECT_ID]], $filter->reportQuery());
+
+        $jan = $this->row($this->buildFiltered($filter), self::REVENUE_ID)->cells['2027-01'];
+        self::assertSame(['250.00', '130.00'], [$jan->plan, $jan->fact]);
+
+        // Только дочерний — без родителя.
+        $child = $this->row($this->buildFiltered($this->filter([$childId], [])), self::REVENUE_ID)->cells['2027-01'];
+        self::assertSame(['50.00', '30.00'], [$child->plan, $child->fact]);
+    }
+
+    public function testFilterCentersIncludeFactWithoutCenterOnlyWithGeneral(): void
+    {
+        $this->fact(self::REVENUE_ID, self::GENERAL_PROJECT_ID, null, '2027-01-25', income: '7.00');
+        $this->fact(self::REVENUE_ID, self::SHOP_PROJECT_ID, null, '2027-01-26', income: '9.00');
+        $this->em->flush();
+        $this->em->clear();
+
+        $sales = $this->filter([], [$this->salesCenterId]);
+        self::assertFalse($sales->includeUnassigned);
+        self::assertTrue($sales->reportLinkable());
+        $jan = $this->row($this->buildFiltered($sales), self::REVENUE_ID)->cells['2027-01'];
+        self::assertSame(['200.00', '100.00'], [$jan->plan, $jan->fact]);
+
+        // «Общий» — и факт без ЦФО всех проектов; отчёт ОПиУ с фильтром ЦФО его не покажет — без ссылок.
+        $general = $this->filter([], [$this->generalCenterId]);
+        self::assertTrue($general->includeUnassigned);
+        self::assertFalse($general->reportLinkable());
+        $jan = $this->row($this->buildFiltered($general), self::REVENUE_ID)->cells['2027-01'];
+        self::assertSame(['1000.00', '1166.00'], [$jan->plan, $jan->fact]);
+
+        // Проект «Магазин» × «Общий»: только факт без ЦФО этого проекта.
+        $jan = $this->row($this->buildFiltered($this->filter([self::SHOP_PROJECT_ID], [$this->generalCenterId])), self::REVENUE_ID)->cells['2027-01'];
+        self::assertSame(['0.00', '9.00'], [$jan->plan, $jan->fact]);
+    }
+
+    public function testFilterAllSelectedOrUnknownIsWholeCompany(): void
+    {
+        foreach ([
+            [[], []],
+            [[self::GENERAL_PROJECT_ID, self::SHOP_PROJECT_ID], [$this->generalCenterId, $this->salesCenterId]],
+            [[self::OTHER_COMPANY_PROJECT_ID, 'not-a-uuid'], [$this->otherCompanyCenterId, $this->archivedCenterId]],
+        ] as [$projects, $centers]) {
+            $filter = $this->filter($projects, $centers);
+            self::assertTrue($filter->isAll());
+            self::assertSame([], $filter->query());
+            self::assertSame('Все', $filter->projectLabel());
+            $jan = $this->row($this->buildFiltered($filter), self::REVENUE_ID)->cells['2027-01'];
+            self::assertSame(['1200.00', '1250.00'], [$jan->plan, $jan->fact]);
+        }
+
+        // Чужой id рядом со своим отбрасывается.
+        $filter = $this->filter([self::SHOP_PROJECT_ID, self::OTHER_COMPANY_PROJECT_ID], [$this->salesCenterId, $this->otherCompanyCenterId]);
+        self::assertSame(['projects' => [self::SHOP_PROJECT_ID], 'centers' => [$this->salesCenterId]], $filter->query());
+        self::assertSame(['Магазин', 'Продажи'], [$filter->projectLabel(), $filter->centerLabel()]);
+    }
+
     public function testColumnsFollowClosedMonthsAndQuartersAreCalculatedNotSummed(): void
     {
         $company = $this->em->find(Company::class, self::COMPANY_ID);
@@ -141,6 +213,36 @@ final class BudgetPlanFactBuilderTest extends BudgetIntegrationTestCase
         self::assertNotNull($version);
 
         return self::getContainer()->get(BudgetPlanFactBuilder::class)->build($version, $projectId, $centerId);
+    }
+
+    /**
+     * @param list<string> $projects
+     * @param list<string> $centers
+     */
+    private function filter(array $projects, array $centers): BudgetPlanFactFilter
+    {
+        return self::getContainer()->get(BudgetPlanFactFilterResolver::class)->resolve(self::COMPANY_ID, $projects, $centers);
+    }
+
+    private function buildFiltered(BudgetPlanFactFilter $filter): BudgetPlanFactView
+    {
+        $version = $this->em->find(BudgetVersion::class, self::VERSION_ID);
+        self::assertNotNull($version);
+
+        return self::getContainer()->get(BudgetPlanFactBuilder::class)->buildFiltered($version, $filter);
+    }
+
+    private function childProject(string $parentId, string $name): string
+    {
+        $company = $this->em->getReference(Company::class, self::COMPANY_ID);
+        $parent = $this->em->find(ProjectDirection::class, $parentId);
+        self::assertNotNull($company);
+        self::assertNotNull($parent);
+        $child = new ProjectDirection(sprintf('0193cccc-0000-7000-8000-0000000f9%03d', ++$this->n), $company, $name);
+        $child->setParent($parent);
+        $this->em->persist($child);
+
+        return (string) $child->getId();
     }
 
     private function row(BudgetPlanFactView $view, string $id): BudgetPlanFactRow

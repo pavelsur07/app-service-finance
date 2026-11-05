@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Finance\Infrastructure\Query;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 /**
  * Факт ОПиУ из регистра `pl_daily_totals` по статьям и месяцам года одним GROUP BY — для
- * план–факт бюджета. Знак — значение отчёта (доход − расход). Проект — точное совпадение, без
- * дочерних (в отличие от отчёта ОПиУ): план бюджета хранится по точной паре «проект × ЦФО», и
- * факт дочернего проекта сравнивается с его собственным планом.
+ * план–факт бюджета. Знак — значение отчёта (доход − расход). Проекты — точные id: `fetch` (одна
+ * пара) сравнивает факт проекта с его собственным планом; `fetchSlice` получает уже развёрнутое
+ * вызывающим поддерево (как в отчёте ОПиУ).
  */
 final readonly class PlFactMonthlyAmountsQuery
 {
@@ -23,22 +24,54 @@ final readonly class PlFactMonthlyAmountsQuery
      */
     public function fetch(string $companyId, int $year, ?string $projectDirectionId, ?string $responsibilityCenterId, bool $includeUnassignedCenter = false): array
     {
+        return $this->fetchSlice(
+            $companyId,
+            $year,
+            null === $projectDirectionId ? null : [$projectDirectionId],
+            null === $responsibilityCenterId ? null : [$responsibilityCenterId],
+            $includeUnassignedCenter,
+        );
+    }
+
+    /**
+     * Срез по спискам: проекты — точные id (поддерево разворачивает вызывающий), ЦФО — список,
+     * `includeUnassignedCenter` — плюс строки без ЦФО. null — без фильтра по измерению, пустой
+     * список — ничего.
+     *
+     * @param list<string>|null $projectDirectionIds
+     * @param list<string>|null $responsibilityCenterIds
+     *
+     * @return array<string, array<string, string>> `Y-m` → plCategoryId → сумма; пустые месяцы не возвращаются
+     */
+    public function fetchSlice(string $companyId, int $year, ?array $projectDirectionIds, ?array $responsibilityCenterIds, bool $includeUnassignedCenter = false): array
+    {
+        if ([] === $projectDirectionIds || ([] === $responsibilityCenterIds && !$includeUnassignedCenter)) {
+            return [];
+        }
         $params = [
             'company' => $companyId,
             'from' => sprintf('%04d-01-01', $year),
             'to' => sprintf('%04d-12-31', $year),
         ];
+        $types = [];
         $projectFilter = '';
-        if (null !== $projectDirectionId) {
-            $projectFilter = 'AND dt.project_direction_id = :project';
-            $params['project'] = $projectDirectionId;
+        if (null !== $projectDirectionIds) {
+            $projectFilter = 'AND dt.project_direction_id IN (:projects)';
+            $params['projects'] = array_values(array_unique($projectDirectionIds));
+            $types['projects'] = ArrayParameterType::STRING;
         }
         $centerFilter = '';
-        if (null !== $responsibilityCenterId) {
-            $centerFilter = $includeUnassignedCenter
-                ? 'AND (dt.responsibility_center_id = :center OR dt.responsibility_center_id IS NULL)'
-                : 'AND dt.responsibility_center_id = :center';
-            $params['center'] = $responsibilityCenterId;
+        if (null !== $responsibilityCenterIds) {
+            $conditions = [];
+            if ([] !== $responsibilityCenterIds) {
+                $conditions[] = 'dt.responsibility_center_id IN (:centers)';
+                $params['centers'] = array_values(array_unique($responsibilityCenterIds));
+                $types['centers'] = ArrayParameterType::STRING;
+            }
+            if ($includeUnassignedCenter) {
+                $conditions[] = 'dt.responsibility_center_id IS NULL';
+            }
+            $centerFilter = 'AND ('.implode(' OR ', $conditions).')';
         }
 
         $rows = $this->connection->fetchAllAssociative(<<<SQL
@@ -54,7 +87,7 @@ final readonly class PlFactMonthlyAmountsQuery
              GROUP BY 1, 2
             HAVING SUM(dt.amount_income) - SUM(dt.amount_expense) <> 0
              ORDER BY 1, 2
-            SQL, $params);
+            SQL, $params, $types);
 
         $result = [];
         foreach ($rows as $row) {

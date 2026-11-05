@@ -1,14 +1,72 @@
 /**
  * «План–факт» бюджета ОПиУ (templates/budget/plan_fact.html.twig), BUDGET-SPEC §6:
- * выбор пары «проект × ЦФО» одним списком и сворачивание групп дерева.
+ * мультивыбор проектов и ЦФО и сворачивание групп дерева.
  */
-function initPairSelect(root) {
-  root.querySelector('[data-pf-pair]')?.addEventListener('change', (event) => {
-    const [project = '', center = ''] = event.target.value.split('|');
-    const form = event.target.form;
-    form.elements.project.value = project;
-    form.elements.center.value = center;
-    form.submit();
+/**
+ * Пилюли «Проект» / «ЦФО»: «все / ни одной», без выбора «Применить» неактивна; выбраны все —
+ * список не передаётся (вся компания). Открыто одно меню; Esc и клик мимо закрывают.
+ */
+function initPickers(root) {
+  const pickers = [...root.querySelectorAll('[data-pf-pick]')];
+  const boxes = (picker) => [...picker.querySelectorAll('input[type="checkbox"]')];
+  // Вложенный проект выбранного родителя входит в фильтр: отмечен и неактивен (не отправляется).
+  const cascade = (picker) => {
+    const levels = [];
+    for (const box of boxes(picker)) {
+      const level = Number(box.dataset.pfLevel);
+      while (levels.length > 0 && levels[levels.length - 1] >= level) levels.pop();
+      const implied = levels.length > 0;
+      if (implied) {
+        box.checked = true;
+      } else if (box.dataset.pfImplied === '1') {
+        box.checked = false;
+      }
+      box.disabled = implied;
+      box.dataset.pfImplied = implied ? '1' : '';
+      if (box.checked && !implied) levels.push(level);
+    }
+  };
+  const sync = (picker) => {
+    cascade(picker);
+    const none = !boxes(picker).some((box) => box.checked);
+    picker.querySelector('[data-pf-pick-apply]').disabled = none;
+    picker.querySelector('[data-pf-pick-hint]').hidden = !none;
+  };
+  for (const picker of pickers) {
+    sync(picker);
+    picker.addEventListener('change', () => sync(picker));
+    picker.querySelector('[data-pf-pick-all]').addEventListener('click', () => {
+      boxes(picker).forEach((box) => { box.checked = true; });
+      sync(picker);
+    });
+    picker.querySelector('[data-pf-pick-none]').addEventListener('click', () => {
+      boxes(picker).forEach((box) => { box.checked = false; box.dataset.pfImplied = ''; });
+      sync(picker);
+    });
+    picker.querySelector('[data-pf-pick-form]').addEventListener('submit', (event) => {
+      const list = boxes(picker);
+      if (!list.some((box) => box.checked)) {
+        event.preventDefault();
+        return;
+      }
+      if (list.every((box) => box.checked)) {
+        list.forEach((box) => { box.disabled = true; });
+      }
+    });
+    picker.addEventListener('toggle', () => {
+      if (!picker.open) return;
+      pickers.filter((other) => other !== picker).forEach((other) => { other.open = false; });
+    });
+  }
+  document.addEventListener('click', (event) => {
+    pickers.filter((picker) => picker.open && !picker.contains(event.target)).forEach((picker) => { picker.open = false; });
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    const open = pickers.find((picker) => picker.open);
+    if (!open) return;
+    open.open = false;
+    open.querySelector('summary').focus();
   });
 }
 
@@ -50,6 +108,6 @@ function initCollapse(root) {
 export function initBudgetPlanFact() {
   const root = document.querySelector('[data-budget-plan-fact]');
   if (!root) return;
-  initPairSelect(root);
+  initPickers(root);
   initCollapse(root);
 }
