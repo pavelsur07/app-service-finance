@@ -247,8 +247,11 @@
                                             {% endif %}
                                             <span class="vf-pf__title" title="{{ row.name }}">{{ row.name }}</span>
                                         {% else %}
-                                            <span class="vf-pf__chev-sp" aria-hidden="true"></span>
-                                            {# В «Строками» на телефоне видна только строка «Откл.» — название дублируется в ней. #}
+                                            {# В «Строками» на телефоне видна только строка «Откл.» — название и шеврон дублируются в ней. #}
+                                            {% if row_metric == 'diff' and has_children %}
+                                                <button type="button" class="vf-pf__chev vf-pf__chev--mobile" aria-expanded="true" aria-label="Свернуть «{{ row.name }}»" data-pf-toggle><i class="ti ti-chevron-down" aria-hidden="true"></i></button>
+                                            {% endif %}
+                                            <span class="vf-pf__chev-sp{{ row_metric == 'diff' and has_children ? ' vf-pf__chev-sp--desktop' : '' }}" aria-hidden="true"></span>
                                             {% if row_metric == 'diff' %}<span class="vf-pf__title vf-pf__title--mobile">{{ row.name }}</span>{% endif %}
                                             <span class="visually-hidden">{{ row.name }}</span>
                                         {% endif %}

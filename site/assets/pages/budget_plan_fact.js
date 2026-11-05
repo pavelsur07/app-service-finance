@@ -34,10 +34,15 @@ function initCollapse(root) {
   table.addEventListener('click', (event) => {
     const toggle = event.target instanceof Element ? event.target.closest('[data-pf-toggle]') : null;
     if (!toggle) return;
+    const body = toggle.closest('tbody');
+    if (!body) return;
     const expanded = toggle.getAttribute('aria-expanded') !== 'false';
-    const name = toggle.closest('tbody')?.querySelector('.vf-pf__title')?.textContent ?? '';
-    toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-    toggle.setAttribute('aria-label', `${expanded ? 'Развернуть' : 'Свернуть'} «${name}»`);
+    const name = body.querySelector('.vf-pf__title')?.textContent ?? '';
+    // В «Строками» у статьи два шеврона (первая строка и мобильная строка «Откл.») — состояние общее.
+    for (const button of body.querySelectorAll('[data-pf-toggle]')) {
+      button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+      button.setAttribute('aria-label', `${expanded ? 'Развернуть' : 'Свернуть'} «${name}»`);
+    }
     applyCollapse(table);
   });
 }

@@ -483,7 +483,8 @@
   text-overflow: ellipsis;
 }
 
-.vf-pf__title--mobile {
+.vf-pf__title--mobile,
+.vf-pf__chev--mobile {
   display: none;
 }
 
@@ -545,18 +546,19 @@
   text-align: center;
 }
 
-/* Строки дерева: группа, расчётный итог, KPI — как в сетке плана. */
-.vf-pf__row--group > * {
+/* Строки дерева: группа, расчётный итог, KPI — как в сетке плана. Специфичность выше базовых
+   th/td и колонки статей; подсветка (.vf-pf__hl, ниже) — ещё сильнее по порядку. */
+.vf-pf__table .vf-pf__row--group > * {
   background: var(--vf-table-group-bg);
   font-weight: var(--vf-weight-semibold);
 }
 
-.vf-pf__row--calc > * {
+.vf-pf__table .vf-pf__row--calc > * {
   background: var(--vf-hover-bg);
   font-weight: var(--vf-weight-bold);
 }
 
-.vf-pf__row--kpi > * {
+.vf-pf__table .vf-pf__row--kpi > * {
   font-style: italic;
   font-weight: var(--vf-weight-medium);
   color: var(--vf-text-muted);
@@ -658,6 +660,14 @@
 
   .vf-pf--rows .vf-pf__title--mobile {
     display: block;
+  }
+
+  .vf-pf--rows .vf-pf__chev--mobile {
+    display: inline-flex;
+  }
+
+  .vf-pf--rows .vf-pf__chev-sp--desktop {
+    display: none;
   }
 
   .vf-pf--rows .vf-pf__tag {
