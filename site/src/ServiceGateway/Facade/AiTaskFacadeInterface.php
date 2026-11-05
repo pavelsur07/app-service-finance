@@ -36,4 +36,25 @@ interface AiTaskFacadeInterface
     public function taskIdFor(string $companyId, string $taskType, string $idempotencyKey): string;
 
     public function isEnabledForCompany(string $companyId): bool;
+
+    /**
+     * Какие из компаний сейчас получают ИИ (сервис включён и компания подключена) — одним запросом.
+     *
+     * @param list<string> $companyIds
+     *
+     * @return list<string> id в нижнем регистре
+     */
+    public function enabledCompanyIds(array $companyIds): array;
+
+    /** Общий выключатель `AI_SERVICE_ENABLED` с адресом и токеном. */
+    public function isServiceEnabled(): bool;
+
+    /**
+     * Какие из компаний подключены администратором, без учёта общего выключателя (админка).
+     *
+     * @param list<string> $companyIds
+     *
+     * @return list<string> id в нижнем регистре
+     */
+    public function grantedCompanyIds(array $companyIds): array;
 }

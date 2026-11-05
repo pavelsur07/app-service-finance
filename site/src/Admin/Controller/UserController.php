@@ -11,6 +11,7 @@ use App\Admin\Service\UserDeletionService;
 use App\Billing\Facade\BillingFacadeInterface;
 use App\Company\Entity\User;
 use App\Company\Repository\UserRepository;
+use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -36,6 +37,7 @@ final class UserController extends AbstractController
 
     public function __construct(
         private readonly BillingFacadeInterface $billing,
+        private readonly AiTaskFacadeInterface $ai,
         private readonly ClockInterface $clock,
     ) {
     }
@@ -88,6 +90,8 @@ final class UserController extends AbstractController
             }
         }
         $cabinetAccess = $this->billing->accessForCompanies(array_keys($cabinetIds), $this->clock->now());
+        // Подключение к ИИ — один запрос на страницу.
+        $aiCabinets = array_fill_keys($this->ai->grantedCompanyIds(array_map('strval', array_keys($cabinetIds))), true);
 
         return $this->render('admin/users/index.html.twig', [
             'title' => 'Зарегистрированные пользователи',
@@ -100,6 +104,8 @@ final class UserController extends AbstractController
             'roleLabels' => self::ROLE_LABELS,
             'userCabinets' => $userCabinets,
             'cabinetAccess' => $cabinetAccess,
+            'aiCabinets' => $aiCabinets,
+            'aiServiceEnabled' => $this->ai->isServiceEnabled(),
             'cabinetChoices' => $userAdminQuery->cabinetChoices(),
             'filter' => $filter,
         ]);

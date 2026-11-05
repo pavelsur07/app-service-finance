@@ -97,6 +97,33 @@
                           {%- endif -%}
                         </a>
                       {% endif %}
+                      {# Без данных ИИ (рендер после ошибки формы аккаунта) отметку не показываем — иначе «выкл» у подключённых #}
+                      {% if aiCabinets is defined %}
+                      {% set aiOn = aiCabinets[cabinet.id|lower] ?? false %}
+                      <form method="post" action="{{ path('admin_ai_company_access', { companyId: cabinet.id }) }}" style="display:inline;">
+                        <input type="hidden" name="_token" value="{{ csrf_token('ai_company_access_' ~ cabinet.id) }}">
+                        <input type="hidden" name="enabled" value="{{ aiOn ? 0 : 1 }}">
+                        <input type="hidden" name="return_query" value="{{ app.request.queryString }}">
+                        <button type="submit"
+                                class="status status--{{ aiOn ? (aiServiceEnabled ? 'success' : 'warning') : 'neutral' }}"
+                                style="border:0;cursor:pointer;font:inherit;"
+                                data-ai-badge="{{ cabinet.id }}"
+                                title="{{ aiOn and not aiServiceEnabled ? 'Подключён, но ИИ-сервис выключен (AI_SERVICE_ENABLED)' : 'ИИ-функции кабинета' }}"
+                                {% if aiOn %}
+                                data-admin-confirm="Кабинет «{{ cabinet.name }}» перестанет получать ИИ-подсказки. Уже показанные подсказки останутся."
+                                data-admin-confirm-title="Отключить ИИ?"
+                                data-admin-confirm-label="Отключить"
+                                data-admin-confirm-tone="danger"
+                                {% else %}
+                                data-admin-confirm="Кабинет «{{ cabinet.name }}» попадёт в ближайший запуск ИИ (в :25 каждого часа): операции без статьи за 90 дней уйдут в платные запросы к LLM."
+                                data-admin-confirm-title="Подключить ИИ?"
+                                data-admin-confirm-label="Подключить"
+                                data-admin-confirm-tone="warning"
+                                {% endif %}>
+                          <span class="dot"></span>ИИ {{ aiOn ? 'вкл' : 'выкл' }}{% if aiOn and not aiServiceEnabled %} · сервис выключен{% endif %}
+                        </button>
+                      </form>
+                      {% endif %}
                     </div>
                   {% endfor %}
                 {% else %}

@@ -12,6 +12,7 @@ use App\ServiceGateway\Exception\ServiceUnavailableException;
 use App\ServiceGateway\Infrastructure\Client\AiServiceClientInterface;
 use App\ServiceGateway\Message\SubmitAiTaskMessage;
 use App\ServiceGateway\MessageHandler\SubmitAiTaskHandler;
+use Doctrine\DBAL\Connection;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\TestCase;
@@ -92,7 +93,7 @@ final class SubmitAiTaskHandlerTest extends TestCase
     {
         return new SubmitAiTaskHandler(
             $client,
-            new AiServiceAccess(true, $allowlist, 'http://ai', 'token'),
+            $this->access('*' === $allowlist ? '*' : []),
             new Logger('test', [$logs ?? new TestHandler()]),
         );
     }
@@ -109,6 +110,17 @@ final class SubmitAiTaskHandlerTest extends TestCase
             createdAt: '2026-10-30T12:00:00+03:00',
             payload: ['text' => 'a'],
         );
+    }
+
+    /** @param list<string>|'*' $granted '*' — подключены все */
+    private function access(array|string $granted): AiServiceAccess
+    {
+        $db = $this->createStub(Connection::class);
+        $db->method('fetchFirstColumn')->willReturnCallback(
+            static fn (string $sql, array $params): array => '*' === $granted ? $params['ids'] : array_values(array_intersect($params['ids'], $granted)),
+        );
+
+        return new AiServiceAccess(true, 'http://ai', 'token', $db);
     }
 }
 

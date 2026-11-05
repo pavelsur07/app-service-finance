@@ -444,9 +444,14 @@
 (Python, в прод не выведен); контракт — `services/_contracts/ai-task/v1`.
 
 - Доступ — `AiServiceAccess`: `AI_SERVICE_ENABLED`, `AI_SERVICE_BASE_URL`,
-  `AI_SERVICE_API_TOKEN` (направление «Symfony → сервис»),
-  `AI_SERVICE_COMPANY_ALLOWLIST` (через запятую; пусто — никому, `*` — всем).
-  Любое пустое значение — выключено.
+  `AI_SERVICE_API_TOKEN` (направление «Symfony → сервис») — общий выключатель; любое
+  пустое значение — выключено для всех. Компания получает ИИ, только если подключена
+  администратором: строка в `ai_company_access` (unique `company_id`), переключатель «ИИ» у
+  кабинета в `/admin/users` → `POST /admin/ai/companies/{companyId}/access` →
+  `SetAiCompanyAccessAction` (одна инструкция SQL, повтор безопасен; коммитит сама).
+- `AiTaskFacadeInterface`: `isEnabledForCompany`, `enabledCompanyIds(list)` (сервис включён и
+  компания подключена, одним запросом — cron `ai-categorize --all-enabled`),
+  `isServiceEnabled`, `grantedCompanyIds(list)` (подключение без учёта выключателя — админка).
 - Провайдеры моделей (OpenAI, DeepSeek, Kimi) — только через шлюз
   `ai.vashfindir.ru` (`docs/tasks/ai/gateway/`): в `services/ai-service/config/routes.yaml`
   `base_url` шлюза и один токен `AI_GATEWAY_TOKEN`, ключи провайдеров — только на
@@ -5002,6 +5007,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.143 | 2026-11-05 | ServiceGateway: подключение компаний к ИИ из админки — `ai_company_access` (`Version20261105120000`, перенос Вумджой), `SetAiCompanyAccessAction`, переключатель «ИИ» в `/admin/users`; `AiTaskFacadeInterface::enabledCompanyIds/isServiceEnabled/grantedCompanyIds`; env `AI_SERVICE_COMPANY_ALLOWLIST` удалена (задача `ai-company-access`) |
 | 2.142 | 2026-11-05 | Company: удаление компании двухшаговое — `deletion_requested_at`/`deletion_requested_by` (`Version20261105090000`), `RequestCompanyDeletionAction`/`RestoreCompanyDeletionAction`, `CompanyDeletionRequestedEvent` (отключение подключений Marketplace, MoySklad, BankSync, привязок Telegram), закрыт API-доступ, помеченные компании вне активных; `CompanyFacade::getDeletionRequestedCompanyIds()` (задача `company-deletion`, этап 1) |
 | 2.141 | 2026-11-05 | Budget: план–факт — мультивыбор проектов (с дочерними) и ЦФО пилюлями (`BudgetPlanFactFilterResolver`, `buildFiltered`, `BudgetCellsQuery::fetchSlice`), ссылка в отчёт ОПиУ с теми же фильтрами; Finance: `getPlFactAmountsByMonthForSlice()` (задача `pl-budget`, этап 15) |
 | 2.140 | 2026-11-05 | Budget: план–факт по пакету DS — «Все показатели» колонками и строками, память вида в сессии, «Итого», подсветка > 10 %, п. п. у KPI, сворачивание групп, мобильная только с итогом (задача `pl-budget`, этап 14) |

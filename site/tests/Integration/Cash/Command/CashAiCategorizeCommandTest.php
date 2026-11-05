@@ -115,6 +115,21 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
             {
                 return \in_array($companyId, $this->allowlist, true);
             }
+
+            public function enabledCompanyIds(array $companyIds): array
+            {
+                return array_values(array_filter($companyIds, $this->isEnabledForCompany(...)));
+            }
+
+            public function isServiceEnabled(): bool
+            {
+                return true;
+            }
+
+            public function grantedCompanyIds(array $companyIds): array
+            {
+                return $this->enabledCompanyIds($companyIds);
+            }
         };
         $registry = $container->get(ManagerRegistry::class);
         $store = new class(new InMemoryStore(), $failingKey, $closeEntityManager ? $registry : null) implements PersistingStoreInterface {

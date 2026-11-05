@@ -8,7 +8,7 @@ use Doctrine\DBAL\Connection;
 
 /**
  * Охват cron `app:cash:ai-categorize --all-enabled`: компании с живыми операциями ДДС за
- * окно кандидатов. Включён ли ИИ для компании, решает allowlist (`AiTaskFacadeInterface`),
+ * окно кандидатов. Включён ли ИИ для компании, решает `AiTaskFacadeInterface` (подключение в админке),
  * какие операции ставить — `RequestCashAiCategorizationAction`.
  */
 final readonly class CashAiCategorizationCompaniesQuery
