@@ -326,25 +326,430 @@
     }
 }
 
-/* Помощник заполнения — панель над сеткой, как комментарий. Списки статей и месяцев прокручиваются внутри. */
+/* Панели загрузки из Excel и правила — над сеткой, как комментарий. */
 .fillPanel {
     padding: var(--vf-space-3) var(--vf-space-4);
     border-bottom: 1px solid var(--vf-border);
     background: var(--vf-surface-alt);
 }
 
-.fillList {
-    max-height: 14rem;
+/* Окно «Быстрое заполнение» (BUDGET-SPEC §5, refs 13, 26): 960 px, два шага. */
+.fillScrim {
+    position: fixed;
+    inset: 0;
+    z-index: 1055;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: var(--vf-space-6) var(--vf-space-4);
     overflow-y: auto;
-    padding: var(--vf-space-2);
+    background: color-mix(in srgb, var(--vf-navy-900) 45%, transparent);
+}
+
+.fillDialog {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 960px;
+    max-height: calc(100vh - 2 * var(--vf-space-6));
+    border-radius: var(--vf-radius-md);
+    background: var(--vf-surface);
+    box-shadow: var(--vf-shadow-lg);
+    color: var(--vf-text);
+}
+
+.fillDialog:focus {
+    outline: none;
+}
+
+.fillHead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--vf-space-4);
+    padding: var(--vf-space-4) var(--vf-space-5) var(--vf-space-3);
+    border-bottom: 1px solid var(--vf-border);
+}
+
+.fillHeadText {
+    min-width: 0;
+}
+
+.fillTitle {
+    margin: 0;
+    font-size: var(--vf-size-lg);
+    font-weight: var(--vf-weight-semibold);
+}
+
+.fillSteps {
+    display: flex;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--vf-size-sm);
+    white-space: nowrap;
+}
+
+.fillSteps li {
+    padding: 3px 10px;
+    border-radius: var(--vf-radius-pill);
+    background: var(--vf-table-group-bg);
+    color: var(--vf-text-muted);
+}
+
+.fillSteps li[aria-current='step'] {
+    background: var(--vf-primary-lt);
+    color: var(--vf-info-text);
+    font-weight: var(--vf-weight-semibold);
+}
+
+.fillBody {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.fillCards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vf-space-2);
+    padding: var(--vf-space-4);
+    border-right: 1px solid var(--vf-border);
+    background: var(--vf-table-readonly-bg);
+}
+
+.fillCard {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border: 1px solid var(--vf-border);
+    border-radius: var(--vf-radius-md);
+    background: var(--vf-surface);
+    color: var(--vf-text);
+    text-align: left;
+}
+
+.fillCard span {
+    font-size: var(--vf-size-xs);
+    color: var(--vf-text-muted);
+}
+
+.fillCard:hover {
+    background: var(--vf-hover-bg);
+}
+
+.fillCard[aria-checked='true'] {
+    border-color: var(--vf-primary);
+    background: var(--vf-primary-lt);
+    box-shadow: inset 0 0 0 1px var(--vf-primary);
+}
+
+.fillCard:focus-visible,
+.chip:focus-visible {
+    outline: 2px solid var(--vf-primary);
+    outline-offset: 2px;
+}
+
+.fillSetup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--vf-space-4);
+    min-width: 0;
+    padding: var(--vf-space-4) var(--vf-space-5);
+}
+
+.fillField {
+    max-width: 260px;
+}
+
+.fillPercent {
+    width: 120px;
+}
+
+.fillBase {
+    min-width: 220px;
+}
+
+.fillHint {
+    margin-top: var(--vf-space-1);
+    font-size: var(--vf-size-xs);
+    color: var(--vf-text-muted);
+}
+
+.fillSectionHead {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--vf-space-2);
+    margin-bottom: 6px;
+}
+
+.fillCount {
+    font-size: var(--vf-size-xs);
+    font-weight: var(--vf-weight-medium);
+    color: var(--vf-text-muted);
+    white-space: nowrap;
+}
+
+.fillSectionHead .fillCount {
+    font-size: inherit;
+}
+
+/* ~50 статей: список прокручивается внутри, ≈210 px. */
+.fillList {
+    max-height: 210px;
+    overflow-y: auto;
     border: 1px solid var(--vf-border);
     border-radius: var(--vf-radius-sm);
 }
 
+.fillRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--vf-border);
+    cursor: pointer;
+}
+
+.fillGroupRow {
+    background: var(--vf-table-group-bg);
+    font-weight: var(--vf-weight-semibold);
+}
+
+.fillLeafRow {
+    padding-left: 36px;
+}
+
+.fillLocked {
+    color: var(--vf-text-muted);
+    cursor: default;
+}
+
+.fillRowName {
+    flex: 1;
+    min-width: 0;
+}
+
+.fillBadge {
+    padding: 1px 6px;
+    border-radius: var(--vf-radius-sm);
+    background: var(--vf-primary-lt);
+    color: var(--vf-info-text);
+    font-size: 11px;
+    font-weight: var(--vf-weight-semibold);
+}
+
+.fillEmpty {
+    padding: var(--vf-space-4);
+    color: var(--vf-text-muted);
+}
+
+.fillChips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: var(--vf-space-2);
+}
+
 .fillMonths {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    column-gap: var(--vf-space-2);
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.chip {
+    height: 30px;
+    min-width: 48px;
+    padding: 0 10px;
+    border: 1px solid var(--vf-border-strong);
+    border-radius: 15px;
+    background: var(--vf-surface);
+    color: var(--vf-text);
+    font-size: var(--vf-size-sm);
+    font-weight: var(--vf-weight-medium);
+}
+
+.chip:hover {
+    background: var(--vf-hover-bg);
+}
+
+.chip[aria-pressed='true'] {
+    border-color: var(--vf-primary);
+    background: var(--vf-primary-lt);
+    color: var(--vf-info-text);
+    font-weight: var(--vf-weight-semibold);
+}
+
+.fillFoot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--vf-space-3);
+    padding: var(--vf-space-3) var(--vf-space-5) var(--vf-space-4);
+    border-top: 1px solid var(--vf-border);
+}
+
+.fillFootInfo {
+    min-width: 0;
+}
+
+.fillPreview {
+    min-height: 0;
+    padding: var(--vf-space-4) var(--vf-space-5);
+    overflow-y: auto;
+}
+
+.fillWarn {
+    margin-bottom: var(--vf-space-3);
+}
+
+/* Таблица «было → стало»: прокрутка внутри окна, колонка статей закреплена. */
+.fillTableWrap {
+    max-height: 50vh;
+    overflow: auto;
+    border: 1px solid var(--vf-border);
+    border-radius: var(--vf-radius-sm);
+}
+
+.fillTable {
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.fillTable th,
+.fillTable td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--vf-border);
+    white-space: nowrap;
+}
+
+.fillTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--vf-table-group-bg);
+    font-size: var(--vf-size-xs);
+    font-weight: var(--vf-weight-semibold);
+    color: var(--vf-text-muted);
+    text-transform: uppercase;
+    text-align: right;
+}
+
+.fillTable th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    min-width: 200px;
+    border-right: 1px solid var(--vf-border);
+    background: var(--vf-surface);
+    font-weight: var(--vf-weight-medium);
+    text-align: left;
+}
+
+.fillTable thead th:first-child {
+    z-index: 2;
+    background: var(--vf-table-group-bg);
+}
+
+.fillTable td {
+    min-width: 104px;
+    text-align: right;
+}
+
+.fillTable td + td,
+.fillTable thead th + th {
+    border-left: 1px solid var(--vf-border);
+}
+
+.fillNew {
+    display: block;
+    font-weight: var(--vf-weight-semibold);
+}
+
+.fillOld {
+    display: block;
+    font-size: 11px;
+    color: var(--vf-text-muted);
+}
+
+.fillSame .fillNew {
+    font-weight: var(--vf-weight-regular);
+    color: var(--vf-text-muted);
+}
+
+.fillOverwrite {
+    background: var(--vf-warn-bg);
+}
+
+.fillTable .fillDeltaCol {
+    min-width: 120px;
+    border-left: 1px solid var(--vf-border);
+    font-weight: var(--vf-weight-semibold);
+}
+
+/* ≤ 760 px: окно во всю ширину, помощники — лентой вбок, месяцы по 4 в ряд. */
+@media (max-width: 760px) {
+    .fillScrim {
+        padding: var(--vf-space-2);
+    }
+
+    .fillDialog {
+        max-height: calc(100vh - 2 * var(--vf-space-2));
+    }
+
+    .fillHead {
+        flex-wrap: wrap;
+        padding: var(--vf-space-3) var(--vf-space-4);
+    }
+
+    /* Колонкой flex, а не сеткой: лента с overflow иначе сжимается до нуля по высоте. */
+    .fillBody {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .fillCards {
+        flex: 0 0 auto;
+        flex-direction: row;
+        overflow-x: auto;
+        padding: var(--vf-space-3);
+        border-right: 0;
+        border-bottom: 1px solid var(--vf-border);
+    }
+
+    .fillCard {
+        flex: 0 0 200px;
+    }
+
+    .fillSetup,
+    .fillPreview {
+        padding: var(--vf-space-3) var(--vf-space-4);
+    }
+
+    .fillMonths {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .fillFoot {
+        padding: var(--vf-space-3) var(--vf-space-4);
+    }
+
+    .fillTable th:first-child {
+        min-width: 140px;
+        white-space: normal;
+    }
 }
 
 /* Метка правила «X % от строки» под названием статьи. */

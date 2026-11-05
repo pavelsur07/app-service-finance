@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ClipboardEvent, KeyboardEvent, MouseEvent } from 'react';
 import { inputToStored, isZero, parseAmountInput, storedToInput } from './amount';
 import type { BudgetFillHelper, BudgetGridProps, BudgetGridRow, CellPosition, PendingCell, SelectedPair } from './budget-grid.types';
-import { BudgetFillPanel } from './BudgetFillPanel';
+import { BudgetFillDialog } from './BudgetFillDialog';
 import { BudgetImportPanel } from './BudgetImportPanel';
 import { BudgetRulePanel } from './BudgetRulePanel';
 import { BudgetGridView } from './BudgetGridView';
 import type { CommentDraft } from './BudgetGridView';
+import { plural } from './fill-logic';
 import { planPaste, visibleRows } from './grid-logic';
 import { BudgetSlicePills } from './BudgetSlicePills';
 import { HeadSlot, HelpersMenu, SaveIndicator } from './BudgetHeadControls';
@@ -477,13 +478,19 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
             onClose={() => setRulesOpen(false)}
         />
     ) : null;
-    const fillPanel = rulesPanel ?? importPanel ?? (fillOpen && fillDisabledReason === null && pair !== null && grid.data !== null ? (
-        <BudgetFillPanel
+    const fillPanel = rulesPanel ?? importPanel;
+    const selectedPair = pair === null ? undefined : props.pairs.find((item) => pairValueOf(item) === pairValueOf(pair));
+    const fillDialog = fillOpen && fillDisabledReason === null && pair !== null && grid.data !== null ? (
+        <BudgetFillDialog
             key={`${panelKey}|${fillHelper}`}
             initialHelper={fillHelper}
             fillUrl={props.fillUrl}
             csrfToken={props.csrfToken}
             pair={pair}
+            sliceLabel={selectedPair === undefined ? '' : `${selectedPair.projectName} × ${selectedPair.centerName}`}
+            // Название правится в шапке Twig без перезагрузки — берём текущее.
+            versionName={document.querySelector('[data-budget-name]')?.textContent?.trim() ?? ''}
+            year={props.year}
             months={grid.data.months}
             rows={grid.data.rows}
             busy={grid.saveState === 'saving' || grid.hasPending()}
@@ -494,7 +501,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
             }}
             onClose={() => setFillOpen(false)}
         />
-    ) : null);
+    ) : null;
 
     return (
         <>
@@ -518,6 +525,7 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
                     onImport={() => openPanel('import')}
                 />
             </HeadSlot>
+            {fillDialog}
             <BudgetGridView
                 months={months}
                 rows={rows}
@@ -563,17 +571,4 @@ export function BudgetGridWidget(props: BudgetGridProps): JSX.Element {
             />
         </>
     );
-}
-
-function plural(count: number, one: string, few: string, many: string): string {
-    const mod10 = count % 10;
-    const mod100 = count % 100;
-    if (mod10 === 1 && mod100 !== 11) {
-        return one;
-    }
-    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-        return few;
-    }
-
-    return many;
 }

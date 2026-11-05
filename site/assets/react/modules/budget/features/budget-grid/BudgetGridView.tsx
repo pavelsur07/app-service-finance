@@ -27,7 +27,7 @@ export interface BudgetGridViewProps {
     lockedMessage: string | null;
     unsavedLabels: string[];
     comment: CommentDraft | null;
-    /** Панель над сеткой: разрез и итог помощника; раскрытая панель помощника (BudgetFillPanel). */
+    /** Панель над сеткой: разрез и итог помощника; панель загрузки из Excel или правила. */
     toolbar: ReactNode;
     fillPanel: ReactNode;
     loading: boolean;
