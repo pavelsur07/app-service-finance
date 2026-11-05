@@ -49,6 +49,10 @@ final readonly class AuthenticateApiKeyAction
             $this->limits->failed($ip);
             throw new AccessDeniedHttpException('API key does not belong to this company.');
         }
+        // Компания помечена владельцем к удалению: данные не отдаём, восстановление вернёт доступ.
+        if ($company->isDeletionRequested()) {
+            throw new AccessDeniedHttpException('Company is scheduled for deletion.');
+        }
 
         return new ApiPrincipal(
             $key->getCompanyId(), (int) $publicCompanyId, $key->getId(), $key->getExpiresAt(),

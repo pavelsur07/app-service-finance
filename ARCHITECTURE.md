@@ -1225,9 +1225,14 @@ findByPublicId(int $publicId): ?Company
 // Только фактический владелец companies.user_id; роли участника и admin.write не подходят.
 isOwner(string $companyId, string $userId): bool
 
-// ID всех активных компаний
+// ID всех активных компаний (без помеченных к удалению)
 // @return list<string>
 getAllActiveCompanyIds(): array
+
+// ID компаний, помеченных владельцем к удалению: фоновые задачи их пропускают
+// (напоминания биллинга). Только чтение.
+// @return list<string>
+getDeletionRequestedCompanyIds(): array
 
 // Компании по списку ID как простые DTO-массивы
 // @param list<string> $companyIds
@@ -2285,6 +2290,39 @@ Cash (`BackfillDefaultMoneyAccounts`), Finance (`BackfillDefaultPLTree`), Balanc
 `report()`. `--execute` — только с `--expected-count`, равным числу компаний с пробелами из
 dry-run; каждая компания — своя транзакция; останов на первой ошибке, повторный запуск
 продолжает. ДДС не дозаполняется: системные статьи у существующих компаний уже есть.
+
+### Удаление компании: запрос, срок ожидания, восстановление
+
+Удаление двухшаговое (задача `docs/tasks/company-deletion`). Владелец запрашивает удаление на
+`/company/{id}/delete` (`Company\Controller\Deletion\DeleteCompanyController`, GET — страница с
+датой очистки, POST — ввод названия компании, сравнение без учёта регистра и лишних пробелов).
+`RequestCompanyDeletionAction` в `wrapInTransaction` берёт `SELECT … FOR UPDATE` строки
+`companies`, вызывает `Company::requestDeletion(now, userId)` (колонки `deletion_requested_at`,
+`deletion_requested_by`), синхронно диспатчит `Company\Event\CompanyDeletionRequestedEvent(companyId)`
+и коммитит; повтор — без изменений и без события. Не владелец — `CompanyDeletionNotAllowedException`
+(404), неверное название — `CompanyDeletionConfirmationMismatchException` (ошибка формы, 422).
+Данные хранятся `Company::DELETION_GRACE_DAYS` = 30 дней (`getDeletionDueAt()`); окончательная
+очистка — этап 2 задачи.
+
+Подписчики события только меняют сущности, коммитит Action:
+
+| Кто | Что делает |
+|---|---|
+| Marketplace `DeactivateConnectionsOnCompanyDeletionRequested` | `marketplace_connections.is_active = false` (Seller и Performance) |
+| MoySklad `DeactivateConnectionsOnCompanyDeletionRequested` | `moysklad_connections.is_active = false` |
+| BankSync `DisableConnectionsOnCompanyDeletionRequested` | `ACTIVE`/`NEEDS_REAUTH` → `DISABLED`; согласие в банке не отзывается |
+| Telegram `BlockBindingsOnCompanyDeletionRequested` | привязки клиентов → `blocked`, подписки на отчёты выключаются |
+
+Помеченная компания: не попадает в список компаний (отдельный блок «Будут удалены» с кнопкой
+«Восстановить»), переключатель, `company_set_active` (404), `ActiveCompanyService` (из сессии
+игнорируется, выбирается другая компания владельца или участника), `getAllActiveCompanyIds()` /
+`getAllActiveCompanyProfiles()` (обход компаний cron-командами) и напоминания биллинга; внешний API
+(`AuthenticateApiKeyAction`) отвечает 403, ключ отчётов (`ReportApiKeyManager::findCompanyByRawKey`) не
+находит компанию — доступ возвращается восстановлением.
+Восстановление — `POST /company/{id}/restore` (`RestoreCompanyDeletionAction`, та же блокировка
+строки): пометка снимается, подключения остаются выключенными — их включает пользователь. Оба
+контроллера — в `ModuleAccessMap::EXEMPT_EXACT` (работают без активной компании) и в белом списке
+`Billing\Domain\ReadOnlyRule`.
 
 ### Company → Cash: системные статьи ДДС и денежные счета по `CompanyCreatedEvent`
 
@@ -4962,6 +5000,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.142 | 2026-11-05 | Company: удаление компании двухшаговое — `deletion_requested_at`/`deletion_requested_by` (`Version20261105090000`), `RequestCompanyDeletionAction`/`RestoreCompanyDeletionAction`, `CompanyDeletionRequestedEvent` (отключение подключений Marketplace, MoySklad, BankSync, привязок Telegram), закрыт API-доступ, помеченные компании вне активных; `CompanyFacade::getDeletionRequestedCompanyIds()` (задача `company-deletion`, этап 1) |
 | 2.141 | 2026-11-05 | Budget: план–факт — мультивыбор проектов (с дочерними) и ЦФО пилюлями (`BudgetPlanFactFilterResolver`, `buildFiltered`, `BudgetCellsQuery::fetchSlice`), ссылка в отчёт ОПиУ с теми же фильтрами; Finance: `getPlFactAmountsByMonthForSlice()` (задача `pl-budget`, этап 15) |
 | 2.140 | 2026-11-05 | Budget: план–факт по пакету DS — «Все показатели» колонками и строками, память вида в сессии, «Итого», подсветка > 10 %, п. п. у KPI, сворачивание групп, мобильная только с итогом (задача `pl-budget`, этап 14) |
 | 2.139 | 2026-11-05 | Budget: окно «Быстрое заполнение» в два шага вместо панели помощников (`BudgetFillDialog`, `fill-logic.ts`); статьи с правилом показываются неактивными; контракт `/fill` без изменений (задача `pl-budget`, этап 13) |

@@ -11,6 +11,8 @@ use App\Company\Controller\CompanyController;
 use App\Company\Controller\Counterparty\ApplyCounterpartyDisplayNameController;
 use App\Company\Controller\Counterparty\ResetCounterpartyDisplayNameController;
 use App\Company\Controller\CounterpartyController;
+use App\Company\Controller\Deletion\DeleteCompanyController;
+use App\Company\Controller\Deletion\RestoreCompanyController;
 use App\Company\Controller\FinancialResponsibilityCenterController;
 use App\Company\Controller\ProfileController;
 use App\Company\Controller\ProjectDirectionController;
@@ -77,6 +79,8 @@ final class ModuleAccessMap
         ProfileController::class,   // личный профиль (смена пароля), доступен любому участнику
         UiModeController::class,    // переключение темы UI, личная настройка
         CompanyController::class,   // список/создание/переключение компаний; работает и без активной компании, свои owner-проверки
+        DeleteCompanyController::class,  // удаление компании: работает и без активной компании, владельца сверяет Action
+        RestoreCompanyController::class, // восстановление помеченной к удалению компании — она не бывает активной
         HomeRedirectController::class, // роутер лендинга «/», доступен любому участнику; сам проверяет права через is_granted
         CompanyTariffController::class, // тариф и оплата активного кабинета (только чтение) — любому участнику; историю оплат видит владелец
         StartCheckoutController::class, // онлайн-оплата тарифа активного кабинета — сам проверяет владельца

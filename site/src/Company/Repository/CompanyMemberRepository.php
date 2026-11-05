@@ -180,6 +180,7 @@ class CompanyMemberRepository extends ServiceEntityRepository
             ->addSelect('company')
             ->andWhere('companyMember.user = :user')
             ->andWhere('companyMember.status = :status')
+            ->andWhere('company.deletionRequestedAt IS NULL')
             ->setParameter('user', $user)
             ->setParameter('status', CompanyMember::STATUS_ACTIVE)
             ->orderBy('companyMember.createdAt', \SortDirection::Ascending)

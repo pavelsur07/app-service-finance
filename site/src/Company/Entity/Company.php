@@ -14,6 +14,9 @@ use Webmozart\Assert\Assert;
 #[ORM\UniqueConstraint(name: 'uniq_companies_public_id', columns: ['public_id'])]
 class Company
 {
+    /** Срок между запросом удаления и окончательной очисткой данных компании. */
+    public const DELETION_GRACE_DAYS = 30;
+
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
     private ?string $id = null;
@@ -39,6 +42,14 @@ class Company
 
     #[ORM\Embedded(class: Money::class, columnPrefix: 'minimum_balance_')]
     private Money $minimumBalance;
+
+    /** Когда владелец запросил удаление; null — компания работает. */
+    #[ORM\Column(name: 'deletion_requested_at', type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $deletionRequestedAt = null;
+
+    /** Кто запросил удаление (id пользователя) — для журнала и разбора. */
+    #[ORM\Column(name: 'deletion_requested_by', type: 'guid', nullable: true)]
+    private ?string $deletionRequestedBy = null;
 
     public function __construct(string $id, User $user)
     {
@@ -132,5 +143,63 @@ class Company
         $this->minimumBalance = $minimumBalance;
 
         return $this;
+    }
+
+    /**
+     * Помечает компанию к удалению. Повторный запрос ничего не меняет: дата и срок
+     * очистки считаются от первого запроса.
+     *
+     * @return bool true — пометка поставлена сейчас, false — уже стояла
+     */
+    public function requestDeletion(\DateTimeImmutable $now, string $requestedByUserId): bool
+    {
+        Assert::uuid($requestedByUserId);
+
+        if (null !== $this->deletionRequestedAt) {
+            return false;
+        }
+
+        $this->deletionRequestedAt = $now;
+        $this->deletionRequestedBy = $requestedByUserId;
+
+        return true;
+    }
+
+    /**
+     * Снимает пометку удаления.
+     *
+     * @return bool true — пометка снята сейчас, false — её не было
+     */
+    public function cancelDeletion(): bool
+    {
+        if (null === $this->deletionRequestedAt) {
+            return false;
+        }
+
+        $this->deletionRequestedAt = null;
+        $this->deletionRequestedBy = null;
+
+        return true;
+    }
+
+    public function isDeletionRequested(): bool
+    {
+        return null !== $this->deletionRequestedAt;
+    }
+
+    public function getDeletionRequestedAt(): ?\DateTimeImmutable
+    {
+        return $this->deletionRequestedAt;
+    }
+
+    public function getDeletionRequestedBy(): ?string
+    {
+        return $this->deletionRequestedBy;
+    }
+
+    /** С этого момента данные компании удаляются окончательно. */
+    public function getDeletionDueAt(): ?\DateTimeImmutable
+    {
+        return $this->deletionRequestedAt?->modify(sprintf('+%d days', self::DELETION_GRACE_DAYS));
     }
 }

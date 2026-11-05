@@ -56,6 +56,10 @@ class ActiveCompanyService implements ResetInterface
 
         if ($id) {
             $company = $this->companyRepository->find($id);
+            // Помеченная к удалению компания активной не бывает: выбираем другую.
+            if ($company instanceof Company && $company->isDeletionRequested()) {
+                $company = null;
+            }
             if ($company && $company->getUser() === $user) {
                 return $this->memoizeCompany($company, $userKey);
             }
@@ -68,7 +72,7 @@ class ActiveCompanyService implements ResetInterface
             }
         }
 
-        $company = $this->companyRepository->findOneBy(['user' => $user])
+        $company = $this->companyRepository->findOneBy(['user' => $user, 'deletionRequestedAt' => null])
             ?? $this->companyMemberRepository->findFirstActiveCompanyForUser($user);
         if (!$company) {
             throw new NotFoundHttpException();

@@ -116,7 +116,7 @@ final class CompanyFacade
     }
 
     /**
-     * Возвращает список ID всех активных компаний в системе.
+     * Возвращает список ID всех активных (не помеченных к удалению) компаний в системе.
      * Используется воркерами и CLI-командами других модулей.
      *
      * @return list<string>
@@ -124,6 +124,17 @@ final class CompanyFacade
     public function getAllActiveCompanyIds(): array
     {
         return $this->repository->getAllActiveCompanyIds();
+    }
+
+    /**
+     * ID компаний, помеченных владельцем к удалению: фоновые задачи других модулей
+     * (напоминания биллинга) их пропускают.
+     *
+     * @return list<string>
+     */
+    public function getDeletionRequestedCompanyIds(): array
+    {
+        return $this->repository->getDeletionRequestedCompanyIds();
     }
 
     /**

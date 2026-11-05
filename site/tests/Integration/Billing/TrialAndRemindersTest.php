@@ -97,6 +97,9 @@ final class TrialAndRemindersTest extends IntegrationTestCase
         $trial3 = $this->companyWith(fn (string $id) => $this->trial($id, '2027-02-28', '2027-03-13'));
         $trial7 = $this->companyWith(fn (string $id) => $this->trial($id, '2027-03-04', '2027-03-17'));
         $friend = $this->companyWith(fn (string $id) => CompanySubscriptionBuilder::aSubscription()->withId(Uuid::uuid7()->toString())->forCompany($id)->onTariff($this->tariff(TariffCode::FRIEND))->perpetualFrom('2026-11-01')->build());
+        // Помечена владельцем к удалению: напоминание в срок, но письма нет.
+        $deleting = $this->companyWith(fn (string $id) => $this->paid($id, '2027-02-11', '2027-03-17'));
+        $this->connection->executeStatement('UPDATE companies SET deletion_requested_at = now() WHERE id = ?', [$deleting]);
 
         $transport = $this->transport();
         $result = $this->schedule()();
@@ -106,7 +109,7 @@ final class TrialAndRemindersTest extends IntegrationTestCase
         $expected = [$paid0 => [0, false], $paid7 => [7, false], $trial3 => [3, true]];
         ksort($expected);
         self::assertSame($expected, $sent);
-        foreach ([$paid5, $trial7, $friend] as $companyId) {
+        foreach ([$paid5, $trial7, $friend, $deleting] as $companyId) {
             self::assertArrayNotHasKey($companyId, $sent);
         }
 
@@ -205,6 +208,7 @@ final class TrialAndRemindersTest extends IntegrationTestCase
             self::getContainer()->get(MessageBusInterface::class),
             new MockClock(new \DateTimeImmutable(self::NOW, new \DateTimeZone('Europe/Moscow'))),
             new NullLogger(),
+            self::getContainer()->get(CompanyFacade::class),
         );
     }
 

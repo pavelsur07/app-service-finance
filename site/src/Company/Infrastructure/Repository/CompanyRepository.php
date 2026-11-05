@@ -58,6 +58,53 @@ class CompanyRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Компании владельца, помеченные к удалению, — для блока «Будет удалена» в списке.
+     *
+     * @return list<Company>
+     */
+    public function findDeletionRequestedByUser(User $user): array
+    {
+        /** @var list<Company> $companies */
+        $companies = $this->createQueryBuilder('c')
+            ->andWhere('c.user = :user')
+            ->andWhere('c.deletionRequestedAt IS NOT NULL')
+            ->setParameter('user', $user)
+            ->orderBy('c.deletionRequestedAt', \SortDirection::Ascending)
+            ->getQuery()
+            ->getResult();
+
+        return $companies;
+    }
+
+    /**
+     * Работающие (не помеченные к удалению) компании владельца.
+     *
+     * @return list<Company>
+     */
+    public function findActiveByUser(User $user): array
+    {
+        /** @var list<Company> $companies */
+        $companies = $this->createQueryBuilder('c')
+            ->andWhere('c.user = :user')
+            ->andWhere('c.deletionRequestedAt IS NULL')
+            ->setParameter('user', $user)
+            ->orderBy('c.name', \SortDirection::Ascending)
+            ->getQuery()
+            ->getResult();
+
+        return $companies;
+    }
+
+    /** Компания по id, только если ею владеет пользователь (в т.ч. помеченная к удалению). */
+    public function findOneOwnedBy(string $companyId, User $owner): ?Company
+    {
+        /** @var Company|null $company */
+        $company = $this->findOneBy(['id' => $companyId, 'user' => $owner]);
+
+        return $company;
+    }
+
     public function findByUserId(string $userId): array
     {
         return $this->createQueryBuilder('c')
@@ -90,21 +137,34 @@ class CompanyRepository extends ServiceEntityRepository
     }
 
     /**
-     * Возвращает список ID всех активных компаний в системе.
+     * Возвращает список ID всех активных (не помеченных к удалению) компаний в системе.
      * Используется воркерами и CLI-командами других модулей.
      *
      * @return list<string>
      */
     public function getAllActiveCompanyIds(): array
     {
-        // До появления CompanyStatus/is_active все сохранённые companies считаются активными.
-        $sql = 'SELECT id::text FROM companies ORDER BY id';
+        // Помеченные к удалению компании не обрабатываются фоновыми задачами.
+        $sql = 'SELECT id::text FROM companies WHERE deletion_requested_at IS NULL ORDER BY id';
 
         return $this->connection->fetchFirstColumn($sql);
     }
 
     /**
-     * Профили бизнеса всех компаний в порядке getAllActiveCompanyIds(): одним запросом, без
+     * @companyScopeExempt обход всех компаний: фоновые задачи пропускают помеченные к удалению
+     *
+     * @return list<string>
+     */
+    public function getDeletionRequestedCompanyIds(): array
+    {
+        /** @var list<string> $ids */
+        $ids = $this->connection->fetchFirstColumn('SELECT id::text FROM companies WHERE deletion_requested_at IS NOT NULL ORDER BY id');
+
+        return $ids;
+    }
+
+    /**
+     * Профили бизнеса всех работающих компаний в порядке getAllActiveCompanyIds(): одним запросом, без
      * гидрации сущностей — для обхода всех компаний CLI-командами.
      *
      * @return array<string, BusinessProfile> id компании → профиль
@@ -112,7 +172,7 @@ class CompanyRepository extends ServiceEntityRepository
     public function getAllActiveCompanyProfiles(): array
     {
         $profiles = [];
-        foreach ($this->connection->fetchAllKeyValue('SELECT id::text, business_profile FROM companies ORDER BY id') as $id => $profile) {
+        foreach ($this->connection->fetchAllKeyValue('SELECT id::text, business_profile FROM companies WHERE deletion_requested_at IS NULL ORDER BY id') as $id => $profile) {
             $profiles[(string) $id] = BusinessProfile::from((string) $profile);
         }
 

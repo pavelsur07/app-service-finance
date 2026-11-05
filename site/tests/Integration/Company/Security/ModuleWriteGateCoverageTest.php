@@ -118,7 +118,8 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         // Компании: сверка владельца инлайном, работает и без активной компании.
         'company_new' => ['inline-owner', 'App\Company\Controller\CompanyController::new'],
         'company_edit' => ['inline-owner', 'App\Company\Controller\CompanyController::edit'],
-        'company_delete' => ['inline-owner', 'App\Company\Controller\CompanyController::delete'],
+        'company_delete' => ['delegated-owner', 'App\Company\Controller\Deletion\DeleteCompanyController::__invoke'],
+        'company_restore' => ['delegated-owner', 'App\Company\Controller\Deletion\RestoreCompanyController::__invoke'],
         'company_set_active' => ['inline-owner', 'App\Company\Controller\CompanyController::setActive'],
         'company_tax_profile_save' => ['inline-owner', 'App\Company\Controller\TaxProfile\SaveCompanyTaxProfileController::__invoke'],
         'company_tax_profile_delete' => ['inline-owner', 'App\Company\Controller\TaxProfile\DeleteCompanyTaxProfileController::__invoke'],

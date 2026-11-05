@@ -1,0 +1,29 @@
+{% extends 'base.html.twig' %}
+{% block title %}Удалить компанию{% endblock %}
+{% block body %}
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-header"><b>Удалить компанию «{{ company.name }}»</b></div>
+            <div class="card-body">
+                <p>После подтверждения:</p>
+                <ul>
+                    <li>компания сразу пропадёт из списка и переключателя, сотрудники потеряют к ней доступ;</li>
+                    <li>подключения маркетплейсов, МойСклад и банков будут отключены, загрузки остановятся;</li>
+                    <li><b>{{ dueAt|date('d.m.Y') }}</b> все данные компании будут удалены без возможности восстановления;</li>
+                    <li>до этой даты компанию можно восстановить в списке компаний;</li>
+                    <li>сведения об оплатах сервиса сохраняются.</li>
+                </ul>
+                <form method="post" action="{{ path('company_delete', {'id': company.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ company.id) }}">
+                    <div class="mb-3">
+                        <label class="form-label" for="confirm_name">Введите название компании для подтверждения</label>
+                        <input type="text" id="confirm_name" name="confirm_name" class="form-control{{ error ? ' is-invalid' : '' }}" autocomplete="off" required>
+                        {% if error %}<div class="invalid-feedback">{{ error }}</div>{% endif %}
+                    </div>
+                    <button class="btn btn-danger">Удалить компанию</button>
+                    <a href="{{ path('company_index') }}" class="btn btn-secondary">Отмена</a>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

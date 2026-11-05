@@ -8,6 +8,7 @@ use App\Billing\Domain\PaidPeriodCalculator;
 use App\Billing\Message\SendBillingExpiryReminderMessage;
 use App\Billing\Repository\BillingExpiryReminderRepository;
 use App\Billing\Repository\CompanySubscriptionRepository;
+use App\Company\Facade\CompanyFacade;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -20,6 +21,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * пропускаются; «не больше одного письма» держит handler, застолбляя строку перед SMTP, —
  * поэтому повтор прогона или двойная постановка дубля не дают, а сбой постановки ничего
  * не застолбляет и лечится повторным запуском. Сбой постановки — ERROR в журнале.
+ * Компании, помеченные к удалению, пропускаются.
  */
 final readonly class ScheduleExpiryRemindersAction
 {
@@ -33,6 +35,7 @@ final readonly class ScheduleExpiryRemindersAction
         private MessageBusInterface $bus,
         private ClockInterface $clock,
         private LoggerInterface $logger,
+        private CompanyFacade $companies,
     ) {
     }
 
@@ -47,7 +50,12 @@ final readonly class ScheduleExpiryRemindersAction
 
         $result = ['due' => 0, 'queued' => 0, 'skipped' => 0, 'failed' => 0];
         $failedCompanies = [];
+        // Компании, помеченные владельцем к удалению, писем об оплате не получают.
+        $deletionRequested = array_flip($this->companies->getDeletionRequestedCompanyIds());
         foreach ($this->subscriptions->findEndingOn($dates) as $subscription) {
+            if (isset($deletionRequested[$subscription->getCompanyId()])) {
+                continue;
+            }
             $paidUntil = $subscription->getPaidUntil();
             if (null === $paidUntil) {
                 continue;

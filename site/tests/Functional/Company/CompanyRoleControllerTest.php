@@ -432,7 +432,7 @@ final class CompanyRoleControllerTest extends WebTestCaseBase
 
         // company_members.role_id переведён в RESTRICT, но company_role.company_id остаётся
         // CASCADE: удаление строки компании без участников обязано по-прежнему сносить её шаблоны.
-        // Кнопка «удалить» строку больше не удаляет (#458), поэтому проверяем схему напрямую.
+        // Кнопка «удалить» строку сразу не удаляет (двухшаговое удаление), поэтому проверяем схему.
         $em->getConnection()->executeStatement('DELETE FROM companies WHERE id = ?', [$companyId]);
 
         $this->em()->clear();
