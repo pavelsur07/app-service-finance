@@ -2310,7 +2310,7 @@ dry-run; каждая компания — своя транзакция; ост
 |---|---|
 | Marketplace `DeactivateConnectionsOnCompanyDeletionRequested` | `marketplace_connections.is_active = false` (Seller и Performance) |
 | MoySklad `DeactivateConnectionsOnCompanyDeletionRequested` | `moysklad_connections.is_active = false` |
-| BankSync `DisableConnectionsOnCompanyDeletionRequested` | `ACTIVE`/`NEEDS_REAUTH` → `DISABLED`; согласие в банке не отзывается |
+| BankSync `DisableConnectionsOnCompanyDeletionRequested` | `ACTIVE`/`NEEDS_REAUTH` → `DISABLED`; согласие в банке не отзывается; OAuth callback, завершившийся после пометки, подключение не сохраняет (`BankCompanyDeletionRequestedException`, `FOR SHARE` строки компании) |
 | Telegram `BlockBindingsOnCompanyDeletionRequested` | привязки клиентов → `blocked`, подписки на отчёты выключаются; новая привязка по ранее выданной ссылке отклоняется в `/start` (`FOR SHARE` строки компании) |
 
 Помеченная компания: не попадает в список компаний (отдельный блок «Будут удалены» с кнопкой

@@ -12,6 +12,7 @@ use App\BankSync\Exception\BankAuthorizationNotConfiguredException;
 use App\BankSync\Exception\BankAuthorizationRejectedException;
 use App\BankSync\Exception\BankAuthorizationStateInvalidException;
 use App\BankSync\Exception\BankChannelNotConfiguredException;
+use App\BankSync\Exception\BankCompanyDeletionRequestedException;
 use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Exception\BankConnectionNotFoundException;
 use App\BankSync\Exception\BankEnvironmentNotAllowedException;
@@ -71,6 +72,8 @@ final class OAuthCallbackController extends AbstractController
             throw $this->createAccessDeniedException();
         } catch (BankConnectionNotFoundException) {
             $this->addFlash('warning', 'Подключение удалили, пока шёл вход в банк.');
+        } catch (BankCompanyDeletionRequestedException) {
+            $this->addFlash('warning', 'Компания помечена к удалению — подключение банка не сохранено.');
         } catch (BankConnectionBusyException) {
             $this->addFlash('warning', 'Подключение сейчас обновляется. Начните вход в банк заново через минуту.');
         }

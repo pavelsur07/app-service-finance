@@ -14,6 +14,7 @@ use App\BankSync\Entity\BankConnection;
 use App\BankSync\Enum\BankCode;
 use App\BankSync\Enum\BankConnectionStatus;
 use App\BankSync\Exception\BankAuthorizationStateInvalidException;
+use App\BankSync\Exception\BankCompanyDeletionRequestedException;
 use App\BankSync\Exception\BankConnectionBusyException;
 use App\BankSync\Exception\BankStaticTokenNotSupportedException;
 use App\BankSync\Infrastructure\OAuth\AuthorizationSessionStore;
@@ -101,6 +102,22 @@ final class ConnectionChangeLockTest extends IntegrationTestCase
         self::assertTrue($lockedDuringExchange, 'параллельный вход ждёт, пока этот не сохранит свою пару токенов');
         self::assertSame(StubBankAuthorizationProvider::ACCESS_TOKEN, $this->storedTokens()->accessToken);
         self::assertTrue((new BankConnectionTokenLock($this->worker))->acquire($this->bankConnection->getId(), 0), 'блокировка отпущена');
+    }
+
+    /** Удаление компании запрошено, пока шёл обмен кода в банке: подключение не оживает. */
+    public function testCompanyMarkedForDeletionDuringExchangeIsNotReconnected(): void
+    {
+        StubBankAuthorizationProvider::$duringExchange = function (): void {
+            $this->em->getConnection()->executeStatement('UPDATE companies SET deletion_requested_at = now() WHERE id = ?', [$this->companyId]);
+        };
+
+        try {
+            $this->completeReconnect(self::getContainer()->get(CompleteBankAuthorizationAction::class));
+            self::fail('Ожидался отказ: компания помечена к удалению.');
+        } catch (BankCompanyDeletionRequestedException) {
+        }
+
+        self::assertSame('old-access', $this->storedTokens()->accessToken);
     }
 
     public function testReconnectWhileTokensAreLockedKeepsCodeUnusedAndCredentialsIntact(): void
