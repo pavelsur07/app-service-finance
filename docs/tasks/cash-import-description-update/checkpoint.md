@@ -9,6 +9,8 @@
 
 ## Completed
 
+- Добавлены четыре ТЗ этапов в specs/ и acceptance.md с ID тестов, ожидаемыми результатами, существующими test suites и финальным checklist. Все новые пункты приёмки пока не выполнены.
+
 - 2026-11-06: все шесть правил подтверждены владельцем и внесены в TASK/plan/design; защита описания от перезаписи банком/1С включена в Stage 2 и приёмку.
 
 - Проверены текущий импорт, количественная дедупликация, блокировки, аудит и автоправила.
@@ -29,4 +31,4 @@
 
 ## Files to inspect first on resume
 
-TASK.md, design.md, baseline.md, plan.md; CashFileImportService, CashFileImportHandler, CashTransactionAutoRulesSubscriber, AuditLogSubscriber и CashFileImportIdempotencyTest.
+TASK.md, specs/stage-1.md, acceptance.md, design.md, baseline.md, plan.md; CashFileImportService, CashFileImportHandler, CashTransactionAutoRulesSubscriber, AuditLogSubscriber и CashFileImportIdempotencyTest.
