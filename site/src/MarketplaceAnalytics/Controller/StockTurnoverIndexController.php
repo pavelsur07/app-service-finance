@@ -45,7 +45,7 @@ final class StockTurnoverIndexController extends AbstractController
         // Отчёт строится в памяти целиком (сводка нужна по всем строкам), поэтому ArrayAdapter.
         $pager = new Pagerfanta(new ArrayAdapter($report->rows));
         $pager->setMaxPerPage(self::PER_PAGE);
-        $pager->setCurrentPage(max(1, $request->query->getInt('page', 1)));
+        $pager->setCurrentPage(StockTurnoverFilterParser::page($request));
 
         return $this->render('marketplace_analytics/stock_turnover/index.html.twig', [
             'pager' => $pager,

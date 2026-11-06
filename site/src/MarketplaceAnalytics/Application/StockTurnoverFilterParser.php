@@ -18,11 +18,18 @@ use Symfony\Component\HttpFoundation\Request;
  */
 final readonly class StockTurnoverFilterParser
 {
+    /** Номер страницы: нечисловое или < 1 → 1; выход за диапазон решает Pagerfanta (422). */
+    public static function page(Request $request): int
+    {
+        return max(1, filter_var($request->query->get('page'), \FILTER_VALIDATE_INT, \FILTER_NULL_ON_FAILURE) ?? 1);
+    }
+
     public function parse(Request $request, string $companyId): StockTurnoverFilter
     {
         $today = new \DateTimeImmutable('today');
 
-        $period = $request->query->getInt('period', 30);
+        // Не getInt(): нечисловое значение — умолчание, а не 400.
+        $period = filter_var($request->query->get('period'), \FILTER_VALIDATE_INT, \FILTER_NULL_ON_FAILURE) ?? 30;
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) $request->query->get('date', ''));
         if (false === $date || $date->format('Y-m-d') !== $request->query->get('date') || $date > $today) {
             $date = $today;

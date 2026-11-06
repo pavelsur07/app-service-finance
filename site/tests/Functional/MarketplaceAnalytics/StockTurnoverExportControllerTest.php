@@ -63,6 +63,34 @@ final class StockTurnoverExportControllerTest extends WebTestCaseBase
         self::assertEquals(772400, $sheets['Сводка'][0][1]);
     }
 
+    public function testExportKeepsFormulaLookingTextAsStrings(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompany('turnover-export-formula@example.test', '11111111-1111-1111-1111-111111118803');
+        $listing = $this->listing($company, 8899, '=HYPERLINK("http://evil")', '=1+1');
+        $this->snapshot($company, $listing, '5.000');
+        $this->em()->flush();
+        $this->login($client, $owner, $company);
+
+        $client->request('GET', self::URL.'?date='.$this->date->format('Y-m-d'));
+        self::assertResponseStatusCodeSame(200);
+
+        // В xlsx формула — элемент <f>; текст, начинающийся с «=», должен остаться строкой.
+        $path = tempnam(sys_get_temp_dir(), 'turnover_formula_');
+        self::assertNotFalse($path);
+        file_put_contents($path, $client->getInternalResponse()->getContent());
+        $zip = new \ZipArchive();
+        self::assertTrue($zip->open($path));
+        $sheetXml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+        unlink($path);
+        self::assertStringNotContainsString('<f>', $sheetXml);
+
+        $sheets = $this->download($client, self::URL.'?date='.$this->date->format('Y-m-d'));
+        self::assertSame('=1+1', $sheets['Оборачиваемость'][1][1]);
+        self::assertSame('=HYPERLINK("http://evil")', $sheets['Оборачиваемость'][1][2]);
+    }
+
     public function testExportRequiresAuthentication(): void
     {
         $client = static::createClient();

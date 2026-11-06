@@ -9,12 +9,16 @@ use App\MarketplaceAnalytics\DTO\StockTurnoverReport;
 use App\MarketplaceAnalytics\DTO\StockTurnoverRow;
 use App\MarketplaceAnalytics\Enum\TurnoverBucket;
 use OpenSpout\Common\Entity\Cell;
+use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\Color;
 use OpenSpout\Common\Entity\Style\Style;
 use OpenSpout\Writer\XLSX\Writer;
 
-/** Отчёт «Оборачиваемость» в xlsx: лист строк и лист сводки (та же сводка, что на странице — до фильтра корзины). */
+/**
+ * Отчёт «Оборачиваемость» в xlsx: лист строк и лист сводки (та же сводка, что на странице — до фильтра корзины).
+ * Текст из данных маркетплейса (название, SKU, артикул) — только StringCell: Cell::fromValue() делает из «=…» формулу.
+ */
 final readonly class StockTurnoverXlsxExporter
 {
     private const FORMAT_MONEY = '#,##0.00';
@@ -63,7 +67,7 @@ final readonly class StockTurnoverXlsxExporter
                 $lines[] = [sprintf('Остатки %s устарели, последний снимок', $this->sourceLabel($source)), $date, $text];
             }
             foreach ($lines as [$label, $value, $style]) {
-                $writer->addRow(new Row([Cell::fromValue($label, $text), Cell::fromValue($value, $style)]));
+                $writer->addRow(new Row([new StringCell($label, $text), is_string($value) ? new StringCell($value, $style) : Cell::fromValue($value, $style)]));
             }
         } finally {
             $writer->close();
@@ -73,11 +77,11 @@ final readonly class StockTurnoverXlsxExporter
     private function dataRow(StockTurnoverRow $row, Style $text, Style $integer, Style $rate, Style $money): Row
     {
         return new Row([
-            Cell::fromValue($row->listingId, $text),
-            Cell::fromValue($row->title ?? '', $text),
-            Cell::fromValue($row->sku, $text),
-            Cell::fromValue($row->supplierSku ?? '', $text),
-            Cell::fromValue($this->sourceLabel($row->marketplace), $text),
+            new StringCell($row->listingId, $text),
+            new StringCell($row->title ?? '', $text),
+            new StringCell($row->sku, $text),
+            new StringCell($row->supplierSku ?? '', $text),
+            new StringCell($this->sourceLabel($row->marketplace), $text),
             Cell::fromValue($row->stockQty, $integer),
             Cell::fromValue($row->salesQty, $integer),
             Cell::fromValue($row->salesPerDay, $rate),

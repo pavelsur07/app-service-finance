@@ -50,6 +50,8 @@ final class StockTurnoverControllerTest extends WebTestCaseBase
         yield 'date' => ['date=31-12-2026'];
         yield 'source' => ['source=amazon'];
         yield 'tags' => ['tags[]=not-a-uuid'];
+        yield 'period-nonnumeric' => ['period=abc'];
+        yield 'page-nonnumeric' => ['page=abc'];
     }
 
     #[DataProvider('invalidParams')]
