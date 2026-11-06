@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Cash\Application;
 
 use App\Cash\Application\AcceptCashCategorySuggestionAction;
 use App\Cash\Application\DismissCashCategorySuggestionAction;
+use App\Cash\Application\DTO\CashCategorizationExample;
 use App\Cash\Application\RequestCashAiCategorizationAction;
 use App\Cash\Application\Service\CashCategorizationPayloadMapper;
 use App\Cash\Application\Service\CashCategorizationResultConsumer;
@@ -151,6 +152,56 @@ final class CashAiCategorizationTest extends IntegrationTestCase
 
         self::assertSame('awaiting_results', $result->skippedReason);
         self::assertSame(0, $result->requested);
+    }
+
+    public function testBatchCarriesSimilarCompanyDecisionsButNotAcceptedAiSuggestions(): void
+    {
+        $this->transaction('Оплата аренды склада за сентябрь', $this->rent, new \DateTimeImmutable('-30 days'));
+        $byAi = $this->transaction('Оплата аренды парковки за август', $this->rent, new \DateTimeImmutable('-40 days'));
+        $autoApplied = $this->transaction('Оплата аренды стоянки за июль', $this->rent, new \DateTimeImmutable('-50 days'));
+        $this->transaction('Банковская комиссия за обслуживание', $this->rent, new \DateTimeImmutable('-20 days'));
+        $this->transaction('Оплата аренды офиса в прошлом году', $this->rent, new \DateTimeImmutable('-400 days'));
+        $this->transaction('Оплата аренды офиса за октябрь');
+        $this->em->flush();
+        // Статью парковки поставил человек, приняв подсказку ИИ, стоянки — автоприменение ИИ: модель не должна
+        // учиться на своих ответах.
+        $this->suggested($byAi, $this->rent)->accept((string) $this->user->getId(), new \DateTimeImmutable());
+        $this->suggested($autoApplied, $this->rent)->autoApply(new \DateTimeImmutable());
+        $this->em->flush();
+
+        $this->request();
+
+        self::assertSame([[
+            'direction' => 'outflow',
+            'description' => 'Оплата аренды склада за сентябрь',
+            'counterparty' => null,
+            'category_id' => (string) $this->rent->getId(),
+        ]], $this->ai->requests[0]['payload']['examples']);
+    }
+
+    public function testBatchWithoutSimilarDecisionsKeepsThePreviousPayloadShape(): void
+    {
+        $this->transaction('Банковская комиссия за обслуживание', $this->rent, new \DateTimeImmutable('-20 days'));
+        $this->transaction('Оплата аренды офиса за октябрь');
+        $this->em->flush();
+
+        $this->request();
+
+        self::assertArrayNotHasKey('examples', $this->ai->requests[0]['payload']);
+    }
+
+    public function testExampleWithCategoryOutsideTheBatchTreeIsDropped(): void
+    {
+        $mapper = new CashCategorizationPayloadMapper();
+        $categories = [new \App\Cash\Application\DTO\CashCategorizationCategory((string) $this->rent->getId(), 'Расходы / Аренда', 'OUTFLOW')];
+        $operation = new \App\Cash\Application\DTO\CashCategorizationOperation(Uuid::uuid4()->toString(), 'OUTFLOW', '10.00', 'RUB', new \DateTimeImmutable(), 'Аренда', null);
+
+        $payload = $mapper->payload($categories, [$operation], [
+            new CashCategorizationExample('OUTFLOW', 'Аренда склада', null, (string) $this->rent->getId()),
+            new CashCategorizationExample('OUTFLOW', 'Архивная статья', null, Uuid::uuid4()->toString()),
+        ]);
+
+        self::assertSame(['Аренда склада'], array_column($payload['examples'] ?? [], 'description'));
     }
 
     public function testOwnFundsTransfersAreNotSentWhileCompanyHasNoSuchDecisions(): void

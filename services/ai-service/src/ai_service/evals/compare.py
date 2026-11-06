@@ -8,8 +8,13 @@
 Разбивка ошибок — пары «ожидали → ответ модели» по путям статей (id статей в наборах свои, путь
 однозначен между наборами) с id кейсов, чтобы найти операцию в cases.jsonl и отличить ошибку
 модели от непоследовательной ручной разметки. Сбой пачки в разбивку не попадает — он в таблице.
+
+С `with_examples` пачка получает примеры, как в проде (`examples` во входе, промпт v3): для каждой
+операции — до трёх других размеченных кейсов того же набора с тем же контрагентом или общими словами
+назначения. Сам кейс в примеры не попадает: ответ не подсказывается.
 """
 
+import re
 import statistics
 import time
 from collections.abc import Iterator
@@ -31,6 +36,9 @@ EVAL_COMPANY = "0192f0a0-0000-7000-8000-0000000000c1"
 NO_CATEGORY = "без статьи"
 TOP_ERRORS = 15
 EXAMPLES = 3
+EXAMPLES_PER_CASE = 3
+EXAMPLES_PER_BATCH = 30
+_WORD = re.compile(r"[a-zа-яё]{4,}")
 
 
 @dataclass(slots=True)
@@ -91,7 +99,7 @@ def available_models(raw_routes: dict[str, Any], env: dict[str, str]) -> list[st
     return [ref.key for ref in routing.routes[TASK].models if routing.providers[ref.provider].available]
 
 
-def evaluate(pipeline: Pipeline, eval_set: EvalSet) -> Score:
+def evaluate(pipeline: Pipeline, eval_set: EvalSet, with_examples: bool = False) -> Score:
     spec = build_registry().get(TASK)
     if spec is None:
         raise LookupError(TASK)
@@ -99,7 +107,9 @@ def evaluate(pipeline: Pipeline, eval_set: EvalSet) -> Score:
     paths = {c["id"]: c["path"] for c in eval_set.categories}
     score = Score()
     for chunk in _chunks(eval_set.cases, BATCH_SIZE):
-        payload = {"categories": eval_set.categories, "operations": [c["operation"] for c in chunk]}
+        payload: dict[str, Any] = {"categories": eval_set.categories, "operations": [c["operation"] for c in chunk]}
+        if with_examples:
+            payload["examples"] = similar_examples(chunk, eval_set.cases)
         score.batches += 1
         predicted: dict[str, tuple[str | None, float]] = {}
         started = time.monotonic()
@@ -126,6 +136,48 @@ def evaluate(pipeline: Pipeline, eval_set: EvalSet) -> Score:
             _score_case(score, case, answer, threshold)
             _record_error(score, f"{eval_set.name}:{case['id']}", case["expected_category_id"], answer, paths)
     return score
+
+
+def similar_examples(chunk: list[dict[str, Any]], pool: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Примеры для пачки: размеченные кейсы набора, похожие на её операции (контрагент, затем общие слова)."""
+    in_chunk = {c["id"] for c in chunk}
+    labelled = [c for c in pool if c["expected_category_id"] is not None and c["id"] not in in_chunk]
+    picked: dict[str, dict[str, Any]] = {}
+    for case in chunk:
+        op = case["operation"]
+        counterparty = op.get("counterparty")
+        words = _words(op.get("description"))
+        ranked = sorted(
+            (
+                (
+                    counterparty is not None and other["operation"].get("counterparty") == counterparty,
+                    len(words & _words(other["operation"].get("description"))),
+                    other,
+                )
+                for other in labelled
+                if other["operation"]["direction"] == op["direction"]
+            ),
+            key=lambda r: (r[0], r[1]),
+            reverse=True,
+        )
+        for same_counterparty, common, other in ranked[:EXAMPLES_PER_CASE]:
+            if same_counterparty or common > 0:
+                picked.setdefault(other["id"], other)
+        if len(picked) >= EXAMPLES_PER_BATCH:
+            break
+    return [
+        {
+            "direction": c["operation"]["direction"],
+            "description": c["operation"].get("description"),
+            "counterparty": c["operation"].get("counterparty"),
+            "category_id": c["expected_category_id"],
+        }
+        for c in list(picked.values())[:EXAMPLES_PER_BATCH]
+    ]
+
+
+def _words(text: str | None) -> set[str]:
+    return set(_WORD.findall((text or "").lower()))
 
 
 def render(rows: list[tuple[str, Score]], prices: dict[str, Price]) -> str:

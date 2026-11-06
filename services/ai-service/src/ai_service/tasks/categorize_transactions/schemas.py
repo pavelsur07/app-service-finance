@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 MAX_OPERATIONS = 50
 MAX_CATEGORIES = 1000
+MAX_EXAMPLES = 50
 
 Direction = Literal["inflow", "outflow"]
 
@@ -33,11 +34,23 @@ class Operation(BaseModel):
     counterparty: str | None = Field(default=None, max_length=255)
 
 
+class Example(BaseModel):
+    """Как компания сама разнесла похожую операцию (человек или автоправило, не ИИ)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    direction: Direction
+    description: str | None = Field(default=None, max_length=1024)
+    counterparty: str | None = Field(default=None, max_length=255)
+    category_id: str = Field(min_length=1, max_length=64)
+
+
 class CategorizeInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     categories: list[Category] = Field(min_length=1, max_length=MAX_CATEGORIES)
     operations: list[Operation] = Field(min_length=1, max_length=MAX_OPERATIONS)
+    examples: list[Example] = Field(default_factory=list, max_length=MAX_EXAMPLES)
 
     @model_validator(mode="after")
     def _unique_ids(self) -> Self:
@@ -45,6 +58,10 @@ class CategorizeInput(BaseModel):
             raise ValueError("category ids must be unique")
         if len({o.id for o in self.operations}) != len(self.operations):
             raise ValueError("operation ids must be unique")
+        known = {c.id for c in self.categories}
+        if any(e.category_id not in known for e in self.examples):
+            # Рассинхрон справочника и примеров у отправителя — ошибка входа, а не ответ модели.
+            raise ValueError("example category ids must be in categories")
         return self
 
 

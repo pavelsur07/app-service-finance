@@ -2420,6 +2420,12 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   перемещение» без слов «депозит/кредит/займ/процент» исключает операцию, только если у
   компании нет ни одной такой операции в несистемной статье (`TRANSFER_LIKE`; число
   исключённых — `CashCategorizationStats::$transferLikeSkipped` на странице «ИИ» кабинета).
+  Примеры (`examples` в `categorize_payload`, промпт `categorize_transactions/v3`): к пачке —
+  `CashCategorizationQuery::findExamplesFor` одним запросом, до 3 на операцию и 30 на пачку,
+  операции компании за 365 дней в несистемной статье с одной разбивкой (человек или автоправило;
+  подсказки ИИ `accepted`/`auto_applied` не берутся), сначала тот же контрагент, затем общие слова
+  назначения (`to_tsvector('russian')`). Пример со статьёй вне справочника пачки mapper отбрасывает;
+  пустой список не передаётся.
   Справочник — активные несистемные конечные статьи с путём (0 или больше 1000
   → пропуск компании). ИНН и счета не передаются.
 - `CashCategorizationResultConsumer`: строки `requested` по `task_id` (повтор
@@ -5030,6 +5036,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.146 | 2026-11-06 | ai-service/Cash: необязательное поле `examples` в `categorize_payload` (контракт `ai-task/v1`, категория примера — из справочника, иначе 422), промпт `categorize_transactions/v3` (правило 6 — примеры компании), `CashCategorizationQuery::findExamplesFor`, `CashCategorizationExample`; `evals-compare --examples` — примеры из других кейсов набора (задача `ai-routines`, этап 3) |
 | 2.145 | 2026-11-06 | Cash: переводы собственных средств не отправляются в ИИ, если компания такие операции в статьи не разносила (`CashCategorizationQuery::TRANSFER_LIKE`), счётчик `transferLikeSkipped` на странице «ИИ» кабинета, `CashFacade::getAiSuggestionStats(..., ?occurredFrom)` (задача `ai-routines`, этап 2) |
 | 2.144 | 2026-11-06 | ServiceGateway: учёт расходов ИИ `ai_usage`, журнал `ai_run`, лимиты `ai_company_access.monthly_limit_rub`/`lookback_days` (`Version20261106090000`–`110000`), гейт `app:ai-service:health-check`, страница `/admin/ai/companies/{id}`; cron `ai-categorize` идёт по всем подключённым компаниям, `CashAiCategorizationCompaniesQuery` удалён; `CashFacade::getAiSuggestionStats` (задача `ai-observability-budget`) |
 | 2.143 | 2026-11-05 | ServiceGateway: подключение компаний к ИИ из админки — `ai_company_access` (`Version20261105120000`, перенос Вумджой), `SetAiCompanyAccessAction`, переключатель «ИИ» в `/admin/users`; `AiTaskFacadeInterface::enabledCompanyIds/isServiceEnabled/grantedCompanyIds`; env `AI_SERVICE_COMPANY_ALLOWLIST` удалена (задача `ai-company-access`) |

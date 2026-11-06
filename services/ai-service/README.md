@@ -41,7 +41,7 @@ php bin/console app:cash:ai-categorize-stats --company-id=<uuid>
 ```bash
 php bin/console app:cash:ai-eval-export --company-id=<uuid> > export.json   # ПДн в открытом виде, не коммитить
 python -m ai_service evals-import export.json --name <имя> --redact <название> [--redact <бренд>]  # обезличивание; результат просмотреть
-python -m ai_service evals-compare [--models a/m,b/m] [--sets synthetic,history/<имя>]
+python -m ai_service evals-compare [--models a/m,b/m] [--sets synthetic,history/<имя>] [--examples]
 ```
 
 `evals-compare` гоняет каждую модель отдельно через тот же pipeline пачками по
@@ -52,6 +52,9 @@ python -m ai_service evals-compare [--models a/m,b/m] [--sets synthetic,history/
 модели» по путям статей, доля от кейсов ожидаемой статьи и до трёх id кейсов
 (`набор:кейс`) — найти операцию в `cases.jsonl` и отличить ошибку модели от
 непоследовательной ручной разметки. Сбой пачки в разбивку не входит.
+С `--examples` пачка получает примеры разнесения, как в проде (`examples`, промпт v3): для каждой
+операции — до трёх других размеченных кейсов набора с тем же контрагентом или общими словами
+назначения; сам кейс в примеры не попадает. Сравнение «с примерами / без» — два прогона.
 Модели прод-маршрутов отвечают только через шлюз, то есть только с app-сервера
 (в контейнере `ai-service`; наборы — в образе, `AI_SERVICE_EVALS_DIR=/app/evals`).
 

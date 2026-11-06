@@ -7,6 +7,7 @@ namespace App\Cash\Infrastructure\Query;
 use App\Cash\Application\DTO\CashAiAutoApplyGateStats;
 use App\Cash\Application\DTO\CashAiRuleProposal;
 use App\Cash\Application\DTO\CashCategorizationCategory;
+use App\Cash\Application\DTO\CashCategorizationExample;
 use App\Cash\Application\DTO\CashCategorizationHistoryCase;
 use App\Cash\Application\DTO\CashCategorizationOperation;
 use App\Cash\Application\DTO\CashCategorizationStats;
@@ -117,6 +118,92 @@ final readonly class CashCategorizationQuery
         );
 
         return array_map(self::operation(...), $rows);
+    }
+
+    /**
+     * Примеры для пачки (docs/tasks/ai-routines, этап 3): операции компании за год, разнесённые человеком или
+     * автоправилом в несистемную статью (принятые и автоприменённые подсказки ИИ не берутся — модель не учится на
+     * своих ответах),
+     * похожие на операции пачки. Для каждой операции пачки — до `$perOperation` примеров: сначала тот же
+     * контрагент, затем больше общих слов назначения (полнотекстовый поиск, русская морфология). Один запрос.
+     *
+     * @param list<string> $transactionIds операции пачки
+     *
+     * @return list<CashCategorizationExample>
+     */
+    public function findExamplesFor(string $companyId, array $transactionIds, \DateTimeImmutable $occurredFrom, int $perOperation, int $limit): array
+    {
+        Assert::uuid($companyId);
+        Assert::allUuid($transactionIds);
+        Assert::range($perOperation, 1, 10);
+        Assert::range($limit, 1, 50);
+        if ([] === $transactionIds) {
+            return [];
+        }
+
+        $rows = $this->connection->fetchAllAssociative(
+            'WITH batch AS MATERIALIZED (
+                 -- Слова назначения через «или»: пример похож, если делит с операцией хоть одно слово, ранг — по числу общих.
+                 SELECT b.counterparty_id,
+                        CASE WHEN b.description ~ \'[[:alpha:]]{2}\'
+                             THEN NULLIF(replace(plainto_tsquery(\'russian\', b.description)::text, \'&\', \'|\'), \'\')::tsquery
+                        END AS words
+                 FROM cash_transaction b
+                 WHERE b.company_id = :companyId AND b.id IN (:ids)
+             ), pool AS MATERIALIZED (
+                 SELECT tx.id, tx.direction, tx.description, tx.counterparty_id, tx.occurred_at,
+                        COALESCE(counterparty.display_name, counterparty.name) AS counterparty,
+                        tx.cashflow_category_id AS category_id,
+                        to_tsvector(\'russian\', COALESCE(tx.description, \'\')) AS document
+                 FROM cash_transaction tx
+                 JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id AND category.company_id = :companyId
+                 LEFT JOIN counterparty ON counterparty.id = tx.counterparty_id AND counterparty.company_id = :companyId
+                 WHERE tx.company_id = :companyId
+                   AND tx.deleted_at IS NULL
+                   AND tx.is_transfer = false
+                   AND tx.occurred_at >= :occurredFrom
+                   AND category.is_system = false
+                   AND (SELECT count(*) FROM cash_transaction_split split WHERE split.cash_transaction_id = tx.id) = 1
+                   AND NOT EXISTS (
+                       SELECT 1 FROM cash_category_suggestion s
+                       WHERE s.company_id = :companyId AND s.transaction_id = tx.id AND s.status IN (\'accepted\', \'auto_applied\')
+                   )
+             )
+             SELECT picked.direction, picked.description, picked.counterparty, picked.category_id
+             FROM (
+                 SELECT DISTINCT ON (near.id) near.id, near.direction, near.description, near.counterparty,
+                        near.category_id, near.same_counterparty, near.rank
+                 FROM batch
+                 CROSS JOIN LATERAL (
+                     SELECT pool.*,
+                            (batch.counterparty_id IS NOT NULL AND pool.counterparty_id = batch.counterparty_id) AS same_counterparty,
+                            CASE WHEN batch.words IS NULL THEN 0 ELSE ts_rank(pool.document, batch.words) END AS rank
+                     FROM pool
+                     WHERE (batch.counterparty_id IS NOT NULL AND pool.counterparty_id = batch.counterparty_id)
+                        OR (batch.words IS NOT NULL AND pool.document @@ batch.words)
+                     ORDER BY same_counterparty DESC, rank DESC, pool.occurred_at DESC, pool.id
+                     LIMIT :perOperation
+                 ) near
+                 ORDER BY near.id, near.same_counterparty DESC, near.rank DESC
+             ) picked
+             ORDER BY picked.same_counterparty DESC, picked.rank DESC, picked.id
+             LIMIT :limit',
+            [
+                'companyId' => $companyId,
+                'ids' => $transactionIds,
+                'occurredFrom' => $occurredFrom->format('Y-m-d'),
+                'perOperation' => $perOperation,
+                'limit' => $limit,
+            ],
+            ['ids' => ArrayParameterType::STRING],
+        );
+
+        return array_map(static fn (array $row): CashCategorizationExample => new CashCategorizationExample(
+            direction: (string) $row['direction'],
+            description: null === $row['description'] ? null : (string) $row['description'],
+            counterparty: null === $row['counterparty'] ? null : (string) $row['counterparty'],
+            categoryId: (string) $row['category_id'],
+        ), $rows);
     }
 
     /**
