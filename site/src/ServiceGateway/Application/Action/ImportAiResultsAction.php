@@ -38,8 +38,8 @@ final readonly class ImportAiResultsAction
     private const LOGGED_TASK_IDS = 20;
 
     /**
-     * @param iterable<AiTaskResultConsumerInterface>                     $consumers
-     * @param array<string, array{input: float|null, output: float|null}> $prices    ₽ за 1 млн токенов
+     * @param iterable<AiTaskResultConsumerInterface> $consumers
+     * @param array<string, array{input: float|null, output: float|null}> $prices ₽ за 1 млн токенов
      */
     public function __construct(
         private AiServiceClientInterface $client,

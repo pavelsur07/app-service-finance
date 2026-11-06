@@ -152,7 +152,7 @@ final class ImportAiResultsActionTest extends TestCase
     }
 
     /**
-     * @param list<AiTaskResultConsumerInterface>                         $consumers
+     * @param list<AiTaskResultConsumerInterface> $consumers
      * @param array<string, array{input: float|null, output: float|null}> $prices
      */
     private function action(ImportPagesClient $client, array $consumers, TestHandler $logs, array $prices = []): ImportAiResultsAction

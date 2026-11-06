@@ -6,10 +6,10 @@ namespace App\ServiceGateway\Facade;
 
 use App\ServiceGateway\Application\DTO\AiCompanyBudget;
 use App\ServiceGateway\Application\DTO\AiCompanyOverview;
-use App\ServiceGateway\Infrastructure\Query\AiUsageQuery;
 use App\ServiceGateway\Application\Service\AiBudget;
 use App\ServiceGateway\Application\Service\AiRunJournal;
 use App\ServiceGateway\Application\Service\AiServiceAccess;
+use App\ServiceGateway\Infrastructure\Query\AiUsageQuery;
 use App\ServiceGateway\Message\SubmitAiTaskMessage;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;

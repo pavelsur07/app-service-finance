@@ -6,9 +6,9 @@ namespace App\Tests\Unit\ServiceGateway\Facade;
 
 use App\ServiceGateway\Application\Service\AiBudget;
 use App\ServiceGateway\Application\Service\AiRunJournal;
-use App\ServiceGateway\Infrastructure\Query\AiUsageQuery;
 use App\ServiceGateway\Application\Service\AiServiceAccess;
 use App\ServiceGateway\Facade\AiTaskFacade;
+use App\ServiceGateway\Infrastructure\Query\AiUsageQuery;
 use App\ServiceGateway\Message\SubmitAiTaskMessage;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;

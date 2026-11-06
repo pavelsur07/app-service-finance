@@ -47,13 +47,6 @@ final readonly class AiServiceAccess
     }
 
     /**
-     * Подключена ли компания администратором — без учёта общего выключателя (для админки).
-     *
-     * @param list<string> $companyIds
-     *
-     * @return list<string>
-     */
-    /**
      * Все подключённые компании с моментом подключения (проверка «тишины»).
      *
      * @return array<string, \DateTimeImmutable> companyId → enabled_at
@@ -66,6 +59,13 @@ final readonly class AiServiceAccess
         );
     }
 
+    /**
+     * Подключена ли компания администратором — без учёта общего выключателя (для админки).
+     *
+     * @param list<string> $companyIds
+     *
+     * @return list<string>
+     */
     public function grantedCompanyIds(array $companyIds): array
     {
         if ([] === $companyIds) {
