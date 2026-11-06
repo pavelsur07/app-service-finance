@@ -18,6 +18,10 @@ use Webmozart\Assert\Assert;
 #[ORM\UniqueConstraint(name: 'uq_ai_company_access_company', columns: ['company_id'])]
 class AiCompanyAccess
 {
+    public const DEFAULT_MONTHLY_LIMIT_RUB = '500.00';
+    public const DEFAULT_LOOKBACK_DAYS = 90;
+    public const LOOKBACK_CHOICES = [7, 30, 90];
+
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
     private string $id;
@@ -31,6 +35,14 @@ class AiCompanyAccess
     /** Администратор, включивший доступ; null — перенос из env-списка. */
     #[ORM\Column(type: 'guid', nullable: true)]
     private ?string $enabledByUserId;
+
+    /** Лимит расходов ИИ компании за календарный месяц, ₽. */
+    #[ORM\Column(type: 'decimal', precision: 12, scale: 2, options: ['default' => 500])]
+    private string $monthlyLimitRub = self::DEFAULT_MONTHLY_LIMIT_RUB;
+
+    /** Окно операций, которые уходят в ИИ: 7, 30 или 90 дней. */
+    #[ORM\Column(type: 'smallint', options: ['default' => 90])]
+    private int $lookbackDays = self::DEFAULT_LOOKBACK_DAYS;
 
     public function __construct(
         string $companyId,

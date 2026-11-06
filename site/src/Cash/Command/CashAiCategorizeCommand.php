@@ -6,12 +6,10 @@ namespace App\Cash\Command;
 
 use App\Cash\Application\AutoApplyCashCategorySuggestionsAction;
 use App\Cash\Application\RequestCashAiCategorizationAction;
-use App\Cash\Infrastructure\Query\CashAiCategorizationCompaniesQuery;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -25,8 +23,9 @@ use Webmozart\Assert\Assert;
  * автоприменение уверенных подсказок, если ворота компании открыты (по умолчанию закрыты:
  * без флага операции не меняются). Выключенный ИИ-сервис для компании — ничего не ставит.
  *
- * `--all-enabled` (cron) — по очереди все подключённые к ИИ компании с операциями за окно
- * кандидатов; сбой одной компании пишется в лог и не останавливает остальные: после него
+ * `--all-enabled` (cron) — по очереди все подключённые к ИИ компании, в том числе без новых
+ * операций: каждая получает запись в журнале запусков, по которой гейт «тишины» видит, что cron
+ * жив. Пустой запуск LLM не вызывает. Сбой одной компании пишется в лог и не останавливает остальные: после него
  * EntityManager пересоздаётся.
  */
 #[AsCommand(
@@ -38,11 +37,9 @@ final class CashAiCategorizeCommand extends Command
     public function __construct(
         private readonly AutoApplyCashCategorySuggestionsAction $autoApply,
         private readonly RequestCashAiCategorizationAction $action,
-        private readonly CashAiCategorizationCompaniesQuery $companies,
         private readonly AiTaskFacadeInterface $aiTasks,
         private readonly LockFactory $lockFactory,
         private readonly ManagerRegistry $managerRegistry,
-        private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
@@ -79,9 +76,7 @@ final class CashAiCategorizeCommand extends Command
             return self::SUCCESS;
         }
 
-        $since = $this->clock->now()->modify(sprintf('-%d days', RequestCashAiCategorizationAction::LOOKBACK_DAYS));
-        $enabled = $this->aiTasks->enabledCompanyIds($this->companies->withTransactionsSince($since));
-        sort($enabled);
+        $enabled = $this->aiTasks->connectedCompanyIds();
         $failed = 0;
         foreach ($enabled as $id) {
             try {
@@ -90,6 +85,8 @@ final class CashAiCategorizeCommand extends Command
                 // Сбой одной компании не должен лишать подсказок остальные; повтор — следующий запуск.
                 ++$failed;
                 $this->logger->error('AI categorization failed for a company.', ['companyId' => $id, 'exception' => $e]);
+                // Журнал — через DBAL: переживает закрытый EntityManager.
+                $this->aiTasks->recordRun($id, RequestCashAiCategorizationAction::TASK_TYPE, error: $e::class);
                 // Исключение внутри wrapInTransaction закрывает EntityManager: следующая компания —
                 // со свежим (сервисы держат lazy-ссылку, resetManager подменяет её содержимое).
                 $manager = $this->managerRegistry->getManager();
@@ -109,6 +106,7 @@ final class CashAiCategorizeCommand extends Command
         $lock = $this->lockFactory->createLock($this->getName().':'.$companyId, 1800);
         if (!$lock->acquire()) {
             $output->writeln(sprintf('ai-categorize: %s: another run for this company is in progress, skipping', $companyId));
+            $this->aiTasks->recordRun($companyId, RequestCashAiCategorizationAction::TASK_TYPE, skippedReason: 'locked');
 
             return;
         }
@@ -127,9 +125,19 @@ final class CashAiCategorizeCommand extends Command
 
         if (!$result->enabled) {
             $output->writeln(sprintf('ai-categorize: %s: ai-service is disabled for the company', $companyId));
+            $this->aiTasks->recordRun($companyId, RequestCashAiCategorizationAction::TASK_TYPE, skippedReason: 'disabled');
 
             return;
         }
+        $this->aiTasks->recordRun(
+            $companyId,
+            RequestCashAiCategorizationAction::TASK_TYPE,
+            $result->requested,
+            $result->tasks,
+            $result->redispatched,
+            $result->expired,
+            $result->skippedReason,
+        );
         $output->writeln(sprintf(
             'ai-categorize: %s: %d operations in %d tasks requested, %d tasks re-sent, %d requests expired%s',
             $companyId,

@@ -15,7 +15,7 @@ final readonly class CashAiCategorizationRequestResult
         public int $redispatched = 0,
         public int $requested = 0,
         public int $tasks = 0,
-        /** Причина, по которой компания пропущена целиком (нет статей, справочник больше лимита). */
+        /** Причина, по которой компания пропущена целиком (нет статей, справочник больше лимита, исчерпан лимит расходов ИИ — `budget_exceeded`). */
         public ?string $skippedReason = null,
     ) {
     }

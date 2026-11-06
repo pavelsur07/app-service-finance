@@ -26,6 +26,8 @@ use App\Cash\Repository\Transaction\CashCategorizationTaskRepository;
 use App\Cash\Repository\Transaction\CashCategorySuggestionRepository;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\ServiceGateway\Application\DTO\AiCompanyBudget;
+use App\ServiceGateway\Application\DTO\AiCompanyOverview;
 use App\ServiceGateway\Application\DTO\AiTaskResult;
 use App\ServiceGateway\Enum\AiResultStatus;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
@@ -121,6 +123,64 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         self::assertSame(0, $this->countSuggestions());
     }
 
+    public function testExhaustedBudgetRequestsNothingNew(): void
+    {
+        $this->transaction('Оплата аренды');
+        $this->em->flush();
+        $this->ai->spentRub = 500.0;
+
+        $result = $this->request();
+
+        self::assertSame('budget_exceeded', $result->skippedReason);
+        self::assertSame([], $this->ai->requests);
+        self::assertSame(0, $this->countSuggestions());
+    }
+
+    public function testNewBatchesWaitWhilePreviousRequestsHaveNoAnswer(): void
+    {
+        $this->transaction('Оплата аренды');
+        $this->em->flush();
+        self::assertSame(1, $this->request()->requested);
+
+        // Импорт встал: через час ответа нет, появилась новая операция — новых пачек не будет,
+        // их стоимость не попала бы в лимит.
+        $this->transaction('Аренда склада');
+        $this->em->flush();
+        $this->clock->modify('+1 hour');
+        $result = $this->request();
+
+        self::assertSame('awaiting_results', $result->skippedReason);
+        self::assertSame(0, $result->requested);
+    }
+
+    public function testExpiredUnansweredRequestsKeepNewBatchesPaused(): void
+    {
+        $this->transaction('Оплата аренды');
+        $this->em->flush();
+        self::assertSame(1, $this->request()->requested);
+
+        // Импорт стоит больше недели: запрос истекает, но та же операция не уходит повторно
+        // с новым ключом — сервис мог уже выполнить её платно.
+        $this->clock->modify('+8 days');
+        $result = $this->request();
+
+        self::assertSame(1, $result->expired);
+        self::assertSame('awaiting_results', $result->skippedReason);
+        self::assertCount(1, $this->ai->requests);
+    }
+
+    public function testCompanyLookbackLimitsCandidateWindow(): void
+    {
+        $recent = $this->transaction('Аренда за неделю', null, new \DateTimeImmutable('-3 days'));
+        $this->transaction('Аренда месячной давности', null, new \DateTimeImmutable('-20 days'));
+        $this->em->flush();
+        $this->ai->lookbackDays = 7;
+
+        $this->request();
+
+        self::assertSame([$recent->getId()], array_column($this->ai->requests[0]['payload']['operations'], 'id'));
+    }
+
     public function testAnswerBecomesSuggestionAndRepeatedResultIsIgnored(): void
     {
         $rentTx = $this->transaction('Оплата аренды офиса');
@@ -214,14 +274,16 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         $tx = $this->transaction('Оплата аренды');
         $this->em->flush();
 
+        // Каждый цикл: отправка → неделя без ответа → истечение и пауза → пауза кончилась.
         for ($i = 0; $i < 4; ++$i) {
-            $this->request();
+            self::assertSame(1, $this->request()->requested);
+            $this->clock->modify('+8 days');
+            self::assertSame(1, $this->request()->expired);
             $this->clock->modify('+8 days');
         }
         $result = $this->request();
 
         // Четыре истечения подряд не исключили операцию (лимит MAX_FAILED_ATTEMPTS — для сбоев ответа).
-        self::assertSame(1, $result->expired);
         self::assertSame(1, $result->requested);
         self::assertSame(Status::REQUESTED, $this->suggestionFor($tx)->getStatus());
         self::assertSame(4, (int) $this->connection->fetchOne("SELECT count(*) FROM cash_category_suggestion WHERE error_code = 'expired'"));
@@ -468,6 +530,8 @@ final class CashAiCategorizationTest extends IntegrationTestCase
 final class RecordingAiTaskFacade implements AiTaskFacadeInterface
 {
     public bool $enabled = true;
+    public float $spentRub = 0.0;
+    public int $lookbackDays = 90;
     /** @var list<array{taskId: string, taskType: string, payload: array<string, mixed>, key: string}> */
     public array $requests = [];
 
@@ -494,6 +558,11 @@ final class RecordingAiTaskFacade implements AiTaskFacadeInterface
         return $this->enabled ? $companyIds : [];
     }
 
+    public function connectedCompanyIds(): array
+    {
+        return [];
+    }
+
     public function isServiceEnabled(): bool
     {
         return $this->enabled;
@@ -502,5 +571,24 @@ final class RecordingAiTaskFacade implements AiTaskFacadeInterface
     public function grantedCompanyIds(array $companyIds): array
     {
         return $this->enabledCompanyIds($companyIds);
+    }
+
+    public function companyOverview(string $companyId, int $runs = 50): AiCompanyOverview
+    {
+        throw new \LogicException('not used');
+    }
+
+    public function exhaustedCompanyIds(array $companyIds): array
+    {
+        return [];
+    }
+
+    public function budgetFor(string $companyId): AiCompanyBudget
+    {
+        return new AiCompanyBudget(limitRub: 500.0, spentRub: $this->spentRub, totalLimitRub: 5000.0, totalSpentRub: $this->spentRub, lookbackDays: $this->lookbackDays);
+    }
+
+    public function recordRun(string $companyId, string $taskType, int $requested = 0, int $tasks = 0, int $redispatched = 0, int $expired = 0, ?string $skippedReason = null, ?string $error = null): void
+    {
     }
 }

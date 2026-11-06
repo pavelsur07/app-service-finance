@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace App\ServiceGateway\Facade;
 
+use App\ServiceGateway\Application\DTO\AiCompanyBudget;
+use App\ServiceGateway\Application\DTO\AiCompanyOverview;
+use App\ServiceGateway\Application\Service\AiBudget;
+use App\ServiceGateway\Application\Service\AiRunJournal;
 use App\ServiceGateway\Application\Service\AiServiceAccess;
+use App\ServiceGateway\Infrastructure\Query\AiUsageQuery;
 use App\ServiceGateway\Message\SubmitAiTaskMessage;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -22,6 +27,9 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
         private MessageBusInterface $bus,
         private ClockInterface $clock,
         private LoggerInterface $logger,
+        private AiRunJournal $runs,
+        private AiBudget $budget,
+        private AiUsageQuery $usage,
     ) {
     }
 
@@ -82,6 +90,11 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
         return $this->access->enabledCompanyIds($companyIds);
     }
 
+    public function connectedCompanyIds(): array
+    {
+        return $this->access->isEnabled() ? array_keys($this->access->grantedCompanies()) : [];
+    }
+
     public function isServiceEnabled(): bool
     {
         return $this->access->isEnabled();
@@ -90,5 +103,43 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
     public function grantedCompanyIds(array $companyIds): array
     {
         return $this->access->grantedCompanyIds($companyIds);
+    }
+
+    public function budgetFor(string $companyId): AiCompanyBudget
+    {
+        return $this->budget->forCompany($companyId);
+    }
+
+    public function companyOverview(string $companyId, int $runs = 50): AiCompanyOverview
+    {
+        $month = $this->usage->monthTotals($companyId);
+
+        return new AiCompanyOverview(
+            serviceEnabled: $this->access->isEnabled(),
+            enabledAt: $this->budget->enabledAt($companyId),
+            budget: $this->budget->forCompany($companyId),
+            resultsThisMonth: $month['results'],
+            inputTokensThisMonth: $month['inputTokens'],
+            outputTokensThisMonth: $month['outputTokens'],
+            runs: $this->runs->recent($companyId, $runs),
+        );
+    }
+
+    public function exhaustedCompanyIds(array $companyIds): array
+    {
+        return $this->budget->exhaustedAmong($companyIds);
+    }
+
+    public function recordRun(
+        string $companyId,
+        string $taskType,
+        int $requested = 0,
+        int $tasks = 0,
+        int $redispatched = 0,
+        int $expired = 0,
+        ?string $skippedReason = null,
+        ?string $error = null,
+    ): void {
+        $this->runs->record($companyId, $taskType, $requested, $tasks, $redispatched, $expired, $skippedReason, $error);
     }
 }

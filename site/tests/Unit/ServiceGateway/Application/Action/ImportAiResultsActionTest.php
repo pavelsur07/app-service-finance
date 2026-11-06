@@ -12,6 +12,7 @@ use App\ServiceGateway\Enum\AiResultStatus;
 use App\ServiceGateway\Exception\ContractViolationException;
 use App\ServiceGateway\Facade\AiTaskResultConsumerInterface;
 use App\ServiceGateway\Infrastructure\Client\AiServiceClientInterface;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Monolog\Handler\TestHandler;
@@ -22,6 +23,8 @@ final class ImportAiResultsActionTest extends TestCase
 {
     private bool $emClosedAfterFailure = false;
     private int $resets = 0;
+    /** @var list<array<string, mixed>> параметры INSERT INTO ai_usage */
+    private array $usage = [];
 
     public function testHandsResultsToConsumersAndAcksOnlyHandledPerPage(): void
     {
@@ -39,6 +42,60 @@ final class ImportAiResultsActionTest extends TestCase
         self::assertSame([null, '2'], $client->cursors);
         self::assertSame([3, 2, 1, 0, 0], [$result->received, $result->acked, $result->unhandled, $result->failed, $result->invalid]);
         self::assertTrue($logs->hasErrorThatContains('AI results without a consumer were left unacknowledged.'));
+    }
+
+    public function testAcceptedResultRecordsTokensAndCostByModelPrice(): void
+    {
+        $result = self::aiResult('0192f0a0-0000-7000-8000-000000000011', 'echo', ['deepseek/deepseek-flash'], 1_000_000, 500_000);
+        $client = new ImportPagesClient([new AiResultsPage([$result], null)]);
+
+        $this->action($client, [new ImportRecordingConsumer('echo')], new TestHandler(), ['deepseek/deepseek-flash' => ['input' => 24.17, 'output' => 96.67]])();
+
+        self::assertCount(1, $this->usage);
+        self::assertSame('0192f0a0-0000-7000-8000-000000000011', $this->usage[0]['task']);
+        self::assertSame('deepseek/deepseek-flash', $this->usage[0]['model']);
+        self::assertSame([1_000_000, 500_000], [$this->usage[0]['in'], $this->usage[0]['out']]);
+        // 1 млн × 24,17 + 0,5 млн × 96,67 = 72,505 ₽
+        self::assertSame('72.5050', $this->usage[0]['cost']);
+        self::assertSame('2026-10-30 12:00:00', $this->usage[0]['completed']);
+    }
+
+    public function testMixedModelsArePricedByTheMostExpensiveOne(): void
+    {
+        // Повтор после невалидного ответа ушёл в запасную модель: токены суммой по обоим вызовам.
+        $result = self::aiResult('0192f0a0-0000-7000-8000-000000000014', 'echo', ['deepseek/deepseek-flash', 'openai/gpt-4.1-mini'], 1_000_000, 1_000_000);
+        $client = new ImportPagesClient([new AiResultsPage([$result], null)]);
+
+        $this->action($client, [new ImportRecordingConsumer('echo')], new TestHandler(), [
+            'deepseek/deepseek-flash' => ['input' => 24.17, 'output' => 96.67],
+            'openai/gpt-4.1-mini' => ['input' => 32.22, 'output' => 128.89],
+        ])();
+
+        self::assertSame('161.1100', $this->usage[0]['cost']);
+    }
+
+    public function testUnknownModelPriceKeepsTokensWithoutCostAndWarnsOnce(): void
+    {
+        $client = new ImportPagesClient([new AiResultsPage([
+            self::aiResult('0192f0a0-0000-7000-8000-000000000012', 'echo', ['kimi/k2'], 10, 5),
+            self::aiResult('0192f0a0-0000-7000-8000-000000000013', 'echo', ['kimi/k2'], 10, 5),
+        ], null)]);
+        $logs = new TestHandler();
+
+        $this->action($client, [new ImportRecordingConsumer('echo')], $logs, ['kimi/k2' => ['input' => null, 'output' => null]])();
+
+        self::assertSame([null, null], array_column($this->usage, 'cost'));
+        self::assertSame([10, 10], array_column($this->usage, 'in'));
+        self::assertCount(1, array_filter($logs->getRecords(), static fn ($r): bool => str_contains($r->message, 'model price is unknown')));
+    }
+
+    public function testFailedConsumerRecordsNoUsage(): void
+    {
+        $client = new ImportPagesClient([new AiResultsPage([self::aiResult('t1', 'echo')], null)]);
+
+        $this->action($client, [new ImportRecordingConsumer('echo', failTaskIds: ['t1'])], new TestHandler())();
+
+        self::assertSame([], $this->usage);
     }
 
     public function testEmptyQueueDoesNothing(): void
@@ -110,11 +167,19 @@ final class ImportAiResultsActionTest extends TestCase
 
     /**
      * @param list<AiTaskResultConsumerInterface> $consumers
+     * @param array<string, array{input: float|null, output: float|null}> $prices
      */
-    private function action(ImportPagesClient $client, array $consumers, TestHandler $logs): ImportAiResultsAction
+    private function action(ImportPagesClient $client, array $consumers, TestHandler $logs, array $prices = []): ImportAiResultsAction
     {
         $open = true;
+        $db = $this->createMock(Connection::class);
+        $db->method('executeStatement')->willReturnCallback(function (string $sql, array $params): int {
+            $this->usage[] = $params;
+
+            return 1;
+        });
         $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getConnection')->willReturn($db);
         $em->method('wrapInTransaction')->willReturnCallback(function (callable $func) use (&$open): mixed {
             try {
                 return $func();
@@ -135,10 +200,11 @@ final class ImportAiResultsActionTest extends TestCase
             return $em;
         });
 
-        return new ImportAiResultsAction($client, $consumers, $registry, new Logger('test', [$logs]));
+        return new ImportAiResultsAction($client, $consumers, $registry, new Logger('test', [$logs]), $prices);
     }
 
-    private static function aiResult(string $taskId, string $taskType): AiTaskResult
+    /** @param list<string> $models */
+    private static function aiResult(string $taskId, string $taskType, array $models = ['stub/echo'], int $inputTokens = 0, int $outputTokens = 0): AiTaskResult
     {
         return new AiTaskResult(
             taskId: $taskId,
@@ -149,10 +215,10 @@ final class ImportAiResultsActionTest extends TestCase
             checks: [],
             confidence: 1.0,
             traceId: '0192f0a0-0000-7000-8000-0000000000f1',
-            models: ['stub/echo'],
+            models: $models,
             promptVersion: 'echo/v1',
-            inputTokens: 0,
-            outputTokens: 0,
+            inputTokens: $inputTokens,
+            outputTokens: $outputTokens,
             errorCode: null,
             completedAt: new \DateTimeImmutable('2026-10-30T12:00:00+03:00'),
         );

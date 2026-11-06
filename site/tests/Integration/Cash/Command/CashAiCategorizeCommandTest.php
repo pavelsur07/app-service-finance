@@ -12,8 +12,9 @@ use App\Cash\Entity\Transaction\CashCategorySuggestion;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType;
-use App\Cash\Infrastructure\Query\CashAiCategorizationCompaniesQuery;
 use App\Company\Entity\Company;
+use App\ServiceGateway\Application\DTO\AiCompanyBudget;
+use App\ServiceGateway\Application\DTO\AiCompanyOverview;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use App\Tests\Builders\Cash\CashAiCategorizationSettingBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
@@ -24,7 +25,6 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
-use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Lock\Key;
@@ -38,6 +38,8 @@ use Symfony\Component\Lock\Store\InMemoryStore;
 final class CashAiCategorizeCommandTest extends IntegrationTestCase
 {
     private int $index = 9500;
+    /** @var object{runs: list<array{companyId: string, requested: int, skippedReason: ?string, error: ?string}>} */
+    private object $facade;
 
     public function testRequiresExactlyOneScope(): void
     {
@@ -48,7 +50,7 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
         self::assertSame(Command::INVALID, $tester->execute(['--company-id' => 'not-a-uuid']));
     }
 
-    public function testAllEnabledRunsOnlyAllowlistedCompaniesWithRecentOperations(): void
+    public function testAllEnabledRunsEveryConnectedCompanyIncludingOnesWithoutRecentOperations(): void
     {
         $enabled = $this->company('-3 days');
         $disabled = $this->company('-3 days');
@@ -60,8 +62,15 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
         $display = $tester->getDisplay();
         self::assertStringContainsString('ai-categorize: '.$enabled->getId().': ', $display);
         self::assertStringNotContainsString((string) $disabled->getId(), $display);
-        self::assertStringNotContainsString((string) $stale->getId(), $display);
-        self::assertStringContainsString('ai-categorize: 1 enabled companies, 0 failed', $display);
+        // Подключённая компания без свежих операций тоже получает запуск: гейт «тишины» видит, что cron жив.
+        self::assertStringContainsString('ai-categorize: '.$stale->getId().': ', $display);
+        self::assertStringContainsString('ai-categorize: 2 enabled companies, 0 failed', $display);
+        $runs = array_column($this->facade->runs, 'companyId');
+        sort($runs);
+        $expected = [(string) $enabled->getId(), (string) $stale->getId()];
+        sort($expected);
+        self::assertSame($expected, $runs);
+        self::assertSame([null, null], array_column($this->facade->runs, 'error'));
     }
 
     public function testFailureOfOneCompanyDoesNotStopTheOthers(): void
@@ -76,6 +85,9 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
         self::assertStringContainsString('ai-categorize: '.$broken->getId().' failed', $display);
         self::assertStringContainsString('ai-categorize: '.$healthy->getId().': ', $display);
         self::assertStringContainsString('ai-categorize: 2 enabled companies, 1 failed', $display);
+        $errors = array_column($this->facade->runs, 'error', 'companyId');
+        self::assertNotNull($errors[(string) $broken->getId()]);
+        self::assertNull($errors[(string) $healthy->getId()]);
     }
 
     public function testClosedEntityManagerAfterAFailureDoesNotBreakTheNextCompany(): void
@@ -96,6 +108,9 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
     {
         $container = self::getContainer();
         $facade = new class($allowlist) implements AiTaskFacadeInterface {
+            /** @var list<array{companyId: string, requested: int, skippedReason: ?string, error: ?string}> */
+            public array $runs = [];
+
             /** @param list<string> $allowlist */
             public function __construct(private array $allowlist)
             {
@@ -121,6 +136,11 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
                 return array_values(array_filter($companyIds, $this->isEnabledForCompany(...)));
             }
 
+            public function connectedCompanyIds(): array
+            {
+                return $this->allowlist;
+            }
+
             public function isServiceEnabled(): bool
             {
                 return true;
@@ -129,6 +149,26 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
             public function grantedCompanyIds(array $companyIds): array
             {
                 return $this->enabledCompanyIds($companyIds);
+            }
+
+            public function companyOverview(string $companyId, int $runs = 50): AiCompanyOverview
+            {
+                throw new \LogicException('not used');
+            }
+
+            public function exhaustedCompanyIds(array $companyIds): array
+            {
+                return [];
+            }
+
+            public function budgetFor(string $companyId): AiCompanyBudget
+            {
+                return new AiCompanyBudget(500.0, 0.0, 5000.0, 0.0, 90);
+            }
+
+            public function recordRun(string $companyId, string $taskType, int $requested = 0, int $tasks = 0, int $redispatched = 0, int $expired = 0, ?string $skippedReason = null, ?string $error = null): void
+            {
+                $this->runs[] = ['companyId' => $companyId, 'requested' => $requested, 'skippedReason' => $skippedReason, 'error' => $error];
             }
         };
         $registry = $container->get(ManagerRegistry::class);
@@ -165,14 +205,13 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
             }
         };
 
+        $this->facade = $facade;
         $command = new CashAiCategorizeCommand(
             $container->get(AutoApplyCashCategorySuggestionsAction::class),
             $container->get(RequestCashAiCategorizationAction::class),
-            $container->get(CashAiCategorizationCompaniesQuery::class),
             $facade,
             new LockFactory($store),
             $registry,
-            new MockClock(),
             new NullLogger(),
         );
 

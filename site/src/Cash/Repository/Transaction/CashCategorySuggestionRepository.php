@@ -62,6 +62,29 @@ final class CashCategorySuggestionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Были ли у компании запросы, истёкшие без ответа (`failed/expired`) с момента: сервис мог
+     * выполнить их платно, а импорт — не дойти.
+     */
+    public function hasExpiredSince(string $companyId, \DateTimeImmutable $since): bool
+    {
+        Assert::uuid($companyId);
+
+        return null !== $this->createQueryBuilder('s')
+            ->select('s.id')
+            ->andWhere('s.companyId = :companyId')
+            ->andWhere('s.status = :status')
+            ->andWhere('s.errorCode = :expired')
+            ->andWhere('s.respondedAt >= :since')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('status', Status::FAILED)
+            ->setParameter('expired', 'expired')
+            ->setParameter('since', $since)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
      * Строки без ответа дольше порога (задача переотправлялась, ответа так и нет).
      *
      * @return list<CashCategorySuggestion>

@@ -13,6 +13,8 @@ use App\ServiceGateway\Infrastructure\Client\AiTaskV1Parser;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
+use Ramsey\Uuid\Uuid;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 /**
@@ -26,6 +28,9 @@ use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
  * после commit. Сбой ack — сервис отдаст результаты снова, потребители идемпотентны
  * по taskId. Сбой одного потребителя не останавливает импорт: результат остаётся
  * неподтверждённым, EntityManager пересоздаётся.
+ *
+ * Принятый результат пишет строку `ai_usage` (токены, стоимость) в транзакции потребителя:
+ * сбой потребителя откатывает и учёт, повторный импорт того же task_id строку не задваивает.
  */
 final readonly class ImportAiResultsAction
 {
@@ -34,6 +39,7 @@ final readonly class ImportAiResultsAction
 
     /**
      * @param iterable<AiTaskResultConsumerInterface> $consumers
+     * @param array<string, array{input: float|null, output: float|null}> $prices ₽ за 1 млн токенов
      */
     public function __construct(
         private AiServiceClientInterface $client,
@@ -41,6 +47,8 @@ final readonly class ImportAiResultsAction
         private iterable $consumers,
         private ManagerRegistry $managerRegistry,
         private LoggerInterface $logger,
+        #[Autowire('%ai.prices%')]
+        private array $prices = [],
     ) {
     }
 
@@ -55,6 +63,8 @@ final readonly class ImportAiResultsAction
         $failedClasses = [];
         /** @var list<string> $invalid */
         $invalid = [];
+        /** @var array<string, true> $unpricedModels */
+        $unpricedModels = [];
         $after = null;
 
         while (true) {
@@ -72,6 +82,13 @@ final readonly class ImportAiResultsAction
                 $failure = $this->consume($consumer, $result);
                 if (null === $failure) {
                     $handled[] = $result->taskId;
+                    if (null === $this->cost($result)) {
+                        foreach ($result->models as $model) {
+                            if (null === ($this->prices[$model]['input'] ?? null) || null === ($this->prices[$model]['output'] ?? null)) {
+                                $unpricedModels[$model] = true;
+                            }
+                        }
+                    }
                 } else {
                     $failedTaskIds[] = $result->taskId;
                     $failedClasses[$failure] = true;
@@ -93,6 +110,11 @@ final readonly class ImportAiResultsAction
         }
 
         $this->logLeftovers($unhandledByType, $failedTaskIds, array_keys($failedClasses), $invalid);
+        if ([] !== $unpricedModels) {
+            $this->logger->warning('AI usage recorded without cost: model price is unknown (ai.prices).', [
+                'models' => array_keys($unpricedModels),
+            ]);
+        }
 
         return new ImportAiResultsResult(
             received: $received,
@@ -110,7 +132,10 @@ final readonly class ImportAiResultsAction
     {
         $em = $this->entityManager();
         try {
-            $em->wrapInTransaction(static fn () => $consumer->consume($result));
+            $em->wrapInTransaction(function () use ($consumer, $result, $em): void {
+                $consumer->consume($result);
+                $this->recordUsage($em, $result);
+            });
 
             return null;
         } catch (\Throwable $e) {
@@ -121,6 +146,55 @@ final readonly class ImportAiResultsAction
 
             return $e::class;
         }
+    }
+
+    private function recordUsage(EntityManagerInterface $em, AiTaskResult $result): void
+    {
+        $em->getConnection()->executeStatement(
+            'INSERT INTO ai_usage (id, task_id, company_id, task_type, status, model, input_tokens, output_tokens, cost_rub, completed_at)
+             VALUES (:id, :task, :company, :type, :status, :model, :in, :out, :cost, :completed)
+             ON CONFLICT (task_id) DO NOTHING',
+            [
+                'id' => Uuid::uuid7()->toString(),
+                'task' => $result->taskId,
+                'company' => strtolower($result->companyId),
+                'type' => $result->taskType,
+                'status' => $result->status->value,
+                'model' => $result->models[0] ?? null,
+                'in' => $result->inputTokens,
+                'out' => $result->outputTokens,
+                'cost' => $this->cost($result),
+                // Время в БД — МСК без зоны, как остальные timestamp прода.
+                'completed' => $result->completedAt->setTimezone(new \DateTimeZone(date_default_timezone_get()))->format('Y-m-d H:i:s'),
+            ],
+        );
+    }
+
+    /**
+     * Стоимость в ₽; null — цена хотя бы одной модели неизвестна. Контракт отдаёт токены суммой
+     * по всем вызовам (повтор, запасная модель), поэтому цена — наибольшая среди моделей ответа:
+     * оценка сверху, лимит не занижается.
+     * ponytail: оценка сверху; точно — когда контракт начнёт отдавать usage по моделям.
+     */
+    private function cost(AiTaskResult $result): ?string
+    {
+        if (0 === $result->inputTokens + $result->outputTokens) {
+            return '0.0000';
+        }
+        if ([] === $result->models) {
+            return null;
+        }
+        $input = $output = 0.0;
+        foreach ($result->models as $model) {
+            $price = $this->prices[$model] ?? null;
+            if (null === $price || null === $price['input'] || null === $price['output']) {
+                return null;
+            }
+            $input = max($input, $price['input']);
+            $output = max($output, $price['output']);
+        }
+
+        return number_format(($result->inputTokens * $input + $result->outputTokens * $output) / 1_000_000, 4, '.', '');
     }
 
     private function entityManager(): EntityManagerInterface

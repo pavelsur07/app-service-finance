@@ -91,7 +91,9 @@ final class UserController extends AbstractController
         }
         $cabinetAccess = $this->billing->accessForCompanies(array_keys($cabinetIds), $this->clock->now());
         // Подключение к ИИ — один запрос на страницу.
-        $aiCabinets = array_fill_keys($this->ai->grantedCompanyIds(array_map('strval', array_keys($cabinetIds))), true);
+        $pageCabinetIds = array_map('strval', array_keys($cabinetIds));
+        $aiCabinets = array_fill_keys($this->ai->grantedCompanyIds($pageCabinetIds), true);
+        $aiExhausted = array_fill_keys($this->ai->exhaustedCompanyIds($pageCabinetIds), true);
 
         return $this->render('admin/users/index.html.twig', [
             'title' => 'Зарегистрированные пользователи',
@@ -105,6 +107,7 @@ final class UserController extends AbstractController
             'userCabinets' => $userCabinets,
             'cabinetAccess' => $cabinetAccess,
             'aiCabinets' => $aiCabinets,
+            'aiExhausted' => $aiExhausted,
             'aiServiceEnabled' => $this->ai->isServiceEnabled(),
             'cabinetChoices' => $userAdminQuery->cabinetChoices(),
             'filter' => $filter,

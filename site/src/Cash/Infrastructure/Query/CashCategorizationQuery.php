@@ -484,14 +484,17 @@ final readonly class CashCategorizationQuery
         return $views;
     }
 
-    public function stats(string $companyId): CashCategorizationStats
+    /** @param \DateTimeImmutable|null $requestedSince только подсказки, запрошенные с этого момента */
+    public function stats(string $companyId, ?\DateTimeImmutable $requestedSince = null): CashCategorizationStats
     {
         Assert::uuid($companyId);
+        // Нижняя граница по умолчанию — «всё время»: один текст запроса на оба случая.
+        $since = ($requestedSince ?? new \DateTimeImmutable('1970-01-01'))->format('Y-m-d H:i:s');
 
         /** @var array<string, int|string> $byStatus */
         $byStatus = $this->connection->fetchAllKeyValue(
-            'SELECT status, count(*) FROM cash_category_suggestion WHERE company_id = :companyId GROUP BY status',
-            ['companyId' => $companyId],
+            'SELECT status, count(*) FROM cash_category_suggestion WHERE company_id = :companyId AND requested_at >= :since GROUP BY status',
+            ['companyId' => $companyId, 'since' => $since],
         );
         // Висящая подсказка у операции, которая уже со статьёй: человек решил правкой операции.
         $edited = $this->connection->fetchAssociative(
@@ -500,13 +503,14 @@ final readonly class CashCategorizationQuery
              FROM cash_category_suggestion s
              JOIN cash_transaction tx ON tx.id = s.transaction_id AND tx.company_id = :companyId
              LEFT JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id
-             WHERE s.company_id = :companyId AND s.status = \'suggested\'
+             WHERE s.company_id = :companyId AND s.status = \'suggested\' AND s.requested_at >= :since
                AND tx.deleted_at IS NULL
                AND tx.cashflow_category_id IS NOT NULL
                AND category.system_code IS DISTINCT FROM :unallocated
                AND category.system_code IS DISTINCT FROM :legacyUnallocated',
             [
                 'companyId' => $companyId,
+                'since' => $since,
                 'unallocated' => CashflowCategory::CODE_UNALLOCATED,
                 'legacyUnallocated' => CashflowCategory::SYSTEM_UNALLOCATED,
             ],

@@ -9,6 +9,7 @@ use App\Cash\Application\CashTransferLifecycleAction;
 use App\Cash\Application\CreateCashTransferAction;
 use App\Cash\Application\DTO\BankStatementDayInput;
 use App\Cash\Application\DTO\BankStatementDayResult;
+use App\Cash\Application\DTO\CashCategorizationStats;
 use App\Cash\Application\DTO\CashCategoryAmount;
 use App\Cash\Application\DTO\CashDailyAmount;
 use App\Cash\Application\DTO\CashflowCategoryNode;
@@ -36,6 +37,7 @@ use App\Cash\Exception\StatementImportOutsideTransactionException;
 use App\Cash\Exception\StatementImportTargetNotFoundException;
 use App\Cash\Infrastructure\Lock\CashImportAccountLock;
 use App\Cash\Infrastructure\Lock\CashImportLogLease;
+use App\Cash\Infrastructure\Query\CashCategorizationQuery;
 use App\Cash\Infrastructure\Query\CashDashboardQuery;
 use App\Cash\Infrastructure\Query\CashReportQuery;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
@@ -70,7 +72,17 @@ final readonly class CashFacade
         private CashImportLogLease $importLogLease,
         private ImportLogger $importLogger,
         private ImportLogRepository $importLogRepository,
+        private CashCategorizationQuery $categorizationQuery,
     ) {
+    }
+
+    /**
+     * Подсказки статей ИИ компании, запрошенные с момента: по статусам и решения людей
+     * (страница «ИИ» кабинета в админке).
+     */
+    public function getAiSuggestionStats(string $companyId, \DateTimeImmutable $requestedSince): CashCategorizationStats
+    {
+        return $this->categorizationQuery->stats($companyId, $requestedSince);
     }
 
     /**
