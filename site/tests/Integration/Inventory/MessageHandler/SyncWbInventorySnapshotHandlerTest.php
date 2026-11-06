@@ -446,6 +446,72 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
         self::assertSame(1, $this->countNormalizeMessages($session, $company));
     }
 
+    public function testNumericBarcodesAreSentToSellerStocksAsStrings(): void
+    {
+        $company = $this->createCompany(724);
+        $connection = $this->createConnection($company, 724);
+        $session = $this->createSession($company);
+        $responses = [
+            $this->catalogResponse([$this->card(124, [[1241, 'S', '4601234567890']])]),
+            $this->catalogResponse([]),
+            $this->inventoryResponse([$this->stock(124, 1241, 507, 4)]),
+            $this->sellerWarehousesResponse([['id' => 7, 'name' => 'Мой склад']]),
+            $this->sellerStocksResponse([['sku' => '4601234567890', 'amount' => 3]]),
+        ];
+        $stocksRequestBody = null;
+        self::getContainer()->set('http_client', new MockHttpClient(static function (string $method, string $url, array $options) use (&$responses, &$stocksRequestBody): MockResponse {
+            if (str_contains($url, WbInventoryClient::SELLER_STOCKS_ENDPOINT.'/')) {
+                $stocksRequestBody = $options['body'];
+            }
+            $next = array_shift($responses);
+            self::assertNotNull($next, sprintf('Unexpected request %s %s', $method, $url));
+
+            return $next;
+        }));
+
+        ($this->handler())($this->message($company, $connection, $session));
+
+        self::assertIsString($stocksRequestBody);
+        // Числовой баркод уходит в WB строкой: PHP превращает такие ключи массива в int.
+        self::assertSame(['skus' => ['4601234567890']], json_decode($stocksRequestBody, true, 512, \JSON_THROW_ON_ERROR));
+        $this->em->refresh($session);
+        self::assertSame(SnapshotSessionStatus::Completed, $session->getStatus());
+    }
+
+    public function testSellerPhaseFailureAfterFirstPageDiscardsSellerPages(): void
+    {
+        $company = $this->createCompany(725);
+        $connection = $this->createConnection($company, 725);
+        $session = $this->createSession($company);
+        $this->swapHttpClient([
+            $this->catalogResponse([$this->card(125, [[1251, 'S', 'barcode-725-s']])]),
+            $this->catalogResponse([]),
+            $this->inventoryResponse([$this->stock(125, 1251, 507, 4)]),
+            $this->sellerWarehousesResponse([['id' => 7, 'name' => 'Склад А'], ['id' => 8, 'name' => 'Склад Б']]),
+            $this->sellerStocksResponse([['sku' => 'barcode-725-s', 'amount' => 3]]),
+            new MockResponse('', ['http_code' => 429]),
+        ]);
+
+        ($this->handler())($this->message($company, $connection, $session));
+
+        $this->em->refresh($session);
+        // Половина складов продавца — не остаток склада продавца: FBS-страницы этой ночи не сохраняются,
+        // отчёт в режиме FBS покажет предыдущий полный день.
+        self::assertSame(SnapshotSessionStatus::Completed, $session->getStatus());
+        self::assertSame(1, $session->getReceivedPages());
+        $raw = $this->rawSnapshots($session);
+        self::assertCount(1, $raw);
+        self::assertSame(WbInventoryClient::ENDPOINT, $raw[0]->getSourceEndpoint());
+
+        self::getContainer()->get(NormalizeInventorySnapshotHandler::class)($this->normalizeMessage($session, $company));
+
+        $types = $this->connection->fetchFirstColumn(
+            'SELECT DISTINCT fulfillment_type FROM inventory_stock_snapshots WHERE snapshot_session_id = :session',
+            ['session' => $session->getId()],
+        );
+        self::assertSame(['fbw'], $types);
+    }
+
     private function handler(int $pageLimit = WbInventoryClient::DEFAULT_LIMIT, ?MessageBusInterface $messageBus = null): SyncWbInventorySnapshotHandler
     {
         return new SyncWbInventorySnapshotHandler(

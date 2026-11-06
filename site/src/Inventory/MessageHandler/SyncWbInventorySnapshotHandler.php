@@ -202,11 +202,16 @@ final readonly class SyncWbInventorySnapshotHandler
 
     /**
      * Фаза FBS: остатки склада продавца по баркодам листингов. Сбой фазы не трогает
-     * результат FBW — сессия завершается с тем, что уже сохранено.
+     * результат FBW — сессия завершается с данными FBW.
+     *
+     * Страницы фазы сохраняются только все вместе: половина складов продавца, записанная как
+     * снимок дня, выглядела бы полным остатком, а отчёт в режиме FBS вместо предыдущего
+     * полного дня показал бы её.
      */
     private function fetchSellerStockPages(InventorySnapshotSession $session, SyncWbInventorySnapshotMessage $message, string $apiKey, int $page): void
     {
-        $barcodes = array_keys($this->marketplaceFacade->getListingBarcodes($message->companyId, MarketplaceType::WILDBERRIES->value));
+        // Числовой баркод PHP делает int-ключом массива; WB ждёт строки.
+        $barcodes = array_map(strval(...), array_keys($this->marketplaceFacade->getListingBarcodes($message->companyId, MarketplaceType::WILDBERRIES->value)));
         if ([] === $barcodes) {
             $this->logger->info('WB seller warehouse stocks skipped: no barcodes.', [
                 'companyId' => $message->companyId,
@@ -216,7 +221,8 @@ final readonly class SyncWbInventorySnapshotHandler
             return;
         }
 
-        $savedSellerPages = 0;
+        /** @var list<InventoryRawSnapshot> $sellerPages */
+        $sellerPages = [];
         try {
             foreach ($this->inventoryClient->fetchSellerWarehouses($apiKey) as $warehouse) {
                 $chunk = 0;
@@ -226,7 +232,7 @@ final readonly class SyncWbInventorySnapshotHandler
                     $responseBody = $this->inventoryClient->fetchSellerWarehouseStocks($apiKey, $warehouse['id'], $barcodeChunk);
                     $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
 
-                    $this->entityManager->persist(new InventoryRawSnapshot(
+                    $sellerPages[] = new InventoryRawSnapshot(
                         companyId: $message->companyId,
                         snapshotSessionId: $session->getId(),
                         source: MarketplaceType::WILDBERRIES,
@@ -247,11 +253,8 @@ final readonly class SyncWbInventorySnapshotHandler
                         fetchDurationMs: max(0, $durationMs),
                         correlationId: $session->getCorrelationId(),
                         pageNumber: $page,
-                    ));
+                    );
                     ++$page;
-                    ++$savedSellerPages;
-                    $session->incrementReceivedPages();
-                    $this->entityManager->flush();
                 }
             }
         } catch (WbInventoryRateLimitException|WbInventoryTemporaryApiException|WbInventoryApiException $e) {
@@ -260,11 +263,19 @@ final readonly class SyncWbInventorySnapshotHandler
             $this->logger->warning('WB seller warehouse stocks skipped.', [
                 'companyId' => $message->companyId,
                 'snapshotSessionId' => $session->getId(),
-                'savedSellerPages' => $savedSellerPages,
+                'discardedSellerPages' => count($sellerPages),
                 'exceptionClass' => $e::class,
                 'errorMessage' => $e->getMessage(),
             ]);
+
+            return;
         }
+
+        foreach ($sellerPages as $sellerPage) {
+            $this->entityManager->persist($sellerPage);
+            $session->incrementReceivedPages();
+        }
+        $this->entityManager->flush();
     }
 
     private function dispatchNormalization(SyncWbInventorySnapshotMessage $message, InventorySnapshotSession $session): void
