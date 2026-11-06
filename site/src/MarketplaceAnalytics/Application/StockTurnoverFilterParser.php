@@ -32,7 +32,8 @@ final readonly class StockTurnoverFilterParser
 
         $period = filter_var(self::string($request, 'period'), \FILTER_VALIDATE_INT, \FILTER_NULL_ON_FAILURE) ?? 30;
         $rawDate = self::string($request, 'date');
-        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $rawDate);
+        // Только форма Y-m-d: createFromFormat() бросает ValueError на нулевом байте раньше любого fallback.
+        $date = 1 === preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawDate) ? \DateTimeImmutable::createFromFormat('!Y-m-d', $rawDate) : false;
         if (false === $date || $date->format('Y-m-d') !== $rawDate || $date > $today) {
             $date = $today;
         }

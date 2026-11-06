@@ -57,6 +57,7 @@ final class StockTurnoverControllerTest extends WebTestCaseBase
         yield 'source-array' => ['source[]=ozon'];
         yield 'date-array' => ['date[]=2026-01-01'];
         yield 'period-array' => ['period[]=60'];
+        yield 'date-null-byte' => ['date=2026-11-06%00'];
     }
 
     #[DataProvider('invalidParams')]

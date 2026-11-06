@@ -34,7 +34,7 @@
 - iterations: 1 (OpenSpout Reader отдаёт целые числа как int — проверки в тесте на равенство значений)
 
 #### External review
-- required: yes (handoff) — результаты в `handoff.md` (раздел Reviews)
+- required: yes (handoff). Codex round 1: IMPORTANT формулы в xlsx (`StringCell` для текста, `testExportKeepsFormulaLookingTextAsStrings`), MINOR `period=abc` → 400 (fallback); независимое ревью ветки: параметры-массивы, редирект с пустой страницы, стабильный порядок, пустое состояние при фильтре — все с тестами RED→GREEN. Итог — `handoff.md`.
 
 #### Risks / reviewer focus
 - Экспорт читает весь отчёт в память до стрима (как и страница); для компаний с тысячами SKU — секунды, не минуты.
