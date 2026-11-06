@@ -2984,6 +2984,11 @@ getActiveWbSellerConnections(?string $companyId = null): array
 // @return array<string, string|null> map listingId → productId|null
 resolveListingsToProducts(string $companyId, array $listingIds): array
 
+// Баркоды листингов компании по маркетплейсу, ключ — баркод. Inventory запрашивает по ним
+// остатки склада продавца WB (FBS) и маппит ответ на листинг.
+// @return array<string, array{listingId: string, marketplaceSku: string, marketplaceVariantId: ?string}>
+getListingBarcodes(string $companyId, string $marketplace): array
+
 // Загружает активные и находящиеся в корзине WB Product Cards для SELLER-подключения
 // и атомарно обновляет MarketplaceListing.marketplaceVariantId (chrtId), isActive и barcodes.
 // Токен должен иметь категорию Content или Promotion.
@@ -2993,6 +2998,7 @@ refreshWbListingCatalog(string $companyId, string $connectionId): int
 **Inventory mapping-контракт через Facade:**
 - Ozon `sourceSku` → `MarketplaceFacade::findListingsByMarketplaceSkus(companyId, marketplace, sourceSkus)`;
 - Wildberries `sourceSku` содержит `chrtId` размера и маппится через `MarketplaceFacade::findListingsByMarketplaceVariantIds(companyId, marketplace, marketplaceVariantIds)`;
+- Wildberries FBS (склад продавца): `sourceSku` — баркод, маппится через `MarketplaceFacade::getListingBarcodes(companyId, marketplace)`;
 - найденные `listingId` → `MarketplaceFacade::resolveListingsToProducts(companyId, listingIds)`;
 - Inventory не импортирует напрямую Marketplace repository/service;
 - связь с MarketplaceListing в `StockSnapshot` хранится как `listingId: ?string` (без ManyToOne).
@@ -3004,7 +3010,12 @@ refreshWbListingCatalog(string $companyId, string $connectionId): int
 ```php
 // Остатки на дату отчёта по листингам вместе с происхождением данных.
 // Возвращает Application\DTO\StockOnDateResult, а не голую карту.
-getStockQtyByListingOnReportDate(string $companyId, \DateTimeImmutable $reportDate): StockOnDateResult
+getStockQtyByListingOnReportDate(
+    string $companyId,
+    \DateTimeImmutable $reportDate,
+    ?string $marketplace = null,          // 'ozon' | 'wildberries' | null — все источники
+    ?FulfillmentScheme $scheme = null,    // Fbo | Fbs | null — обе схемы вместе
+): StockOnDateResult
 ```
 
 `StockOnDateResult` (`src/Inventory/Application/DTO/StockOnDateResult.php`):
@@ -3669,11 +3680,16 @@ buildQueryBuilder(
 
 - DBAL read-model для `GET /inventory/stocks`;
 - обязательный IDOR-фильтр `company_id = :companyId`;
-- ровно два фильтра: `source` (через `MarketplaceType`) и `snapshotDate`;
-- `findEffectiveSnapshotDate(companyId, source, date): ?\DateTimeImmutable` —
-  `MAX(snapshot_date)` при `snapshot_date <= :date`, то есть семантика «остатки **на** дату»:
-  в день без синхронизации берётся ближайший предыдущий снимок. `null` — снимков на эту дату и раньше нет;
-- `getPage(companyId, page, perPage, source, snapshotDate, breakdownColumns = [])` — выборка одного дня
+- ровно три фильтра: `source` (через `MarketplaceType`), `scheme` (`FulfillmentScheme`) и `snapshotDate`;
+- схема вычисляется из `fulfillment_type` одним SQL-выражением:
+  `CASE WHEN LOWER(TRIM(COALESCE(fulfillment_type, ''))) IN ('fbs', 'rfbs') THEN 'fbs' ELSE 'fbo' END`
+  (`FulfillmentScheme::FBS_TYPES`); строка без типа — FBO. Каждая строка снимка попадает ровно в одну схему,
+  поэтому сумма «Доступно расчётно» по FBO и FBS равна прежнему общему значению;
+- `findEffectiveSnapshotDate(companyId, source, scheme, date): ?\DateTimeImmutable` —
+  последний `snapshot_date <= :date` (`ORDER BY … DESC LIMIT 1` по индексу) **внутри схемы**, то есть семантика «остатки **на** дату»:
+  в день без синхронизации (или без строк выбранной схемы) берётся ближайший предыдущий снимок.
+  `null` — снимков на эту дату и раньше нет;
+- `getPage(companyId, page, perPage, source, scheme, snapshotDate, breakdownColumns = [])` — выборка одного дня
   (`snapshot_date = :snapshotDate`); на день по источнику существует ровно один срез
   за счёт уникального ключа `uniq_inventory_stock_snapshot_day_item` и `upsertDaySnapshot()`;
 - строка результата — **один `source_sku`** (`GROUP BY s.source_sku`): записи снимка по всем
@@ -3683,12 +3699,16 @@ buildQueryBuilder(
 - pagination через Pagerfanta; count-модификатор считает
   `COUNT(DISTINCT COALESCE(s.source_sku, ''))`, то есть страницы считаются по SKU,
   а не по записям снимка;
-- `getBreakdownColumns(companyId, source, snapshotDate): array<string, array{value, label}>` —
+- `getBreakdownColumns(companyId, source, scheme, snapshotDate): array<string, array{value, label}>` —
   колонки разбивки «Доступно расчётно» по типам склада, ключ = алиас колонки в строке
-  (`bd_<value>`). Набор строится по данным дня: у Ozon разбивка по `fulfillment_type`
-  (`fbo`, `fbs`, `unknown` → «Без типа»), у Wildberries `fulfillment_type` всегда один,
-  поэтому разбивка идёт по `StockStatus` в порядке объявления enum. Результат передаётся
-  в `getPage()`, которая добавляет `SUM(...) FILTER (WHERE ...)` на каждую колонку;
+  (`bd_<value>`). Набор строится по данным дня внутри схемы: у Ozon разбивка по `fulfillment_type`
+  (в FBS — `FBS` / `RFBS`), у Wildberries разбивка идёт по `StockStatus` в порядке объявления enum;
+- `getTotals(companyId, source, scheme, snapshotDate): StockReportTotals` — `SUM` тех же строк, что
+  попадают в `getPage()` (без группировки по SKU): `quantity`, `reservedQuantity`, `availableForSale`
+  numeric-строками. Шаблон показывает его как «Итого по фильтру» над таблицей; «Итого на странице»
+  считается в Twig по строкам текущей страницы. Количества в UI — целые (`vf_number`, 0 знаков).
+  Один тип внутри схемы — пустой массив: колонка дублировала бы «Доступно расчётно».
+  Результат передаётся в `getPage()`, которая добавляет `SUM(...) FILTER (WHERE ...)` на каждую колонку;
 - `SELECT *` не используется; join с `inventory_locations` не нужен — склад в отчёте
   не выводится.
 
@@ -3937,9 +3957,11 @@ enum StockStatus: string
 ```php
 enum StockSnapshotMappingStatus: string
 {
-    case Unmapped = 'unmapped';
     case Mapped = 'mapped';
+    case Unmapped = 'unmapped';
     case Ambiguous = 'ambiguous';
+
+    public function label(): string; // «Сопоставлен» / «Не сопоставлен» / «Неоднозначно» — подпись бейджа в отчёте
 }
 ```
 
@@ -3956,8 +3978,23 @@ enum LocationType: string
     case MpAcceptance = 'mp_acceptance';
     case MpInTransitToCustomer = 'mp_in_transit_to_customer';
     case MpInTransitFromCustomer = 'mp_in_transit_from_customer';
+    case SellerWarehouse = 'seller_warehouse'; // склад продавца (FBS)
 }
 ```
+
+### `src/Inventory/Enum/FulfillmentScheme.php`
+```php
+enum FulfillmentScheme: string
+{
+    case Fbo = 'fbo'; // товар на складе маркетплейса
+    case Fbs = 'fbs'; // товар на складе продавца
+    public const FBS_TYPES = ['fbs', 'rfbs'];
+    public function label(): string;                                   // 'FBO' | 'FBS'
+    public static function fromFulfillmentType(?string $type): self;   // FBS_TYPES → Fbs, остальное → Fbo
+}
+```
+Переключатель отчёта `/inventory/stocks` (`?scheme=fbo|fbs`, по умолчанию `fbo`); смысл одинаков
+для всех источников, отдельных положений под Ozon / WB / rFBS нет.
 
 
 ### `src/Marketplace/Enum/FinancialReportSyncStatus.php`
@@ -4068,6 +4105,60 @@ enum AbcClass: string
 Классы считает `Domain\Service\AbcClassificationPolicy` (в копейках, равные значения — по ID).
 `UnitExtendedQuery` отдаёт `abcRevenue` (база — выручка − возвраты) и `abcProfit` по всему
 набору периода/маркетплейса/тегов — до поиска и лимита строк.
+
+### `src/MarketplaceAnalytics/Enum/TurnoverBucket.php`
+```php
+enum TurnoverBucket: string
+{
+    case Fast = 'fast';        // дней запаса < 30
+    case Medium = 'medium';    // 30 ≤ d < 60
+    case Slow = 'slow';        // 60 ≤ d ≤ 90
+    case Frozen = 'frozen';    // d > 90
+    case NoSales = 'no_sales'; // продаж за период нет при остатке > 0
+
+    public static function fromDaysOfCover(?int $days): self; // null → NoSales
+    public function label(): string;    // «до 30 дней» … «нет продаж»
+    public function isFrozen(): bool;   // Frozen и NoSales — «заморожено»
+}
+```
+`Domain\Service\StockTurnoverPolicy::measure(int $stockQty, int $salesQty, int $periodDays): TurnoverMeasure`
+— `salesPerDay = round(salesQty / periodDays, 2)`, `daysOfCover = intdiv(stockQty × periodDays, salesQty)`
+(целочисленно, чтобы граница ровно в 30/60/90 не зависела от float), `null` при нуле продаж.
+
+### `StockTurnoverQuery` (`src/MarketplaceAnalytics/Infrastructure/Query/StockTurnoverQuery.php`)
+
+Отчёт «Оборачиваемость» (`GET /inventory/stock-turnover`): где заморожены деньги.
+`execute(StockTurnoverFilter): StockTurnoverReport`, без SQL — только Facade:
+
+- остатки: `InventoryFacade::getStockQtyByListingOnReportDate(companyId, date, source, scheme)`
+  (статус «на складе», FBO + FBS либо одна схема; устаревший источник — в `staleSources`);
+- продажи: `MarketplaceFacade::getSalesAggregatesByListing()` за окно `[date − (period − 1), date]`,
+  `period ∈ {30, 60, 90}`; возвраты не вычитаются;
+- себестоимость: `MarketplaceFacade::getCostPricesForListingsOnDate()` (listing cost price на дату,
+  как в юнит-экономике; нулевая цена = «без себестоимости»);
+- теги: `ListingTagFacade::listingIdsByTags(companyId, tagIds, false)` — пересечение со строками.
+
+`StockTurnoverFilter(companyId, date, periodDays, ?source, ?FulfillmentScheme scheme, ?TurnoverBucket bucket, tagIds)`.
+Строка `StockTurnoverRow` — листинг с остатком `> 0` (`(int) round`): `stockQty`, `salesQty`,
+`salesPerDay`, `daysOfCover`, `costPrice`, `stockValue = stockQty × costPrice` (scale 2, `null` без цены),
+`bucket`. Сортировка — `stockValue` DESC, без себестоимости — в конце, внутри группы по названию.
+`StockTurnoverSummary` считается **до** фильтра корзины по всем строкам фильтра: `totalValue`,
+`frozenValue` (Frozen + NoSales), `frozenShare` (%, `null` при нуле), `valueByBucket` (все пять
+корзин), `listingsWithoutCostPrice` / `qtyWithoutCostPrice` (в деньги не входят),
+`listingsTotal`, `snapshotDateBySource`, `staleSources`. Листинг с продажами без остатка в отчёт
+не попадает. Листинг без меты (удалён) остаётся со `sku = '—'`.
+
+Страница: `StockTurnoverIndexController` (`GET /inventory/stock-turnover`,
+`inventory_stock_turnover_index`, `ROLE_COMPANY_USER`), вкладка «Оборачиваемость» после «Остатки»
+в `templates/inventory/layout.html.twig` («Товары и остатки»); контроллер остаётся в MarketplaceAnalytics,
+как страницы Marketplace в том же layout. Параметры разбирает `Application/StockTurnoverFilterParser::parse(Request, companyId)`
+(общий для страницы и экспорта): невалидное значение → умолчание (`period` 30, `source`/`scheme`/`bucket`
+все, `date` сегодня — будущее тоже, `tags[]` только валидные UUID). Отчёт строится в памяти, страница —
+Pagerfanta `ArrayAdapter` по 50 строк; сводка и баннер «Остатки: … на дату / устарели» — по всем строкам.
+Экспорт: `StockTurnoverExportController` (`GET /inventory/stock-turnover/export.xlsx`,
+`inventory_stock_turnover_export`, тот же парсер, `ReportsApiRateLimiter` → 429) отдаёт
+`StreamedResponse` `stock-turnover-<date>-<period>d.xlsx`; `Infrastructure/Export/StockTurnoverXlsxExporter::export(StockTurnoverReport, outputPath)`
+— лист «Оборачиваемость» (строки) и лист «Сводка» (та же сводка до фильтра корзины).
 
 ### `src/Marketplace/Enum/PipelineStatus.php`
 ```php
@@ -4549,7 +4640,7 @@ GET  /api/public/{resource}?token=...  — публичный API
 - `POST /inventory/snapshots/request` — ручной запуск raw-загрузки Ozon;
 - `POST /inventory/snapshots/request/wildberries` — ручной запуск raw-загрузки Wildberries;
 - `GET /inventory/snapshots/{id}/json` — raw JSON по session;
-- `GET /inventory/stocks` — UI-отчёт по нормализованным остаткам.
+- `GET /inventory/stocks` — UI-отчёт по нормализованным остаткам; фильтры `source`, `scheme` (FBO / FBS), `date`.
 
 ## Inventory — Ozon stock normalization
 
@@ -4648,8 +4739,47 @@ NormalizeInventorySnapshotAction → StockSnapshot
 
 `StockQtyByListingOnDateQuery` выбирает последнюю целую snapshot-сессию отдельно
 для каждого marketplace source, содержащую хотя бы один замапленный листинг,
-и суммирует только `StockStatus::Available`.
+и суммирует только `StockStatus::Available` по всем типам склада — у Ozon это `fbo` + `fbs`,
+у WB с ноября 2026 `fbw` + `fbs` (склад продавца). Параметр `$scheme` (`FulfillmentScheme`)
+оставляет только одну схему тем же CASE-выражением, что в `InventoryStockReportQuery`;
+фильтр применяется к строкам выбранной сессии, а не к выбору сессии — день без FBS-строк
+не «откатывается» на старую сессию, а даёт пустой `qtyByListingId` при заполненном
+`snapshotDateBySource`.
 Товары в пути в количественный остаток `InventoryFacade` не входят.
+
+### Wildberries FBS — остатки склада продавца
+
+Та же сессия и тот же обработчик: после последней FBW-страницы `SyncWbInventorySnapshotHandler`
+выполняет фазу FBS (`fetchSellerStockPages`):
+
+```text
+MarketplaceFacade::getListingBarcodes(companyId, 'wildberries')   — пусто → фаза пропускается (info)
+↓ GET https://marketplace-api.wildberries.ru/api/v3/warehouses      — склады продавца
+↓ POST /api/v3/stocks/{warehouseId} {"skus": [баркоды]} порциями по WbInventoryClient::SELLER_STOCKS_CHUNK (1000)
+InventoryRawSnapshot: sourceEndpoint = '/api/v3/stocks/<id>', requestParams.warehouseId / warehouseName / chunk,
+                      pageNumber продолжает нумерацию FBW-страниц
+```
+
+- Токен должен иметь категорию «Маркетплейс». 401/403/429/5xx/transport в FBS-фазе — `warning`
+  `WB seller warehouse stocks skipped.`, сессия всё равно `completed` с данными FBW; повтора внутри
+  сессии нет, следующая ночь — новая попытка. Страницы FBS-фазы сохраняются **только все вместе**
+  одним `flush()` после успеха всех складов и порций: частичный набор складов продавца выглядел бы
+  полным остатком дня, и отчёт в режиме FBS показал бы его вместо предыдущего полного дня.
+- Баркоды передаются в WB строками (`array_map(strval(...), array_keys(...))`): числовой баркод PHP
+  делает int-ключом массива.
+- `fetchSellerWarehouseStocks()` принимает только ответ со списком `stocks` из объектов с `sku`; HTTP 200
+  другой формы — `WbInventoryApiException`, и фаза отбрасывается целиком (иначе страница сохранилась бы,
+  нормализатор её пропустил бы, и неполный набор складов выглядел бы полным).
+- Повторная доставка: FBW-страницы и FBS-страницы различаются по `sourceEndpoint`; при наличии хотя бы
+  одной FBS-страницы фаза не повторяется.
+- Нормализатор `WbSellerWarehouseStocksRawNormalizer` берёт только страницы с префиксом `/api/v3/stocks/`:
+  `sku` (баркод) → `sourceSku`, `amount` → `StockStatus::Available` (отрицательное → 0),
+  `fulfillmentType = fbs`, `reservedQuantity = 0`; локация `LocationType::SellerWarehouse`,
+  `externalId = seller:<warehouseId>`, `code = WB-FBS-<warehouseId>`, `name` — имя склада.
+- `sourceSku` — баркод, а не `chrtId`: у одного размера бывает несколько баркодов, и `chrtId`
+  в уникальном ключе снимка схлопнул бы их. Листинг и `sourceOfferId` (nmId) подставляет
+  `NormalizeInventorySnapshotAction` по карте `getListingBarcodes()`; баркоды берутся из каталога,
+  поэтому строки по построению `mapped`.
 
 ## Messenger routing — Inventory
 
@@ -5047,7 +5177,12 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.150 | 2026-11-06 | Settlement: independent Money documents, explicit Cash/Finance sources, manual M:N allocation, dated history/reversals, source guards, verify/rebuild and native UI; additive Version20261106183000 (counterparty-settlements, Stages 1–5) |
+| 2.155 | 2026-11-06 | Settlement: independent Money documents, explicit Cash/Finance sources, manual M:N allocation, dated history/reversals, source guards, verify/rebuild and native UI; additive Version20261106183000 (counterparty-settlements, Stages 1–5) |
+| 2.154 | 2026-11-06 | MarketplaceAnalytics: отчёт «Оборачиваемость» перенесён во вкладки «Товары и остатки» после «Остатки» (решение Владельца): маршруты `/inventory/stock-turnover` и `/inventory/stock-turnover/export.xlsx` (`inventory_stock_turnover_*`), layout `inventory/layout.html.twig`; из вкладок аналитики маркетплейсов убран. Контроллеры и Query остаются в модуле |
+| 2.153 | 2026-11-06 | MarketplaceAnalytics: в отчёте «Оборачиваемость» термин «корзина» в UI и xlsx заменён на «Скорость продаж» (решение Владельца); код (`TurnoverBucket`, параметр `bucket`) без изменений |
+| 2.152 | 2026-11-06 | MarketplaceAnalytics: отчёт «Оборачиваемость» — где заморожены деньги: `TurnoverBucket`, `StockTurnoverPolicy`, `StockTurnoverQuery` (только через Facade), страница `/marketplace-analytics/stock-turnover` с фильтрами период/источник/схема/дата/корзина/теги, сводкой и баннером свежести, экспорт `export.xlsx`; `InventoryFacade::getStockQtyByListingOnReportDate()` получил параметр `scheme` (задача `stock-turnover-report`) |
+| 2.151 | 2026-11-06 | Inventory: таблица `/inventory/stocks` — количества целыми (`vf_number`), русские заголовки, итоги по странице и по фильтру (`InventoryStockReportQuery::getTotals()` → `StockReportTotals`), подписи `StockSnapshotMappingStatus::label()`, отрицательное «Доступно» подсвечено (задача `inventory-stocks-table-format`) |
+| 2.150 | 2026-11-06 | Inventory: отчёт `/inventory/stocks` — переключатель схемы FBO / FBS (`FulfillmentScheme`, параметр `scheme`, эффективная дата и разбивка внутри схемы, разбивка скрыта при одном типе); WB — фаза FBS в `SyncWbInventorySnapshotHandler` (склады продавца `/api/v3/warehouses`, остатки `/api/v3/stocks/{id}` по баркодам), `WbSellerWarehouseStocksRawNormalizer`, `LocationType::SellerWarehouse`, `MarketplaceFacade::getListingBarcodes()` (задача `inventory-stocks-fbs`) |
 | 2.149 | 2026-11-06 | Cash: правило переводов выключается, только когда у компании от 3 разнесённых в статьи операций с фразой перевода — одна случайная (у COMPSHOP одна из 106) больше не отправляет все переводы в ИИ (`CashCategorizationQuery::TRANSFER_LIKE`, задача `ai-routines`, этап 4) |
 | 2.148 | 2026-11-06 | Cash: immutable whole-file description plan, явный выбор, scoped chunk apply/audit/retry, защита description от 1С overwrite (`Version20261106120000`), Twig preview/result (cash-import-description-update) |
 | 2.147 | 2026-11-06 | Cash: «нет ответа» на прошлой версии промпта переспрашивается один раз (`RequestCashAiCategorizationAction::PROMPT_VERSION = categorize_transactions/v3`, `findCandidates(..., $promptVersion)`), сверка версии с ai-service — pytest `test_symfony_prompt_version.py` (задача `ai-routines`, этап 4) |

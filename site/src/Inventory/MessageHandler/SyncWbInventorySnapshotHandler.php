@@ -11,6 +11,7 @@ use App\Inventory\Exception\WbInventoryApiException;
 use App\Inventory\Exception\WbInventoryRateLimitException;
 use App\Inventory\Exception\WbInventoryTemporaryApiException;
 use App\Inventory\Infrastructure\Api\Wildberries\WbInventoryClient;
+use App\Inventory\Infrastructure\Normalizer\WbSellerWarehouseStocksRawNormalizer;
 use App\Inventory\Message\NormalizeInventorySnapshotMessage;
 use App\Inventory\Message\SyncWbInventorySnapshotMessage;
 use App\Inventory\Repository\InventoryRawSnapshotRepository;
@@ -84,11 +85,19 @@ final readonly class SyncWbInventorySnapshotHandler
         $page = 1;
         $seenPageHashes = [];
         $lastPageSize = null;
+        $hasSellerStockPages = false;
 
         try {
             $rawSnapshots = $this->rawSnapshotRepository->findBySessionAndCompanyOrdered($session->getId(), $message->companyId);
             $savedPages = count($rawSnapshots);
             foreach ($rawSnapshots as $rawSnapshot) {
+                // Страницы FBS-фазы (склад продавца) в пагинации FBW не участвуют.
+                if (str_starts_with($rawSnapshot->getSourceEndpoint(), WbSellerWarehouseStocksRawNormalizer::ENDPOINT_PREFIX)) {
+                    $hasSellerStockPages = true;
+                    $page = max($page, ($rawSnapshot->getPageNumber() ?? 0) + 1);
+                    continue;
+                }
+
                 $items = $rawSnapshot->getResponseBody()['data']['items'] ?? null;
                 if (!is_array($items) || !array_is_list($items)) {
                     throw new WbInventoryApiException('Persisted WB inventory page has an unexpected response structure.');
@@ -149,6 +158,10 @@ final readonly class SyncWbInventorySnapshotHandler
                 } while ($response->hasNextPage);
             }
 
+            if (!$hasSellerStockPages) {
+                $this->fetchSellerStockPages($session, $message, $credentials['api_key'], $page);
+            }
+
             $session->markCompleted();
             $this->entityManager->flush();
         } catch (MarketplaceRateLimitException|MarketplaceTemporaryApiException|WbInventoryRateLimitException|WbInventoryTemporaryApiException $e) {
@@ -185,6 +198,84 @@ final readonly class SyncWbInventorySnapshotHandler
         }
 
         $this->dispatchNormalization($message, $session);
+    }
+
+    /**
+     * Фаза FBS: остатки склада продавца по баркодам листингов. Сбой фазы не трогает
+     * результат FBW — сессия завершается с данными FBW.
+     *
+     * Страницы фазы сохраняются только все вместе: половина складов продавца, записанная как
+     * снимок дня, выглядела бы полным остатком, а отчёт в режиме FBS вместо предыдущего
+     * полного дня показал бы её.
+     */
+    private function fetchSellerStockPages(InventorySnapshotSession $session, SyncWbInventorySnapshotMessage $message, string $apiKey, int $page): void
+    {
+        // Числовой баркод PHP делает int-ключом массива; WB ждёт строки.
+        $barcodes = array_map(strval(...), array_keys($this->marketplaceFacade->getListingBarcodes($message->companyId, MarketplaceType::WILDBERRIES->value)));
+        if ([] === $barcodes) {
+            $this->logger->info('WB seller warehouse stocks skipped: no barcodes.', [
+                'companyId' => $message->companyId,
+                'snapshotSessionId' => $session->getId(),
+            ]);
+
+            return;
+        }
+
+        /** @var list<InventoryRawSnapshot> $sellerPages */
+        $sellerPages = [];
+        try {
+            foreach ($this->inventoryClient->fetchSellerWarehouses($apiKey) as $warehouse) {
+                $chunk = 0;
+                foreach (array_chunk($barcodes, WbInventoryClient::SELLER_STOCKS_CHUNK) as $barcodeChunk) {
+                    ++$chunk;
+                    $startedAt = microtime(true);
+                    $responseBody = $this->inventoryClient->fetchSellerWarehouseStocks($apiKey, $warehouse['id'], $barcodeChunk);
+                    $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+
+                    $sellerPages[] = new InventoryRawSnapshot(
+                        companyId: $message->companyId,
+                        snapshotSessionId: $session->getId(),
+                        source: MarketplaceType::WILDBERRIES,
+                        sourceEndpoint: WbInventoryClient::SELLER_STOCKS_ENDPOINT.'/'.$warehouse['id'],
+                        requestParams: [
+                            'connectionId' => $message->connectionId,
+                            'marketplace' => MarketplaceType::WILDBERRIES->value,
+                            'warehouseId' => $warehouse['id'],
+                            'warehouseName' => $warehouse['name'],
+                            'chunk' => $chunk,
+                            'chunkSize' => count($barcodeChunk),
+                            'requestedAt' => $session->getStartedAt()->format(\DATE_ATOM),
+                            'correlationId' => $session->getCorrelationId(),
+                        ],
+                        responseStatus: 200,
+                        responseBody: $responseBody,
+                        fetchedAt: new \DateTimeImmutable(),
+                        fetchDurationMs: max(0, $durationMs),
+                        correlationId: $session->getCorrelationId(),
+                        pageNumber: $page,
+                    );
+                    ++$page;
+                }
+            }
+        } catch (WbInventoryRateLimitException|WbInventoryTemporaryApiException|WbInventoryApiException $e) {
+            // ponytail: сбой FBS-фазы в этой сессии не повторяется, следующая ночь — новая попытка;
+            // ретраи внутри сессии — когда появится потребность.
+            $this->logger->warning('WB seller warehouse stocks skipped.', [
+                'companyId' => $message->companyId,
+                'snapshotSessionId' => $session->getId(),
+                'discardedSellerPages' => count($sellerPages),
+                'exceptionClass' => $e::class,
+                'errorMessage' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        foreach ($sellerPages as $sellerPage) {
+            $this->entityManager->persist($sellerPage);
+            $session->incrementReceivedPages();
+        }
+        $this->entityManager->flush();
     }
 
     private function dispatchNormalization(SyncWbInventorySnapshotMessage $message, InventorySnapshotSession $session): void

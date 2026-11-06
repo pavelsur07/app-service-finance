@@ -35,6 +35,7 @@
                     {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
                         {label: 'Листинг', href: path('marketplace_listings_index'), active: active_tab == 'listings'},
                         {label: 'Остатки', href: path('inventory_stocks_index'), active: active_tab == 'stocks'},
+                        {label: 'Оборачиваемость', href: path('inventory_stock_turnover_index'), active: active_tab == 'stock_turnover'},
                         {label: 'Себестоимость', href: path('marketplace_inventory_index'), active: active_tab == 'inventory'},
                         {label: 'Теги', href: path('marketplace_listing_tags_manage'), active: active_tab == 'listings_tags'},
                     ]} only %}

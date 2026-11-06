@@ -17,6 +17,16 @@
                     </select>
                 </div>
                 <div class="col-md-3">
+                    <label class="form-label">Схема</label>
+                    <div class="btn-group w-100" role="group" aria-label="Схема">
+                        {% for item in schemes %}
+                            <input type="radio" class="btn-check" name="scheme" id="scheme-{{ item.value }}" value="{{ item.value }}" {{ scheme.value == item.value ? 'checked' : '' }}>
+                            <label class="btn" for="scheme-{{ item.value }}">{{ item.label() }}</label>
+                        {% endfor %}
+                    </div>
+                    <div class="form-hint">FBO — склад маркетплейса, FBS — склад продавца</div>
+                </div>
+                <div class="col-md-3">
                     <label class="form-label">Остатки на дату</label>
                     <input type="date" name="date" value="{{ date|date('Y-m-d') }}" class="form-control">
                 </div>
@@ -34,51 +44,84 @@
     </div>
 
     <div class="card">
+        {# Итог по всему фильтру: страница показывает до PER_PAGE SKU, сравнивать FBO и FBS нужно по целому числу. #}
+        <div class="card-header vf-stocks-totals text-secondary">
+            Итого по фильтру:
+            остаток&nbsp;<span class="vf-num vf-strong">{{ totals.quantity|vf_number }}</span>,
+            резерв&nbsp;<span class="vf-num">{{ totals.reservedQuantity|vf_number }}</span>,
+            доступно&nbsp;<span class="vf-num vf-strong{{ totals.availableForSale < 0 ? ' text-danger' : '' }}">{{ totals.availableForSale|vf_number }}</span>
+        </div>
         <div class="table-responsive">
-            <table class="table table-vcenter card-table">
+            {% set hasBreakdown = breakdownColumns|length > 0 %}
+            {% set rowspan = hasBreakdown ? 2 : 1 %}
+            <table class="table table-vcenter card-table vf-table">
+                <caption class="visually-hidden">Остатки {{ source.getDisplayName() }}, схема {{ scheme.label() }}, на {{ (effectiveDate ?? date)|date('d.m.Y') }}</caption>
                 <thead>
                 <tr>
-                    <th>Дата-время snapshot</th>
-                    <th>Marketplace/source</th>
-                    <th>SKU</th>
-                    <th>Offer ID</th>
-                    <th>Остаток</th>
-                    <th>Зарезервировано</th>
-                    <th>Доступно расчётно</th>
-                    {% for column in breakdownColumns %}
-                        <th>{{ column.label }}</th>
-                    {% endfor %}
-                    <th>mappingStatus</th>
+                    <th scope="col" rowspan="{{ rowspan }}">Снимок</th>
+                    <th scope="col" rowspan="{{ rowspan }}">Источник</th>
+                    <th scope="col" rowspan="{{ rowspan }}">SKU</th>
+                    <th scope="col" rowspan="{{ rowspan }}" class="d-none d-md-table-cell">Артикул продавца</th>
+                    <th scope="col" rowspan="{{ rowspan }}" class="text-end text-nowrap">Остаток</th>
+                    <th scope="col" rowspan="{{ rowspan }}" class="text-end text-nowrap d-none d-md-table-cell">Резерв</th>
+                    <th scope="col" rowspan="{{ rowspan }}" class="text-end text-nowrap">Доступно</th>
+                    {% if hasBreakdown %}
+                        <th scope="colgroup" colspan="{{ breakdownColumns|length }}" class="text-center text-secondary">В том числе</th>
+                    {% endif %}
+                    <th scope="col" rowspan="{{ rowspan }}">Сопоставление</th>
                 </tr>
+                {% if hasBreakdown %}
+                    <tr>
+                        {% for column in breakdownColumns %}
+                            <th scope="col" class="text-end text-secondary text-wrap">{{ column.label }}</th>
+                        {% endfor %}
+                    </tr>
+                {% endif %}
                 </thead>
                 <tbody>
+                {% set mapClass = {'mapped': 'bg-green-lt', 'unmapped': 'bg-yellow-lt', 'ambiguous': 'bg-red-lt'} %}
                 {% for row in pager.currentPageResults %}
+                    {% set mappingStatus = enum('App\\Inventory\\Enum\\StockSnapshotMappingStatus').tryFrom(row.mapping_status) %}
                     <tr>
-                        <td>{{ row.snapshot_at|date('d.m.Y H:i:s') }}</td>
+                        <td class="vf-num" title="{{ row.snapshot_at|date('d.m.Y H:i:s') }}">{{ row.snapshot_at|date('d.m.Y') }}</td>
                         <td><span class="badge bg-azure-lt">{{ source.value|upper }}</span></td>
-                        <td>{{ row.source_sku ?: '—' }}</td>
-                        <td>{{ row.source_offer_id ?: '—' }}</td>
-                        <td>{{ row.quantity }}</td>
-                        <td>{{ row.reserved_quantity }}</td>
-                        <td>{{ row.available_for_sale }}</td>
+                        <td class="font-monospace">{{ row.source_sku ?: '—' }}</td>
+                        <td class="font-monospace d-none d-md-table-cell">{{ row.source_offer_id ?: '—' }}</td>
+                        <td class="text-end vf-num">{{ row.quantity|vf_number }}</td>
+                        <td class="text-end vf-num text-secondary d-none d-md-table-cell">{{ row.reserved_quantity|vf_number }}</td>
+                        {# Резерв больше остатка — расхождение данных маркетплейса, подсвечиваем, а не прячем. #}
+                        <td class="text-end vf-num vf-strong{{ row.available_for_sale < 0 ? ' text-danger' : '' }}">{{ row.available_for_sale|vf_number }}</td>
                         {% for alias in breakdownColumns|keys %}
-                            <td>{{ attribute(row, alias) }}</td>
+                            {% set part = attribute(row, alias) %}
+                            <td class="text-end vf-num text-secondary">{{ part == 0 ? '—' : part|vf_number }}</td>
                         {% endfor %}
                         <td>
-                            {% set mapClass = {
-                                'mapped': 'bg-green-lt',
-                                'unmapped': 'bg-yellow-lt',
-                                'ambiguous': 'bg-red-lt'
-                            } %}
-                            <span class="badge {{ mapClass[row.mapping_status]|default('bg-secondary-lt') }}">{{ row.mapping_status }}</span>
+                            <span class="badge {{ mapClass[row.mapping_status]|default('bg-secondary-lt') }}">{{ mappingStatus ? mappingStatus.label() : row.mapping_status }}</span>
                         </td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="{{ 8 + breakdownColumns|length }}" class="text-center text-muted py-4">Нет остатков на выбранную дату.</td>
+                        <td colspan="{{ 8 + breakdownColumns|length }}" class="text-center text-secondary py-4">
+                            Нет остатков на выбранную дату. Попробуйте другую дату, источник или схему FBO / FBS.
+                        </td>
                     </tr>
                 {% endfor %}
                 </tbody>
+                {% if pager.nbResults > 0 %}
+                    {% set rows = pager.currentPageResults %}
+                    {% set pageAvailable = rows|map(r => r.available_for_sale)|reduce((a, b) => a + b, 0) %}
+                    <tfoot>
+                    {# Сетка подвала повторяет строки: скрытые на узких экранах ячейки тоже скрыты, иначе итоги съезжают под чужие заголовки. #}
+                    <tr class="vf-strong">
+                        <th scope="row" colspan="3" class="fw-medium">Итого на странице</th>
+                        <td class="d-none d-md-table-cell"></td>
+                        <td class="text-end vf-num">{{ rows|map(r => r.quantity)|reduce((a, b) => a + b, 0)|vf_number }}</td>
+                        <td class="text-end vf-num d-none d-md-table-cell">{{ rows|map(r => r.reserved_quantity)|reduce((a, b) => a + b, 0)|vf_number }}</td>
+                        <td class="text-end vf-num{{ pageAvailable < 0 ? ' text-danger' : '' }}">{{ pageAvailable|vf_number }}</td>
+                        <td colspan="{{ 1 + breakdownColumns|length }}"></td>
+                    </tr>
+                    </tfoot>
+                {% endif %}
             </table>
         </div>
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Inventory\Facade;
 
 use App\Inventory\Application\DTO\StockOnDateResult;
+use App\Inventory\Enum\FulfillmentScheme;
 use App\Inventory\Infrastructure\Query\StockQtyByListingOnDateQuery;
 
 /**
@@ -30,13 +31,15 @@ final readonly class InventoryFacade
      * Отсутствие листинга в qtyByListingId означает «остаток неизвестен», а не «ноль».
      *
      * $marketplace сужает выборку до одного источника ('ozon', 'wildberries');
-     * null — все источники компании.
+     * null — все источники компании. $scheme — только склад маркетплейса (FBO)
+     * или только склад продавца (FBS); null — обе схемы вместе.
      */
     public function getStockQtyByListingOnReportDate(
         string $companyId,
         \DateTimeImmutable $reportDate,
         ?string $marketplace = null,
+        ?FulfillmentScheme $scheme = null,
     ): StockOnDateResult {
-        return $this->stockQtyByListingOnDateQuery->execute($companyId, $reportDate, $marketplace);
+        return $this->stockQtyByListingOnDateQuery->execute($companyId, $reportDate, $marketplace, $scheme);
     }
 }

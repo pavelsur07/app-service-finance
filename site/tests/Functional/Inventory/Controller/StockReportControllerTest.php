@@ -101,6 +101,8 @@ final class StockReportControllerTest extends WebTestCaseBase
         yield 'year zero (вне диапазона PostgreSQL DATE)' => ['date=0000-01-01'];
         yield 'null byte' => ['date=%00'];
         yield 'date with trailing null byte' => ['date=2026-05-10%00'];
+        yield 'unsupported scheme' => ['scheme=dbs'];
+        yield 'array scheme' => ['scheme[]=fbs'];
     }
 
     public function testSnapshotsOfAnotherCompanyAreNeverVisible(): void
@@ -203,18 +205,65 @@ final class StockReportControllerTest extends WebTestCaseBase
         $this->persist($owner, $company, $location, $unmapped, $mapped);
         $this->login($client, $owner, $company);
 
-        $client->request('GET', '/inventory/stocks?mappingStatus=unmapped&search=zzz&status=defect&snapshotSessionId=not-a-uuid');
+        $crawler = $client->request('GET', '/inventory/stocks?mappingStatus=unmapped&search=zzz&status=defect&snapshotSessionId=not-a-uuid');
 
         self::assertResponseIsSuccessful();
         $html = (string) $client->getResponse()->getContent();
         self::assertStringContainsString('UNMAPPED-SKU', $html);
         self::assertStringContainsString('MATCHED-SKU', $html);
-        self::assertStringContainsString('10.000', $html);
-        self::assertStringContainsString('3.000', $html);
-        self::assertStringContainsString('7.000', $html);
+        // Сортировка — по SKU убыванию, поэтому UNMAPPED-SKU первый. Остатки целые, статус словами.
+        $cells = $crawler->filter('table tbody tr')->first()->filter('td')->each(static fn (Crawler $td): string => trim($td->text()));
+        self::assertSame(['UNMAPPED-SKU', '10', '3', '7', 'Не сопоставлен'], [$cells[2], $cells[4], $cells[5], $cells[6], $cells[7]]);
+        self::assertSame('Сопоставлен', trim($crawler->filter('table tbody tr')->last()->filter('td')->last()->text()));
     }
 
-    public function testRowsAreGroupedBySkuWithFulfillmentTypeBreakdown(): void
+    public function testTotalsRowAndNegativeAvailableAreHighlighted(): void
+    {
+        $client = static::createClient();
+
+        $owner = UserBuilder::aUser()->withEmail('stocks-totals@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112019')->withOwner($owner)->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
+
+        $this->persist(
+            $owner,
+            $company,
+            $location,
+            $this->snapshot($company, $location, '191', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-POS')
+                ->withQuantity('10.000')
+                ->withReservedQuantity('3.000'),
+            // Резерв больше остатка: расчётное «Доступно» отрицательное.
+            $this->snapshot($company, $location, '192', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-NEG')
+                ->withQuantity('2.000')
+                ->withReservedQuantity('5.000'),
+        );
+
+        $this->login($client, $owner, $company);
+        $crawler = $client->request('GET', '/inventory/stocks?date='.$this->daysAgo(1)->format('Y-m-d'));
+
+        self::assertResponseIsSuccessful();
+
+        $negative = $crawler->filter('table tbody tr')->last()->filter('td');
+        self::assertSame('SKU-NEG', trim($negative->eq(2)->text()));
+        self::assertSame("\u{2212}3", trim($negative->eq(6)->text()));
+        self::assertStringContainsString('text-danger', (string) $negative->eq(6)->attr('class'));
+        self::assertStringNotContainsString('text-danger', (string) $crawler->filter('table tbody tr')->first()->filter('td')->eq(6)->attr('class'));
+
+        // Подвал повторяет сетку колонок: скрытые на узких экранах ячейки есть и в нём, иначе итоги съезжают под чужие заголовки.
+        self::assertSame('Итого на странице', trim($crawler->filter('table tfoot th[scope="row"]')->text()));
+        self::assertSame('3', $crawler->filter('table tfoot th')->attr('colspan'));
+        $footer = $crawler->filter('table tfoot td')->each(static fn (Crawler $td): string => trim($td->text()));
+        self::assertSame(['', '12', '8', '4', ''], $footer);
+        self::assertStringContainsString('d-md-table-cell', (string) $crawler->filter('table tfoot td')->eq(0)->attr('class'));
+        self::assertStringContainsString('d-md-table-cell', (string) $crawler->filter('table tfoot td')->eq(2)->attr('class'));
+        self::assertSame('1', $crawler->filter('table tfoot td')->eq(4)->attr('colspan'));
+        self::assertSame(
+            'Итого по фильтру: остаток 12, резерв 8, доступно 4',
+            preg_replace('/\s+/u', ' ', trim($crawler->filter('.vf-stocks-totals')->text())),
+        );
+    }
+
+    public function testFboSchemeIsDefaultAndHidesSellerWarehouseRows(): void
     {
         $client = static::createClient();
 
@@ -240,22 +289,135 @@ final class StockReportControllerTest extends WebTestCaseBase
         $crawler = $client->request('GET', '/inventory/stocks?date='.$this->daysAgo(1)->format('Y-m-d'));
 
         self::assertResponseIsSuccessful();
+        // Внутри схемы FBO один тип склада — колонка разбивки дублировала бы «Доступно расчётно» и не выводится.
         self::assertSame(
-            ['Дата-время snapshot', 'Marketplace/source', 'SKU', 'Offer ID', 'Остаток', 'Зарезервировано', 'Доступно расчётно', 'FBO', 'FBS', 'mappingStatus'],
+            ['Снимок', 'Источник', 'SKU', 'Артикул продавца', 'Остаток', 'Резерв', 'Доступно', 'Сопоставление'],
             $crawler->filter('table thead th')->each(static fn (Crawler $th): string => trim($th->text())),
         );
 
-        // Две записи снимка одного SKU схлопнуты в одну строку.
         self::assertCount(1, $crawler->filter('table tbody tr'));
 
         $cells = $crawler->filter('table tbody tr td')->each(static fn (Crawler $td): string => trim($td->text()));
         self::assertSame('SKU-ROLLUP', $cells[2]);
-        self::assertSame('15.000', $cells[4]);
-        self::assertSame('4.000', $cells[5]);
-        // Доступно расчётно = сумма по обоим типам склада, и она сходится с разбивкой.
-        self::assertSame('11.000', $cells[6]);
-        self::assertSame('7.000', $cells[7]);
-        self::assertSame('4.000', $cells[8]);
+        // Только склад маркетплейса: fbs-строка в схему FBO не входит.
+        self::assertSame('10', $cells[4]);
+        self::assertSame('3', $cells[5]);
+        self::assertSame('7', $cells[6]);
+        self::assertSame('Не сопоставлен', $cells[7]);
+        // Дата снимка без секунд, полное время — в title.
+        self::assertSame($this->daysAgo(1)->format('d.m.Y'), $cells[0]);
+        self::assertSame($this->daysAgo(1)->setTime(9, 0)->format('d.m.Y H:i:s'), $crawler->filter('table tbody tr td')->first()->attr('title'));
+        self::assertCount(1, $crawler->filter('table caption'));
+        self::assertCount(8, $crawler->filter('table thead th[scope="col"]'));
+    }
+
+    public function testFbsSchemeShowsSellerWarehouseTypesWithBreakdown(): void
+    {
+        $client = static::createClient();
+
+        $owner = UserBuilder::aUser()->withEmail('stocks-fbs-scheme@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112015')->withOwner($owner)->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
+
+        $this->persist(
+            $owner,
+            $company,
+            $location,
+            $this->snapshot($company, $location, '151', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-SELLER')
+                ->withFulfillmentType('fbo')
+                ->withQuantity('10.000')
+                ->withReservedQuantity('3.000'),
+            $this->snapshot($company, $location, '152', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-SELLER')
+                ->withFulfillmentType('fbs')
+                ->withQuantity('5.000')
+                ->withReservedQuantity('1.000'),
+            $this->snapshot($company, $location, '153', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-SELLER')
+                ->withFulfillmentType('rfbs')
+                ->withQuantity('2.000'),
+            $this->snapshot($company, $location, '154', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-FBS-ONLY')
+                ->withFulfillmentType('fbs')
+                ->withQuantity('3.000'),
+        );
+
+        $this->login($client, $owner, $company);
+        $crawler = $client->request('GET', '/inventory/stocks?scheme=fbs&date='.$this->daysAgo(1)->format('Y-m-d'));
+
+        self::assertResponseIsSuccessful();
+        // Склад продавца у Ozon — два типа (fbs и rfbs), поэтому разбивка есть.
+        self::assertSame(
+            ['Снимок', 'Источник', 'SKU', 'Артикул продавца', 'Остаток', 'Резерв', 'Доступно', 'В том числе', 'Сопоставление', 'FBS', 'RFBS'],
+            $crawler->filter('table thead th')->each(static fn (Crawler $th): string => trim($th->text())),
+        );
+
+        self::assertCount(2, $crawler->filter('table tbody tr'));
+
+        $cells = $crawler->filter('table tbody tr')->first()->filter('td')->each(static fn (Crawler $td): string => trim($td->text()));
+        self::assertSame('SKU-SELLER', $cells[2]);
+        self::assertSame('7', $cells[4]);
+        self::assertSame('1', $cells[5]);
+        self::assertSame('6', $cells[6]);
+        self::assertSame('4', $cells[7]);
+        self::assertSame('2', $cells[8]);
+        // Нулевая часть разбивки — прочерк, а не «0».
+        $onlyFbs = $crawler->filter('table tbody tr')->last()->filter('td')->each(static fn (Crawler $td): string => trim($td->text()));
+        self::assertSame(['SKU-FBS-ONLY', '3', '3', '—'], [$onlyFbs[2], $onlyFbs[6], $onlyFbs[7], $onlyFbs[8]]);
+        self::assertSame('3', $crawler->filter('table tfoot td')->eq(4)->attr('colspan'));
+    }
+
+    public function testRowWithoutFulfillmentTypeStaysInFboScheme(): void
+    {
+        $client = static::createClient();
+
+        $owner = UserBuilder::aUser()->withEmail('stocks-no-type@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112016')->withOwner($owner)->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
+
+        $this->persist(
+            $owner,
+            $company,
+            $location,
+            $this->snapshot($company, $location, '161', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-NOTYPE')->withFulfillmentType(null),
+        );
+
+        $this->login($client, $owner, $company);
+        $date = $this->daysAgo(1)->format('Y-m-d');
+
+        $client->request('GET', '/inventory/stocks?scheme=fbo&date='.$date);
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('SKU-NOTYPE', (string) $client->getResponse()->getContent());
+
+        $client->request('GET', '/inventory/stocks?scheme=fbs&date='.$date);
+        self::assertResponseIsSuccessful();
+        $html = (string) $client->getResponse()->getContent();
+        self::assertStringNotContainsString('SKU-NOTYPE', $html);
+        self::assertStringContainsString('Нет остатков на выбранную дату', $html);
+    }
+
+    public function testEffectiveDateIsResolvedWithinScheme(): void
+    {
+        $client = static::createClient();
+
+        $owner = UserBuilder::aUser()->withEmail('stocks-scheme-date@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112017')->withOwner($owner)->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
+
+        $this->persist(
+            $owner,
+            $company,
+            $location,
+            $this->snapshot($company, $location, '171', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-FBO-TODAY')->withFulfillmentType('fbo'),
+            $this->snapshot($company, $location, '172', MarketplaceType::OZON, $this->daysAgo(2), 'SKU-FBS-YESTERDAY')->withFulfillmentType('fbs'),
+        );
+
+        $this->login($client, $owner, $company);
+        $client->request('GET', '/inventory/stocks?scheme=fbs&date='.$this->daysAgo(1)->format('Y-m-d'));
+
+        self::assertResponseIsSuccessful();
+        $html = (string) $client->getResponse()->getContent();
+        // Ближайший снимок ищется внутри схемы: день без FBS-строк не считается «днём со снимком».
+        self::assertStringContainsString('SKU-FBS-YESTERDAY', $html);
+        self::assertStringNotContainsString('SKU-FBO-TODAY', $html);
+        self::assertStringContainsString('показан ближайший на '.$this->daysAgo(2)->format('d.m.Y'), $html);
     }
 
     public function testWildberriesBreaksDownByStockStatus(): void
@@ -289,17 +451,17 @@ final class StockReportControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         // У Wildberries fulfillment_type всегда один, поэтому разбивка идёт по статусам остатка.
         self::assertSame(
-            ['Дата-время snapshot', 'Marketplace/source', 'SKU', 'Offer ID', 'Остаток', 'Зарезервировано', 'Доступно расчётно', 'На складе', 'В пути к клиенту', 'В пути от клиента', 'mappingStatus'],
+            ['Снимок', 'Источник', 'SKU', 'Артикул продавца', 'Остаток', 'Резерв', 'Доступно', 'В том числе', 'Сопоставление', 'На складе', 'В пути к клиенту', 'В пути от клиента'],
             $crawler->filter('table thead th')->each(static fn (Crawler $th): string => trim($th->text())),
         );
 
         self::assertCount(1, $crawler->filter('table tbody tr'));
 
         $cells = $crawler->filter('table tbody tr td')->each(static fn (Crawler $td): string => trim($td->text()));
-        self::assertSame('11.000', $cells[6]);
-        self::assertSame('8.000', $cells[7]);
-        self::assertSame('2.000', $cells[8]);
-        self::assertSame('1.000', $cells[9]);
+        self::assertSame('11', $cells[6]);
+        self::assertSame('8', $cells[7]);
+        self::assertSame('2', $cells[8]);
+        self::assertSame('1', $cells[9]);
     }
 
     public function testPaginationCountsSkuNotSnapshotRows(): void
@@ -373,6 +535,9 @@ final class StockReportControllerTest extends WebTestCaseBase
             sprintf('Показано с 1 по %d из %d', InventoryStockReportQuery::PER_PAGE, InventoryStockReportQuery::PER_PAGE + 1),
             preg_replace('/\s+/u', ' ', trim($crawler->filter('.card-footer p')->text())),
         );
+        // Итог страницы — по 30 SKU (30 × 12,345 = 370,35), итог по фильтру — по всем 31 (382,695); оба целыми.
+        self::assertSame('370', trim($crawler->filter('table tfoot td')->eq(3)->text()));
+        self::assertStringContainsString('доступно 383', preg_replace('/\s+/u', ' ', trim($crawler->filter('.vf-stocks-totals')->text())) ?? '');
 
         // Ссылки страниц берут фильтры из текущего query string, а не из белого списка шаблона.
         $links = $crawler->filter('.card-footer nav a')->each(static fn (Crawler $link): string => (string) $link->attr('href'));
@@ -381,6 +546,42 @@ final class StockReportControllerTest extends WebTestCaseBase
         self::assertNotEmpty($secondPage);
         self::assertStringContainsString('source=wildberries', $secondPage[0]);
         self::assertStringContainsString('date='.$date, $secondPage[0]);
+    }
+
+    public function testSchemeToggleMarksActiveOptionAndKeepsItInPagination(): void
+    {
+        $client = static::createClient();
+
+        $owner = UserBuilder::aUser()->withEmail('stocks-scheme-toggle@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112018')->withOwner($owner)->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
+
+        $snapshots = [];
+        for ($index = 0; $index < InventoryStockReportQuery::PER_PAGE + 1; ++$index) {
+            $snapshots[] = $this->snapshot(
+                $company,
+                $location,
+                sprintf('%03x', 0x300 + $index),
+                MarketplaceType::OZON,
+                $this->daysAgo(1),
+                sprintf('SKU-FBS-PAGE-%02d', $index),
+            )->withFulfillmentType('fbs');
+        }
+
+        $this->persist($owner, $company, $location, ...$snapshots);
+        $this->login($client, $owner, $company);
+
+        $crawler = $client->request('GET', '/inventory/stocks?scheme=fbs&date='.$this->daysAgo(1)->format('Y-m-d'));
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('input[name="scheme"][value="fbs"][checked]'));
+        self::assertCount(1, $crawler->filter('input[name="scheme"][value="fbo"]'));
+        self::assertCount(0, $crawler->filter('input[name="scheme"][value="fbo"][checked]'));
+
+        $links = $crawler->filter('.card-footer nav a')->each(static fn (Crawler $link): string => (string) $link->attr('href'));
+        $secondPage = array_values(array_filter($links, static fn (string $href): bool => str_contains($href, 'page=2')));
+        self::assertNotEmpty($secondPage);
+        self::assertStringContainsString('scheme=fbs', $secondPage[0]);
     }
 
     private function seedTwoOzonDays(string $email, string $companyId, string $suffix): KernelBrowser

@@ -6,7 +6,9 @@ namespace App\Inventory\Infrastructure\Query;
 
 use App\Inventory\Application\DTO\StockOnDateResult;
 use App\Inventory\Domain\StockSnapshotFreshnessPolicy;
+use App\Inventory\Enum\FulfillmentScheme;
 use App\Inventory\Enum\StockStatus;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 final readonly class StockQtyByListingOnDateQuery
@@ -32,8 +34,12 @@ final readonly class StockQtyByListingOnDateQuery
      * вызывающий код сам отфильтрован по маркетплейсу: без него в отчёт по Ozon
      * попали бы остатки Wildberries.
      */
-    public function execute(string $companyId, \DateTimeImmutable $reportDate, ?string $marketplace = null): StockOnDateResult
-    {
+    public function execute(
+        string $companyId,
+        \DateTimeImmutable $reportDate,
+        ?string $marketplace = null,
+        ?FulfillmentScheme $scheme = null,
+    ): StockOnDateResult {
         // Свежесть оценивается относительно min(дата отчёта, сегодня), а не даты
         // отчёта напрямую: период может заканчиваться в будущем, и тогда сегодняшний
         // снапшот выглядел бы протухшим, оставляя отчёт вовсе без остатков.
@@ -50,6 +56,17 @@ final readonly class StockQtyByListingOnDateQuery
         if (null !== $marketplace) {
             $sourceFilter = ' AND candidate.source = :marketplace';
             $params['marketplace'] = $marketplace;
+        }
+
+        // Схема фильтрует строки выбранной сессии, а не выбор сессии: иначе день без
+        // FBS-строк «откатился» бы на старую сессию, где они были.
+        $schemeFilter = '';
+        $types = [];
+        if (null !== $scheme) {
+            $schemeFilter = " AND CASE WHEN LOWER(TRIM(COALESCE(s.fulfillment_type, ''))) IN (:fbsTypes) THEN 'fbs' ELSE 'fbo' END = :scheme";
+            $params['fbsTypes'] = FulfillmentScheme::FBS_TYPES;
+            $params['scheme'] = $scheme->value;
+            $types['fbsTypes'] = ArrayParameterType::STRING;
         }
 
         $rows = $this->connection->fetchAllAssociative(
@@ -80,9 +97,10 @@ final readonly class StockQtyByListingOnDateQuery
                AND s.company_id = :companyId
                AND s.status = :status
                AND s.listing_id IS NOT NULL
-               AND latest.snapshot_date >= :earliestAcceptableDate
+               AND latest.snapshot_date >= :earliestAcceptableDate'.$schemeFilter.'
              GROUP BY latest.source, latest.snapshot_date, s.listing_id',
             $params,
+            $types,
         );
 
         $qtyByListingId = [];
