@@ -29,6 +29,7 @@ final class Version20261106183000 extends AbstractMigration
         $this->addSql('CREATE UNIQUE INDEX uniq_settlement_document_request ON settlement_documents (company_id, request_id)');
         $this->addSql('CREATE UNIQUE INDEX uniq_settlement_event_sequence ON settlement_documents (company_id, event_sequence)');
         $this->addSql('CREATE UNIQUE INDEX uniq_settlement_document_reversal ON settlement_documents (company_id, reversed_document_id)');
+        $this->addSql('CREATE INDEX idx_settlement_documents_party ON settlement_documents (company_id, counterparty_id, effective_date)');
         $this->addSql('CREATE TABLE settlement_items (id UUID NOT NULL, company_id UUID NOT NULL, document_id UUID NOT NULL, counterparty_id UUID NOT NULL, bucket VARCHAR(255) NOT NULL, effective_date DATE NOT NULL, due_date DATE DEFAULT NULL, amount_amount_minor BIGINT NOT NULL, amount_currency VARCHAR(3) NOT NULL, PRIMARY KEY (id))');
         $this->addSql('CREATE UNIQUE INDEX uniq_settlement_item_company_id ON settlement_items (company_id, id)');
         $this->addSql('CREATE UNIQUE INDEX uniq_settlement_item_document ON settlement_items (company_id, document_id)');

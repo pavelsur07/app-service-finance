@@ -28,6 +28,8 @@ final class DeleteCashTransactionAction
      */
     public function __invoke(CashTransaction $tx, ?string $userId = null, ?string $reason = null): void
     {
+        $this->transactions->assertStandaloneTransaction($tx);
+
         $this->entityManager->wrapInTransaction(function () use ($tx, $userId, $reason): void {
             $this->settlementLifecycle->lock($tx);
             $this->settlementLifecycle->changing($tx, true);

@@ -21,12 +21,14 @@ use Doctrine\ORM\EntityManagerInterface;
 /** Replays immutable primary facts, never reads settlement_movements or source_links. */
 final readonly class SettlementRegisterProjectionQuery
 {
-    public function __construct(private EntityManagerInterface $em, private SettlementPostingPolicy $posting)
+    public function __construct(private EntityManagerInterface $em, private SettlementPostingPolicy $posting, private \App\Settlement\Domain\SettlementMutationPolicy $dates)
     {
     }
 
     public function project(string $companyId): SettlementRegisterProjection
     {
+        $book = $this->em->getRepository(\App\Settlement\Entity\SettlementBook::class)->findOneBy(['companyId' => $companyId]) ?? throw new \DomainException('Настройте начало учёта.');
+        $this->em->refresh($book);
         $documents = $this->em->createQuery('SELECT d FROM '.SettlementDocument::class.' d WHERE d.companyId=:company AND d.status=:status ORDER BY d.eventSequence ASC')->setParameter('company', $companyId)->setParameter('status', SettlementDocumentStatus::POSTED)->setHint(\Doctrine\ORM\Query::HINT_REFRESH, true)->getResult();
         $items = [];
         $itemsByDocument = [];
@@ -51,7 +53,11 @@ final readonly class SettlementRegisterProjectionQuery
             $snapshot = $doc->getSourceSnapshot();
             $sequences[$id] = $doc->getEventSequence();
             $event = [];
-            if (!$doc->getAmount()->isPositive() || 'RUB' !== $doc->getAmount()->currency() || null === $doc->getEventSequence() || '' === trim($doc->getReason())) {
+            $this->dates->assertHistoryDate($book, $doc->getEffectiveDate());
+            if (!in_array($doc->getKind(), [SettlementDocumentKind::OPENING, SettlementDocumentKind::OBLIGATION, SettlementDocumentKind::PAYMENT], true) && (SettlementSourceType::MANUAL !== $doc->getSourceType() || null !== $doc->getSourceId())) {
+                throw new \DomainException('Источник служебного события не согласован.');
+            }
+            if (!$doc->getAmount()->isPositive() || 'RUB' !== $doc->getAmount()->currency() || null === $doc->getEventSequence() || $doc->getEventSequence() < 1 || '' === trim($doc->getReason())) {
                 throw new \DomainException('Повреждён первичный документ.');
             }
             if (null !== $doc->getReversedDocumentId()) {
@@ -75,6 +81,18 @@ final readonly class SettlementRegisterProjectionQuery
                     case SettlementDocumentKind::OPENING:
                     case SettlementDocumentKind::OBLIGATION:
                     case SettlementDocumentKind::PAYMENT:
+                        $this->posting->assertBaseDocument($doc->getKind(), $doc->getBucket(), $doc->getSourceType(), $doc->getSourceId(), $doc->getEffectiveDate(), $book->getStartDate());
+                        if (SettlementDocumentKind::PAYMENT === $doc->getKind()) {
+                            $advance = $snapshot['isAdvance'] ?? null;
+                            $day = $snapshot['occurredAt'] ?? null;
+                            $sourceDate = is_string($day) ? \DateTimeImmutable::createFromFormat('!Y-m-d', $day) : false;
+                            if (!is_bool($advance) || false === $sourceDate || $sourceDate->format('Y-m-d') !== $day || $day < $book->getStartDate()->format('Y-m-d') || $day > $doc->getEffectiveDate()->format('Y-m-d') || $advance !== in_array($doc->getBucket(), [SettlementBucket::ADVANCE_GIVEN, SettlementBucket::ADVANCE_RECEIVED], true)) {
+                                throw new \DomainException('Снимок первичной оплаты не согласован.');
+                            }
+                            if (null === ($links['cash:'.$doc->getSourceId()] ?? null)?->getLastReversalDate() && $day !== $doc->getEffectiveDate()->format('Y-m-d')) {
+                                throw new \DomainException('Дата первого включения оплаты не соответствует ДДС.');
+                            }
+                        }
                         $item = $itemsByDocument[$id] ?? throw new \DomainException('У первичного документа отсутствует позиция.');
                         $usedItems[$item->getId()] = true;
                         if (!$doc->getAmount()->equals($item->getAmount()) || $doc->getBucket() !== $item->getBucket() || $doc->getCounterpartyId() !== $item->getCounterpartyId() || $doc->getEffectiveDate()->format('Y-m-d') !== $item->getEffectiveDate()->format('Y-m-d') || $doc->getDueDate()?->format('Y-m-d') !== $item->getDueDate()?->format('Y-m-d')) {
@@ -128,6 +146,9 @@ final readonly class SettlementRegisterProjectionQuery
                         throw new \DomainException('Первичная отмена не содержит ссылки на исходный документ.');
                 }
                 if (SettlementSourceType::MANUAL !== $doc->getSourceType()) {
+                    if (!is_string($snapshot['fingerprint'] ?? null) || !preg_match('/^[a-f0-9]{64}$/D', $snapshot['fingerprint'])) {
+                        throw new \DomainException('Снимок первичного источника отсутствует.');
+                    }
                     $sourceId = $doc->getSourceId() ?? throw new \DomainException('Источник документа отсутствует.');
                     $key = $doc->getSourceType()->value.':'.$sourceId;
                     $link = $links[$key] ??= new SettlementSourceLink($companyId, $doc->getSourceType(), $sourceId);
@@ -183,6 +204,6 @@ final readonly class SettlementRegisterProjectionQuery
             }
         }
 
-        return new SettlementRegisterProjection($movements, array_values($links), $active);
+        return new SettlementRegisterProjection($movements, array_values($links), $active, $book->getStartDate());
     }
 }

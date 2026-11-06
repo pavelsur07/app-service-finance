@@ -28,6 +28,7 @@ final readonly class SettlementSchemaExtension implements SchemaExtension
             $schema->getTable($table)->addForeignKeyConstraint($target, ['company_id', $column], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_'.$table.'_'.$column);
         }
         $schema->getTable('settlement_documents')->addUniqueIndex(['company_id', 'reversed_document_id'], 'uniq_settlement_document_reversal');
+        $schema->getTable('settlement_documents')->addIndex(['company_id', 'counterparty_id', 'effective_date'], 'idx_settlement_documents_party');
         $schema->getTable('settlement_items')->addIndex(['company_id', 'counterparty_id', 'amount_currency', 'effective_date'], 'idx_settlement_items_party');
         $schema->getTable('settlement_movements')->addIndex(['company_id', 'item_id', 'effective_date', 'id'], 'idx_settlement_movements_history');
     }

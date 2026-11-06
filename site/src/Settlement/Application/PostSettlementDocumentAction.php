@@ -20,7 +20,7 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final readonly class PostSettlementDocumentAction
 {
-    public function __construct(private EntityManagerInterface $em, private SettlementMutationPolicy $policy, private SettlementRepository $repository, private SettlementRegisterUpdater $updater, private FinanceFacade $finance, private SettlementFinanceSourcePolicy $sourcePolicy)
+    public function __construct(private EntityManagerInterface $em, private SettlementMutationPolicy $policy, private SettlementRepository $repository, private SettlementRegisterUpdater $updater, private FinanceFacade $finance, private SettlementFinanceSourcePolicy $sourcePolicy, private \App\Settlement\Domain\SettlementPostingPolicy $posting)
     {
     }
 
@@ -45,6 +45,7 @@ final readonly class PostSettlementDocumentAction
                 return new SettlementResult($documentId, $this->repository->findItemByDocument($companyId, $documentId)?->getId(), $document->getVersion(), true);
             }
             $link = null;
+            $this->posting->assertBaseDocument($document->getKind(), $document->getBucket(), $document->getSourceType(), $document->getSourceId(), $document->getEffectiveDate(), $book->getStartDate());
             if (SettlementSourceType::FINANCE === $document->getSourceType()) {
                 if (null === $source) {
                     throw new \DomainException('Не удалось проверить источник ОПиУ.');

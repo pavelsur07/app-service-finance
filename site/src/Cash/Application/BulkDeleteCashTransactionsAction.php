@@ -34,10 +34,12 @@ final class BulkDeleteCashTransactionsAction
      */
     public function __invoke(Company $company, array $transactionIds, ?string $actorUserId): int
     {
-        $result = $this->entityManager->wrapInTransaction(function () use ($company, $transactionIds, $actorUserId): int {
-            $ids = $this->normalizeIds($transactionIds);
-            $companyId = (string) $company->getId();
-
+        $ids = $this->normalizeIds($transactionIds);
+        $companyId = (string) $company->getId();
+        if ($this->transactionRepository->hasAnyTransferAggregateByIdsAndCompanyId($ids, $companyId)) {
+            throw new \DomainException('Операции перевода нельзя удалить отдельно. Удалите связанный перевод.');
+        }
+        $result = $this->entityManager->wrapInTransaction(function () use ($company, $ids, $companyId, $actorUserId): int {
             $transactions = $this->transactionRepository->findActiveByIdsAndCompanyId($ids, $companyId);
             if (\count($transactions) !== \count($ids)) {
                 throw new \DomainException('Не удалось удалить выбранные транзакции. Обновите страницу и повторите.');

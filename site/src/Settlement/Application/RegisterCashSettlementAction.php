@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Settlement\Application;
 
-use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Facade\CashFacade;
 use App\Settlement\Application\DTO\RegisterCashSettlementInput;
 use App\Settlement\Application\DTO\SettlementResult;
@@ -13,7 +12,6 @@ use App\Settlement\Domain\SettlementMutationPolicy;
 use App\Settlement\Entity\SettlementDocument;
 use App\Settlement\Entity\SettlementItem;
 use App\Settlement\Entity\SettlementSourceLink;
-use App\Settlement\Enum\SettlementBucket;
 use App\Settlement\Enum\SettlementDocumentKind;
 use App\Settlement\Enum\SettlementSourceType;
 use App\Settlement\Repository\SettlementRepository;
@@ -21,7 +19,7 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final readonly class RegisterCashSettlementAction
 {
-    public function __construct(private EntityManagerInterface $em, private SettlementMutationPolicy $policy, private SettlementRepository $repository, private SettlementRegisterUpdater $updater, private CashFacade $cash, private \App\Company\Facade\CounterpartyFacade $parties)
+    public function __construct(private EntityManagerInterface $em, private SettlementMutationPolicy $policy, private SettlementRepository $repository, private SettlementRegisterUpdater $updater, private CashFacade $cash, private \App\Company\Facade\CounterpartyFacade $parties, private \App\Settlement\Domain\SettlementPostingPolicy $posting)
     {
     }
 
@@ -52,10 +50,7 @@ final readonly class RegisterCashSettlementAction
             if ($source->occurredAt->format('Y-m-d') < $book->getStartDate()->format('Y-m-d') || (null === $lastReversal && $day !== $source->occurredAt->format('Y-m-d')) || (null !== $lastReversal && ($day < $lastReversal->format('Y-m-d') || $day < $source->occurredAt->format('Y-m-d')))) {
                 throw new \DomainException('Дата включения раньше источника или последней отмены.');
             }
-            $bucket = match ($source->direction) {
-                CashDirection::OUTFLOW => $input->isAdvance ? SettlementBucket::ADVANCE_GIVEN : SettlementBucket::UNALLOCATED_OUT,
-                CashDirection::INFLOW => $input->isAdvance ? SettlementBucket::ADVANCE_RECEIVED : SettlementBucket::UNALLOCATED_IN,
-            };
+            $bucket = $this->posting->paymentBucket($source->direction, $input->isAdvance);
             $document = new SettlementDocument($companyId, $input->requestId, SettlementDocumentKind::PAYMENT, $source->counterpartyId, $bucket, $source->amount, $input->effectiveDate, null, 'Оплата ДДС', $actorUserId, SettlementSourceType::CASH, $source->id, ['fingerprint' => $source->fingerprint, 'occurredAt' => $source->occurredAt->format('Y-m-d'), 'isAdvance' => $input->isAdvance]);
             $document->post(1, $book->takeEventSequence());
             $item = new SettlementItem($companyId, $document->getId(), $source->counterpartyId, $bucket, $source->amount, $input->effectiveDate);

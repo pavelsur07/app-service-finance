@@ -25,6 +25,8 @@ final class RestoreCashTransactionAction
      */
     public function __invoke(CashTransaction $tx): void
     {
+        $this->transactions->assertStandaloneTransaction($tx);
+
         $this->entityManager->wrapInTransaction(function () use ($tx): void {
             $this->settlementLifecycle->lock($tx);
             $this->settlementLifecycle->changing($tx, true);

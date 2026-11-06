@@ -409,13 +409,17 @@ class DocumentController extends AbstractController
         }
 
         if ($this->isCsrfTokenValid('delete'.$document->getId(), $request->request->get('_token'))) {
-            $softDeleteDocument(
-                (string) $company->getId(),
-                (string) $document->getId(),
-                $auditContextProvider->getActorUserId(),
-                'manual-ui',
-            );
-            $this->addFlash('success', 'Документ ОПиУ перемещён в «Удалённые».');
+            try {
+                $softDeleteDocument(
+                    (string) $company->getId(),
+                    (string) $document->getId(),
+                    $auditContextProvider->getActorUserId(),
+                    'manual-ui',
+                );
+                $this->addFlash('success', 'Документ ОПиУ перемещён в «Удалённые».');
+            } catch (\DomainException $exception) {
+                $this->addFlash('danger', $exception->getMessage());
+            }
         } else {
             $this->addFlash('danger', 'Неверный CSRF токен.');
         }

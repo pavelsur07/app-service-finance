@@ -9,14 +9,13 @@ use App\Settlement\Application\DTO\CreateSettlementDocumentInput;
 use App\Settlement\Application\DTO\SettlementResult;
 use App\Settlement\Domain\SettlementMutationPolicy;
 use App\Settlement\Entity\SettlementDocument;
-use App\Settlement\Enum\SettlementBucket;
 use App\Settlement\Enum\SettlementDocumentKind;
 use App\Settlement\Repository\SettlementRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final readonly class CreateSettlementDocumentAction
 {
-    public function __construct(private EntityManagerInterface $em, private SettlementMutationPolicy $policy, private SettlementRepository $repository, private CounterpartyFacade $parties)
+    public function __construct(private EntityManagerInterface $em, private SettlementMutationPolicy $policy, private SettlementRepository $repository, private CounterpartyFacade $parties, private \App\Settlement\Domain\SettlementPostingPolicy $posting)
     {
     }
 
@@ -25,13 +24,10 @@ final readonly class CreateSettlementDocumentAction
         return $this->em->wrapInTransaction(function () use ($companyId, $actorUserId, $input): SettlementResult {
             $book = $this->policy->lock($companyId, $actorUserId);
             if (!in_array($input->kind, [SettlementDocumentKind::OPENING, SettlementDocumentKind::OBLIGATION], true)
-                || !in_array($input->bucket, SettlementDocumentKind::OPENING === $input->kind ? [SettlementBucket::RECEIVABLE, SettlementBucket::PAYABLE, SettlementBucket::ADVANCE_GIVEN, SettlementBucket::ADVANCE_RECEIVED] : [SettlementBucket::RECEIVABLE, SettlementBucket::PAYABLE], true)
                 || null === $this->parties->findEntityByIdAndCompany($input->counterpartyId, $companyId)) {
                 throw new \DomainException('Неверное основание или контрагент.');
             }
-            if (SettlementDocumentKind::OPENING === $input->kind && $input->effectiveDate->format('Y-m-d') !== $book->getStartDate()->format('Y-m-d')) {
-                throw new \DomainException('Начальный остаток должен относиться к дате начала учёта.');
-            }
+            $this->posting->assertBaseDocument($input->kind, $input->bucket, \App\Settlement\Enum\SettlementSourceType::MANUAL, null, $input->effectiveDate, $book->getStartDate());
             $existing = $this->repository->findByRequest($companyId, $input->requestId);
             if (null !== $existing) {
                 if ($existing->getKind() !== $input->kind || $existing->getCounterpartyId() !== $input->counterpartyId || $existing->getBucket() !== $input->bucket || !$existing->getAmount()->equals($input->amount) || $existing->getEffectiveDate()->format('Y-m-d') !== $input->effectiveDate->format('Y-m-d') || $existing->getDueDate()?->format('Y-m-d') !== $input->dueDate?->format('Y-m-d') || $existing->getReason() !== $input->reason) {

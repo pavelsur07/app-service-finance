@@ -34,6 +34,8 @@ final class UpdateCashTransactionAction
      */
     public function __invoke(CashTransaction $tx, CashTransactionDTO $dto): CashTransaction
     {
+        $this->transactions->assertStandaloneTransaction($tx);
+
         $result = $this->entityManager->wrapInTransaction(function () use ($tx, $dto): CashTransaction {
             $this->settlementLifecycle->lock($tx);
 
@@ -52,12 +54,12 @@ final class UpdateCashTransactionAction
             $currency = $this->transactions->resolveCurrencyForAccount($dto->currency, $account);
 
             $currentMoney = \App\Shared\Domain\ValueObject\Money::fromString($tx->getAmount(), $tx->getCurrency());
-            $newMoney = \App\Shared\Domain\ValueObject\Money::fromString($this->transactions->requireAmount($dto), $currency);
+            $amount = $this->transactions->requireAmount($dto);
+            $newMoney = \App\Shared\Domain\ValueObject\Money::fromString($amount, $currency);
             $materialChange = !$currentMoney->equals($newMoney) || $tx->getMoneyAccount()->getId() !== $account->getId() || $tx->getDirection() !== $dto->direction || $tx->getOccurredAt()->format('Y-m-d') !== $dto->occurredAt->format('Y-m-d') || $tx->getCounterparty()?->getId() !== $dto->counterpartyId;
             $this->settlementLifecycle->changing($tx, $materialChange);
 
             // Обновляем поля
-            $amount = $newMoney->toDecimalString();
             $tx->setMoneyAccount($account)
                 ->setDirection($dto->direction)
                 ->setAmount($amount)

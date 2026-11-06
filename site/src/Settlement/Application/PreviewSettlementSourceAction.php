@@ -22,7 +22,7 @@ final readonly class PreviewSettlementSourceAction
     public function __invoke(string $companyId, string $actorUserId, SettlementSourceType $type, string $id): CashSettlementSource|FinanceSettlementSource
     {
         return $this->em->wrapInTransaction(function () use ($companyId, $actorUserId, $type, $id): CashSettlementSource|FinanceSettlementSource {
-            $this->policy->requireWrite($companyId, $actorUserId);
+            $this->policy->requireRead($companyId, $actorUserId);
 
             return match ($type) {
                 SettlementSourceType::CASH => $this->cash->getSettlementSourceForUpdate($companyId, $id),

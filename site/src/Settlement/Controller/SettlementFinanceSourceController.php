@@ -26,12 +26,15 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/settlements/sources/finance/{id}', name: 'settlement_source_finance', methods: ['GET', 'POST'])]
 #[IsGranted('ROLE_USER')]
-#[IsGranted(ModuleAccess::FINANCE_WRITE)]
+#[IsGranted(ModuleAccess::FINANCE_READ)]
 final class SettlementFinanceSourceController extends AbstractController
 {
     public function __invoke(Request $request, string $id, ActiveCompanyService $activeCompany, #[CurrentUser] User $user, SettlementUiQuery $query, PreviewSettlementSourceAction $preview, CreateSettlementFromFinanceAction $include): Response
     {
         $company = $activeCompany->getActiveCompany();
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
         $companyId = (string) $company->getId();
         if (!Uuid::isValid($id)) {
             throw $this->createNotFoundException();

@@ -5047,6 +5047,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.150 | 2026-11-06 | Settlement: independent Money documents, explicit Cash/Finance sources, manual M:N allocation, dated history/reversals, source guards, verify/rebuild and native UI; additive Version20261106183000 (counterparty-settlements, Stages 1–5) |
 | 2.149 | 2026-11-06 | Cash: правило переводов выключается, только когда у компании от 3 разнесённых в статьи операций с фразой перевода — одна случайная (у COMPSHOP одна из 106) больше не отправляет все переводы в ИИ (`CashCategorizationQuery::TRANSFER_LIKE`, задача `ai-routines`, этап 4) |
 | 2.148 | 2026-11-06 | Cash: immutable whole-file description plan, явный выбор, scoped chunk apply/audit/retry, защита description от 1С overwrite (`Version20261106120000`), Twig preview/result (cash-import-description-update) |
 | 2.147 | 2026-11-06 | Cash: «нет ответа» на прошлой версии промпта переспрашивается один раз (`RequestCashAiCategorizationAction::PROMPT_VERSION = categorize_transactions/v3`, `findCandidates(..., $promptVersion)`), сверка версии с ai-service — pytest `test_symfony_prompt_version.py` (задача `ai-routines`, этап 4) |
@@ -5422,8 +5423,8 @@ source drift считаются временными ошибками. `SyncStoc
 ручные документы: OPENING/OBLIGATION; корректировка и отмена — отдельные записи.
 `SettlementDocument`, `SettlementItem`, `SettlementMovement`, `SettlementBook`,
 `SettlementAllocation`, `SettlementSourceLink` принадлежат компании через `string companyId`.
-Последние две сущности пока описывают схему будущих связей; адаптеров ДДС/ОПиУ,
-погашения и пользовательского интерфейса на этом этапе нет.
+Распределения связывают долговые и платёжные позиции M:N; source links защищают
+активные связи с ДДС/ОПиУ. Расчётные документы доступны в `/settlements/documents`.
 
 Все денежные поля — существующий `App\Shared\Domain\ValueObject\Money`,
 ORM Embeddable/MoneyAmountType; signed Money у движения, положительная сумма
@@ -5446,7 +5447,7 @@ SettlementBook FOR UPDATE → позиции по отсортированным
 читает текущую границу через DBAL CompanyRepository, обходя кэш сущности Company;
 потребитель вызывает его под блокировкой company в транзакции мутации.
 
-### Settlement source contracts (Stage2 in progress)
+### Settlement source contracts
 
 `CashFacade::getSettlementSourceForUpdate(string $companyId, string $transactionId): CashSettlementSource`
 requires an active caller transaction; company-scoped DBAL projection locks current Cash row and returns
@@ -5482,7 +5483,7 @@ SettlementSourceExceptionListener отображает SourceInUseException в H
 JSON error.code=settlement_source_in_use для API/Accept JSON. SourceInUseException
 наследует DomainException: существующие HTML source controllers сохраняют форму
 или flash+redirect. Подтверждение импорта 1С ловит business DomainException и
-возвращает к сохранённому предпросмотру. UI Settlement и отчёты ещё не реализованы.
+возвращает к сохранённому предпросмотру.
 
 ### Settlement: погашения, отчёты и восстановление
 
@@ -5502,10 +5503,25 @@ Maintenance Action: CompanyFacade::lockFinancialMaintenance (exclusive company),
 затем Cash в сортировке ID (включая ссылки Finance), Finance, книга.
 FinanceFacade::getSettlementSourceCashIds подготавливает общий порядок;
 optional prelockedCashIds не допускает позднее получение нового Cash вне порядка.
+Проверка и восстановление блокируют и сверяют активные источники: fingerprint,
+фактические Money/контрагента/направление/дату Cash и допустимость Finance.
+Полная сумма основания Finance остаётся независимой от суммы ОПиУ.
 Изменившийся fingerprint активного источника запрещает rebuild. Первичные
 документы, позиции и распределения не переписываются; восстанавливаются только
 движения и source links с активным документом и датой последней отмены.
 Производственный execute требует отдельного именованного одобрения владельца.
+
+`SettlementPostingPolicy::assertBaseDocument` задаёт общие сочетания вида,
+корзины и источника для создания, проведения и независимого воспроизведения.
+OPENING: ручной источник и четыре начальные корзины строго на cutoff;
+OBLIGATION: receivable/payable, ручной либо явный Finance;
+PAYMENT: только Cash и четыре платёжные корзины.
+`paymentBucket` использует фактическое направление Cash и явное подтверждение аванса.
+Воспроизведение проверяет даты/порядок событий, snapshot источника и согласованность
+позиций; ошибочные первичные факты отклоняет без изменения регистра.
+`SettlementMutationPolicy` использует существующий ClockInterface и московскую
+дату. Новая запись требует открытого периода; историческое воспроизведение
+допускает уже закрытый период, сохраняя cutoff и запрет будущих фактов.
 
 ### Settlement HTTP/UI
 

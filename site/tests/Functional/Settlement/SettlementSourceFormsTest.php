@@ -39,6 +39,26 @@ final class SettlementSourceFormsTest extends WebTestCaseBase
         return [$client, $companyId, $party->getId(), (string) $cash->getId(), (string) $finance->getId()];
     }
 
+    public function testLinkedFinanceDeletionReturnsBusinessMessageWithoutDeletingSource(): void
+    {
+        [$client, $company, , , $source] = $this->fixture();
+        $crawler = $client->request('GET', '/settlements/sources/finance/'.$source);
+        $form = $crawler->filter('form[name="settlement_source"]')->form();
+        $form['settlement_source[amount]'] = '120000.00';
+        $client->submit($form);
+        $id = (string) $this->em()->getConnection()->fetchOne('SELECT id FROM settlement_documents WHERE company_id=?', [$company]);
+        $client->request('POST', '/settlements/documents/'.$id.'/post', ['version' => '1', '_token' => $this->csrfToken($client, 'settlement_post'.$id)]);
+        self::assertResponseRedirects();
+        $client->request('POST', '/documents/'.$source.'/delete', ['_token' => $this->csrfToken($client, 'delete'.$source)]);
+        self::assertResponseRedirects();
+        $client->followRedirect();
+        self::assertResponseRedirects();
+        $client->followRedirect();
+        self::assertSelectorTextContains('body', 'Источник участвует во взаиморасчётах');
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM documents WHERE company_id=? AND deleted_at IS NOT NULL', [$company]));
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM settlement_movements WHERE company_id=?', [$company]));
+    }
+
     public function testFinanceSourceNeedsAnExplicitFullAmountAndSeparatePosting(): void
     {
         [$client, $company, , , $source] = $this->fixture();

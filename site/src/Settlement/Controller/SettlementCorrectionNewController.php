@@ -24,12 +24,15 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/settlements/corrections/new', name: 'settlement_correction_new', methods: ['GET', 'POST'])]
 #[IsGranted('ROLE_USER')]
-#[IsGranted(ModuleAccess::FINANCE_WRITE)]
+#[IsGranted(ModuleAccess::FINANCE_READ)]
 final class SettlementCorrectionNewController extends AbstractController
 {
     public function __invoke(Request $request, ActiveCompanyService $activeCompany, #[CurrentUser] User $user, SettlementUiQuery $query, CorrectSettlementItemAction $apply): Response
     {
         $company = $activeCompany->getActiveCompany();
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
         $companyId = (string) $company->getId();
         $book = $query->book($companyId);
         if (null === $book) {

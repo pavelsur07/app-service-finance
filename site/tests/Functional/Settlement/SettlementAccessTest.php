@@ -25,7 +25,7 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 final class SettlementAccessTest extends WebTestCaseBase
 {
-    /** @return array{KernelBrowser,string,string,string,string,string,string} */
+    /** @return array{KernelBrowser,string,string,string,string,string,string,string,string} */
     private function fixture(string $level): array
     {
         $client = self::createClient();
@@ -52,10 +52,18 @@ final class SettlementAccessTest extends WebTestCaseBase
         foreach ([$otherCompany, $otherParty, $foreign, $cash->getMoneyAccount(), $cash] as $entity) {
             $this->em()->persist($entity);
         } $this->em()->flush();
+        $ownedCash = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $ownedCash->setCounterparty($party)->setOccurredAt(new \DateTimeImmutable('2026-11-01'));
+        $finance = (new \App\Finance\Entity\Document(Uuid::uuid7()->toString(), $company))->setCounterparty($party)->setDate(new \DateTimeImmutable('2026-11-01'));
+        $operation = (new \App\Finance\Entity\DocumentOperation())->setDocument($finance)->setAmount('100.00');
+        foreach ([$ownedCash->getMoneyAccount(), $ownedCash, $finance, $operation] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
         $client->loginUser($memberUser);
         $this->setClientSessionValue($client, 'active_company_id', $companyId);
 
-        return [$client, $companyId, $party->getId(), $draft->documentId, (string) $role->getId(), $foreign->getId(), (string) $cash->getId()];
+        return [$client, $companyId, $party->getId(), $draft->documentId, (string) $role->getId(), $foreign->getId(), (string) $cash->getId(), (string) $ownedCash->getId(), (string) $finance->getId()];
     }
 
     public function testReadOnlyMemberCanViewButCannotMutate(): void
@@ -68,11 +76,26 @@ final class SettlementAccessTest extends WebTestCaseBase
         self::assertSelectorNotExists('form[action$="/post"]');
         foreach (['/settlements/setup', '/settlements/documents/new', '/settlements/allocations/new', '/settlements/corrections/new', '/settlements/documents/'.$document.'/reverse'] as $path) {
             $client->request('GET', $path);
+            self::assertResponseIsSuccessful();
+            $client->request('POST', $path);
             self::assertResponseStatusCodeSame(403);
         }
         $client->request('POST', '/settlements/documents/'.$document.'/post', ['version' => '1']);
         self::assertResponseStatusCodeSame(403);
         self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM settlement_movements WHERE company_id=?', [$companyId]));
+    }
+
+    public function testReaderCanPreviewOwnedSourcesButCannotIncludeThem(): void
+    {
+        [$client, $companyId, , , , , , $cashId, $financeId] = $this->fixture('read');
+        foreach (['cash' => $cashId, 'finance' => $financeId] as $type => $id) {
+            $path = '/settlements/sources/'.$type.'/'.$id;
+            $client->request('GET', $path);
+            self::assertResponseIsSuccessful();
+            $client->request('POST', $path);
+            self::assertResponseStatusCodeSame(403);
+        }
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM settlement_source_links WHERE company_id=?', [$companyId]));
     }
 
     public function testNoFinanceAccessDeniesReading(): void

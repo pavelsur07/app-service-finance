@@ -252,7 +252,7 @@ final class SettlementAllocationTest extends IntegrationTestCase
             self::fail('Invalid primary allocation must not be repaired into the journal.');
         } catch (\DomainException $exception) {
             self::assertSame(match ($case) {
-                'direction' => 'Недопустимое распределение оплаты.', 'reversal' => 'Первичная отмена не согласована с исходным событием.', default => 'Первичный документ и позиция не согласованы.'
+                'direction' => 'Недопустимое распределение оплаты.', 'reversal' => 'Первичная отмена не согласована с исходным событием.', default => 'Первичный документ и позиция не согласованы.',
             }, $exception->getMessage());
             self::assertSame($debtBefore, $this->balance('payable'));
             self::assertSame($receivableBefore, $this->balance('receivable'));

@@ -23,12 +23,15 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/settlements/payments/{id}/classify', name: 'settlement_payment_classify', requirements: ['id' => Requirement::UUID], methods: ['GET', 'POST'])]
 #[IsGranted('ROLE_USER')]
-#[IsGranted(ModuleAccess::FINANCE_WRITE)]
+#[IsGranted(ModuleAccess::FINANCE_READ)]
 final class SettlementPaymentClassifyController extends AbstractController
 {
     public function __invoke(Request $request, string $id, ActiveCompanyService $activeCompany, #[CurrentUser] User $user, SettlementUiQuery $query, ClassifySettlementPaymentAction $classify): Response
     {
         $company = $activeCompany->getActiveCompany();
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
         $companyId = (string) $company->getId();
         $book = $query->book($companyId);
         $item = $query->item($companyId, $id) ?? throw $this->createNotFoundException('Оплата не найдена.');

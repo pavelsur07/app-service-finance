@@ -14,7 +14,7 @@ final readonly class SettlementRegisterProjection
      * @param list<SettlementSourceLink> $links
      * @param array<string,SettlementDocument> $activeSources
      */
-    public function __construct(public array $movements, public array $links, public array $activeSources)
+    public function __construct(public array $movements, public array $links, public array $activeSources, public \DateTimeImmutable $startDate)
     {
     }
 }

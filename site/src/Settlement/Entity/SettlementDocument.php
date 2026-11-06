@@ -159,7 +159,7 @@ class SettlementDocument
         return $this->version;
     }
 
-    #[ORM\Column(type: Types::BIGINT, nullable: true)]
+    #[ORM\Column(type: \App\Shared\Infrastructure\Doctrine\MoneyAmountType::NAME, nullable: true)]
     private ?int $eventSequence = null;
 
     public function getEventSequence(): ?int

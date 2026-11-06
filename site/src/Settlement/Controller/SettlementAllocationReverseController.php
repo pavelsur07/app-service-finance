@@ -23,12 +23,15 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/settlements/allocations/{id}/reverse', name: 'settlement_allocation_reverse', requirements: ['id' => Requirement::UUID], methods: ['GET', 'POST'])]
 #[IsGranted('ROLE_USER')]
-#[IsGranted(ModuleAccess::FINANCE_WRITE)]
+#[IsGranted(ModuleAccess::FINANCE_READ)]
 final class SettlementAllocationReverseController extends AbstractController
 {
     public function __invoke(Request $request, string $id, ActiveCompanyService $activeCompany, #[CurrentUser] User $user, SettlementUiQuery $query, ReverseSettlementAllocationAction $reverse): Response
     {
         $company = $activeCompany->getActiveCompany();
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
         $companyId = (string) $company->getId();
         $book = $query->book($companyId);
         $allocation = $query->allocation($companyId, $id) ?? throw $this->createNotFoundException('Распределение не найдено.');

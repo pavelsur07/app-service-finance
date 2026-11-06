@@ -64,7 +64,7 @@ class SettlementBook
     {
         $this->initialized = true;
     }
-    #[ORM\Column(type: Types::BIGINT)]
+    #[ORM\Column(type: \App\Shared\Infrastructure\Doctrine\MoneyAmountType::NAME)]
     private int $nextEventSequence = 1;
 
     public function takeEventSequence(): int

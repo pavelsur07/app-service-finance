@@ -1,65 +1,51 @@
 # Current checkpoint
 
-**Phase:** Stage4 CLOSED / Stage5 next
-**Status:** commit/push Stage4 then Stage5
-**Task base commit:** 4fdad15c974830d13ff9342d1f40a526f3b5bd33
-**Stage base commit:** a3b1ba860
-**Branch:** feat/counterparty-settlements
-**Worktree:** /home/deploy/.codex/worktrees/3821/app-service-finance
-**Draft PR:** https://github.com/pavelsur07/app-service-finance/pull/2901 (base master verified)
+**Phase:** Stage 5 / Work item 5.2 — full gates and final review
+**Status:** checking / reviewing
+**Task base commit:** `4fdad15c974830d13ff9342d1f40a526f3b5bd33`
+**Stage base commit:** `89ec6ea49`
+**Branch:** `feat/counterparty-settlements`
+**Worktree:** `/home/deploy/.codex/worktrees/3821/app-service-finance`
+**PR:** https://github.com/pavelsur07/app-service-finance/pull/2901 (Draft, master base verified)
 
 ## Exact next action
-1. Stage4 external REVIEW_GREEN (one round); all3MINOR fixed, actual3red→green17assertions.
-2. Final targeted PASS144/725; focused PHPStan/CS and Twig21PASS. Browser refresh10screens PASS, results copied; commit/push/update PR.
-3. Continue Stage5 automatically: frozen-date acceptance, P01–P24, existing-data migration check, full gates once, fresh final reviews, handoff/Ready.
+
+1. Full first complete suite8400/47261 ended1E/4F, all4root causes identified and fixed: transfer preflight/closedEM (incl bulk), legacy exact DTO31 representation, GET READ+POST WRITE mixed route contract, bigint int mapping via existing MoneyAmountType. New previewREAD mismatch found in fixreview also fixed, testRED403→green. Flaky split identity test now compares unordered exactIDsets (refresh changescollectionorder, neverIDs).
+2. Final external1round B0/I1/MINOR2: linkedFinanceHTMLdelete500 fixed, newtestactual /documents/{id}/delete RED500→green; partyindex added migration+schema extension. N guardqueries on companymaintenance recorded FOLLOW-UP because source-ownedbatch contract needed; no crossmoduleSQL shortcut. Result fixed without re-run perpolicy. Fresh bounded review noopenB/I.
+3. Targeted allfailedgates+module+legacy source191/942 PASS. Focused34PHPfiles CS fixes1format-only; final fresh307migration36statements and existing306→307 snapshotproof PASS on fresh_final/migration_final DBs. FinalSchemaInSync running (correctpath tests/Integration/Shared/Doctrine/...), prior typo command failedfile-notfound, no application failure.
+4. Commit current task checkpoint, merge origin/master (407ec649c) into FEATURE branch, retainboth services_test.yaml additions (onlyconflict). Then full finalgates on mergedtree. Protect alltaskchanges; nofeature→mastermerge. Finalize docs/commit/push/PRReady and single namedmigration+deploy approval.
 
 No merge, production migration or deploy approval requested/received. Do not merge.
 
 ## Completed Stages
-- Stage1 CLOSED66e666657: primary documents/book/items/journal, Money, opening/corrections/reversals, scoped FKs/idempotency and event sequence. PASS27/103. Internal B0/I4fixed; external1round B0/I1/MINOR3fixed, fixed without re-run. See stage-1.md.
-- Stage2 CLOSED81ba2ffa5: explicit Cash payment + Finance draft source, fingerprints, all material source mutation guards including1C atomic overwrite and raw commands. Targeted119/608 PASS; focusedCS/PHPStan PASS. Internal B0/I5fixed; external1round B0/I2/MINOR3fixed, fixed without re-run. Source write inventory complete, real PG lock/lease races tested. See stage-2.md.
-- Stage3 CLOSEDa3b1ba860: M:N allocations/classification/reversal, exact historical report/card DTO/Facade, independent primary projection/verify/rebuild. PASS87/441; focused41PHPfiles PHPStan/CS PASS. Internal B0/I1/MINOR2fixed, bounded rereview B0/I0. External1round REVIEW_GREEN B0/I0/MINOR4:3fixed, guard-removal suggestion technically rejected (authorization before allocation lookup remains distinct from inner fresh write lock). See stage-3.md.
 
-## Stage4 implemented, uncommitted
-- New UI: setup/cutoff, summary/card, separate Documents list/detail/post, manual opening/obligation, Cash include, explicit full-amount Finance draft, allocation/correction/classification and dated cancellation forms. Existing sidebar/source/counterparty links. ModuleAccessMap FINANCE, company scope/CSRF/requestId/version.
-- Strict RUB form rejects excess precision BEFORE Money::fromString; exact DS rendering. Form constraints reject blank choices/date/IDs; false bool allowed.
-- Card movement report is paginated; optional unbounded current-position table removed. Form balance preview50 labelled rows, full scoped choices retained; linked full paginated Documents and per-document free balance/classification.
-- Allocation HTTP retry retains only matching submitted IDs among scoped positions so an exhausted payment can reach Action replay.
-- Document list cancellations loaded in one batch; detail links both allocation sides.
-- Current targeted Settlement+affected legacy view set PASS142/719 (/tmp/vf-settlement-stage4-final.log). Focused changed33PHPfiles PHPStan/CS PASS; final review-fix forms/controllers/tests PHPStan PASS. Twig21files PASS.
-- Fresh internal Stage4 reviewer /root/review_settlement_stage4: B0/I3/MINOR1, all fixed and bounded rereview no open findings. I1 null fields500 HTTP red4cases→green; I2 old setup tab configured switched company, company-bound CSRF red→green1/2; I3 many invoices rendered242rows, bounded read/UI red→green1/8. MINOR identical allocation POST red422→green Journey1/26, exactly1allocation.
+- Stage1 CLOSED `66e666657`: primary documents/book/items/journal, Money, openings/corrections/reversals, company FKs/idempotency/sequence. PASS27/103. Internal B0/I4 fixed; external1 round B0/I1/MINOR3 fixed without re-run.
+- Stage2 CLOSED `81ba2ffa5`: explicit Cash/Finance sources and complete material source mutation guards, atomic 1C overwrite, real locks/leases. PASS119/608. Internal B0/I5 fixed; external1 round B0/I2/MINOR3 fixed without re-run. Inventory: source-write-paths.md.
+- Stage3 CLOSED `a3b1ba860`: M:N/manual classification, historical report/card Money DTO, independent verification/rebuild. PASS87/441; focused41 files CS/PHPStan PASS. Internal B0/I1/MINOR2 fixed; external1 round REVIEW_GREEN B0/I0/MINOR4, three fixed, one guard-removal suggestion rejected with authorization rationale.
+- Stage4 CLOSED `89ec6ea49`, pushed: complete native Twig UI, Documents list/detail, source forms, company/CSRF/access, bounded previews, exact Money. Final targeted144/725 PASS, focused33 files PHPStan/CS PASS, Twig21 PASS. Internal B0/I3/MINOR1 fixed; external1 round REVIEW_GREEN B0/I0/MINOR3 fixed/verified. Offline browser smoke5 pages×2 sizes PASS.
 
-## UI evidence / rulings
-- Browser: cached Playwright1.56.1 image/package, no dependency added.5 synthetic rendered HTML pages x1440/390=10screens, no page horizontal overflow/unlabelled controls/JS errors; keyboard focus visible. HTML fixture transaction rolled back. Artifacts site/var/settlement-smoke/, results.json. Offline DS CSS smoke, business requests tested via BrowserKit.
-- App layer lacks Tabler-specific legacy picker assets. Existing CounterpartyPickerType (browse=true) retains company-scoped validation; local theme uses kit-styled native choice widget. TODO(ds) enhanced app adapter is follow-up; no copied legacy CSS/JS/new JS arithmetic.
-- Legacy external IDs follow existing Ramsey validation instead of stricter RFC-variant route regex; malformed/foreign IDs404. Internal event IDs use UUID route requirements.
-- Reversal/classification routes GET+POST to collect explicit date/reason; mutation Actions unchanged.
-- Stage4 risk HIGH-LOCAL (financial HTTP mutations/access map), correcting lower plan MEDIUM; >500lines requires one external round. No owner gate between Stages.
-- Closed-date drafts are permitted; posting is restricted. One test initially asserted the wrong draft rule, corrected to posting without changing financial semantics.
-- Owner asked about tests/Architecture: folder pre-exists task (cf1ef467c,2026-08-30, technical author deploy), no task edits there so far. Explained approval history cannot be inferred from Git.
+## Stage5 Work item5.1 completed
 
-## Environment / checks
-- Running local vf-settlements-php mounts THIS worktree site at/app and original vendor read-only. Original checkout has unrelated owner artifacts, untouched. Composer lock matches reused vendor checkout; no new deps.
-- /tmp/vf-settlement-check.py silently reads tracked .env.test local URL, redirects DB to vf_settlements_test; optional VF_SETTLEMENT_TEST_DATABASE for isolated DB. No production env copied or accessed.
-- vf_settlements_test all306base+Version20261106183000 applied; second fresh vf_settlements_fresh_test all307 applied and schema test1/4 PASS. Migration additive6tables, down abort preserves financial records.
-- Full gates have NOT run yet (only at handoffStage5). Make targets use DOCKER_COMPOSE override; prepare task-local wrapper to execute same commands in running container without vendor writes. Composer lock verified identical.
-- Schema validate includes missing test_money_holder fixture; actual SchemaInSyncWithMigrationsTest excludes App\Tests metadata, so do NOT create that table permanently. Its own mapping test creates/drops it.
-- CS config .php-cs-fixer.php (not dist); format exact task files, never whole Cash/Finance modules.
-- Baseline original Cash allocation7/15, Finance create-from-Cash11/49 PASS. No production commands.
+- Fixed-date AcceptanceTest covers exact A1–A10, existing concurrency owns A11. MockClock before EM/listeners, Moscow today 10.11.2026, cutoff01.11.2026. Existing ClockInterface injected into MutationPolicy after correct RED of Nov8 reversal; SystemClock production semantics unchanged.
+- P01–P24 passed and mapped to owning tests in acceptance.md. Module final PASS153 tests/719 assertions, `/tmp/vf-settlement-stage5-module.log`; focused changed10 files CS/PHPStan PASS.
+- Independent replay accepted consistently corrupted base document+item before fix (8 tests proved RED). Shared PostingPolicy checks legal kind/bucket/source; history cutoff/today/sequence/source snapshots checked. Verify/rebuild validate locked active Cash Money/party/direction/date and Finance usability/party. Closed historical periods remain replayable; refusal preserves journal/links. Acceptance21/107 PASS before final extra projection checks; final153/719 includes all changes.
+- One-line Settlement registry entry in existing tests/Architecture/ModuleBoundaryRules.php; no new test directory/framework. Owner was told folder predates task at cf1ef467c,2026-08-30, technical author deploy; Git cannot establish approval history.
+- Additive migration proof: fresh DB all307 + schema1/4 PASS. Third isolated DB migrated306, seeded1Cash40000.00 +1Finance/operation100000.00, applied307; material source snapshot unchanged, all6 new tables empty. Log `/tmp/vf-settlement-existing-migration.log`.
 
-## Important contracts
-- Source lock order: company → sorted Cash (including Finance linkedCash) → Finance → book → sorted items. Maintenance exclusive company lock, active source fingerprint checks, then book; no primary modifications.
-- Persistent eventSequence under book lock; no UUID event ordering. Bucket history validated at every event. Manual PAYMENT correction forbidden; actual source Cash remains authoritative.
-- Policy allocation capacity takes actual Money availability, not original amounts. ALLOCATION event kind explicit. If payment spans advance+unallocated, require explicit classification; no automatic priority.
-- Reports require from>=cutoff; opening excluded from turnover, six buckets separate, dueDate strict <to, absent due date separate. One SQL snapshot page/totals/card; labels batch including archived. SUM checked beforeintcast. Real EXPLAIN10000movement fixture42.728ms, report-explain.json/performance.md.
-- Existing Money overflow limitations must not be bypassed via local money helpers. All new monetary arithmetic uses shared Money.
+## Full gates / environment
 
-## Stage5 preparation read (not implemented yet)
-- release.md read: final approval must name Version20261106183000 and separate production migration+deploy; reply template run the migration and deploy #2901.
-- Acceptance fixed Nov6/7/8 dates require injecting existing ClockInterface into SettlementMutationPolicy (System clock default behavior unchanged), then MockClock in acceptance test. Existing Billing tests show container replacement pattern. Record ruling/test proof.
-- Existing migration immediately before307 is Version20261106120000. For P18 use isolated local third DB, migrate through306, seed existing Cash/Finance, apply307, compare exact snapshots and zero auto settlement docs.
+- Initial full Make attempt stopped at PHPStan: only3 obsolete unmatched ignore entries for task-fixed methods, no real code errors. Removed those3 baseline entries, no regeneration/growth. Initial attempt did not reach CS/unit/full tests.
+- Current full command: `make -o site-composer-install DOCKER_COMPOSE=/tmp/vf-settlement-compose site-stan site-cs-check site-cs-strict-types site-test-unit site-test`.
+- Wrapper executes Make CLI recipes in existing vf-settlements-php, this worktree mounted /app, original vendor read-only; composer.lock SHA256 matches original vendor checkout. Only reinstall skipped with -o, all cache/DB/migration/test prerequisites run.
+- Helper `/tmp/vf-settlement-check.py` silently picks isolated local DB vf_settlements_test; override VF_SETTLEMENT_TEST_DATABASE for fresh/migration DBs. No production config/data, no new dependencies.
+- Missing test_money_holder is expected: SchemaInSyncWithMigrationsTest excludes App\Tests metadata; Money mapping test owns create/drop fixture. Do not create it permanently.
+- Exact CS paths/config .php-cs-fixer.php, never format whole legacy modules. Original owner checkout/branch/unrelated artifacts untouched.
 
-## Stage4 closure
-- External1round REVIEW_GREEN B0/I0/MINOR3 all fixed and verified. No re-run required.
-- Final targeted144/725 PASS; final focused PHPStan/CS PASS; Twig21PASS. Stage4 Report DONE.
-- New classification guard checks four payment buckets, preserving opening advances as allowed by existing Action; no kind-based financial restriction invented.
+## Important contracts / limitations
+
+- Source lock order company→sorted Cash (including Finance links)→Finance→book→sorted items; maintenance exclusive company. No live external side effects.
+- Event order effectiveDate,eventSequence, never UUID. All future historical intervals/buckets validated. PAYMENT correction forbidden; source Cash is authoritative for money.
+- Separate six buckets, no netting. Full Finance obligation independent P&L. RUB only; shared Money, exact strings; overflow limitations of shared Money remain.
+- Report one SQL snapshot, batch labels including archived, cutoff, strict due<to, bounded pagination. EXPLAIN10k fixture42.728ms, not production SLA.
+- UI native company-scoped CounterpartyPicker choice via kit theme. TODO(ds): enhanced app adapter; no legacy Tabler assets copied. No JS/assets/dependency changes.
+- release.md read: Version20261106183000 adds6 tables, no existing data transform; down aborts to preserve records. Final reply template `run the migration and deploy #2901`. Code rollback leaves additive tables.

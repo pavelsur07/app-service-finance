@@ -18,7 +18,7 @@ use Ramsey\Uuid\Uuid;
 /** CLI maintenance boundary. Production execution requires separate named owner approval. */
 final readonly class ReconcileSettlementRegisterAction
 {
-    public function __construct(private EntityManagerInterface $em, private CompanyFacade $companies, private CashFacade $cash, private FinanceFacade $finance, private SettlementRepository $repository, private SettlementRegisterProjectionQuery $projection)
+    public function __construct(private EntityManagerInterface $em, private CompanyFacade $companies, private CashFacade $cash, private FinanceFacade $finance, private SettlementRepository $repository, private SettlementRegisterProjectionQuery $projection, private \App\Settlement\Domain\SettlementPostingPolicy $posting, private \App\Settlement\Domain\SettlementFinanceSourcePolicy $financePolicy)
     {
     }
 
@@ -28,9 +28,7 @@ final readonly class ReconcileSettlementRegisterAction
             $this->companies->lockFinancialMaintenance($companyId);
             // Company lock freezes the set of settlement primary facts. Sources always precede book.
             $expected = $this->projection->project($companyId);
-            if ($execute) {
-                $this->lockAndValidateSources($companyId, $expected);
-            }
+            $this->lockAndValidateSources($companyId, $expected);
             $this->repository->getBookForUpdate($companyId);
             $db = $this->em->getConnection();
             $expectedRows = [];
@@ -96,15 +94,30 @@ final readonly class ReconcileSettlementRegisterAction
         sort($cashIds);
         sort($financeIds);
         $fingerprints = [];
+        $cashSources = [];
+        $financeSources = [];
         foreach ($cashIds as $id) {
-            $fingerprints['cash:'.$id] = $this->cash->getSettlementSourceForUpdate($companyId, $id)->fingerprint;
+            $cashSources[$id] = $this->cash->getSettlementSourceForUpdate($companyId, $id);
+            $fingerprints['cash:'.$id] = $cashSources[$id]->fingerprint;
         }
         foreach ($financeIds as $id) {
-            $fingerprints['finance:'.$id] = $this->finance->getSettlementSourceForUpdate($companyId, $id, $cashIds)->fingerprint;
+            $financeSources[$id] = $this->finance->getSettlementSourceForUpdate($companyId, $id, $cashIds);
+            $this->financePolicy->assertUsable($financeSources[$id]);
+            $fingerprints['finance:'.$id] = $financeSources[$id]->fingerprint;
         }
         foreach ($expected->activeSources as $key => $doc) {
             if (($doc->getSourceSnapshot()['fingerprint'] ?? null) !== ($fingerprints[$key] ?? null)) {
                 throw new \DomainException('Активный источник изменён: требуется разбор первичных документов.');
+            }
+            $id = $doc->getSourceId();
+            if (SettlementSourceType::CASH === $doc->getSourceType()) {
+                $source = $cashSources[$id] ?? throw new \DomainException('Источник оплаты отсутствует.');
+                $advance = $doc->getSourceSnapshot()['isAdvance'] ?? null;
+                if (!is_bool($advance) || $source->deleted || $source->isTransfer || !$source->amount->equals($doc->getAmount()) || $source->counterpartyId !== $doc->getCounterpartyId() || $this->posting->paymentBucket($source->direction, $advance) !== $doc->getBucket() || $source->occurredAt->format('Y-m-d') < $expected->startDate->format('Y-m-d') || ($doc->getSourceSnapshot()['occurredAt'] ?? null) !== $source->occurredAt->format('Y-m-d')) {
+                    throw new \DomainException('Первичная оплата не соответствует фактической транзакции ДДС.');
+                }
+            } elseif (($financeSources[$id] ?? null)?->counterpartyId !== $doc->getCounterpartyId()) {
+                throw new \DomainException('Первичное основание не соответствует контрагенту ОПиУ.');
             }
         }
     }

@@ -10,10 +10,12 @@
 
 **Spec:** [TASK.md](TASK.md), включая решения D1–D7 и примеры A1–A11.
 
-**Status:** Проект плана от 2026-11-06. Ни один этап реализации не выполнен.
+**Status:** Stage 1–4 завершены; Stage 5: приёмка P01–P24 пройдена, общие gates
+и итоговое независимое review выполняются. Текущее состояние — [checkpoint.md](checkpoint.md).
 **Repository inspection base:** `4fdad15c974830d13ff9342d1f40a526f3b5bd33` (`origin/master`).
 **Planning baseline:** `git diff --check` — exit 0, документационные изменения.
-PHP/DB/frontend baseline не запускался: текущая задача создаёт только план.
+Исходный planning baseline был документационным. Baseline реализации и результаты
+проверок зафиксированы в Stage Reports; сводная приёмка — [acceptance.md](acceptance.md).
 
 ## Global Constraints
 
@@ -562,22 +564,22 @@ Risk: HIGH-LOCAL. Definition of Done: матрица ниже подтвержд
 **Files:** `site/tests/Integration/Settlement/SettlementAcceptanceTest.php`;
 `docs/tasks/counterparty-settlements/acceptance.md`, `handoff.md`, `checkpoint.md`.
 
-- [ ] Создать изолированный acceptance dataset для A1–A11; даты задавать явно,
+- [x] Создать изолированный acceptance dataset для A1–A11; даты задавать явно,
   не привязывать сценарий к реальному today; startDate=2026-11-01.
-- [ ] Добавить тесты matrix P01–P21, если ещё не покрыты owning tests. Не дублировать
+- [x] Добавить тесты matrix P01–P21, если ещё не покрыты owning tests. Не дублировать
   реализацию в assertions: сравнивать наблюдаемые суммы, строки, HTTP и число записей.
-- [ ] Выполнить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/SettlementAcceptanceTest.php`.
-- [ ] Заполнить acceptance.md: ID, фактический результат, команда/тест, commit.
-  Чекбокс становится [x] только после фактического PASS; сейчас все остаются [ ].
+- [x] Выполнить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/SettlementAcceptanceTest.php`.
+- [x] Заполнить acceptance.md: ID, фактический результат, команда/тест, commit.
+  Чекбокс становится [x] только после фактического PASS.
 
 ### Work item 5.2 — полные gates, review, релизная готовность
 
 - [ ] Один раз на handoff выполнить `make site-stan`, `make site-cs-check`,
   `make site-cs-strict-types`, `make site-test-unit`, `make site-test`.
   Для изменённых assets — действующие frontend gates. Записать реальные outputs.
-- [ ] Проверить миграцию на пустой test DB и на копии локальной тестовой схемы
+- [x] Проверить миграцию на пустой test DB и на копии локальной тестовой схемы
   с существующими документами: их количества/суммы не изменились, связи не создались.
-- [ ] Final internal review в свежей сессии: только TASK.md, полный task diff,
+- [x] Final internal review в свежей сессии: только TASK.md, полный task diff,
   backend/frontend checklist. Исправить BLOCKER/IMPORTANT и безопасные MINOR.
 - [ ] Прочитать external-review.md и выполнить обязательный read-only review
   `site/bin/external-review.sh <task_base_commit> --effort medium`; следовать
@@ -594,30 +596,30 @@ Commit: `test: verify settlement acceptance and release readiness`.
 
 | Done | ID | Проверка | Ожидаемый результат | Где доказать |
 |---|---|---|---|---|
-| [ ] | P01 | Начальный долг 25000, оборотов нет | Opening=closing=25000, обороты=0 | Lifecycle + ReportQuery |
-| [ ] | P02 | A1: 100000 − 40000 | Долг 60000; нераспределено 0 | Allocation |
-| [ ] | P03 | A2: аванс 40000 → акт 100000 → доплата 60000 | Аванс 0, долг 0 | Allocation + Journey |
-| [ ] | P04 | A3: покупатель 120000 − 30000 − 50000 | Дебиторка 40000 | Allocation |
-| [ ] | P05 | A4: один платёж на два документа | Остаток второго 10000, перерасход запрещён | Allocation |
-| [ ] | P06 | A5: отмена распределения 07.11 | История 06.11 не изменилась; деньги не вернулись | ReportQuery |
-| [ ] | P07 | A6: встречные долги 30000 и 50000 | Две отдельные суммы без зачёта | ReportQuery |
-| [ ] | P08 | A7: оплата основания из ОПиУ | ОПиУ не изменён, нового расхода/дохода нет | FinanceSource + Allocation |
-| [ ] | P09 | A8: полная сумма отличается от ОПиУ | Долг 120000, ОПиУ 100000 | FinanceSource |
-| [ ] | P10 | Неидентифицированный платёж | Отдельная корзина, не автоматический аванс | CashSource + ReportQuery |
-| [ ] | P11 | Повтор запроса / конфликт payload | Тот же ID / отказ без новых движений | Lifecycle + Allocation |
-| [ ] | P12 | Два распределения по 30000 из 40000 | Одно успешно, остаток 10000 | Concurrency |
-| [ ] | P13 | Чужая компания / read-only / отозванное право | Отказ, чужие данные не раскрыты | Access + Lifecycle |
-| [ ] | P14 | Изменение/удаление источника через bulk/import | Атомарный отказ при активной связи | SourceMutationGuard |
-| [ ] | P15 | Закрытая дата / будущая дата / до старта | Проведение запрещено | Lifecycle + Validation |
-| [ ] | P16 | Срок 05.11; отчёт 05.11/06.11; нет срока | 0/положительная просрочка; без срока отдельно | ReportQuery |
-| [ ] | P17 | Порча производного регистра + rebuild | Verify обнаружил; rebuild вернул все historical totals | Verification |
-| [ ] | P18 | Миграция при существующих Cash/Finance | Исходные данные неизменны, старые связи не мигрированы | Schema + acceptance protocol |
-| [ ] | P19 | A9: распределение/коррекция/классификация/отмена задним числом | Ни один промежуточный остаток не отрицателен; иначе rollback | Lifecycle + Allocation + ReportQuery |
-| [ ] | P20 | A10: повторное включение Cash после отмены | На 06/07/08.11 учтено 40000/0/40000, один Cash | CashSource + ReportQuery |
-| [ ] | P21 | A11: две отмены с разными requestId | Один reversal ID и один эффект, в том числе конкурентно | Lifecycle + Concurrency |
-| [ ] | P22 | Money во всех денежных контрактах и новых Entity; 0.10 + 0.20; распределение 0.31 из 0.30 | Единственный общий Money; итог 0.30; перерасход и смешение валют запрещены | PostingPolicy + Schema + review контрактов |
-| [ ] | P23 | Формы/сериализация 0.01 и 0.30; ввод 0.001 RUB и суммы вне диапазона | Точные строки с валютой; невалидный ввод отклонён без записи и скрытого округления | Validation + Journey |
-| [ ] | P24 | SQL SUM 0.10 + 0.20; агрегат вне диапазона | Money 0.30; проверка диапазона до int-cast, без float/усечения | ReportQuery |
+| [x] | P01 | Начальный долг 25000, оборотов нет | Opening=closing=25000, обороты=0 | Lifecycle + ReportQuery |
+| [x] | P02 | A1: 100000 − 40000 | Долг 60000; нераспределено 0 | Allocation |
+| [x] | P03 | A2: аванс 40000 → акт 100000 → доплата 60000 | Аванс 0, долг 0 | Allocation + Journey |
+| [x] | P04 | A3: покупатель 120000 − 30000 − 50000 | Дебиторка 40000 | Allocation |
+| [x] | P05 | A4: один платёж на два документа | Остаток второго 10000, перерасход запрещён | Allocation |
+| [x] | P06 | A5: отмена распределения 07.11 | История 06.11 не изменилась; деньги не вернулись | ReportQuery |
+| [x] | P07 | A6: встречные долги 30000 и 50000 | Две отдельные суммы без зачёта | ReportQuery |
+| [x] | P08 | A7: оплата основания из ОПиУ | ОПиУ не изменён, нового расхода/дохода нет | FinanceSource + Allocation |
+| [x] | P09 | A8: полная сумма отличается от ОПиУ | Долг 120000, ОПиУ 100000 | FinanceSource |
+| [x] | P10 | Неидентифицированный платёж | Отдельная корзина, не автоматический аванс | CashSource + ReportQuery |
+| [x] | P11 | Повтор запроса / конфликт payload | Тот же ID / отказ без новых движений | Lifecycle + Allocation |
+| [x] | P12 | Два распределения по 30000 из 40000 | Одно успешно, остаток 10000 | Concurrency |
+| [x] | P13 | Чужая компания / read-only / отозванное право | Отказ, чужие данные не раскрыты | Access + Lifecycle |
+| [x] | P14 | Изменение/удаление источника через bulk/import | Атомарный отказ при активной связи | SourceMutationGuard |
+| [x] | P15 | Закрытая дата / будущая дата / до старта | Проведение запрещено | Lifecycle + Validation |
+| [x] | P16 | Срок 05.11; отчёт 05.11/06.11; нет срока | 0/положительная просрочка; без срока отдельно | ReportQuery |
+| [x] | P17 | Порча производного регистра + rebuild | Verify обнаружил; rebuild вернул все historical totals | Verification |
+| [x] | P18 | Миграция при существующих Cash/Finance | Исходные данные неизменны, старые связи не мигрированы | Schema + acceptance protocol |
+| [x] | P19 | A9: распределение/коррекция/классификация/отмена задним числом | Ни один промежуточный остаток не отрицателен; иначе rollback | Lifecycle + Allocation + ReportQuery |
+| [x] | P20 | A10: повторное включение Cash после отмены | На 06/07/08.11 учтено 40000/0/40000, один Cash | CashSource + ReportQuery |
+| [x] | P21 | A11: две отмены с разными requestId | Один reversal ID и один эффект, в том числе конкурентно | Lifecycle + Concurrency |
+| [x] | P22 | Money во всех денежных контрактах и новых Entity; 0.10 + 0.20; распределение 0.31 из 0.30 | Единственный общий Money; итог 0.30; перерасход и смешение валют запрещены | PostingPolicy + Schema + review контрактов |
+| [x] | P23 | Формы/сериализация 0.01 и 0.30; ввод 0.001 RUB и суммы вне диапазона | Точные строки с валютой; невалидный ввод отклонён без записи и скрытого округления | Validation + Journey |
+| [x] | P24 | SQL SUM 0.10 + 0.20; агрегат вне диапазона | Money 0.30; проверка диапазона до int-cast, без float/усечения | ReportQuery |
 
 ## Контроль готовности самого плана
 

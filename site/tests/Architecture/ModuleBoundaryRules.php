@@ -36,6 +36,7 @@ final class ModuleBoundaryRules
         'Marketplace',
         'MarketplaceAds',
         'MarketplaceAnalytics',
+        'Settlement',
     ];
 
     /**
