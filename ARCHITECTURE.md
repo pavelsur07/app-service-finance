@@ -5415,3 +5415,30 @@ source drift считаются временными ошибками. `SyncStoc
 подключений текущей страницы; отдельный batch-запрос выбирает только последний
 `completed` снимок и считает его строки. Более новый `building` или `failed`
 снимок не скрывает предыдущий опубликованный.
+
+## Settlement: ядро взаиморасчётов
+
+`Settlement` хранит независимые основания расчётов по контрагентам. Проводимые
+ручные документы: OPENING/OBLIGATION; корректировка и отмена — отдельные записи.
+`SettlementDocument`, `SettlementItem`, `SettlementMovement`, `SettlementBook`,
+`SettlementAllocation`, `SettlementSourceLink` принадлежат компании через `string companyId`.
+Последние две сущности пока описывают схему будущих связей; адаптеров ДДС/ОПиУ,
+погашения и пользовательского интерфейса на этом этапе нет.
+
+Все денежные поля — существующий `App\Shared\Domain\ValueObject\Money`,
+ORM Embeddable/MoneyAmountType; signed Money у движения, положительная сумма
+у документа/позиции. Остатки не редактируются отдельно.
+
+Actions ConfigureSettlementBook/CreateSettlementDocument/PostSettlementDocument/
+CorrectSettlementItem/ReverseSettlementDocument владеют `wrapInTransaction`.
+SettlementRepository и SettlementRegisterUpdater не вызывают flush/commit.
+Порядок блокировок: Company financialAccess(..., lock: true) FOR SHARE →
+SettlementBook FOR UPDATE → позиции по отсортированным ID; для первоначального
+создания книги — advisory lock settlement:companyId после company lock.
+Проведённые документы неизменяемы; повтор по requestId возвращает исходный результат,
+повтор отмены исходного документа с новым requestId возвращает существующую отмену.
+Коррекции/отмены проверяют неотрицательность всей последующей истории позиции.
+
+`CompanyFacade::getFinanceLockBefore(string $companyId): ?DateTimeImmutable`
+читает текущую границу через DBAL CompanyRepository, обходя кэш сущности Company;
+потребитель вызывает его под блокировкой company в транзакции мутации.

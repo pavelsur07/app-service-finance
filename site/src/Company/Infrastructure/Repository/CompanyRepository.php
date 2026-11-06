@@ -115,6 +115,13 @@ class CompanyRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    public function getFinanceLockBefore(string $companyId): ?\DateTimeImmutable
+    {
+        $value = $this->connection->fetchOne('SELECT finance_lock_before FROM companies WHERE id = ?', [$companyId]);
+
+        return false === $value || null === $value ? null : new \DateTimeImmutable((string) $value);
+    }
+
     public function findById(string $companyId): ?Company
     {
         return $this->find($companyId);

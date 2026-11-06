@@ -122,3 +122,8 @@ services:
         public: true
     App\Budget\Application\Service\BudgetFillPlanner:
         public: true
+
+    App\Settlement\Application\:
+        resource: '../src/Settlement/Application/'
+        exclude: '../src/Settlement/Application/DTO/'
+        public: true
