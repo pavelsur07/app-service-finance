@@ -52,6 +52,7 @@ final class StockReportController extends AbstractController
 
         return $this->render('inventory/stocks/index.html.twig', [
             'pager' => $pager,
+            'totals' => $this->stockReportQuery->getTotals($companyId, $source, $scheme, $snapshotDate),
             'breakdownColumns' => $breakdownColumns,
             'source' => $source,
             'sources' => self::SOURCES,
