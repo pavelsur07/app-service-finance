@@ -20,11 +20,77 @@ use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
 use Webmozart\Assert\Assert;
 
+/**
+ * @phpstan-type ImportSnapshot array{id: string, date: string, amount: string, direction: string, currency: string, docNumber: ?string, description: ?string, counterparty: ?string, occurredAt: string, counterpartyId: ?string, importSource: ?string}
+ */
 class CashTransactionRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, CashTransaction::class);
+    }
+
+    /** @return list<ImportSnapshot> */
+    public function findImportCandidates(string $companyId, string $accountId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        // Scalar projection deliberately bypasses the ORM identity map: a preview
+        // must not retain every transaction in the statement's date range.
+        /** @var list<ImportSnapshot> $rows */
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            'SELECT t.id, t.occurred_at::text AS date, t.amount::text AS amount,
+                    t.direction, t.currency, t.doc_number AS "docNumber", t.description,
+                    c.name AS counterparty, t.occurred_at::text AS "occurredAt",
+                    t.counterparty_id AS "counterpartyId", t.import_source AS "importSource"
+             FROM cash_transaction t
+             LEFT JOIN counterparty c ON c.id = t.counterparty_id AND c.company_id = t.company_id
+             WHERE t.company_id = :company AND t.money_account_id = :account
+               AND t.deleted_at IS NULL AND t.occurred_at >= :from AND t.occurred_at < :to
+             ORDER BY t.id',
+            ['company' => $companyId, 'account' => $accountId, 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')],
+        );
+
+        return $rows;
+    }
+
+    /**
+     * @param list<string> $ids
+     *
+     * @return list<CashTransaction>
+     */
+    public function findForDescriptionUpdate(string $companyId, string $accountId, array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        $connection = $this->getEntityManager()->getConnection();
+        if (!$connection->isTransactionActive()) {
+            throw \Doctrine\ORM\TransactionRequiredException::transactionRequired();
+        }
+        // PostgreSQL cannot lock the nullable side of a LEFT JOIN. Lock only
+        // scoped parent rows first, then hydrate their counterparties in one query
+        // while the parent locks remain held until the caller commits the chunk.
+        /** @var list<string> $lockedIds */
+        $lockedIds = $connection->fetchFirstColumn(
+            'SELECT id FROM cash_transaction
+             WHERE company_id = :company AND money_account_id = :account AND id IN (:ids)
+             ORDER BY id FOR UPDATE',
+            ['company' => $companyId, 'account' => $accountId, 'ids' => $ids],
+            ['ids' => ArrayParameterType::STRING],
+        );
+        if ([] === $lockedIds) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('t')
+            ->leftJoin('t.counterparty', 'c', 'WITH', 'IDENTITY(c.company) = :company')->addSelect('c')
+            ->andWhere('IDENTITY(t.company) = :company')->setParameter('company', $companyId)
+            ->andWhere('IDENTITY(t.moneyAccount) = :account')->setParameter('account', $accountId)
+            ->andWhere('t.id IN (:ids)')->setParameter('ids', $lockedIds)
+            ->orderBy('t.id', \SortDirection::Ascending)
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getResult();
     }
 
     public function findOneByIdAndCompanyId(string $id, string $companyId): ?CashTransaction

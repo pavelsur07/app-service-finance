@@ -6,18 +6,23 @@ namespace App\Cash\Controller\Import;
 
 use App\Cash\Application\CreateCashFileImportProfileAction;
 use App\Cash\Application\StartCashFileImportJobAction;
+use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Import\CashFileImportProfile;
 use App\Cash\Message\Import\CashFileImportMessage;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Import\CashFileImportProfileRepository;
-use App\Cash\Service\Import\File\CashFileRowNormalizer;
+use App\Cash\Service\Import\File\CashFileDescriptionPlan;
 use App\Cash\Service\Import\File\FileTabularReader;
 use App\Cash\Service\Import\File\HeaderAutoMapper;
 use App\Company\Entity\User;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
+use App\Shared\Service\Storage\ObjectStorageException;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Shared\Service\Storage\TemporaryLocalFile;
+use Doctrine\ORM\EntityManagerInterface;
+use Pagerfanta\Adapter\ArrayAdapter;
+use Pagerfanta\Pagerfanta;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -27,6 +32,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -223,6 +229,7 @@ class CashFileImportController extends AbstractController
         }
 
         $importPayload['mapping'] = $mapping;
+        unset($importPayload['description_plan'], $importPayload['description_context'], $importPayload['selected_descriptions'], $importPayload['description_filter'], $importPayload['committed_job_id']);
 
         $session->set('cash_file_import', $importPayload);
 
@@ -264,6 +271,7 @@ class CashFileImportController extends AbstractController
             return $this->redirectToRoute('cash_file_import_upload');
         }
 
+        unset($importPayload['description_plan'], $importPayload['description_context'], $importPayload['selected_descriptions'], $importPayload['description_filter'], $importPayload['committed_job_id']);
         $importPayload['mapping'] = $profile->getMapping();
         $importPayload['options'] = $profile->getOptions();
         $importPayload['profile_id'] = $profile->getId();
@@ -320,6 +328,7 @@ class CashFileImportController extends AbstractController
         );
 
         $importPayload['mapping'] = $mapping;
+        unset($importPayload['description_plan'], $importPayload['description_context'], $importPayload['selected_descriptions'], $importPayload['description_filter'], $importPayload['committed_job_id']);
         $importPayload['profile_id'] = $profile->getId();
         $session->set('cash_file_import', $importPayload);
 
@@ -328,18 +337,26 @@ class CashFileImportController extends AbstractController
         return $this->redirectToRoute('cash_file_import_mapping');
     }
 
-    #[Route('/preview', name: 'cash_file_import_preview', methods: ['GET'])]
+    #[Route('/preview', name: 'cash_file_import_preview', methods: ['GET', 'POST'])]
     public function preview(
         SessionInterface $session,
-        FileTabularReader $fileTabularReader,
-        CashFileRowNormalizer $rowNormalizer,
+        Request $request,
+        CashFileDescriptionPlan $plans,
         MoneyAccountRepository $accountRepository,
     ): Response {
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
         $importPayload = $session->get('cash_file_import');
         if (!is_array($importPayload)) {
             $this->addFlash('error', 'Сессия импорта не найдена. Загрузите файл заново.');
 
             return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $committedJobId = $importPayload['committed_job_id'] ?? null;
+        if (is_string($committedJobId)) {
+            return $this->redirectToRoute('cash_file_import_result', ['id' => $committedJobId]);
         }
 
         $mapping = $importPayload['mapping'] ?? null;
@@ -384,47 +401,88 @@ class CashFileImportController extends AbstractController
             return $this->redirectToRoute('cash_file_import_upload');
         }
 
-        [$headers, $sampleRows] = $this->temporaryLocalFile->with(
-            $storageKey,
-            static fn (string $filePath): array => [
-                $fileTabularReader->readHeader($filePath),
-                $fileTabularReader->readSampleRows($filePath, 100),
-            ],
-        );
-
-        $headerLabels = [];
-        foreach ($headers as $index => $header) {
-            if (null === $header || '' === $header) {
-                $headerLabels[$index] = sprintf('Колонка %d', $index + 1);
+        $actor = $this->getUser() instanceof User ? $this->getUser()->getId() : null;
+        $context = hash('sha256', json_encode([$company->getId(), $account->getId(), $fileHash, $mapping, $actor], \JSON_THROW_ON_ERROR));
+        try {
+            if (($importPayload['description_context'] ?? null) !== $context || !is_string($importPayload['description_plan'] ?? null)) {
+                $plan = $this->temporaryLocalFile->with($storageKey, fn (string $filePath): array => $plans->build($filePath, $account, $mapping, $fileHash, $actor));
+                $importPayload['description_plan'] = $plans->save($plan);
+                $importPayload['description_context'] = $context;
+                $importPayload['selected_descriptions'] = [];
             } else {
-                $headerLabels[$index] = $header;
+                $plan = $plans->load((string) $company->getId(), $importPayload['description_plan']);
+            }
+        } catch (\DomainException $exception) {
+            $this->invalidateDescriptionPlan($session, $importPayload);
+            if ($exception->getPrevious() instanceof \JsonException) {
+                $this->addFlash('error', 'Файл содержит некорректный текст. Проверьте кодировку UTF-8 и загрузите его заново.');
+
+                return $this->redirectToRoute('cash_file_import_upload');
+            }
+            $this->addFlash('error', 'План импорта устарел или повреждён. Проверьте новый план и повторно выберите обновления.');
+
+            return $this->redirectToRoute('cash_file_import_preview');
+        } catch (ObjectStorageException) {
+            $this->invalidateDescriptionPlan($session, $importPayload);
+            $this->addFlash('error', 'Не удалось прочитать или сохранить план импорта. Загрузите файл заново.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+        $selected = array_fill_keys($importPayload['selected_descriptions'] ?? [], true);
+        if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('cash_file_import_selection', $request->request->getString('_token'))) {
+                throw $this->createAccessDeniedException('Некорректный CSRF-токен.');
+            }
+            $available = [];
+            foreach ($plan['rows'] as $rowId => $row) {
+                if ('update_description' === $row['action']) {
+                    $available[(string) $rowId] = true;
+                }
+            }
+            $operation = $request->request->get('selection_action');
+            if ('all' === $operation) {
+                $selected = $available;
+            } elseif ('none' === $operation) {
+                $selected = [];
+            } else {
+                foreach ($request->request->all('visible') as $rowId) {
+                    if (!is_string($rowId) || !isset($available[$rowId])) {
+                        throw $this->createAccessDeniedException('Недоступная строка плана.');
+                    }
+                    unset($selected[$rowId]);
+                }
+                foreach ($request->request->all('selected') as $rowId) {
+                    if (!is_string($rowId) || !isset($available[$rowId])) {
+                        throw $this->createAccessDeniedException('Недоступная строка плана.');
+                    }
+                    $selected[$rowId] = true;
+                }
             }
         }
-
+        $filter = $request->request->getString('filter', $request->query->getString('filter'));
+        $filterChanged = $filter !== ($importPayload['description_filter'] ?? '');
+        $importPayload['description_filter'] = $filter;
+        $importPayload['selected_descriptions'] = array_map('strval', array_keys($selected));
+        $session->set('cash_file_import', $importPayload);
+        $summary = array_fill_keys(['create', 'unchanged', 'update_description', 'conflict', 'invalid'], 0);
         $previewRows = [];
-        foreach ($sampleRows as $row) {
-            $rowByHeader = [];
-            foreach ($headerLabels as $index => $label) {
-                $rowByHeader[$label] = $row[$index] ?? null;
+        foreach ($plan['rows'] as $rowId => $row) {
+            ++$summary[$row['action']];
+            if ('' === $filter || $filter === $row['action']) {
+                $previewRows[] = $row + ['rowId' => (string) $rowId, 'selected' => isset($selected[$rowId])];
             }
-
-            $normalized = $rowNormalizer->normalize($rowByHeader, $mapping, $account->getCurrency());
-            $previewRows[] = [
-                'ok' => $normalized['ok'],
-                'errors' => $normalized['errors'],
-                'date' => $normalized['occurredAt']?->format('d.m.Y'),
-                'direction' => $normalized['direction']?->value,
-                'amount' => $normalized['amount'],
-                'counterparty' => $normalized['counterpartyName'],
-                'description' => $normalized['description'],
-                'currency' => $normalized['currency'],
-                'docNumber' => $normalized['docNumber'],
-            ];
         }
+        $page = $filterChanged ? 1 : max(1, $request->request->getInt('page', $request->query->getInt('page', 1)));
+        $pager = new Pagerfanta(new ArrayAdapter($previewRows));
+        $pager->setMaxPerPage(50);
+        $pager->setNormalizeOutOfRangePages(true);
+        $pager->setCurrentPage($page);
 
         return $this->render('cash/file_import_preview.html.twig', [
             'fileName' => $importPayload['file_name'] ?? '',
-            'previewRows' => $previewRows,
+            'previewRows' => $pager->getCurrentPageResults(),
+            'pager' => $pager, 'summary' => $summary, 'filter' => $filter,
+            'selectedCount' => count($selected),
         ]);
     }
 
@@ -434,8 +492,9 @@ class CashFileImportController extends AbstractController
         Request $request,
         SessionInterface $session,
         MoneyAccountRepository $accountRepository,
+        CashFileDescriptionPlan $plans,
     ): Response {
-        if (!$this->isCsrfTokenValid('cash_file_import_commit', $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('cash_file_import_commit', $request->request->get('_commit_token', $request->request->get('_token')))) {
             $this->addFlash('error', 'Некорректный CSRF-токен.');
 
             return $this->redirectToRoute('cash_file_import_preview');
@@ -446,6 +505,11 @@ class CashFileImportController extends AbstractController
             $this->addFlash('error', 'Сессия импорта не найдена. Загрузите файл заново.');
 
             return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $committedJobId = $importPayload['committed_job_id'] ?? null;
+        if (is_string($committedJobId)) {
+            return $this->redirectToRoute('cash_file_import_result', ['id' => $committedJobId]);
         }
 
         $mapping = $importPayload['mapping'] ?? null;
@@ -503,25 +567,123 @@ class CashFileImportController extends AbstractController
             $userIdentifier = $user;
         }
 
-        $job = ($this->startImportJob)(
-            $company,
-            $account,
-            'cash:file',
-            $fileName,
-            $fileHash,
-            $mapping,
-            is_string($storedExtension) && '' !== $storedExtension ? ['stored_ext' => $storedExtension] : [],
-            $userIdentifier
-        );
+        $planHash = $importPayload['description_plan'] ?? null;
+        if (!is_string($planHash)) {
+            $this->addFlash('error', 'Сначала просмотрите план импорта.');
 
-        $this->messageBus->dispatch(new CashFileImportMessage($job->getId()));
+            return $this->redirectToRoute('cash_file_import_preview');
+        }
+        try {
+            $plan = $plans->load((string) $company->getId(), $planHash);
+        } catch (\DomainException) {
+            $this->invalidateDescriptionPlan($session, $importPayload);
+            $this->addFlash('error', 'План импорта устарел или повреждён. Проверьте новый план и повторно выберите обновления.');
 
-        $session->remove('cash_file_import');
+            return $this->redirectToRoute('cash_file_import_preview');
+        } catch (ObjectStorageException) {
+            $this->invalidateDescriptionPlan($session, $importPayload);
+            $this->addFlash('error', 'План импорта недоступен. Загрузите файл заново.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+        if ($plan['accountId'] !== $account->getId() || $plan['fileHash'] !== $fileHash
+            || $plan['actor'] !== $userIdentifier
+            || $plan['mappingHash'] !== hash('sha256', json_encode($mapping, \JSON_THROW_ON_ERROR))) {
+            throw $this->createAccessDeniedException('План импорта не соответствует текущему файлу.');
+        }
+        $selected = $importPayload['selected_descriptions'] ?? [];
+        if ($request->request->has('visible') || $request->request->has('selected')) {
+            $selection = array_fill_keys($selected, true);
+            foreach ($request->request->all('visible') as $rowId) {
+                if (!is_string($rowId) || 'update_description' !== ($plan['rows'][$rowId]['action'] ?? null)) {
+                    throw $this->createAccessDeniedException('Недоступная строка плана.');
+                }
+                unset($selection[$rowId]);
+            }
+            foreach ($request->request->all('selected') as $rowId) {
+                if (!is_string($rowId) || 'update_description' !== ($plan['rows'][$rowId]['action'] ?? null)) {
+                    throw $this->createAccessDeniedException('Недоступная строка плана.');
+                }
+                $selection[$rowId] = true;
+            }
+            $selected = array_map('strval', array_keys($selection));
+            $importPayload['selected_descriptions'] = $selected;
+            $session->set('cash_file_import', $importPayload);
+        }
+        foreach ($selected as $rowId) {
+            if (!is_string($rowId) || 'update_description' !== ($plan['rows'][$rowId]['action'] ?? null)) {
+                throw $this->createAccessDeniedException('Недоступная строка плана.');
+            }
+        }
+        $options = is_string($storedExtension) && '' !== $storedExtension ? ['stored_ext' => $storedExtension] : [];
+        $options['description_plan'] = $planHash;
+        $options['selected_descriptions'] = $selected;
+
+        try {
+            $job = ($this->startImportJob)(
+                $company,
+                $account,
+                'cash:file',
+                $fileName,
+                $fileHash,
+                $mapping,
+                $options,
+                $userIdentifier,
+                $plan['id'],
+            );
+        } catch (\DomainException) {
+            $this->invalidateDescriptionPlan($session, $importPayload);
+            $this->addFlash('error', 'Это подтверждение уже использовано или настройки изменились. Проверьте новый план и повторно выберите обновления.');
+
+            return $this->redirectToRoute('cash_file_import_preview');
+        }
+
+        if (CashFileImportJob::STATUS_QUEUED === $job->getStatus()) {
+            $this->messageBus->dispatch(new CashFileImportMessage($job->getId()));
+        }
+        $importPayload['committed_job_id'] = $job->getId();
+        $session->set('cash_file_import', $importPayload);
+        if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
+            return $this->redirectToRoute('cash_file_import_result', ['id' => $job->getId()]);
+        }
 
         return $this->render('cash/file_import_queued.html.twig', [
             'jobId' => $job->getId(),
             'importLogId' => $job->getImportLog()?->getId(),
         ]);
+    }
+
+    #[Route('/result/{id}', name: 'cash_file_import_result', requirements: ['id' => Requirement::UUID], methods: ['GET'])]
+    #[IsGranted(ModuleAccess::FINANCE_READ)]
+    public function result(string $id, EntityManagerInterface $entityManager, CashFileDescriptionPlan $plans): Response
+    {
+        $company = $this->activeCompanyService->getActiveCompany();
+        $job = $entityManager->getRepository(CashFileImportJob::class)->findOneBy(['id' => $id, 'company' => $company]);
+        if (!$job instanceof CashFileImportJob) {
+            throw $this->createNotFoundException('Импорт не найден.');
+        }
+
+        $options = $job->getOptions();
+        $summary = array_fill_keys(['create', 'unchanged', 'update_description', 'conflict', 'invalid'], 0);
+        if (is_string($options['description_plan'] ?? null)) {
+            try {
+                $plan = $plans->load((string) $company->getId(), $options['description_plan']);
+                foreach ($plan['rows'] as $row) {
+                    ++$summary[$row['action']];
+                }
+            } catch (ObjectStorageException|\DomainException) {
+                $this->addFlash('error', 'Подробный план недоступен. Показаны сохранённые результаты обработки.');
+            }
+        }
+
+        return $this->render('cash/file_import_result.html.twig', ['job' => $job, 'options' => $options, 'summary' => $summary]);
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function invalidateDescriptionPlan(SessionInterface $session, array $payload): void
+    {
+        unset($payload['description_plan'], $payload['description_context'], $payload['selected_descriptions'], $payload['description_filter']);
+        $session->set('cash_file_import', $payload);
     }
 
     /**

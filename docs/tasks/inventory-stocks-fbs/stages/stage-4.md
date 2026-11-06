@@ -6,7 +6,7 @@
 
 #### What was done
 - `ARCHITECTURE.md`: `InventoryStockReportQuery` (схема), блоки `LocationType` и `FulfillmentScheme`, маршрут,
-  `MarketplaceFacade::getListingBarcodes()`, подраздел «Wildberries FBS — остатки склада продавца», Changelog 2.148.
+  `MarketplaceFacade::getListingBarcodes()`, подраздел «Wildberries FBS — остатки склада продавца», Changelog 2.150.
 - `docs/tasks/inventory-stocks-fbs/`: `checkpoint.md`, `stages/`, `handoff.md`.
 
 #### Checks

@@ -438,7 +438,7 @@ Definition of Done:
   типе, SQL-выражение схемы), блок `LocationType` (новое значение), раздел
   «Inventory — Wildberries FBW stock normalization» дополнен подразделом «FBS (склад продавца)»
   со схемой фазы и семантикой полей из TASK.md, `MarketplaceFacade::getListingBarcodes()` в
-  списке методов Facade, строка Changelog `2.148 | 2026-11-06 | Inventory: …`.
+  списке методов Facade, строка Changelog `2.150 | 2026-11-06 | Inventory: …`.
 - `docs/tasks/inventory-stocks-fbs/handoff.md` по шаблону `docs/workflow/templates.md`.
 - Полные гейты: `make site-stan`, `make site-cs-check`, `make site-cs-strict-types`,
   `make site-test-unit`, `make site-test` (затронуты integration-пути).

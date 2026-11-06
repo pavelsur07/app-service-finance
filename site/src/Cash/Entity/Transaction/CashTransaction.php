@@ -28,6 +28,8 @@ use Webmozart\Assert\Assert;
 #[ORM\UniqueConstraint(name: 'uniq_cashflow_import', columns: ['company_id', 'import_source', 'external_id'])]
 class CashTransaction
 {
+    public const int DESCRIPTION_MAX_LENGTH = 1024;
+
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
     private ?string $id = null;
@@ -81,8 +83,11 @@ class CashTransaction
     #[ORM\Column(type: 'date_immutable')]
     private \DateTimeImmutable $bookedAt;
 
-    #[ORM\Column(type: 'string', length: 1024, nullable: true)]
+    #[ORM\Column(type: 'string', length: self::DESCRIPTION_MAX_LENGTH, nullable: true)]
     private ?string $description = null;
+
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $importedDescriptionOverridden = false;
 
     #[ORM\Column(length: 64, nullable: true)]
     private ?string $docType = null;
@@ -513,6 +518,23 @@ class CashTransaction
         $this->description = $d;
 
         return $this;
+    }
+
+    public function overrideImportedDescription(string $description): self
+    {
+        if ('' === trim($description)) {
+            throw new \InvalidArgumentException('Описание не может быть пустым.');
+        }
+        Assert::maxLength($description, self::DESCRIPTION_MAX_LENGTH, sprintf('Описание не должно превышать %d символа.', self::DESCRIPTION_MAX_LENGTH));
+        $this->description = $description;
+        $this->importedDescriptionOverridden = true;
+
+        return $this;
+    }
+
+    public function isImportedDescriptionOverridden(): bool
+    {
+        return $this->importedDescriptionOverridden;
     }
 
     public function getDocType(): ?string

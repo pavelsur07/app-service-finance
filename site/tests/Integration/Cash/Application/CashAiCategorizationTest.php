@@ -278,7 +278,9 @@ final class CashAiCategorizationTest extends IntegrationTestCase
     public function testOwnFundsTransfersAreSentWhenCompanyCategorizesThem(): void
     {
         // Компания сама относит такие переводы к статье (у одного кабинета — погашение кредита): решает её история.
-        $this->transaction('Перевод собственных средств. НДС не облагается', $this->rent, new \DateTimeImmutable('-300 days'));
+        foreach ([-300, -200, -100] as $days) {
+            $this->transaction('Перевод собственных средств. НДС не облагается', $this->rent, new \DateTimeImmutable($days.' days'));
+        }
         $transfer = $this->transaction('Перевод собственных средств. НДС не облагается');
         $this->em->flush();
 
@@ -287,6 +289,23 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         self::assertSame(1, $result->requested);
         self::assertSame([(string) $transfer->getId()], array_column($this->ai->requests[0]['payload']['operations'], 'id'));
         self::assertSame(0, $this->query()->stats((string) $this->company->getId(), null, new \DateTimeImmutable('-90 days'))->transferLikeSkipped);
+    }
+
+    public function testSingleCategorizedTransferDoesNotSwitchTheRuleOff(): void
+    {
+        // Прод 06.11, COMPSHOP: одна из 106 операций с фразой перевода разнесена в «Транспортные расходы» —
+        // остальные 105 всё равно переводы и в ИИ не уходят.
+        $this->transaction('Перевод собственных средств. НДС не облагается', $this->rent, new \DateTimeImmutable('-30 days'));
+        $this->transaction('Перевод собственных средств. НДС не облагается', $this->rent, new \DateTimeImmutable('-20 days'));
+        $this->transaction('Перевод собственных средств. НДС не облагается');
+        $rent = $this->transaction('Оплата аренды');
+        $this->em->flush();
+
+        $result = $this->request();
+
+        self::assertSame(1, $result->requested);
+        self::assertSame([(string) $rent->getId()], array_column($this->ai->requests[0]['payload']['operations'], 'id'));
+        self::assertSame(1, $this->query()->stats((string) $this->company->getId(), null, new \DateTimeImmutable('-90 days'))->transferLikeSkipped);
     }
 
     public function testExpiredUnansweredRequestsKeepNewBatchesPaused(): void
