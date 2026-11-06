@@ -2,7 +2,8 @@
 
 **Branch:** `feat/counterparty-settlements`.
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/2901.
-**Base:** `master` (407ec649c incorporated). **Status:** implementation complete; handoff.
+**Base:** `master` (407ec649c incorporated). **Status:** Ready, mergeable; implementation complete.
+**Implementation commit:** `db23a4f6f9d4877d82225646228e73796d03712b`.
 **CI:** [актуальные проверки PR](https://github.com/pavelsur07/app-service-finance/pull/2901/checks).
 **Task base:** `4fdad15c974830d13ff9342d1f40a526f3b5bd33`.
 
@@ -39,7 +40,8 @@ scope, CSRF, requestId/version, блокировки и исторические
 
 Подробные Stage Reports — в `stages/`; правила источников —
 [source-write-paths.md](source-write-paths.md), приёмка — [acceptance.md](acceptance.md).
-Frontend assets/JS/dependencies/CI не менялись.
+Frontend assets/JS/dependencies/CI configuration не менялись. Старый docs-only
+PR2899 закрыт без merge, план включён в этот implementation PR.
 
 ## Миграция и rollback
 

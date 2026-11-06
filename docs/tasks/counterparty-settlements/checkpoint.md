@@ -7,7 +7,9 @@
 **Merged master:** `407ec649c` via feature merge `a3e9f02a5`
 **Branch:** `feat/counterparty-settlements`
 **Worktree:** `/home/deploy/.codex/worktrees/3821/app-service-finance`
-**PR:** https://github.com/pavelsur07/app-service-finance/pull/2901, base master
+**PR:** https://github.com/pavelsur07/app-service-finance/pull/2901, base master, Ready verified, MERGEABLE
+**Implementation commit:** `db23a4f6f9d4877d82225646228e73796d03712b`
+**CI:** latest actual status at PR checks; local full gates green
 
 ## Completed
 
@@ -50,8 +52,10 @@ company maintenance and enhanced app DS picker adapter recorded as FOLLOW-UP.
 
 ## Exact next action
 
-Finish closing docs commit/push/PR body/Ready and inspect GitHub CI. No additional
-local tests without new changes or failures. Ask once: `run the migration and deploy #2901`.
+Inspect final GitHub CI, then ask once: `run the migration and deploy #2901`.
+Implementation/closing commit pushed, PR body final, Ready and master base verified.
+No additional local tests without new changes or failures. Old docs-only PR2899
+closed without merge, its complete plan is retained in implementation PR2901.
 No merge, production migration or deploy approval received. After explicit approval,
 follow docs/workflow/release.md pipeline completely; production only through allowed
 wrappers. MigrationVersion20261106183000 adds6tables; down aborts to preserve data.
