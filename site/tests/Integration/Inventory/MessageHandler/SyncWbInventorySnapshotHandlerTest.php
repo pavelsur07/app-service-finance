@@ -45,6 +45,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
                 $this->stock(100, 1001, 507, 4),
                 $this->stock(100, 1002, 507, 7),
             ]),
+            $this->sellerWarehousesResponse([]),
         ]);
 
         ($this->handler())($this->message($company, $connection, $session));
@@ -79,6 +80,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
                 $this->stock(110, 1101, 507, 5),
                 $this->stock(110, 1102, 507, 8),
             ]),
+            $this->sellerWarehousesResponse([]),
         ]);
 
         ($this->handler())($this->message($company, $connection, $session));
@@ -104,6 +106,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
             $this->catalogResponse([]),
             $this->inventoryResponse([$this->stock(200, 2001, 1, 1), $this->stock(200, 2001, 2, 2)]),
             $this->inventoryResponse([$this->stock(200, 2001, 3, 3)]),
+            $this->sellerWarehousesResponse([]),
         ]);
 
         ($this->handler(2))($this->message($company, $connection, $session));
@@ -235,6 +238,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
             $this->catalogResponse([$this->card(800, [[8001, 'S', 'barcode-708-s'], [8002, 'M', 'barcode-708-m'], [8003, 'L', 'barcode-708-l']])]),
             $this->catalogResponse([]),
             $this->inventoryResponse([$this->stock(800, 8003, 1, 3)]),
+            $this->sellerWarehousesResponse([]),
         ]);
 
         ($this->handler(2))($this->message($company, $connection, $session));
@@ -258,6 +262,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
             $this->catalogResponse([$this->card(900, [[9001, 'S', 'barcode-709']])]),
             $this->catalogResponse([]),
             $this->inventoryResponse([$this->stock(900, 9001, 1, 1)]),
+            $this->sellerWarehousesResponse([]),
         ]);
         $failingBus = $this->createMock(MessageBusInterface::class);
         $failingBus->expects(self::once())
@@ -277,6 +282,167 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
 
         ($this->handler())($this->message($company, $connection, $session));
 
+        self::assertSame(1, $this->countNormalizeMessages($session, $company));
+    }
+
+    public function testSellerWarehouseStocksAreFetchedAndNormalizedAsFbs(): void
+    {
+        $company = $this->createCompany(720);
+        $connection = $this->createConnection($company, 720);
+        $session = $this->createSession($company);
+        $this->swapHttpClient([
+            $this->catalogResponse([$this->card(120, [[1201, 'S', 'barcode-720-s']])]),
+            $this->catalogResponse([]),
+            $this->inventoryResponse([$this->stock(120, 1201, 507, 4)]),
+            $this->sellerWarehousesResponse([['id' => 7, 'name' => 'Мой склад']]),
+            $this->sellerStocksResponse([['sku' => 'barcode-720-s', 'amount' => 3]]),
+        ]);
+
+        ($this->handler())($this->message($company, $connection, $session));
+
+        $this->em->refresh($session);
+        self::assertSame(SnapshotSessionStatus::Completed, $session->getStatus());
+        $raw = $this->rawSnapshots($session);
+        self::assertCount(2, $raw);
+        self::assertSame(WbInventoryClient::SELLER_STOCKS_ENDPOINT.'/7', $raw[1]->getSourceEndpoint());
+        self::assertSame(1, $raw[1]->getRequestParams()['chunk']);
+        self::assertSame(7, $raw[1]->getRequestParams()['warehouseId']);
+        self::assertSame(2, $raw[1]->getPageNumber());
+
+        self::getContainer()->get(NormalizeInventorySnapshotHandler::class)($this->normalizeMessage($session, $company));
+
+        $rows = $this->connection->fetchAllAssociative(
+            "SELECT s.source_sku, s.source_offer_id, s.listing_id, s.quantity, s.fulfillment_type, s.mapping_status,
+                    l.type AS location_type, l.external_id AS location_external_id, l.code AS location_code, l.name AS location_name
+               FROM inventory_stock_snapshots s
+               JOIN inventory_locations l ON l.id = s.location_id
+              WHERE s.snapshot_session_id = :session AND s.status = 'available'
+              ORDER BY s.fulfillment_type",
+            ['session' => $session->getId()],
+        );
+        self::assertCount(2, $rows);
+        [$fbs, $fbw] = $rows;
+        self::assertSame('fbw', $fbw['fulfillment_type']);
+        self::assertSame('1201', $fbw['source_sku']);
+        self::assertSame('4.000', $fbw['quantity']);
+
+        self::assertSame('fbs', $fbs['fulfillment_type']);
+        self::assertSame('barcode-720-s', $fbs['source_sku']);
+        self::assertSame('120', $fbs['source_offer_id']);
+        self::assertSame('3.000', $fbs['quantity']);
+        self::assertSame('mapped', $fbs['mapping_status']);
+        self::assertNotNull($fbs['listing_id']);
+        self::assertSame($fbw['listing_id'], $fbs['listing_id']);
+        self::assertSame('seller_warehouse', $fbs['location_type']);
+        self::assertSame('seller:7', $fbs['location_external_id']);
+        self::assertSame('WB-FBS-7', $fbs['location_code']);
+        self::assertSame('Мой склад', $fbs['location_name']);
+    }
+
+    public function testSellerWarehouseAccessDeniedKeepsFbwResultAndCompletesSession(): void
+    {
+        $company = $this->createCompany(721);
+        $connection = $this->createConnection($company, 721);
+        $session = $this->createSession($company);
+        $httpClient = new MockHttpClient([
+            $this->catalogResponse([$this->card(121, [[1211, 'S', 'barcode-721-s']])]),
+            $this->catalogResponse([]),
+            $this->inventoryResponse([$this->stock(121, 1211, 507, 4)]),
+            new MockResponse('{"title":"forbidden"}', ['http_code' => 403]),
+        ]);
+        self::getContainer()->set('http_client', $httpClient);
+
+        ($this->handler())($this->message($company, $connection, $session));
+
+        // Запрос складов продавца ушёл и получил 403 — сессия всё равно завершена данными FBW.
+        self::assertSame(4, $httpClient->getRequestsCount());
+        $this->em->refresh($session);
+        self::assertSame(SnapshotSessionStatus::Completed, $session->getStatus());
+        $raw = $this->rawSnapshots($session);
+        self::assertCount(1, $raw);
+        self::assertSame(WbInventoryClient::ENDPOINT, $raw[0]->getSourceEndpoint());
+
+        self::getContainer()->get(NormalizeInventorySnapshotHandler::class)($this->normalizeMessage($session, $company));
+
+        $types = $this->connection->fetchFirstColumn(
+            'SELECT DISTINCT fulfillment_type FROM inventory_stock_snapshots WHERE snapshot_session_id = :session',
+            ['session' => $session->getId()],
+        );
+        self::assertSame(['fbw'], $types);
+    }
+
+    public function testNoBarcodesMeansNoMarketplaceApiRequests(): void
+    {
+        $company = $this->createCompany(722);
+        $connection = $this->createConnection($company, 722);
+        $session = $this->createSession($company);
+        $responses = [
+            $this->catalogResponse([]),
+            $this->catalogResponse([]),
+            $this->inventoryResponse([]),
+        ];
+        self::getContainer()->set('http_client', new MockHttpClient(static function (string $method, string $url) use (&$responses): MockResponse {
+            self::assertStringNotContainsString('marketplace-api', $url, 'Без баркодов запросов в marketplace-api быть не должно.');
+            $next = array_shift($responses);
+            self::assertNotNull($next, sprintf('Unexpected request %s %s', $method, $url));
+
+            return $next;
+        }));
+
+        ($this->handler())($this->message($company, $connection, $session));
+
+        $this->em->refresh($session);
+        self::assertSame(SnapshotSessionStatus::Completed, $session->getStatus());
+        self::assertSame([], $responses);
+        foreach ($this->rawSnapshots($session) as $rawSnapshot) {
+            self::assertStringStartsNotWith(WbInventoryClient::SELLER_STOCKS_ENDPOINT, $rawSnapshot->getSourceEndpoint());
+        }
+    }
+
+    public function testRedeliveryAfterSellerPhaseDoesNotDuplicateSellerPages(): void
+    {
+        $company = $this->createCompany(723);
+        $connection = $this->createConnection($company, 723);
+        $session = $this->createSession($company);
+        $session->markInProgress();
+        $session->incrementReceivedPages(2);
+        $this->em->persist(new InventoryRawSnapshot(
+            companyId: $company->getId(),
+            snapshotSessionId: $session->getId(),
+            source: MarketplaceType::WILDBERRIES,
+            sourceEndpoint: WbInventoryClient::ENDPOINT,
+            requestParams: ['offset' => 0, 'limit' => 2],
+            responseStatus: 200,
+            responseBody: ['data' => ['items' => [$this->stock(123, 1231, 1, 1)]]],
+            fetchedAt: new \DateTimeImmutable(),
+            fetchDurationMs: 1,
+            correlationId: $session->getCorrelationId(),
+            pageNumber: 1,
+        ));
+        $this->em->persist(new InventoryRawSnapshot(
+            companyId: $company->getId(),
+            snapshotSessionId: $session->getId(),
+            source: MarketplaceType::WILDBERRIES,
+            sourceEndpoint: WbInventoryClient::SELLER_STOCKS_ENDPOINT.'/7',
+            requestParams: ['warehouseId' => 7, 'warehouseName' => 'Мой склад', 'chunk' => 1],
+            responseStatus: 200,
+            responseBody: ['stocks' => [['sku' => 'barcode-723', 'amount' => 2]]],
+            fetchedAt: new \DateTimeImmutable(),
+            fetchDurationMs: 1,
+            correlationId: $session->getCorrelationId(),
+            pageNumber: 2,
+        ));
+        $this->em->flush();
+        // Повторная доставка: каталог обновлять не нужно, страницы есть — ни одного HTTP-запроса.
+        self::getContainer()->set('http_client', new MockHttpClient(static function (string $method, string $url): MockResponse {
+            self::fail(sprintf('Unexpected request %s %s', $method, $url));
+        }));
+
+        ($this->handler(2))($this->message($company, $connection, $session));
+
+        $this->em->refresh($session);
+        self::assertSame(SnapshotSessionStatus::Completed, $session->getStatus());
+        self::assertCount(2, $this->rawSnapshots($session));
         self::assertSame(1, $this->countNormalizeMessages($session, $company));
     }
 
@@ -381,6 +547,18 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
     private function inventoryResponse(array $items): MockResponse
     {
         return new MockResponse(json_encode(['data' => ['items' => $items]], \JSON_THROW_ON_ERROR), ['http_code' => 200]);
+    }
+
+    /** @param list<array{id: int, name: string}> $warehouses */
+    private function sellerWarehousesResponse(array $warehouses): MockResponse
+    {
+        return new MockResponse(json_encode($warehouses, \JSON_THROW_ON_ERROR), ['http_code' => 200]);
+    }
+
+    /** @param list<array{sku: string, amount: int}> $stocks */
+    private function sellerStocksResponse(array $stocks): MockResponse
+    {
+        return new MockResponse(json_encode(['stocks' => $stocks], \JSON_THROW_ON_ERROR), ['http_code' => 200]);
     }
 
     /** @return list<InventoryRawSnapshot> */
