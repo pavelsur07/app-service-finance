@@ -1,8 +1,9 @@
-# counterparty-settlements — handoff preparation
+# counterparty-settlements — handoff
 
 **Branch:** `feat/counterparty-settlements`.
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/2901.
-**Base:** `master`. **Status:** Draft; final gates/external review in progress.
+**Base:** `master` (407ec649c incorporated). **Status:** implementation complete; handoff.
+**CI:** [актуальные проверки PR](https://github.com/pavelsur07/app-service-finance/pull/2901/checks).
 **Task base:** `4fdad15c974830d13ff9342d1f40a526f3b5bd33`.
 
 ## Результат
@@ -31,8 +32,10 @@ scope, CSRF, requestId/version, блокировки и исторические
   CLI verify/rebuild, EXPLAIN.
 - Stage4 `89ec6ea49`: controllers/forms/Twig/access map и переходы из существующих
   ДДС/ОПиУ/контрагентов; тесты и desktop/mobile smoke.
-- Stage5: фиксированная приёмка, валидация первичных фактов восстановления,
-  архитектурная registry entry и уменьшение PHPStan baseline; итоговые документы.
+- Stage5 `dbc31b643`: фиксированная приёмка, валидация первичных фактов восстановления,
+  архитектурная registry entry, уменьшение PHPStan baseline, исправления source/UI
+  contracts по full gates/review; итоговые документы. Sync master — a3e9f02a5.
+  Закрывающий commit Stage5 имеет subject `test: verify settlement acceptance and release readiness`.
 
 Подробные Stage Reports — в `stages/`; правила источников —
 [source-write-paths.md](source-write-paths.md), приёмка — [acceptance.md](acceptance.md).
@@ -66,11 +69,15 @@ CLI: `app:settlement:verify` и dry-run `app:settlement:rebuild`; production
 - Browser:5страниц×1440/390,10smoke PASS; offline fixture, не production.
 - Fresh migration307/schema1/4 PASS; existing-data306→307 PASS.
 - Focused Stage5 CS/PHPStan10files PASS.
-- Full PHPStan3837files PASS;3obsolete ignores removed. Первый full attempt
+- Full PHPStan3860files PASS;3obsolete ignores removed. Первый full attempt
   остановился только на этих3unmatched ignores, затем исправлен.
-- Full CS/strict-types PASS; unit4513/25298 PASS. Первый полный8400/47261:1E/4F,
+- Full merged-tree PHPStan3860files, CS/strict-types3896files PASS;
+  unit4547/25384 PASS. Первый полный8400/47261:1E/4F,
   четыре причины исправлены; failed-gates+module/legacy source191/942 PASS.
-  После обновления master выполняется заключительный полный прогон.
+  После обновления master заключительный полный прогон **8485/47654 PASS**,
+  exit0,6m57.816s. Все пять обязательных gates завершены.
+  Unit mock query-count уточнён для preflight+locked checks; assertions удаления
+  и единственного batch/recalculation сохранены.
 - Make wrapper повторяет project CLI recipes в running worktree container;
   только переустановка уже доступного vendor пропущена (`-o`), exact lock hash
   совпадает, остальные prerequisites выполняются.
@@ -84,7 +91,11 @@ Stage3/4 REVIEW_GREEN с локальными MINOR fixes. Итоговый exte
 с RED500→green; индекс добавлен; N guardqueries maintenance — FOLLOW-UP,
 для пакетной оптимизации нужен source-owned event contract без Cash→Settlement SQL.
 Результат fixed without re-run, BLOCKER не было.
-Сводные metrics и финальный результат будут обновлены после выхода reviewer.
+Final fixes: fresh bounded review без открытых находок; merge resolutions checked.
+Review metrics: **internal BLOCKER0 / IMPORTANT19 fixed; external BLOCKER0 /
+IMPORTANT4 fixed,5rounds**. Stage5 external fixed without re-run, как разрешает
+policy для исправленного IMPORTANT без BLOCKER. У Stage3/4 точный REVIEW_GREEN.
+Ни один round не имел write/production доступа.
 
 ## Ограничения / follow-up
 
@@ -96,4 +107,12 @@ enhanced counterparty picker adapter — отдельное продолжени
 на10000синтетических движений — локальный замер, не production SLA.
 
 Production-команд, merge, миграции или deploy в рамках реализации не было.
-Запрос решения владельца будет сделан после gates/review/Ready.
+## Решение владельца
+
+Ready: PR #2901 «feat: взаиморасчёты по контрагентам» — миграция
+Version20261106183000 добавляет таблицы, существующие данные не изменяет;
+откат кода сохраняет финансовую историю. Выполнить production migration и deploy?
+Ответ: **`run the migration and deploy #2901`**.
+
+До этого решения merge/production migration/deploy запрещены. Это единый
+именованный запрос по AGENTS.md §3.2 и docs/workflow/release.md.

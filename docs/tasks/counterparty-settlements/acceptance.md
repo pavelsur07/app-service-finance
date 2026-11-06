@@ -71,16 +71,16 @@ maintenance сверяет активные источники под блоки
 
 Только локальные изолированные БД, без копии production:
 
-1. `vf_settlements_fresh_test`: все 307 миграций с пустой схемы;
-   SchemaInSyncWithMigrationsTest — **1 test / 4 assertions PASS**.
-2. `vf_settlements_migration_b42f`: 306 миграций до `Version20261106120000`;
+1. `vf_settlements_fresh_final`: все 307 миграций окончательной версии с пустой схемы;
+   SchemaInSyncWithMigrationsTest — **1 test / 1 assertion PASS**.
+2. `vf_settlements_migration_final`: 306 миграций до `Version20261106120000`;
    синтетические Cash **40000.00**, Finance и одна операция **100000.00**.
 3. Сохранён точный снимок материальных полей существующих источников. Применена
-   только `Version20261106183000`: 35 SQL statements, PASS.
+   только `Version20261106183000`: 36 SQL statements (в окончательной версии с party index), PASS.
 4. Снимок совпал; Cash=1, Finance=1, operations=1. Books/documents/items/movements/
    allocations/source_links — **0/0/0/0/0/0**. История автоматически не включена.
 
-Полный локальный лог: `/tmp/vf-settlement-existing-migration.log`. Миграция
+Полный локальный лог окончательной версии: `/tmp/vf-settlement-existing-final-migration.log`. Миграция
 добавляет таблицы без преобразования прежних данных. `down()` намеренно запрещён,
 чтобы откат кода не удалял финансовую историю.
 
@@ -95,4 +95,12 @@ DS CSS; бизнес-запросы проверены functional tests.
 100 контрагентах и странице 50 строк — 42.728 ms в локальной среде.
 Это измерение тестовой среды, не SLA production.
 
-Итоговые общие gates и review фиксируются отдельно в [handoff.md](handoff.md).
+После общего прогона8400tests исправлены интеграционные контракты mixed routes,
+стабильного int mapping, preflight transfer guards и legacy DTO representation.
+Внешний review нашёл HTML Finance delete500: новый тест сначала RED500, после
+исправления показывает бизнес-сообщение и неизменные source/debt. Reader preview
+Cash/Finance отдельно RED403→green, POST403 и отсутствие новых source links.
+Итоговый целевой набор со всеми прежними failed gates: **191tests/942assertions PASS**.
+Окончательный полный набор на merged tree: **8485tests/47654assertions PASS**;
+unit4547/25384 PASS; PHPStan3860files и CS/strict3896files PASS.
+Итоговые review и выпуск — в [handoff.md](handoff.md).

@@ -10,8 +10,9 @@
 
 **Spec:** [TASK.md](TASK.md), включая решения D1–D7 и примеры A1–A11.
 
-**Status:** Stage 1–4 завершены; Stage 5: приёмка P01–P24 пройдена, общие gates
-и итоговое независимое review выполняются. Текущее состояние — [checkpoint.md](checkpoint.md).
+**Status:** Stage 1–5 завершены. P01–P24 PASS; полный набор8485/47654 PASS,
+все Make gates и обязательные review завершены. Production migration/deploy
+ожидают именованного решения владельца. См. [handoff.md](handoff.md).
 **Repository inspection base:** `4fdad15c974830d13ff9342d1f40a526f3b5bd33` (`origin/master`).
 **Planning baseline:** `git diff --check` — exit 0, документационные изменения.
 Исходный planning baseline был документационным. Baseline реализации и результаты
@@ -574,20 +575,20 @@ Risk: HIGH-LOCAL. Definition of Done: матрица ниже подтвержд
 
 ### Work item 5.2 — полные gates, review, релизная готовность
 
-- [ ] Один раз на handoff выполнить `make site-stan`, `make site-cs-check`,
+- [x] Один раз на handoff выполнить `make site-stan`, `make site-cs-check`,
   `make site-cs-strict-types`, `make site-test-unit`, `make site-test`.
   Для изменённых assets — действующие frontend gates. Записать реальные outputs.
 - [x] Проверить миграцию на пустой test DB и на копии локальной тестовой схемы
   с существующими документами: их количества/суммы не изменились, связи не создались.
 - [x] Final internal review в свежей сессии: только TASK.md, полный task diff,
   backend/frontend checklist. Исправить BLOCKER/IMPORTANT и безопасные MINOR.
-- [ ] Прочитать external-review.md и выполнить обязательный read-only review
+- [x] Прочитать external-review.md и выполнить обязательный read-only review
   `site/bin/external-review.sh <task_base_commit> --effort medium`; следовать
   marker/fix policy и лимиту трёх rounds. В текущем документационном PR не запускать.
-- [ ] Обновить ARCHITECTURE.md, Stage Reports, checkpoint, handoff; проверить PR base
+- [x] Обновить ARCHITECTURE.md, Stage Reports, checkpoint, handoff; проверить PR base
   `master`, подготовить rollback: возврат кода без удаления финансовых записей,
   additive tables сохраняются. Фактическое имя миграции включить в handoff.
-- [ ] Mark Ready; запросить одобрение production migration + deploy по release.md.
+- [x] Mark Ready; запросить одобрение production migration + deploy по release.md.
   До одобрения не merge и не запускать production commands.
 
 Commit: `test: verify settlement acceptance and release readiness`.

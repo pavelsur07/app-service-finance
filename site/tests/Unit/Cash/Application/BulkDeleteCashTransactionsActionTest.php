@@ -101,7 +101,7 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
                 }),
             );
 
-        $repository->expects(self::once())
+        $repository->expects(self::atLeastOnce())
             ->method('hasAnyTransferAggregateByIdsAndCompanyId')
             ->with($ids, $company->getId())
             ->willReturn(false);

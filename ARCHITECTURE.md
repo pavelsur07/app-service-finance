@@ -5662,14 +5662,14 @@ PAYMENT: только Cash и четыре платёжные корзины.
 
 HTML раздел `/settlements`: сводка, карточка `/counterparties/{id}`, отдельные
 `/documents` и `/documents/{id}`. FINANCE_READ/WRITE через ModuleAccessMap и
-IsGranted; company из ActiveCompanyService до данных; mutation Actions повторяют
+IsGranted (GET — READ, POST — inline WRITE до данных); company из ActiveCompanyService до данных; mutation Actions повторяют
 fresh authorization под блокировками. Setup CSRF intention включает companyId.
 Формы имеют requestId, проведение version/CSRF, суммы — SettlementAmountType
 (RUB, явная проверка2знаков до Money parser). Пустые обязательные значения
 отклоняются server constraints, false допустим для bool choices.
 
 PreviewSettlementSourceAction открывает короткую транзакцию для существующих
-locked Cash/Finance Facades; не проводит ничего. Реальные mutations отдельными
+locked Cash/Finance Facades и свежую проверку FINANCE_READ; не проводит ничего. Реальные mutations отдельными
 Actions снова проверяют источники. GET+POST страниц отмены/классификации только
 собирают explicit date/reason; ledger изменяется лишь Actions.
 
