@@ -1,0 +1,8 @@
+# Цены моделей ИИ, ₽ за 1 млн токенов (вход / выход) — копия services/ai-service/config/prices.yaml.
+# Совпадение держит services/ai-service/tests/unit/test_symfony_prices.py; менять оба файла вместе.
+# null — цена неизвестна: токены учитываются, стоимость нет (warning при импорте).
+parameters:
+    ai.prices:
+        deepseek/deepseek-flash: {input: 24.17, output: 96.67}
+        openai/gpt-4.1-mini: {input: 32.22, output: 128.89}
+        kimi/kimi-k2-0905-preview: {input: null, output: null}
