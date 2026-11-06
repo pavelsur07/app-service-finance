@@ -54,35 +54,42 @@
 **Что делаем.** Операция, похожая на перевод собственных средств, не становится кандидатом: не создаётся подсказка,
 не тратится бюджет. Признак считается в SQL, без модели. Отметку `is_transfer` не ставим (данные не меняем).
 
+**Правило (по замеру этапа 1, `measurements/stage-1.md`).** Назначение содержит одну из фраз `перевод собственных
+средств`, `перемещение собственных средств`, `внутреннее перемещение` и не содержит `депозит|кредит|займ|процент`, **и**
+у компании нет ни одной операции с такой фразой, разнесённой человеком в несистемную статью. Фраза одна признаком быть не
+может: у `b57d7682` человек относит те же «Перевод собственных средств» к кредитам (7 операций). ИНН контрагента = ИНН
+компании — не признак: это и депозиты, и кредиты со своими статьями.
+
 **Что меняем.**
 - `CashCategorizationQuery`:
-  - константа `TRANSFER_LIKE` — SQL-условие по признакам этапа 1: `tx.description ~* :transferPattern`
-    (один `pg`-regex, собранный в PHP из списка фраз), либо `counterparty.inn = company.inn` (`Company::$inn` есть;
-    у контрагента ИНН проверить при реализации — иначе только назначение);
-  - `findCandidates(...)` получает `AND NOT (TRANSFER_LIKE)`;
-  - новый метод `countTransferLike(string $companyId, \DateTimeImmutable $occurredFrom): int` для счётчика;
-  - `stats(...)` возвращает в `CashCategorizationStats` новое поле `transferLikeSkipped` (DTO
-    `src/Cash/Application/DTO/CashCategorizationStats.php`).
-- Паттерн — в `CashCategorizationQuery` как `private const TRANSFER_PHRASES = [...]` (список из этапа 1); не в
-  `.env`: это доменное правило, а не конфигурация.
-- `CashFacade::getAiSuggestionStats(...)` — пробрасывает новое поле (метод уже есть, сигнатуру не меняем).
-- `templates/admin/ai/company.html.twig` — в карточке подсказок строка «Похоже на перевод, не отправлено: N»
-  (`data-ai-transfer-skipped`).
-- `ARCHITECTURE.md`, раздел «ServiceGateway: ai-service» → подраздел про отбор операций: одна строка про `TRANSFER_LIKE`;
-  `Changelog`.
+  - `private const TRANSFER_PATTERN` и `TRANSFER_EXCLUDE_PATTERN` — два POSIX-регэкспа (`~*`), доменное правило в коде,
+    не в `.env`;
+  - `private const TRANSFER_LIKE` — SQL-фрагмент: `tx.description ~* :transferPattern AND tx.description !~* :transferExclude
+    AND NOT EXISTS (SELECT 1 FROM cash_transaction own JOIN cashflow_categories oc ON oc.id = own.cashflow_category_id
+    WHERE own.company_id = :companyId AND own.deleted_at IS NULL AND oc.system_code IS NULL
+    AND own.description ~* :transferPattern AND own.description !~* :transferExclude)`;
+  - `findCandidates(...)` — `AND NOT (TRANSFER_LIKE)`;
+  - `stats(...)` → `CashCategorizationStats::$transferLikeSkipped` (операции без статьи под правилом за окно 90 дней) —
+    DTO `src/Cash/Application/DTO/CashCategorizationStats.php`.
+- `CashFacade::getAiSuggestionStats(...)` — пробрасывает поле (сигнатура та же).
+- `templates/admin/ai/company.html.twig` — строка «Похоже на перевод, не отправлено: N» (`data-ai-transfer-skipped`).
+- `ARCHITECTURE.md`, «ServiceGateway: ai-service» — одна строка про правило переводов; `Changelog`.
 
 **Тесты.**
 - `tests/Integration/Cash/Application/CashAiCategorizationTest.php`:
-  - «Перевод собственных средств в фонд Налоги» → `requested = 0`, подсказки нет;
-  - «Перевод долга поставщику по договору» → кандидат (ложного срабатывания нет);
-  - счётчик `transferLikeSkipped` в stats.
+  - «Перевод собственных средств в фонд Налоги…» у компании без образцов → `requested = 0`, подсказки нет;
+  - та же фраза, но у компании есть операция с фразой в статье «Погашение кредита» → кандидат;
+  - «Возврат средств по депозитной сделке … внутреннее перемещение» → кандидат;
+  - «Перевод под отчёт по ведомости» → кандидат (не своя фраза);
+  - счётчик `transferLikeSkipped`.
 - `tests/Functional/Admin/AdminAiCompanyPageTest.php` — счётчик виден.
 
 **Чек-лист готовности.**
-- [ ] три интеграционных теста выше зелёные; на копии данных COMPSHOP (фикстура из масок этапа 1) 68 переводов
-  не кандидаты, остальные — кандидаты;
-- [ ] один SQL на отбор, план запроса без seq scan по `cash_transaction` сверх текущего (регексп применяется
-  после фильтра по компании и дате — проверить `EXPLAIN` на тестовой БД);
+- [ ] пять интеграционных тестов выше зелёные;
+- [ ] на проде после выката: у `fbebb285` не отправлены 110 операций с фразой, у `b57d7682` — отправляются (сверка
+  на этапе 4);
+- [ ] план запроса: регэксп и `NOT EXISTS` после фильтра по компании (`EXPLAIN` на тестовой БД, без seq scan по всей
+  `cash_transaction`);
 - [ ] счётчик на странице ИИ кабинета;
 - [ ] `make site-cs-check`, `site-stan`, затронутые тесты — зелёные; `ARCHITECTURE.md` обновлён.
 
