@@ -2420,8 +2420,8 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   (`RequestCashAiCategorizationAction::PROMPT_VERSION`, сверка с сервисом —
   `test_symfony_prompt_version.py`); не перевод
   собственных средств: фраза «перевод/перемещение собственных средств», «внутреннее
-  перемещение» без слов «депозит/кредит/займ/процент» исключает операцию, только если у
-  компании нет ни одной такой операции в несистемной статье (`TRANSFER_LIKE`; число
+  перемещение» без слов «депозит/кредит/займ/процент» исключает операцию, пока у
+  компании меньше 3 таких операций в несистемной статье (`TRANSFER_LIKE`; число
   исключённых — `CashCategorizationStats::$transferLikeSkipped` на странице «ИИ» кабинета).
   Примеры (`examples` в `categorize_payload`, промпт `categorize_transactions/v3`): к пачке —
   `CashCategorizationQuery::findExamplesFor` одним запросом, до 3 на операцию и 30 на пачку,
@@ -5047,6 +5047,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.149 | 2026-11-06 | Cash: правило переводов выключается, только когда у компании от 3 разнесённых в статьи операций с фразой перевода — одна случайная (у COMPSHOP одна из 106) больше не отправляет все переводы в ИИ (`CashCategorizationQuery::TRANSFER_LIKE`, задача `ai-routines`, этап 4) |
 | 2.148 | 2026-11-06 | Cash: immutable whole-file description plan, явный выбор, scoped chunk apply/audit/retry, защита description от 1С overwrite (`Version20261106120000`), Twig preview/result (cash-import-description-update) |
 | 2.147 | 2026-11-06 | Cash: «нет ответа» на прошлой версии промпта переспрашивается один раз (`RequestCashAiCategorizationAction::PROMPT_VERSION = categorize_transactions/v3`, `findCandidates(..., $promptVersion)`), сверка версии с ai-service — pytest `test_symfony_prompt_version.py` (задача `ai-routines`, этап 4) |
 | 2.146 | 2026-11-06 | ai-service/Cash: необязательное поле `examples` в `categorize_payload` (контракт `ai-task/v1`, категория примера — из справочника, иначе 422), промпт `categorize_transactions/v3` (правило 6 — примеры компании), `CashCategorizationQuery::findExamplesFor`, `CashCategorizationExample`; `evals-compare --examples` — примеры из других кейсов набора (задача `ai-routines`, этап 3) |

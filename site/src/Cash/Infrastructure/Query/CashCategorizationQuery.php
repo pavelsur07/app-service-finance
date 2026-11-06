@@ -51,18 +51,20 @@ final readonly class CashCategorizationQuery
     private const TRANSFER_EXCLUDE_PATTERN = '(депозит|кредит|займ|процент)';
 
     /**
-     * Фраза перевода — признак, только если компания сама такие операции в статьи не разносила: иначе
-     * (у одного кабинета «перевод собственных средств» — погашение кредита) решает её история.
+     * Фраза перевода — признак, пока компания сама не разнесла в статьи хотя бы 3 такие операции: иначе
+     * (у одного кабинета «перевод собственных средств» — погашение кредита) решает её история. Одна случайная
+     * разнесённая операция правило не выключает: у COMPSHOP одна из 106 стояла в «Транспортных расходах».
      * COALESCE: у пустого назначения условие иначе NULL, и `NOT (...)` выбросило бы операцию из кандидатов.
      */
     private const TRANSFER_LIKE = <<<'SQL'
         (COALESCE(tx.description, '') ~* :transferPattern AND COALESCE(tx.description, '') !~* :transferExclude
-         AND NOT EXISTS (
+         AND (SELECT count(*) FROM (
              SELECT 1 FROM cash_transaction own
              JOIN "cashflow_categories" own_category ON own_category.id = own.cashflow_category_id
              WHERE own.company_id = :companyId AND own.deleted_at IS NULL AND own_category.is_system = false
                AND own.description ~* :transferPattern AND own.description !~* :transferExclude
-         ))
+             LIMIT 3
+         ) own_decisions) < 3)
         SQL;
 
     /** Порог предложения автоправила по ИИ-подсказкам: операций со статьёй человека. */
