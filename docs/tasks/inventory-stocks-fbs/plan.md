@@ -19,7 +19,7 @@
 **Класс задачи:** Large (Messenger-обработчик, внешняя интеграция). Ветка
 `feat/inventory-stocks-fbs-scheme`, один Draft PR. Коммиты — только с pathspec.
 
-Baseline (снять до первого изменения, записать в checkpoint.md):
+Baseline (снять до первого изменения, записать в ledger):
 `docker compose run --rm -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Functional/Inventory/Controller/StockReportControllerTest.php tests/Integration/Inventory/MessageHandler/SyncWbInventorySnapshotHandlerTest.php tests/Unit/Inventory`
 (перед functional/integration один раз `make site-test-prepare`).
 
@@ -48,14 +48,14 @@ Baseline (снять до первого изменения, записать в
 (тест на каждый добавлен в задачу-владельца):
 
 1. Ozon-строка без `fulfillment_type` (NULL или пустая) — должна остаться в FBO, не пропасть
-   из обоих режимов → Stage 1, задача 1.2.
+   из обоих режимов → Stage 1, Task 2.
 2. У WB-токена нет доступа к «Маркетплейсу» (401/403 на `/api/v3/warehouses`) — сессия всё равно
-   `completed`, FBW-строки нормализуются, в логе один `warning` → Stage 3, задача 3.3.
+   `completed`, FBW-строки нормализуются, в логе один `warning` → Stage 3, Task 6.
 3. Повторная доставка сообщения после сбоя посреди FBS-фазы — FBW-страницы не перезапрашиваются,
-   FBS-фаза не дублирует raw → Stage 3, задача 3.3.
-4. У компании нет баркодов WB — ни одного запроса в marketplace-api → Stage 3, задача 3.3.
+   FBS-фаза не дублирует raw → Stage 3, Task 6.
+4. У компании нет баркодов WB — ни одного запроса в marketplace-api → Stage 3, Task 6.
 5. Эффективная дата внутри схемы: за сегодня есть только FBO-строки, вчера были FBS — режим FBS
-   показывает вчера с подписью «показан ближайший» → Stage 1, задача 1.2.
+   показывает вчера с подписью «показан ближайший» → Stage 1, Task 2.
 
 ---
 
@@ -70,7 +70,7 @@ Definition of Done:
 - Тесты контроллера зелёные, включая новые из этого Stage.
 - Исключено: вёрстка переключателя (Stage 2), данные WB FBS (Stage 3).
 
-### Задача 1.1: Enum `FulfillmentScheme`
+### Task 1 (1.1): Enum `FulfillmentScheme`
 
 **Файлы:**
 - Создать: `site/src/Inventory/Enum/FulfillmentScheme.php`
@@ -112,7 +112,7 @@ public function testFulfillmentSchemeFromFulfillmentType(): void
 - [ ] **Шаг 4:** тот же запуск — PASS.
 - [ ] **Шаг 5:** `git add site/src/Inventory/Enum/FulfillmentScheme.php site/tests/Unit/Inventory/Enum/InventoryEnumsTest.php && git commit -m "feat(inventory): enum FulfillmentScheme — FBO/FBS из fulfillment_type"`
 
-### Задача 1.2: схема в `InventoryStockReportQuery` и `StockReportController`
+### Task 2 (1.2): схема в `InventoryStockReportQuery` и `StockReportController`
 
 **Файлы:**
 - Изменить: `site/src/Inventory/Infrastructure/Query/InventoryStockReportQuery.php`
@@ -121,7 +121,7 @@ public function testFulfillmentSchemeFromFulfillmentType(): void
 - Тест: `site/tests/Functional/Inventory/Controller/StockReportControllerTest.php`
 
 **Интерфейсы:**
-- Потребляет: `FulfillmentScheme` (1.1).
+- Потребляет: `FulfillmentScheme` (Task 1).
 - Производит (сигнатуры, на которые опираются Stage 2 и ARCHITECTURE.md):
   ```php
   public function findEffectiveSnapshotDate(string $companyId, MarketplaceType $source, FulfillmentScheme $scheme, \DateTimeImmutable $date): ?\DateTimeImmutable;
@@ -190,13 +190,13 @@ Definition of Done:
   шаблон менять не нужно — проверить).
 - Исключено: смена вёрстки таблицы.
 
-### Задача 2.1: переключатель FBO / FBS
+### Task 3 (2.1): переключатель FBO / FBS
 
 **Файлы:**
 - Изменить: `site/templates/inventory/stocks/index.html.twig`
 - Тест: `site/tests/Functional/Inventory/Controller/StockReportControllerTest.php`
 
-**Интерфейсы:** потребляет `scheme` (`FulfillmentScheme`) и `schemes` (`list<FulfillmentScheme>`) из контроллера (1.2).
+**Интерфейсы:** потребляет `scheme` (`FulfillmentScheme`) и `schemes` (`list<FulfillmentScheme>`) из контроллера (Task 2).
 
 - [ ] **Шаг 1: тест**
 
@@ -242,7 +242,7 @@ Definition of Done:
   обработчика обновлены.
 - Исключено: новый cron, новое сообщение, ретраи FBS-фазы внутри сессии.
 
-### Задача 3.1: клиент — склады продавца и остатки по баркодам
+### Task 4 (3.1): клиент — склады продавца и остатки по баркодам
 
 **Файлы:**
 - Изменить: `site/src/Inventory/Infrastructure/Api/Wildberries/WbInventoryClient.php`
@@ -290,7 +290,7 @@ public function testSellerWarehouseStocksRejectsEmptyAndOversizedBarcodeLists():
 - [ ] **Шаг 4:** тот же запуск — PASS.
 - [ ] **Шаг 5:** `git add site/src/Inventory/Infrastructure/Api/Wildberries/WbInventoryClient.php site/tests/Unit/Inventory/Infrastructure/Api/Wildberries/WbInventoryClientTest.php && git commit -m "feat(inventory): WbInventoryClient — склады продавца и остатки по баркодам"`
 
-### Задача 3.2: `MarketplaceFacade::getListingBarcodes()`, `LocationType::SellerWarehouse`, нормализатор FBS
+### Task 5 (3.2): `MarketplaceFacade::getListingBarcodes()`, `LocationType::SellerWarehouse`, нормализатор FBS
 
 **Файлы:**
 - Изменить: `site/src/Marketplace/Facade/MarketplaceFacade.php`
@@ -298,7 +298,7 @@ public function testSellerWarehouseStocksRejectsEmptyAndOversizedBarcodeLists():
 - Создать: `site/src/Inventory/Infrastructure/Normalizer/WbSellerWarehouseStocksRawNormalizer.php`
 - Тесты: `site/tests/Unit/Inventory/Infrastructure/Normalizer/WbSellerWarehouseStocksRawNormalizerTest.php`,
   `site/tests/Unit/Inventory/Enum/InventoryEnumsTest.php`,
-  `site/tests/Integration/Inventory/MessageHandler/SyncWbInventorySnapshotHandlerTest.php` (маппинг по баркоду проверяется там, 3.3)
+  `site/tests/Integration/Inventory/MessageHandler/SyncWbInventorySnapshotHandlerTest.php` (маппинг по баркоду проверяется там, Task 6)
 
 **Интерфейсы (производит):**
 ```php
@@ -348,14 +348,14 @@ public function testBuildsFbsRowsFromSellerStockPagesAndSkipsOtherEndpoints(): v
 - [ ] **Шаг 4:** запуск — PASS.
 - [ ] **Шаг 5:** `git add site/src/Marketplace/Facade/MarketplaceFacade.php site/src/Inventory/Enum/LocationType.php site/src/Inventory/Infrastructure/Normalizer/WbSellerWarehouseStocksRawNormalizer.php site/tests/Unit/Inventory/Infrastructure/Normalizer/WbSellerWarehouseStocksRawNormalizerTest.php site/tests/Unit/Inventory/Enum/InventoryEnumsTest.php && git commit -m "feat(inventory): нормализатор остатков склада продавца WB, LocationType::SellerWarehouse, баркоды через Facade"`
 
-### Задача 3.3: FBS-фаза в `SyncWbInventorySnapshotHandler` и нормализация в Action
+### Task 6 (3.3): FBS-фаза в `SyncWbInventorySnapshotHandler` и нормализация в Action
 
 **Файлы:**
 - Изменить: `site/src/Inventory/MessageHandler/SyncWbInventorySnapshotHandler.php`
 - Изменить: `site/src/Inventory/Application/NormalizeInventorySnapshotAction.php`
 - Тест: `site/tests/Integration/Inventory/MessageHandler/SyncWbInventorySnapshotHandlerTest.php`
 
-**Интерфейсы:** потребляет 3.1 и 3.2. Поведение обработчика:
+**Интерфейсы:** потребляет Task 4 и Task 5. Поведение обработчика:
 
 1. Цикл возобновления по сохранённым raw учитывает только страницы с
    `getSourceEndpoint() === WbInventoryClient::ENDPOINT` (FBW); страницы FBS-фазы считаются
@@ -444,7 +444,7 @@ Definition of Done:
   `make site-test-unit`, `make site-test` (затронуты integration-пути).
 - PR Ready, один вопрос Владельцу: «merge and deploy #N».
 
-### Задача 4.1: ARCHITECTURE.md и handoff
+### Task 7 (4.1): ARCHITECTURE.md и handoff
 
 - [ ] **Шаг 1:** внести правки по DoD (текущее состояние — в разделы, история — в Changelog).
 - [ ] **Шаг 2:** `grep -n "FulfillmentScheme\|getListingBarcodes\|seller_warehouse" ARCHITECTURE.md` — все три есть.
