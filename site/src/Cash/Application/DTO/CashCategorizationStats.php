@@ -18,6 +18,8 @@ final readonly class CashCategorizationStats
         public int $corrected,
         /** Подсказка висела, а человек проставил ту же статью правкой операции. */
         public int $confirmedByEdit,
+        /** Операции без статьи, похожие на перевод собственных средств: в ИИ не отправляются. */
+        public int $transferLikeSkipped = 0,
     ) {
     }
 

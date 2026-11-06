@@ -88,6 +88,7 @@ final class AdminAiCompanyPageTest extends WebTestCaseBase
         self::assertStringContainsString('12,50 ₽ из 10 ₽', $crawler->filter('[data-ai-spent]')->text());
         self::assertCount(1, $crawler->filter('[data-ai-exhausted]'));
         self::assertStringContainsString('лимит исчерпан', $crawler->filter('[data-ai-runs]')->text());
+        self::assertStringEndsWith(': 0', $crawler->filter('[data-ai-transfer-skipped]')->text());
 
         $list = $this->client->request('GET', '/admin/users');
         self::assertCount(1, $list->filter(sprintf('[data-ai-exhausted-badge="%s"]', $this->company->getId())));

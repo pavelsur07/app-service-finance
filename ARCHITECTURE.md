@@ -2415,7 +2415,11 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   payload ответил бы 409); строки без ответа старше 7 дней → `failed`
   (`expired`); запись задачи без `requested` удаляется. Кандидаты — без статьи,
   за 90 дней, созданы раньше чем 10 мин назад (автоправила отработали), без
-  открытой подсказки и меньше 3 сбоев ответа (`expired` не считается).
+  открытой подсказки и меньше 3 сбоев ответа (`expired` не считается), не перевод
+  собственных средств: фраза «перевод/перемещение собственных средств», «внутреннее
+  перемещение» без слов «депозит/кредит/займ/процент» исключает операцию, только если у
+  компании нет ни одной такой операции в несистемной статье (`TRANSFER_LIKE`; число
+  исключённых — `CashCategorizationStats::$transferLikeSkipped` на странице «ИИ» кабинета).
   Справочник — активные несистемные конечные статьи с путём (0 или больше 1000
   → пропуск компании). ИНН и счета не передаются.
 - `CashCategorizationResultConsumer`: строки `requested` по `task_id` (повтор
@@ -5026,6 +5030,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.145 | 2026-11-06 | Cash: переводы собственных средств не отправляются в ИИ, если компания такие операции в статьи не разносила (`CashCategorizationQuery::TRANSFER_LIKE`), счётчик `transferLikeSkipped` на странице «ИИ» кабинета, `CashFacade::getAiSuggestionStats(..., ?occurredFrom)` (задача `ai-routines`, этап 2) |
 | 2.144 | 2026-11-06 | ServiceGateway: учёт расходов ИИ `ai_usage`, журнал `ai_run`, лимиты `ai_company_access.monthly_limit_rub`/`lookback_days` (`Version20261106090000`–`110000`), гейт `app:ai-service:health-check`, страница `/admin/ai/companies/{id}`; cron `ai-categorize` идёт по всем подключённым компаниям, `CashAiCategorizationCompaniesQuery` удалён; `CashFacade::getAiSuggestionStats` (задача `ai-observability-budget`) |
 | 2.143 | 2026-11-05 | ServiceGateway: подключение компаний к ИИ из админки — `ai_company_access` (`Version20261105120000`, перенос Вумджой), `SetAiCompanyAccessAction`, переключатель «ИИ» в `/admin/users`; `AiTaskFacadeInterface::enabledCompanyIds/isServiceEnabled/grantedCompanyIds`; env `AI_SERVICE_COMPANY_ALLOWLIST` удалена (задача `ai-company-access`) |
 | 2.142 | 2026-11-05 | Company: удаление компании двухшаговое — `deletion_requested_at`/`deletion_requested_by` (`Version20261105090000`), `RequestCompanyDeletionAction`/`RestoreCompanyDeletionAction`, `CompanyDeletionRequestedEvent` (отключение подключений Marketplace, MoySklad, BankSync, привязок Telegram), закрыт API-доступ, помеченные компании вне активных; `CompanyFacade::getDeletionRequestedCompanyIds()` (задача `company-deletion`, этап 1) |

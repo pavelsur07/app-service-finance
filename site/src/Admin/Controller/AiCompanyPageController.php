@@ -24,6 +24,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class AiCompanyPageController extends AbstractController
 {
     public const STATS_DAYS = 7;
+    /** Окно счётчика переводов — наибольшая глубина истории ИИ (RequestCashAiCategorizationAction::LOOKBACK_DAYS). */
+    public const TRANSFER_WINDOW_DAYS = 90;
 
     public function __construct(
         private readonly CompanyFacade $companies,
@@ -36,13 +38,15 @@ final class AiCompanyPageController extends AbstractController
     public function __invoke(string $companyId): Response
     {
         $company = $this->companies->findById($companyId) ?? throw $this->createNotFoundException('Кабинет не найден.');
-        $since = $this->clock->now()->modify(sprintf('-%d days', self::STATS_DAYS));
+        $now = $this->clock->now();
+        $since = $now->modify(sprintf('-%d days', self::STATS_DAYS));
 
         return $this->render('admin/ai/company.html.twig', [
             'company' => $company,
             'overview' => $this->ai->companyOverview($companyId),
-            'stats' => $this->cash->getAiSuggestionStats($companyId, $since),
+            'stats' => $this->cash->getAiSuggestionStats($companyId, $since, $now->modify(sprintf('-%d days', self::TRANSFER_WINDOW_DAYS))->setTime(0, 0)),
             'statsDays' => self::STATS_DAYS,
+            'transferWindowDays' => self::TRANSFER_WINDOW_DAYS,
             'runsSince' => $since,
             'lookbackChoices' => AiCompanyAccess::LOOKBACK_CHOICES,
         ]);

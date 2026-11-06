@@ -41,6 +41,29 @@ final readonly class CashCategorizationQuery
         AND (company.finance_lock_before IS NULL OR tx.occurred_at >= company.finance_lock_before)
         SQL;
 
+    /**
+     * Перевод собственных средств (docs/tasks/ai-routines/measurements/stage-1.md): между своими счетами,
+     * в «налоговую копилку». Статьи ДДС у него нет, модель по нему не отвечает — не отправлять и не платить.
+     * Депозиты и кредиты с той же фразой — настоящие статьи, они не переводы.
+     */
+    private const TRANSFER_PATTERN = '(перевод\s+собственных\s+средств|перемещение\s+собственных\s+средств|внутреннее\s+перемещение)';
+    private const TRANSFER_EXCLUDE_PATTERN = '(депозит|кредит|займ|процент)';
+
+    /**
+     * Фраза перевода — признак, только если компания сама такие операции в статьи не разносила: иначе
+     * (у одного кабинета «перевод собственных средств» — погашение кредита) решает её история.
+     * COALESCE: у пустого назначения условие иначе NULL, и `NOT (...)` выбросило бы операцию из кандидатов.
+     */
+    private const TRANSFER_LIKE = <<<'SQL'
+        (COALESCE(tx.description, '') ~* :transferPattern AND COALESCE(tx.description, '') !~* :transferExclude
+         AND NOT EXISTS (
+             SELECT 1 FROM cash_transaction own
+             JOIN "cashflow_categories" own_category ON own_category.id = own.cashflow_category_id
+             WHERE own.company_id = :companyId AND own.deleted_at IS NULL AND own_category.is_system = false
+               AND own.description ~* :transferPattern AND own.description !~* :transferExclude
+         ))
+        SQL;
+
     /** Порог предложения автоправила по ИИ-подсказкам: операций со статьёй человека. */
     public const RULE_PROPOSAL_MIN_CONFIRMED = 3;
 
@@ -68,6 +91,7 @@ final readonly class CashCategorizationQuery
              WHERE '.self::UNCATEGORIZED.'
                AND tx.occurred_at >= :occurredFrom
                AND tx.created_at < :createdBefore
+               AND NOT '.self::TRANSFER_LIKE.'
                AND NOT EXISTS (
                    SELECT 1 FROM cash_category_suggestion s
                    WHERE s.company_id = :companyId AND s.transaction_id = tx.id
@@ -86,6 +110,8 @@ final readonly class CashCategorizationQuery
                 'createdBefore' => $createdBefore->format('Y-m-d H:i:s'),
                 'maxFailed' => self::MAX_FAILED_ATTEMPTS,
                 'limit' => $limit,
+                'transferPattern' => self::TRANSFER_PATTERN,
+                'transferExclude' => self::TRANSFER_EXCLUDE_PATTERN,
             ],
             ['unallocatedCodes' => ArrayParameterType::STRING],
         );
@@ -484,8 +510,11 @@ final readonly class CashCategorizationQuery
         return $views;
     }
 
-    /** @param \DateTimeImmutable|null $requestedSince только подсказки, запрошенные с этого момента */
-    public function stats(string $companyId, ?\DateTimeImmutable $requestedSince = null): CashCategorizationStats
+    /**
+     * @param \DateTimeImmutable|null $requestedSince только подсказки, запрошенные с этого момента
+     * @param \DateTimeImmutable|null $occurredFrom окно операций для счётчика переводов (null — не считать)
+     */
+    public function stats(string $companyId, ?\DateTimeImmutable $requestedSince = null, ?\DateTimeImmutable $occurredFrom = null): CashCategorizationStats
     {
         Assert::uuid($companyId);
         // Нижняя граница по умолчанию — «всё время»: один текст запроса на оба случая.
@@ -516,10 +545,26 @@ final readonly class CashCategorizationQuery
             ],
         );
 
+        $transferLike = null === $occurredFrom ? 0 : (int) $this->connection->fetchOne(
+            'SELECT count(*) FROM cash_transaction tx
+             JOIN "companies" company ON company.id = tx.company_id
+             LEFT JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id
+             WHERE '.self::UNCATEGORIZED.' AND tx.occurred_at >= :occurredFrom AND '.self::TRANSFER_LIKE,
+            [
+                'companyId' => $companyId,
+                'unallocatedCodes' => [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
+                'occurredFrom' => $occurredFrom->format('Y-m-d'),
+                'transferPattern' => self::TRANSFER_PATTERN,
+                'transferExclude' => self::TRANSFER_EXCLUDE_PATTERN,
+            ],
+            ['unallocatedCodes' => ArrayParameterType::STRING],
+        );
+
         return new CashCategorizationStats(
             byStatus: array_map('intval', $byStatus),
             corrected: (int) ($edited['corrected'] ?? 0),
             confirmedByEdit: (int) ($edited['confirmed'] ?? 0),
+            transferLikeSkipped: $transferLike,
         );
     }
 }
