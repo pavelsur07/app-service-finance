@@ -57,7 +57,7 @@ final readonly class ReverseSettlementDocumentAction
                 }
             }
             $reversal = new SettlementDocument($companyId, $input->requestId, SettlementDocumentKind::DOCUMENT_REVERSAL, $original->getCounterpartyId(), $original->getBucket(), $original->getAmount(), $input->effectiveDate, null, $input->reason, $actorUserId, SettlementSourceType::MANUAL, null, [], $documentId);
-            $reversal->post(1);
+            $reversal->post(1, $book->takeEventSequence());
             $this->em->persist($reversal);
             foreach ($movements as $movement) {
                 $this->em->persist(new SettlementMovement($companyId, $reversal->getId(), $movement->getItemId(), $movement->getBucket(), $movement->getDelta()->negate(), $input->effectiveDate));

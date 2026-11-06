@@ -42,7 +42,7 @@ final readonly class CorrectSettlementItemAction
                 throw new \DomainException('Корректировка раньше исходной позиции.');
             }
             $document = new SettlementDocument($companyId, $input->requestId, SettlementDocumentKind::CORRECTION, $item->getCounterpartyId(), $item->getBucket(), $input->amount, $input->effectiveDate, null, $input->reason, $actorUserId, SettlementSourceType::MANUAL, null, $snapshot);
-            $document->post(1);
+            $document->post(1, $book->takeEventSequence());
             $this->em->persist($document);
             $this->updater->append($document, $item, $input->increase ? $input->amount : $input->amount->negate());
             $this->em->flush();

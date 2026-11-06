@@ -1,7 +1,7 @@
 ## Current checkpoint
 
 **Phase:** Stage 1 / Work item 1.2
-**Status:** implementing
+**Status:** reviewing
 **Task base commit:** 4fdad15c974830d13ff9342d1f40a526f3b5bd33
 **Stage base commit:** 4fdad15c974830d13ff9342d1f40a526f3b5bd33
 **Branch:** feat/counterparty-settlements
@@ -27,7 +27,7 @@
 - external: pending at required Stage/handoff points
 
 ### Exact next action
-- Complete Stage 1 negative/action tests and review; source adapters and remaining Stages not implemented.
+- Await/read external Stage1 review, fix confirmed findings; finish Stage Report, commit/push fixes, continue Stage2 automatically. Source adapters and later Stages not implemented.
 
 ### Files to inspect first on resume
 - TASK.md, plan.md, checkpoint.md, git status.
@@ -50,3 +50,16 @@
 - Internal review ongoing; Stage 1 not closed; external review required (>500 lines) before closure.
 - Schema validate mapping PASS; schema difference only pre-existing test_money_holder fixture.
 - Remaining: strengthen Stage1 action negative/idempotency tests, complete fresh internal review and external review, Stage Report.
+
+- Internal fresh Stage1 review found 3 IMPORTANT in total: stale closure getter (fixed), UUID ordering (fixed with company-book-issued persistent eventSequence), missing Stage1 security/opening/history coverage (expanded).
+- Sequence regression: old UUID order fails when chronological movement IDs are deliberately reversed; new effectiveDate/eventSequence passes.
+- Draft implementation PR: https://github.com/pavelsur07/app-service-finance/pull/2901 (base master verified). Checkpoint commit 80e4c8502 pushed; Stage1 review fixes not yet committed.
+- Local migration evolving before release: added event_sequence to documents and next_event_sequence to book; test DB altered locally, migration remains additive for fresh production deployment.
+
+### Latest evidence
+- Expanded module tests PASS 23 tests / 78 assertions; no new Doctrine deprecations.
+- Focused PHPStan PASS (Settlement src/tests/builders and Company changed files).
+- Fresh independent internal rereview: BLOCKER 0 / IMPORTANT 0 remaining, all findings fixed.
+- Fresh second DB vf_settlements_fresh_test: all 307 migrations applied, Settlement schema test PASS 1/4. New migration executable from empty database.
+- External Stage1 review running via site/bin/external-review.sh 4fdad15c974830d13ff9342d1f40a526f3b5bd33 --effort medium --context /tmp/vf-settlement-stage1-review-context.md. Process session82656; output /tmp/vf-settlement-external-stage1.log and site/var/external-review/4fdad15c/. Do not start duplicate review.
+- Source write-path exploration delegated read-only to inspect_settlement_sources; await inventory for Stage2.

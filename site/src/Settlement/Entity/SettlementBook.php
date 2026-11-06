@@ -65,4 +65,11 @@ class SettlementBook
         $this->initialized = true;
         ++$this->version;
     }
+    #[ORM\Column(type: Types::BIGINT)]
+    private int $nextEventSequence = 1;
+
+    public function takeEventSequence(): int
+    {
+        return $this->nextEventSequence++;
+    }
 }

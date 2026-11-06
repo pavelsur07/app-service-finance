@@ -63,6 +63,12 @@ final readonly class SettlementRepository
     /** @return list<SettlementMovement> */
     public function getHistory(string $companyId, string $itemId): array
     {
-        return $this->em->getRepository(SettlementMovement::class)->findBy(['companyId' => $companyId, 'itemId' => $itemId], ['effectiveDate' => 'ASC', 'id' => 'ASC']);
+        return $this->em->createQueryBuilder()->select('m')
+            ->from(SettlementMovement::class, 'm')
+            ->join(SettlementDocument::class, 'd', 'ON', 'd.id = m.documentId AND d.companyId = m.companyId')
+            ->where('m.companyId = :company')->andWhere('m.itemId = :item')
+            ->setParameter('company', $companyId)->setParameter('item', $itemId)
+            ->orderBy('m.effectiveDate', \SortDirection::Ascending)->addOrderBy('d.eventSequence', \SortDirection::Ascending)->addOrderBy('m.id', \SortDirection::Ascending)
+            ->getQuery()->getResult();
     }
 }

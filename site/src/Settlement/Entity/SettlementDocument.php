@@ -18,6 +18,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'settlement_documents')]
 #[ORM\UniqueConstraint(name: 'uniq_settlement_documents_company_id', columns: ['company_id', 'id'])]
 #[ORM\UniqueConstraint(name: 'uniq_settlement_document_request', columns: ['company_id', 'request_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_settlement_event_sequence', columns: ['company_id', 'event_sequence'])]
 class SettlementDocument
 {
     #[ORM\Id]
@@ -158,11 +159,21 @@ class SettlementDocument
         return $this->version;
     }
 
-    public function post(int $expectedVersion): void
+    #[ORM\Column(type: Types::BIGINT, nullable: true)]
+    private ?int $eventSequence = null;
+
+    public function getEventSequence(): ?int
+    {
+        return $this->eventSequence;
+    }
+
+    public function post(int $expectedVersion, int $eventSequence): void
     {
         if (SettlementDocumentStatus::DRAFT !== $this->status || $expectedVersion !== $this->version) {
             throw new \DomainException('Документ уже проведён или изменён.');
         }
+        Assert::positiveInteger($eventSequence);
+        $this->eventSequence = $eventSequence;
         $this->status = SettlementDocumentStatus::POSTED;
         ++$this->version;
     }

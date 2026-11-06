@@ -31,7 +31,7 @@ final readonly class PostSettlementDocumentAction
                 return new SettlementResult($documentId, $this->repository->findItemByDocument($companyId, $documentId)?->getId(), $document->getVersion(), true);
             }
             $this->policy->assertDate($companyId, $book, $document->getEffectiveDate());
-            $document->post($expectedVersion);
+            $document->post($expectedVersion, $book->takeEventSequence());
             $item = new SettlementItem($companyId, $documentId, $document->getCounterpartyId(), $document->getBucket(), $document->getAmount(), $document->getEffectiveDate(), $document->getDueDate());
             $this->em->persist($item);
             $this->updater->append($document, $item, $item->getAmount());

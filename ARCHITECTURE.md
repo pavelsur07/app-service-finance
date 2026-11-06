@@ -5438,6 +5438,9 @@ SettlementBook FOR UPDATE → позиции по отсортированным
 Проведённые документы неизменяемы; повтор по requestId возвращает исходный результат,
 повтор отмены исходного документа с новым requestId возвращает существующую отмену.
 Коррекции/отмены проверяют неотрицательность всей последующей истории позиции.
+Порядок событий: effectiveDate, eventSequence; номер выдаётся из SettlementBook
+под FOR UPDATE, уникален по компании и сохраняется в SettlementDocument. UUID
+не используется для определения порядка разных финансовых событий.
 
 `CompanyFacade::getFinanceLockBefore(string $companyId): ?DateTimeImmutable`
 читает текущую границу через DBAL CompanyRepository, обходя кэш сущности Company;

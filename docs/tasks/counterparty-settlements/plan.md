@@ -61,21 +61,21 @@ PHP/DB/frontend baseline не запускался: текущая задача 
 
 ## Phase 0 — зафиксировать решения и baseline
 
-- [ ] Получить ответы D1–D7; записать согласованные правила в TASK.md. Если изменился
+- [x] Получить ответы D1–D7; записать согласованные правила в TASK.md. Если изменился
   scope, скорректировать таблицу этапов, DTO и матрицу приёмки до продуктового кода.
-- [ ] Создать/проверить изолированную implementation branch от актуального master.
+- [x] Создать/проверить изолированную implementation branch от актуального master.
   Документационный PR этого плана не является implementation PR.
-- [ ] Прочитать актуальные AGENTS.md, CLAUDE.md, разделы Facade/Cash/Finance/Balance
+- [x] Прочитать актуальные AGENTS.md, CLAUDE.md, разделы Facade/Cash/Finance/Balance
   в ARCHITECTURE.md, PATTERNS.md §7/§12/денежные суммы, new-module.md, CLAUDE.frontend.md.
-- [ ] Сравнить три образца: `BalanceLedgerService` (проведение/отмена),
+- [x] Сравнить три образца: `BalanceLedgerService` (проведение/отмена),
   `CreateDocumentFromTransactionAction` (блокировка источника),
   `PaymentPlanMatcher` (существующая связь с оплатами и её ограничения).
-- [ ] Проверить локальное окружение, mount рабочей копии в контейнер и отдельную
+- [x] Проверить локальное окружение, mount рабочей копии в контейнер и отдельную
   test DB. При необходимости подготовить её `make site-test-smoke-init`.
-- [ ] Выполнить baseline существующих тестов: `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Unit/Cash/Entity/Transaction/CashTransactionAllocationTest.php`;
+- [x] Выполнить baseline существующих тестов: `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Unit/Cash/Entity/Transaction/CashTransactionAllocationTest.php`;
   затем `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Cash/Application/CreateDocumentFromTransactionActionTest.php`.
   Записать команды, числа тестов и pre-existing failures в checkpoint.md.
-- [ ] Создать `checkpoint.md`; перед каждым Stage записывать реальный stage_base_commit.
+- [x] Создать `checkpoint.md`; перед каждым Stage записывать реальный stage_base_commit.
 
 Не копировать .env.local и production credentials в новую рабочую копию.
 Не запускать `make site-test` до handoff. При повторных тестах использовать running

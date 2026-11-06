@@ -106,4 +106,87 @@ final class SettlementDocumentInvariantTest extends IntegrationTestCase
         $this->expectException(\DomainException::class);
         (self::getContainer()->get(CorrectSettlementItemAction::class))($this->companyId, $this->actorId, new CorrectSettlementItemInput(Uuid::uuid7()->toString(), $posted->itemId, Money::fromString('1.00', 'RUB'), true, new \DateTimeImmutable('2026-11-03'), 'Уточнение'));
     }
+
+    public function testFourOpeningBucketsAndRepeatedPostingDoNotDuplicateMovements(): void
+    {
+        $create = self::getContainer()->get(CreateSettlementDocumentAction::class);
+        $post = self::getContainer()->get(PostSettlementDocumentAction::class);
+        foreach ([SettlementBucket::RECEIVABLE, SettlementBucket::PAYABLE, SettlementBucket::ADVANCE_GIVEN, SettlementBucket::ADVANCE_RECEIVED] as $bucket) {
+            $draft = $create($this->companyId, $this->actorId, new CreateSettlementDocumentInput(Uuid::uuid7()->toString(), SettlementDocumentKind::OPENING, $this->partyId, $bucket, Money::fromString('25.01', 'RUB'), new \DateTimeImmutable('2026-11-01'), null, 'Ввод остатков'));
+            $first = $post($this->companyId, $this->actorId, $draft->documentId, $draft->version);
+            $again = $post($this->companyId, $this->actorId, $draft->documentId, $draft->version);
+            self::assertSame($first->itemId, $again->itemId);
+            self::assertTrue($again->replayed);
+        }
+        self::assertSame(4, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM settlement_movements WHERE company_id = ?', [$this->companyId]));
+        self::assertSame('10004', (string) $this->connection->fetchOne('SELECT SUM(delta_amount_minor) FROM settlement_movements WHERE company_id = ?', [$this->companyId]));
+    }
+
+    public function testCrossCompanyDocumentCannotBePosted(): void
+    {
+        $draft = $this->draft();
+        $owner = $this->company->getUser();
+        self::assertNotNull($owner);
+        $other = CompanyBuilder::aCompany()->withIndex(2)->withOwner($owner)->build();
+        $this->em->persist($other);
+        $this->em->flush();
+        $otherId = $other->getId();
+        self::assertNotNull($otherId);
+        (self::getContainer()->get(ConfigureSettlementBookAction::class))($otherId, $this->actorId, new \DateTimeImmutable('2026-11-01'));
+        $this->expectException(\DomainException::class);
+        (self::getContainer()->get(PostSettlementDocumentAction::class))($otherId, $this->actorId, $draft->documentId, $draft->version);
+    }
+
+    public function testRevokedRightsAreRecheckedBeforePosting(): void
+    {
+        $draft = $this->draft();
+        $other = UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail('other@example.test')->build();
+        $this->em->persist($other);
+        $this->em->flush();
+        $this->connection->executeStatement('UPDATE companies SET user_id = ? WHERE id = ?', [$other->getId(), $this->companyId]);
+        $this->expectException(AccessDeniedException::class);
+        (self::getContainer()->get(PostSettlementDocumentAction::class))($this->companyId, $this->actorId, $draft->documentId, $draft->version);
+    }
+
+    public function testPostingOrderDoesNotDependOnMovementUuid(): void
+    {
+        $draft = $this->draft();
+        $posted = (self::getContainer()->get(PostSettlementDocumentAction::class))($this->companyId, $this->actorId, $draft->documentId, $draft->version);
+        self::assertNotNull($posted->itemId);
+        $correct = self::getContainer()->get(CorrectSettlementItemAction::class);
+        $increase = $correct($this->companyId, $this->actorId, new CorrectSettlementItemInput(Uuid::uuid7()->toString(), $posted->itemId, Money::fromString('100.00', 'RUB'), true, new \DateTimeImmutable('2026-11-01'), 'Увеличение'));
+        $this->connection->executeStatement("UPDATE settlement_movements SET id = 'ffffffff-ffff-7fff-afff-ffffffffffff' WHERE company_id = ? AND document_id = ?", [$this->companyId, $draft->documentId]);
+        $this->connection->executeStatement("UPDATE settlement_movements SET id = 'eeeeeeee-eeee-7eee-aeee-eeeeeeeeeeee' WHERE company_id = ? AND document_id = ?", [$this->companyId, $increase->documentId]);
+        $this->em->clear();
+        $correct($this->companyId, $this->actorId, new CorrectSettlementItemInput(Uuid::uuid7()->toString(), $posted->itemId, Money::fromString('150.00', 'RUB'), false, new \DateTimeImmutable('2026-11-01'), 'Уменьшение'));
+        self::assertSame('5000', (string) $this->connection->fetchOne('SELECT SUM(delta_amount_minor) FROM settlement_movements WHERE company_id = ?', [$this->companyId]));
+    }
+
+    public function testBackdatedCorrectionCannotBreakLaterInterval(): void
+    {
+        $draft = $this->draft();
+        $posted = (self::getContainer()->get(PostSettlementDocumentAction::class))($this->companyId, $this->actorId, $draft->documentId, $draft->version);
+        self::assertNotNull($posted->itemId);
+        $correct = self::getContainer()->get(CorrectSettlementItemAction::class);
+        $decrease = $correct($this->companyId, $this->actorId, new CorrectSettlementItemInput(Uuid::uuid7()->toString(), $posted->itemId, Money::fromString('100.00', 'RUB'), false, new \DateTimeImmutable('2026-11-02'), 'Уменьшение'));
+        (self::getContainer()->get(ReverseSettlementDocumentAction::class))($this->companyId, $this->actorId, $decrease->documentId, new ReverseSettlementInput(Uuid::uuid7()->toString(), new \DateTimeImmutable('2026-11-04'), 'Отмена'));
+        $this->expectException(\DomainException::class);
+        $correct($this->companyId, $this->actorId, new CorrectSettlementItemInput(Uuid::uuid7()->toString(), $posted->itemId, Money::fromString('1.00', 'RUB'), false, new \DateTimeImmutable('2026-11-03'), 'Ошибка задним числом'));
+    }
+
+    public function testReadOnlyMemberCannotPostDocument(): void
+    {
+        $draft = $this->draft();
+        $reader = UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail('reader@example.test')->build();
+        $role = new \App\Company\Entity\CompanyRole(Uuid::uuid7()->toString(), 'Чтение', ['finance' => 'read'], $this->company);
+        $member = \App\Tests\Builders\Company\CompanyMemberBuilder::aMember()->withCompany($this->company)->withUser($reader)->withAccessRole($role)->build();
+        foreach ([$reader, $role, $member] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+        $readerId = $reader->getId();
+        self::assertNotNull($readerId);
+        $this->expectException(AccessDeniedException::class);
+        (self::getContainer()->get(PostSettlementDocumentAction::class))($this->companyId, $readerId, $draft->documentId, $draft->version);
+    }
 }

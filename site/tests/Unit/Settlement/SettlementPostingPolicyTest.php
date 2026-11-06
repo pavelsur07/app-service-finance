@@ -50,4 +50,27 @@ final class SettlementPostingPolicyTest extends TestCase
         $this->expectException(\DomainException::class);
         (new SettlementPostingPolicy())->assertAllocation($debt, $payment, Money::fromString('0.31', 'RUB'), $date);
     }
+
+    /** @return iterable<string, array{string, string, string, bool, SettlementBucket}> */
+    public static function invalidAllocations(): iterable
+    {
+        yield 'zero' => ['0.00', 'RUB', '2026-11-01', false, SettlementBucket::ADVANCE_GIVEN];
+        yield 'negative' => ['-0.01', 'RUB', '2026-11-01', false, SettlementBucket::ADVANCE_GIVEN];
+        yield 'currency' => ['0.01', 'USD', '2026-11-01', false, SettlementBucket::ADVANCE_GIVEN];
+        yield 'earlier date' => ['0.01', 'RUB', '2026-10-31', false, SettlementBucket::ADVANCE_GIVEN];
+        yield 'company' => ['0.01', 'RUB', '2026-11-01', true, SettlementBucket::ADVANCE_GIVEN];
+        yield 'opposite side' => ['0.01', 'RUB', '2026-11-01', false, SettlementBucket::ADVANCE_RECEIVED];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('invalidAllocations')]
+    public function testInvalidAllocationHasNoFinancialEffect(string $amount, string $currency, string $date, bool $otherCompany, SettlementBucket $bucket): void
+    {
+        $company = Uuid::uuid7()->toString();
+        $party = Uuid::uuid7()->toString();
+        $created = new \DateTimeImmutable('2026-11-01');
+        $debt = new SettlementItem($company, Uuid::uuid7()->toString(), $party, SettlementBucket::PAYABLE, Money::fromString('100.00', 'RUB'), $created);
+        $payment = new SettlementItem($otherCompany ? Uuid::uuid7()->toString() : $company, Uuid::uuid7()->toString(), $party, $bucket, Money::fromString('100.00', 'RUB'), $created);
+        $this->expectException(\DomainException::class);
+        (new SettlementPostingPolicy())->assertAllocation($debt, $payment, Money::fromString($amount, $currency), new \DateTimeImmutable($date));
+    }
 }
