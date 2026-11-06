@@ -93,3 +93,7 @@ Actual local app +Chromium/Playwright в отдельном временном �
 -1024 Unicode limit: invalid row не обрезается, другая корректная строка применяется; targeted1test/15assertions GREEN.
 - External handoff round3: точный REVIEW_GREEN; безопасные MINOR UUID/encoding в финальном исправлении. Review ledger — review-findings.md.
 - Independently confirmed release BLOCKER: старый worker может импортировать новый description_plan как legacy. Подготовлен consumer-first CI patch, git apply --check GREEN; активный CI/CD не меняли без named approval по §3.3.
+
+## CI parity и восстановление baseline
+
+На commit107da28b1 CI PHPStan нашёл4 ошибки вне задачи: AdvertisingOtherMetrics (3), MarketplaceListingBuilder (1). Ранее удалённые как локально unmatched suppressions оказались нужными в чистом CI. Baseline восстановлен **точно как origin/master**, без роста; сторонний код не меняли. Локальный повтор дополнительно показал11 ignore.unmatched в других файлах после master integration; для проверки очищен только task-local PHPStan result cache и запущен новый анализ. Это исправление не меняет финансовое поведение. Ошибки и финальный результат не скрываются; новый CI run обязателен.

@@ -6891,6 +6891,24 @@ parameters:
 			path: src/MarketplaceAnalytics/Domain/ValueObject/AdvertisingDetails.php
 
 		-
+			message: '#^Method App\\MarketplaceAnalytics\\Domain\\ValueObject\\AdvertisingOtherMetrics\:\:__construct\(\) has parameter \$details with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/MarketplaceAnalytics/Domain/ValueObject/AdvertisingOtherMetrics.php
+
+		-
+			message: '#^Method App\\MarketplaceAnalytics\\Domain\\ValueObject\\AdvertisingOtherMetrics\:\:fromArray\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/MarketplaceAnalytics/Domain/ValueObject/AdvertisingOtherMetrics.php
+
+		-
+			message: '#^Method App\\MarketplaceAnalytics\\Domain\\ValueObject\\AdvertisingOtherMetrics\:\:toArray\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/MarketplaceAnalytics/Domain/ValueObject/AdvertisingOtherMetrics.php
+
+		-
 			message: '#^Method App\\MarketplaceAnalytics\\Domain\\ValueObject\\CostBreakdown\:\:fromArray\(\) has parameter \$data with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -7699,6 +7717,12 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: tests/Builders/Marketplace/MarketplaceAdvertisingCostBuilder.php
+
+		-
+			message: '#^Property App\\Tests\\Builders\\Marketplace\\MarketplaceListingBuilder\:\:\$product \(App\\Catalog\\Entity\\Product\|null\) is never assigned App\\Catalog\\Entity\\Product so it can be removed from the property type\.$#'
+			identifier: property.unusedType
+			count: 1
+			path: tests/Builders/Marketplace/MarketplaceListingBuilder.php
 
 		-
 			message: '#^Method App\\Tests\\Builders\\Marketplace\\MarketplaceOrderBuilder\:\:withRawData\(\) has parameter \$rawData with no value type specified in iterable type array\.$#'

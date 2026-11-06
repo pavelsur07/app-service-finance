@@ -1,36 +1,30 @@
 # Current checkpoint
 
-**Phase:** Stage 2 / применение описаний
-**Status:** implementing — Stage 1, автономная реализация разрешена владельцем
+**Phase:** Stage4 / release prerequisite approval
+**Status:** release BLOCKER requires named CI/CD approval; final check evidence in PR
 **Branch:** feat/cash-import-description-update
 **Worktree:** /tmp/vf-cash-import-preparation
-**Preparation base:** cfb6728d2b95f4938c19996ef7d44214c9066648
-**Stage base commit:** Stage 1: 0bfe1a259; Stage 2: записать HEAD после commit Stage 1.
+**Task base:** cfb6728d2b95f4938c19996ef7d44214c9066648
+**Stage1:**0bfe1a259→9f6d94a81; Stage2 base9f6d94a81. Backend/UI work was parallel, commits group integration boundaries.
 
 ## Completed
 
-- Stage 1: matcher/plan, scoped candidates; baseline 32/116 OK, красная регрессия legacy подтверждена. Ведётся Stage 2.
+- Whole-file planner/matcher, explicit apply/chunk/snapshot/audit/source protection and Twig UI implemented.
+- Stage1 pushed; Stage2 commit d512ea500 / Stage3 commit88d0eb73e pushed; current master integrated107da28b1. Stage4 documents and reviewable release patch prepared; final code tree excludes baseline changes (restored exactly master).
+- Full unit4468/full8226/46454 GREEN before last fixes; integrated unit4470/25248 and CS+strict3760 GREEN. CI tests/builds107da28b1 GREEN; baseline removal caused static failure, baseline restored exactly master, clean rerun required.
+- Browser desktop/mobile keyboard/empty/error/long text:0JS errors; fixtures removed/server stopped.
+- Fresh internal review and Claude Stage2round1/handoffrounds3 completed; last exact REVIEW_GREEN. Final UUID/UTF8 minor fixes and committedfixture rowlock test complete; targeted2/5+1/3 and focused PHPStan GREEN.
+- Approved InputRow actual-create guard prevents relative date drift; over1024 text invalid; empty descriptions cannot steal ambiguous candidates.
+- Acceptance results/review ledger/release plan prepared. No production actions performed.
 
-- Добавлены четыре ТЗ этапов в specs/ и acceptance.md с ID тестов, ожидаемыми результатами, существующими test suites и финальным checklist. Все новые пункты приёмки пока не выполнены.
+## Open release requirement
 
-- 2026-11-06: все шесть правил подтверждены владельцем и внесены в TASK/plan/design; защита описания от перезаписи банком/1С включена в Stage 2 и приёмку.
-
-- Проверены текущий импорт, количественная дедупликация, блокировки, аудит и автоправила.
-- Найдены три существующих образца; подготовлены TASK.md, plan.md, design.md и baseline.md.
-- Выбран проект хранения плана без миграции; необходимость отдельного хранения защиты описания уточняется по путям банка/1С в реализации; зафиксированы матрица сопоставления, транзакции и восстановление.
-- Baseline после обновления тестовой схемы: 32 теста, 116 assertions, зелёный.
-- Приложение и тестовый код не менялись; исходная рабочая ветка и посторонние файлы не затронуты.
-
-## Review status
-
-- Подготовительные документы: самопроверка на соответствие коду и границе задачи.
-- Найденные риски реализации: автоправила при description; подавление аудита общим guard; нормализация скрывает изменения текста; старый файл после обновления. Все отражены в design.md и тестовых требованиях.
-- Внешнее ревью: не требуется для документационной подготовки, 0 раундов. Финальные ревью реализации ещё не выполнялись.
+Confirmed: old worker can consume new plan job between FPM and worker update. Minimal consumer-first patch is stored (not applied) in release-worker-order.patch, git apply --check GREEN. §3.3 requires named approval for CI/CD; until then Draft/Stage4 remain open. Details handoff.md/release.md.
 
 ## Exact next action
 
-Открытых вопросов по согласованному пакету правил нет. После отдельного перехода к реализации: сверить git status, зафиксировать stage_base_commit, добавить красную регрессию и выполнить Work item 1.1. Владелец разрешил автономную реализацию; следующий шаг — завершить интеграционные тесты применения, затем Stage 3.
+Final run output and final SHA/check status are recorded in PR body/checks; runtime logs /tmp/vf-cash-frozen-final-* and /tmp/vf-cash-frozen-clean-stan.log. After green CI, wait only for concrete named approval for consumer-first patch +migration+deploy. Do not apply workflow patch or touch production before approval. On resume first compare git status/checkpoint and PR.
 
-## Files to inspect first on resume
+## Environment
 
-TASK.md, specs/stage-1.md, acceptance.md, design.md, baseline.md, plan.md; CashFileImportService, CashFileImportHandler, CashTransactionAutoRulesSubscriber, AuditLogSubscriber и CashFileImportIdempotencyTest.
+Local Compose override /tmp/vf-cash-compose.yml mounts this worktree and original vendor, DATABASE_URL points isolated app_test_cash_description. Gates use DOCKER_COMPOSE override. Do not touch owner original worktree feat/ai-observability-budget or original app_test schema. Do not expose credentials/production data. Runtime reports /tmp/vf-cash-*.log and site/var/external-review/.
