@@ -1,8 +1,8 @@
-# Stage4 — сквозная приёмка — CHECKS COMPLETE / RELEASE APPROVAL PENDING
+# Stage4 — сквозная приёмка — DONE
 
 **Risk:** HIGH-LOCAL; release prerequisite HIGH-EXTERNAL по AGENTS.md §3.3.
 **Stage base commit:**88d0eb73e (UI); master integration107da28b1. Последние backend/UI fixes выполнены в интеграции и проверены до финального freeze.
-**Work items:**4.1–4.3 выполнены;4.4 код/документы переданы в Draft PR, release blocker ждёт named approval.
+**Work items:**4.1–4.3 выполнены;4.4 документы и approved release prerequisite завершены; дальнейшая pipeline разрешена владельцем.
 
 ## Результат
 
@@ -19,7 +19,7 @@
 
 ## Review
 
-Fresh internal:6code BLOCKER/8IMPORTANT fixed; confirmed release BLOCKER1 pending named approval. External Stage2round1:0B/2I fixed without re-run; handoffrounds1–3:0B/1I fixed, last exact REVIEW_GREEN, safe MINOR fixed. Метрики и перечень — [review-findings.md](../review-findings.md). Отсутствующий manual concurrent browser scenario не выдаётся за выполненный; DB-level account/row locks и stale tests реально выполнены.
+Fresh internal:6code BLOCKER/8IMPORTANT fixed; release BLOCKER1 fixed после named approval и consumer-first workflow patch. External Stage2round1:0B/2I fixed without re-run; handoffrounds1–3:0B/1I fixed, last exact REVIEW_GREEN, safe MINOR fixed. Метрики и перечень — [review-findings.md](../review-findings.md). Отсутствующий manual concurrent browser scenario не выдаётся за выполненный; DB-level account/row locks и stale tests реально выполнены.
 
 ## Definition of Done
 
@@ -27,7 +27,7 @@ Fresh internal:6code BLOCKER/8IMPORTANT fixed; confirmed release BLOCKER1 pendin
 - [x] Миграция local UP→DOWN→UP; source protection и финансовые инварианты проверены.
 - [x] Internal/external code review закрыты; code B/I0.
 - [x] Документы и acceptance evidence подготовлены.
-- [ ] Release BLOCKER снят: consumer-first patch требует named approval (§3.3).
-- [ ] Ready и production pipeline — после конкретного разрешения из handoff; до этого Draft.
+- [x] Release BLOCKER снят: владелец разрешил patch, применён и независимо проверен; YAML/b​ash-n41scripts/order PASS.
+- [x] Полное разрешение Ready/merge/migration/deploy получено; pipeline исполняется без новых owner gates.
 
-Этап не объявляется DONE при открытом release BLOCKER. Merge/production migration/deploy не выполнялись.
+Stage4 завершён: открытых B/I0; full8244/46533,unit4470/25248,PHPStan3724,CS/strict3760,Twig3 GREEN; CI95b457de8 green. Production acceptance публикуется по окончании разрешённой pipeline в PR/финальном отчёте.

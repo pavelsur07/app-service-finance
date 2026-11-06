@@ -105,8 +105,8 @@ php bin/console lint:twig templates/cash/file_import_preview.html.twig templates
 - [x] Красная регрессия исходного поведения и зелёная реализованного сохранены в отчётах.
 - [x] `make site-stan`, `make site-cs-check`, `make site-cs-strict-types`, `make site-test-unit`, `make site-test` завершены; failures не скрыты.
 - [x] Frontend gates при соответствующих изменениях завершены, ручной smoke записан.
-- [ ] Свежий internal review и обязательный external review завершены; BLOCKER/IMPORTANT открытых нет.
-- [ ] TASK/ARCHITECTURE/checkpoint/Stage Reports/handoff и PR актуальны.
+- [x] Свежий internal review и обязательный external review завершены; BLOCKER/IMPORTANT открытых нет.
+- [x] TASK/ARCHITECTURE/checkpoint/Stage Reports/handoff и PR актуальны.
 - [x] Merge/deploy не выполнялись без отдельного одобрения; если есть миграция, отдельный dispatch включён в запрос.
 
-Открытый пункт handoff: consumer-first release prerequisite требует named CI/CD approval; до него нет Ready и Stage4 не закрыт. См. release.md.
+Consumer-first release prerequisite согласован владельцем, применён и проверен; Stage4 завершён, release pipeline разрешена. См. release.md.

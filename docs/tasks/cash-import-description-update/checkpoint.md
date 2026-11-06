@@ -1,30 +1,26 @@
 # Current checkpoint
 
-**Phase:** Stage4 / release prerequisite approval
-**Status:** release BLOCKER requires named CI/CD approval; final check evidence in PR
+**Phase:** approved release pipeline
+**Status:** owner approval received; release BLOCKER fixed; CI →Ready/merge→migration→deploy→acceptance
 **Branch:** feat/cash-import-description-update
 **Worktree:** /tmp/vf-cash-import-preparation
 **Task base:** cfb6728d2b95f4938c19996ef7d44214c9066648
-**Stage1:**0bfe1a259→9f6d94a81; Stage2 base9f6d94a81. Backend/UI work was parallel, commits group integration boundaries.
+**Stage commits:**1:9f6d94a81;2:d512ea500;3:88d0eb73e; master integration107da28b1; pre-release evidence95b457de8.
 
 ## Completed
 
-- Whole-file planner/matcher, explicit apply/chunk/snapshot/audit/source protection and Twig UI implemented.
-- Stage1 pushed; Stage2 commit d512ea500 / Stage3 commit88d0eb73e pushed; current master integrated107da28b1. Stage4 documents and reviewable release patch prepared; final code tree excludes baseline changes (restored exactly master).
-- Full unit4468/full8226/46454 GREEN before last fixes; integrated unit4470/25248 and CS+strict3760 GREEN. CI tests/builds107da28b1 GREEN; baseline removal caused static failure, baseline restored exactly master, clean rerun required.
-- Browser desktop/mobile keyboard/empty/error/long text:0JS errors; fixtures removed/server stopped.
-- Fresh internal review and Claude Stage2round1/handoffrounds3 completed; last exact REVIEW_GREEN. Final UUID/UTF8 minor fixes and committedfixture rowlock test complete; targeted2/5+1/3 and focused PHPStan GREEN.
-- Approved InputRow actual-create guard prevents relative date drift; over1024 text invalid; empty descriptions cannot steal ambiguous candidates.
-- Acceptance results/review ledger/release plan prepared. No production actions performed.
-
-## Open release requirement
-
-Confirmed: old worker can consume new plan job between FPM and worker update. Minimal consumer-first patch is stored (not applied) in release-worker-order.patch, git apply --check GREEN. §3.3 requires named approval for CI/CD; until then Draft/Stage4 remain open. Details handoff.md/release.md.
+- Whole-file XLSX/CSV plan, scoped explicit updates, atomic chunk/audit/retry, source protection and Twig UI implemented.
+- Frozen integrated code: unit4470/25248; full8244/46533; PHPStan3724files; CS/strict3760files; Twig3 GREEN. CI95b457de8 all19checks success/skipped. Baseline exactly master after correcting local stale-cache removal; clean PHPStan GREEN.
+- Browser desktop/mobile/keyboard/empty/error/long text:0JS errors. Fixtures removed/server stopped. No live bank API calls.
+- Fresh internal+Claude external completed. Internal7B/8I all fixed, external0B/3I all fixed; Stage2round1 fixed without re-run +handoff3rounds final REVIEW_GREEN. Actual-create/Unicode/empty/multiplicity/rowlock regression covered.
+- Owner explicitly approved sync-before-FPM CI change, merge PR2894, Version20261106120000 production migration and deploy in current chat.
+- Consumer-first patch applied exactly as reviewed artifact: async_sync up --wait before FPM, removed from later worker restart. YAML parse, bash -n41 scripts, order/uniqueness assertions and independent focused review PASS. Release B closed; openB/I0.
+- Production preflight via restricted wrappers works; override column absent before migration. No production mutation outside approved pipeline.
 
 ## Exact next action
 
-Final run output and final SHA/check status are recorded in PR body/checks; runtime logs /tmp/vf-cash-frozen-final-* and /tmp/vf-cash-frozen-clean-stan.log. After green CI, wait only for concrete named approval for consumer-first patch +migration+deploy. Do not apply workflow patch or touch production before approval. On resume first compare git status/checkpoint and PR.
+Commit/push approved workflow+status docs; wait final CI; mark PR Ready and merge into master. Wait push schema gate to stop on pending migration (expected), dispatch production_action=migrations, verify schema via read-only wrapper, dispatch production_action=deploy, wait and do read-only postdeploy acceptance. Do not ask permission again inside this approved pipeline. No remote branch deletion authorized.
 
-## Environment
+## Environment / evidence
 
-Local Compose override /tmp/vf-cash-compose.yml mounts this worktree and original vendor, DATABASE_URL points isolated app_test_cash_description. Gates use DOCKER_COMPOSE override. Do not touch owner original worktree feat/ai-observability-budget or original app_test schema. Do not expose credentials/production data. Runtime reports /tmp/vf-cash-*.log and site/var/external-review/.
+Local Compose override /tmp/vf-cash-compose.yml uses isolated app_test_cash_description; original owner worktree untouched. Final local output /tmp/vf-cash-frozen-final-{tests,cs,twig}.log and /tmp/vf-cash-frozen-clean-stan.log; current release output /tmp/vf-cash-prod-*.log. Runtime reviews site/var/external-review/. Final merge/deploy SHA and checks recorded in PR body/comment and final response after completion; no production data/secrets committed.

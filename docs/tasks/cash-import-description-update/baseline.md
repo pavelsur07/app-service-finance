@@ -97,3 +97,8 @@ Actual local app +Chromium/Playwright в отдельном временном �
 ## CI parity и восстановление baseline
 
 На commit107da28b1 CI PHPStan нашёл4 ошибки вне задачи: AdvertisingOtherMetrics (3), MarketplaceListingBuilder (1). Ранее удалённые как локально unmatched suppressions оказались нужными в чистом CI. Baseline восстановлен **точно как origin/master**, без роста; сторонний код не меняли. Локальный повтор дополнительно показал11 ignore.unmatched в других файлах после master integration; для проверки очищен только task-local PHPStan result cache и запущен новый анализ. Это исправление не меняет финансовое поведение. Ошибки и финальный результат не скрываются; новый CI run обязателен.
+
+## Финальные frozen gates / approved consumer-first release
+
+- После master integration: unit4470tests/25248assertions; full8244tests/46533assertions,10m38.780s; PHPStan3724files с очищенным task-local result cache; canonical CS/strict3760files; Twig3 — GREEN. CI95b457de8 все19checks success/skipped.
+- Владелец явно разрешил sync-before-FPM,merge,migration,deploy. Применён ровно подготовленный workflow patch. YAML parse,bash -n41 scripts,order/uniqueness checks PASS; независимый focused review0B/0I. Production preflight wrappers доступны, колонка override до миграции отсутствует.

@@ -57,4 +57,6 @@
 
 Новых npm/Vite/React assets нет; npm build/lint не запускались. Inline progressive script проверен реальным браузером. Проверка browser/sync использовала локальные fixtures и существующий parser; живые банковские API не вызывались.
 
-Финальный review всего diff — fresh internal и Claude read-only. Открытых проблем корректности кода BLOCKER/IMPORTANT нет; production выкладка требует согласования безопасного порядка worker/web, указанного в handoff.
+Финальный review всего diff — fresh internal и Claude read-only. Открытых проблем корректности кода BLOCKER/IMPORTANT нет; безопасный consumer-first порядок worker/web согласован владельцем, применён и независимо проверен; production pipeline разрешена.
+
+Final integrated gates: unit4470/25248,full8244/46533,PHPStan3724,CS/strict3760,Twig3 GREEN; CI95b457de8 all19checks success/skipped. Consumer-first release fix: YAML,bash-n41scripts,order assertions и независимый focused review PASS. Production acceptance — после pipeline в PR/финальном отчёте.
