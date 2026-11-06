@@ -249,8 +249,14 @@ final class StockReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('text-danger', (string) $negative->eq(6)->attr('class'));
         self::assertStringNotContainsString('text-danger', (string) $crawler->filter('table tbody tr')->first()->filter('td')->eq(6)->attr('class'));
 
+        // Подвал повторяет сетку колонок: скрытые на узких экранах ячейки есть и в нём, иначе итоги съезжают под чужие заголовки.
+        self::assertSame('Итого на странице', trim($crawler->filter('table tfoot th[scope="row"]')->text()));
+        self::assertSame('3', $crawler->filter('table tfoot th')->attr('colspan'));
         $footer = $crawler->filter('table tfoot td')->each(static fn (Crawler $td): string => trim($td->text()));
-        self::assertSame(['Итого на странице', '12', '8', '4'], $footer);
+        self::assertSame(['', '12', '8', '4', ''], $footer);
+        self::assertStringContainsString('d-md-table-cell', (string) $crawler->filter('table tfoot td')->eq(0)->attr('class'));
+        self::assertStringContainsString('d-md-table-cell', (string) $crawler->filter('table tfoot td')->eq(2)->attr('class'));
+        self::assertSame('1', $crawler->filter('table tfoot td')->eq(4)->attr('colspan'));
         self::assertSame(
             'Итого по фильтру: остаток 12, резерв 8, доступно 4',
             preg_replace('/\s+/u', ' ', trim($crawler->filter('.vf-stocks-totals')->text())),
@@ -328,6 +334,9 @@ final class StockReportControllerTest extends WebTestCaseBase
             $this->snapshot($company, $location, '153', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-SELLER')
                 ->withFulfillmentType('rfbs')
                 ->withQuantity('2.000'),
+            $this->snapshot($company, $location, '154', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-FBS-ONLY')
+                ->withFulfillmentType('fbs')
+                ->withQuantity('3.000'),
         );
 
         $this->login($client, $owner, $company);
@@ -340,15 +349,19 @@ final class StockReportControllerTest extends WebTestCaseBase
             $crawler->filter('table thead th')->each(static fn (Crawler $th): string => trim($th->text())),
         );
 
-        self::assertCount(1, $crawler->filter('table tbody tr'));
+        self::assertCount(2, $crawler->filter('table tbody tr'));
 
-        $cells = $crawler->filter('table tbody tr td')->each(static fn (Crawler $td): string => trim($td->text()));
+        $cells = $crawler->filter('table tbody tr')->first()->filter('td')->each(static fn (Crawler $td): string => trim($td->text()));
         self::assertSame('SKU-SELLER', $cells[2]);
         self::assertSame('7', $cells[4]);
         self::assertSame('1', $cells[5]);
         self::assertSame('6', $cells[6]);
         self::assertSame('4', $cells[7]);
         self::assertSame('2', $cells[8]);
+        // Нулевая часть разбивки — прочерк, а не «0».
+        $onlyFbs = $crawler->filter('table tbody tr')->last()->filter('td')->each(static fn (Crawler $td): string => trim($td->text()));
+        self::assertSame(['SKU-FBS-ONLY', '3', '3', '—'], [$onlyFbs[2], $onlyFbs[6], $onlyFbs[7], $onlyFbs[8]]);
+        self::assertSame('3', $crawler->filter('table tfoot td')->eq(4)->attr('colspan'));
     }
 
     public function testRowWithoutFulfillmentTypeStaysInFboScheme(): void

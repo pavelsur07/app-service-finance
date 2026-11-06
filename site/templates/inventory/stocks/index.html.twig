@@ -56,7 +56,7 @@
             {% set rowspan = hasBreakdown ? 2 : 1 %}
             <table class="table table-vcenter card-table vf-table">
                 <caption class="visually-hidden">Остатки {{ source.getDisplayName() }}, схема {{ scheme.label() }}, на {{ (effectiveDate ?? date)|date('d.m.Y') }}</caption>
-                <thead class="sticky-top">
+                <thead>
                 <tr>
                     <th scope="col" rowspan="{{ rowspan }}">Снимок</th>
                     <th scope="col" rowspan="{{ rowspan }}">Источник</th>
@@ -111,11 +111,14 @@
                     {% set rows = pager.currentPageResults %}
                     {% set pageAvailable = rows|map(r => r.available_for_sale)|reduce((a, b) => a + b, 0) %}
                     <tfoot>
+                    {# Сетка подвала повторяет строки: скрытые на узких экранах ячейки тоже скрыты, иначе итоги съезжают под чужие заголовки. #}
                     <tr class="vf-strong">
-                        <td colspan="4">Итого на странице</td>
+                        <th scope="row" colspan="3" class="fw-medium">Итого на странице</th>
+                        <td class="d-none d-md-table-cell"></td>
                         <td class="text-end vf-num">{{ rows|map(r => r.quantity)|reduce((a, b) => a + b, 0)|vf_number }}</td>
                         <td class="text-end vf-num d-none d-md-table-cell">{{ rows|map(r => r.reserved_quantity)|reduce((a, b) => a + b, 0)|vf_number }}</td>
                         <td class="text-end vf-num{{ pageAvailable < 0 ? ' text-danger' : '' }}">{{ pageAvailable|vf_number }}</td>
+                        <td colspan="{{ 1 + breakdownColumns|length }}"></td>
                     </tr>
                     </tfoot>
                 {% endif %}

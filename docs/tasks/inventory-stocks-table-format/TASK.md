@@ -31,8 +31,10 @@
 - Итоги: строка `tfoot` «Итого на странице» и общий итог по фильтру
   (`InventoryStockReportQuery::getTotals()` → `StockReportTotals` DTO:
   quantity, reserved, available) над таблицей.
-- Шапка `sticky-top`, `scope="col"`, скрытый `caption`; «Резерв» и «Артикул»
-  скрываются на узких экранах (`d-none d-md-table-cell`).
+- `scope="col"` у заголовков, `scope="row"` у строки итогов, скрытый `caption`;
+  «Резерв» и «Артикул» скрываются на узких экранах (`d-none d-md-table-cell`),
+  подвал повторяет ту же сетку. Липкая шапка не делается: внутри
+  `.table-responsive` она не работает (DS решает это только для `.vf-card`).
 - Пустое состояние подсказывает сменить дату или схему.
 
 ## Не в объёме
