@@ -3010,7 +3010,12 @@ refreshWbListingCatalog(string $companyId, string $connectionId): int
 ```php
 // Остатки на дату отчёта по листингам вместе с происхождением данных.
 // Возвращает Application\DTO\StockOnDateResult, а не голую карту.
-getStockQtyByListingOnReportDate(string $companyId, \DateTimeImmutable $reportDate): StockOnDateResult
+getStockQtyByListingOnReportDate(
+    string $companyId,
+    \DateTimeImmutable $reportDate,
+    ?string $marketplace = null,          // 'ozon' | 'wildberries' | null — все источники
+    ?FulfillmentScheme $scheme = null,    // Fbo | Fbs | null — обе схемы вместе
+): StockOnDateResult
 ```
 
 `StockOnDateResult` (`src/Inventory/Application/DTO/StockOnDateResult.php`):
@@ -4681,7 +4686,11 @@ NormalizeInventorySnapshotAction → StockSnapshot
 `StockQtyByListingOnDateQuery` выбирает последнюю целую snapshot-сессию отдельно
 для каждого marketplace source, содержащую хотя бы один замапленный листинг,
 и суммирует только `StockStatus::Available` по всем типам склада — у Ozon это `fbo` + `fbs`,
-у WB с ноября 2026 `fbw` + `fbs` (склад продавца).
+у WB с ноября 2026 `fbw` + `fbs` (склад продавца). Параметр `$scheme` (`FulfillmentScheme`)
+оставляет только одну схему тем же CASE-выражением, что в `InventoryStockReportQuery`;
+фильтр применяется к строкам выбранной сессии, а не к выбору сессии — день без FBS-строк
+не «откатывается» на старую сессию, а даёт пустой `qtyByListingId` при заполненном
+`snapshotDateBySource`.
 Товары в пути в количественный остаток `InventoryFacade` не входят.
 
 ### Wildberries FBS — остатки склада продавца
