@@ -49,6 +49,13 @@ interface AiTaskFacadeInterface
      */
     public function enabledCompanyIds(array $companyIds): array;
 
+    /**
+     * Все компании, которые сейчас получают ИИ (сервис включён и компания подключена), по id.
+     *
+     * @return list<string>
+     */
+    public function connectedCompanyIds(): array;
+
     /** Общий выключатель `AI_SERVICE_ENABLED` с адресом и токеном. */
     public function isServiceEnabled(): bool;
 

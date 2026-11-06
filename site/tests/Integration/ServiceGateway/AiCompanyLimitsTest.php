@@ -33,7 +33,7 @@ final class AiCompanyLimitsTest extends IntegrationTestCase
     {
         $this->enable(self::COMPANY);
 
-        foreach ([['0', 90], ['-5', 90], ['abc', 90], ['100', 14]] as [$limit, $lookback]) {
+        foreach ([['0', 90], ['0,001', 90], ['-5', 90], ['abc', 90], ['100', 14]] as [$limit, $lookback]) {
             try {
                 $this->update()(self::COMPANY, $limit, $lookback, self::ADMIN);
                 self::fail(sprintf('limit %s, lookback %d must be rejected', $limit, $lookback));

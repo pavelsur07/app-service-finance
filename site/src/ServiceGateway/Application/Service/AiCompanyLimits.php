@@ -18,11 +18,13 @@ final readonly class AiCompanyLimits
     public static function limit(string $raw): string
     {
         $normalized = str_replace([' ', "\u{00A0}", ','], ['', '', '.'], trim($raw));
-        if (!is_numeric($normalized) || (float) $normalized <= 0 || (float) $normalized > self::MAX_LIMIT_RUB) {
+        // Проверка — после округления до копеек: «0,001» дало бы 0.00 и нарушило CHECK в БД.
+        $rounded = is_numeric($normalized) ? round((float) $normalized, 2) : 0.0;
+        if ($rounded <= 0 || $rounded > self::MAX_LIMIT_RUB) {
             throw new InvalidAiCompanyLimitsException(sprintf('Лимит — число больше 0 и не больше %s ₽.', number_format(self::MAX_LIMIT_RUB, 0, ',', ' ')));
         }
 
-        return number_format((float) $normalized, 2, '.', '');
+        return number_format($rounded, 2, '.', '');
     }
 
     public static function lookback(int $days): int

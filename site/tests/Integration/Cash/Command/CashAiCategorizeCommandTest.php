@@ -12,7 +12,6 @@ use App\Cash\Entity\Transaction\CashCategorySuggestion;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType;
-use App\Cash\Infrastructure\Query\CashAiCategorizationCompaniesQuery;
 use App\Company\Entity\Company;
 use App\ServiceGateway\Application\DTO\AiCompanyBudget;
 use App\ServiceGateway\Application\DTO\AiCompanyOverview;
@@ -26,7 +25,6 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
-use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Lock\Key;
@@ -52,7 +50,7 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
         self::assertSame(Command::INVALID, $tester->execute(['--company-id' => 'not-a-uuid']));
     }
 
-    public function testAllEnabledRunsOnlyAllowlistedCompaniesWithRecentOperations(): void
+    public function testAllEnabledRunsEveryConnectedCompanyIncludingOnesWithoutRecentOperations(): void
     {
         $enabled = $this->company('-3 days');
         $disabled = $this->company('-3 days');
@@ -64,11 +62,15 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
         $display = $tester->getDisplay();
         self::assertStringContainsString('ai-categorize: '.$enabled->getId().': ', $display);
         self::assertStringNotContainsString((string) $disabled->getId(), $display);
-        self::assertStringNotContainsString((string) $stale->getId(), $display);
-        self::assertStringContainsString('ai-categorize: 1 enabled companies, 0 failed', $display);
-        // Запуск записан в журнал (ai_run) — по нему видно, что cron работает.
-        self::assertSame([(string) $enabled->getId()], array_column($this->facade->runs, 'companyId'));
-        self::assertNull($this->facade->runs[0]['error']);
+        // Подключённая компания без свежих операций тоже получает запуск: гейт «тишины» видит, что cron жив.
+        self::assertStringContainsString('ai-categorize: '.$stale->getId().': ', $display);
+        self::assertStringContainsString('ai-categorize: 2 enabled companies, 0 failed', $display);
+        $runs = array_column($this->facade->runs, 'companyId');
+        sort($runs);
+        $expected = [(string) $enabled->getId(), (string) $stale->getId()];
+        sort($expected);
+        self::assertSame($expected, $runs);
+        self::assertSame([null, null], array_column($this->facade->runs, 'error'));
     }
 
     public function testFailureOfOneCompanyDoesNotStopTheOthers(): void
@@ -132,6 +134,11 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
             public function enabledCompanyIds(array $companyIds): array
             {
                 return array_values(array_filter($companyIds, $this->isEnabledForCompany(...)));
+            }
+
+            public function connectedCompanyIds(): array
+            {
+                return $this->allowlist;
             }
 
             public function isServiceEnabled(): bool
@@ -202,11 +209,9 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
         $command = new CashAiCategorizeCommand(
             $container->get(AutoApplyCashCategorySuggestionsAction::class),
             $container->get(RequestCashAiCategorizationAction::class),
-            $container->get(CashAiCategorizationCompaniesQuery::class),
             $facade,
             new LockFactory($store),
             $registry,
-            new MockClock(),
             new NullLogger(),
         );
 

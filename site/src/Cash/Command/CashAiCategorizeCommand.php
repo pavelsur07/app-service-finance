@@ -6,12 +6,10 @@ namespace App\Cash\Command;
 
 use App\Cash\Application\AutoApplyCashCategorySuggestionsAction;
 use App\Cash\Application\RequestCashAiCategorizationAction;
-use App\Cash\Infrastructure\Query\CashAiCategorizationCompaniesQuery;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -25,8 +23,9 @@ use Webmozart\Assert\Assert;
  * автоприменение уверенных подсказок, если ворота компании открыты (по умолчанию закрыты:
  * без флага операции не меняются). Выключенный ИИ-сервис для компании — ничего не ставит.
  *
- * `--all-enabled` (cron) — по очереди все подключённые к ИИ компании с операциями за окно
- * кандидатов; сбой одной компании пишется в лог и не останавливает остальные: после него
+ * `--all-enabled` (cron) — по очереди все подключённые к ИИ компании, в том числе без новых
+ * операций: каждая получает запись в журнале запусков, по которой гейт «тишины» видит, что cron
+ * жив. Пустой запуск LLM не вызывает. Сбой одной компании пишется в лог и не останавливает остальные: после него
  * EntityManager пересоздаётся.
  */
 #[AsCommand(
@@ -38,11 +37,9 @@ final class CashAiCategorizeCommand extends Command
     public function __construct(
         private readonly AutoApplyCashCategorySuggestionsAction $autoApply,
         private readonly RequestCashAiCategorizationAction $action,
-        private readonly CashAiCategorizationCompaniesQuery $companies,
         private readonly AiTaskFacadeInterface $aiTasks,
         private readonly LockFactory $lockFactory,
         private readonly ManagerRegistry $managerRegistry,
-        private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
@@ -79,9 +76,7 @@ final class CashAiCategorizeCommand extends Command
             return self::SUCCESS;
         }
 
-        $since = $this->clock->now()->modify(sprintf('-%d days', RequestCashAiCategorizationAction::LOOKBACK_DAYS));
-        $enabled = $this->aiTasks->enabledCompanyIds($this->companies->withTransactionsSince($since));
-        sort($enabled);
+        $enabled = $this->aiTasks->connectedCompanyIds();
         $failed = 0;
         foreach ($enabled as $id) {
             try {

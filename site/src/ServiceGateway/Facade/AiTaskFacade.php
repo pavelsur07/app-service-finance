@@ -90,6 +90,11 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
         return $this->access->enabledCompanyIds($companyIds);
     }
 
+    public function connectedCompanyIds(): array
+    {
+        return $this->access->isEnabled() ? array_keys($this->access->grantedCompanies()) : [];
+    }
+
     public function isServiceEnabled(): bool
     {
         return $this->access->isEnabled();

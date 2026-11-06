@@ -450,8 +450,25 @@
   кабинета в `/admin/users` → `POST /admin/ai/companies/{companyId}/access` →
   `SetAiCompanyAccessAction` (одна инструкция SQL, повтор безопасен; коммитит сама).
 - `AiTaskFacadeInterface`: `isEnabledForCompany`, `enabledCompanyIds(list)` (сервис включён и
-  компания подключена, одним запросом — cron `ai-categorize --all-enabled`),
-  `isServiceEnabled`, `grantedCompanyIds(list)` (подключение без учёта выключателя — админка).
+  компания подключена, одним запросом), `connectedCompanyIds()` (охват cron
+  `ai-categorize --all-enabled` — все подключённые, в т. ч. без новых операций),
+  `isServiceEnabled`, `grantedCompanyIds(list)` (подключение без учёта выключателя — админка),
+  `budgetFor`, `companyOverview`, `exhaustedCompanyIds(list)`, `recordRun` (журнал; одна инструкция
+  SQL, коммитится сама).
+- Учёт расходов — `ai_usage`: строка на принятый результат (токены, модель, `cost_rub` по
+  `ai.prices` в `config/packages/ai_prices.yaml` — копия `services/ai-service/config/prices.yaml`,
+  сверка — pytest сервиса). Пишет `ImportAiResultsAction` в транзакции потребителя,
+  `ON CONFLICT (task_id) DO NOTHING`.
+- Лимиты — `ai_company_access.monthly_limit_rub` (по умолчанию 500 ₽) и `lookback_days` (7/30/90),
+  общий `ai.monthly_limit_rub` (5000 ₽); месяц — календарный МСК. `RequestCashAiCategorizationAction`
+  проверяет лимит перед запуском компании (`budget_exceeded`, перерасход — не больше одного запуска);
+  переотправка задач без ответа лимитом не останавливается. Правка — `UpdateAiCompanyLimitsAction`.
+- Журнал запусков — `ai_run` (компания, итог, причина пропуска, класс исключения; 90 дней).
+  Гейт `app:ai-service:health-check` (cron :50): компания без запуска > 3 ч или ≥ 50 % `failed`
+  при ≥ 10 результатах за сутки — `error`; исчерпанный лимит — `warning`.
+- Админка: `/admin/ai/companies/{companyId}` (`Admin\AiCompanyPageController` — в Admin, чтобы не
+  дать цикл Cash ↔ ServiceGateway) — подключение, расход, запуски, подсказки за 7 дней
+  (`CashFacade::getAiSuggestionStats`), форма лимитов → `POST …/limits`.
 - Провайдеры моделей (OpenAI, DeepSeek, Kimi) — только через шлюз
   `ai.vashfindir.ru` (`docs/tasks/ai/gateway/`): в `services/ai-service/config/routes.yaml`
   `base_url` шлюза и один токен `AI_GATEWAY_TOKEN`, ключи провайдеров — только на
@@ -5007,6 +5024,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.144 | 2026-11-06 | ServiceGateway: учёт расходов ИИ `ai_usage`, журнал `ai_run`, лимиты `ai_company_access.monthly_limit_rub`/`lookback_days` (`Version20261106090000`–`110000`), гейт `app:ai-service:health-check`, страница `/admin/ai/companies/{id}`; cron `ai-categorize` идёт по всем подключённым компаниям, `CashAiCategorizationCompaniesQuery` удалён; `CashFacade::getAiSuggestionStats` (задача `ai-observability-budget`) |
 | 2.143 | 2026-11-05 | ServiceGateway: подключение компаний к ИИ из админки — `ai_company_access` (`Version20261105120000`, перенос Вумджой), `SetAiCompanyAccessAction`, переключатель «ИИ» в `/admin/users`; `AiTaskFacadeInterface::enabledCompanyIds/isServiceEnabled/grantedCompanyIds`; env `AI_SERVICE_COMPANY_ALLOWLIST` удалена (задача `ai-company-access`) |
 | 2.142 | 2026-11-05 | Company: удаление компании двухшаговое — `deletion_requested_at`/`deletion_requested_by` (`Version20261105090000`), `RequestCompanyDeletionAction`/`RestoreCompanyDeletionAction`, `CompanyDeletionRequestedEvent` (отключение подключений Marketplace, MoySklad, BankSync, привязок Telegram), закрыт API-доступ, помеченные компании вне активных; `CompanyFacade::getDeletionRequestedCompanyIds()` (задача `company-deletion`, этап 1) |
 | 2.141 | 2026-11-05 | Budget: план–факт — мультивыбор проектов (с дочерними) и ЦФО пилюлями (`BudgetPlanFactFilterResolver`, `buildFiltered`, `BudgetCellsQuery::fetchSlice`), ссылка в отчёт ОПиУ с теми же фильтрами; Finance: `getPlFactAmountsByMonthForSlice()` (задача `pl-budget`, этап 15) |
