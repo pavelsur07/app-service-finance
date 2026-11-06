@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Inventory\Enum;
 
+use App\Inventory\Enum\FulfillmentScheme;
 use App\Inventory\Enum\LocationType;
 use App\Inventory\Enum\SnapshotSessionStatus;
 use App\Inventory\Enum\SnapshotTriggerType;
@@ -78,5 +79,18 @@ final class InventoryEnumsTest extends TestCase
             ],
             array_map(static fn (StockSnapshotMappingStatus $case): string => $case->value, StockSnapshotMappingStatus::cases()),
         );
+    }
+
+    public function testFulfillmentSchemeFromFulfillmentType(): void
+    {
+        self::assertSame(FulfillmentScheme::Fbs, FulfillmentScheme::fromFulfillmentType('fbs'));
+        self::assertSame(FulfillmentScheme::Fbs, FulfillmentScheme::fromFulfillmentType(' RFBS '));
+        self::assertSame(FulfillmentScheme::Fbo, FulfillmentScheme::fromFulfillmentType('fbo'));
+        self::assertSame(FulfillmentScheme::Fbo, FulfillmentScheme::fromFulfillmentType('fbw'));
+        self::assertSame(FulfillmentScheme::Fbo, FulfillmentScheme::fromFulfillmentType(null));
+        self::assertSame(FulfillmentScheme::Fbo, FulfillmentScheme::fromFulfillmentType(''));
+        self::assertSame(['fbo', 'fbs'], array_map(static fn (FulfillmentScheme $case): string => $case->value, FulfillmentScheme::cases()));
+        self::assertSame('FBO', FulfillmentScheme::Fbo->label());
+        self::assertSame('FBS', FulfillmentScheme::Fbs->label());
     }
 }
