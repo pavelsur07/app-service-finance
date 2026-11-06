@@ -2,6 +2,8 @@
 # Совпадение держит services/ai-service/tests/unit/test_symfony_prices.py; менять оба файла вместе.
 # null — цена неизвестна: токены учитываются, стоимость нет (warning при импорте).
 parameters:
+    # Общий лимит расходов ИИ всех компаний за календарный месяц, ₽ (лимит компании — в админке).
+    ai.monthly_limit_rub: 5000.0
     ai.prices:
         deepseek/deepseek-flash: {input: 24.17, output: 96.67}
         openai/gpt-4.1-mini: {input: 32.22, output: 128.89}

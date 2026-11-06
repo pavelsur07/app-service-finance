@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\ServiceGateway;
 
+use App\ServiceGateway\Application\Service\AiBudget;
 use App\ServiceGateway\Application\Service\AiRunJournal;
 use App\ServiceGateway\Application\Service\AiServiceAccess;
 use App\ServiceGateway\Command\AiServiceHealthCheckCommand;
@@ -66,6 +67,17 @@ final class AiServiceHealthCheckCommandTest extends IntegrationTestCase
         self::assertTrue($this->logs->hasErrorThatContains('most AI results failed'));
     }
 
+    public function testExhaustedBudgetIsWarningNotError(): void
+    {
+        $this->connect(self::COMPANY, '-10 hours');
+        $this->ran(self::COMPANY, '-10 minutes');
+        $this->connection->update('ai_company_access', ['monthly_limit_rub' => '1.00'], ['company_id' => self::COMPANY]);
+        $this->usageRow('accepted', '-1 hour', '1.5000');
+
+        self::assertSame(Command::SUCCESS, $this->check());
+        self::assertTrue($this->logs->hasWarningThatContains('monthly AI budget is exhausted'));
+    }
+
     public function testRunsOlderThanNinetyDaysArePurged(): void
     {
         $this->ran(self::COMPANY, '-91 days');
@@ -80,11 +92,13 @@ final class AiServiceHealthCheckCommandTest extends IntegrationTestCase
     {
         $this->logs = new TestHandler();
         $clock = new MockClock(new \DateTimeImmutable(self::NOW));
+        $usage = new AiUsageQuery($this->connection, $clock);
 
         return (new CommandTester(new AiServiceHealthCheckCommand(
             new AiServiceAccess($enabled, 'http://ai', 'token', $this->connection),
             new AiRunJournal($this->connection, $clock),
-            new AiUsageQuery($this->connection, $clock),
+            $usage,
+            new AiBudget($this->connection, $usage, 5000.0),
             $clock,
             new Logger('test', [$this->logs]),
         )))->execute([]);
@@ -113,7 +127,7 @@ final class AiServiceHealthCheckCommandTest extends IntegrationTestCase
         ]);
     }
 
-    private function usageRow(string $status, string $ago): void
+    private function usageRow(string $status, string $ago, ?string $costRub = null): void
     {
         $this->connection->insert('ai_usage', [
             'id' => Uuid::uuid7()->toString(),
@@ -123,6 +137,7 @@ final class AiServiceHealthCheckCommandTest extends IntegrationTestCase
             'status' => $status,
             'input_tokens' => 0,
             'output_tokens' => 0,
+            'cost_rub' => $costRub,
             'completed_at' => $this->at($ago),
         ]);
     }

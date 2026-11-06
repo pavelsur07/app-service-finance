@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\ServiceGateway\Facade;
 
+use App\ServiceGateway\Application\DTO\AiCompanyBudget;
+
 /**
  * Постановка ИИ-задач для модулей-потребителей (ТЗ §4). Результат приходит
  * потребителю через {@see AiTaskResultConsumerInterface} при импорте.
@@ -57,6 +59,9 @@ interface AiTaskFacadeInterface
      * @return list<string> id в нижнем регистре
      */
     public function grantedCompanyIds(array $companyIds): array;
+
+    /** Лимит и расход компании за месяц, общий лимит, окно выгрузки. */
+    public function budgetFor(string $companyId): AiCompanyBudget;
 
     /**
      * Записать запуск ИИ по компании в журнал (`ai_run`): итог, причина пропуска или класс

@@ -7,7 +7,7 @@
 ## Результат
 - `ai_company_access`: `monthly_limit_rub` (по умолчанию 500), `lookback_days` (7/30/90,
   по умолчанию 90).
-- `RequestCashAiCategorizationAction`: перед каждой пачкой — расход компании за месяц ≥ лимита
+- `RequestCashAiCategorizationAction`: перед запуском — расход компании за месяц ≥ лимита
   или общий расход ≥ `ai.monthly_limit_rub` → остановка, `skippedReason = budget_exceeded`,
   warning; окно кандидатов — `lookback_days` компании.
 - Переотправка задач без ответа лимитом не останавливается (тот же ключ — сервис не платит

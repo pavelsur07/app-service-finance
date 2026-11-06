@@ -14,6 +14,7 @@ use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use App\Cash\Infrastructure\Query\CashAiCategorizationCompaniesQuery;
 use App\Company\Entity\Company;
+use App\ServiceGateway\Application\DTO\AiCompanyBudget;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use App\Tests\Builders\Cash\CashAiCategorizationSettingBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
@@ -140,6 +141,11 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
             public function grantedCompanyIds(array $companyIds): array
             {
                 return $this->enabledCompanyIds($companyIds);
+            }
+
+            public function budgetFor(string $companyId): AiCompanyBudget
+            {
+                return new AiCompanyBudget(500.0, 0.0, 5000.0, 0.0, 90);
             }
 
             public function recordRun(string $companyId, string $taskType, int $requested = 0, int $tasks = 0, int $redispatched = 0, int $expired = 0, ?string $skippedReason = null, ?string $error = null): void

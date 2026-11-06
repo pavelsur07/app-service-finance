@@ -28,6 +28,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\ServiceGateway\Application\DTO\AiTaskResult;
 use App\ServiceGateway\Enum\AiResultStatus;
+use App\ServiceGateway\Application\DTO\AiCompanyBudget;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -119,6 +120,31 @@ final class CashAiCategorizationTest extends IntegrationTestCase
 
         self::assertFalse($this->request()->enabled);
         self::assertSame(0, $this->countSuggestions());
+    }
+
+    public function testExhaustedBudgetRequestsNothingNew(): void
+    {
+        $this->transaction('Оплата аренды');
+        $this->em->flush();
+        $this->ai->spentRub = 500.0;
+
+        $result = $this->request();
+
+        self::assertSame('budget_exceeded', $result->skippedReason);
+        self::assertSame([], $this->ai->requests);
+        self::assertSame(0, $this->countSuggestions());
+    }
+
+    public function testCompanyLookbackLimitsCandidateWindow(): void
+    {
+        $recent = $this->transaction('Аренда за неделю', null, new \DateTimeImmutable('-3 days'));
+        $this->transaction('Аренда месячной давности', null, new \DateTimeImmutable('-20 days'));
+        $this->em->flush();
+        $this->ai->lookbackDays = 7;
+
+        $this->request();
+
+        self::assertSame([$recent->getId()], array_column($this->ai->requests[0]['payload']['operations'], 'id'));
     }
 
     public function testAnswerBecomesSuggestionAndRepeatedResultIsIgnored(): void
@@ -468,6 +494,8 @@ final class CashAiCategorizationTest extends IntegrationTestCase
 final class RecordingAiTaskFacade implements AiTaskFacadeInterface
 {
     public bool $enabled = true;
+    public float $spentRub = 0.0;
+    public int $lookbackDays = 90;
     /** @var list<array{taskId: string, taskType: string, payload: array<string, mixed>, key: string}> */
     public array $requests = [];
 
@@ -502,6 +530,11 @@ final class RecordingAiTaskFacade implements AiTaskFacadeInterface
     public function grantedCompanyIds(array $companyIds): array
     {
         return $this->enabledCompanyIds($companyIds);
+    }
+
+    public function budgetFor(string $companyId): AiCompanyBudget
+    {
+        return new AiCompanyBudget(limitRub: 500.0, spentRub: $this->spentRub, totalLimitRub: 5000.0, totalSpentRub: $this->spentRub, lookbackDays: $this->lookbackDays);
     }
 
     public function recordRun(string $companyId, string $taskType, int $requested = 0, int $tasks = 0, int $redispatched = 0, int $expired = 0, ?string $skippedReason = null, ?string $error = null): void

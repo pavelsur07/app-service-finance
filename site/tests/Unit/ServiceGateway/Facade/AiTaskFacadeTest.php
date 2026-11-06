@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\ServiceGateway\Facade;
 
+use App\ServiceGateway\Application\Service\AiBudget;
 use App\ServiceGateway\Application\Service\AiRunJournal;
+use App\ServiceGateway\Infrastructure\Query\AiUsageQuery;
 use App\ServiceGateway\Application\Service\AiServiceAccess;
 use App\ServiceGateway\Facade\AiTaskFacade;
 use App\ServiceGateway\Message\SubmitAiTaskMessage;
@@ -80,6 +82,7 @@ final class AiTaskFacadeTest extends TestCase
             new MockClock(new \DateTimeImmutable('2026-10-30T12:00:00+03:00')),
             new NullLogger(),
             new AiRunJournal($this->createStub(Connection::class), new MockClock()),
+            new AiBudget($this->createStub(Connection::class), new AiUsageQuery($this->createStub(Connection::class), new MockClock()), 5000.0),
         );
     }
 

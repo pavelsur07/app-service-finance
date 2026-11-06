@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\ServiceGateway\Command;
 
+use App\ServiceGateway\Application\Service\AiBudget;
 use App\ServiceGateway\Application\Service\AiRunJournal;
 use App\ServiceGateway\Application\Service\AiServiceAccess;
 use App\ServiceGateway\Infrastructure\Query\AiUsageQuery;
@@ -20,7 +21,9 @@ use Symfony\Component\Console\Output\OutputInterface;
  *
  * - error: подключённая компания без запуска `ai-categorize` дольше SILENCE_HOURS
  *   (от последнего запуска или от подключения, если запусков не было);
- * - error: за сутки ≥ MIN_RESULTS результатов и доля `failed` ≥ FAILED_SHARE.
+ * - error: за сутки ≥ MIN_RESULTS результатов и доля `failed` ≥ FAILED_SHARE;
+ * - warning (не красное): исчерпан лимит расходов компании или общий — ИИ стоит штатно до
+ *   нового месяца или повышения лимита в админке. Запуски такой компании идут (`budget_exceeded`).
  *
  * Сервис выключен или ни одной компании — exit 0 без сообщений. exit 1 — штатный результат гейта.
  */
@@ -35,6 +38,7 @@ final class AiServiceHealthCheckCommand extends Command
         private readonly AiServiceAccess $access,
         private readonly AiRunJournal $runs,
         private readonly AiUsageQuery $usage,
+        private readonly AiBudget $budget,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
     ) {
@@ -67,6 +71,17 @@ final class AiServiceHealthCheckCommand extends Command
             }
         }
 
+        $exhausted = [];
+        // ponytail: запрос лимита на компанию; одним запросом — когда подключённых станут сотни.
+        foreach (array_keys($companies) as $companyId) {
+            if ($this->budget->forCompany($companyId)->exceeded()) {
+                $exhausted[] = $companyId;
+            }
+        }
+        if ([] !== $exhausted) {
+            $this->logger->warning('AI health: monthly AI budget is exhausted.', ['companyIds' => $exhausted]);
+        }
+
         $results = $this->usage->resultsSince($now->modify('-24 hours'));
         $failing = $results['total'] >= self::MIN_RESULTS && $results['failed'] / $results['total'] >= self::FAILED_SHARE;
 
@@ -80,9 +95,10 @@ final class AiServiceHealthCheckCommand extends Command
             $this->logger->error('AI health: most AI results failed in the last 24 hours.', $results);
         }
         $output->writeln(sprintf(
-            'ai health: %d companies, %d silent, results 24h %d (failed %d), purged runs %d',
+            'ai health: %d companies, %d silent, %d over budget, results 24h %d (failed %d), purged runs %d',
             \count($companies),
             \count($silent),
+            \count($exhausted),
             $results['total'],
             $results['failed'],
             $purged,

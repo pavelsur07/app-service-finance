@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\ServiceGateway\Facade;
 
+use App\ServiceGateway\Application\DTO\AiCompanyBudget;
+use App\ServiceGateway\Application\Service\AiBudget;
 use App\ServiceGateway\Application\Service\AiRunJournal;
 use App\ServiceGateway\Application\Service\AiServiceAccess;
 use App\ServiceGateway\Message\SubmitAiTaskMessage;
@@ -24,6 +26,7 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
         private ClockInterface $clock,
         private LoggerInterface $logger,
         private AiRunJournal $runs,
+        private AiBudget $budget,
     ) {
     }
 
@@ -92,6 +95,11 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
     public function grantedCompanyIds(array $companyIds): array
     {
         return $this->access->grantedCompanyIds($companyIds);
+    }
+
+    public function budgetFor(string $companyId): AiCompanyBudget
+    {
+        return $this->budget->forCompany($companyId);
     }
 
     public function recordRun(
