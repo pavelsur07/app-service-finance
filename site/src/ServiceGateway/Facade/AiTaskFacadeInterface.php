@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\ServiceGateway\Facade;
 
 use App\ServiceGateway\Application\DTO\AiCompanyBudget;
+use App\ServiceGateway\Application\DTO\AiCompanyOverview;
 
 /**
  * Постановка ИИ-задач для модулей-потребителей (ТЗ §4). Результат приходит
@@ -62,6 +63,18 @@ interface AiTaskFacadeInterface
 
     /** Лимит и расход компании за месяц, общий лимит, окно выгрузки. */
     public function budgetFor(string $companyId): AiCompanyBudget;
+
+    /** ИИ кабинета для админки: подключение, лимиты, расход и токены месяца, последние запуски. */
+    public function companyOverview(string $companyId, int $runs = 50): AiCompanyOverview;
+
+    /**
+     * Подключённые компании из списка с исчерпанным лимитом (своим или общим) — одним запросом.
+     *
+     * @param list<string> $companyIds
+     *
+     * @return list<string> id в нижнем регистре
+     */
+    public function exhaustedCompanyIds(array $companyIds): array;
 
     /**
      * Записать запуск ИИ по компании в журнал (`ai_run`): итог, причина пропуска или класс

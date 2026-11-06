@@ -25,6 +25,48 @@ final readonly class AiBudget
     ) {
     }
 
+    /** Момент подключения компании; null — не подключена. */
+    public function enabledAt(string $companyId): ?\DateTimeImmutable
+    {
+        Assert::uuid($companyId);
+        $at = $this->db->fetchOne('SELECT enabled_at FROM ai_company_access WHERE company_id = :company', ['company' => strtolower($companyId)]);
+
+        return false === $at || null === $at ? null : new \DateTimeImmutable((string) $at);
+    }
+
+    /**
+     * Подключённые компании из списка, у которых исчерпан свой лимит или общий — одним-двумя запросами.
+     *
+     * @param list<string> $companyIds
+     *
+     * @return list<string>
+     */
+    public function exhaustedAmong(array $companyIds): array
+    {
+        if ([] === $companyIds) {
+            return [];
+        }
+        if ($this->usage->spentThisMonthTotal() >= $this->totalLimitRub) {
+            return $this->connectedAmong($companyIds);
+        }
+
+        return $this->usage->overLimitAmong($companyIds);
+    }
+
+    /**
+     * @param list<string> $companyIds
+     *
+     * @return list<string>
+     */
+    private function connectedAmong(array $companyIds): array
+    {
+        return array_map('strval', $this->db->fetchFirstColumn(
+            'SELECT company_id::text FROM ai_company_access WHERE company_id IN (:ids)',
+            ['ids' => array_values(array_unique(array_map('strtolower', $companyIds)))],
+            ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING],
+        ));
+    }
+
     public function forCompany(string $companyId): AiCompanyBudget
     {
         Assert::uuid($companyId);

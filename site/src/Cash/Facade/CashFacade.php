@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Cash\Facade;
 
+use App\Cash\Infrastructure\Query\CashCategorizationQuery;
+
+use App\Cash\Application\DTO\CashCategorizationStats;
+
 use App\Cash\Application\AddCashTransactionAction;
 use App\Cash\Application\CashTransferLifecycleAction;
 use App\Cash\Application\CreateCashTransferAction;
@@ -70,7 +74,17 @@ final readonly class CashFacade
         private CashImportLogLease $importLogLease,
         private ImportLogger $importLogger,
         private ImportLogRepository $importLogRepository,
+        private CashCategorizationQuery $categorizationQuery,
     ) {
+    }
+
+    /**
+     * Подсказки статей ИИ компании, запрошенные с момента: по статусам и решения людей
+     * (страница «ИИ» кабинета в админке).
+     */
+    public function getAiSuggestionStats(string $companyId, \DateTimeImmutable $requestedSince): CashCategorizationStats
+    {
+        return $this->categorizationQuery->stats($companyId, $requestedSince);
     }
 
     /**

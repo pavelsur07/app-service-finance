@@ -83,6 +83,7 @@ final class AiTaskFacadeTest extends TestCase
             new NullLogger(),
             new AiRunJournal($this->createStub(Connection::class), new MockClock()),
             new AiBudget($this->createStub(Connection::class), new AiUsageQuery($this->createStub(Connection::class), new MockClock()), 5000.0),
+            new AiUsageQuery($this->createStub(Connection::class), new MockClock()),
         );
     }
 

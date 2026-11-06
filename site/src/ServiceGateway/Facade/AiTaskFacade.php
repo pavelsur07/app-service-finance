@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\ServiceGateway\Facade;
 
 use App\ServiceGateway\Application\DTO\AiCompanyBudget;
+use App\ServiceGateway\Application\DTO\AiCompanyOverview;
+use App\ServiceGateway\Infrastructure\Query\AiUsageQuery;
 use App\ServiceGateway\Application\Service\AiBudget;
 use App\ServiceGateway\Application\Service\AiRunJournal;
 use App\ServiceGateway\Application\Service\AiServiceAccess;
@@ -27,6 +29,7 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
         private LoggerInterface $logger,
         private AiRunJournal $runs,
         private AiBudget $budget,
+        private AiUsageQuery $usage,
     ) {
     }
 
@@ -100,6 +103,26 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
     public function budgetFor(string $companyId): AiCompanyBudget
     {
         return $this->budget->forCompany($companyId);
+    }
+
+    public function companyOverview(string $companyId, int $runs = 50): AiCompanyOverview
+    {
+        $month = $this->usage->monthTotals($companyId);
+
+        return new AiCompanyOverview(
+            serviceEnabled: $this->access->isEnabled(),
+            enabledAt: $this->budget->enabledAt($companyId),
+            budget: $this->budget->forCompany($companyId),
+            resultsThisMonth: $month['results'],
+            inputTokensThisMonth: $month['inputTokens'],
+            outputTokensThisMonth: $month['outputTokens'],
+            runs: $this->runs->recent($companyId, $runs),
+        );
+    }
+
+    public function exhaustedCompanyIds(array $companyIds): array
+    {
+        return $this->budget->exhaustedAmong($companyIds);
     }
 
     public function recordRun(

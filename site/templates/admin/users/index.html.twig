@@ -115,7 +115,7 @@
                                 data-admin-confirm-label="Отключить"
                                 data-admin-confirm-tone="danger"
                                 {% else %}
-                                data-admin-confirm="Кабинет «{{ cabinet.name }}» попадёт в ближайший запуск ИИ (в :25 каждого часа): операции без статьи за 90 дней уйдут в платные запросы к LLM."
+                                data-admin-confirm="Кабинет «{{ cabinet.name }}» попадёт в ближайший запуск ИИ (в :25 каждого часа): операции без статьи за 90 дней уйдут в платные запросы к LLM. Лимит — 500 ₽ в месяц. Другую глубину и лимит можно задать на странице «ИИ» кабинета."
                                 data-admin-confirm-title="Подключить ИИ?"
                                 data-admin-confirm-label="Подключить"
                                 data-admin-confirm-tone="warning"
@@ -123,6 +123,10 @@
                           <span class="dot"></span>ИИ {{ aiOn ? 'вкл' : 'выкл' }}{% if aiOn and not aiServiceEnabled %} · сервис выключен{% endif %}
                         </button>
                       </form>
+                      {% if aiExhausted[cabinet.id|lower] ?? false %}
+                        <span class="status status--danger" data-ai-exhausted-badge="{{ cabinet.id }}"><span class="dot"></span>Лимит ИИ исчерпан</span>
+                      {% endif %}
+                      <a href="{{ path('admin_ai_company', { companyId: cabinet.id }) }}" class="btn btn-sm btn-ghost" data-ai-page-link="{{ cabinet.id }}" title="ИИ кабинета: запуски, расход, лимиты">ИИ ›</a>
                       {% endif %}
                     </div>
                   {% endfor %}

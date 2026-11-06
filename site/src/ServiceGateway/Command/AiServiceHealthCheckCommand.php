@@ -71,13 +71,7 @@ final class AiServiceHealthCheckCommand extends Command
             }
         }
 
-        $exhausted = [];
-        // ponytail: запрос лимита на компанию; одним запросом — когда подключённых станут сотни.
-        foreach (array_keys($companies) as $companyId) {
-            if ($this->budget->forCompany($companyId)->exceeded()) {
-                $exhausted[] = $companyId;
-            }
-        }
+        $exhausted = $this->budget->exhaustedAmong(array_keys($companies));
         if ([] !== $exhausted) {
             $this->logger->warning('AI health: monthly AI budget is exhausted.', ['companyIds' => $exhausted]);
         }

@@ -74,6 +74,32 @@ final readonly class AiRunJournal
         return array_map(static fn (mixed $at): \DateTimeImmutable => new \DateTimeImmutable((string) $at), $rows);
     }
 
+    /**
+     * Последние запуски компании, новые первыми.
+     *
+     * @return list<\App\ServiceGateway\Application\DTO\AiRunView>
+     */
+    public function recent(string $companyId, int $limit): array
+    {
+        Assert::uuid($companyId);
+        Assert::range($limit, 1, 500);
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT ran_at, requested, tasks, redispatched, expired, skipped_reason, error
+             FROM ai_run WHERE company_id = :company ORDER BY ran_at DESC LIMIT '.$limit,
+            ['company' => strtolower($companyId)],
+        );
+
+        return array_map(static fn (array $row): \App\ServiceGateway\Application\DTO\AiRunView => new \App\ServiceGateway\Application\DTO\AiRunView(
+            ranAt: new \DateTimeImmutable((string) $row['ran_at']),
+            requested: (int) $row['requested'],
+            tasks: (int) $row['tasks'],
+            redispatched: (int) $row['redispatched'],
+            expired: (int) $row['expired'],
+            skippedReason: null === $row['skipped_reason'] ? null : (string) $row['skipped_reason'],
+            error: null === $row['error'] ? null : (string) $row['error'],
+        ), $rows);
+    }
+
     /** Удаляет запуски старше KEEP_DAYS; возвращает число строк. */
     public function purgeOld(): int
     {

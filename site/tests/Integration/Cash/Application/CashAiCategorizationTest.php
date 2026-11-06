@@ -29,6 +29,7 @@ use App\Company\Entity\User;
 use App\ServiceGateway\Application\DTO\AiTaskResult;
 use App\ServiceGateway\Enum\AiResultStatus;
 use App\ServiceGateway\Application\DTO\AiCompanyBudget;
+use App\ServiceGateway\Application\DTO\AiCompanyOverview;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -530,6 +531,16 @@ final class RecordingAiTaskFacade implements AiTaskFacadeInterface
     public function grantedCompanyIds(array $companyIds): array
     {
         return $this->enabledCompanyIds($companyIds);
+    }
+
+    public function companyOverview(string $companyId, int $runs = 50): AiCompanyOverview
+    {
+        throw new \LogicException('not used');
+    }
+
+    public function exhaustedCompanyIds(array $companyIds): array
+    {
+        return [];
     }
 
     public function budgetFor(string $companyId): AiCompanyBudget
