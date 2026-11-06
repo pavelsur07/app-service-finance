@@ -82,6 +82,13 @@ final class InventoryEnumsTest extends TestCase
         );
     }
 
+    public function testStockSnapshotMappingStatusLabels(): void
+    {
+        self::assertSame('Сопоставлен', StockSnapshotMappingStatus::Mapped->label());
+        self::assertSame('Не сопоставлен', StockSnapshotMappingStatus::Unmapped->label());
+        self::assertSame('Неоднозначно', StockSnapshotMappingStatus::Ambiguous->label());
+    }
+
     public function testFulfillmentSchemeFromFulfillmentType(): void
     {
         self::assertSame(FulfillmentScheme::Fbs, FulfillmentScheme::fromFulfillmentType('fbs'));

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Inventory\Infrastructure\Query;
 
+use App\Inventory\Application\DTO\StockReportTotals;
 use App\Inventory\Enum\FulfillmentScheme;
 use App\Inventory\Enum\StockStatus;
 use App\Marketplace\Enum\MarketplaceType;
@@ -148,6 +149,31 @@ final class InventoryStockReportQuery
             }),
             max(1, $page),
             min(100, max(1, $perPage)),
+        );
+    }
+
+    /**
+     * Итог по всем строкам фильтра — те же условия, что у getPage(), без группировки по SKU.
+     */
+    public function getTotals(
+        string $companyId,
+        MarketplaceType $source,
+        FulfillmentScheme $scheme,
+        \DateTimeImmutable $snapshotDate,
+    ): StockReportTotals {
+        $row = $this->baseQueryBuilder($companyId, $source, $scheme, $snapshotDate)
+            ->select(
+                'COALESCE(SUM(s.quantity), 0.000) AS quantity',
+                'COALESCE(SUM(s.reserved_quantity), 0.000) AS reserved_quantity',
+                'COALESCE(SUM(s.quantity - s.reserved_quantity), 0.000) AS available_for_sale',
+            )
+            ->executeQuery()
+            ->fetchAssociative();
+
+        return new StockReportTotals(
+            quantity: (string) ($row['quantity'] ?? '0.000'),
+            reservedQuantity: (string) ($row['reserved_quantity'] ?? '0.000'),
+            availableForSale: (string) ($row['available_for_sale'] ?? '0.000'),
         );
     }
 
