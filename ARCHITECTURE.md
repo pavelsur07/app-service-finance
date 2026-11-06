@@ -2976,6 +2976,11 @@ getActiveWbSellerConnections(?string $companyId = null): array
 // @return array<string, string|null> map listingId → productId|null
 resolveListingsToProducts(string $companyId, array $listingIds): array
 
+// Баркоды листингов компании по маркетплейсу, ключ — баркод. Inventory запрашивает по ним
+// остатки склада продавца WB (FBS) и маппит ответ на листинг.
+// @return array<string, array{listingId: string, marketplaceSku: string, marketplaceVariantId: ?string}>
+getListingBarcodes(string $companyId, string $marketplace): array
+
 // Загружает активные и находящиеся в корзине WB Product Cards для SELLER-подключения
 // и атомарно обновляет MarketplaceListing.marketplaceVariantId (chrtId), isActive и barcodes.
 // Токен должен иметь категорию Content или Promotion.
@@ -2985,6 +2990,7 @@ refreshWbListingCatalog(string $companyId, string $connectionId): int
 **Inventory mapping-контракт через Facade:**
 - Ozon `sourceSku` → `MarketplaceFacade::findListingsByMarketplaceSkus(companyId, marketplace, sourceSkus)`;
 - Wildberries `sourceSku` содержит `chrtId` размера и маппится через `MarketplaceFacade::findListingsByMarketplaceVariantIds(companyId, marketplace, marketplaceVariantIds)`;
+- Wildberries FBS (склад продавца): `sourceSku` — баркод, маппится через `MarketplaceFacade::getListingBarcodes(companyId, marketplace)`;
 - найденные `listingId` → `MarketplaceFacade::resolveListingsToProducts(companyId, listingIds)`;
 - Inventory не импортирует напрямую Marketplace repository/service;
 - связь с MarketplaceListing в `StockSnapshot` хранится как `listingId: ?string` (без ManyToOne).
@@ -3661,11 +3667,16 @@ buildQueryBuilder(
 
 - DBAL read-model для `GET /inventory/stocks`;
 - обязательный IDOR-фильтр `company_id = :companyId`;
-- ровно два фильтра: `source` (через `MarketplaceType`) и `snapshotDate`;
-- `findEffectiveSnapshotDate(companyId, source, date): ?\DateTimeImmutable` —
-  `MAX(snapshot_date)` при `snapshot_date <= :date`, то есть семантика «остатки **на** дату»:
-  в день без синхронизации берётся ближайший предыдущий снимок. `null` — снимков на эту дату и раньше нет;
-- `getPage(companyId, page, perPage, source, snapshotDate, breakdownColumns = [])` — выборка одного дня
+- ровно три фильтра: `source` (через `MarketplaceType`), `scheme` (`FulfillmentScheme`) и `snapshotDate`;
+- схема вычисляется из `fulfillment_type` одним SQL-выражением:
+  `CASE WHEN LOWER(TRIM(COALESCE(fulfillment_type, ''))) IN ('fbs', 'rfbs') THEN 'fbs' ELSE 'fbo' END`
+  (`FulfillmentScheme::FBS_TYPES`); строка без типа — FBO. Каждая строка снимка попадает ровно в одну схему,
+  поэтому сумма «Доступно расчётно» по FBO и FBS равна прежнему общему значению;
+- `findEffectiveSnapshotDate(companyId, source, scheme, date): ?\DateTimeImmutable` —
+  `MAX(snapshot_date)` при `snapshot_date <= :date` **внутри схемы**, то есть семантика «остатки **на** дату»:
+  в день без синхронизации (или без строк выбранной схемы) берётся ближайший предыдущий снимок.
+  `null` — снимков на эту дату и раньше нет;
+- `getPage(companyId, page, perPage, source, scheme, snapshotDate, breakdownColumns = [])` — выборка одного дня
   (`snapshot_date = :snapshotDate`); на день по источнику существует ровно один срез
   за счёт уникального ключа `uniq_inventory_stock_snapshot_day_item` и `upsertDaySnapshot()`;
 - строка результата — **один `source_sku`** (`GROUP BY s.source_sku`): записи снимка по всем
@@ -3675,12 +3686,12 @@ buildQueryBuilder(
 - pagination через Pagerfanta; count-модификатор считает
   `COUNT(DISTINCT COALESCE(s.source_sku, ''))`, то есть страницы считаются по SKU,
   а не по записям снимка;
-- `getBreakdownColumns(companyId, source, snapshotDate): array<string, array{value, label}>` —
+- `getBreakdownColumns(companyId, source, scheme, snapshotDate): array<string, array{value, label}>` —
   колонки разбивки «Доступно расчётно» по типам склада, ключ = алиас колонки в строке
-  (`bd_<value>`). Набор строится по данным дня: у Ozon разбивка по `fulfillment_type`
-  (`fbo`, `fbs`, `unknown` → «Без типа»), у Wildberries `fulfillment_type` всегда один,
-  поэтому разбивка идёт по `StockStatus` в порядке объявления enum. Результат передаётся
-  в `getPage()`, которая добавляет `SUM(...) FILTER (WHERE ...)` на каждую колонку;
+  (`bd_<value>`). Набор строится по данным дня внутри схемы: у Ozon разбивка по `fulfillment_type`
+  (в FBS — `FBS` / `RFBS`), у Wildberries разбивка идёт по `StockStatus` в порядке объявления enum.
+  Один тип внутри схемы — пустой массив: колонка дублировала бы «Доступно расчётно».
+  Результат передаётся в `getPage()`, которая добавляет `SUM(...) FILTER (WHERE ...)` на каждую колонку;
 - `SELECT *` не используется; join с `inventory_locations` не нужен — склад в отчёте
   не выводится.
 
@@ -3948,8 +3959,23 @@ enum LocationType: string
     case MpAcceptance = 'mp_acceptance';
     case MpInTransitToCustomer = 'mp_in_transit_to_customer';
     case MpInTransitFromCustomer = 'mp_in_transit_from_customer';
+    case SellerWarehouse = 'seller_warehouse'; // склад продавца (FBS)
 }
 ```
+
+### `src/Inventory/Enum/FulfillmentScheme.php`
+```php
+enum FulfillmentScheme: string
+{
+    case Fbo = 'fbo'; // товар на складе маркетплейса
+    case Fbs = 'fbs'; // товар на складе продавца
+    public const FBS_TYPES = ['fbs', 'rfbs'];
+    public function label(): string;                                   // 'FBO' | 'FBS'
+    public static function fromFulfillmentType(?string $type): self;   // FBS_TYPES → Fbs, остальное → Fbo
+}
+```
+Переключатель отчёта `/inventory/stocks` (`?scheme=fbo|fbs`, по умолчанию `fbo`); смысл одинаков
+для всех источников, отдельных положений под Ozon / WB / rFBS нет.
 
 
 ### `src/Marketplace/Enum/FinancialReportSyncStatus.php`
@@ -4541,7 +4567,7 @@ GET  /api/public/{resource}?token=...  — публичный API
 - `POST /inventory/snapshots/request` — ручной запуск raw-загрузки Ozon;
 - `POST /inventory/snapshots/request/wildberries` — ручной запуск raw-загрузки Wildberries;
 - `GET /inventory/snapshots/{id}/json` — raw JSON по session;
-- `GET /inventory/stocks` — UI-отчёт по нормализованным остаткам.
+- `GET /inventory/stocks` — UI-отчёт по нормализованным остаткам; фильтры `source`, `scheme` (FBO / FBS), `date`.
 
 ## Inventory — Ozon stock normalization
 
@@ -4640,8 +4666,36 @@ NormalizeInventorySnapshotAction → StockSnapshot
 
 `StockQtyByListingOnDateQuery` выбирает последнюю целую snapshot-сессию отдельно
 для каждого marketplace source, содержащую хотя бы один замапленный листинг,
-и суммирует только `StockStatus::Available`.
+и суммирует только `StockStatus::Available` по всем типам склада — у Ozon это `fbo` + `fbs`,
+у WB с ноября 2026 `fbw` + `fbs` (склад продавца).
 Товары в пути в количественный остаток `InventoryFacade` не входят.
+
+### Wildberries FBS — остатки склада продавца
+
+Та же сессия и тот же обработчик: после последней FBW-страницы `SyncWbInventorySnapshotHandler`
+выполняет фазу FBS (`fetchSellerStockPages`):
+
+```text
+MarketplaceFacade::getListingBarcodes(companyId, 'wildberries')   — пусто → фаза пропускается (info)
+↓ GET https://marketplace-api.wildberries.ru/api/v3/warehouses      — склады продавца
+↓ POST /api/v3/stocks/{warehouseId} {"skus": [баркоды]} порциями по WbInventoryClient::SELLER_STOCKS_CHUNK (1000)
+InventoryRawSnapshot: sourceEndpoint = '/api/v3/stocks/<id>', requestParams.warehouseId / warehouseName / chunk,
+                      pageNumber продолжает нумерацию FBW-страниц
+```
+
+- Токен должен иметь категорию «Маркетплейс». 401/403/429/5xx/transport в FBS-фазе — `warning`
+  `WB seller warehouse stocks skipped.`, сессия всё равно `completed` с данными FBW; повтора внутри
+  сессии нет, следующая ночь — новая попытка.
+- Повторная доставка: FBW-страницы и FBS-страницы различаются по `sourceEndpoint`; при наличии хотя бы
+  одной FBS-страницы фаза не повторяется.
+- Нормализатор `WbSellerWarehouseStocksRawNormalizer` берёт только страницы с префиксом `/api/v3/stocks/`:
+  `sku` (баркод) → `sourceSku`, `amount` → `StockStatus::Available` (отрицательное → 0),
+  `fulfillmentType = fbs`, `reservedQuantity = 0`; локация `LocationType::SellerWarehouse`,
+  `externalId = seller:<warehouseId>`, `code = WB-FBS-<warehouseId>`, `name` — имя склада.
+- `sourceSku` — баркод, а не `chrtId`: у одного размера бывает несколько баркодов, и `chrtId`
+  в уникальном ключе снимка схлопнул бы их. Листинг и `sourceOfferId` (nmId) подставляет
+  `NormalizeInventorySnapshotAction` по карте `getListingBarcodes()`; баркоды берутся из каталога,
+  поэтому строки по построению `mapped`.
 
 ## Messenger routing — Inventory
 
@@ -5039,6 +5093,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.148 | 2026-11-06 | Inventory: отчёт `/inventory/stocks` — переключатель схемы FBO / FBS (`FulfillmentScheme`, параметр `scheme`, эффективная дата и разбивка внутри схемы, разбивка скрыта при одном типе); WB — фаза FBS в `SyncWbInventorySnapshotHandler` (склады продавца `/api/v3/warehouses`, остатки `/api/v3/stocks/{id}` по баркодам), `WbSellerWarehouseStocksRawNormalizer`, `LocationType::SellerWarehouse`, `MarketplaceFacade::getListingBarcodes()` (задача `inventory-stocks-fbs`) |
 | 2.147 | 2026-11-06 | Cash: «нет ответа» на прошлой версии промпта переспрашивается один раз (`RequestCashAiCategorizationAction::PROMPT_VERSION = categorize_transactions/v3`, `findCandidates(..., $promptVersion)`), сверка версии с ai-service — pytest `test_symfony_prompt_version.py` (задача `ai-routines`, этап 4) |
 | 2.146 | 2026-11-06 | ai-service/Cash: необязательное поле `examples` в `categorize_payload` (контракт `ai-task/v1`, категория примера — из справочника, иначе 422), промпт `categorize_transactions/v3` (правило 6 — примеры компании), `CashCategorizationQuery::findExamplesFor`, `CashCategorizationExample`; `evals-compare --examples` — примеры из других кейсов набора (задача `ai-routines`, этап 3) |
 | 2.145 | 2026-11-06 | Cash: переводы собственных средств не отправляются в ИИ, если компания такие операции в статьи не разносила (`CashCategorizationQuery::TRANSFER_LIKE`), счётчик `transferLikeSkipped` на странице «ИИ» кабинета, `CashFacade::getAiSuggestionStats(..., ?occurredFrom)` (задача `ai-routines`, этап 2) |
