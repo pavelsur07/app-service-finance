@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\MessageHandler\Import;
 
+use App\Cash\Application\ApplyCashFileDescriptionsAction;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Infrastructure\Lock\CashImportAccountLock;
 use App\Cash\Message\Import\CashFileImportMessage;
@@ -37,6 +38,7 @@ final class CashFileImportHandler
         private readonly ImportLogger $importLogger,
         private readonly LoggerInterface $logger,
         private readonly CashImportAccountLock $accountLock,
+        private readonly ApplyCashFileDescriptionsAction $applyDescriptions,
     ) {
     }
 
@@ -133,7 +135,8 @@ final class CashFileImportHandler
         $importException = null;
 
         try {
-            $this->importService->import($job, fn () => $this->entityManager->flush());
+            $allowedRows = isset($job->getOptions()['description_plan']) ? ($this->applyDescriptions)($job) : null;
+            $this->importService->import($job, fn () => $this->entityManager->flush(), $allowedRows);
             if ($resumed) {
                 // Прежний воркер мог умереть после последней пачки, но до пересчёта остатков:
                 // тогда импорт выше ничего не создаёт и пересчёт пропускает. Добираем диапазон

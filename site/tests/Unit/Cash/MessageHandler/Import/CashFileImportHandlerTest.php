@@ -150,6 +150,7 @@ final class CashFileImportHandlerTest extends TestCase
             new ImportLogger($entityManager),
             new NullLogger(),
             new CashImportAccountLock($connection),
+            (new \ReflectionClass(\App\Cash\Application\ApplyCashFileDescriptionsAction::class))->newInstanceWithoutConstructor(),
         );
         $handler(new CashFileImportMessage((string) $job->getId()));
 
@@ -202,6 +203,7 @@ final class CashFileImportHandlerTest extends TestCase
             new ImportLogger($freshManager),
             $logger,
             $this->accountLock(true),
+            (new \ReflectionClass(\App\Cash\Application\ApplyCashFileDescriptionsAction::class))->newInstanceWithoutConstructor(),
         );
         $handler(new CashFileImportMessage($jobId));
 
@@ -221,6 +223,7 @@ final class CashFileImportHandlerTest extends TestCase
             new ImportLogger($entityManager),
             new NullLogger(),
             $this->accountLock($accountLockFree),
+            (new \ReflectionClass(\App\Cash\Application\ApplyCashFileDescriptionsAction::class))->newInstanceWithoutConstructor(),
         );
     }
 

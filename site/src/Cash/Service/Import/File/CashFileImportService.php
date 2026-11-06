@@ -27,6 +27,11 @@ use OpenSpout\Reader\ReaderInterface;
 use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 use Ramsey\Uuid\Uuid;
 
+/**
+ * @phpstan-import-type InputRow from CashFileDescriptionPlan
+ *
+ * @phpstan-type NormalizedRow array{ok: bool, errors: list<string>, occurredAt: ?\DateTimeImmutable, direction: ?\App\Cash\Enum\Transaction\CashDirection, amount: ?string, counterpartyName: ?string, description: ?string, currency: string, docNumber: ?string, externalId: ?string, raw: array<string, mixed>}
+ */
 final class CashFileImportService
 {
     private const IMPORT_SOURCE = 'file';
@@ -60,12 +65,17 @@ final class CashFileImportService
     ) {
     }
 
-    public function withJobFile(CashFileImportJob $job, \Closure $operation): mixed
+    public function withReadablePath(string $path, \Closure $operation): mixed
+    {
+        return $this->xlsConverter->withReadablePath($path, $operation);
+    }
+
+    public function withJobFile(CashFileImportJob $job, \Closure $operation, bool $readable = true): mixed
     {
         $this->allowedRows = null;
 
         return $this->temporaryLocalFile->with($this->resolveStorageKey($job),
-            fn (string $path) => $this->xlsConverter->withReadablePath($path, $operation));
+            fn (string $path) => $readable ? $this->withReadablePath($path, $operation) : $operation($path));
     }
 
     /**
@@ -74,19 +84,37 @@ final class CashFileImportService
      *
      * @param \Closure(): void $commitBatch
      */
-    /** @var array<int, bool>|null */
+    /** @var array<int, InputRow>|null */
     private ?array $allowedRows = null;
 
-    /** @param array<int, bool>|null $allowedRows */
+    /** @param array<int, InputRow>|null $allowedRows */
     public function import(CashFileImportJob $job, \Closure $commitBatch, ?array $allowedRows = null): void
     {
         $this->allowedRows = $allowedRows;
+        try {
+            $this->importRows($job, $commitBatch);
+        } finally {
+            $this->allowedRows = null;
+        }
+    }
+
+    /** @param \Closure(): void $commitBatch */
+    private function importRows(CashFileImportJob $job, \Closure $commitBatch): void
+    {
         $company = $job->getCompany();
         $account = $job->getMoneyAccount();
         if ($account->getCompany()->getId() !== $company->getId()) {
             throw new \DomainException('Счёт импорта принадлежит другой компании.');
         }
         FiatCurrency::fromCode($account->getCurrency());
+        if ([] === $this->allowedRows) {
+            if (null !== $job->getImportLog()) {
+                $this->importLogger->finish($job->getImportLog());
+            }
+            $commitBatch();
+
+            return;
+        }
 
         $storageKey = $this->resolveStorageKey($job);
 
@@ -97,10 +125,13 @@ final class CashFileImportService
             $storageKey,
             // Устаревший .xls конвертируется в .xlsx: ридера для него у OpenSpout нет,
             // и раньше задача молча умирала в очереди фатальной ошибкой.
-            fn (string $filePath) => $this->xlsConverter->withReadablePath(
-                $filePath,
-                fn (string $readablePath) => $this->readAndPersist($readablePath, $job, $commitBatch),
-            ),
+            function (string $filePath) use ($job, $commitBatch): void {
+                $expectedHash = $job->getOptions()['description_content_hash'] ?? null;
+                if (null !== $this->allowedRows && (!is_string($expectedHash) || !hash_equals($expectedHash, (string) hash_file('sha256', $filePath)))) {
+                    throw new \DomainException('Файл изменился после подтверждения.');
+                }
+                $this->xlsConverter->withReadablePath($filePath, fn (string $readablePath) => $this->readAndPersist($readablePath, $job, $commitBatch));
+            },
         );
     }
 
@@ -134,13 +165,25 @@ final class CashFileImportService
         $batchCount = 0;
 
         // Первый проход: сколько строк каждого ключа в файле и сколько из них уже есть в БД.
-        $this->matchQuota = $this->planExistingMatches($filePath, $job);
+        // A confirmed plan has already allocated the full file against the current
+        // snapshot under the account lock. Counting again on its filtered create
+        // rows would consume existing matches twice and lose legitimate payments.
+        $this->matchQuota = null === $this->allowedRows ? $this->planExistingMatches($filePath, $job) : [];
 
         try {
             try {
                 foreach ($this->normalizedRows($filePath, $mapping, $moneyAccount->getCurrency()) as $item) {
                     $rowByHeader = $item['row'];
                     $normalized = $item['normalized'];
+
+                    // The clock or parser context can change even after the final
+                    // re-plan. Validate the exact values about to reach the entity.
+                    if (null !== $this->allowedRows && self::planInput($normalized, $item['rowNumber']) !== ($this->allowedRows[$item['rowNumber']] ?? null)) {
+                        $current = $job->getOptions();
+                        $current['creation_conflicts']['r'.$item['rowNumber']] = 'Данные строки изменились после предпросмотра';
+                        $job->setOptions($current);
+                        continue;
+                    }
 
                     if (false === $normalized['ok']) {
                         if ($importLog) {
@@ -374,19 +417,7 @@ final class CashFileImportService
      *
      * @param array<string, mixed> $mapping
      *
-     * @return \Generator<int, array{row: array<string, ?string>, normalized: array{
-     *     ok: bool,
-     *     errors: list<string>,
-     *     occurredAt: ?\DateTimeImmutable,
-     *     direction: ?\App\Cash\Enum\Transaction\CashDirection,
-     *     amount: ?string,
-     *     counterpartyName: ?string,
-     *     description: ?string,
-     *     currency: string,
-     *     docNumber: ?string,
-     *     externalId: ?string,
-     *     raw: array<string, mixed>
-     * }}>
+     * @return \Generator<int, array{rowNumber: int, row: array<string, ?string>, normalized: NormalizedRow}>
      */
     public function normalizedRows(string $filePath, array $mapping, string $currency): \Generator
     {
@@ -420,13 +451,40 @@ final class CashFileImportService
                     if (null !== $this->allowedRows && !isset($this->allowedRows[$dataIndex + 1])) {
                         continue;
                     }
-                    yield ['row' => $rowByHeader, 'normalized' => $this->rowNormalizer->normalize($rowByHeader, $mapping, $currency)];
+                    yield ['rowNumber' => $dataIndex + 1, 'row' => $rowByHeader, 'normalized' => $this->rowNormalizer->normalize($rowByHeader, $mapping, $currency)];
                 }
                 break;
             }
         } finally {
             $reader->close();
         }
+    }
+
+    /**
+     * @param NormalizedRow $normalized
+     *
+     * @return InputRow
+     */
+    public static function planInput(array $normalized, int $rowNumber): array
+    {
+        $errors = $normalized['errors'];
+        $tooLong = mb_strlen($normalized['description'] ?? '', 'UTF-8') > CashTransaction::DESCRIPTION_MAX_LENGTH;
+        if ($tooLong) {
+            $errors[] = sprintf('Описание не должно превышать %d символа.', CashTransaction::DESCRIPTION_MAX_LENGTH);
+        }
+
+        return [
+            'rowId' => 'r'.$rowNumber,
+            'date' => $normalized['occurredAt']?->format('Y-m-d') ?? '',
+            'amount' => $normalized['amount'] ?? '',
+            'direction' => null === $normalized['direction'] ? '' : $normalized['direction']->value,
+            'currency' => $normalized['currency'],
+            'docNumber' => $normalized['docNumber'],
+            'description' => $normalized['description'],
+            'counterparty' => $normalized['counterpartyName'],
+            'ok' => $normalized['ok'] && !$tooLong,
+            'errors' => $errors,
+        ];
     }
 
     /**

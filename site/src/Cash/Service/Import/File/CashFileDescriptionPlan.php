@@ -11,10 +11,12 @@ use App\Shared\Service\Storage\ObjectStorageInterface;
 use Ramsey\Uuid\Uuid;
 
 /**
- * @phpstan-type InputRow array{rowId: string, date: string, amount: string, direction: string, currency: string, docNumber: ?string, description: ?string, counterparty: ?string, ok: bool}
- * @phpstan-type Snapshot array{id: string, date: string, amount: string, direction: string, currency: string, docNumber: ?string, description: ?string, counterparty: ?string, occurredAt: string, counterpartyId: ?string, importSource: ?string}
+ * @phpstan-type InputRow array{rowId: string, date: string, amount: string, direction: string, currency: string, docNumber: ?string, description: ?string, counterparty: ?string, ok: bool, errors: list<string>}
+ *
+ * @phpstan-import-type ImportSnapshot from CashTransactionRepository as Snapshot
+ *
  * @phpstan-type PlanRow array{input: InputRow, action: string, reason: string, transactionId: ?string, oldDescription: ?string, snapshot: ?Snapshot}
- * @phpstan-type Plan array{version: int, id: string, companyId: string, accountId: string, actor: ?string, fileHash: string, mappingHash: string, rows: array<string, PlanRow>}
+ * @phpstan-type Plan array{version: int, id: string, companyId: string, accountId: string, actor: ?string, fileHash: string, mappingHash: string, contentHash: string, rows: array<string, PlanRow>}
  */
 final readonly class CashFileDescriptionPlan
 {
@@ -34,16 +36,16 @@ final readonly class CashFileDescriptionPlan
      */
     public function build(string $path, MoneyAccount $account, array $mapping, string $fileHash, ?string $actor): array
     {
+        if ('xls' === strtolower(pathinfo($path, \PATHINFO_EXTENSION))) {
+            // Preserve the existing legacy converter; no new format implementation.
+            $plan = $this->reader->withReadablePath($path, fn (string $readablePath): array => $this->build($readablePath, $account, $mapping, $fileHash, $actor));
+            $plan['contentHash'] = (string) hash_file('sha256', $path);
+
+            return $plan;
+        }
         $rows = [];
-        foreach ($this->reader->normalizedRows($path, $mapping, $account->getCurrency()) as $index => $item) {
-            $n = $item['normalized'];
-            $rows[] = [
-                'rowId' => 'r'.($index + 2),
-                'date' => $n['occurredAt']?->format('Y-m-d') ?? '',
-                'amount' => $n['amount'] ?? '', 'direction' => null === $n['direction'] ? '' : $n['direction']->value,
-                'currency' => $n['currency'], 'docNumber' => $n['docNumber'],
-                'description' => $n['description'], 'counterparty' => $n['counterpartyName'], 'ok' => $n['ok'],
-            ];
+        foreach ($this->reader->normalizedRows($path, $mapping, $account->getCurrency()) as $item) {
+            $rows[] = CashFileImportService::planInput($item['normalized'], $item['rowNumber']);
         }
         $dates = array_column(array_filter($rows, static fn (array $r): bool => $r['ok']), 'date');
         $snapshots = [];
@@ -52,8 +54,8 @@ final readonly class CashFileDescriptionPlan
                 (string) $account->getCompany()->getId(), (string) $account->getId(),
                 new \DateTimeImmutable(min($dates), new \DateTimeZone('UTC')),
                 (new \DateTimeImmutable(max($dates), new \DateTimeZone('UTC')))->modify('+1 day'),
-            ) as $transaction) {
-                $snapshots[$transaction->getId()] = self::snapshot($transaction);
+            ) as $snapshot) {
+                $snapshots[$snapshot['id']] = $snapshot;
             }
         }
         $matchingRows = $rows;
@@ -76,7 +78,7 @@ final readonly class CashFileDescriptionPlan
         return [
             'version' => 1, 'id' => Uuid::uuid7()->toString(), 'companyId' => (string) $account->getCompany()->getId(),
             'accountId' => (string) $account->getId(), 'actor' => $actor, 'fileHash' => $fileHash,
-            'mappingHash' => hash('sha256', json_encode($mapping, JSON_THROW_ON_ERROR)), 'rows' => $planRows,
+            'mappingHash' => hash('sha256', json_encode($mapping, \JSON_THROW_ON_ERROR)), 'contentHash' => (string) hash_file('sha256', $path), 'rows' => $planRows,
         ];
     }
 
@@ -105,9 +107,17 @@ final readonly class CashFileDescriptionPlan
     /** @param Plan $plan */
     public function save(array $plan): string
     {
-        $json = json_encode($plan, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+        try {
+            $json = json_encode($plan, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
+        } catch (\JsonException $exception) {
+            throw new \DomainException('План содержит некорректный текст. Проверьте кодировку UTF-8.', previous: $exception);
+        }
         $hash = hash('sha256', $json);
-        $this->storage->write('cash-file-plans/'.$plan['companyId'].'/'.$hash.'.json', $json);
+        try {
+            $this->storage->write('cash-file-plans/'.$plan['companyId'].'/'.$hash.'.json', $json);
+        } catch (\RuntimeException $exception) {
+            throw new \App\Shared\Service\Storage\ObjectStorageException('Не удалось сохранить план импорта.', previous: $exception);
+        }
 
         return $hash;
     }
@@ -123,7 +133,7 @@ final readonly class CashFileDescriptionPlan
             throw new \DomainException('План импорта повреждён.');
         }
         /** @var Plan $plan */
-        $plan = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        $plan = json_decode($json, true, 512, \JSON_THROW_ON_ERROR);
         if (1 !== $plan['version'] || $plan['companyId'] !== $companyId) {
             throw new \DomainException('План импорта устарел.');
         }
