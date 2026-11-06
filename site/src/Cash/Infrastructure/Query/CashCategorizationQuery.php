@@ -148,7 +148,7 @@ final readonly class CashCategorizationQuery
         $rows = $this->connection->fetchAllAssociative(
             'WITH batch AS MATERIALIZED (
                  -- Слова назначения через «или»: пример похож, если делит с операцией хоть одно слово, ранг — по числу общих.
-                 SELECT b.counterparty_id,
+                 SELECT b.counterparty_id, b.direction,
                         CASE WHEN b.description ~ \'[[:alpha:]]{2}\'
                              THEN NULLIF(replace(plainto_tsquery(\'russian\', b.description)::text, \'&\', \'|\'), \'\')::tsquery
                         END AS words
@@ -180,11 +180,13 @@ final readonly class CashCategorizationQuery
                  FROM batch
                  CROSS JOIN LATERAL (
                      SELECT pool.*,
-                            (batch.counterparty_id IS NOT NULL AND pool.counterparty_id = batch.counterparty_id) AS same_counterparty,
+                            COALESCE(pool.counterparty_id = batch.counterparty_id, false) AS same_counterparty,
                             CASE WHEN batch.words IS NULL THEN 0 ELSE ts_rank(pool.document, batch.words) END AS rank
                      FROM pool
-                     WHERE (batch.counterparty_id IS NOT NULL AND pool.counterparty_id = batch.counterparty_id)
-                        OR (batch.words IS NOT NULL AND pool.document @@ batch.words)
+                     -- Направление — как у операции: пример поступления списанию не подсказка (и в промпте, и в evals).
+                     WHERE pool.direction = batch.direction
+                       AND (pool.counterparty_id = batch.counterparty_id
+                            OR (batch.words IS NOT NULL AND pool.document @@ batch.words))
                      ORDER BY same_counterparty DESC, rank DESC, pool.occurred_at DESC, pool.id
                      LIMIT :perOperation
                  ) near

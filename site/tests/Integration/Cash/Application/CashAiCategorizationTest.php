@@ -34,6 +34,7 @@ use App\ServiceGateway\Enum\AiResultStatus;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CounterpartyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Psr\Log\NullLogger;
@@ -177,6 +178,32 @@ final class CashAiCategorizationTest extends IntegrationTestCase
             'counterparty' => null,
             'category_id' => (string) $this->rent->getId(),
         ]], $this->ai->requests[0]['payload']['examples']);
+    }
+
+    public function testSameCounterpartyAndDirectionWinOverWordMatches(): void
+    {
+        $north = CounterpartyBuilder::aCounterparty()->withId(Uuid::uuid4()->toString())->withCompany($this->company)->withName('ООО Север')->build();
+        $this->em->persist($north);
+        // Три примера без контрагента с общими словами и три поступления от того же контрагента — шум.
+        foreach ([2, 3, 4] as $n) {
+            $this->transaction(sprintf('Оплата по счёту %d', $n), $this->rent, new \DateTimeImmutable(sprintf('-%d days', 10 + $n)));
+            $income = CashTransactionBuilder::aCashTransaction()->withId(Uuid::uuid4()->toString())->forCompany($this->company)
+                ->withMoneyAccount($this->account)->withDirection(CashDirection::INFLOW)->withAmount('100.00')
+                ->withCashflowCategory($this->revenue)->build();
+            $income->setOccurredAt(new \DateTimeImmutable(sprintf('-%d days', $n)));
+            $income->setDescription(sprintf('Оплата по счёту %d от покупателя', $n));
+            $income->setCounterparty($north);
+            $this->em->persist($income);
+        }
+        $this->transaction('Поставка материалов', $this->rent, new \DateTimeImmutable('-60 days'))->setCounterparty($north);
+        $this->transaction('Оплата по счёту 1')->setCounterparty($north);
+        $this->em->flush();
+
+        $this->request();
+
+        $examples = $this->ai->requests[0]['payload']['examples'];
+        self::assertSame('Поставка материалов', $examples[0]['description']);
+        self::assertSame(['outflow'], array_values(array_unique(array_column($examples, 'direction'))));
     }
 
     public function testBatchWithoutSimilarDecisionsKeepsThePreviousPayloadShape(): void
