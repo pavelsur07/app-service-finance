@@ -4154,6 +4154,10 @@ enum TurnoverBucket: string
 (общий для страницы и экспорта): невалидное значение → умолчание (`period` 30, `source`/`scheme`/`bucket`
 все, `date` сегодня — будущее тоже, `tags[]` только валидные UUID). Отчёт строится в памяти, страница —
 Pagerfanta `ArrayAdapter` по 50 строк; сводка и баннер «Остатки: … на дату / устарели» — по всем строкам.
+Экспорт: `StockTurnoverExportController` (`GET /marketplace-analytics/stock-turnover/export.xlsx`,
+`marketplace_analytics_stock_turnover_export`, тот же парсер, `ReportsApiRateLimiter` → 429) отдаёт
+`StreamedResponse` `stock-turnover-<date>-<period>d.xlsx`; `Infrastructure/Export/StockTurnoverXlsxExporter::export(StockTurnoverReport, outputPath)`
+— лист «Оборачиваемость» (строки) и лист «Сводка» (та же сводка до фильтра корзины).
 
 ### `src/Marketplace/Enum/PipelineStatus.php`
 ```php
@@ -5172,6 +5176,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.152 | 2026-11-06 | MarketplaceAnalytics: отчёт «Оборачиваемость» — где заморожены деньги: `TurnoverBucket`, `StockTurnoverPolicy`, `StockTurnoverQuery` (только через Facade), страница `/marketplace-analytics/stock-turnover` с фильтрами период/источник/схема/дата/корзина/теги, сводкой и баннером свежести, экспорт `export.xlsx`; `InventoryFacade::getStockQtyByListingOnReportDate()` получил параметр `scheme` (задача `stock-turnover-report`) |
 | 2.151 | 2026-11-06 | Inventory: таблица `/inventory/stocks` — количества целыми (`vf_number`), русские заголовки, итоги по странице и по фильтру (`InventoryStockReportQuery::getTotals()` → `StockReportTotals`), подписи `StockSnapshotMappingStatus::label()`, отрицательное «Доступно» подсвечено (задача `inventory-stocks-table-format`) |
 | 2.150 | 2026-11-06 | Inventory: отчёт `/inventory/stocks` — переключатель схемы FBO / FBS (`FulfillmentScheme`, параметр `scheme`, эффективная дата и разбивка внутри схемы, разбивка скрыта при одном типе); WB — фаза FBS в `SyncWbInventorySnapshotHandler` (склады продавца `/api/v3/warehouses`, остатки `/api/v3/stocks/{id}` по баркодам), `WbSellerWarehouseStocksRawNormalizer`, `LocationType::SellerWarehouse`, `MarketplaceFacade::getListingBarcodes()` (задача `inventory-stocks-fbs`) |
 | 2.149 | 2026-11-06 | Cash: правило переводов выключается, только когда у компании от 3 разнесённых в статьи операций с фразой перевода — одна случайная (у COMPSHOP одна из 106) больше не отправляет все переводы в ИИ (`CashCategorizationQuery::TRANSFER_LIKE`, задача `ai-routines`, этап 4) |

@@ -67,6 +67,9 @@
                         <div class="col-auto d-flex gap-2">
                             <button type="submit" class="btn btn-primary">Применить</button>
                             <a href="{{ path('marketplace_analytics_stock_turnover_index') }}" class="btn btn-outline-secondary">Сбросить</a>
+                            <a href="{{ path('marketplace_analytics_stock_turnover_export', app.request.query.all|filter((v, k) => k != 'page')) }}" class="btn btn-outline-secondary">
+                                <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>&nbsp;Excel
+                            </a>
                         </div>
                     </form>
                 </div>
