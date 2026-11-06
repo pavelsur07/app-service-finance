@@ -84,8 +84,11 @@ final class RequestCashAiCategorizationAction
             return new CashAiCategorizationRequestResult(enabled: true, expired: $expired, redispatched: $redispatched, skippedReason: 'budget_exceeded');
         }
         // Пока прошлые запросы без ответа, их стоимость не в учёте: новые пачки ждут. Иначе при
-        // вставшем импорте лимит видел бы прежний расход, а отправка шла бы каждый час.
-        if ([] !== $this->suggestions->findRequestedBefore($companyId, $now, 1)) {
+        // вставшем импорте лимит видел бы прежний расход, а отправка шла бы каждый час. Истёкшие
+        // без ответа за последние EXPIRE_AFTER_DAYS держат паузу ещё столько же (истечение — ERROR).
+        // ponytail: пауза по времени, не до подтверждения импорта; точно — учётом отправленных задач в ServiceGateway.
+        if ([] !== $this->suggestions->findRequestedBefore($companyId, $now, 1)
+            || $this->suggestions->hasExpiredSince($companyId, $now->modify(sprintf('-%d days', self::EXPIRE_AFTER_DAYS)))) {
             return new CashAiCategorizationRequestResult(enabled: true, expired: $expired, redispatched: $redispatched, skippedReason: 'awaiting_results');
         }
 
@@ -163,7 +166,8 @@ final class RequestCashAiCategorizationAction
                     $suggestion->fail('expired', null, $now);
                 }
             });
-            $this->logger->warning('AI categorization requests without an answer expired.', [
+            // Неделя без ответа — сломан сервис или импорт результатов; запросы могли быть оплачены.
+            $this->logger->error('AI categorization requests without an answer expired.', [
                 'companyId' => $companyId,
                 'count' => \count($expired),
             ]);

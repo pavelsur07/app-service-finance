@@ -153,6 +153,22 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         self::assertSame(0, $result->requested);
     }
 
+    public function testExpiredUnansweredRequestsKeepNewBatchesPaused(): void
+    {
+        $this->transaction('Оплата аренды');
+        $this->em->flush();
+        self::assertSame(1, $this->request()->requested);
+
+        // Импорт стоит больше недели: запрос истекает, но та же операция не уходит повторно
+        // с новым ключом — сервис мог уже выполнить её платно.
+        $this->clock->modify('+8 days');
+        $result = $this->request();
+
+        self::assertSame(1, $result->expired);
+        self::assertSame('awaiting_results', $result->skippedReason);
+        self::assertCount(1, $this->ai->requests);
+    }
+
     public function testCompanyLookbackLimitsCandidateWindow(): void
     {
         $recent = $this->transaction('Аренда за неделю', null, new \DateTimeImmutable('-3 days'));
@@ -258,14 +274,16 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         $tx = $this->transaction('Оплата аренды');
         $this->em->flush();
 
+        // Каждый цикл: отправка → неделя без ответа → истечение и пауза → пауза кончилась.
         for ($i = 0; $i < 4; ++$i) {
-            $this->request();
+            self::assertSame(1, $this->request()->requested);
+            $this->clock->modify('+8 days');
+            self::assertSame(1, $this->request()->expired);
             $this->clock->modify('+8 days');
         }
         $result = $this->request();
 
         // Четыре истечения подряд не исключили операцию (лимит MAX_FAILED_ATTEMPTS — для сбоев ответа).
-        self::assertSame(1, $result->expired);
         self::assertSame(1, $result->requested);
         self::assertSame(Status::REQUESTED, $this->suggestionFor($tx)->getStatus());
         self::assertSame(4, (int) $this->connection->fetchOne("SELECT count(*) FROM cash_category_suggestion WHERE error_code = 'expired'"));
