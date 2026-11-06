@@ -26,7 +26,7 @@ final readonly class StockTurnoverXlsxExporter
     private const FORMAT_RATE = '#,##0.00';
     private const HEADER_BG_COLOR = '2563EB';
 
-    private const HEADERS = ['Листинг ID', 'Товар', 'SKU', 'Артикул продавца', 'Источник', 'Остаток', 'Продано за период', 'Продаж в день', 'Дней запаса', 'Себестоимость', 'В деньгах', 'Корзина'];
+    private const HEADERS = ['Листинг ID', 'Товар', 'SKU', 'Артикул продавца', 'Источник', 'Остаток', 'Продано за период', 'Продаж в день', 'Дней запаса', 'Себестоимость', 'В деньгах', 'Скорость продаж'];
 
     public function export(StockTurnoverReport $report, string $outputPath): void
     {
@@ -55,7 +55,7 @@ final readonly class StockTurnoverXlsxExporter
                 ['Доля замороженного, %', $s->frozenShare, $rate],
             ];
             foreach (TurnoverBucket::cases() as $bucket) {
-                $lines[] = [sprintf('Корзина «%s», ₽', $bucket->label()), (float) ($s->valueByBucket[$bucket->value] ?? '0'), $money];
+                $lines[] = [sprintf('Скорость продаж «%s», ₽', $bucket->label()), (float) ($s->valueByBucket[$bucket->value] ?? '0'), $money];
             }
             $lines[] = ['Листингов без себестоимости', $s->listingsWithoutCostPrice, $integer];
             $lines[] = ['Штук без себестоимости', $s->qtyWithoutCostPrice, $integer];

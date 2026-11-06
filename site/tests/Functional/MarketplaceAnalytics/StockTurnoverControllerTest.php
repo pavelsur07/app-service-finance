@@ -35,7 +35,10 @@ final class StockTurnoverControllerTest extends WebTestCaseBase
         self::assertStringContainsString('без себестоимости: 1,', $summary);
         self::assertStringContainsString('Остатки: Ozon на '.$this->date->format('d.m.Y'), $crawler->filter('.vf-turnover-stock-meta')->text());
 
-        // Корзина словами, отрицательных нет; первая строка — «свыше 90 дней».
+        // Скорость продаж словами (не «корзина»): фильтр, колонка и сводка.
+        self::assertSame('Скорость продаж', trim($crawler->filter('label[for="bucket"]')->text()));
+        self::assertSame('Скорость продаж', trim($crawler->filter('table thead th')->last()->text()));
+        self::assertStringNotContainsString('орзин', $crawler->filter('.page-body')->text());
         self::assertStringContainsString('свыше 90 дней', $crawler->filter('table tbody tr')->first()->filter('.badge')->last()->text());
     }
 
