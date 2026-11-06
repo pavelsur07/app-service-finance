@@ -167,6 +167,7 @@ public function testSchemeFbsUsesOnlySellerWarehouseRows(): void   // A: fbo 400
 
 **Files:**
 - Create: `site/src/MarketplaceAnalytics/Controller/StockTurnoverIndexController.php`
+- Create: `site/src/MarketplaceAnalytics/Application/StockTurnoverFilterParser.php`
 - Create: `site/templates/marketplace_analytics/stock_turnover/index.html.twig`
 - Modify: `site/templates/marketplace_analytics/_tabs.html.twig` (вкладка «Оборачиваемость», `activeTab == 'stock_turnover'`)
 - Modify: `ARCHITECTURE.md` (маршруты модуля)
@@ -174,7 +175,7 @@ public function testSchemeFbsUsesOnlySellerWarehouseRows(): void   // A: fbo 400
 
 **Interfaces:**
 - Consumes: `StockTurnoverQuery::execute(StockTurnoverFilter)` (Task 3), `ListingTagFacade::list(companyId): list<ListingTagDTO{id,name}>`, `partials/_pagination.html.twig` с `pager`.
-- Produces: маршрут `GET /marketplace-analytics/stock-turnover` (`marketplace_analytics_stock_turnover_index`); render-переменные `pager` (Pagerfanta `ArrayAdapter` по `report->rows`, 50 на страницу), `summary`, `filter`, `periods` ([30, 60, 90]), `sources`, `schemes` (`FulfillmentScheme::cases()`), `buckets` (`TurnoverBucket::cases()`), `tags`; private `parseFilter(Request, string $companyId): StockTurnoverFilter` — `period` не из {30,60,90} → 30; `source` не из `MarketplaceType` → null; `scheme` не `fbo|fbs` → null; `bucket` не из enum → null; `date` не `Y-m-d` или в будущем → сегодня; `tags[]` — только валидные UUID.
+- Produces: маршрут `GET /marketplace-analytics/stock-turnover` (`marketplace_analytics_stock_turnover_index`); render-переменные `pager` (Pagerfanta `ArrayAdapter` по `report->rows`, 50 на страницу), `summary`, `filter`, `periods` ([30, 60, 90]), `sources`, `schemes` (`FulfillmentScheme::cases()`), `buckets` (`TurnoverBucket::cases()`), `tags`; `final readonly class StockTurnoverFilterParser { public function parse(Request $request, string $companyId): StockTurnoverFilter; }` (общий для страницы и экспорта) — `period` не из {30,60,90} → 30; `source` не из `MarketplaceType` → null; `scheme` не `fbo|fbs` → null; `bucket` не из enum → null; `date` не `Y-m-d` или в будущем → сегодня; `tags[]` — только валидные UUID.
 
 Экран (DS: карточка фильтров → карточка сводки → таблица `vf-table`):
 
@@ -218,7 +219,7 @@ public function testTabIsPresentInAnalyticsTabs(): void             // ссыл�
 - Test: `site/tests/Functional/MarketplaceAnalytics/StockTurnoverExportControllerTest.php`
 
 **Interfaces:**
-- Consumes: `StockTurnoverQuery`, `StockTurnoverFilter` и `parseFilter` (вынести общий парсер в `final readonly class StockTurnoverFilterParser { public function parse(Request $request, string $companyId): StockTurnoverFilter; }` в `MarketplaceAnalytics/Application/`, контроллер Task 4 переключить на него), `ReportsApiRateLimiter`, `OpenSpout\Writer\XLSX\Writer` как в `UnitExtendedXlsxExporter`.
+- Consumes: `StockTurnoverQuery`, `StockTurnoverFilterParser::parse()` (Task 4), `ReportsApiRateLimiter`, `OpenSpout\Writer\XLSX\Writer` как в `UnitExtendedXlsxExporter`.
 - Produces: `GET /marketplace-analytics/stock-turnover/export.xlsx` (`marketplace_analytics_stock_turnover_export`), `StreamedResponse` с `Content-Disposition: attachment; filename="stock-turnover-<date>-<period>d.xlsx"`; `StockTurnoverXlsxExporter::export(StockTurnoverReport $report, string $outputPath): void` — лист 1 строки: `Листинг ID, Товар, SKU, Артикул продавца, Источник, Остаток, Продано за период, Продаж в день, Дней запаса, Себестоимость, В деньгах, Корзина`; лист 2 «Сводка» — всего, заморожено, доля, по корзинам, без себестоимости.
 
 - [ ] **Step 1: Write the failing test**
@@ -227,11 +228,11 @@ public function testTabIsPresentInAnalyticsTabs(): void             // ссыл�
 public function testExportReturnsXlsxWithHeaderAndRows(): void
 // 200, Content-Type xlsx, filename содержит дату; файл читается OpenSpout Reader: первая строка — заголовки, строк данных 4, у A в колонке «Корзина» «свыше 90 дней», у D «В деньгах» пусто
 public function testExportRespectsBucketFilter(): void   // ?bucket=frozen → 1 строка данных
-public function testExportIsRateLimited(): void          // как в UnitExtendedExportControllerTest, если там есть такой кейс; иначе пропустить и записать Ruling
+public function testExportRequiresAuthentication(): void  // без логина — редирект на вход, как testReturnsErrorWhenNotAuthenticated в UnitExtendedExportControllerTest
 ```
 
 - [ ] **Step 2: Run** — Expected: FAIL (404).
-- [ ] **Step 3: Implement** парсер, экспортер, контроллер, кнопку.
+- [ ] **Step 3: Implement** экспортер, контроллер, кнопку.
 - [ ] **Step 4: Run** functional MarketplaceAnalytics целиком — Expected: OK. `make site-stan`, `make site-cs-check`, `make site-cs-strict-types`, `make site-test-unit`.
 - [ ] **Step 5: ARCHITECTURE.md** — маршрут экспорта, Changelog `2.152 | 2026-11-06 | MarketplaceAnalytics: отчёт «Оборачиваемость» …`.
 - [ ] **Step 6: Commit** — `feat(marketplace-analytics): экспорт отчёта «Оборачиваемость» в xlsx`.
