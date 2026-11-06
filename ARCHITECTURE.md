@@ -3697,7 +3697,11 @@ buildQueryBuilder(
 - `getBreakdownColumns(companyId, source, scheme, snapshotDate): array<string, array{value, label}>` —
   колонки разбивки «Доступно расчётно» по типам склада, ключ = алиас колонки в строке
   (`bd_<value>`). Набор строится по данным дня внутри схемы: у Ozon разбивка по `fulfillment_type`
-  (в FBS — `FBS` / `RFBS`), у Wildberries разбивка идёт по `StockStatus` в порядке объявления enum.
+  (в FBS — `FBS` / `RFBS`), у Wildberries разбивка идёт по `StockStatus` в порядке объявления enum;
+- `getTotals(companyId, source, scheme, snapshotDate): StockReportTotals` — `SUM` тех же строк, что
+  попадают в `getPage()` (без группировки по SKU): `quantity`, `reservedQuantity`, `availableForSale`
+  numeric-строками. Шаблон показывает его как «Итого по фильтру» над таблицей; «Итого на странице»
+  считается в Twig по строкам текущей страницы. Количества в UI — целые (`vf_number`, 0 знаков).
   Один тип внутри схемы — пустой массив: колонка дублировала бы «Доступно расчётно».
   Результат передаётся в `getPage()`, которая добавляет `SUM(...) FILTER (WHERE ...)` на каждую колонку;
 - `SELECT *` не используется; join с `inventory_locations` не нужен — склад в отчёте
@@ -3948,9 +3952,11 @@ enum StockStatus: string
 ```php
 enum StockSnapshotMappingStatus: string
 {
-    case Unmapped = 'unmapped';
     case Mapped = 'mapped';
+    case Unmapped = 'unmapped';
     case Ambiguous = 'ambiguous';
+
+    public function label(): string; // «Сопоставлен» / «Не сопоставлен» / «Неоднозначно» — подпись бейджа в отчёте
 }
 ```
 
@@ -5108,6 +5114,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.151 | 2026-11-06 | Inventory: таблица `/inventory/stocks` — количества целыми (`vf_number`), русские заголовки, итоги по странице и по фильтру (`InventoryStockReportQuery::getTotals()` → `StockReportTotals`), подписи `StockSnapshotMappingStatus::label()`, отрицательное «Доступно» подсвечено (задача `inventory-stocks-table-format`) |
 | 2.150 | 2026-11-06 | Inventory: отчёт `/inventory/stocks` — переключатель схемы FBO / FBS (`FulfillmentScheme`, параметр `scheme`, эффективная дата и разбивка внутри схемы, разбивка скрыта при одном типе); WB — фаза FBS в `SyncWbInventorySnapshotHandler` (склады продавца `/api/v3/warehouses`, остатки `/api/v3/stocks/{id}` по баркодам), `WbSellerWarehouseStocksRawNormalizer`, `LocationType::SellerWarehouse`, `MarketplaceFacade::getListingBarcodes()` (задача `inventory-stocks-fbs`) |
 | 2.149 | 2026-11-06 | Cash: правило переводов выключается, только когда у компании от 3 разнесённых в статьи операций с фразой перевода — одна случайная (у COMPSHOP одна из 106) больше не отправляет все переводы в ИИ (`CashCategorizationQuery::TRANSFER_LIKE`, задача `ai-routines`, этап 4) |
 | 2.148 | 2026-11-06 | Cash: immutable whole-file description plan, явный выбор, scoped chunk apply/audit/retry, защита description от 1С overwrite (`Version20261106120000`), Twig preview/result (cash-import-description-update) |

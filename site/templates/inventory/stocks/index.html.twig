@@ -47,9 +47,9 @@
         {# Итог по всему фильтру: страница показывает до PER_PAGE SKU, сравнивать FBO и FBS нужно по целому числу. #}
         <div class="card-header vf-stocks-totals text-secondary">
             Итого по фильтру:
-            остаток <span class="vf-num vf-strong">{{ totals.quantity|vf_number }}</span>,
-            резерв <span class="vf-num">{{ totals.reservedQuantity|vf_number }}</span>,
-            доступно <span class="vf-num vf-strong{{ totals.availableForSale < 0 ? ' text-danger' : '' }}">{{ totals.availableForSale|vf_number }}</span>
+            остаток&nbsp;<span class="vf-num vf-strong">{{ totals.quantity|vf_number }}</span>,
+            резерв&nbsp;<span class="vf-num">{{ totals.reservedQuantity|vf_number }}</span>,
+            доступно&nbsp;<span class="vf-num vf-strong{{ totals.availableForSale < 0 ? ' text-danger' : '' }}">{{ totals.availableForSale|vf_number }}</span>
         </div>
         <div class="table-responsive">
             {% set hasBreakdown = breakdownColumns|length > 0 %}
@@ -73,7 +73,7 @@
                 {% if hasBreakdown %}
                     <tr>
                         {% for column in breakdownColumns %}
-                            <th scope="col" class="text-end text-nowrap text-secondary">{{ column.label }}</th>
+                            <th scope="col" class="text-end text-secondary">{{ column.label }}</th>
                         {% endfor %}
                     </tr>
                 {% endif %}
