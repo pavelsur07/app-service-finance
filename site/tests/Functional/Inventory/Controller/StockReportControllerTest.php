@@ -485,6 +485,42 @@ final class StockReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('date='.$date, $secondPage[0]);
     }
 
+    public function testSchemeToggleMarksActiveOptionAndKeepsItInPagination(): void
+    {
+        $client = static::createClient();
+
+        $owner = UserBuilder::aUser()->withEmail('stocks-scheme-toggle@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112018')->withOwner($owner)->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
+
+        $snapshots = [];
+        for ($index = 0; $index < InventoryStockReportQuery::PER_PAGE + 1; ++$index) {
+            $snapshots[] = $this->snapshot(
+                $company,
+                $location,
+                sprintf('%03x', 0x300 + $index),
+                MarketplaceType::OZON,
+                $this->daysAgo(1),
+                sprintf('SKU-FBS-PAGE-%02d', $index),
+            )->withFulfillmentType('fbs');
+        }
+
+        $this->persist($owner, $company, $location, ...$snapshots);
+        $this->login($client, $owner, $company);
+
+        $crawler = $client->request('GET', '/inventory/stocks?scheme=fbs&date='.$this->daysAgo(1)->format('Y-m-d'));
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('input[name="scheme"][value="fbs"][checked]'));
+        self::assertCount(1, $crawler->filter('input[name="scheme"][value="fbo"]'));
+        self::assertCount(0, $crawler->filter('input[name="scheme"][value="fbo"][checked]'));
+
+        $links = $crawler->filter('.card-footer nav a')->each(static fn (Crawler $link): string => (string) $link->attr('href'));
+        $secondPage = array_values(array_filter($links, static fn (string $href): bool => str_contains($href, 'page=2')));
+        self::assertNotEmpty($secondPage);
+        self::assertStringContainsString('scheme=fbs', $secondPage[0]);
+    }
+
     private function seedTwoOzonDays(string $email, string $companyId, string $suffix): KernelBrowser
     {
         $client = static::createClient();
