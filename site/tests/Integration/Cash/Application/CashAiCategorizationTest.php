@@ -136,6 +136,23 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         self::assertSame(0, $this->countSuggestions());
     }
 
+    public function testNewBatchesWaitWhilePreviousRequestsHaveNoAnswer(): void
+    {
+        $this->transaction('Оплата аренды');
+        $this->em->flush();
+        self::assertSame(1, $this->request()->requested);
+
+        // Импорт встал: через час ответа нет, появилась новая операция — новых пачек не будет,
+        // их стоимость не попала бы в лимит.
+        $this->transaction('Аренда склада');
+        $this->em->flush();
+        $this->clock->modify('+1 hour');
+        $result = $this->request();
+
+        self::assertSame('awaiting_results', $result->skippedReason);
+        self::assertSame(0, $result->requested);
+    }
+
     public function testCompanyLookbackLimitsCandidateWindow(): void
     {
         $recent = $this->transaction('Аренда за неделю', null, new \DateTimeImmutable('-3 days'));

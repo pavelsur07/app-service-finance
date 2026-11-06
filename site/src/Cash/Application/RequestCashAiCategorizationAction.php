@@ -83,6 +83,11 @@ final class RequestCashAiCategorizationAction
 
             return new CashAiCategorizationRequestResult(enabled: true, expired: $expired, redispatched: $redispatched, skippedReason: 'budget_exceeded');
         }
+        // Пока прошлые запросы без ответа, их стоимость не в учёте: новые пачки ждут. Иначе при
+        // вставшем импорте лимит видел бы прежний расход, а отправка шла бы каждый час.
+        if ([] !== $this->suggestions->findRequestedBefore($companyId, $now, 1)) {
+            return new CashAiCategorizationRequestResult(enabled: true, expired: $expired, redispatched: $redispatched, skippedReason: 'awaiting_results');
+        }
 
         $categories = $this->query->findLeafCategories($companyId);
         if ([] === $categories) {

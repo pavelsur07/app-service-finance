@@ -3,6 +3,7 @@
 {% block title %}Admin · ИИ · {{ company.name }}{% endblock %}
 
 {% set skipLabels = {
+  awaiting_results: 'ждёт ответов прошлого запуска',
   budget_exceeded: 'лимит исчерпан',
   disabled: 'сервис выключен',
   locked: 'идёт другой запуск',

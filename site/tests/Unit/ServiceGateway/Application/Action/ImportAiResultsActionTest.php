@@ -60,6 +60,20 @@ final class ImportAiResultsActionTest extends TestCase
         self::assertSame('2026-10-30 12:00:00', $this->usage[0]['completed']);
     }
 
+    public function testMixedModelsArePricedByTheMostExpensiveOne(): void
+    {
+        // Повтор после невалидного ответа ушёл в запасную модель: токены суммой по обоим вызовам.
+        $result = self::aiResult('0192f0a0-0000-7000-8000-000000000014', 'echo', ['deepseek/deepseek-flash', 'openai/gpt-4.1-mini'], 1_000_000, 1_000_000);
+        $client = new ImportPagesClient([new AiResultsPage([$result], null)]);
+
+        $this->action($client, [new ImportRecordingConsumer('echo')], new TestHandler(), [
+            'deepseek/deepseek-flash' => ['input' => 24.17, 'output' => 96.67],
+            'openai/gpt-4.1-mini' => ['input' => 32.22, 'output' => 128.89],
+        ])();
+
+        self::assertSame('161.1100', $this->usage[0]['cost']);
+    }
+
     public function testUnknownModelPriceKeepsTokensWithoutCostAndWarnsOnce(): void
     {
         $client = new ImportPagesClient([new AiResultsPage([

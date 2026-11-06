@@ -82,9 +82,12 @@ final readonly class ImportAiResultsAction
                 $failure = $this->consume($consumer, $result);
                 if (null === $failure) {
                     $handled[] = $result->taskId;
-                    $model = $result->models[0] ?? null;
-                    if (null !== $model && ($result->inputTokens + $result->outputTokens) > 0 && null === $this->cost($result)) {
-                        $unpricedModels[$model] = true;
+                    if (null === $this->cost($result)) {
+                        foreach ($result->models as $model) {
+                            if (null === ($this->prices[$model]['input'] ?? null) || null === ($this->prices[$model]['output'] ?? null)) {
+                                $unpricedModels[$model] = true;
+                            }
+                        }
                     }
                 } else {
                     $failedTaskIds[] = $result->taskId;
@@ -168,17 +171,30 @@ final readonly class ImportAiResultsAction
     }
 
     /**
-     * Стоимость в ₽ по цене первой модели ответа; null — цена неизвестна.
-     * ponytail: токены нескольких моделей одного ответа цена первой; разнести по моделям, когда маршрут начнёт отвечать разными.
+     * Стоимость в ₽; null — цена хотя бы одной модели неизвестна. Контракт отдаёт токены суммой
+     * по всем вызовам (повтор, запасная модель), поэтому цена — наибольшая среди моделей ответа:
+     * оценка сверху, лимит не занижается.
+     * ponytail: оценка сверху; точно — когда контракт начнёт отдавать usage по моделям.
      */
     private function cost(AiTaskResult $result): ?string
     {
-        $price = $this->prices[$result->models[0] ?? ''] ?? null;
-        if (null === $price || null === $price['input'] || null === $price['output']) {
-            return 0 === $result->inputTokens + $result->outputTokens ? '0.0000' : null;
+        if (0 === $result->inputTokens + $result->outputTokens) {
+            return '0.0000';
+        }
+        $input = $output = null;
+        foreach ($result->models as $model) {
+            $price = $this->prices[$model] ?? null;
+            if (null === $price || null === $price['input'] || null === $price['output']) {
+                return null;
+            }
+            $input = max($input ?? 0.0, $price['input']);
+            $output = max($output ?? 0.0, $price['output']);
+        }
+        if (null === $input || null === $output) {
+            return null;
         }
 
-        return number_format(($result->inputTokens * $price['input'] + $result->outputTokens * $price['output']) / 1_000_000, 4, '.', '');
+        return number_format(($result->inputTokens * $input + $result->outputTokens * $output) / 1_000_000, 4, '.', '');
     }
 
     private function entityManager(): EntityManagerInterface
