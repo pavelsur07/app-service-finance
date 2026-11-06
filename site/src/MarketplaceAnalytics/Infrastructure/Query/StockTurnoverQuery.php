@@ -87,10 +87,11 @@ final readonly class StockTurnoverQuery
                     return null === $a->stockValue ? 1 : -1;
                 }
 
-                return strcmp((string) $a->title, (string) $b->title);
+                return strcmp((string) $a->title, (string) $b->title) ?: strcmp($a->listingId, $b->listingId);
             }
 
-            return bccomp($b->stockValue, $a->stockValue, 2) ?: strcmp((string) $a->title, (string) $b->title);
+            // Последний ключ — listingId: при равных деньгах и названии порядок страниц должен быть стабильным.
+            return bccomp($b->stockValue, $a->stockValue, 2) ?: strcmp((string) $a->title, (string) $b->title) ?: strcmp($a->listingId, $b->listingId);
         });
 
         $summary = $this->summarize($rows, $stock->snapshotDateBySource, $stock->staleSources);

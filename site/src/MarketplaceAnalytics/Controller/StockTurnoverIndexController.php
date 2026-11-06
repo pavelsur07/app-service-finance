@@ -14,6 +14,7 @@ use App\MarketplaceAnalytics\Enum\TurnoverBucket;
 use App\MarketplaceAnalytics\Infrastructure\Query\StockTurnoverQuery;
 use App\Shared\Service\ActiveCompanyService;
 use Pagerfanta\Adapter\ArrayAdapter;
+use Pagerfanta\Exception\OutOfRangeCurrentPageException;
 use Pagerfanta\Pagerfanta;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -45,7 +46,12 @@ final class StockTurnoverIndexController extends AbstractController
         // Отчёт строится в памяти целиком (сводка нужна по всем строкам), поэтому ArrayAdapter.
         $pager = new Pagerfanta(new ArrayAdapter($report->rows));
         $pager->setMaxPerPage(self::PER_PAGE);
-        $pager->setCurrentPage(StockTurnoverFilterParser::page($request));
+        try {
+            $pager->setCurrentPage(StockTurnoverFilterParser::page($request));
+        } catch (OutOfRangeCurrentPageException) {
+            // Закладка на страницу, которой после изменения остатков или фильтра больше нет: фильтры сохраняем, страница первая.
+            return $this->redirectToRoute('marketplace_analytics_stock_turnover_index', array_diff_key($request->query->all(), ['page' => true]));
+        }
 
         return $this->render('marketplace_analytics/stock_turnover/index.html.twig', [
             'pager' => $pager,

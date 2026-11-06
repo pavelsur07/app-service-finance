@@ -87,6 +87,25 @@ final class StockTurnoverQueryTest extends IntegrationTestCase
         self::assertSame([], $summary->staleSources);
     }
 
+    public function testTiesAreOrderedByListingIdSoPagesAreStable(): void
+    {
+        // Одинаковые название, цена и остаток: порядок должен быть детерминирован (по listingId), иначе страницы «плывут».
+        $same = [];
+        foreach (['X', 'Y', 'Z', 'W', 'V'] as $key) {
+            $listing = $this->listing($key, 'Футболка одинаковая');
+            $this->snapshot($listing, '10.000', 'fbo');
+            $this->costPrice($listing, '100.00');
+            $same[] = $listing->getId();
+        }
+        $this->em->flush();
+        $this->em->clear();
+
+        $rows = $this->query->execute($this->filter())->rows;
+
+        sort($same);
+        self::assertSame($same, array_map(static fn (StockTurnoverRow $row): string => $row->listingId, $rows));
+    }
+
     public function testBucketFilterNarrowsRowsButNotSummary(): void
     {
         $this->seedStandardSet();

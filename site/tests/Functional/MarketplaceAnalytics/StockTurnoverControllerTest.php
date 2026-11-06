@@ -52,6 +52,11 @@ final class StockTurnoverControllerTest extends WebTestCaseBase
         yield 'tags' => ['tags[]=not-a-uuid'];
         yield 'period-nonnumeric' => ['period=abc'];
         yield 'page-nonnumeric' => ['page=abc'];
+        yield 'tags-scalar' => ['tags=not-a-uuid'];
+        yield 'tags-nested' => ['tags[a][]=x'];
+        yield 'source-array' => ['source[]=ozon'];
+        yield 'date-array' => ['date[]=2026-01-01'];
+        yield 'period-array' => ['period[]=60'];
     }
 
     #[DataProvider('invalidParams')]
@@ -82,6 +87,38 @@ final class StockTurnoverControllerTest extends WebTestCaseBase
         // A и D — свыше 90 дней; сводка по всем четырём.
         self::assertCount(2, $crawler->filter('table tbody tr'));
         self::assertStringContainsString('772'.self::NBSP.'400,00', $crawler->filter('.vf-turnover-summary')->text());
+    }
+
+    public function testOutOfRangePageRedirectsToFirstPageKeepingFilters(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompany('turnover-page-range@example.test', '11111111-1111-1111-1111-111111118706');
+        $this->seedStandardSet($company);
+        $this->login($client, $owner, $company);
+
+        $client->request('GET', self::URL.'?bucket=frozen&period=60&page=7');
+
+        self::assertResponseRedirects();
+        $location = (string) $client->getResponse()->headers->get('Location');
+        self::assertStringContainsString('bucket=frozen', $location);
+        self::assertStringContainsString('period=60', $location);
+        self::assertStringNotContainsString('page=', $location);
+    }
+
+    public function testFilterWithoutRowsShowsFilterEmptyStateNotStockOne(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompany('turnover-empty-filter@example.test', '11111111-1111-1111-1111-111111118707');
+        $this->seedStandardSet($company);
+        $this->login($client, $owner, $company);
+
+        // В стандартном наборе нет корзины «60–90 дней».
+        $crawler = $client->request('GET', self::URL.'?bucket=slow&date='.$this->date->format('Y-m-d'));
+
+        self::assertResponseIsSuccessful();
+        $tbody = $crawler->filter('table tbody')->text();
+        self::assertStringContainsString('Под фильтр ничего не попало', $tbody);
+        self::assertStringNotContainsString('Остатков на эту дату нет', $tbody);
     }
 
     public function testPaginationUsesFiftyRowsAndKeepsFilters(): void
