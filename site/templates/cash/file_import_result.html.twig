@@ -1,0 +1,25 @@
+{% extends 'base.html.twig' %}
+{% block title %}Результат импорта ДДС{% endblock %}
+{% block body %}
+    <div class="page-header"><div class="container-xl"><h2 class="page-title">Результат импорта ДДС</h2></div></div>
+    <div class="container-xl mt-3"><div class="card"><div class="card-body">
+        {% set statuses = {queued: 'В очереди', processing: 'Обрабатывается', done: 'Завершён', failed: 'Завершён с ошибкой'} %}
+        <p>Файл: {{ job.filename }}</p><p>Состояние: <strong>{{ statuses[job.status] ?? job.status }}</strong></p>
+        {% if job.status in ['queued', 'processing'] %}<div class="alert alert-info">Обработка ещё выполняется. Обновите страницу, чтобы увидеть актуальный результат.</div>{% endif %}
+        {% if job.status == 'failed' %}<div class="alert alert-danger">Импорт завершён с ошибкой. Проверьте журнал импорта перед повторной загрузкой.</div>{% endif %}
+        {% set updated = 0 %}{% set conflicts = 0 %}
+        {% for result in options.description_finished ?? [] %}{% if result == 'updated' %}{% set updated = updated + 1 %}{% elseif result == 'conflict' %}{% set conflicts = conflicts + 1 %}{% endif %}{% endfor %}
+        <dl class="row">
+            <dt class="col-sm-6">Создано операций</dt><dd class="col-sm-6">{{ job.importLog ? job.importLog.createdCount : 0 }}</dd>
+            <dt class="col-sm-6">Обновлено описаний</dt><dd class="col-sm-6">{{ updated }}</dd>
+            <dt class="col-sm-6">Конфликтов при применении описаний</dt><dd class="col-sm-6">{{ conflicts }}</dd>
+            <dt class="col-sm-6">Без изменений в плане</dt><dd class="col-sm-6">{{ summary.unchanged }}</dd>
+            <dt class="col-sm-6">Не выбрано обновлений</dt><dd class="col-sm-6">{{ max(0, summary.update_description - (options.selected_descriptions ?? [])|length) }}</dd>
+            <dt class="col-sm-6">Конфликтов в плане</dt><dd class="col-sm-6">{{ summary.conflict }}</dd>
+            <dt class="col-sm-6">Уже появились после предпросмотра</dt><dd class="col-sm-6">{{ options.creation_already_present ?? 0 }}</dd>
+            <dt class="col-sm-6">Конфликтов при создании</dt><dd class="col-sm-6">{{ (options.creation_conflicts ?? [])|length }}</dd>
+            <dt class="col-sm-6">Ошибок строк в плане</dt><dd class="col-sm-6">{{ summary.invalid }}</dd>
+        </dl>
+        <div class="d-flex gap-2 flex-wrap"><a class="btn btn-primary" href="{{ path('cash_file_import_result', {id: job.id}) }}">Обновить результат</a><a class="btn btn-outline-secondary" href="{{ path('import_logs_index', {source: 'cash:file'}) }}">Журнал импортов</a><a class="btn btn-outline-secondary" href="{{ path('cash_file_import_upload') }}">Новый импорт</a></div>
+    </div></div></div>
+{% endblock %}
