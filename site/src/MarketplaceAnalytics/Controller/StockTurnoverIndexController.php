@@ -22,7 +22,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-/** Отчёт «Оборачиваемость»: где заморожены деньги в остатках. */
+/** Отчёт «Оборачиваемость»: где заморожены деньги в остатках. Живёт во вкладках «Товары и остатки», модуль — MarketplaceAnalytics (сборка из Facade). */
 #[IsGranted('ROLE_COMPANY_USER')]
 final class StockTurnoverIndexController extends AbstractController
 {
@@ -36,7 +36,7 @@ final class StockTurnoverIndexController extends AbstractController
     ) {
     }
 
-    #[Route('/marketplace-analytics/stock-turnover', name: 'marketplace_analytics_stock_turnover_index', methods: ['GET'])]
+    #[Route('/inventory/stock-turnover', name: 'inventory_stock_turnover_index', methods: ['GET'])]
     public function __invoke(Request $request): Response
     {
         $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
@@ -50,7 +50,7 @@ final class StockTurnoverIndexController extends AbstractController
             $pager->setCurrentPage(StockTurnoverFilterParser::page($request));
         } catch (OutOfRangeCurrentPageException) {
             // Закладка на страницу, которой после изменения остатков или фильтра больше нет: фильтры сохраняем, страница первая.
-            return $this->redirectToRoute('marketplace_analytics_stock_turnover_index', array_diff_key($request->query->all(), ['page' => true]));
+            return $this->redirectToRoute('inventory_stock_turnover_index', array_diff_key($request->query->all(), ['page' => true]));
         }
 
         return $this->render('marketplace_analytics/stock_turnover/index.html.twig', [

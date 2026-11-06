@@ -15,7 +15,7 @@
 
 ## Результат
 
-Страница `/marketplace-analytics/stock-turnover`, вкладка «Оборачиваемость» в
+Страница `/inventory/stock-turnover`, вкладка «Оборачиваемость» в
 разделе «Unit-экономика» (аналитика маркетплейсов), доступ `ROLE_COMPANY_USER`.
 
 **Фильтры (GET):** `period` — окно продаж 30 | 60 | 90 дней (по умолчанию 30);
@@ -112,3 +112,8 @@ SKU, артикул продавца), источник, остаток (шт, �
 - Гейты `site-stan`, `site-cs-check`, `site-cs-strict-types`, `site-test-unit`,
   functional/integration по затронутым модулям; скриншоты страницы на стенде.
 - ARCHITECTURE.md: новые Query/DTO/Enum, параметр Facade, маршруты, Changelog.
+
+## Изменения после выката
+
+- 06.11.2026 (#2904): термин «корзина» в UI и xlsx → «Скорость продаж» (код `bucket` без изменений).
+- 06.11.2026: отчёт перенесён из вкладок аналитики маркетплейсов во вкладки «Товары и остатки» после «Остатки» (решение Владельца); маршруты `/inventory/stock-turnover` и `/inventory/stock-turnover/export.xlsx`, скриншот `screenshots/inventory-tabs.png`. Код остаётся в MarketplaceAnalytics.

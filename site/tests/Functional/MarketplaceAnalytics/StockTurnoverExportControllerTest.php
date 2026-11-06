@@ -12,7 +12,7 @@ final class StockTurnoverExportControllerTest extends WebTestCaseBase
 {
     use StockTurnoverFixtures;
 
-    private const URL = '/marketplace-analytics/stock-turnover/export.xlsx';
+    private const URL = '/inventory/stock-turnover/export.xlsx';
 
     public function testExportReturnsXlsxWithHeaderAndRows(): void
     {

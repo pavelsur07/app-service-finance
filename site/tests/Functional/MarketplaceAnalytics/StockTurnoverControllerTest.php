@@ -12,7 +12,7 @@ final class StockTurnoverControllerTest extends WebTestCaseBase
 {
     use StockTurnoverFixtures;
 
-    private const URL = '/marketplace-analytics/stock-turnover';
+    private const URL = '/inventory/stock-turnover';
     private const NBSP = "\u{00A0}";
 
     public function testPageRendersRowsSortedByValueAndSummary(): void
@@ -166,16 +166,26 @@ final class StockTurnoverControllerTest extends WebTestCaseBase
         self::assertStringContainsString('Остатков на эту дату нет', $crawler->filter('table tbody')->text());
     }
 
-    public function testTabIsPresentInAnalyticsTabs(): void
+    public function testTabFollowsStocksInInventoryTabsAndIsGoneFromAnalytics(): void
     {
         $client = static::createClient();
         [$owner, $company] = $this->seedCompany('turnover-tab@example.test', '11111111-1111-1111-1111-111111118705');
         $this->em()->flush();
         $this->login($client, $owner, $company);
 
-        $crawler = $client->request('GET', '/marketplace-analytics/snapshots');
-
+        $crawler = $client->request('GET', '/inventory/stocks');
         self::assertResponseIsSuccessful();
-        self::assertCount(1, $crawler->filter('a[href="'.self::URL.'"]'));
+        $labels = $crawler->filter('.card-header-tabs a')->each(static fn (Crawler $a): string => trim($a->text()));
+        self::assertSame(['Листинг', 'Остатки', 'Оборачиваемость', 'Себестоимость', 'Теги'], $labels);
+        self::assertCount(1, $crawler->filter('.card-header-tabs a[href="'.self::URL.'"]'));
+
+        $crawler = $client->request('GET', self::URL);
+        self::assertResponseIsSuccessful();
+        self::assertSame('Оборачиваемость', trim($crawler->filter('.card-header-tabs .active')->text()));
+
+        $crawler = $client->request('GET', '/marketplace-analytics/snapshots');
+        self::assertResponseIsSuccessful();
+        self::assertCount(0, $crawler->filter('a[href="'.self::URL.'"]'));
+        self::assertStringNotContainsString('Оборачиваемость', $crawler->filter('.page-header')->text());
     }
 }
