@@ -66,6 +66,7 @@ final class SettlementDocumentInvariantTest extends IntegrationTestCase
         $key = Uuid::uuid7()->toString();
         $this->draft($key);
         $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Ключ повтора использован с другими данными.');
         $this->draft($key, '101.00');
     }
 
@@ -74,6 +75,7 @@ final class SettlementDocumentInvariantTest extends IntegrationTestCase
         $draft = $this->draft();
         $this->connection->executeStatement("UPDATE companies SET finance_lock_before = '2026-11-02' WHERE id = ?", [$this->companyId]);
         $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Дата вне открытого периода учёта.');
         (self::getContainer()->get(PostSettlementDocumentAction::class))($this->companyId, $this->actorId, $draft->documentId, $draft->version);
     }
 
@@ -81,6 +83,7 @@ final class SettlementDocumentInvariantTest extends IntegrationTestCase
     {
         $draft = $this->draft(date: '2099-11-01');
         $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Дата вне открытого периода учёта.');
         (self::getContainer()->get(PostSettlementDocumentAction::class))($this->companyId, $this->actorId, $draft->documentId, $draft->version);
     }
 
@@ -104,6 +107,7 @@ final class SettlementDocumentInvariantTest extends IntegrationTestCase
         self::assertNotNull($posted->itemId);
         (self::getContainer()->get(ReverseSettlementDocumentAction::class))($this->companyId, $this->actorId, $draft->documentId, new ReverseSettlementInput(Uuid::uuid7()->toString(), new \DateTimeImmutable('2026-11-02'), 'Отмена'));
         $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Нельзя корректировать отменённую позицию.');
         (self::getContainer()->get(CorrectSettlementItemAction::class))($this->companyId, $this->actorId, new CorrectSettlementItemInput(Uuid::uuid7()->toString(), $posted->itemId, Money::fromString('1.00', 'RUB'), true, new \DateTimeImmutable('2026-11-03'), 'Уточнение'));
     }
 
@@ -134,6 +138,7 @@ final class SettlementDocumentInvariantTest extends IntegrationTestCase
         self::assertNotNull($otherId);
         (self::getContainer()->get(ConfigureSettlementBookAction::class))($otherId, $this->actorId, new \DateTimeImmutable('2026-11-01'));
         $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Документ не найден.');
         (self::getContainer()->get(PostSettlementDocumentAction::class))($otherId, $this->actorId, $draft->documentId, $draft->version);
     }
 
@@ -171,6 +176,7 @@ final class SettlementDocumentInvariantTest extends IntegrationTestCase
         $decrease = $correct($this->companyId, $this->actorId, new CorrectSettlementItemInput(Uuid::uuid7()->toString(), $posted->itemId, Money::fromString('100.00', 'RUB'), false, new \DateTimeImmutable('2026-11-02'), 'Уменьшение'));
         (self::getContainer()->get(ReverseSettlementDocumentAction::class))($this->companyId, $this->actorId, $decrease->documentId, new ReverseSettlementInput(Uuid::uuid7()->toString(), new \DateTimeImmutable('2026-11-04'), 'Отмена'));
         $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Изменение создаёт отрицательный остаток в истории.');
         $correct($this->companyId, $this->actorId, new CorrectSettlementItemInput(Uuid::uuid7()->toString(), $posted->itemId, Money::fromString('1.00', 'RUB'), false, new \DateTimeImmutable('2026-11-03'), 'Ошибка задним числом'));
     }
 
@@ -188,5 +194,57 @@ final class SettlementDocumentInvariantTest extends IntegrationTestCase
         self::assertNotNull($readerId);
         $this->expectException(AccessDeniedException::class);
         (self::getContainer()->get(PostSettlementDocumentAction::class))($this->companyId, $readerId, $draft->documentId, $draft->version);
+    }
+
+    /** @return array{SettlementResult, SettlementResult} */
+    private function obligationWithCorrection(): array
+    {
+        $draft = $this->draft();
+        $posted = (self::getContainer()->get(PostSettlementDocumentAction::class))($this->companyId, $this->actorId, $draft->documentId, $draft->version);
+        self::assertNotNull($posted->itemId);
+        $correction = (self::getContainer()->get(CorrectSettlementItemAction::class))($this->companyId, $this->actorId, new CorrectSettlementItemInput(Uuid::uuid7()->toString(), $posted->itemId, Money::fromString('10.00', 'RUB'), true, new \DateTimeImmutable('2026-11-02'), 'Увеличение'));
+
+        return [$posted, $correction];
+    }
+
+    public function testActiveCorrectionBlocksObligationReversal(): void
+    {
+        [$posted] = $this->obligationWithCorrection();
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Сначала отмените зависимые события с допустимой датой.');
+        (self::getContainer()->get(ReverseSettlementDocumentAction::class))($this->companyId, $this->actorId, $posted->documentId, new ReverseSettlementInput(Uuid::uuid7()->toString(), new \DateTimeImmutable('2026-11-03'), 'Отмена'));
+    }
+
+    public function testDependencyReversalLaterThanObligationReversalIsRejected(): void
+    {
+        [$posted, $correction] = $this->obligationWithCorrection();
+        $reverse = self::getContainer()->get(ReverseSettlementDocumentAction::class);
+        $reverse($this->companyId, $this->actorId, $correction->documentId, new ReverseSettlementInput(Uuid::uuid7()->toString(), new \DateTimeImmutable('2026-11-04'), 'Отмена уточнения'));
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Сначала отмените зависимые события с допустимой датой.');
+        $reverse($this->companyId, $this->actorId, $posted->documentId, new ReverseSettlementInput(Uuid::uuid7()->toString(), new \DateTimeImmutable('2026-11-03'), 'Отмена основания'));
+    }
+
+    public function testObligationReversalAfterAllDependenciesLeavesZeroBalance(): void
+    {
+        [$posted, $correction] = $this->obligationWithCorrection();
+        $reverse = self::getContainer()->get(ReverseSettlementDocumentAction::class);
+        $reverse($this->companyId, $this->actorId, $correction->documentId, new ReverseSettlementInput(Uuid::uuid7()->toString(), new \DateTimeImmutable('2026-11-04'), 'Отмена уточнения'));
+        $reverse($this->companyId, $this->actorId, $posted->documentId, new ReverseSettlementInput(Uuid::uuid7()->toString(), new \DateTimeImmutable('2026-11-04'), 'Отмена основания'));
+        self::assertSame('0', (string) $this->connection->fetchOne('SELECT SUM(delta_amount_minor) FROM settlement_movements WHERE company_id = ?', [$this->companyId]));
+    }
+
+    public function testForeignCounterpartyCannotBeUsedInObligation(): void
+    {
+        $owner = $this->company->getUser();
+        self::assertNotNull($owner);
+        $other = CompanyBuilder::aCompany()->withIndex(2)->withOwner($owner)->build();
+        $party = CounterpartyBuilder::aCounterparty()->withId(Uuid::uuid7()->toString())->withCompany($other)->build();
+        $this->em->persist($other);
+        $this->em->persist($party);
+        $this->em->flush();
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Неверное основание или контрагент.');
+        (self::getContainer()->get(CreateSettlementDocumentAction::class))($this->companyId, $this->actorId, new CreateSettlementDocumentInput(Uuid::uuid7()->toString(), SettlementDocumentKind::OBLIGATION, $party->getId(), SettlementBucket::PAYABLE, Money::fromString('100.00', 'RUB'), new \DateTimeImmutable('2026-11-01'), null, 'Акт'));
     }
 }

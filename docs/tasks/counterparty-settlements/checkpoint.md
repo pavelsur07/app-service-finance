@@ -63,3 +63,7 @@
 - Fresh second DB vf_settlements_fresh_test: all 307 migrations applied, Settlement schema test PASS 1/4. New migration executable from empty database.
 - External Stage1 review running via site/bin/external-review.sh 4fdad15c974830d13ff9342d1f40a526f3b5bd33 --effort medium --context /tmp/vf-settlement-stage1-review-context.md. Process session82656; output /tmp/vf-settlement-external-stage1.log and site/var/external-review/4fdad15c/. Do not start duplicate review.
 - Source write-path exploration delegated read-only to inspect_settlement_sources; await inventory for Stage2.
+
+### Stage1 closure
+- External review completed one round: BLOCKER0, IMPORTANT1, MINOR3; all fixed. IMPORTANT was missing dependency-reversal coverage, now 3 explicit cases pass. External result: fixed without re-run per AGENTS7.2.
+- Final Stage1 tests PASS27 /103; focused PHPStan and CS checked. No open B/I. Stage Report saved; continue Stage2 automatically.

@@ -200,13 +200,13 @@ SettlementItem $payment, Money $amount, DateTimeImmutable $date): void`;
 `SettlementRepository::getDocumentForUpdate(string $companyId, string $id): SettlementDocument`;
 `getItemForUpdate(string $companyId, string $id): SettlementItem`.
 
-- [ ] Написать red tests: чужие company FK отвергнуты; amount >0; precision 2;
+- [x] Написать red tests: чужие company FK отвергнуты; amount >0; precision 2;
   несовпадающая валюта и отрицательная сумма запрещены; draft не входит в регистр.
   В policy test: `self::assertSame(4000000, Money::fromString('40000.00', 'RUB')->amountMinor());`
   затем `expectException(DomainException::class)` для суммы распределения 40000.01
   при свободных 40000.00.
-- [ ] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Unit/Settlement/SettlementPostingPolicyTest.php`; сохранить red output.
-- [ ] Реализовать схему: company-scoped составные FK, unique(requestId,companyId),
+- [x] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Unit/Settlement/SettlementPostingPolicyTest.php`; сохранить red output.
+- [x] Реализовать схему: company-scoped составные FK, unique(requestId,companyId),
   unique sourceType+sourceId+companyId в SettlementSourceLink с nullable activeDocumentId;
   unique companyId+reversedEventType+reversedEventId для единственной прямой отмены;
   unique movement event+item+bucket; индексы
@@ -215,12 +215,12 @@ SettlementItem $payment, Money $amount, DateTimeImmutable $date): void`;
   Один документ OPENING/OBLIGATION/PAYMENT создаёт одну позицию; остальные виды
   меняют существующие позиции. Журнал хранит signed delta как `Money` по каждой корзине;
   физическое хранение — minor units и валюта через существующий MoneyAmountType.
-- [ ] Дополнить SettlementPostingPolicyTest проверкой: `0.10 RUB + 0.20 RUB = 0.30 RUB`
+- [x] Дополнить SettlementPostingPolicyTest проверкой: `0.10 RUB + 0.20 RUB = 0.30 RUB`
   через Money; распределение `0.31 RUB` из `0.30 RUB` запрещено, другая валюта запрещена.
   В SettlementSchemaTest проверить persist/hydrate Money для `0.01 RUB` и
   отрицательной дельты `-0.01 RUB`: сохраняются точные minor units и валюта.
-- [ ] Зарегистрировать ORM и расширение схемы; применить миграцию только в test DB.
-- [ ] Повторить целевые unit/schema tests до PASS; `doctrine:schema:validate --env=test`
+- [x] Зарегистрировать ORM и расширение схемы; применить миграцию только в test DB.
+- [x] Повторить целевые unit/schema tests до PASS; `doctrine:schema:validate --env=test`
   не должен выявлять новых расхождений. Записать pre-existing отдельно.
 
 ### Work item 1.2 — проведение, начальные остатки и исправления
@@ -242,29 +242,29 @@ SettlementItem $payment, Money $amount, DateTimeImmutable $date): void`;
 Новый company-scoped `CompanyFacade::getFinanceLockBefore(string $companyId): ?DateTimeImmutable`
 возвращает существующую границу без Entity; вызывать после `financialAccess(..., lock: true)`.
 
-- [ ] Написать red tests: 100000.00 обязательства → `payable=10000000` minor;
+- [x] Написать red tests: 100000.00 обязательства → `payable=10000000` minor;
   коррекция уменьшения 10000.00 → `9000000`; повтор → та же сумма/ID;
   тот же requestId с другой суммой → конфликт; opening не входит в оборот дня;
   отозванные права/чужой companyId/закрытая дата → отказ без записей.
-- [ ] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/SettlementDocumentLifecycleTest.php`, зафиксировать red.
-- [ ] Реализовать Actions и необходимые DTO. `wrapInTransaction` принадлежит Action;
+- [x] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/SettlementDocumentLifecycleTest.php`, зафиксировать red.
+- [x] Реализовать Actions и необходимые DTO. `wrapInTransaction` принадлежит Action;
   Repository/Updater не flush. Проверить актуальные финансовые права внутри транзакции.
   Порядок блокировок: company FOR SHARE → source row (если есть) → SettlementBook
   FOR UPDATE → позиции по сортированным ID. Дату начала после первого проведения
   менять нельзя. Неподдерживаемый kind/bucket и будущая дата отвергаются.
-- [ ] Реализовать отмену с датой и причиной: никаких зависимых активных распределений;
+- [x] Реализовать отмену с датой и причиной: никаких зависимых активных распределений;
   сумма отмены определяется системой. История исходного периода сохраняется.
   Проверять всю последующую историю затронутой позиции, а не только текущий остаток.
   Дата отмены не раньше исходного события и отмен зависимостей. Два разных requestId
   для одной отмены возвращают исходную отмену; сумму/дату исходной отмены не менять.
-- [ ] Запустить тест до PASS; обновить checkpoint после Work item.
+- [x] Запустить тест до PASS; обновить checkpoint после Work item.
 
 **Приёмка Stage 1:**
-- [ ] Ручное обязательство и четыре вида начальных остатков воспроизводятся из журнала.
-- [ ] Черновик не меняет цифры; повтор проведения не дублирует движения.
-- [ ] Корректировка имеет основание и не делает открытый остаток отрицательным.
-- [ ] Company isolation, права и закрытая дата проверены на уровне Action.
-- [ ] Нет float, скрытого взаимозачёта и ручного редактирования итогового долга.
+- [x] Ручное обязательство и четыре вида начальных остатков воспроизводятся из журнала.
+- [x] Черновик не меняет цифры; повтор проведения не дублирует движения.
+- [x] Корректировка имеет основание и не делает открытый остаток отрицательным.
+- [x] Company isolation, права и закрытая дата проверены на уровне Action.
+- [x] Нет float, скрытого взаимозачёта и ручного редактирования итогового долга.
 
 Stage checks: `php bin/phpunit tests/Unit/Settlement` и
 `php bin/phpunit tests/Integration/Settlement` через running контейнер;

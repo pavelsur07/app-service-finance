@@ -63,7 +63,6 @@ class SettlementBook
     public function initialize(): void
     {
         $this->initialized = true;
-        ++$this->version;
     }
     #[ORM\Column(type: Types::BIGINT)]
     private int $nextEventSequence = 1;
