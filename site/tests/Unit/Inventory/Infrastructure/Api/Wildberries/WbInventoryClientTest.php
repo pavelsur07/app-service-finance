@@ -124,4 +124,90 @@ final class WbInventoryClientTest extends TestCase
         yield 'items not list' => ['{"data":{"items":{"key":"value"}}}'];
         yield 'non-object item' => ['{"data":{"items":[1]}}'];
     }
+
+    public function testFetchesSellerWarehousesWithExpectedRequest(): void
+    {
+        $httpClient = new MockHttpClient(static function (string $method, string $url, array $options): MockResponse {
+            self::assertSame('GET', $method);
+            self::assertSame('https://marketplace-api.wildberries.ru/api/v3/warehouses', $url);
+            self::assertContains('Authorization: test-token', $options['normalized_headers']['authorization']);
+
+            return new MockResponse('[{"id":1,"name":"Склад А","officeId":15},{"id":2,"name":""},{"name":"без id"}]', ['http_code' => 200]);
+        });
+
+        $warehouses = (new WbInventoryClient($httpClient))->fetchSellerWarehouses('test-token');
+
+        self::assertSame([
+            ['id' => 1, 'name' => 'Склад А'],
+            ['id' => 2, 'name' => 'WB seller warehouse 2'],
+        ], $warehouses);
+    }
+
+    public function testFetchesSellerWarehouseStocksWithExpectedRequest(): void
+    {
+        $httpClient = new MockHttpClient(static function (string $method, string $url, array $options): MockResponse {
+            self::assertSame('POST', $method);
+            self::assertSame('https://marketplace-api.wildberries.ru/api/v3/stocks/7', $url);
+            self::assertContains('Authorization: test-token', $options['normalized_headers']['authorization']);
+            self::assertSame(['skus' => ['b1', 'b2']], json_decode($options['body'], true, 512, \JSON_THROW_ON_ERROR));
+
+            return new MockResponse('{"stocks":[{"sku":"b1","amount":3}]}', ['http_code' => 200]);
+        });
+
+        $response = (new WbInventoryClient($httpClient))->fetchSellerWarehouseStocks('test-token', 7, ['b1', 'b2']);
+
+        self::assertSame(['stocks' => [['sku' => 'b1', 'amount' => 3]]], $response);
+    }
+
+    public function testSellerWarehouseStocksRejectsEmptyAndOversizedBarcodeLists(): void
+    {
+        $httpClient = new MockHttpClient(static function (): MockResponse {
+            self::fail('No HTTP request expected.');
+        });
+        $client = new WbInventoryClient($httpClient);
+
+        try {
+            $client->fetchSellerWarehouseStocks('test-token', 7, []);
+            self::fail('Expected exception for empty barcode list.');
+        } catch (\InvalidArgumentException) {
+        }
+
+        $this->expectException(\InvalidArgumentException::class);
+        $client->fetchSellerWarehouseStocks('test-token', 7, array_fill(0, WbInventoryClient::SELLER_STOCKS_CHUNK + 1, 'b'));
+    }
+
+    #[DataProvider('permanentErrorProvider')]
+    public function testSellerEndpointsPermanentHttpErrors(int $status): void
+    {
+        $client = new WbInventoryClient(new MockHttpClient([
+            new MockResponse('{"error":"hidden"}', ['http_code' => $status]),
+            new MockResponse('{"error":"hidden"}', ['http_code' => $status]),
+        ]));
+
+        try {
+            $client->fetchSellerWarehouses('test-token');
+            self::fail('Expected permanent API exception for warehouses.');
+        } catch (WbInventoryApiException $e) {
+            self::assertStringNotContainsString('hidden', $e->getMessage());
+        }
+
+        $this->expectException(WbInventoryApiException::class);
+        $client->fetchSellerWarehouseStocks('test-token', 7, ['b1']);
+    }
+
+    public function testSellerWarehousesRateLimitIsRetryable(): void
+    {
+        $client = new WbInventoryClient(new MockHttpClient(new MockResponse('', ['http_code' => 429, 'response_headers' => ['retry-after: 5']])));
+
+        $this->expectException(WbInventoryRateLimitException::class);
+        $client->fetchSellerWarehouses('test-token');
+    }
+
+    public function testSellerWarehousesRejectsNonListPayload(): void
+    {
+        $client = new WbInventoryClient(new MockHttpClient(new MockResponse('{"id":1}', ['http_code' => 200])));
+
+        $this->expectException(WbInventoryApiException::class);
+        $client->fetchSellerWarehouses('test-token');
+    }
 }
