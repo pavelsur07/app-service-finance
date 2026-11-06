@@ -1,13 +1,15 @@
 # Current checkpoint
 
-**Phase:** Phase 0 / подготовка перед кодом
-**Status:** done — подготовка выполнена, бизнес-правила согласованы; реализация не начата
+**Phase:** Stage 2 / применение описаний
+**Status:** implementing — Stage 1, автономная реализация разрешена владельцем
 **Branch:** feat/cash-import-description-update
 **Worktree:** /tmp/vf-cash-import-preparation
 **Preparation base:** cfb6728d2b95f4938c19996ef7d44214c9066648
-**Stage base commit:** Stage 1 не начат; перед первым Work item записать актуальный HEAD с подготовительными документами.
+**Stage base commit:** Stage 1: 0bfe1a259; Stage 2: записать HEAD после commit Stage 1.
 
 ## Completed
+
+- Stage 1: matcher/plan, scoped candidates; baseline 32/116 OK, красная регрессия legacy подтверждена. Ведётся Stage 2.
 
 - Добавлены четыре ТЗ этапов в specs/ и acceptance.md с ID тестов, ожидаемыми результатами, существующими test suites и финальным checklist. Все новые пункты приёмки пока не выполнены.
 
@@ -27,7 +29,7 @@
 
 ## Exact next action
 
-Открытых вопросов по согласованному пакету правил нет. После отдельного перехода к реализации: сверить git status, зафиксировать stage_base_commit, добавить красную регрессию и выполнить Work item 1.1. Не начинать код в рамках текущего поручения подготовки.
+Открытых вопросов по согласованному пакету правил нет. После отдельного перехода к реализации: сверить git status, зафиксировать stage_base_commit, добавить красную регрессию и выполнить Work item 1.1. Владелец разрешил автономную реализацию; следующий шаг — завершить интеграционные тесты применения, затем Stage 3.
 
 ## Files to inspect first on resume
 

@@ -60,14 +60,27 @@ final class CashFileImportService
     ) {
     }
 
+    public function withJobFile(CashFileImportJob $job, \Closure $operation): mixed
+    {
+        $this->allowedRows = null;
+
+        return $this->temporaryLocalFile->with($this->resolveStorageKey($job),
+            fn (string $path) => $this->xlsConverter->withReadablePath($path, $operation));
+    }
+
     /**
      * Строки пишутся пачками: после каждой вызывается $commitBatch точки входа (Handler), сервис
      * сам не коммитит.
      *
      * @param \Closure(): void $commitBatch
      */
-    public function import(CashFileImportJob $job, \Closure $commitBatch): void
+    /** @var array<int, bool>|null */
+    private ?array $allowedRows = null;
+
+    /** @param array<int, bool>|null $allowedRows */
+    public function import(CashFileImportJob $job, \Closure $commitBatch, ?array $allowedRows = null): void
     {
+        $this->allowedRows = $allowedRows;
         $company = $job->getCompany();
         $account = $job->getMoneyAccount();
         if ($account->getCompany()->getId() !== $company->getId()) {
@@ -375,9 +388,10 @@ final class CashFileImportService
      *     raw: array<string, mixed>
      * }}>
      */
-    private function normalizedRows(string $filePath, array $mapping, string $currency): \Generator
+    public function normalizedRows(string $filePath, array $mapping, string $currency): \Generator
     {
         $reader = $this->openReaderByExtension($filePath);
+        $dataIndex = 0;
 
         try {
             $reader->open($filePath);
@@ -402,6 +416,10 @@ final class CashFileImportService
                         $rowByHeader[$label] = $this->normalizeValue($cells[$index] ?? null, false);
                     }
 
+                    ++$dataIndex;
+                    if (null !== $this->allowedRows && !isset($this->allowedRows[$dataIndex + 1])) {
+                        continue;
+                    }
                     yield ['row' => $rowByHeader, 'normalized' => $this->rowNormalizer->normalize($rowByHeader, $mapping, $currency)];
                 }
                 break;

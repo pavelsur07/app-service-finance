@@ -27,6 +27,19 @@ class CashTransactionRepository extends ServiceEntityRepository
         parent::__construct($registry, CashTransaction::class);
     }
 
+    /** @return list<CashTransaction> */
+    public function findImportCandidates(string $companyId, string $accountId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        return $this->createQueryBuilder('t')
+            ->leftJoin('t.counterparty', 'c')->addSelect('c')
+            ->andWhere('IDENTITY(t.company) = :company')->setParameter('company', $companyId)
+            ->andWhere('IDENTITY(t.moneyAccount) = :account')->setParameter('account', $accountId)
+            ->andWhere('t.deletedAt IS NULL')
+            ->andWhere('t.occurredAt >= :from AND t.occurredAt < :to')
+            ->setParameter('from', $from)->setParameter('to', $to)
+            ->orderBy('t.id', \SortDirection::Ascending)->getQuery()->getResult();
+    }
+
     public function findOneByIdAndCompanyId(string $id, string $companyId): ?CashTransaction
     {
         return $this->createQueryBuilder('t')
