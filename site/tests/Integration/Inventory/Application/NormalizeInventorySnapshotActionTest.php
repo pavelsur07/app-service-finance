@@ -14,6 +14,7 @@ use App\Inventory\Entity\StockSnapshot;
 use App\Inventory\Enum\SnapshotTriggerType;
 use App\Inventory\Enum\StockSnapshotMappingStatus;
 use App\Inventory\Enum\StockStatus;
+use App\Inventory\Enum\FulfillmentScheme;
 use App\Inventory\Infrastructure\Query\InventoryStockReportQuery;
 use App\Inventory\Infrastructure\Query\StockQtyByListingOnDateQuery;
 use App\Marketplace\Entity\MarketplaceListing;
@@ -224,6 +225,7 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
         $breakdownColumns = $reportQuery->getBreakdownColumns(
             (string) $company->getId(),
             MarketplaceType::WILDBERRIES,
+            FulfillmentScheme::Fbo,
             $session->getStartedAt(),
         );
         $reportPager = $reportQuery->getPage(
@@ -231,6 +233,7 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
             page: 1,
             perPage: 30,
             source: MarketplaceType::WILDBERRIES,
+            scheme: FulfillmentScheme::Fbo,
             snapshotDate: $session->getStartedAt(),
             breakdownColumns: $breakdownColumns,
         );
