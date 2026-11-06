@@ -429,7 +429,9 @@ class ClientBank1CImportService
                     continue;
                 }
 
-                $transaction->setDedupeHash($dedupeHash);
+                if (!$transaction->isImportedDescriptionOverridden()) {
+                    $transaction->setDedupeHash($dedupeHash);
+                }
 
                 if (!$isPreview) {
                     $shouldFlush = true;
@@ -460,8 +462,10 @@ class ClientBank1CImportService
                     $transaction->setCounterparty(null);
                 }
             } else {
+                if (!$transaction->isImportedDescriptionOverridden()) {
+                    $transaction->setDescription($purpose);
+                }
                 $transaction
-                    ->setDescription($purpose)
                     ->setRawData($rawData)
                     ->setUpdatedAt(new \DateTimeImmutable());
 

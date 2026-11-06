@@ -1,103 +1,71 @@
 {% extends 'base.html.twig' %}
-
-{% block title %}Предпросмотр импорта кассы{% endblock %}
-
-{% block stylesheets %}
-    {{ parent() }}
-    <style>
-        .preview-row-error { --tblr-table-bg: var(--vf-danger-bg); }
-    </style>
+{% block title %}Предпросмотр импорта ДДС{% endblock %}
+{% block body %}
+    {% set labels = {create: 'Новые операции', unchanged: 'Без изменений', update_description: 'Обновления описаний', conflict: 'Конфликты', invalid: 'Ошибки'} %}
+    {% set reasons = {ambiguous_match: 'Несколько возможных соответствий', counterparty_mismatch: 'Отличается контрагент', existing_match_exhausted: 'Операция уже сопоставлена другой строке', financial_mismatch: 'Отличаются финансовые реквизиты', invalid_row: 'Некорректные данные строки', possible_match: 'Возможное совпадение — проверьте реквизиты'} %}
+    <div class="page-header"><div class="container-xl"><h2 class="page-title">Предпросмотр импорта ДДС</h2><div class="text-muted">Файл: {{ fileName }}</div></div></div>
+    <div class="container-xl mt-3">
+        <div class="alert alert-info">У существующих операций обновляется только описание. Проверьте возможные совпадения и явно выберите изменения. Конфликты и невыбранные обновления будут пропущены.</div>
+        <form method="post" action="{{ path('cash_file_import_preview') }}" data-description-selection data-selected-count="{{ selectedCount }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('cash_file_import_selection') }}">
+            <input type="hidden" name="_commit_token" value="{{ csrf_token('cash_file_import_commit') }}">
+            <div class="card mb-3"><div class="card-body">
+                <label for="import-filter" class="form-label">Показать строки</label>
+                <select name="filter" id="import-filter" class="form-select">
+                    <option value="">Все строки</option>
+                    {% for action, label in labels %}<option value="{{ action }}" {{ filter == action ? 'selected' : '' }}>{{ label }}: {{ summary[action] }}</option>{% endfor %}
+                </select>
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    <button class="btn btn-outline-primary" type="submit" name="selection_action" value="all">Выбрать все доступные обновления ({{ summary.update_description }})</button>
+                    <button class="btn btn-outline-secondary" type="submit" name="selection_action" value="none">Снять выбор</button>
+                    <button class="btn btn-primary" type="submit">Сохранить выбор и применить фильтр</button>
+                </div>
+            </div></div>
+            <div class="card mb-3"><div class="table-responsive"><table class="table table-vcenter card-table">
+                <thead><tr><th>Выбор</th><th>Строка / действие</th><th>Реквизиты</th><th>Текущее описание</th><th>Описание из файла</th></tr></thead>
+                <tbody>
+                {% for row in previewRows %}
+                    {% set operationDoc = row.snapshot ? row.snapshot.docNumber : row.input.docNumber %}
+                    {% set operationParty = row.snapshot ? row.snapshot.counterparty : row.input.counterparty %}
+                    <tr>
+                        <td>{% if row.action == 'update_description' %}
+                            <input type="hidden" name="visible[]" value="{{ row.rowId }}">
+                            <input type="checkbox" class="form-check-input" name="selected[]" value="{{ row.rowId }}" aria-label="Обновить описание строки {{ row.rowId }}" {{ row.selected ? 'checked' : '' }}>
+                        {% else %}—{% endif %}</td>
+                        <td>{{ row.rowId }}<br>{{ labels[row.action] }}{% if reasons[row.reason] is defined %}<div class="text-muted small">{{ reasons[row.reason] }}</div>{% endif %}</td>
+                        <td>{{ row.input.date ?: '—' }}<br>{{ row.input.amount ? row.input.amount|vf_amount : '—' }} {{ row.input.currency }}<br>{{ row.input.direction == 'INFLOW' ? 'Приход' : (row.input.direction == 'OUTFLOW' ? 'Расход' : '—') }}<br>Документ: {{ operationDoc|default('—') }}{% if row.snapshot and (row.input.docNumber|default('')) != (operationDoc|default('')) %}<div class="text-muted small">В файле: {{ row.input.docNumber|default('—') }}</div>{% endif %}<br>{{ operationParty|default('—') }}{% if row.snapshot and (row.input.counterparty|default('')) != (operationParty|default('')) %}<div class="text-muted small">В файле: {{ row.input.counterparty|default('—') }}</div>{% endif %}{% for error in row.input.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}{% if row.snapshot %}<br>Источник: {{ row.snapshot.importSource|default('—') }}{% endif %}</td>
+                        <td><div class="text-break">{{ (row.oldDescription|default('—'))|nl2br }}</div></td>
+                        <td><div class="text-break">{{ (row.input.description|default('—'))|nl2br }}</div></td>
+                    </tr>
+                {% else %}<tr><td colspan="5" class="text-center text-muted">Нет строк для выбранного фильтра.</td></tr>{% endfor %}
+                </tbody>
+            </table></div>
+            <div class="card-footer d-flex justify-content-between align-items-center">
+                <button type="submit" class="btn btn-outline-secondary" name="page" value="{{ pager.currentPage - 1 }}" {{ pager.hasPreviousPage ? '' : 'disabled' }}>Назад</button>
+                <span>Страница {{ pager.currentPage }} из {{ pager.nbPages }} · Строк: {{ pager.nbResults }}</span>
+                <button type="submit" class="btn btn-outline-secondary" name="page" value="{{ pager.currentPage + 1 }}" {{ pager.hasNextPage ? '' : 'disabled' }}>Далее</button>
+            </div></div>
+        <div class="card"><div class="card-body">
+            <p>Создать операций: <strong>{{ summary.create }}</strong>. Обновить описаний: <strong data-description-count aria-live="polite">{{ selectedCount }}</strong>. Конфликтов: {{ summary.conflict }}. Ошибок: {{ summary.invalid }}.</p>
+            <p class="text-muted">Переход между страницами сохраняет выбор. При запуске учитываются также флажки на текущей странице; итоговое число обновлений отражается в результате.</p>
+            <div class="d-flex gap-2"><button class="btn btn-primary" type="submit" formaction="{{ path('cash_file_import_commit') }}">Запустить импорт</button><a class="btn btn-outline-secondary" href="{{ path('cash_file_import_upload') }}">Отмена</a></div>
+        </div></div>
+        </form>
+    </div>
 {% endblock %}
 
-{% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Предпросмотр импорта кассовых операций</h2>
-                    {% if fileName %}
-                        <div class="text-muted small">Файл: <strong>{{ fileName }}</strong></div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="container-xl mt-3">
-        <div class="card mb-3">
-            <div class="card-header">
-                <h3 class="card-title mb-0">Нормализованные строки</h3>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-vcenter card-table">
-                    <thead>
-                        <tr>
-                            <th>Дата</th>
-                            <th>Направление</th>
-                            <th class="text-end">Сумма</th>
-                            <th>Контрагент</th>
-                            <th>Описание</th>
-                            <th>Валюта</th>
-                            <th>Документ</th>
-                            <th>Ошибки</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in previewRows %}
-                            {% set hasErrors = row.errors is not empty %}
-                            <tr class="{{ hasErrors ? 'preview-row-error' : '' }}">
-                                <td>{{ row.date ?? '—' }}</td>
-                                <td>
-                                    {% if row.direction == 'INFLOW' %}
-                                        <span class="text-success">Приход</span>
-                                    {% elseif row.direction == 'OUTFLOW' %}
-                                        <span class="text-danger">Расход</span>
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </td>
-                                <td class="text-end">
-                                    {% if row.amount %}
-                                        {{ row.amount|vf_amount }}
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </td>
-                                <td>{{ row.counterparty ?? '—' }}</td>
-                                <td>{{ row.description ?? '—' }}</td>
-                                <td>{{ row.currency ?? '—' }}</td>
-                                <td>{{ row.docNumber ?? '—' }}</td>
-                                <td>
-                                    {% if hasErrors %}
-                                        <ul class="list-unstyled mb-0">
-                                            {% for error in row.errors %}
-                                                <li class="text-danger small">{{ error }}</li>
-                                            {% endfor %}
-                                        </ul>
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% else %}
-                            <tr>
-                                <td colspan="8" class="text-center text-muted">Нет данных для предпросмотра.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-body">
-                <form action="/cash/import/file/commit" method="post">
-                    <input type="hidden" name="_token" value="{{ csrf_token('cash_file_import_commit') }}">
-                    <div class="d-flex justify-content-end">
-                        <button type="submit" class="btn btn-primary">Запустить импорт</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+{% block scripts %}
+    {{ parent() }}
+    <script>
+        (() => {
+            const form = document.querySelector('[data-description-selection]');
+            if (!form) return;
+            const checkboxes = Array.from(form.querySelectorAll('input[name="selected[]"]'));
+            const output = form.querySelector('[data-description-count]');
+            const offPage = Number(form.dataset.selectedCount) - checkboxes.filter((input) => input.checked).length;
+            const update = () => { output.textContent = String(offPage + checkboxes.filter((input) => input.checked).length); };
+            checkboxes.forEach((input) => input.addEventListener('change', update));
+            update();
+        })();
+    </script>
 {% endblock %}
