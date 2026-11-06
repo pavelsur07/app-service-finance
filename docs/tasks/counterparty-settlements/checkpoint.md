@@ -109,3 +109,19 @@
 - Source query cleanup: deleting/restoring technical Finance docs locks header without loading huge operation arrays; full snapshot retained for edit comparisons/create/post. Reversal refreshes active source link before clearing.
 - User asked where documents will be: answered separate “Взаиморасчёты → Документы”, links in counterparty card and Cash/Finance. Ensure Stage4 includes document list route/navigation.
 - Stages3/4/5 NOT implemented. Task remains active; no merge/deploy approval received or requested for implementation.
+
+### External Stage2 findings (one round)
+- B0 / I2 / MINOR3. IMPORTANT fixes: preserve real existing source UI (SourceInUse extends DomainException, existing form handlers retain state, Bank1C confirm catches generic business domain error, JSON-only listener); narrow overwrite row locks to real file external IDs instead of all account history.
+- Functional BrowserKit source UI regression red (unstyled text422 loses forms), green after fix: PASS2 /17. Symfony correctly uses HTML422 on submitted invalid form; bulk redirects with flash.
+- Target lock regression verifies unrelated history NOWAIT remains available while import holds actual targets; target+source+idempotency subset PASS21 /126.
+- MINOR fixes: remove dead foreign-company check after scoped lookup, correct import flush/atomicity doc, reuse validated Money amount rather than requireAmount twice.
+- Ruling: DomainException base for this business rejection follows existing source-controller catches and prevents reverse Cash/Finance→Settlement dependencies; this compatibility/UX requirement supersedes generic lower-level exception-base style guidance.
+- Focused project CS and PHPStan on external fixes PASS. Final combined test run session3714 (/tmp/vf-settlement-stage2-final.log) pending.
+- External result can be recorded fixed without re-run after final checks: no BLOCKER and both IMPORTANT fixed with evidence (AGENTS7.2); do not pay for identical external round again.
+
+### Stage2 CLOSED
+- Final targeted combined set PASS119 /608, focused project CS/PHPStan PASS. Internal B0/I5 fixed; external one round B0/I2/MINOR3 all fixed, result fixed without re-run.
+- Stage Report stage-2.md DONE. SourceWritePaths complete. Continue Stage3 automatically.
+- Stage3 preflight: existing pure PostingPolicy uses original item amounts as capacity, which must be changed to locked available Money for increased corrected obligations/initial advances. No allocation route is exposed yet; prove red→green in3.1 and document signature ruling.
+- Stage3 preflight: add ALLOCATION event kind missing from original enum proposal; journal needs common identity for its two rows. Do not disguise allocation as a correction/payment.
+- Stage3 needs bucket-wise history validation and bucket override when classifying remaining payment. No automatic allocation priority if both advance and unallocated buckets positive: require explicit classification first (no silent financial choice).

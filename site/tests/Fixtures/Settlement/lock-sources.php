@@ -35,7 +35,7 @@ if ('guard' === getenv('SETTLEMENT_LOCK_MODE')) {
         return;
     }
 }
-$repo->lockSettlementSourcesForAccount((string) getenv('SETTLEMENT_LOCK_COMPANY'), (string) getenv('SETTLEMENT_LOCK_ACCOUNT'));
+$repo->lockSettlementSourcesForAccount((string) getenv('SETTLEMENT_LOCK_COMPANY'), (string) getenv('SETTLEMENT_LOCK_ACCOUNT'), ['file-b', 'file-a']);
 echo "locked\n";
 flush();
 fgets(\STDIN);

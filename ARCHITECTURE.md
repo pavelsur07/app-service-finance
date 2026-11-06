@@ -5459,4 +5459,27 @@ Both methods perform no flush/commit; transaction belongs to the Settlement Acti
 RegisterCashSettlementAction includes payment once via active source link and preserves original
 Cash allocatedAmount. CreateSettlementFromFinanceAction creates a draft with explicitly supplied Money;
 PostSettlementDocumentAction rereads source/fingerprint before activating link and creating debt.
-Source mutations are not yet guarded (Work item2.3 pending); do not release this intermediate state.
+Материальные изменения источников блокируются source-owned событиями
+CashSettlementSourceChanging / FinanceSettlementSourceChanging и подписчиком
+SettlementSourceMutationSubscriber. Источник блокируется до события; active source
+link исключает изменение суммы/даты/валюты/контрагента/направления/операций и удаление.
+Описание/комментарии разрешены. Все write paths и доказательства —
+docs/tasks/counterparty-settlements/source-write-paths.md.
+
+FinanceSettlementSourceQuery хранит единый canonical fingerprint для сохранённой
+и изменённой формы; header-only lock используется для удаления/restore без загрузки
+больших marketplace операций. Чужие source Entity не возвращаются через новый контракт.
+Физическое удаление пересчитывает день из перечитанного под блокировкой документа.
+
+ImportBank1CStatementAction владеет whole-file transaction и CashImportAccountLock:
+company FOR SHARE → session account lease → real overwrite target Cash IDs ASC; lease
+остаётся до внешнего commit/rollback. Сервис получает server-owned ownership flag,
+не освобождает чужую lease и отклоняет неподдерживаемого transactional caller.
+Новые существующие overwrite targets вне prelocked set отклоняются. После rollback
+журнал завершается отдельным scoped DBAL update, деньги пакета не сохраняются.
+
+SettlementSourceExceptionListener отображает SourceInUseException в HTTP422:
+JSON error.code=settlement_source_in_use для API/Accept JSON. SourceInUseException
+наследует DomainException: существующие HTML source controllers сохраняют форму
+или flash+redirect. Подтверждение импорта 1С ловит business DomainException и
+возвращает к сохранённому предпросмотру. UI Settlement и отчёты ещё не реализованы.

@@ -202,8 +202,8 @@ class ClientBank1CImportService
 
     // --- import (с добавлением очистки кэша в начале) ---
     /**
-     * Строки пишутся по одной: после каждой вызывается $commit точки входа (Action), сервис сам
-     * не коммитит.
+     * Строки flush-ятся callback-ом точки входа. Production Action владеет общей
+     * транзакцией пакета и блокировкой счёта до commit/rollback; сервис не коммитит.
      *
      * @param \Closure(): void $commit
      *
@@ -240,7 +240,7 @@ class ClientBank1CImportService
 
         try {
             if ($overwrite) {
-                $context['settlement_prelocked_ids'] = array_fill_keys($this->cashTransactionRepository->lockSettlementSourcesForAccount($companyId, $accountId), true);
+                $context['settlement_prelocked_ids'] = array_fill_keys($this->cashTransactionRepository->lockSettlementSourcesForAccount($companyId, $accountId, $this->overwriteExternalIds($preview, $account)), true);
             }
 
             return $this->importRows($preview, $company, $account, $overwrite, $commit, $context);
@@ -770,6 +770,30 @@ class ClientBank1CImportService
         return $normalized;
     }
 
+    /** @param array<int, mixed> $preview
+     * @return list<string>
+     */
+    private function overwriteExternalIds(array $preview, MoneyAccount $account): array
+    {
+        $occurrences = [];
+        $ids = [];
+        foreach ($preview as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $direction = $this->resolveDirection($row);
+            if (null === $direction || null === $this->resolveOccurredAt($row, $direction) || null === $this->resolveAmount($row, $direction)) {
+                continue;
+            }
+            $baseId = $this->generateExternalId($row, $account);
+            $occurrences[$baseId] = ($occurrences[$baseId] ?? -1) + 1;
+            $ids[] = $this->applyOccurrence($baseId, $occurrences[$baseId], $this->getStringValue($row['docType'] ?? null));
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /** @param array<string, mixed> $row */
     private function generateExternalId(array $row, MoneyAccount $account): string
     {
         $parts = [

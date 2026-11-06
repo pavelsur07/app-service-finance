@@ -30,15 +30,21 @@ class CashTransactionRepository extends ServiceEntityRepository
         parent::__construct($registry, CashTransaction::class);
     }
 
-    /** @return list<string> */
-    public function lockSettlementSourcesForAccount(string $companyId, string $accountId): array
+    /** @param list<string> $externalIds
+     * @return list<string>
+     */
+    public function lockSettlementSourcesForAccount(string $companyId, string $accountId, array $externalIds): array
     {
         $db = $this->getEntityManager()->getConnection();
         if (!$db->isTransactionActive()) {
             throw new \LogicException('Account source locks require a transaction.');
         }
 
-        return array_map(static fn ($id): string => (string) $id, $db->fetchFirstColumn('SELECT id FROM cash_transaction WHERE company_id = :company AND money_account_id = :account ORDER BY id FOR UPDATE', ['company' => $companyId, 'account' => $accountId]));
+        if ([] === $externalIds) {
+            return [];
+        }
+
+        return array_map(static fn ($id): string => (string) $id, $db->fetchFirstColumn('SELECT id FROM cash_transaction WHERE company_id = :company AND money_account_id = :account AND external_id IN (:externalIds) AND deleted_at IS NULL ORDER BY id FOR UPDATE', ['company' => $companyId, 'account' => $accountId, 'externalIds' => $externalIds], ['externalIds' => ArrayParameterType::STRING]));
     }
 
     public function getSettlementSourceForUpdate(string $companyId, string $transactionId): \App\Cash\Application\DTO\CashSettlementSource

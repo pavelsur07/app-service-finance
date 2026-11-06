@@ -60,7 +60,7 @@ All material ORM paths dispatch source-owned synchronous events via CashSettleme
 | Cash delete / bulk | sorted fixed source locks, guards before mutation in tx; linked delete rejected, whole bulk unchanged (SourceMutationGuardTest) |
 | Cash restore | source lock + guard; cancellation→delete→restore does not recreate settlement effects (RegisterCashSettlementTest) |
 | Cash existing import match | locked refresh before comparing counterparty; linked update rejected (SourceMutationGuardTest) |
-| 1C overwrite | company share lock; Action owns account session lock until commit/rollback; account existing Cash IDs prelocked ascending, concurrent new existing targets rejected; guard before counterparty assignment, dedupe hash set after refresh; batch rollback and retained failure log, allowed overwrite hash repair, commit-window mutex regression (SourceMutationGuardTest); legacy AccountLockTest/IdempotencyTest/DescriptionOverrideTest |
+| 1C overwrite | company share lock; Action owns account session lock until commit/rollback; only real file overwrite targets prelocked ascending, concurrent new existing targets rejected; guard before counterparty assignment, dedupe hash set after refresh; batch rollback and retained failure log, allowed overwrite hash repair, commit-window mutex regression (SourceMutationGuardTest); legacy AccountLockTest/IdempotencyTest/DescriptionOverrideTest |
 | Cash SQL company command | company and selected IDs locked, per-source events before fixed-ID UPDATE, recalc same tx; active source rejected via real CommandTester, command regression set |
 | Finance edited document | one canonical stored/in-memory fingerprint, no refresh of edited form; operation edit rejected, comment allowed (SourceMutationGuardTest) |
 | Finance soft/hard deletion | Cash-before-Finance snapshot lock + event, hard deletion date read after refresh; active source both deletions rejected, fresh-day PL regression (SourceMutationGuardTest / DocumentSoftDeleteActionTest) |
@@ -72,3 +72,11 @@ Concurrency: SettlementSourceLockOrderTest uses independent PG sessions/child PH
 Account lock ownership: standalone service may own its lease only outside a caller transaction. An atomic caller must own the lease explicitly; production import Action retains it beyond service return until actual outer commit. Two-connection regression proved original release window red, fixed green.
 
 A missing/empty active link never auto-reactivates when a source is restored. Company/source scope is present in snapshots and source-link checks; source fields are never read through stale ORM identity-map snapshots.
+
+External review fixes: SourceInUseException is a DomainException so current forms and
+flash/redirect survive; JSON listener is API-only, import confirm catches business
+DomainException. Actual BrowserKit requests prove edit form preserved (HTML422) and
+bulk delete redirects to list with danger flash. Overwrite preflight computes file
+external IDs using existing hash/occurrence rules and locks only matching active
+sources in sorted ID order; a two-session NOWAIT probe confirms unrelated account
+history remains unlocked.

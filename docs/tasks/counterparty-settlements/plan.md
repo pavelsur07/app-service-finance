@@ -289,18 +289,18 @@ direction: App\Cash\Enum\Transaction\CashDirection, deleted: bool,
 isTransfer: bool, fingerprint: string. `RegisterCashSettlementAction::__invoke(
 string $companyId, string $actorUserId, RegisterCashSettlementInput $input): SettlementResult`.
 
-- [ ] Red tests: outflow 40000.00 → `unallocatedOut=4000000`; isAdvance=true →
+- [x] Red tests: outflow 40000.00 → `unallocatedOut=4000000`; isAdvance=true →
   `advanceGiven=4000000`; повтор → одна позиция. Нет контрагента, transfer,
   deleted, чужая компания, не RUB, дата до старта → отказ.
   A10: повторное включение после отмены не удваивает старый период;
   effectiveDate раньше отмены отклоняется, Cash остаётся единственной транзакцией.
-- [ ] Выполнить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/RegisterCashSettlementTest.php`, зафиксировать red.
-- [ ] Реализовать DTO/Facade и Action под общей транзакцией/lock order Stage 1.
+- [x] Выполнить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/RegisterCashSettlementTest.php`, зафиксировать red.
+- [x] Реализовать DTO/Facade и Action под общей транзакцией/lock order Stage 1.
   Источник перечитывается после блокировки. SettlementSourceLink сериализует одну
   активную связь sourceType+sourceId+companyId; при отмене activeDocumentId очищается,
   lastReversalDate обновляется в той же транзакции. Action создаёт и проводит PAYMENT с позицией
   в одной транзакции. Не менять Cash allocatedAmount и не создавать ОПиУ.
-- [ ] Повторить тест до PASS; записать checkpoint.
+- [x] Повторить тест до PASS; записать checkpoint.
 
 ### Work item 2.2 — обязательство из документа ОПиУ
 
@@ -316,11 +316,11 @@ date, deleted, status, type, operationIds: list<string>, fingerprint.
 `CreateSettlementFromFinanceAction::__invoke(string $companyId, string $actorUserId,
 CreateSettlementFromFinanceInput $input): SettlementResult`.
 
-- [ ] Red tests A7/A8: полная сумма 120000.00 при ОПиУ 100000.00 создаёт
+- [x] Red tests A7/A8: полная сумма 120000.00 при ОПиУ 100000.00 создаёт
   `payable=12000000`, исходные operations неизменны; повтор не создаёт второй долг.
   Нет контрагента/чужой источник/удалённый/технический marketplace документ → отказ.
-- [ ] Выполнить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/CreateSettlementFromFinanceTest.php`, записать red.
-- [ ] Реализовать явное создание одного обязательства на один ручной документ.
+- [x] Выполнить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/CreateSettlementFromFinanceTest.php`, записать red.
+- [x] Реализовать явное создание одного обязательства на один ручной документ.
   При принятии D3: status=ACTIVE, source=null, type ∈ {OTHER, OBLIGATIONS,
   CASHFLOW_EXPENSE}; остальные типы отклоняются. Это явно предлагаемый allowlist
   первой версии, а не классификация всех existing documents. Создание сохраняет
@@ -328,7 +328,7 @@ CreateSettlementFromFinanceInput $input): SettlementResult`.
   повторно проверяются и fingerprint сравнивается перед проведением. Не выводить
   направление из знака суммы или имени категории. Долги по строкам не поддерживать.
   Если источник связан с Cash, lock order: company → Cash → Finance → SettlementBook.
-- [ ] Тест до PASS; регрессия `CreateDocumentFromTransactionActionTest` остаётся green.
+- [x] Тест до PASS; регрессия `CreateDocumentFromTransactionActionTest` остаётся green.
 
 ### Work item 2.3 — защита всех путей изменения источников
 
@@ -348,23 +348,23 @@ materialChange: bool)`; subscriber проверяет активные пров�
 Cash/Finance не зависят от Settlement; subscriber принадлежит Settlement.
 Событие синхронное, внутри транзакции после блокировки источника и до изменения.
 
-- [ ] Составить реестр **всех** записывающих путей по rg, включая soft delete,
+- [x] Составить реестр **всех** записывающих путей по rg, включая soft delete,
   изменение суммы/даты/валюты/контрагента/направления/operations и raw SQL.
   У каждого пути: покрыт guard / по scope источник невозможен + проверяемая причина.
-- [ ] Red tests: ручная правка, bulk delete и существующий import update связанного
+- [x] Red tests: ручная правка, bulk delete и существующий import update связанного
   источника отклоняются атомарно; изменение комментария допустимо; race register
   vs delete не оставляет проведённой оплаты со скрытым источником.
-- [ ] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/SettlementSourceMutationGuardTest.php`.
-- [ ] Встроить события/блокировки в каждый применимый путь; источник и guard одной
+- [x] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/SettlementSourceMutationGuardTest.php`.
+- [x] Встроить события/блокировки в каждый применимый путь; источник и guard одной
   транзакции. Отказ не должен оставлять persisted изменения других источников bulk.
   Restore сам по себе не восстанавливает отменённые расчётные движения.
-- [ ] Повторить тест до PASS. Нельзя закрыть Stage с непроверенными write paths.
+- [x] Повторить тест до PASS. Нельзя закрыть Stage с непроверенными write paths.
 
 **Приёмка Stage 2:**
-- [ ] Связать ДДС можно без создания ОПиУ; создать обязательство можно до оплаты.
-- [ ] Старые документы и старое распределение allocatedAmount не меняются автоматически.
-- [ ] Повтор, bulk, import и конкурентное изменение источника покрыты тестами.
-- [ ] В ARCHITECTURE.md записаны реальные новые контракты и порядок блокировок.
+- [x] Связать ДДС можно без создания ОПиУ; создать обязательство можно до оплаты.
+- [x] Старые документы и старое распределение allocatedAmount не меняются автоматически.
+- [x] Повтор, bulk, import и конкурентное изменение источника покрыты тестами.
+- [x] В ARCHITECTURE.md записаны реальные новые контракты и порядок блокировок.
 
 Stage checks: integration Settlement + затронутые Cash/Finance tests;
 focused PHPStan/CS; review исходящих source write paths. Commit:

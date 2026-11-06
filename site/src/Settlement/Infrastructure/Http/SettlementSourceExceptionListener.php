@@ -7,7 +7,6 @@ namespace App\Settlement\Infrastructure\Http;
 use App\Settlement\Exception\SettlementSourceInUseException;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
@@ -30,6 +29,5 @@ final readonly class SettlementSourceExceptionListener implements EventSubscribe
 
             return;
         }
-        $event->setResponse(new Response($exception->getMessage(), 422, ['Content-Type' => 'text/plain; charset=UTF-8']));
     }
 }

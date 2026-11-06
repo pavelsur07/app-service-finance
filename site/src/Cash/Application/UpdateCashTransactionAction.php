@@ -57,7 +57,7 @@ final class UpdateCashTransactionAction
             $this->settlementLifecycle->changing($tx, $materialChange);
 
             // Обновляем поля
-            $amount = $this->transactions->requireAmount($dto);
+            $amount = $newMoney->toDecimalString();
             $tx->setMoneyAccount($account)
                 ->setDirection($dto->direction)
                 ->setAmount($amount)

@@ -41,10 +41,6 @@ final class DeletePLDocumentAction
             return;
         }
 
-        if ((string) $document->getCompany()->getId() !== $companyId) {
-            throw new \DomainException(sprintf('Document "%s" does not belong to company "%s".', $documentId, $companyId));
-        }
-
         // Пересчитываем PL-регистр за день удалённого документа.
         // Метод recalcRange принимает Company — получаем через Facade.
         $company = $this->companyFacade->findById($companyId);

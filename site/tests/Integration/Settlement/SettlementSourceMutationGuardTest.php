@@ -62,7 +62,7 @@ final class SettlementSourceMutationGuardTest extends IntegrationTestCase
 
     public function testLinkedCashCannotBeDeleted(): void
     {
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(\App\Settlement\Exception\SettlementSourceInUseException::class);
         $this->expectExceptionMessage('Источник участвует во взаиморасчётах');
         (self::getContainer()->get(DeleteCashTransactionAction::class))($this->cash, $this->actorId);
     }
@@ -77,7 +77,7 @@ final class SettlementSourceMutationGuardTest extends IntegrationTestCase
         try {
             (self::getContainer()->get(BulkDeleteCashTransactionsAction::class))($this->company, [$other->getId(), $this->cash->getId()], $this->actorId);
             self::fail('Linked source deletion must fail.');
-        } catch (\RuntimeException $exception) {
+        } catch (\App\Settlement\Exception\SettlementSourceInUseException $exception) {
             self::assertStringContainsString('Источник участвует во взаиморасчётах', $exception->getMessage());
             self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM cash_transaction WHERE company_id = ? AND deleted_at IS NOT NULL', [$this->companyId]));
         }
@@ -101,7 +101,7 @@ final class SettlementSourceMutationGuardTest extends IntegrationTestCase
     {
         $dto = $this->cashInput();
         $dto->amount = '40001.00';
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(\App\Settlement\Exception\SettlementSourceInUseException::class);
         $this->expectExceptionMessage('Источник участвует во взаиморасчётах');
         (self::getContainer()->get(UpdateCashTransactionAction::class))($this->cash, $dto);
     }
@@ -128,7 +128,7 @@ final class SettlementSourceMutationGuardTest extends IntegrationTestCase
         (self::getContainer()->get(PostSettlementDocumentAction::class))($this->companyId, $this->actorId, $draft->documentId, $draft->version);
         $initialStatus = $source->getStatus();
         $operation->setAmount('100001.00');
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(\App\Settlement\Exception\SettlementSourceInUseException::class);
         $this->expectExceptionMessage('Источник участвует во взаиморасчётах');
         (self::getContainer()->get(UpdateManualDocumentAction::class))($source, $initialStatus, $date);
     }
@@ -147,7 +147,7 @@ final class SettlementSourceMutationGuardTest extends IntegrationTestCase
         self::assertNotNull($kernel);
         $application = new \Symfony\Bundle\FrameworkBundle\Console\Application($kernel);
         $tester = new \Symfony\Component\Console\Tester\CommandTester($application->find('app:cash:soft-delete-company-transactions'));
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(\App\Settlement\Exception\SettlementSourceInUseException::class);
         $this->expectExceptionMessage('Источник участвует во взаиморасчётах');
         $tester->execute(['companyId' => $this->companyId, '--execute' => true, '--reason' => 'Проверка защиты']);
     }
@@ -160,7 +160,7 @@ final class SettlementSourceMutationGuardTest extends IntegrationTestCase
         $dto->importSource = 'test-settlement';
         $dto->externalId = 'existing-payment';
         $dto->counterpartyId = null;
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(\App\Settlement\Exception\SettlementSourceInUseException::class);
         $this->expectExceptionMessage('Источник участвует во взаиморасчётах');
         (self::getContainer()->get(\App\Cash\Application\AddCashTransactionAction::class))($dto);
     }

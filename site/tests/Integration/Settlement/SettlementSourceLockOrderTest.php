@@ -24,11 +24,13 @@ final class SettlementSourceLockOrderTest extends IntegrationTestCase
         $db->executeStatement('CREATE SCHEMA '.$schema);
         try {
             $db->executeStatement('SET search_path TO '.$schema);
-            $db->executeStatement('CREATE TABLE cash_transaction (id UUID PRIMARY KEY, company_id UUID NOT NULL, money_account_id UUID NOT NULL)');
+            $db->executeStatement('CREATE TABLE cash_transaction (id UUID PRIMARY KEY, company_id UUID NOT NULL, money_account_id UUID NOT NULL, external_id VARCHAR(128), deleted_at TIMESTAMP)');
             // Physical insertion order intentionally opposes the required lock order.
             foreach ([$secondId, $firstId] as $id) {
-                $db->insert('cash_transaction', ['id' => $id, 'company_id' => $company, 'money_account_id' => $account]);
+                $db->insert('cash_transaction', ['id' => $id, 'company_id' => $company, 'money_account_id' => $account, 'external_id' => $id === $firstId ? 'file-a' : 'file-b']);
             }
+            $unrelatedId = '33333333-3333-7333-a333-333333333333';
+            $db->insert('cash_transaction', ['id' => $unrelatedId, 'company_id' => $company, 'money_account_id' => $account, 'external_id' => 'other-file']);
             $db->beginTransaction();
             $db->fetchOne('SELECT id FROM cash_transaction WHERE id = ? FOR UPDATE', [$firstId]);
             $input = new InputStream();
@@ -47,6 +49,9 @@ final class SettlementSourceLockOrderTest extends IntegrationTestCase
             self::assertSame($secondId, $db->fetchOne('SELECT id FROM cash_transaction WHERE id = ? FOR UPDATE NOWAIT', [$secondId]));
             $db->commit();
             self::assertTrue($process->waitUntil(static fn (string $type, string $buffer): bool => str_contains($buffer, "locked\n")), $process->getErrorOutput());
+            $db->beginTransaction();
+            self::assertSame($unrelatedId, $db->fetchOne('SELECT id FROM cash_transaction WHERE id = ? FOR UPDATE NOWAIT', [$unrelatedId]), 'Overwrite must not lock unrelated account history.');
+            $db->rollBack();
             $input->write("stop\n");
             $input->close();
             self::assertSame(0, $process->wait(), $process->getErrorOutput());
