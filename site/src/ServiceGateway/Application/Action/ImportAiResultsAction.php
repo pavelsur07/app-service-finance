@@ -181,17 +181,17 @@ final readonly class ImportAiResultsAction
         if (0 === $result->inputTokens + $result->outputTokens) {
             return '0.0000';
         }
-        $input = $output = null;
+        if ([] === $result->models) {
+            return null;
+        }
+        $input = $output = 0.0;
         foreach ($result->models as $model) {
             $price = $this->prices[$model] ?? null;
             if (null === $price || null === $price['input'] || null === $price['output']) {
                 return null;
             }
-            $input = max($input ?? 0.0, $price['input']);
-            $output = max($output ?? 0.0, $price['output']);
-        }
-        if (null === $input || null === $output) {
-            return null;
+            $input = max($input, $price['input']);
+            $output = max($output, $price['output']);
         }
 
         return number_format(($result->inputTokens * $input + $result->outputTokens * $output) / 1_000_000, 4, '.', '');
