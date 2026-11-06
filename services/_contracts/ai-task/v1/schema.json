@@ -136,7 +136,7 @@
             "properties": {"text": {"type": "string"}}
         },
         "categorize_payload": {
-            "description": "payload задачи categorize_transactions: справочник статей ДДС компании и до 50 операций без статьи",
+            "description": "payload задачи categorize_transactions: справочник статей ДДС компании, до 50 операций без статьи и необязательные примеры разнесения самой компании",
             "type": "object",
             "additionalProperties": false,
             "required": ["categories", "operations"],
@@ -168,6 +168,21 @@
                             "date": {"type": "string", "format": "date"},
                             "description": {"type": ["string", "null"], "maxLength": 1024},
                             "counterparty": {"type": ["string", "null"], "maxLength": 255}
+                        }
+                    }
+                },
+                "examples": {
+                    "description": "как компания сама разнесла похожие операции (человек или автоправило, не ИИ); category_id — из categories",
+                    "type": "array", "maxItems": 50,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["direction", "description", "counterparty", "category_id"],
+                        "properties": {
+                            "direction": {"enum": ["inflow", "outflow"]},
+                            "description": {"type": ["string", "null"], "maxLength": 1024},
+                            "counterparty": {"type": ["string", "null"], "maxLength": 255},
+                            "category_id": {"type": "string", "minLength": 1, "maxLength": 64}
                         }
                     }
                 }

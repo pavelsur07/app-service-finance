@@ -2415,7 +2415,20 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   payload ответил бы 409); строки без ответа старше 7 дней → `failed`
   (`expired`); запись задачи без `requested` удаляется. Кандидаты — без статьи,
   за 90 дней, созданы раньше чем 10 мин назад (автоправила отработали), без
-  открытой подсказки и меньше 3 сбоев ответа (`expired` не считается).
+  открытой подсказки и меньше 3 сбоев ответа (`expired` не считается); `no_answer` на прошлой
+  версии промпта не блокирует — операция переспрашивается один раз на текущей
+  (`RequestCashAiCategorizationAction::PROMPT_VERSION`, сверка с сервисом —
+  `test_symfony_prompt_version.py`); не перевод
+  собственных средств: фраза «перевод/перемещение собственных средств», «внутреннее
+  перемещение» без слов «депозит/кредит/займ/процент» исключает операцию, только если у
+  компании нет ни одной такой операции в несистемной статье (`TRANSFER_LIKE`; число
+  исключённых — `CashCategorizationStats::$transferLikeSkipped` на странице «ИИ» кабинета).
+  Примеры (`examples` в `categorize_payload`, промпт `categorize_transactions/v3`): к пачке —
+  `CashCategorizationQuery::findExamplesFor` одним запросом, до 3 на операцию и 30 на пачку,
+  операции компании за 365 дней в несистемной статье с одной разбивкой (человек или автоправило;
+  подсказки ИИ `accepted`/`auto_applied` не берутся), того же направления, сначала тот же контрагент,
+  затем общие слова назначения (`to_tsvector('russian')`). Пример со статьёй вне справочника пачки mapper отбрасывает;
+  пустой список не передаётся.
   Справочник — активные несистемные конечные статьи с путём (0 или больше 1000
   → пропуск компании). ИНН и счета не передаются.
 - `CashCategorizationResultConsumer`: строки `requested` по `task_id` (повтор
@@ -5034,7 +5047,10 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.145 | 2026-11-06 | Cash: immutable whole-file description plan, явный выбор, scoped chunk apply/audit/retry, защита description от 1С overwrite (`Version20261106120000`), Twig preview/result (cash-import-description-update) |
+| 2.148 | 2026-11-06 | Cash: immutable whole-file description plan, явный выбор, scoped chunk apply/audit/retry, защита description от 1С overwrite (`Version20261106120000`), Twig preview/result (cash-import-description-update) |
+| 2.147 | 2026-11-06 | Cash: «нет ответа» на прошлой версии промпта переспрашивается один раз (`RequestCashAiCategorizationAction::PROMPT_VERSION = categorize_transactions/v3`, `findCandidates(..., $promptVersion)`), сверка версии с ai-service — pytest `test_symfony_prompt_version.py` (задача `ai-routines`, этап 4) |
+| 2.146 | 2026-11-06 | ai-service/Cash: необязательное поле `examples` в `categorize_payload` (контракт `ai-task/v1`, категория примера — из справочника, иначе 422), промпт `categorize_transactions/v3` (правило 6 — примеры компании), `CashCategorizationQuery::findExamplesFor`, `CashCategorizationExample`; `evals-compare --examples` — примеры из других кейсов набора (задача `ai-routines`, этап 3) |
+| 2.145 | 2026-11-06 | Cash: переводы собственных средств не отправляются в ИИ, если компания такие операции в статьи не разносила (`CashCategorizationQuery::TRANSFER_LIKE`), счётчик `transferLikeSkipped` на странице «ИИ» кабинета, `CashFacade::getAiSuggestionStats(..., ?occurredFrom)` (задача `ai-routines`, этап 2) |
 | 2.144 | 2026-11-06 | ServiceGateway: учёт расходов ИИ `ai_usage`, журнал `ai_run`, лимиты `ai_company_access.monthly_limit_rub`/`lookback_days` (`Version20261106090000`–`110000`), гейт `app:ai-service:health-check`, страница `/admin/ai/companies/{id}`; cron `ai-categorize` идёт по всем подключённым компаниям, `CashAiCategorizationCompaniesQuery` удалён; `CashFacade::getAiSuggestionStats` (задача `ai-observability-budget`) |
 | 2.143 | 2026-11-05 | ServiceGateway: подключение компаний к ИИ из админки — `ai_company_access` (`Version20261105120000`, перенос Вумджой), `SetAiCompanyAccessAction`, переключатель «ИИ» в `/admin/users`; `AiTaskFacadeInterface::enabledCompanyIds/isServiceEnabled/grantedCompanyIds`; env `AI_SERVICE_COMPANY_ALLOWLIST` удалена (задача `ai-company-access`) |
 | 2.142 | 2026-11-05 | Company: удаление компании двухшаговое — `deletion_requested_at`/`deletion_requested_by` (`Version20261105090000`), `RequestCompanyDeletionAction`/`RestoreCompanyDeletionAction`, `CompanyDeletionRequestedEvent` (отключение подключений Marketplace, MoySklad, BankSync, привязок Telegram), закрыт API-доступ, помеченные компании вне активных; `CompanyFacade::getDeletionRequestedCompanyIds()` (задача `company-deletion`, этап 1) |

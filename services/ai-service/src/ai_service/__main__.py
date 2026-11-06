@@ -34,6 +34,7 @@ from ai_service.llm.routes import (
 )
 from ai_service.store.migrate import migrate
 from ai_service.store.tasks import TaskStore
+from ai_service.tasks.categorize_transactions import task as categorize
 from ai_service.tasks.registry import build_registry
 from ai_service.tracing.errors import configure_error_reporting
 from ai_service.tracing.logging import configure_logging
@@ -66,6 +67,9 @@ def main(argv: list[str] | None = None) -> int:
     comparer.add_argument("--routes", type=Path, default=routes)
     comparer.add_argument("--prices", type=Path, default=routes.with_name("prices.yaml"))
     comparer.add_argument("--timeout", type=float, default=120.0)
+    comparer.add_argument(
+        "--examples", action="store_true", help="примеры разнесения во входе, как в проде (из других кейсов набора)"
+    )
     checker = commands.add_parser("gateway-check", help="проверки 2 и 4: /models через шлюз с токеном и без")
     checker.add_argument("--routes", type=Path, default=routes)
     pinger = commands.add_parser("llm-ping", help="проверка 3: короткий чат-запрос к каждому провайдеру маршрутов")
@@ -199,9 +203,11 @@ def _evals_compare(evals: Path, args: argparse.Namespace) -> int:
         pipeline = compare.single_model_pipeline(raw_routes, model, env, args.timeout)
         total = compare.Score()
         for eval_set in sets:
-            total.add(compare.evaluate(pipeline, eval_set))
+            total.add(compare.evaluate(pipeline, eval_set, with_examples=args.examples))
         rows.append((model, total))
-    print(f"Наборы: {', '.join(s.name for s in sets)}")  # noqa: T201
+    prompt = f"{categorize.TASK_TYPE}/{categorize.PROMPT_VERSION}"
+    examples = "да" if args.examples else "нет"
+    print(f"Наборы: {', '.join(s.name for s in sets)}; промпт {prompt}; примеры: {examples}")  # noqa: T201
     print(compare.render(rows, prices))  # noqa: T201
     print()  # noqa: T201
     print(compare.render_errors(rows))  # noqa: T201

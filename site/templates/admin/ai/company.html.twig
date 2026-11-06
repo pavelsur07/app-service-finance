@@ -126,6 +126,9 @@
         Доля верных среди решённых людьми: {{ precision is null ? '— (решений нет)' : (precision * 100)|round(0) ~ ' %' }}
         {%- if stats.corrected or stats.confirmedByEdit %} · правкой операции: подтверждено {{ stats.confirmedByEdit }}, исправлено {{ stats.corrected }}{% endif %}
       </p>
+      <p class="form-hint" style="margin:0 0 var(--s-3);" data-ai-transfer-skipped>
+        Похоже на перевод собственных средств, в ИИ не отправлено (операции за {{ transferWindowDays }} дней): {{ stats.transferLikeSkipped }}
+      </p>
       {% if stats.byStatus is empty %}
         <div class="form-hint">Подсказок не было.</div>
       {% else %}
