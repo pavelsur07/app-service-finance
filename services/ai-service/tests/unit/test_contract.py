@@ -31,6 +31,20 @@ def test_categorize_examples_match_schema_and_models() -> None:
     CategorizeOutput.model_validate(example("categorize_output"))
 
 
+def test_categorize_payload_with_company_examples_matches_schema_and_model() -> None:
+    payload = example("categorize_payload")
+    rent = payload["categories"][1]["id"]
+    payload["examples"] = [
+        {"direction": "outflow", "description": "Оплата аренды за сентябрь", "counterparty": None, "category_id": rent}
+    ]
+    validate("categorize_payload", payload)
+    assert CategorizeInput.model_validate(payload).examples[0].category_id == rent
+
+    payload["examples"][0]["amount"] = "1.00"  # лишнее поле примера — нарушение контракта
+    with pytest.raises(ValidationError):
+        validate("categorize_payload", payload)
+
+
 @pytest.mark.parametrize(
     ("change", "path"),
     [

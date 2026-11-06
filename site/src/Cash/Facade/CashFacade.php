@@ -78,11 +78,12 @@ final readonly class CashFacade
 
     /**
      * Подсказки статей ИИ компании, запрошенные с момента: по статусам и решения людей
-     * (страница «ИИ» кабинета в админке).
+     * (страница «ИИ» кабинета в админке). С `$occurredFrom` — ещё и число операций без статьи,
+     * похожих на перевод собственных средств, с этой даты (в ИИ не отправляются).
      */
-    public function getAiSuggestionStats(string $companyId, \DateTimeImmutable $requestedSince): CashCategorizationStats
+    public function getAiSuggestionStats(string $companyId, \DateTimeImmutable $requestedSince, ?\DateTimeImmutable $occurredFrom = null): CashCategorizationStats
     {
-        return $this->categorizationQuery->stats($companyId, $requestedSince);
+        return $this->categorizationQuery->stats($companyId, $requestedSince, $occurredFrom);
     }
 
     /**

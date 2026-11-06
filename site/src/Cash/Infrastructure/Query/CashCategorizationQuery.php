@@ -7,6 +7,7 @@ namespace App\Cash\Infrastructure\Query;
 use App\Cash\Application\DTO\CashAiAutoApplyGateStats;
 use App\Cash\Application\DTO\CashAiRuleProposal;
 use App\Cash\Application\DTO\CashCategorizationCategory;
+use App\Cash\Application\DTO\CashCategorizationExample;
 use App\Cash\Application\DTO\CashCategorizationHistoryCase;
 use App\Cash\Application\DTO\CashCategorizationOperation;
 use App\Cash\Application\DTO\CashCategorizationStats;
@@ -41,6 +42,29 @@ final readonly class CashCategorizationQuery
         AND (company.finance_lock_before IS NULL OR tx.occurred_at >= company.finance_lock_before)
         SQL;
 
+    /**
+     * Перевод собственных средств (docs/tasks/ai-routines/measurements/stage-1.md): между своими счетами,
+     * в «налоговую копилку». Статьи ДДС у него нет, модель по нему не отвечает — не отправлять и не платить.
+     * Депозиты и кредиты с той же фразой — настоящие статьи, они не переводы.
+     */
+    private const TRANSFER_PATTERN = '(перевод\s+собственных\s+средств|перемещение\s+собственных\s+средств|внутреннее\s+перемещение)';
+    private const TRANSFER_EXCLUDE_PATTERN = '(депозит|кредит|займ|процент)';
+
+    /**
+     * Фраза перевода — признак, только если компания сама такие операции в статьи не разносила: иначе
+     * (у одного кабинета «перевод собственных средств» — погашение кредита) решает её история.
+     * COALESCE: у пустого назначения условие иначе NULL, и `NOT (...)` выбросило бы операцию из кандидатов.
+     */
+    private const TRANSFER_LIKE = <<<'SQL'
+        (COALESCE(tx.description, '') ~* :transferPattern AND COALESCE(tx.description, '') !~* :transferExclude
+         AND NOT EXISTS (
+             SELECT 1 FROM cash_transaction own
+             JOIN "cashflow_categories" own_category ON own_category.id = own.cashflow_category_id
+             WHERE own.company_id = :companyId AND own.deleted_at IS NULL AND own_category.is_system = false
+               AND own.description ~* :transferPattern AND own.description !~* :transferExclude
+         ))
+        SQL;
+
     /** Порог предложения автоправила по ИИ-подсказкам: операций со статьёй человека. */
     public const RULE_PROPOSAL_MIN_CONFIRMED = 3;
 
@@ -50,10 +74,12 @@ final readonly class CashCategorizationQuery
 
     /**
      * Операции без статьи, которым подсказку ещё не запрашивали (или прошлые попытки сорвались).
+     * «Нет ответа» на прошлой версии промпта — повод спросить ещё раз, ровно один: ответ на текущей
+     * (`$promptVersion`, `task_type/vN` из результата сервиса) операцию больше не возвращает.
      *
      * @return list<CashCategorizationOperation>
      */
-    public function findCandidates(string $companyId, \DateTimeImmutable $occurredFrom, \DateTimeImmutable $createdBefore, int $limit): array
+    public function findCandidates(string $companyId, \DateTimeImmutable $occurredFrom, \DateTimeImmutable $createdBefore, int $limit, string $promptVersion): array
     {
         Assert::uuid($companyId);
         Assert::range($limit, 1, 1000);
@@ -68,10 +94,12 @@ final readonly class CashCategorizationQuery
              WHERE '.self::UNCATEGORIZED.'
                AND tx.occurred_at >= :occurredFrom
                AND tx.created_at < :createdBefore
+               AND NOT '.self::TRANSFER_LIKE.'
                AND NOT EXISTS (
                    SELECT 1 FROM cash_category_suggestion s
                    WHERE s.company_id = :companyId AND s.transaction_id = tx.id
-                     AND s.status NOT IN (\'failed\', \'stale\')
+                     AND (s.status NOT IN (\'failed\', \'stale\', \'no_answer\')
+                          OR (s.status = \'no_answer\' AND s.prompt_version IS NOT DISTINCT FROM :promptVersion))
                )
                AND (
                    SELECT count(*) FROM cash_category_suggestion s
@@ -86,11 +114,102 @@ final readonly class CashCategorizationQuery
                 'createdBefore' => $createdBefore->format('Y-m-d H:i:s'),
                 'maxFailed' => self::MAX_FAILED_ATTEMPTS,
                 'limit' => $limit,
+                'transferPattern' => self::TRANSFER_PATTERN,
+                'transferExclude' => self::TRANSFER_EXCLUDE_PATTERN,
+                'promptVersion' => $promptVersion,
             ],
             ['unallocatedCodes' => ArrayParameterType::STRING],
         );
 
         return array_map(self::operation(...), $rows);
+    }
+
+    /**
+     * Примеры для пачки (docs/tasks/ai-routines, этап 3): операции компании за год, разнесённые человеком или
+     * автоправилом в несистемную статью (принятые и автоприменённые подсказки ИИ не берутся — модель не учится на
+     * своих ответах),
+     * похожие на операции пачки. Для каждой операции пачки — до `$perOperation` примеров: сначала тот же
+     * контрагент, затем больше общих слов назначения (полнотекстовый поиск, русская морфология). Один запрос.
+     *
+     * @param list<string> $transactionIds операции пачки
+     *
+     * @return list<CashCategorizationExample>
+     */
+    public function findExamplesFor(string $companyId, array $transactionIds, \DateTimeImmutable $occurredFrom, int $perOperation, int $limit): array
+    {
+        Assert::uuid($companyId);
+        Assert::allUuid($transactionIds);
+        Assert::range($perOperation, 1, 10);
+        Assert::range($limit, 1, 50);
+        if ([] === $transactionIds) {
+            return [];
+        }
+
+        $rows = $this->connection->fetchAllAssociative(
+            'WITH batch AS MATERIALIZED (
+                 -- Слова назначения через «или»: пример похож, если делит с операцией хоть одно слово, ранг — по числу общих.
+                 SELECT b.counterparty_id, b.direction,
+                        CASE WHEN b.description ~ \'[[:alpha:]]{2}\'
+                             THEN NULLIF(replace(plainto_tsquery(\'russian\', b.description)::text, \'&\', \'|\'), \'\')::tsquery
+                        END AS words
+                 FROM cash_transaction b
+                 WHERE b.company_id = :companyId AND b.id IN (:ids)
+             ), pool AS MATERIALIZED (
+                 SELECT tx.id, tx.direction, tx.description, tx.counterparty_id, tx.occurred_at,
+                        COALESCE(counterparty.display_name, counterparty.name) AS counterparty,
+                        tx.cashflow_category_id AS category_id,
+                        to_tsvector(\'russian\', COALESCE(tx.description, \'\')) AS document
+                 FROM cash_transaction tx
+                 JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id AND category.company_id = :companyId
+                 LEFT JOIN counterparty ON counterparty.id = tx.counterparty_id AND counterparty.company_id = :companyId
+                 WHERE tx.company_id = :companyId
+                   AND tx.deleted_at IS NULL
+                   AND tx.is_transfer = false
+                   AND tx.occurred_at >= :occurredFrom
+                   AND category.is_system = false
+                   AND (SELECT count(*) FROM cash_transaction_split split WHERE split.cash_transaction_id = tx.id) = 1
+                   AND NOT EXISTS (
+                       SELECT 1 FROM cash_category_suggestion s
+                       WHERE s.company_id = :companyId AND s.transaction_id = tx.id AND s.status IN (\'accepted\', \'auto_applied\')
+                   )
+             )
+             SELECT picked.direction, picked.description, picked.counterparty, picked.category_id
+             FROM (
+                 SELECT DISTINCT ON (near.id) near.id, near.direction, near.description, near.counterparty,
+                        near.category_id, near.same_counterparty, near.rank
+                 FROM batch
+                 CROSS JOIN LATERAL (
+                     SELECT pool.*,
+                            COALESCE(pool.counterparty_id = batch.counterparty_id, false) AS same_counterparty,
+                            CASE WHEN batch.words IS NULL THEN 0 ELSE ts_rank(pool.document, batch.words) END AS rank
+                     FROM pool
+                     -- Направление — как у операции: пример поступления списанию не подсказка (и в промпте, и в evals).
+                     WHERE pool.direction = batch.direction
+                       AND (pool.counterparty_id = batch.counterparty_id
+                            OR (batch.words IS NOT NULL AND pool.document @@ batch.words))
+                     ORDER BY same_counterparty DESC, rank DESC, pool.occurred_at DESC, pool.id
+                     LIMIT :perOperation
+                 ) near
+                 ORDER BY near.id, near.same_counterparty DESC, near.rank DESC
+             ) picked
+             ORDER BY picked.same_counterparty DESC, picked.rank DESC, picked.id
+             LIMIT :limit',
+            [
+                'companyId' => $companyId,
+                'ids' => $transactionIds,
+                'occurredFrom' => $occurredFrom->format('Y-m-d'),
+                'perOperation' => $perOperation,
+                'limit' => $limit,
+            ],
+            ['ids' => ArrayParameterType::STRING],
+        );
+
+        return array_map(static fn (array $row): CashCategorizationExample => new CashCategorizationExample(
+            direction: (string) $row['direction'],
+            description: null === $row['description'] ? null : (string) $row['description'],
+            counterparty: null === $row['counterparty'] ? null : (string) $row['counterparty'],
+            categoryId: (string) $row['category_id'],
+        ), $rows);
     }
 
     /**
@@ -484,8 +603,11 @@ final readonly class CashCategorizationQuery
         return $views;
     }
 
-    /** @param \DateTimeImmutable|null $requestedSince только подсказки, запрошенные с этого момента */
-    public function stats(string $companyId, ?\DateTimeImmutable $requestedSince = null): CashCategorizationStats
+    /**
+     * @param \DateTimeImmutable|null $requestedSince только подсказки, запрошенные с этого момента
+     * @param \DateTimeImmutable|null $occurredFrom окно операций для счётчика переводов (null — не считать)
+     */
+    public function stats(string $companyId, ?\DateTimeImmutable $requestedSince = null, ?\DateTimeImmutable $occurredFrom = null): CashCategorizationStats
     {
         Assert::uuid($companyId);
         // Нижняя граница по умолчанию — «всё время»: один текст запроса на оба случая.
@@ -516,10 +638,26 @@ final readonly class CashCategorizationQuery
             ],
         );
 
+        $transferLike = null === $occurredFrom ? 0 : (int) $this->connection->fetchOne(
+            'SELECT count(*) FROM cash_transaction tx
+             JOIN "companies" company ON company.id = tx.company_id
+             LEFT JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id
+             WHERE '.self::UNCATEGORIZED.' AND tx.occurred_at >= :occurredFrom AND '.self::TRANSFER_LIKE,
+            [
+                'companyId' => $companyId,
+                'unallocatedCodes' => [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED],
+                'occurredFrom' => $occurredFrom->format('Y-m-d'),
+                'transferPattern' => self::TRANSFER_PATTERN,
+                'transferExclude' => self::TRANSFER_EXCLUDE_PATTERN,
+            ],
+            ['unallocatedCodes' => ArrayParameterType::STRING],
+        );
+
         return new CashCategorizationStats(
             byStatus: array_map('intval', $byStatus),
             corrected: (int) ($edited['corrected'] ?? 0),
             confirmedByEdit: (int) ($edited['confirmed'] ?? 0),
+            transferLikeSkipped: $transferLike,
         );
     }
 }

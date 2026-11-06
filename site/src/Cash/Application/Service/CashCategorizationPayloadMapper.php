@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Application\Service;
 
 use App\Cash\Application\DTO\CashCategorizationCategory;
+use App\Cash\Application\DTO\CashCategorizationExample;
 use App\Cash\Application\DTO\CashCategorizationOperation;
 
 /**
@@ -27,16 +28,40 @@ final readonly class CashCategorizationPayloadMapper
     }
 
     /**
+     * Примеры со статьёй вне справочника пачки (архивная, стала группой) отбрасываются: сервис отверг бы
+     * весь вход. Пустой список не передаётся — вход остаётся прежней формы.
+     *
      * @param list<CashCategorizationCategory> $categories
      * @param list<CashCategorizationOperation> $operations
+     * @param list<CashCategorizationExample> $examples
      *
-     * @return array{categories: list<array<string, string>>, operations: list<array<string, string|null>>}
+     * @return array{categories: list<array<string, string>>, operations: list<array<string, string|null>>, examples?: list<array<string, string|null>>}
      */
-    public function payload(array $categories, array $operations): array
+    public function payload(array $categories, array $operations, array $examples = []): array
     {
-        return [
+        $payload = [
             'categories' => array_map($this->category(...), $categories),
             'operations' => array_map($this->operation(...), $operations),
+        ];
+        $known = array_fill_keys(array_map(static fn (CashCategorizationCategory $c): string => $c->id, $categories), true);
+        $examples = array_values(array_filter($examples, static fn (CashCategorizationExample $e): bool => isset($known[$e->categoryId])));
+        if ([] !== $examples) {
+            $payload['examples'] = array_map($this->example(...), $examples);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @return array<string, string|null>
+     */
+    public function example(CashCategorizationExample $example): array
+    {
+        return [
+            'direction' => 'INFLOW' === $example->direction ? 'inflow' : 'outflow',
+            'description' => $example->description,
+            'counterparty' => null === $example->counterparty ? null : mb_substr($example->counterparty, 0, self::MAX_COUNTERPARTY),
+            'category_id' => $example->categoryId,
         ];
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Application;
 
 use App\Cash\Application\DTO\CashAiCategorizationRequestResult;
+use App\Cash\Application\DTO\CashCategorizationOperation;
 use App\Cash\Application\Service\CashCategorizationPayloadMapper;
 use App\Cash\Entity\Transaction\CashCategorizationTask;
 use App\Cash\Entity\Transaction\CashCategorySuggestion;
@@ -34,6 +35,16 @@ final class RequestCashAiCategorizationAction
 {
     public const TASK_TYPE = 'categorize_transactions';
     public const BATCH_SIZE = 50;
+    /**
+     * Текущий промпт сервиса (`PROMPT_VERSION` задачи в ai-service; сверка —
+     * services/ai-service/tests/unit/test_symfony_prompt_version.py): «нет ответа» на прошлой версии
+     * переспрашивается один раз.
+     */
+    public const PROMPT_VERSION = 'categorize_transactions/v3';
+    /** Примеры разнесения компании на пачку (контракт — до 50): по три на операцию, за год. */
+    private const EXAMPLES_PER_OPERATION = 3;
+    private const EXAMPLES_PER_BATCH = 30;
+    private const EXAMPLES_DAYS = 365;
     /** Лимиты контракта categorize_payload. */
     private const MAX_CATEGORIES = 1000;
     /** Наибольшее окно кандидатов (охват cron); окно компании — `lookbackDays` из лимитов ИИ. */
@@ -111,6 +122,7 @@ final class RequestCashAiCategorizationAction
                 $now->modify(sprintf('-%d days', min($budget->lookbackDays, self::LOOKBACK_DAYS)))->setTime(0, 0),
                 $now->modify(sprintf('-%d minutes', self::SETTLE_MINUTES)),
                 $limit,
+                self::PROMPT_VERSION,
             ),
             $this->mapper->isRepresentable(...),
         ));
@@ -120,7 +132,14 @@ final class RequestCashAiCategorizationAction
         foreach (array_chunk($operations, self::BATCH_SIZE) as $batch) {
             $key = 'cash-categorize:'.Uuid::uuid7()->toString();
             $taskId = $this->ai->taskIdFor($companyId, self::TASK_TYPE, $key);
-            $payload = $this->mapper->payload($categories, $batch);
+            $examples = $this->query->findExamplesFor(
+                $companyId,
+                array_map(static fn (CashCategorizationOperation $o): string => $o->id, $batch),
+                $now->modify(sprintf('-%d days', self::EXAMPLES_DAYS))->setTime(0, 0),
+                self::EXAMPLES_PER_OPERATION,
+                self::EXAMPLES_PER_BATCH,
+            );
+            $payload = $this->mapper->payload($categories, $batch, $examples);
             $this->entityManager->wrapInTransaction(function () use ($batch, $companyId, $taskId, $key, $payload, $now): void {
                 $this->entityManager->persist(new CashCategorizationTask($taskId, $companyId, $key, $payload, $now));
                 foreach ($batch as $operation) {

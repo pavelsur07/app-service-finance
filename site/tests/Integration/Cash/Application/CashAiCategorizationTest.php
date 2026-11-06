@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Cash\Application;
 
 use App\Cash\Application\AcceptCashCategorySuggestionAction;
 use App\Cash\Application\DismissCashCategorySuggestionAction;
+use App\Cash\Application\DTO\CashCategorizationExample;
 use App\Cash\Application\RequestCashAiCategorizationAction;
 use App\Cash\Application\Service\CashCategorizationPayloadMapper;
 use App\Cash\Application\Service\CashCategorizationResultConsumer;
@@ -33,6 +34,7 @@ use App\ServiceGateway\Enum\AiResultStatus;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CounterpartyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Psr\Log\NullLogger;
@@ -151,6 +153,140 @@ final class CashAiCategorizationTest extends IntegrationTestCase
 
         self::assertSame('awaiting_results', $result->skippedReason);
         self::assertSame(0, $result->requested);
+    }
+
+    public function testBatchCarriesSimilarCompanyDecisionsButNotAcceptedAiSuggestions(): void
+    {
+        $this->transaction('Оплата аренды склада за сентябрь', $this->rent, new \DateTimeImmutable('-30 days'));
+        $byAi = $this->transaction('Оплата аренды парковки за август', $this->rent, new \DateTimeImmutable('-40 days'));
+        $autoApplied = $this->transaction('Оплата аренды стоянки за июль', $this->rent, new \DateTimeImmutable('-50 days'));
+        $this->transaction('Банковская комиссия за обслуживание', $this->rent, new \DateTimeImmutable('-20 days'));
+        $this->transaction('Оплата аренды офиса в прошлом году', $this->rent, new \DateTimeImmutable('-400 days'));
+        $this->transaction('Оплата аренды офиса за октябрь');
+        $this->em->flush();
+        // Статью парковки поставил человек, приняв подсказку ИИ, стоянки — автоприменение ИИ: модель не должна
+        // учиться на своих ответах.
+        $this->suggested($byAi, $this->rent)->accept((string) $this->user->getId(), new \DateTimeImmutable());
+        $this->suggested($autoApplied, $this->rent)->autoApply(new \DateTimeImmutable());
+        $this->em->flush();
+
+        $this->request();
+
+        self::assertSame([[
+            'direction' => 'outflow',
+            'description' => 'Оплата аренды склада за сентябрь',
+            'counterparty' => null,
+            'category_id' => (string) $this->rent->getId(),
+        ]], $this->ai->requests[0]['payload']['examples']);
+    }
+
+    public function testSameCounterpartyAndDirectionWinOverWordMatches(): void
+    {
+        $north = CounterpartyBuilder::aCounterparty()->withId(Uuid::uuid4()->toString())->withCompany($this->company)->withName('ООО Север')->build();
+        $this->em->persist($north);
+        // Три примера без контрагента с общими словами и три поступления от того же контрагента — шум.
+        foreach ([2, 3, 4] as $n) {
+            $this->transaction(sprintf('Оплата по счёту %d', $n), $this->rent, new \DateTimeImmutable(sprintf('-%d days', 10 + $n)));
+            $income = CashTransactionBuilder::aCashTransaction()->withId(Uuid::uuid4()->toString())->forCompany($this->company)
+                ->withMoneyAccount($this->account)->withDirection(CashDirection::INFLOW)->withAmount('100.00')
+                ->withCashflowCategory($this->revenue)->build();
+            $income->setOccurredAt(new \DateTimeImmutable(sprintf('-%d days', $n)));
+            $income->setDescription(sprintf('Оплата по счёту %d от покупателя', $n));
+            $income->setCounterparty($north);
+            $this->em->persist($income);
+        }
+        $this->transaction('Поставка материалов', $this->rent, new \DateTimeImmutable('-60 days'))->setCounterparty($north);
+        $this->transaction('Оплата по счёту 1')->setCounterparty($north);
+        $this->em->flush();
+
+        $this->request();
+
+        $examples = $this->ai->requests[0]['payload']['examples'];
+        self::assertSame('Поставка материалов', $examples[0]['description']);
+        self::assertSame(['outflow'], array_values(array_unique(array_column($examples, 'direction'))));
+    }
+
+    public function testBatchWithoutSimilarDecisionsKeepsThePreviousPayloadShape(): void
+    {
+        $this->transaction('Банковская комиссия за обслуживание', $this->rent, new \DateTimeImmutable('-20 days'));
+        $this->transaction('Оплата аренды офиса за октябрь');
+        $this->em->flush();
+
+        $this->request();
+
+        self::assertArrayNotHasKey('examples', $this->ai->requests[0]['payload']);
+    }
+
+    public function testExampleWithCategoryOutsideTheBatchTreeIsDropped(): void
+    {
+        $mapper = new CashCategorizationPayloadMapper();
+        $categories = [new \App\Cash\Application\DTO\CashCategorizationCategory((string) $this->rent->getId(), 'Расходы / Аренда', 'OUTFLOW')];
+        $operation = new \App\Cash\Application\DTO\CashCategorizationOperation(Uuid::uuid4()->toString(), 'OUTFLOW', '10.00', 'RUB', new \DateTimeImmutable(), 'Аренда', null);
+
+        $payload = $mapper->payload($categories, [$operation], [
+            new CashCategorizationExample('OUTFLOW', 'Аренда склада', null, (string) $this->rent->getId()),
+            new CashCategorizationExample('OUTFLOW', 'Архивная статья', null, Uuid::uuid4()->toString()),
+        ]);
+
+        self::assertSame(['Аренда склада'], array_column($payload['examples'] ?? [], 'description'));
+    }
+
+    public function testNoAnswerOfPreviousPromptIsAskedAgainExactlyOnce(): void
+    {
+        $old = $this->transaction('Оплата по счёту 15 от 01.10.2026');
+        $current = $this->transaction('Оплата по счёту 16 от 02.10.2026');
+        $this->em->flush();
+        $this->noAnswer($old, 'categorize_transactions/v2');
+        $this->noAnswer($current, RequestCashAiCategorizationAction::PROMPT_VERSION);
+
+        $first = $this->request();
+
+        // «Нет ответа» на прошлом промпте — спросить ещё раз; на текущем — не платить повторно.
+        self::assertSame(1, $first->requested);
+        self::assertSame([(string) $old->getId()], array_column($this->ai->requests[0]['payload']['operations'], 'id'));
+
+        // Повтор тоже без ответа, уже на текущем промпте: больше операция не уходит.
+        $this->consume($this->aiResult($this->ai->requests[0]['taskId'], [[(string) $old->getId(), null, 0.0]]));
+        $this->clock->modify('+1 hour');
+        self::assertSame(0, $this->request()->requested);
+        self::assertCount(1, $this->ai->requests);
+    }
+
+    public function testOwnFundsTransfersAreNotSentWhileCompanyHasNoSuchDecisions(): void
+    {
+        $this->transaction('Перевод собственных средств в фонд Налоги с операций. Без НДС');
+        $this->transaction('Перевод собственных средств между счетами. НДС не облагается');
+        $deposit = $this->transaction('Возврат средств по депозитной сделке № 1 от 01.10.2026 / Внутреннее перемещение собственных средств');
+        $advance = $this->transaction('Перевод под отчет, по ведомости 12 от 01.10.2026');
+        $empty = $this->transaction('');
+        $empty->setDescription(null);
+        $this->em->flush();
+
+        $result = $this->request();
+
+        // Свою фразу компания в статьи не разносила: переводы не отправляются; депозит, подотчёт и пустое
+        // назначение — обычные операции.
+        self::assertSame(3, $result->requested);
+        $ids = array_column($this->ai->requests[0]['payload']['operations'], 'id');
+        sort($ids);
+        $expected = [(string) $deposit->getId(), (string) $advance->getId(), (string) $empty->getId()];
+        sort($expected);
+        self::assertSame($expected, $ids);
+        self::assertSame(2, $this->query()->stats((string) $this->company->getId(), null, new \DateTimeImmutable('-90 days'))->transferLikeSkipped);
+    }
+
+    public function testOwnFundsTransfersAreSentWhenCompanyCategorizesThem(): void
+    {
+        // Компания сама относит такие переводы к статье (у одного кабинета — погашение кредита): решает её история.
+        $this->transaction('Перевод собственных средств. НДС не облагается', $this->rent, new \DateTimeImmutable('-300 days'));
+        $transfer = $this->transaction('Перевод собственных средств. НДС не облагается');
+        $this->em->flush();
+
+        $result = $this->request();
+
+        self::assertSame(1, $result->requested);
+        self::assertSame([(string) $transfer->getId()], array_column($this->ai->requests[0]['payload']['operations'], 'id'));
+        self::assertSame(0, $this->query()->stats((string) $this->company->getId(), null, new \DateTimeImmutable('-90 days'))->transferLikeSkipped);
     }
 
     public function testExpiredUnansweredRequestsKeepNewBatchesPaused(): void
@@ -424,6 +560,14 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         return $tx;
     }
 
+    private function noAnswer(CashTransaction $tx, string $promptVersion): void
+    {
+        $suggestion = new CashCategorySuggestion((string) $this->company->getId(), (string) $tx->getId(), Uuid::uuid4()->toString(), new \DateTimeImmutable('-1 day'));
+        $suggestion->suggest(null, 0.0, 'needs_review', 'stub/categorize', $promptVersion, new \DateTimeImmutable('-1 day'));
+        $this->em->persist($suggestion);
+        $this->em->flush();
+    }
+
     private function suggested(CashTransaction $tx, CashflowCategory $category): CashCategorySuggestion
     {
         $suggestion = new CashCategorySuggestion((string) $this->company->getId(), (string) $tx->getId(), Uuid::uuid4()->toString(), new \DateTimeImmutable());
@@ -495,7 +639,7 @@ final class CashAiCategorizationTest extends IntegrationTestCase
             confidence: $rejected ? null : 0.9,
             traceId: Uuid::uuid7()->toString(),
             models: ['stub/categorize'],
-            promptVersion: 'categorize_transactions/v1',
+            promptVersion: RequestCashAiCategorizationAction::PROMPT_VERSION,
             inputTokens: 0,
             outputTokens: 0,
             errorCode: null,

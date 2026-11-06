@@ -356,3 +356,63 @@ def test_render_errors_keeps_only_top_confusions() -> None:
 
     assert table.count("| А | Б") == compare.TOP_ERRORS
     assert "ещё 5 пар" in table
+
+
+def test_similar_examples_prefer_same_counterparty_and_never_leak_the_case_itself() -> None:
+    def case(
+        case_id: str, description: str, counterparty: str | None, expected: str | None, direction: str = "outflow"
+    ) -> dict[str, Any]:
+        return {
+            "id": case_id,
+            "operation": _operation(case_id, description, counterparty, direction),
+            "expected_category_id": expected,
+        }
+
+    asked = case("q", "Оплата по счёту 7", "ООО Север", "rent")
+    pool = [
+        asked,
+        case("same-cp", "Оплата по счёту 3", "ООО Север", "rent"),
+        case("words", "Оплата по счёту 9", "ООО Юг", "other"),
+        case("unrelated", "Зарплата за октябрь", "ИП Иванов", "salary"),
+        case("trap", "Оплата по счёту 1", "ООО Север", None),
+        case("inflow", "Оплата по счёту 2", "ООО Север", "sales", direction="inflow"),
+    ]
+
+    examples = compare.similar_examples([asked], pool)
+
+    assert [e["category_id"] for e in examples] == ["rent", "other"]
+    assert all(e["description"] != "Оплата по счёту 7" for e in examples)
+
+
+def test_evaluate_with_examples_sends_them_in_the_payload() -> None:
+    categories = [{"id": "rent", "path": "Расходы / Аренда", "direction": "outflow"}]
+    cases = [
+        {
+            "id": f"c{n}",
+            "operation": _operation(f"c{n}", "Оплата аренды офиса", "ООО Север"),
+            "expected_category_id": "rent",
+        }
+        for n in range(60)
+    ]
+    seen: list[str] = []
+
+    class Spy(StubAdapter):
+        def complete(self, model: str, request: LlmRequest) -> LlmResponse:
+            seen.append(extract_data_block(request.user))
+            return super().complete(model, request)
+
+    routing = parse_routing(
+        {
+            "providers": {"stub": {"type": "stub"}},
+            "tasks": {"categorize_transactions": {"mode": "single", "models": ["stub/categorize"]}},
+        },
+        {},
+    )
+    pipeline = Pipeline(build_registry(), LlmGateway(routing, {"stub": Spy()}, retries_per_model=0))  # type: ignore[dict-item]
+
+    compare.evaluate(pipeline, EvalSet("s", categories, cases), with_examples=True)
+
+    assert len(seen) == 2
+    first = json.loads(seen[0])
+    assert 0 < len(first["examples"]) <= compare.EXAMPLES_PER_BATCH
+    assert all(e["category_id"] == "rent" for e in first["examples"])

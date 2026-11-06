@@ -14,6 +14,8 @@ from ai_service.tasks.categorize_transactions.checks import (
 from ai_service.tasks.categorize_transactions.schemas import CategorizeInput, CategorizeOutput
 
 TASK_TYPE = "categorize_transactions"
+# Версию знает и Symfony (повтор no_answer прошлой версии): tests/unit/test_symfony_prompt_version.py.
+PROMPT_VERSION = "v3"
 
 INSTRUCTION = (
     "Подбери статью ДДС для каждой операции из блока данных. "
@@ -30,13 +32,13 @@ def build() -> TaskSpec[CategorizeInput, CategorizeOutput]:
         task_type=TASK_TYPE,
         input_model=CategorizeInput,
         output_model=CategorizeOutput,
-        prompt=Prompt.load(TASK_TYPE, "v2", Path(__file__).parent / "prompts"),
+        prompt=Prompt.load(TASK_TYPE, PROMPT_VERSION, Path(__file__).parent / "prompts"),
         risk=Risk.LOW,
         build_user=build_user,
         checks=(completeness, category_in_tree, direction_matches),
         confidence=batch_confidence,
         confidence_threshold=0.8,
         # Идентификаторы и суммы — не ПДн, а маскирование цифр испортило бы их (12 цифр похожи на ИНН).
-        mask_skip_keys=frozenset({"id", "direction", "amount", "currency", "date"}),
+        mask_skip_keys=frozenset({"id", "category_id", "direction", "amount", "currency", "date"}),
         max_tokens=4096,
     )

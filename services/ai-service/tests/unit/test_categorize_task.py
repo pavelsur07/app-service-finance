@@ -2,6 +2,7 @@ import json
 from typing import Any
 
 import pytest
+from pydantic import ValidationError as PydanticValidationError
 
 from ai_service.core.pipeline import Pipeline
 from ai_service.core.task import TaskRegistry
@@ -9,6 +10,7 @@ from ai_service.llm.gateway import LlmGateway
 from ai_service.llm.routes import parse_routing
 from ai_service.llm.types import LlmRequest, LlmResponse
 from ai_service.tasks.categorize_transactions import task as categorize
+from ai_service.tasks.categorize_transactions.schemas import CategorizeInput
 from ai_service.verification.checks import Verdict
 from tests.contract import example
 
@@ -101,7 +103,7 @@ def test_model_sees_masked_purpose_but_intact_ids_and_amounts() -> None:
 
 def test_prompt_names_marketplace_legal_entities() -> None:
     prompt = categorize.build().prompt
-    assert prompt.version == "v2"
+    assert prompt.version == "v3"
     for name in ("Интернет Решения", "РВБ", "Вайлдберриз", "Яндекс Маркет", "Маркетплейс"):
         assert name in prompt.text
 
@@ -118,3 +120,27 @@ def test_marketplace_legal_entities_survive_masking() -> None:
     assert "ИНТЕРНЕТ РЕШЕНИЯ" in user
     assert "ИР-17719/19" in user
     assert "РВБ" in user
+
+
+def test_examples_reach_the_model_with_intact_category_ids() -> None:
+    payload = example("categorize_payload")
+    payload["examples"] = [
+        {
+            "direction": "outflow",
+            "description": "Оплата по счёту 15 от 01.09.2026",
+            "counterparty": "ООО Бизнес-Центр",
+            "category_id": RENT,
+        }
+    ]
+    _, adapter = run(items((OP1, RENT, 0.9), (OP2, None, 0.0)), payload)
+    user = adapter.requests[0].user
+    assert '"examples"' in user
+    assert user.count(RENT) >= 2  # справочник и пример: id статьи не маскируется
+    assert "examples" in categorize.build().prompt.text
+
+
+def test_example_with_category_outside_the_tree_is_an_input_error() -> None:
+    payload = example("categorize_payload")
+    payload["examples"] = [{"direction": "outflow", "description": "x", "counterparty": None, "category_id": "foreign"}]
+    with pytest.raises(PydanticValidationError, match="example category ids"):
+        CategorizeInput.model_validate(payload)
