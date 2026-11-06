@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Inventory\Controller;
 
+use App\Inventory\Enum\FulfillmentScheme;
 use App\Inventory\Infrastructure\Query\InventoryStockReportQuery;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Shared\Service\ActiveCompanyService;
@@ -31,18 +32,20 @@ final class StockReportController extends AbstractController
         $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
 
         $source = $this->parseSource($request->query->all()['source'] ?? null);
+        $scheme = $this->parseScheme($request->query->all()['scheme'] ?? null);
         $date = $this->parseDate($request->query->all()['date'] ?? null) ?? new \DateTimeImmutable('today');
 
-        $effectiveDate = $this->stockReportQuery->findEffectiveSnapshotDate($companyId, $source, $date);
+        $effectiveDate = $this->stockReportQuery->findEffectiveSnapshotDate($companyId, $source, $scheme, $date);
 
         $snapshotDate = $effectiveDate ?? $date;
-        $breakdownColumns = $this->stockReportQuery->getBreakdownColumns($companyId, $source, $snapshotDate);
+        $breakdownColumns = $this->stockReportQuery->getBreakdownColumns($companyId, $source, $scheme, $snapshotDate);
 
         $pager = $this->stockReportQuery->getPage(
             companyId: $companyId,
             page: max(1, $request->query->getInt('page', 1)),
             perPage: InventoryStockReportQuery::PER_PAGE,
             source: $source,
+            scheme: $scheme,
             snapshotDate: $snapshotDate,
             breakdownColumns: $breakdownColumns,
         );
@@ -52,6 +55,8 @@ final class StockReportController extends AbstractController
             'breakdownColumns' => $breakdownColumns,
             'source' => $source,
             'sources' => self::SOURCES,
+            'scheme' => $scheme,
+            'schemes' => FulfillmentScheme::cases(),
             'date' => $date,
             'effectiveDate' => $effectiveDate,
         ]);
@@ -62,6 +67,11 @@ final class StockReportController extends AbstractController
         $source = is_string($raw) ? MarketplaceType::tryFrom($raw) : null;
 
         return null !== $source && in_array($source, self::SOURCES, true) ? $source : MarketplaceType::OZON;
+    }
+
+    private function parseScheme(mixed $raw): FulfillmentScheme
+    {
+        return (is_string($raw) ? FulfillmentScheme::tryFrom($raw) : null) ?? FulfillmentScheme::Fbo;
     }
 
     private function parseDate(mixed $raw): ?\DateTimeImmutable

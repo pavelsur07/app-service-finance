@@ -14,6 +14,7 @@ use App\Inventory\Enum\SnapshotSessionStatus;
 use App\Inventory\Enum\StockSnapshotMappingStatus;
 use App\Inventory\Enum\StockStatus;
 use App\Inventory\Infrastructure\Normalizer\OzonProductStocksRawNormalizer;
+use App\Inventory\Infrastructure\Normalizer\WbSellerWarehouseStocksRawNormalizer;
 use App\Inventory\Infrastructure\Normalizer\WbWarehouseStocksRawNormalizer;
 use App\Inventory\Repository\InventoryRawSnapshotRepository;
 use App\Inventory\Repository\InventorySnapshotSessionRepository;
@@ -31,6 +32,7 @@ final readonly class NormalizeInventorySnapshotAction
         private InventoryRawSnapshotRepository $rawSnapshotRepository,
         private OzonProductStocksRawNormalizer $ozonRawNormalizer,
         private WbWarehouseStocksRawNormalizer $wbRawNormalizer,
+        private WbSellerWarehouseStocksRawNormalizer $wbSellerRawNormalizer,
         private MarketplaceFacade $marketplaceFacade,
         private LocationRepository $locationRepository,
         private StockSnapshotRepository $stockSnapshotRepository,
@@ -153,7 +155,7 @@ final readonly class NormalizeInventorySnapshotAction
      */
     private function normalizeWildberries(string $companyId, string $snapshotSessionId, InventorySnapshotSession $session, array $rawSnapshots): void
     {
-        $rows = $this->wbRawNormalizer->normalize($rawSnapshots);
+        $rows = [...$this->wbRawNormalizer->normalize($rawSnapshots), ...$this->wbSellerRawNormalizer->normalize($rawSnapshots)];
         if ([] === $rows) {
             foreach ($rawSnapshots as $rawSnapshot) {
                 $rawSnapshot->markAsProcessed();
@@ -163,9 +165,15 @@ final readonly class NormalizeInventorySnapshotAction
             return;
         }
 
+        // FBW-строки маппятся по chrtId, FBS-строки (склад продавца) — по баркоду.
+        $sellerRows = array_filter($rows, static fn (NormalizedStockRow $row): bool => self::isSellerRow($row));
+        $listingsByBarcode = [] !== $sellerRows
+            ? $this->marketplaceFacade->getListingBarcodes($companyId, MarketplaceType::WILDBERRIES->value)
+            : [];
+
         $marketplaceVariantIds = array_values(array_unique(array_map(
             static fn (NormalizedStockRow $row): string => $row->sourceSku,
-            $rows,
+            array_filter($rows, static fn (NormalizedStockRow $row): bool => !self::isSellerRow($row)),
         )));
         $listingsByVariantId = [];
         foreach (array_chunk($marketplaceVariantIds, 5000) as $marketplaceVariantIdChunk) {
@@ -188,6 +196,16 @@ final readonly class NormalizeInventorySnapshotAction
                 : ['status' => StockSnapshotMappingStatus::Mapped, 'listingId' => $listing['id']];
             if (null !== $listing) {
                 $mappedListingIds[] = $listing['id'];
+            }
+        }
+        $mappingByBarcode = [];
+        foreach ($sellerRows as $row) {
+            $listing = $listingsByBarcode[$row->sourceSku] ?? null;
+            $mappingByBarcode[$row->sourceSku] = null === $listing
+                ? ['status' => StockSnapshotMappingStatus::Unmapped, 'listingId' => null, 'sourceOfferId' => null]
+                : ['status' => StockSnapshotMappingStatus::Mapped, 'listingId' => $listing['listingId'], 'sourceOfferId' => $listing['marketplaceSku']];
+            if (null !== $listing) {
+                $mappedListingIds[] = $listing['listingId'];
             }
         }
 
@@ -221,7 +239,8 @@ final readonly class NormalizeInventorySnapshotAction
                     ->setIsActive(true);
             }
 
-            $mapping = $mappingByVariantId[$row->sourceSku] ?? ['status' => StockSnapshotMappingStatus::Unmapped, 'listingId' => null];
+            // Обе карты построены по всем строкам своего вида выше, ключ есть всегда.
+            $mapping = self::isSellerRow($row) ? $mappingByBarcode[$row->sourceSku] : $mappingByVariantId[$row->sourceSku];
             $listingId = $mapping['listingId'];
             $productId = null !== $listingId ? ($productsByListing[$listingId] ?? null) : null;
 
@@ -239,7 +258,7 @@ final readonly class NormalizeInventorySnapshotAction
                 listingId: $listingId,
                 productId: $productId,
                 sourceSku: $row->sourceSku,
-                sourceOfferId: $row->sourceOfferId,
+                sourceOfferId: $row->sourceOfferId ?? $mapping['sourceOfferId'] ?? null,
                 fulfillmentType: $row->fulfillmentType,
                 mappingStatus: $mapping['status'],
             ));
@@ -256,7 +275,7 @@ final readonly class NormalizeInventorySnapshotAction
         $externalId = (string) $row->locationExternalId;
         $location = new Location(
             companyId: $companyId,
-            type: LocationType::MpWarehouse,
+            type: self::isSellerRow($row) ? LocationType::SellerWarehouse : LocationType::MpWarehouse,
             externalSystem: MarketplaceType::WILDBERRIES,
             code: (string) $row->locationCode,
             name: (string) $row->locationName,
@@ -266,6 +285,11 @@ final readonly class NormalizeInventorySnapshotAction
         $this->entityManager->persist($location);
 
         return $location;
+    }
+
+    private static function isSellerRow(NormalizedStockRow $row): bool
+    {
+        return 'fbs' === $row->fulfillmentType;
     }
 
     /**

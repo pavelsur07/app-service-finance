@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Inventory\Infrastructure\Query;
 
+use App\Inventory\Enum\FulfillmentScheme;
 use App\Inventory\Enum\StockStatus;
 use App\Marketplace\Enum\MarketplaceType;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\DBAL\Types\Types;
@@ -29,19 +31,19 @@ final class InventoryStockReportQuery
     }
 
     /**
-     * Остатки «на дату»: ближайший день со снимком не позже запрошенной даты.
-     * null — снимков по источнику на эту дату и раньше нет.
+     * Остатки «на дату»: ближайший день не позже запрошенной даты, в котором есть строки
+     * выбранной схемы. null — таких строк по источнику на эту дату и раньше нет.
      */
-    public function findEffectiveSnapshotDate(string $companyId, MarketplaceType $source, \DateTimeImmutable $date): ?\DateTimeImmutable
+    public function findEffectiveSnapshotDate(string $companyId, MarketplaceType $source, FulfillmentScheme $scheme, \DateTimeImmutable $date): ?\DateTimeImmutable
     {
         Assert::uuid($companyId);
 
         // ORDER BY + LIMIT 1, а не MAX(): планировщик идёт обратным сканом по
         // idx_inventory_stock_company_source_date и останавливается на первой подходящей строке.
-        $value = $this->connection->createQueryBuilder()
+        $value = $this->applySchemeFilter($this->connection->createQueryBuilder(), $scheme)
             ->select('s.snapshot_date')
             ->from('inventory_stock_snapshots', 's')
-            ->where('s.company_id = :companyId')
+            ->andWhere('s.company_id = :companyId')
             ->andWhere('s.source = :source')
             ->andWhere('s.snapshot_date <= :date')
             ->setParameter('companyId', $companyId)
@@ -62,16 +64,21 @@ final class InventoryStockReportQuery
     /**
      * Колонки разбивки «Доступно расчётно» по типам склада: алиас колонки строки => значение и заголовок.
      *
-     * Набор зависит от данных: показываются только типы, реально встретившиеся в снимке.
+     * Набор зависит от данных: показываются только типы, реально встретившиеся в снимке
+     * внутри схемы. Один тип — разбивки нет: колонка дублировала бы «Доступно расчётно».
      *
      * @return array<string, BreakdownColumn>
      */
-    public function getBreakdownColumns(string $companyId, MarketplaceType $source, \DateTimeImmutable $snapshotDate): array
+    public function getBreakdownColumns(string $companyId, MarketplaceType $source, FulfillmentScheme $scheme, \DateTimeImmutable $snapshotDate): array
     {
-        $values = $this->baseQueryBuilder($companyId, $source, $snapshotDate)
+        $values = $this->baseQueryBuilder($companyId, $source, $scheme, $snapshotDate)
             ->select(sprintf('DISTINCT %s AS breakdown_value', $this->breakdownExpression($source)))
             ->executeQuery()
             ->fetchFirstColumn();
+
+        if (count($values) <= 1) {
+            return [];
+        }
 
         /** @var list<string> $values */
         $values = array_map(static fn (mixed $value): string => (string) $value, $values);
@@ -96,10 +103,11 @@ final class InventoryStockReportQuery
         int $page,
         int $perPage,
         MarketplaceType $source,
+        FulfillmentScheme $scheme,
         \DateTimeImmutable $snapshotDate,
         array $breakdownColumns = [],
     ): Pagerfanta {
-        $qb = $this->baseQueryBuilder($companyId, $source, $snapshotDate)
+        $qb = $this->baseQueryBuilder($companyId, $source, $scheme, $snapshotDate)
             ->select(
                 's.source_sku',
                 'MAX(s.snapshot_at) AS snapshot_at',
@@ -146,18 +154,35 @@ final class InventoryStockReportQuery
     private function baseQueryBuilder(
         string $companyId,
         MarketplaceType $source,
+        FulfillmentScheme $scheme,
         \DateTimeImmutable $snapshotDate,
     ): QueryBuilder {
         Assert::uuid($companyId);
 
-        return $this->connection->createQueryBuilder()
+        return $this->applySchemeFilter($this->connection->createQueryBuilder(), $scheme)
             ->from('inventory_stock_snapshots', 's')
-            ->where('s.company_id = :companyId')
+            ->andWhere('s.company_id = :companyId')
             ->andWhere('s.source = :source')
             ->andWhere('s.snapshot_date = :snapshotDate')
             ->setParameter('companyId', $companyId)
             ->setParameter('source', $source->value)
             ->setParameter('snapshotDate', $snapshotDate, Types::DATE_IMMUTABLE);
+    }
+
+    /**
+     * Схема вычисляется из fulfillment_type: типы склада продавца (FulfillmentScheme::FBS_TYPES) — FBS,
+     * всё остальное, включая строки без типа, — FBO. Каждая строка попадает ровно в одну схему.
+     */
+    private function applySchemeFilter(QueryBuilder $qb, FulfillmentScheme $scheme): QueryBuilder
+    {
+        return $qb
+            ->where(sprintf(
+                "(CASE WHEN LOWER(TRIM(COALESCE(s.fulfillment_type, ''))) IN (:fbsTypes) THEN '%s' ELSE '%s' END) = :scheme",
+                FulfillmentScheme::Fbs->value,
+                FulfillmentScheme::Fbo->value,
+            ))
+            ->setParameter('fbsTypes', FulfillmentScheme::FBS_TYPES, ArrayParameterType::STRING)
+            ->setParameter('scheme', $scheme->value);
     }
 
     /**

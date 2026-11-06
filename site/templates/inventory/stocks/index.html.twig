@@ -17,6 +17,16 @@
                     </select>
                 </div>
                 <div class="col-md-3">
+                    <label class="form-label">Схема</label>
+                    <div class="btn-group w-100" role="group" aria-label="Схема">
+                        {% for item in schemes %}
+                            <input type="radio" class="btn-check" name="scheme" id="scheme-{{ item.value }}" value="{{ item.value }}" {{ scheme.value == item.value ? 'checked' : '' }}>
+                            <label class="btn" for="scheme-{{ item.value }}">{{ item.label() }}</label>
+                        {% endfor %}
+                    </div>
+                    <div class="form-hint">FBO — склад маркетплейса, FBS — склад продавца</div>
+                </div>
+                <div class="col-md-3">
                     <label class="form-label">Остатки на дату</label>
                     <input type="date" name="date" value="{{ date|date('Y-m-d') }}" class="form-control">
                 </div>
