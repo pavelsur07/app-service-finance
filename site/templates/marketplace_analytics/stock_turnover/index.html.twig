@@ -1,0 +1,182 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Оборачиваемость — Аналитика маркетплейсов{% endblock %}
+
+{% block content %}
+    {% set bucket_classes = {fast: 'bg-green-lt', medium: 'bg-azure-lt', slow: 'bg-yellow-lt', frozen: 'bg-red-lt', no_sales: 'bg-secondary-lt'} %}
+    {% include 'marketplace_analytics/_tabs.html.twig' with { activeTab: 'stock_turnover' } %}
+
+    <div class="page-body">
+        <div class="container-xl">
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <form method="GET" action="{{ path('marketplace_analytics_stock_turnover_index') }}" class="row g-2 align-items-end">
+                        <div class="col-auto">
+                            <label class="form-label">Период продаж</label>
+                            <div class="btn-group" role="group" aria-label="Период продаж">
+                                {% for days in periods %}
+                                    <input type="radio" class="btn-check" name="period" id="period-{{ days }}" value="{{ days }}" {{ filter.periodDays == days ? 'checked' : '' }}>
+                                    <label class="btn" for="period-{{ days }}">{{ days }} дней</label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label" for="source">Источник</label>
+                            <select name="source" id="source" class="form-select">
+                                <option value="">Все</option>
+                                {% for item in sources %}
+                                    <option value="{{ item.value }}" {{ filter.source == item.value ? 'selected' : '' }}>{{ item.getDisplayName() }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label">Схема</label>
+                            <div class="btn-group" role="group" aria-label="Схема">
+                                <input type="radio" class="btn-check" name="scheme" id="scheme-all" value="" {{ filter.scheme is null ? 'checked' : '' }}>
+                                <label class="btn" for="scheme-all">Все</label>
+                                {% for item in schemes %}
+                                    <input type="radio" class="btn-check" name="scheme" id="scheme-{{ item.value }}" value="{{ item.value }}" {{ filter.scheme == item ? 'checked' : '' }}>
+                                    <label class="btn" for="scheme-{{ item.value }}">{{ item.label() }}</label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label" for="date">Остатки на дату</label>
+                            <input type="date" name="date" id="date" value="{{ filter.date|date('Y-m-d') }}" class="form-control">
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label" for="bucket">Корзина</label>
+                            <select name="bucket" id="bucket" class="form-select">
+                                <option value="">Все</option>
+                                {% for item in buckets %}
+                                    <option value="{{ item.value }}" {{ filter.bucket == item ? 'selected' : '' }}>{{ item.label() }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% if tags|length > 0 %}
+                            <div class="col-auto">
+                                <label class="form-label" for="tags">Теги</label>
+                                <select name="tags[]" id="tags" class="form-select" multiple size="1">
+                                    {% for tag in tags %}
+                                        <option value="{{ tag.id }}" {{ tag.id in filter.tagIds ? 'selected' : '' }}>{{ tag.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        {% endif %}
+                        <div class="col-auto d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Применить</button>
+                            <a href="{{ path('marketplace_analytics_stock_turnover_index') }}" class="btn btn-outline-secondary">Сбросить</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {# Сводка по всему фильтру без учёта корзины: сравнивать «заморожено» нужно с целым. #}
+            <div class="card mb-3">
+                <div class="card-body vf-turnover-summary">
+                    <div class="row g-3">
+                        <div class="col-6 col-md-3">
+                            <div class="text-secondary small">В товаре</div>
+                            <div class="vf-num vf-strong fs-3">{{ summary.totalValue|vf_money(2, 'RUB') }}</div>
+                            <div class="text-secondary small">листингов с остатком: <span class="vf-num">{{ summary.listingsTotal|vf_number }}</span></div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="text-secondary small">Заморожено</div>
+                            <div class="vf-num vf-strong fs-3">{{ summary.frozenValue|vf_money(2, 'RUB') }}</div>
+                            <div class="text-secondary small">
+                                {% if summary.frozenShare is not null %}<span class="vf-num">{{ summary.frozenShare|round }}&nbsp;%</span> от суммы в товаре{% else %}свыше 90 дней и без продаж{% endif %}
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="text-secondary small">По корзинам</div>
+                            <div class="d-flex flex-wrap gap-3">
+                                {% for bucket in buckets %}
+                                    <div>
+                                        <span class="badge {{ bucket_classes[bucket.value] }}">{{ bucket.label() }}</span>
+                                        <span class="vf-num">{{ summary.valueByBucket[bucket.value]|vf_money(2, 'RUB') }}</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% if summary.listingsWithoutCostPrice > 0 %}
+                                <div class="text-secondary small mt-2">
+                                    В деньгах не учтены листинги без себестоимости: <span class="vf-num">{{ summary.listingsWithoutCostPrice|vf_number }}</span>,
+                                    <span class="vf-num">{{ summary.qtyWithoutCostPrice|vf_number }}</span>&nbsp;шт.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer text-secondary vf-turnover-stock-meta">
+                    {% set marketplaceEnum = enum('App\\Marketplace\\Enum\\MarketplaceType') %}
+                    {% if summary.snapshotDateBySource|length > 0 %}
+                        Остатки:
+                        {% for source, snapshotDate in summary.snapshotDateBySource %}
+                            {{ marketplaceEnum.tryFrom(source) ? marketplaceEnum.tryFrom(source).getDisplayName() : source }} на <span class="vf-num">{{ snapshotDate|date('d.m.Y') }}</span>{{ loop.last ? '' : ',' }}
+                        {% endfor %}
+                        · продажи за <span class="vf-num">{{ filter.periodDays }}</span> дней до {{ filter.date|date('d.m.Y') }}.
+                    {% else %}
+                        Остатков на {{ filter.date|date('d.m.Y') }} нет.
+                    {% endif %}
+                    {% for source, lastDate in summary.staleSources %}
+                        <span class="text-warning d-block">
+                            <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+                            остатки {{ marketplaceEnum.tryFrom(source) ? marketplaceEnum.tryFrom(source).getDisplayName() : source }} устарели: последний снимок <span class="vf-num">{{ lastDate|date('d.m.Y') }}</span>, в отчёт не вошли.
+                        </span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table vf-table">
+                        <caption class="visually-hidden">Оборачиваемость остатков на {{ filter.date|date('d.m.Y') }}, продажи за {{ filter.periodDays }} дней</caption>
+                        <thead>
+                        <tr>
+                            <th scope="col">Товар</th>
+                            <th scope="col">Источник</th>
+                            <th scope="col" class="text-end text-nowrap">Остаток</th>
+                            <th scope="col" class="text-end text-nowrap">Продано</th>
+                            <th scope="col" class="text-end text-nowrap d-none d-md-table-cell">В день</th>
+                            <th scope="col" class="text-end text-nowrap">Дней запаса</th>
+                            <th scope="col" class="text-end text-nowrap d-none d-md-table-cell">Себестоимость, ₽</th>
+                            <th scope="col" class="text-end text-nowrap">В деньгах, ₽</th>
+                            <th scope="col">Корзина</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for row in pager.currentPageResults %}
+                            <tr>
+                                <td>
+                                    <div>{{ row.title ?: row.sku }}</div>
+                                    <div class="text-secondary small font-monospace">{{ row.sku }}{% if row.supplierSku %} · {{ row.supplierSku }}{% endif %}</div>
+                                </td>
+                                <td><span class="badge bg-azure-lt">{{ marketplaceEnum.tryFrom(row.marketplace) ? marketplaceEnum.tryFrom(row.marketplace).getDisplayName() : row.marketplace }}</span></td>
+                                <td class="text-end vf-num">{{ row.stockQty|vf_number }}</td>
+                                <td class="text-end vf-num">{{ row.salesQty|vf_number }}</td>
+                                <td class="text-end vf-num text-secondary d-none d-md-table-cell">{{ row.salesPerDay|vf_number(2) }}</td>
+                                <td class="text-end vf-num">{{ row.daysOfCover is null ? '—' : row.daysOfCover|vf_number }}</td>
+                                <td class="text-end vf-num text-secondary d-none d-md-table-cell">{{ row.costPrice is null ? '—' : row.costPrice|vf_money }}</td>
+                                <td class="text-end vf-num vf-strong">{{ row.stockValue is null ? '—' : row.stockValue|vf_money }}</td>
+                                <td><span class="badge {{ bucket_classes[row.bucket.value] }}">{{ row.bucket.label() }}</span></td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center text-secondary py-4">
+                                    Остатков на эту дату нет. Проверьте дату или загрузки остатков.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if pager.nbResults > 0 %}
+                    <div class="card-footer d-flex align-items-center">
+                        {{ include('partials/_pagination.html.twig', {pager: pager}) }}
+                    </div>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+{% endblock %}

@@ -4148,6 +4148,13 @@ enum TurnoverBucket: string
 `listingsTotal`, `snapshotDateBySource`, `staleSources`. Листинг с продажами без остатка в отчёт
 не попадает. Листинг без меты (удалён) остаётся со `sku = '—'`.
 
+Страница: `StockTurnoverIndexController` (`GET /marketplace-analytics/stock-turnover`,
+`marketplace_analytics_stock_turnover_index`, `ROLE_COMPANY_USER`), вкладка «Оборачиваемость»
+в `_tabs.html.twig`. Параметры разбирает `Application/StockTurnoverFilterParser::parse(Request, companyId)`
+(общий для страницы и экспорта): невалидное значение → умолчание (`period` 30, `source`/`scheme`/`bucket`
+все, `date` сегодня — будущее тоже, `tags[]` только валидные UUID). Отчёт строится в памяти, страница —
+Pagerfanta `ArrayAdapter` по 50 строк; сводка и баннер «Остатки: … на дату / устарели» — по всем строкам.
+
 ### `src/Marketplace/Enum/PipelineStatus.php`
 ```php
 enum PipelineStatus: string
