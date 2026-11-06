@@ -54,6 +54,12 @@
             <!-- Деньги -->
             {% endif %}
 
+            {% if is_granted('module.finance.read') %}
+            <li class="nav-item {{ current_route starts with 'settlement_' ? 'active' : '' }}">
+                <a class="nav-link" href="{{ path('settlement_index') }}"><span class="nav-link-icon"><i class="ti ti-arrows-exchange" aria-hidden="true"></i></span><span class="nav-link-title">Взаиморасчёты</span></a>
+            </li>
+            {% endif %}
+
             <!-- ОПиУ -->
             {# Все страницы раздела: список, «Удалённые», документ. #}
             {% set documents_active = current_route starts with 'document_' %}

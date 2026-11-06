@@ -1,0 +1,10 @@
+{% extends 'settlement/layout.html.twig' %}
+{% form_theme form 'settlement/_form_theme.html.twig' %}
+{% block settlement_content %}
+<div class="wz-head"><h1 class="wz-title">{{ title }}</h1></div>
+<section class="card"><p>{{ description }}</p>
+    {% if relatedDocument is defined %}<p><a href="{{ path('settlement_document',{id:relatedDocument.id}) }}">Исходный документ{% if relatedDocument.eventSequence %} №{{ relatedDocument.eventSequence }}{% endif %}</a></p>{% endif %}
+    {{ form_start(form) }}{{ form_errors(form) }}{{ form_widget(form) }}
+    <div class="wz-row-actions"><button class="btn btn-md btn-primary" type="submit">{{ submitLabel }}</button><a class="btn btn-md btn-secondary" href="{{ path('settlement_documents') }}">К документам</a></div>{{ form_end(form) }}
+</section>
+{% endblock %}

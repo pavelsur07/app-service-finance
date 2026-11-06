@@ -2,5 +2,6 @@
 {% block title %}Редактировать контрагента{% endblock %}
 
 {% block body %}
+    {% if is_granted('module.finance.read') %}<p><a href="{{ path('settlement_card',{id:item.id}) }}">Взаиморасчёты контрагента</a></p>{% endif %}
     {% include 'counterparty/_form.html.twig' with {form: form, title: 'Редактировать контрагента', current: item.name, item: item} only %}
 {% endblock %}

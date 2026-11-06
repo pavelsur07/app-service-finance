@@ -1,0 +1,164 @@
+[
+  {
+    "page": "index",
+    "width": 1440,
+    "viewport": 1440,
+    "body": 1440,
+    "main": 1176,
+    "mainScroll": 1176,
+    "regions": [
+      {
+        "client": 1110,
+        "scroll": 1110
+      }
+    ],
+    "labelledInputs": true
+  },
+  {
+    "page": "card",
+    "width": 1440,
+    "viewport": 1440,
+    "body": 1440,
+    "main": 1176,
+    "mainScroll": 1176,
+    "regions": [
+      {
+        "client": 1110,
+        "scroll": 1110
+      },
+      {
+        "client": 1110,
+        "scroll": 1110
+      }
+    ],
+    "labelledInputs": true
+  },
+  {
+    "page": "documents",
+    "width": 1440,
+    "viewport": 1440,
+    "body": 1440,
+    "main": 1176,
+    "mainScroll": 1176,
+    "regions": [
+      {
+        "client": 1110,
+        "scroll": 1110
+      }
+    ],
+    "labelledInputs": true
+  },
+  {
+    "page": "document",
+    "width": 1440,
+    "viewport": 1440,
+    "body": 1440,
+    "main": 1176,
+    "mainScroll": 1176,
+    "regions": [
+      {
+        "client": 1110,
+        "scroll": 1110
+      }
+    ],
+    "labelledInputs": true
+  },
+  {
+    "page": "form",
+    "width": 1440,
+    "viewport": 1440,
+    "body": 1440,
+    "main": 1176,
+    "mainScroll": 1176,
+    "regions": [],
+    "labelledInputs": true
+  },
+  {
+    "keyboardWidth": 1440,
+    "focus": {
+      "tag": "A",
+      "outline": "solid"
+    }
+  },
+  {
+    "page": "index",
+    "width": 390,
+    "viewport": 390,
+    "body": 390,
+    "main": 390,
+    "mainScroll": 390,
+    "regions": [
+      {
+        "client": 356,
+        "scroll": 832
+      }
+    ],
+    "labelledInputs": true
+  },
+  {
+    "page": "card",
+    "width": 390,
+    "viewport": 390,
+    "body": 390,
+    "main": 390,
+    "mainScroll": 390,
+    "regions": [
+      {
+        "client": 356,
+        "scroll": 555
+      },
+      {
+        "client": 356,
+        "scroll": 641
+      }
+    ],
+    "labelledInputs": true
+  },
+  {
+    "page": "documents",
+    "width": 390,
+    "viewport": 390,
+    "body": 390,
+    "main": 390,
+    "mainScroll": 390,
+    "regions": [
+      {
+        "client": 356,
+        "scroll": 638
+      }
+    ],
+    "labelledInputs": true
+  },
+  {
+    "page": "document",
+    "width": 390,
+    "viewport": 390,
+    "body": 390,
+    "main": 390,
+    "mainScroll": 390,
+    "regions": [
+      {
+        "client": 356,
+        "scroll": 356
+      }
+    ],
+    "labelledInputs": true
+  },
+  {
+    "page": "form",
+    "width": 390,
+    "viewport": 390,
+    "body": 390,
+    "main": 390,
+    "mainScroll": 390,
+    "regions": [],
+    "labelledInputs": true
+  },
+  {
+    "keyboardWidth": 390,
+    "focus": {
+      "tag": "A",
+      "outline": "solid"
+    }
+  }
+]

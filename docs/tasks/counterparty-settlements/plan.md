@@ -88,7 +88,7 @@ PHP/DB/frontend baseline не запускался: текущая задача 
 | 1 | Документы, позиции, регистр, начальные остатки, корректировки | HIGH-LOCAL | D1–D7, baseline |
 | 2 | Проверяемые связи с ДДС/ОПиУ и защита исходных документов | HIGH-LOCAL | Stage 1 |
 | 3 | Частичные погашения, авансы, исторические отчёты и сверка | HIGH-LOCAL | Stage 1–2 |
-| 4 | Пользовательский интерфейс и сценарии доступа | MEDIUM | Stage 1–3 |
+| 4 | Пользовательский интерфейс и сценарии доступа | HIGH-LOCAL | Stage 1–3 |
 | 5 | Сквозная приёмка, review, миграционный handoff | HIGH-LOCAL | Stage 1–4 |
 
 Один implementation Draft PR на все Stage. После Stage: модульные проверки,
@@ -477,7 +477,7 @@ Commit: `feat: add settlement allocation and reconciled reports`.
 
 ## Stage 4 — интерфейс
 
-Risk: MEDIUM. Definition of Done: пользователь проходит A1/A2/A5 без SQL и
+Risk: HIGH-LOCAL (финансовые HTTP-мутации и access-map). Definition of Done: пользователь проходит A1/A2/A5 без SQL и
 видит объяснение каждой суммы. Backend-контракты не проектируются заново на фронте.
 
 ### Work item 4.1 — формы и отчёты
@@ -507,15 +507,15 @@ GET/POST `/settlements/sources/cash/{id}`, `/settlements/sources/finance/{id}`.
 Контроллеры вызывают Actions Stage 1–3; сумма/дата не вычисляются в JS.
 Каждый контроллер — один `__invoke`; GET/POST одного form scenario остаются одним action.
 
-- [ ] Написать red functional test: создать основание 100000, включить оплату 40000,
+- [x] Написать red functional test: создать основание 100000, включить оплату 40000,
   распределить → показать «К оплате 60 000,00» с переходами на оба источника.
   Аванс до основания виден отдельной суммой. Новая компания видит понятный setup.
-- [ ] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Functional/Settlement/SettlementJourneyTest.php`.
-- [ ] Реализовать Twig/Symfony Forms по существующей DS; CounterpartyPickerType,
+- [x] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Functional/Settlement/SettlementJourneyTest.php`.
+- [x] Реализовать Twig/Symfony Forms по существующей DS; CounterpartyPickerType,
   денежные Twig-фильтры, server-side pagination. Формы содержат requestId/version,
   CSRF; повтор submit безопасен. Ссылки из Cash/Finance ведут в Settlement,
   а не добавляют обратную зависимость на его сервисы.
-- [ ] Пройти тест до PASS; ручной smoke desktop/mobile, пустые состояния, ошибки,
+- [x] Пройти тест до PASS; ручной smoke desktop/mobile, пустые состояния, ошибки,
   запрет повторной отправки, понятный конфликт старой версии, keyboard/focus.
 
 ### Work item 4.2 — права и защитные состояния
@@ -526,28 +526,28 @@ GET/POST `/settlements/sources/cash/{id}`, `/settlements/sources/finance/{id}`.
 
 **Interfaces:** только существующие FINANCE_READ/FINANCE_WRITE, без новых grants.
 
-- [ ] Red tests: read-only видит отчёт, POST получает 403; чужой company ID не
+- [x] Red tests: read-only видит отчёт, POST получает 403; чужой company ID не
   раскрывает документ; подмена sourceId/positionId отклонена; без CSRF запись
   не производится; повтор после смены активной компании не меняет прежнюю компанию.
-- [ ] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Functional/Settlement/SettlementAccessTest.php`.
-- [ ] Подключить namespace Settlement к FINANCE; в каждом контроллере получать
+- [x] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Functional/Settlement/SettlementAccessTest.php`.
+- [x] Подключить namespace Settlement к FINANCE; в каждом контроллере получать
   active company до чтения; проверять права мутаций также в Actions.
   Ошибки показывать в принятом проектом формате, без stack trace и raw payload.
-- [ ] В SettlementValidationTest проверить: ввод `0.01` сохраняет 1 minor unit;
+- [x] В SettlementValidationTest проверить: ввод `0.01` сохраняет 1 minor unit;
   ввод `0.001 RUB` отвергнут без записи, а не округлён; сумма вне диапазона отвергнута.
   В SettlementJourneyTest проверить точное отображение `0.30 RUB` и передачу сумм
   формами/ответами строками с валютой; сериализация не преобразует Money в float.
-- [ ] Проверить access/validation tests до PASS; frontend checklist из
+- [x] Проверить access/validation tests до PASS; frontend checklist из
   stage-report-frontend.md. Для созданных шаблонов выполнить `php bin/console lint:twig templates/settlement`
   через контейнер. При изменении assets запустить существующие npm lint/build/test:unit
   в `site-frontend`; api:types:check только при изменении OpenAPI.
 
 **Приёмка Stage 4:**
-- [ ] Видны четыре вида долга/аванса и отдельные нераспределённые оплаты.
-- [ ] Есть фильтр периода, контрагента, карточка движений, исходные документы.
-- [ ] Пользователь различает «не участвует», «не распределено», «аванс», «погашено».
-- [ ] Формы и отчёты доступны с клавиатуры и на узком экране.
-- [ ] Нельзя провести без права, компании, корректной суммы, даты и CSRF.
+- [x] Видны четыре вида долга/аванса и отдельные нераспределённые оплаты.
+- [x] Есть фильтр периода, контрагента, карточка движений, исходные документы.
+- [x] Пользователь различает «не участвует», «не распределено», «аванс», «погашено».
+- [x] Формы и отчёты доступны с клавиатуры и на узком экране.
+- [x] Нельзя провести без права, компании, корректной суммы, даты и CSRF.
 
 Stage checks: functional Settlement + Twig lint + применимые frontend gates.
 Commit: `feat: expose counterparty settlements and payment allocation`.

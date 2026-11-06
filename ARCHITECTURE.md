@@ -5506,3 +5506,24 @@ optional prelockedCashIds не допускает позднее получен�
 документы, позиции и распределения не переписываются; восстанавливаются только
 движения и source links с активным документом и датой последней отмены.
 Производственный execute требует отдельного именованного одобрения владельца.
+
+### Settlement HTTP/UI
+
+HTML раздел `/settlements`: сводка, карточка `/counterparties/{id}`, отдельные
+`/documents` и `/documents/{id}`. FINANCE_READ/WRITE через ModuleAccessMap и
+IsGranted; company из ActiveCompanyService до данных; mutation Actions повторяют
+fresh authorization под блокировками. Setup CSRF intention включает companyId.
+Формы имеют requestId, проведение version/CSRF, суммы — SettlementAmountType
+(RUB, явная проверка2знаков до Money parser). Пустые обязательные значения
+отклоняются server constraints, false допустим для bool choices.
+
+PreviewSettlementSourceAction открывает короткую транзакцию для существующих
+locked Cash/Finance Facades; не проводит ничего. Реальные mutations отдельными
+Actions снова проверяют источники. GET+POST страниц отмены/классификации только
+собирают explicit date/reason; ledger изменяется лишь Actions.
+
+SettlementUiQuery возвращает scoped own entities/readonly position DTO и QB
+документов под Pagerfanta; labels/reversals batch. Карточка ограничена страницей
+движений, формы имеют подписанный preview50позиций и полный scoped choice set.
+Doc detail показывает текущий свободный остаток и связь обеих сторон погашения.
+Все money HTML значения — точные строки через vf_money/vf_amount.

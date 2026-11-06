@@ -13,6 +13,8 @@
 {% endblock %}
 
 {% block content %}
+{% if is_granted('module.finance.read') and tx.counterparty %}<p><a href="{{ path('settlement_card',{id:tx.counterparty.id}) }}">Взаиморасчёты контрагента</a></p>{% endif %}
+{% if is_granted('module.finance.write') and not transfer %}<p><a class="btn btn-outline-primary" href="{{ path('settlement_source_cash',{id:tx.id}) }}">Учесть оплату во взаиморасчётах</a></p>{% endif %}
 {% if transfer %}
     <div class="alert alert-info" role="alert">
         Это операция перевода. Изменение и удаление выполняются только для всего перевода.
