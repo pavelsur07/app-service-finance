@@ -112,7 +112,7 @@ final class AccountLockTest extends ClientBank1CImportServiceTestCase
 
     private function action(): ImportBank1CStatementAction
     {
-        return new ImportBank1CStatementAction($this->service, self::getContainer()->get(ImportLogger::class), self::getContainer()->get(CashImportLogLease::class), $this->em);
+        return new ImportBank1CStatementAction($this->service, self::getContainer()->get(ImportLogger::class), self::getContainer()->get(CashImportLogLease::class), $this->em, self::getContainer()->get(\App\Cash\Infrastructure\Lock\CashImportAccountLock::class));
     }
 
     /**

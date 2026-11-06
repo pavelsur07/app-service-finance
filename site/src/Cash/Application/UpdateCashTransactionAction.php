@@ -19,6 +19,7 @@ final class UpdateCashTransactionAction
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly Service\CashSettlementSourceLifecycle $settlementLifecycle,
         private readonly CashTransactionService $transactions,
         private readonly DailyBalanceRecalculator $recalculator,
         private readonly EventDispatcherInterface $eventDispatcher,
@@ -33,74 +34,84 @@ final class UpdateCashTransactionAction
      */
     public function __invoke(CashTransaction $tx, CashTransactionDTO $dto): CashTransaction
     {
-        $this->transactions->assertStandaloneTransaction($tx);
+        $result = $this->entityManager->wrapInTransaction(function () use ($tx, $dto): CashTransaction {
+            $this->settlementLifecycle->lock($tx);
 
-        $company = $tx->getCompany();
-        $oldAccount = $tx->getMoneyAccount();
-        $oldDate = $tx->getOccurredAt();
+            $this->transactions->assertStandaloneTransaction($tx);
 
-        // --- Безопасность: нельзя править/переносить транзакцию в закрытый период
-        $this->transactions->assertNotLockedForCompany($company, $oldDate);
-        $this->transactions->assertNotLockedForCompany($company, $dto->occurredAt);
+            $company = $tx->getCompany();
+            $oldAccount = $tx->getMoneyAccount();
+            $oldDate = $tx->getOccurredAt();
 
-        $companyId = (string) $company->getId();
-        $account = $this->transactions->resolveAccount($dto->moneyAccountId, $companyId);
-        $currency = $this->transactions->resolveCurrencyForAccount($dto->currency, $account);
+            // --- Безопасность: нельзя править/переносить транзакцию в закрытый период
+            $this->transactions->assertNotLockedForCompany($company, $oldDate);
+            $this->transactions->assertNotLockedForCompany($company, $dto->occurredAt);
 
-        // Обновляем поля
-        $amount = $this->transactions->requireAmount($dto);
-        $tx->setMoneyAccount($account)
-            ->setDirection($dto->direction)
-            ->setAmount($amount)
-            ->setCurrency($currency)
-            ->setOccurredAt($dto->occurredAt)
-            ->setDescription($dto->description);
+            $companyId = (string) $company->getId();
+            $account = $this->transactions->resolveAccount($dto->moneyAccountId, $companyId);
+            $currency = $this->transactions->resolveCurrencyForAccount($dto->currency, $account);
 
-        $counterparty = $this->transactions->resolveCounterparty($dto->counterpartyId, $companyId);
-        $category = $this->transactions->resolveCategory($dto->cashflowCategoryId, $companyId);
-        $responsibilityPair = $this->responsibilityCenterResolver->resolveChangedPairForUpdate(
-            $companyId,
-            $tx->getProjectDirection()?->getId(),
-            $tx->getResponsibilityCenterId(),
-            $dto->projectDirectionId ?? $tx->getProjectDirection()?->getId(),
-            $dto->responsibilityCenterId ?? $tx->getResponsibilityCenterId(),
-        );
-        $projectDirection = null !== $responsibilityPair
-            ? $this->transactions->resolveProjectDirection($responsibilityPair->projectDirectionId, $companyId)
-            : $tx->getProjectDirection();
-        $responsibilityCenterId = null !== $responsibilityPair
-            ? $responsibilityPair->responsibilityCenterId
-            : $tx->getResponsibilityCenterId();
+            $currentMoney = \App\Shared\Domain\ValueObject\Money::fromString($tx->getAmount(), $tx->getCurrency());
+            $newMoney = \App\Shared\Domain\ValueObject\Money::fromString($this->transactions->requireAmount($dto), $currency);
+            $materialChange = !$currentMoney->equals($newMoney) || $tx->getMoneyAccount()->getId() !== $account->getId() || $tx->getDirection() !== $dto->direction || $tx->getOccurredAt()->format('Y-m-d') !== $dto->occurredAt->format('Y-m-d') || $tx->getCounterparty()?->getId() !== $dto->counterpartyId;
+            $this->settlementLifecycle->changing($tx, $materialChange);
 
-        $tx->setCounterparty($counterparty)
-            ->setCashflowCategory($category)
-            ->setProjectDirection($projectDirection)
-            ->setResponsibilityCenterId($responsibilityCenterId);
+            // Обновляем поля
+            $amount = $this->transactions->requireAmount($dto);
+            $tx->setMoneyAccount($account)
+                ->setDirection($dto->direction)
+                ->setAmount($amount)
+                ->setCurrency($currency)
+                ->setOccurredAt($dto->occurredAt)
+                ->setDescription($dto->description);
 
-        $this->transactions->applyVat($tx, $company, $dto->direction, $amount);
+            $counterparty = $this->transactions->resolveCounterparty($dto->counterpartyId, $companyId);
+            $category = $this->transactions->resolveCategory($dto->cashflowCategoryId, $companyId);
+            $responsibilityPair = $this->responsibilityCenterResolver->resolveChangedPairForUpdate(
+                $companyId,
+                $tx->getProjectDirection()?->getId(),
+                $tx->getResponsibilityCenterId(),
+                $dto->projectDirectionId ?? $tx->getProjectDirection()?->getId(),
+                $dto->responsibilityCenterId ?? $tx->getResponsibilityCenterId(),
+            );
+            $projectDirection = null !== $responsibilityPair
+                ? $this->transactions->resolveProjectDirection($responsibilityPair->projectDirectionId, $companyId)
+                : $tx->getProjectDirection();
+            $responsibilityCenterId = null !== $responsibilityPair
+                ? $responsibilityPair->responsibilityCenterId
+                : $tx->getResponsibilityCenterId();
 
-        $this->splitSynchronizer->sync($tx, CashTransactionSplitSource::MANUAL);
+            $tx->setCounterparty($counterparty)
+                ->setCashflowCategory($category)
+                ->setProjectDirection($projectDirection)
+                ->setResponsibilityCenterId($responsibilityCenterId);
 
-        // Сохраняем изменения
-        $this->entityManager->flush(); // ← flush перед пересчётом обязателен
+            $this->transactions->applyVat($tx, $company, $dto->direction, $amount);
 
-        // Минимальный диапазон пересчёта: от min(старая дата, новая дата) до сегодня
-        $from = min($dto->occurredAt, $oldDate)->setTime(0, 0);
-        $to = (new \DateTimeImmutable('today'))->setTime(0, 0);
+            $this->splitSynchronizer->sync($tx, CashTransactionSplitSource::MANUAL);
 
-        // После обновления пересчитываем факты по затронутым счетам, а затем инвалидируем snapshot,
-        // чтобы следующий запрос dashboard гарантированно строился на новой версии данных.
-        // Это защищает от ситуации, когда расчёт уже завершился, но API ещё отдаёт кэш старой версии.
-        // Пересчёт по старому счёту (на случай переноса даты/суммы/направления)
-        $this->recalculator->recalcRange($company, $from, $to, [(string) $oldAccount->getId()]);
+            // Сохраняем изменения
+            $this->entityManager->flush(); // ← flush перед пересчётом обязателен
 
-        // Если счёт изменили — пересчитываем и по новому счёту
-        if ($oldAccount->getId() !== $account->getId()) {
-            $this->recalculator->recalcRange($company, $from, $to, [(string) $account->getId()]);
-        }
+            // Минимальный диапазон пересчёта: от min(старая дата, новая дата) до сегодня
+            $from = min($dto->occurredAt, $oldDate)->setTime(0, 0);
+            $to = (new \DateTimeImmutable('today'))->setTime(0, 0);
 
-        $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
+            // После обновления пересчитываем факты по затронутым счетам, а затем инвалидируем snapshot,
+            // чтобы следующий запрос dashboard гарантированно строился на новой версии данных.
+            // Это защищает от ситуации, когда расчёт уже завершился, но API ещё отдаёт кэш старой версии.
+            // Пересчёт по старому счёту (на случай переноса даты/суммы/направления)
+            $this->recalculator->recalcRange($company, $from, $to, [(string) $oldAccount->getId()]);
 
-        return $tx;
+            // Если счёт изменили — пересчитываем и по новому счёту
+            if ($oldAccount->getId() !== $account->getId()) {
+                $this->recalculator->recalcRange($company, $from, $to, [(string) $account->getId()]);
+            }
+
+            return $tx;
+        });
+        $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $tx->getCompany()->getId()));
+
+        return $result;
     }
 }

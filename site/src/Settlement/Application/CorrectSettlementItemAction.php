@@ -37,6 +37,10 @@ final readonly class CorrectSettlementItemAction
             if (null !== $this->em->getRepository(SettlementDocument::class)->findOneBy(['companyId' => $companyId, 'reversedDocumentId' => $item->getDocumentId()])) {
                 throw new \DomainException('Нельзя корректировать отменённую позицию.');
             }
+            $origin = $this->repository->getDocumentForUpdate($companyId, $item->getDocumentId());
+            if (SettlementDocumentKind::PAYMENT === $origin->getKind()) {
+                throw new \DomainException('Фактическую оплату нельзя изменять корректировкой. Отмените включение и исправьте ДДС.');
+            }
             $this->policy->assertDate($companyId, $book, $input->effectiveDate);
             if ($input->effectiveDate->format('Y-m-d') < $item->getEffectiveDate()->format('Y-m-d')) {
                 throw new \DomainException('Корректировка раньше исходной позиции.');

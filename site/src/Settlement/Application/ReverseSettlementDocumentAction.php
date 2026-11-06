@@ -82,6 +82,7 @@ final readonly class ReverseSettlementDocumentAction
             }
             if (SettlementSourceType::MANUAL !== $original->getSourceType() && null !== $original->getSourceId()) {
                 $link = $this->em->getRepository(SettlementSourceLink::class)->findOneBy(['companyId' => $companyId, 'sourceType' => $original->getSourceType(), 'sourceId' => $original->getSourceId()]);
+                if (null !== $link) { $this->em->refresh($link); }
                 if (null === $link || $link->getActiveDocumentId() !== $documentId) {
                     throw new \DomainException('Активная связь источника не соответствует документу.');
                 }

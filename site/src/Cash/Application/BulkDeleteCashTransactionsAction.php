@@ -23,6 +23,7 @@ final class BulkDeleteCashTransactionsAction
     public function __construct(
         private readonly CashTransactionRepository $transactionRepository,
         private readonly EntityManagerInterface $entityManager,
+        private readonly Service\CashSettlementSourceLifecycle $settlementLifecycle,
         private readonly DailyBalanceRecalculator $recalculator,
         private readonly EventDispatcherInterface $eventDispatcher,
     ) {
@@ -33,50 +34,59 @@ final class BulkDeleteCashTransactionsAction
      */
     public function __invoke(Company $company, array $transactionIds, ?string $actorUserId): int
     {
-        $ids = $this->normalizeIds($transactionIds);
-        $companyId = (string) $company->getId();
+        $result = $this->entityManager->wrapInTransaction(function () use ($company, $transactionIds, $actorUserId): int {
+            $ids = $this->normalizeIds($transactionIds);
+            $companyId = (string) $company->getId();
 
-        $transactions = $this->transactionRepository->findActiveByIdsAndCompanyId($ids, $companyId);
-        if (\count($transactions) !== \count($ids)) {
-            throw new \DomainException('Не удалось удалить выбранные транзакции. Обновите страницу и повторите.');
-        }
-        if ($this->transactionRepository->hasAnyTransferAggregateByIdsAndCompanyId($ids, $companyId)) {
-            throw new \DomainException('Операции перевода нельзя удалить отдельно. Удалите связанный перевод.');
-        }
+            $transactions = $this->transactionRepository->findActiveByIdsAndCompanyId($ids, $companyId);
+            if (\count($transactions) !== \count($ids)) {
+                throw new \DomainException('Не удалось удалить выбранные транзакции. Обновите страницу и повторите.');
+            }
+            if ($this->transactionRepository->hasAnyTransferAggregateByIdsAndCompanyId($ids, $companyId)) {
+                throw new \DomainException('Операции перевода нельзя удалить отдельно. Удалите связанный перевод.');
+            }
 
-        $this->assertTransactionsAreUnlocked($company, $transactions);
+            usort($transactions, static fn ($a, $b): int => strcmp((string) $a->getId(), (string) $b->getId()));
+            foreach ($transactions as $transaction) {
+                $this->settlementLifecycle->lock($transaction);
+                $this->settlementLifecycle->changing($transaction, true);
+            }
+            $this->assertTransactionsAreUnlocked($company, $transactions);
 
-        $from = null;
-        $accountIds = [];
-        foreach ($transactions as $transaction) {
-            $occurredAt = $transaction->getOccurredAt()->setTime(0, 0);
-            $from = null === $from || $occurredAt < $from ? $occurredAt : $from;
-            $accountIds[$transaction->getMoneyAccount()->getId()] = true;
-            // postUpdate наступает слишком поздно, чтобы новая запись subscriber-а
-            // попала в текущий UnitOfWork, поэтому аудит пакета планируем до flush.
-            $this->entityManager->persist(new AuditLog(
-                $companyId,
-                CashTransaction::class,
-                (string) $transaction->getId(),
-                AuditLogAction::SOFT_DELETE,
-                null,
-                $actorUserId,
-            ));
-            $transaction->markDeleted($actorUserId);
-        }
+            $from = null;
+            $accountIds = [];
+            foreach ($transactions as $transaction) {
+                $occurredAt = $transaction->getOccurredAt()->setTime(0, 0);
+                $from = null === $from || $occurredAt < $from ? $occurredAt : $from;
+                $accountIds[$transaction->getMoneyAccount()->getId()] = true;
+                // postUpdate наступает слишком поздно, чтобы новая запись subscriber-а
+                // попала в текущий UnitOfWork, поэтому аудит пакета планируем до flush.
+                $this->entityManager->persist(new AuditLog(
+                    $companyId,
+                    CashTransaction::class,
+                    (string) $transaction->getId(),
+                    AuditLogAction::SOFT_DELETE,
+                    null,
+                    $actorUserId,
+                ));
+                $transaction->markDeleted($actorUserId);
+            }
 
-        $this->entityManager->flush();
+            $this->entityManager->flush();
 
-        \assert($from instanceof \DateTimeImmutable);
-        $this->recalculator->recalcRange(
-            $company,
-            $from,
-            (new \DateTimeImmutable('today'))->setTime(0, 0),
-            array_keys($accountIds),
-        );
+            \assert($from instanceof \DateTimeImmutable);
+            $this->recalculator->recalcRange(
+                $company,
+                $from,
+                (new \DateTimeImmutable('today'))->setTime(0, 0),
+                array_keys($accountIds),
+            );
+
+            return \count($transactions);
+        });
         $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
 
-        return \count($transactions);
+        return $result;
     }
 
     /**

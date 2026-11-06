@@ -94,6 +94,7 @@ final class CashTransactionActionsTest extends IntegrationTestCase
         $container = self::getContainer();
         $action = new AddCashTransactionAction(
             $this->em,
+            $container->get(\App\Cash\Application\Service\CashSettlementSourceLifecycle::class),
             $container->get(\App\Cash\Service\Transaction\CashTransactionService::class),
             $container->get(\App\Cash\Application\Service\DailyBalanceRecalculator::class),
             $missingLookup,
@@ -131,6 +132,7 @@ final class CashTransactionActionsTest extends IntegrationTestCase
         };
         $failing = new AddCashTransactionAction(
             $this->em,
+            $container->get(\App\Cash\Application\Service\CashSettlementSourceLifecycle::class),
             $container->get(\App\Cash\Service\Transaction\CashTransactionService::class),
             $failingRecalculator,
             $container->get(CashTransactionRepository::class),

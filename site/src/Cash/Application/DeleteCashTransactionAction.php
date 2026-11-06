@@ -15,6 +15,7 @@ final class DeleteCashTransactionAction
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly Service\CashSettlementSourceLifecycle $settlementLifecycle,
         private readonly CashTransactionService $transactions,
         private readonly DailyBalanceRecalculator $recalculator,
         private readonly EventDispatcherInterface $eventDispatcher,
@@ -27,28 +28,33 @@ final class DeleteCashTransactionAction
      */
     public function __invoke(CashTransaction $tx, ?string $userId = null, ?string $reason = null): void
     {
-        $this->transactions->assertStandaloneTransaction($tx);
+        $this->entityManager->wrapInTransaction(function () use ($tx, $userId, $reason): void {
+            $this->settlementLifecycle->lock($tx);
+            $this->settlementLifecycle->changing($tx, true);
 
-        $company = $tx->getCompany();
+            $this->transactions->assertStandaloneTransaction($tx);
 
-        // --- Безопасность: нельзя удалять транзакцию из закрытого периода
-        $this->transactions->assertNotLockedForCompany($company, $tx->getOccurredAt());
+            $company = $tx->getCompany();
 
-        $account = $tx->getMoneyAccount();
+            // --- Безопасность: нельзя удалять транзакцию из закрытого периода
+            $this->transactions->assertNotLockedForCompany($company, $tx->getOccurredAt());
 
-        // Диапазон пересчёта
-        $from = $tx->getOccurredAt()->setTime(0, 0);
-        $to = (new \DateTimeImmutable('today'))->setTime(0, 0);
+            $account = $tx->getMoneyAccount();
 
-        // Удаляем и фиксируем
-        $tx->markDeleted($userId, $reason);
-        $this->entityManager->flush(); // ← flush перед пересчётом обязателен
+            // Диапазон пересчёта
+            $from = $tx->getOccurredAt()->setTime(0, 0);
+            $to = (new \DateTimeImmutable('today'))->setTime(0, 0);
 
-        // Для удаления действуем так же: сначала фиксируем изменение, потом обновляем факты,
-        // и только после этого повышаем версию snapshot cache. Такой порядок гарантирует,
-        // что новый cache key укажет на уже актуальное состояние регистров и остатков.
-        // Пересчёт по счёту
-        $this->recalculator->recalcRange($company, $from, $to, [(string) $account->getId()]);
-        $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
+            // Удаляем и фиксируем
+            $tx->markDeleted($userId, $reason);
+            $this->entityManager->flush(); // ← flush перед пересчётом обязателен
+
+            // Для удаления действуем так же: сначала фиксируем изменение, потом обновляем факты,
+            // и только после этого повышаем версию snapshot cache. Такой порядок гарантирует,
+            // что новый cache key укажет на уже актуальное состояние регистров и остатков.
+            // Пересчёт по счёту
+            $this->recalculator->recalcRange($company, $from, $to, [(string) $account->getId()]);
+        });
+        $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $tx->getCompany()->getId()));
     }
 }

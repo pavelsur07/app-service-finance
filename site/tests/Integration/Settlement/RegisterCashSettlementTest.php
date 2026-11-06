@@ -47,6 +47,9 @@ final class RegisterCashSettlementTest extends IntegrationTestCase
         self::assertSame('4000000', (string) $this->connection->fetchOne('SELECT SUM(delta_amount_minor) FROM settlement_movements WHERE company_id = ?', [$companyId]));
         self::assertSame('unallocated_out', $this->connection->fetchOne('SELECT bucket FROM settlement_items WHERE company_id = ?', [$companyId]));
         (self::getContainer()->get(ReverseSettlementDocumentAction::class))($companyId, $actorId, $first->documentId, new ReverseSettlementInput(Uuid::uuid7()->toString(), new \DateTimeImmutable('2026-11-03'), 'Отмена включения'));
+        (self::getContainer()->get(\App\Cash\Application\DeleteCashTransactionAction::class))($cash, $actorId);
+        (self::getContainer()->get(\App\Cash\Application\RestoreCashTransactionAction::class))($cash);
+        self::assertSame('0', (string) $this->connection->fetchOne('SELECT SUM(delta_amount_minor) FROM settlement_movements WHERE company_id = ?', [$companyId]));
         $action($companyId, $actorId, new RegisterCashSettlementInput(Uuid::uuid7()->toString(), $cashId, true, new \DateTimeImmutable('2026-11-04')));
         self::assertSame('0', (string) $this->connection->fetchOne("SELECT SUM(delta_amount_minor) FROM settlement_movements WHERE company_id = ? AND effective_date <= '2026-11-03'", [$companyId]));
         self::assertSame('4000000', (string) $this->connection->fetchOne('SELECT SUM(delta_amount_minor) FROM settlement_movements WHERE company_id = ?', [$companyId]));

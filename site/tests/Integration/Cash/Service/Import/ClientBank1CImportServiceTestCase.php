@@ -81,6 +81,7 @@ abstract class ClientBank1CImportServiceTestCase extends IntegrationTestCase
         $activeCompanyService = new ImportTestActiveCompanyService($this->company);
 
         $this->service = new ClientBank1CImportService(
+            self::getContainer()->get(\App\Cash\Application\Service\CashSettlementSourceLifecycle::class),
             $activeCompanyService,
             new CounterpartyNameNormalizer(),
             self::getContainer()->get(CounterpartyFacade::class),
@@ -91,6 +92,17 @@ abstract class ClientBank1CImportServiceTestCase extends IntegrationTestCase
             self::getContainer()->get(CashTransactionResponsibilityCenterResolver::class),
             self::getContainer()->get(CashImportAccountLock::class),
         );
+    }
+
+    /** @param list<array<string, mixed>> $rows
+     * @return array<string, mixed>
+     */
+    protected function overwriteViaAction(array $rows): array
+    {
+        $container = self::getContainer();
+        $action = new \App\Cash\Application\ImportBank1CStatementAction($this->service, $container->get(ImportLogger::class), $container->get(\App\Cash\Infrastructure\Lock\CashImportLogLease::class), $this->em, $container->get(CashImportAccountLock::class));
+
+        return $action($this->company, $rows, $this->account, true, $this->company->getUser()?->getId(), 'fixture.txt', [])['summary'];
     }
 }
 

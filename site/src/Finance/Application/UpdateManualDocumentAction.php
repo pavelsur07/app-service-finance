@@ -20,6 +20,7 @@ use Doctrine\ORM\PersistentCollection;
 final readonly class UpdateManualDocumentAction
 {
     public function __construct(
+        private readonly Service\FinanceSettlementSourceLifecycle $settlementLifecycle,
         private EntityManagerInterface $entityManager,
         private PLRegisterUpdater $plRegisterUpdater,
         private DocumentRepository $documentRepository,
@@ -49,6 +50,7 @@ final readonly class UpdateManualDocumentAction
 
             // Строка документа — после строки транзакции ДДС (источник раньше производных).
             $this->assertNotChangedConcurrently($document);
+            $this->settlementLifecycle->changing($document, true);
 
             $this->entityManager->flush();
 

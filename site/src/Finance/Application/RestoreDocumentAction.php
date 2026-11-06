@@ -12,6 +12,7 @@ use Doctrine\ORM\EntityManagerInterface;
 final readonly class RestoreDocumentAction
 {
     public function __construct(
+        private readonly Service\FinanceSettlementSourceLifecycle $settlementLifecycle,
         private DocumentRepository $documentRepository,
         private EntityManagerInterface $entityManager,
         private PLRegisterUpdater $plRegisterUpdater,
@@ -37,6 +38,7 @@ final readonly class RestoreDocumentAction
                 $this->entityManager->refresh($cashTransaction);
             }
 
+            $this->settlementLifecycle->changing($document);
             $documentAmount = $document->getTotalAmount();
             if (null !== $cashTransaction && $documentAmount > 0.0) {
                 $cashTransaction->assertCanAllocateAmount($documentAmount);

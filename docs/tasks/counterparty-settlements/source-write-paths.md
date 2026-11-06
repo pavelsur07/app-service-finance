@@ -1,6 +1,6 @@
 # Source write-path inventory — Stage2 preflight
 
-Status: inspected, guards not yet implemented. No path below is marked covered.
+Status: guards implemented; targeted regression checks passed. Fresh Stage2 review and external review closure pending.
 Lock order: company → Cash → Finance → SettlementBook → sorted item IDs.
 Read-only inspection by inspect_settlement_sources; all paths under site/src/.
 
@@ -50,4 +50,25 @@ Finance fingerprint: company, counterparty, date, deleted, status, type, source,
 Finance DTO must include nullable source or Facade must validate source=null; do not infer it from absent fields.
 Never use Finance Document::getTotalAmount() (float); settlement full amount is explicitly supplied as Money.
 
-Stage2 closure requires concrete guard locations and test evidence for every material row; this inventory alone does not satisfy acceptance.
+## Guard coverage and evidence
+
+All material ORM paths dispatch source-owned synchronous events via CashSettlementSourceLifecycle / FinanceSettlementSourceLifecycle after row lock, before database writes. SettlementSourceMutationSubscriber rejects an active link; SourceExceptionListener returns business HTTP422.
+
+| Material path | Guard / evidence |
+|---|---|
+| Cash update | source lock + Money/material field comparison; amount edit rejected, description allowed (SettlementSourceMutationGuardTest) |
+| Cash delete / bulk | sorted fixed source locks, guards before mutation in tx; linked delete rejected, whole bulk unchanged (SourceMutationGuardTest) |
+| Cash restore | source lock + guard; cancellation→delete→restore does not recreate settlement effects (RegisterCashSettlementTest) |
+| Cash existing import match | locked refresh before comparing counterparty; linked update rejected (SourceMutationGuardTest) |
+| 1C overwrite | company share lock; Action owns account session lock until commit/rollback; account existing Cash IDs prelocked ascending, concurrent new existing targets rejected; guard before counterparty assignment, dedupe hash set after refresh; batch rollback and retained failure log, allowed overwrite hash repair, commit-window mutex regression (SourceMutationGuardTest); legacy AccountLockTest/IdempotencyTest/DescriptionOverrideTest |
+| Cash SQL company command | company and selected IDs locked, per-source events before fixed-ID UPDATE, recalc same tx; active source rejected via real CommandTester, command regression set |
+| Finance edited document | one canonical stored/in-memory fingerprint, no refresh of edited form; operation edit rejected, comment allowed (SourceMutationGuardTest) |
+| Finance soft/hard deletion | Cash-before-Finance snapshot lock + event, hard deletion date read after refresh; active source both deletions rejected, fresh-day PL regression (SourceMutationGuardTest / DocumentSoftDeleteActionTest) |
+| Finance restore | source snapshot lock + event before restore; normal restore/allocation/register regression set DocumentSoftDeleteActionTest |
+| Finance raw repair | all affected Cash IDs before sorted Finance IDs, lifecycle guard before SQL, operation WHERE includes expected document ID; real repair of linked eligible manual doc rejected (RepairPlTree19621cffCommandTest) |
+
+Concurrency: SettlementSourceLockOrderTest uses independent PG sessions/child PHP process (not outer DAMA rollback) to prove ascending locks, and mutation waits for registration then sees newly committed active link. DESC mutation made the lock-order regression red; ASC green.
+
+Account lock ownership: standalone service may own its lease only outside a caller transaction. An atomic caller must own the lease explicitly; production import Action retains it beyond service return until actual outer commit. Two-connection regression proved original release window red, fixed green.
+
+A missing/empty active link never auto-reactivates when a source is restored. Company/source scope is present in snapshots and source-link checks; source fields are never read through stale ORM identity-map snapshots.

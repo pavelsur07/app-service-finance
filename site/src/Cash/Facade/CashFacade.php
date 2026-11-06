@@ -222,7 +222,7 @@ final readonly class CashFacade
      * транзакции вызывающего (`wrapInTransaction()`): коммитит он, вместе со своим курсором.
      *
      * @throws StatementImportOutsideTransactionException транзакция не открыта
-     * @throws StatementImportTargetNotFoundException     счёт не принадлежит компании
+     * @throws StatementImportTargetNotFoundException счёт не принадлежит компании
      */
     public function importBankStatementDay(
         string $companyId,

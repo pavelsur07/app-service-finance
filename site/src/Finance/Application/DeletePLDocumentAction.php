@@ -21,6 +21,7 @@ use Doctrine\ORM\EntityManagerInterface;
 final class DeletePLDocumentAction
 {
     public function __construct(
+        private readonly Service\FinanceSettlementSourceLifecycle $settlementLifecycle,
         private readonly DocumentRepository $documentRepository,
         private readonly EntityManagerInterface $em,
         private readonly PLRegisterUpdater $plRegisterUpdater,
@@ -33,7 +34,7 @@ final class DeletePLDocumentAction
      */
     public function __invoke(string $companyId, string $documentId): void
     {
-        $document = $this->documentRepository->find($documentId);
+        $document = $this->documentRepository->findByIdAndCompany($documentId, $companyId);
 
         if (null === $document) {
             // Документ уже удалён — идемпотентно, не ошибка
@@ -44,16 +45,15 @@ final class DeletePLDocumentAction
             throw new \DomainException(sprintf('Document "%s" does not belong to company "%s".', $documentId, $companyId));
         }
 
-        // Запоминаем дату ДО удаления — нужна для пересчёта регистра
-        $documentDate = $document->getDate()->setTime(0, 0);
-
         // Пересчитываем PL-регистр за день удалённого документа.
         // Метод recalcRange принимает Company — получаем через Facade.
         $company = $this->companyFacade->findById($companyId);
 
         // Удаление и регистр — один commit: сбой между ними не оставит в регистре сумму
         // документа, которого уже нет.
-        $this->em->wrapInTransaction(function () use ($document, $company, $documentDate): void {
+        $this->em->wrapInTransaction(function () use ($document, $company): void {
+            $this->settlementLifecycle->changing($document);
+            $documentDate = $document->getDate()->setTime(0, 0);
             $this->em->remove($document);
             $this->em->flush();
 

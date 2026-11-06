@@ -214,7 +214,9 @@ final class RepairPlTree19621cffCommand extends Command
     private int $deferred = 0;
 
     public function __construct(
+        private readonly \App\Finance\Application\Service\FinanceSettlementSourceLifecycle $settlementLifecycle,
         private readonly CompanyFacade $companyFacade,
+        private readonly \App\Cash\Facade\CashFacade $cashFacade,
         private readonly PLRegisterUpdater $registerUpdater,
         private readonly EntityManagerInterface $em,
         private readonly Connection $connection,
@@ -360,7 +362,7 @@ final class RepairPlTree19621cffCommand extends Command
     {
         $sources = [self::COGS_PRODUCT, self::MP_STORAGE, self::MP_OTHER_DEDUCTIONS, self::OVERHEAD_PROD_CERT, ...array_keys(self::OP_MOVES)];
         $operations = $this->connection->fetchAllAssociative(
-            "SELECT o.id, o.category_id, o.amount, o.comment, d.type, d.source, to_char(d.date, 'YYYY-MM-DD') AS day
+            "SELECT o.id, o.category_id, o.amount, o.comment, d.id AS document_id, d.cash_transaction_id, d.type, d.source, to_char(d.date, 'YYYY-MM-DD') AS day
              FROM document_operations o
              JOIN documents d ON d.id = o.document_id
              WHERE d.company_id = :company
@@ -412,14 +414,45 @@ final class RepairPlTree19621cffCommand extends Command
             return $days;
         }
 
+        $movedOperationIds = [];
+        foreach ($moves as [$operationId, $fromId, $toId]) {
+            if ($fromId !== $toId) {
+                $movedOperationIds[$operationId] = true;
+            }
+        }
+        $documentIds = [];
+        $cashIds = [];
+        foreach ($operations as $operation) {
+            if (!isset($movedOperationIds[(string) $operation['id']])) {
+                continue;
+            }
+            $documentIds[(string) $operation['document_id']] = true;
+            if (null !== $operation['cash_transaction_id']) {
+                $cashIds[(string) $operation['cash_transaction_id']] = true;
+            }
+        }
+        ksort($cashIds);
+        foreach (array_keys($cashIds) as $cashId) {
+            $this->cashFacade->getSettlementSourceForUpdate(self::COMPANY_ID, $cashId);
+        }
+        ksort($documentIds);
+        foreach (array_keys($documentIds) as $documentId) {
+            $document = $this->em->getRepository(\App\Finance\Entity\Document::class)->findOneBy(['company' => self::COMPANY_ID, 'id' => $documentId]);
+            if (!$document instanceof \App\Finance\Entity\Document) {
+                throw new \DomainException('Документ ОПиУ не найден.');
+            }
+            $this->settlementLifecycle->changing($document);
+        }
+
         $before = $this->netByDay($days);
         $storedBefore = $this->storedNetByDay($days);
 
+        $operationDocuments = array_column($operations, 'document_id', 'id');
         $byPair = [];
         foreach ($moves as [$id, $from, $to, $day, $amount]) {
             $moved = $this->connection->executeStatement(
-                'UPDATE document_operations SET category_id = :to WHERE id = :id AND category_id = :from',
-                ['id' => $id, 'from' => $from, 'to' => $to],
+                'UPDATE document_operations SET category_id = :to WHERE id = :id AND category_id = :from AND document_id = :document',
+                ['id' => $id, 'from' => $from, 'to' => $to, 'document' => $operationDocuments[$id]],
             );
             if (1 !== $moved) {
                 ++$this->failed;

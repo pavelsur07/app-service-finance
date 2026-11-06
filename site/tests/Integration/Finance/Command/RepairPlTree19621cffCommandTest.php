@@ -259,6 +259,31 @@ final class RepairPlTree19621cffCommandTest extends IntegrationTestCase
         self::assertStringContainsString('не знаю, куда перенести', $tester->getDisplay());
     }
 
+    public function testLinkedManualDocumentCannotBeChangedByRawSqlRepair(): void
+    {
+        $this->seed();
+        $company = $this->em->getRepository(Company::class)->findOneBy(['id' => Repair::COMPANY_ID]);
+        self::assertInstanceOf(Company::class, $company);
+        $this->company = $company;
+        $party = \App\Tests\Builders\Company\CounterpartyBuilder::aCounterparty()->withCompany($this->company)->build();
+        $this->em->persist($party);
+        $this->em->flush();
+        $documentId = $this->document('2026-09-30', 'OTHER', null);
+        $this->operation($documentId, Repair::COGS_PRODUCT, '100.00', null);
+        $this->connection->executeStatement('UPDATE documents SET counterparty_id = ? WHERE id = ? AND company_id = ?', [$party->getId(), $documentId, Repair::COMPANY_ID]);
+        $owner = $this->company->getUser();
+        self::assertNotNull($owner);
+        $actorId = $owner->getId();
+        self::assertNotNull($actorId);
+        $container = self::getContainer();
+        ($container->get(\App\Settlement\Application\ConfigureSettlementBookAction::class))(Repair::COMPANY_ID, $actorId, new \DateTimeImmutable('2026-09-01'));
+        $draft = ($container->get(\App\Settlement\Application\CreateSettlementFromFinanceAction::class))(Repair::COMPANY_ID, $actorId, new \App\Settlement\Application\DTO\CreateSettlementFromFinanceInput(Uuid::uuid7()->toString(), $documentId, \App\Settlement\Enum\SettlementBucket::PAYABLE, \App\Shared\Domain\ValueObject\Money::fromString('100.00', 'RUB'), new \DateTimeImmutable('2026-09-30'), null, 'Акт'));
+        ($container->get(\App\Settlement\Application\PostSettlementDocumentAction::class))(Repair::COMPANY_ID, $actorId, $draft->documentId, $draft->version);
+        $this->expectException(\App\Settlement\Exception\SettlementSourceInUseException::class);
+        $this->expectExceptionMessage('Источник участвует во взаиморасчётах');
+        $this->tester()->execute(['--execute' => true]);
+    }
+
     private function seed(): void
     {
         $owner = UserBuilder::aUser()->withIndex(962)->build();

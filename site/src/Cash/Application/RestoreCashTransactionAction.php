@@ -13,6 +13,7 @@ final class RestoreCashTransactionAction
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly Service\CashSettlementSourceLifecycle $settlementLifecycle,
         private readonly CashTransactionService $transactions,
         private readonly DailyBalanceRecalculator $recalculator,
     ) {
@@ -24,24 +25,29 @@ final class RestoreCashTransactionAction
      */
     public function __invoke(CashTransaction $tx): void
     {
-        $this->transactions->assertStandaloneTransaction($tx);
+        $this->entityManager->wrapInTransaction(function () use ($tx): void {
+            $this->settlementLifecycle->lock($tx);
+            $this->settlementLifecycle->changing($tx, true);
 
-        $company = $tx->getCompany();
+            $this->transactions->assertStandaloneTransaction($tx);
 
-        // --- Безопасность: нельзя восстанавливать транзакцию из закрытого периода
-        $this->transactions->assertNotLockedForCompany($company, $tx->getOccurredAt());
+            $company = $tx->getCompany();
 
-        $account = $tx->getMoneyAccount();
+            // --- Безопасность: нельзя восстанавливать транзакцию из закрытого периода
+            $this->transactions->assertNotLockedForCompany($company, $tx->getOccurredAt());
 
-        // Диапазон пересчёта
-        $from = $tx->getOccurredAt()->setTime(0, 0);
-        $to = (new \DateTimeImmutable('today'))->setTime(0, 0);
+            $account = $tx->getMoneyAccount();
 
-        // Восстанавливаем и фиксируем
-        $tx->restore();
-        $this->entityManager->flush(); // ← flush перед пересчётом обязателен
+            // Диапазон пересчёта
+            $from = $tx->getOccurredAt()->setTime(0, 0);
+            $to = (new \DateTimeImmutable('today'))->setTime(0, 0);
 
-        // Пересчёт по счёту
-        $this->recalculator->recalcRange($company, $from, $to, [(string) $account->getId()]);
+            // Восстанавливаем и фиксируем
+            $tx->restore();
+            $this->entityManager->flush(); // ← flush перед пересчётом обязателен
+
+            // Пересчёт по счёту
+            $this->recalculator->recalcRange($company, $from, $to, [(string) $account->getId()]);
+        });
     }
 }

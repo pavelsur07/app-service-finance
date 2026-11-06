@@ -30,6 +30,17 @@ class CashTransactionRepository extends ServiceEntityRepository
         parent::__construct($registry, CashTransaction::class);
     }
 
+    /** @return list<string> */
+    public function lockSettlementSourcesForAccount(string $companyId, string $accountId): array
+    {
+        $db = $this->getEntityManager()->getConnection();
+        if (!$db->isTransactionActive()) {
+            throw new \LogicException('Account source locks require a transaction.');
+        }
+
+        return array_map(static fn ($id): string => (string) $id, $db->fetchFirstColumn('SELECT id FROM cash_transaction WHERE company_id = :company AND money_account_id = :account ORDER BY id FOR UPDATE', ['company' => $companyId, 'account' => $accountId]));
+    }
+
     public function getSettlementSourceForUpdate(string $companyId, string $transactionId): \App\Cash\Application\DTO\CashSettlementSource
     {
         $db = $this->getEntityManager()->getConnection();
@@ -42,7 +53,7 @@ class CashTransactionRepository extends ServiceEntityRepository
         }
         $money = \App\Shared\Domain\ValueObject\Money::fromString((string) $row['amount'], (string) $row['currency']);
 
-        return new \App\Cash\Application\DTO\CashSettlementSource((string) $row['id'], $companyId, null === $row['counterparty_id'] ? null : (string) $row['counterparty_id'], $money, new \DateTimeImmutable((string) $row['occurred_at']), CashDirection::from((string) $row['direction']), null !== $row['deleted_at'], (bool) $row['is_transfer'], hash('sha256', json_encode($row, JSON_THROW_ON_ERROR)));
+        return new \App\Cash\Application\DTO\CashSettlementSource((string) $row['id'], $companyId, null === $row['counterparty_id'] ? null : (string) $row['counterparty_id'], $money, new \DateTimeImmutable((string) $row['occurred_at']), CashDirection::from((string) $row['direction']), null !== $row['deleted_at'], (bool) $row['is_transfer'], hash('sha256', json_encode($row, \JSON_THROW_ON_ERROR)));
     }
 
     /** @return list<ImportSnapshot> */
