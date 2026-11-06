@@ -702,6 +702,37 @@ final readonly class MarketplaceFacade
         return $this->listingRepository->findListingToProductMap($companyId, $listingIds);
     }
 
+    /**
+     * Баркоды листингов компании по маркетплейсу, ключ — баркод.
+     * Inventory запрашивает по ним остатки склада продавца WB и маппит ответ на листинг.
+     *
+     * @return array<string, array{listingId: string, marketplaceSku: string, marketplaceVariantId: ?string}>
+     */
+    public function getListingBarcodes(string $companyId, string $marketplace): array
+    {
+        Assert::uuid($companyId);
+
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT b.barcode, l.id, l.marketplace_sku, l.marketplace_variant_id
+             FROM marketplace_listing_barcodes b
+             JOIN marketplace_listings l ON l.id = b.listing_id
+            WHERE b.company_id = :companyId
+              AND l.marketplace = :marketplace',
+            ['companyId' => $companyId, 'marketplace' => $marketplace],
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[(string) $row['barcode']] = [
+                'listingId' => (string) $row['id'],
+                'marketplaceSku' => (string) $row['marketplace_sku'],
+                'marketplaceVariantId' => null !== $row['marketplace_variant_id'] ? (string) $row['marketplace_variant_id'] : null,
+            ];
+        }
+
+        return $result;
+    }
+
     public function refreshWbListingCatalog(string $companyId, string $connectionId): int
     {
         Assert::uuid($companyId);

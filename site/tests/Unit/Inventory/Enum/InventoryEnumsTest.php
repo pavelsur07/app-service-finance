@@ -22,6 +22,7 @@ final class InventoryEnumsTest extends TestCase
                 'mp_acceptance',
                 'mp_in_transit_to_customer',
                 'mp_in_transit_from_customer',
+                'seller_warehouse',
             ],
             array_map(static fn (LocationType $case): string => $case->value, LocationType::cases()),
         );

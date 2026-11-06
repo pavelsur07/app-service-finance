@@ -10,4 +10,6 @@ enum LocationType: string
     case MpAcceptance = 'mp_acceptance';
     case MpInTransitToCustomer = 'mp_in_transit_to_customer';
     case MpInTransitFromCustomer = 'mp_in_transit_from_customer';
+    /** Склад продавца (FBS): остатки, которые маркетплейс знает со слов продавца. */
+    case SellerWarehouse = 'seller_warehouse';
 }
