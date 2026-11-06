@@ -10,8 +10,20 @@ use App\Shared\Domain\ValueObject\Money;
 
 final readonly class SettlementPostingPolicy
 {
-    /** Original amounts are only an upper bound; the Action validates historical free balances under lock. */
-    public function assertAllocation(SettlementItem $obligation, SettlementItem $payment, Money $amount, \DateTimeImmutable $date): void
+    /** Available balances are read under the company book lock; corrections may change original capacity. */
+    public function assertAllocation(SettlementItem $obligation, SettlementItem $payment, Money $amount, \DateTimeImmutable $date, Money $obligationAvailable, Money $paymentAvailable): void
+    {
+        $this->assertAllocationPair($obligation, $payment, $amount, $date);
+        if ($amount->currency() !== $obligationAvailable->currency()
+            || $amount->currency() !== $paymentAvailable->currency()
+            || $amount->compareTo($obligationAvailable) > 0
+            || $amount->compareTo($paymentAvailable) > 0) {
+            throw new \DomainException('Недостаточно свободного остатка.');
+        }
+    }
+
+    /** Identity/direction invariants also apply when independently replaying all primary facts. */
+    public function assertAllocationPair(SettlementItem $obligation, SettlementItem $payment, Money $amount, \DateTimeImmutable $date): void
     {
         $allowed = match ($obligation->getBucket()) {
             SettlementBucket::RECEIVABLE => [SettlementBucket::ADVANCE_RECEIVED, SettlementBucket::UNALLOCATED_IN],
@@ -25,9 +37,7 @@ final readonly class SettlementPostingPolicy
             || $amount->currency() !== $payment->getAmount()->currency()
             || !$amount->isPositive()
             || $date->format('Y-m-d') < $obligation->getEffectiveDate()->format('Y-m-d')
-            || $date->format('Y-m-d') < $payment->getEffectiveDate()->format('Y-m-d')
-            || $amount->compareTo($obligation->getAmount()) > 0
-            || $amount->compareTo($payment->getAmount()) > 0) {
+            || $date->format('Y-m-d') < $payment->getEffectiveDate()->format('Y-m-d')) {
             throw new \DomainException('Недопустимое распределение оплаты.');
         }
     }

@@ -68,7 +68,17 @@ final readonly class SettlementRepository
             ->join(SettlementDocument::class, 'd', 'ON', 'd.id = m.documentId AND d.companyId = m.companyId')
             ->where('m.companyId = :company')->andWhere('m.itemId = :item')
             ->setParameter('company', $companyId)->setParameter('item', $itemId)
-            ->orderBy('m.effectiveDate', \SortDirection::Ascending)->addOrderBy('d.eventSequence', \SortDirection::Ascending)->addOrderBy('m.id', \SortDirection::Ascending)
+            ->orderBy('m.effectiveDate', \SortDirection::Ascending)->addOrderBy('d.eventSequence', \SortDirection::Ascending)->addOrderBy('m.bucket', \SortDirection::Ascending)
             ->getQuery()->getResult();
+    }
+
+    public function getAllocation(string $companyId, string $allocationId): \App\Settlement\Entity\SettlementAllocation
+    {
+        return $this->em->getRepository(\App\Settlement\Entity\SettlementAllocation::class)->findOneBy(['companyId' => $companyId, 'id' => $allocationId]) ?? throw new \DomainException('Распределение не найдено.');
+    }
+
+    public function getAllocationByDocument(string $companyId, string $documentId): \App\Settlement\Entity\SettlementAllocation
+    {
+        return $this->em->getRepository(\App\Settlement\Entity\SettlementAllocation::class)->findOneBy(['companyId' => $companyId, 'documentId' => $documentId]) ?? throw new \DomainException('Распределение не найдено.');
     }
 }

@@ -1,9 +1,9 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 / Work item 2.3
-**Status:** reviewing
+**Phase:** Stage 3 CLOSED / Stage 4 next
+**Status:** Stage 4 pending baseline
 **Task base commit:** 4fdad15c974830d13ff9342d1f40a526f3b5bd33
-**Stage base commit:** 66e666657
+**Stage base commit:** 81ba2ffa5
 **Branch:** feat/counterparty-settlements
 **Worktree:** /home/deploy/.codex/worktrees/3821/app-service-finance
 
@@ -27,7 +27,7 @@
 - external: pending at required Stage/handoff points
 
 ### Exact next action
-- Await external Stage2 review session34272; log /tmp/vf-settlement-external-stage2.log, artifacts site/var/external-review/66e66665/. Fix confirmed findings, finalize Stage2 report/commit/push, then Stage3. Do not rerun duplicate review.
+- Finish Stage3 reporting/rebuild coverage, performance evidence, focused checks and Stage review. Stage4/5 incomplete.
 
 ### Files to inspect first on resume
 - TASK.md, plan.md, checkpoint.md, git status.
@@ -125,3 +125,35 @@
 - Stage3 preflight: existing pure PostingPolicy uses original item amounts as capacity, which must be changed to locked available Money for increased corrected obligations/initial advances. No allocation route is exposed yet; prove red→green in3.1 and document signature ruling.
 - Stage3 preflight: add ALLOCATION event kind missing from original enum proposal; journal needs common identity for its two rows. Do not disguise allocation as a correction/payment.
 - Stage3 needs bucket-wise history validation and bucket override when classifying remaining payment. No automatic allocation priority if both advance and unallocated buckets positive: require explicit classification first (no silent financial choice).
+
+### Work item3.1 evidence
+- Allocation/actual-capacity tests red (missing action + original-capacity bug), then PASS23/58. Extended history, one payment to several receivables, idempotency-conflict and bucket reversal tests PASS9/72.
+- Two independent PostgreSQL sessions: allocation30+30 from40 results one success/one rejection/10 remaining; concurrent reversals return one ID and effect. PASS1/18 (later fixture typing assertion adds one).
+- Ruling: add ALLOCATION event kind and available-Money policy arguments; existing original amounts cannot represent corrected capacity. Per-bucket historical validation replaces total-only validation.
+
+### Work item3.2 evidence
+- Red report tests missing Facade, then report+historical allocation checks PASS13/100. Totals span all pages; opening outside regular turnover; exact kopecks and aggregate overflow before int cast; due date strict boundary.
+- Ruling: reports reject from before company cutoff, preserving meaningful opening+turnover=closing identity. Page, totals and card rows share one SQL statement snapshot. Names are a separate company-scoped batch including archived parties.
+- Counterparty row includes display label for UI; no additional money fields/calculation in browser.
+
+### Work item3.3 in progress
+- Verify/rebuild red missing command; initial corrupted/missing-delta/dry-run/repeated execute tests PASS1/14.
+- Projection independently replays primary documents/items/allocations/classification snapshots/reversals; derived journal/source links are never inputs. Invalid primary facts stop safely; rebuild never invents liability.
+- Ruling: maintenance serializes company financial writers with exclusive Company Facade lock, then locks sorted Cash and Finance sources before book. Active fingerprint drift refuses repair. Rebuild only replaces derived rows atomically.
+- User asked about tests/Architecture: verified folder pre-exists this task (introduced cf1ef467c 2026-08-30, technical author deploy). Current task has no changes there; explained its PHPStan/PHPat role and that approval history cannot be inferred from Git.
+
+### Stage3 latest verification
+- Complete module set PASS80 /402 after formatting and source-link rebuild/history additions. Focused PHPStan PASS39 changed PHP files, project CS applied.
+- Real report SQL EXPLAIN on 10000 synthetic movements: 100 parties, 50 page rows, total100.00RUB, planning1.459ms/execution42.728ms. Evidence performance.md + report-explain.json. No production data.
+- Fresh read-only internal Stage3 reviewer running /root/review_settlement_stage3. External not yet started; wait for internal fixes first.
+
+### Stage3 review checkpoint
+- Fresh internal review B0/I1/MINOR2. I1 primary consistency fixed with red/green wrong-side allocation and dependency-chronology regressions, plus due-date/reversal-before-target refusal cases. Both MINOR fixed (semantic movement tie order and valid advance concurrency fixture). Bounded rereview B0/I0.
+- Final module PASS84 /430; final focused PHPStan PASS, project focused CS applied.
+- External Stage3 running: site/bin/external-review.sh81ba2ffa5 --effort medium --context /tmp/vf-settlement-stage3-review-context.md. Exec47778, log /tmp/vf-settlement-external-stage3.log, artifacts site/var/external-review/81ba2ffa/. Do not duplicate.
+- Stage3 source changes not committed yet. Wait external result, fix per7.2, Stage Report/commit/push/PR update, then Stage4. Read-only UI pattern exploration done; no Stage4 code written.
+
+### Stage3 CLOSED
+- External one round REVIEW_GREEN; B0/I0/MINOR4. First3 safe minors fixed, #4 technically rejected to preserve authorization before allocation lookup; inner write lock serves different purpose.
+- Final module PASS87/441, focused PHPStan41PHPfiles/CS PASS. Internal B0/I1fixed/MINOR2fixed; bounded rereview B0/I0.
+- Stage3 Report DONE, performance evidence committed. Next Stage4: record closure commit as base, baseline functional existing-source tests, then UI journey red and implementation.

@@ -100,6 +100,11 @@ final class CompanyFacade
         return $this->repository->getFinanceLockBefore($companyId);
     }
 
+    public function lockFinancialMaintenance(string $companyId): void
+    {
+        $this->repository->lockFinancialMaintenance($companyId);
+    }
+
     public function isOwner(string $companyId, string $userId): bool
     {
         if (!Uuid::isValid($companyId) || !Uuid::isValid($userId)) {

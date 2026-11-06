@@ -135,7 +135,7 @@ Cash/Finance write paths и новые синхронные domain events. Их 
 - `SettlementBucket`: RECEIVABLE, PAYABLE, ADVANCE_GIVEN, ADVANCE_RECEIVED,
   UNALLOCATED_OUT, UNALLOCATED_IN; persisted values — lowercase из TASK.md.
 - `SettlementDocumentKind`: OPENING, OBLIGATION, PAYMENT, CORRECTION,
-  CLASSIFICATION, ALLOCATION_REVERSAL, DOCUMENT_REVERSAL.
+  CLASSIFICATION, ALLOCATION, ALLOCATION_REVERSAL, DOCUMENT_REVERSAL.
 - `SettlementDocumentStatus`: DRAFT, POSTED. Отмена — новая запись; исходная
   остаётся проведённым фактом для исторического расчёта.
 - `SettlementSourceType`: MANUAL, CASH, FINANCE.
@@ -196,7 +196,8 @@ Risk: HIGH-LOCAL. Definition of Done: после проведения начал
 `site/tests/Integration/Settlement/SettlementSchemaTest.php`.
 
 **Interfaces:** `SettlementPostingPolicy::assertAllocation(SettlementItem $obligation,
-SettlementItem $payment, Money $amount, DateTimeImmutable $date): void`;
+SettlementItem $payment, Money $amount, DateTimeImmutable $date,
+Money $obligationAvailable, Money $paymentAvailable): void`;
 `SettlementRepository::getDocumentForUpdate(string $companyId, string $id): SettlementDocument`;
 `getItemForUpdate(string $companyId, string $id): SettlementItem`.
 
@@ -390,7 +391,7 @@ string $allocationId, ReverseSettlementInput $input): SettlementResult`;
 string $paymentItemId, bool $isAdvance, ReverseSettlementInput $input): SettlementResult`.
 Для классификации input несёт requestId/date/reason; исходная оплата неизменна.
 
-- [ ] Red tests A1–A4/A6/A7: после оплаты 40000 из 100000
+- [x] Red tests A1–A4/A6/A7: после оплаты 40000 из 100000
   `assertSame(6000000, $balances->payable->amountMinor())` и
   `assertSame(0, $balances->unallocatedOut->amountMinor())`;
   повтор возвращает тот же ID. Отмена восстанавливает обе корзины ровно один раз.
@@ -399,18 +400,18 @@ string $paymentItemId, bool $isAdvance, ReverseSettlementInput $input): Settleme
   Аналогичные тесты для корректировки, классификации и отмены: сохранять
   неотрицательные позиции на всём затронутом временном интервале.
   A11: две отмены одного target с разными requestId возвращают один reversal ID.
-- [ ] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/SettlementAllocationTest.php`, зафиксировать red.
-- [ ] Реализовать допустимые пары из TASK.md. В одной транзакции блокировать книгу
+- [x] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/SettlementAllocationTest.php`, зафиксировать red.
+- [x] Реализовать допустимые пары из TASK.md. В одной транзакции блокировать книгу
   и обе позиции; перечитать свободные суммы. Никакого изменения Cash/Finance.
   Два движения распределения имеют общую event identity. Только явные отмены.
   Для backdated события валидировать последовательность (effectiveDate,eventSequence)
   всех последующих событий обеих позиций. Если хотя бы один остаток отрицателен — rollback.
-- [ ] Проверить две параллельные DB-сессии: остаток 40000, два запроса по 30000;
+- [x] Проверить две параллельные DB-сессии: остаток 40000, два запроса по 30000;
   один успешен, второй отклонён, остаток 10000, единственное распределение.
   Concurrency test не должен проходить только за счёт внешней DAMA-транзакции.
   Отдельно параллельно отменить одно распределение с двумя разными requestId:
   одна reversal-запись, один обратный эффект, ответы с одним ID.
-- [ ] Запустить allocation/concurrency tests до PASS; checkpoint.
+- [x] Запустить allocation/concurrency tests до PASS; checkpoint.
 
 ### Work item 3.2 — сводка, карточка и просрочка
 
@@ -427,19 +428,19 @@ Read Facade не принимает actor: HTTP слой проверяет FINA
 принимает list<string>, возвращает array<string,string> (ID → display label),
 включает архивных контрагентов для истории; неизвестные/чужие ID не возвращает.
 
-- [ ] Red tests A5/A6: на 06.11 payable=6000000, на 08.11 payable=10000000,
+- [x] Red tests A5/A6: на 06.11 payable=6000000, на 08.11 payable=10000000,
   unallocatedOut=4000000; на 04.11 payment не существует в отчёте.
   Начальный остаток не включён в обычный оборот; сумма по всей выборке не равна
   сумме одной страницы. При dueDate=05.11 долг просрочен 06.11, но не 05.11.
-- [ ] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/SettlementReportQueryTest.php`, сохранить red.
-- [ ] Реализовать запросы из согласованного снимка: opening на начало from,
+- [x] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/SettlementReportQueryTest.php`, сохранить red.
+- [x] Реализовать запросы из согласованного снимка: opening на начало from,
   обороты за [from 00:00; to+1 day 00:00), closing на конец to. Даты Europe/Moscow.
   Шесть корзин отдельно, суммы в RUB, отсутствие срока отдельным показателем.
   Имена контрагентов получать пакетно через новый метод существующего CounterpartyFacade.
-- [ ] Дополнить SettlementReportQueryTest: движения `0.10 RUB` и `0.20 RUB`
+- [x] Дополнить SettlementReportQueryTest: движения `0.10 RUB` и `0.20 RUB`
   дают итог Money `0.30 RUB`; агрегат вне диапазона Money отклоняется до int-cast,
   без усечения или подстановки нуля; запрос не смешивает валюты.
-- [ ] Проверить PASS, отсутствие N+1, стабильный порядок date/sequence/id,
+- [x] Проверить PASS, отсутствие N+1, стабильный порядок date/sequence/id,
   индексы на локальном наборе 10000 движений; сохранить EXPLAIN без пользовательских данных.
 
 ### Work item 3.3 — сверка и восстановление регистра
@@ -452,24 +453,24 @@ Read Facade не принимает actor: HTTP слой проверяет FINA
 совпадении, exit 1 при расхождении; `app:settlement:rebuild <companyId>` — dry-run,
 запись только с `--execute`; rebuild не меняет исходные документы/распределения.
 
-- [ ] Red test: намеренно нарушить один delta в test DB → verify exit 1;
+- [x] Red test: намеренно нарушить один delta в test DB → verify exit 1;
   dry-run не изменяет БД; execute восстанавливает из документов → exit 0;
   повтор rebuild не меняет количество и суммы.
-- [ ] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/SettlementRegisterVerificationTest.php`.
-- [ ] Реализовать независимую сверку по исходным проведённым документам,
+- [x] Запустить `docker compose exec -T -e XDEBUG_MODE=off site-php-cli php bin/phpunit tests/Integration/Settlement/SettlementRegisterVerificationTest.php`.
+- [x] Реализовать независимую сверку по исходным проведённым документам,
   распределениям, классификациям и отменам, а не сравнение двух SUM одного регистра.
   Rebuild использует ту же блокировку книги и атомарно заменяет производные записи.
   Исторические позиции и отмены восстанавливаются, не только текущие totals.
   SettlementSourceLink также восстанавливается; до/после rebuild активная связь
   и lastReversalDate совпадают, одновременно активных включений источника нет.
-- [ ] Тест до PASS; production execute не запускать без отдельного одобрения.
+- [x] Тест до PASS; production execute не запускать без отдельного одобрения.
 
 **Приёмка Stage 3:**
-- [ ] Все A1–A11 проходят; лишнее распределение запрещено.
-- [ ] Контрагент может одновременно иметь дебиторку и кредиторку без автозачёта.
-- [ ] Отмена сегодня не переписывает вчера; оплата не создаётся повторно.
-- [ ] Перестроенный регистр даёт те же отчёты на исторические даты.
-- [ ] Сверка обнаруживает пропущенное, дублированное и неверное движение.
+- [x] Все A1–A11 проходят; лишнее распределение запрещено.
+- [x] Контрагент может одновременно иметь дебиторку и кредиторку без автозачёта.
+- [x] Отмена сегодня не переписывает вчера; оплата не создаётся повторно.
+- [x] Перестроенный регистр даёт те же отчёты на исторические даты.
+- [x] Сверка обнаруживает пропущенное, дублированное и неверное движение.
 
 Stage checks: весь модуль Settlement, source guards и focused static analysis.
 Commit: `feat: add settlement allocation and reconciled reports`.

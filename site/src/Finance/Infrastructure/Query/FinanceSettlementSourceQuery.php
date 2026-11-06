@@ -14,13 +14,26 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final readonly class FinanceSettlementSourceQuery
 {
+    /** @param list<string> $documentIds
+     * @return list<string>
+     */
+    public function getCashIds(string $companyId, array $documentIds): array
+    {
+        if ([] === $documentIds) {
+            return [];
+        }
+
+        return $this->entityManager->getConnection()->fetchFirstColumn('SELECT DISTINCT cash_transaction_id FROM documents WHERE company_id=? AND id IN (?) AND cash_transaction_id IS NOT NULL ORDER BY cash_transaction_id', [$companyId, $documentIds], [\Doctrine\DBAL\ParameterType::STRING, \Doctrine\DBAL\ArrayParameterType::STRING]);
+    }
+
     public function __construct(private EntityManagerInterface $entityManager, private CashFacade $cashFacade)
     {
     }
 
-    public function getForUpdate(string $companyId, string $documentId): \App\Finance\Application\DTO\FinanceSettlementSource
+    /** @param ?list<string> $prelockedCashIds */
+    public function getForUpdate(string $companyId, string $documentId, ?array $prelockedCashIds = null): \App\Finance\Application\DTO\FinanceSettlementSource
     {
-        $row = $this->lockHeaderForUpdate($companyId, $documentId);
+        $row = $this->lockHeaderForUpdate($companyId, $documentId, $prelockedCashIds);
         $db = $this->entityManager->getConnection();
         $cashId = $row['cash_transaction_id'];
         $operations = $db->fetchAllAssociative('SELECT id, amount, category_id, project_direction_id, responsibility_center_id FROM document_operations WHERE document_id = :id ORDER BY id', ['id' => $documentId]);
@@ -28,8 +41,10 @@ final readonly class FinanceSettlementSourceQuery
         return new \App\Finance\Application\DTO\FinanceSettlementSource((string) $row['id'], $companyId, null === $row['counterparty_id'] ? null : (string) $row['counterparty_id'], new \DateTimeImmutable((string) $row['date']), null !== $row['deleted_at'], DocumentStatus::from((string) $row['status']), DocumentType::from((string) $row['type']), array_map(static fn (array $operation): string => (string) $operation['id'], $operations), $this->fingerprint($row, $operations), null === $row['source'] ? null : PLDocumentSource::from((string) $row['source']), null === $cashId ? null : (string) $cashId);
     }
 
-    /** @return array<string, mixed> */
-    public function lockHeaderForUpdate(string $companyId, string $documentId): array
+    /** @param ?list<string> $prelockedCashIds
+     * @return array<string, mixed>
+     */
+    public function lockHeaderForUpdate(string $companyId, string $documentId, ?array $prelockedCashIds = null): array
     {
         $db = $this->entityManager->getConnection();
         if (!$db->isTransactionActive()) {
@@ -39,6 +54,9 @@ final readonly class FinanceSettlementSourceQuery
         if (false === $cashId) {
             throw new \DomainException('Документ ОПиУ не найден.');
         }
+        if (null !== $prelockedCashIds && null !== $cashId && !in_array($cashId, $prelockedCashIds, true)) {
+            throw new \DomainException('Связь ОПиУ с ДДС изменилась: повторите сверку.');
+        }
         if (null !== $cashId) {
             $this->cashFacade->getSettlementSourceForUpdate($companyId, (string) $cashId);
         }
@@ -46,6 +64,7 @@ final readonly class FinanceSettlementSourceQuery
         if (false === $row || $row['cash_transaction_id'] !== $cashId) {
             throw new \DomainException('Документ ОПиУ изменён параллельно.');
         }
+
         return $row;
     }
 

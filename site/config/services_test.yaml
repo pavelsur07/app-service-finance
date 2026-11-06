@@ -127,3 +127,7 @@ services:
         resource: '../src/Settlement/Application/'
         exclude: '../src/Settlement/Application/DTO/'
         public: true
+
+    App\Settlement\Facade\SettlementFacadeInterface:
+        alias: App\Settlement\Facade\SettlementFacade
+        public: true

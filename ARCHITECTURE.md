@@ -5483,3 +5483,26 @@ JSON error.code=settlement_source_in_use для API/Accept JSON. SourceInUseExce
 наследует DomainException: существующие HTML source controllers сохраняют форму
 или flash+redirect. Подтверждение импорта 1С ловит business DomainException и
 возвращает к сохранённому предпросмотру. UI Settlement и отчёты ещё не реализованы.
+
+### Settlement: погашения, отчёты и восстановление
+
+`SettlementFacadeInterface::report(companyId, SettlementReportFilter)` и `card(companyId,
+counterpartyId, filter)` возвращают readonly DTO с Money. Один SQL-снимок содержит
+страницу, полные totals и карточку; подписи включая архивные — пакетным
+`CounterpartyFacade::getLabelsByIds(companyId, ids)`. Период не раньше cutoff.
+
+`AllocateSettlementAction` принимает фактические доступные Money двух позиций,
+сериализует книгу и проверяет все последующие остатки отдельно по корзинам.
+ALLOCATION имеет собственную event identity; CLASSIFICATION переносит лишь
+свободный остаток; отмены добавляют датированное обратное событие.
+
+`app:settlement:verify <companyId>` независимо воспроизводит первичные факты;
+`app:settlement:rebuild <companyId>` — dry-run, запись только `--execute`.
+Maintenance Action: CompanyFacade::lockFinancialMaintenance (exclusive company),
+затем Cash в сортировке ID (включая ссылки Finance), Finance, книга.
+FinanceFacade::getSettlementSourceCashIds подготавливает общий порядок;
+optional prelockedCashIds не допускает позднее получение нового Cash вне порядка.
+Изменившийся fingerprint активного источника запрещает rebuild. Первичные
+документы, позиции и распределения не переписываются; восстанавливаются только
+движения и source links с активным документом и датой последней отмены.
+Производственный execute требует отдельного именованного одобрения владельца.

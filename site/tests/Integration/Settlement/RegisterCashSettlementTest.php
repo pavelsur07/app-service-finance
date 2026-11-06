@@ -55,6 +55,16 @@ final class RegisterCashSettlementTest extends IntegrationTestCase
         self::assertSame('4000000', (string) $this->connection->fetchOne('SELECT SUM(delta_amount_minor) FROM settlement_movements WHERE company_id = ?', [$companyId]));
         self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM cash_transaction WHERE company_id = ?', [$companyId]));
         self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM documents WHERE company_id = ?', [$companyId]));
+        $links = $this->connection->fetchAllAssociative('SELECT source_type,source_id,active_document_id,last_reversal_date FROM settlement_source_links WHERE company_id=?', [$companyId]);
+        $history = $this->connection->fetchAllAssociative('SELECT effective_date,bucket,SUM(delta_amount_minor)::text AS amount FROM settlement_movements WHERE company_id=? GROUP BY effective_date,bucket ORDER BY effective_date,bucket', [$companyId]);
+        $this->connection->executeStatement('DELETE FROM settlement_movements WHERE company_id=?', [$companyId]);
+        $this->connection->executeStatement('DELETE FROM settlement_source_links WHERE company_id=?', [$companyId]);
+        $reconcile = self::getContainer()->get(\App\Settlement\Application\ReconcileSettlementRegisterAction::class);
+        self::assertCount(2, $reconcile($companyId)->differences);
+        $reconcile($companyId, true);
+        self::assertSame([], $reconcile($companyId)->differences);
+        self::assertSame($links, $this->connection->fetchAllAssociative('SELECT source_type,source_id,active_document_id,last_reversal_date FROM settlement_source_links WHERE company_id=?', [$companyId]));
+        self::assertSame($history, $this->connection->fetchAllAssociative('SELECT effective_date,bucket,SUM(delta_amount_minor)::text AS amount FROM settlement_movements WHERE company_id=? GROUP BY effective_date,bucket ORDER BY effective_date,bucket', [$companyId]));
     }
 
     /** @return iterable<string, array{string}> */

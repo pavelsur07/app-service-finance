@@ -20,6 +20,19 @@ use Ramsey\Uuid\Uuid;
  */
 final class CounterpartyFacade
 {
+    /** @param list<string> $ids
+     * @return array<string,string>
+     */
+    public function getLabelsByIds(string $companyId, array $ids): array
+    {
+        if (!Uuid::isValid($companyId)) {
+            return [];
+        }
+        $ids = array_values(array_filter($ids, static fn (string $id): bool => Uuid::isValid($id)));
+
+        return $this->repository->getLabelsByIds($companyId, $ids);
+    }
+
     public function __construct(
         private readonly CounterpartyRepository $repository,
         private readonly EntityManagerInterface $entityManager,

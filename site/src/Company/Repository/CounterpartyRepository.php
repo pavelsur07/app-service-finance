@@ -16,6 +16,19 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class CounterpartyRepository extends ServiceEntityRepository
 {
+    /** @param list<string> $ids
+     * @return array<string,string>
+     */
+    public function getLabelsByIds(string $companyId, array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+        $rows = $this->createQueryBuilder('c')->select('c.id, COALESCE(c.displayName,c.name) AS label')->where('c.company=:company')->andWhere('c.id IN (:ids)')->setParameter('company', $companyId)->setParameter('ids', $ids)->getQuery()->getArrayResult();
+
+        return array_column($rows, 'label', 'id');
+    }
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Counterparty::class);

@@ -65,9 +65,18 @@ final class FinanceFacade
     ) {
     }
 
-    public function getSettlementSourceForUpdate(string $companyId, string $documentId): \App\Finance\Application\DTO\FinanceSettlementSource
+    /** @param ?list<string> $prelockedCashIds */
+    public function getSettlementSourceForUpdate(string $companyId, string $documentId, ?array $prelockedCashIds = null): \App\Finance\Application\DTO\FinanceSettlementSource
     {
-        return $this->settlementSourceQuery->getForUpdate($companyId, $documentId);
+        return $this->settlementSourceQuery->getForUpdate($companyId, $documentId, $prelockedCashIds);
+    }
+
+    /** @param list<string> $documentIds
+     * @return list<string>
+     */
+    public function getSettlementSourceCashIds(string $companyId, array $documentIds): array
+    {
+        return $this->settlementSourceQuery->getCashIds($companyId, $documentIds);
     }
 
     /**

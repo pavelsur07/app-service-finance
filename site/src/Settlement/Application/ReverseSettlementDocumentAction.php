@@ -74,7 +74,7 @@ final readonly class ReverseSettlementDocumentAction
                     }
                 }
             }
-            $reversal = new SettlementDocument($companyId, $input->requestId, SettlementDocumentKind::DOCUMENT_REVERSAL, $original->getCounterpartyId(), $original->getBucket(), $original->getAmount(), $input->effectiveDate, null, $input->reason, $actorUserId, SettlementSourceType::MANUAL, null, [], $documentId);
+            $reversal = new SettlementDocument($companyId, $input->requestId, SettlementDocumentKind::ALLOCATION === $original->getKind() ? SettlementDocumentKind::ALLOCATION_REVERSAL : SettlementDocumentKind::DOCUMENT_REVERSAL, $original->getCounterpartyId(), $original->getBucket(), $original->getAmount(), $input->effectiveDate, null, $input->reason, $actorUserId, SettlementSourceType::MANUAL, null, [], $documentId);
             $reversal->post(1, $book->takeEventSequence());
             $this->em->persist($reversal);
             foreach ($movements as $movement) {
@@ -82,7 +82,9 @@ final readonly class ReverseSettlementDocumentAction
             }
             if (SettlementSourceType::MANUAL !== $original->getSourceType() && null !== $original->getSourceId()) {
                 $link = $this->em->getRepository(SettlementSourceLink::class)->findOneBy(['companyId' => $companyId, 'sourceType' => $original->getSourceType(), 'sourceId' => $original->getSourceId()]);
-                if (null !== $link) { $this->em->refresh($link); }
+                if (null !== $link) {
+                    $this->em->refresh($link);
+                }
                 if (null === $link || $link->getActiveDocumentId() !== $documentId) {
                     throw new \DomainException('Активная связь источника не соответствует документу.');
                 }
