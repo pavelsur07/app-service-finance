@@ -1,6 +1,6 @@
 # stock-turnover-report — handoff
 
-**Branch:** `feat/stock-turnover-report` · **PR:** (будет заполнено) · **CI:** GitHub Actions на PR, обязательные job’ы зелёные перед merge
+**Branch:** `feat/stock-turnover-report` · **PR:** https://github.com/pavelsur07/app-service-finance/pull/2903 · **CI:** GitHub Actions на PR, обязательные job’ы зелёные перед merge
 
 ## Summary of stages
 - Stage 1 — `InventoryFacade::getStockQtyByListingOnReportDate()` получил `?FulfillmentScheme $scheme`; `TurnoverBucket`, `StockTurnoverPolicy`
@@ -62,5 +62,5 @@
 - Скриншоты: `docs/tasks/stock-turnover-report/screenshots/` (общий вид с устаревшим WB, корзина «свыше 90», схема FBS).
 
 ## Owner decision
-Ready: PR #N «feat(marketplace-analytics): отчёт «Оборачиваемость» — где заморожены деньги» — merge into master with automatic production deploy?
-Reply: "merge and deploy #N"
+Ready: PR #2903 «feat(marketplace-analytics): отчёт «Оборачиваемость» — где заморожены деньги» — merge into master with automatic production deploy?
+Reply: "merge and deploy #2903"
