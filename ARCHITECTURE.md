@@ -5445,3 +5445,18 @@ SettlementBook FOR UPDATE → позиции по отсортированным
 `CompanyFacade::getFinanceLockBefore(string $companyId): ?DateTimeImmutable`
 читает текущую границу через DBAL CompanyRepository, обходя кэш сущности Company;
 потребитель вызывает его под блокировкой company в транзакции мутации.
+
+### Settlement source contracts (Stage2 in progress)
+
+`CashFacade::getSettlementSourceForUpdate(string $companyId, string $transactionId): CashSettlementSource`
+requires an active caller transaction; company-scoped DBAL projection locks current Cash row and returns
+id/company/counterparty, Money amount, date, CashDirection, deleted/transfer flags, fingerprint.
+`FinanceFacade::getSettlementSourceForUpdate(string $companyId, string $documentId): FinanceSettlementSource`
+locks linked Cash before Finance header and returns header status/type/source, counterparty/date,
+sorted operation IDs/fingerprint and optional linked Cash ID. No P&L float total is read.
+Both methods perform no flush/commit; transaction belongs to the Settlement Action.
+
+RegisterCashSettlementAction includes payment once via active source link and preserves original
+Cash allocatedAmount. CreateSettlementFromFinanceAction creates a draft with explicitly supplied Money;
+PostSettlementDocumentAction rereads source/fingerprint before activating link and creating debt.
+Source mutations are not yet guarded (Work item2.3 pending); do not release this intermediate state.

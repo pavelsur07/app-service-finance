@@ -76,6 +76,11 @@ final readonly class CashFacade
     ) {
     }
 
+    public function getSettlementSourceForUpdate(string $companyId, string $transactionId): \App\Cash\Application\DTO\CashSettlementSource
+    {
+        return $this->cashTransactionRepository->getSettlementSourceForUpdate($companyId, $transactionId);
+    }
+
     /**
      * Подсказки статей ИИ компании, запрошенные с момента: по статусам и решения людей
      * (страница «ИИ» кабинета в админке). С `$occurredFrom` — ещё и число операций без статьи,
@@ -217,7 +222,7 @@ final readonly class CashFacade
      * транзакции вызывающего (`wrapInTransaction()`): коммитит он, вместе со своим курсором.
      *
      * @throws StatementImportOutsideTransactionException транзакция не открыта
-     * @throws StatementImportTargetNotFoundException счёт не принадлежит компании
+     * @throws StatementImportTargetNotFoundException     счёт не принадлежит компании
      */
     public function importBankStatementDay(
         string $companyId,

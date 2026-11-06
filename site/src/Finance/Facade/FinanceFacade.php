@@ -48,6 +48,7 @@ use Ramsey\Uuid\Uuid;
 final class FinanceFacade
 {
     public function __construct(
+        private readonly \App\Cash\Facade\CashFacade $cashFacade,
         private readonly CreatePLDocumentAction $createAction,
         private readonly DeletePLDocumentAction $deleteAction,
         private readonly CounterpartyRepository $counterpartyRepository,
@@ -62,6 +63,28 @@ final class FinanceFacade
         private readonly CompanyFacade $companyFacade,
         private readonly PlFactMonthlyAmountsQuery $plFactMonthlyAmounts,
     ) {
+    }
+
+    public function getSettlementSourceForUpdate(string $companyId, string $documentId): \App\Finance\Application\DTO\FinanceSettlementSource
+    {
+        $db = $this->entityManager->getConnection();
+        if (!$db->isTransactionActive()) {
+            throw new \LogicException('Snapshot requires a transaction.');
+        }
+        $cashId = $db->fetchOne('SELECT cash_transaction_id FROM documents WHERE company_id = :company AND id = :id', ['company' => $companyId, 'id' => $documentId]);
+        if (false === $cashId) {
+            throw new \DomainException('Документ ОПиУ не найден.');
+        }
+        if (null !== $cashId) {
+            $this->cashFacade->getSettlementSourceForUpdate($companyId, (string) $cashId);
+        }
+        $row = $db->fetchAssociative('SELECT id, company_id, counterparty_id, date, deleted_at, status, type, source, cash_transaction_id FROM documents WHERE company_id = :company AND id = :id FOR UPDATE', ['company' => $companyId, 'id' => $documentId]);
+        if (false === $row || $row['cash_transaction_id'] !== $cashId) {
+            throw new \DomainException('Документ ОПиУ изменён параллельно.');
+        }
+        $operations = $db->fetchAllAssociative('SELECT id, amount, category_id, project_direction_id, responsibility_center_id FROM document_operations WHERE document_id = :id ORDER BY id', ['id' => $documentId]);
+
+        return new \App\Finance\Application\DTO\FinanceSettlementSource((string) $row['id'], $companyId, null === $row['counterparty_id'] ? null : (string) $row['counterparty_id'], new \DateTimeImmutable((string) $row['date']), null !== $row['deleted_at'], DocumentStatus::from((string) $row['status']), DocumentType::from((string) $row['type']), array_map(static fn (array $operation): string => (string) $operation['id'], $operations), hash('sha256', json_encode([$row, $operations], JSON_THROW_ON_ERROR)), null === $row['source'] ? null : PLDocumentSource::from((string) $row['source']), null === $cashId ? null : (string) $cashId);
     }
 
     /**
@@ -101,13 +124,13 @@ final class FinanceFacade
     /**
      * Создаёт документ ОПиУ с набором строк.
      *
-     * @param string $companyId UUID компании
-     * @param PLDocumentSource $source Источник данных (WB, Ozon, manual...)
-     * @param PLDocumentStream $stream Поток (revenue, costs, storno)
-     * @param string $periodFrom Начало периода (Y-m-d)
-     * @param string $periodTo Конец периода (Y-m-d)
-     * @param array $entries Массив PLEntryDTO[]
-     * @param string|null $projectDirectionId UUID проекта ОПиУ для документа и строк (nullable)
+     * @param string           $companyId          UUID компании
+     * @param PLDocumentSource $source             Источник данных (WB, Ozon, manual...)
+     * @param PLDocumentStream $stream             Поток (revenue, costs, storno)
+     * @param string           $periodFrom         Начало периода (Y-m-d)
+     * @param string           $periodTo           Конец периода (Y-m-d)
+     * @param array            $entries            Массив PLEntryDTO[]
+     * @param string|null      $projectDirectionId UUID проекта ОПиУ для документа и строк (nullable)
      *
      * @return string documentId (UUID созданного документа)
      */
@@ -174,8 +197,8 @@ final class FinanceFacade
      * PlPreviewResult::$unplaced.
      *
      * @param list<PlPreviewColumn> $columns
-     * @param string|null $natureBaseColumn колонка-итог: знак статьи по ней, остальные колонки —
-     *                                      линейные доли, складываются в итог
+     * @param string|null           $natureBaseColumn колонка-итог: знак статьи по ней, остальные колонки —
+     *                                                линейные доли, складываются в итог
      */
     public function calculatePlPreview(
         string $companyId,

@@ -1,9 +1,9 @@
 ## Current checkpoint
 
-**Phase:** Stage 1 / Work item 1.2
-**Status:** reviewing
+**Phase:** Stage 2 / Work item 2.3
+**Status:** implementing
 **Task base commit:** 4fdad15c974830d13ff9342d1f40a526f3b5bd33
-**Stage base commit:** 4fdad15c974830d13ff9342d1f40a526f3b5bd33
+**Stage base commit:** 66e666657
 **Branch:** feat/counterparty-settlements
 **Worktree:** /home/deploy/.codex/worktrees/3821/app-service-finance
 
@@ -27,7 +27,7 @@
 - external: pending at required Stage/handoff points
 
 ### Exact next action
-- Await/read external Stage1 review, fix confirmed findings; finish Stage Report, commit/push fixes, continue Stage2 automatically. Source adapters and later Stages not implemented.
+- Write red Cash registration tests, add source snapshot Facade/DTO and RegisterCashSettlementAction; preserve company → Cash → book lock order. Stage2/3/4/5 not yet complete.
 
 ### Files to inspect first on resume
 - TASK.md, plan.md, checkpoint.md, git status.
@@ -67,3 +67,19 @@
 ### Stage1 closure
 - External review completed one round: BLOCKER0, IMPORTANT1, MINOR3; all fixed. IMPORTANT was missing dependency-reversal coverage, now 3 explicit cases pass. External result: fixed without re-run per AGENTS7.2.
 - Final Stage1 tests PASS27 /103; focused PHPStan and CS checked. No open B/I. Stage Report saved; continue Stage2 automatically.
+
+### Work item2.1
+- Cash snapshot Facade/DTO added with scoped locked DBAL projection, no stale ORM source.
+- RegisterCashSettlementAction posts Money PAYMENT/item/movement and active link; source Cash/legacy allocation untouched.
+- Reverse source document now locks Cash before book and clears source link with lastReversalDate; repeated reinclusion respects history.
+- Registration test red missing Action, then reinclusion failed until link lifecycle fixed. PASS7 tests /35 assertions, focused PHPStan PASS, CS applied.
+- Source guard integration still pending Work item2.3; source adapter alone is not safe for release.
+- Next: Finance source snapshot and explicit obligation draft; post must reread/fingerprint under source locks.
+
+### Work item2.2
+- Finance locked snapshot DTO/Facade with Cash-before-Finance order; explicit full Money amount creates draft only.
+- Posting revalidates source eligibility/fingerprint, activates unique source link. Changed date/operation amount and duplicate active obligation were red (3 real assertion failures), then green.
+- Cancellation releases Finance link using source-before-book locking.
+- Settlement current tests PASS38 /160; focused PHPStan PASS, CS applied.
+- Next Work item2.3: source-owned events/lifecycle guards and all inventory write paths; these are NOT implemented yet, so feature remains unsafe to release.
+- Snapshot query should be factored out of FinanceFacade before injecting guard into DeletePLDocumentAction, to avoid FinanceFacade → Action → guard → FinanceFacade DI cycle. Reuse one fingerprint builder for stored vs in-memory form state.
