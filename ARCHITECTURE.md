@@ -3673,7 +3673,7 @@ buildQueryBuilder(
   (`FulfillmentScheme::FBS_TYPES`); строка без типа — FBO. Каждая строка снимка попадает ровно в одну схему,
   поэтому сумма «Доступно расчётно» по FBO и FBS равна прежнему общему значению;
 - `findEffectiveSnapshotDate(companyId, source, scheme, date): ?\DateTimeImmutable` —
-  `MAX(snapshot_date)` при `snapshot_date <= :date` **внутри схемы**, то есть семантика «остатки **на** дату»:
+  последний `snapshot_date <= :date` (`ORDER BY … DESC LIMIT 1` по индексу) **внутри схемы**, то есть семантика «остатки **на** дату»:
   в день без синхронизации (или без строк выбранной схемы) берётся ближайший предыдущий снимок.
   `null` — снимков на эту дату и раньше нет;
 - `getPage(companyId, page, perPage, source, scheme, snapshotDate, breakdownColumns = [])` — выборка одного дня
@@ -4690,6 +4690,9 @@ InventoryRawSnapshot: sourceEndpoint = '/api/v3/stocks/<id>', requestParams.ware
   полным остатком дня, и отчёт в режиме FBS показал бы его вместо предыдущего полного дня.
 - Баркоды передаются в WB строками (`array_map(strval(...), array_keys(...))`): числовой баркод PHP
   делает int-ключом массива.
+- `fetchSellerWarehouseStocks()` принимает только ответ со списком `stocks` из объектов с `sku`; HTTP 200
+  другой формы — `WbInventoryApiException`, и фаза отбрасывается целиком (иначе страница сохранилась бы,
+  нормализатор её пропустил бы, и неполный набор складов выглядел бы полным).
 - Повторная доставка: FBW-страницы и FBS-страницы различаются по `sourceEndpoint`; при наличии хотя бы
   одной FBS-страницы фаза не повторяется.
 - Нормализатор `WbSellerWarehouseStocksRawNormalizer` берёт только страницы с префиксом `/api/v3/stocks/`:

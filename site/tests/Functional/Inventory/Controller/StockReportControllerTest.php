@@ -264,7 +264,7 @@ final class StockReportControllerTest extends WebTestCaseBase
 
         $owner = UserBuilder::aUser()->withEmail('stocks-fbs-scheme@example.test')->build();
         $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112015')->withOwner($owner)->build();
-        $location = LocationBuilder::aLocation()->withCompanyId($company->getId())->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
 
         $this->persist(
             $owner,
@@ -310,7 +310,7 @@ final class StockReportControllerTest extends WebTestCaseBase
 
         $owner = UserBuilder::aUser()->withEmail('stocks-no-type@example.test')->build();
         $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112016')->withOwner($owner)->build();
-        $location = LocationBuilder::aLocation()->withCompanyId($company->getId())->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
 
         $this->persist(
             $owner,
@@ -339,7 +339,7 @@ final class StockReportControllerTest extends WebTestCaseBase
 
         $owner = UserBuilder::aUser()->withEmail('stocks-scheme-date@example.test')->build();
         $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112017')->withOwner($owner)->build();
-        $location = LocationBuilder::aLocation()->withCompanyId($company->getId())->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
 
         $this->persist(
             $owner,

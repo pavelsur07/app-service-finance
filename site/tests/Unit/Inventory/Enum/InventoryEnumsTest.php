@@ -24,7 +24,7 @@ final class InventoryEnumsTest extends TestCase
                 'mp_in_transit_from_customer',
                 'seller_warehouse',
             ],
-            array_map(static fn (LocationType $case): string => $case->value, LocationType::cases()),
+            self::backingValues(LocationType::class),
         );
     }
 
@@ -90,8 +90,24 @@ final class InventoryEnumsTest extends TestCase
         self::assertSame(FulfillmentScheme::Fbo, FulfillmentScheme::fromFulfillmentType('fbw'));
         self::assertSame(FulfillmentScheme::Fbo, FulfillmentScheme::fromFulfillmentType(null));
         self::assertSame(FulfillmentScheme::Fbo, FulfillmentScheme::fromFulfillmentType(''));
-        self::assertSame(['fbo', 'fbs'], array_map(static fn (FulfillmentScheme $case): string => $case->value, FulfillmentScheme::cases()));
+        self::assertSame(['fbo', 'fbs'], self::backingValues(FulfillmentScheme::class));
         self::assertSame('FBO', FulfillmentScheme::Fbo->label());
         self::assertSame('FBS', FulfillmentScheme::Fbs->label());
+    }
+
+    /**
+     * Через Reflection, а не ::cases(): PHPStan знает значения cases() и считает сравнение
+     * с литералом всегда истинным (alreadyNarrowedType).
+     *
+     * @param class-string<\BackedEnum> $enum
+     *
+     * @return list<string>
+     */
+    private static function backingValues(string $enum): array
+    {
+        return array_values(array_map(
+            static fn (\ReflectionEnumBackedCase $case): string => (string) $case->getBackingValue(),
+            (new \ReflectionEnum($enum))->getCases(),
+        ));
     }
 }

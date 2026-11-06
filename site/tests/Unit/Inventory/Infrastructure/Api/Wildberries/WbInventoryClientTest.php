@@ -210,4 +210,30 @@ final class WbInventoryClientTest extends TestCase
         $this->expectException(WbInventoryApiException::class);
         $client->fetchSellerWarehouses('test-token');
     }
+
+    #[DataProvider('invalidSellerStocksPayloadProvider')]
+    public function testSellerWarehouseStocksRejectsPayloadWithoutStocksList(string $payload): void
+    {
+        $client = new WbInventoryClient(new MockHttpClient(new MockResponse($payload, ['http_code' => 200])));
+
+        $this->expectException(WbInventoryApiException::class);
+        $client->fetchSellerWarehouseStocks('test-token', 7, ['b1']);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function invalidSellerStocksPayloadProvider(): iterable
+    {
+        yield 'empty object' => ['{}'];
+        yield 'stocks null' => ['{"stocks":null}'];
+        yield 'stocks not list' => ['{"stocks":{"sku":"b1"}}'];
+        yield 'non-object item' => ['{"stocks":[1]}'];
+        yield 'item without sku' => ['{"stocks":[{"amount":1}]}'];
+    }
+
+    public function testSellerWarehouseStocksAcceptsEmptyList(): void
+    {
+        $client = new WbInventoryClient(new MockHttpClient(new MockResponse('{"stocks":[]}', ['http_code' => 200])));
+
+        self::assertSame(['stocks' => []], $client->fetchSellerWarehouseStocks('test-token', 7, ['b1']));
+    }
 }

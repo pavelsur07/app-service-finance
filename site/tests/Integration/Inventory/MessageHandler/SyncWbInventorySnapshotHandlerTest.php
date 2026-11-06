@@ -407,7 +407,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
         $session->markInProgress();
         $session->incrementReceivedPages(2);
         $this->em->persist(new InventoryRawSnapshot(
-            companyId: $company->getId(),
+            companyId: (string) $company->getId(),
             snapshotSessionId: $session->getId(),
             source: MarketplaceType::WILDBERRIES,
             sourceEndpoint: WbInventoryClient::ENDPOINT,
@@ -420,7 +420,7 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
             pageNumber: 1,
         ));
         $this->em->persist(new InventoryRawSnapshot(
-            companyId: $company->getId(),
+            companyId: (string) $company->getId(),
             snapshotSessionId: $session->getId(),
             source: MarketplaceType::WILDBERRIES,
             sourceEndpoint: WbInventoryClient::SELLER_STOCKS_ENDPOINT.'/7',
@@ -510,6 +510,30 @@ final class SyncWbInventorySnapshotHandlerTest extends IntegrationTestCase
             ['session' => $session->getId()],
         );
         self::assertSame(['fbw'], $types);
+    }
+
+    public function testSellerStocksPageWithoutStocksListDiscardsWholeSellerPhase(): void
+    {
+        $company = $this->createCompany(726);
+        $connection = $this->createConnection($company, 726);
+        $session = $this->createSession($company);
+        $this->swapHttpClient([
+            $this->catalogResponse([$this->card(126, [[1261, 'S', 'barcode-726-s']])]),
+            $this->catalogResponse([]),
+            $this->inventoryResponse([$this->stock(126, 1261, 507, 4)]),
+            $this->sellerWarehousesResponse([['id' => 7, 'name' => 'Склад А'], ['id' => 8, 'name' => 'Склад Б']]),
+            $this->sellerStocksResponse([['sku' => 'barcode-726-s', 'amount' => 3]]),
+            new MockResponse('{}', ['http_code' => 200]),
+        ]);
+
+        ($this->handler())($this->message($company, $connection, $session));
+
+        $this->em->refresh($session);
+        // HTTP 200 без списка stocks — нарушение контракта, а не «пустой склад»: фаза отбрасывается целиком.
+        self::assertSame(SnapshotSessionStatus::Completed, $session->getStatus());
+        $raw = $this->rawSnapshots($session);
+        self::assertCount(1, $raw);
+        self::assertSame(WbInventoryClient::ENDPOINT, $raw[0]->getSourceEndpoint());
     }
 
     private function handler(int $pageLimit = WbInventoryClient::DEFAULT_LIMIT, ?MessageBusInterface $messageBus = null): SyncWbInventorySnapshotHandler

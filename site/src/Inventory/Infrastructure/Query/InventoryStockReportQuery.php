@@ -31,8 +31,8 @@ final class InventoryStockReportQuery
     }
 
     /**
-     * Остатки «на дату»: ближайший день со снимком не позже запрошенной даты.
-     * null — снимков по источнику на эту дату и раньше нет.
+     * Остатки «на дату»: ближайший день не позже запрошенной даты, в котором есть строки
+     * выбранной схемы. null — таких строк по источнику на эту дату и раньше нет.
      */
     public function findEffectiveSnapshotDate(string $companyId, MarketplaceType $source, FulfillmentScheme $scheme, \DateTimeImmutable $date): ?\DateTimeImmutable
     {

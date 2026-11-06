@@ -11781,12 +11781,6 @@ parameters:
 			path: tests/Unit/Inventory/Enum/InventoryEnumsTest.php
 
 		-
-			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with array\{''mp_warehouse'', ''mp_acceptance'', ''mp_in_transit_to…'', ''mp_in_transit_from…''\} and array\{''mp_warehouse'', ''mp_acceptance'', ''mp_in_transit_to…'', ''mp_in_transit_from…''\} will always evaluate to true\.$#'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Unit/Inventory/Enum/InventoryEnumsTest.php
-
-		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with array\{''pending'', ''in_progress'', ''completed'', ''partial'', ''failed''\} and array\{''pending'', ''in_progress'', ''completed'', ''partial'', ''failed''\} will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1

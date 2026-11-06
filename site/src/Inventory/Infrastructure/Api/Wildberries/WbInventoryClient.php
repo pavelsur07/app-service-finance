@@ -106,6 +106,18 @@ final readonly class WbInventoryClient
         /** @var array<string, mixed> $decoded */
         $decoded = $this->requestJson($apiKey, 'POST', self::MARKETPLACE_BASE_URL, self::SELLER_STOCKS_ENDPOINT.'/'.$warehouseId, ['skus' => $barcodes]);
 
+        // HTTP 200 без списка stocks — нарушение контракта, а не пустой склад: иначе такая
+        // страница сохранилась бы, нормализатор её молча пропустил бы, и фаза выглядела бы полной.
+        $stocks = $decoded['stocks'] ?? null;
+        if (!is_array($stocks) || !array_is_list($stocks)) {
+            throw new WbInventoryApiException('WB Inventory API returned unexpected seller stocks structure.');
+        }
+        foreach ($stocks as $stock) {
+            if (!is_array($stock) || !array_key_exists('sku', $stock)) {
+                throw new WbInventoryApiException('WB Inventory API returned a seller stock item without sku.');
+            }
+        }
+
         return $decoded;
     }
 

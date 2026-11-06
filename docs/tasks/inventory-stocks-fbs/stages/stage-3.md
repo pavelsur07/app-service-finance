@@ -42,7 +42,10 @@
 - required: yes (HIGH-LOCAL); round 1 (Codex): 2 IMPORTANT, оба подтверждены и исправлены с регрессионными тестами:
   числовые баркоды уходили в WB числами (`testNumericBarcodesAreSentToSellerStocksAsStrings`);
   частичная FBS-фаза публиковала неполный остаток (`testSellerPhaseFailureAfterFirstPageDiscardsSellerPages`,
-  страницы фазы теперь сохраняются только все вместе). Round 2 — см. handoff.md
+  страницы фазы теперь сохраняются только все вместе). Round 2 (Codex): 1 IMPORTANT, исправлен — HTTP 200 без
+  списка `stocks` проходил в raw и давал частичную фазу; клиент теперь валидирует ответ
+  (`testSellerWarehouseStocksRejectsPayloadWithoutStocksList`, `testSellerStocksPageWithoutStocksListDiscardsWholeSellerPhase`).
+  Round 3 и независимый whole-branch review — см. handoff.md
 
 #### Risks / reviewer focus
 - токен и тело ответа не логируются; `flush()` только в обработчике/Action
