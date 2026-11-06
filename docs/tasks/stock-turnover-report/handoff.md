@@ -25,7 +25,7 @@
 - none
 
 ## Public API / contract changes
-- Новые маршруты `GET /marketplace-analytics/stock-turnover` и `GET /marketplace-analytics/stock-turnover/export.xlsx` (`ROLE_COMPANY_USER`).
+- Новые маршруты `GET /inventory/stock-turnover` и `GET /inventory/stock-turnover/export.xlsx` (`ROLE_COMPANY_USER`).
 - `InventoryFacade::getStockQtyByListingOnReportDate(companyId, date, ?marketplace, ?scheme = null)` — новый необязательный параметр; существующие вызовы не меняются.
 - Messenger routing, cron, схема БД — без изменений.
 

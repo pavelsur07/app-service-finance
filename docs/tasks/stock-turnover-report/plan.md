@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Страница `/marketplace-analytics/stock-turnover`: по каждому листингу с остатком — дней запаса, деньги в товаре, корзина; сводка «всего / заморожено»; экспорт xlsx.
+**Goal:** Страница `/inventory/stock-turnover`: по каждому листингу с остатком — дней запаса, деньги в товаре, корзина; сводка «всего / заморожено»; экспорт xlsx.
 
 **Architecture:** Новый `StockTurnoverQuery` в MarketplaceAnalytics собирает строки из трёх Facade (остатки — Inventory, продажи и себестоимость — Marketplace) в PHP; классификация — чистая `StockTurnoverPolicy`; UI — Twig в легаси-слое по DS с Pagerfanta `ArrayAdapter`; экспорт — OpenSpout по образцу `UnitExtendedXlsxExporter`. Inventory получает один необязательный параметр схемы в существующем запросе остатков.
 
@@ -17,7 +17,7 @@
 - Границы модулей: MarketplaceAnalytics импортирует только `App\Inventory\Facade\*`, `App\Marketplace\Facade\*`, `App\Marketplace\DTO\*`, `App\Inventory\Application\DTO\*`, `App\Inventory\Enum\FulfillmentScheme`; никакого SQL по чужим таблицам из MarketplaceAnalytics.
 - Деньги в Twig — `vf_money`, количества — `vf_number` (0 знаков); числа `text-end vf-num`; без хардкода цветов.
 - Query возвращает DTO, не `array`; Pagerfanta, `perPage = 50`.
-- Доступ `ROLE_COMPANY_USER`; маршруты `marketplace_analytics_stock_turnover_index` и `marketplace_analytics_stock_turnover_export`.
+- Доступ `ROLE_COMPANY_USER`; маршруты `inventory_stock_turnover_index` и `inventory_stock_turnover_export`.
 - Корзины: `<30` / `30 ≤ d < 60` / `60 ≤ d ≤ 90` / `> 90` / «нет продаж»; `period ∈ {30, 60, 90}`, по умолчанию 30.
 - Коммиты с pathspec, trailer `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`; ARCHITECTURE.md обновляется в той же задаче (Changelog 2.152).
 
@@ -175,7 +175,7 @@ public function testSchemeFbsUsesOnlySellerWarehouseRows(): void   // A: fbo 400
 
 **Interfaces:**
 - Consumes: `StockTurnoverQuery::execute(StockTurnoverFilter)` (Task 3), `ListingTagFacade::list(companyId): list<ListingTagDTO{id,name}>`, `partials/_pagination.html.twig` с `pager`.
-- Produces: маршрут `GET /marketplace-analytics/stock-turnover` (`marketplace_analytics_stock_turnover_index`); render-переменные `pager` (Pagerfanta `ArrayAdapter` по `report->rows`, 50 на страницу), `summary`, `filter`, `periods` ([30, 60, 90]), `sources`, `schemes` (`FulfillmentScheme::cases()`), `buckets` (`TurnoverBucket::cases()`), `tags`; `final readonly class StockTurnoverFilterParser { public function parse(Request $request, string $companyId): StockTurnoverFilter; }` (общий для страницы и экспорта) — `period` не из {30,60,90} → 30; `source` не из `MarketplaceType` → null; `scheme` не `fbo|fbs` → null; `bucket` не из enum → null; `date` не `Y-m-d` или в будущем → сегодня; `tags[]` — только валидные UUID.
+- Produces: маршрут `GET /inventory/stock-turnover` (`inventory_stock_turnover_index`); render-переменные `pager` (Pagerfanta `ArrayAdapter` по `report->rows`, 50 на страницу), `summary`, `filter`, `periods` ([30, 60, 90]), `sources`, `schemes` (`FulfillmentScheme::cases()`), `buckets` (`TurnoverBucket::cases()`), `tags`; `final readonly class StockTurnoverFilterParser { public function parse(Request $request, string $companyId): StockTurnoverFilter; }` (общий для страницы и экспорта) — `period` не из {30,60,90} → 30; `source` не из `MarketplaceType` → null; `scheme` не `fbo|fbs` → null; `bucket` не из enum → null; `date` не `Y-m-d` или в будущем → сегодня; `tags[]` — только валидные UUID.
 
 Экран (DS: карточка фильтров → карточка сводки → таблица `vf-table`):
 
@@ -220,7 +220,7 @@ public function testTabIsPresentInAnalyticsTabs(): void             // ссыл�
 
 **Interfaces:**
 - Consumes: `StockTurnoverQuery`, `StockTurnoverFilterParser::parse()` (Task 4), `ReportsApiRateLimiter`, `OpenSpout\Writer\XLSX\Writer` как в `UnitExtendedXlsxExporter`.
-- Produces: `GET /marketplace-analytics/stock-turnover/export.xlsx` (`marketplace_analytics_stock_turnover_export`), `StreamedResponse` с `Content-Disposition: attachment; filename="stock-turnover-<date>-<period>d.xlsx"`; `StockTurnoverXlsxExporter::export(StockTurnoverReport $report, string $outputPath): void` — лист 1 строки: `Листинг ID, Товар, SKU, Артикул продавца, Источник, Остаток, Продано за период, Продаж в день, Дней запаса, Себестоимость, В деньгах, Корзина`; лист 2 «Сводка» — всего, заморожено, доля, по корзинам, без себестоимости.
+- Produces: `GET /inventory/stock-turnover/export.xlsx` (`inventory_stock_turnover_export`), `StreamedResponse` с `Content-Disposition: attachment; filename="stock-turnover-<date>-<period>d.xlsx"`; `StockTurnoverXlsxExporter::export(StockTurnoverReport $report, string $outputPath): void` — лист 1 строки: `Листинг ID, Товар, SKU, Артикул продавца, Источник, Остаток, Продано за период, Продаж в день, Дней запаса, Себестоимость, В деньгах, Корзина`; лист 2 «Сводка» — всего, заморожено, доля, по корзинам, без себестоимости.
 
 - [ ] **Step 1: Write the failing test**
 

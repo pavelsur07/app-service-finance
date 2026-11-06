@@ -30,7 +30,7 @@ final class StockTurnoverExportController extends AbstractController
     ) {
     }
 
-    #[Route('/marketplace-analytics/stock-turnover/export.xlsx', name: 'marketplace_analytics_stock_turnover_export', methods: ['GET'])]
+    #[Route('/inventory/stock-turnover/export.xlsx', name: 'inventory_stock_turnover_export', methods: ['GET'])]
     public function __invoke(Request $request): Response
     {
         $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();

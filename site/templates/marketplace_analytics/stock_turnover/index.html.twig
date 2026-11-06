@@ -1,17 +1,15 @@
-{% extends 'base.html.twig' %}
+{% extends 'inventory/layout.html.twig' %}
 
-{% block title %}Оборачиваемость — Аналитика маркетплейсов{% endblock %}
+{% set active_tab = 'stock_turnover' %}
 
-{% block content %}
+{% block title %}Оборачиваемость — Товары и остатки{% endblock %}
+
+{% block tab_content %}
+    <div class="p-3">
     {% set bucket_classes = {fast: 'bg-green-lt', medium: 'bg-azure-lt', slow: 'bg-yellow-lt', frozen: 'bg-red-lt', no_sales: 'bg-secondary-lt'} %}
-    {% include 'marketplace_analytics/_tabs.html.twig' with { activeTab: 'stock_turnover' } %}
-
-    <div class="page-body">
-        <div class="container-xl">
-
             <div class="card mb-3">
                 <div class="card-body">
-                    <form method="GET" action="{{ path('marketplace_analytics_stock_turnover_index') }}" class="row g-2 align-items-end">
+                    <form method="GET" action="{{ path('inventory_stock_turnover_index') }}" class="row g-2 align-items-end">
                         <div class="col-auto">
                             <label class="form-label">Период продаж</label>
                             <div class="btn-group" role="group" aria-label="Период продаж">
@@ -66,8 +64,8 @@
                         {% endif %}
                         <div class="col-auto d-flex gap-2">
                             <button type="submit" class="btn btn-primary">Применить</button>
-                            <a href="{{ path('marketplace_analytics_stock_turnover_index') }}" class="btn btn-outline-secondary">Сбросить</a>
-                            <a href="{{ path('marketplace_analytics_stock_turnover_export', app.request.query.all|filter((v, k) => k != 'page')) }}" class="btn btn-outline-secondary">
+                            <a href="{{ path('inventory_stock_turnover_index') }}" class="btn btn-outline-secondary">Сбросить</a>
+                            <a href="{{ path('inventory_stock_turnover_export', app.request.query.all|filter((v, k) => k != 'page')) }}" class="btn btn-outline-secondary">
                                 <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>&nbsp;Excel
                             </a>
                         </div>
@@ -184,6 +182,5 @@
                 {% endif %}
             </div>
 
-        </div>
     </div>
 {% endblock %}

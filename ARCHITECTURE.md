@@ -4127,7 +4127,7 @@ enum TurnoverBucket: string
 
 ### `StockTurnoverQuery` (`src/MarketplaceAnalytics/Infrastructure/Query/StockTurnoverQuery.php`)
 
-Отчёт «Оборачиваемость» (`GET /marketplace-analytics/stock-turnover`): где заморожены деньги.
+Отчёт «Оборачиваемость» (`GET /inventory/stock-turnover`): где заморожены деньги.
 `execute(StockTurnoverFilter): StockTurnoverReport`, без SQL — только Facade:
 
 - остатки: `InventoryFacade::getStockQtyByListingOnReportDate(companyId, date, source, scheme)`
@@ -4148,14 +4148,15 @@ enum TurnoverBucket: string
 `listingsTotal`, `snapshotDateBySource`, `staleSources`. Листинг с продажами без остатка в отчёт
 не попадает. Листинг без меты (удалён) остаётся со `sku = '—'`.
 
-Страница: `StockTurnoverIndexController` (`GET /marketplace-analytics/stock-turnover`,
-`marketplace_analytics_stock_turnover_index`, `ROLE_COMPANY_USER`), вкладка «Оборачиваемость»
-в `_tabs.html.twig`. Параметры разбирает `Application/StockTurnoverFilterParser::parse(Request, companyId)`
+Страница: `StockTurnoverIndexController` (`GET /inventory/stock-turnover`,
+`inventory_stock_turnover_index`, `ROLE_COMPANY_USER`), вкладка «Оборачиваемость» после «Остатки»
+в `templates/inventory/layout.html.twig` («Товары и остатки»); контроллер остаётся в MarketplaceAnalytics,
+как страницы Marketplace в том же layout. Параметры разбирает `Application/StockTurnoverFilterParser::parse(Request, companyId)`
 (общий для страницы и экспорта): невалидное значение → умолчание (`period` 30, `source`/`scheme`/`bucket`
 все, `date` сегодня — будущее тоже, `tags[]` только валидные UUID). Отчёт строится в памяти, страница —
 Pagerfanta `ArrayAdapter` по 50 строк; сводка и баннер «Остатки: … на дату / устарели» — по всем строкам.
-Экспорт: `StockTurnoverExportController` (`GET /marketplace-analytics/stock-turnover/export.xlsx`,
-`marketplace_analytics_stock_turnover_export`, тот же парсер, `ReportsApiRateLimiter` → 429) отдаёт
+Экспорт: `StockTurnoverExportController` (`GET /inventory/stock-turnover/export.xlsx`,
+`inventory_stock_turnover_export`, тот же парсер, `ReportsApiRateLimiter` → 429) отдаёт
 `StreamedResponse` `stock-turnover-<date>-<period>d.xlsx`; `Infrastructure/Export/StockTurnoverXlsxExporter::export(StockTurnoverReport, outputPath)`
 — лист «Оборачиваемость» (строки) и лист «Сводка» (та же сводка до фильтра корзины).
 
@@ -5176,6 +5177,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.154 | 2026-11-06 | MarketplaceAnalytics: отчёт «Оборачиваемость» перенесён во вкладки «Товары и остатки» после «Остатки» (решение Владельца): маршруты `/inventory/stock-turnover` и `/inventory/stock-turnover/export.xlsx` (`inventory_stock_turnover_*`), layout `inventory/layout.html.twig`; из вкладок аналитики маркетплейсов убран. Контроллеры и Query остаются в модуле |
 | 2.153 | 2026-11-06 | MarketplaceAnalytics: в отчёте «Оборачиваемость» термин «корзина» в UI и xlsx заменён на «Скорость продаж» (решение Владельца); код (`TurnoverBucket`, параметр `bucket`) без изменений |
 | 2.152 | 2026-11-06 | MarketplaceAnalytics: отчёт «Оборачиваемость» — где заморожены деньги: `TurnoverBucket`, `StockTurnoverPolicy`, `StockTurnoverQuery` (только через Facade), страница `/marketplace-analytics/stock-turnover` с фильтрами период/источник/схема/дата/корзина/теги, сводкой и баннером свежести, экспорт `export.xlsx`; `InventoryFacade::getStockQtyByListingOnReportDate()` получил параметр `scheme` (задача `stock-turnover-report`) |
 | 2.151 | 2026-11-06 | Inventory: таблица `/inventory/stocks` — количества целыми (`vf_number`), русские заголовки, итоги по странице и по фильтру (`InventoryStockReportQuery::getTotals()` → `StockReportTotals`), подписи `StockSnapshotMappingStatus::label()`, отрицательное «Доступно» подсвечено (задача `inventory-stocks-table-format`) |
