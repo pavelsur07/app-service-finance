@@ -122,3 +122,7 @@ services:
         public: true
     App\Budget\Application\Service\BudgetFillPlanner:
         public: true
+
+    # MarketplaceAnalytics: integration-тест отчёта «Оборачиваемость» берёт Query из контейнера.
+    App\MarketplaceAnalytics\Infrastructure\Query\StockTurnoverQuery:
+        public: true

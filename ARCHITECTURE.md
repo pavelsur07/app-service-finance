@@ -4106,6 +4106,48 @@ enum AbcClass: string
 `UnitExtendedQuery` отдаёт `abcRevenue` (база — выручка − возвраты) и `abcProfit` по всему
 набору периода/маркетплейса/тегов — до поиска и лимита строк.
 
+### `src/MarketplaceAnalytics/Enum/TurnoverBucket.php`
+```php
+enum TurnoverBucket: string
+{
+    case Fast = 'fast';        // дней запаса < 30
+    case Medium = 'medium';    // 30 ≤ d < 60
+    case Slow = 'slow';        // 60 ≤ d ≤ 90
+    case Frozen = 'frozen';    // d > 90
+    case NoSales = 'no_sales'; // продаж за период нет при остатке > 0
+
+    public static function fromDaysOfCover(?int $days): self; // null → NoSales
+    public function label(): string;    // «до 30 дней» … «нет продаж»
+    public function isFrozen(): bool;   // Frozen и NoSales — «заморожено»
+}
+```
+`Domain\Service\StockTurnoverPolicy::measure(int $stockQty, int $salesQty, int $periodDays): TurnoverMeasure`
+— `salesPerDay = round(salesQty / periodDays, 2)`, `daysOfCover = intdiv(stockQty × periodDays, salesQty)`
+(целочисленно, чтобы граница ровно в 30/60/90 не зависела от float), `null` при нуле продаж.
+
+### `StockTurnoverQuery` (`src/MarketplaceAnalytics/Infrastructure/Query/StockTurnoverQuery.php`)
+
+Отчёт «Оборачиваемость» (`GET /marketplace-analytics/stock-turnover`): где заморожены деньги.
+`execute(StockTurnoverFilter): StockTurnoverReport`, без SQL — только Facade:
+
+- остатки: `InventoryFacade::getStockQtyByListingOnReportDate(companyId, date, source, scheme)`
+  (статус «на складе», FBO + FBS либо одна схема; устаревший источник — в `staleSources`);
+- продажи: `MarketplaceFacade::getSalesAggregatesByListing()` за окно `[date − (period − 1), date]`,
+  `period ∈ {30, 60, 90}`; возвраты не вычитаются;
+- себестоимость: `MarketplaceFacade::getCostPricesForListingsOnDate()` (listing cost price на дату,
+  как в юнит-экономике; нулевая цена = «без себестоимости»);
+- теги: `ListingTagFacade::listingIdsByTags(companyId, tagIds, false)` — пересечение со строками.
+
+`StockTurnoverFilter(companyId, date, periodDays, ?source, ?FulfillmentScheme scheme, ?TurnoverBucket bucket, tagIds)`.
+Строка `StockTurnoverRow` — листинг с остатком `> 0` (`(int) round`): `stockQty`, `salesQty`,
+`salesPerDay`, `daysOfCover`, `costPrice`, `stockValue = stockQty × costPrice` (scale 2, `null` без цены),
+`bucket`. Сортировка — `stockValue` DESC, без себестоимости — в конце, внутри группы по названию.
+`StockTurnoverSummary` считается **до** фильтра корзины по всем строкам фильтра: `totalValue`,
+`frozenValue` (Frozen + NoSales), `frozenShare` (%, `null` при нуле), `valueByBucket` (все пять
+корзин), `listingsWithoutCostPrice` / `qtyWithoutCostPrice` (в деньги не входят),
+`listingsTotal`, `snapshotDateBySource`, `staleSources`. Листинг с продажами без остатка в отчёт
+не попадает. Листинг без меты (удалён) остаётся со `sku = '—'`.
+
 ### `src/Marketplace/Enum/PipelineStatus.php`
 ```php
 enum PipelineStatus: string

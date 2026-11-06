@@ -44,6 +44,10 @@ final class TurnoverBucketTest extends TestCase
             [TurnoverBucket::Frozen, TurnoverBucket::NoSales],
             array_values(array_filter(TurnoverBucket::cases(), static fn (TurnoverBucket $b): bool => $b->isFrozen())),
         );
-        self::assertSame(['fast', 'medium', 'slow', 'frozen', 'no_sales'], array_column(TurnoverBucket::cases(), 'value'));
+        $backingValues = array_map(
+            static fn (\ReflectionEnumBackedCase $case): string => (string) $case->getBackingValue(),
+            (new \ReflectionEnum(TurnoverBucket::class))->getCases(),
+        );
+        self::assertSame(['fast', 'medium', 'slow', 'frozen', 'no_sales'], $backingValues);
     }
 }
