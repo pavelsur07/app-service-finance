@@ -46,7 +46,7 @@
                             <input type="date" name="date" id="date" value="{{ filter.date|date('Y-m-d') }}" class="form-control">
                         </div>
                         <div class="col-auto">
-                            <label class="form-label" for="bucket">Корзина</label>
+                            <label class="form-label" for="bucket">Скорость продаж</label>
                             <select name="bucket" id="bucket" class="form-select">
                                 <option value="">Все</option>
                                 {% for item in buckets %}
@@ -75,7 +75,7 @@
                 </div>
             </div>
 
-            {# Сводка по всему фильтру без учёта корзины: сравнивать «заморожено» нужно с целым. #}
+            {# Сводка по всему фильтру без учёта скорости продаж: сравнивать «заморожено» нужно с целым. #}
             <div class="card mb-3">
                 <div class="card-body vf-turnover-summary">
                     <div class="row g-3">
@@ -92,7 +92,7 @@
                             </div>
                         </div>
                         <div class="col-12 col-md-6">
-                            <div class="text-secondary small">По корзинам</div>
+                            <div class="text-secondary small">По скорости продаж</div>
                             <div class="d-flex flex-wrap gap-3">
                                 {% for bucket in buckets %}
                                     <div>
@@ -144,7 +144,7 @@
                             <th scope="col" class="text-end text-nowrap">Дней запаса</th>
                             <th scope="col" class="text-end text-nowrap d-none d-md-table-cell">Себестоимость, ₽</th>
                             <th scope="col" class="text-end text-nowrap">В деньгах, ₽</th>
-                            <th scope="col">Корзина</th>
+                            <th scope="col">Скорость продаж</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -167,7 +167,7 @@
                             <tr>
                                 <td colspan="9" class="text-center text-secondary py-4">
                                     {% if summary.listingsTotal > 0 %}
-                                        Под фильтр ничего не попало: в корзине нет листингов. Сводка выше — по всем остаткам фильтра.
+                                        Под фильтр ничего не попало: с такой скоростью продаж листингов нет. Сводка выше — по всем остаткам фильтра.
                                     {% else %}
                                         Остатков на эту дату нет. Проверьте дату или загрузки остатков.
                                     {% endif %}
