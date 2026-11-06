@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\ServiceGateway\Facade;
 
+use App\ServiceGateway\Application\Service\AiRunJournal;
 use App\ServiceGateway\Application\Service\AiServiceAccess;
 use App\ServiceGateway\Message\SubmitAiTaskMessage;
 use Psr\Log\LoggerInterface;
@@ -22,6 +23,7 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
         private MessageBusInterface $bus,
         private ClockInterface $clock,
         private LoggerInterface $logger,
+        private AiRunJournal $runs,
     ) {
     }
 
@@ -90,5 +92,18 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
     public function grantedCompanyIds(array $companyIds): array
     {
         return $this->access->grantedCompanyIds($companyIds);
+    }
+
+    public function recordRun(
+        string $companyId,
+        string $taskType,
+        int $requested = 0,
+        int $tasks = 0,
+        int $redispatched = 0,
+        int $expired = 0,
+        ?string $skippedReason = null,
+        ?string $error = null,
+    ): void {
+        $this->runs->record($companyId, $taskType, $requested, $tasks, $redispatched, $expired, $skippedReason, $error);
     }
 }

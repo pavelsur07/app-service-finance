@@ -90,6 +90,8 @@ final class CashAiCategorizeCommand extends Command
                 // Сбой одной компании не должен лишать подсказок остальные; повтор — следующий запуск.
                 ++$failed;
                 $this->logger->error('AI categorization failed for a company.', ['companyId' => $id, 'exception' => $e]);
+                // Журнал — через DBAL: переживает закрытый EntityManager.
+                $this->aiTasks->recordRun($id, RequestCashAiCategorizationAction::TASK_TYPE, error: $e::class);
                 // Исключение внутри wrapInTransaction закрывает EntityManager: следующая компания —
                 // со свежим (сервисы держат lazy-ссылку, resetManager подменяет её содержимое).
                 $manager = $this->managerRegistry->getManager();
@@ -109,6 +111,7 @@ final class CashAiCategorizeCommand extends Command
         $lock = $this->lockFactory->createLock($this->getName().':'.$companyId, 1800);
         if (!$lock->acquire()) {
             $output->writeln(sprintf('ai-categorize: %s: another run for this company is in progress, skipping', $companyId));
+            $this->aiTasks->recordRun($companyId, RequestCashAiCategorizationAction::TASK_TYPE, skippedReason: 'locked');
 
             return;
         }
@@ -127,9 +130,19 @@ final class CashAiCategorizeCommand extends Command
 
         if (!$result->enabled) {
             $output->writeln(sprintf('ai-categorize: %s: ai-service is disabled for the company', $companyId));
+            $this->aiTasks->recordRun($companyId, RequestCashAiCategorizationAction::TASK_TYPE, skippedReason: 'disabled');
 
             return;
         }
+        $this->aiTasks->recordRun(
+            $companyId,
+            RequestCashAiCategorizationAction::TASK_TYPE,
+            $result->requested,
+            $result->tasks,
+            $result->redispatched,
+            $result->expired,
+            $result->skippedReason,
+        );
         $output->writeln(sprintf(
             'ai-categorize: %s: %d operations in %d tasks requested, %d tasks re-sent, %d requests expired%s',
             $companyId,

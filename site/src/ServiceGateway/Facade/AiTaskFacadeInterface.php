@@ -57,4 +57,19 @@ interface AiTaskFacadeInterface
      * @return list<string> id в нижнем регистре
      */
     public function grantedCompanyIds(array $companyIds): array;
+
+    /**
+     * Записать запуск ИИ по компании в журнал (`ai_run`): итог, причина пропуска или класс
+     * исключения. Одна инструкция SQL — коммитится сама, если вызывающий не держит транзакцию.
+     */
+    public function recordRun(
+        string $companyId,
+        string $taskType,
+        int $requested = 0,
+        int $tasks = 0,
+        int $redispatched = 0,
+        int $expired = 0,
+        ?string $skippedReason = null,
+        ?string $error = null,
+    ): void;
 }

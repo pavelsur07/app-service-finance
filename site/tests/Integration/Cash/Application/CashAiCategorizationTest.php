@@ -503,4 +503,8 @@ final class RecordingAiTaskFacade implements AiTaskFacadeInterface
     {
         return $this->enabledCompanyIds($companyIds);
     }
+
+    public function recordRun(string $companyId, string $taskType, int $requested = 0, int $tasks = 0, int $redispatched = 0, int $expired = 0, ?string $skippedReason = null, ?string $error = null): void
+    {
+    }
 }

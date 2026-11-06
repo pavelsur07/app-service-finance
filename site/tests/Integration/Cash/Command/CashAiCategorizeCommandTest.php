@@ -38,6 +38,8 @@ use Symfony\Component\Lock\Store\InMemoryStore;
 final class CashAiCategorizeCommandTest extends IntegrationTestCase
 {
     private int $index = 9500;
+    /** @var object{runs: list<array{companyId: string, requested: int, skippedReason: ?string, error: ?string}>} */
+    private object $facade;
 
     public function testRequiresExactlyOneScope(): void
     {
@@ -62,6 +64,9 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
         self::assertStringNotContainsString((string) $disabled->getId(), $display);
         self::assertStringNotContainsString((string) $stale->getId(), $display);
         self::assertStringContainsString('ai-categorize: 1 enabled companies, 0 failed', $display);
+        // Запуск записан в журнал (ai_run) — по нему видно, что cron работает.
+        self::assertSame([(string) $enabled->getId()], array_column($this->facade->runs, 'companyId'));
+        self::assertNull($this->facade->runs[0]['error']);
     }
 
     public function testFailureOfOneCompanyDoesNotStopTheOthers(): void
@@ -76,6 +81,9 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
         self::assertStringContainsString('ai-categorize: '.$broken->getId().' failed', $display);
         self::assertStringContainsString('ai-categorize: '.$healthy->getId().': ', $display);
         self::assertStringContainsString('ai-categorize: 2 enabled companies, 1 failed', $display);
+        $errors = array_column($this->facade->runs, 'error', 'companyId');
+        self::assertNotNull($errors[(string) $broken->getId()]);
+        self::assertNull($errors[(string) $healthy->getId()]);
     }
 
     public function testClosedEntityManagerAfterAFailureDoesNotBreakTheNextCompany(): void
@@ -96,6 +104,9 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
     {
         $container = self::getContainer();
         $facade = new class($allowlist) implements AiTaskFacadeInterface {
+            /** @var list<array{companyId: string, requested: int, skippedReason: ?string, error: ?string}> */
+            public array $runs = [];
+
             /** @param list<string> $allowlist */
             public function __construct(private array $allowlist)
             {
@@ -129,6 +140,11 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
             public function grantedCompanyIds(array $companyIds): array
             {
                 return $this->enabledCompanyIds($companyIds);
+            }
+
+            public function recordRun(string $companyId, string $taskType, int $requested = 0, int $tasks = 0, int $redispatched = 0, int $expired = 0, ?string $skippedReason = null, ?string $error = null): void
+            {
+                $this->runs[] = ['companyId' => $companyId, 'requested' => $requested, 'skippedReason' => $skippedReason, 'error' => $error];
             }
         };
         $registry = $container->get(ManagerRegistry::class);
@@ -165,6 +181,7 @@ final class CashAiCategorizeCommandTest extends IntegrationTestCase
             }
         };
 
+        $this->facade = $facade;
         $command = new CashAiCategorizeCommand(
             $container->get(AutoApplyCashCategorySuggestionsAction::class),
             $container->get(RequestCashAiCategorizationAction::class),

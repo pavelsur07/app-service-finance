@@ -41,6 +41,21 @@ final readonly class AiUsageQuery
         );
     }
 
+    /**
+     * Принятые результаты с момента и сколько из них `failed`.
+     *
+     * @return array{total: int, failed: int}
+     */
+    public function resultsSince(\DateTimeImmutable $since): array
+    {
+        $row = $this->db->fetchAssociative(
+            "SELECT count(*) AS total, count(*) FILTER (WHERE status = 'failed') AS failed FROM ai_usage WHERE completed_at >= :since",
+            ['since' => $since->setTimezone(new \DateTimeZone(date_default_timezone_get()))->format('Y-m-d H:i:s')],
+        );
+
+        return ['total' => (int) ($row['total'] ?? 0), 'failed' => (int) ($row['failed'] ?? 0)];
+    }
+
     private function monthStart(): string
     {
         return $this->clock->now()->setTimezone(new \DateTimeZone(date_default_timezone_get()))->format('Y-m-01 00:00:00');

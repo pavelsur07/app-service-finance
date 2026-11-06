@@ -53,6 +53,19 @@ final readonly class AiServiceAccess
      *
      * @return list<string>
      */
+    /**
+     * Все подключённые компании с моментом подключения (проверка «тишины»).
+     *
+     * @return array<string, \DateTimeImmutable> companyId → enabled_at
+     */
+    public function grantedCompanies(): array
+    {
+        return array_map(
+            static fn (mixed $at): \DateTimeImmutable => new \DateTimeImmutable((string) $at),
+            $this->db->fetchAllKeyValue('SELECT company_id::text, enabled_at FROM ai_company_access ORDER BY company_id'),
+        );
+    }
+
     public function grantedCompanyIds(array $companyIds): array
     {
         if ([] === $companyIds) {
