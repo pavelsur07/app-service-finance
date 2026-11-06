@@ -3010,7 +3010,12 @@ refreshWbListingCatalog(string $companyId, string $connectionId): int
 ```php
 // Остатки на дату отчёта по листингам вместе с происхождением данных.
 // Возвращает Application\DTO\StockOnDateResult, а не голую карту.
-getStockQtyByListingOnReportDate(string $companyId, \DateTimeImmutable $reportDate): StockOnDateResult
+getStockQtyByListingOnReportDate(
+    string $companyId,
+    \DateTimeImmutable $reportDate,
+    ?string $marketplace = null,          // 'ozon' | 'wildberries' | null — все источники
+    ?FulfillmentScheme $scheme = null,    // Fbo | Fbs | null — обе схемы вместе
+): StockOnDateResult
 ```
 
 `StockOnDateResult` (`src/Inventory/Application/DTO/StockOnDateResult.php`):
@@ -4101,6 +4106,59 @@ enum AbcClass: string
 `UnitExtendedQuery` отдаёт `abcRevenue` (база — выручка − возвраты) и `abcProfit` по всему
 набору периода/маркетплейса/тегов — до поиска и лимита строк.
 
+### `src/MarketplaceAnalytics/Enum/TurnoverBucket.php`
+```php
+enum TurnoverBucket: string
+{
+    case Fast = 'fast';        // дней запаса < 30
+    case Medium = 'medium';    // 30 ≤ d < 60
+    case Slow = 'slow';        // 60 ≤ d ≤ 90
+    case Frozen = 'frozen';    // d > 90
+    case NoSales = 'no_sales'; // продаж за период нет при остатке > 0
+
+    public static function fromDaysOfCover(?int $days): self; // null → NoSales
+    public function label(): string;    // «до 30 дней» … «нет продаж»
+    public function isFrozen(): bool;   // Frozen и NoSales — «заморожено»
+}
+```
+`Domain\Service\StockTurnoverPolicy::measure(int $stockQty, int $salesQty, int $periodDays): TurnoverMeasure`
+— `salesPerDay = round(salesQty / periodDays, 2)`, `daysOfCover = intdiv(stockQty × periodDays, salesQty)`
+(целочисленно, чтобы граница ровно в 30/60/90 не зависела от float), `null` при нуле продаж.
+
+### `StockTurnoverQuery` (`src/MarketplaceAnalytics/Infrastructure/Query/StockTurnoverQuery.php`)
+
+Отчёт «Оборачиваемость» (`GET /marketplace-analytics/stock-turnover`): где заморожены деньги.
+`execute(StockTurnoverFilter): StockTurnoverReport`, без SQL — только Facade:
+
+- остатки: `InventoryFacade::getStockQtyByListingOnReportDate(companyId, date, source, scheme)`
+  (статус «на складе», FBO + FBS либо одна схема; устаревший источник — в `staleSources`);
+- продажи: `MarketplaceFacade::getSalesAggregatesByListing()` за окно `[date − (period − 1), date]`,
+  `period ∈ {30, 60, 90}`; возвраты не вычитаются;
+- себестоимость: `MarketplaceFacade::getCostPricesForListingsOnDate()` (listing cost price на дату,
+  как в юнит-экономике; нулевая цена = «без себестоимости»);
+- теги: `ListingTagFacade::listingIdsByTags(companyId, tagIds, false)` — пересечение со строками.
+
+`StockTurnoverFilter(companyId, date, periodDays, ?source, ?FulfillmentScheme scheme, ?TurnoverBucket bucket, tagIds)`.
+Строка `StockTurnoverRow` — листинг с остатком `> 0` (`(int) round`): `stockQty`, `salesQty`,
+`salesPerDay`, `daysOfCover`, `costPrice`, `stockValue = stockQty × costPrice` (scale 2, `null` без цены),
+`bucket`. Сортировка — `stockValue` DESC, без себестоимости — в конце, внутри группы по названию.
+`StockTurnoverSummary` считается **до** фильтра корзины по всем строкам фильтра: `totalValue`,
+`frozenValue` (Frozen + NoSales), `frozenShare` (%, `null` при нуле), `valueByBucket` (все пять
+корзин), `listingsWithoutCostPrice` / `qtyWithoutCostPrice` (в деньги не входят),
+`listingsTotal`, `snapshotDateBySource`, `staleSources`. Листинг с продажами без остатка в отчёт
+не попадает. Листинг без меты (удалён) остаётся со `sku = '—'`.
+
+Страница: `StockTurnoverIndexController` (`GET /marketplace-analytics/stock-turnover`,
+`marketplace_analytics_stock_turnover_index`, `ROLE_COMPANY_USER`), вкладка «Оборачиваемость»
+в `_tabs.html.twig`. Параметры разбирает `Application/StockTurnoverFilterParser::parse(Request, companyId)`
+(общий для страницы и экспорта): невалидное значение → умолчание (`period` 30, `source`/`scheme`/`bucket`
+все, `date` сегодня — будущее тоже, `tags[]` только валидные UUID). Отчёт строится в памяти, страница —
+Pagerfanta `ArrayAdapter` по 50 строк; сводка и баннер «Остатки: … на дату / устарели» — по всем строкам.
+Экспорт: `StockTurnoverExportController` (`GET /marketplace-analytics/stock-turnover/export.xlsx`,
+`marketplace_analytics_stock_turnover_export`, тот же парсер, `ReportsApiRateLimiter` → 429) отдаёт
+`StreamedResponse` `stock-turnover-<date>-<period>d.xlsx`; `Infrastructure/Export/StockTurnoverXlsxExporter::export(StockTurnoverReport, outputPath)`
+— лист «Оборачиваемость» (строки) и лист «Сводка» (та же сводка до фильтра корзины).
+
 ### `src/Marketplace/Enum/PipelineStatus.php`
 ```php
 enum PipelineStatus: string
@@ -4681,7 +4739,11 @@ NormalizeInventorySnapshotAction → StockSnapshot
 `StockQtyByListingOnDateQuery` выбирает последнюю целую snapshot-сессию отдельно
 для каждого marketplace source, содержащую хотя бы один замапленный листинг,
 и суммирует только `StockStatus::Available` по всем типам склада — у Ozon это `fbo` + `fbs`,
-у WB с ноября 2026 `fbw` + `fbs` (склад продавца).
+у WB с ноября 2026 `fbw` + `fbs` (склад продавца). Параметр `$scheme` (`FulfillmentScheme`)
+оставляет только одну схему тем же CASE-выражением, что в `InventoryStockReportQuery`;
+фильтр применяется к строкам выбранной сессии, а не к выбору сессии — день без FBS-строк
+не «откатывается» на старую сессию, а даёт пустой `qtyByListingId` при заполненном
+`snapshotDateBySource`.
 Товары в пути в количественный остаток `InventoryFacade` не входят.
 
 ### Wildberries FBS — остатки склада продавца
@@ -5114,6 +5176,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.152 | 2026-11-06 | MarketplaceAnalytics: отчёт «Оборачиваемость» — где заморожены деньги: `TurnoverBucket`, `StockTurnoverPolicy`, `StockTurnoverQuery` (только через Facade), страница `/marketplace-analytics/stock-turnover` с фильтрами период/источник/схема/дата/корзина/теги, сводкой и баннером свежести, экспорт `export.xlsx`; `InventoryFacade::getStockQtyByListingOnReportDate()` получил параметр `scheme` (задача `stock-turnover-report`) |
 | 2.151 | 2026-11-06 | Inventory: таблица `/inventory/stocks` — количества целыми (`vf_number`), русские заголовки, итоги по странице и по фильтру (`InventoryStockReportQuery::getTotals()` → `StockReportTotals`), подписи `StockSnapshotMappingStatus::label()`, отрицательное «Доступно» подсвечено (задача `inventory-stocks-table-format`) |
 | 2.150 | 2026-11-06 | Inventory: отчёт `/inventory/stocks` — переключатель схемы FBO / FBS (`FulfillmentScheme`, параметр `scheme`, эффективная дата и разбивка внутри схемы, разбивка скрыта при одном типе); WB — фаза FBS в `SyncWbInventorySnapshotHandler` (склады продавца `/api/v3/warehouses`, остатки `/api/v3/stocks/{id}` по баркодам), `WbSellerWarehouseStocksRawNormalizer`, `LocationType::SellerWarehouse`, `MarketplaceFacade::getListingBarcodes()` (задача `inventory-stocks-fbs`) |
 | 2.149 | 2026-11-06 | Cash: правило переводов выключается, только когда у компании от 3 разнесённых в статьи операций с фразой перевода — одна случайная (у COMPSHOP одна из 106) больше не отправляет все переводы в ИИ (`CashCategorizationQuery::TRANSFER_LIKE`, задача `ai-routines`, этап 4) |

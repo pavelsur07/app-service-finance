@@ -15,6 +15,7 @@
                 {% include 'partials/_tabs.html.twig' with {tabs: [
                     {label: 'Unit — Экономика', href: path('marketplace_analytics_unit_extended_index'), active: activeTab == 'unit_extended'},
                     {label: 'Снапшоты', href: path('marketplace_analytics_snapshots_index'), active: activeTab == 'snapshots'},
+                    {label: 'Оборачиваемость', href: path('marketplace_analytics_stock_turnover_index'), active: activeTab == 'stock_turnover'},
                     {label: 'Настройки', href: path('marketplace_analytics_cost_mappings_index'), active: activeTab == 'settings'},
                 ]} only %}
             </div>
