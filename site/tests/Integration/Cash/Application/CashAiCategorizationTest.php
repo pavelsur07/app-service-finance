@@ -204,6 +204,27 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         self::assertSame(['Аренда склада'], array_column($payload['examples'] ?? [], 'description'));
     }
 
+    public function testNoAnswerOfPreviousPromptIsAskedAgainExactlyOnce(): void
+    {
+        $old = $this->transaction('Оплата по счёту 15 от 01.10.2026');
+        $current = $this->transaction('Оплата по счёту 16 от 02.10.2026');
+        $this->em->flush();
+        $this->noAnswer($old, 'categorize_transactions/v2');
+        $this->noAnswer($current, RequestCashAiCategorizationAction::PROMPT_VERSION);
+
+        $first = $this->request();
+
+        // «Нет ответа» на прошлом промпте — спросить ещё раз; на текущем — не платить повторно.
+        self::assertSame(1, $first->requested);
+        self::assertSame([(string) $old->getId()], array_column($this->ai->requests[0]['payload']['operations'], 'id'));
+
+        // Повтор тоже без ответа, уже на текущем промпте: больше операция не уходит.
+        $this->consume($this->aiResult($this->ai->requests[0]['taskId'], [[(string) $old->getId(), null, 0.0]]));
+        $this->clock->modify('+1 hour');
+        self::assertSame(0, $this->request()->requested);
+        self::assertCount(1, $this->ai->requests);
+    }
+
     public function testOwnFundsTransfersAreNotSentWhileCompanyHasNoSuchDecisions(): void
     {
         $this->transaction('Перевод собственных средств в фонд Налоги с операций. Без НДС');
@@ -512,6 +533,14 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         return $tx;
     }
 
+    private function noAnswer(CashTransaction $tx, string $promptVersion): void
+    {
+        $suggestion = new CashCategorySuggestion((string) $this->company->getId(), (string) $tx->getId(), Uuid::uuid4()->toString(), new \DateTimeImmutable('-1 day'));
+        $suggestion->suggest(null, 0.0, 'needs_review', 'stub/categorize', $promptVersion, new \DateTimeImmutable('-1 day'));
+        $this->em->persist($suggestion);
+        $this->em->flush();
+    }
+
     private function suggested(CashTransaction $tx, CashflowCategory $category): CashCategorySuggestion
     {
         $suggestion = new CashCategorySuggestion((string) $this->company->getId(), (string) $tx->getId(), Uuid::uuid4()->toString(), new \DateTimeImmutable());
@@ -583,7 +612,7 @@ final class CashAiCategorizationTest extends IntegrationTestCase
             confidence: $rejected ? null : 0.9,
             traceId: Uuid::uuid7()->toString(),
             models: ['stub/categorize'],
-            promptVersion: 'categorize_transactions/v1',
+            promptVersion: RequestCashAiCategorizationAction::PROMPT_VERSION,
             inputTokens: 0,
             outputTokens: 0,
             errorCode: null,

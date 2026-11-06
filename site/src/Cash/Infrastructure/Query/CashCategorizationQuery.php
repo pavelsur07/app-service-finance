@@ -74,10 +74,12 @@ final readonly class CashCategorizationQuery
 
     /**
      * Операции без статьи, которым подсказку ещё не запрашивали (или прошлые попытки сорвались).
+     * «Нет ответа» на прошлой версии промпта — повод спросить ещё раз, ровно один: ответ на текущей
+     * (`$promptVersion`, `task_type/vN` из результата сервиса) операцию больше не возвращает.
      *
      * @return list<CashCategorizationOperation>
      */
-    public function findCandidates(string $companyId, \DateTimeImmutable $occurredFrom, \DateTimeImmutable $createdBefore, int $limit): array
+    public function findCandidates(string $companyId, \DateTimeImmutable $occurredFrom, \DateTimeImmutable $createdBefore, int $limit, string $promptVersion): array
     {
         Assert::uuid($companyId);
         Assert::range($limit, 1, 1000);
@@ -96,7 +98,8 @@ final readonly class CashCategorizationQuery
                AND NOT EXISTS (
                    SELECT 1 FROM cash_category_suggestion s
                    WHERE s.company_id = :companyId AND s.transaction_id = tx.id
-                     AND s.status NOT IN (\'failed\', \'stale\')
+                     AND (s.status NOT IN (\'failed\', \'stale\', \'no_answer\')
+                          OR (s.status = \'no_answer\' AND s.prompt_version IS NOT DISTINCT FROM :promptVersion))
                )
                AND (
                    SELECT count(*) FROM cash_category_suggestion s
@@ -113,6 +116,7 @@ final readonly class CashCategorizationQuery
                 'limit' => $limit,
                 'transferPattern' => self::TRANSFER_PATTERN,
                 'transferExclude' => self::TRANSFER_EXCLUDE_PATTERN,
+                'promptVersion' => $promptVersion,
             ],
             ['unallocatedCodes' => ArrayParameterType::STRING],
         );

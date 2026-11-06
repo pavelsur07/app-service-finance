@@ -35,6 +35,12 @@ final class RequestCashAiCategorizationAction
 {
     public const TASK_TYPE = 'categorize_transactions';
     public const BATCH_SIZE = 50;
+    /**
+     * Текущий промпт сервиса (`PROMPT_VERSION` задачи в ai-service; сверка —
+     * services/ai-service/tests/unit/test_symfony_prompt_version.py): «нет ответа» на прошлой версии
+     * переспрашивается один раз.
+     */
+    public const PROMPT_VERSION = 'categorize_transactions/v3';
     /** Примеры разнесения компании на пачку (контракт — до 50): по три на операцию, за год. */
     private const EXAMPLES_PER_OPERATION = 3;
     private const EXAMPLES_PER_BATCH = 30;
@@ -116,6 +122,7 @@ final class RequestCashAiCategorizationAction
                 $now->modify(sprintf('-%d days', min($budget->lookbackDays, self::LOOKBACK_DAYS)))->setTime(0, 0),
                 $now->modify(sprintf('-%d minutes', self::SETTLE_MINUTES)),
                 $limit,
+                self::PROMPT_VERSION,
             ),
             $this->mapper->isRepresentable(...),
         ));

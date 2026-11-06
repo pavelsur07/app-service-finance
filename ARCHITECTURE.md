@@ -2415,7 +2415,10 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   payload ответил бы 409); строки без ответа старше 7 дней → `failed`
   (`expired`); запись задачи без `requested` удаляется. Кандидаты — без статьи,
   за 90 дней, созданы раньше чем 10 мин назад (автоправила отработали), без
-  открытой подсказки и меньше 3 сбоев ответа (`expired` не считается), не перевод
+  открытой подсказки и меньше 3 сбоев ответа (`expired` не считается); `no_answer` на прошлой
+  версии промпта не блокирует — операция переспрашивается один раз на текущей
+  (`RequestCashAiCategorizationAction::PROMPT_VERSION`, сверка с сервисом —
+  `test_symfony_prompt_version.py`); не перевод
   собственных средств: фраза «перевод/перемещение собственных средств», «внутреннее
   перемещение» без слов «депозит/кредит/займ/процент» исключает операцию, только если у
   компании нет ни одной такой операции в несистемной статье (`TRANSFER_LIKE`; число
@@ -5036,6 +5039,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.147 | 2026-11-06 | Cash: «нет ответа» на прошлой версии промпта переспрашивается один раз (`RequestCashAiCategorizationAction::PROMPT_VERSION = categorize_transactions/v3`, `findCandidates(..., $promptVersion)`), сверка версии с ai-service — pytest `test_symfony_prompt_version.py` (задача `ai-routines`, этап 4) |
 | 2.146 | 2026-11-06 | ai-service/Cash: необязательное поле `examples` в `categorize_payload` (контракт `ai-task/v1`, категория примера — из справочника, иначе 422), промпт `categorize_transactions/v3` (правило 6 — примеры компании), `CashCategorizationQuery::findExamplesFor`, `CashCategorizationExample`; `evals-compare --examples` — примеры из других кейсов набора (задача `ai-routines`, этап 3) |
 | 2.145 | 2026-11-06 | Cash: переводы собственных средств не отправляются в ИИ, если компания такие операции в статьи не разносила (`CashCategorizationQuery::TRANSFER_LIKE`), счётчик `transferLikeSkipped` на странице «ИИ» кабинета, `CashFacade::getAiSuggestionStats(..., ?occurredFrom)` (задача `ai-routines`, этап 2) |
 | 2.144 | 2026-11-06 | ServiceGateway: учёт расходов ИИ `ai_usage`, журнал `ai_run`, лимиты `ai_company_access.monthly_limit_rub`/`lookback_days` (`Version20261106090000`–`110000`), гейт `app:ai-service:health-check`, страница `/admin/ai/companies/{id}`; cron `ai-categorize` идёт по всем подключённым компаниям, `CashAiCategorizationCompaniesQuery` удалён; `CashFacade::getAiSuggestionStats` (задача `ai-observability-budget`) |
