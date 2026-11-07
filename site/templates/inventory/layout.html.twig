@@ -19,17 +19,6 @@
     <div class="page-body">
         <div class="container-xl">
 
-            {% for label, messages in app.flashes %}
-                {% for message in messages %}
-                    <div class="alert alert-{{ label == 'error' ? 'danger' : label }} alert-dismissible mb-3" role="alert">
-                        <div class="d-flex">
-                            <div>{{ message }}</div>
-                        </div>
-                        <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
-                    </div>
-                {% endfor %}
-            {% endfor %}
-
             <div class="card">
                 <div class="card-header">
                     {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [

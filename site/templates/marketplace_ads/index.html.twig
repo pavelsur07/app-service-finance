@@ -36,19 +36,6 @@
          data-mark-failed-url="{{ path('marketplace_ads_admin_mark_load_job_failed', {jobId: '00000000-0000-0000-0000-000000000000'}) }}">
         <div class="container-xl">
 
-            {% for message in app.flashes('success') %}
-                <div class="alert alert-success alert-dismissible" role="alert">
-                    <div>{{ message }}</div>
-                    <a class="btn-close" data-bs-dismiss="alert" aria-label="Close"></a>
-                </div>
-            {% endfor %}
-            {% for message in app.flashes('error') %}
-                <div class="alert alert-danger alert-dismissible" role="alert">
-                    <div>{{ message }}</div>
-                    <a class="btn-close" data-bs-dismiss="alert" aria-label="Close"></a>
-                </div>
-            {% endfor %}
-
             {# ---------- Блок «Реклама Ozon» ---------- #}
             <div class="card mb-3">
                 <div class="card-header">

@@ -1,14 +1,15 @@
-{% set labelClassMap = {
-    'error': 'danger',
-    'notice': 'info',
-    'alert': 'warning',
-} %}
+{#
+  Flash легаси-shell'а (_layout/legacy): единственное место, где легаси читает app.flashes.
+  Читаются только известные label — служебные ключи (invite_token …) страница забирает сама.
+  Маппинг label → variant тот же, что в admin/_toasts и app/_ui/_flash. Показ тостов — assets/legacy-app.js.
+#}
+{% set labelVariants = {success: 'success', error: 'danger', danger: 'danger', warning: 'warning', alert: 'warning', notice: 'info', info: 'info'} %}
+{% set variantIcons = {success: 'ti-check', danger: 'ti-alert-circle', warning: 'ti-alert-triangle', info: 'ti-info-circle'} %}
 
 {% set flashMessages = [] %}
-{% for label, messages in app.flashes %}
-    {% set bootstrapLabel = labelClassMap[label]|default(label) %}
-    {% for message in messages %}
-        {% set flashMessages = flashMessages|merge([{type: bootstrapLabel, message: message}]) %}
+{% for label, variant in labelVariants %}
+    {% for message in app.flashes(label) %}
+        {% set flashMessages = flashMessages|merge([{type: variant, message: message}]) %}
     {% endfor %}
 {% endfor %}
 
@@ -17,79 +18,11 @@
         {% for flash in flashMessages %}
             <div class="toast text-bg-{{ flash.type }}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000" data-bs-autohide="true">
                 <div class="toast-body d-flex align-items-center gap-2">
-                    <span class="toast-icon">
-                        {% if flash.type == 'success' %}
-                            <i class="ti ti-check"></i>
-                        {% elseif flash.type == 'danger' %}
-                            <i class="ti ti-alert-circle"></i>
-                        {% elseif flash.type == 'warning' %}
-                            <i class="ti ti-alert-triangle"></i>
-                        {% elseif flash.type == 'info' %}
-                            <i class="ti ti-info-circle"></i>
-                        {% else %}
-                            <i class="ti ti-bell"></i>
-                        {% endif %}
-                    </span>
+                    <span class="toast-icon"><i class="ti {{ variantIcons[flash.type] }}"></i></span>
                     <span>{{ flash.message }}</span>
                     <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="toast" aria-label="Закрыть"></button>
                 </div>
             </div>
         {% endfor %}
     </div>
-
-    <script>
-        function showFlashToasts() {
-            var BootstrapToast = window.bootstrap && typeof window.bootstrap.Toast === 'function'
-                ? window.bootstrap.Toast
-                : null;
-
-            function hideToastFallback(toastEl) {
-                toastEl.classList.remove('show');
-                toastEl.classList.add('hide');
-                toastEl.style.display = 'none';
-                toastEl.setAttribute('aria-hidden', 'true');
-                toastEl.removeAttribute('aria-live');
-            }
-
-            document.querySelectorAll('.toast[data-bs-autohide]').forEach(function (toastEl) {
-                if (!BootstrapToast) {
-                    toastEl.classList.add('show');
-                    toastEl.style.display = 'block';
-                    toastEl.setAttribute('aria-hidden', 'false');
-                    toastEl.setAttribute('aria-live', 'assertive');
-
-                    var delayAttr = toastEl.getAttribute('data-bs-delay');
-                    var delay = parseInt(delayAttr, 10);
-                    if (!Number.isFinite(delay) || delay < 0) {
-                        delay = 5000;
-                    }
-
-                    if (toastEl.getAttribute('data-bs-autohide') === 'true') {
-                        window.setTimeout(function () {
-                            hideToastFallback(toastEl);
-                        }, delay);
-                    }
-
-                    toastEl.querySelectorAll('[data-bs-dismiss="toast"]').forEach(function (dismissButton) {
-                        dismissButton.addEventListener('click', function () {
-                            hideToastFallback(toastEl);
-                        });
-                    });
-
-                    return;
-                }
-
-                var toast = BootstrapToast.getInstance(toastEl);
-                if (!toast) {
-                    toast = new BootstrapToast(toastEl);
-                }
-
-                toast.show();
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', showFlashToasts);
-        document.addEventListener('turbo:load', showFlashToasts);
-    </script>
 {% endif %}
-
