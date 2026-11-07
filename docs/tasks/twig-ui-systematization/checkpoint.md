@@ -57,11 +57,12 @@
   массовое удаление, автоправило, «Создать на основании»); e2e `tests/e2e/cash-transactions.e2e.cjs`.
 - PR H — #2920 на handoff. PR I (2.3, часть 5): `pages/pnl_document` (страница документа ОПиУ), партиал
   `document/_page_scripts` удалён; e2e `tests/e2e/pnl-document.e2e.cjs`.
-- Остаток 2.3: Chart-острова dashboard.
+- Остаток 2.3: Chart-острова — два демо-партиала dashboard нигде не подключены; удалить закрывающим PR этапа.
 
 ### Exact next action
 - handoff PR H (#2920) и PR I («merge and deploy»; PR I открывать после мержа PR H — ветка от него);
-  после деплоев — GlitchTip 30 мин (операции ДДС; документ ОПиУ: создание/правка); затем Chart-острова dashboard
+  после деплоев — GlitchTip 30 мин (операции ДДС; документ ОПиУ: создание/правка); затем закрывающий PR Stage 2
+  (удалить `dashboard/_demo_chart`, `_money_balance_chart`; отчёт DONE) и Stage 3
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`

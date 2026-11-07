@@ -471,5 +471,7 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
   в `data-confirm-title` через автоэкранирование, прежний JS конкатенировал строку.
 
 #### Next
-- PR H (#2920, CI 16/16) и PR I → handoff «merge and deploy» (PR I открывать после мержа PR H);
-  затем Chart-острова dashboard — последний пункт 2.3
+- PR H (#2920, CI 16/16) и PR I → handoff «merge and deploy» (PR I открывать после мержа PR H).
+- Chart-острова (`dashboard/_demo_chart`, `dashboard/_money_balance_chart`, Chart.js с CDN): партиалы нигде
+  не подключены (ни `include`, ни `render` в `src/`, `templates/`, `tests/`; история — «dashboard demo» 2024 г.) —
+  переносить нечего, удалить закрывающим PR этапа вместе с отметкой Stage 2 DONE.
