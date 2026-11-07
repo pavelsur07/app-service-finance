@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Документ ОПиУ — демо</title>
+</head>
+<body>
+<!-- Демо для tests/e2e/pnl-document.e2e.cjs: разметка document/_page в объёме хуков модуля.
+     ?mode=new — создание без строк; ?mode=error — после неудачного сохранения. -->
+<a id="link-out" href="/documents">К списку</a>
+<a id="link-safe" href="/documents/x/export" data-leave-safe>Экспорт</a>
+<span data-dirty-badge id="dirty-badge" hidden>Есть несохранённые изменения</span>
+<div id="summary-slot"></div>
+<form method="post" action="/save" id="doc-form" data-document-form data-document-mode="edit" data-currency="RUB" data-currency-symbol="₽" data-marketplace="false">
+  <select id="hdr-project" data-document-project-direction><option value="">— не задан —</option><option value="p1">Проект 1</option><option value="p2">Проект 2</option></select>
+  <select id="hdr-cfo" data-document-responsibility-center><option value="">—</option><option value="r1">ЦФО 1</option><option value="r2">ЦФО 2</option></select>
+  <div id="notice" data-inherit-notice hidden></div>
+  <textarea id="descr" data-document-description></textarea><div id="descr-counter" data-document-description-counter>0 из 500</div>
+  <div id="allocation" data-allocation data-allocation-available="200000">
+    <dd id="alloc-rest" data-allocation-rest></dd>
+    <div id="alloc-ok" data-allocation-ok><span id="alloc-ok-text" data-allocation-ok-text></span></div>
+    <div id="alloc-over" data-allocation-over hidden>Сумма операций больше остатка</div>
+    <button type="button" id="alloc-fill" data-allocation-fill hidden>Добавить операцию на остаток</button>
+    <div id="alloc-live" data-allocation-live hidden>Остаток пересчитан</div>
+  </div>
+  <span id="ops-count" data-operations-count>0</span>
+  <button type="button" class="add_item_link" id="add-op">Добавить операцию</button>
+  <div id="holder" data-collection-holder></div>
+  <div id="ops-empty" data-operations-empty>Операций нет</div>
+  <strong id="t-income" data-total-income>—</strong><strong id="t-expense" data-total-expense>—</strong><strong id="t-result" data-total-result>—</strong>
+  <span id="t-uncat" data-total-uncategorized hidden></span>
+  <strong id="alloc-rest-footer" data-allocation-rest-footer></strong>
+  <span id="dirty-text" data-dirty-text>Все изменения сохранены</span>
+  <button type="submit" id="save" data-document-save>Сохранить</button>
+</form>
+<div id="document-leave-modal"><a href="#" id="leave-confirm" data-leave-confirm>Выйти без сохранения</a></div>
+
+<template id="proto">
+<div class="vf-docform-op document-operation-card" data-operation-row>
+  <span data-operation-flow-label data-flow="">—</span>
+  <div class="vf-docform-op__cell vf-docform-op__cell--category">
+    <select name="document[operations][__name__][category]" data-operation-category><option value="">—</option><option value="c-inc" data-flow="INCOME">Выручка</option><option value="c-exp" data-flow="EXPENSE">Аренда</option><option value="c-none" data-flow="NONE">Прочее</option></select>
+  </div>
+  <div class="vf-docform-op__cell vf-docform-op__cell--projectDirection">
+    <select name="document[operations][__name__][projectDirection]" data-operation-project-direction><option value="">—</option><option value="p1">Проект 1</option><option value="p2">Проект 2</option></select>
+    <div data-inherit-mark="project" hidden><button type="button" data-inherit-reset="project">Как в шапке</button></div>
+  </div>
+  <div class="vf-docform-op__cell vf-docform-op__cell--responsibilityCenterId">
+    <select name="document[operations][__name__][responsibilityCenterId]" data-operation-responsibility-center><option value="">—</option><option value="r1">ЦФО 1</option><option value="r2">ЦФО 2</option></select>
+    <div data-inherit-mark="cfo" hidden><button type="button" data-inherit-reset="cfo">Как в шапке</button></div>
+  </div>
+  <div class="vf-docform-op__cell vf-docform-op__cell--amount"><input name="document[operations][__name__][amount]" data-operation-amount></div>
+  <button type="button" data-operation-duplicate>Дубль</button>
+  <button type="button" class="remove-item">Удалить</button>
+  <div class="vf-docform-op__cell vf-docform-op__cell--comment"><input name="document[operations][__name__][comment]" data-operation-comment></div>
+</div>
+</template>
+
+<script type="module">
+  import { initPnlDocument } from '/assets/pages/pnl_document.js';
+  const mode = new URLSearchParams(location.search).get('mode') || 'edit';
+  const form = document.getElementById('doc-form');
+  const holder = document.getElementById('holder');
+  const proto = document.getElementById('proto').innerHTML.trim();
+  holder.dataset.prototype = proto;
+  const row = (i, values) => {
+    const t = document.createElement('template');
+    t.innerHTML = proto.replace(/__name__/g, String(i));
+    const node = t.content.firstElementChild;
+    Object.entries(values).forEach(([sel, v]) => { node.querySelector(sel).value = v; });
+    node.id = `row-${i}`;
+    return node;
+  };
+  if (mode === 'new') {
+    form.dataset.documentMode = 'new';
+    document.getElementById('allocation').remove();
+  } else {
+    document.getElementById('hdr-project').value = 'p1';
+    document.getElementById('hdr-cfo').value = 'r1';
+    holder.append(
+      row(0, { '[data-operation-category]': 'c-exp', '[data-operation-project-direction]': 'p1', '[data-operation-responsibility-center]': 'r1', '[data-operation-amount]': '70000', '[data-operation-comment]': 'Аренда офиса' }),
+      row(1, { '[data-operation-category]': 'c-inc', '[data-operation-project-direction]': 'p2', '[data-operation-responsibility-center]': 'r1', '[data-operation-amount]': '100 000,00' }),
+    );
+  }
+  if (mode === 'error') {
+    const summary = document.createElement('div');
+    summary.id = 'summary';
+    summary.tabIndex = -1;
+    summary.setAttribute('data-error-summary', '');
+    summary.innerHTML = '<a href="#row-1-amount" id="summary-link">Сумма</a>';
+    document.getElementById('summary-slot').append(summary);
+    const amount = holder.querySelector('#row-1 [data-operation-amount]');
+    amount.id = 'row-1-amount';
+    amount.classList.add('is-invalid');
+  }
+  window.shown = [];
+  window.bootstrap = { Modal: { getOrCreateInstance: (el) => ({ show: () => window.shown.push(el.id), hide: () => {} }) } };
+  initPnlDocument();
+  window.submits = [];
+  document.addEventListener('submit', (e) => { window.submits.push(e.target.id); e.preventDefault(); });
+  window.clicks = [];
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('a[href]');
+    if (!link) return;
+    window.clicks.push({ id: link.id, prevented: e.defaultPrevented });
+    e.preventDefault();
+  });
+  window.ready = true;
+</script>
+</body>
+</html>
