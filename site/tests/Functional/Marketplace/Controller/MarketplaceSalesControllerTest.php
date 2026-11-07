@@ -35,6 +35,7 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
         $client->request('GET', '/marketplace/sales');
 
         self::assertResponseIsSuccessful();
+        self::assertSelectorExists('#modal-recalculate-cost form[data-busy-submit][data-busy-label]');
         $body = (string) $client->getResponse()->getContent();
         self::assertStringContainsString('01.04.2026', $body);
         self::assertStringContainsString('15.04.2026', $body);

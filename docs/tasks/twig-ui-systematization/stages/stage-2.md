@@ -1,13 +1,17 @@
-### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A из трёх)
+### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A на проде, PR B на handoff)
 
 **Risk:** MEDIUM (поведение страниц; финансовые формы — в PR C)
 **Stage base commit:** `3c7bb858c` (master после Stage 1)
-**Work items:** 2.0–2.3; PR A = 2.0 (для своих страниц) + 2.1a
+**Work items:** 2.0–2.3; PR A = 2.0 (для своих страниц) + 2.1a; PR B = 2.1b; PR C = 2.2; PR D = 2.3
 
 Правило плана «один PR — не больше ~5 страниц» делит 2.1 на две части:
 2.1a — формы с `onsubmit="return confirm()"` (9 шаблонов, один механический
-паттерн, один общий диалог), 2.1b — мелкие `<script>` до 50 строк и
-`onchange="this.form.submit()"` (общий `data-autosubmit`). 2.2 и 2.3 — как в плане.
+паттерн, один общий диалог), 2.1b — мелкие `<script>` и
+`onchange="this.form.submit()"` (общий `data-autosubmit`). 2.2 и 2.3 — отдельными
+PR C и PR D, а не вместе с 2.1b: каждый трогает другие страницы.
+
+PR A: #2911, merge `2317ed9b`, деплой 07.11 08:19Z без даунтайма, GlitchTip чист,
+контейнеры healthy.
 
 #### PR A (2.0 + 2.1a): `confirm()` → `partials/_confirm_modal`
 
@@ -41,6 +45,60 @@
 Оставшиеся вхождения `confirm(`/`onclick=`/`onsubmit=` — внутри `<script>`
 крупных страниц (`marketplace/*`, `document/*`, `marketplace_analytics/cost_mappings`)
 и `admin/dashboard` (свой `<dialog>` админки) — уходят в PR B/C вместе со скриптами.
+
+#### PR B (2.1b): мелкий inline-JS → общие модули легаси-бандла
+
+- `onchange="this.form.submit()"` (9 мест в 8 шаблонах) → атрибут формы
+  `data-autosubmit` + делегированный `assets/autosubmit.js` (select / checkbox /
+  radio → `form.requestSubmit()`): `document/_list_layout`, `document/deleted_index`,
+  `marketplace/index`, `marketplace/ozon_reconciliation/index`, `marketplace/pl_mappings`,
+  `marketplace/returns`, `partials/_active_company_widget` (сайдбар каждой страницы),
+  `budget/plan_fact` (год и версия). Скрипт «чекбокс архива» в `counterparty/index`
+  удалён — его форма уже была `data-autosubmit`.
+- Три одинаковых «спиннер на кнопке после submit» (`marketplace/sales`,
+  `marketplace/returns`, `catalog/product/import`) → `data-busy-submit` +
+  `data-busy-label`; обработчик — `assets/busy_submit.js`, куда без изменения
+  поведения перенесён блок `data-moysklad-check` из `legacy-app.js` (общий селектор,
+  подпись по умолчанию «Проверяем…», восстановление из bfcache).
+- Подпись валюты счёта в «Новом переводе» → `assets/pages/cash_transfer.js`,
+  `initCashTransfer()` в списке инициализаций `legacy-app.js`.
+- Итог: минус 5 inline `<script>`, минус 9 `onchange`. Остались `onchange` в
+  `marketplace/month_close/index` (3) и `marketplace/cost_pl_mapping/index` (1) —
+  страницы с крупным скриптом, уходят в PR C/D целиком; `onchange="window.location…"`
+  в `marketplace_analytics/cost_mappings` — там же.
+- Тесты: `MarketplaceReturnsPageTest` (новый smoke: страница без теста), проверка
+  `data-busy-submit` в `MarketplaceSalesControllerTest` и GET страницы импорта в
+  `ProductImportUploadTest`; e2e `tests/e2e/legacy-forms.e2e.cjs` (puppeteer):
+  autosubmit по select и чекбоксу, не по текстовому полю и не в чужой форме;
+  busy-submit блокирует кнопку с подписью, второй submit — `preventDefault`;
+  подпись валюты следует за select.
+
+#### Checks (PR B)
+- `make site-cs-twig` — 0 / OK (324); `npm run lint` — 0; `npm run build` — OK
+- `make site-cs-check` — 0; `make site-stan` — OK
+- функциональные тесты 11 файлов страниц PR B — OK (100 тестов)
+- `tests/e2e/legacy-forms.e2e.cjs` — 8 passed
+- `make site-test` — OK (8501 tests, 47782 assertions), 7 мин 09 с
+
+#### Internal review (PR B)
+- iteration 1: MINOR — после вырезания `<script>` в `marketplace/sales` и `returns`
+  `</div>` и `{% endblock %}` оказались на одной строке; поправлено.
+
+#### External review (PR B)
+- rounds: 1 (codex, effort medium, `site/var/external-review/2317ed9b/review.txt`): REVIEW_GREEN
+  с одним MINOR — фикстура e2e отменяла submit в capture-фазе до модуля, и проверка
+  «второй submit отменён» проходила бы и без защиты. Исправлено: наблюдатель
+  регистрируется после модулей и читает `defaultPrevented`; проверка «первый submit
+  не отменён, второй отменён». Мутационная проверка: без защиты в `busy_submit.js`
+  тест падает.
+
+#### Risks / reviewer focus (PR B)
+- `requestSubmit()` вместо `submit()`: срабатывает событие `submit` и HTML-валидация.
+  Все 9 форм — GET-фильтры без `required` и без своих submit-обработчиков; у виджета
+  смены компании — POST с одним select. В «План–факт» формы год/версия отдельные
+  от пилюль `data-pf-pick-form`, которые держит `budget_plan_fact.js`.
+- `busy_submit.js` теперь блокирует все `button[type=submit]` формы, прежние скрипты
+  блокировали кнопку по id; в трёх формах кнопка submit одна.
 
 #### Files changed (PR A)
 - `site/templates/**` — 9 страниц + `company/edit` (include) + `partials/_confirm_modal` (doc)
@@ -87,4 +145,4 @@
   в `data-confirm-title` через автоэкранирование, прежний JS конкатенировал строку.
 
 #### Next
-- PR A → handoff «merge and deploy»; затем PR B (2.1b + 2.2), PR C (2.3)
+- PR B → handoff «merge and deploy»; затем PR C (2.2 Twig внутри JS), PR D (2.3 крупные скрипты)

@@ -6,10 +6,10 @@
 {% block tab_content %}
     <div class="p-3" data-testid="ozon-reconciliation">
         <div class="d-flex flex-wrap align-items-end gap-3 mb-3">
-            <form method="get" class="d-flex align-items-end gap-2">
+            <form data-autosubmit method="get" class="d-flex align-items-end gap-2">
                 <div>
                     <label class="form-label" for="ozon-reconciliation-month">Месяц</label>
-                    <select class="form-select" id="ozon-reconciliation-month" name="month" onchange="this.form.submit()">
+                    <select class="form-select" id="ozon-reconciliation-month" name="month">
                         {% for value, label in months %}
                             <option value="{{ value }}" {{ value == month ? 'selected' : '' }}>{{ label }}</option>
                         {% endfor %}

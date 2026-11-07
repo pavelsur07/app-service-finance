@@ -6,8 +6,8 @@
     <div class="card-header d-flex align-items-center gap-3">
         <h3 class="card-title me-auto mb-0">Возвраты</h3>
 
-        <form method="get" action="{{ path('marketplace_returns_index') }}" class="d-flex align-items-center gap-2 mb-0">
-            <select name="marketplace" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+        <form data-autosubmit method="get" action="{{ path('marketplace_returns_index') }}" class="d-flex align-items-center gap-2 mb-0">
+            <select name="marketplace" class="form-select form-select-sm w-auto">
                 <option value="">Все площадки</option>
                 {% for mp in available_marketplaces %}
                     <option value="{{ mp.value }}" {{ selected_marketplace == mp.value ? 'selected' : '' }}>
@@ -136,7 +136,7 @@
     <div class="modal modal-blur fade" id="modal-recalculate-cost" tabindex="-1" role="dialog">
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
-                <form method="post" action="{{ path('marketplace_recalculate_sales_cost_price') }}">
+                <form method="post" action="{{ path('marketplace_recalculate_sales_cost_price') }}" data-busy-submit data-busy-label="Пересчитываем...">
                     <input type="hidden" name="_token" value="{{ csrf_token('marketplace_recalculate_sales_cost_price') }}">
                     <input type="hidden" name="redirect_to" value="marketplace_returns_index">
                     <div class="modal-header">
@@ -188,13 +188,4 @@
             </div>
         </div>
     </div>
-    <script>
-        document.getElementById('modal-recalculate-cost')
-            .querySelector('form')
-            .addEventListener('submit', function () {
-                var btn = document.getElementById('btn-recalculate-returns');
-                btn.disabled = true;
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Пересчитываем...';
-            });
-    </script>
 {% endblock %}

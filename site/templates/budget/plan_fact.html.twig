@@ -142,9 +142,9 @@
         <div class="vf-card-bar d-print-none vf-pf-bar">
             <div class="vf-pf-bar__filters">
                 {# Год — отдельной формой: смена года сбрасывает вариант. #}
-                <form method="get" action="{{ path('budget_plan_fact') }}" class="vf-pf-bar__field">
+                <form data-autosubmit method="get" action="{{ path('budget_plan_fact') }}" class="vf-pf-bar__field">
                     <label class="vf-pf-bar__label" for="pf-year">Год</label>
-                    <select id="pf-year" name="year" class="form-select w-auto" onchange="this.form.submit()" data-pf-year>
+                    <select id="pf-year" name="year" class="form-select w-auto" data-pf-year>
                         {% for y in years %}
                             <option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>
                         {% endfor %}
@@ -152,13 +152,13 @@
                     <noscript><button type="submit" class="btn btn-sm">Показать</button></noscript>
                 </form>
                 {% if version %}
-                    <form method="get" action="{{ path('budget_plan_fact') }}" class="vf-pf-bar__group" data-budget-plan-fact-filters>
+                    <form data-autosubmit method="get" action="{{ path('budget_plan_fact') }}" class="vf-pf-bar__group" data-budget-plan-fact-filters>
                         <input type="hidden" name="year" value="{{ year }}">
                         <input type="hidden" name="show" value="{{ show }}">
                         <input type="hidden" name="period" value="{{ period }}">
                         <div class="vf-pf-bar__field">
                             <label class="vf-pf-bar__label" for="pf-version">Вариант</label>
-                            <select id="pf-version" name="version" class="form-select w-auto" onchange="this.form.submit()">
+                            <select id="pf-version" name="version" class="form-select w-auto">
                                 {% for v in versions|merge(archived) %}
                                     <option value="{{ v.id }}"{% if v.id == version.id %} selected{% endif %}>{{ v.name }} · {{ v.status.value == 'approved' ? 'утверждён' : (v.status.value == 'archived' ? 'архив' : 'черновик') }}</option>
                                 {% endfor %}
