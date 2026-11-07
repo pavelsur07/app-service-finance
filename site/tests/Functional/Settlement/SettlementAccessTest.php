@@ -149,7 +149,7 @@ final class SettlementAccessTest extends WebTestCaseBase
         }
         $crawler = $client->request('GET', '/settlements/counterparties/'.$party.'?limit=25');
         self::assertResponseIsSuccessful();
-        self::assertLessThanOrEqual(100, $crawler->filter('.app-workzone tbody tr')->count(), 'Financial pages must not render every historical item.');
+        self::assertLessThanOrEqual(100, $crawler->filter('.settlement-ui tbody tr')->count(), 'Financial pages must not render every historical item.');
         $crawler = $client->request('GET', '/settlements/allocations/new?counterparty='.$party);
         self::assertResponseIsSuccessful();
         self::assertLessThanOrEqual(50, $crawler->filter('[aria-label="Основания и свободные оплаты сейчас"] tbody tr')->count());

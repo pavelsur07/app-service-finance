@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 / Work item 2.1
+**Phase:** Stage 3 / Work item 3.1
 **Status:** implementing
-**Stage base commit:** `03e7ad64bc794c1739781f4e431076e31bb7e60e`
+**Stage base commit:** `d10c43891`
 
 ### Completed
 - Owner approved implementation («Делай»). Existing isolated worktree/branch and PR #2907 reused; PR returned to Draft. Main checkout untouched.
@@ -19,13 +19,16 @@
 - Reuse existing branch/PR rather than create a second implementation PR: AGENTS one-task/one-PR rule takes precedence over plan wording.
 - Local synthetic browser data only, dedicated vf_settlements_test DB. No production config/data.
 
+- Stage2 templates/forms implemented;34tests/234assertions, Twig19, PHPStan/CS PASS; frontend lint/build/67tests PASS.
+
 ### Review status
+- Stage2 internal1iteration, B0/I1fixed (readonly fields/buttons),open0; external handoff pending.
 - Stage1 internal1iteration, B0/I1fixed,open0; external not required (<500lines).
 - Stage1 checks:53tests/250assertions, Twig15, focused PHPStan/CS, Node lint/build/67tests PASS.
 - Browser period focus/Escape+picker visible, pageerror0.
 
 ### Exact next action
-- Implement list/card/form rendering; add exact UI/form regression assertions.
+- Finish13screen×4viewport acceptance, stress/reader/no-JS/picker; full gates once; fresh final review then external review.
 
 ### Files to inspect first on resume
 - plan.md, design.md, this checkpoint; git status; site/templates/settlement; site/tests/Functional/Settlement/SettlementUiRefactorTest.php.

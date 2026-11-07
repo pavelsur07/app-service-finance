@@ -21,7 +21,7 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 final class SettlementUiRefactorTest extends WebTestCaseBase
 {
     /** @return array{KernelBrowser,string,string,string} */
-    private function fixture(int $documents = 1): array
+    private function fixture(int $documents = 1, bool $readonly = false): array
     {
         $client = self::createClient();
         $owner = UserBuilder::aUser()->build();
@@ -40,7 +40,18 @@ final class SettlementUiRefactorTest extends WebTestCaseBase
             $draft = $create($companyId, $actor, new CreateSettlementDocumentInput(Uuid::uuid7()->toString(), SettlementDocumentKind::OBLIGATION, $party->getId(), SettlementBucket::PAYABLE, Money::fromString('0.30', 'RUB'), new \DateTimeImmutable('2026-11-01'), null, 'Акт UI '.$i));
             $post($companyId, $actor, $draft->documentId, $draft->version);
         }
-        $client->loginUser($owner);
+        if ($readonly) {
+            $reader = UserBuilder::aUser()->withIndex(523)->withRoles(['ROLE_COMPANY_USER'])->build();
+            $role = new \App\Company\Entity\CompanyRole(Uuid::uuid7()->toString(), 'Чтение', ['finance' => 'read'], $company);
+            $member = \App\Tests\Builders\Company\CompanyMemberBuilder::aMember()->withId(Uuid::uuid7()->toString())->withCompany($company)->withUser($reader)->withAccessRole($role)->build();
+            foreach ([$reader, $role, $member] as $entity) {
+                $this->em()->persist($entity);
+            }
+            $this->em()->flush();
+            $client->loginUser($reader);
+        } else {
+            $client->loginUser($owner);
+        }
         $this->setClientSessionValue($client, 'active_company_id', $companyId);
 
         return [$client, $companyId, $party->getId(), $draft->documentId];
@@ -100,5 +111,65 @@ final class SettlementUiRefactorTest extends WebTestCaseBase
         self::assertSelectorExists('[data-cp-picker][data-cp-browse="1"][data-cp-search-url="/api/counterparties/search"] select[data-cp-select][required]');
         self::assertCount(1, $crawler->filter('select[name="settlement_document[counterpartyId]"] option[value="'.$party.'"]'));
         self::assertSelectorExists('[data-cp-search-wrap].d-none');
+    }
+
+    public function testSummaryKeepsSixSeparateExactBalances(): void
+    {
+        [$client] = $this->fixture();
+        $crawler = $client->request('GET', '/settlements?from=2026-11-01&to=2026-11-07');
+        self::assertResponseIsSuccessful();
+        self::assertCount(6, $crawler->filter('[aria-label="Остатки на конец периода"] .card'));
+        self::assertSelectorTextContains('[aria-label="Остатки на конец периода"]', 'К оплате');
+        self::assertSelectorTextContains('[aria-label="Остатки на конец периода"]', '0,30');
+        foreach (['Нам должны', 'К оплате', 'Выданные авансы', 'Полученные авансы', 'Нераспределённые выплаты', 'Нераспределённые поступления'] as $label) {
+            self::assertSelectorTextContains('[aria-label="Остатки на конец периода"]', $label);
+        }
+    }
+
+    public function testDocumentKeepsReversalNavigationAndExactAmount(): void
+    {
+        [$client, , $party, $document] = $this->fixture();
+        $crawler = $client->request('GET', '/settlements/documents/'.$document);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.settlement-ui', '0,30');
+        self::assertCount(1, $crawler->filter('a[href="/settlements/documents/'.$document.'/reverse"]'));
+        self::assertCount(1, $crawler->filter('.settlement-ui a[href="/settlements/counterparties/'.$party.'"]'));
+        self::assertSelectorTextContains('.settlement-ui .badge', 'Проведён');
+    }
+
+    public function testFormsKeepHiddenFieldsAndInputOnFailure(): void
+    {
+        [$client, $companyId, $party] = $this->fixture();
+        $crawler = $client->request('GET', '/settlements/documents/new');
+        foreach (['_token', 'requestId'] as $field) {
+            self::assertCount(1, $crawler->filter('input[name="settlement_document['.$field.']"]'));
+        }
+        self::assertCount(1, $crawler->filter('fieldset legend')->reduce(static fn ($node) => 'Сумма и даты' === trim($node->text())));
+        $form = $crawler->filter('form[name="settlement_document"]')->form();
+        $form['settlement_document[counterpartyId]'] = $party;
+        $form['settlement_document[amount]'] = '0.001';
+        $form['settlement_document[effectiveDate]'] = '2026-11-02';
+        $form['settlement_document[reason]'] = 'Причина сохраняется';
+        $crawler = $client->submit($form);
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorExists('[role="alert"]');
+        self::assertSame('0.001', $crawler->filter('[name="settlement_document[amount]"]')->attr('value'));
+        self::assertSelectorTextContains('textarea', 'Причина сохраняется');
+        self::assertSame($party, $crawler->filter('[name="settlement_document[counterpartyId]"] option[selected]')->attr('value'));
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM settlement_documents WHERE company_id=?', [$companyId]));
+    }
+
+    public function testReadonlyKeepsReadFiltersAndNoWriteActions(): void
+    {
+        [$client] = $this->fixture(1, true);
+        $client->request('GET', '/settlements');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('[data-settlement-filter] button[type="submit"]');
+        self::assertSelectorNotExists('.settlement-ui a[href="/settlements/documents/new"]');
+        foreach (['/settlements/documents/new', '/settlements/setup'] as $path) {
+            $client->request('GET', $path);
+            self::assertResponseIsSuccessful();
+            self::assertSelectorNotExists('.settlement-ui button[type="submit"]');
+        }
     }
 }

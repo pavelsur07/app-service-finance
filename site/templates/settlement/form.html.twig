@@ -5,9 +5,9 @@
 {% endblock %}
 {% block settlement_content %}
 
-<section class="card"><p>{{ description }}</p>
+<section class="card-body settlement-form"><p class="text-secondary">{{ description }}</p>
     {% if relatedDocument is defined %}<p><a href="{{ path('settlement_document',{id:relatedDocument.id}) }}">Исходный документ{% if relatedDocument.eventSequence %} №{{ relatedDocument.eventSequence }}{% endif %}</a></p>{% endif %}
-    {{ form_start(form) }}{{ form_errors(form) }}{{ form_widget(form) }}
-    <div class="wz-row-actions"><button class="btn btn-md btn-primary" type="submit">{{ submitLabel }}</button><a class="btn btn-md btn-secondary" href="{{ path('settlement_documents') }}">К документам</a></div>{{ form_end(form) }}
+    {{ form_start(form) }}{{ form_errors(form) }}<fieldset aria-label="Реквизиты документа"{% if not is_granted('module.finance.write') %} disabled{% endif %}>{% include form.counterpartyId is defined ? 'settlement/_document_fields.html.twig' : 'settlement/_event_fields.html.twig' %}
+    <div class="btn-list settlement-form-actions">{% if is_granted('module.finance.write') %}<button class="btn btn-primary" type="submit">{{ submitLabel }}</button>{% endif %}<a class="btn btn-outline-secondary" href="{{ path('settlement_documents') }}">К документам</a></div></fieldset>{{ form_end(form) }}
 </section>
 {% endblock %}

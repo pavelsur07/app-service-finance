@@ -1,0 +1,8 @@
+<fieldset class="mb-4"><legend class="h3">Контрагент и документ</legend>
+    {{ form_row(form.counterpartyId) }}
+    <div class="row"><div class="col-md-6">{{ form_row(form.kind) }}</div><div class="col-md-6">{{ form_row(form.bucket) }}</div></div>
+</fieldset>
+<fieldset class="mb-4"><legend class="h3">Сумма и даты</legend>
+    <div class="row"><div class="col-md-4">{{ form_row(form.amount) }}</div><div class="col-md-4">{{ form_row(form.effectiveDate) }}</div><div class="col-md-4">{{ form_row(form.dueDate) }}</div></div>
+</fieldset>
+{{ form_row(form.reason) }}

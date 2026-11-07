@@ -5,13 +5,13 @@
 {% endblock %}
 {% block settlement_content %}
 
-<section class="card">{{ form_start(partyForm) }}{{ form_errors(partyForm) }}{{ form_widget(partyForm) }}<button class="btn btn-md btn-secondary" type="submit">Показать основания и оплаты</button>{{ form_end(partyForm) }}</section>
+<section class="card-body settlement-form border-bottom">{{ form_start(partyForm) }}{{ form_errors(partyForm) }}{{ form_row(partyForm.counterparty) }}<button class="btn btn-outline-secondary" type="submit">Показать основания и оплаты</button>{{ form_end(partyForm) }}</section>
 {% if form %}
     {% form_theme form 'settlement/_form_theme.html.twig' %}
-    <section class="card"><p>Выберите основание и оплату одного направления. Остатки ниже приведены на текущую дату; возможность изменения проверяется и на все последующие даты.</p>
-        {{ form_start(form) }}{{ form_errors(form) }}{{ form_widget(form) }}<button class="btn btn-md btn-primary" type="submit">{{ submitLabel }}</button>{{ form_end(form) }}
+    <section class="card-body settlement-form border-bottom"><p>Выберите основание и оплату одного направления. Остатки ниже приведены на текущую дату; возможность изменения проверяется и на все последующие даты.</p>
+        {{ form_start(form) }}{{ form_errors(form) }}<fieldset aria-label="Реквизиты документа"{% if not is_granted('module.finance.write') %} disabled{% endif %}>{% include 'settlement/_event_fields.html.twig' %}<div class="settlement-form-actions">{% if is_granted('module.finance.write') %}<button class="btn btn-primary" type="submit">{{ submitLabel }}</button>{% endif %}</div></fieldset>{{ form_end(form) }}
     </section>
-    <p>Показано {{ min(positions|length,50) }} из {{ positions|length }} оснований и оплат. Все варианты доступны в полях выбора. <a href="{{ path('settlement_documents',{counterparty:counterpartyId}) }}">Все документы с остатками в карточках</a></p>
+    <p class="card-body mb-0">Показано {{ min(positions|length,50) }} из {{ positions|length }} оснований и оплат. Все варианты доступны в полях выбора. <a href="{{ path('settlement_documents',{counterparty:counterpartyId}) }}">Все документы с остатками в карточках</a></p>
     {% include 'settlement/_positions.html.twig' with {canWrite:false,positions:positions|slice(0,50)} %}
 {% endif %}
 {% endblock %}

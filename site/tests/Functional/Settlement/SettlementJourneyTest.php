@@ -91,11 +91,11 @@ final class SettlementJourneyTest extends WebTestCaseBase
         self::assertResponseRedirects();
         $crawler = $client->request('GET', '/settlements/counterparties/'.$partyId.'?from=2026-11-01&to=2026-11-02');
         self::assertResponseIsSuccessful();
-        $historic = str_replace(["\u{00a0}", "\u{202f}"], ' ', $crawler->filter('.kpi')->eq(1)->text());
+        $historic = str_replace(["\u{00a0}", "\u{202f}"], ' ', $crawler->filter('[aria-label="Остатки на конец периода"] .col')->eq(1)->text());
         self::assertStringContainsString('60 000,00', $historic);
         $crawler = $client->request('GET', '/settlements/counterparties/'.$partyId.'?from=2026-11-01&to=2026-11-04');
         self::assertResponseIsSuccessful();
-        $current = str_replace(["\u{00a0}", "\u{202f}"], ' ', $crawler->filter('.kpi')->eq(1)->text());
+        $current = str_replace(["\u{00a0}", "\u{202f}"], ' ', $crawler->filter('[aria-label="Остатки на конец периода"] .col')->eq(1)->text());
         self::assertStringContainsString('100 000,00', $current);
     }
 }

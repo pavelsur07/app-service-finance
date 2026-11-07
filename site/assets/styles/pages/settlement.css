@@ -17,3 +17,21 @@
 .settlement-ui[data-settlement-enhanced] .settlement-period-fields:not(.show) { display: none; }
 .settlement-ui .vf-ops-filterbar { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--vf-space-3); }
 .settlement-ui:not([data-settlement-enhanced]) .settlement-period-fields { position: static; box-shadow: none; }
+.settlement-ui .settlement-balance-wide { flex: 0 0 100%; width: 100%; }
+.settlement-ui .settlement-balance { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: clamp(1rem, 2.2vw, 1.5rem); }
+.settlement-ui .settlement-form { max-width: 60rem; width: 100%; }
+.settlement-ui .settlement-form-actions { border-top: 1px solid var(--vf-border); padding-top: var(--vf-space-4); margin-top: var(--vf-space-4); }
+.settlement-ui .settlement-metadata dd { overflow-wrap: anywhere; }
+.settlement-ui .settlement-reason { white-space: normal; overflow-wrap: anywhere; }
+.settlement-ui .vf-ops-table th[scope="row"],
+.settlement-ui .vf-ops-table td:not(.text-nowrap) { min-width: 10rem; max-width: 24rem; white-space: normal; overflow-wrap: anywhere; }
+.settlement-ui .vf-ops-table th[scope="col"] { white-space: normal; }
+.settlement-ui .vf-ops-head { flex-wrap: wrap; }
+.settlement-ui .settlement-limit .form-label { margin: 0; }
+@media (max-width: 575px) {
+  .settlement-ui .settlement-form-actions > .btn { width: 100%; }
+  .settlement-ui .vf-chip { max-width: 100%; height: auto; min-height: 28px; overflow-wrap: anywhere; }
+  .settlement-ui .vf-chip a { flex-shrink: 0; }
+}
+/* Seven financial columns may need scrolling even on desktop; keep it inside the table. */
+.settlement-ui .cashflow-ops .table-responsive { overflow-x: auto; }
