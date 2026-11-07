@@ -34,9 +34,7 @@ final class SettlementSourceLockOrderTest extends IntegrationTestCase
             $db->beginTransaction();
             $db->fetchOne('SELECT id FROM cash_transaction WHERE id = ? FOR UPDATE', [$firstId]);
             $input = new InputStream();
-            $process = new Process([\PHP_BINARY, 'tests/Fixtures/Settlement/lock-sources.php'], (string) self::getContainer()->getParameter('kernel.project_dir'), ['SETTLEMENT_LOCK_SCHEMA' => $schema, 'SETTLEMENT_LOCK_COMPANY' => $company, 'SETTLEMENT_LOCK_ACCOUNT' => $account], $input, 15);
-            $process->start();
-            self::assertTrue($process->waitUntil(static fn (string $type, string $buffer): bool => str_contains($buffer, "ready\n")), $process->getErrorOutput());
+            $process = $this->startChild(['SETTLEMENT_LOCK_SCHEMA' => $schema, 'SETTLEMENT_LOCK_COMPANY' => $company, 'SETTLEMENT_LOCK_ACCOUNT' => $account], $input);
             $deadline = microtime(true) + 5;
             do {
                 $waiting = (bool) $db->fetchOne("SELECT 1 FROM pg_stat_activity WHERE application_name = ? AND wait_event_type = 'Lock'", [$schema]);
@@ -86,9 +84,7 @@ final class SettlementSourceLockOrderTest extends IntegrationTestCase
             $db->fetchOne('SELECT id FROM cash_transaction WHERE id = ? FOR UPDATE', [$source]);
             // Registration's active link remains invisible to another transaction until commit.
             $db->insert('settlement_source_links', ['company_id' => $company, 'source_type' => 'cash', 'source_id' => $source, 'active_document_id' => Uuid::uuid7()->toString()]);
-            $process = new Process([\PHP_BINARY, 'tests/Fixtures/Settlement/lock-sources.php'], (string) self::getContainer()->getParameter('kernel.project_dir'), ['SETTLEMENT_LOCK_SCHEMA' => $schema, 'SETTLEMENT_LOCK_COMPANY' => $company, 'SETTLEMENT_LOCK_ACCOUNT' => $account, 'SETTLEMENT_LOCK_SOURCE' => $source, 'SETTLEMENT_LOCK_MODE' => 'guard'], null, 15);
-            $process->start();
-            self::assertTrue($process->waitUntil(static fn (string $type, string $buffer): bool => str_contains($buffer, "ready\n")), $process->getErrorOutput());
+            $process = $this->startChild(['SETTLEMENT_LOCK_SCHEMA' => $schema, 'SETTLEMENT_LOCK_COMPANY' => $company, 'SETTLEMENT_LOCK_ACCOUNT' => $account, 'SETTLEMENT_LOCK_SOURCE' => $source, 'SETTLEMENT_LOCK_MODE' => 'guard'], null);
             $deadline = microtime(true) + 5;
             do {
                 $waiting = (bool) $db->fetchOne("SELECT 1 FROM pg_stat_activity WHERE application_name = ? AND wait_event_type = 'Lock'", [$schema]);
@@ -111,5 +107,25 @@ final class SettlementSourceLockOrderTest extends IntegrationTestCase
             $db->executeStatement('DROP SCHEMA '.$schema.' CASCADE');
             $db->close();
         }
+    }
+
+    /**
+     * Дочерний процесс холодно грузит ядро test-окружения; на загруженном раннере CI это занимало
+     * дольше прежних 15 с и валило деплой без отношения к порядку блокировок. Таймаут процесса —
+     * страховка от зависания, не утверждение: само свойство («ребёнок ждёт строку») проверяется
+     * опросом pg_stat_activity со своим дедлайном. Время старта — в сообщении, чтобы при падении
+     * отличать медленный старт от дедлока.
+     *
+     * @param array<string, string> $env
+     */
+    private function startChild(array $env, ?InputStream $input): Process
+    {
+        $process = new Process([\PHP_BINARY, 'tests/Fixtures/Settlement/lock-sources.php'], (string) self::getContainer()->getParameter('kernel.project_dir'), $env, $input, 90);
+        $startedAt = microtime(true);
+        $process->start();
+        $ready = $process->waitUntil(static fn (string $type, string $buffer): bool => str_contains($buffer, "ready\n"));
+        self::assertTrue($ready, sprintf('Child did not report ready in %.1f s: %s', microtime(true) - $startedAt, $process->getErrorOutput()));
+
+        return $process;
     }
 }
