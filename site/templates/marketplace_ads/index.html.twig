@@ -25,7 +25,15 @@
         </div>
     </div>
 
-    <div class="page-body">
+    {# Адреса с id — шаблоны с плейсхолдером-UUID: path() с requirements не примет '__ID__'. #}
+    <div class="page-body" data-marketplace-ads
+         data-jobs-url="{{ path('marketplace_ads_load_jobs_list') }}"
+         data-raw-docs-url="{{ path('marketplace_ads_raw_documents_list') }}"
+         data-load-range-url="{{ path('marketplace_ads_ozon_load_range') }}"
+         data-extract-url="{{ path('marketplace_ads_extract_batches', {jobId: '00000000-0000-0000-0000-000000000000'}) }}"
+         data-download-url="{{ path('marketplace_ads_raw_document_download', {id: '00000000-0000-0000-0000-000000000000'}) }}"
+         data-reprocess-url="{{ path('marketplace_ads_raw_documents_reprocess', {id: '00000000-0000-0000-0000-000000000000'}) }}"
+         data-mark-failed-url="{{ path('marketplace_ads_admin_mark_load_job_failed', {jobId: '00000000-0000-0000-0000-000000000000'}) }}">
         <div class="container-xl">
 
             {% for message in app.flashes('success') %}
@@ -78,7 +86,6 @@
 
                         {% if activeAdLoadJob is not null %}
                             <div class="mt-3"
-                                 id="ozon-ad-load-widget"
                                  data-ad-job-id="{{ activeAdLoadJob.id }}"
                                  data-ad-job-status="{{ activeAdLoadJob.status.value }}"
                                  data-status-url="{{ path('marketplace_ads_ozon_load_job_status', {jobId: activeAdLoadJob.id}) }}">
@@ -102,9 +109,9 @@
                                         <small class="text-muted">Загрузка рекламы Ozon...</small>
                                     </div>
                                     <div class="progress mb-1" style="height:6px;">
-                                        <div class="progress-bar bg-indigo ozon-ad-progress-bar" style="width:0%"></div>
+                                        <div class="progress-bar bg-indigo" data-ad-progress-bar style="width:0%"></div>
                                     </div>
-                                    <small class="text-muted ozon-ad-counters">Чанков: —, Документов: —</small>
+                                    <small class="text-muted" data-ad-counters>Чанков: —, Документов: —</small>
                                 {% endif %}
                             </div>
                         {% endif %}
@@ -118,7 +125,7 @@
                     <h3 class="card-title">История загрузок</h3>
                 </div>
                 <div class="table-responsive">
-                    <table class="table card-table table-vcenter" id="ad-load-jobs-table"
+                    <table class="table card-table table-vcenter" data-ad-jobs
                            data-is-company-owner="{{ is_granted('ROLE_COMPANY_OWNER') ? '1' : '0' }}">
                         <thead>
                         <tr>
@@ -144,15 +151,15 @@
                     <h3 class="card-title">Сырые документы</h3>
                 </div>
                 <div class="card-body">
-                    <form id="raw-documents-filter" class="row g-2 align-items-end mb-3">
+                    <form class="row g-2 align-items-end mb-3" data-raw-documents-filter>
                         <div class="col-auto">
                             <label class="form-label">Дата с</label>
-                            <input type="date" id="raw-date-from" class="form-control"
+                            <input type="date" class="form-control" data-raw-date-from
                                    value="{{ 'now'|date_modify('-30 days')|date('Y-m-d') }}">
                         </div>
                         <div class="col-auto">
                             <label class="form-label">Дата по</label>
-                            <input type="date" id="raw-date-to" class="form-control"
+                            <input type="date" class="form-control" data-raw-date-to
                                    value="{{ 'now'|date('Y-m-d') }}">
                         </div>
                         <div class="col-auto">
@@ -161,7 +168,7 @@
                     </form>
                 </div>
                 <div class="table-responsive">
-                    <table class="table card-table table-vcenter" id="ad-raw-documents-table">
+                    <table class="table card-table table-vcenter" data-ad-raw-docs>
                         <thead>
                         <tr>
                             <th>Дата отчёта</th>
@@ -179,11 +186,10 @@
             </div>
 
         </div>
-    </div>
 
     {# ---------- Modal: Пометить AdLoadJob как FAILED ---------- #}
     {% if is_granted('ROLE_COMPANY_OWNER') %}
-        <div class="modal modal-blur fade" id="modal-mark-ad-load-job-failed" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal modal-blur fade" id="modal-mark-ad-load-job-failed" tabindex="-1" role="dialog" aria-hidden="true" data-mark-failed-modal>
             <div class="modal-dialog modal-dialog-centered" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -196,13 +202,13 @@
                         </p>
                         <div class="mb-3">
                             <label class="form-label required">Причина</label>
-                            <textarea id="mark-failed-reason" class="form-control" rows="3" maxlength="1000"
+                            <textarea class="form-control" rows="3" maxlength="1000" data-mark-failed-reason
                                       placeholder="Опишите причину ручной финализации"></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
-                        <button type="button" class="btn btn-danger" id="btn-mark-ad-load-job-failed">
+                        <button type="button" class="btn btn-danger" data-mark-failed-submit>
                             Пометить FAILED
                         </button>
                     </div>
@@ -213,7 +219,7 @@
 
     {# ---------- Modal: Загрузить рекламу Ozon за произвольный период ---------- #}
     {% if hasPerformanceConnection and is_granted('ROLE_COMPANY_OWNER') %}
-        <div class="modal modal-blur fade" id="modal-ozon-ad-load-range" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal modal-blur fade" id="modal-ozon-ad-load-range" tabindex="-1" role="dialog" aria-hidden="true" data-ozon-ad-load-range>
             <div class="modal-dialog modal-dialog-centered" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -223,386 +229,24 @@
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label required">Дата начала</label>
-                            <input type="date" id="ozon-ad-range-from" class="form-control" required
+                            <input type="date" class="form-control" required data-range-from
                                    value="{{ 'now'|date_modify('first day of last month')|date('Y-m-d') }}">
                         </div>
                         <div class="mb-3">
                             <label class="form-label required">Дата окончания</label>
-                            <input type="date" id="ozon-ad-range-to" class="form-control" required
+                            <input type="date" class="form-control" required data-range-to
                                    value="{{ 'now'|date_modify('last day of last month')|date('Y-m-d') }}">
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
-                        <button type="button" class="btn btn-primary" id="btn-ozon-ad-load-range">Загрузить</button>
+                        <button type="button" class="btn btn-primary" data-range-submit>Загрузить</button>
                     </div>
                 </div>
             </div>
         </div>
     {% endif %}
 
-    <script>
-        (function () {
-            var escapeHtml = function (value) {
-                if (value === null || value === undefined) return '';
-                return String(value)
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;')
-                    .replace(/'/g, '&#039;');
-            };
-
-            var jobStatusBadge = function (status) {
-                var map = {
-                    pending:         ['bg-secondary', 'В очереди'],
-                    running:         ['bg-info',      'Выполняется'],
-                    completed:       ['bg-success',   'Выполнено'],
-                    failed:          ['bg-danger',    'Ошибка'],
-                    partial_success: ['bg-warning',   'Частично'],
-                };
-                var row = map[status] || ['bg-secondary', status];
-                return '<span class="badge ' + row[0] + '">' + escapeHtml(row[1]) + '</span>';
-            };
-
-            // Прогресс cron-driven pipeline (Task-11.8): три bootstrap-бейджа
-            // «OK / ошибок / ожидает». Для старых jobs (hasBatches=false)
-            // показываем прежний "Чанки: N".
-            var renderJobProgress = function (job) {
-                var stats = job.batchStats || {};
-                if (!stats.hasBatches) {
-                    return job.chunksTotal > 0
-                        ? 'Чанки: ' + escapeHtml(job.chunksTotal)
-                        : '—';
-                }
-                var parts = [];
-                parts.push('<span class="badge bg-success">' + stats.ok + '/' + stats.total + ' OK</span>');
-                if (stats.pending > 0) {
-                    parts.push('<span class="badge bg-info ms-1">' + stats.pending + ' в работе</span>');
-                }
-                if (stats.failed > 0) {
-                    parts.push('<span class="badge bg-danger ms-1">' + stats.failed + ' ошибок</span>');
-                }
-                return parts.join('');
-            };
-
-            var docStatusBadge = function (status) {
-                var map = {
-                    draft:     ['bg-secondary', 'Черновик'],
-                    processed: ['bg-success',   'Обработан'],
-                    failed:    ['bg-danger',    'Ошибка'],
-                };
-                var row = map[status] || ['bg-secondary', status];
-                return '<span class="badge ' + row[0] + '">' + escapeHtml(row[1]) + '</span>';
-            };
-
-            var jobsTable = document.getElementById('ad-load-jobs-table');
-            var isCompanyOwner = jobsTable && jobsTable.dataset.isCompanyOwner === '1';
-
-            var loadJobs = function () {
-                var tbody = document.querySelector('#ad-load-jobs-table tbody');
-                fetch('{{ path('marketplace_ads_load_jobs_list') }}', {
-                    credentials: 'same-origin',
-                    headers: {'X-Requested-With': 'XMLHttpRequest'},
-                })
-                    .then(function (r) { return r.json(); })
-                    .then(function (data) {
-                        var items = (data && data.items) || [];
-                        if (items.length === 0) {
-                            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Нет данных</td></tr>';
-                            return;
-                        }
-                        tbody.innerHTML = items.map(function (job) {
-                            var canMarkFailed = isCompanyOwner && (job.status === 'pending' || job.status === 'running');
-                            var markFailedBtn = canMarkFailed
-                                ? '<button type="button" class="btn btn-sm btn-outline-danger mb-1" '
-                                    + 'data-bs-toggle="modal" '
-                                    + 'data-bs-target="#modal-mark-ad-load-job-failed" '
-                                    + 'data-job-id="' + escapeHtml(job.id) + '">'
-                                    + 'Пометить FAILED</button>'
-                                : '';
-                            // Task-12-test: кнопка «Обработать». Показываем только
-                            // если API вернул extractToken (owner + completed/partial_success
-                            // с батчами нового pipeline'а).
-                            var extractBtn = job.extractToken
-                                ? '<form method="post" '
-                                    + 'action="/marketplace-ads/jobs/' + encodeURIComponent(job.id) + '/extract-batches" '
-                                    + 'class="d-inline me-1 mb-1">'
-                                    + '<input type="hidden" name="_token" value="' + escapeHtml(job.extractToken) + '">'
-                                    + '<button type="submit" class="btn btn-sm btn-primary" '
-                                    + 'onclick="return confirm(\'Запустить обработку всех batch файлов этого job?\')">'
-                                    + 'Обработать</button>'
-                                    + '</form>'
-                                : '';
-                            // Task-16: кнопки «Открыть batch N» убраны из UI. Endpoint
-                            // /marketplace-ads/batches/{id}/download остаётся доступен
-                            // для admin-debug через прямой URL.
-                            var hasActions = extractBtn || markFailedBtn;
-                            var actionsCell = '<td>' + (hasActions ? extractBtn + markFailedBtn : '<span class="text-muted">—</span>') + '</td>';
-                            return '<tr>'
-                                + '<td><small>' + escapeHtml(job.dateFrom) + ' — ' + escapeHtml(job.dateTo) + '</small></td>'
-                                + '<td>' + jobStatusBadge(job.status) + '</td>'
-                                + '<td><small>' + renderJobProgress(job) + '</small></td>'
-                                + '<td><small>' + escapeHtml(job.createdAt) + '</small></td>'
-                                + '<td><small>' + escapeHtml(job.finishedAt || '—') + '</small></td>'
-                                + '<td><small class="text-danger">' + escapeHtml(job.lastError || '') + '</small></td>'
-                                + actionsCell
-                                + '</tr>';
-                        }).join('');
-                    })
-                    .catch(function () {
-                        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Ошибка загрузки</td></tr>';
-                    });
-            };
-
-            // Шаблон URL reprocess-эндпоинта: заменяем plaсeholder '__ID__' на реальный UUID
-            // в JS. Symfony-path с requirements=[0-9a-fA-F-]{36} отвергнет __ID__ при генерации,
-            // поэтому собираем URL из базового префикса и хвоста вручную.
-            var rawDocsListUrl = '{{ path('marketplace_ads_raw_documents_list') }}';
-            var buildReprocessUrl = function (documentId) {
-                return rawDocsListUrl + '/' + encodeURIComponent(documentId) + '/reprocess';
-            };
-
-            // Кнопка «Открыть» — скачать сырой csv/zip, сохранённый на диск
-            // (task-8). URL собираем вручную по той же причине, что и
-            // reprocess: UUID placeholder не пройдёт Symfony requirements.
-            var buildDownloadUrl = function (documentId) {
-                return '/marketplace-ads/raw-documents/' + encodeURIComponent(documentId) + '/download';
-            };
-
-            var loadRawDocuments = function (dateFrom, dateTo) {
-                var tbody = document.querySelector('#ad-raw-documents-table tbody');
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Загрузка…</td></tr>';
-
-                var url = rawDocsListUrl;
-                if (dateFrom && dateTo) {
-                    url += '?dateFrom=' + encodeURIComponent(dateFrom) + '&dateTo=' + encodeURIComponent(dateTo);
-                }
-
-                fetch(url, {
-                    credentials: 'same-origin',
-                    headers: {'X-Requested-With': 'XMLHttpRequest'},
-                })
-                    .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
-                    .then(function (res) {
-                        if (!res.ok) {
-                            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">'
-                                + escapeHtml((res.data && res.data.message) || 'Ошибка загрузки') + '</td></tr>';
-                            return;
-                        }
-                        var items = (res.data && res.data.items) || [];
-                        if (items.length === 0) {
-                            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Нет данных</td></tr>';
-                            return;
-                        }
-                        tbody.innerHTML = items.map(function (doc) {
-                            var openBtn = doc.hasFile
-                                ? '<a href="' + escapeHtml(buildDownloadUrl(doc.id)) + '" '
-                                    + 'class="btn btn-sm btn-outline-primary me-1">Открыть</a>'
-                                : '';
-                            return '<tr>'
-                                + '<td>' + escapeHtml(doc.reportDate) + '</td>'
-                                + '<td>' + docStatusBadge(doc.status) + '</td>'
-                                + '<td><small>' + escapeHtml(doc.loadedAt) + '</small></td>'
-                                + '<td><small class="text-danger">' + escapeHtml(doc.processingError || '') + '</small></td>'
-                                + '<td>' + openBtn
-                                + '<button type="button" class="btn btn-sm btn-outline-secondary" data-reprocess-doc="' + escapeHtml(doc.id) + '">'
-                                + 'Переобработать</button></td>'
-                                + '</tr>';
-                        }).join('');
-                    })
-                    .catch(function () {
-                        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Ошибка загрузки</td></tr>';
-                    });
-            };
-
-            // Делегирование: клик по любой «Переобработать»-кнопке внутри таблицы.
-            // Одно-разовый listener на tbody переживает перерисовки innerHTML.
-            document.querySelector('#ad-raw-documents-table tbody').addEventListener('click', function (e) {
-                var btn = e.target.closest('[data-reprocess-doc]');
-                if (!btn) return;
-                var documentId = btn.getAttribute('data-reprocess-doc');
-                if (!documentId) return;
-
-                btn.disabled = true;
-                var original = btn.innerHTML;
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Запуск…';
-
-                fetch(buildReprocessUrl(documentId), {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: {'X-Requested-With': 'XMLHttpRequest'},
-                })
-                    .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
-                    .then(function (res) {
-                        if (!res.ok) {
-                            window.alert((res.data && res.data.message) || 'Не удалось поставить документ на переобработку.');
-                            btn.disabled = false;
-                            btn.innerHTML = original;
-                            return;
-                        }
-                        // Перезагружаем список, чтобы увидеть статус DRAFT и чистое поле «Ошибка».
-                        var fromEl = document.getElementById('raw-date-from');
-                        var toEl   = document.getElementById('raw-date-to');
-                        loadRawDocuments(fromEl.value, toEl.value);
-                    })
-                    .catch(function () {
-                        window.alert('Сетевая ошибка при постановке документа на переобработку.');
-                        btn.disabled = false;
-                        btn.innerHTML = original;
-                    });
-            });
-
-            document.addEventListener('DOMContentLoaded', function () {
-                loadJobs();
-
-                var fromEl = document.getElementById('raw-date-from');
-                var toEl   = document.getElementById('raw-date-to');
-                loadRawDocuments(fromEl.value, toEl.value);
-
-                var filterForm = document.getElementById('raw-documents-filter');
-                filterForm.addEventListener('submit', function (e) {
-                    e.preventDefault();
-                    loadRawDocuments(fromEl.value, toEl.value);
-                });
-            });
-
-            // Handler кнопки «Загрузить с начала года» удалён вместе с самой
-            // кнопкой (см. комментарий в шаблоне выше). Endpoint
-            // marketplace_ads_ozon_initial_load остаётся доступен для прямого
-            // API-вызова; UI вернёт кнопку, когда будет multi-chunk поддержка
-            // периодов >62 дней.
-
-            // Кнопка «Загрузить за период» в модалке
-            var rangeBtn = document.getElementById('btn-ozon-ad-load-range');
-            if (rangeBtn) {
-                rangeBtn.addEventListener('click', function () {
-                    var dateFrom = (document.getElementById('ozon-ad-range-from') || {}).value;
-                    var dateTo   = (document.getElementById('ozon-ad-range-to') || {}).value;
-                    if (!dateFrom || !dateTo) { alert('Укажите обе даты'); return; }
-                    rangeBtn.disabled = true;
-                    rangeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Запуск...';
-                    fetch('{{ path('marketplace_ads_ozon_load_range') }}', {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-                        body: JSON.stringify({dateFrom: dateFrom, dateTo: dateTo}),
-                    })
-                        .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
-                        .then(function (res) {
-                            if (res.ok) {
-                                window.location.reload();
-                            } else {
-                                var BootstrapModal = window.bootstrap && window.bootstrap.Modal;
-                                if (BootstrapModal) {
-                                    BootstrapModal.getOrCreateInstance(document.getElementById('modal-ozon-ad-load-range')).hide();
-                                }
-                                alert('Ошибка: ' + ((res.data && res.data.message) || 'Неизвестная ошибка'));
-                                rangeBtn.disabled = false;
-                                rangeBtn.innerHTML = 'Загрузить';
-                            }
-                        })
-                        .catch(function (err) {
-                            alert('Ошибка сети: ' + err.message);
-                            rangeBtn.disabled = false;
-                            rangeBtn.innerHTML = 'Загрузить';
-                        });
-                });
-            }
-
-            // Ручная пометка AdLoadJob как FAILED (только ROLE_COMPANY_OWNER)
-            var markFailedModalEl = document.getElementById('modal-mark-ad-load-job-failed');
-            var markFailedBtn = document.getElementById('btn-mark-ad-load-job-failed');
-            var markFailedReasonEl = document.getElementById('mark-failed-reason');
-            var markFailedJobId = null;
-
-            var hideMarkFailedModal = function () {
-                if (!markFailedModalEl) return;
-                var BootstrapModal = window.bootstrap && window.bootstrap.Modal;
-                if (BootstrapModal) {
-                    BootstrapModal.getOrCreateInstance(markFailedModalEl).hide();
-                    return;
-                }
-                var closeBtn = markFailedModalEl.querySelector('[data-bs-dismiss="modal"]');
-                if (closeBtn) closeBtn.click();
-            };
-
-            if (markFailedModalEl) {
-                markFailedModalEl.addEventListener('show.bs.modal', function (event) {
-                    var trigger = event.relatedTarget;
-                    markFailedJobId = trigger ? trigger.getAttribute('data-job-id') : null;
-                    if (markFailedReasonEl) markFailedReasonEl.value = '';
-                });
-            }
-
-            if (markFailedBtn) {
-                markFailedBtn.addEventListener('click', function () {
-                    if (!markFailedJobId) return;
-                    var reason = (markFailedReasonEl && markFailedReasonEl.value) || '';
-                    if (!reason.trim()) {
-                        alert('Укажите причину');
-                        return;
-                    }
-                    markFailedBtn.disabled = true;
-                    var original = markFailedBtn.innerHTML;
-                    markFailedBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Выполняется...';
-                    fetch('/api/marketplace-ads/admin/load-jobs/' + encodeURIComponent(markFailedJobId) + '/mark-failed', {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-                        body: JSON.stringify({reason: reason}),
-                    })
-                        .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
-                        .then(function (res) {
-                            if (res.ok) {
-                                window.location.reload();
-                            } else {
-                                hideMarkFailedModal();
-                                alert('Ошибка: ' + ((res.data && res.data.error) || 'Неизвестная ошибка'));
-                                markFailedBtn.disabled = false;
-                                markFailedBtn.innerHTML = original;
-                            }
-                        })
-                        .catch(function (err) {
-                            alert('Ошибка сети: ' + err.message);
-                            markFailedBtn.disabled = false;
-                            markFailedBtn.innerHTML = original;
-                        });
-                });
-            }
-
-            // Поллер прогресса загрузки рекламы Ozon (15 сек).
-            // Терминальные статусы (polling stops): completed | failed | partial_success.
-            // Последний добавлен в Task-11.7: cron-финализатор (Task-11.7) проставляет
-            // его при смеси OK + FAILED/ABANDONED batch'ей. Без этой проверки jobs
-            // в partial_success поллились бы бесконечно.
-            var TERMINAL_AD_JOB_STATUSES = ['completed', 'failed', 'partial_success'];
-            document.querySelectorAll('[data-ad-job-id]').forEach(function (widget) {
-                var status = widget.dataset.adJobStatus;
-                if (TERMINAL_AD_JOB_STATUSES.indexOf(status) !== -1) return;
-
-                var statusUrl = widget.dataset.statusUrl;
-                var bar       = widget.querySelector('.ozon-ad-progress-bar');
-                var counters  = widget.querySelector('.ozon-ad-counters');
-
-                var interval = setInterval(function () {
-                    fetch(statusUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
-                        .then(function (r) { return r.json(); })
-                        .then(function (data) {
-                            if (bar) bar.style.width = data.progress + '%';
-                            if (counters) {
-                                counters.textContent = 'Чанков: ' + data.completedChunks + '/' + data.chunksTotal
-                                    + ', Документов: ' + data.totalDocs
-                                    + ' (' + data.processedDocs + ' обработано, ' + data.failedDocs + ' ошибок)';
-                            }
-                            if (TERMINAL_AD_JOB_STATUSES.indexOf(data.status) !== -1) {
-                                clearInterval(interval);
-                                window.location.reload();
-                            }
-                        })
-                        .catch(function () { /* сеть — продолжаем */ });
-                }, 15000);
-            });
-        })();
-    </script>
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'ads-confirm'} only %}
+    </div>
 {% endblock %}

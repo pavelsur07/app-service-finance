@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Реклама маркетплейсов — демо</title>
+</head>
+<body>
+<!-- Демо для tests/e2e/marketplace-ads.e2e.cjs: разметка страницы в объёме хуков модуля. -->
+<div data-marketplace-ads
+     data-jobs-url="/api/jobs" data-raw-docs-url="/api/raw" data-load-range-url="/api/load-range"
+     data-extract-url="/jobs/00000000-0000-0000-0000-000000000000/extract"
+     data-download-url="/raw/00000000-0000-0000-0000-000000000000/download"
+     data-reprocess-url="/api/raw/00000000-0000-0000-0000-000000000000/reprocess"
+     data-mark-failed-url="/api/admin/00000000-0000-0000-0000-000000000000/mark-failed">
+  <div data-ad-job-id="j-run" data-ad-job-status="running" data-status-url="/api/status" data-poll-interval="50">
+    <div class="progress-bar" data-ad-progress-bar style="width:0%"></div>
+    <small data-ad-counters>Чанков: —, Документов: —</small>
+  </div>
+  <table data-ad-jobs data-is-company-owner="1"><tbody><tr><td colspan="7">Загрузка…</td></tr></tbody></table>
+  <form data-raw-documents-filter id="raw-filter">
+    <input type="date" data-raw-date-from value="2026-10-01"><input type="date" data-raw-date-to value="2026-10-31">
+    <button type="submit" id="raw-show">Показать</button>
+  </form>
+  <table data-ad-raw-docs><tbody><tr><td colspan="5">Загрузка…</td></tr></tbody></table>
+  <div id="modal-mark-ad-load-job-failed" data-mark-failed-modal>
+    <textarea data-mark-failed-reason></textarea>
+    <button type="button" id="mark-failed" data-mark-failed-submit>Пометить FAILED</button>
+  </div>
+  <div id="modal-ozon-ad-load-range" data-ozon-ad-load-range>
+    <input type="date" data-range-from value=""><input type="date" data-range-to value="2026-10-31">
+    <button type="button" id="range-submit" data-range-submit>Загрузить</button>
+  </div>
+  <div id="ads-confirm" data-confirm-modal>
+    <form method="post" action="" data-confirm-form>
+      <input type="hidden" name="_token" value="" data-confirm-token>
+      <h2 data-confirm-title></h2><p data-confirm-body></p><ul data-confirm-links hidden></ul>
+      <a data-confirm-link hidden></a><button type="button" data-bs-dismiss="modal" data-confirm-cancel>Отмена</button>
+      <button type="submit" data-confirm-submit disabled>Подтвердить</button>
+    </form>
+  </div>
+</div>
+<script type="module">
+  import '/assets/confirm_modal.js';
+  import { initMarketplaceAds } from '/assets/pages/marketplace_ads.js';
+  window.alerts = [];
+  window.alert = (text) => window.alerts.push(String(text));
+  window.hidden = [];
+  window.bootstrap = { Modal: { getOrCreateInstance: (el) => ({ hide: () => window.hidden.push(el.id) }) } };
+  window.bs = (id, type, relatedTarget) => {
+    const ev = new Event(type, { bubbles: true, cancelable: true });
+    ev.relatedTarget = relatedTarget ?? null;
+    document.getElementById(id).dispatchEvent(ev);
+    return ev.defaultPrevented;
+  };
+  initMarketplaceAds();
+  window.submits = [];
+  document.addEventListener('submit', (e) => { window.submits.push({ id: e.target.id, prevented: e.defaultPrevented }); e.preventDefault(); });
+  window.ready = true;
+</script>
+</body>
+</html>

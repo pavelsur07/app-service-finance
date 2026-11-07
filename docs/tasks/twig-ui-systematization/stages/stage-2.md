@@ -1,9 +1,9 @@
-### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–D на проде; PR E на handoff)
+### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–E на проде; PR F на handoff)
 
 **Risk:** MEDIUM (поведение страниц; финансовые формы — в PR C)
 **Stage base commit:** `3c7bb858c` (master после Stage 1)
 **Work items:** 2.0–2.3; PR A = 2.0 (для своих страниц) + 2.1a; PR B = 2.1b; PR C = 2.2 (пять модулей);
-PR D = 2.2 (три marketplace-страницы); 2.3 (крупные скрипты) — PR E (маппинг ОПиУ) и далее
+PR D = 2.2 (три marketplace-страницы); 2.3 (крупные скрипты) — PR E (маппинг ОПиУ), PR F (реклама), далее листинги, операции, документы
 
 Правило плана «один PR — не больше ~5 страниц» делит 2.1 на две части:
 2.1a — формы с `onsubmit="return confirm()"` (9 шаблонов, один механический
@@ -15,7 +15,7 @@ PR A: #2911, merge `2317ed9b`, деплой 07.11 08:19Z без даунтайм
 контейнеры healthy. PR B: #2912, merge `92611b3e`, деплой 07.11 08:54Z без даунтайма, GlitchTip чист.
 PR C: #2914, merge `b4311777`, деплой 07.11 09:24Z без даунтайма, GlitchTip чист (последнее событие 04:37),
 контейнеры healthy. PR D: #2915, merge `24dbd846`, деплой 07.11 09:58Z без даунтайма,
-GlitchTip чист, контейнеры healthy (12).
+GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51546`, деплой 07.11 10:41Z без даунтайма (перезапуск после flaky SettlementSourceLockOrderTest), GlitchTip чист.
 
 #### PR A (2.0 + 2.1a): `confirm()` → `partials/_confirm_modal`
 
@@ -256,6 +256,44 @@ GlitchTip чист, контейнеры healthy (12).
   был другой, смысл тот же. `X-Requested-With` не шлётся — контроллеры его не читают.
 - `setTimeout(reload, 1000)` после apply сохранён.
 
+#### PR F (2.3, часть 2): «Реклама маркетплейсов»
+
+- `marketplace_ads/index` (364 строки JS: Twig внутри JS, захардкоженные фрагменты URL,
+  `onclick="return confirm()"` внутри innerHTML) → `assets/pages/marketplace_ads.js`.
+  Адреса API — на корне `[data-marketplace-ads]` (`.page-body`); адреса с id — `path()` с
+  плейсхолдером-UUID `00000000-0000-0000-0000-000000000000`, модуль подставляет id
+  (requirements маршрутов не примут `__ID__`, а прежний код собирал `/marketplace-ads/jobs/…`
+  строками). Таблицы «История загрузок» и «Сырые документы» строятся через DOM/`textContent`
+  (раньше innerHTML + `escapeHtml`, но числа `batchStats` и статусы — без него).
+  «Обработать» — кнопка-триггер `_confirm_modal` (`data-confirm-action` + `extractToken` из
+  API) вместо формы с `onclick=confirm` в строке. Модалы «Загрузить за период» и «Пометить
+  FAILED», поллер прогресса (15 с, `data-poll-interval`) — через `apiFetch`; разные форматы
+  ошибок эндпоинтов (`{message}`, `{error}`) читает `legacyErrorMessage`. Модалы и диалог
+  перенесены внутрь корня `.page-body`. Id элементов → `data-*`.
+- Тесты: `AdsIndexControllerTest` — адреса на корне (в т. ч. четыре шаблона с плейсхолдером),
+  хуки таблиц, форм и модалов, диалог, нет `onclick`/`onchange`/`onsubmit`; e2e
+  `tests/e2e/marketplace-ads.e2e.cjs` (9 проверок: таблицы с XSS-строками, прогресс batch'ей,
+  триггер подтверждения и отправка формы диалога, фильтр сырых документов, reprocess с
+  перечиткой, load-range и mark-failed с ошибками сервера и восстановлением кнопок, поллер).
+  Поллер не даёт сети стать idle — e2e ждёт `domcontentloaded` и флаг готовности.
+
+#### Checks (PR F)
+- `make site-cs-twig` — 0 / OK (324); `npm run lint` — 0; `npm run build` — OK
+- `make site-cs-check` — 0 of 3904; `make site-stan` — OK
+- `AdsIndexControllerTest` — OK (3, 19 assertions); e2e `marketplace-ads` — 9 passed
+- `make site-test` — OK (8506 tests, 47884 assertions), 7 мин 17 с
+
+#### External review (PR F)
+- rounds: 1 (codex, effort medium, дифф 1105 строк, `site/var/external-review/97b51546/review.txt`): REVIEW_GREEN;
+  MINOR исправлен — в e2e ожидание reprocess было пустым (`waitForFunction(() => true)`), теперь
+  `waitForResponse` на POST reprocess и GET перечитки
+
+#### Risks / reviewer focus (PR F)
+- Сеть vs сервер в alert'ах: `error.status === 0` — «Ошибка сети: …», иначе «Ошибка: <текст сервера>»
+  (раньше сервер без JSON-тела давал «Неизвестная ошибка», теперь «Ошибка сервера (N)»).
+- Страница без прав владельца: модалов нет в разметке — модуль проверяет наличие узлов.
+- `X-Requested-With` не шлётся — контроллеры его не читают.
+
 #### Files changed (PR A)
 - `site/templates/**` — 9 страниц + `company/edit` (include) + `partials/_confirm_modal` (doc)
 - `site/assets/confirm_modal.js` — `data-confirm-fields`
@@ -301,5 +339,5 @@ GlitchTip чист, контейнеры healthy (12).
   в `data-confirm-title` через автоэкранирование, прежний JS конкатенировал строку.
 
 #### Next
-- PR E → handoff «merge and deploy»; затем PR F: `marketplace_ads/index` (364, Twig в JS) и
-  `marketplace/listings/{index,tags}` (412 + 151), далее `transaction/index`, `document/_page_scripts`, Chart-острова
+- PR F → handoff «merge and deploy»; затем PR G: `marketplace/listings/{index,tags}` (412 + 151),
+  далее `transaction/index` (385), `document/_page_scripts` (460), Chart-острова dashboard

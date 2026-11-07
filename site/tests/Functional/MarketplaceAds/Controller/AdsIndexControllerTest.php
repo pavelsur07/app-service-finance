@@ -78,9 +78,28 @@ final class AdsIndexControllerTest extends WebTestCaseBase
         $client->loginUser($owner);
         $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
-        $client->request('GET', '/marketplace-ads');
+        $crawler = $client->request('GET', '/marketplace-ads');
 
         self::assertResponseIsSuccessful();
+
+        // Хуки assets/pages/marketplace_ads.js: адреса API на корне, адреса с id — шаблоны с плейсхолдером.
+        $root = $crawler->filter('[data-marketplace-ads]');
+        self::assertCount(1, $root);
+        self::assertSame('/api/marketplace-ads/load-jobs', $root->attr('data-jobs-url'));
+        self::assertSame('/api/marketplace-ads/raw-documents', $root->attr('data-raw-docs-url'));
+        self::assertSame('/api/marketplace-ads/ozon/load-range', $root->attr('data-load-range-url'));
+        $placeholder = '00000000-0000-0000-0000-000000000000';
+        self::assertSame('/marketplace-ads/jobs/'.$placeholder.'/extract-batches', $root->attr('data-extract-url'));
+        self::assertSame('/marketplace-ads/raw-documents/'.$placeholder.'/download', $root->attr('data-download-url'));
+        self::assertSame('/api/marketplace-ads/raw-documents/'.$placeholder.'/reprocess', $root->attr('data-reprocess-url'));
+        self::assertSame('/api/marketplace-ads/admin/load-jobs/'.$placeholder.'/mark-failed', $root->attr('data-mark-failed-url'));
+        self::assertCount(1, $root->filter('table[data-ad-jobs][data-is-company-owner="1"] tbody'));
+        self::assertCount(1, $root->filter('form[data-raw-documents-filter] input[type="date"][data-raw-date-from]'));
+        self::assertCount(1, $root->filter('table[data-ad-raw-docs] tbody'));
+        self::assertCount(1, $root->filter('#modal-ozon-ad-load-range[data-ozon-ad-load-range] button[data-range-submit]'));
+        self::assertCount(1, $root->filter('#modal-mark-ad-load-job-failed[data-mark-failed-modal] textarea[data-mark-failed-reason]'));
+        self::assertCount(1, $root->filter('#ads-confirm[data-confirm-modal]'));
+        self::assertCount(0, $crawler->filter('[onclick], [onchange], [onsubmit]'));
     }
 
     public function testRedirectsWhenNotAuthenticated(): void
