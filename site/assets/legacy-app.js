@@ -48,6 +48,16 @@ document.addEventListener('click', (event) => {
 // Виджеты «Статья ДДС» / «Категория ОПиУ» (partials/_dds_tree_picker.html.twig) поверх
 // select формы, в том числе в строках, добавленных позже (коллекция операций документа);
 // страница «Операция ДДС» — после виджетов (её снимок формы видит их значения).
+// Flash-тосты (partials/_flash.html.twig): Bootstrap Toast из Tabler (window.bootstrap задаёт _layout/legacy).
+// Без Tabler (CDN не ответил) тост просто остаётся видимым: сообщение важнее автоскрытия.
+const showFlashToasts = () => {
+  const Toast = (window.bootstrap || window.tabler?.bootstrap)?.Toast;
+  document.querySelectorAll('.toast[data-bs-autohide]').forEach((toastEl) => {
+    if (Toast) Toast.getOrCreateInstance(toastEl).show();
+    else toastEl.classList.add('show');
+  });
+};
+
 const initDds = () => {
   initDdsTreePickers();
   observeDdsTreePickers();
@@ -72,6 +82,7 @@ const initDds = () => {
   initListingTags();
   initCashTransactions();
   initPnlDocument();
+  showFlashToasts();
 };
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initDds);

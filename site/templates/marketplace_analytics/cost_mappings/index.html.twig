@@ -16,19 +16,6 @@
                      data-add-url="{{ path('marketplace_analytics_api_cost_mapping_add') }}"
                      data-index-url="{{ path('marketplace_analytics_cost_mappings_index') }}">
 
-                    {% for message in app.flashes('success') %}
-                        <div class="alert alert-success alert-dismissible mb-3" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    {% endfor %}
-                    {% for message in app.flashes('error') %}
-                        <div class="alert alert-danger alert-dismissible mb-3" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    {% endfor %}
-
                     {# Форма добавления маппинга #}
                     <div class="card mb-3">
                         <div class="card-header">

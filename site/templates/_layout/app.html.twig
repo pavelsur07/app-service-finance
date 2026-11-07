@@ -17,6 +17,7 @@
         <div class="app-body">
             {% include 'app/_shell/sidebar.html.twig' %}
             <main class="app-workzone">
+                {% include 'app/_ui/_flash.html.twig' %}
                 {% include 'billing/_partials/expiry_notice.html.twig' with {variant: 'app'} only %}
                 {% block content %}{% block body %}{% endblock %}{% endblock %}
             </main>

@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 / закрывающий PR / handoff → Stage 3 PLANNED
+**Phase:** Stage 2 закрывающий PR #2923 на handoff → Stage 3 PR A на handoff
 **Status:** Stage 1 (#2909) и Stage 2 PR A–I (#2910–#2921) на проде 07.11; закрывающий PR Stage 2 на handoff
-**Stage base commit:** master 4ac412c42 · ветка `refactor/twig-ui-stage-2j`
+**Stage base commit:** master 4ac412c42 · ветки `refactor/twig-ui-stage-2j` (#2923) → `refactor/twig-ui-stage-3a` (PR A)
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -58,10 +58,13 @@
 - PR H — на проде 07.11 19:07Z (#2920). PR I (2.3, часть 5): `pages/pnl_document`, партиал `document/_page_scripts`
   удалён; e2e `tests/e2e/pnl-document.e2e.cjs` — на проде 07.11 19:24Z (#2921).
 - Закрывающий PR: удалены неподключённые `dashboard/_demo_chart`, `_money_balance_chart`; Stage 2 DONE;
-  план Stage 3 — `stages/stage-3.md`. Flaky `SettlementSourceLockOrderTest` — фикс таймаута PR #2922.
+  план Stage 3 — `stages/stage-3.md`. Flaky `SettlementSourceLockOrderTest` — фикс таймаута PR #2922,
+  на проде 07.11 19:44Z. Закрывающий PR #2923 — на handoff.
+- Stage 3 PR A (3.0 + 3.1): один маппинг flash на три shell'а, `app/_ui/_flash` для кита, 9 inline-копий
+  удалены, дефект `invite_token` закрыт; ветка `refactor/twig-ui-stage-3a` от 2j — после мержа #2923 дифф только PR A.
 
 ### Exact next action
-- handoff закрывающего PR Stage 2 и #2922 («merge and deploy»); затем Stage 3 PR A (3.0 + 3.1, flash) с ветки от master
+- handoff #2923 и Stage 3 PR A («merge and deploy»); затем PR B (3.2, `partials/_empty`, 17 замен) с ветки от PR A
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`

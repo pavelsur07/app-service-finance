@@ -50,7 +50,7 @@ final class PermissionsController extends AbstractController
         }
         if ($form->isSubmitted() && $form->isValid()) {
             ($this->save)($companyId, $userId, $id, $form->get('selectedScopes')->getData(), $form->get('enabledResources')->getData(), (int) $form->get('version')->getData());
-            $this->addFlash('api_permissions_success', 'Права сохранены.');
+            $this->addFlash('success', 'Права сохранены.');
 
             return $this->redirectToRoute('settings_api_permissions', ['id' => $id], Response::HTTP_SEE_OTHER);
         }

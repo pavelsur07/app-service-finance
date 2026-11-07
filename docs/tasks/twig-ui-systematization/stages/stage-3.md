@@ -1,4 +1,4 @@
-### Stage 3: общие партиалы и подписи — PLANNED
+### Stage 3: общие партиалы и подписи — IN PROGRESS (PR A на handoff)
 
 **Risk:** LOW–MEDIUM (разметка 65+17+10 мест меняется на include/embed; визуал не меняется)
 **Stage base commit:** master после закрывающего PR Stage 2
@@ -36,8 +36,9 @@
   Enum без `label()` получает его в том же PR с unit-тестом.
 
 #### Чек-лист приёмки
-- [ ] 3.0 — функциональный тест: три shell'а рендерят flash каждого label одинаковыми классами
-- [ ] 3.1 — `grep -rl app.flashes templates` → только `partials/_flash`, `admin/_toasts`, `app/_ui/_flash`
+- [x] 3.0 — функциональный тест: три shell'а рендерят flash каждого label одинаковыми классами (PR A, `FlashShellsTest`)
+- [x] 3.1 — `grep -rl app.flashes templates` → `partials/_flash`, `admin/_toasts`, `app/_ui/_flash` + два служебных ключа
+      (`company_member/index` — `invite_token`, `telegram/admin/bot/index` — `webhook_status`): это данные страницы, не сообщения (PR A)
 - [ ] 3.2 — `grep -rl 'class="empty"' templates` → только `partials/_empty`
 - [ ] 3.3 — `grep -rl 'class="page-header' templates` → только `partials/_page_header`
 - [ ] 3.4 — `grep -rn '{% set [a-zA-Z]*Labels' templates` → 0
@@ -47,3 +48,59 @@
 #### Reviewer focus
 - Одинаковые классы flash для одинакового label во всех 12 местах; никаких новых CSS-классов.
 - `embed` шапки: блок `actions` пустой → кнопок нет, лишнего `<div class="col-auto">` не остаётся.
+
+#### PR A (3.0 + 3.1) — flash: один маппинг на три shell'а
+
+##### Факт, найденный при разборе
+`_layout/legacy` включает `partials/_flash` до `{% block content %}`, а партиал читал `app.flashes` без ключа —
+`FlashBag::all()` опустошал **все** ключи. Поэтому 7 inline-копий на страницах легаси (`inventory/layout`,
+`marketplace/layout`, `catalog/product/import`, `marketplace_ads/index`, `cost_mappings/index`,
+`telegram/integration/index`) никогда не рендерились — мёртвый код, удаление без визуальных изменений.
+Побочный дефект: `company_member/index` ждал `app.flashes('invite_token')`, но токен уходил в тост
+`text-bg-invite_token` — карточка «Ссылка для приглашения» не показывалась. Тестов на это не было.
+
+##### Что сделано
+- `partials/_flash` читает только известные label (`success/error/danger/warning/alert/notice/info`) через
+  `app.flashes(label)`; служебные ключи остаются странице. Inline `<script>` (fallback без Bootstrap, `turbo:load` —
+  Turbo в `controllers.json` выключен) удалён; показ тостов — `showFlashToasts()` в `assets/legacy-app.js`
+  (`bootstrap.Toast.getOrCreateInstance`, Tabler грузится классическим скриптом до модуля).
+- Кит: новый `app/_ui/_flash.html.twig` (DS `alert alert--{variant}` в `wz-row`, без JS), включён в `_layout/app`
+  до `expiry_notice`; inline-копии `balance/layout` и `api/settings/permissions` удалены,
+  `PermissionsController` пишет `success` вместо ключа `api_permissions_success`.
+- `admin/_toasts` не менялся — маппинг уже совпадал.
+- Удалено 9 inline-копий `app.flashes` (10 файлов замера минус 2 служебных ключа + `permissions`).
+
+##### Визуальные отличия (намеренные)
+- Баланс: flash теперь над вкладками разделов (был под ними); `error/danger` → `alert--danger`
+  (был `alert--warning`; контроллеры Баланса пишут только `success`, фактического изменения нет).
+- Права API-ключа: «Права сохранены.» над формой в `wz-row`, а не внутри карточки.
+- Легаси: порядок тостов — по label в порядке маппинга, не по времени `addFlash` (на странице почти всегда один).
+
+##### Тесты
+- `tests/Integration/Shared/FlashShellsTest.php` — три shell'а × 7 label → один variant; известные ключи
+  прочитаны, `invite_token` остаётся в FlashBag и не рендерится.
+- `CompanyMemberInviteFlowTest::testInviteCreatesCompanyInvite` — после redirect карточка «Ссылка для приглашения»
+  с `/invite/`, тоста `text-bg-invite_token` нет (красный на старом `_flash`, зелёный на новом).
+- `ApiPermissionsControllerTest` — без правок, `.alert--success` «Права сохранены.» проходит через общий flash.
+
+##### Files changed (PR A)
+- `site/templates/partials/_flash.html.twig`, `site/templates/app/_ui/_flash.html.twig` (new), `site/templates/_layout/app.html.twig`
+- `site/templates/{balance/layout,api/settings/permissions,inventory/layout,marketplace/layout,catalog/product/import,marketplace_ads/index,marketplace_analytics/cost_mappings/index,telegram/integration/index}.html.twig`
+- `site/assets/legacy-app.js`, `site/src/Api/Controller/Settings/PermissionsController.php`
+- `site/tests/Integration/Shared/FlashShellsTest.php` (new), `site/tests/Functional/Company/CompanyMemberInviteFlowTest.php`
+
+##### Проверки (PR A)
+- `make site-cs-twig` — twigcs 0, `lint:twig` OK (322); `npm run lint` — 0; `npm run build` — OK
+- `make site-cs-check` — 0 of 3914; `make site-cs-strict-types` — 0; `make site-stan` — OK
+- целевые функциональные тесты (flash-ассерты, Balance, Telegram, MarketplaceAds, MarketplaceAnalytics, Catalog) — OK (255 tests, 1507 assertions)
+- `make site-test` — OK (8540 tests, 48108 assertions), 8 мин 23 с
+
+##### External review (PR A)
+- rounds: 2 (codex, effort medium, база — ветка 2j 048909b5c, дифф 516 строк, `site/var/external-review/048909b5/review.txt`).
+  Раунд 1, IMPORTANT: без Tabler JS (CDN) тосты оставались скрытыми — прежний inline-скрипт имел fallback.
+  Исправлено: без `Toast` тост получает класс `show` и остаётся видимым (без автоскрытия). Раунд 2 — REVIEW_GREEN.
+
+##### Risks / reviewer focus (PR A)
+- Страницы кита без сессии: `app/_ui/_flash` читает `app.flashes` в `_layout/app` — все страницы кита (Баланс, права API,
+  `balance_error`) под stateful-firewall; `BalanceLedgerUiTest` покрывает 404/422 HTML.
+- Новый ключ `addFlash` вне семи известных молча пропадёт: проверка — `grep -rhoE "addFlash\('[a-z_]+'" src | sort -u`.

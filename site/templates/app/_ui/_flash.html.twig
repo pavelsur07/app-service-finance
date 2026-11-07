@@ -1,0 +1,16 @@
+{#
+  Flash кита (_layout/app): единственное место, где кит читает app.flashes.
+  Маппинг label → variant тот же, что в partials/_flash и admin/_toasts; DS-alert без JS.
+#}
+{% set labelVariants = {success: 'success', error: 'danger', danger: 'danger', warning: 'warning', alert: 'warning', notice: 'info', info: 'info'} %}
+{% for label, variant in labelVariants %}
+    {% for message in app.flashes(label) %}
+        <div class="wz-row">
+            <div class="alert alert--{{ variant }}" role="status">
+                <div class="a-body">
+                    <p class="a-text">{{ message }}</p>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+{% endfor %}
