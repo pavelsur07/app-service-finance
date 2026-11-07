@@ -168,7 +168,7 @@
 </div>
 
 <div class="card pl-preview-controls-card mb-3">
-    <form id="cashflow-filter-form" class="card-body" method="get">
+    <form id="cashflow-filter-form" data-report-filters class="card-body" method="get">
         <input type="hidden" name="from" value="{{ date_from|date('Y-m-d') }}" data-pl-exact-from>
         <input type="hidden" name="to" value="{{ date_to|date('Y-m-d') }}" data-pl-exact-to>
         <input type="hidden" name="group" value="{{ group }}" data-pl-group>
@@ -573,9 +573,6 @@
     {% endfor %}
 {% endif %}
 
-{% include 'finance/report/_filter_controls_script.html.twig' with {
-    'reportControlsFormId': 'cashflow-filter-form'
-} only %}
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {

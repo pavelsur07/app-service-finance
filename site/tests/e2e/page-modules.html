@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Страничные модули — демо</title>
+</head>
+<body>
+<!-- Демо для tests/e2e/page-modules.e2e.cjs: разметка страниц в объёме хуков модулей. -->
+
+<!-- company/_tax_profile_fields -->
+<div class="row g-2" data-tax-profile-fields data-matrix='{"usn":["none","vat5"],"osno":["vat20"]}'>
+  <select data-tax-regime><option value="">—</option><option value="usn" selected>УСН</option><option value="osno">ОСНО</option></select>
+  <select data-vat-mode><option value="">—</option><option value="none">Без НДС</option><option value="vat5">5%</option><option value="vat20">20%</option></select>
+</div>
+
+<!-- profile/money_account/new -->
+<form id="ma" data-money-account-form="1">
+  <input type="radio" name="t" value="cash" data-money-account-type="cash" checked>
+  <input type="radio" name="t" value="bank" data-money-account-type="bank">
+  <div data-money-account-number-field class="col-12"><input data-money-account-number="1" name="num"></div>
+  <input type="checkbox" data-money-account-default="1">
+  <span data-money-account-default-badge class="badge d-none">Основной</span>
+</form>
+
+<!-- pl_category/edit -->
+<div class="page-body">
+  <form id="pl" data-pl-category-form="1">
+    <span data-pl-category-badge="KPI" hidden>KPI</span>
+    <span data-pl-category-badge="SUBTOTAL" hidden>SUBTOTAL</span>
+    <span data-pl-category-badge="LEAF_INPUT" hidden>LEAF</span>
+    <select data-pl-category-type="1"><option value="LEAF_INPUT" selected>Лист</option><option value="KPI">KPI</option></select>
+    <select data-pl-category-flow="1"><option value="INCOME" selected>Доход</option><option value="EXPENSE">Расход</option></select>
+    <select data-pl-category-expense-type="1"><option value="">—</option></select>
+    <textarea id="formula" data-pl-category-formula="1"></textarea>
+    <small data-pl-category-formula-hint data-hint-leaf="Лист: без формулы" data-hint-formula="Вставляйте коды"></small>
+  </form>
+  <button type="button" id="ins" data-insert-code="REV" data-insert-target="#formula">REV</button>
+</div>
+
+<!-- catalog/product/import_status -->
+<span id="status-badge" data-import-status-badge class="badge bg-secondary">В очереди</span>
+<div id="import-body" data-import-status data-status-url="/api/status" data-import-url="/import" data-products-url="/products" data-poll-interval="50">
+  <div id="progress-block">…</div>
+</div>
+
+<!-- report filters -->
+<form id="rf" data-report-filters method="get" action="/">
+  <input data-pl-exact-from name="from" value="2026-01-01">
+  <input data-pl-exact-to name="to" value="2026-01-31">
+  <input data-pl-month-from name="mf" value="2026-01">
+  <input data-pl-month-to name="mt" value="2026-01">
+  <input type="hidden" data-pl-legacy-filter="project" name="project" value="1">
+  <input type="hidden" data-pl-filter-marker="project" name="projects_marker" value="1" disabled>
+  <input type="checkbox" data-pl-filter-input="project" data-pl-filter-name="projects[]" value="1">
+  <input type="checkbox" data-pl-filter-input="project" data-pl-filter-name="projects[]" value="2">
+</form>
+
+<script type="module">
+  import { initTaxProfileFields } from '/assets/tax_profile_fields.js';
+  import { initMoneyAccountForm } from '/assets/pages/money_account.js';
+  import { initPlCategoryEdit } from '/assets/pages/pl_category_edit.js';
+  import { initProductImportStatus } from '/assets/pages/product_import_status.js';
+  import { initReportFilters } from '/assets/pages/report_filters.js';
+  window.submits = [];
+  document.addEventListener('submit', (e) => { window.submits.push(e.target.id); e.preventDefault(); });
+  initTaxProfileFields();
+  initMoneyAccountForm();
+  initPlCategoryEdit();
+  initProductImportStatus();
+  initReportFilters();
+  window.ready = true;
+</script>
+</body>
+</html>

@@ -43,11 +43,11 @@
         <div class="container-xl">
             <div class="row row-cards">
                 <div class="col-lg-8">
-                    {{ form_start(form, {'attr': {'id': 'money-account-create-form', 'class': 'card'}}) }}
+                    {{ form_start(form, {'attr': {'id': 'money-account-create-form', 'class': 'card', 'data-money-account-form': '1'}}) }}
                         <div class="card-header">
                             <h3 class="card-title">Реквизиты счёта</h3>
                             <div class="card-actions">
-                                <span id="money-account-default-badge" class="badge bg-blue-lt{{ form.isDefault.vars.data ? '' : ' d-none' }}"><i class="ti ti-star-filled me-1"></i>Основной</span>
+                                <span id="money-account-default-badge" data-money-account-default-badge class="badge bg-blue-lt{{ form.isDefault.vars.data ? '' : ' d-none' }}"><i class="ti ti-star-filled me-1"></i>Основной</span>
                             </div>
                         </div>
                         <div class="card-body">
@@ -85,11 +85,11 @@
                                     {{ form_errors(form.type) }}
                                 </div>
 
-                                <div id="money-account-number-field" class="col-12">
+                                <div id="money-account-number-field" class="col-12" data-money-account-number-field>
                                     {{ form_label(form.accountNumber, 'Расчётный счёт') }}
                                     <div class="input-group input-group-flat">
                                         <span class="input-group-text"><i class="ti ti-hash"></i></span>
-                                        {{ form_widget(form.accountNumber, {'attr': {'class': 'font-monospace', 'placeholder': '20 цифр', 'inputmode': 'numeric'}}) }}
+                                        {{ form_widget(form.accountNumber, {'attr': {'class': 'font-monospace', 'placeholder': '20 цифр', 'inputmode': 'numeric', 'data-money-account-number': '1'}}) }}
                                     </div>
                                     {{ form_errors(form.accountNumber) }}
                                     <small class="form-hint">Укажите номер для банковского счёта.</small>
@@ -150,48 +150,4 @@
             </div>
         </div>
     </div>
-{% endblock %}
-
-{% block javascripts %}
-    {{ parent() }}
-    <script>
-        (function () {
-            const initMoneyAccountCreate = function () {
-                const form = document.getElementById('money-account-create-form');
-                if (!form || form.dataset.moneyAccountCreateBound === '1') {
-                    return;
-                }
-
-                const typeInputs = form.querySelectorAll('[data-money-account-type]');
-                const accountNumberField = document.getElementById('money-account-number-field');
-                const accountNumberInput = document.getElementById('{{ form.accountNumber.vars.id }}');
-                const defaultInput = document.getElementById('{{ form.isDefault.vars.id }}');
-                const defaultBadge = document.getElementById('money-account-default-badge');
-
-                const syncType = function () {
-                    const selectedType = form.querySelector('[data-money-account-type]:checked');
-                    const isBank = selectedType && selectedType.value === 'bank';
-                    accountNumberField.classList.toggle('d-none', !isBank);
-                    accountNumberInput.disabled = !isBank;
-                };
-
-                const syncDefault = function () {
-                    defaultBadge.classList.toggle('d-none', !defaultInput.checked);
-                };
-
-                typeInputs.forEach(function (input) {
-                    input.addEventListener('change', syncType);
-                });
-                defaultInput.addEventListener('change', syncDefault);
-
-                form.dataset.moneyAccountCreateBound = '1';
-                syncType();
-                syncDefault();
-            };
-
-            initMoneyAccountCreate();
-            document.addEventListener('DOMContentLoaded', initMoneyAccountCreate);
-            document.addEventListener('turbo:load', initMoneyAccountCreate);
-        })();
-    </script>
 {% endblock %}

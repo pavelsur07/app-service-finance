@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 / PR B (2.1b) / handoff
-**Status:** Stage 1 (#2909) и PR A этапа 2 (#2911, 08:19Z) на проде, GlitchTip чист; PR B готов к handoff
-**Stage base commit:** master 2317ed9b8 · ветка `refactor/twig-ui-stage-2b`
+**Phase:** Stage 2 / PR C (2.2) / handoff
+**Status:** Stage 1 (#2909), PR A (#2911), PR B (#2912) на проде; PR C готов к handoff
+**Stage base commit:** master 92611b3ec · ветка `refactor/twig-ui-stage-2c`
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -40,15 +40,19 @@
 - PR A — на проде. PR B (2.1b): `data-autosubmit` (`assets/autosubmit.js`), `data-busy-submit`
   (`assets/busy_submit.js`, туда же блок moysklad), `assets/pages/cash_transfer.js`; минус 5
   `<script>` и 9 `onchange`; e2e `tests/e2e/legacy-forms.e2e.cjs`.
-- Разбиение: PR C — 2.2 (Twig внутри JS, 12 файлов), PR D — 2.3 (пять крупных скриптов).
+- PR B — на проде. PR C (2.2): пять модулей (`tax_profile_fields`, `pages/money_account`,
+  `pages/pl_category_edit`, `pages/product_import_status`, `pages/report_filters`), партиал
+  `_filter_controls_script` удалён, попутно создан отсутствовавший `_import_result`;
+  e2e `tests/e2e/page-modules.e2e.cjs`.
+- PR D — 2.3 (пять крупных скриптов) + marketplace-страницы с Twig в JS из 2.2.
 
 ### Exact next action
-- handoff PR B («merge and deploy»); после деплоя — GlitchTip 30 мин (виджет смены компании
-  в сайдбаре — на каждой странице); затем PR C: 2.2 начиная с `partials/_dds_tree_picker`
+- handoff PR C («merge and deploy»); после деплоя — GlitchTip 30 мин (отчёты ОПиУ/ДДС,
+  редактор статьи ОПиУ); затем PR D: начать с `marketplace/cost_pl_mapping/index`
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`
-- `site/assets/{confirm_modal,autosubmit,busy_submit}.js`, `site/assets/legacy-app.js`
+- `site/assets/legacy-app.js` (список init), `site/assets/pages/*.js`
 - `site/.twigcs.php`, `site/tests/Twigcs/Ruleset.php`, `.github/workflows/twig-lint.yml`
 
 ### Шаблоны без функционального теста (1.0, 41)
