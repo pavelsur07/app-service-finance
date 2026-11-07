@@ -1,12 +1,15 @@
 {% extends 'settlement/layout.html.twig' %}
 {% form_theme form 'settlement/_form_theme.html.twig' %}
+{% block settlement_header %}<div class="vf-ops-head"><h1>Начало учёта взаиморасчётов</h1></div>{% endblock %}
 {% block settlement_content %}
-<div class="wz-head"><h1 class="wz-title">Начало учёта взаиморасчётов</h1></div>
-<section class="card">
-    <p>Учёт ведётся в рублях. На выбранную дату внесите долги и подтверждённые авансы отдельными документами начальных остатков. Старые ДДС и ОПиУ автоматически не включаются.</p>
-    {% if book %}<p>Дата начала зафиксирована: {{ book.startDate|date('d.m.Y') }}. Её нельзя изменить после настройки.</p>{% endif %}
-    {{ form_start(form) }}{{ form_errors(form) }}{{ form_widget(form) }}
-    {% if not book %}<button class="btn btn-md btn-primary" type="submit">Сохранить дату начала</button>{% endif %}{{ form_end(form) }}
-    {% if book %}<a class="btn btn-md btn-secondary" href="{{ path('settlement_document_new') }}">Ввести начальные остатки</a>{% endif %}
-</section>
+<div class="dds-op card-body"><div class="dds-op__grid">
+    <div class="dds-op__main"><section class="dds-card"><h2 class="dds-card__title">Дата начала</h2><div class="card-body">
+        {% if book %}<p>Дата начала зафиксирована: {{ book.startDate|date('d.m.Y') }}. Её нельзя изменить после настройки.</p>{% endif %}
+        {{ form_start(form, {attr: {id: 'settlement-setup-form'}}) }}{{ form_errors(form) }}{{ form_row(form.startDate, {disabled: form.startDate.vars.disabled or not is_granted('module.finance.write')}) }}{{ form_end(form) }}
+    </div></section></div>
+    <aside class="dds-op__aside"><section class="dds-card"><h2 class="dds-card__title">Сведения</h2><p class="dds-card__empty">Учёт ведётся в рублях. На выбранную дату внесите долги и подтверждённые авансы отдельными документами начальных остатков. Старые ДДС и ОПиУ автоматически не включаются.</p></section></aside>
+</div>
+<div class="dds-op__bar"><span class="dds-op__status">{{ book ? 'Учёт настроен' : 'Учёт ещё не начат' }}</span><div class="dds-op__actions"><a class="btn" href="{{ path('settlement_index') }}">К сводке</a>
+    {% if is_granted('module.finance.write') %}{% if book %}<a class="btn btn-primary" href="{{ path('settlement_document_new') }}">Ввести начальные остатки</a>{% else %}<button class="btn btn-primary" type="submit" form="settlement-setup-form">Сохранить дату начала</button>{% endif %}{% endif %}
+</div></div></div>
 {% endblock %}

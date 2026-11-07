@@ -1,6 +1,14 @@
 {% set fields = {receivable: 'Нам должны', payable: 'К оплате', advanceGiven: 'Выданные авансы', advanceReceived: 'Полученные авансы', unallocatedOut: 'Нераспределённые выплаты', unallocatedIn: 'Нераспределённые поступления'} %}
-<div class="wz-row">
-{% for field, label in fields %}
-    <section class="kpi"><div class="kpi-label">{{ label }}</div><div class="kpi-value">{{ attribute(balances, field).toDecimalString|vf_money(2, 'RUB') }}</div></section>
-{% endfor %}
-</div>
+<section class="card-body" aria-label="Остатки на конец периода">
+    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
+        {% for field, label in fields %}
+            {% set amount = attribute(balances, field).toDecimalString %}
+            <div class="col{{ amount|length > 16 ? ' settlement-balance-wide' }}">
+                <div class="card h-100"><div class="card-body">
+                    <div class="subheader mb-2">{{ label }}</div>
+                    <div class="h2 mb-0 settlement-balance">{{ amount|vf_money(2, 'RUB') }}</div>
+                </div></div>
+            </div>
+        {% endfor %}
+    </div>
+</section>

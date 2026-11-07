@@ -1,10 +1,24 @@
 {% extends 'settlement/layout.html.twig' %}
 {% form_theme form 'settlement/_form_theme.html.twig' %}
+{% block settlement_header %}<div class="vf-ops-head"><h1>{{ title }}</h1></div>{% endblock %}
 {% block settlement_content %}
-<div class="wz-head"><h1 class="wz-title">{{ title }}</h1></div>
-<section class="card"><p>{{ description }}</p>
-    {% if relatedDocument is defined %}<p><a href="{{ path('settlement_document', {id: relatedDocument.id}) }}">Исходный документ{% if relatedDocument.eventSequence %} №{{ relatedDocument.eventSequence }}{% endif %}</a></p>{% endif %}
-    {{ form_start(form) }}{{ form_errors(form) }}{{ form_widget(form) }}
-    <div class="wz-row-actions"><button class="btn btn-md btn-primary" type="submit">{{ submitLabel }}</button><a class="btn btn-md btn-secondary" href="{{ path('settlement_documents') }}">К документам</a></div>{{ form_end(form) }}
-</section>
+<div class="dds-op card-body">
+    <div class="dds-op__grid">
+        <div class="dds-op__main">
+            {{ form_start(form, {attr: {id: 'settlement-entry-form', class: 'dds-op__form'}}) }}{{ form_errors(form) }}
+            <fieldset class="dds-op__fieldset" aria-label="Реквизиты документа"{% if not is_granted('module.finance.write') %} disabled{% endif %}>
+                {% if form.counterpartyId is defined %}{% include 'settlement/_document_fields.html.twig' %}
+                {% else %}<section class="dds-card" aria-labelledby="settlement-event-title"><h2 class="dds-card__title" id="settlement-event-title">Реквизиты изменения</h2><div class="card-body">{% include 'settlement/_event_fields.html.twig' %}</div></section>{% endif %}
+            </fieldset>
+            {{ form_end(form) }}
+        </div>
+        <aside class="dds-op__aside"><section class="dds-card" aria-labelledby="settlement-info-title"><h2 class="dds-card__title" id="settlement-info-title">Сведения</h2>
+            <p class="dds-card__empty">{{ description }}</p>
+            {% if relatedDocument is defined %}<p class="dds-info__note"><a href="{{ path('settlement_document', {id: relatedDocument.id}) }}">Исходный документ{% if relatedDocument.eventSequence %} №{{ relatedDocument.eventSequence }}{% endif %}</a></p>{% endif %}
+        </section></aside>
+    </div>
+    <div class="dds-op__bar"><span class="dds-op__status">{{ is_granted('module.finance.write') ? 'Изменения сохраняются после подтверждения' : 'Только просмотр' }}</span><div class="dds-op__actions">
+        <a class="btn" href="{{ path('settlement_documents') }}">К документам</a>{% if is_granted('module.finance.write') %}<button class="btn btn-primary" type="submit" form="settlement-entry-form">{{ submitLabel }}</button>{% endif %}
+    </div></div>
+</div>
 {% endblock %}

@@ -1,0 +1,11 @@
+{% set route = app.request.attributes.get('_route') %}
+{% set tabs = [
+    {label: 'Сводка', href: path('settlement_index'), active: route in ['settlement_index', 'settlement_card']},
+    {label: 'Документы', href: path('settlement_documents'), active: route not in ['settlement_index', 'settlement_card', 'settlement_setup']}
+] %}
+{% if is_granted('module.finance.write') %}
+    {% set tabs = tabs|merge([{label: 'Начало учёта', href: path('settlement_setup'), active: route == 'settlement_setup'}]) %}
+{% endif %}
+<nav aria-label="Разделы взаиморасчётов">
+    {% include 'partials/_tabs.html.twig' with {tabs: tabs, class: 'card-header-tabs'} only %}
+</nav>
