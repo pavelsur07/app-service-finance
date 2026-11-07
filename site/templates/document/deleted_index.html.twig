@@ -104,9 +104,9 @@
         </div>
     {% endif %}
     <div class="card-footer d-flex flex-column flex-md-row align-items-center gap-2">
-        <form method="get" class="d-flex align-items-center gap-2">
+        <form data-autosubmit method="get" class="d-flex align-items-center gap-2">
             <label for="deleted-document-limit" class="form-label mb-0">Показывать по</label>
-            <select id="deleted-document-limit" name="limit" class="form-select form-select-sm" onchange="this.form.submit()">
+            <select id="deleted-document-limit" name="limit" class="form-select form-select-sm">
                 {% for option in [20, 30, 50] %}
                     <option value="{{ option }}" {{ option == limit ? 'selected' : '' }}>{{ option }}</option>
                 {% endfor %}

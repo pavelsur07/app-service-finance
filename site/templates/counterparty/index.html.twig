@@ -217,13 +217,3 @@
 
 {% include 'partials/_confirm_modal.html.twig' with {id: 'counterparty-confirm'} only %}
 {% endblock %}
-
-{% block scripts %}
-    {{ parent() }}
-    <script>
-    // Переключатель «Показывать архив» применяет фильтр сразу; без JS — по Enter в поиске.
-    document.querySelectorAll('form[data-autosubmit] input[type="checkbox"]').forEach(box => {
-      box.addEventListener('change', () => box.form.requestSubmit());
-    });
-    </script>
-{% endblock %}

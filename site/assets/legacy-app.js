@@ -8,45 +8,15 @@ import './project_direction_picker.js';
 import './counterparty_picker.js';
 import './picker_pill.js';
 import './confirm_modal.js';
+import './autosubmit.js';
+import './busy_submit.js';
 import { initDdsTreePickers, observeDdsTreePickers } from './dds_tree_picker.js';
 import { initDdsOperation } from './pages/dds_operation.js';
 import { initBudgetVersions } from './pages/budget_versions.js';
 import { initBudgetVersion } from './pages/budget_version.js';
 import { initSettlementUi } from './pages/settlement.js';
 import { initBudgetPlanFact } from './pages/budget_plan_fact.js';
-
-// Keep connection verification as a regular POST while preventing duplicate clicks.
-document.addEventListener('submit', (event) => {
-  const form = event.target;
-  if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-moysklad-check')) return;
-  if (form.dataset.submitting === 'true') {
-    event.preventDefault();
-    return;
-  }
-  form.dataset.submitting = 'true';
-  form.setAttribute('aria-busy', 'true');
-  for (const button of form.querySelectorAll('button[type="submit"]')) {
-    button.dataset.originalLabel = button.textContent;
-    button.disabled = true;
-    const spinner = document.createElement('span');
-    spinner.className = 'spinner-border spinner-border-sm me-2';
-    spinner.setAttribute('aria-hidden', 'true');
-    button.replaceChildren(spinner, document.createTextNode('Проверяем…'));
-  }
-});
-
-// Back/forward cache may restore the submitted page with its controls disabled.
-window.addEventListener('pageshow', () => {
-  for (const form of document.querySelectorAll('form[data-moysklad-check]')) {
-    delete form.dataset.submitting;
-    form.removeAttribute('aria-busy');
-    for (const button of form.querySelectorAll('button[data-original-label]')) {
-      button.disabled = false;
-      button.textContent = button.dataset.originalLabel;
-      delete button.dataset.originalLabel;
-    }
-  }
-});
+import { initCashTransfer } from './pages/cash_transfer.js';
 
 // Period presets (partials/_period_presets.html.twig): dates come from the server.
 document.addEventListener('click', (event) => {
@@ -71,6 +41,7 @@ const initDds = () => {
   initBudgetVersion();
   initBudgetPlanFact();
   initSettlementUi();
+  initCashTransfer();
 };
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initDds);

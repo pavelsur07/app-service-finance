@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Формы легаси — демо</title>
+</head>
+<body>
+<!-- Демо для tests/e2e/legacy-forms.e2e.cjs: data-autosubmit (assets/autosubmit.js),
+     data-busy-submit (assets/busy_submit.js), подпись валюты (assets/pages/cash_transfer.js). -->
+<form id="filter" method="get" action="/" data-autosubmit>
+  <select name="marketplace"><option value="">Все</option><option value="wb">WB</option></select>
+  <input type="checkbox" name="archived" value="1">
+  <input type="text" name="q" value="">
+</form>
+<form id="plain" method="get" action="/">
+  <select name="x"><option value="1">1</option><option value="2">2</option></select>
+</form>
+<form id="busy" method="post" action="/" data-busy-submit data-busy-label="Пересчитываем...">
+  <button type="submit">Пересчитать</button>
+  <button type="button" id="other">Отмена</button>
+</form>
+<form id="transfer">
+  <select data-currency-select="from">
+    <option value="a" data-currency="RUB">Касса</option>
+    <option value="b" data-currency="USD" selected>Валютный</option>
+  </select>
+  <input data-currency-output="from" readonly>
+</form>
+<script type="module">
+  import '/assets/autosubmit.js';
+  import '/assets/busy_submit.js';
+  import { initCashTransfer } from '/assets/pages/cash_transfer.js';
+  initCashTransfer();
+  // Наблюдатель регистрируется после модулей: видит, отменил ли модуль отправку,
+  // и сам не даёт странице уйти.
+  window.submits = [];
+  document.addEventListener('submit', (e) => {
+    window.submits.push({ id: e.target.id, prevented: e.defaultPrevented });
+    e.preventDefault();
+  });
+  window.ready = true;
+</script>
+</body>
+</html>

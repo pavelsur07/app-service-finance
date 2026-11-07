@@ -41,6 +41,10 @@ final class ProductImportUploadTest extends WebTestCaseBase
         $client->loginUser($owner);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
+        $client->request('GET', '/catalog/products/import');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('#import-form[data-busy-submit][data-busy-label]');
+
         $payload = 'fake-xlsx-bytes-'.bin2hex(random_bytes(4));
         $tmpPath = tempnam(sys_get_temp_dir(), 'imp-').'.xlsx';
         file_put_contents($tmpPath, $payload);
