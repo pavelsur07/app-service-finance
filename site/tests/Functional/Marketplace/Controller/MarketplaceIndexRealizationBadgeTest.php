@@ -44,5 +44,7 @@ final class MarketplaceIndexRealizationBadgeTest extends WebTestCaseBase
         self::assertSame('Применена', trim($crawler->filter('[data-testid="realization-applied"]')->text()));
         self::assertCount(1, $crawler->filter('[data-testid="realization-not-applied"]'));
         self::assertSame('Не применена', trim($crawler->filter('[data-testid="realization-not-applied"]')->text()));
+        self::assertCount(1, $crawler->filter('#modal-apply-realization form[data-busy-submit]'));
+        self::assertSame('Применяем выручку…', $crawler->filter('#modal-apply-realization form')->attr('data-busy-label'));
     }
 }
