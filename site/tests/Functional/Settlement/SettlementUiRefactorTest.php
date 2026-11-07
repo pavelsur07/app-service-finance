@@ -144,7 +144,7 @@ final class SettlementUiRefactorTest extends WebTestCaseBase
         foreach (['_token', 'requestId'] as $field) {
             self::assertCount(1, $crawler->filter('input[name="settlement_document['.$field.']"]'));
         }
-        self::assertCount(1, $crawler->filter('fieldset legend')->reduce(static fn ($node) => 'Сумма и даты' === trim($node->text())));
+        self::assertCount(1, $crawler->filter('.settlement-ui h2')->reduce(static fn ($node) => 'Сумма и даты' === trim($node->text())));
         $form = $crawler->filter('form[name="settlement_document"]')->form();
         $form['settlement_document[counterpartyId]'] = $party;
         $form['settlement_document[amount]'] = '0.001';
@@ -171,5 +171,44 @@ final class SettlementUiRefactorTest extends WebTestCaseBase
             self::assertResponseIsSuccessful();
             self::assertSelectorNotExists('.settlement-ui button[type="submit"]');
         }
+    }
+
+    public function testSelectedCounterpartyStaysFirstInInitialChoices(): void
+    {
+        [$client, $companyId, $party] = $this->fixture();
+        $company = $this->em()->getReference(\App\Company\Entity\Company::class, $companyId);
+        self::assertInstanceOf(\App\Company\Entity\Company::class, $company);
+        for ($i = 0; $i < 21; ++$i) {
+            $candidate = CounterpartyBuilder::aCounterparty()->withId(Uuid::uuid7()->toString())->withCompany($company)->withInn(null)->withName('Альфа '.$i)->build();
+            $this->em()->persist($candidate);
+        }
+        $this->em()->flush();
+        $crawler = $client->request('GET', '/settlements?counterparty='.$party);
+        self::assertResponseIsSuccessful();
+        $initial = json_decode((string) $crawler->filter('[data-picker-initial]')->attr('data-picker-initial'), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame($party, $initial[0]['id']);
+        self::assertCount(21, $initial);
+    }
+
+    public function testMalformedDatesRemainVisibleValidationErrors(): void
+    {
+        [$client, , $party] = $this->fixture();
+        foreach (['/settlements', '/settlements/counterparties/'.$party] as $path) {
+            foreach (['from', 'to'] as $field) {
+                $client->request('GET', $path.'?'.$field.'=not-a-date');
+                self::assertResponseStatusCodeSame(422);
+                self::assertSelectorExists('[role="alert"]');
+                self::assertSelectorExists('[name="'.$field.'"]');
+            }
+        }
+    }
+
+    public function testInvalidCounterpartyErrorStaysOutsideEnhancedNativeControl(): void
+    {
+        [$client] = $this->fixture();
+        $client->request('GET', '/settlements?counterparty='.Uuid::uuid7()->toString());
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorExists('.settlement-filter-errors [role="alert"]');
+        self::assertSelectorNotExists('.settlement-native-filter [role="alert"]');
     }
 }

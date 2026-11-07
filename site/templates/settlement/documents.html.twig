@@ -8,14 +8,14 @@
 <div class="vf-ops-bar"><span>Документы: <strong>{{ pager.nbResults|vf_number }}</strong></span></div>
 <div class="table-responsive" tabindex="0" role="region" aria-label="Список документов взаиморасчётов">
 <table class="table card-table table-vcenter vf-ops-table">
-    <thead><tr><th scope="col">Дата / номер</th><th scope="col">Контрагент</th><th scope="col">Вид / основание</th><th scope="col" class="text-end">Сумма, ₽</th><th scope="col">Статус</th><th scope="col"><span class="visually-hidden">Действия</span></th></tr></thead>
+    <thead><tr><th scope="col">Дата / номер</th><th scope="col">Контрагент</th><th scope="col">Вид / основание</th><th scope="col" class="text-end">Сумма, ₽</th><th scope="col">Статус</th><th scope="col" aria-label="Действия"></th></tr></thead>
     <tbody>{% for document in documents %}<tr>
         <td class="text-nowrap"><a class="vf-ops-strong" href="{{ path('settlement_document',{id:document.id}) }}">{{ document.effectiveDate|date('d.m.Y') }}</a><div class="vf-ops-sub">{{ document.eventSequence ? '№' ~ document.eventSequence : 'Без номера' }}</div></td>
         <td><a href="{{ path('settlement_card',{id:document.counterpartyId}) }}">{{ labels[document.counterpartyId]|default('Контрагент недоступен') }}</a></td>
         <td><div class="vf-ops-strong">{{ kindLabels[document.kind.value] }}</div><div class="vf-ops-sub settlement-reason">{{ document.reason }}</div></td>
         <td class="text-end text-nowrap">{{ document.amount.toDecimalString|vf_amount(2) }}</td>
         <td>{% include 'settlement/_status.html.twig' with {status:document.status.value,reversalUrl:reversalIds[document.id] is defined ? path('settlement_document',{id:reversalIds[document.id]}) : null} only %}</td>
-        <td><div class="dropdown">
+        <td class="text-nowrap"><div class="dropdown">
             <button type="button" class="btn btn-icon btn-ghost-secondary" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" aria-label="Действия с документом {{ document.eventSequence ? '№' ~ document.eventSequence : 'без номера' }}"><i class="ti ti-dots-vertical" aria-hidden="true"></i></button>
             <div class="dropdown-menu dropdown-menu-end"><a class="dropdown-item" href="{{ path('settlement_document',{id:document.id}) }}">Открыть документ</a><a class="dropdown-item" href="{{ path('settlement_card',{id:document.counterpartyId}) }}">Взаиморасчёты контрагента</a></div>
         </div></td>

@@ -5,17 +5,18 @@
 {% set selectedId = filterForm.counterparty is defined ? filterForm.counterparty.vars.value : '' %}
 {% set choices = filterForm.counterparty is defined ? filterForm.counterparty.vars.counterparties : [] %}
 {% set selected = choices|filter(p => p.id == selectedId)|first %}
-{% set initial = choices|filter(p => p.id == selectedId or not p.isArchived)|slice(0,20)|map(p => {id:p.id,name:p.name,displayName:p.displayName,inn:p.inn,kpp:p.kpp,isArchived:p.isArchived,type:p.type ? p.type.value : null}) %}
+{% set initialChoices = (selected ? [selected] : [])|merge(choices|filter(p => p.id != selectedId and not p.isArchived)|slice(0,20)) %}
+{% set initial = initialChoices|map(p => {id:p.id,name:p.name,displayName:p.displayName,inn:p.inn,kpp:p.kpp,isArchived:p.isArchived,type:p.type ? p.type.value : null}) %}
 <div class="vf-ops-filterbar">
     {{ form_start(filterForm, {action:path(route,routeParams),attr:{'data-settlement-filter':'',class:'settlement-filter-controls'}}) }}
         {{ form_errors(filterForm) }}
         <div class="dropdown" data-settlement-period>
             <button type="button" class="vf-ops-pill settlement-period-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-haspopup="dialog" id="settlement-period">
                 <i class="ti ti-calendar" aria-hidden="true"></i>
-                {{ filterForm.from.vars.value ? filterForm.from.vars.value|date('d.m.Y') : '…' }} — {{ filterForm.to.vars.value ? filterForm.to.vars.value|date('d.m.Y') : '…' }}
+                {{ filterForm.from.vars.valid and filterForm.from.vars.value ? filterForm.from.vars.value|date('d.m.Y') : '…' }} — {{ filterForm.to.vars.valid and filterForm.to.vars.value ? filterForm.to.vars.value|date('d.m.Y') : '…' }}
                 <i class="ti ti-chevron-down" aria-hidden="true"></i>
             </button>
-            <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm settlement-period-fields{{ not filterForm.vars.valid ? ' show' }}" role="dialog" aria-labelledby="settlement-period">
+            <div class="dropdown-menu vf-ops-pop vf-ops-pop--sm settlement-period-fields{{ not (filterForm.from.vars.valid and filterForm.to.vars.valid) ? ' show' }}" role="dialog" aria-labelledby="settlement-period">
                 <div class="vf-ops-pop__body vf-ops-pop__pair">
                     <div>{{ form_row(filterForm.from) }}</div><div>{{ form_row(filterForm.to) }}</div>
                 </div>
@@ -23,7 +24,8 @@
             </div>
         </div>
         {% if filterForm.counterparty is defined %}
-            <div class="settlement-native-filter">{{ form_row(filterForm.counterparty) }}</div>
+            <div class="settlement-native-filter">{{ form_label(filterForm.counterparty) }}{{ form_widget(filterForm.counterparty) }}{{ form_help(filterForm.counterparty) }}</div>
+            {% if filterForm.counterparty.vars.errors|length %}<div class="settlement-filter-errors">{{ form_errors(filterForm.counterparty) }}</div>{% endif %}
         {% endif %}
         <div class="settlement-limit">{{ form_label(filterForm.limit) }}{{ form_widget(filterForm.limit) }}{{ form_errors(filterForm.limit) }}</div>
         <button class="btn btn-outline-secondary btn-sm" type="submit">Показать</button>
@@ -42,7 +44,7 @@
 <div class="vf-ops-applied">
     <span class="vf-ops-label">Применены</span>
     {% if app.request.query.has('from') or app.request.query.has('to') %}
-        <span class="vf-chip">Период: {{ filterForm.from.vars.value }} — {{ filterForm.to.vars.value }}<a href="{{ path(route,params|filter((v,k) => k not in ['from','to'])) }}" aria-label="Снять фильтр периода"><i class="ti ti-x" aria-hidden="true"></i></a></span>
+        <span class="vf-chip">Период: {{ filterForm.from.vars.valid and filterForm.from.vars.value ? filterForm.from.vars.value|date('d.m.Y') : '…' }} — {{ filterForm.to.vars.valid and filterForm.to.vars.value ? filterForm.to.vars.value|date('d.m.Y') : '…' }}<a href="{{ path(route,params|filter((v,k) => k not in ['from','to'])) }}" aria-label="Снять фильтр периода"><i class="ti ti-x" aria-hidden="true"></i></a></span>
     {% endif %}
     {% if selectedId %}
         <span class="vf-chip">Контрагент: {{ selected ? selected.shownName : 'Не найден' }}<a href="{{ path(route,params|filter((v,k) => k != 'counterparty')) }}" aria-label="Снять фильтр контрагента"><i class="ti ti-x" aria-hidden="true"></i></a></span>

@@ -35,3 +35,9 @@
 }
 /* Seven financial columns may need scrolling even on desktop; keep it inside the table. */
 .settlement-ui .cashflow-ops .table-responsive { overflow-x: auto; }
+.settlement-ui .dds-op__grid { min-width: 0; }
+.settlement-ui .settlement-filter-errors { flex-basis: 100%; }
+@media (max-width: 575px) {
+  .settlement-ui .dds-op__bar { align-items: stretch; flex-direction: column; }
+  .settlement-ui .dds-op__actions { flex-wrap: wrap; }
+}
