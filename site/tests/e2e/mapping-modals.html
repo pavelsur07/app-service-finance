@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Модалы маппинга — демо</title>
+</head>
+<body>
+<!-- Демо для tests/e2e/mapping-modals.e2e.cjs: разметка страниц в объёме хуков модулей. -->
+
+<!-- marketplace/cost_pl_mapping/index -->
+<form id="filter" method="get" action="/" data-autosubmit><select name="marketplace" data-marketplace-select><option value="">Все</option><option value="ozon" selected>OZON</option></select></form>
+<table><tbody>
+  <tr id="row-1" data-mapping-row data-update-url="/api/update/c-1" data-name="Доставка <b>" data-pl-category-id="pl-1" data-include-in-pl="1" data-sort-order="5">
+    <td data-cell-pl>Логистика</td><td data-cell-include><span class="badge bg-green-lt">Да</span></td><td data-cell-sort>5</td>
+    <td><button type="button" id="edit-1">Изменить</button> <button type="button" id="del-1" data-url="/cost/c-1/delete" data-name="Доставка <b>">Удалить</button></td>
+  </tr>
+  <tr id="row-2" data-mapping-row data-update-url="/api/update/c-2" data-name="Хранение" data-pl-category-id="pl-gone" data-include-in-pl="0" data-sort-order="7">
+    <td data-cell-pl>Статья ОПиУ не найдена</td><td data-cell-include><span class="badge bg-secondary-lt">Нет</span></td><td data-cell-sort>7</td>
+    <td><button type="button" id="edit-2">Изменить</button></td>
+  </tr>
+</tbody></table>
+<div id="modal-edit-cost-mapping" class="modal" data-edit-mapping-modal>
+  <form data-edit-mapping-form data-csrf-token="upd-token">
+    <span data-edit-mapping-name></span>
+    <div class="alert d-none" data-edit-mapping-error></div>
+    <div class="alert d-none" data-edit-mapping-dangling>dangling</div>
+    <select data-edit-mapping-pl><option value="">— не задана —</option><option value="pl-1" data-name="Логистика">Логистика</option><option value="pl-2" data-name="Реклама &lt;i&gt;">Реклама</option></select>
+    <input type="checkbox" data-edit-mapping-include>
+    <input type="number" data-edit-mapping-sort min="0" max="1000">
+    <button type="submit" id="edit-submit" data-edit-mapping-submit>Сохранить</button>
+  </form>
+</div>
+<div id="modal-delete-cost-category" class="modal" data-delete-cost-category-modal>
+  <form method="post" data-delete-cost-category-form><strong data-delete-cost-category-name></strong></form>
+</div>
+<div id="modal-default-cost-mapping" class="modal">
+  <div data-default-mapping-modal data-preview-url="/cost/preview" data-apply-url="/cost/apply" data-csrf-token="cost-token">
+    <div class="d-none" data-default-mapping-blocking>blocking</div>
+    <div class="d-none" data-default-mapping-warning>warning</div>
+    <div class="d-none" data-default-mapping-error></div>
+    <div class="d-none" data-default-mapping-success></div>
+    <div class="d-none" data-default-mapping-loading>loading</div>
+    <div class="d-none" data-default-mapping-empty>empty</div>
+    <div data-default-mapping-preview></div>
+    <small data-default-mapping-apply-hint></small>
+    <button type="button" id="cost-apply" data-default-mapping-apply disabled>Применить базовый маппинг</button>
+  </div>
+</div>
+
+<!-- marketplace/pl_mappings/_default_mapping_modal -->
+<div id="modal-default-sale-mapping" class="modal">
+  <div data-default-sale-mapping-modal data-preview-url="/sale/preview" data-apply-url="/sale/apply" data-csrf-token="sale-token" data-marketplace="wildberries">
+    <div class="d-none" data-default-sale-mapping-blocking>blocking</div>
+    <div class="d-none" data-default-sale-mapping-conflicts></div>
+    <div class="d-none" data-default-sale-mapping-mismatch></div>
+    <div class="d-none" data-default-sale-mapping-error></div>
+    <div class="d-none" data-default-sale-mapping-success></div>
+    <div class="d-none" data-default-sale-mapping-loading>loading</div>
+    <div class="d-none" data-default-sale-mapping-empty>empty</div>
+    <div data-default-sale-mapping-preview></div>
+    <small data-default-sale-mapping-hint></small>
+    <button type="button" id="sale-apply" data-default-sale-mapping-apply disabled>Применить базовый маппинг</button>
+  </div>
+</div>
+
+<script type="module">
+  import '/assets/autosubmit.js';
+  import { initCostPlMapping } from '/assets/pages/cost_pl_mapping.js';
+  import { initDefaultSaleMapping } from '/assets/pages/default_sale_mapping.js';
+  window.hidden = [];
+  window.bootstrap = { Modal: { getOrCreateInstance: (el) => ({ hide: () => window.hidden.push(el.id) }) } };
+  window.bs = (id, type, relatedTarget) => {
+    const ev = new Event(type, { bubbles: true, cancelable: true });
+    ev.relatedTarget = relatedTarget ?? null;
+    document.getElementById(id).dispatchEvent(ev);
+    return ev.defaultPrevented;
+  };
+  initCostPlMapping();
+  initDefaultSaleMapping();
+  window.submits = [];
+  document.addEventListener('submit', (e) => { window.submits.push({ id: e.target.id, prevented: e.defaultPrevented }); e.preventDefault(); });
+  window.ready = true;
+</script>
+</body>
+</html>

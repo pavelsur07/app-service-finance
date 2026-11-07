@@ -174,6 +174,10 @@ final class OzonPlMappingUiTest extends WebTestCaseBase
         self::assertSelectorTextContains('#modal-ozon-mapping-repair', 'Продажи и возвраты с СПП будут рассчитываться только по реализации Ozon');
         self::assertSelectorNotExists('#modal-add-mapping option[value="sale_revenue"]');
         self::assertSelectorExists('#modal-add-mapping input[name="marketplace"][value="ozon"]');
+        // Модал базовой настройки — assets/pages/default_sale_mapping.js по data-* корня, без inline-скрипта.
+        self::assertSelectorExists('#modal-default-sale-mapping [data-default-sale-mapping-modal][data-marketplace="ozon"][data-preview-url="/marketplace/pl-mappings/default/preview"][data-apply-url="/marketplace/pl-mappings/default/apply"][data-csrf-token]:not([data-csrf-token=""])');
+        self::assertSelectorExists('[data-default-sale-mapping-modal] [data-default-sale-mapping-preview]');
+        self::assertSelectorExists('[data-default-sale-mapping-modal] button[data-default-sale-mapping-apply][disabled]');
         self::assertSelectorTextContains('[data-ozon-realization-status]', 'ещё не загружена');
         self::assertStringContainsString('Продажи с СПП', (string) $client->getResponse()->getContent());
         self::assertSame($before, $this->snapshot(), 'GET не должен исправлять правила.');

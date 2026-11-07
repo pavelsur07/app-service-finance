@@ -42,6 +42,15 @@ final class CostPLMappingControllerTest extends WebTestCaseBase
         self::assertSelectorExists('[data-apply-url="/marketplace/cost-pl-mapping/default/apply"]');
 
         self::assertSelectorExists('[data-default-mapping-modal][data-csrf-token]:not([data-csrf-token=""])');
+
+        // Хуки assets/pages/cost_pl_mapping.js: без inline-скрипта и обработчиков в разметке.
+        self::assertSelectorExists('form[data-autosubmit] select[name="marketplace"][data-marketplace-select]');
+        self::assertSelectorExists('#modal-edit-cost-mapping[data-edit-mapping-modal] form[data-edit-mapping-form][data-csrf-token]:not([data-csrf-token=""])');
+        foreach (['name', 'error', 'dangling', 'pl', 'include', 'sort', 'submit'] as $hook) {
+            self::assertSelectorExists(sprintf('[data-edit-mapping-form] [data-edit-mapping-%s]', $hook));
+        }
+        self::assertSelectorExists('#modal-delete-cost-category[data-delete-cost-category-modal] form[data-delete-cost-category-form] [data-delete-cost-category-name]');
+        self::assertSelectorNotExists('[onclick], [onchange], [onsubmit]');
     }
 
     public function testIndexRendersReadOnlyRowsWithSingleSelect(): void

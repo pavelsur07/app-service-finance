@@ -1,9 +1,9 @@
-### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–C на проде; PR D на handoff)
+### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–D на проде; PR E на handoff)
 
 **Risk:** MEDIUM (поведение страниц; финансовые формы — в PR C)
 **Stage base commit:** `3c7bb858c` (master после Stage 1)
 **Work items:** 2.0–2.3; PR A = 2.0 (для своих страниц) + 2.1a; PR B = 2.1b; PR C = 2.2 (пять модулей);
-PR D = 2.2 (три marketplace-страницы); 2.3 (крупные скрипты) — PR E и далее
+PR D = 2.2 (три marketplace-страницы); 2.3 (крупные скрипты) — PR E (маппинг ОПиУ) и далее
 
 Правило плана «один PR — не больше ~5 страниц» делит 2.1 на две части:
 2.1a — формы с `onsubmit="return confirm()"` (9 шаблонов, один механический
@@ -14,7 +14,8 @@ PR C и PR D, а не вместе с 2.1b: каждый трогает друг
 PR A: #2911, merge `2317ed9b`, деплой 07.11 08:19Z без даунтайма, GlitchTip чист,
 контейнеры healthy. PR B: #2912, merge `92611b3e`, деплой 07.11 08:54Z без даунтайма, GlitchTip чист.
 PR C: #2914, merge `b4311777`, деплой 07.11 09:24Z без даунтайма, GlitchTip чист (последнее событие 04:37),
-контейнеры healthy.
+контейнеры healthy. PR D: #2915, merge `24dbd846`, деплой 07.11 09:58Z без даунтайма,
+GlitchTip чист, контейнеры healthy (12).
 
 #### PR A (2.0 + 2.1a): `confirm()` → `partials/_confirm_modal`
 
@@ -211,6 +212,50 @@ PR C: #2914, merge `b4311777`, деплой 07.11 09:24Z без даунтайм
   POST как раньше — поведение остальных диалогов не меняется.
 - Кнопка «Закрыть этап» без JS остаётся `disabled` (как и прежде).
 
+#### PR E (2.3, часть 1): модалы маппинга ОПиУ
+
+- `marketplace/cost_pl_mapping/index` (343 строки JS) → `assets/pages/cost_pl_mapping.js`:
+  модал удаления категории (имя и адрес формы — из триггера), модал правки маппинга строки
+  (POST JSON по `data-update-url` строки, CSRF в `X-CSRF-Token`, ответ ошибки
+  `{error: {code, message}}` читает `apiFetch`; защита от позднего ответа в чужую строку
+  сохранена), модал базового маппинга затрат (preview/apply — JSON `{marketplace, _token}`;
+  доменная ошибка приходит как 200 `{ok: false, message}` — проверяется в модуле). Карточки,
+  вкладки и элементы preview строятся через DOM/`textContent`: раньше innerHTML с ручным
+  `escapeHtml`, а подписи статусов и счётчики шли без него. `onchange="this.form.submit()"`
+  фильтра → `data-autosubmit`. Id полей модала правки → `data-edit-mapping-*`
+  (`id` остались только у `label for`).
+- `marketplace/pl_mappings/_default_mapping_modal` (223 строки) →
+  `assets/pages/default_sale_mapping.js`: тело запроса — FormData (контроллер читает
+  `$request->request`), таблица preview через DOM; тексты Ozon/WB и правило «у настроенного
+  правила показывать реальную статью» перенесены 1:1. Страница `marketplace/pl_mappings`
+  теперь без `<script>`.
+- `assets/dom.js` — общий `el(tag, class, children)` для новых модулей (прежние модули со
+  своим `el` не трогал).
+- Снято: обработчик click кнопки «Настроить базовый маппинг» («если модал уже открыт —
+  перезагрузить preview») — недостижим, кнопка под backdrop'ом открытого модала.
+- Тесты: `CostPLMappingControllerTest` — хуки трёх модалов, `data-autosubmit`, нет
+  `onclick`/`onchange`/`onsubmit`; `OzonPlMappingUiTest` — атрибуты модала базовой настройки;
+  e2e `tests/e2e/mapping-modals.e2e.cjs` (10 проверок: модал удаления, правка строки —
+  заполнение, dangling-статья, ошибка 422 с текстом сервера, успех с перерисовкой строки;
+  preview затрат — JSON с токеном, карточки/вкладки, XSS-строка текстом, `{ok:false}` при 200,
+  отсутствие маркетплейса без запроса; preview продаж — FormData с токеном, таблица, конфликты и
+  расхождение знака, успех apply).
+
+#### Checks (PR E)
+- `make site-cs-twig` — 0 / OK (324); `npm run lint` — 0; `npm run build` — OK
+- `make site-cs-check` — 0 of 3904; `make site-cs-strict-types` — 0; `make site-stan` — OK
+- функциональные тесты 4 файлов — OK (39 + расширенные 21); e2e `mapping-modals` — 10 passed
+- `make site-test` — OK (8506 tests, 47869 assertions), 7 мин 31 с
+
+#### External review (PR E)
+- rounds: 1 (codex, effort medium, дифф 1553 строк, `site/var/external-review/24dbd846/review.txt`): REVIEW_GREEN без замечаний
+
+#### Risks / reviewer focus (PR E)
+- Состояния кнопки «Применить» (disabled + подсказка) — перенесены 1:1, проверены e2e.
+- `apiFetch`: не-JSON ответ 2xx — исключение «Сервер вернул неожиданный ответ»; раньше текст
+  был другой, смысл тот же. `X-Requested-With` не шлётся — контроллеры его не читают.
+- `setTimeout(reload, 1000)` после apply сохранён.
+
 #### Files changed (PR A)
 - `site/templates/**` — 9 страниц + `company/edit` (include) + `partials/_confirm_modal` (doc)
 - `site/assets/confirm_modal.js` — `data-confirm-fields`
@@ -256,5 +301,5 @@ PR C: #2914, merge `b4311777`, деплой 07.11 09:24Z без даунтайм
   в `data-confirm-title` через автоэкранирование, прежний JS конкатенировал строку.
 
 #### Next
-- PR D → handoff «merge and deploy»; затем PR E: `marketplace/cost_pl_mapping/index` (343) и
-  `marketplace/pl_mappings/_default_mapping_modal` (223), далее остальные крупные скрипты 2.3
+- PR E → handoff «merge and deploy»; затем PR F: `marketplace_ads/index` (364, Twig в JS) и
+  `marketplace/listings/{index,tags}` (412 + 151), далее `transaction/index`, `document/_page_scripts`, Chart-острова
