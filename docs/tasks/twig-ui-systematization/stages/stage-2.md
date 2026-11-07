@@ -1,9 +1,9 @@
-### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–E на проде; PR F на handoff)
+### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–F на проде; PR G #2918 на handoff)
 
 **Risk:** MEDIUM (поведение страниц; финансовые формы — в PR C)
 **Stage base commit:** `3c7bb858c` (master после Stage 1)
 **Work items:** 2.0–2.3; PR A = 2.0 (для своих страниц) + 2.1a; PR B = 2.1b; PR C = 2.2 (пять модулей);
-PR D = 2.2 (три marketplace-страницы); 2.3 (крупные скрипты) — PR E (маппинг ОПиУ), PR F (реклама), далее листинги, операции, документы
+PR D = 2.2 (три marketplace-страницы); 2.3 (крупные скрипты) — PR E (маппинг ОПиУ), PR F (реклама), PR G (листинги и теги), далее операции, документы
 
 Правило плана «один PR — не больше ~5 страниц» делит 2.1 на две части:
 2.1a — формы с `onsubmit="return confirm()"` (9 шаблонов, один механический
@@ -288,11 +288,60 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
   MINOR исправлен — в e2e ожидание reprocess было пустым (`waitForFunction(() => true)`), теперь
   `waitForResponse` на POST reprocess и GET перечитки
 
+#### Деплой (PR F)
+- #2917 влит 07.11, деплой 17:17Z без даунтайма, 12 контейнеров healthy, GlitchTip чист.
+
 #### Risks / reviewer focus (PR F)
 - Сеть vs сервер в alert'ах: `error.status === 0` — «Ошибка сети: …», иначе «Ошибка: <текст сервера>»
   (раньше сервер без JSON-тела давал «Неизвестная ошибка», теперь «Ошибка сервера (N)»).
 - Страница без прав владельца: модалов нет в разметке — модуль проверяет наличие узлов.
 - `X-Requested-With` не шлётся — контроллеры его не читают.
+
+#### PR G (2.3, часть 3): реестр листингов и «Управление тегами»
+
+- `marketplace/listings/index` (412 строк JS: fallback-реализация модала без Bootstrap, `window.confirm`,
+  строковые `/api/...`, innerHTML для `<option>` и подсказок) → `assets/pages/listings_index.js`;
+  `marketplace/listings/tags` (151 строка: два `window.confirm`, innerHTML) → `assets/pages/listing_tags.js`.
+  Адреса API — на корнях `[data-listings-index]` / `[data-listing-tags]` через `path()`; адреса с id —
+  плейсхолдер-UUID, helper `withId` вынесен в `assets/url_template.js` (из `marketplace_ads.js`).
+- Подтверждения — через `_confirm_modal` + `confirm:submit` (как `cost_mappings` в PR D): «присвоить тег всем
+  по фильтру» — скрытый триггер в панели, тексты подставляет модуль (собственный `#bulk-tag-confirm` удалён);
+  удаление тега — триггер в Twig (`data-confirm-*` из `tag.name`/`listingsCount`); слияние — пункты меню
+  строит модуль из `data-tags` как триггеры. Форма диалога не отправляется (модуль шлёт JSON и отменяет
+  `confirm:submit`); `data-confirm-token` = `csrf_token('listing_tags')` — нужен `confirm_modal.js` как условие
+  открытия, эндпоинты тегов CSRF не проверяют (как и раньше).
+- `<option>` и подсказки — через DOM; у плейсхолдера явный `value=""` (без него `select.value` отдаёт текст,
+  и проверку «Выберите товар» можно было обойти — поймал e2e). Fallback «без Bootstrap» (`style.display`)
+  удалён: Tabler всегда даёт `bootstrap.Modal` (`bootstrapModal()`). Сброс кнопки «Привязать» — по
+  `hidden.bs.modal`, а не по клику на `[data-bs-dismiss]`.
+- Тексты ошибок API: `{error:{message}}` → как раньше; строка `{error: "..."}` у `/map` → `legacyErrorMessage`;
+  ответ без JSON → «Ошибка сервера (N)» вместо «Не удалось …». Сеть — прежние тексты.
+- id сохранены только там, где они контракт: `#listings-filter-form`, `#bulk-tag-panel`, `.row-select`,
+  `td.listing-tags` (тесты), `#product-select`/`#createTagName` (`label for`), `#createTagModal`
+  (`data-bs-target`).
+- Тесты: `MarketplaceListingsSearchTest` и `ListingTagsManageTest` — хуки модулей (адреса на корне,
+  шаблон с плейсхолдером, триггеры диалога, нет `onclick`/`onchange`/`onsubmit`); e2e
+  `tests/e2e/listings.e2e.cjs` (13 проверок на одной демо-странице с обеими разметками: автосабмит фильтра
+  с отключением пустых полей, модал привязки с ошибкой 400, панель тегов и подсказки, диалог «по фильтру»
+  с 422, снятие тега, меню слияния, создание/переименование/удаление с ошибками сервера, слияние с
+  перезагрузкой, назначение с flash через sessionStorage и сбросом `page`).
+
+#### Checks (PR G)
+- `make site-cs-twig` — 0 / OK (324); `npm run lint` — 0; `npm run build` — OK
+- `make site-cs-check` — 0 of 3904; `make site-cs-strict-types` — 0; `make site-stan` — OK
+- 5 функциональных классов листингов — OK (59 tests, 214 assertions); e2e `listings` — 13 passed
+- `make site-test` — OK (8506 tests, 47922 assertions), 7 мин 12 с
+
+#### External review (PR G)
+- rounds: 1 (codex, effort medium, база — ветка PR F, дифф 1788 строк с untracked-файлами Владельца, `site/var/external-review/36ac2ed3/review.txt`): REVIEW_GREEN без замечаний
+
+#### Risks / reviewer focus (PR G)
+- Диалог «присвоить всем по фильтру» открывается программно: `Modal.show(trigger)` → `show.bs.modal` с
+  `relatedTarget` — тот же путь, что у кнопки с `data-bs-toggle`.
+- Пункты «Слить в…» — `<button data-bs-toggle="modal">` внутри dropdown: Bootstrap data-api делегирован на
+  document, динамические элементы работают; после закрытия диалога фокус возвращается на «Слить в…»
+  (`confirm_modal.js`).
+- Переименование: blur inline-поля коммитит, как раньше; Chrome шлёт blur и при удалении узла.
 
 #### Files changed (PR A)
 - `site/templates/**` — 9 страниц + `company/edit` (include) + `partials/_confirm_modal` (doc)
@@ -339,5 +388,5 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
   в `data-confirm-title` через автоэкранирование, прежний JS конкатенировал строку.
 
 #### Next
-- PR F → handoff «merge and deploy»; затем PR G: `marketplace/listings/{index,tags}` (412 + 151),
-  далее `transaction/index` (385), `document/_page_scripts` (460), Chart-острова dashboard
+- PR G (#2918, CI 16/16) → handoff «merge and deploy»; затем PR H: `transaction/index` (385),
+  далее `document/_page_scripts` (460), Chart-острова dashboard

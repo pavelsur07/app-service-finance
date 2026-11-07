@@ -7,8 +7,8 @@
 import { apiFetch } from '../api/client';
 import { bootstrapModal } from '../bootstrap_modal.js';
 import { el } from '../dom.js';
+import { withId } from '../url_template.js';
 
-const ID_PLACEHOLDER = '00000000-0000-0000-0000-000000000000';
 const JOB_STATUS = {
   pending: ['bg-secondary', 'В очереди'],
   running: ['bg-info', 'Выполняется'],
@@ -24,7 +24,6 @@ const DOC_STATUS = {
 // Терминальные статусы: поллер останавливается (partial_success ставит cron-финализатор).
 const TERMINAL_JOB_STATUSES = ['completed', 'failed', 'partial_success'];
 
-const withId = (template, id) => template.replace(ID_PLACEHOLDER, encodeURIComponent(id));
 const badge = (map, status) => {
   const [css, label] = map[status] || ['bg-secondary', String(status ?? '')];
   return el('span', `badge ${css}`, [label]);

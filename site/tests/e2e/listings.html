@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Листинги и теги — демо</title>
+</head>
+<body>
+<!-- Демо для tests/e2e/listings.e2e.cjs: разметка двух страниц в объёме хуков модулей. -->
+<div data-listings-index data-products-url="/api/products"
+     data-map-url="/api/listings/00000000-0000-0000-0000-000000000000/map"
+     data-assign-url="/api/tags/assign" data-detach-url="/api/tags/detach">
+  <form method="get" action="/" id="listings-filter-form" data-listings-filter>
+    <select name="filter" id="filter-select" data-autosubmit><option value="all">все</option><option value="mapped">привязанные</option></select>
+    <input type="search" name="q" id="filter-q" value="">
+  </form>
+  <div class="d-none" data-listings-flash><div data-message id="flash-text"></div></div>
+  <div class="d-none" data-listings-error><div data-message id="error-text"></div></div>
+  <div class="d-none" id="bulk-tag-panel" data-bulk-tag-panel
+       data-all-tags='[{"id":"t1","name":"Новинки"},{"id":"t2","name":"Склад <b>1</b>"}]'
+       data-applied-filter='{"q":"плед"}' data-filter-summary="поиск «плед»" data-nb-results="5">
+    <span data-bulk-count id="bulk-count">0</span>
+    <span class="d-none" data-bulk-scope-offer id="scope-offer"><button type="button" id="select-filter" data-bulk-select-filter>все 5</button></span>
+    <span class="d-none" data-bulk-scope-filter id="scope-filter"><button type="button" data-bulk-clear-filter>снять</button></span>
+    <div data-bulk-tag-input><input type="text" id="tag-name" data-bulk-tag-name><div class="d-none" id="suggest" data-bulk-tag-suggest></div></div>
+    <button type="button" hidden id="assign-trigger" data-bulk-assign-trigger data-bs-target="#listings-confirm" data-confirm-token="tok-assign" data-confirm-submit="Присвоить"></button>
+  </div>
+  <table><thead><tr><th><input type="checkbox" id="select-all" data-select-all></th></tr></thead><tbody>
+    <tr><td><input type="checkbox" class="row-select" id="row-1" value="l-1"></td>
+        <td><button type="button" id="map-1" data-map-listing data-listing-id="l-1" data-listing-sku="WB-1">Привязать</button></td>
+        <td class="listing-tags"><button type="button" id="detach-1" data-detach-tag data-listing-id="l-1" data-tag-id="t1">×</button></td></tr>
+    <tr><td><input type="checkbox" class="row-select" id="row-2" value="l-2"></td><td></td><td></td></tr>
+  </tbody></table>
+</div>
+<div id="mapListingModal" data-map-listing-modal>
+  <code data-map-listing-sku id="map-sku"></code>
+  <select id="product-select" data-map-product><option value="">— выберите товар —</option></select>
+  <div class="d-none" id="map-error" data-map-error></div>
+  <button type="button" id="map-submit" data-map-submit>Привязать</button>
+</div>
+<div id="listings-confirm" data-confirm-modal>
+  <form method="post" action="" data-confirm-form id="listings-confirm-form">
+    <input type="hidden" name="_token" value="" data-confirm-token>
+    <h2 data-confirm-title></h2><p data-confirm-body></p><ul data-confirm-links hidden></ul>
+    <a data-confirm-link hidden></a><button type="button" data-bs-dismiss="modal" data-confirm-cancel>Отмена</button>
+    <button type="submit" data-confirm-submit disabled>Подтвердить</button>
+  </form>
+</div>
+
+<div data-listing-tags data-create-url="/api/tags/create"
+     data-rename-url="/api/tags/00000000-0000-0000-0000-000000000000/rename" data-merge-url="/api/tags/merge"
+     data-confirm-target="#tags-confirm" data-confirm-token="tok-tags" data-name-max-length="50"
+     data-tags='[{"id":"t1","name":"Новинки"},{"id":"t2","name":"Склад <b>1</b>"}]'>
+  <table><tbody>
+    <tr data-tag-id="t1" data-tag-name="Новинки"><td data-tag-cell id="cell-1"><span>Новинки</span></td><td>3</td>
+      <td><button type="button" id="rename-1" data-rename-tag>Переименовать</button><div data-merge-menu id="menu-1"></div>
+          <button type="button" id="delete-1" data-delete-tag data-bs-toggle="modal" data-bs-target="#tags-confirm"
+                  data-confirm-action="/api/tags/t1/delete" data-confirm-token="tok-tags"
+                  data-confirm-title="Удалить тег «Новинки»?" data-confirm-body="Тег снимется с 3 листинг(ов)." data-confirm-submit="Удалить" data-confirm-variant="danger">Удалить</button></td></tr>
+    <tr data-tag-id="t2" data-tag-name="Склад <b>1</b>"><td data-tag-cell><span>Склад</span></td><td>0</td><td><div data-merge-menu id="menu-2"></div></td></tr>
+  </tbody></table>
+</div>
+<div id="createTagModal" data-create-tag-modal>
+  <form novalidate id="create-form">
+    <input type="text" name="name" id="create-name"><div class="invalid-feedback" id="create-error"></div>
+    <button type="submit" id="create-submit">Создать</button>
+  </form>
+</div>
+<div id="tags-confirm" data-confirm-modal>
+  <form method="post" action="" data-confirm-form id="tags-confirm-form">
+    <input type="hidden" name="_token" value="" data-confirm-token>
+    <h2 data-confirm-title></h2><p data-confirm-body></p><ul data-confirm-links hidden></ul>
+    <a data-confirm-link hidden></a><button type="button" data-bs-dismiss="modal" data-confirm-cancel>Отмена</button>
+    <button type="submit" data-confirm-submit disabled>Подтвердить</button>
+  </form>
+</div>
+
+<script type="module">
+  import '/assets/confirm_modal.js';
+  import { initListingsIndex } from '/assets/pages/listings_index.js';
+  import { initListingTags } from '/assets/pages/listing_tags.js';
+  window.alerts = [];
+  window.alert = (text) => window.alerts.push(String(text));
+  window.hidden = [];
+  window.shown = [];
+  window.bs = (id, type, relatedTarget) => {
+    const ev = new Event(type, { bubbles: true, cancelable: true });
+    ev.relatedTarget = relatedTarget ?? null;
+    document.getElementById(id).dispatchEvent(ev);
+    return ev.defaultPrevented;
+  };
+  // Bootstrap без анимаций: show(trigger) шлёт show.bs.modal с relatedTarget, как настоящий.
+  window.bootstrap = { Modal: { getOrCreateInstance: (el) => ({
+    hide: () => window.hidden.push(el.id),
+    show: (trigger) => { window.shown.push(el.id); window.bs(el.id, 'show.bs.modal', trigger); },
+  }) } };
+  initListingsIndex();
+  initListingTags();
+  window.submits = [];
+  document.addEventListener('submit', (e) => { window.submits.push({ id: e.target.id, prevented: e.defaultPrevented }); e.preventDefault(); });
+  window.ready = true;
+</script>
+</body>
+</html>

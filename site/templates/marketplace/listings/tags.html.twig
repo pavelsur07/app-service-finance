@@ -1,7 +1,17 @@
 {% extends 'inventory/layout.html.twig' %}
 
 {% block tab_content %}
-    <div class="container-xl py-4">
+    {# Адреса API — на корне; переименование — path() с плейсхолдером-UUID (requirements не примут '__ID__').
+       Токен нужен диалогу подтверждения как условие открытия: его форма не отправляется, запрос JSON шлёт модуль. #}
+    {% set confirm_token = csrf_token('listing_tags') %}
+    <div class="container-xl py-4" data-listing-tags
+         data-create-url="{{ path('api_marketplace_listing_tags_create') }}"
+         data-rename-url="{{ path('api_marketplace_listing_tags_rename', {tagId: '00000000-0000-0000-0000-000000000000'}) }}"
+         data-merge-url="{{ path('api_marketplace_listing_tags_merge') }}"
+         data-confirm-target="#tags-confirm"
+         data-confirm-token="{{ confirm_token }}"
+         data-name-max-length="{{ constant('App\\Marketplace\\Entity\\MarketplaceListingTag::NAME_MAX_LENGTH') }}"
+         data-tags="{{ tags|json_encode|e('html_attr') }}">
 
         <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
             <h3 class="mb-0 me-auto">Управление тегами</h3>
@@ -10,7 +20,7 @@
             </button>
         </div>
 
-        <div class="card" data-tags="{{ tags|json_encode|e('html_attr') }}">
+        <div class="card">
             {% if tags is empty %}
                 <div class="card-body">
                     <div class="empty">
@@ -33,24 +43,32 @@
                         <tbody>
                         {% for tag in tags %}
                             <tr data-tag-id="{{ tag.id }}" data-tag-name="{{ tag.name }}">
-                                <td class="tag-cell">
+                                <td class="tag-cell" data-tag-cell>
                                     <span class="tag-chip tag-name">{{ tag.name }}</span>
                                 </td>
                                 <td class="text-end">{{ tag.listingsCount }}</td>
                                 <td>
                                     <div class="d-flex justify-content-end gap-1">
-                                        <button type="button" class="btn btn-sm btn-ghost-secondary rename-tag-btn">
+                                        <button type="button" class="btn btn-sm btn-ghost-secondary" data-rename-tag>
                                             Переименовать
                                         </button>
                                         <div class="dropdown">
-                                            <button type="button" class="btn btn-sm btn-ghost-secondary dropdown-toggle merge-tag-btn"
+                                            <button type="button" class="btn btn-sm btn-ghost-secondary dropdown-toggle"
                                                     data-bs-toggle="dropdown" aria-expanded="false"
                                                     {{ tags|length < 2 ? 'disabled' : '' }}>
                                                 Слить в…
                                             </button>
-                                            <div class="dropdown-menu dropdown-menu-end merge-menu"></div>
+                                            {# Пункты-цели строит модуль из data-tags. #}
+                                            <div class="dropdown-menu dropdown-menu-end" data-merge-menu></div>
                                         </div>
-                                        <button type="button" class="btn btn-sm btn-ghost-danger delete-tag-btn">
+                                        <button type="button" class="btn btn-sm btn-ghost-danger" data-delete-tag
+                                                data-bs-toggle="modal" data-bs-target="#tags-confirm"
+                                                data-confirm-action="{{ path('api_marketplace_listing_tags_delete', {tagId: tag.id}) }}"
+                                                data-confirm-token="{{ confirm_token }}"
+                                                data-confirm-title="Удалить тег «{{ tag.name }}»?"
+                                                data-confirm-body="{{ tag.listingsCount > 0 ? 'Тег снимется с ' ~ tag.listingsCount ~ ' листинг(ов).' : '' }}"
+                                                data-confirm-submit="Удалить"
+                                                data-confirm-variant="danger">
                                             Удалить
                                         </button>
                                     </div>
@@ -63,164 +81,12 @@
             {% endif %}
         </div>
     </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            // Создание — модальное окно; ошибка показывается под полем, окно не закрывается.
-            const createForm = document.getElementById('createTagForm');
-            const createModal = document.getElementById('createTagModal');
-            if (createForm && createModal) {
-                const nameInput = createForm.querySelector('input[name="name"]');
-                const errorEl = createForm.querySelector('.invalid-feedback');
-                const submitBtn = createForm.querySelector('button[type="submit"]');
-
-                function showError(message) {
-                    errorEl.textContent = message;
-                    nameInput.classList.add('is-invalid');
-                }
-
-                createModal.addEventListener('shown.bs.modal', () => nameInput.focus());
-                createModal.addEventListener('hidden.bs.modal', () => {
-                    createForm.reset();
-                    nameInput.classList.remove('is-invalid');
-                });
-                nameInput.addEventListener('input', () => nameInput.classList.remove('is-invalid'));
-
-                createForm.addEventListener('submit', async e => {
-                    e.preventDefault();
-                    const name = nameInput.value.trim();
-                    if (name === '') {
-                        showError('Введите название тега.');
-                        return;
-                    }
-                    submitBtn.disabled = true;
-                    try {
-                        const res = await fetch('/api/marketplace/listings/tags/create', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({name}),
-                        });
-                        if (res.ok) {
-                            window.location.reload();
-                            return;
-                        }
-                        const data = await res.json().catch(() => ({}));
-                        showError(data.error?.message || 'Не удалось создать тег');
-                    } catch {
-                        showError('Ошибка сети');
-                    }
-                    submitBtn.disabled = false;
-                });
-            }
-
-            const cardEl = document.querySelector('.card[data-tags]');
-            const allTags = cardEl ? JSON.parse(cardEl.dataset.tags || '[]') : [];
-
-            async function postJson(url, body) {
-                try {
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: body ? JSON.stringify(body) : '{}',
-                    });
-                    const data = await res.json().catch(() => ({}));
-                    if (!res.ok) {
-                        alert(data.error?.message || 'Не удалось выполнить операцию');
-                        return false;
-                    }
-                    return true;
-                } catch {
-                    alert('Ошибка сети');
-                    return false;
-                }
-            }
-
-            // Переименование — inline-поле в ячейке тега.
-            document.querySelectorAll('.rename-tag-btn').forEach(btn => {
-                btn.addEventListener('click', function () {
-                    const row = this.closest('tr');
-                    const cell = row.querySelector('.tag-cell');
-                    const currentName = row.dataset.tagName;
-                    const tagId = row.dataset.tagId;
-
-                    cell.innerHTML = '';
-                    const input = document.createElement('input');
-                    input.type = 'text';
-                    input.className = 'form-control form-control-sm';
-                    input.value = currentName;
-                    input.maxLength = 50;
-                    input.style.maxWidth = '260px';
-                    cell.appendChild(input);
-                    input.focus();
-                    input.select();
-
-                    async function commit() {
-                        const name = input.value.trim();
-                        if (name === '' || name === currentName) {
-                            window.location.reload();
-                            return;
-                        }
-                        if (await postJson('/api/marketplace/listings/tags/' + tagId + '/rename', {name})) {
-                            window.location.reload();
-                        }
-                    }
-
-                    input.addEventListener('keydown', e => {
-                        if (e.key === 'Enter') { commit(); }
-                        if (e.key === 'Escape') { window.location.reload(); }
-                    });
-                    input.addEventListener('blur', commit);
-                });
-            });
-
-            // Удаление.
-            document.querySelectorAll('.delete-tag-btn').forEach(btn => {
-                btn.addEventListener('click', async function () {
-                    const row = this.closest('tr');
-                    const name = row.dataset.tagName;
-                    const count = parseInt(row.children[1].textContent, 10) || 0;
-                    const warn = count > 0
-                        ? 'Тег «' + name + '» снимется с ' + count + ' листинг(ов). Удалить?'
-                        : 'Удалить тег «' + name + '»?';
-                    if (!window.confirm(warn)) {
-                        return;
-                    }
-                    if (await postJson('/api/marketplace/listings/tags/' + row.dataset.tagId + '/delete')) {
-                        window.location.reload();
-                    }
-                });
-            });
-
-            // Слияние — меню с остальными тегами как целями.
-            document.querySelectorAll('.merge-tag-btn').forEach(btn => {
-                const row = btn.closest('tr');
-                const sourceId = row.dataset.tagId;
-                const menu = row.querySelector('.merge-menu');
-
-                allTags.filter(t => t.id !== sourceId).forEach(target => {
-                    const item = document.createElement('button');
-                    item.type = 'button';
-                    item.className = 'dropdown-item';
-                    item.textContent = target.name;
-                    item.addEventListener('click', async () => {
-                        if (!window.confirm('Слить «' + row.dataset.tagName + '» в «' + target.name + '»? Тег «' + row.dataset.tagName + '» будет удалён.')) {
-                            return;
-                        }
-                        if (await postJson('/api/marketplace/listings/tags/merge', {sourceTagId: sourceId, targetTagId: target.id})) {
-                            window.location.reload();
-                        }
-                    });
-                    menu.appendChild(item);
-                });
-            });
-        });
-    </script>
 {% endblock %}
 
 {% block modals %}
-    <div class="modal modal-blur fade" id="createTagModal" tabindex="-1" role="dialog" aria-labelledby="createTagModalTitle">
+    <div class="modal modal-blur fade" id="createTagModal" tabindex="-1" role="dialog" aria-labelledby="createTagModalTitle" data-create-tag-modal>
         <div class="modal-dialog modal-dialog-centered modal-sm" role="document">
-            <form class="modal-content" id="createTagForm" novalidate>
+            <form class="modal-content" novalidate>
                 <div class="modal-header">
                     <h5 class="modal-title" id="createTagModalTitle">Новый тег</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
@@ -239,4 +105,6 @@
             </form>
         </div>
     </div>
+
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'tags-confirm'} only %}
 {% endblock %}

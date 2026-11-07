@@ -1,7 +1,13 @@
 {% extends 'inventory/layout.html.twig' %}
 
 {% block tab_content %}
-    <div class="container-xl py-4">
+    {# Адреса API — на корне; адрес привязки — path() с плейсхолдером-UUID (requirements не примут '__ID__').
+       Токен нужен диалогу подтверждения как условие открытия: его форма не отправляется, запрос JSON шлёт модуль. #}
+    <div class="container-xl py-4" data-listings-index
+         data-products-url="{{ path('api_products_list') }}"
+         data-map-url="{{ path('api_marketplace_listing_map', {listingId: '00000000-0000-0000-0000-000000000000'}) }}"
+         data-assign-url="{{ path('api_marketplace_listing_tags_assign') }}"
+         data-detach-url="{{ path('api_marketplace_listing_tags_detach') }}">
 
         <div class="card">
             <div class="card-header d-flex align-items-center gap-3 flex-wrap">
@@ -44,7 +50,7 @@
                     Управление тегами
                 </a>
                 <form method="get" action="{{ path('marketplace_listings_index') }}"
-                      class="d-flex align-items-center gap-2 flex-wrap" id="listings-filter-form" role="search">
+                      class="d-flex align-items-center gap-2 flex-wrap" id="listings-filter-form" role="search" data-listings-filter>
                     <select class="form-select w-auto" name="filter" aria-label="Привязка к товару" data-autosubmit>
                         <option value="all" {{ filter == 'all' ? 'selected' : '' }}>Привязка: все</option>
                         <option value="mapped" {{ filter == 'mapped' ? 'selected' : '' }}>Привязанные</option>
@@ -112,11 +118,11 @@
                 {% endif %}
             </div>
 
-            <div class="card-body border-bottom py-2 d-none" id="listings-flash">
-                <div class="alert alert-success mb-0" role="status" id="listings-flash-text"></div>
+            <div class="card-body border-bottom py-2 d-none" data-listings-flash>
+                <div class="alert alert-success mb-0" role="status" data-message></div>
             </div>
-            <div class="card-body border-bottom py-2 d-none" id="listings-error">
-                <div class="alert alert-danger mb-0" role="alert" id="listings-error-text"></div>
+            <div class="card-body border-bottom py-2 d-none" data-listings-error>
+                <div class="alert alert-danger mb-0" role="alert" data-message></div>
             </div>
 
             {% if pager.nbResults == 0 %}
@@ -134,17 +140,17 @@
             {% else %}
                 {# data-applied-filter — фильтр, который применил сервер: назначение «все N» уходит
                    по нему, а не по тексту в поле поиска, изменённому без Enter. #}
-                <div class="card-body border-bottom py-2 d-none" id="bulk-tag-panel"
+                <div class="card-body border-bottom py-2 d-none" id="bulk-tag-panel" data-bulk-tag-panel
                      data-all-tags="{{ all_tags|json_encode|e('html_attr') }}"
                      data-applied-filter="{{ filter_params|json_encode|e('html_attr') }}"
                      data-filter-summary="{{ filter_summary }}"
                      data-nb-results="{{ pager.nbResults }}">
                     <div class="d-flex align-items-center gap-3 flex-wrap">
-                        <span class="text-muted small"><span id="bulk-count">0</span> выбрано</span>
-                        <span class="small d-none" id="bulk-scope-offer">
+                        <span class="text-muted small"><span data-bulk-count>0</span> выбрано</span>
+                        <span class="small d-none" data-bulk-scope-offer>
                             Выбраны все на странице.
                             {% if pager.nbResults <= max_filter_match %}
-                                <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="bulk-select-filter">
+                                <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-bulk-select-filter>
                                     Выбрать все {{ pager.nbResults|vf_number }} по текущему фильтру
                                 </button>
                             {% else %}
@@ -154,17 +160,22 @@
                                 </span>
                             {% endif %}
                         </span>
-                        <span class="small d-none" id="bulk-scope-filter">
+                        <span class="small d-none" data-bulk-scope-filter>
                             Выбраны все {{ pager.nbResults|vf_number }} по фильтру.
-                            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="bulk-clear-filter">
+                            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-bulk-clear-filter>
                                 Снять выбор
                             </button>
                         </span>
-                        <div class="tags-input" id="bulk-tag-input" style="max-width:320px">
-                            <input type="text" placeholder="Тег…" autocomplete="off" id="bulk-tag-name"
+                        <div class="tags-input" data-bulk-tag-input style="max-width:320px">
+                            <input type="text" placeholder="Тег…" autocomplete="off" data-bulk-tag-name
                                    aria-label="Тег для выбранных листингов">
-                            <div class="suggest d-none" id="bulk-tag-suggest"></div>
+                            <div class="suggest d-none" data-bulk-tag-suggest></div>
                         </div>
+                        {# Скрытый триггер диалога «присвоить всем по фильтру»: тексты подставляет модуль. #}
+                        <button type="button" hidden data-bulk-assign-trigger
+                                data-bs-target="#listings-confirm"
+                                data-confirm-token="{{ csrf_token('listing_tags') }}"
+                                data-confirm-submit="Присвоить"></button>
                     </div>
                 </div>
 
@@ -173,7 +184,7 @@
                         <thead>
                         <tr>
                             <th class="w-1">
-                                <input type="checkbox" class="form-check-input m-0" id="select-all"
+                                <input type="checkbox" class="form-check-input m-0" data-select-all
                                        aria-label="Выбрать все листинги на странице">
                             </th>
                             <th>Маркет</th>
@@ -222,7 +233,7 @@
                                 </span>
                                         </div>
                                     {% else %}
-                                        <button class="btn btn-sm btn-warning map-listing-btn"
+                                        <button type="button" class="btn btn-sm btn-warning" data-map-listing
                                                 data-listing-id="{{ listing.id }}"
                                                 data-listing-sku="{{ listing.marketplaceSku }}">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="16" height="16"
@@ -239,7 +250,7 @@
                                     <div class="d-flex flex-wrap gap-1">
                                         {% for tag in tags_by_listing[listing.id]|default([]) %}
                                             <span class="tag-chip">{{ tag.name }}
-                                                <button type="button" class="x detach-tag-btn"
+                                                <button type="button" class="x" data-detach-tag
                                                         data-listing-id="{{ listing.id }}"
                                                         data-tag-id="{{ tag.id }}"
                                                         title="Снять тег {{ tag.name }}"
@@ -250,7 +261,7 @@
                                 </td>
                                 <td>
                                     {% if listing.product %}
-                                        <button class="btn btn-sm btn-ghost-secondary map-listing-btn"
+                                        <button type="button" class="btn btn-sm btn-ghost-secondary" data-map-listing
                                                 data-listing-id="{{ listing.id }}"
                                                 data-listing-sku="{{ listing.marketplaceSku }}"
                                                 title="Изменить привязку">
@@ -281,7 +292,7 @@
 {% endblock %}
 
 {% block modals %}
-    <div class="modal modal-blur fade" id="mapListingModal" tabindex="-1" role="dialog">
+    <div class="modal modal-blur fade" id="mapListingModal" tabindex="-1" role="dialog" data-map-listing-modal>
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
@@ -293,455 +304,26 @@
                         <label class="form-label text-muted">Листинг</label>
                         <div class="d-flex align-items-center gap-2">
                             <span class="badge bg-azure-lt">WB</span>
-                            <code id="modal-listing-sku"></code>
+                            <code data-map-listing-sku></code>
                         </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label" for="product-select">
                             Товар <span class="text-danger">*</span>
                         </label>
-                        <select class="form-select" id="product-select">
+                        <select class="form-select" id="product-select" data-map-product>
                             <option value="">— выберите товар —</option>
                         </select>
                     </div>
-                    <div id="mapping-error" class="alert alert-danger d-none" role="alert"></div>
+                    <div class="alert alert-danger d-none" role="alert" data-map-error></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-link me-auto" data-bs-dismiss="modal">Отмена</button>
-                    <button type="button" class="btn btn-primary" id="confirm-mapping-btn">Привязать</button>
+                    <button type="button" class="btn btn-primary" data-map-submit>Привязать</button>
                 </div>
             </div>
         </div>
     </div>
 
-    {# Подтверждение назначения тега по фильтру: разметка DS-Feedback (vf-confirm).
-       _confirm_modal не подходит — он отправляет форму с CSRF, здесь JSON-запрос. #}
-    <div class="modal fade vf-confirm" id="bulk-tag-confirm" tabindex="-1" aria-hidden="true"
-         aria-labelledby="bulk-tag-confirm-title" aria-describedby="bulk-tag-confirm-body">
-        <div class="modal-dialog modal-dialog-centered vf-confirm__dialog" role="document">
-            <div class="modal-content">
-                <div class="vf-confirm__head">
-                    <h2 class="vf-confirm__title" id="bulk-tag-confirm-title">Присвоить тег?</h2>
-                </div>
-                <p class="vf-confirm__body" id="bulk-tag-confirm-body"></p>
-                <div class="vf-confirm__footer">
-                    <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
-                    <button type="button" class="btn btn-primary" id="bulk-tag-confirm-submit">Присвоить</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            let currentListingId = null;
-            const modalEl = document.getElementById('mapListingModal');
-
-            // Ищем Bootstrap в разных местах где Tabler его размещает
-            function getBootstrapModal() {
-                if (window.bootstrap && window.bootstrap.Modal) {
-                    return window.bootstrap.Modal;
-                }
-                if (window.Modal) {
-                    return window.Modal;
-                }
-                return null;
-            }
-
-            function openModal(listingId, listingSku) {
-                currentListingId = listingId;
-                document.getElementById('modal-listing-sku').textContent = listingSku;
-                document.getElementById('mapping-error').classList.add('d-none');
-                loadProducts();
-
-                const BootstrapModal = getBootstrapModal();
-                if (BootstrapModal) {
-                    BootstrapModal.getOrCreateInstance(modalEl).show();
-                } else {
-                    // Fallback без Bootstrap
-                    modalEl.style.display = 'block';
-                    modalEl.classList.add('show');
-                    document.body.classList.add('modal-open');
-                }
-            }
-
-            function closeModal() {
-                const BootstrapModal = getBootstrapModal();
-                if (BootstrapModal) {
-                    BootstrapModal.getOrCreateInstance(modalEl).hide();
-                } else {
-                    modalEl.style.display = 'none';
-                    modalEl.classList.remove('show');
-                    document.body.classList.remove('modal-open');
-                }
-                const btn = document.getElementById('confirm-mapping-btn');
-                btn.disabled = false;
-                btn.textContent = 'Привязать';
-            }
-
-            document.querySelectorAll('.map-listing-btn').forEach(btn => {
-                btn.addEventListener('click', function () {
-                    openModal(this.dataset.listingId, this.dataset.listingSku);
-                });
-            });
-
-            document.querySelectorAll('[data-bs-dismiss="modal"]').forEach(btn => {
-                btn.addEventListener('click', closeModal);
-            });
-
-            async function loadProducts() {
-                const select = document.getElementById('product-select');
-                select.innerHTML = '<option value="">Загрузка...</option>';
-                select.disabled = true;
-                try {
-                    const res = await fetch('/api/products');
-                    const products = await res.json();
-                    select.innerHTML = '<option value="">— выберите товар —</option>';
-                    products.forEach(p => {
-                        const opt = document.createElement('option');
-                        opt.value = p.id;
-                        opt.textContent = `${p.sku} — ${p.name}`;
-                        select.appendChild(opt);
-                    });
-                } catch {
-                    select.innerHTML = '<option value="">Ошибка загрузки</option>';
-                } finally {
-                    select.disabled = false;
-                }
-            }
-
-            document.getElementById('confirm-mapping-btn').addEventListener('click', async function () {
-                const productId = document.getElementById('product-select').value;
-                const errorDiv = document.getElementById('mapping-error');
-                errorDiv.classList.add('d-none');
-
-                if (!productId) {
-                    errorDiv.textContent = 'Выберите товар';
-                    errorDiv.classList.remove('d-none');
-                    return;
-                }
-
-                this.disabled = true;
-                this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Сохранение...';
-
-                try {
-                    const res = await fetch(`/api/marketplace/listings/${currentListingId}/map`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({productId}),
-                    });
-                    const data = await res.json();
-
-                    if (res.ok) {
-                        window.location.reload();
-                    } else {
-                        errorDiv.textContent = data.error || 'Не удалось привязать';
-                        errorDiv.classList.remove('d-none');
-                        this.disabled = false;
-                        this.textContent = 'Привязать';
-                    }
-                } catch {
-                    errorDiv.textContent = 'Ошибка сети';
-                    errorDiv.classList.remove('d-none');
-                    this.disabled = false;
-                    this.textContent = 'Привязать';
-                }
-            });
-
-            // ---- Форма фильтров ----
-            const filterForm = document.getElementById('listings-filter-form');
-            filterForm?.querySelectorAll('[data-autosubmit]').forEach(el => {
-                el.addEventListener('change', () => filterForm.requestSubmit());
-            });
-            // Пустые поля не попадают в адрес: ?q=&tag= ничего не значат.
-            filterForm?.addEventListener('submit', () => {
-                filterForm.querySelectorAll('input[name], select[name]').forEach(el => {
-                    el.disabled = el.value === '';
-                });
-            });
-            // Возврат «Назад» берёт страницу из bfcache вместе с отключёнными полями.
-            window.addEventListener('pageshow', () => {
-                filterForm?.querySelectorAll('input[name], select[name]').forEach(el => {
-                    el.disabled = false;
-                });
-            });
-
-            // ---- Сообщения ----
-            const FLASH_KEY = 'vf.listings.tagResult';
-
-            function showMessage(boxId, textId, text) {
-                document.getElementById(textId).textContent = text;
-                document.getElementById(boxId).classList.remove('d-none');
-            }
-
-            function hideError() {
-                document.getElementById('listings-error').classList.add('d-none');
-            }
-
-            // Итог назначения переживает перезагрузку через sessionStorage;
-            // без хранилища (приватный режим) страница просто перезагрузится.
-            function rememberFlash(text) {
-                try {
-                    sessionStorage.setItem(FLASH_KEY, text);
-                } catch {
-                    // Хранилище недоступно (приватный режим) — показываем итог до перезагрузки.
-                    window.alert(text);
-                }
-            }
-
-            function showRememberedFlash() {
-                let text = null;
-                try {
-                    text = sessionStorage.getItem(FLASH_KEY);
-                    sessionStorage.removeItem(FLASH_KEY);
-                } catch {
-                    text = null;
-                }
-                if (text) {
-                    showMessage('listings-flash', 'listings-flash-text', text);
-                }
-            }
-
-            function formatCount(n) {
-                return Number(n).toLocaleString('ru-RU').replace(/\s/g, '\u00A0');
-            }
-
-            function listingsDative(n) {
-                return n % 10 === 1 && n % 100 !== 11 ? 'листингу' : 'листингам';
-            }
-
-            function listingsGenitive(n) {
-                return n % 10 === 1 && n % 100 !== 11 ? 'листинга' : 'листингов';
-            }
-
-            function resultText(data) {
-                const already = data.matched - data.assigned;
-                if (data.assigned === 0 && already > 0) {
-                    return `Тег «${data.tagName}» уже был у всех ${formatCount(already)} ${listingsGenitive(already)}.`;
-                }
-                let text = `Тег «${data.tagName}»: назначен ${formatCount(data.assigned)} ${listingsDative(data.assigned)}`;
-                if (already > 0) {
-                    text += `, у ${formatCount(already)} уже был`;
-                }
-
-                return text + '.';
-            }
-
-            // ---- Теги листингов ----
-            const ASSIGN_URL = '/api/marketplace/listings/tags/assign';
-            const bulkPanel = document.getElementById('bulk-tag-panel');
-            const allTags = bulkPanel ? JSON.parse(bulkPanel.dataset.allTags || '[]') : [];
-            const appliedFilter = bulkPanel ? JSON.parse(bulkPanel.dataset.appliedFilter || '{}') : {};
-            const nbResults = bulkPanel ? Number(bulkPanel.dataset.nbResults || 0) : 0;
-            const rowBoxes = Array.from(document.querySelectorAll('.row-select'));
-            const selectAll = document.getElementById('select-all');
-            const tagInput = document.getElementById('bulk-tag-name');
-            const tagInputWrap = document.getElementById('bulk-tag-input');
-            const suggestBox = document.getElementById('bulk-tag-suggest');
-
-            // page — отмеченные строки страницы; filter — все листинги по применённому фильтру.
-            let scope = 'page';
-
-            function selectedListingIds() {
-                return rowBoxes.filter(cb => cb.checked).map(cb => cb.value);
-            }
-
-            function allOnPageChecked() {
-                return rowBoxes.length > 0 && rowBoxes.every(cb => cb.checked);
-            }
-
-            function hideSuggest() {
-                suggestBox?.classList.add('d-none');
-            }
-
-            function refreshBulkPanel() {
-                if (!bulkPanel) {
-                    return;
-                }
-                if (scope === 'filter' && !allOnPageChecked()) {
-                    scope = 'page';
-                }
-                const count = scope === 'filter' ? nbResults : selectedListingIds().length;
-                document.getElementById('bulk-count').textContent = formatCount(count);
-                document.getElementById('bulk-scope-offer').classList.toggle(
-                    'd-none',
-                    !(scope === 'page' && allOnPageChecked() && nbResults > rowBoxes.length),
-                );
-                document.getElementById('bulk-scope-filter').classList.toggle('d-none', scope !== 'filter');
-                if (selectAll) {
-                    selectAll.checked = allOnPageChecked();
-                }
-                bulkPanel.classList.toggle('d-none', count === 0);
-                if (count === 0) {
-                    hideSuggest();
-                }
-            }
-
-            // Ответ API или null; ошибка — видимым текстом над таблицей.
-            async function postTagRequest(url, body) {
-                hideError();
-                try {
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify(body),
-                    });
-                    const data = await res.json().catch(() => ({}));
-                    if (!res.ok) {
-                        showMessage('listings-error', 'listings-error-text', data.error?.message || 'Не удалось выполнить операцию');
-                        return null;
-                    }
-                    return data;
-                } catch {
-                    showMessage('listings-error', 'listings-error-text', 'Ошибка сети. Проверьте соединение и повторите.');
-                    return null;
-                }
-            }
-
-            // После назначения или снятия тега выборка по тегу может сжаться, и текущая
-            // страница окажется за её концом (OutOfRangeCurrentPage). Фильтры сохраняем,
-            // страницу — нет.
-            function reloadFromFirstPage() {
-                const url = new URL(window.location.href);
-                url.searchParams.delete('page');
-                window.location.assign(url.toString());
-            }
-
-            function finishAssign(data) {
-                rememberFlash(resultText(data));
-                reloadFromFirstPage();
-            }
-
-            // ---- Подтверждение назначения по фильтру ----
-            const confirmEl = document.getElementById('bulk-tag-confirm');
-            const confirmTitle = document.getElementById('bulk-tag-confirm-title');
-            const confirmBody = document.getElementById('bulk-tag-confirm-body');
-            const confirmSubmit = document.getElementById('bulk-tag-confirm-submit');
-            let pendingTagRef = null;
-
-            async function submitFilterAssign() {
-                if (!pendingTagRef) {
-                    return;
-                }
-                confirmSubmit.disabled = true;
-                const data = await postTagRequest(ASSIGN_URL, {filter: appliedFilter, ...pendingTagRef});
-                if (data) {
-                    finishAssign(data);
-                    return;
-                }
-                getBootstrapModal()?.getOrCreateInstance(confirmEl).hide();
-                confirmSubmit.disabled = false;
-            }
-
-            function openFilterConfirm(tagRef, tagLabel) {
-                pendingTagRef = tagRef;
-                confirmTitle.textContent = `Присвоить тег «${tagLabel}» ${formatCount(nbResults)} ${listingsDative(nbResults)}?`;
-                confirmBody.textContent = `Выборка: ${bulkPanel.dataset.filterSummary}. `
-                    + 'Тег получат все листинги по этому фильтру, а не только строки текущей страницы.';
-                confirmSubmit.disabled = false;
-                const BootstrapModal = getBootstrapModal();
-                if (BootstrapModal) {
-                    BootstrapModal.getOrCreateInstance(confirmEl).show();
-                } else if (window.confirm(confirmTitle.textContent)) {
-                    submitFilterAssign();
-                }
-            }
-
-            confirmSubmit?.addEventListener('click', submitFilterAssign);
-
-            async function assignTag(tagRef, tagLabel) {
-                hideSuggest();
-                if (scope === 'filter') {
-                    openFilterConfirm(tagRef, tagLabel);
-                    return;
-                }
-                const listingIds = selectedListingIds();
-                if (listingIds.length === 0) {
-                    return;
-                }
-                const data = await postTagRequest(ASSIGN_URL, {listingIds, ...tagRef});
-                if (data) {
-                    finishAssign(data);
-                }
-            }
-
-            function renderSuggest() {
-                if (!suggestBox || !tagInput) {
-                    return;
-                }
-                const raw = tagInput.value.trim();
-                const term = raw.toLowerCase();
-                const matches = allTags.filter(t => t.name.toLowerCase().includes(term)).slice(0, 20);
-                const hasExact = allTags.some(t => t.name.toLowerCase() === term);
-
-                suggestBox.innerHTML = '';
-
-                matches.forEach(tag => {
-                    const item = document.createElement('div');
-                    item.className = 'suggest-item';
-                    item.textContent = tag.name;
-                    item.addEventListener('click', () => assignTag({tagId: tag.id}, tag.name));
-                    suggestBox.appendChild(item);
-                });
-
-                if (raw !== '' && !hasExact) {
-                    const create = document.createElement('div');
-                    create.className = 'suggest-create';
-                    create.textContent = 'Создать «' + raw + '»';
-                    create.addEventListener('click', () => assignTag({name: raw}, raw));
-                    suggestBox.appendChild(create);
-                }
-
-                suggestBox.classList.toggle('d-none', suggestBox.childElementCount === 0);
-            }
-
-            selectAll?.addEventListener('change', function () {
-                rowBoxes.forEach(cb => {
-                    cb.checked = this.checked;
-                });
-                refreshBulkPanel();
-            });
-
-            rowBoxes.forEach(cb => {
-                cb.addEventListener('change', refreshBulkPanel);
-            });
-
-            document.getElementById('bulk-select-filter')?.addEventListener('click', () => {
-                scope = 'filter';
-                refreshBulkPanel();
-            });
-
-            document.getElementById('bulk-clear-filter')?.addEventListener('click', () => {
-                scope = 'page';
-                rowBoxes.forEach(cb => {
-                    cb.checked = false;
-                });
-                refreshBulkPanel();
-            });
-
-            tagInput?.addEventListener('input', renderSuggest);
-            tagInput?.addEventListener('focus', renderSuggest);
-            tagInputWrap?.addEventListener('click', () => tagInput?.focus());
-            document.addEventListener('click', e => {
-                if (!tagInputWrap?.contains(e.target)) {
-                    hideSuggest();
-                }
-            });
-
-            document.querySelectorAll('.detach-tag-btn').forEach(btn => {
-                btn.addEventListener('click', async function () {
-                    const data = await postTagRequest('/api/marketplace/listings/tags/detach', {
-                        listingIds: [this.dataset.listingId],
-                        tagId: this.dataset.tagId,
-                    });
-                    if (data) {
-                        reloadFromFirstPage();
-                    }
-                });
-            });
-
-            showRememberedFlash();
-            refreshBulkPanel();
-        });
-    </script>
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'listings-confirm'} only %}
 {% endblock %}

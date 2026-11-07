@@ -145,6 +145,32 @@ final class MarketplaceListingsSearchTest extends WebTestCaseBase
         );
         self::assertSame('3', $panel->attr('data-nb-results'));
         self::assertSame('поиск «навол», маркетплейс OZON, без привязки', $panel->attr('data-filter-summary'));
+
+        // Хуки модуля assets/pages/listings_index.js: адреса API на корне, панель тегов, модал привязки, диалог.
+        $root = $crawler->filter('[data-listings-index]');
+        self::assertCount(1, $root);
+        self::assertSame('/api/products', $root->attr('data-products-url'));
+        self::assertSame(
+            '/api/marketplace/listings/00000000-0000-0000-0000-000000000000/map',
+            $root->attr('data-map-url'),
+        );
+        self::assertSame('/api/marketplace/listings/tags/assign', $root->attr('data-assign-url'));
+        self::assertSame('/api/marketplace/listings/tags/detach', $root->attr('data-detach-url'));
+        self::assertSelectorExists('[data-listings-index] #listings-filter-form[data-listings-filter] select[data-autosubmit]');
+        self::assertSelectorExists('[data-listings-index] [data-listings-flash] [data-message]');
+        self::assertSelectorExists('[data-listings-index] [data-listings-error] [data-message]');
+        self::assertSelectorExists('#bulk-tag-panel[data-bulk-tag-panel] [data-bulk-tag-input] input[data-bulk-tag-name]');
+        self::assertSelectorExists('#bulk-tag-panel [data-bulk-select-filter]');
+        $trigger = $crawler->filter('#bulk-tag-panel [data-bulk-assign-trigger]');
+        self::assertSame('#listings-confirm', $trigger->attr('data-bs-target'));
+        self::assertNotSame('', (string) $trigger->attr('data-confirm-token'));
+        self::assertSelectorExists('thead input[data-select-all]');
+        self::assertCount(3, $crawler->filter('tbody button[data-map-listing][data-listing-id][data-listing-sku]'));
+        self::assertSelectorExists('#mapListingModal[data-map-listing-modal] select#product-select[data-map-product]');
+        self::assertSelectorExists('#mapListingModal [data-map-error]');
+        self::assertSelectorExists('#mapListingModal [data-map-submit]');
+        self::assertSelectorExists('#listings-confirm[data-confirm-modal] form[data-confirm-form]');
+        self::assertSelectorNotExists('[onclick], [onchange], [onsubmit]');
     }
 
     /**
