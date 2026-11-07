@@ -78,7 +78,7 @@ final class SettlementJourneyTest extends WebTestCaseBase
         self::assertSame('6000000', (string) $this->em()->getConnection()->fetchOne("SELECT SUM(delta_amount_minor) FROM settlement_movements WHERE company_id=? AND bucket='payable'", [$companyId]));
         $client->request('GET', '/settlements/documents');
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('h1', 'Документы');
+        self::assertSelectorTextContains('.settlement-ui h1', 'Документы');
         $client->request('GET', '/settlements/documents/'.$documentId);
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'Акт №1');

@@ -6,7 +6,7 @@
 **Architecture:** Twig/Symfony Forms на той же base/legacy оболочке и готовых DS-компонентах ДДС. Scope-specific CSS/JS обслуживает только разметку Settlement; существующие picker/widgets переиспользуются без нового React-острова.
 **Tech Stack:** Twig, действующие Tabler/Bootstrap+DS, существующие JS/Vite/PHPUnit/Vitest; без новых библиотек.
 **Spec:** [design.md](design.md) — требование владельца, визуальный образец, решение об оболочке и список неизменяемых контрактов.
-**Status:** План обновлён по уточнению владельца. Реализация не начата. Чекбоксы ниже — будущие работы.
+**Status:** Реализация одобрена. Stage1 выполнен; факты/проверки — checkpoint.md и stages/stage-1.md. Остальные чекбоксы подтверждаются на handoff.
 **Audit base:** `3c2cabc399226cceb33a10d41a10b3d5ca6a906d`; planning baseline `git diff --check` exit0. Сейчас меняется только документация, PHP/frontend tests не запускались.
 
 ## Global Constraints

@@ -1,7 +1,10 @@
 {% extends 'settlement/layout.html.twig' %}
 {% form_theme form 'settlement/_form_theme.html.twig' %}
+{% block settlement_header %}
+<div class="vf-ops-head"><h1>{{ sourceKind == 'cash' ? 'Включить оплату ДДС' : 'Основание из документа ОПиУ' }}</h1></div>
+{% endblock %}
 {% block settlement_content %}
-<div class="wz-head"><h1 class="wz-title">{{ sourceKind == 'cash' ? 'Включить оплату ДДС' : 'Основание из документа ОПиУ' }}</h1></div>
+
 <section class="card">
     <p><a href="{{ path(sourceKind == 'cash' ? 'cash_transaction_show' : 'document_show',{id:source.id}) }}">Открыть исходный документ</a></p>
     {% if sourceKind == 'cash' %}<p>Сумма оплаты: {{ source.amount.toDecimalString|vf_money(2,source.amount.currency) }}. Дата ДДС: {{ source.occurredAt|date('d.m.Y') }}.</p><p>Без подтверждения аванса сумма попадёт в нераспределённые оплаты. Для погашения долга её нужно распределить отдельно.</p>

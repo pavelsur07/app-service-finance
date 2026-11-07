@@ -1,7 +1,10 @@
 {% extends 'settlement/layout.html.twig' %}
+{% block settlement_header %}
+<div class="vf-ops-head"><div class="vf-ops-head__title"><h1>{{ counterpartyName }}</h1><p class="vf-ops-head__lead">Взаиморасчёты</p></div>
+{% if canWrite and book %}<div class="btn-list"><a class="btn btn-primary" href="{{ path('settlement_allocation_new',{counterparty:counterpartyId}) }}">Распределить оплату</a><a class="btn btn-outline-secondary" href="{{ path('settlement_correction_new',{counterparty:counterpartyId}) }}">Корректировка</a></div>{% endif %}</div>
+{% endblock %}
 {% block settlement_content %}
-<div class="wz-head"><h1 class="wz-title">{{ counterpartyName }}<span class="wz-sub">Взаиморасчёты</span></h1>
-{% if canWrite and book %}<div class="wz-row-actions"><a class="btn btn-md btn-primary" href="{{ path('settlement_allocation_new',{counterparty:counterpartyId}) }}">Распределить оплату</a><a class="btn btn-md btn-secondary" href="{{ path('settlement_correction_new',{counterparty:counterpartyId}) }}">Корректировка</a></div>{% endif %}</div>
+
 {% include 'settlement/_filter.html.twig' %}
 {% if report %}
     {% include 'settlement/_summary.html.twig' with {balances:report.summary.closing} only %}
@@ -13,7 +16,7 @@
     <section class="card report-scroll" tabindex="0" role="region" aria-label="Движения взаиморасчётов"><h2>Движения</h2>
     <table class="t-table"><thead><tr><th scope="col">Дата</th><th scope="col">Документ / основание</th><th scope="col">Показатель</th><th scope="col" class="t-cell--right">Изменение, ₽</th><th scope="col">Источник</th></tr></thead><tbody>
     {% for row in report.rows %}<tr><td>{{ row.effectiveDate|date('d.m.Y') }}</td><td><a href="{{ path('settlement_document',{id:row.documentId}) }}">{{ row.reason }}</a></td><td>{{ bucketLabels[row.bucket.value] }}</td><td class="t-cell--right">{{ row.delta.toDecimalString|vf_amount(2,signed:true) }}</td><td>{% if row.sourceId and row.sourceType.value in ['cash','finance'] %}<a href="{{ path(row.sourceType.value == 'cash' ? 'cash_transaction_show' : 'document_show',{id:row.sourceId}) }}">{{ row.sourceType.value == 'cash' ? 'ДДС' : 'ОПиУ' }}</a>{% else %}Документ взаиморасчётов{% endif %}</td></tr>{% else %}<tr><td colspan="5">За выбранный период нет движений.</td></tr>{% endfor %}
-    </tbody></table></section>{% include 'app/_ui/_pagination.html.twig' with {pager:pager} %}
+    </tbody></table></section>{% include 'partials/_pagination.html.twig' with {pager:pager,params:app.request.query.all|merge(app.request.attributes.get('_route_params'))} %}
 {% endif %}
 <p><a href="{{ path('settlement_documents',{counterparty:counterpartyId}) }}">Все документы контрагента</a></p>
 {% endblock %}

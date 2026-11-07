@@ -1,16 +1,15 @@
-{% extends '_layout/app.html.twig' %}
+{% extends 'base.html.twig' %}
 {% set app_nav_active = 'settlement' %}
 {% set app_breadcrumb = 'Взаиморасчёты' %}
 {% set bucketLabels = {receivable:'Нам должны', payable:'К оплате', advance_given:'Выданные авансы', advance_received:'Полученные авансы', unallocated_out:'Нераспределённые выплаты', unallocated_in:'Нераспределённые поступления'} %}
 {% set kindLabels = {opening:'Начальный остаток', obligation:'Основание долга', payment:'Оплата', correction:'Корректировка', allocation:'Погашение', classification:'Классификация оплаты', allocation_reversal:'Отмена погашения', document_reversal:'Отмена документа'} %}
 {% block title %}Взаиморасчёты{% endblock %}
 {% block content %}
-    {% set route = app.request.attributes.get('_route') %}
-    {% set tabs = [{label:'Сводка',href:path('settlement_index'),active:route in ['settlement_index','settlement_card']},{label:'Документы',href:path('settlement_documents'),active:route starts with 'settlement_document'}] %}
-    {% if is_granted('module.finance.write') %}{% set tabs = tabs|merge([{label:'Начало учёта',href:path('settlement_setup'),active:route == 'settlement_setup'}]) %}{% endif %}
-    <div class="wz-row">{% include 'app/_ui/_tabs.html.twig' with {tabs:tabs,label:'Разделы взаиморасчётов'} only %}</div>
-    {% for label,messages in app.flashes %}{% for message in messages %}
-        <div class="alert alert--{{ label == 'success' ? 'success' : 'warning' }} wz-row" role="status"><div class="a-body"><p class="a-text">{{ message }}</p></div></div>
-    {% endfor %}{% endfor %}
-    {% block settlement_content %}{% endblock %}
+<div class="settlement-ui" data-settlement-ui>
+    {% block settlement_header %}{% endblock %}
+    <section class="card cashflow-ops vf-ops mb-4">
+        <div class="card-header">{% include 'settlement/_tabs.html.twig' %}</div>
+        {% block settlement_content %}{% endblock %}
+    </section>
+</div>
 {% endblock %}

@@ -1,7 +1,10 @@
 {% extends 'settlement/layout.html.twig' %}
 {% form_theme partyForm 'settlement/_form_theme.html.twig' %}
+{% block settlement_header %}
+<div class="vf-ops-head"><h1>{{ title }}</h1></div>
+{% endblock %}
 {% block settlement_content %}
-<div class="wz-head"><h1 class="wz-title">{{ title }}</h1></div>
+
 <section class="card">{{ form_start(partyForm) }}{{ form_errors(partyForm) }}{{ form_widget(partyForm) }}<button class="btn btn-md btn-secondary" type="submit">Показать основания и оплаты</button>{{ form_end(partyForm) }}</section>
 {% if form %}
     {% form_theme form 'settlement/_form_theme.html.twig' %}

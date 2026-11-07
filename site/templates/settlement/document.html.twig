@@ -1,6 +1,9 @@
 {% extends 'settlement/layout.html.twig' %}
+{% block settlement_header %}
+<div class="vf-ops-head"><h1>{{ kindLabels[document.kind.value] }}{% if document.eventSequence %} №{{ document.eventSequence }}{% endif %}</h1></div>
+{% endblock %}
 {% block settlement_content %}
-<div class="wz-head"><h1 class="wz-title">{{ kindLabels[document.kind.value] }}{% if document.eventSequence %} №{{ document.eventSequence }}{% endif %}</h1></div>
+
 <section class="card"><dl><dt>Контрагент</dt><dd><a href="{{ path('settlement_card',{id:document.counterpartyId}) }}">{{ counterpartyName }}</a></dd><dt>Дата</dt><dd>{{ document.effectiveDate|date('d.m.Y') }}</dd><dt>Показатель</dt><dd>{{ bucketLabels[document.bucket.value] }}</dd><dt>Сумма</dt><dd>{{ document.amount.toDecimalString|vf_money(2,'RUB') }}</dd><dt>Срок оплаты</dt><dd>{{ document.dueDate ? document.dueDate|date('d.m.Y') : 'Не указан' }}</dd><dt>Основание / причина</dt><dd>{{ document.reason }}</dd><dt>Статус</dt><dd>{{ document.status.value == 'draft' ? 'Черновик: в остатках не учитывается' : 'Проведён' }}</dd></dl>
 {% if reversal %}<p>Отменён с {{ reversal.effectiveDate|date('d.m.Y') }}. <a href="{{ path('settlement_document',{id:reversal.id}) }}">Открыть отмену</a></p>{% endif %}
 {% if position %}<p>Свободный остаток сейчас: {{ position.available.toDecimalString|vf_money(2,'RUB') }}.{% if position.available.zero %} {{ document.kind.value == 'payment' ? 'Оплата полностью распределена.' : 'Остаток закрыт.' }}{% endif %}</p>{% endif %}

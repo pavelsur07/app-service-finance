@@ -1,0 +1,19 @@
+/* Local layout only; controls, tables, money and tabs use the DDS design system. */
+.settlement-ui { min-width: 0; }
+.settlement-ui .vf-ops-head h1 { overflow-wrap: anywhere; }
+.settlement-ui .settlement-filter-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--vf-space-3); }
+.settlement-ui .settlement-limit { display: flex; align-items: center; gap: var(--vf-space-2); }
+.settlement-ui .settlement-limit .form-select { width: auto; }
+.settlement-ui .settlement-native-filter { max-width: 20rem; }
+.settlement-ui .settlement-native-filter label { margin: 0; }
+.settlement-ui .settlement-native-filter select { max-width: 100%; }
+.settlement-ui .settlement-pill-enhanced { display: none; }
+.settlement-ui[data-settlement-enhanced] .settlement-native-filter { display: none; }
+.settlement-ui[data-settlement-enhanced] .settlement-pill-enhanced { display: block; }
+/* Native dates remain visible if JS/Bootstrap cannot initialize. */
+.settlement-ui .settlement-period-toggle { display: none; }
+.settlement-ui .settlement-period-fields { display: block; }
+.settlement-ui[data-settlement-enhanced] .settlement-period-toggle { display: inline-flex; }
+.settlement-ui[data-settlement-enhanced] .settlement-period-fields:not(.show) { display: none; }
+.settlement-ui .vf-ops-filterbar { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--vf-space-3); }
+.settlement-ui:not([data-settlement-enhanced]) .settlement-period-fields { position: static; box-shadow: none; }

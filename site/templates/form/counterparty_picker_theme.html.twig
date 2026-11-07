@@ -7,7 +7,7 @@
     {% set attr = form.vars.attr|default({}) %}
     {% set attrClass = attr.class|default('') %}
     {% set placeholder = form.vars.placeholder|default(null) %}
-    {% set searchUrl = form.vars.search_url|default(null) %}
+    {% set searchUrl = counterparty_picker_search_url|default(form.vars.search_url|default(null)) %}
     {% set allowCreate = form.vars.allow_create|default(false) %}
 
     {% set currentLabel = '' %}
