@@ -141,6 +141,7 @@ final class MarketplaceControllerRealizationLoggingTest extends TestCase
             self::uninitialized(MarketplaceListingRepository::class),
             $this->createMock(EntityManagerInterface::class),
             new NullLogger(),
+            self::uninitialized(\App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery::class),
         );
     }
 

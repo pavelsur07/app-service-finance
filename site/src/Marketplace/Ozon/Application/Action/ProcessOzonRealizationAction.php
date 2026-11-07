@@ -9,6 +9,7 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceOzonRealization;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceOzonRealizationRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
@@ -41,8 +42,9 @@ use Ramsey\Uuid\Uuid;
  * Переобработка (повторный вызов для уже обработанного периода):
  *   Существующие строки обновляются — заполняются поля return_commission
  *   которые отсутствовали до добавления фичи «Возврат с СПП».
- *   Строки с pl_document_id (уже закрытые) также обновляются —
- *   данные нужны для корректного закрытия следующих периодов.
+ *   Финальное закрытие и financeLockBefore защищены от изменения.
+ *   Все способы запуска сериализованы с закрытием месяца одной
+ *   транзакционной блокировкой; батчевые flush не коммитят части отчёта.
  *
  * Важно: realization НЕ входит в daily raw pipeline (sales/returns/costs)
  * и остаётся отдельным monthly/realization flow.
@@ -55,6 +57,7 @@ final class ProcessOzonRealizationAction
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
+        private readonly MonthCloseAdvisoryLockQuery $monthCloseLock,
     ) {
     }
 
@@ -63,9 +66,9 @@ final class ProcessOzonRealizationAction
      */
     public function __invoke(string $companyId, string $rawDocId): array
     {
-        $rawDoc = $this->rawDocumentRepository->find($rawDocId);
+        $rawDoc = $this->rawDocumentRepository->findOneBy(['id' => $rawDocId, 'company' => $companyId]);
 
-        if (null === $rawDoc) {
+        if (!$rawDoc instanceof MarketplaceRawDocument) {
             throw new \RuntimeException(sprintf('Raw document not found: %s', $rawDocId));
         }
 
@@ -83,6 +86,57 @@ final class ProcessOzonRealizationAction
             throw new \InvalidArgumentException(sprintf('Expected documentType "realization", got "%s".', $rawDoc->getDocumentType()));
         }
 
+        $from = $rawDoc->getPeriodFrom()->format('Y-m-d');
+        $to = $rawDoc->getPeriodTo()->format('Y-m-d');
+
+        return $this->em->wrapInTransaction(function () use ($companyId, $rawDocId, $rawDoc, $from, $to): array {
+            $this->monthCloseLock->lock($companyId, MarketplaceType::OZON,
+                (int) $rawDoc->getPeriodFrom()->format('Y'), (int) $rawDoc->getPeriodFrom()->format('n'));
+            $connection = $this->em->getConnection();
+            if (false === $connection->fetchOne(
+                'SELECT id FROM marketplace_raw_documents WHERE company_id = :companyId AND id = :id FOR UPDATE',
+                ['companyId' => $companyId, 'id' => $rawDocId],
+            )) {
+                throw new \DomainException('Документ реализации больше не существует.');
+            }
+            // A caller may have loaded the document before waiting for the lock.
+            $this->em->refresh($rawDoc);
+            if ($from !== $rawDoc->getPeriodFrom()->format('Y-m-d') || $to !== $rawDoc->getPeriodTo()->format('Y-m-d')) {
+                throw new \DomainException('Период реализации изменился во время ожидания. Повторите обработку.');
+            }
+            if (empty($rawDoc->getRawData()['result']['rows'])) {
+                return ['created' => 0, 'updated' => 0, 'skipped' => 0];
+            }
+            $header = $rawDoc->getRawData()['result']['header'] ?? [];
+            if (($header['start_date'] ?? null) !== $from || ($header['stop_date'] ?? null) !== $to
+                || '01' !== $rawDoc->getPeriodFrom()->format('d')
+                || $rawDoc->getPeriodFrom()->modify('last day of this month')->format('Y-m-d') !== $to) {
+                throw new \DomainException('Заголовок реализации должен совпадать с полным месяцем документа.');
+            }
+            $lockBefore = $connection->fetchOne('SELECT finance_lock_before FROM companies WHERE id = :id', ['id' => $companyId]);
+            if (is_string($lockBefore) && $to <= $lockBefore) {
+                throw new \DomainException('Период заблокирован для редактирования.');
+            }
+            $month = $connection->fetchAssociative(
+                'SELECT stage_sales_returns_status, settings FROM marketplace_month_closes WHERE company_id = :companyId AND marketplace = :marketplace AND year = :year AND month = :month',
+                ['companyId' => $companyId, 'marketplace' => MarketplaceType::OZON->value,
+                    'year' => (int) $rawDoc->getPeriodFrom()->format('Y'), 'month' => (int) $rawDoc->getPeriodFrom()->format('n')],
+            );
+            $settings = false !== $month && is_string($month['settings']) ? json_decode($month['settings'], true, 512, \JSON_THROW_ON_ERROR) : [];
+            if (false !== $month && 'closed' === $month['stage_sales_returns_status']
+                && !($settings['last_close_was_preliminary']['sales_returns'] ?? false)) {
+                throw new \DomainException('Этап продаж и возвратов закрыт окончательно. Сначала переоткройте его.');
+            }
+
+            return $this->processLocked($companyId, $rawDoc);
+        });
+    }
+
+    /** @return array{created: int, updated: int, skipped: int} */
+    private function processLocked(string $companyId, MarketplaceRawDocument $rawDoc): array
+    {
+        $rawDocId = $rawDoc->getId();
+
         $company = $this->em->find(Company::class, $companyId);
         if (!$company instanceof Company) {
             throw new \RuntimeException('Company not found: '.$companyId);
@@ -90,7 +144,6 @@ final class ProcessOzonRealizationAction
 
         $rawData = $rawDoc->getRawData();
         $rows = $rawData['result']['rows'] ?? [];
-        $header = $rawData['result']['header'] ?? [];
 
         if (empty($rows)) {
             $this->logger->info('[OzonRealization] No rows in document', ['raw_doc_id' => $rawDocId]);
@@ -99,8 +152,8 @@ final class ProcessOzonRealizationAction
         }
 
         // Период из заголовка реализации
-        $periodFrom = new \DateTimeImmutable($header['start_date'] ?? date('Y-m-01'));
-        $periodTo = new \DateTimeImmutable($header['stop_date'] ?? date('Y-m-t'));
+        $periodFrom = $rawDoc->getPeriodFrom();
+        $periodTo = $rawDoc->getPeriodTo();
 
         // Проверяем режим: первичная обработка или переобработка (повторный запуск)
         $isReprocess = $this->realizationRepository->existsForPeriod(
@@ -115,12 +168,7 @@ final class ProcessOzonRealizationAction
                 'period_to' => $periodTo->format('Y-m-d'),
             ]);
 
-            // DELETE + пересоздание — атомарно. Без транзакции упавший process()
-            // оставляет период с уже закоммиченным DELETE: строки реализации и
-            // связи pl_document_id теряются безвозвратно.
-            return $this->em->wrapInTransaction(
-                fn (): array => $this->reprocess($companyId, $rawDoc, $rows, $periodFrom, $periodTo),
-            );
+            return $this->reprocess($companyId, $rawDoc, $rows, $periodFrom, $periodTo);
         }
 
         return $this->process($companyId, $rawDoc, $rows, $periodFrom, $periodTo);

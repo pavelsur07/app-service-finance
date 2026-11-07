@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Marketplace\Ozon\Application;
 
+use App\Marketplace\Entity\MarketplaceMonthClose;
 use App\Marketplace\Entity\MarketplaceRawDocument;
+use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Ozon\Application\Action\ProcessOzonRealizationAction;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -38,6 +40,76 @@ final class ProcessOzonRealizationRegressionTest extends IntegrationTestCase
 
     private string $companyId;
     private string $rawDocId;
+
+    public function testFailedInitialProcessingRollsBackEarlierBatches(): void
+    {
+        $rows = $this->buildRows(self::BATCH_SIZE + 1, null);
+        $rows[self::BATCH_SIZE]['delivery_commission']['price_per_instance'] = 1e12;
+        $this->seed($rows);
+        try {
+            ($this->action())($this->companyId, $this->rawDocId);
+            self::fail('Expected numeric overflow.');
+        } catch (\Throwable $e) {
+            self::assertStringContainsString('overflow', mb_strtolower($e->getMessage()));
+        }
+        self::assertSame(0, $this->countRows());
+    }
+
+    public function testFinalClosedMonthCannotBeChangedByDirectCall(): void
+    {
+        $this->seed($this->buildRows(2, null));
+        $month = new MarketplaceMonthClose(Uuid::uuid7()->toString(), $this->companyId, MarketplaceType::OZON, 2026, 1);
+        $month->closeStage(CloseStage::SALES_RETURNS, Uuid::uuid7()->toString(), [], []);
+        $this->em->persist($month);
+        $this->em->flush();
+        $this->expectException(\DomainException::class);
+        try {
+            ($this->action())($this->companyId, $this->rawDocId);
+        } finally {
+            self::assertSame(0, $this->countRows());
+        }
+    }
+
+    public function testFinanceLockedPeriodCannotBeChanged(): void
+    {
+        $this->seed($this->buildRows(2, null));
+        $this->connection->executeStatement('UPDATE companies SET finance_lock_before = ? WHERE id = ?', ['2026-01-31', $this->companyId]);
+        $this->expectException(\DomainException::class);
+        try {
+            ($this->action())($this->companyId, $this->rawDocId);
+        } finally {
+            self::assertSame(0, $this->countRows());
+        }
+    }
+
+    public function testMissingHeaderCannotSilentlyUseCurrentMonth(): void
+    {
+        $this->seed($this->buildRows(2, null));
+        $doc = $this->em->find(MarketplaceRawDocument::class, $this->rawDocId);
+        self::assertInstanceOf(MarketplaceRawDocument::class, $doc);
+        $doc->setRawData(['result' => ['rows' => $this->buildRows(2, null)]]);
+        $this->em->flush();
+        $this->expectException(\DomainException::class);
+        try {
+            ($this->action())($this->companyId, $this->rawDocId);
+        } finally {
+            self::assertSame(0, $this->countRows());
+        }
+    }
+
+    public function testPreliminaryClosedMonthCanStillBeReprocessed(): void
+    {
+        $this->seed($this->buildRows(2, null));
+        $month = new MarketplaceMonthClose(Uuid::uuid7()->toString(), $this->companyId, MarketplaceType::OZON, 2026, 1);
+        $month->closeStage(CloseStage::SALES_RETURNS, Uuid::uuid7()->toString(), [], []);
+        $month->setSettings(['last_close_was_preliminary' => ['sales_returns' => true]]);
+        $this->em->persist($month);
+        $this->em->flush();
+        ($this->action())($this->companyId, $this->rawDocId);
+        ($this->action())($this->companyId, $this->rawDocId);
+        self::assertSame(2, $this->countRows());
+        self::assertSame('closed', $this->connection->fetchOne('SELECT stage_sales_returns_status FROM marketplace_month_closes WHERE company_id = ?', [$this->companyId]));
+    }
 
     /**
      * Строка «только возврат» стоит ровно на второй границе батча (500-я),
