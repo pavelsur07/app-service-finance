@@ -149,7 +149,7 @@
                         {% for row in pager.currentPageResults %}
                             <tr>
                                 <td>
-                                    <div>{{ row.title ?: row.sku }}</div>
+                                    <div>{{ row.title ?: row.sku }}{% if row.size %} · размер {{ row.size }}{% endif %}</div>
                                     <div class="text-secondary small font-monospace">{{ row.sku }}{% if row.supplierSku %} · {{ row.supplierSku }}{% endif %}</div>
                                 </td>
                                 <td><span class="badge bg-azure-lt">{{ marketplaceEnum.tryFrom(row.marketplace) ? marketplaceEnum.tryFrom(row.marketplace).getDisplayName() : row.marketplace }}</span></td>

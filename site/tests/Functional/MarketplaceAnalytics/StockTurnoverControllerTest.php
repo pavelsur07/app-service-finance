@@ -27,6 +27,10 @@ final class StockTurnoverControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertCount(4, $crawler->filter('table tbody tr'));
         self::assertStringContainsString('Худи серое', $crawler->filter('table tbody tr')->first()->text());
+        // Размер — у B, у A размера нет (UNKNOWN не показываем).
+        $rows = $crawler->filter('table tbody tr')->each(static fn (Crawler $tr): string => $tr->text());
+        self::assertStringContainsString('Футболка чёрная · размер 46', implode(' | ', $rows));
+        self::assertStringNotContainsString('UNKNOWN', implode(' | ', $rows));
 
         $summary = $crawler->filter('.vf-turnover-summary')->text();
         self::assertStringContainsString('772'.self::NBSP.'400,00', $summary);

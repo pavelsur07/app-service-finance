@@ -4139,7 +4139,8 @@ enum TurnoverBucket: string
 - теги: `ListingTagFacade::listingIdsByTags(companyId, tagIds, false)` — пересечение со строками.
 
 `StockTurnoverFilter(companyId, date, periodDays, ?source, ?FulfillmentScheme scheme, ?TurnoverBucket bucket, tagIds)`.
-Строка `StockTurnoverRow` — листинг с остатком `> 0` (`(int) round`): `stockQty`, `salesQty`,
+Строка `StockTurnoverRow` — листинг с остатком `> 0` (`(int) round`): `title`, `sku`, `supplierSku`, `size`
+(из `ListingMetaDTO::size`, `null` при `UNKNOWN` — размеры WB иначе неразличимы), `stockQty`, `salesQty`,
 `salesPerDay`, `daysOfCover`, `costPrice`, `stockValue = stockQty × costPrice` (scale 2, `null` без цены),
 `bucket`. Сортировка — `stockValue` DESC, без себестоимости — в конце, внутри группы по названию.
 `StockTurnoverSummary` считается **до** фильтра корзины по всем строкам фильтра: `totalValue`,
@@ -5178,6 +5179,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 | Версия | Дата | Что изменилось |
 |---|---|---|
 | 2.155 | 2026-11-06 | Settlement: independent Money documents, explicit Cash/Finance sources, manual M:N allocation, dated history/reversals, source guards, verify/rebuild and native UI; additive Version20261106183000 (counterparty-settlements, Stages 1–5) |
+| 2.155 | 2026-11-07 | Marketplace/MarketplaceAnalytics: `ListingMetaDTO` получил `?size` (`UNKNOWN` → `null`, `ListingMetaQuery`); отчёт «Оборачиваемость» показывает размер рядом с названием и колонкой «Размер» в xlsx — размеры WB одного артикула были неразличимы (проверка на проде 07.11) |
 | 2.154 | 2026-11-06 | MarketplaceAnalytics: отчёт «Оборачиваемость» перенесён во вкладки «Товары и остатки» после «Остатки» (решение Владельца): маршруты `/inventory/stock-turnover` и `/inventory/stock-turnover/export.xlsx` (`inventory_stock_turnover_*`), layout `inventory/layout.html.twig`; из вкладок аналитики маркетплейсов убран. Контроллеры и Query остаются в модуле |
 | 2.153 | 2026-11-06 | MarketplaceAnalytics: в отчёте «Оборачиваемость» термин «корзина» в UI и xlsx заменён на «Скорость продаж» (решение Владельца); код (`TurnoverBucket`, параметр `bucket`) без изменений |
 | 2.152 | 2026-11-06 | MarketplaceAnalytics: отчёт «Оборачиваемость» — где заморожены деньги: `TurnoverBucket`, `StockTurnoverPolicy`, `StockTurnoverQuery` (только через Facade), страница `/marketplace-analytics/stock-turnover` с фильтрами период/источник/схема/дата/корзина/теги, сводкой и баннером свежести, экспорт `export.xlsx`; `InventoryFacade::getStockQtyByListingOnReportDate()` получил параметр `scheme` (задача `stock-turnover-report`) |

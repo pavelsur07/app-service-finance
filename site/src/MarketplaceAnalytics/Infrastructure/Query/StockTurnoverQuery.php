@@ -69,6 +69,7 @@ final readonly class StockTurnoverQuery
                 title: $listingMeta?->title,
                 sku: null !== $listingMeta ? $listingMeta->sku : '—',
                 supplierSku: $listingMeta?->supplierSku,
+                size: $listingMeta?->size,
                 marketplace: null !== $listingMeta ? $listingMeta->marketplace : ($filter->source ?? ''),
                 stockQty: $stockQty,
                 salesQty: $salesQty,

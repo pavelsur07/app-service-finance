@@ -26,7 +26,7 @@ final readonly class StockTurnoverXlsxExporter
     private const FORMAT_RATE = '#,##0.00';
     private const HEADER_BG_COLOR = '2563EB';
 
-    private const HEADERS = ['Листинг ID', 'Товар', 'SKU', 'Артикул продавца', 'Источник', 'Остаток', 'Продано за период', 'Продаж в день', 'Дней запаса', 'Себестоимость', 'В деньгах', 'Скорость продаж'];
+    private const HEADERS = ['Листинг ID', 'Товар', 'SKU', 'Артикул продавца', 'Размер', 'Источник', 'Остаток', 'Продано за период', 'Продаж в день', 'Дней запаса', 'Себестоимость', 'В деньгах', 'Скорость продаж'];
 
     public function export(StockTurnoverReport $report, string $outputPath): void
     {
@@ -81,6 +81,7 @@ final readonly class StockTurnoverXlsxExporter
             new StringCell($row->title ?? '', $text),
             new StringCell($row->sku, $text),
             new StringCell($row->supplierSku ?? '', $text),
+            new StringCell($row->size ?? '', $text),
             new StringCell($this->sourceLabel($row->marketplace), $text),
             Cell::fromValue($row->stockQty, $integer),
             Cell::fromValue($row->salesQty, $integer),
