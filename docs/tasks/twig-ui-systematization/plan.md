@@ -54,10 +54,34 @@
 | 5 | Разбиение шаблонов > 400 строк | читаемость; делать после 2 и 4 — они сами сократят файлы | LOW | по модулю |
 | 6 | Легаси-шапки и фильтры на DS-композицию (`vf-page-head`, `vf-card-bar`) | визуальное изменение 65 страниц — отдельные задачи по модулям, не часть этой | MEDIUM | вне рамок |
 
+## 2. Безопасность: система и деплой
+
+Требование Владельца (07.11): рефакторинг не ломает работу системы и текущий
+деплой. Как устроен деплой (`.github/workflows/deploy.yml`): push в `master` →
+unit, cs, stan, функциональные тесты → сборка образов (внутри `yarn build`,
+`cache:clear` компилирует все Twig-шаблоны) → `schema-ready` → деплой без
+даунтайма с healthcheck. Из этого следуют меры:
+
+| Риск | Мера |
+|---|---|
+| Синтаксическая ошибка Twig | ловится на сборке образа (`cache:clear`), деплой не стартует; локально — `lint:twig` в каждом Work item |
+| Неопределённая переменная после переноса в партиал | в prod Twig не строгий — страница отрендерится с пустотой молча. Сетка: `strict_variables: true` в `test`, поэтому **у каждой затрагиваемой страницы до правки должен быть функциональный тест на 200 и ключевые селекторы**. Сейчас без теста ~41 из 191 рендерящихся шаблонов — Work item 0 каждого этапа: дописать smoke-тест страницам, которые этап трогает |
+| Сломанный JS-импорт или отсутствующий Vite entry | `yarn build` падает при сборке образа → деплой не стартует, но и релиз встаёт. Локально `npm run build` идентичен Dockerfile — обязателен перед каждым коммитом Stage 2/4; entry в `vite.config.js` только добавлять, не переименовывать и не удалять в том же PR, где удаляется потребитель |
+| Поведение страницы изменилось (JS, flash, модалки) | один модуль — один PR, разметка и поведение 1:1; ручной smoke на локальном стенде с перечнем действий в Stage Report; для финансовых форм (`transaction/*`, `document/*`) — тест на выдачу `data-*`-атрибутов |
+| Новый гейт блокирует чужой merge/деплой | `cs-twig` — отдельный workflow как `frontend-lint.yml`, **не** в цепочке `deploy.yml`; в required checks — только после нуля нарушений и отдельного «да» Владельца |
+| Регресс после деплоя | ни один этап не несёт миграций и данных — откат = `git revert` PR и обычный деплой; образы предыдущих SHA остаются в GHCR. После каждого деплоя — GlitchTip (`gt.sh`) по затронутым маршрутам 30 минут, при новой ошибке — revert, разбор потом |
+| Массовые whitespace-правки (Stage 1.3) | `git diff -w --stat` пуст; пачки по модулю; `make site-test` перед handoff |
+| Shell-слои (`_layout/*`, `admin/base`) | трогаются только в Stage 3 (flash) одним маленьким PR, с тестом на все три shell'а |
+| E-mail шаблоны | не трогать вообще |
+
+Порядок merge: один PR этапа за раз, следующий — после зелёного деплоя и
+проверки предыдущего. Между PR разных этапов можно вклинивать чужие релизы —
+этапы независимы.
+
 ## Stage 1: гейт Twig и конвенции
 
 Risk: LOW (docs + конфиг линта; добавление job в CI — §3.3 «CI/CD behavior»,
-назвать в handoff отдельно)
+назвать в handoff отдельно; job вне цепочки `deploy.yml`)
 Definition of Done:
 - `docs/workflow/twig-conventions.md`: три shell'а и когда какой (`_layout/legacy`,
   `_layout/app`, `admin/base`); именование партиалов `_name.html.twig` и макросов
@@ -71,14 +95,19 @@ Definition of Done:
   отключить правило кастомным Ruleset, не переименовывать. Остальные 1636
   (пробелы, запятые, unused) — чинить.
 - `composer cs:twig` и `bin/console lint:twig templates` зелёные; `make site-cs-twig`
-  в Makefile; job в `.github/workflows` рядом с `site-cs-check`.
+  в Makefile; отдельный workflow `twig-lint.yml` по образцу `frontend-lint.yml`
+  (paths: `site/templates/**`), не в цепочке `deploy.yml`.
 - Удалены 74 неиспользуемые переменные и 6 неиспользуемых импортов макросов.
 Work items:
+- 1.0 — список рендерящихся шаблонов без функционального теста (сейчас ~41),
+  записать в `checkpoint.md`; smoke-тесты дописываются по мере того, как этап
+  трогает страницу (Stage 1.3 трогает все — минимум 200 + `assertSelectorExists`
+  на корневой блок для каждой из 41)
 - 1.1 — конвенции `docs/workflow/twig-conventions.md` + строка в `AGENTS.md` таблице документов
 - 1.2 — кастомный Ruleset (без lower_case), прогон, фиксация числа
 - 1.3 — правка 1636 нарушений пробелов/запятых (механически, пофайлово; `lint:twig` после каждой пачки)
 - 1.4 — unused variables / imports
-- 1.5 — Makefile target + CI job
+- 1.5 — Makefile target + workflow `twig-lint.yml` (не required до отдельного «да»)
 Stage checks:
 - `composer cs:twig` → 0; `bin/console lint:twig templates` → OK; `make site-test` (шаблоны меняются массово — функциональные тесты с crawler, 135 файлов)
 Reviewer focus:
@@ -103,7 +132,11 @@ Definition of Done:
 - Для каждой затронутой страницы — ручной smoke с перечнем действий в Stage Report;
   для `transaction/index`, `document/_page*`, `marketplace/month_close` —
   функциональный тест на выдачу `data-*` (атрибуты и экранирование).
+- `npm run build` зелёный перед каждым коммитом; новые entry только добавляются.
+- Старый inline-скрипт удаляется в том же PR, где появляется модуль в `assets/`
+  (две реализации запрещены), но PR — один модуль, не больше ~5 страниц.
 Work items (три PR, от дешёвого к рискованному):
+- 2.0 — smoke-тесты страницам этапа без теста
 - 2.1 — `confirm()`/`onclick` → `_confirm_modal` (15 файлов, механически) и
   мелкие `<script>` до 50 строк (≈25 файлов)
 - 2.2 — шаблоны с Twig внутри JS (12 файлов): `partials/_dds_tree_picker`,
@@ -141,6 +174,7 @@ Definition of Done:
   `kindLabels`) и `document/_list_layout` (`typeShortLabels`, `statusLabels`) —
   первыми, они общие для вкладок модуля.
 Work items:
+- 3.0 — тест: три shell'а рендерят flash каждого label одинаковыми классами
 - 3.1 — flash; 3.2 — `_empty`; 3.3 — `_page_header` embed; 3.4 — подписи из Enum
 Stage checks:
 - `make site-test` (crawler-тесты видят flash и заголовки); `composer cs:twig`
@@ -160,6 +194,7 @@ Definition of Done:
 - Значения в перенесённом CSS — через `--vf-*`/semantic-токены; hex и «магические»
   px без токена помечены `TODO(ds)`.
 Work items:
+- 4.0 — скриншоты «до» страниц этапа на локальном стенде
 - 4.1 — `cashflow_category/index`, `pl_category/index`, `finance/report/preview`,
   `report/cashflow`, `marketplace/pl_preview/index`, `home/index`,
   `integrations/marketplace` (7 крупных блоков, 505 строк)
@@ -204,6 +239,9 @@ Stage checks: `composer cs:twig`, `lint:twig`, тесты модуля.
 2. Job `cs-twig` в CI как обязательная проверка — да? (§3.3 «CI/CD behavior».)
 
 ## Чек-лист приёмки задачи
+
+- [ ] каждый PR этапа задеплоен отдельно, после деплоя GlitchTip без новых ошибок по затронутым маршрутам; откатов не было (или записаны с причиной)
+- [ ] у каждого шаблона, который трогала задача, есть функциональный тест на 200
 
 - [ ] `composer cs:twig` 0 нарушений, в CI
 - [ ] `<script>` только в shell-слоях и e-mail; 0 Twig-выражений внутри JS; 0 `confirm(`
