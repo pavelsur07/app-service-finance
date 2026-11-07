@@ -1,4 +1,4 @@
-### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–E на проде; PR F #2917 на handoff; PR G на handoff)
+### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–F на проде; PR G #2918 на handoff)
 
 **Risk:** MEDIUM (поведение страниц; финансовые формы — в PR C)
 **Stage base commit:** `3c7bb858c` (master после Stage 1)
@@ -288,6 +288,9 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
   MINOR исправлен — в e2e ожидание reprocess было пустым (`waitForFunction(() => true)`), теперь
   `waitForResponse` на POST reprocess и GET перечитки
 
+#### Деплой (PR F)
+- #2917 влит 07.11, деплой 17:17Z без даунтайма, 12 контейнеров healthy, GlitchTip чист.
+
 #### Risks / reviewer focus (PR F)
 - Сеть vs сервер в alert'ах: `error.status === 0` — «Ошибка сети: …», иначе «Ошибка: <текст сервера>»
   (раньше сервер без JSON-тела давал «Неизвестная ошибка», теперь «Ошибка сервера (N)»).
@@ -385,5 +388,5 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
   в `data-confirm-title` через автоэкранирование, прежний JS конкатенировал строку.
 
 #### Next
-- PR F (#2917) и PR G → handoff «merge and deploy»; затем PR H: `transaction/index` (385),
+- PR G (#2918, CI 16/16) → handoff «merge and deploy»; затем PR H: `transaction/index` (385),
   далее `document/_page_scripts` (460), Chart-острова dashboard

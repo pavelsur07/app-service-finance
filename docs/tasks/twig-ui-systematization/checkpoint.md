@@ -1,8 +1,8 @@
 ## Current checkpoint
 
 **Phase:** Stage 2 / PR G (2.3, часть 3) / handoff
-**Status:** Stage 1 (#2909), PR A–E на проде; PR F (#2917) на handoff; PR G готов к handoff
-**Stage base commit:** master 97b51546c · ветка `refactor/twig-ui-stage-2g` (от `refactor/twig-ui-stage-2f`)
+**Status:** Stage 1 (#2909), PR A–F на проде; PR G (#2918) на handoff, CI 16/16
+**Stage base commit:** master 46e93d924 · ветка `refactor/twig-ui-stage-2g`
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -50,14 +50,14 @@
 - PR D — на проде 07.11 09:58Z. PR E (2.3, часть 1): `pages/cost_pl_mapping`, `pages/default_sale_mapping`,
   `assets/dom.js`; e2e `tests/e2e/mapping-modals.e2e.cjs`.
 - PR E — на проде 07.11 10:41Z (#2916). PR F (#2917, 2.3, часть 2): `pages/marketplace_ads` (адреса с id —
-  `path()` с плейсхолдером-UUID), e2e `tests/e2e/marketplace-ads.e2e.cjs` — на handoff.
+  `path()` с плейсхолдером-UUID), e2e `tests/e2e/marketplace-ads.e2e.cjs` — на проде 07.11 17:17Z.
 - PR G (2.3, часть 3): `pages/listings_index`, `pages/listing_tags`, `assets/url_template.js`;
   подтверждения через `_confirm_modal` + `confirm:submit`; e2e `tests/e2e/listings.e2e.cjs`.
 - Остаток 2.3: `transaction/index` (385), `document/_page_scripts` (460), Chart-острова dashboard — PR H и далее.
 
 ### Exact next action
-- handoff PR F и PR G («merge and deploy»; PR G открывать после мержа PR F — ветка от него); после деплоя —
-  GlitchTip 30 мин (реклама; листинги: привязка, теги); затем PR H: `transaction/index`
+- ждать «merge and deploy #2918»; после деплоя — GlitchTip 30 мин (листинги: привязка, теги);
+  затем PR H: `transaction/index`
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`
