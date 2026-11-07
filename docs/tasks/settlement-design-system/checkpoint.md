@@ -17,7 +17,7 @@
 - Worktree isolated; main checkout/owner changes untouched. No production actions.
 
 ### Exact next action
-- Final documentation commit/push, PR Ready and owner handoff. Upon explicit merge+deploy approval, run whole release pipeline to completion per AGENTS§3.2. No migration dispatch needed.
+- Await the owner merge+deploy decision for PR2907. Once authorized, run the whole release pipeline through post-deploy acceptance per AGENTS§3.2. No migration dispatch needed.
 
 ### Evidence
 - handoff.md,acceptance.md,stages/stage-1..3.md; logs /tmp/vf-ui-*; ignored site/var/settlement-ui-evidence and external-review/3c2cabc3.

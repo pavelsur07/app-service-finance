@@ -7,7 +7,7 @@
 
 ## Files
 
-- `site/templates/settlement/*.html.twig` — существующие13шаблонов+6локальных композиций.
+- `site/templates/settlement/*.html.twig` — существующие13шаблонов+5локальных композиций.
 - `site/templates/form/counterparty_picker_theme.html.twig` — optional URL с прежним default.
 - `site/assets/styles/pages/settlement.css`, `site/assets/pages/settlement.js`, `site/assets/legacy-app.js` — scoped presentation/import, без нового entry.
 - `site/tests/Functional/Settlement/SettlementUiRefactorTest.php` —11UI regressions; Journey/Access — только selectors.
