@@ -482,4 +482,8 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
   (Chart.js с CDN, нигде не подключены — ни `include`, ни `render` в `src/`, `templates/`, `tests/`; история —
   «dashboard demo»); переносить было нечего. `lint:twig` — 321 файл. Итог этапа: 0 `<script>` с логикой страниц
   вне исключений конвенции (`_layout/*`, `admin/base`, `notifications/email`, JSON-данные `type="application/json"`).
+- Внешнее ревью закрывающего PR (codex, база master 4ac412c42): по коду замечаний нет; единственная находка —
+  артефакт скрипта: он диффует рабочее дерево двумя точками (`git diff master`), и в дифф попал «откат» чужого
+  PR #2919 (`marketplace/index`, `data-busy-submit`), которого нет в ветке (три точки — только наши 5 файлов).
+  Урок: перед ревью ветку с отставшей базой перебазировать на master или читать находки через `git diff master...HEAD`.
 - Дальше — Stage 3 (`stages/stage-3.md`, план и замер «до» записаны).
