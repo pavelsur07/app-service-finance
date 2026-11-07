@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 / PR I (2.3, часть 5) / handoff
-**Status:** Stage 1 (#2909), PR A–G на проде (#2910–#2918); PR H (#2920) на handoff, CI 16/16; PR I готов
-**Stage base commit:** master 7e10ae310 · ветка `refactor/twig-ui-stage-2i` (от `refactor/twig-ui-stage-2h`)
+**Phase:** Stage 2 / закрывающий PR / handoff → Stage 3 PLANNED
+**Status:** Stage 1 (#2909) и Stage 2 PR A–I (#2910–#2921) на проде 07.11; закрывающий PR Stage 2 на handoff
+**Stage base commit:** master 4ac412c42 · ветка `refactor/twig-ui-stage-2j`
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -55,14 +55,13 @@
   подтверждения через `_confirm_modal` + `confirm:submit`; e2e `tests/e2e/listings.e2e.cjs`.
 - PR G — на проде 07.11 17:39Z (#2918). PR H (2.3, часть 4): `pages/cash_transactions` (поповеры фильтров,
   массовое удаление, автоправило, «Создать на основании»); e2e `tests/e2e/cash-transactions.e2e.cjs`.
-- PR H — #2920 на handoff. PR I (2.3, часть 5): `pages/pnl_document` (страница документа ОПиУ), партиал
-  `document/_page_scripts` удалён; e2e `tests/e2e/pnl-document.e2e.cjs`.
-- Остаток 2.3: Chart-острова — два демо-партиала dashboard нигде не подключены; удалить закрывающим PR этапа.
+- PR H — на проде 07.11 19:07Z (#2920). PR I (2.3, часть 5): `pages/pnl_document`, партиал `document/_page_scripts`
+  удалён; e2e `tests/e2e/pnl-document.e2e.cjs` — на проде 07.11 19:24Z (#2921).
+- Закрывающий PR: удалены неподключённые `dashboard/_demo_chart`, `_money_balance_chart`; Stage 2 DONE;
+  план Stage 3 — `stages/stage-3.md`. Flaky `SettlementSourceLockOrderTest` — фикс таймаута PR #2922.
 
 ### Exact next action
-- handoff PR H (#2920) и PR I («merge and deploy»; PR I открывать после мержа PR H — ветка от него);
-  после деплоев — GlitchTip 30 мин (операции ДДС; документ ОПиУ: создание/правка); затем закрывающий PR Stage 2
-  (удалить `dashboard/_demo_chart`, `_money_balance_chart`; отчёт DONE) и Stage 3
+- handoff закрывающего PR Stage 2 и #2922 («merge and deploy»); затем Stage 3 PR A (3.0 + 3.1, flash) с ветки от master
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`
