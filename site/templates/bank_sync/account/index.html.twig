@@ -55,10 +55,13 @@
                                 {% if account.moneyAccountId %}
                                     <div class="d-flex align-items-center gap-2">
                                         <span>{{ money_account_names[account.moneyAccountId] ?? 'неактивный денежный счёт' }}</span>
-                                        <form method="post" action="{{ path('bank_sync_account_unlink', {'id': connection.id, 'accountId': account.id}) }}" onsubmit="return confirm('Отвязать счёт? Выписка по нему перестанет загружаться.');">
-                                            <input type="hidden" name="_token" value="{{ csrf_token('bank_account_unlink_' ~ account.id) }}">
-                                            <button class="btn btn-sm btn-outline-danger">Отвязать</button>
-                                        </form>
+                                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                                data-bs-toggle="modal" data-bs-target="#bank-account-confirm"
+                                                data-confirm-action="{{ path('bank_sync_account_unlink', {'id': connection.id, 'accountId': account.id}) }}"
+                                                data-confirm-token="{{ csrf_token('bank_account_unlink_' ~ account.id) }}"
+                                                data-confirm-title="Отвязать счёт?"
+                                                data-confirm-body="Выписка по нему перестанет загружаться."
+                                                data-confirm-submit="Отвязать" data-confirm-variant="danger">Отвязать</button>
                                     </div>
                                 {% else %}
                                     {% set form = forms[account.id] %}
@@ -83,4 +86,5 @@
             </div>
         </div>
     </div>
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'bank-account-confirm'} only %}
 {% endblock %}

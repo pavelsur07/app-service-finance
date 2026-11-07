@@ -92,7 +92,7 @@ final class BankAccountsPageTest extends WebTestCaseBase
         self::assertSelectorTextContains('table', 'загружается');
         self::assertSelectorTextContains('table', 'Альфа расчётный');
 
-        $this->client->submit($crawler->selectButton('Отвязать')->form());
+        $this->submitConfirmTrigger($this->client, $crawler->filter('[data-confirm-submit="Отвязать"]'));
 
         self::assertResponseRedirects($this->pageUrl());
         self::assertNull($this->linkedMoneyAccountId());

@@ -8,6 +8,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\BrowserKit\Cookie;
+use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -39,6 +40,19 @@ abstract class WebTestCaseBase extends WebTestCase
         $session->save();
 
         $client->getCookieJar()->set(new Cookie($session->getName(), $session->getId()));
+    }
+
+    /**
+     * Отправляет действие кнопки-триггера диалога подтверждения (partials/_confirm_modal):
+     * POST на data-confirm-action с токеном и дополнительными полями, как это делает confirm_modal.js.
+     */
+    protected function submitConfirmTrigger(KernelBrowser $client, Crawler $trigger): Crawler
+    {
+        self::assertCount(1, $trigger, 'ожидалась ровно одна кнопка-триггер диалога подтверждения');
+        /** @var array<string, scalar> $fields */
+        $fields = json_decode($trigger->attr('data-confirm-fields') ?? '{}', true, 512, \JSON_THROW_ON_ERROR);
+
+        return $client->request('POST', (string) $trigger->attr('data-confirm-action'), ['_token' => (string) $trigger->attr('data-confirm-token')] + $fields);
     }
 
     protected function csrfToken(KernelBrowser $client, string $tokenId): string

@@ -101,7 +101,7 @@ final class BankConnectionPagesTest extends WebTestCaseBase
         self::assertSame($ciphertext, $edited['credentials_encrypted']);
 
         $crawler = $this->client->request('GET', '/bank-connections/');
-        $this->client->submit($crawler->filter(sprintf('form[action="/bank-connections/%s/delete"]', $id))->form());
+        $this->submitConfirmTrigger($this->client, $crawler->filter(sprintf('[data-confirm-action="/bank-connections/%s/delete"]', $id)));
         self::assertResponseRedirects('/bank-connections/');
         self::assertFalse($this->connectionRowOrFalse());
         self::assertSame(['oauth-refresh'], StubBankAuthorizationProvider::$revoked, 'токен отозван в банке');

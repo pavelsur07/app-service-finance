@@ -99,12 +99,11 @@ final class FinancialResponsibilityCenterControllerTest extends WebTestCaseBase
         self::assertSame(3, $center->getVersion());
 
         $crawler = $client->request('GET', '/financial-responsibility-centers/');
-        self::assertCount(1, $crawler->selectButton('Архивировать'));
-        self::assertCount(1, $crawler->filter('form input[name="version"][value="3"]'));
-        $client->request('POST', sprintf('/financial-responsibility-centers/%s/archive', $center->getId()), [
-            '_token' => $this->csrfToken($client, 'archive'.$center->getId()),
-            'version' => $center->getVersion(),
-        ]);
+        $archiveTrigger = $crawler->filter(sprintf('[data-confirm-action="/financial-responsibility-centers/%s/archive"]', $center->getId()));
+        self::assertCount(1, $archiveTrigger);
+        self::assertSame('{"version":3}', $archiveTrigger->attr('data-confirm-fields'), 'version уходит в диалог подтверждения');
+        self::assertCount(1, $crawler->filter('#frc-confirm[data-confirm-modal]'));
+        $this->submitConfirmTrigger($client, $archiveTrigger);
         self::assertResponseRedirects('/financial-responsibility-centers/');
 
         $this->em()->clear();

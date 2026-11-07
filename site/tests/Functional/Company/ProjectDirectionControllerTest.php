@@ -70,10 +70,12 @@ final class ProjectDirectionControllerTest extends WebTestCaseBase
 
         $crawler = $client->followRedirect();
         self::assertSelectorTextContains('thead', 'Сортировка');
+        self::assertCount(1, $crawler->filter('#project-direction-confirm[data-confirm-modal]'));
 
         $createdRow = $crawler->filterXPath('//tbody/tr[td[contains(normalize-space(.), "Manual sort")]]');
         self::assertCount(1, $createdRow);
         self::assertSame('77', trim($createdRow->filter('td')->eq(1)->text()));
+        self::assertCount(1, $createdRow->filter(sprintf('[data-confirm-action="/project-directions/%s/delete"][data-confirm-token]', $created->getId())));
 
         $rootRow = $crawler->filterXPath('//tbody/tr[td[contains(normalize-space(.), "Root")]]');
         self::assertCount(1, $rootRow);

@@ -1,10 +1,11 @@
 ## Current checkpoint
 
-**Phase:** Stage 1 / handoff
-**Status:** done (Stage 1), ждёт merge
-**Stage base commit:** 5c0b59a4d (план) · master 02930481b
+**Phase:** Stage 2 / PR A (2.0 + 2.1a) / handoff
+**Status:** Stage 1 на проде (PR #2909, 07.11 07:35Z, GlitchTip чист); PR A этапа 2 готов к handoff
+**Stage base commit:** master 3c7bb858c · ветка `refactor/twig-ui-stage-2`
 
 ### Completed
+- Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
 - 1.0 — список рендерящихся шаблонов без функционального теста снят (41, эвристика по
   каталогу шаблона в `tests/Functional`), ниже. Для Stage 1 страховка — не тесты, а
   доказательство: `git diff -w` по шаблонам пуст, кроме 12 файлов с переносом
@@ -32,11 +33,19 @@
 - internal: iteration 1, open: none
 - external: round 1, result: REVIEW_GREEN
 
+### Stage 2 — PR A (2.0 + 2.1a), детали в `stages/stage-2.md`
+- 9 форм `onsubmit=confirm` → `_confirm_modal`; `data-confirm-fields` в `confirm_modal.js`;
+  `WebTestCaseBase::submitConfirmTrigger()`; smoke-тесты loan/schedule и
+  cash/file_import_profiles; e2e `tests/e2e/confirm-modal.e2e.cjs`.
+- 2.1 разделён: 2.1a (этот PR), 2.1b — мелкие `<script>` и `onchange=submit` (PR B вместе с 2.2).
+
 ### Exact next action
-- после «merge and deploy» PR этапа 1: проверить прогон `twig-lint.yml` на master и GlitchTip; Stage 2 — новая ветка от master
+- handoff PR A («merge and deploy»); после деплоя — GlitchTip 30 мин по страницам PR A;
+  затем PR B: 2.1b (`data-autosubmit`, мелкие `<script>` ≤50 строк) + 2.2 (Twig внутри JS)
 
 ### Files to inspect first on resume
-- `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-1.md`
+- `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`
+- `site/assets/confirm_modal.js`, `site/templates/partials/_confirm_modal.html.twig`
 - `site/.twigcs.php`, `site/tests/Twigcs/Ruleset.php`, `.github/workflows/twig-lint.yml`
 
 ### Шаблоны без функционального теста (1.0, 41)
@@ -50,3 +59,5 @@
 `marketplace_analytics/cost_mappings/index`, `marketplace_analytics/stock_turnover/index`,
 `profile/money_account/{edit,index,new}`, `telegram/admin/bot/{edit,index,new}`,
 `telegram/integration/index`. Smoke-тест дописывается тем этапом, который трогает страницу.
+Уточнение 07.11 (Stage 2 PR A): `@BankSync/*` тесты имели (`tests/Functional/BankSync`);
+`loan/schedule` и `cash/file_import_profiles/index` закрыты smoke-тестами PR A.
