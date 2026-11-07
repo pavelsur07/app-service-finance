@@ -26,7 +26,7 @@ final class RawDocumentTenantGuardTest extends IntegrationTestCase
         $action = self::getContainer()->get(ProcessOzonRealizationAction::class);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Raw document does not belong to the given company.');
+        $this->expectExceptionMessage('Raw document not found:');
 
         // companyId владельца, но rawDocId чужой компании
         ($action)((string) $ownerCompany->getId(), (string) $this->documentId);

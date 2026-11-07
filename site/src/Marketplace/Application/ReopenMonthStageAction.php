@@ -11,8 +11,10 @@ use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\MonthCloseStageStatus;
 use App\Marketplace\Infrastructure\Query\MarkProcessedQuery;
+use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use App\Marketplace\Repository\MarketplaceOzonRealizationRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 final class ReopenMonthStageAction
@@ -24,10 +26,31 @@ final class ReopenMonthStageAction
         private readonly MarketplaceOzonRealizationRepository $ozonRealizationRepository,
         private readonly FinanceFacade $financeFacade,
         private readonly LoggerInterface $logger,
+        private readonly EntityManagerInterface $entityManager,
+        private readonly MonthCloseAdvisoryLockQuery $monthCloseLock,
     ) {
     }
 
     public function __invoke(ReopenMonthStageCommand $command): void
+    {
+        $connection = $this->entityManager->getConnection();
+        $connection->beginTransaction();
+        try {
+            $this->monthCloseLock->lock($command->companyId, MarketplaceType::from($command->marketplace), $command->year, $command->month);
+            $this->reopenLocked($command);
+            $connection->commit();
+        } catch (\Throwable $e) {
+            if ($connection->isTransactionActive()) {
+                $connection->rollBack();
+            }
+            $this->entityManager->clear();
+
+            throw $e;
+        }
+        $this->financeFacade->invalidatePLRegisterCache($command->companyId);
+    }
+
+    private function reopenLocked(ReopenMonthStageCommand $command): void
     {
         $marketplace = MarketplaceType::from($command->marketplace);
 
@@ -41,6 +64,8 @@ final class ReopenMonthStageAction
         if (null === $monthClose) {
             throw new \DomainException('Этап не найден.');
         }
+
+        $this->entityManager->refresh($monthClose);
 
         $currentStatus = $monthClose->getStageStatus($command->stage);
 
@@ -69,6 +94,7 @@ final class ReopenMonthStageAction
         if (null === $company) {
             throw new \DomainException('Компания не найдена.');
         }
+        $this->entityManager->refresh($company);
 
         $lockBefore = $company->getFinanceLockBefore();
         if (null !== $lockBefore && $monthClose->getPeriodEnd() <= $lockBefore) {

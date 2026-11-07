@@ -625,12 +625,23 @@
   строки → документ `realization` сохраняется/перезаписывается, `raw_loaded` + хеш строк. `OzonRealizationFetcher` бросает типизированные исключения (`MarketplaceRateLimit/Auth/BadRequest/TemporaryApiException`).
 - **Обработка** (`ProcessOzonRealizationMessage` → `async_pipeline`, `ProcessOzonRealizationHandler`): тот же `ProcessOzonRealizationAction`, что и «Применить выручку»; затем пересчёт сверки за месяц. Тот же отчёт повторно не обрабатывается (хеш),
   окончательно закрытый этап «Продажи и возвраты» → `conflict` + warning (предварительное закрытие не блокирует), сбой → `failed` + повтор через час и `error`.
+- **Общая транзакционная защита реализации.** `ProcessOzonRealizationAction` берёт `MonthCloseAdvisoryLockQuery` до проверки существующих строк, затем блокирует и перечитывает raw-документ. Первичная обработка и DELETE/пересоздание атомарны, в том числе после батчевых `flush/clear`. Тот же lock используют закрытие и переоткрытие месяца; разные компании/месяцы независимы. Прямые вызовы UI/CLI защищены наравне с Handler. Финально закрытый этап и `financeLockBefore` запрещают обработку; для ремонта требуется явное переоткрытие. Непустой отчёт без совпадающего заголовка полного месяца отклоняется.
 - **Сверка** считает «Реализацию» из сырого документа (`OzonRealizationTotalsQuery`), не из обработанной таблицы; на вкладке «Сверка Ozon» состояние отчёта показывает `OzonRealizationStateFactory`.
 - **Гейт** `app:marketplace:ozon-realization-check` (cron 07:20, активен с 9-го по 16-е число): отчёт получен и применён (статус `success` либо строки в `marketplace_ozon_realizations`); иначе один агрегированный `error`, `conflict` — warning.
 - **Догоняющий проход** `app:marketplace:ozon-realization-catchup` (cron 05:30): документы последних N (по умолчанию 3) закрытых месяцев (`OzonRealizationCatchupWindow`), загруженные, но не применённые
   (`records_created = 0`, пара не `success/conflict/failed_final/auth_failed`, `failed` с наступившим сроком, «залипшие» в работе дольше часа; нужно активное seller-подключение), получают `ProcessOzonRealizationMessage`
   (`OzonUnappliedRealizationQuery`; ≤ `--limit` за прогон, новые месяцы первыми). Закрытый этап → `conflict` в обработчике; старше окна — по слову Владельца. Гейт `app:marketplace:ozon-realization-unapplied-check` (cron 07:25, read-only):
   то же для документов, загруженных больше суток назад; один агрегированный `error`, `conflict` не краснит.
+
+Одноразовая команда `app:marketplace:ozon-realization:repair-october-b57d7682`
+восстанавливает только сохранённую реализацию октября 2026 целевой компании.
+Без `--execute` только читает; для execute обязателен `--expected-raw-hash`
+из согласованного dry-run. Проверяет точное удвоение мультимножества raw,
+переоткрывает/восстанавливает/финально закрывает `sales_returns` одной
+транзакцией под общим lock. Деньги и аналитики вне двух статей с СПП
+сохраняются; регистр проверяется через `FinanceFacade::isPLRegisterConsistent()`.
+Production запуск и изменение wrapper требуют отдельных named approvals.
+Порядок: `docs/tasks/ozon-realization-duplicate-repair/production-runbook.md`.
 
 ### Marketplace: ключ записи продаж и возвратов Ozon by-day
 
@@ -1496,6 +1507,12 @@ findByIdAndCompany(string $categoryId, string $companyId): ?PLCategoryDTO
 
 ### `FinanceFacade` (`src/Finance/Facade/FinanceFacade.php`)
 ```php
+// Сверить сохранённый регистр с каноническим расчётом из документов, без записи.
+// Сравнивает день/статью/проект/ЦФО, income и expense; строки без статьи
+// игнорируются, как у verify-pl-register. Вызывающий владеет согласованным
+// снимком; внутри ремонта — общей транзакцией и блокировкой пересчёта.
+isPLRegisterConsistent(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): bool;
+
 // Создать PL-документ из внешнего источника
 //
 // ВАЖНО — семантика amount у DocumentOperation:

@@ -141,6 +141,7 @@ final class MarketplaceControllerRealizationLoggingTest extends TestCase
             self::uninitialized(MarketplaceListingRepository::class),
             $this->createMock(EntityManagerInterface::class),
             new NullLogger(),
+            self::uninitialized(\App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery::class),
         );
     }
 
@@ -178,6 +179,7 @@ final class MarketplaceControllerRealizationLoggingTest extends TestCase
                 return true;
             }
 
+            /** @param array<string,mixed> $parameters */
             protected function redirectToRoute(string $route, array $parameters = [], int $status = 302): RedirectResponse
             {
                 return new RedirectResponse('/'.$route, $status);
