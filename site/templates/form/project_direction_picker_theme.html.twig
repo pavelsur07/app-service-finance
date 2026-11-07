@@ -32,7 +32,7 @@
             name="{{ fieldName }}"
             class="form-select d-none {{ attrClass }}"
             {% if form.vars.required %}required="required"{% endif %}
-            {% for k,v in attr %}{% if k != 'class' %}{{ k }}="{{ v }}"{% endif %}{% endfor %}
+            {% for k, v in attr %}{% if k != 'class' %}{{ k }}="{{ v }}"{% endif %}{% endfor %}
         >
             {% if placeholder is not empty %}
                 <option value="" {% if currentValue is empty %}selected="selected"{% endif %}>{{ placeholder }}</option>
@@ -42,7 +42,7 @@
                 <option
                     value="{{ choice.value }}"
                     {% if choice.value == currentValue %}selected="selected"{% endif %}
-                    {% for ak,av in choice.attr %}{{ ak }}="{{ av }}"{% endfor %}
+                    {% for ak, av in choice.attr %}{{ ak }}="{{ av }}"{% endfor %}
                 >
                     {{ choice.label }}
                 </option>
@@ -118,7 +118,7 @@
                                             {% set rootChoices = rootChoices|merge([choice]) %}
                                         {% else %}
                                             {% set currentChildren = choicesByParent[parentId]|default([]) %}
-                                            {% set choicesByParent = choicesByParent|merge({ (parentId): currentChildren|merge([choice]) }) %}
+                                            {% set choicesByParent = choicesByParent|merge({(parentId): currentChildren|merge([choice])}) %}
                                         {% endif %}
                                     {% endif %}
                                 {% endfor %}

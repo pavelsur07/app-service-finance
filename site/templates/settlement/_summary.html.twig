@@ -1,6 +1,6 @@
-{% set fields = {receivable:'Нам должны',payable:'К оплате',advanceGiven:'Выданные авансы',advanceReceived:'Полученные авансы',unallocatedOut:'Нераспределённые выплаты',unallocatedIn:'Нераспределённые поступления'} %}
+{% set fields = {receivable: 'Нам должны', payable: 'К оплате', advanceGiven: 'Выданные авансы', advanceReceived: 'Полученные авансы', unallocatedOut: 'Нераспределённые выплаты', unallocatedIn: 'Нераспределённые поступления'} %}
 <div class="wz-row">
-{% for field,label in fields %}
-    <section class="kpi"><div class="kpi-label">{{ label }}</div><div class="kpi-value">{{ attribute(balances,field).toDecimalString|vf_money(2,'RUB') }}</div></section>
+{% for field, label in fields %}
+    <section class="kpi"><div class="kpi-label">{{ label }}</div><div class="kpi-value">{{ attribute(balances, field).toDecimalString|vf_money(2, 'RUB') }}</div></section>
 {% endfor %}
 </div>

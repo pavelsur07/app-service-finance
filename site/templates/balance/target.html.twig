@@ -1,9 +1,8 @@
 {% extends 'balance/layout.html.twig' %}
-{% import 'balance/_macros.html.twig' as ui %}
 {% form_theme form 'balance/_form_theme.html.twig' %}
 {% block balance_content %}
     <div class="wz-head">
-        <h1 class="wz-title">{{ document ? 'Обновить расчет остатка':'Установить остаток' }}: {{ account.name }}
+        <h1 class="wz-title">{{ document ? 'Обновить расчет остатка' : 'Установить остаток' }}: {{ account.name }}
         </h1>
     </div>
     <section class="card">

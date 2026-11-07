@@ -3,10 +3,10 @@
 {% block title %}Фонды{% endblock %}
 
 {% block breadcrumbs %}
-    {{ include('partials/_breadcrumbs.html.twig', { crumbs: [
-        { label: 'Финансы' },
-        { label: 'Фонды', url: path('finance_funds_index') }
-    ] }) }}
+    {{ include('partials/_breadcrumbs.html.twig', {crumbs: [
+        {label: 'Финансы'},
+        {label: 'Фонды', url: path('finance_funds_index')}
+    ]}) }}
 {% endblock %}
 
 {% block body %}

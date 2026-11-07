@@ -42,7 +42,7 @@
                 </span>
                 <span class="cashflow-category-col cashflow-category-col--actions">
                     {% if not item.system %}
-                    {{ include('cashflow_category/_delete_trigger.html.twig', {category: item, usage: usage[item.id] ?? null, class: 'btn btn-sm btn-danger', label: '🗑'}, with_context = false) }}
+                    {{ include('cashflow_category/_delete_trigger.html.twig', {category: item, usage: usage[item.id] ?? null, class: 'btn btn-sm btn-danger', label: '🗑'}, with_context=false) }}
                     {% endif %}
                 </span>
             </div>

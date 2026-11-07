@@ -36,6 +36,7 @@ npm run lint                        # eslint, --max-warnings=0
 npm run build                       # vite build
 npm run api:types:check             # schema.d.ts синхронна с OpenAPI
 npm run test:unit                   # vitest: чистые функции, assets/**/*.test.ts
+make site-cs-twig                   # twigcs (site/.twigcs.php) + lint:twig, CI — twig-lint.yml
 ```
 
 `test:unit` (vitest, окружение `node`, конфиг `vitest.config.ts`) — только для
@@ -258,6 +259,7 @@ import * as Icons from '@tabler/icons-react';
 
 - `AGENTS.md` — workflow, полномочия, ревью, одно одобрение «merge and deploy».
 - `docs/workflow/stage-report-frontend.md` — фронтовый self-review checklist.
+- `docs/workflow/twig-conventions.md` — Twig: shell'ы, партиалы, что в шаблоне не живёт, гейт `make site-cs-twig`.
 - `screen-intake.md` в корне репозитория — анализ нового макета от дизайнера.
 - `docs/design-system/sheets/` — листы дизайн-системы «Ваш Финдир» (эталон),
   `docs/design-system/README.md` — как их читать.

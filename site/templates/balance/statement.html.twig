@@ -3,7 +3,7 @@
 {% block balance_content %}
     <div class="wz-head">
         <h1 class="wz-title">Ведомость изменений</h1>
-    </div>{{ ui.period(from,to) }}
+    </div>{{ ui.period(from, to) }}
     {% if not statement.accounting_started %}
         <div class="wz-row">
             <div class="alert alert--info" role="status"><div class="a-body"><p class="a-text">Учет не начат в выбранном периоде.</p></div></div>
@@ -28,12 +28,12 @@
                 {% for row in statement.accounts %}
                     <tr>
                         <td>
-                            <a href="{{ path('balance_account_card',{id:row.id,from:from,to:to}) }}">{{ row.name }}</a>
+                            <a href="{{ path('balance_account_card', {id: row.id, from: from, to: to}) }}">{{ row.name }}</a>
                             {% if row.is_archived %} <span class="status status--neutral">В архиве</span>{% endif %}
                             <p class="t-sub">{{ row.article_name }}</p>
                         </td>
-                        {% for key in ['opening','increase','decrease','closing'] %}
-                            <td class="t-cell--right">{{ ui.amount(attribute(row,key), currency) }}</td>
+                        {% for key in ['opening', 'increase', 'decrease', 'closing'] %}
+                            <td class="t-cell--right">{{ ui.amount(attribute(row, key), currency) }}</td>
                         {% endfor %}
                     </tr>
                 {% else %}

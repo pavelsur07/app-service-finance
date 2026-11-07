@@ -8,6 +8,6 @@
     <section class="card">
         <p>Будет проведен документ с обратными изменениями всех счетов. Исходный документ останется в истории.</p>{{ form_start(form) }}{{ form_widget(form) }}
         <button class="btn btn-md btn-danger">Провести сторно</button>
-        <a class="btn btn-md btn-secondary" href="{{ path('balance_document',{id:document.id}) }}">Отмена</a>{{ form_end(form) }}
+        <a class="btn btn-md btn-secondary" href="{{ path('balance_document', {id: document.id}) }}">Отмена</a>{{ form_end(form) }}
     </section>
 {% endblock %}

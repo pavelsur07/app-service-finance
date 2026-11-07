@@ -3,7 +3,7 @@
 {% block title %}Снапшоты — Аналитика маркетплейсов{% endblock %}
 
 {% block content %}
-    {% include 'marketplace_analytics/_tabs.html.twig' with { activeTab: 'snapshots' } %}
+    {% include 'marketplace_analytics/_tabs.html.twig' with {activeTab: 'snapshots'} %}
 
     <div class="page-body">
         <div class="container-xl">
@@ -167,7 +167,7 @@
 
                 {% if pager.haveToPaginate %}
                     <div class="card-footer d-flex align-items-center">
-                        {% include 'partials/_pagination.html.twig' with { pager: pager } %}
+                        {% include 'partials/_pagination.html.twig' with {pager: pager} %}
                     </div>
                 {% endif %}
 

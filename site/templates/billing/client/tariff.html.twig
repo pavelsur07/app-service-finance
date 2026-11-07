@@ -3,10 +3,10 @@
 {% block title %}Тариф и оплата — {{ company.name }}{% endblock %}
 
 {% set statusView = {
-  active: { cls: 'success', label: 'Активен' },
-  grace: { cls: 'warning', label: 'Оплата просрочена' },
-  read_only: { cls: 'danger', label: 'Только чтение' },
-  none: { cls: 'secondary', label: 'Тариф не выбран' },
+  active: {cls: 'success', label: 'Активен'},
+  grace: {cls: 'warning', label: 'Оплата просрочена'},
+  read_only: {cls: 'danger', label: 'Только чтение'},
+  none: {cls: 'secondary', label: 'Тариф не выбран'},
 } %}
 
 {% block body %}
@@ -18,10 +18,10 @@
   {# Итог онлайн-оплаты после возврата с ЮKassa #}
   {% if checkout %}
     {% set checkoutView = {
-      pending: { cls: 'info', text: 'Платёж обрабатывается. Если вы уже оплатили, обновите страницу через минуту — срок продлится автоматически.' },
-      succeeded: { cls: 'success', text: 'Оплата прошла, тариф продлён.' },
-      canceled: { cls: 'warning', text: 'Оплата не прошла или отменена. Деньги не списаны — можно попробовать ещё раз.' },
-      failed_to_apply: { cls: 'danger', text: 'Оплата получена, но не зачислена автоматически. Мы уже видим её и продлим тариф вручную — писать не нужно.' },
+      pending: {cls: 'info', text: 'Платёж обрабатывается. Если вы уже оплатили, обновите страницу через минуту — срок продлится автоматически.'},
+      succeeded: {cls: 'success', text: 'Оплата прошла, тариф продлён.'},
+      canceled: {cls: 'warning', text: 'Оплата не прошла или отменена. Деньги не списаны — можно попробовать ещё раз.'},
+      failed_to_apply: {cls: 'danger', text: 'Оплата получена, но не зачислена автоматически. Мы уже видим её и продлим тариф вручную — писать не нужно.'},
     } %}
     {% set cv = checkoutView[checkout.status.value] %}
     <div class="alert alert-{{ cv.cls }}" role="alert" data-billing-checkout-status="{{ checkout.status.value }}">
@@ -207,7 +207,7 @@
         </div>
         {% if payments.haveToPaginate %}
           <div class="card-footer">
-            {% include 'partials/_pagination.html.twig' with { pager: payments, route: 'company_price_index', params: {} } %}
+            {% include 'partials/_pagination.html.twig' with {pager: payments, route: 'company_price_index', params: {}} %}
           </div>
         {% endif %}
       {% else %}

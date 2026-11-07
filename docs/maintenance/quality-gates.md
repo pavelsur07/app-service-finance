@@ -111,6 +111,20 @@ Baseline только сокращается: исправили все вызо
 делать при падении — в docblock теста; устройство — `ARCHITECTURE.md`, «Схема БД: миграции —
 источник истины».
 
+## Twig
+
+`make site-cs-twig` — `twigcs` (конфиг `site/.twigcs.php`, ruleset
+`site/tests/Twigcs/Ruleset.php`: Official без `LowerCaseVariable`) и
+`bin/console lint:twig templates`. Введён 07.11.2026 с нулём нарушений
+(`docs/tasks/twig-ui-systematization/`): 2286 исходных нарушений — 650 snake_case
+снято правилом, остальное исправлено. Порог `error`: предупреждения unused
+variable/macro не выводятся и не блокируют — без резолвера include/extends они
+ложные. Фиксера у twigcs нет; переносы строк допустимы только внутри хэша и
+списка аргументов функции, не вокруг операторов. CI — `.github/workflows/twig-lint.yml`,
+отдельный workflow вне цепочки `deploy.yml`; в required checks не входит
+(решение Владельца отдельно). Компиляция шаблонов дополнительно проверяется
+`cache:clear` при сборке prod-образа.
+
 ## Branch protection на `master`
 
 Обязательные проверки заданы в защите ветки, а не в коде: `🔬 Static analysis`,

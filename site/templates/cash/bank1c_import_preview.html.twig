@@ -70,10 +70,7 @@
                         {% endif %}
 
                         {# счёт контрагента (уже санитизирован в контроллере) #}
-                        {% set counterpartyAccount = isOutflow
-                            ? row.receiverAccount
-                            : (isInflow ? row.payerAccount : null)
-                        %}
+                        {% set counterpartyAccount = isOutflow ? row.receiverAccount : (isInflow ? row.payerAccount : null) %}
 
                         {% set counterpartyAccountDisplay = null %}
                         {% if isSelfTransfer %}

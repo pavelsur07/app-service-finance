@@ -8,7 +8,7 @@
     <section class="card"><p>Выберите основание и оплату одного направления. Остатки ниже приведены на текущую дату; возможность изменения проверяется и на все последующие даты.</p>
         {{ form_start(form) }}{{ form_errors(form) }}{{ form_widget(form) }}<button class="btn btn-md btn-primary" type="submit">{{ submitLabel }}</button>{{ form_end(form) }}
     </section>
-    <p>Показано {{ min(positions|length,50) }} из {{ positions|length }} оснований и оплат. Все варианты доступны в полях выбора. <a href="{{ path('settlement_documents',{counterparty:counterpartyId}) }}">Все документы с остатками в карточках</a></p>
-    {% include 'settlement/_positions.html.twig' with {canWrite:false,positions:positions|slice(0,50)} %}
+    <p>Показано {{ min(positions|length, 50) }} из {{ positions|length }} оснований и оплат. Все варианты доступны в полях выбора. <a href="{{ path('settlement_documents', {counterparty: counterpartyId}) }}">Все документы с остатками в карточках</a></p>
+    {% include 'settlement/_positions.html.twig' with {canWrite: false, positions: positions|slice(0, 50)} %}
 {% endif %}
 {% endblock %}

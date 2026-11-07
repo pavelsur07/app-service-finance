@@ -23,7 +23,7 @@
         <div class="col-lg-8">
             <div class="card">
                 <div class="card-body">
-                    {{ form_start(form, { attr: { id: 'pl-category-form' } }) }}
+                    {{ form_start(form, {attr: {id: 'pl-category-form'}}) }}
 
                     <h3 class="card-title mb-3">Основное</h3>
                     <div class="row g-3">
@@ -36,7 +36,7 @@
                         <div class="col-md-4">
                             {{ form_label(form.code) }}
                             <div class="input-group">
-                                {{ form_widget(form.code, { attr: { class: 'form-control font-monospace' } }) }}
+                                {{ form_widget(form.code, {attr: {class: 'form-control font-monospace'}}) }}
                                 <button
                                     type="button"
                                     class="btn btn-outline-secondary"
@@ -83,9 +83,9 @@
                             </label>
                         </div>
                         <div class="col-12">
-                            {{ form_label(form.isVisible, null, { label_attr: { class: 'd-block mb-2' } }) }}
+                            {{ form_label(form.isVisible, null, {label_attr: {class: 'd-block mb-2'}}) }}
                             <label class="form-check form-switch">
-                                {{ form_widget(form.isVisible, { attr: { class: 'form-check-input' } }) }}
+                                {{ form_widget(form.isVisible, {attr: {class: 'form-check-input'}}) }}
                                 <span class="form-check-label">Показывать</span>
                             </label>
                             {{ form_errors(form.isVisible) }}
@@ -98,7 +98,7 @@
                         <div class="row g-3">
                         <div class="col-12">
                             {{ form_label(form.formula) }}
-                            {{ form_widget(form.formula, { attr: { class: 'form-control font-monospace', rows: 5 } }) }}
+                            {{ form_widget(form.formula, {attr: {class: 'form-control font-monospace', rows: 5}}) }}
                             {{ form_errors(form.formula) }}
                             <div class="form-hint">Пример: REV_TOTAL - VAR_COSTS_TOTAL</div>
                             {% if available_codes is not empty %}
@@ -119,7 +119,7 @@
                     </div>
 
                     {{ form_rest(form) }}
-                    {{ form_end(form, { render_rest: false }) }}
+                    {{ form_end(form, {render_rest: false}) }}
                 </div>
             </div>
         </div>

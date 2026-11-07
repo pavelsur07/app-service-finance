@@ -111,7 +111,7 @@
         "cs:strict-types": "php-cs-fixer fix --dry-run --config=.php-cs-fixer.strict-types.php --cache-file=var/cache/.php-cs-fixer.strict-types.cache",
         "cs:fix": "php-cs-fixer fix --cache-file=var/cache/.php-cs-fixer.cache",
         "cs:phpcs": "phpcs --standard=PSR12 src tests",
-        "cs:twig": "twigcs --config .twig-cs-fixer.php templates",
+        "cs:twig": "twigcs --config .twigcs.php templates",
         "stan": "phpstan analyse --memory-limit=1G",
         "stan:baseline": "phpstan analyse --generate-baseline --allow-empty-baseline --memory-limit=1G",
         "auto-scripts": {

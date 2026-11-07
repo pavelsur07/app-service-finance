@@ -1,8 +1,8 @@
 <section class="card report-scroll" tabindex="0" role="region" aria-label="Основания и свободные оплаты сейчас">
 <h2>Основания и оплаты сейчас</h2>
 <table class="t-table"><thead><tr><th scope="col">Документ</th><th scope="col">Вид</th><th scope="col" class="t-cell--right">Свободный остаток, ₽</th>{% if canWrite %}<th scope="col">Действия</th>{% endif %}</tr></thead><tbody>
-{% for position in positions %}<tr><td><a href="{{ path('settlement_document',{id:position.documentId}) }}">№{{ position.sequence }} от {{ position.effectiveDate|date('d.m.Y') }}</a></td><td>{{ kindLabels[position.kind.value] }}</td><td class="t-cell--right">{{ position.available.toDecimalString|vf_amount(2) }}</td>
-{% if canWrite %}<td>{% if position.kind.value != 'payment' %}<a href="{{ path('settlement_correction_new',{counterparty:position.counterpartyId}) }}">Корректировка</a>{% endif %}
-{% if position.available.positive and position.bucket.value in ['advance_given','advance_received','unallocated_out','unallocated_in'] %}<a href="{{ path('settlement_payment_classify',{id:position.itemId}) }}">Классификация</a>{% endif %}</td>{% endif %}</tr>
+{% for position in positions %}<tr><td><a href="{{ path('settlement_document', {id: position.documentId}) }}">№{{ position.sequence }} от {{ position.effectiveDate|date('d.m.Y') }}</a></td><td>{{ kindLabels[position.kind.value] }}</td><td class="t-cell--right">{{ position.available.toDecimalString|vf_amount(2) }}</td>
+{% if canWrite %}<td>{% if position.kind.value != 'payment' %}<a href="{{ path('settlement_correction_new', {counterparty: position.counterpartyId}) }}">Корректировка</a>{% endif %}
+{% if position.available.positive and position.bucket.value in ['advance_given', 'advance_received', 'unallocated_out', 'unallocated_in'] %}<a href="{{ path('settlement_payment_classify', {id: position.itemId}) }}">Классификация</a>{% endif %}</td>{% endif %}</tr>
 {% else %}<tr><td colspan="{{ canWrite ? 4 : 3 }}">Нет действующих оснований и оплат.</td></tr>{% endfor %}
 </tbody></table></section>

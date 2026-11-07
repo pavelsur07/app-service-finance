@@ -22,13 +22,13 @@
         <div class="ms-auto d-flex gap-2">
             <a class="btn btn-outline-primary"
                href="{{ path('report_cashflow_ops_check_index',
-                   app.request.query.all|merge({'export':'csv','part':'trx'})) }}">
+                   app.request.query.all|merge({'export': 'csv', 'part': 'trx'})) }}">
                 <i class="ti ti-download me-1"></i> Экспорт транзакций (CSV)
             </a>
 
             <a class="btn btn-outline-primary"
                href="{{ path('report_cashflow_ops_check_index',
-                   app.request.query.all|merge({'export':'csv','part':'recon'})) }}">
+                   app.request.query.all|merge({'export': 'csv', 'part': 'recon'})) }}">
                 <i class="ti ti-download me-1"></i> Экспорт сверки (CSV)
             </a>
         </div>

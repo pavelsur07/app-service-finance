@@ -275,6 +275,7 @@ INFO/DEBUG.
 | `make site-stan` | PHPStan level 8, baseline `site/phpstan-baseline.neon` |
 | `make site-cs-check` | PHP CS Fixer `@Symfony` + risky |
 | `make site-cs-strict-types` | только `declare_strict_types` |
+| `make site-cs-twig` | twigcs по `site/.twigcs.php` + `lint:twig`; конвенции — `docs/workflow/twig-conventions.md` |
 | `make site-test-unit` / `make site-test` | unit / полный набор |
 
 - Baseline только сокращать. Рост блокирует CI; осознанный рост — метка

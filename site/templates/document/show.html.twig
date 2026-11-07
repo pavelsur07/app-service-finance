@@ -24,8 +24,8 @@
         </div>
     </div>
     <div class="btn-list d-print-none">
-        {% if is_granted('module.finance.write') %}<a class="btn" href="{{ path('settlement_source_finance',{id:item.id}) }}">Основание взаиморасчётов</a>{% endif %}
-        {% if is_granted('module.finance.read') and item.counterparty %}<a class="btn" href="{{ path('settlement_card',{id:item.counterparty.id}) }}">Взаиморасчёты контрагента</a>{% endif %}
+        {% if is_granted('module.finance.write') %}<a class="btn" href="{{ path('settlement_source_finance', {id: item.id}) }}">Основание взаиморасчётов</a>{% endif %}
+        {% if is_granted('module.finance.read') and item.counterparty %}<a class="btn" href="{{ path('settlement_card', {id: item.counterparty.id}) }}">Взаиморасчёты контрагента</a>{% endif %}
         <a class="btn" href="{{ path('document_export_json', {'id': item.id}) }}" target="_blank" rel="noopener">
             <i class="ti ti-download me-1" aria-hidden="true"></i> Выгрузить JSON
         </a>

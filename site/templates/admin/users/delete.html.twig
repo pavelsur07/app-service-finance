@@ -15,7 +15,7 @@
       </div>
     </div>
 
-    <form method="post" action="{{ path('admin_user_delete', { id: user.id }) }}">
+    <form method="post" action="{{ path('admin_user_delete', {id: user.id}) }}">
       <input type="hidden" name="_token" value="{{ csrf_token('admin_user_delete_' ~ user.id) }}">
 
       <div class="form-field admin-delete-field">

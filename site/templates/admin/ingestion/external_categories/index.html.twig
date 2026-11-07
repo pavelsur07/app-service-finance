@@ -15,14 +15,14 @@
     'needs_review': 'warning',
     'disabled': 'neutral',
   } %}
-  {% set refresh_status_tone = { 'done': 'success', 'dry-run': 'pending', 'error': 'danger' } %}
+  {% set refresh_status_tone = {'done': 'success', 'dry-run': 'pending', 'error': 'danger'} %}
   {% set category_status_labels = {} %}
   {% for status in category_statuses %}
-    {% set category_status_labels = category_status_labels|merge({ (status.value): status.label }) %}
+    {% set category_status_labels = category_status_labels|merge({(status.value): status.label}) %}
   {% endfor %}
   {% set mapping_status_labels = {} %}
   {% for status in mapping_statuses %}
-    {% set mapping_status_labels = mapping_status_labels|merge({ (status.value): status.label }) %}
+    {% set mapping_status_labels = mapping_status_labels|merge({(status.value): status.label}) %}
   {% endfor %}
 
   <div class="wz-head">

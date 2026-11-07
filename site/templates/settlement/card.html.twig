@@ -1,19 +1,19 @@
 {% extends 'settlement/layout.html.twig' %}
 {% block settlement_content %}
 <div class="wz-head"><h1 class="wz-title">{{ counterpartyName }}<span class="wz-sub">Взаиморасчёты</span></h1>
-{% if canWrite and book %}<div class="wz-row-actions"><a class="btn btn-md btn-primary" href="{{ path('settlement_allocation_new',{counterparty:counterpartyId}) }}">Распределить оплату</a><a class="btn btn-md btn-secondary" href="{{ path('settlement_correction_new',{counterparty:counterpartyId}) }}">Корректировка</a></div>{% endif %}</div>
+{% if canWrite and book %}<div class="wz-row-actions"><a class="btn btn-md btn-primary" href="{{ path('settlement_allocation_new', {counterparty: counterpartyId}) }}">Распределить оплату</a><a class="btn btn-md btn-secondary" href="{{ path('settlement_correction_new', {counterparty: counterpartyId}) }}">Корректировка</a></div>{% endif %}</div>
 {% include 'settlement/_filter.html.twig' %}
 {% if report %}
-    {% include 'settlement/_summary.html.twig' with {balances:report.summary.closing} only %}
-    <p>Просрочено: {{ report.summary.overdue.toDecimalString|vf_money(2,'RUB') }}. Без срока оплаты: {{ report.summary.withoutDueDate.toDecimalString|vf_money(2,'RUB') }}.</p>
+    {% include 'settlement/_summary.html.twig' with {balances: report.summary.closing} only %}
+    <p>Просрочено: {{ report.summary.overdue.toDecimalString|vf_money(2, 'RUB') }}. Без срока оплаты: {{ report.summary.withoutDueDate.toDecimalString|vf_money(2, 'RUB') }}.</p>
     <section class="card report-scroll" tabindex="0" role="region" aria-label="Изменения за выбранный период"><h2>Изменения за период</h2>
     <table class="t-table"><thead><tr><th scope="col">Показатель, ₽</th><th scope="col" class="t-cell--right">Начало</th><th scope="col" class="t-cell--right">Увеличение</th><th scope="col" class="t-cell--right">Уменьшение</th><th scope="col" class="t-cell--right">Конец</th></tr></thead><tbody>
-    {% for field,label in {receivable:'Нам должны',payable:'К оплате',advanceGiven:'Выданные авансы',advanceReceived:'Полученные авансы',unallocatedOut:'Нераспределённые выплаты',unallocatedIn:'Нераспределённые поступления'} %}<tr><th scope="row">{{ label }}</th>{% for column in ['opening','increases','decreases','closing'] %}<td class="t-cell--right">{{ attribute(attribute(report.summary,column),field).toDecimalString|vf_amount(2) }}</td>{% endfor %}</tr>{% endfor %}
+    {% for field, label in {receivable: 'Нам должны', payable: 'К оплате', advanceGiven: 'Выданные авансы', advanceReceived: 'Полученные авансы', unallocatedOut: 'Нераспределённые выплаты', unallocatedIn: 'Нераспределённые поступления'} %}<tr><th scope="row">{{ label }}</th>{% for column in ['opening', 'increases', 'decreases', 'closing'] %}<td class="t-cell--right">{{ attribute(attribute(report.summary, column), field).toDecimalString|vf_amount(2) }}</td>{% endfor %}</tr>{% endfor %}
     </tbody></table></section>
     <section class="card report-scroll" tabindex="0" role="region" aria-label="Движения взаиморасчётов"><h2>Движения</h2>
     <table class="t-table"><thead><tr><th scope="col">Дата</th><th scope="col">Документ / основание</th><th scope="col">Показатель</th><th scope="col" class="t-cell--right">Изменение, ₽</th><th scope="col">Источник</th></tr></thead><tbody>
-    {% for row in report.rows %}<tr><td>{{ row.effectiveDate|date('d.m.Y') }}</td><td><a href="{{ path('settlement_document',{id:row.documentId}) }}">{{ row.reason }}</a></td><td>{{ bucketLabels[row.bucket.value] }}</td><td class="t-cell--right">{{ row.delta.toDecimalString|vf_amount(2,signed:true) }}</td><td>{% if row.sourceId and row.sourceType.value in ['cash','finance'] %}<a href="{{ path(row.sourceType.value == 'cash' ? 'cash_transaction_show' : 'document_show',{id:row.sourceId}) }}">{{ row.sourceType.value == 'cash' ? 'ДДС' : 'ОПиУ' }}</a>{% else %}Документ взаиморасчётов{% endif %}</td></tr>{% else %}<tr><td colspan="5">За выбранный период нет движений.</td></tr>{% endfor %}
-    </tbody></table></section>{% include 'app/_ui/_pagination.html.twig' with {pager:pager} %}
+    {% for row in report.rows %}<tr><td>{{ row.effectiveDate|date('d.m.Y') }}</td><td><a href="{{ path('settlement_document', {id: row.documentId}) }}">{{ row.reason }}</a></td><td>{{ bucketLabels[row.bucket.value] }}</td><td class="t-cell--right">{{ row.delta.toDecimalString|vf_amount(2, signed:true) }}</td><td>{% if row.sourceId and row.sourceType.value in ['cash', 'finance'] %}<a href="{{ path(row.sourceType.value == 'cash' ? 'cash_transaction_show' : 'document_show', {id: row.sourceId}) }}">{{ row.sourceType.value == 'cash' ? 'ДДС' : 'ОПиУ' }}</a>{% else %}Документ взаиморасчётов{% endif %}</td></tr>{% else %}<tr><td colspan="5">За выбранный период нет движений.</td></tr>{% endfor %}
+    </tbody></table></section>{% include 'app/_ui/_pagination.html.twig' with {pager: pager} %}
 {% endif %}
-<p><a href="{{ path('settlement_documents',{counterparty:counterpartyId}) }}">Все документы контрагента</a></p>
+<p><a href="{{ path('settlement_documents', {counterparty: counterpartyId}) }}">Все документы контрагента</a></p>
 {% endblock %}

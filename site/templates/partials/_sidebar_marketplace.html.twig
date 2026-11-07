@@ -1,11 +1,7 @@
 {# Весь раздел — модуль marketplace: без права на чтение пункты не показываем. #}
 {% if is_granted('module.marketplace.read') %}
 {% set marketplace_path = app.request ? app.request.pathinfo : '' %}
-{% set marketplace_menu_active =
-    (current_route starts with 'marketplace_' and not (current_route starts with 'marketplace_analytics_') and not (current_route starts with 'marketplace_ads_'))
-    or current_route starts with 'marketplace_analytics_'
-    or current_route starts with 'marketplace_ads_'
-    or current_route starts with 'inventory_'
+{% set marketplace_menu_active = (current_route starts with 'marketplace_' and not (current_route starts with 'marketplace_analytics_') and not (current_route starts with 'marketplace_ads_')) or current_route starts with 'marketplace_analytics_' or current_route starts with 'marketplace_ads_' or current_route starts with 'inventory_'
 %}
 <li class="nav-item dropdown {{ marketplace_menu_active ? 'show' : '' }}">
     <a class="nav-link dropdown-toggle {{ marketplace_menu_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ marketplace_menu_active ? 'true' : 'false' }}">

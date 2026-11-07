@@ -24,16 +24,16 @@
                 {% for item in items %}
                     <tr>
                         <td>
-                            <a href="{{ path('balance_audit',{type:'access',id:item.user_id}) }}">{{ members[item.user_id]|default('Участник больше недоступен') }}
+                            <a href="{{ path('balance_audit', {type: 'access', id: item.user_id}) }}">{{ members[item.user_id]|default('Участник больше недоступен') }}
                             </a>
                         </td>
-                        <td>{{ item.can_prepare ? 'Да':'Нет' }}
+                        <td>{{ item.can_prepare ? 'Да' : 'Нет' }}
                         </td>
-                        <td>{{ item.can_post ? 'Да':'Нет' }}
+                        <td>{{ item.can_post ? 'Да' : 'Нет' }}
                         </td>
-                        <td>{{ item.can_manage_periods ? 'Да':'Нет' }}
+                        <td>{{ item.can_manage_periods ? 'Да' : 'Нет' }}
                         </td>
-                        <td>{{ item.can_reopen_periods ? 'Да':'Нет' }}</td>
+                        <td>{{ item.can_reopen_periods ? 'Да' : 'Нет' }}</td>
                     </tr>
                 {% else %}
                     <tr>
