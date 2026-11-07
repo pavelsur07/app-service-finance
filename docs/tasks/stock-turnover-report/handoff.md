@@ -61,6 +61,10 @@
 - Отложенный minor: доля замороженного округляется до целого процента («0 %» при доле меньше 0,5 %).
 - Скриншоты: `docs/tasks/stock-turnover-report/screenshots/` (общий вид с устаревшим WB, корзина «свыше 90», схема FBS).
 
-## Owner decision
+## Status
+Задача закрыта 07.11.2026. На проде: #2903 (отчёт), #2904 («Скорость продаж»), #2905 (вкладки «Товары и остатки», `/inventory/stock-turnover`), #2906 (размер листинга).
+Проверка на проде 07.11 — см. `checkpoint.md`.
+
+## Owner decision (историческое)
 Ready: PR #2903 «feat(marketplace-analytics): отчёт «Оборачиваемость» — где заморожены деньги» — merge into master with automatic production deploy?
 Reply: "merge and deploy #2903"
