@@ -50,7 +50,7 @@
     </div>
   {% endif %}
 
-  <form id="autoRuleApplyForm" method="post"
+  <form method="post" data-auto-rule-apply
         action="{{ path('cash_transaction_auto_rule_apply_one', {transactionId: transaction.id}) }}">
     <input type="hidden" name="ruleId" value="{{ rule.id }}">
     <input type="hidden" name="_token" value="{{ csrf_token('apply-auto-rule' ~ transaction.id) }}">

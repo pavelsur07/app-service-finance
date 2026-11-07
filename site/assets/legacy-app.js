@@ -30,6 +30,7 @@ import { initDefaultSaleMapping } from './pages/default_sale_mapping.js';
 import { initMarketplaceAds } from './pages/marketplace_ads.js';
 import { initListingsIndex } from './pages/listings_index.js';
 import { initListingTags } from './pages/listing_tags.js';
+import { initCashTransactions } from './pages/cash_transactions.js';
 
 // Period presets (partials/_period_presets.html.twig): dates come from the server.
 document.addEventListener('click', (event) => {
@@ -68,6 +69,7 @@ const initDds = () => {
   initMarketplaceAds();
   initListingsIndex();
   initListingTags();
+  initCashTransactions();
 };
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initDds);

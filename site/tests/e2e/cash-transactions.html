@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Операции ДДС — демо</title>
+</head>
+<body>
+<!-- Демо для tests/e2e/cash-transactions.e2e.cjs: разметка transaction/index в объёме хуков модуля. -->
+<div id="page">
+<div class="card cashflow-ops" data-cash-transactions data-csrf-token="tok-cf">
+  <div class="dropdown">
+    <button type="button" id="pop-toggle" data-bs-toggle="dropdown">Статья</button>
+    <div class="dropdown-menu" data-ops-pop id="pop">
+      <input type="search" id="pop-search" data-ops-pop-search>
+      <a class="dropdown-item" id="pop-all" href="#">Все статьи</a>
+      <a class="dropdown-item" id="pop-1" href="#" data-ops-pop-item="аренда">Аренда</a>
+      <a class="dropdown-item" id="pop-2" href="#" data-ops-pop-item="зарплата">Зарплата</a>
+      <div data-ops-pop-empty id="pop-empty" hidden>Ничего не нашли.</div>
+    </div>
+  </div>
+  <div id="summary" data-ops-summary>Найдено 3 операции</div>
+  <div id="selection" data-ops-selection hidden>
+    <span id="sel-count" data-ops-selection-count>Выбрано: 0</span>
+    <button type="button" id="bulk-delete-button" data-bulk-delete data-bs-toggle="modal" data-bs-target="#bulkDeleteModal" disabled><span id="del-label" data-bulk-delete-label>Удалить</span></button>
+    <button type="button" id="clear" data-ops-clear-selection>Снять выбор</button>
+  </div>
+  <table><thead><tr><th><input type="checkbox" id="select-all" data-select-all></th></tr></thead><tbody>
+    <tr id="tr-1"><td><input type="checkbox" class="js-cash-transaction-select" id="row-1" value="tx-1"></td>
+      <td data-tx-id="tx-1" id="icon-1"><i class="ti ti-file-plus text-secondary"></i></td>
+      <td><button type="button" id="auto-1" data-auto-rule data-url="/auto-rule/match/tx-1" data-bs-toggle="modal" data-bs-target="#autoRuleModal">Автоправило</button>
+          <button type="button" id="cf-1" data-create-from data-transaction-id="tx-1" data-url="/create-from/tx-1">Создать на основании</button></td></tr>
+    <tr id="tr-2"><td><input type="checkbox" class="js-cash-transaction-select" id="row-2" value="tx-2"></td>
+      <td data-tx-id="tx-2" id="icon-2"><i class="ti ti-file-plus text-secondary"></i></td>
+      <td><button type="button" id="auto-2" data-auto-rule data-url="/auto-rule/match/tx-2" data-bs-toggle="modal" data-bs-target="#autoRuleModal">Автоправило</button>
+          <button type="button" id="cf-2" data-create-from data-transaction-id="tx-2" data-url="/create-from/tx-2">Создать на основании</button></td></tr>
+    <tr id="tr-3"><td><input type="checkbox" class="form-check-input" disabled></td>
+      <td data-tx-id="tx-3" id="icon-3"><i class="ti ti-file-plus text-secondary"></i></td>
+      <td><button type="button" id="cf-3" data-create-from data-transaction-id="tx-3" data-url="/create-from/tx-3">Создать на основании</button></td></tr>
+  </tbody></table>
+</div>
+</div>
+
+<div id="bulkDeleteModal" data-bulk-delete-modal>
+  <p>Выбрано транзакций: <strong id="bd-count" data-bulk-delete-count>0</strong>.</p>
+  <form method="post" action="/bulk-delete" id="bd-form" data-bulk-delete-form>
+    <input type="hidden" name="_token" value="tok-bd">
+    <div id="bd-ids" data-bulk-delete-ids></div>
+    <button type="submit" id="bd-submit">Удалить</button>
+  </form>
+</div>
+<div id="autoRuleModal" data-auto-rule-modal>
+  <div id="ar-body" data-auto-rule-body><div class="text-muted">Загрузка…</div></div>
+</div>
+<div id="createFromWarningModal" data-create-from-modal>
+  <p id="cf-body" class="mb-0" data-create-from-body></p>
+  <form method="post" class="d-inline" id="cf-form" data-create-from-form>
+    <input type="hidden" name="_token" value="">
+    <input type="hidden" name="confirmed" value="1">
+    <button type="submit" id="cf-submit">Продолжить</button>
+  </form>
+</div>
+
+<script type="module">
+  import { initCashTransactions } from '/assets/pages/cash_transactions.js';
+  window.hidden = [];
+  window.shown = [];
+  window.opened = [];
+  window.open = (url) => window.opened.push(url);
+  window.bs = (id, type) => {
+    const ev = new Event(type, { bubbles: true, cancelable: true });
+    document.getElementById(id).dispatchEvent(ev);
+    return ev.defaultPrevented;
+  };
+  // Bootstrap без анимаций: show() шлёт show.bs.modal, как настоящий.
+  window.bootstrap = { Modal: { getOrCreateInstance: (el) => ({
+    hide: () => window.hidden.push(el.id),
+    show: () => { window.shown.push(el.id); window.bs(el.id, 'show.bs.modal'); },
+  }) } };
+  initCashTransactions();
+  window.submits = [];
+  document.addEventListener('submit', (e) => { window.submits.push({ id: e.target.id, prevented: e.defaultPrevented }); e.preventDefault(); });
+  window.ready = true;
+</script>
+</body>
+</html>
