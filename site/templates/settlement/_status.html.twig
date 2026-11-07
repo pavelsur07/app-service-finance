@@ -1,0 +1,5 @@
+{% if reversalUrl|default(null) %}
+    <a class="badge bg-yellow-lt" href="{{ reversalUrl }}">Отменён</a>
+{% else %}
+    <span class="badge {{ status == 'draft' ? 'bg-secondary-lt' : 'bg-green-lt' }}">{{ status == 'draft' ? 'Черновик' : 'Проведён' }}</span>
+{% endif %}

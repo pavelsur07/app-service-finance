@@ -1,0 +1,10 @@
+{% if form.obligationItemId is defined %}{{ form_row(form.obligationItemId) }}{% endif %}
+{% if form.paymentItemId is defined %}{{ form_row(form.paymentItemId) }}{% endif %}
+{% if form.itemId is defined %}{{ form_row(form.itemId) }}{% endif %}
+{% if form.increase is defined %}{{ form_row(form.increase) }}{% endif %}
+{% if form.isAdvance is defined %}{{ form_row(form.isAdvance) }}{% endif %}
+<div class="row">
+    {% if form.amount is defined %}<div class="col-md-6">{{ form_row(form.amount) }}</div>{% endif %}
+    <div class="col-md-6">{{ form_row(form.effectiveDate) }}</div>
+</div>
+{% if form.reason is defined %}{{ form_row(form.reason) }}{% endif %}

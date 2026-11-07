@@ -1,7 +1,13 @@
-{% use 'balance/_form_theme.html.twig' %}
+{% use 'bootstrap_5_layout.html.twig' %}
+{% use 'form/counterparty_picker_theme.html.twig' with counterparty_picker_widget as shared_counterparty_picker_widget %}
 {% block counterparty_picker_widget %}
-    {# TODO(ds): the legacy picker depends on Tabler CSS/JS. Keep the existing
-       company-scoped CounterpartyPickerType, using the app layer's accessible
-       native select until the enhanced picker has an app-layer adapter. #}
-    {{ block('choice_widget_collapsed') }}
+    {% set counterparty_picker_search_url = path('api_counterparty_search') %}
+    {{ block('shared_counterparty_picker_widget') }}
+{% endblock %}
+{% block form_errors %}
+    {% if errors|length > 0 %}
+        <div id="{{ id }}_errors" class="{{ form.parent ? 'invalid-feedback d-block' : 'alert alert-danger' }}" role="alert">
+            {% for error in errors %}<p class="mb-0">{{ error.message }}</p>{% endfor %}
+        </div>
+    {% endif %}
 {% endblock %}

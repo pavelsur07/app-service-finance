@@ -1,17 +1,26 @@
 {% extends 'settlement/layout.html.twig' %}
 {% form_theme form 'settlement/_form_theme.html.twig' %}
+{% block settlement_header %}<div class="vf-ops-head"><h1>{{ sourceKind == 'cash' ? 'Включить оплату ДДС' : 'Основание из документа ОПиУ' }}</h1></div>{% endblock %}
 {% block settlement_content %}
-<div class="wz-head"><h1 class="wz-title">{{ sourceKind == 'cash' ? 'Включить оплату ДДС' : 'Основание из документа ОПиУ' }}</h1></div>
-<section class="card">
-    <p><a href="{{ path(sourceKind == 'cash' ? 'cash_transaction_show' : 'document_show',{id:source.id}) }}">Открыть исходный документ</a></p>
-    {% if sourceKind == 'cash' %}<p>Сумма оплаты: {{ source.amount.toDecimalString|vf_money(2,source.amount.currency) }}. Дата ДДС: {{ source.occurredAt|date('d.m.Y') }}.</p><p>Без подтверждения аванса сумма попадёт в нераспределённые оплаты. Для погашения долга её нужно распределить отдельно.</p>
-    {% else %}<p>Укажите полную сумму обязательства, включая НДС при его наличии. Сумма операций ОПиУ не подставляется автоматически. Будет создан черновик для отдельного проведения.</p>{% endif %}
-    {% if link and link.activeDocumentId %}
-        <p>Источник уже участвует во взаиморасчётах.</p><a class="btn btn-md btn-secondary" href="{{ path('settlement_document',{id:link.activeDocumentId}) }}">Открыть документ взаиморасчётов</a>
-    {% else %}
-        <p>Источник пока не участвует во взаиморасчётах.</p>
+<div class="dds-op card-body"><div class="dds-op__grid">
+    <div class="dds-op__main">
+        {% if link and link.activeDocumentId %}
+            <section class="dds-card"><h2 class="dds-card__title">Источник включён</h2><div class="card-body"><p>Источник уже участвует во взаиморасчётах.</p><a class="btn" href="{{ path('settlement_document',{id:link.activeDocumentId}) }}">Открыть документ взаиморасчётов</a></div></section>
+        {% else %}
+            {{ form_start(form,{attr:{id:'settlement-source-form',class:'dds-op__form'}}) }}{{ form_errors(form) }}
+            <fieldset class="dds-op__fieldset" aria-label="Реквизиты документа"{% if not is_granted('module.finance.write') %} disabled{% endif %}>
+                <section class="dds-card"><h2 class="dds-card__title">{{ sourceKind == 'cash' ? 'Учёт оплаты' : 'Реквизиты обязательства' }}</h2><div class="card-body">{% include 'settlement/_source_fields.html.twig' %}</div></section>
+            </fieldset>{{ form_end(form) }}
+        {% endif %}
+    </div>
+    <aside class="dds-op__aside"><section class="dds-card"><h2 class="dds-card__title">Сведения</h2><div class="card-body">
+        <p><a href="{{ path(sourceKind == 'cash' ? 'cash_transaction_show' : 'document_show',{id:source.id}) }}">Открыть исходный документ</a></p>
+        {% if sourceKind == 'cash' %}<p>Сумма оплаты: {{ source.amount.toDecimalString|vf_money(2,source.amount.currency) }}. Дата ДДС: {{ source.occurredAt|date('d.m.Y') }}.</p><p>Без подтверждения аванса сумма попадёт в нераспределённые оплаты. Для погашения долга её нужно распределить отдельно.</p>
+        {% else %}<p>Укажите полную сумму обязательства, включая НДС при его наличии. Сумма операций ОПиУ не подставляется автоматически. Будет создан черновик для отдельного проведения.</p>{% endif %}
+        {% if not link or not link.activeDocumentId %}<p>Источник пока не участвует во взаиморасчётах.</p>{% endif %}
         {% if link and link.lastReversalDate %}<p>Предыдущее включение отменено {{ link.lastReversalDate|date('d.m.Y') }}. Новая дата не может быть раньше отмены и даты источника.</p>{% endif %}
-        {{ form_start(form) }}{{ form_errors(form) }}{{ form_widget(form) }}<button class="btn btn-md btn-primary" type="submit">{{ sourceKind == 'cash' ? 'Включить оплату' : 'Создать черновик' }}</button>{{ form_end(form) }}
-    {% endif %}
-</section>
+    </div></section></aside>
+</div>
+{% if not link or not link.activeDocumentId %}<div class="dds-op__bar"><span class="dds-op__status">{{ is_granted('module.finance.write') ? 'Источник требует подтверждения' : 'Только просмотр' }}</span><div class="dds-op__actions"><a class="btn" href="{{ path('settlement_documents') }}">К документам</a>{% if is_granted('module.finance.write') %}<button class="btn btn-primary" type="submit" form="settlement-source-form">{{ sourceKind == 'cash' ? 'Включить оплату' : 'Создать черновик' }}</button>{% endif %}</div></div>{% endif %}
+</div>
 {% endblock %}

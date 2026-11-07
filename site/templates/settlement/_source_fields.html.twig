@@ -1,0 +1,8 @@
+{% if form.bucket is defined %}{{ form_row(form.bucket) }}{% endif %}
+<div class="row">
+    {% if form.amount is defined %}<div class="col-md-4">{{ form_row(form.amount) }}</div>{% endif %}
+    <div class="col-md-4">{{ form_row(form.effectiveDate) }}</div>
+    {% if form.dueDate is defined %}<div class="col-md-4">{{ form_row(form.dueDate) }}</div>{% endif %}
+</div>
+{% if form.isAdvance is defined %}{{ form_row(form.isAdvance) }}{% endif %}
+{% if form.reason is defined %}{{ form_row(form.reason) }}{% endif %}
