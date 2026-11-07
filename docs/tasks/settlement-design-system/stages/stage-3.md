@@ -1,4 +1,4 @@
-### Stage 3: визуальная и регрессионная приёмка — checking
+### Stage 3: визуальная и регрессионная приёмка — DONE
 
 **Risk:** MEDIUM
 **Stage base commit:** `e4df18bed`
@@ -12,4 +12,6 @@
 
 **Scope:** templates/assets/tests/docs only; no productPHP/API/DB/financial logic changed. No Vite entries/dependencies/tokens/shared picker JS modifications. BundleCSS+2.59kB,JS+0.36kB.
 
-**Next:** await/diagnose full test and external result; final report/commit/push/Ready.
+**DoD:** all15UI acceptance criteria verified; all local gates PASS; external REVIEW_GREEN; product checkpoint CI SUCCESS.
+
+**Next:** final documentation commit/push, PR Ready, single owner merge+deploy decision. No production actions.

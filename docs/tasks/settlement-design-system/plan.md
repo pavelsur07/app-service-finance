@@ -6,7 +6,7 @@
 **Architecture:** Twig/Symfony Forms на той же base/legacy оболочке и готовых DS-компонентах ДДС. Scope-specific CSS/JS обслуживает только разметку Settlement; существующие picker/widgets переиспользуются без нового React-острова.
 **Tech Stack:** Twig, действующие Tabler/Bootstrap+DS, существующие JS/Vite/PHPUnit/Vitest; без новых библиотек.
 **Spec:** [design.md](design.md) — требование владельца, визуальный образец, решение об оболочке и список неизменяемых контрактов.
-**Status:** Stage1–2 выполнены; Stage3: браузерная приёмка и внутреннее ревью завершены, full suite/external review выполняются. Факты — checkpoint.md, acceptance.md и stages/.
+**Status:** Stage1–2 выполнены; Stage3 завершён: браузерная приёмка, reviews и full suite PASS; результаты — acceptance.md/handoff.md. Факты — checkpoint.md, acceptance.md и stages/.
 **Audit base:** `3c2cabc399226cceb33a10d41a10b3d5ca6a906d`. Исходные и текущие проверки записаны в acceptance.md; успешность full suite/external review отмечается отдельно после результата.
 
 ## Global Constraints
@@ -137,18 +137,18 @@ Transaction templates/CSS — эталон, не редактируемые фа
 
 ### Work item3.1 — проверка внешнего вида и сценариев
 
-- [ ] Снять «после» на тех же fixtures/user/company/locale и1440/1280/768/390, что в Phase0. Сводку и документы сравнить рядом с DDS list; формы рядом с DDS new/edit/show. Логотип/шрифт/assets действительно загружены.
-- [ ] Все13экранов: сводка, карточка, документы, документ, setup, новый документ, allocation, correction, Cash source, Finance source, classification, document reverse, allocation reverse.
-- [ ] Пройти default/empty/filtered-empty/error/readonly, draft/posted/reversed, active/reincluded sources; неверный период/страница, archived party, long name/amount. Только реально применимые состояния, без фиктивных loaders.
-- [ ] Проверить только UI diff allowlist: templates/assets/tests/docs. В product PHP/API/DB/Money/financial logic/permissions/UiMode/CI изменений нет. Если понадобится иное, не маскировать это под UI-рефакторинг: вынести из scope и сообщить владельцу.
-- [ ] Проверить legacy DDS/Finance picker, соседние страницы и обе ссылки меню Settlement; страницу-эталон не изменять.
+- [x] Снять «после» на тех же fixtures/user/company/locale и1440/1280/768/390, что в Phase0. Сводку и документы сравнить рядом с DDS list; формы рядом с DDS new/edit/show. Логотип/шрифт/assets действительно загружены.
+- [x] Все13экранов: сводка, карточка, документы, документ, setup, новый документ, allocation, correction, Cash source, Finance source, classification, document reverse, allocation reverse.
+- [x] Пройти default/empty/filtered-empty/error/readonly, draft/posted/reversed, active/reincluded sources; неверный период/страница, archived party, long name/amount. Только реально применимые состояния, без фиктивных loaders.
+- [x] Проверить только UI diff allowlist: templates/assets/tests/docs. В product PHP/API/DB/Money/financial logic/permissions/UiMode/CI изменений нет. Если понадобится иное, не маскировать это под UI-рефакторинг: вынести из scope и сообщить владельцу.
+- [x] Проверить legacy DDS/Finance picker, соседние страницы и обе ссылки меню Settlement; страницу-эталон не изменять.
 
 ### Work item3.2 — gates и handoff
 
-- [ ] Full gates один раз на handoff: `make site-stan`, `make site-cs-check`, `make site-cs-strict-types`, `make site-test-unit`, `make site-test`. Frontend lint/build/test:unit — в site-frontend container. API types check не обязателен: API не меняется.
-- [ ] Fresh final internal review + обязательный external read-only review Large по AGENTS.md. No BLOCKER/IMPORTANT; фиксировать реальные rounds/metrics/fixes/ограничения.
-- [ ] Acceptance report содержит viewport/state matrix, before/after evidence, реальные результаты и проверку UI-only diff. Существующие функциональные assertions не ослаблены.
-- [ ] Stage Report/commit/push/PR Ready; один merge+deploy запрос на handoff. Миграций нет; rollback — revert UI. Production не трогать до одобрения.
+- [x] Full gates один раз на handoff: `make site-stan`, `make site-cs-check`, `make site-cs-strict-types`, `make site-test-unit`, `make site-test`. Frontend lint/build/test:unit — в site-frontend container. API types check не обязателен: API не меняется.
+- [x] Fresh final internal review + обязательный external read-only review Large по AGENTS.md. No BLOCKER/IMPORTANT; фиксировать реальные rounds/metrics/fixes/ограничения.
+- [x] Acceptance report содержит viewport/state matrix, before/after evidence, реальные результаты и проверку UI-only diff. Существующие функциональные assertions не ослаблены.
+- [x] Stage Report/commit/push/PR Ready; один merge+deploy запрос на handoff. Миграций нет; rollback — revert UI. Production не трогать до одобрения.
 
 ## Чек-лист приёмки реализации
 
@@ -168,7 +168,7 @@ Transaction templates/CSS — эталон, не редактируемые фа
 | [x] | UI12 | Деньги/даты/source defaults не меняются автоматически, Finance не дублирует ОПиУ, Cash не создаётся повторно | SourceForms/Acceptance |
 | [x] | UI13 |390px: имена переносятся, суммы не обрезаются, скролл только внутри таблицы, controls доступны | mobile screenshots/keyboard |
 | [x] | UI14 | Нет новых API/БД/ролей/бизнес-кода/React/widget engine; DDS и старые формы не изменились | diff allowlist + regression smoke |
-| [ ] | UI15 | Пройдены frontend/PHP gates и reviews; результаты и снимки сохранены, не заявлены заранее | handoff report |
+| [x] | UI15 | Пройдены frontend/PHP gates и reviews; результаты и снимки сохранены, не заявлены заранее | handoff report |
 
 ## Self-review плана
 
