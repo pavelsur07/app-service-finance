@@ -45,7 +45,7 @@ export class ApiError extends Error {
 }
 
 export interface ApiFetchOptions {
-    method?: 'GET' | 'POST';
+    method?: 'GET' | 'POST' | 'DELETE';
     body?: unknown;
     csrfToken?: string;
     /** Запрос при закрытии страницы: браузер доотправит его после ухода. */
@@ -57,7 +57,8 @@ export interface ApiFetchOptions {
  * объект (JSON) или FormData (multipart, загрузка файла).
  * Ответ не 2xx → `ApiError` с кодом из тела; сбой сети → `ApiError(0, 'network_error')`;
  * 401 или редирект на вход (сессия истекла) — переход на страницу входа; не-JSON
- * ответ 2xx — `ApiError('invalid_response')`, а не успех.
+ * ответ 2xx — `ApiError('invalid_response')`, а не успех; 204 без тела — `undefined`.
+ * Сообщение ошибки легаси-эндпоинтов (`{error: "текст"}`, `{type, message}`) тоже попадает в `ApiError`.
  */
 export async function apiFetch<T>(url: string, options: ApiFetchOptions = {}): Promise<T> {
     const headers: Record<string, string> = { Accept: 'application/json' };
@@ -97,7 +98,11 @@ export async function apiFetch<T>(url: string, options: ApiFetchOptions = {}): P
     }
     if (!response.ok) {
         const error = isErrorBody(data) ? data.error : null;
-        throw new ApiError(response.status, error?.code ?? 'http_error', error?.message ?? `Ошибка сервера (${response.status}).`);
+        const message = error?.message ?? legacyErrorMessage(data) ?? `Ошибка сервера (${response.status}).`;
+        throw new ApiError(response.status, error?.code ?? 'http_error', message);
+    }
+    if (response.status === 204) {
+        return undefined as T;
     }
     if (data === undefined) {
         throw new ApiError(response.status, 'invalid_response', 'Сервер вернул неожиданный ответ.');
@@ -115,4 +120,17 @@ function isErrorBody(data: unknown): data is { error: { code: string; message: s
     return typeof error === 'object' && error !== null
         && typeof (error as { code?: unknown }).code === 'string'
         && typeof (error as { message?: unknown }).message === 'string';
+}
+
+/** Ошибки легаси-эндпоинтов до RFC 7807: `{error: "текст"}` или `{type, message}`. */
+function legacyErrorMessage(data: unknown): string | null {
+    if (typeof data !== 'object' || data === null) {
+        return null;
+    }
+    const { error, message } = data as { error?: unknown; message?: unknown };
+    if (typeof error === 'string' && error !== '') {
+        return error;
+    }
+
+    return typeof message === 'string' && message !== '' ? message : null;
 }

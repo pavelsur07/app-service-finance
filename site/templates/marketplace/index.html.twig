@@ -277,7 +277,7 @@
 
 {% block modals %}
     {# Modal: Подтверждение применения выручки из реализации #}
-    <div class="modal modal-blur fade" id="modal-apply-realization" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal modal-blur fade" id="modal-apply-realization" tabindex="-1" role="dialog" aria-hidden="true" data-apply-realization-modal>
         <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-body">
@@ -293,8 +293,8 @@
                                 <button type="button" class="btn w-100" data-bs-dismiss="modal">Отмена</button>
                             </div>
                             <div class="col">
-                                <form method="post" action="" id="form-apply-realization">
-                                    <input type="hidden" name="_token" id="apply-realization-token" value="">
+                                <form method="post" action="" data-apply-realization-form>
+                                    <input type="hidden" name="_token" value="" data-apply-realization-token>
                                     <button type="submit" class="btn btn-teal w-100">Применить</button>
                                 </form>
                             </div>
@@ -306,7 +306,8 @@
     </div>
 
     {# Modal: Пакетная обработка за месяц #}
-    <div class="modal modal-blur fade" id="bulkProcessModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal modal-blur fade" id="bulkProcessModal" tabindex="-1" role="dialog" aria-hidden="true"
+         data-bulk-process-url="{{ path('marketplace_bulk_process') }}">
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
@@ -316,7 +317,7 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label required">Маркетплейс</label>
-                        <select id="bulk-marketplace" class="form-select" required>
+                        <select class="form-select" required data-bulk-marketplace>
                             <option value="">Выберите маркетплейс</option>
                             {% for marketplace in availableMarketplaces %}
                                 <option value="{{ marketplace.value }}">{{ marketplace.displayName }}</option>
@@ -325,95 +326,17 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label required">Месяц</label>
-                        <input type="month" id="bulk-month" class="form-control" required
+                        <input type="month" class="form-control" required data-bulk-month
                                value="{{ 'now'|date_modify('first day of last month')|date('Y-m') }}">
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
-                    <button type="button" class="btn btn-warning" id="bulk-process-btn">
+                    <button type="button" class="btn btn-warning" data-bulk-process-submit>
                         Запустить обработку
                     </button>
                 </div>
             </div>
         </div>
     </div>
-
-    <script>
-        // modal-apply-realization — подставляем action и CSRF-токен из data-атрибутов кнопки
-        document.getElementById('modal-apply-realization').addEventListener('show.bs.modal', function (event) {
-            document.getElementById('form-apply-realization').action = event.relatedTarget.getAttribute('data-action');
-            document.getElementById('apply-realization-token').value = event.relatedTarget.getAttribute('data-token');
-        });
-
-        // Пакетная обработка месяца — сброс кнопки при открытии модала
-        document.getElementById('bulkProcessModal').addEventListener('show.bs.modal', function () {
-            var btn = document.getElementById('bulk-process-btn');
-            btn.disabled = false;
-            btn.innerHTML = 'Запустить обработку';
-        });
-
-        document.getElementById('bulk-process-btn').addEventListener('click', function () {
-            var marketplace = document.getElementById('bulk-marketplace').value;
-            var monthVal    = document.getElementById('bulk-month').value;
-
-            if (!marketplace || !monthVal) {
-                alert('Выберите маркетплейс и месяц');
-                return;
-            }
-
-            var parts = monthVal.split('-');
-            var year  = parseInt(parts[0], 10);
-            var month = parseInt(parts[1], 10);
-
-            var btn = this;
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Запуск...';
-
-            fetch('{{ path('marketplace_bulk_process') }}', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                body: JSON.stringify({marketplace: marketplace, year: year, month: month})
-            })
-                .then(function (r) {
-                    var contentType = r.headers.get('content-type') || '';
-                    if (contentType.indexOf('application/json') !== -1) {
-                        return r.json().then(function (data) { return {ok: r.ok, status: r.status, data: data}; });
-                    }
-                    return r.text().then(function (text) {
-                        return {ok: false, status: r.status, data: {error: 'HTTP ' + r.status + ': сервер вернул не-JSON ответ'}};
-                    });
-                })
-                .then(function (res) {
-                    var BootstrapModal = window.bootstrap && window.bootstrap.Modal;
-                    if (res.ok) {
-                        if (BootstrapModal) {
-                            var modalEl = document.getElementById('bulkProcessModal');
-                            modalEl.addEventListener('hidden.bs.modal', function () {
-                                window.location.reload();
-                            }, {once: true});
-                            BootstrapModal.getOrCreateInstance(modalEl).hide();
-                        } else {
-                            window.location.reload();
-                        }
-                    } else {
-                        if (BootstrapModal) {
-                            BootstrapModal.getOrCreateInstance(document.getElementById('bulkProcessModal')).hide();
-                        }
-                        alert('Ошибка: ' + (res.data.error ?? 'Неизвестная ошибка'));
-                        btn.disabled = false;
-                        btn.innerHTML = 'Запустить обработку';
-                    }
-                })
-                .catch(function (err) {
-                    alert('Ошибка сети: ' + err.message);
-                    btn.disabled = false;
-                    btn.innerHTML = 'Запустить обработку';
-                });
-        });
-    </script>
 {% endblock %}

@@ -1,8 +1,9 @@
-### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A, PR B на проде; PR C на handoff)
+### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–C на проде; PR D на handoff)
 
 **Risk:** MEDIUM (поведение страниц; финансовые формы — в PR C)
 **Stage base commit:** `3c7bb858c` (master после Stage 1)
-**Work items:** 2.0–2.3; PR A = 2.0 (для своих страниц) + 2.1a; PR B = 2.1b; PR C = 2.2; PR D = 2.3
+**Work items:** 2.0–2.3; PR A = 2.0 (для своих страниц) + 2.1a; PR B = 2.1b; PR C = 2.2 (пять модулей);
+PR D = 2.2 (три marketplace-страницы); 2.3 (крупные скрипты) — PR E и далее
 
 Правило плана «один PR — не больше ~5 страниц» делит 2.1 на две части:
 2.1a — формы с `onsubmit="return confirm()"` (9 шаблонов, один механический
@@ -12,6 +13,8 @@ PR C и PR D, а не вместе с 2.1b: каждый трогает друг
 
 PR A: #2911, merge `2317ed9b`, деплой 07.11 08:19Z без даунтайма, GlitchTip чист,
 контейнеры healthy. PR B: #2912, merge `92611b3e`, деплой 07.11 08:54Z без даунтайма, GlitchTip чист.
+PR C: #2914, merge `b4311777`, деплой 07.11 09:24Z без даунтайма, GlitchTip чист (последнее событие 04:37),
+контейнеры healthy.
 
 #### PR A (2.0 + 2.1a): `confirm()` → `partials/_confirm_modal`
 
@@ -154,6 +157,60 @@ PR A: #2911, merge `2317ed9b`, деплой 07.11 08:19Z без даунтайм
 - Бейдж типа статьи ОПиУ: три `<span hidden>` вместо одного с подменой класса —
   визуально то же.
 
+#### PR D (2.2, часть 2): marketplace-страницы с Twig внутри JS
+
+Три страницы, чьи скрипты подставляли `path()` и `csrf_token()` в JS:
+
+- `marketplace/month_close/index` (141 строка JS) → `assets/pages/month_close.js`:
+  адреса API на корне `[data-month-close]` (`data-preflight-url`, `data-rebuild-url`),
+  кнопки `[data-preflight]` / `[data-preliminary-rebuild]` несут период и токен;
+  результат preflight строится через DOM и `textContent` (раньше `label`/`message`
+  проверок шли в `innerHTML` без экранирования, детали — через свой `escapeHtml`);
+  спиннеры форм «Сверить с xlsx»/«Закрыть этап» — общий `data-busy-submit`;
+  `confirm('Переоткрыть этап?')` → `_confirm_modal` с полями этапа в
+  `data-confirm-fields`; фильтр периода — `data-autosubmit` (3 `onchange`).
+- `marketplace/index` (77 строк) → `assets/pages/marketplace_index.js`: модал
+  «Применить выручку» (`[data-apply-realization-*]`), «Обработать месяц» —
+  `data-bulk-process-url` на модале, `apiFetch` вместо ручного разбора content-type.
+- `marketplace_analytics/cost_mappings/index` (71 строка) → `assets/pages/cost_mappings.js`:
+  `data-add-url` / `data-index-url` на корне `[data-cost-mappings]`; `confirm('Удалить
+  маппинг?')` → `_confirm_modal`; удаление — DELETE через `apiFetch` по адресу триггера.
+- Общее: `assets/confirm_modal.js` — событие `confirm:submit` (cancelable, на
+  кнопке-триггере) для действий, которые выполняет JS страницы вместо POST формы
+  диалога; `assets/bootstrap_modal.js` — один helper доступа к Bootstrap Modal
+  (прежние три копии в `project_direction_picker`, `budget_versions`, `dds_operation`
+  не трогал); `assets/api/client.ts` — метод `DELETE`, `204` → `undefined`, сообщение
+  ошибки из легаси-тел `{error: "текст"}` / `{type, message}` (иначе пользователь
+  видел бы «Ошибка сервера (422)» вместо «Подождите минуту…»).
+- Тесты: новый smoke `MarketplaceAnalytics/CostMappingsIndexPageTest` (страница из
+  списка 1.0: хуки модуля, триггер удаления, диалог, нет `onclick`/`onchange`);
+  `MonthCloseHistoryControllerTest` — хуки preflight/закрытия и переоткрытие через
+  `submitConfirmTrigger()` (этап действительно переоткрывается);
+  `MarketplaceIndexHistoryFilterMonthTest` — атрибуты модалов; e2e
+  `tests/e2e/marketplace-modules.e2e.cjs` (9 проверок: preflight с XSS-строкой в
+  label — текстом, multipart с токеном, 202/429 пересчёта, модал выручки, пакетная
+  обработка с ошибкой сервера, добавление маппинга, удаление через диалог — DELETE
+  с токеном и форма диалога не отправлена, смена маркетплейса — переход);
+  заглушка `tests/e2e/api-client-stub.js` повторяет контракт `apiFetch`.
+
+#### Checks (PR D)
+- `make site-cs-twig` — 0 / OK (324); `npm run lint` — 0; `npm run build` — OK
+- `make site-cs-check` — 0 of 3904; `make site-cs-strict-types` — 0; `make site-stan` — OK
+- функциональные тесты 5 файлов — OK (11, 82 assertions); e2e `marketplace-modules` — 9 passed
+- `make site-test` — OK (8506 tests, 47855 assertions), 7 мин 26 с
+
+#### External review (PR D)
+- rounds: 1 (codex, effort medium, дифф 1503 строк, `site/var/external-review/b4311777/review.txt`): REVIEW_GREEN без замечаний
+
+#### Risks / reviewer focus (PR D)
+- `apiFetch` вместо `fetch`: ответ 4xx/5xx — исключение с сообщением сервера;
+  `X-Requested-With` больше не шлётся (ни один из эндпоинтов его не читает).
+- Preflight: тело уходит `multipart/form-data` (FormData), контроллер читает
+  `$request->request` — для PHP это тот же `$_POST`, что и urlencoded.
+- `confirm:submit`: если модуль страницы не отменил событие, форма диалога уходит
+  POST как раньше — поведение остальных диалогов не меняется.
+- Кнопка «Закрыть этап» без JS остаётся `disabled` (как и прежде).
+
 #### Files changed (PR A)
 - `site/templates/**` — 9 страниц + `company/edit` (include) + `partials/_confirm_modal` (doc)
 - `site/assets/confirm_modal.js` — `data-confirm-fields`
@@ -199,4 +256,5 @@ PR A: #2911, merge `2317ed9b`, деплой 07.11 08:19Z без даунтайм
   в `data-confirm-title` через автоэкранирование, прежний JS конкатенировал строку.
 
 #### Next
-- PR C → handoff «merge and deploy»; затем PR D (2.3 крупные скрипты + marketplace-страницы из 2.2)
+- PR D → handoff «merge and deploy»; затем PR E: `marketplace/cost_pl_mapping/index` (343) и
+  `marketplace/pl_mappings/_default_mapping_modal` (223), далее остальные крупные скрипты 2.3

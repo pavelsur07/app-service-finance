@@ -2,6 +2,7 @@
  * Диалог подтверждения (templates/partials/_confirm_modal.html.twig): один на страницу.
  * При открытии берёт адрес формы, CSRF-токен и тексты из data-confirm-* кнопки-триггера,
  * поэтому разметка не повторяется в каждой строке таблицы. Текст — только textContent.
+ * Событие `confirm:submit` (cancelable) на триггере — страница может выполнить действие сама.
  */
 const triggers = new WeakMap();
 
@@ -88,6 +89,26 @@ document.addEventListener('show.bs.modal', (event) => {
     // Без JS кнопка остаётся disabled: пустая форма не уйдёт на текущую страницу.
     submit.disabled = blocked;
     triggers.set(modal, trigger);
+});
+
+// Действие, которое выполняет JS страницы (например, DELETE к API): модуль слушает `confirm:submit`
+// на кнопке-триггере и отменяет его — тогда форма диалога не отправляется.
+document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.matches('[data-confirm-form]')) {
+        return;
+    }
+
+    const modal = form.closest('[data-confirm-modal]');
+    const trigger = modal ? triggers.get(modal) : undefined;
+    if (!trigger) {
+        return;
+    }
+
+    const handledByPage = !trigger.dispatchEvent(new CustomEvent('confirm:submit', { bubbles: true, cancelable: true, detail: { modal } }));
+    if (handledByPage) {
+        event.preventDefault();
+    }
 });
 
 // Фокус на безопасное действие: Enter сразу после открытия не архивирует.
