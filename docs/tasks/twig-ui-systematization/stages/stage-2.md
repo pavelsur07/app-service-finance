@@ -1,4 +1,4 @@
-### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–D на проде; PR E влит, PR F на handoff)
+### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–E на проде; PR F на handoff)
 
 **Risk:** MEDIUM (поведение страниц; финансовые формы — в PR C)
 **Stage base commit:** `3c7bb858c` (master после Stage 1)
@@ -15,7 +15,7 @@ PR A: #2911, merge `2317ed9b`, деплой 07.11 08:19Z без даунтайм
 контейнеры healthy. PR B: #2912, merge `92611b3e`, деплой 07.11 08:54Z без даунтайма, GlitchTip чист.
 PR C: #2914, merge `b4311777`, деплой 07.11 09:24Z без даунтайма, GlitchTip чист (последнее событие 04:37),
 контейнеры healthy. PR D: #2915, merge `24dbd846`, деплой 07.11 09:58Z без даунтайма,
-GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51546`, деплой __DEPLOY_E__.
+GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51546`, деплой 07.11 10:41Z без даунтайма (перезапуск после flaky SettlementSourceLockOrderTest), GlitchTip чист.
 
 #### PR A (2.0 + 2.1a): `confirm()` → `partials/_confirm_modal`
 
