@@ -19,7 +19,7 @@
     </div>
     {% if book %}
         <p>
-            <a href="{{ path('balance_audit',{type:'book',id:book.id}) }}">История настроек учета</a>
+            <a href="{{ path('balance_audit', {type: 'book', id: book.id}) }}">История настроек учета</a>
         </p>
     {% endif %}
     <form method="post" action="{{ path('balance_structure_seed') }}">

@@ -27,9 +27,9 @@
 {% block breadcrumbs %}
     {% include 'partials/_breadcrumbs.html.twig' with {
         breadcrumbs: [
-            {'label':'Деньги'},
-            {'label':'Операции ДДС','path':'cash_transaction_index','params': app.request.query.all},
-            {'label':'Редактирование'}
+            {'label': 'Деньги'},
+            {'label': 'Операции ДДС', 'path': 'cash_transaction_index', 'params': app.request.query.all},
+            {'label': 'Редактирование'}
         ]
     } %}
 {% endblock %}

@@ -34,11 +34,11 @@
                 <label class="form-label">Операция</label>
                 <div class="btn-group w-100">
                     <a class="btn {{ operationType == 'sale' ? 'btn-primary' : 'btn-outline-primary' }}"
-                       href="{{ path('marketplace_pl_mappings_index', { op: 'sale', marketplace: marketplaceFilterValue }) }}">
+                       href="{{ path('marketplace_pl_mappings_index', {op: 'sale', marketplace: marketplaceFilterValue}) }}">
                         Продажи
                     </a>
                     <a class="btn {{ operationType == 'return' ? 'btn-primary' : 'btn-outline-primary' }}"
-                       href="{{ path('marketplace_pl_mappings_index', { op: 'return', marketplace: marketplaceFilterValue }) }}">
+                       href="{{ path('marketplace_pl_mappings_index', {op: 'return', marketplace: marketplaceFilterValue}) }}">
                         Возвраты
                     </a>
                 </div>

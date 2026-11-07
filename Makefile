@@ -42,8 +42,11 @@ site-cs-strict-types:
 site-cs-fix:
 	$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:fix # Автопочинка PHP-стиля
 
+site-cs-twig:
+	$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:twig   # Гейт Twig: twigcs (site/.twigcs.php) + lint:twig
+	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console lint:twig templates
+
     #$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:phpcs   # Проверка через phpcs (PSR-12)
-    #$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:twig    # Линт Twig-шаблонов
 
 # ===== СТАТИЧЕСКИЙ АНАЛИЗ =====
 # Гейт достижимо зелёный: существующие ошибки лежат в site/phpstan-baseline.neon,

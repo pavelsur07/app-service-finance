@@ -3,14 +3,14 @@
 {% block balance_content %}
     <div class="wz-head">
         <h1 class="wz-title">{{ item.name }}
-            <span class="wz-sub">{{ article ? 'Карточка статьи':'Карточка счета' }}</span>
+            <span class="wz-sub">{{ article ? 'Карточка статьи' : 'Карточка счета' }}</span>
         </h1>
         {% if not article and permissions.prepare and not item.is_archived %}
             <div class="wz-head-actions">
-                <a class="btn btn-md btn-secondary" href="{{ path('balance_account_target',{id:item.id}) }}">Установить остаток</a>
+                <a class="btn btn-md btn-secondary" href="{{ path('balance_account_target', {id: item.id}) }}">Установить остаток</a>
             </div>
         {% endif %}
-    </div>{{ ui.period(from,to) }}
+    </div>{{ ui.period(from, to) }}
     {% if not card.accounting_started %}
         <div class="wz-row">
             <div class="alert alert--info" role="status"><div class="a-body"><p class="a-text">Учет не начат в выбранном периоде.</p></div></div>
@@ -45,7 +45,7 @@
                     {% for row in card.accounts %}
                         <tr>
                             <td>
-                                <a href="{{ path('balance_account_card',{id:row.id,from:from,to:to}) }}">{{ row.name }}</a>
+                                <a href="{{ path('balance_account_card', {id: row.id, from: from, to: to}) }}">{{ row.name }}</a>
                             </td>
                             <td class="t-cell--right">{{ ui.amount(row.closing, currency) }}</td>
                         </tr>
@@ -73,7 +73,7 @@
             <tbody>
                 {% for entry in card.entries %}
                     <tr>
-                        <td>{{ ui.date(entry.operation_date) }} · <a href="{{ path('balance_document',{id:entry.id}) }}">№ {{ entry.number }}</a></td>
+                        <td>{{ ui.date(entry.operation_date) }} · <a href="{{ path('balance_document', {id: entry.id}) }}">№ {{ entry.number }}</a></td>
                         <td>{{ entry.account_name }}</td>
                         <td>{{ entry.reason }}</td>
                         {# Список движений: плюс у увеличения, минус у уменьшения (DS-Money). #}
@@ -88,6 +88,6 @@
             </tbody>
         </table>
         {{ ui.pager(card.pager) }}
-        <p><a href="{{ path('balance_audit',{type:article ? 'article':'account',id:item.id}) }}">История изменений</a></p>
+        <p><a href="{{ path('balance_audit', {type: article ? 'article' : 'account', id: item.id}) }}">История изменений</a></p>
     </section>
 {% endblock %}

@@ -10,18 +10,18 @@
 
   <div class="wz-form-grid">
     <div class="form-field wz-span-all">
-      {{ form_label(form.token, 'Токен', { label_attr: { class: 'form-label' } }) }}
-      {{ form_widget(form.token, { attr: { class: 'input' ~ (form.token.vars.errors|length > 0 ? ' is-error') } }) }}
+      {{ form_label(form.token, 'Токен', {label_attr: {class: 'form-label'}}) }}
+      {{ form_widget(form.token, {attr: {class: 'input' ~ (form.token.vars.errors|length > 0 ? ' is-error')}}) }}
       {{ form_errors(form.token) }}
     </div>
     <div class="form-field">
-      {{ form_label(form.username, 'Имя пользователя', { label_attr: { class: 'form-label' } }) }}
-      {{ form_widget(form.username, { attr: { class: 'input' ~ (form.username.vars.errors|length > 0 ? ' is-error') } }) }}
+      {{ form_label(form.username, 'Имя пользователя', {label_attr: {class: 'form-label'}}) }}
+      {{ form_widget(form.username, {attr: {class: 'input' ~ (form.username.vars.errors|length > 0 ? ' is-error')}}) }}
       {{ form_errors(form.username) }}
     </div>
     <div class="form-field">
-      {{ form_label(form.webhookUrl, 'URL вебхука', { label_attr: { class: 'form-label' } }) }}
-      {{ form_widget(form.webhookUrl, { attr: { class: 'input' ~ (form.webhookUrl.vars.errors|length > 0 ? ' is-error') } }) }}
+      {{ form_label(form.webhookUrl, 'URL вебхука', {label_attr: {class: 'form-label'}}) }}
+      {{ form_widget(form.webhookUrl, {attr: {class: 'input' ~ (form.webhookUrl.vars.errors|length > 0 ? ' is-error')}}) }}
       {{ form_errors(form.webhookUrl) }}
     </div>
     <div class="form-field wz-span-all">
@@ -44,4 +44,4 @@
     <a href="{{ path('admin_telegram_bot_index') }}" class="btn btn-md btn-secondary">Отмена</a>
   </div>
 </div>
-{{ form_end(form, { render_rest: false }) }}
+{{ form_end(form, {render_rest: false}) }}

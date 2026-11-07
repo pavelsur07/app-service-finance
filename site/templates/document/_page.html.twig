@@ -12,9 +12,7 @@
 {% set doc = item ?? form.vars.value %}
 {% set isEdit = item is defined and item is not null %}
 {% set statusLabels = {'DRAFT': 'Черновик', 'ACTIVE': 'Активен', 'INACTIVE': 'Неактивен', 'TO_DELETE': 'На удаление'} %}
-{% set title = isEdit
-    ? 'Документ ОПиУ' ~ (doc.number ? ' № ' ~ doc.number : '')
-    : (app.request.attributes.get('_route') == 'document_copy' ? 'Копия документа ОПиУ' : 'Новый документ ОПиУ') %}
+{% set title = isEdit ? 'Документ ОПиУ' ~ (doc.number ? ' № ' ~ doc.number : '') : (app.request.attributes.get('_route') == 'document_copy' ? 'Копия документа ОПиУ' : 'Новый документ ОПиУ') %}
 {% set allocation = transactionAllocation ?? null %}
 {% set cashTransaction = isEdit ? doc.cashTransaction : null %}
 {% set currency = cashTransaction ? cashTransaction.currency : 'RUB' %}
@@ -56,7 +54,7 @@
         placeholder: placeholder,
         empty_note: emptyNote,
         noun: 'ЦФО',
-    }, with_context = false) }}
+    }, with_context=false) }}
 {% endmacro %}
 
 {# Пометка «Изменён» у поля операции, отличного от шапки; «Как в шапке» возвращает значение шапки. #}

@@ -1,22 +1,22 @@
 {% extends 'settlement/layout.html.twig' %}
 {% block settlement_header %}
 <div class="vf-ops-head"><div class="vf-ops-head__title"><h1>{{ counterpartyName }}</h1><p class="vf-ops-head__lead">Взаиморасчёты</p></div>
-{% if canWrite and book %}<div class="btn-list"><a class="btn btn-primary" href="{{ path('settlement_allocation_new',{counterparty:counterpartyId}) }}">Распределить оплату</a><a class="btn btn-outline-secondary" href="{{ path('settlement_correction_new',{counterparty:counterpartyId}) }}">Корректировка</a></div>{% endif %}</div>
+{% if canWrite and book %}<div class="btn-list"><a class="btn btn-primary" href="{{ path('settlement_allocation_new', {counterparty: counterpartyId}) }}">Распределить оплату</a><a class="btn btn-outline-secondary" href="{{ path('settlement_correction_new', {counterparty: counterpartyId}) }}">Корректировка</a></div>{% endif %}</div>
 {% endblock %}
 {% block settlement_content %}
 
 {% include 'settlement/_filter.html.twig' %}
 {% if report %}
-    {% include 'settlement/_summary.html.twig' with {balances:report.summary.closing} only %}
-    <div class="vf-ops-bar"><span>Просрочено: {{ report.summary.overdue.toDecimalString|vf_money(2,'RUB') }}. Без срока оплаты: {{ report.summary.withoutDueDate.toDecimalString|vf_money(2,'RUB') }}.</span></div>
+    {% include 'settlement/_summary.html.twig' with {balances: report.summary.closing} only %}
+    <div class="vf-ops-bar"><span>Просрочено: {{ report.summary.overdue.toDecimalString|vf_money(2, 'RUB') }}. Без срока оплаты: {{ report.summary.withoutDueDate.toDecimalString|vf_money(2, 'RUB') }}.</span></div>
     <section class="border-top"><div class="card-header"><h2 class="card-title">Изменения за период</h2></div><div class="table-responsive" tabindex="0" role="region" aria-label="Изменения за выбранный период">
     <table class="table card-table table-vcenter vf-ops-table"><thead><tr><th scope="col">Показатель, ₽</th><th scope="col" class="text-end text-nowrap">Начало</th><th scope="col" class="text-end text-nowrap">Увеличение</th><th scope="col" class="text-end text-nowrap">Уменьшение</th><th scope="col" class="text-end text-nowrap">Конец</th></tr></thead><tbody>
-    {% for field,label in {receivable:'Нам должны',payable:'К оплате',advanceGiven:'Выданные авансы',advanceReceived:'Полученные авансы',unallocatedOut:'Нераспределённые выплаты',unallocatedIn:'Нераспределённые поступления'} %}<tr><th scope="row">{{ label }}</th>{% for column in ['opening','increases','decreases','closing'] %}<td class="text-end text-nowrap">{{ attribute(attribute(report.summary,column),field).toDecimalString|vf_amount(2) }}</td>{% endfor %}</tr>{% endfor %}
+    {% for field, label in {receivable: 'Нам должны', payable: 'К оплате', advanceGiven: 'Выданные авансы', advanceReceived: 'Полученные авансы', unallocatedOut: 'Нераспределённые выплаты', unallocatedIn: 'Нераспределённые поступления'} %}<tr><th scope="row">{{ label }}</th>{% for column in ['opening', 'increases', 'decreases', 'closing'] %}<td class="text-end text-nowrap">{{ attribute(attribute(report.summary, column), field).toDecimalString|vf_amount(2) }}</td>{% endfor %}</tr>{% endfor %}
     </tbody></table></div></section>
     <section class="border-top"><div class="card-header"><h2 class="card-title">Движения</h2></div><div class="table-responsive" tabindex="0" role="region" aria-label="Движения взаиморасчётов">
     <table class="table card-table table-vcenter vf-ops-table"><thead><tr><th scope="col">Дата</th><th scope="col">Документ / основание</th><th scope="col">Показатель</th><th scope="col" class="text-end text-nowrap">Изменение, ₽</th><th scope="col">Источник</th></tr></thead><tbody>
-    {% for row in report.rows %}<tr><td>{{ row.effectiveDate|date('d.m.Y') }}</td><td><a href="{{ path('settlement_document',{id:row.documentId}) }}">{{ row.reason }}</a></td><td>{{ bucketLabels[row.bucket.value] }}</td><td class="text-end text-nowrap">{{ row.delta.toDecimalString|vf_amount(2,signed:true) }}</td><td>{% if row.sourceId and row.sourceType.value in ['cash','finance'] %}<a href="{{ path(row.sourceType.value == 'cash' ? 'cash_transaction_show' : 'document_show',{id:row.sourceId}) }}">{{ row.sourceType.value == 'cash' ? 'ДДС' : 'ОПиУ' }}</a>{% else %}Документ взаиморасчётов{% endif %}</td></tr>{% else %}<tr><td colspan="5">За выбранный период нет движений.</td></tr>{% endfor %}
-    </tbody></table></div></section><div class="card-footer">{% include 'partials/_pagination.html.twig' with {pager:pager,params:app.request.query.all|merge(app.request.attributes.get('_route_params'))} %}</div>
+    {% for row in report.rows %}<tr><td>{{ row.effectiveDate|date('d.m.Y') }}</td><td><a href="{{ path('settlement_document', {id: row.documentId}) }}">{{ row.reason }}</a></td><td>{{ bucketLabels[row.bucket.value] }}</td><td class="text-end text-nowrap">{{ row.delta.toDecimalString|vf_amount(2, signed:true) }}</td><td>{% if row.sourceId and row.sourceType.value in ['cash', 'finance'] %}<a href="{{ path(row.sourceType.value == 'cash' ? 'cash_transaction_show' : 'document_show', {id: row.sourceId}) }}">{{ row.sourceType.value == 'cash' ? 'ДДС' : 'ОПиУ' }}</a>{% else %}Документ взаиморасчётов{% endif %}</td></tr>{% else %}<tr><td colspan="5">За выбранный период нет движений.</td></tr>{% endfor %}
+    </tbody></table></div></section><div class="card-footer">{% include 'partials/_pagination.html.twig' with {pager: pager, params: app.request.query.all|merge(app.request.attributes.get('_route_params'))} %}</div>
 {% endif %}
-<p class="card-body mb-0"><a href="{{ path('settlement_documents',{counterparty:counterpartyId}) }}">Все документы контрагента</a></p>
+<p class="card-body mb-0"><a href="{{ path('settlement_documents', {counterparty: counterpartyId}) }}">Все документы контрагента</a></p>
 {% endblock %}

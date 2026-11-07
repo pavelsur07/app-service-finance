@@ -277,7 +277,7 @@
                     <tbody>
                     {% for mc in history %}
                         {% set salesReturnsPreliminary = mc.isStageLastCloseWasPreliminary(constant('App\\Marketplace\\Enum\\CloseStage::SALES_RETURNS')) %}
-                        {% set costsPreliminary        = mc.isStageLastCloseWasPreliminary(constant('App\\Marketplace\\Enum\\CloseStage::COSTS')) %}
+                        {% set costsPreliminary = mc.isStageLastCloseWasPreliminary(constant('App\\Marketplace\\Enum\\CloseStage::COSTS')) %}
                         <tr>
                             <td>
                                 <a href="{{ path('marketplace_month_close_index', {
@@ -285,8 +285,8 @@
                                     year: mc.year,
                                     month: mc.month
                                 }) }}" class="fw-medium">
-                                    {{ ['', 'Январь','Февраль','Март','Апрель','Май','Июнь',
-                                        'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][mc.month] }}
+                                    {{ ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                                        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'][mc.month] }}
                                     {{ mc.year }}
                                 </a>
                             </td>

@@ -430,17 +430,10 @@
                     </div>
                 {% endif %}
 
-                {% if report.product_summary.missing_cost_quantity > 0
-                    or report.product_summary.unmapped_sku_count > 0
-                    or report.product_summary.conflict_sku_count > 0
-                    or report.product_summary.fallback_cost_quantity > 0
-                    or report.product_summary.unallocated_for_pay_minor != 0
-                    or report.product_summary.sales_reconciliation_minor != 0 %}
+                {% if report.product_summary.missing_cost_quantity > 0 or report.product_summary.unmapped_sku_count > 0 or report.product_summary.conflict_sku_count > 0 or report.product_summary.fallback_cost_quantity > 0 or report.product_summary.unallocated_for_pay_minor != 0 or report.product_summary.sales_reconciliation_minor != 0 %}
                     <div class="card-body border-top">
                         <div class="d-flex flex-column gap-3">
-                        {% if report.product_summary.missing_cost_quantity > 0
-                            or report.product_summary.unmapped_sku_count > 0
-                            or report.product_summary.conflict_sku_count > 0 %}
+                        {% if report.product_summary.missing_cost_quantity > 0 or report.product_summary.unmapped_sku_count > 0 or report.product_summary.conflict_sku_count > 0 %}
                             <div class="alert alert-warning mb-0" role="status">
                                 Общий результат недостоверен, пока не заполнена себестоимость для
                                 {{ report.product_summary.missing_cost_quantity|vf_number }} шт.

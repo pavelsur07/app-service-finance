@@ -449,7 +449,7 @@
             <span class="text-truncate" title="{{ cat.name }}">{{ cat.name }}</span>
         </div>
     </td>
-    {% for i in 0..periodCount-1 %}
+    {% for i in 0..periodCount - 1 %}
         {% set val = totals[cat.id].totals[currency][i] ?? 0 %}
         <td class="text-end">{{ _self.format_amount(val)|raw }}</td>
     {% endfor %}
@@ -507,7 +507,7 @@
                 <tbody>
                     <tr class="fw-bold">
                         <td>Сальдо на начало</td>
-                        {% for i in 0..periodCount-1 %}
+                        {% for i in 0..periodCount - 1 %}
                             <td class="text-end">{{ macros.format_amount(openings[currency][i])|raw }}</td>
                         {% endfor %}
                     </tr>
@@ -516,7 +516,7 @@
                     {% endfor %}
                     <tr class="fw-bold">
                         <td>Сальдо на конец</td>
-                        {% for i in 0..periodCount-1 %}
+                        {% for i in 0..periodCount - 1 %}
                             <td class="text-end">{{ macros.format_amount(closings[currency][i])|raw }}</td>
                         {% endfor %}
                     </tr>

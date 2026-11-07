@@ -30,7 +30,7 @@
         {{ company.name }}{% if company.inn %} · ИНН {{ company.inn }}{% endif %}
       </div>
     </div>
-    <a href="{{ path('admin_user_index', { company: company.id }) }}" class="btn btn-md btn-secondary">К пользователям</a>
+    <a href="{{ path('admin_user_index', {company: company.id}) }}" class="btn btn-md btn-secondary">К пользователям</a>
   </div>
 
   {# Состояние #}
@@ -90,12 +90,12 @@
       {% if overview.connected %}
         <h2 style="font-size:var(--font-15); margin:0 0 var(--s-1);">Лимиты</h2>
         <p class="form-hint" style="margin:0 0 var(--s-3);">Расход считается по календарному месяцу; при исчерпании новые операции не отправляются до нового месяца или повышения лимита.</p>
-        <form method="post" action="{{ path('admin_ai_company_limits', { companyId: company.id }) }}" data-ai-limits-form>
+        <form method="post" action="{{ path('admin_ai_company_limits', {companyId: company.id}) }}" data-ai-limits-form>
           <input type="hidden" name="_token" value="{{ csrf_token('ai_company_limits_' ~ company.id) }}">
       {% else %}
         <h2 style="font-size:var(--font-15); margin:0 0 var(--s-1);">Подключить ИИ</h2>
         <p class="form-hint" style="margin:0 0 var(--s-3);">Операции без статьи за выбранный период уйдут в ближайший запуск (в :25 каждого часа) — это платные запросы к LLM.</p>
-        <form method="post" action="{{ path('admin_ai_company_access', { companyId: company.id }) }}" data-ai-connect-form>
+        <form method="post" action="{{ path('admin_ai_company_access', {companyId: company.id}) }}" data-ai-connect-form>
           <input type="hidden" name="_token" value="{{ csrf_token('ai_company_access_' ~ company.id) }}">
           <input type="hidden" name="enabled" value="1">
           <input type="hidden" name="return_to" value="company">

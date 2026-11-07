@@ -65,9 +65,7 @@
 {% set centerName = center ? center.name : '' %}
 {% set category = filters.categoryId ? categories|filter(c => c.id == filters.categoryId)|first : null %}
 {% set categoryName = category ? category.name : '' %}
-{% set amountLabel = filters.amountFrom is not null and filters.amountTo is not null
-    ? filters.amountFrom|vf_money ~ ' — ' ~ filters.amountTo|vf_money
-    : (filters.amountFrom is not null ? 'от ' ~ filters.amountFrom|vf_money : (filters.amountTo is not null ? 'до ' ~ filters.amountTo|vf_money : '')) %}
+{% set amountLabel = filters.amountFrom is not null and filters.amountTo is not null ? filters.amountFrom|vf_money ~ ' — ' ~ filters.amountTo|vf_money : (filters.amountFrom is not null ? 'от ' ~ filters.amountFrom|vf_money : (filters.amountTo is not null ? 'до ' ~ filters.amountTo|vf_money : '')) %}
 {% set moreCount = (filters.status ? 1 : 0) + (filters.number ? 1 : 0) %}
 {# Выбранный контрагент — из списка контроллера: туда он попадает и архивным. #}
 {% set filterCounterparty = filters.counterpartyId ? counterparties|filter(c => c.id == filters.counterpartyId)|first : null %}
@@ -248,9 +246,7 @@
                 valueLabel: filterCounterparty ? (filterCounterparty.displayName ?? filterCounterparty.name) : '',
                 searchUrl: path('api_counterparty_search'),
                 adapter: 'counterparty',
-                initial: (filterCounterparty ? [filterCounterparty] : [])
-                    |merge(counterparties|filter(c => not c.isArchived and c.id != filters.counterpartyId)|sort((a, b) => (a.displayName ?? a.name) <=> (b.displayName ?? b.name))|slice(0, 20))
-                    |map(c => {id: c.id, name: c.name, displayName: c.displayName, inn: c.inn, type: c.type ? c.type.value : null}),
+                initial: (filterCounterparty ? [filterCounterparty] : [])|merge(counterparties|filter(c => not c.isArchived and c.id != filters.counterpartyId)|sort((a, b) => (a.displayName ?? a.name) <=> (b.displayName ?? b.name))|slice(0, 20))|map(c => {id: c.id, name: c.name, displayName: c.displayName, inn: c.inn, type: c.type ? c.type.value : null}),
                 emptyText: 'Никого не нашли. Проверьте название или ИНН.',
                 allLabel: 'Все контрагенты',
                 placeholder: 'Название или ИНН',
@@ -353,7 +349,7 @@
             {{ ui.hidden(baseQuery|filter((v, k) => k not in ['limit'])) }}
         </form>
         <div class="ms-md-auto w-100 w-md-auto">
-            {% include 'partials/_pagination.html.twig' with { pager: pager, route: route, params: baseQuery|merge({'limit': limit}) } %}
+            {% include 'partials/_pagination.html.twig' with {pager: pager, route: route, params: baseQuery|merge({'limit': limit})} %}
         </div>
     </div>
 </div>

@@ -8,7 +8,7 @@
 {% for label, messages in app.flashes %}
     {% set bootstrapLabel = labelClassMap[label]|default(label) %}
     {% for message in messages %}
-        {% set flashMessages = flashMessages|merge([{ type: bootstrapLabel, message: message }]) %}
+        {% set flashMessages = flashMessages|merge([{type: bootstrapLabel, message: message}]) %}
     {% endfor %}
 {% endfor %}
 

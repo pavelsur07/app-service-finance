@@ -13,11 +13,11 @@
 {% else %}
     {% include 'settlement/_filter.html.twig' %}
     {% if report %}
-        {% include 'settlement/_summary.html.twig' with {balances:report.totals.closing} only %}
+        {% include 'settlement/_summary.html.twig' with {balances: report.totals.closing} only %}
         <div class="vf-ops-bar">
             <span>Контрагенты: <strong>{{ report.total|vf_number }}</strong></span>
-            <span>Просрочено: {{ report.totals.overdue.toDecimalString|vf_money(2,'RUB') }}</span>
-            <span>Без срока оплаты: {{ report.totals.withoutDueDate.toDecimalString|vf_money(2,'RUB') }}</span>
+            <span>Просрочено: {{ report.totals.overdue.toDecimalString|vf_money(2, 'RUB') }}</span>
+            <span>Без срока оплаты: {{ report.totals.withoutDueDate.toDecimalString|vf_money(2, 'RUB') }}</span>
             <span>Итоги по всей выборке</span>
         </div>
         {% if report.total == 0 %}
@@ -26,14 +26,14 @@
             <div class="table-responsive" tabindex="0" role="region" aria-label="Остатки по контрагентам">
                 <table class="table card-table table-vcenter vf-ops-table">
                     <caption class="visually-hidden">Остатки на конец выбранного периода, рубли</caption>
-                    <thead><tr><th scope="col">Контрагент</th>{% for field,label in {receivable:'Нам должны',payable:'К оплате',advanceGiven:'Выданные авансы',advanceReceived:'Полученные авансы',unallocatedOut:'Нераспределённые выплаты',unallocatedIn:'Нераспределённые поступления'} %}<th scope="col" class="text-end">{{ label }}, ₽</th>{% endfor %}</tr></thead>
+                    <thead><tr><th scope="col">Контрагент</th>{% for field, label in {receivable: 'Нам должны', payable: 'К оплате', advanceGiven: 'Выданные авансы', advanceReceived: 'Полученные авансы', unallocatedOut: 'Нераспределённые выплаты', unallocatedIn: 'Нераспределённые поступления'} %}<th scope="col" class="text-end">{{ label }}, ₽</th>{% endfor %}</tr></thead>
                     <tbody>{% for row in report.rows %}<tr>
-                        <th scope="row"><a href="{{ path('settlement_card',{id:row.counterpartyId}) }}">{{ row.counterpartyName }}</a></th>
-                        {% for field in ['receivable','payable','advanceGiven','advanceReceived','unallocatedOut','unallocatedIn'] %}<td class="text-end text-nowrap">{{ attribute(row.closing,field).toDecimalString|vf_amount(2) }}</td>{% endfor %}
+                        <th scope="row"><a href="{{ path('settlement_card', {id: row.counterpartyId}) }}">{{ row.counterpartyName }}</a></th>
+                        {% for field in ['receivable', 'payable', 'advanceGiven', 'advanceReceived', 'unallocatedOut', 'unallocatedIn'] %}<td class="text-end text-nowrap">{{ attribute(row.closing, field).toDecimalString|vf_amount(2) }}</td>{% endfor %}
                     </tr>{% endfor %}</tbody>
                 </table>
             </div>
-            <div class="card-footer">{% include 'partials/_pagination.html.twig' with {pager:pager,params:app.request.query.all|merge(app.request.attributes.get('_route_params'))} %}</div>
+            <div class="card-footer">{% include 'partials/_pagination.html.twig' with {pager: pager, params: app.request.query.all|merge(app.request.attributes.get('_route_params'))} %}</div>
         {% endif %}
     {% endif %}
 {% endif %}

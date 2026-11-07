@@ -225,16 +225,7 @@
             <!-- Справочники -->
 
 
-            {% set handbooks_menu_open =
-                current_route == 'cashflow_category_index'
-                or current_route == 'pl_category_index'
-                or current_route starts with 'balance_structure_'
-                or current_route == 'money_account_index'
-                or current_route == 'counterparty_index'
-                or current_route == 'project_direction_index'
-                or current_route starts with 'catalog_products_'
-                or current_route == 'cash_transaction_auto_rule_index'
-            %}
+            {% set handbooks_menu_open = current_route == 'cashflow_category_index' or current_route == 'pl_category_index' or current_route starts with 'balance_structure_' or current_route == 'money_account_index' or current_route == 'counterparty_index' or current_route == 'project_direction_index' or current_route starts with 'catalog_products_' or current_route == 'cash_transaction_auto_rule_index' %}
 
 
             {% if is_granted('module.finance.read') %}
@@ -265,13 +256,7 @@
 
             {# Блок смешанный: Telegram — admin, банки — finance, маркетплейс — marketplace. #}
             {% if is_granted('module.admin.read') or is_granted('module.finance.read') or is_granted('module.marketplace.read') %}
-            {% set integrations_active =
-                current_route starts with 'ozon_'
-                or current_route starts with 'wildberries_'
-                or current_route starts with 'telegram_integration_'
-                or current_route starts with 'bank_sync_connection_'
-                or current_route starts with 'integrations_marketplace_'
-            %}
+            {% set integrations_active = current_route starts with 'ozon_' or current_route starts with 'wildberries_' or current_route starts with 'telegram_integration_' or current_route starts with 'bank_sync_connection_' or current_route starts with 'integrations_marketplace_' %}
             <li class="nav-item dropdown {{ integrations_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ integrations_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
                     <span class="nav-link-icon"><i class="ti ti-plug-connected"></i></span>
@@ -306,11 +291,7 @@
 
             {# Компания и доступы — модуль admin. #}
             {% if is_granted('module.admin.read') %}
-            {% set company_users_active =
-                current_route starts with 'company_users_'
-                or current_route starts with 'company_member_'
-                or current_route starts with 'company_invite_'
-            %}
+            {% set company_users_active = current_route starts with 'company_users_' or current_route starts with 'company_member_' or current_route starts with 'company_invite_' %}
             {% set company_active = current_route starts with 'company_' or current_route starts with 'settings_report_api_key_' or current_route starts with 'settings_api_' or company_users_active %}
             <li class="nav-item dropdown {{ company_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ company_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ company_active ? 'true' : 'false' }}">
@@ -352,25 +333,13 @@
                и была заперта за admin-гейтом, из-за чего finance-участник не видел
                навигацию к доступным ему страницам. Вынесена в свой блок. #}
                     {% if is_granted('module.finance.read') %}
-                    {% set reports_debug_active =
-                        current_route starts with 'report_transactions_statement_'
-                        or current_route starts with 'report_transactions_debug_'
-                        or current_route starts with 'report_debug_'
-                        or current_route starts with 'finance_report_raw'
-                        or current_route starts with 'finance_report_pl_raw'
-                    %}
+                    {% set reports_debug_active = current_route starts with 'report_transactions_statement_' or current_route starts with 'report_transactions_debug_' or current_route starts with 'report_debug_' or current_route starts with 'finance_report_raw' or current_route starts with 'finance_report_pl_raw' %}
             <li class="nav-item dropdown {{ reports_debug_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ reports_debug_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ reports_debug_active ? 'true' : 'false' }}">
                     <span class="nav-link-icon"><i class="ti ti-bug"></i></span>
                     <span class="nav-link-title">Отладка</span>
                 </a>
-                        {% set reports_debug_show = (
-                            reports_debug_active
-                            or current_route starts with 'report_transactions_statement_'
-                            or current_route starts with 'report_debug_'
-                            or current_route starts with 'finance_report_raw'
-                            or current_route starts with 'finance_report_pl_raw'
-                        ) ? 'show' : '' %}
+                        {% set reports_debug_show = (reports_debug_active or current_route starts with 'report_transactions_statement_' or current_route starts with 'report_debug_' or current_route starts with 'finance_report_raw' or current_route starts with 'finance_report_pl_raw') ? 'show' : '' %}
                         <div class="dropdown-menu {{ reports_debug_show }}">
                             {% set report_statement_active = current_route starts with 'report_transactions_statement_' %}
                             <a class="dropdown-item {{ report_statement_active ? 'active' : '' }}" href="{{ path('report_transactions_statement_index') }}">

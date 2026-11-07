@@ -85,8 +85,8 @@
                       {% endif %}
                       {% set access = cabinetAccess[cabinet.id] ?? null %}
                       {% if access %}
-                        {% set accessCls = { active: 'success', grace: 'warning', read_only: 'danger', none: 'neutral' }[access.status.value] %}
-                        <a href="{{ path('admin_billing_company', { companyId: cabinet.id }) }}" class="status status--{{ accessCls }}" title="Тариф кабинета" data-billing-badge="{{ cabinet.id }}">
+                        {% set accessCls = {active: 'success', grace: 'warning', read_only: 'danger', none: 'neutral'}[access.status.value] %}
+                        <a href="{{ path('admin_billing_company', {companyId: cabinet.id}) }}" class="status status--{{ accessCls }}" title="Тариф кабинета" data-billing-badge="{{ cabinet.id }}">
                           <span class="dot"></span>
                           {%- if access.tariffName is null -%}
                             Нет тарифа
@@ -100,7 +100,7 @@
                       {# Без данных ИИ (рендер после ошибки формы аккаунта) отметку не показываем — иначе «выкл» у подключённых #}
                       {% if aiCabinets is defined %}
                       {% set aiOn = aiCabinets[cabinet.id|lower] ?? false %}
-                      <form method="post" action="{{ path('admin_ai_company_access', { companyId: cabinet.id }) }}" style="display:inline;">
+                      <form method="post" action="{{ path('admin_ai_company_access', {companyId: cabinet.id}) }}" style="display:inline;">
                         <input type="hidden" name="_token" value="{{ csrf_token('ai_company_access_' ~ cabinet.id) }}">
                         <input type="hidden" name="enabled" value="{{ aiOn ? 0 : 1 }}">
                         <input type="hidden" name="return_query" value="{{ app.request.queryString }}">
@@ -126,7 +126,7 @@
                       {% if aiExhausted[cabinet.id|lower] ?? false %}
                         <span class="status status--danger" data-ai-exhausted-badge="{{ cabinet.id }}"><span class="dot"></span>Лимит ИИ исчерпан</span>
                       {% endif %}
-                      <a href="{{ path('admin_ai_company', { companyId: cabinet.id }) }}" class="btn btn-sm btn-ghost" data-ai-page-link="{{ cabinet.id }}" title="ИИ кабинета: запуски, расход, лимиты">ИИ ›</a>
+                      <a href="{{ path('admin_ai_company', {companyId: cabinet.id}) }}" class="btn btn-sm btn-ghost" data-ai-page-link="{{ cabinet.id }}" title="ИИ кабинета: запуски, расход, лимиты">ИИ ›</a>
                       {% endif %}
                     </div>
                   {% endfor %}
@@ -143,14 +143,14 @@
                 {% endif %}
               </td>
               <td class="t-cell--right">
-                <a href="{{ path('admin_user_update_roles', { id: user.id }) }}" class="btn btn-sm btn-secondary">Изменить роль</a>
+                <a href="{{ path('admin_user_update_roles', {id: user.id}) }}" class="btn btn-sm btn-secondary">Изменить роль</a>
               </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
       {# route явно: при 422 re-render из CreateAccountController текущий _route — POST-only #}
-      {% include 'app/_ui/_pagination.html.twig' with { pager: pager, route: 'admin_user_index', params: app.request.query.all } %}
+      {% include 'app/_ui/_pagination.html.twig' with {pager: pager, route: 'admin_user_index', params: app.request.query.all} %}
     </div>
   {% else %}
     <div class="empty">
@@ -167,7 +167,7 @@
 {% block admin_modals %}
   <dialog id="account-create-dialog" class="dlg" aria-labelledby="account-create-title">
     <div class="mdl">
-      {{ form_start(accountForm, { action: path('admin_user_create_account'), method: 'POST' }) }}
+      {{ form_start(accountForm, {action: path('admin_user_create_account'), method: 'POST'}) }}
         <div class="mdl-head">
           <div class="u-flex-1">
             <h3 id="account-create-title">Добавить аккаунт</h3>
@@ -187,7 +187,7 @@
           {% endif %}
 
           <div class="form-field">
-            {{ form_label(accountForm.email, 'Email', { label_attr: { class: 'form-label' } }) }}
+            {{ form_label(accountForm.email, 'Email', {label_attr: {class: 'form-label'}}) }}
             {{ form_widget(accountForm.email, {
               attr: {
                 class: 'input' ~ (accountForm.email.vars.errors|length > 0 ? ' is-error'),
@@ -199,7 +199,7 @@
           </div>
 
           <div class="form-field">
-            {{ form_label(accountForm.plainPassword, 'Пароль', { label_attr: { class: 'form-label' } }) }}
+            {{ form_label(accountForm.plainPassword, 'Пароль', {label_attr: {class: 'form-label'}}) }}
             {{ form_widget(accountForm.plainPassword, {
               attr: {
                 class: 'input' ~ (accountForm.plainPassword.vars.errors|length > 0 ? ' is-error'),
@@ -211,7 +211,7 @@
           </div>
 
           <div class="form-field">
-            {{ form_label(accountForm.companyName, 'Название компании', { label_attr: { class: 'form-label' } }) }}
+            {{ form_label(accountForm.companyName, 'Название компании', {label_attr: {class: 'form-label'}}) }}
             {{ form_widget(accountForm.companyName, {
               attr: {
                 class: 'input' ~ (accountForm.companyName.vars.errors|length > 0 ? ' is-error'),

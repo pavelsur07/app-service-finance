@@ -42,9 +42,7 @@
     {% set applied = applied|merge([{label: 'Валюта: ' ~ filters.currency, keys: ['currency']}]) %}
 {% endif %}
 {# Сумма — «от 1 000», «до 1 500,50»: копейки только если они есть. Та же подпись у пилюли «Сумма». #}
-{% set amountLabel = (filters.amountMin ? 'от ' ~ filters.amountMin|vf_number(filters.amountMin matches '/\\.\\d*[1-9]/' ? 2 : 0) : '')
-    ~ (filters.amountMin and filters.amountMax ? ' ' : '')
-    ~ (filters.amountMax ? 'до ' ~ filters.amountMax|vf_number(filters.amountMax matches '/\\.\\d*[1-9]/' ? 2 : 0) : '') %}
+{% set amountLabel = (filters.amountMin ? 'от ' ~ filters.amountMin|vf_number(filters.amountMin matches '/\\.\\d*[1-9]/' ? 2 : 0) : '') ~ (filters.amountMin and filters.amountMax ? ' ' : '') ~ (filters.amountMax ? 'до ' ~ filters.amountMax|vf_number(filters.amountMax matches '/\\.\\d*[1-9]/' ? 2 : 0) : '') %}
 {% if amountLabel %}
     {% set applied = applied|merge([{label: 'Сумма: ' ~ amountLabel, keys: ['amountMin', 'amountMax']}]) %}
 {% endif %}
@@ -237,10 +235,7 @@
                                title="Документы ОПиУ созданы на всю сумму"></i>
                         {# Документ ОПиУ строится из одной категории (решение D1),
                            поэтому предлагаем его только при единственной строке разбивки. #}
-                        {% elseif not tx.isTransfer
-                                     and tx.splits|length == 1
-                                     and tx.splits|first.cashflowCategory.allowPlDocument
-                                     and tx.remainingAmount > 0 %}
+                        {% elseif not tx.isTransfer and tx.splits|length == 1 and tx.splits|first.cashflowCategory.allowPlDocument and tx.remainingAmount > 0 %}
                             <i class="ti ti-file-plus text-secondary" role="img" aria-label="Можно создать документ ОПиУ"
                                title="Можно создать документ ОПиУ"></i>
                         {% else %}

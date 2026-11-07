@@ -3,7 +3,7 @@
 {% block balance_content %}
     <div class="wz-head">
         <h1 class="wz-title">Сравнение двух дат</h1>
-    </div>{{ ui.period(from,to) }}
+    </div>{{ ui.period(from, to) }}
     {% if not comparison.before.initialized or not comparison.after.initialized %}
         <div class="wz-row">
             <div class="alert alert--info" role="status"><div class="a-body"><p class="a-text">На одной из выбранных дат учет еще не начат.</p></div></div>
@@ -23,11 +23,11 @@
                 {% for row in comparison.after.accounts %}
                     <tr>
                         <td>
-                            <a href="{{ path('balance_account_card',{id:row.id,from:from,to:to}) }}">{{ row.name }}</a>
+                            <a href="{{ path('balance_account_card', {id: row.id, from: from, to: to}) }}">{{ row.name }}</a>
                             <p class="t-sub">{{ row.article_name }}</p>
                         </td>
-                        {% for key in ['before','closing','change'] %}
-                            <td class="t-cell--right">{{ ui.amount(attribute(row,key), currency) }}</td>
+                        {% for key in ['before', 'closing', 'change'] %}
+                            <td class="t-cell--right">{{ ui.amount(attribute(row, key), currency) }}</td>
                         {% endfor %}
                     </tr>
                 {% else %}

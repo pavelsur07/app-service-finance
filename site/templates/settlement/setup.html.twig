@@ -5,7 +5,7 @@
 <div class="dds-op card-body"><div class="dds-op__grid">
     <div class="dds-op__main"><section class="dds-card"><h2 class="dds-card__title">Дата начала</h2><div class="card-body">
         {% if book %}<p>Дата начала зафиксирована: {{ book.startDate|date('d.m.Y') }}. Её нельзя изменить после настройки.</p>{% endif %}
-        {{ form_start(form,{attr:{id:'settlement-setup-form'}}) }}{{ form_errors(form) }}{{ form_row(form.startDate,{disabled:form.startDate.vars.disabled or not is_granted('module.finance.write')}) }}{{ form_end(form) }}
+        {{ form_start(form, {attr: {id: 'settlement-setup-form'}}) }}{{ form_errors(form) }}{{ form_row(form.startDate, {disabled: form.startDate.vars.disabled or not is_granted('module.finance.write')}) }}{{ form_end(form) }}
     </div></section></div>
     <aside class="dds-op__aside"><section class="dds-card"><h2 class="dds-card__title">Сведения</h2><p class="dds-card__empty">Учёт ведётся в рублях. На выбранную дату внесите долги и подтверждённые авансы отдельными документами начальных остатков. Старые ДДС и ОПиУ автоматически не включаются.</p></section></aside>
 </div>

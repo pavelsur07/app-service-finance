@@ -3,7 +3,7 @@
   поэтому символ — в заголовке колонки (col), а в ячейке только число.
   signed — плюс у увеличения в списке движений; negate — уменьшение, хранящееся положительной суммой.
 #}
-{% macro amount(minor, currency, signed = false, negate = false) %}
+{% macro amount(minor, currency, signed=false, negate=false) %}
     {%- set digits = vf_currency_digits(currency) -%}
     {{- minor|vf_minor(digits)|vf_amount(digits, null, signed, null, negate) -}}
 {% endmacro %}
@@ -42,7 +42,7 @@
         {% if item.isVisible %}
             <tr>
                 <td class="t-tree{{ item.level == 1 ? ' t-tree--root' : '' }}" style="--lvl: {{ item.level - 1 }}">
-                    <a href="{{ path('balance_article_card',{id:item.id}) }}">{{ item.name }}</a>
+                    <a href="{{ path('balance_article_card', {id: item.id}) }}">{{ item.name }}</a>
                 </td>
                 <td class="t-cell--right">{{ _self.amount(item.amountMinor, currency) }}</td>
             </tr>

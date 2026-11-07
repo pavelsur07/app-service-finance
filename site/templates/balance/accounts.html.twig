@@ -25,27 +25,27 @@
                 {% for item in items %}
                     <tr>
                         <td>
-                            <a href="{{ path('balance_account_card',{id:item.id}) }}">{{ item.name }}</a>
+                            <a href="{{ path('balance_account_card', {id: item.id}) }}">{{ item.name }}</a>
                             {% if item.is_archived %} <span class="status status--neutral">В архиве</span>{% endif %}
                             <p class="t-sub">{{ item.code }}</p>
                         </td>
                         <td>
-                            <a href="{{ path('balance_article_card',{id:item.article_id}) }}">{{ item.article_name }}</a>
+                            <a href="{{ path('balance_article_card', {id: item.article_id}) }}">{{ item.article_name }}</a>
                         </td>
                         <td class="t-cell--right">{{ ui.amount(item.balance, currency) }}</td>
                         <td>{{ item.allow_negative ? 'Отрицательный остаток разрешен' : 'Отрицательный остаток запрещен' }}</td>
                         <td>
                             <div class="t-actions">
                                 {% if permissions.manage %}
-                                    <a class="btn btn-sm btn-secondary" href="{{ path('balance_account_edit',{id:item.id}) }}">Изменить</a>
-                                    <form method="post" action="{{ path('balance_account_archive',{id:item.id}) }}">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('account_archive_'~item.id) }}">
-                                        <input type="hidden" name="archive" value="{{ item.is_archived ? '0':'1' }}">
-                                        <button class="btn btn-sm btn-secondary">{{ item.is_archived ? 'Вернуть из архива':'Архивировать' }}</button>
+                                    <a class="btn btn-sm btn-secondary" href="{{ path('balance_account_edit', {id: item.id}) }}">Изменить</a>
+                                    <form method="post" action="{{ path('balance_account_archive', {id: item.id}) }}">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('account_archive_' ~ item.id) }}">
+                                        <input type="hidden" name="archive" value="{{ item.is_archived ? '0' : '1' }}">
+                                        <button class="btn btn-sm btn-secondary">{{ item.is_archived ? 'Вернуть из архива' : 'Архивировать' }}</button>
                                     </form>
                                 {% endif %}
                                 {% if permissions.prepare and not item.is_archived %}
-                                    <a class="btn btn-sm btn-secondary" href="{{ path('balance_account_target',{id:item.id}) }}">Установить остаток</a>
+                                    <a class="btn btn-sm btn-secondary" href="{{ path('balance_account_target', {id: item.id}) }}">Установить остаток</a>
                                 {% endif %}
                             </div>
                         </td>

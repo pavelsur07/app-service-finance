@@ -9,7 +9,7 @@
         </div></section>
         {% if form %}
             {% form_theme form 'settlement/_form_theme.html.twig' %}
-            {{ form_start(form,{attr:{id:'settlement-positions-form',class:'dds-op__form'}}) }}{{ form_errors(form) }}
+            {{ form_start(form, {attr: {id: 'settlement-positions-form', class: 'dds-op__form'}}) }}{{ form_errors(form) }}
             <fieldset class="dds-op__fieldset" aria-label="Реквизиты документа"{% if not is_granted('module.finance.write') %} disabled{% endif %}>
                 <section class="dds-card"><h2 class="dds-card__title">Реквизиты изменения</h2><div class="card-body">{% include 'settlement/_event_fields.html.twig' %}</div></section>
             </fieldset>{{ form_end(form) }}
@@ -17,10 +17,10 @@
     </div>
     <aside class="dds-op__aside"><section class="dds-card"><h2 class="dds-card__title">Сведения</h2><div class="card-body">
         <p>Выберите основание и оплату одного направления. Остатки ниже приведены на текущую дату; возможность изменения проверяется и на все последующие даты.</p>
-        {% if form %}<p>Показано {{ min(positions|length,50) }} из {{ positions|length }} оснований и оплат. Все варианты доступны в полях выбора.</p><a href="{{ path('settlement_documents',{counterparty:counterpartyId}) }}">Все документы с остатками в карточках</a>{% endif %}
+        {% if form %}<p>Показано {{ min(positions|length, 50) }} из {{ positions|length }} оснований и оплат. Все варианты доступны в полях выбора.</p><a href="{{ path('settlement_documents', {counterparty: counterpartyId}) }}">Все документы с остатками в карточках</a>{% endif %}
     </div></section></aside>
 </div>
 {% if form %}<div class="dds-op__bar"><span class="dds-op__status">{{ is_granted('module.finance.write') ? 'Изменения сохраняются после подтверждения' : 'Только просмотр' }}</span><div class="dds-op__actions"><a class="btn" href="{{ path('settlement_documents') }}">К документам</a>{% if is_granted('module.finance.write') %}<button class="btn btn-primary" type="submit" form="settlement-positions-form">{{ submitLabel }}</button>{% endif %}</div></div>{% endif %}
 </div>
-{% if form %}{% include 'settlement/_positions.html.twig' with {canWrite:false,positions:positions|slice(0,50)} %}{% endif %}
+{% if form %}{% include 'settlement/_positions.html.twig' with {canWrite: false, positions: positions|slice(0, 50)} %}{% endif %}
 {% endblock %}

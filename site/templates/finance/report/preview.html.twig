@@ -133,9 +133,7 @@
             {% set availableResponsibilityCenterIds = availableResponsibilityCenterIds|merge([responsibilityCenter.id]) %}
         {% endfor %}
         {# Legacy project-layout URLs never scoped columns by singular projectDirectionId. #}
-        {% set uiSelectedProjectDirectionIds = layout == 'projects' and not dimensionFiltersPresent
-            ? null
-            : selectedProjectDirectionIds %}
+        {% set uiSelectedProjectDirectionIds = layout == 'projects' and not dimensionFiltersPresent ? null : selectedProjectDirectionIds %}
         {% set submittedProjectIds = uiSelectedProjectDirectionIds ?? availableProjectIds %}
         {% set submittedResponsibilityCenterIds = selectedResponsibilityCenterIds ?? availableResponsibilityCenterIds %}
         {% set projectFilterTracked = projectDirections is not empty or selectedProjectDirectionIds is not null %}
@@ -201,9 +199,7 @@
         {% set fromMonth = from|date('n') %}
         {% set toMonth = to|date('n') %}
         {% if fromYear == toYear %}
-            {% set reportPeriodLabel = fromMonth == toMonth
-                ? monthNames[fromMonth] ~ ' ' ~ fromYear
-                : monthNames[fromMonth] ~ ' – ' ~ monthNames[toMonth] ~ ' ' ~ toYear %}
+            {% set reportPeriodLabel = fromMonth == toMonth ? monthNames[fromMonth] ~ ' ' ~ fromYear : monthNames[fromMonth] ~ ' – ' ~ monthNames[toMonth] ~ ' ' ~ toYear %}
         {% else %}
             {% set reportPeriodLabel = monthNames[fromMonth] ~ ' ' ~ fromYear ~ ' – ' ~ monthNames[toMonth] ~ ' ' ~ toYear %}
         {% endif %}

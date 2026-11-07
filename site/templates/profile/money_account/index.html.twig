@@ -31,7 +31,7 @@
                     {% for acc in accounts %}
                         <tr>
                             <td>{{ acc.name }}</td>
-                            <td>{% include 'profile/money_account/_type_badge.html.twig' with { type: acc.type.value } only %}</td>
+                            <td>{% include 'profile/money_account/_type_badge.html.twig' with {type: acc.type.value} only %}</td>
                             <td>{{ acc.currency }}</td>
                             <td class="text-end">
                                 <a href="{{ path('money_account_edit', {'id': acc.id}) }}" class="btn btn-icon" title="Редактировать">

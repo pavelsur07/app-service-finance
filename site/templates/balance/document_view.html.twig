@@ -11,12 +11,12 @@
         </p>
         {% if document.original_operation_id %}
             <p>
-                <a href="{{ path('balance_document',{id:document.original_operation_id}) }}">Исходный документ</a>
+                <a href="{{ path('balance_document', {id: document.original_operation_id}) }}">Исходный документ</a>
             </p>
         {% endif %}
         {% if document.reversal_id %}
             <p>
-                <a href="{{ path('balance_document',{id:document.reversal_id}) }}">Сторнирующий документ</a>
+                <a href="{{ path('balance_document', {id: document.reversal_id}) }}">Сторнирующий документ</a>
             </p>
         {% endif %}
         <table class="t-table">
@@ -32,12 +32,12 @@
                 {% for line in document.lines %}
                     <tr>
                         <td>
-                            <a href="{{ path('balance_account_card',{id:line.account_id}) }}">{{ line.account_name }}
+                            <a href="{{ path('balance_account_card', {id: line.account_id}) }}">{{ line.account_name }}
                             </a>
                         </td>
-                        <td>{{ line.type == 'asset' ? 'Актив':'Пассив' }}
+                        <td>{{ line.type == 'asset' ? 'Актив' : 'Пассив' }}
                         </td>
-                        <td>{{ line.direction == 'increase' ? 'Увеличение':'Уменьшение' }}
+                        <td>{{ line.direction == 'increase' ? 'Увеличение' : 'Уменьшение' }}
                         </td>
                         <td class="t-cell--right">{{ ui.amount(line.amount, currency) }}</td>
                     </tr>
@@ -51,8 +51,8 @@
         {% if document.status == 'posted' %}
             <p>Проведен {{ ui.datetime(document.posted_at) }}. Проведенные данные неизменяемы.</p>
         {% elseif permissions.post %}
-            <form method="post" action="{{ path('balance_document_post',{id:document.id}) }}">
-                <input type="hidden" name="_token" value="{{ csrf_token('document_post_'~document.id) }}">
+            <form method="post" action="{{ path('balance_document_post', {id: document.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('document_post_' ~ document.id) }}">
                 <input type="hidden" name="version" value="{{ document.version }}">
                 {% if document.kind == 'opening' and document.lines is empty %}
                     <label class="checkbox-label">
@@ -63,9 +63,9 @@
         {% endif %}
         <div class="wz-actions">
             {% if permissions.post and document.status == 'posted' and document.kind != 'opening' and not document.reversal_id %}
-                <a class="btn btn-md btn-danger" href="{{ path('balance_document_reverse',{id:document.id}) }}">Оформить сторно</a>
+                <a class="btn btn-md btn-danger" href="{{ path('balance_document_reverse', {id: document.id}) }}">Оформить сторно</a>
             {% endif %}
-            <a class="btn btn-md btn-secondary" href="{{ path('balance_audit',{type:'operation',id:document.id}) }}">История документа</a>
+            <a class="btn btn-md btn-secondary" href="{{ path('balance_audit', {type: 'operation', id: document.id}) }}">История документа</a>
             <a class="btn btn-md btn-secondary" href="{{ path('balance_journal') }}">Журнал</a>
         </div>
     </section>

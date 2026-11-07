@@ -12,6 +12,7 @@ linked documents — read the one your task touches, not all of them:
 | `docs/workflow/release.md` | Migration deploy: dispatch, gates, request templates | PR carries a migration |
 | `docs/workflow/templates.md` | plan, checkpoint, Stage Report, handoff, STOP message | Large task |
 | `docs/workflow/stage-report.md`, `stage-report-frontend.md` | Stage self-review checklists | closing a Stage |
+| `docs/workflow/twig-conventions.md` | Twig: shells, partials, what never lives in a template, twigcs style | task touches `site/templates/` |
 | `docs/workflow/git-housekeeping.md` | PR base verification, branch deletion | `gh pr create`, branch cleanup |
 | `docs/workflow/data-migrations.md` | Data migrations: measurements, merges, post-deploy reconciliation | migration touching data |
 | `docs/workflow/health-gates.md` | Monitors and gates: check coverage = fix coverage | cron check, verifier |

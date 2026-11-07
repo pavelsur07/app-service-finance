@@ -3,10 +3,10 @@
 {% block title %}Admin · Тариф · {{ company.name }}{% endblock %}
 
 {% set statusView = {
-  active: { cls: 'success', label: 'Активен' },
-  grace: { cls: 'warning', label: 'Льготный период' },
-  read_only: { cls: 'danger', label: 'Только чтение' },
-  none: { cls: 'neutral', label: 'Нет тарифа' },
+  active: {cls: 'success', label: 'Активен'},
+  grace: {cls: 'warning', label: 'Льготный период'},
+  read_only: {cls: 'danger', label: 'Только чтение'},
+  none: {cls: 'neutral', label: 'Нет тарифа'},
 } %}
 
 {% block body %}
@@ -17,7 +17,7 @@
         {{ company.name }}{% if company.inn %} · ИНН {{ company.inn }}{% endif %}
       </div>
     </div>
-    <a href="{{ path('admin_user_index', { company: company.id }) }}" class="btn btn-md btn-secondary">К пользователям</a>
+    <a href="{{ path('admin_user_index', {company: company.id}) }}" class="btn btn-md btn-secondary">К пользователям</a>
   </div>
 
   {# Текущее состояние #}
@@ -46,7 +46,7 @@
         <div data-billing-next-tariff>
           <div class="form-hint">Запланировано</div>
           <div>С {{ access.nextTariffFrom|date('d.m.Y') }} — тариф «{{ access.nextTariffName }}»</div>
-          <form method="post" action="{{ path('admin_billing_company_cancel_next', { companyId: company.id }) }}" style="margin-top:var(--s-1);" data-billing-cancel-next>
+          <form method="post" action="{{ path('admin_billing_company_cancel_next', {companyId: company.id}) }}" style="margin-top:var(--s-1);" data-billing-cancel-next>
             <input type="hidden" name="_token" value="{{ csrf_token('billing_cancel_next_' ~ company.id) }}">
             <button type="submit" class="btn btn-sm btn-secondary" title="До {{ access.paidUntil|date('d.m.Y') }} останется тариф «{{ access.tariffName }}» — дни, оплаченные по цене «{{ access.nextTariffName }}», клиент получит на текущем тарифе. Онлайн-повышение до этой даты — только через вас.">Отменить переход</button>
           </form>
@@ -66,7 +66,7 @@
     <section class="card">
       <h2 style="font-size:var(--font-15); margin:0 0 var(--s-1);">Назначить тариф</h2>
       <p class="form-hint" style="margin:0 0 var(--s-3);">Без оплаты: «Друг» — бессрочно; остальные — с периодом (договор сопровождения, особые условия, ручная правка).</p>
-      <form method="post" action="{{ path('admin_billing_company_assign', { companyId: company.id }) }}">
+      <form method="post" action="{{ path('admin_billing_company_assign', {companyId: company.id}) }}">
         <input type="hidden" name="_token" value="{{ csrf_token('billing_assign_' ~ company.id) }}">
         <div class="form-field">
           <label class="form-label" for="assign-tariff">Тариф</label>
@@ -101,7 +101,7 @@
     <section class="card">
       <h2 style="font-size:var(--font-15); margin:0 0 var(--s-1);">Отметить оплату по счёту</h2>
       <p class="form-hint" style="margin:0 0 var(--s-3);">Период считается от даты зачисления; оплата до окончания продлевает текущий период. Другой тариф: дороже — сразу, остаток пересчитывается в дни; дешевле — со следующего периода.</p>
-      <form method="post" action="{{ path('admin_billing_company_payment', { companyId: company.id }) }}">
+      <form method="post" action="{{ path('admin_billing_company_payment', {companyId: company.id}) }}">
         <input type="hidden" name="_token" value="{{ csrf_token('billing_payment_' ~ company.id) }}">
         <input type="hidden" name="payment_id" value="{{ paymentFormId }}">
         <div style="display:flex; gap:var(--s-3);">
@@ -230,7 +230,7 @@
           {% endfor %}
         </tbody>
       </table>
-      {% include 'app/_ui/_pagination.html.twig' with { pager: payments } %}
+      {% include 'app/_ui/_pagination.html.twig' with {pager: payments} %}
     {% else %}
       <div class="empty">
         <div class="empty-title">Оплат пока нет</div>

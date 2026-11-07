@@ -1,8 +1,8 @@
 {% extends 'base.html.twig' %}
 {% set app_nav_active = 'settlement' %}
 {% set app_breadcrumb = 'Взаиморасчёты' %}
-{% set bucketLabels = {receivable:'Нам должны', payable:'К оплате', advance_given:'Выданные авансы', advance_received:'Полученные авансы', unallocated_out:'Нераспределённые выплаты', unallocated_in:'Нераспределённые поступления'} %}
-{% set kindLabels = {opening:'Начальный остаток', obligation:'Основание долга', payment:'Оплата', correction:'Корректировка', allocation:'Погашение', classification:'Классификация оплаты', allocation_reversal:'Отмена погашения', document_reversal:'Отмена документа'} %}
+{% set bucketLabels = {receivable: 'Нам должны', payable: 'К оплате', advance_given: 'Выданные авансы', advance_received: 'Полученные авансы', unallocated_out: 'Нераспределённые выплаты', unallocated_in: 'Нераспределённые поступления'} %}
+{% set kindLabels = {opening: 'Начальный остаток', obligation: 'Основание долга', payment: 'Оплата', correction: 'Корректировка', allocation: 'Погашение', classification: 'Классификация оплаты', allocation_reversal: 'Отмена погашения', document_reversal: 'Отмена документа'} %}
 {% block title %}Взаиморасчёты{% endblock %}
 {% block breadcrumbs %}
 <nav aria-label="Путь"><ol class="breadcrumb"><li class="breadcrumb-item">Деньги</li><li class="breadcrumb-item"{% if app.request.attributes.get('_route') == 'settlement_index' %} aria-current="page"{% endif %}><a href="{{ path('settlement_index') }}">Взаиморасчёты</a></li></ol></nav>
