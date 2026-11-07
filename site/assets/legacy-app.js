@@ -28,6 +28,8 @@ import { initCostMappings } from './pages/cost_mappings.js';
 import { initCostPlMapping } from './pages/cost_pl_mapping.js';
 import { initDefaultSaleMapping } from './pages/default_sale_mapping.js';
 import { initMarketplaceAds } from './pages/marketplace_ads.js';
+import { initListingsIndex } from './pages/listings_index.js';
+import { initListingTags } from './pages/listing_tags.js';
 
 // Period presets (partials/_period_presets.html.twig): dates come from the server.
 document.addEventListener('click', (event) => {
@@ -64,6 +66,8 @@ const initDds = () => {
   initCostPlMapping();
   initDefaultSaleMapping();
   initMarketplaceAds();
+  initListingsIndex();
+  initListingTags();
 };
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initDds);

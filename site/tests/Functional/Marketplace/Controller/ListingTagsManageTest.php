@@ -49,6 +49,33 @@ final class ListingTagsManageTest extends WebTestCaseBase
         self::assertStringContainsString('Зима', (string) $client->getResponse()->getContent());
         // Счётчик листингов под тегом = 2.
         self::assertStringContainsString('2', $crawler->filter('tbody tr td.text-end')->first()->text());
+
+        // Хуки модуля assets/pages/listing_tags.js: адреса API на корне, удаление — триггер диалога.
+        $root = $crawler->filter('[data-listing-tags]');
+        self::assertCount(1, $root);
+        self::assertSame('/api/marketplace/listings/tags/create', $root->attr('data-create-url'));
+        self::assertSame('/api/marketplace/listings/tags/merge', $root->attr('data-merge-url'));
+        self::assertSame(
+            '/api/marketplace/listings/tags/00000000-0000-0000-0000-000000000000/rename',
+            $root->attr('data-rename-url'),
+        );
+        self::assertSame('#tags-confirm', $root->attr('data-confirm-target'));
+        self::assertNotSame('', (string) $root->attr('data-confirm-token'));
+        self::assertSame('50', $root->attr('data-name-max-length'));
+        self::assertSame($winter, json_decode((string) $root->attr('data-tags'), true)[0]['id'] ?? null);
+
+        $delete = $crawler->filter('tr[data-tag-id] [data-delete-tag]');
+        self::assertCount(1, $delete);
+        self::assertSame('#tags-confirm', $delete->attr('data-bs-target'));
+        self::assertSame('/api/marketplace/listings/tags/'.$winter.'/delete', $delete->attr('data-confirm-action'));
+        self::assertSame('Удалить тег «Зима»?', $delete->attr('data-confirm-title'));
+        self::assertSame('Тег снимется с 2 листинг(ов).', $delete->attr('data-confirm-body'));
+        self::assertSame('danger', $delete->attr('data-confirm-variant'));
+        self::assertSelectorExists('tr[data-tag-id] [data-rename-tag]');
+        self::assertSelectorExists('tr[data-tag-id] [data-merge-menu]');
+        self::assertSelectorExists('#tags-confirm[data-confirm-modal] form[data-confirm-form]');
+        self::assertSelectorExists('#createTagModal[data-create-tag-modal] form input[name="name"]');
+        self::assertSelectorNotExists('[onclick], [onchange], [onsubmit]');
     }
 
     public function testPageShowsAddButtonEvenWithoutTags(): void
