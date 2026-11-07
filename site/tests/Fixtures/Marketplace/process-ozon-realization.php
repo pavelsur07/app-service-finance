@@ -12,10 +12,16 @@ $db->fetchOne("SELECT set_config('application_name', ?, false)", [(string) geten
 echo "ready\n";
 flush();
 if ('repair' === getenv('OZON_RACE_MODE')) {
-    exit($container->get(App\Marketplace\Ozon\Command\RepairOzonRealizationOctoberB57d7682Command::class)->run(
+    $status = $container->get(App\Marketplace\Ozon\Command\RepairOzonRealizationOctoberB57d7682Command::class)->run(
         new Symfony\Component\Console\Input\ArrayInput(['--execute' => true, '--expected-raw-hash' => (string) getenv('OZON_RAW_HASH')]),
         new Symfony\Component\Console\Output\ConsoleOutput(),
-    ));
+    );
+    $kernel->shutdown();
+    if (0 !== $status) {
+        throw new RuntimeException('Repair fixture failed.');
+    }
+
+    return;
 }
 try {
     if ('handler' === getenv('OZON_RACE_MODE')) {

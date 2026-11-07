@@ -167,11 +167,11 @@ focused lint/static analysis. Stage Report, commit/push одного task Draft 
 
 ## Handoff и production — отдельное одобрение
 
-- [ ] Один раз выполнить `make site-stan`, `make site-cs-check`,
+- [x] Выполнить `make site-stan`, `make site-cs-check`,
   `make site-cs-strict-types`, `make site-test-unit`, `make site-test`.
   Провести final internal review в свежей сессии и external review по
   `docs/workflow/external-review.md`; зафиксировать findings и метрики.
-- [ ] После готового кода, тестов и локального rehearsal подготовить конкретные
+- [x] После готового кода, тестов и локального rehearsal подготовить конкретные
   команды и отдельные named approvals: merge + deploy кода; резервная копия
   целевых строк; установка/удаление узкого временного wrapper для команды;
   единственный execute ремонта. Одобрение плана не разрешает эти операции.

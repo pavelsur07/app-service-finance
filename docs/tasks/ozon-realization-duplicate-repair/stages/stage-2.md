@@ -46,8 +46,9 @@
 - External findings сначала RED, после исправлений: 11 tests / 15 assertions PASS.
 - Focused PHPStan (11 changed PHP files): No errors.
 - Header unit после финального phpDoc: 8 tests / 8 assertions PASS.
+- Финальный fixture entrypoint regression: 3 tests / 19 assertions PASS; focused CS PASS.
 - Полный PHPUnit после runtime fixes: 8532 tests / 47908 assertions PASS.
-- Full CS: 0 / 3909 changes; strict-types: 0 / 3909 changes. Full PHPStan — handoff gate.
+- Full CS: 0 / 3909 changes; strict-types: 0 / 3909 changes. Full PHPStan после устранения fixture exit — No errors / 3873 files.
 
 #### Internal review
 
@@ -67,4 +68,4 @@ BLOCKER 1 / IMPORTANT 3. Исправлены safe MINOR; открытых FOLLO
 
 Production данные остаются удвоенными до отдельно одобренного execute.
 Не добавлены миграции, зависимости или разрешения wrapper. Next: handoff;
-полный PHPStan, документация итогов, push/Ready и единый запрос Владельцу.
+документация итогов, push/Ready и единый запрос Владельцу.
