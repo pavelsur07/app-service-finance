@@ -20,7 +20,7 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 /**
  * Сид отчёта «Оборачиваемость» для functional-тестов страницы и экспорта.
- * Стандартный набор: A 412/39/1800 → свыше 90; B 48/186/600 → до 30; C 20/0/100 → нет продаж; D 15/3 без цены.
+ * Стандартный набор: A 412/39/1800 → свыше 90; B 48/186/600 → до 30 (размер 46); C 20/0/100 → нет продаж; D 15/3 без цены.
  */
 trait StockTurnoverFixtures
 {
@@ -52,7 +52,7 @@ trait StockTurnoverFixtures
         $tail = substr((string) $company->getId(), -2);
         $base = 9000 + (int) hexdec($tail) * 10;
         $a = $this->listing($company, $base + 1, 'SKU-A', 'Худи серое');
-        $b = $this->listing($company, $base + 2, 'SKU-B', 'Футболка чёрная');
+        $b = $this->listing($company, $base + 2, 'SKU-B', 'Футболка чёрная', '46');
         $c = $this->listing($company, $base + 3, 'SKU-C', 'Носки');
         $d = $this->listing($company, $base + 4, 'SKU-D', 'Кепка');
 
@@ -69,7 +69,7 @@ trait StockTurnoverFixtures
         $this->em()->flush();
     }
 
-    private function listing(Company $company, int $index, string $sku, string $name): MarketplaceListing
+    private function listing(Company $company, int $index, string $sku, string $name, ?string $size = null): MarketplaceListing
     {
         $listing = MarketplaceListingBuilder::aListing()
             ->forCompany($company)
@@ -78,6 +78,9 @@ trait StockTurnoverFixtures
             ->withMarketplaceSku($sku)
             ->withName($name)
             ->build();
+        if (null !== $size) {
+            $listing->setSize($size);
+        }
         $this->em()->persist($listing);
 
         return $listing;

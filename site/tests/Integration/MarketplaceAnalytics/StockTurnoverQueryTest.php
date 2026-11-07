@@ -87,6 +87,23 @@ final class StockTurnoverQueryTest extends IntegrationTestCase
         self::assertSame([], $summary->staleSources);
     }
 
+    public function testListingSizeIsExposedAndUnknownBecomesNull(): void
+    {
+        $sized = $this->listing('S', 'Лосины');
+        $sized->setSize('46');
+        $this->snapshot($sized, '5.000', 'fbo');
+        $plain = $this->listing('P', 'Кепка');
+        $this->snapshot($plain, '5.000', 'fbo');
+        $this->em->flush();
+        $this->em->clear();
+
+        $rows = $this->query->execute($this->filter())->rows;
+        $byId = array_column(array_map(static fn (StockTurnoverRow $r): array => [$r->listingId, $r->size], $rows), 1, 0);
+
+        self::assertSame('46', $byId[$sized->getId()]);
+        self::assertNull($byId[$plain->getId()]);
+    }
+
     public function testTiesAreOrderedByListingIdSoPagesAreStable(): void
     {
         // Одинаковые название, цена и остаток: порядок должен быть детерминирован (по listingId), иначе страницы «плывут».

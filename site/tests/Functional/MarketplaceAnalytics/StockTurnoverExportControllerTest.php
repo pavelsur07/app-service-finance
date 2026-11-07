@@ -31,15 +31,17 @@ final class StockTurnoverExportControllerTest extends WebTestCaseBase
 
         $rows = $sheets['Оборачиваемость'];
         self::assertSame(
-            ['Листинг ID', 'Товар', 'SKU', 'Артикул продавца', 'Источник', 'Остаток', 'Продано за период', 'Продаж в день', 'Дней запаса', 'Себестоимость', 'В деньгах', 'Скорость продаж'],
+            ['Листинг ID', 'Товар', 'SKU', 'Артикул продавца', 'Размер', 'Источник', 'Остаток', 'Продано за период', 'Продаж в день', 'Дней запаса', 'Себестоимость', 'В деньгах', 'Скорость продаж'],
             $rows[0],
         );
         self::assertCount(5, $rows);
         self::assertSame('Худи серое', $rows[1][1]);
-        self::assertSame('свыше 90 дней', $rows[1][11]);
-        self::assertEquals(741600, $rows[1][10]);
+        self::assertSame('свыше 90 дней', $rows[1][12]);
+        self::assertEquals(741600, $rows[1][11]);
+        self::assertSame('', $rows[1][4]);
         self::assertSame('Кепка', $rows[4][1]);
-        self::assertSame('', $rows[4][10]);
+        self::assertSame('', $rows[4][11]);
+        self::assertSame(['Футболка чёрная', '46'], [$rows[2][1], $rows[2][4]]);
 
         $summary = $sheets['Сводка'];
         self::assertEquals(['В товаре, ₽', 772400], [$summary[0][0], $summary[0][1]]);

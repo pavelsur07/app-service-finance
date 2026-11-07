@@ -14,6 +14,7 @@ final readonly class StockTurnoverRow
         public ?string $title,
         public string $sku,
         public ?string $supplierSku,
+        public ?string $size,
         public string $marketplace,
         public int $stockQty,
         public int $salesQty,
