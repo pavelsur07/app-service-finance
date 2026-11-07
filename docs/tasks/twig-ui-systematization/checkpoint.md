@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 / PR C (2.2) / handoff
-**Status:** Stage 1 (#2909), PR A (#2911), PR B (#2912) на проде; PR C готов к handoff
-**Stage base commit:** master 92611b3ec · ветка `refactor/twig-ui-stage-2c`
+**Phase:** Stage 2 / PR D (2.2, часть 2) / handoff
+**Status:** Stage 1 (#2909), PR A (#2911), PR B (#2912), PR C (#2914) на проде; PR D готов к handoff
+**Stage base commit:** master b43117778 · ветка `refactor/twig-ui-stage-2d`
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -44,11 +44,14 @@
   `pages/pl_category_edit`, `pages/product_import_status`, `pages/report_filters`), партиал
   `_filter_controls_script` удалён, попутно создан отсутствовавший `_import_result`;
   e2e `tests/e2e/page-modules.e2e.cjs`.
-- PR D — 2.3 (пять крупных скриптов) + marketplace-страницы с Twig в JS из 2.2.
+- PR C — на проде. PR D (2.2, часть 2): `pages/month_close`, `pages/marketplace_index`,
+  `pages/cost_mappings`; `confirm:submit` в `confirm_modal.js`, `bootstrap_modal.js`,
+  `apiFetch` с DELETE/204/легаси-ошибками; e2e `tests/e2e/marketplace-modules.e2e.cjs`.
+- 2.3 (крупные скрипты, 5 файлов + Chart-острова) — PR E и далее, по одной-две страницы.
 
 ### Exact next action
-- handoff PR C («merge and deploy»); после деплоя — GlitchTip 30 мин (отчёты ОПиУ/ДДС,
-  редактор статьи ОПиУ); затем PR D: начать с `marketplace/cost_pl_mapping/index`
+- handoff PR D («merge and deploy»); после деплоя — GlitchTip 30 мин (закрытие месяца,
+  настройки аналитики); затем PR E: `marketplace/cost_pl_mapping/index` + `_default_mapping_modal`
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`
@@ -63,7 +66,7 @@
 `company/company_member/{index,invite_show}`, `deals/charge_types/{edit,index,new}`,
 `import_log/index`, `loan/{form,index,report,schedule,schedule_upload}`,
 `marketplace/admin/mapping_error_list`, `marketplace/unmapped/index`,
-`marketplace_analytics/cost_mappings/index`, `marketplace_analytics/stock_turnover/index`,
+`marketplace_analytics/cost_mappings/index` (smoke-тест — PR D), `marketplace_analytics/stock_turnover/index`,
 `profile/money_account/{edit,index,new}`, `telegram/admin/bot/{edit,index,new}`,
 `telegram/integration/index`. Smoke-тест дописывается тем этапом, который трогает страницу.
 Уточнение 07.11 (Stage 2 PR A): `@BankSync/*` тесты имели (`tests/Functional/BankSync`);

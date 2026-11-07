@@ -154,6 +154,64 @@ final class MonthCloseHistoryControllerTest extends WebTestCaseBase
         self::assertStringNotContainsString('закройте этап вручную', $notice->text());
     }
 
+    /**
+     * Модуль assets/pages/month_close.js: адреса API на корне, preflight и закрытие по data-атрибутам,
+     * «Переоткрыть» — через общий диалог подтверждения с полями этапа в data-confirm-fields.
+     */
+    public function testStageCardsExposeModuleHooksAndReopenGoesThroughConfirmDialog(): void
+    {
+        $client = static::createClient();
+        $this->seedActiveSession($client);
+
+        $year = (int) (new \DateTimeImmutable('now'))->format('Y') - 1;
+        $this->persistMonthClose(
+            id: '33333333-3333-3333-3333-c00000000021',
+            year: $year,
+            month: 6,
+            salesClosed: true,
+            costsClosed: false,
+            salesPreliminary: false,
+            costsPreliminary: false,
+        );
+
+        $crawler = $client->request('GET', sprintf('/marketplace/month-close?marketplace=ozon&year=%d&month=6', $year));
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $root = $crawler->filter('[data-month-close]');
+        self::assertCount(1, $root);
+        self::assertSame('/marketplace/month-close/preflight', $root->attr('data-preflight-url'));
+        self::assertSame('/marketplace/month-close/preliminary/rebuild', $root->attr('data-rebuild-url'));
+        self::assertCount(1, $crawler->filter('form[data-autosubmit] select[name="month"]'));
+
+        $preflight = $crawler->filter('button[data-preflight][data-stage="costs"]');
+        self::assertCount(1, $preflight);
+        self::assertSame('ozon', $preflight->attr('data-marketplace'));
+        self::assertSame('6', $preflight->attr('data-month'));
+        self::assertNotSame('', (string) $preflight->attr('data-token'));
+        self::assertCount(1, $crawler->filter('[data-preflight-result="costs"][hidden]'));
+        self::assertCount(1, $crawler->filter('form[data-busy-submit] button[data-close-stage="costs"][disabled]'));
+        self::assertCount(0, $crawler->filter('[onclick], [onsubmit], [onchange]'));
+
+        $trigger = $crawler->filter('[data-confirm-action$="/marketplace/month-close/reopen-stage"]');
+        self::assertCount(1, $trigger, 'Переоткрыть можно только закрытый этап продаж.');
+        self::assertSame('#month-close-confirm', $trigger->attr('data-bs-target'));
+        self::assertSame(
+            ['marketplace' => 'ozon', 'year' => $year, 'month' => 6, 'stage' => 'sales_returns'],
+            json_decode((string) $trigger->attr('data-confirm-fields'), true, 512, \JSON_THROW_ON_ERROR),
+        );
+        self::assertCount(1, $crawler->filter('#month-close-confirm[data-confirm-modal]'));
+
+        $this->submitConfirmTrigger($client, $trigger);
+
+        self::assertResponseRedirects();
+        $client->followRedirect();
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $crawler = new Crawler((string) $client->getResponse()->getContent());
+        self::assertCount(0, $crawler->filter('[data-confirm-action$="/marketplace/month-close/reopen-stage"]'));
+        self::assertCount(1, $crawler->filter('button[data-preflight][data-stage="sales_returns"]'));
+        self::assertCount(1, $crawler->filter('[data-role="reopened-notice"]'));
+    }
+
     private function persistReopenedCosts(string $id, int $year, int $month): void
     {
         $monthClose = new MarketplaceMonthClose(

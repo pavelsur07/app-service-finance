@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Модули маркетплейсов — демо</title>
+</head>
+<body>
+<!-- Демо для tests/e2e/marketplace-modules.e2e.cjs: разметка страниц в объёме хуков модулей. -->
+
+<!-- marketplace/month_close/index -->
+<div class="p-3" data-month-close data-preflight-url="/preflight" data-rebuild-url="/rebuild">
+  <button type="button" id="preflight" data-preflight data-stage="costs" data-marketplace="ozon" data-year="2026" data-month="6" data-token="pf-token"><svg class="icon"></svg>Проверить готовность</button>
+  <div data-preflight-result="costs" hidden></div>
+  <form method="post" action="/" data-busy-submit data-busy-label="Закрываем..."><button type="submit" data-close-stage="costs" disabled>Закрыть этап</button></form>
+  <button type="button" id="rebuild" data-preliminary-rebuild data-marketplace="ozon" data-year="2026" data-month="6" data-token="rb-token">Пересчитать сейчас</button>
+</div>
+
+<!-- marketplace/index -->
+<button type="button" id="apply-trigger" data-action="/raw/doc-1/apply" data-token="apply-token">Применить выручку</button>
+<div id="modal-apply-realization" data-apply-realization-modal>
+  <form method="post" action="" data-apply-realization-form><input type="hidden" name="_token" value="" data-apply-realization-token></form>
+</div>
+<div id="bulkProcessModal" data-bulk-process-url="/api/bulk">
+  <select data-bulk-marketplace><option value="">—</option><option value="ozon">Ozon</option></select>
+  <input type="month" data-bulk-month value="">
+  <button type="button" id="bulk-submit" data-bulk-process-submit>Запустить обработку</button>
+</div>
+
+<!-- marketplace_analytics/cost_mappings/index -->
+<div data-cost-mappings data-add-url="/api/cost-mappings" data-index-url="/">
+  <select data-cost-mapping-marketplace><option value="wildberries" selected>WB</option><option value="ozon">Ozon</option></select>
+  <select data-cost-mapping-type><option value="">—</option><option value="logistics_to">Логистика</option></select>
+  <select data-cost-mapping-category><option value="">—</option><option value="cat-1" data-name="Логистика &lt;b&gt;">Логистика</option></select>
+  <button type="button" id="add" data-cost-mapping-add>Добавить</button>
+  <table><tbody>
+    <tr id="row-1"><td>WB</td><td><button type="button" id="del-1" data-cost-mapping-delete data-bs-toggle="modal" data-bs-target="#cost-mapping-confirm"
+      data-confirm-action="/api/cost-mappings/m-1" data-confirm-token="del-token" data-confirm-title="Удалить маппинг?" data-confirm-submit="Удалить" data-confirm-variant="danger">Удалить</button></td></tr>
+  </tbody></table>
+</div>
+<div id="cost-mapping-confirm" data-confirm-modal>
+  <form method="post" action="" data-confirm-form>
+    <input type="hidden" name="_token" value="" data-confirm-token>
+    <h2 data-confirm-title></h2><p data-confirm-body></p><ul data-confirm-links hidden></ul>
+    <a data-confirm-link hidden></a><button type="button" data-bs-dismiss="modal" data-confirm-cancel>Отмена</button>
+    <button type="submit" data-confirm-submit disabled>Подтвердить</button>
+  </form>
+</div>
+
+<script type="module">
+  import '/assets/confirm_modal.js';
+  import '/assets/busy_submit.js';
+  import { initMonthClose } from '/assets/pages/month_close.js';
+  import { initMarketplaceIndex } from '/assets/pages/marketplace_index.js';
+  import { initCostMappings } from '/assets/pages/cost_mappings.js';
+  window.alerts = [];
+  window.alert = (text) => window.alerts.push(String(text));
+  window.hidden = [];
+  // Bootstrap без события hidden.bs.modal: перезагрузка страницы в тесте не нужна.
+  window.bootstrap = { Modal: { getOrCreateInstance: (el) => ({ hide: () => window.hidden.push(el.id) }) } };
+  initMonthClose();
+  initMarketplaceIndex();
+  initCostMappings();
+  window.submits = [];
+  document.addEventListener('submit', (e) => { window.submits.push({ id: e.target.id, prevented: e.defaultPrevented }); e.preventDefault(); });
+  window.ready = true;
+</script>
+</body>
+</html>

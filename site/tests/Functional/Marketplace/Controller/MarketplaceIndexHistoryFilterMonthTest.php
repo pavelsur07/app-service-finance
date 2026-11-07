@@ -37,5 +37,12 @@ final class MarketplaceIndexHistoryFilterMonthTest extends WebTestCaseBase
         $form = $crawler->filter('#sync-history-marketplace')->closest('form');
         self::assertNotNull($form);
         self::assertCount(0, $form->filter('input[name=month]'));
+
+        // Хуки assets/pages/marketplace_index.js: модалы без inline-скрипта, адрес API в data-атрибуте.
+        self::assertSame('/api/marketplace/bulk-process', $crawler->filter('#bulkProcessModal')->attr('data-bulk-process-url'));
+        self::assertCount(1, $crawler->filter('#bulkProcessModal [data-bulk-marketplace] option[value="ozon"]'));
+        self::assertCount(1, $crawler->filter('#bulkProcessModal input[type="month"][data-bulk-month]'));
+        self::assertCount(1, $crawler->filter('#bulkProcessModal button[data-bulk-process-submit]'));
+        self::assertCount(1, $crawler->filter('#modal-apply-realization[data-apply-realization-modal] form[data-apply-realization-form] input[name="_token"][data-apply-realization-token]'));
     }
 }

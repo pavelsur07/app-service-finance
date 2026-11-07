@@ -3,14 +3,16 @@
 {% set active_tab = 'month_close' %}
 
 {% block tab_content %}
-    <div class="p-3">
+    <div class="p-3" data-month-close
+         data-preflight-url="{{ path('marketplace_month_close_preflight') }}"
+         data-rebuild-url="{{ path('marketplace_month_preliminary_rebuild') }}">
 
         {# Фильтры периода #}
         <form method="get" action="{{ path('marketplace_month_close_index') }}"
-              class="mb-4 d-flex align-items-end gap-3">
+              class="mb-4 d-flex align-items-end gap-3" data-autosubmit>
             <div>
                 <label class="form-label">Маркетплейс</label>
-                <select name="marketplace" class="form-select w-auto" onchange="this.form.submit()">
+                <select name="marketplace" class="form-select w-auto">
                     {% for mp in available_marketplaces %}
                         <option value="{{ mp.value }}" {{ marketplace == mp.value ? 'selected' : '' }}>
                             {{ mp.value|upper }}
@@ -20,7 +22,7 @@
             </div>
             <div>
                 <label class="form-label">Год</label>
-                <select name="year" class="form-select w-auto" onchange="this.form.submit()">
+                <select name="year" class="form-select w-auto">
                     {% for y in range('now'|date('Y'), 'now'|date('Y') - 2, -1) %}
                         <option value="{{ y }}" {{ year == y ? 'selected' : '' }}>{{ y }}</option>
                     {% endfor %}
@@ -28,7 +30,7 @@
             </div>
             <div>
                 <label class="form-label">Месяц</label>
-                <select name="month" class="form-select w-auto" onchange="this.form.submit()">
+                <select name="month" class="form-select w-auto">
                     {% set monthNames = {1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель',
                         5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Август',
                         9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь'} %}
@@ -126,7 +128,7 @@
                                             <form method="post"
                                                   action="{{ path('marketplace_month_close_reconcile') }}"
                                                   enctype="multipart/form-data"
-                                                  onsubmit="handleReconcileSubmit(this)">
+                                                  data-busy-submit data-busy-label="Обработка...">
                                                 <input type="hidden" name="_token" value="{{ csrf_token('marketplace_month_close_reconcile') }}">
                                                 <input type="hidden" name="marketplace" value="{{ marketplace }}">
                                                 <input type="hidden" name="year" value="{{ year }}">
@@ -135,10 +137,7 @@
                                                     <input type="file" name="xlsx_file" class="form-control" accept=".xlsx" required>
                                                     <small class="text-muted">Загрузите актуальный отчёт «Детализация начислений»</small>
                                                 </div>
-                                                <button type="submit" class="btn btn-secondary">
-                                                    <span class="spinner-border spinner-border-sm me-1 d-none" role="status"></span>
-                                                    <span class="btn-label">Пересверить</span>
-                                                </button>
+                                                <button type="submit" class="btn btn-secondary">Пересверить</button>
                                             </form>
                                         </div>
                                     {% else %}
@@ -146,7 +145,7 @@
                                             <form method="post"
                                                   action="{{ path('marketplace_month_close_reconcile') }}"
                                                   enctype="multipart/form-data"
-                                                  onsubmit="handleReconcileSubmit(this)">
+                                                  data-busy-submit data-busy-label="Обработка...">
                                                 <input type="hidden" name="_token" value="{{ csrf_token('marketplace_month_close_reconcile') }}">
                                                 <input type="hidden" name="marketplace" value="{{ marketplace }}">
                                                 <input type="hidden" name="year" value="{{ year }}">
@@ -155,10 +154,7 @@
                                                     <input type="file" name="xlsx_file" class="form-control" accept=".xlsx" required>
                                                     <small class="text-muted">Загрузите отчёт «Детализация начислений» из ЛК Ozon</small>
                                                 </div>
-                                                <button type="submit" class="btn btn-secondary">
-                                                    <span class="spinner-border spinner-border-sm me-1 d-none" role="status"></span>
-                                                    <span class="btn-label">Сверить с xlsx</span>
-                                                </button>
+                                                <button type="submit" class="btn btn-secondary">Сверить с xlsx</button>
                                             </form>
                                         </div>
                                     {% endif %}
@@ -171,27 +167,24 @@
                                 {% endif %}
 
                                 <div class="d-flex flex-wrap gap-2">
-                                    <form method="post"
-                                          action="{{ path('marketplace_month_close_reopen') }}">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('marketplace_month_close_reopen') }}">
-                                        <input type="hidden" name="marketplace" value="{{ marketplace }}">
-                                        <input type="hidden" name="year" value="{{ year }}">
-                                        <input type="hidden" name="month" value="{{ month }}">
-                                        <input type="hidden" name="stage" value="{{ stage.value }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-warning"
-                                                onclick="return confirm('Переоткрыть этап? Документы ОПиУ нужно будет удалить вручную.')">
-                                            Переоткрыть
-                                        </button>
-                                    </form>
+                                    <button type="button" class="btn btn-sm btn-outline-warning"
+                                            data-bs-toggle="modal" data-bs-target="#month-close-confirm"
+                                            data-confirm-action="{{ path('marketplace_month_close_reopen') }}"
+                                            data-confirm-token="{{ csrf_token('marketplace_month_close_reopen') }}"
+                                            data-confirm-fields="{{ {marketplace: marketplace, year: year, month: month, stage: stage.value}|json_encode }}"
+                                            data-confirm-title="Переоткрыть этап?"
+                                            data-confirm-body="Документы ОПиУ нужно будет удалить вручную."
+                                            data-confirm-submit="Переоткрыть" data-confirm-variant="danger">
+                                        Переоткрыть
+                                    </button>
                                     {% if is_current_month and isPreliminary %}
                                         <button type="button"
                                                 class="btn btn-sm btn-outline-warning"
-                                                data-action="preliminary-rebuild"
+                                                data-preliminary-rebuild
                                                 data-marketplace="{{ marketplace }}"
                                                 data-year="{{ year }}"
                                                 data-month="{{ month }}"
-                                                data-token="{{ csrf_token('marketplace_month_preliminary_rebuild') }}"
-                                                onclick="runPreliminaryRebuild(this)">
+                                                data-token="{{ csrf_token('marketplace_month_preliminary_rebuild') }}">
                                             Пересчитать сейчас
                                         </button>
                                     {% endif %}
@@ -213,22 +206,22 @@
                                 {# Кнопка Preflight + закрытие #}
                                 <button type="button"
                                         class="btn btn-outline-secondary btn-sm mb-3"
+                                        data-preflight
                                         data-stage="{{ stage.value }}"
                                         data-marketplace="{{ marketplace }}"
                                         data-year="{{ year }}"
                                         data-month="{{ month }}"
-                                        data-token="{{ csrf_token('marketplace_month_close_preflight') }}"
-                                        onclick="runPreflight(this)">
+                                        data-token="{{ csrf_token('marketplace_month_close_preflight') }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4"/><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"/></svg>
                                     Проверить готовность
                                 </button>
 
-                                <div id="preflight-result-{{ stage.value }}" class="mb-3" style="display:none"></div>
+                                <div data-preflight-result="{{ stage.value }}" class="mb-3" hidden></div>
 
                                 <div class="d-flex flex-wrap gap-2">
                                     <form method="post"
                                           action="{{ path('marketplace_month_close_stage') }}"
-                                          id="form-close-{{ stage.value }}">
+                                          data-busy-submit data-busy-label="Закрываем...">
                                         <input type="hidden" name="_token" value="{{ csrf_token('marketplace_month_close_stage') }}">
                                         <input type="hidden" name="marketplace" value="{{ marketplace }}">
                                         <input type="hidden" name="year" value="{{ year }}">
@@ -236,7 +229,7 @@
                                         <input type="hidden" name="stage" value="{{ stage.value }}">
                                         <button type="submit"
                                                 class="btn btn-primary btn-sm"
-                                                id="btn-close-{{ stage.value }}"
+                                                data-close-stage="{{ stage.value }}"
                                                 disabled>
                                             Закрыть этап
                                         </button>
@@ -244,12 +237,11 @@
                                     {% if is_current_month %}
                                         <button type="button"
                                                 class="btn btn-sm btn-outline-warning"
-                                                data-action="preliminary-rebuild"
+                                                data-preliminary-rebuild
                                                 data-marketplace="{{ marketplace }}"
                                                 data-year="{{ year }}"
                                                 data-month="{{ month }}"
-                                                data-token="{{ csrf_token('marketplace_month_preliminary_rebuild') }}"
-                                                onclick="runPreliminaryRebuild(this)">
+                                                data-token="{{ csrf_token('marketplace_month_preliminary_rebuild') }}">
                                             Пересчитать сейчас
                                         </button>
                                     {% endif %}
@@ -352,145 +344,5 @@
 {% endblock %}
 
 {% block modals %}
-    <script>
-        function handleReconcileSubmit(form) {
-            const btn = form.querySelector('button[type="submit"]');
-            const spinner = btn.querySelector('.spinner-border');
-            const label = btn.querySelector('.btn-label');
-            btn.disabled = true;
-            spinner.classList.remove('d-none');
-            label.textContent = 'Обработка...';
-        }
-
-        function escapeHtml(str) {
-            if (str === null || str === undefined) { return ''; }
-            return String(str)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
-        }
-
-        function runPreflight(btn) {
-            const stage = btn.dataset.stage;
-            const resultDiv = document.getElementById('preflight-result-' + stage);
-            const closeBtn = document.getElementById('btn-close-' + stage);
-
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Проверяем...';
-            resultDiv.style.display = 'none';
-            closeBtn.disabled = true;
-
-            fetch('{{ path('marketplace_month_close_preflight') }}', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: new URLSearchParams({
-                    marketplace: btn.dataset.marketplace,
-                    year: btn.dataset.year,
-                    month: btn.dataset.month,
-                    stage: stage,
-                    _token: btn.dataset.token,
-                })
-            })
-                .then(r => r.json())
-                .then(data => {
-                    let html = '<div class="list-group list-group-flush">';
-                    data.checks.forEach(check => {
-                        const icon = check.passed
-                            ? '<span class="text-success">✓</span>'
-                            : (check.blocking ? '<span class="text-danger">✗</span>' : '<span class="text-warning">⚠</span>');
-                        let detailsHtml = '';
-                        if (check.details && check.details.length > 0) {
-                            detailsHtml = '<ul class="mt-1 mb-0 small text-muted">';
-                            check.details.forEach(item => {
-                                if (item.orphan === true) {
-                                    // sales/returns without a resolvable listing (no marketplace_sku)
-                                    detailsHtml += `<li>Без привязки к листингу — ${Number(item.count)} шт.</li>`;
-                                } else if (item.marketplace_sku !== undefined && item.marketplace_sku !== null) {
-                                    // sales_without_cost / returns_without_cost
-                                    const supplier = item.supplier_sku ? ` (артикул: ${escapeHtml(item.supplier_sku)})` : '';
-                                    detailsHtml += `<li>SKU ${escapeHtml(item.marketplace_sku)}${supplier} — ${Number(item.count)} шт.</li>`;
-                                } else if (item.service_name !== undefined) {
-                                    // costs_unknown_service_names
-                                    const code = item.category_code ? ` (${escapeHtml(item.category_code)})` : '';
-                                    detailsHtml += `<li>${escapeHtml(item.service_name)}${code} — ${Number(item.count)} шт.</li>`;
-                                } else if (item.category_name !== undefined) {
-                                    // costs_without_mapping (existing)
-                                    detailsHtml += `<li>${escapeHtml(item.category_name)} (${Number(item.costs_count)} шт.)</li>`;
-                                } else if (item.business_date !== undefined) {
-                                    // report_days_ready: день периода, не готовый к закрытию
-                                    detailsHtml += `<li>${escapeHtml(item.business_date)} — ${escapeHtml(item.status ?? 'нет статуса')}</li>`;
-                                }
-                            });
-                            detailsHtml += '</ul>';
-                        }
-                        html += `<div class="list-group-item px-0 py-2 d-flex gap-2 align-items-start">
-                        ${icon}
-                        <div>
-                            <div class="fw-medium small">${check.label}</div>
-                            <div class="text-muted small">${check.message}</div>
-                            ${detailsHtml}
-                        </div>
-                     </div>`;
-                    });
-                    html += '</div>';
-
-                    resultDiv.innerHTML = html;
-                    resultDiv.style.display = 'block';
-                    closeBtn.disabled = !data.can_close;
-
-                    btn.disabled = false;
-                    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4"/><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"/></svg>Проверить готовность';
-                })
-                .catch(() => {
-                    resultDiv.innerHTML = '<div class="alert alert-danger">Ошибка проверки. Попробуйте ещё раз.</div>';
-                    resultDiv.style.display = 'block';
-                    btn.disabled = false;
-                });
-        }
-
-        // Блокируем кнопку "Закрыть этап" при submit
-        document.querySelectorAll('form[id^="form-close-"]').forEach(form => {
-            form.addEventListener('submit', function() {
-                const btn = this.querySelector('button[type="submit"]');
-                btn.disabled = true;
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Закрываем...';
-            });
-        });
-
-        function runPreliminaryRebuild(btn) {
-            const originalLabel = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Запускаем...';
-
-            fetch('{{ path('marketplace_month_preliminary_rebuild') }}', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    marketplace: btn.dataset.marketplace,
-                    year: parseInt(btn.dataset.year, 10),
-                    month: parseInt(btn.dataset.month, 10),
-                    _token: btn.dataset.token,
-                }),
-            })
-                .then(async r => {
-                    const data = await r.json().catch(() => ({}));
-                    if (r.status === 202) {
-                        alert('Запущен пересчёт. Обновите страницу через минуту.');
-                    } else if (r.status === 429) {
-                        alert(data.error || 'Подождите минуту перед следующим пересчётом.');
-                    } else {
-                        alert(data.error || 'Не удалось запустить пересчёт.');
-                    }
-                })
-                .catch(() => {
-                    alert('Ошибка сети. Попробуйте ещё раз.');
-                })
-                .finally(() => {
-                    btn.disabled = false;
-                    btn.innerHTML = originalLabel;
-                });
-        }
-    </script>
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'month-close-confirm'} only %}
 {% endblock %}

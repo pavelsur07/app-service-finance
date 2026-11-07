@@ -22,6 +22,9 @@ import { initPlCategoryEdit } from './pages/pl_category_edit.js';
 import { initProductImportStatus } from './pages/product_import_status.js';
 import { initReportFilters } from './pages/report_filters.js';
 import { initTaxProfileFields } from './tax_profile_fields.js';
+import { initMonthClose } from './pages/month_close.js';
+import { initMarketplaceIndex } from './pages/marketplace_index.js';
+import { initCostMappings } from './pages/cost_mappings.js';
 
 // Period presets (partials/_period_presets.html.twig): dates come from the server.
 document.addEventListener('click', (event) => {
@@ -52,6 +55,9 @@ const initDds = () => {
   initProductImportStatus();
   initReportFilters();
   initTaxProfileFields();
+  initMonthClose();
+  initMarketplaceIndex();
+  initCostMappings();
 };
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initDds);
