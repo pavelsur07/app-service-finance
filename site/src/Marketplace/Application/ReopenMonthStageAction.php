@@ -33,10 +33,20 @@ final class ReopenMonthStageAction
 
     public function __invoke(ReopenMonthStageCommand $command): void
     {
-        $this->entityManager->wrapInTransaction(function () use ($command): void {
+        $connection = $this->entityManager->getConnection();
+        $connection->beginTransaction();
+        try {
             $this->monthCloseLock->lock($command->companyId, MarketplaceType::from($command->marketplace), $command->year, $command->month);
             $this->reopenLocked($command);
-        });
+            $connection->commit();
+        } catch (\Throwable $e) {
+            if ($connection->isTransactionActive()) {
+                $connection->rollBack();
+            }
+            $this->entityManager->clear();
+
+            throw $e;
+        }
         $this->financeFacade->invalidatePLRegisterCache($command->companyId);
     }
 
@@ -84,6 +94,7 @@ final class ReopenMonthStageAction
         if (null === $company) {
             throw new \DomainException('Компания не найдена.');
         }
+        $this->entityManager->refresh($company);
 
         $lockBefore = $company->getFinanceLockBefore();
         if (null !== $lockBefore && $monthClose->getPeriodEnd() <= $lockBefore) {

@@ -111,6 +111,19 @@ final class ProcessOzonRealizationRegressionTest extends IntegrationTestCase
         self::assertSame('closed', $this->connection->fetchOne('SELECT stage_sales_returns_status FROM marketplace_month_closes WHERE company_id = ?', [$this->companyId]));
     }
 
+    public function testIsoDateTimeHeaderKeepsTheSourceCalendarDates(): void
+    {
+        $rows = $this->buildRows(2, null);
+        $this->seed($rows);
+        $doc = $this->em->find(MarketplaceRawDocument::class, $this->rawDocId);
+        self::assertInstanceOf(MarketplaceRawDocument::class, $doc);
+        $doc->setRawData(['result' => ['header' => ['start_date' => '2026-01-01T00:00:00+00:00', 'stop_date' => '2026-01-31T23:59:59+00:00'], 'rows' => $rows]]);
+        $this->em->flush();
+        ($this->action())($this->companyId, $this->rawDocId);
+        self::assertSame(2, $this->countRows());
+        self::assertSame('2026-01-31', $this->connection->fetchOne('SELECT MAX(period_to)::text FROM marketplace_ozon_realizations WHERE company_id = ?', [$this->companyId]));
+    }
+
     /**
      * Строка «только возврат» стоит ровно на второй границе батча (500-я),
      * а за ней идёт ещё одна обычная строка — то есть ровно та раскладка,

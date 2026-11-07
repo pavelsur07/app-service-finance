@@ -11,6 +11,12 @@ $db = $container->get(Doctrine\ORM\EntityManagerInterface::class)->getConnection
 $db->fetchOne("SELECT set_config('application_name', ?, false)", [(string) getenv('OZON_RACE_KEY')]);
 echo "ready\n";
 flush();
+if ('repair' === getenv('OZON_RACE_MODE')) {
+    exit($container->get(App\Marketplace\Ozon\Command\RepairOzonRealizationOctoberB57d7682Command::class)->run(
+        new Symfony\Component\Console\Input\ArrayInput(['--execute' => true, '--expected-raw-hash' => (string) getenv('OZON_RAW_HASH')]),
+        new Symfony\Component\Console\Output\ConsoleOutput(),
+    ));
+}
 try {
     if ('handler' === getenv('OZON_RACE_MODE')) {
         $container->get(App\Marketplace\Ozon\MessageHandler\ProcessOzonRealizationHandler::class)(new App\Marketplace\Message\ProcessOzonRealizationMessage(

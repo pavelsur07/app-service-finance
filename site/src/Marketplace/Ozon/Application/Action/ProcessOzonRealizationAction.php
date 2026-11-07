@@ -10,6 +10,7 @@ use App\Marketplace\Entity\MarketplaceOzonRealization;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\MonthCloseAdvisoryLockQuery;
+use App\Marketplace\Ozon\Application\Realization\OzonRealizationReport;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceOzonRealizationRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
@@ -72,12 +73,6 @@ final class ProcessOzonRealizationAction
             throw new \RuntimeException(sprintf('Raw document not found: %s', $rawDocId));
         }
 
-        // Defense-in-depth: документ обязан принадлежать переданной компании,
-        // даже если вызывающий код забыл проверить (IDOR-защита на уровне Action).
-        if ((string) $rawDoc->getCompany()->getId() !== (string) $companyId) {
-            throw new \RuntimeException('Raw document does not belong to the given company.');
-        }
-
         if (MarketplaceType::OZON !== $rawDoc->getMarketplace()) {
             throw new \InvalidArgumentException('ProcessOzonRealizationAction supports only Ozon.');
         }
@@ -107,8 +102,7 @@ final class ProcessOzonRealizationAction
             if (empty($rawDoc->getRawData()['result']['rows'])) {
                 return ['created' => 0, 'updated' => 0, 'skipped' => 0];
             }
-            $header = $rawDoc->getRawData()['result']['header'] ?? [];
-            if (($header['start_date'] ?? null) !== $from || ($header['stop_date'] ?? null) !== $to
+            if (!OzonRealizationReport::hasMatchingHeader($rawDoc->getRawData(), $rawDoc->getPeriodFrom(), $rawDoc->getPeriodTo())
                 || '01' !== $rawDoc->getPeriodFrom()->format('d')
                 || $rawDoc->getPeriodFrom()->modify('last day of this month')->format('Y-m-d') !== $to) {
                 throw new \DomainException('Заголовок реализации должен совпадать с полным месяцем документа.');

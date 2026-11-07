@@ -633,6 +633,16 @@
   (`OzonUnappliedRealizationQuery`; ≤ `--limit` за прогон, новые месяцы первыми). Закрытый этап → `conflict` в обработчике; старше окна — по слову Владельца. Гейт `app:marketplace:ozon-realization-unapplied-check` (cron 07:25, read-only):
   то же для документов, загруженных больше суток назад; один агрегированный `error`, `conflict` не краснит.
 
+Одноразовая команда `app:marketplace:ozon-realization:repair-october-b57d7682`
+восстанавливает только сохранённую реализацию октября 2026 целевой компании.
+Без `--execute` только читает; для execute обязателен `--expected-raw-hash`
+из согласованного dry-run. Проверяет точное удвоение мультимножества raw,
+переоткрывает/восстанавливает/финально закрывает `sales_returns` одной
+транзакцией под общим lock. Деньги и аналитики вне двух статей с СПП
+сохраняются; регистр проверяется через `FinanceFacade::isPLRegisterConsistent()`.
+Production запуск и изменение wrapper требуют отдельных named approvals.
+Порядок: `docs/tasks/ozon-realization-duplicate-repair/production-runbook.md`.
+
 ### Marketplace: ключ записи продаж и возвратов Ozon by-day
 
 Ключ `external_order_id` / `external_return_id` строится как «отправление + индекс товара» (`ozon-accrual-{ref}-product-{i}`, для возвратов `…-return-product-{i}`) и не содержит `accrual_id`; по нему возврат находит исходную продажу.
@@ -1497,6 +1507,12 @@ findByIdAndCompany(string $categoryId, string $companyId): ?PLCategoryDTO
 
 ### `FinanceFacade` (`src/Finance/Facade/FinanceFacade.php`)
 ```php
+// Сверить сохранённый регистр с каноническим расчётом из документов, без записи.
+// Сравнивает день/статью/проект/ЦФО, income и expense; строки без статьи
+// игнорируются, как у verify-pl-register. Вызывающий владеет согласованным
+// снимком; внутри ремонта — общей транзакцией и блокировкой пересчёта.
+isPLRegisterConsistent(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): bool;
+
 // Создать PL-документ из внешнего источника
 //
 // ВАЖНО — семантика amount у DocumentOperation:

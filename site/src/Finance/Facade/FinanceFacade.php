@@ -34,6 +34,7 @@ use App\Finance\Report\PlPreviewCalculator;
 use App\Finance\Report\PlReportPeriod;
 use App\Finance\Repository\DocumentRepository;
 use App\Finance\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLDailyTotalRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -62,6 +63,7 @@ final class FinanceFacade
         private readonly DefaultPLCategoryTreeProvider $plTemplates,
         private readonly CompanyFacade $companyFacade,
         private readonly PlFactMonthlyAmountsQuery $plFactMonthlyAmounts,
+        private readonly PLDailyTotalRepository $dailyTotals,
     ) {
     }
 
@@ -418,5 +420,36 @@ final class FinanceFacade
     public function invalidatePLRegisterCache(string $companyId): void
     {
         $this->plRegisterUpdater->invalidateCacheForCompanyId($companyId);
+    }
+
+    /**
+     * Read-only comparison using the register's canonical calculator and full
+     * date/category/project/responsibility-center key. A mutating caller owns
+     * the transaction and recalculation lock; standalone callers own their snapshot.
+     */
+    public function isPLRegisterConsistent(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): bool
+    {
+        $company = $this->companyFacade->findById($companyId);
+        if (null === $company) {
+            return false;
+        }
+        $actual = [];
+        foreach ($this->dailyTotals->findRowsForRange($companyId, $from, $to) as $row) {
+            if (null !== $row->categoryId) {
+                $actual[$row->key()] = $row;
+            }
+        }
+        foreach ($this->plRegisterUpdater->calculateRows($company, $from, $to) as $row) {
+            if (null === $row->categoryId) {
+                continue;
+            }
+            $stored = $actual[$row->key()] ?? null;
+            if (null === $stored || 0 !== bccomp($row->income, $stored->income, 2) || 0 !== bccomp($row->expense, $stored->expense, 2)) {
+                return false;
+            }
+            unset($actual[$row->key()]);
+        }
+
+        return [] === $actual;
     }
 }
