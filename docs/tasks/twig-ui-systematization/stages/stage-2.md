@@ -1,4 +1,4 @@
-### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A на проде, PR B на handoff)
+### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A, PR B на проде; PR C на handoff)
 
 **Risk:** MEDIUM (поведение страниц; финансовые формы — в PR C)
 **Stage base commit:** `3c7bb858c` (master после Stage 1)
@@ -11,7 +11,7 @@
 PR C и PR D, а не вместе с 2.1b: каждый трогает другие страницы.
 
 PR A: #2911, merge `2317ed9b`, деплой 07.11 08:19Z без даунтайма, GlitchTip чист,
-контейнеры healthy.
+контейнеры healthy. PR B: #2912, merge `92611b3e`, деплой 07.11 08:54Z без даунтайма, GlitchTip чист.
 
 #### PR A (2.0 + 2.1a): `confirm()` → `partials/_confirm_modal`
 
@@ -100,6 +100,60 @@ PR A: #2911, merge `2317ed9b`, деплой 07.11 08:19Z без даунтайм
 - `busy_submit.js` теперь блокирует все `button[type=submit]` формы, прежние скрипты
   блокировали кнопку по id; в трёх формах кнопка submit одна.
 
+#### PR C (2.2): Twig внутри JS → модули с data-*
+
+Инвентарь 2.2 уточнён: `partials/_dds_tree_picker` в список попал ложно (Twig в
+комментарии партиала, `<script>` там нет — виджет давно на `data-*`). Остальные
+файлы с Twig в JS: пять вынесены здесь, `marketplace_ads/index`,
+`marketplace/month_close/index`, `marketplace/index`,
+`marketplace_analytics/cost_mappings/index` — PR D вместе с крупными скриптами;
+`admin/tools/messenger_ping` (13 строк, admin shell) — отдельным мелким PR админки.
+
+- `company/_tax_profile_fields` → `assets/tax_profile_fields.js` (контейнер
+  `[data-tax-profile-fields]`, матрица уже была в `data-matrix`); `id` из `box_id|e('js')`
+  не нужен. Страницы: `company/new`, `company/edit`.
+- `profile/money_account/new` → `assets/pages/money_account.js`; id полей формы
+  (`form.*.vars.id`) заменены атрибутами `data-money-account-*` на виджетах.
+- `pl_category/edit` → `assets/pages/pl_category_edit.js`; id полей → `data-pl-category-*`;
+  бейдж типа строки — три варианта в разметке, JS только снимает `hidden`
+  (раньше `innerHTML` из JS); тексты подсказки формулы — `data-hint-*` на элементе.
+- `catalog/product/import_status` → `assets/pages/product_import_status.js`: адреса
+  (`path()`) — `data-status-url` / `data-import-url` / `data-products-url` на `#import-body`,
+  только пока импорт pending/processing; итог строится через DOM и `textContent`
+  (раньше `innerHTML` с сообщениями ошибок из файла импорта — XSS-вектор);
+  запрос через `apiFetch`. Попутный дефект: ветка `done` страницы включала
+  несуществующий `catalog/product/_import_result.html.twig` с момента фичи
+  (`ed0de8d8`) — страница завершённого импорта отдавала 500; партиал создан.
+- `finance/report/_filter_controls_script` (включался в `finance/report/preview` и
+  `report/cashflow` с id формы через `|e('js')`) → `assets/pages/report_filters.js`,
+  формы помечены `data-report-filters`; логика перенесена 1:1, партиал удалён.
+- Тесты: новые smoke `MoneyAccountNewPageTest` (страница из списка 1.0) и
+  `ProductImportStatusPageTest` (pending — атрибуты опроса; done — опроса нет, итог
+  рендерится); проверки `data-*` в `PLCategoryEditControllerTest`,
+  `PlReportPreviewControllerTest`, `CompanyTaxProfileTest` (company/new, отчёт ДДС);
+  e2e `tests/e2e/page-modules.e2e.cjs` (11 проверок: матрица НДС, тип счёта и бейдж,
+  бейдж/подсказка/вставка кода статьи, опрос статуса импорта с XSS-строкой в
+  сообщении — рендер текстом, фильтры отчёта: месяц → даты и submit, активация
+  множественного фильтра).
+
+#### Checks (PR C)
+- `make site-cs-twig` — 0 / OK (324); `npm run lint` — 0; `npm run build` — OK
+- `make site-cs-check` — 0; `make site-stan` — OK
+- функциональные тесты 5 файлов — OK (37); e2e `page-modules` — 11 passed
+- `make site-test` — OK (8504 tests, 47814 assertions), 7 мин 07 с
+
+#### External review (PR C)
+- rounds: 1 (codex, effort medium, `site/var/external-review/92611b3e/review.txt`): REVIEW_GREEN без замечаний
+
+#### Risks / reviewer focus (PR C)
+- `apiFetch` вместо `fetch(...).then(r => r.json())`: не-2xx теперь исключение → опрос
+  продолжается (раньше парсился JSON ошибки и опрос тоже продолжался); 401 →
+  переход на вход.
+- `report_filters.js`: `requestSubmit()` без запасного `submit()` (все целевые
+  браузеры его поддерживают); dropdown-логика та же.
+- Бейдж типа статьи ОПиУ: три `<span hidden>` вместо одного с подменой класса —
+  визуально то же.
+
 #### Files changed (PR A)
 - `site/templates/**` — 9 страниц + `company/edit` (include) + `partials/_confirm_modal` (doc)
 - `site/assets/confirm_modal.js` — `data-confirm-fields`
@@ -145,4 +199,4 @@ PR A: #2911, merge `2317ed9b`, деплой 07.11 08:19Z без даунтайм
   в `data-confirm-title` через автоэкранирование, прежний JS конкатенировал строку.
 
 #### Next
-- PR B → handoff «merge and deploy»; затем PR C (2.2 Twig внутри JS), PR D (2.3 крупные скрипты)
+- PR C → handoff «merge and deploy»; затем PR D (2.3 крупные скрипты + marketplace-страницы из 2.2)

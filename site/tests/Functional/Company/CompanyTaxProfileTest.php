@@ -144,6 +144,8 @@ final class CompanyTaxProfileTest extends WebTestCaseBase
     public function testNewCompanyStoresInitialProfileOrNone(): void
     {
         $crawler = $this->client->request('GET', '/company/new');
+        self::assertCount(1, $crawler->filter('[data-tax-profile-fields][data-matrix] [data-tax-regime]'));
+        self::assertCount(1, $crawler->filter('[data-tax-profile-fields][data-matrix] [data-vat-mode]'));
         $this->client->submit($crawler->selectButton('Создать')->form([
             'company[name]' => 'New Tax Co',
             'company[taxProfile][taxRegime]' => 'USN',
@@ -181,6 +183,7 @@ final class CompanyTaxProfileTest extends WebTestCaseBase
 
         $this->client->request('GET', '/finance/reports/cashflow');
         self::assertResponseIsSuccessful();
+        self::assertSelectorExists('form#cashflow-filter-form[data-report-filters]');
         self::assertSelectorTextContains('[data-tax-profile-line]', 'Налоговый режим не выбран');
 
         $this->em()->persist(CompanyTaxProfileBuilder::aProfile()->forCompany(self::COMPANY_ID)->with(TaxRegime::USN, VatMode::EXEMPT)->build());

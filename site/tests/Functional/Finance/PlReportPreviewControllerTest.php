@@ -29,6 +29,7 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         $client->request('GET', '/finance/report/preview');
 
         self::assertResponseIsSuccessful();
+        self::assertSelectorExists('form#pl-preview-filter-form[data-report-filters]');
         self::assertGreaterThan(
             0,
             $this->em()->getRepository(PLCategory::class)->count(['company' => $company]),

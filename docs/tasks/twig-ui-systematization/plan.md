@@ -142,8 +142,8 @@ Work items (три PR, от дешёвого к рискованному):
 - 2.1 — `confirm()`/`onclick` → `_confirm_modal` (15 файлов, механически) и
   мелкие `<script>` до 50 строк (≈25 файлов). По правилу «≤5 страниц на PR»
   разделён: 2.1a — формы `onsubmit=confirm` (PR A #2911, на проде 07.11),
-  2.1b — мелкие `<script>` и `onchange="this.form.submit()"` (PR B); 2.2 — PR C,
-  2.3 — PR D
+  2.1b — мелкие `<script>` и `onchange="this.form.submit()"` (PR B #2912, на проде
+  07.11); 2.2 — PR C (5 файлов; marketplace-страницы с Twig в JS — в PR D), 2.3 — PR D
 - 2.2 — шаблоны с Twig внутри JS (12 файлов): `partials/_dds_tree_picker`,
   `pl_category/edit`, `catalog/product/import_status`, `marketplace_ads/index`,
   `profile/money_account/new`, `marketplace/month_close/index`, …

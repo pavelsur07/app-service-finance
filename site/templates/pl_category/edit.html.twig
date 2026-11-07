@@ -33,13 +33,14 @@
         <div class="container-xl">
             <div class="row row-cards">
                 <div class="col-lg-8">
-                    {{ form_start(form, {'attr': {'id': 'pl-category-edit-form', 'class': 'card'}}) }}
+                    {{ form_start(form, {'attr': {'id': 'pl-category-edit-form', 'class': 'card', 'data-pl-category-form': '1'}}) }}
                         <div class="card-header">
                             <h3 class="card-title">Основные данные</h3>
                             <div class="card-actions">
-                                <span id="pl-category-type-badge" class="badge">
-                                    <i class="ti me-1"></i><span></span>
-                                </span>
+                                {# Бейдж типа строки: три варианта в разметке, assets/pages/pl_category_edit.js показывает нужный #}
+                                <span class="badge bg-purple-lt" data-pl-category-badge="KPI" hidden><i class="ti ti-math-function me-1"></i><span>Показатель (KPI)</span></span>
+                                <span class="badge bg-blue-lt" data-pl-category-badge="SUBTOTAL" hidden><i class="ti ti-sum me-1"></i><span>Итог (subtotal)</span></span>
+                                <span class="badge bg-secondary-lt" data-pl-category-badge="LEAF_INPUT" hidden><i class="ti ti-forms me-1"></i><span>Лист (из фактов)</span></span>
                             </div>
                         </div>
                         <div class="card-body">
@@ -69,16 +70,16 @@
                                     {{ form_errors(form.sortOrder) }}
                                 </div>
                                 <div class="col-md-3">
-                                    {{ form_row(form.type) }}
+                                    {{ form_row(form.type, {'attr': {'data-pl-category-type': '1'}}) }}
                                 </div>
 
                                 <div class="col-md-6">
-                                    {{ form_row(form.flow) }}
+                                    {{ form_row(form.flow, {'attr': {'data-pl-category-flow': '1'}}) }}
                                     <small class="form-hint">Составная строка может быть нейтральной.</small>
                                 </div>
 
                                 <div class="col-md-6">
-                                    {{ form_row(form.expenseType, {'help': 'Доступно для строк типа «Расход».'}) }}
+                                    {{ form_row(form.expenseType, {'help': 'Доступно для строк типа «Расход».', 'attr': {'data-pl-category-expense-type': '1'}}) }}
                                 </div>
 
                                 <div class="col-md-4">
@@ -105,9 +106,9 @@
                                 <label class="form-label mb-0">Расчёт (формула)</label>
                                 <span class="ms-2 badge bg-blue-lt">для KPI / особых итогов</span>
                             </div>
-                            {{ form_widget(form.formula, {'attr': {'class': 'form-control font-monospace', 'rows': 3, 'placeholder': 'Например: CM1 / REV_TOTAL_SPP * 100'}}) }}
+                            {{ form_widget(form.formula, {'attr': {'class': 'form-control font-monospace', 'rows': 3, 'placeholder': 'Например: CM1 / REV_TOTAL_SPP * 100', 'data-pl-category-formula': '1'}}) }}
                             {{ form_errors(form.formula) }}
-                            <small id="pl-category-formula-hint" class="form-hint"></small>
+                            <small id="pl-category-formula-hint" class="form-hint" data-pl-category-formula-hint data-hint-leaf="Формула недоступна для строк типа «Лист» — значения берутся напрямую из фактов." data-hint-formula="Вставляйте коды статей ОПиУ. Пример: CM1 / REV_TOTAL_SPP * 100."></small>
                         </div>
 
                         <div class="card-footer d-flex align-items-center">
@@ -192,106 +193,4 @@
     {% if not is_new %}
         {% include 'partials/_confirm_modal.html.twig' with {id: 'pl-category-confirm'} only %}
     {% endif %}
-{% endblock %}
-
-{% block javascripts %}
-    {{ parent() }}
-    <script>
-        (function () {
-            const initPlCategoryEdit = function () {
-                const form = document.getElementById('pl-category-edit-form');
-                if (!form || form.dataset.plCategoryEditBound === '1') {
-                    return;
-                }
-
-                const page = document.getElementById('pl-category-edit-page');
-                const type = document.getElementById('{{ form.type.vars.id }}');
-                const expenseType = document.getElementById('{{ form.expenseType.vars.id }}');
-                const formula = document.getElementById('{{ form.formula.vars.id }}');
-                const formulaHint = document.getElementById('pl-category-formula-hint');
-                const typeBadge = document.getElementById('pl-category-type-badge');
-                const flow = document.getElementById('{{ form.flow.vars.id }}');
-
-                const syncType = function () {
-                    const isLeaf = type.value === 'LEAF_INPUT';
-                    formula.disabled = isLeaf;
-                    formulaHint.textContent = isLeaf
-                        ? 'Формула недоступна для строк типа «Лист» — значения берутся напрямую из фактов.'
-                        : 'Вставляйте коды статей ОПиУ. Пример: CM1 / REV_TOTAL_SPP * 100.';
-
-                    if (type.value === 'KPI') {
-                        typeBadge.className = 'badge bg-purple-lt';
-                        typeBadge.innerHTML = '<i class="ti ti-math-function me-1"></i><span>Показатель (KPI)</span>';
-                    } else if (type.value === 'SUBTOTAL') {
-                        typeBadge.className = 'badge bg-blue-lt';
-                        typeBadge.innerHTML = '<i class="ti ti-sum me-1"></i><span>Итог (subtotal)</span>';
-                    } else {
-                        typeBadge.className = 'badge bg-secondary-lt';
-                        typeBadge.innerHTML = '<i class="ti ti-forms me-1"></i><span>Лист (из фактов)</span>';
-                    }
-                };
-
-                const syncFlow = function () {
-                    expenseType.disabled = flow.value !== 'EXPENSE';
-                };
-
-                type.addEventListener('change', syncType);
-                flow.addEventListener('change', syncFlow);
-
-                form.addEventListener('click', async function (event) {
-                    const copyButton = event.target.closest('[data-copy-target]');
-                    if (copyButton) {
-                        const input = document.querySelector(copyButton.dataset.copyTarget);
-                        if (!input || !input.value) {
-                            return;
-                        }
-
-                        try {
-                            await navigator.clipboard.writeText(input.value);
-                            const feedback = document.getElementById(copyButton.dataset.copyFeedback);
-                            if (feedback) {
-                                feedback.classList.remove('d-none');
-                                setTimeout(function () { feedback.classList.add('d-none'); }, 1400);
-                            }
-                        } catch (error) {
-                            return;
-                        }
-                    }
-                });
-
-                page.addEventListener('click', function (event) {
-                    const button = event.target.closest('[data-insert-code]');
-                    if (!button) {
-                        return;
-                    }
-
-                    const textarea = document.querySelector(button.dataset.insertTarget);
-                    if (!textarea) {
-                        return;
-                    }
-
-                    const value = button.dataset.insertCode;
-                    const start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : textarea.value.length;
-                    const end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : textarea.value.length;
-                    textarea.value = textarea.value.slice(0, start) + value + textarea.value.slice(end);
-                    const cursor = start + value.length;
-                    textarea.focus();
-                    textarea.setSelectionRange(cursor, cursor);
-                });
-
-                form.addEventListener('submit', function () {
-                    formula.disabled = false;
-                    expenseType.disabled = false;
-                });
-
-                form.dataset.plCategoryEditBound = '1';
-                syncType();
-                syncFlow();
-            };
-
-            initPlCategoryEdit();
-            document.addEventListener('DOMContentLoaded', initPlCategoryEdit);
-            document.addEventListener('turbo:load', initPlCategoryEdit);
-        })();
-    </script>
 {% endblock %}

@@ -235,7 +235,7 @@
             </div>
         </header>
 
-        <form id="pl-preview-filter-form" class="card card-body pl-preview-controls-card mb-3" method="get">
+        <form id="pl-preview-filter-form" data-report-filters class="card card-body pl-preview-controls-card mb-3" method="get">
             <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}" data-pl-exact-from>
             <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}" data-pl-exact-to>
             <input type="hidden" name="grouping" value="{{ grouping }}" data-pl-grouping>
@@ -546,7 +546,6 @@
         </div>
     </main>
 
-{% include 'finance/report/_filter_controls_script.html.twig' %}
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {

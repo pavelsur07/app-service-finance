@@ -77,6 +77,13 @@ final class PLCategoryEditControllerTest extends WebTestCaseBase
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
         $crawler = $client->request('GET', '/pl-categories/'.$category->getId().'/edit');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('form[data-pl-category-form] [data-pl-category-type]');
+        self::assertSelectorExists('form[data-pl-category-form] [data-pl-category-flow]');
+        self::assertSelectorExists('form[data-pl-category-form] [data-pl-category-expense-type]');
+        self::assertSelectorExists('form[data-pl-category-form] textarea[data-pl-category-formula]');
+        self::assertSelectorExists('[data-pl-category-formula-hint][data-hint-leaf][data-hint-formula]');
+        self::assertCount(3, $crawler->filter('[data-pl-category-badge][hidden]'));
 
         self::assertResponseIsSuccessful();
         $expenseTypeField = $crawler->filter('select[id$="_expenseType"]');

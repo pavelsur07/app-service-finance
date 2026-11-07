@@ -17,6 +17,11 @@ import { initBudgetVersion } from './pages/budget_version.js';
 import { initSettlementUi } from './pages/settlement.js';
 import { initBudgetPlanFact } from './pages/budget_plan_fact.js';
 import { initCashTransfer } from './pages/cash_transfer.js';
+import { initMoneyAccountForm } from './pages/money_account.js';
+import { initPlCategoryEdit } from './pages/pl_category_edit.js';
+import { initProductImportStatus } from './pages/product_import_status.js';
+import { initReportFilters } from './pages/report_filters.js';
+import { initTaxProfileFields } from './tax_profile_fields.js';
 
 // Period presets (partials/_period_presets.html.twig): dates come from the server.
 document.addEventListener('click', (event) => {
@@ -42,6 +47,11 @@ const initDds = () => {
   initBudgetPlanFact();
   initSettlementUi();
   initCashTransfer();
+  initMoneyAccountForm();
+  initPlCategoryEdit();
+  initProductImportStatus();
+  initReportFilters();
+  initTaxProfileFields();
 };
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initDds);
