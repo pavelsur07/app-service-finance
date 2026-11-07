@@ -51,11 +51,13 @@
                                 <td class="text-end">
                                     <a href="{{ path('financial_responsibility_center_edit', {id: item.id}) }}" class="btn btn-sm btn-outline-primary">Настроить</a>
                                     {% if not item.system and item.status.value == 'active' %}
-                                        <form method="post" action="{{ path('financial_responsibility_center_archive', {id: item.id}) }}" class="d-inline" onsubmit="return confirm('Архивировать ЦФО?');">
-                                            <input type="hidden" name="_token" value="{{ csrf_token('archive' ~ item.id) }}">
-                                            <input type="hidden" name="version" value="{{ item.version }}">
-                                            <button class="btn btn-sm btn-danger" type="submit">Архивировать</button>
-                                        </form>
+                                        <button type="button" class="btn btn-sm btn-danger"
+                                                data-bs-toggle="modal" data-bs-target="#frc-confirm"
+                                                data-confirm-action="{{ path('financial_responsibility_center_archive', {id: item.id}) }}"
+                                                data-confirm-token="{{ csrf_token('archive' ~ item.id) }}"
+                                                data-confirm-fields="{{ {version: item.version}|json_encode }}"
+                                                data-confirm-title="Архивировать ЦФО?"
+                                                data-confirm-submit="Архивировать" data-confirm-variant="danger">Архивировать</button>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -68,4 +70,5 @@
             </div>
         </div>
     </div>
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'frc-confirm'} only %}
 {% endblock %}

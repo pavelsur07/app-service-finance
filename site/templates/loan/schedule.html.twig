@@ -63,10 +63,12 @@
                                                     <i class="ti ti-file-plus"></i>
                                                 </button>
                                             </form>
-                                            <form method="post" action="{{ path('loan_schedule_delete', {loanId: loan.id, itemId: item.id}) }}" class="d-inline" onsubmit="return confirm('Удалить платеж?');">
-                                                <input type="hidden" name="_token" value="{{ csrf_token('loan_schedule_delete_' ~ item.id) }}">
-                                                <button class="btn btn-sm btn-outline-danger" type="submit">🗑️</button>
-                                            </form>
+                                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                                    data-bs-toggle="modal" data-bs-target="#loan-schedule-confirm"
+                                                    data-confirm-action="{{ path('loan_schedule_delete', {loanId: loan.id, itemId: item.id}) }}"
+                                                    data-confirm-token="{{ csrf_token('loan_schedule_delete_' ~ item.id) }}"
+                                                    data-confirm-title="Удалить платеж?"
+                                                    data-confirm-submit="Удалить" data-confirm-variant="danger">🗑️</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -117,4 +119,5 @@
             {% endif %}
         </div>
     </div>
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'loan-schedule-confirm'} only %}
 {% endblock %}

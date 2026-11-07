@@ -32,6 +32,23 @@ document.addEventListener('show.bs.modal', (event) => {
 
     form.action = data.confirmAction;
     modal.querySelector('[data-confirm-token]').value = data.confirmToken;
+
+    // Дополнительные скрытые поля формы (например, version для оптимистической блокировки).
+    form.querySelectorAll('[data-confirm-extra]').forEach((input) => input.remove());
+    let fields = {};
+    try {
+        fields = JSON.parse(data.confirmFields || '{}');
+    } catch {
+        fields = {};
+    }
+    Object.entries(fields).forEach(([name, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = String(value);
+        input.dataset.confirmExtra = '';
+        form.append(input);
+    });
     modal.querySelector('[data-confirm-title]').textContent = data.confirmTitle || 'Подтвердите действие';
     modal.querySelector('[data-confirm-body]').textContent = data.confirmBody || '';
     submit.textContent = data.confirmSubmit || 'Подтвердить';

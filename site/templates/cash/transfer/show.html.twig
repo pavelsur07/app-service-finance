@@ -58,11 +58,14 @@
                 <button type="submit" class="btn btn-outline-primary">Восстановить перевод</button>
             </form>
         {% else %}
-            <form method="post" action="{{ path('cash_transfer_delete', {id: transfer.id}) }}" onsubmit="return confirm('Удалить перевод и обе связанные операции?')">
-                <input type="hidden" name="_token" value="{{ csrf_token('cash_transfer_delete' ~ transfer.id) }}">
-                <button type="submit" class="btn btn-danger">Удалить перевод</button>
-            </form>
+            <button type="button" class="btn btn-danger"
+                    data-bs-toggle="modal" data-bs-target="#cash-transfer-confirm"
+                    data-confirm-action="{{ path('cash_transfer_delete', {id: transfer.id}) }}"
+                    data-confirm-token="{{ csrf_token('cash_transfer_delete' ~ transfer.id) }}"
+                    data-confirm-title="Удалить перевод и обе связанные операции?"
+                    data-confirm-submit="Удалить" data-confirm-variant="danger">Удалить перевод</button>
         {% endif %}
     </div>
 </div>
+{% include 'partials/_confirm_modal.html.twig' with {id: 'cash-transfer-confirm'} only %}
 {% endblock %}

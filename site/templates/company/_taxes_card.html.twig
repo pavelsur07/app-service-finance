@@ -29,11 +29,12 @@
                             <td>{{ profile.taxRegime.label }}</td>
                             <td>{{ profile.vatMode.label }}</td>
                             <td>
-                                <form method="post" action="{{ path('company_tax_profile_delete', {id: company.id, profileId: profile.id}) }}"
-                                      onsubmit="return confirm('Удалить период налогового режима?');">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_tax_profile' ~ profile.id) }}">
-                                    <button class="btn btn-sm btn-ghost-danger" type="submit">Удалить</button>
-                                </form>
+                                <button type="button" class="btn btn-sm btn-ghost-danger"
+                                        data-bs-toggle="modal" data-bs-target="#company-confirm"
+                                        data-confirm-action="{{ path('company_tax_profile_delete', {id: company.id, profileId: profile.id}) }}"
+                                        data-confirm-token="{{ csrf_token('delete_tax_profile' ~ profile.id) }}"
+                                        data-confirm-title="Удалить период налогового режима?"
+                                        data-confirm-submit="Удалить" data-confirm-variant="danger">Удалить</button>
                             </td>
                         </tr>
                     {% endfor %}

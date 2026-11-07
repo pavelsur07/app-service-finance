@@ -32,10 +32,12 @@
                             <td>{{ item.sort }}</td>
                             <td class="text-end">
                                 <a href="{{ path('project_direction_edit', {id: item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
-                                <form method="post" action="{{ path('project_direction_delete', {id: item.id}) }}" style="display:inline;" onsubmit="return confirm('Удалить?');">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
-                                    <button class="btn btn-sm btn-danger">🗑</button>
-                                </form>
+                                <button type="button" class="btn btn-sm btn-danger"
+                                        data-bs-toggle="modal" data-bs-target="#project-direction-confirm"
+                                        data-confirm-action="{{ path('project_direction_delete', {id: item.id}) }}"
+                                        data-confirm-token="{{ csrf_token('delete' ~ item.id) }}"
+                                        data-confirm-title="Удалить направление?"
+                                        data-confirm-submit="Удалить" data-confirm-variant="danger">🗑</button>
                             </td>
                         </tr>
                     {% else %}
@@ -46,4 +48,5 @@
             </div>
         </div>
     </div>
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'project-direction-confirm'} only %}
 {% endblock %}

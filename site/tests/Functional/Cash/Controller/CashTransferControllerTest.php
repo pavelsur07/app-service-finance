@@ -96,7 +96,7 @@ final class CashTransferControllerTest extends WebTestCaseBase
         self::assertSame(1, $outflows->filter('.js-cash-transaction-select')->count());
 
         $crawler = $client->request('GET', $location);
-        $client->submit($crawler->selectButton('Удалить перевод')->form());
+        $this->submitConfirmTrigger($client, $crawler->filter('[data-confirm-submit="Удалить"][data-confirm-action$="/delete"]'));
         self::assertResponseRedirects('/finance/cash-transfers/deleted');
 
         $crawler = $client->followRedirect();

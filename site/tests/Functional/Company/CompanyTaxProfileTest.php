@@ -129,7 +129,7 @@ final class CompanyTaxProfileTest extends WebTestCaseBase
         $profileId = $this->profiles()[0]->getId();
 
         $crawler = $this->client->request('GET', sprintf('/company/%s/edit', self::COMPANY_ID));
-        $this->client->submit($crawler->filter('#taxes')->selectButton('Удалить')->form());
+        $this->submitConfirmTrigger($this->client, $crawler->filter('#taxes [data-confirm-action]'));
 
         self::assertResponseRedirects(sprintf('/company/%s/edit#taxes', self::COMPANY_ID));
         self::assertSame([], $this->profiles());

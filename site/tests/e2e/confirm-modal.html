@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Диалог подтверждения — демо</title>
+</head>
+<body>
+<!-- Демо-страница для e2e (tests/e2e/confirm-modal.e2e.cjs): разметка partials/_confirm_modal.html.twig
+     с id="confirm" и три кнопки-триггера. Bootstrap не подключён: тест сам шлёт show.bs.modal с relatedTarget. -->
+<button type="button" id="archive" class="btn btn-sm btn-danger"
+        data-bs-toggle="modal" data-bs-target="#confirm"
+        data-confirm-action="/centers/42/archive"
+        data-confirm-token="tok-archive"
+        data-confirm-fields='{"version":3}'
+        data-confirm-title="Архивировать ЦФО?"
+        data-confirm-submit="Архивировать" data-confirm-variant="danger">Архивировать</button>
+<button type="button" id="delete" class="btn btn-sm btn-danger"
+        data-bs-toggle="modal" data-bs-target="#confirm"
+        data-confirm-action="/profiles/7/delete"
+        data-confirm-token="tok-delete"
+        data-confirm-title="Удалить профиль?"
+        data-confirm-body="Пояснение <b>без</b> HTML."
+        data-confirm-submit="Удалить">Удалить</button>
+<button type="button" id="blocked" class="btn btn-sm"
+        data-bs-toggle="modal" data-bs-target="#confirm"
+        data-confirm-action="/categories/1/delete"
+        data-confirm-token="tok-blocked"
+        data-confirm-blocked="true"
+        data-confirm-title="Статью нельзя удалить"
+        data-confirm-links='[{"href":"/ops?c=1","label":"Показать операции"}]'>Удалить статью</button>
+
+<div class="modal fade vf-confirm" id="confirm" tabindex="-1" aria-hidden="true" aria-labelledby="confirm-title" aria-describedby="confirm-body" data-confirm-modal>
+    <div class="modal-dialog modal-dialog-centered vf-confirm__dialog" role="document">
+        <div class="modal-content">
+            <form method="post" action="" data-confirm-form>
+                <input type="hidden" name="_token" value="" data-confirm-token>
+                <div class="vf-confirm__head">
+                    <h2 class="vf-confirm__title" id="confirm-title" data-confirm-title>Подтвердите действие</h2>
+                </div>
+                <p class="vf-confirm__body" id="confirm-body" data-confirm-body></p>
+                <ul class="vf-confirm__links" data-confirm-links hidden></ul>
+                <div class="vf-confirm__footer">
+                    <a class="btn" href="#" data-confirm-link hidden></a>
+                    <button type="button" class="btn" data-bs-dismiss="modal" data-confirm-cancel>Отмена</button>
+                    <button type="submit" class="btn btn-primary" data-confirm-submit disabled>Подтвердить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script type="module" src="/assets/confirm_modal.js"></script>
+<script>
+  // Имитация Bootstrap: show.bs.modal всплывает от модалки, relatedTarget — кнопка-триггер.
+  window.openWith = (id) => {
+    const event = new Event('show.bs.modal', { bubbles: true, cancelable: true });
+    event.relatedTarget = document.getElementById(id);
+    return document.getElementById('confirm').dispatchEvent(event);
+  };
+</script>
+</body>
+</html>

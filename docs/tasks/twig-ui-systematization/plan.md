@@ -140,7 +140,9 @@ Definition of Done:
 Work items (три PR, от дешёвого к рискованному):
 - 2.0 — smoke-тесты страницам этапа без теста
 - 2.1 — `confirm()`/`onclick` → `_confirm_modal` (15 файлов, механически) и
-  мелкие `<script>` до 50 строк (≈25 файлов)
+  мелкие `<script>` до 50 строк (≈25 файлов). По правилу «≤5 страниц на PR»
+  разделён: 2.1a — формы `onsubmit=confirm` (PR A, 9 шаблонов, сделано),
+  2.1b — мелкие `<script>` и `onchange="this.form.submit()"` (PR B вместе с 2.2)
 - 2.2 — шаблоны с Twig внутри JS (12 файлов): `partials/_dds_tree_picker`,
   `pl_category/edit`, `catalog/product/import_status`, `marketplace_ads/index`,
   `profile/money_account/new`, `marketplace/month_close/index`, …

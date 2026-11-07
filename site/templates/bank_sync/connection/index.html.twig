@@ -87,12 +87,12 @@
                                         Запустить импорт сейчас
                                     </button>
                                 </form>
-                                <form method="post" action="{{ path('bank_sync_connection_delete', {'id': connection.id}) }}" class="d-inline" onsubmit="return confirm('Удалить подключение?');">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ connection.id) }}">
-                                    <button class="btn btn-icon btn-danger" title="Удалить">
-                                        <i class="ti ti-trash"></i>
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-icon btn-danger" title="Удалить"
+                                        data-bs-toggle="modal" data-bs-target="#bank-connection-confirm"
+                                        data-confirm-action="{{ path('bank_sync_connection_delete', {'id': connection.id}) }}"
+                                        data-confirm-token="{{ csrf_token('delete' ~ connection.id) }}"
+                                        data-confirm-title="Удалить подключение?"
+                                        data-confirm-submit="Удалить" data-confirm-variant="danger"><i class="ti ti-trash"></i></button>
                             </td>
                         </tr>
                     {% else %}
@@ -105,4 +105,5 @@
             </div>
         </div>
     </div>
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'bank-connection-confirm'} only %}
 {% endblock %}
