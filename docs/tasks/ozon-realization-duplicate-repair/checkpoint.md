@@ -1,10 +1,11 @@
 ## Current checkpoint
 
-**Phase:** handoff. **Status:** local work done; final push/PR Ready.
+**Phase:** handoff. **Status:** local work done; PR Ready; awaiting CI/owner decision.
 **Stage 1 base:** `6a6f7d945`. **Stage 2 base:** `61383f407`.
 **Branch:** `docs/ozon-realization-duplicate-repair-plan`.
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/2913 (base master).
-**Implementation commits:** `61383f407`, `ec19cd076`; final fixture/docs commit follows.
+**Implementation commits:** `61383f407`, `ec19cd076`, `b2cd4f228`.
+PR Ready/master verified; task worktree clean after each push.
 
 ### Completed
 
@@ -44,8 +45,9 @@
 
 ### Exact next action
 
-- Commit final fixture correction and handoff docs; push; update PR body/mark Ready.
-- Verify final CI and master base. Ask the single merge+deploy decision.
+- Final fixture correction and handoff committed/pushed; PR body updated and Ready.
+- Master base and head verified. Final CI watch launched; await result and ask
+  the single merge+deploy decision. No application code changes remain.
 - Named backup/temporary wrapper/execute approvals are separately required;
   absent, no production mutation. Approval of plan/implementation is insufficient.
 

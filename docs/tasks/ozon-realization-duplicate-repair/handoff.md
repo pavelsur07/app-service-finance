@@ -2,7 +2,8 @@
 
 **Branch:** `docs/ozon-realization-duplicate-repair-plan` ·
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/2913 · **Base:** master.
-**Implementation commits:** `61383f407`, `ec19cd076`.
+**Implementation commits:** `61383f407`, `ec19cd076`, `b2cd4f228`.
+**PR:** Ready; master base verified.
 **CI:** проверки запускаются автоматически на последнем push; актуальный статус — в PR.
 Локальные handoff gates пройдены.
 
