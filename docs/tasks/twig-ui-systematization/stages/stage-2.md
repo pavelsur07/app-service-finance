@@ -480,7 +480,7 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
 #### Next
 - Закрывающий PR Stage 2 (эта ветка): удалены `dashboard/_demo_chart` и `dashboard/_money_balance_chart`
   (Chart.js с CDN, нигде не подключены — ни `include`, ни `render` в `src/`, `templates/`, `tests/`; история —
-  «dashboard demo»); переносить было нечего. `lint:twig` — 321 файл. Итог этапа: 0 `<script>` с логикой страниц
+  «dashboard demo»); переносить было нечего. `lint:twig` — 321 файл; `make site-test` — OK (8538 tests, 48074 assertions). Итог этапа: 0 `<script>` с логикой страниц
   вне исключений конвенции (`_layout/*`, `admin/base`, `notifications/email`, JSON-данные `type="application/json"`).
 - Внешнее ревью закрывающего PR (codex, база master 4ac412c42): по коду замечаний нет; единственная находка —
   артефакт скрипта: он диффует рабочее дерево двумя точками (`git diff master`), и в дифф попал «откат» чужого
