@@ -25,6 +25,8 @@ import { initTaxProfileFields } from './tax_profile_fields.js';
 import { initMonthClose } from './pages/month_close.js';
 import { initMarketplaceIndex } from './pages/marketplace_index.js';
 import { initCostMappings } from './pages/cost_mappings.js';
+import { initCostPlMapping } from './pages/cost_pl_mapping.js';
+import { initDefaultSaleMapping } from './pages/default_sale_mapping.js';
 
 // Period presets (partials/_period_presets.html.twig): dates come from the server.
 document.addEventListener('click', (event) => {
@@ -58,6 +60,8 @@ const initDds = () => {
   initMonthClose();
   initMarketplaceIndex();
   initCostMappings();
+  initCostPlMapping();
+  initDefaultSaleMapping();
 };
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initDds);
