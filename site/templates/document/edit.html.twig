@@ -4,7 +4,3 @@
 {% block body %}
     {% include 'document/_page.html.twig' with {form: form, item: item, transactionAllocation: transactionAllocation} only %}
 {% endblock %}
-{% block javascripts %}
-    {{ parent() }}
-    {% include 'document/_page_scripts.html.twig' %}
-{% endblock %}

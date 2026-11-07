@@ -1,4 +1,4 @@
-### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–G на проде; PR H на handoff)
+### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–G на проде; PR H #2920 на handoff; PR I готов)
 
 **Risk:** MEDIUM (поведение страниц; финансовые формы — в PR C)
 **Stage base commit:** `3c7bb858c` (master после Stage 1)
@@ -393,6 +393,39 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
   `show()` как и прежний скрипт.
 - HIGH-LOCAL по плану (финансовые формы): контроллеры не менялись, контракты ответов проверены по коду.
 
+#### PR I (2.3, часть 5): страница документа ОПиУ (`document/_page_scripts`)
+
+- Партиал `document/_page_scripts` (460 строк: операции документа — добавить, дубль, удалить, наследование
+  Проекта/ЦФО из шапки; итоги и остаток по основанию; формат сумм DS-Money; несохранённые правки,
+  «Выйти без сохранения?», фокус на ошибку после неудачного сохранения) → `assets/pages/pnl_document.js`,
+  `initPnlDocument()` в `legacy-app.js`. Партиал удалён, `document/{edit,new}` без блока `javascripts`.
+- Скрипт уже работал на `data-*`-хуках без Twig-выражений — перенос механический: `function` → стрелки,
+  `bootstrap.Modal` → `bootstrapModal()`, обёртка `DOMContentLoaded` снята (`legacy-app.js` сам ждёт DOM).
+  Разметка `_page.html.twig` не менялась; `.add_item_link`, `.remove-item`, `.document-operation-card`,
+  `#document-leave-modal` — прежние контракты (тесты, aria).
+- `template.innerHTML` для `data-prototype` строки формы — как раньше (prototype Symfony — наша разметка).
+- Тесты: `DocumentNewPageTest` — хуки (`[data-collection-holder][data-prototype]`, `.add_item_link`,
+  `[data-leave-confirm]`), нет `addEventListener('DOMContentLoaded'` и inline-обработчиков; e2e
+  `tests/e2e/pnl-document.e2e.cjs` — 15 проверок на демо-странице (итоги и формат сумм, смена Проекта шапки
+  с уведомлением, «Как в шапке», добавление с индексом выше существующих, дубль, удаление и запрет удалить
+  последнюю, «Добавить операцию на остаток», перерасход, счётчик описания, диалог ухода и `data-leave-safe`,
+  нормализация сумм при submit, режим создания с одной строкой, страница после ошибки сохранения).
+  Сценарии на живом стенде (`pnl-document-{page,new}.e2e.cjs`) не менялись.
+
+#### Checks (PR I)
+- `make site-cs-twig` — 0 / OK (323); `npm run lint` — 0; `npm run build` — OK
+- `make site-cs-check` — 0 of 3913; `make site-cs-strict-types` — 0; `make site-stan` — OK
+- `DocumentNewPageTest`, `DocumentCategoryPickerTest` — OK (9 tests, 73 assertions); e2e `pnl-document` — 15 passed
+- `make site-test` — OK (8538 tests, 48074 assertions), 8 мин 25 с
+
+#### External review (PR I)
+- rounds: 1 (codex, effort medium, база — ветка PR H 0d64b52a5, дифф 1268 строк, `site/var/external-review/0d64b52a/review.txt`): REVIEW_GREEN без замечаний
+
+#### Risks / reviewer focus (PR I)
+- HIGH-LOCAL по плану (финансовые формы): контроллеры и формы не менялись, разметка не менялась.
+- Порядок инициализации: раньше скрипт ждал `DOMContentLoaded` после бандла, теперь работает в `initDds()`
+  после `initDdsTreePickers()` — виджеты строки по-прежнему подключает наблюдатель DOM.
+
 #### Files changed (PR A)
 - `site/templates/**` — 9 страниц + `company/edit` (include) + `partials/_confirm_modal` (doc)
 - `site/assets/confirm_modal.js` — `data-confirm-fields`
@@ -438,4 +471,7 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
   в `data-confirm-title` через автоэкранирование, прежний JS конкатенировал строку.
 
 #### Next
-- PR H → handoff «merge and deploy»; затем PR I: `document/_page_scripts` (460), далее Chart-острова dashboard
+- PR H (#2920, CI 16/16) и PR I → handoff «merge and deploy» (PR I открывать после мержа PR H).
+- Chart-острова (`dashboard/_demo_chart`, `dashboard/_money_balance_chart`, Chart.js с CDN): партиалы нигде
+  не подключены (ни `include`, ни `render` в `src/`, `templates/`, `tests/`; история — «dashboard demo» 2024 г.) —
+  переносить нечего, удалить закрывающим PR этапа вместе с отметкой Stage 2 DONE.

@@ -45,6 +45,13 @@ final class DocumentNewPageTest extends WebTestCaseBase
         self::assertCount(1, $crawler->filter('.vf-docform-grid--aside'));
         self::assertCount(0, $crawler->filter('.vf-page-head .dropdown-menu'), 'у ручного документа нет основания — пунктов «Ещё» нет');
         self::assertCount(0, $crawler->filter('[data-allocation]'));
+
+        // Логика страницы — assets/pages/pnl_document.js (Stage 2 PR I); шаблон отдаёт только хуки.
+        self::assertCount(1, $crawler->filter('form[data-document-form] [data-collection-holder][data-prototype]'));
+        self::assertCount(1, $crawler->filter('form[data-document-form] .add_item_link'));
+        self::assertCount(1, $crawler->filter('#document-leave-modal [data-leave-confirm]'));
+        self::assertStringNotContainsString("addEventListener('DOMContentLoaded'", (string) $client->getResponse()->getContent());
+        self::assertSelectorNotExists('[onclick], [onchange], [onsubmit]');
     }
 
     public function testCreateRedirectsAsBeforeAndLeavesToast(): void
