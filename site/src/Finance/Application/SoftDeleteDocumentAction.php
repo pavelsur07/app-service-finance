@@ -13,6 +13,7 @@ use Doctrine\ORM\EntityManagerInterface;
 final readonly class SoftDeleteDocumentAction
 {
     public function __construct(
+        private readonly Service\FinanceSettlementSourceLifecycle $settlementLifecycle,
         private DocumentRepository $documentRepository,
         private EntityManagerInterface $entityManager,
         private PLRegisterUpdater $plRegisterUpdater,
@@ -36,6 +37,7 @@ final readonly class SoftDeleteDocumentAction
             }
 
             $this->lockCashTransaction($document);
+            $this->settlementLifecycle->changing($document);
 
             $document->markDeleted($actorUserId, $reason);
             $document->getCashTransaction()?->recalculateAllocatedAmount();

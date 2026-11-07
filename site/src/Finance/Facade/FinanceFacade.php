@@ -48,6 +48,7 @@ use Ramsey\Uuid\Uuid;
 final class FinanceFacade
 {
     public function __construct(
+        private readonly \App\Finance\Infrastructure\Query\FinanceSettlementSourceQuery $settlementSourceQuery,
         private readonly CreatePLDocumentAction $createAction,
         private readonly DeletePLDocumentAction $deleteAction,
         private readonly CounterpartyRepository $counterpartyRepository,
@@ -62,6 +63,20 @@ final class FinanceFacade
         private readonly CompanyFacade $companyFacade,
         private readonly PlFactMonthlyAmountsQuery $plFactMonthlyAmounts,
     ) {
+    }
+
+    /** @param ?list<string> $prelockedCashIds */
+    public function getSettlementSourceForUpdate(string $companyId, string $documentId, ?array $prelockedCashIds = null): \App\Finance\Application\DTO\FinanceSettlementSource
+    {
+        return $this->settlementSourceQuery->getForUpdate($companyId, $documentId, $prelockedCashIds);
+    }
+
+    /** @param list<string> $documentIds
+     * @return list<string>
+     */
+    public function getSettlementSourceCashIds(string $companyId, array $documentIds): array
+    {
+        return $this->settlementSourceQuery->getCashIds($companyId, $documentIds);
     }
 
     /**

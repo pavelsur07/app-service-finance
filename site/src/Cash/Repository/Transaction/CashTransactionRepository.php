@@ -30,6 +30,38 @@ class CashTransactionRepository extends ServiceEntityRepository
         parent::__construct($registry, CashTransaction::class);
     }
 
+    /** @param list<string> $externalIds
+     * @return list<string>
+     */
+    public function lockSettlementSourcesForAccount(string $companyId, string $accountId, array $externalIds): array
+    {
+        $db = $this->getEntityManager()->getConnection();
+        if (!$db->isTransactionActive()) {
+            throw new \LogicException('Account source locks require a transaction.');
+        }
+
+        if ([] === $externalIds) {
+            return [];
+        }
+
+        return array_map(static fn ($id): string => (string) $id, $db->fetchFirstColumn('SELECT id FROM cash_transaction WHERE company_id = :company AND money_account_id = :account AND external_id IN (:externalIds) AND deleted_at IS NULL ORDER BY id FOR UPDATE', ['company' => $companyId, 'account' => $accountId, 'externalIds' => $externalIds], ['externalIds' => ArrayParameterType::STRING]));
+    }
+
+    public function getSettlementSourceForUpdate(string $companyId, string $transactionId): \App\Cash\Application\DTO\CashSettlementSource
+    {
+        $db = $this->getEntityManager()->getConnection();
+        if (!$db->isTransactionActive()) {
+            throw new \LogicException('Snapshot requires a transaction.');
+        }
+        $row = $db->fetchAssociative('SELECT id, company_id, counterparty_id, amount, currency, occurred_at, direction, deleted_at, is_transfer, money_account_id FROM cash_transaction WHERE company_id = :company AND id = :id FOR UPDATE', ['company' => $companyId, 'id' => $transactionId]);
+        if (false === $row) {
+            throw new \DomainException('Транзакция ДДС не найдена.');
+        }
+        $money = \App\Shared\Domain\ValueObject\Money::fromString((string) $row['amount'], (string) $row['currency']);
+
+        return new \App\Cash\Application\DTO\CashSettlementSource((string) $row['id'], $companyId, null === $row['counterparty_id'] ? null : (string) $row['counterparty_id'], $money, new \DateTimeImmutable((string) $row['occurred_at']), CashDirection::from((string) $row['direction']), null !== $row['deleted_at'], (bool) $row['is_transfer'], hash('sha256', json_encode($row, \JSON_THROW_ON_ERROR)));
+    }
+
     /** @return list<ImportSnapshot> */
     public function findImportCandidates(string $companyId, string $accountId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {

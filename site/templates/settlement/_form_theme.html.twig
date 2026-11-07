@@ -1,0 +1,7 @@
+{% use 'balance/_form_theme.html.twig' %}
+{% block counterparty_picker_widget %}
+    {# TODO(ds): the legacy picker depends on Tabler CSS/JS. Keep the existing
+       company-scoped CounterpartyPickerType, using the app layer's accessible
+       native select until the enhanced picker has an app-layer adapter. #}
+    {{ block('choice_widget_collapsed') }}
+{% endblock %}

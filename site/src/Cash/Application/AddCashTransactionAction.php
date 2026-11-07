@@ -25,6 +25,7 @@ final class AddCashTransactionAction
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly Service\CashSettlementSourceLifecycle $settlementLifecycle,
         private readonly CashTransactionService $transactions,
         private readonly DailyBalanceRecalculator $recalculator,
         private readonly CashTransactionRepository $txRepo,
@@ -77,31 +78,35 @@ final class AddCashTransactionAction
         }
 
         if ($existingTransaction instanceof CashTransaction) {
-            $changed = false;
+            return $this->entityManager->wrapInTransaction(function () use ($existingTransaction, $dto, $counterparty): CashTransaction {
+                $this->settlementLifecycle->lock($existingTransaction);
+                $this->settlementLifecycle->changing($existingTransaction, $existingTransaction->getCounterparty()?->getId() !== $dto->counterpartyId);
+                $changed = false;
 
-            if ($dto->description !== $existingTransaction->getDescription()) {
-                $existingTransaction->setDescription($dto->description);
-                $changed = true;
-            }
-
-            $existingCounterparty = $existingTransaction->getCounterparty();
-            $existingCounterpartyId = $existingCounterparty?->getId();
-
-            if (null !== $dto->counterpartyId) {
-                if ($existingCounterpartyId !== $dto->counterpartyId) {
-                    $existingTransaction->setCounterparty($counterparty);
+                if ($dto->description !== $existingTransaction->getDescription()) {
+                    $existingTransaction->setDescription($dto->description);
                     $changed = true;
                 }
-            } elseif (null !== $existingCounterparty) {
-                $existingTransaction->setCounterparty(null);
-                $changed = true;
-            }
 
-            if ($changed) {
-                $this->entityManager->flush();
-            }
+                $existingCounterparty = $existingTransaction->getCounterparty();
+                $existingCounterpartyId = $existingCounterparty?->getId();
 
-            return $existingTransaction;
+                if (null !== $dto->counterpartyId) {
+                    if ($existingCounterpartyId !== $dto->counterpartyId) {
+                        $existingTransaction->setCounterparty($counterparty);
+                        $changed = true;
+                    }
+                } elseif (null !== $existingCounterparty) {
+                    $existingTransaction->setCounterparty(null);
+                    $changed = true;
+                }
+
+                if ($changed) {
+                    $this->entityManager->flush();
+                }
+
+                return $existingTransaction;
+            });
         }
 
         // Создаём сущность транзакции

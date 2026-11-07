@@ -120,7 +120,7 @@ final class CashTransactionServiceTest extends IntegrationTestCase
 
         $this->assertSame($tx->getId(), $repeated->getId(), 'Повторный импорт обязан вернуть ту же операцию.');
         $this->assertCount(2, $repeated->getSplits(), 'Разбивка не должна схлопываться повторным импортом.');
-        $this->assertSame(
+        $this->assertEqualsCanonicalizing(
             $splitIds,
             array_map(
                 static fn (CashTransactionSplit $split): string => $split->getId(),

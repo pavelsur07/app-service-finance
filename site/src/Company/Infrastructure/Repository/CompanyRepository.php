@@ -115,6 +115,24 @@ class CompanyRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    public function getFinanceLockBefore(string $companyId): ?\DateTimeImmutable
+    {
+        $value = $this->connection->fetchOne('SELECT finance_lock_before FROM companies WHERE id = ?', [$companyId]);
+
+        return false === $value || null === $value ? null : new \DateTimeImmutable((string) $value);
+    }
+
+    /** Maintenance serializes all financial writers before source and book locks. */
+    public function lockFinancialMaintenance(string $companyId): void
+    {
+        if (!$this->connection->isTransactionActive()) {
+            throw new \LogicException('Maintenance requires transaction.');
+        }
+        if (false === $this->connection->fetchOne('SELECT id FROM companies WHERE id=? FOR UPDATE', [$companyId])) {
+            throw new \DomainException('Компания не найдена.');
+        }
+    }
+
     public function findById(string $companyId): ?Company
     {
         return $this->find($companyId);

@@ -199,7 +199,7 @@ class IdempotencyTest extends ClientBank1CImportServiceTestCase
         $transaction->setResponsibilityCenterId($alternateCenter->getId());
         $this->em->flush();
 
-        $summaryOverwrite = $this->service->import([$row], $this->account, true, fn () => $this->em->flush());
+        $summaryOverwrite = $this->overwriteViaAction([$row]);
         self::assertSame(0, $summaryOverwrite['created']);
         self::assertSame(1, $summaryOverwrite['duplicates']);
         self::assertSame(0, $summaryOverwrite['errors']);

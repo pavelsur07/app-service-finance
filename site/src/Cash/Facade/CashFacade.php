@@ -76,6 +76,11 @@ final readonly class CashFacade
     ) {
     }
 
+    public function getSettlementSourceForUpdate(string $companyId, string $transactionId): \App\Cash\Application\DTO\CashSettlementSource
+    {
+        return $this->cashTransactionRepository->getSettlementSourceForUpdate($companyId, $transactionId);
+    }
+
     /**
      * Подсказки статей ИИ компании, запрошенные с момента: по статусам и решения людей
      * (страница «ИИ» кабинета в админке). С `$occurredFrom` — ещё и число операций без статьи,

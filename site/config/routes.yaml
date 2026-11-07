@@ -166,3 +166,9 @@ api_management_controllers:
         path: ../src/Api/Controller/
         namespace: App\Api\Controller
     type: attribute
+
+settlement_controllers:
+    resource:
+        path: ../src/Settlement/Controller/
+        namespace: App\Settlement\Controller
+    type: attribute

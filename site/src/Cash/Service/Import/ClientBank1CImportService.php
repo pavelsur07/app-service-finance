@@ -34,6 +34,7 @@ class ClientBank1CImportService
     private array $cpCache = [];
 
     public function __construct(
+        private readonly \App\Cash\Application\Service\CashSettlementSourceLifecycle $settlementLifecycle,
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly CounterpartyNameNormalizer $counterpartyNameNormalizer,
         private readonly CounterpartyFacade $counterpartyFacade,
@@ -201,8 +202,8 @@ class ClientBank1CImportService
 
     // --- import (с добавлением очистки кэша в начале) ---
     /**
-     * Строки пишутся по одной: после каждой вызывается $commit точки входа (Action), сервис сам
-     * не коммитит.
+     * Строки flush-ятся callback-ом точки входа. Production Action владеет общей
+     * транзакцией пакета и блокировкой счёта до commit/rollback; сервис не коммитит.
      *
      * @param \Closure(): void $commit
      *
@@ -224,7 +225,11 @@ class ClientBank1CImportService
         // не атомарны, а уникальный индекс импорта 1С не защищает (import_source пуст).
         $companyId = (string) $company->getId();
         $accountId = (string) $account->getId();
-        if (!$this->accountLock->tryAcquire($companyId, $accountId)) {
+        $callerOwnsLock = (bool) ($context['account_lock_owned_by_caller'] ?? false);
+        if (!$callerOwnsLock && $this->entityManager->getConnection()->isTransactionActive()) {
+            throw new \LogicException('Transactional import caller must retain the account lock through commit.');
+        }
+        if (!$callerOwnsLock && !$this->accountLock->tryAcquire($companyId, $accountId)) {
             $this->logger?->warning('Bank1C import rejected: another import of the account is running', [
                 'company' => $companyId,
                 'account' => $accountId,
@@ -234,10 +239,16 @@ class ClientBank1CImportService
         }
 
         try {
+            if ($overwrite) {
+                $context['settlement_prelocked_ids'] = array_fill_keys($this->cashTransactionRepository->lockSettlementSourcesForAccount($companyId, $accountId, $this->overwriteExternalIds($preview, $account)), true);
+            }
+
             return $this->importRows($preview, $company, $account, $overwrite, $commit, $context);
         } finally {
             try {
-                $this->accountLock->release($companyId, $accountId);
+                if (!$callerOwnsLock) {
+                    $this->accountLock->release($companyId, $accountId);
+                }
             } catch (\Throwable $exception) {
                 // Соединение потеряно — PostgreSQL снял сессионную блокировку сам.
                 $this->logger?->warning('Bank1C import: account lock release failed', [
@@ -279,6 +290,8 @@ class ClientBank1CImportService
             'overwrite' => $overwrite,
         ];
 
+        /** @var array<string, bool> $prelockedIds */
+        $prelockedIds = $context['settlement_prelocked_ids'] ?? [];
         $isPreview = (bool) ($context['preview'] ?? false);
         $importLog = $context['import_log'] ?? null;
         if (!$importLog instanceof ImportLog) {
@@ -403,6 +416,7 @@ class ClientBank1CImportService
                     $account->getCurrency(),
                     $occurredAt,
                 );
+                $prelockedIds[(string) $transaction->getId()] = true;
                 $transaction->setExternalId($externalId);
                 $transaction->setDedupeHash($dedupeHash);
                 $transaction->setProjectDirection($systemProject);
@@ -429,6 +443,12 @@ class ClientBank1CImportService
                     continue;
                 }
 
+                if (!$isPreview) {
+                    if (!isset($prelockedIds[(string) $transaction->getId()])) {
+                        throw new \DomainException('Состав операций счёта изменился параллельно. Повторите импорт.');
+                    }
+                    $this->settlementLifecycle->lock($transaction);
+                }
                 if (!$transaction->isImportedDescriptionOverridden()) {
                     $transaction->setDedupeHash($dedupeHash);
                 }
@@ -462,6 +482,9 @@ class ClientBank1CImportService
                     $transaction->setCounterparty(null);
                 }
             } else {
+                if (!$isPreview) {
+                    $this->settlementLifecycle->changing($transaction, $counterparty instanceof Counterparty && $transaction->getCounterparty()?->getId() !== $counterparty->getId());
+                }
                 if (!$transaction->isImportedDescriptionOverridden()) {
                     $transaction->setDescription($purpose);
                 }
@@ -747,6 +770,30 @@ class ClientBank1CImportService
         return $normalized;
     }
 
+    /** @param array<int, mixed> $preview
+     * @return list<string>
+     */
+    private function overwriteExternalIds(array $preview, MoneyAccount $account): array
+    {
+        $occurrences = [];
+        $ids = [];
+        foreach ($preview as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $direction = $this->resolveDirection($row);
+            if (null === $direction || null === $this->resolveOccurredAt($row, $direction) || null === $this->resolveAmount($row, $direction)) {
+                continue;
+            }
+            $baseId = $this->generateExternalId($row, $account);
+            $occurrences[$baseId] = ($occurrences[$baseId] ?? -1) + 1;
+            $ids[] = $this->applyOccurrence($baseId, $occurrences[$baseId], $this->getStringValue($row['docType'] ?? null));
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /** @param array<string, mixed> $row */
     private function generateExternalId(array $row, MoneyAccount $account): string
     {
         $parts = [

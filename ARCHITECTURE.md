@@ -5177,6 +5177,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.155 | 2026-11-06 | Settlement: independent Money documents, explicit Cash/Finance sources, manual M:N allocation, dated history/reversals, source guards, verify/rebuild and native UI; additive Version20261106183000 (counterparty-settlements, Stages 1–5) |
 | 2.154 | 2026-11-06 | MarketplaceAnalytics: отчёт «Оборачиваемость» перенесён во вкладки «Товары и остатки» после «Остатки» (решение Владельца): маршруты `/inventory/stock-turnover` и `/inventory/stock-turnover/export.xlsx` (`inventory_stock_turnover_*`), layout `inventory/layout.html.twig`; из вкладок аналитики маркетплейсов убран. Контроллеры и Query остаются в модуле |
 | 2.153 | 2026-11-06 | MarketplaceAnalytics: в отчёте «Оборачиваемость» термин «корзина» в UI и xlsx заменён на «Скорость продаж» (решение Владельца); код (`TurnoverBucket`, параметр `bucket`) без изменений |
 | 2.152 | 2026-11-06 | MarketplaceAnalytics: отчёт «Оборачиваемость» — где заморожены деньги: `TurnoverBucket`, `StockTurnoverPolicy`, `StockTurnoverQuery` (только через Facade), страница `/marketplace-analytics/stock-turnover` с фильтрами период/источник/схема/дата/корзина/теги, сводкой и баннером свежести, экспорт `export.xlsx`; `InventoryFacade::getStockQtyByListingOnReportDate()` получил параметр `scheme` (задача `stock-turnover-report`) |
@@ -5550,3 +5551,130 @@ source drift считаются временными ошибками. `SyncStoc
 подключений текущей страницы; отдельный batch-запрос выбирает только последний
 `completed` снимок и считает его строки. Более новый `building` или `failed`
 снимок не скрывает предыдущий опубликованный.
+
+## Settlement: ядро взаиморасчётов
+
+`Settlement` хранит независимые основания расчётов по контрагентам. Проводимые
+ручные документы: OPENING/OBLIGATION; корректировка и отмена — отдельные записи.
+`SettlementDocument`, `SettlementItem`, `SettlementMovement`, `SettlementBook`,
+`SettlementAllocation`, `SettlementSourceLink` принадлежат компании через `string companyId`.
+Распределения связывают долговые и платёжные позиции M:N; source links защищают
+активные связи с ДДС/ОПиУ. Расчётные документы доступны в `/settlements/documents`.
+
+Все денежные поля — существующий `App\Shared\Domain\ValueObject\Money`,
+ORM Embeddable/MoneyAmountType; signed Money у движения, положительная сумма
+у документа/позиции. Остатки не редактируются отдельно.
+
+Actions ConfigureSettlementBook/CreateSettlementDocument/PostSettlementDocument/
+CorrectSettlementItem/ReverseSettlementDocument владеют `wrapInTransaction`.
+SettlementRepository и SettlementRegisterUpdater не вызывают flush/commit.
+Порядок блокировок: Company financialAccess(..., lock: true) FOR SHARE →
+SettlementBook FOR UPDATE → позиции по отсортированным ID; для первоначального
+создания книги — advisory lock settlement:companyId после company lock.
+Проведённые документы неизменяемы; повтор по requestId возвращает исходный результат,
+повтор отмены исходного документа с новым requestId возвращает существующую отмену.
+Коррекции/отмены проверяют неотрицательность всей последующей истории позиции.
+Порядок событий: effectiveDate, eventSequence; номер выдаётся из SettlementBook
+под FOR UPDATE, уникален по компании и сохраняется в SettlementDocument. UUID
+не используется для определения порядка разных финансовых событий.
+
+`CompanyFacade::getFinanceLockBefore(string $companyId): ?DateTimeImmutable`
+читает текущую границу через DBAL CompanyRepository, обходя кэш сущности Company;
+потребитель вызывает его под блокировкой company в транзакции мутации.
+
+### Settlement source contracts
+
+`CashFacade::getSettlementSourceForUpdate(string $companyId, string $transactionId): CashSettlementSource`
+requires an active caller transaction; company-scoped DBAL projection locks current Cash row and returns
+id/company/counterparty, Money amount, date, CashDirection, deleted/transfer flags, fingerprint.
+`FinanceFacade::getSettlementSourceForUpdate(string $companyId, string $documentId): FinanceSettlementSource`
+locks linked Cash before Finance header and returns header status/type/source, counterparty/date,
+sorted operation IDs/fingerprint and optional linked Cash ID. No P&L float total is read.
+Both methods perform no flush/commit; transaction belongs to the Settlement Action.
+
+RegisterCashSettlementAction includes payment once via active source link and preserves original
+Cash allocatedAmount. CreateSettlementFromFinanceAction creates a draft with explicitly supplied Money;
+PostSettlementDocumentAction rereads source/fingerprint before activating link and creating debt.
+Материальные изменения источников блокируются source-owned событиями
+CashSettlementSourceChanging / FinanceSettlementSourceChanging и подписчиком
+SettlementSourceMutationSubscriber. Источник блокируется до события; active source
+link исключает изменение суммы/даты/валюты/контрагента/направления/операций и удаление.
+Описание/комментарии разрешены. Все write paths и доказательства —
+docs/tasks/counterparty-settlements/source-write-paths.md.
+
+FinanceSettlementSourceQuery хранит единый canonical fingerprint для сохранённой
+и изменённой формы; header-only lock используется для удаления/restore без загрузки
+больших marketplace операций. Чужие source Entity не возвращаются через новый контракт.
+Физическое удаление пересчитывает день из перечитанного под блокировкой документа.
+
+ImportBank1CStatementAction владеет whole-file transaction и CashImportAccountLock:
+company FOR SHARE → session account lease → real overwrite target Cash IDs ASC; lease
+остаётся до внешнего commit/rollback. Сервис получает server-owned ownership flag,
+не освобождает чужую lease и отклоняет неподдерживаемого transactional caller.
+Новые существующие overwrite targets вне prelocked set отклоняются. После rollback
+журнал завершается отдельным scoped DBAL update, деньги пакета не сохраняются.
+
+SettlementSourceExceptionListener отображает SourceInUseException в HTTP422:
+JSON error.code=settlement_source_in_use для API/Accept JSON. SourceInUseException
+наследует DomainException: существующие HTML source controllers сохраняют форму
+или flash+redirect. Подтверждение импорта 1С ловит business DomainException и
+возвращает к сохранённому предпросмотру.
+
+### Settlement: погашения, отчёты и восстановление
+
+`SettlementFacadeInterface::report(companyId, SettlementReportFilter)` и `card(companyId,
+counterpartyId, filter)` возвращают readonly DTO с Money. Один SQL-снимок содержит
+страницу, полные totals и карточку; подписи включая архивные — пакетным
+`CounterpartyFacade::getLabelsByIds(companyId, ids)`. Период не раньше cutoff.
+
+`AllocateSettlementAction` принимает фактические доступные Money двух позиций,
+сериализует книгу и проверяет все последующие остатки отдельно по корзинам.
+ALLOCATION имеет собственную event identity; CLASSIFICATION переносит лишь
+свободный остаток; отмены добавляют датированное обратное событие.
+
+`app:settlement:verify <companyId>` независимо воспроизводит первичные факты;
+`app:settlement:rebuild <companyId>` — dry-run, запись только `--execute`.
+Maintenance Action: CompanyFacade::lockFinancialMaintenance (exclusive company),
+затем Cash в сортировке ID (включая ссылки Finance), Finance, книга.
+FinanceFacade::getSettlementSourceCashIds подготавливает общий порядок;
+optional prelockedCashIds не допускает позднее получение нового Cash вне порядка.
+Проверка и восстановление блокируют и сверяют активные источники: fingerprint,
+фактические Money/контрагента/направление/дату Cash и допустимость Finance.
+Полная сумма основания Finance остаётся независимой от суммы ОПиУ.
+Изменившийся fingerprint активного источника запрещает rebuild. Первичные
+документы, позиции и распределения не переписываются; восстанавливаются только
+движения и source links с активным документом и датой последней отмены.
+Производственный execute требует отдельного именованного одобрения владельца.
+
+`SettlementPostingPolicy::assertBaseDocument` задаёт общие сочетания вида,
+корзины и источника для создания, проведения и независимого воспроизведения.
+OPENING: ручной источник и четыре начальные корзины строго на cutoff;
+OBLIGATION: receivable/payable, ручной либо явный Finance;
+PAYMENT: только Cash и четыре платёжные корзины.
+`paymentBucket` использует фактическое направление Cash и явное подтверждение аванса.
+Воспроизведение проверяет даты/порядок событий, snapshot источника и согласованность
+позиций; ошибочные первичные факты отклоняет без изменения регистра.
+`SettlementMutationPolicy` использует существующий ClockInterface и московскую
+дату. Новая запись требует открытого периода; историческое воспроизведение
+допускает уже закрытый период, сохраняя cutoff и запрет будущих фактов.
+
+### Settlement HTTP/UI
+
+HTML раздел `/settlements`: сводка, карточка `/counterparties/{id}`, отдельные
+`/documents` и `/documents/{id}`. FINANCE_READ/WRITE через ModuleAccessMap и
+IsGranted (GET — READ, POST — inline WRITE до данных); company из ActiveCompanyService до данных; mutation Actions повторяют
+fresh authorization под блокировками. Setup CSRF intention включает companyId.
+Формы имеют requestId, проведение version/CSRF, суммы — SettlementAmountType
+(RUB, явная проверка2знаков до Money parser). Пустые обязательные значения
+отклоняются server constraints, false допустим для bool choices.
+
+PreviewSettlementSourceAction открывает короткую транзакцию для существующих
+locked Cash/Finance Facades и свежую проверку FINANCE_READ; не проводит ничего. Реальные mutations отдельными
+Actions снова проверяют источники. GET+POST страниц отмены/классификации только
+собирают explicit date/reason; ledger изменяется лишь Actions.
+
+SettlementUiQuery возвращает scoped own entities/readonly position DTO и QB
+документов под Pagerfanta; labels/reversals batch. Карточка ограничена страницей
+движений, формы имеют подписанный preview50позиций и полный scoped choice set.
+Doc detail показывает текущий свободный остаток и связь обеих сторон погашения.
+Все money HTML значения — точные строки через vf_money/vf_amount.

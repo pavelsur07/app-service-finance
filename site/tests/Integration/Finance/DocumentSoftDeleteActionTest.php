@@ -200,6 +200,27 @@ final class DocumentSoftDeleteActionTest extends IntegrationTestCase
         self::assertSame(1, $this->countRegisterRows());
     }
 
+    public function testHardDeleteRecalculatesDayFromFreshlyLockedDocument(): void
+    {
+        $project = new ProjectDirection(Uuid::uuid7()->toString(), $this->document->getCompany(), 'P&L project');
+        $category = new PLCategory(Uuid::uuid7()->toString(), $this->document->getCompany());
+        $category->setName('P&L expense');
+        $category->setFlow(PLFlow::EXPENSE);
+        $this->document->setProjectDirection($project);
+        $operation = $this->document->getOperations()->first();
+        self::assertInstanceOf(DocumentOperation::class, $operation);
+        $operation->setCategory($category);
+        $this->em->persist($project);
+        $this->em->persist($category);
+        $this->em->flush();
+        $this->plRegisterUpdater()->updateForDocument($this->document);
+        $id = (string) $this->document->getId();
+        $this->connection->executeStatement("UPDATE documents SET date = date + INTERVAL '1 day' WHERE id = ? AND company_id = ?", [$id, self::COMPANY_ID]);
+        $this->connection->executeStatement("UPDATE pl_daily_totals SET date = date + INTERVAL '1 day' WHERE company_id = ?", [self::COMPANY_ID]);
+        $this->deleteAction()(self::COMPANY_ID, $id);
+        self::assertSame(0, $this->countRegisterRows());
+    }
+
     public function testSoftDeleteIsTenantSafe(): void
     {
         $this->expectException(\DomainException::class);
@@ -260,6 +281,7 @@ final class DocumentSoftDeleteActionTest extends IntegrationTestCase
     private function softDeleteAction(): SoftDeleteDocumentAction
     {
         return new SoftDeleteDocumentAction(
+            self::getContainer()->get(\App\Finance\Application\Service\FinanceSettlementSourceLifecycle::class),
             self::getContainer()->get(DocumentRepository::class),
             $this->em,
             self::getContainer()->get(PLRegisterUpdater::class),
@@ -269,6 +291,7 @@ final class DocumentSoftDeleteActionTest extends IntegrationTestCase
     private function restoreAction(): RestoreDocumentAction
     {
         return new RestoreDocumentAction(
+            self::getContainer()->get(\App\Finance\Application\Service\FinanceSettlementSourceLifecycle::class),
             self::getContainer()->get(DocumentRepository::class),
             $this->em,
             self::getContainer()->get(PLRegisterUpdater::class),

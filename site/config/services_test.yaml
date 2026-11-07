@@ -123,6 +123,15 @@ services:
     App\Budget\Application\Service\BudgetFillPlanner:
         public: true
 
+    App\Settlement\Application\:
+        resource: '../src/Settlement/Application/'
+        exclude: '../src/Settlement/Application/DTO/'
+        public: true
+
+    App\Settlement\Facade\SettlementFacadeInterface:
+        alias: App\Settlement\Facade\SettlementFacade
+        public: true
+
     # MarketplaceAnalytics: integration-тест отчёта «Оборачиваемость» берёт Query из контейнера.
     App\MarketplaceAnalytics\Infrastructure\Query\StockTurnoverQuery:
         public: true

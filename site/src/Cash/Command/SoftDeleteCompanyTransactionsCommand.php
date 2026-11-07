@@ -44,9 +44,9 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
  * обновляет (Timestampable-листенеров в проекте нет), массовая операция не должна
  * отличаться от одиночной.
  *
- * Запускать в тихом окне с остановленными воркерами: пречек замка и UPDATE не
- * в одной транзакции, и импорт, попавший между ними, будет подметён массовым
- * UPDATE без замка. В одном экземпляре — параллельные прогоны бессмысленны.
+ * Компания и фиксированный набор исходных строк блокируются в одной транзакции;
+ * проверка взаиморасчётов предшествует UPDATE. Новые строки вне заблокированного
+ * набора не затрагиваются. Пересчёт фактов входит в ту же транзакцию.
  */
 #[AsCommand(
     name: 'app:cash:soft-delete-company-transactions',
@@ -145,31 +145,36 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
             return Command::FAILURE;
         }
 
-        // Диапазон пересчёта фиксируем до мутации: после UPDATE целевой набор
-        // перестанет отличаться предикатом.
-        $minOccurredAt = $this->minOccurredAt($companyId, $restore);
+        $targetIds = $connection->transactional(function () use ($connection, $company, $companyId, $restore, $reason): array {
+            $this->entityManager->lock($company, \Doctrine\DBAL\LockMode::PESSIMISTIC_READ);
+            $this->entityManager->refresh($company);
+            $rows = $connection->fetchAllAssociative('SELECT id, occurred_at FROM cash_transaction WHERE company_id = :companyId AND '.$this->targetCondition($restore).' ORDER BY id FOR UPDATE', $this->targetParams($companyId, $restore));
+            $ids = [];
+            $minOccurredAt = null;
+            foreach ($rows as $row) {
+                $day = new \DateTimeImmutable((string) $row['occurred_at']);
+                if (null !== $company->getFinanceLockBefore() && $day < $company->getFinanceLockBefore()) {
+                    throw new \DomainException('Транзакция в закрытом периоде.');
+                }
+                $id = (string) $row['id'];
+                $ids[] = $id;
+                $minOccurredAt = null === $minOccurredAt || $day < $minOccurredAt ? $day : $minOccurredAt;
+                $this->eventDispatcher->dispatch(new \App\Cash\Domain\Event\CashSettlementSourceChanging($companyId, $id, true));
+            }
+            if ([] === $ids) {
+                return [];
+            }
+            $connection->executeStatement($restore
+                ? 'UPDATE cash_transaction SET deleted_at=NULL, deleted_by=NULL, delete_reason=NULL WHERE company_id=:companyId AND id IN (:ids)'
+                : 'UPDATE cash_transaction SET deleted_at=NOW(), deleted_by=:actor, delete_reason=:reason WHERE company_id=:companyId AND id IN (:ids)',
+                $restore ? ['companyId' => $companyId, 'ids' => $ids] : ['companyId' => $companyId, 'ids' => $ids, 'actor' => self::ACTOR, 'reason' => $reason],
+                ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING]);
+            // UPDATE прошёл мимо UnitOfWork: сбрасываем, чтобы пересчёт и верификация
+            // читали БД, а не закэшированные сущности.
+            $this->entityManager->clear();
+            $company = $this->companyFacade->findById($companyId);
+            \assert($company instanceof Company);
 
-        if ($restore) {
-            $connection->executeStatement(
-                'UPDATE cash_transaction SET deleted_at = NULL, deleted_by = NULL, delete_reason = NULL
-                 WHERE company_id = :companyId AND '.$this->targetCondition(true),
-                $this->targetParams($companyId, true),
-            );
-        } else {
-            $connection->executeStatement(
-                'UPDATE cash_transaction SET deleted_at = NOW(), deleted_by = :actor, delete_reason = :reason
-                 WHERE company_id = :companyId AND deleted_at IS NULL',
-                ['companyId' => $companyId, 'actor' => self::ACTOR, 'reason' => $reason],
-            );
-        }
-
-        // UPDATE прошёл мимо UnitOfWork: сбрасываем, чтобы пересчёт и верификация
-        // читали БД, а не закэшированные сущности.
-        $this->entityManager->clear();
-        $company = $this->companyFacade->findById($companyId);
-        \assert($company instanceof Company);
-
-        if (null !== $minOccurredAt) {
             // Порядок как в DeleteCashTransactionAction: сначала фиксация,
             // потом пересчёт фактов, и только после этого новая версия snapshot cache.
             $this->recalculator->recalcRange(
@@ -178,12 +183,14 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
                 (new \DateTimeImmutable('today'))->setTime(0, 0),
                 null,
             );
-        }
+
+            return $ids;
+        });
         $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
 
         // Верификация по пересчёту из БД: после delete в исходном состоянии (активные)
         // не должно остаться строк, после restore — в исходном состоянии (deleted).
-        $remaining = $this->countTarget($companyId, $restore);
+        $remaining = [] === $targetIds ? 0 : (int) $connection->fetchOne('SELECT COUNT(*) FROM cash_transaction WHERE company_id = :companyId AND id IN (:ids) AND '.$this->targetCondition($restore), $this->targetParams($companyId, $restore) + ['ids' => $targetIds], ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING]);
         if ($remaining > 0) {
             $io->error(sprintf(
                 'Операция не завершена: %d транзакций остались в исходном состоянии. Повторите команду.',
@@ -196,7 +203,7 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
         $io->success(sprintf(
             '%s %d транзакций.',
             $restore ? 'Восстановлено' : 'Помечено удалёнными',
-            $target,
+            count($targetIds),
         ));
 
         return Command::SUCCESS;
@@ -253,16 +260,5 @@ final class SoftDeleteCompanyTransactionsCommand extends Command
         );
 
         return false !== $row;
-    }
-
-    private function minOccurredAt(string $companyId, bool $restore): ?\DateTimeImmutable
-    {
-        $value = $this->entityManager->getConnection()->fetchOne(
-            'SELECT min(occurred_at) FROM cash_transaction
-             WHERE company_id = :companyId AND '.$this->targetCondition($restore),
-            $this->targetParams($companyId, $restore),
-        );
-
-        return false === $value || null === $value ? null : new \DateTimeImmutable((string) $value);
     }
 }

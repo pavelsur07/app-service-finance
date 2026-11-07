@@ -52,6 +52,7 @@ final class ModuleAccessMap
         'App\\Api\\Controller\\Settings\\' => Module::ADMIN,
         'App\\Cash\\Controller\\' => Module::FINANCE,
         'App\\Finance\\' => Module::FINANCE,
+        'App\\Settlement\\' => Module::FINANCE,
         'App\\Balance\\' => Module::FINANCE,
         'App\\Budget\\' => Module::FINANCE,
         'App\\Report\\' => Module::FINANCE,

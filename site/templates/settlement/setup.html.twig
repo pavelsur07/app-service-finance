@@ -1,0 +1,12 @@
+{% extends 'settlement/layout.html.twig' %}
+{% form_theme form 'settlement/_form_theme.html.twig' %}
+{% block settlement_content %}
+<div class="wz-head"><h1 class="wz-title">Начало учёта взаиморасчётов</h1></div>
+<section class="card">
+    <p>Учёт ведётся в рублях. На выбранную дату внесите долги и подтверждённые авансы отдельными документами начальных остатков. Старые ДДС и ОПиУ автоматически не включаются.</p>
+    {% if book %}<p>Дата начала зафиксирована: {{ book.startDate|date('d.m.Y') }}. Её нельзя изменить после настройки.</p>{% endif %}
+    {{ form_start(form) }}{{ form_errors(form) }}{{ form_widget(form) }}
+    {% if not book %}<button class="btn btn-md btn-primary" type="submit">Сохранить дату начала</button>{% endif %}{{ form_end(form) }}
+    {% if book %}<a class="btn btn-md btn-secondary" href="{{ path('settlement_document_new') }}">Ввести начальные остатки</a>{% endif %}
+</section>
+{% endblock %}

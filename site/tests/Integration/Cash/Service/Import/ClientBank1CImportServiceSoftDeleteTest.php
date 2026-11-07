@@ -95,6 +95,7 @@ final class ClientBank1CImportServiceSoftDeleteTest extends IntegrationTestCase
         $this->entityManager->flush();
 
         $this->service = new ClientBank1CImportService(
+            self::getContainer()->get(\App\Cash\Application\Service\CashSettlementSourceLifecycle::class),
             new StubActiveCompanyService($this->company),
             new CounterpartyNameNormalizer(),
             new CounterpartyFacade($counterpartyRepository, $this->entityManager),

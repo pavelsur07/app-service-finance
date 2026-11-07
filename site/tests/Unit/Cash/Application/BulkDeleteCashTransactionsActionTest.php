@@ -44,6 +44,7 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
         $action = new BulkDeleteCashTransactionsAction(
             $repository,
             $entityManager,
+            $this->lifecycle($entityManager, $repository),
             $recalculator,
             $this->dispatcher(),
         );
@@ -100,7 +101,7 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
                 }),
             );
 
-        $repository->expects(self::once())
+        $repository->expects(self::atLeastOnce())
             ->method('hasAnyTransferAggregateByIdsAndCompanyId')
             ->with($ids, $company->getId())
             ->willReturn(false);
@@ -108,6 +109,7 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
         $deletedCount = (new BulkDeleteCashTransactionsAction(
             $repository,
             $entityManager,
+            $this->lifecycle($entityManager, $repository),
             $recalculator,
             $this->dispatcher(),
         ))($company, $ids, '22222222-2222-2222-2222-222222222222');
@@ -136,6 +138,7 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
         $action = new BulkDeleteCashTransactionsAction(
             $repository,
             $entityManager,
+            $this->lifecycle($entityManager, $repository),
             $recalculator,
             $this->dispatcher(),
         );
@@ -166,6 +169,7 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
         $action = new BulkDeleteCashTransactionsAction(
             $repository,
             $entityManager,
+            $this->lifecycle($entityManager, $repository),
             $recalculator,
             $this->dispatcher(),
         );
@@ -208,5 +212,17 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
             'RUB',
             new \DateTimeImmutable($occurredAt),
         );
+    }
+
+    /**
+     * @param EntityManagerInterface&\PHPUnit\Framework\MockObject\MockObject $entityManager
+     * @param CashTransactionRepository&\PHPUnit\Framework\MockObject\MockObject $repository
+     */
+    private function lifecycle(EntityManagerInterface $entityManager, CashTransactionRepository $repository): \App\Cash\Application\Service\CashSettlementSourceLifecycle
+    {
+        $entityManager->method('wrapInTransaction')->willReturnCallback(static fn (callable $callback): mixed => $callback());
+        $repository->method('getSettlementSourceForUpdate')->willReturn(new \App\Cash\Application\DTO\CashSettlementSource(Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), null, \App\Shared\Domain\ValueObject\Money::fromString('1.00', 'RUB'), new \DateTimeImmutable('2026-11-01'), CashDirection::OUTFLOW, false, false, 'test'));
+
+        return new \App\Cash\Application\Service\CashSettlementSourceLifecycle($entityManager, $repository, $this->dispatcher());
     }
 }

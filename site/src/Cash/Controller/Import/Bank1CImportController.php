@@ -369,7 +369,7 @@ class Bank1CImportController extends AbstractController
                 'date_start' => $periodStart,
                 'date_end' => $periodEnd,
             ]);
-        } catch (CashImportAccountBusyException $exception) {
+        } catch (CashImportAccountBusyException|\DomainException $exception) {
             // Предпросмотр в сессии сохраняется: импорт можно повторить, когда счёт освободится.
             $this->addFlash('danger', $exception->getMessage());
 

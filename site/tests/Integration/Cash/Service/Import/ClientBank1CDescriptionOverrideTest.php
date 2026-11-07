@@ -33,7 +33,7 @@ final class ClientBank1CDescriptionOverrideTest extends ClientBank1CImportServic
         $this->em->refresh($transaction);
         self::assertTrue($transaction->isImportedDescriptionOverridden());
 
-        $this->service->import([$row], $this->account, true, fn () => $this->em->flush());
+        $this->overwriteViaAction([$row]);
         $this->em->refresh($transaction);
 
         self::assertSame('Уточнённое описание', $transaction->getDescription());
