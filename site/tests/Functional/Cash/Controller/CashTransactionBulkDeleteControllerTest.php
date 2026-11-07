@@ -44,31 +44,41 @@ final class CashTransactionBulkDeleteControllerTest extends WebTestCaseBase
 
     /**
      * GlitchTip #414: обработчик submit «Применить автоправило» навешивался заново на каждый клик по
-     * .js-auto-rule, и один submit уходил несколькими POST по одной транзакции. Скриптов в проекте без
-     * браузерных тестов нет, поэтому закрепляем форму защиты в разметке страницы.
+     * кнопке, и один submit уходил несколькими POST по одной транзакции. Логика страницы теперь в
+     * assets/pages/cash_transactions.js (одиночная отправка — tests/e2e/cash-transactions.e2e.cjs);
+     * здесь закрепляем хуки разметки, от которых модуль зависит, и отсутствие inline-JS.
      */
-    public function testAutoRuleApplyScriptSubmitsOnceAndBlocksRepeatedSubmit(): void
+    public function testPageExposesModuleHooksWithoutInlineScripts(): void
     {
         $client = static::createClient();
         [$user, $company] = $this->seedCompanyWithTransactions(1);
         $this->login($client, $user, $company);
 
-        $client->request('GET', '/finance/cash-transactions/');
+        $crawler = $client->request('GET', '/finance/cash-transactions/');
         self::assertResponseIsSuccessful();
-        $html = (string) $client->getResponse()->getContent();
 
-        self::assertSame(
-            1,
-            substr_count($html, "addEventListener('submit', async (ev)"),
-            'Обработчик submit автоправила должен регистрироваться один раз, а не на каждый клик.',
-        );
-        self::assertStringNotContainsString(
-            "modalEl.addEventListener('submit'",
-            $html,
-            'Регистрация обработчика внутри клика по .js-auto-rule вернёт многократную отправку.',
-        );
-        self::assertStringContainsString("f.dataset.submitting === '1'", $html, 'Повторный submit в полёте должен игнорироваться.');
-        self::assertStringContainsString('button.disabled = true', $html, 'Кнопка «Применить» должна блокироваться на время запроса.');
+        $root = $crawler->filter('[data-cash-transactions]');
+        self::assertCount(1, $root);
+        self::assertNotSame('', (string) $root->attr('data-csrf-token'));
+        self::assertCount(1, $root->filter('#cash-transactions-select-all[data-select-all]'));
+        self::assertCount(1, $root->filter('#bulk-delete-button[data-bulk-delete] [data-bulk-delete-label]'));
+        self::assertCount(1, $root->filter('[data-ops-summary]'));
+        self::assertCount(1, $root->filter('[data-ops-selection] [data-ops-selection-count]'));
+        self::assertCount(1, $root->filter('[data-ops-selection] [data-ops-clear-selection]'));
+        self::assertCount(1, $root->filter('[data-ops-pop] [data-ops-pop-search]'));
+        self::assertCount(1, $root->filter('[data-auto-rule][data-url][data-bs-target="#autoRuleModal"]'));
+        self::assertCount(1, $root->filter('[data-create-from][data-url][data-transaction-id]'));
+        self::assertCount(1, $root->filter('td[data-tx-id]'));
+
+        self::assertCount(1, $crawler->filter('#bulkDeleteModal[data-bulk-delete-modal] [data-bulk-delete-count]'));
+        self::assertCount(1, $crawler->filter('#bulkDeleteModal form[data-bulk-delete-form] [data-bulk-delete-ids]'));
+        self::assertCount(1, $crawler->filter('#autoRuleModal[data-auto-rule-modal] [data-auto-rule-body]'));
+        self::assertCount(1, $crawler->filter('#createFromWarningModal[data-create-from-modal] [data-create-from-body]'));
+        self::assertCount(1, $crawler->filter('#createFromWarningModal form[data-create-from-form] input[name="_token"]'));
+
+        $html = (string) $client->getResponse()->getContent();
+        self::assertStringNotContainsString('addEventListener(', $html, 'Логика страницы живёт в assets/pages/cash_transactions.js, не в шаблоне.');
+        self::assertSelectorNotExists('[onclick], [onchange], [onsubmit]');
     }
 
     public function testDeletesSelectedTransactionsAndPreservesListQuery(): void

@@ -91,7 +91,7 @@
     </div>
 </div>
 
-<div class="card cashflow-ops vf-ops mb-4"
+<div class="card cashflow-ops vf-ops mb-4" data-cash-transactions
      data-csrf-token="{{ csrf_token('cash_transaction_create_from') }}">
     <div class="card-header">
         {% include 'transaction/_tabs.html.twig' with {active: 'all'} only %}
@@ -115,21 +115,22 @@
     {% endif %}
 
     {# Итоги по фильтру контроллер не считает (TODO(ds), отчёт §4) — показываем число найденных. #}
-    <div class="vf-ops-bar" id="cash-transactions-summary" role="status">
+    <div class="vf-ops-bar" id="cash-transactions-summary" data-ops-summary role="status">
         Найдено {{ totalFound|vf_number }} {{ totalFound % 10 == 1 and totalFound % 100 != 11 ? 'операция' : (totalFound % 10 in 2..4 and (totalFound % 100 < 10 or totalFound % 100 >= 20) ? 'операции' : 'операций') }}
     </div>
-    <div class="vf-ops-bar vf-ops-bar--selection" id="cash-transactions-selection" role="toolbar" aria-label="Действия с выбранными" hidden>
-        <span class="vf-ops-bar__count" id="cash-transactions-selection-count">Выбрано: 0</span>
+    <div class="vf-ops-bar vf-ops-bar--selection" data-ops-selection role="toolbar" aria-label="Действия с выбранными" hidden>
+        <span class="vf-ops-bar__count" data-ops-selection-count>Выбрано: 0</span>
         <button type="button"
                 class="btn btn-sm vf-btn-destructive"
                 id="bulk-delete-button"
+                data-bulk-delete
                 data-bs-toggle="modal"
                 data-bs-target="#bulkDeleteModal"
                 disabled>
             <i class="ti ti-trash me-1" aria-hidden="true"></i>
-            <span id="bulk-delete-button-label">Удалить</span>
+            <span data-bulk-delete-label>Удалить</span>
         </button>
-        <button type="button" class="btn btn-link" id="cash-transactions-clear-selection">Снять выбор</button>
+        <button type="button" class="btn btn-link" data-ops-clear-selection>Снять выбор</button>
     </div>
 
     {% if transactions is empty %}
@@ -160,6 +161,7 @@
                         <input type="checkbox"
                                class="form-check-input m-0"
                                id="cash-transactions-select-all"
+                               data-select-all
                                aria-label="Выбрать все транзакции на странице"
                                {{ not hasStandaloneTransactions ? 'disabled' : '' }}>
                     </th>
@@ -258,7 +260,8 @@
                                 </a>
 
                                 <button type="button"
-                                      class="dropdown-item js-auto-rule"
+                                      class="dropdown-item"
+                                      data-auto-rule
                                       data-transaction-id="{{ tx.id }}"
                                       data-url="{{ path('cash_transaction_auto_rule_match_one', {transactionId: tx.id}) }}"
                                       data-bs-toggle="modal"
@@ -274,7 +277,8 @@
                                 {% if not tx.isTransfer %}
                                   {% set createFromDisabled = tx.isHasViolatedDocument or tx.remainingAmount <= 0 %}
                                   <button type="button"
-                                          class="dropdown-item d-flex align-items-center gap-2 js-create-from {{ createFromDisabled ? 'disabled' : '' }}"
+                                          class="dropdown-item d-flex align-items-center gap-2 {{ createFromDisabled ? 'disabled' : '' }}"
+                                          data-create-from
                                           data-transaction-id="{{ tx.id }}"
                                           data-url="{{ path('cash_transaction_create_from', {id: tx.id}) }}"
                                           {% if createFromDisabled %}
@@ -311,7 +315,7 @@
     {% endif %}
 </div>
 
-<div class="modal fade" id="bulkDeleteModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="bulkDeleteModal" data-bulk-delete-modal tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered" role="document">
     <div class="modal-content">
       <div class="modal-header">
@@ -322,7 +326,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
       </div>
       <div class="modal-body">
-        <p>Выбрано транзакций: <strong id="bulk-delete-modal-count">0</strong>.</p>
+        <p>Выбрано транзакций: <strong data-bulk-delete-count>0</strong>.</p>
         <p class="mb-0 text-muted">
           Транзакции будут перемещены во вкладку «Удалённые». При необходимости их можно восстановить.
         </p>
@@ -331,9 +335,9 @@
         <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
         <form method="post"
               action="{{ path('cash_transaction_bulk_delete', app.request.query.all) }}"
-              id="bulk-delete-form">
+              data-bulk-delete-form>
           <input type="hidden" name="_token" value="{{ csrf_token('cash_transaction_bulk_delete') }}">
-          <div id="bulk-delete-transaction-ids"></div>
+          <div data-bulk-delete-ids></div>
           <button type="submit" class="btn btn-danger">Удалить</button>
         </form>
       </div>
@@ -343,21 +347,21 @@
 
 {{ include('transaction/_filters.html.twig') }}
 
-<div class="modal fade" id="autoRuleModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="autoRuleModal" data-auto-rule-modal tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">Автоправило</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
       </div>
-      <div class="modal-body" id="autoRuleModalBody">
+      <div class="modal-body" data-auto-rule-body>
         <div class="text-muted">Загрузка…</div>
       </div>
     </div>
   </div>
 </div>
 
-<div class="modal fade" id="createFromWarningModal"
+<div class="modal fade" id="createFromWarningModal" data-create-from-modal
      tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -370,13 +374,13 @@
                 data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <p id="createFromWarningBody" class="mb-0"></p>
+        <p class="mb-0" data-create-from-body></p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn"
                 data-bs-dismiss="modal">Отмена</button>
-        <form id="createFromConfirmForm" method="post" class="d-inline">
-          <input type="hidden" name="_token" id="createFromCsrfToken">
+        <form method="post" class="d-inline" data-create-from-form>
+          <input type="hidden" name="_token" value="">
           <input type="hidden" name="confirmed" value="1">
           <button type="submit" class="btn btn-warning">
             Продолжить
@@ -387,393 +391,4 @@
   </div>
 </div>
 
-{% endblock %}
-
-{% block scripts %}
-    {{ parent() }}
-    <script>
-    // Поповеры строки фильтров (_filter_bar.html.twig): открытие/закрытие, Esc и стрелки — dropdown Bootstrap.
-    // Здесь только фокус при открытии, поиск по списку и переход из поиска в список стрелкой вниз.
-    (function () {
-      document.querySelectorAll('[data-ops-pop]').forEach(pop => {
-        const toggle = pop.parentElement.querySelector('[data-bs-toggle="dropdown"]');
-        const search = pop.querySelector('[data-ops-pop-search]');
-        const items = Array.from(pop.querySelectorAll('[data-ops-pop-item]'));
-        const empty = pop.querySelector('[data-ops-pop-empty]');
-
-        toggle?.addEventListener('shown.bs.dropdown', () => {
-          const target = search ?? pop.querySelector('input:not([type="hidden"])') ?? pop.querySelector('[aria-current="true"]') ?? pop.querySelector('.dropdown-item');
-          target?.focus();
-        });
-
-        if (!search) {
-          return;
-        }
-
-        search.addEventListener('input', () => {
-          const needle = search.value.trim().toLowerCase();
-          let shown = 0;
-          items.forEach(item => {
-            const match = needle === '' || item.dataset.opsPopItem.includes(needle);
-            item.hidden = !match;
-            shown += match ? 1 : 0;
-          });
-          if (empty) {
-            empty.hidden = shown > 0;
-          }
-        });
-
-        search.addEventListener('keydown', event => {
-          if (event.key === 'ArrowDown') {
-            event.preventDefault();
-            const first = search.value.trim() === ''
-              ? pop.querySelector('.dropdown-item')
-              : pop.querySelector('[data-ops-pop-item]:not([hidden])');
-            first?.focus();
-          }
-        });
-      });
-    })();
-    </script>
-    <script>
-    (function () {
-      const selectAll = document.getElementById('cash-transactions-select-all');
-      const rowCheckboxes = Array.from(document.querySelectorAll('.js-cash-transaction-select'));
-      const deleteButton = document.getElementById('bulk-delete-button');
-      const deleteButtonLabel = document.getElementById('bulk-delete-button-label');
-      const modal = document.getElementById('bulkDeleteModal');
-      const modalCount = document.getElementById('bulk-delete-modal-count');
-      const form = document.getElementById('bulk-delete-form');
-      const idsContainer = document.getElementById('bulk-delete-transaction-ids');
-      const summaryBar = document.getElementById('cash-transactions-summary');
-      const selectionBar = document.getElementById('cash-transactions-selection');
-      const selectionCount = document.getElementById('cash-transactions-selection-count');
-      const clearSelection = document.getElementById('cash-transactions-clear-selection');
-
-      if (!selectAll || !deleteButton || !deleteButtonLabel || !modal || !modalCount || !form || !idsContainer) {
-        return;
-      }
-
-      function selectedCheckboxes() {
-        return rowCheckboxes.filter(checkbox => checkbox.checked);
-      }
-
-      function renderSelection() {
-        const selectedCount = selectedCheckboxes().length;
-        selectAll.checked = rowCheckboxes.length > 0 && selectedCount === rowCheckboxes.length;
-        selectAll.indeterminate = selectedCount > 0 && selectedCount < rowCheckboxes.length;
-        deleteButton.disabled = selectedCount === 0;
-        deleteButtonLabel.textContent = selectedCount > 0 ? `Удалить (${selectedCount})` : 'Удалить';
-        modalCount.textContent = String(selectedCount);
-        // Панель выбора заменяет строку «Найдено N», выбранные строки подсвечены (DS-Table).
-        if (summaryBar && selectionBar && selectionCount) {
-          summaryBar.hidden = selectedCount > 0;
-          selectionBar.hidden = selectedCount === 0;
-          selectionCount.textContent = `Выбрано: ${selectedCount}`;
-        }
-        rowCheckboxes.forEach(checkbox => {
-          checkbox.closest('tr')?.classList.toggle('table-active', checkbox.checked);
-        });
-      }
-
-      function renderHiddenIds() {
-        idsContainer.replaceChildren(...selectedCheckboxes().map(checkbox => {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = 'transaction_ids[]';
-          input.value = checkbox.value;
-
-          return input;
-        }));
-      }
-
-      selectAll.addEventListener('change', function () {
-        rowCheckboxes.forEach(checkbox => {
-          checkbox.checked = selectAll.checked;
-        });
-        renderSelection();
-      });
-      rowCheckboxes.forEach(checkbox => checkbox.addEventListener('change', renderSelection));
-      clearSelection?.addEventListener('click', function () {
-        rowCheckboxes.forEach(checkbox => {
-          checkbox.checked = false;
-        });
-        renderSelection();
-      });
-      modal.addEventListener('show.bs.modal', renderHiddenIds);
-      form.addEventListener('submit', renderHiddenIds);
-      renderSelection();
-    }());
-    </script>
-    <script>
-    document.addEventListener('click', async (e) => {
-      const btn = e.target.closest('.js-auto-rule');
-      if (!btn) return;
-
-      e.preventDefault();
-      const url = btn.dataset.url;
-      const modalEl = document.getElementById('autoRuleModal');
-      const bodyEl  = document.getElementById('autoRuleModalBody');
-
-      bodyEl.innerHTML = '<div class="text-muted">Загрузка…</div>';
-
-      // Показ модалки (Tabler/Bootstrap 5)
-      const modal = window.bootstrap?.Modal?.getOrCreateInstance(modalEl);
-      modal?.show();
-
-      try {
-        const html = await fetch(url, {headers: {'X-Requested-With':'XMLHttpRequest'}}).then(r => r.text());
-        bodyEl.innerHTML = html;
-      } catch(err) {
-        bodyEl.innerHTML = '<div class="text-danger">Ошибка загрузки</div>';
-      }
-    });
-
-    // Обработка submit «Применить» внутри модалки (AJAX). Регистрируется ОДИН раз: раньше обработчик
-    // навешивался заново на каждый клик по .js-auto-rule, и после повторных открытий модалки один submit
-    // запускал сразу несколько POST по одной форме (GlitchTip #414, uniq_cts_tx_category).
-    document.addEventListener('submit', async (ev) => {
-      const f = ev.target;
-      if (!(f instanceof HTMLFormElement) || f.id !== 'autoRuleApplyForm') return;
-      ev.preventDefault();
-
-      // Повторный submit, пока первый запрос в полёте (двойной клик, Enter), игнорируем.
-      if (f.dataset.submitting === '1') return;
-      f.dataset.submitting = '1';
-      f.querySelectorAll('[type="submit"]').forEach(button => { button.disabled = true; });
-
-      const bodyEl = document.getElementById('autoRuleModalBody');
-
-      try {
-        const formData = new FormData(f);
-        const res = await fetch(f.action, { method: 'POST', body: formData, headers: {'X-Requested-With': 'XMLHttpRequest'}});
-        const data = await res.json();
-
-        if (data.ok) {
-          const alert = document.createElement('div');
-          alert.className = 'alert alert-success mb-2';
-          alert.textContent = `Применено: ${data.changed ? 'да' : 'без изменений'}`;
-
-          const details = document.createElement('div');
-          details.append('Правило: ');
-          const ruleName = document.createElement('strong');
-          ruleName.textContent = data.ruleName ?? '';
-          details.append(ruleName, ` (${data.action ?? ''})`);
-
-          const actions = document.createElement('div');
-          actions.className = 'mt-3 text-end';
-          const closeButton = document.createElement('button');
-          closeButton.type = 'button';
-          closeButton.className = 'btn btn-primary';
-          closeButton.dataset.bsDismiss = 'modal';
-          closeButton.textContent = 'Закрыть';
-          actions.append(closeButton);
-
-          bodyEl.replaceChildren(alert, details, actions);
-          return;
-        }
-
-        const alert = document.createElement('div');
-        alert.className = 'alert alert-warning mb-2';
-        alert.textContent = data.message ?? 'Не найдено';
-
-        const actions = document.createElement('div');
-        actions.className = 'mt-3 text-end';
-        const closeButton = document.createElement('button');
-        closeButton.type = 'button';
-        closeButton.className = 'btn btn-secondary';
-        closeButton.dataset.bsDismiss = 'modal';
-        closeButton.textContent = 'Закрыть';
-        actions.append(closeButton);
-
-        bodyEl.replaceChildren(alert, actions);
-      } catch {
-        const alert = document.createElement('div');
-        alert.className = 'alert alert-danger mb-2';
-        alert.textContent = 'Не удалось обработать запрос. Попробуйте ещё раз.';
-
-        const actions = document.createElement('div');
-        actions.className = 'mt-3 text-end';
-        const closeButton = document.createElement('button');
-        closeButton.type = 'button';
-        closeButton.className = 'btn btn-secondary';
-        closeButton.dataset.bsDismiss = 'modal';
-        closeButton.textContent = 'Закрыть';
-        actions.append(closeButton);
-
-        bodyEl.replaceChildren(alert, actions);
-      }
-    });
-    </script>
-    <script>
-    (function () {
-      const csrfContainer = document.querySelector('.cashflow-ops');
-      const csrfToken = csrfContainer ? csrfContainer.dataset.csrfToken : '';
-
-      // --- helpers ---
-
-      function showFlash(message, type = 'success') {
-        const card = document.querySelector('.cashflow-ops');
-        if (!card) return;
-        card.parentElement.querySelectorAll('.alert.js-create-from-flash')
-          .forEach(el => el.remove());
-        const div = document.createElement('div');
-        div.className = 'alert alert-' + type + ' alert-dismissible fade show mb-3 js-create-from-flash';
-        const text = document.createElement('span');
-        text.textContent = message;
-        const closeBtn = document.createElement('button');
-        closeBtn.type = 'button';
-        closeBtn.className = 'btn-close';
-        closeBtn.setAttribute('data-bs-dismiss', 'alert');
-        div.appendChild(text);
-        div.appendChild(closeBtn);
-        card.before(div);
-      }
-
-      function updateRowIcon(txId, state) {
-        const td = document.querySelector('[data-tx-id="' + txId + '"]');
-        if (!td) return;
-        if (state === 'success') {
-          td.innerHTML = '<i class="ti ti-file-check text-success"'
-            + ' title="Документы ОПиУ созданы на всю сумму"></i>';
-        } else if (state === 'warning') {
-          td.innerHTML = '<i class="ti ti-alert-triangle text-warning"'
-            + ' title="Документ создан без полного маппинга категорий ОПиУ"></i>';
-        }
-      }
-
-      function showCreateFromModal() {
-        const modalEl = document.getElementById('createFromWarningModal');
-        if (!modalEl) return;
-        modalEl.classList.add('show');
-        modalEl.style.display = 'block';
-        document.body.classList.add('modal-open');
-        if (!document.getElementById('createFromBackdrop')) {
-          const backdrop = document.createElement('div');
-          backdrop.className = 'modal-backdrop fade show';
-          backdrop.id = 'createFromBackdrop';
-          document.body.appendChild(backdrop);
-        }
-      }
-
-      function hideCreateFromModal() {
-        const modalEl = document.getElementById('createFromWarningModal');
-        if (!modalEl) return;
-        modalEl.classList.remove('show');
-        modalEl.style.display = '';
-        document.body.classList.remove('modal-open');
-        document.getElementById('createFromBackdrop')?.remove();
-      }
-
-      document.querySelectorAll(
-        '#createFromWarningModal [data-bs-dismiss="modal"]'
-      ).forEach(el => el.addEventListener('click', hideCreateFromModal));
-
-      function disableCreateFromButton(txId) {
-        const btn = document.querySelector(
-          '.js-create-from[data-transaction-id="' + txId + '"]'
-        );
-        if (btn) {
-          btn.classList.add('disabled');
-          btn.disabled = true;
-        }
-      }
-
-      // --- клик "Создать на основании" (event delegation) ---
-
-      document.addEventListener('click', async function (e) {
-        const btn = e.target.closest('.js-create-from');
-        if (!btn || btn.classList.contains('disabled')) return;
-        e.preventDefault();
-
-        // Блокируем немедленно, до запроса — защита от двойного клика
-        btn.classList.add('disabled');
-        btn.disabled = true;
-
-        const url  = btn.dataset.url;
-        const txId = btn.dataset.transactionId;
-
-        let data;
-        try {
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            body: new URLSearchParams({ _token: csrfToken, confirmed: '0' }),
-          });
-          data = await res.json();
-        } catch (err) {
-          btn.classList.remove('disabled');
-          btn.disabled = false;
-          showFlash('Ошибка: не удалось выполнить запрос.', 'danger');
-          return;
-        }
-
-        if (data.error) {
-          btn.classList.remove('disabled');
-          btn.disabled = false;
-          showFlash('Ошибка: ' + data.message, 'danger');
-          return;
-        }
-
-        if (data.needsConfirmation) {
-          // Документ ещё не создан — разблокируем кнопку, чтобы пользователь
-          // мог повторить действие если закроет модалку без подтверждения
-          btn.classList.remove('disabled');
-          btn.disabled = false;
-          document.getElementById('createFromWarningBody').textContent =
-            data.warningMessage;
-          document.getElementById('createFromConfirmForm').action = url;
-          document.getElementById('createFromCsrfToken').value = csrfToken;
-          document.getElementById('createFromConfirmForm')
-            .dataset.txId = txId;
-          showCreateFromModal();
-          return;
-        }
-
-        // Сценарий A — тихое создание
-        if (data.success) {
-          showFlash(data.flash ?? 'Документ ОПиУ создан.');
-          updateRowIcon(txId, 'success');
-          disableCreateFromButton(txId);
-        }
-      });
-
-      // --- submit формы подтверждения (сценарий B) ---
-
-      document.getElementById('createFromConfirmForm')
-        .addEventListener('submit', async function (e) {
-          e.preventDefault();
-          const form = e.target;
-          const txId = form.dataset.txId;
-
-          let data;
-          try {
-            const res = await fetch(form.action, {
-              method: 'POST',
-              headers: { 'X-Requested-With': 'XMLHttpRequest' },
-              body: new FormData(form),
-            });
-            data = await res.json();
-          } catch (err) {
-            hideCreateFromModal();
-            showFlash('Ошибка: не удалось создать документ.', 'danger');
-            return;
-          }
-
-          hideCreateFromModal();
-
-          if (data.error) {
-            showFlash('Ошибка: ' + data.message, 'danger');
-            return;
-          }
-
-          if (data.redirect) {
-            updateRowIcon(txId, 'warning');
-            disableCreateFromButton(txId);
-            window.open(data.redirect, '_blank');
-          }
-        });
-
-    }());
-    </script>
 {% endblock %}

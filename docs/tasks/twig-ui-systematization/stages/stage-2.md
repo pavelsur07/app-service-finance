@@ -1,4 +1,4 @@
-### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–F на проде; PR G #2918 на handoff)
+### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–G на проде; PR H на handoff)
 
 **Risk:** MEDIUM (поведение страниц; финансовые формы — в PR C)
 **Stage base commit:** `3c7bb858c` (master после Stage 1)
@@ -335,6 +335,10 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
 #### External review (PR G)
 - rounds: 1 (codex, effort medium, база — ветка PR F, дифф 1788 строк с untracked-файлами Владельца, `site/var/external-review/36ac2ed3/review.txt`): REVIEW_GREEN без замечаний
 
+#### Деплой (PR G)
+- #2918 влит 07.11, деплой 17:39Z без даунтайма (перезапуск CI после flaky `SettlementSourceLockOrderTest`),
+  12 контейнеров healthy, GlitchTip чист.
+
 #### Risks / reviewer focus (PR G)
 - Диалог «присвоить всем по фильтру» открывается программно: `Modal.show(trigger)` → `show.bs.modal` с
   `relatedTarget` — тот же путь, что у кнопки с `data-bs-toggle`.
@@ -342,6 +346,52 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
   document, динамические элементы работают; после закрытия диалога фокус возвращается на «Слить в…»
   (`confirm_modal.js`).
 - Переименование: blur inline-поля коммитит, как раньше; Chrome шлёт blur и при удалении узла.
+
+#### PR H (2.3, часть 4): «Операции ДДС» (`transaction/index`)
+
+- 385 строк JS в четырёх `<script>` (поиск в поповерах строки фильтров `[data-ops-pop]`, массовое удаление
+  выбранных строк, модал «Автоправило» с AJAX-«Применить», «Создать на основании» с модалом подтверждения
+  и ручным backdrop) → `assets/pages/cash_transactions.js`, `initCashTransactions()` в `legacy-app.js`.
+  Шаблон 779 → 394 строки.
+- Хуки — `data-*` на корне `[data-cash-transactions]` (карточка `.cashflow-ops`, уже несла `data-csrf-token`)
+  и на трёх модалах (`data-bulk-delete-*`, `data-auto-rule-*`, `data-create-from-*`). Форма «Применить» в
+  партиале `cash_transaction_auto_rule/_auto_rule_modal_body`: `id="autoRuleApplyForm"` → `data-auto-rule-apply`.
+  id сохранены только как контракт: `#cash-transactions-select-all`, `#bulk-delete-button`, `#bulkDeleteModal`,
+  `#autoRuleModal`, `#createFromWarningModal` (тесты, `data-bs-target`), класс `.js-cash-transaction-select`
+  (три теста).
+- Запросы — `apiFetch` с `FormData` (контроллеры читают `$request->request`). Не-2xx с JSON-телом
+  (`{ok:false,message}` 403 автоправила; `{error:true,message}` 404/403/422 «Создать на основании») приходит
+  `ApiError` — текст сервера показывается там же и так же, как раньше; без JSON → «Ошибка сервера (N)».
+- Модал «без маппинга» — через `bootstrap.Modal` вместо ручного `classList.add('show')` + backdrop. Тело
+  «Автоправила» — HTML нашего шаблона с сервера, вставляется как раньше; результат «Применить», flash и иконки
+  строки — DOM/`textContent` (`el()`).
+- Защита GlitchTip #414 (один submit-обработчик, `dataset.submitting`, блокировка кнопки) сохранена;
+  функциональный тест, читавший текст inline-скрипта, заменён `testPageExposesModuleHooksWithoutInlineScripts`
+  (хуки разметки, нет `addEventListener(` в HTML, нет `onclick`/`onchange`/`onsubmit`); одиночная отправка —
+  e2e (второй submit в полёте → один POST).
+- e2e `tests/e2e/cash-transactions.e2e.cjs` — 15 проверок: поповер (фокус по `shown.bs.dropdown`, поиск,
+  ArrowDown в список), массовое удаление (панель и подсветка, select-all, скрытые id по `show.bs.modal` и по
+  submit, сброс), автоправило (загрузка HTML, двойной submit → один POST с полями формы, 403 → предупреждение),
+  «Создать на основании» (needsConfirmation → модал, текст и action; подтверждение → `window.open`, иконка,
+  блокировка; тихое создание → flash; 422 → flash-ошибка, кнопка снова активна).
+
+#### Checks (PR H)
+- `make site-cs-twig` — 0 / OK (324); `npm run lint` — 0; `npm run build` — OK
+- `make site-cs-check` — 0 of 3913; `make site-cs-strict-types` — 0; `make site-stan` — OK
+- 4 функциональных класса (bulk delete, create-from, auto-rule apply, settlement UI) — OK (14 tests, 115 assertions);
+  e2e `cash-transactions` — 15 passed
+- `make site-test` — OK (8538 tests, 48069 assertions), 8 мин 30 с
+
+#### External review (PR H)
+- rounds: 1 (codex, effort medium, база master 7e10ae310, дифф 1268 строк, `site/var/external-review/7e10ae31/review.txt`):
+  REVIEW_GREEN без замечаний. Первый запуск шёл против отставшего локального `master` (97b51546, дифф 5421 строк
+  с уже выкаченными PR F/G) — тоже REVIEW_GREEN; локальный `master` подтянут.
+
+#### Risks / reviewer focus (PR H)
+- Flash «Создать на основании» вставляется перед карточкой (`root.before`), как раньше `card.before`.
+- `data-bs-toggle="modal"` на кнопке «Автоправило» остался: Bootstrap открывает модал сам, модуль дублирует
+  `show()` как и прежний скрипт.
+- HIGH-LOCAL по плану (финансовые формы): контроллеры не менялись, контракты ответов проверены по коду.
 
 #### Files changed (PR A)
 - `site/templates/**` — 9 страниц + `company/edit` (include) + `partials/_confirm_modal` (doc)
@@ -388,5 +438,4 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
   в `data-confirm-title` через автоэкранирование, прежний JS конкатенировал строку.
 
 #### Next
-- PR G (#2918, CI 16/16) → handoff «merge and deploy»; затем PR H: `transaction/index` (385),
-  далее `document/_page_scripts` (460), Chart-острова dashboard
+- PR H → handoff «merge and deploy»; затем PR I: `document/_page_scripts` (460), далее Chart-острова dashboard
