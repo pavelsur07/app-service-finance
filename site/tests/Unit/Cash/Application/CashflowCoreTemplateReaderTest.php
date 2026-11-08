@@ -31,7 +31,7 @@ final class CashflowCoreTemplateReaderTest extends TestCase
         self::assertCount(30, $leaves);
         foreach ($leaves as $path => $leaf) {
             // Пометка об ОПиУ — последняя фраза описания каждой статьи (связь шаблон не ставит).
-            self::assertMatchesRegularExpression('/ОПиУ — (напрямую, «[^»]+»|не попадает)/u', (string) $leaf->description, $path);
+            self::assertMatchesRegularExpression('/ОПиУ — (напрямую, в |не попадает)/u', (string) $leaf->description, $path);
         }
 
         self::assertSame(PaymentPlanType::INFLOW, $leaves['CF_OP / Поступления / Поступления от покупателей']->direction);
@@ -52,6 +52,7 @@ final class CashflowCoreTemplateReaderTest extends TestCase
         yield 'direction differs from parent' => ["version: 1\nsections:\n  CF_OP:\n    - name: G\n      direction: INFLOW\n      children:\n        - {name: A, direction: OUTFLOW, description: d}", 'отличается от родителя'];
         yield 'transfer direction' => ["version: 1\nsections:\n  CF_OP:\n    - {name: A, direction: TRANSFER, description: d}", 'INFLOW или OUTFLOW'];
         yield 'duplicate name' => ["version: 1\nsections:\n  CF_OP:\n    - {name: A, direction: INFLOW, description: d}\n    - {name: A, direction: INFLOW, description: d}", 'повторяется'];
+        yield 'unknown key' => ["version: 1\nsections:\n  CF_OP:\n    - {name: A, direction: INFLOW, descripton: d, description: d}", 'неизвестные ключи descripton'];
         yield 'too deep' => ["version: 1\nsections:\n  CF_OP:\n    - name: A\n      direction: INFLOW\n      children:\n        - name: B\n          children:\n            - name: C\n              children:\n                - {name: D, description: d}", 'глубина'];
     }
 

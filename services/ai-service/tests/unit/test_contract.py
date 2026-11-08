@@ -51,6 +51,12 @@ def test_categorize_category_description_is_optional_in_schema_and_model() -> No
     validate("categorize_payload", payload)
     assert CategorizeInput.model_validate(payload).categories[1].description == payload["categories"][1]["description"]
 
+    payload["categories"][1]["description"] = ""
+    with pytest.raises(ValidationError):
+        validate("categorize_payload", payload)
+    with pytest.raises(PydanticValidationError, match="description"):
+        CategorizeInput.model_validate(payload)
+
     payload["categories"][1]["description"] = "x" * 501
     with pytest.raises(ValidationError):
         validate("categorize_payload", payload)

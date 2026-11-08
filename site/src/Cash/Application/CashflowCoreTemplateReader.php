@@ -24,6 +24,7 @@ final readonly class CashflowCoreTemplateReader
         CashflowCategory::CODE_FINANCING,
         CashflowCategory::CODE_INVESTING,
     ];
+    private const NODE_KEYS = ['name', 'description', 'direction', 'children'];
     private const MAX_LEVEL = 3;
     private const MAX_NAME_LENGTH = 255;
     private const MAX_DESCRIPTION_LENGTH = 500;
@@ -97,6 +98,11 @@ final readonly class CashflowCoreTemplateReader
             $nodePath = sprintf('%s[%d]', $path, $index);
             if (!\is_array($item)) {
                 throw new CashflowCoreTemplateException($nodePath.': узел должен быть объектом.');
+            }
+
+            $unknown = array_diff(array_keys($item), self::NODE_KEYS);
+            if ([] !== $unknown) {
+                throw new CashflowCoreTemplateException(sprintf('%s: неизвестные ключи %s.', $nodePath, implode(', ', $unknown)));
             }
 
             $name = $item['name'] ?? null;

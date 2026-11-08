@@ -2318,7 +2318,7 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 |---|---|---|
 | Company (`CompanyOwnerMembershipCreator`, до события) | участник-владелец, проект «Общий» (`PROJECT_GENERAL`), ЦФО «Общий» (`CFO_GENERAL`) и их связь | — |
 | Cash `EnsureCashflowSystemCategoriesOnCompanyCreated` | 7 системных статей ДДС | по `system_code` |
-| Cash `ApplyCashflowCoreTemplateOnCompanyCreated` (priority −10, после системных) | ядро ДДС `config/cash/cashflow_templates/core.yaml`: 7 групп и 30 статей с направлением и описанием «что входит и почему» с пометкой «ОПиУ: …»; связи с ОПиУ не ставит; одно на все профили; backfill не применяет | нет ни одной несистемной статьи ДДС |
+| Cash `ApplyCashflowCoreTemplateOnCompanyCreated` (priority −10, после системных) | ядро ДДС `config/cash/cashflow_templates/core.yaml`: 7 групп и 30 статей с направлением и описанием «что входит и почему» с пометкой «ОПиУ — напрямую, в …» или «ОПиУ — не попадает»; связи с ОПиУ не ставит; одно на все профили; backfill не применяет | нет ни одной несистемной статьи ДДС |
 | Cash `EnsureDefaultMoneyAccountsOnCompanyCreated` | «Основной счет» BANK RUB, касса «Основная» CASH RUB | нет ни одного денежного счёта |
 | Finance `ApplyDefaultPLTreeOnCompanyCreated` | дерево ОПиУ шаблона профиля (`config/finance/pl_templates/`) | нет ни одной статьи ОПиУ |
 | Balance `SeedBalanceStructureOnCompanyCreated` | книга (не инициализирована), статьи и учётные счета шаблона профиля (`config/balance/templates/`) | статьи — нет статей; счета — нет ни одного счёта |
