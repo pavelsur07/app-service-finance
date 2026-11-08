@@ -40,7 +40,7 @@ final class RequestCashAiCategorizationAction
      * services/ai-service/tests/unit/test_symfony_prompt_version.py): «нет ответа» на прошлой версии
      * переспрашивается один раз.
      */
-    public const PROMPT_VERSION = 'categorize_transactions/v3';
+    public const PROMPT_VERSION = 'categorize_transactions/v4';
     /** Примеры разнесения компании на пачку (контракт — до 50): по три на операцию, за год. */
     private const EXAMPLES_PER_OPERATION = 3;
     private const EXAMPLES_PER_BATCH = 30;

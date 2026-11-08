@@ -90,6 +90,7 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         $this->transaction('Перевод между счетами', null, transfer: true);
         $this->transaction('Удалённая')->markDeleted(null);
         $this->transaction('Давняя', null, new \DateTimeImmutable('-200 days'));
+        $this->rent->setDescription("  Аренда офиса и склада.\nПроценты по кредиту сюда не относить.  ");
         $this->em->flush();
 
         $result = $this->request();
@@ -106,6 +107,11 @@ final class CashAiCategorizationTest extends IntegrationTestCase
         // Только конечные несистемные статьи, с путём и направлением.
         $paths = array_column($payload['categories'], 'direction', 'path');
         self::assertSame(['Выручка' => 'inflow', 'Расходы / Аренда' => 'outflow'], $paths);
+        // Описание статьи — только заданное, без краевых пробелов; у «Выручки» его нет — ключа нет.
+        self::assertSame(
+            ['Расходы / Аренда' => "Аренда офиса и склада.\nПроценты по кредиту сюда не относить."],
+            array_column($payload['categories'], 'description', 'path'),
+        );
         self::assertSame('outflow', $payload['operations'][0]['direction']);
         self::assertMatchesRegularExpression('/^\d+\.\d{2}$/', $payload['operations'][0]['amount']);
 
