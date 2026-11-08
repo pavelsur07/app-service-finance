@@ -97,6 +97,8 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
         )));
         sort($systemCodes);
         self::assertSame(['CF_FIN', 'CF_INV', 'CF_OP', 'CF_TECH', 'CF_TECH_IN', 'CF_TECH_OUT', 'CF_UNALLOC'], $systemCodes);
+        // Ядро статей ДДС (core.yaml): 7 групп и 30 статей поверх системных.
+        self::assertSame(37, $categoryRepository->count(['company' => $company, 'isSystem' => false]));
 
         // Денежные счета тоже создаёт Cash по CompanyCreatedEvent.
         self::assertSame(['bank:Основной счет:RUB', 'cash:Основная:RUB'], array_map(

@@ -19,6 +19,9 @@ class Category(BaseModel):
     # Путь от корня: «Операционная деятельность / Расходы / Аренда».
     path: str = Field(min_length=1, max_length=500)
     direction: Literal["inflow", "outflow", "any"]
+    # «Что входит и почему» — описание статьи компании; без него модель видит только путь.
+    # Пустое не передаётся модели: вход компаний без описаний не меняется.
+    description: str | None = Field(default=None, min_length=1, max_length=500, exclude_if=lambda v: v is None)
 
 
 class Operation(BaseModel):

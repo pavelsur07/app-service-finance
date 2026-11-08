@@ -101,6 +101,21 @@ class CashflowCategoryRepository extends ServiceEntityRepository
         ]);
     }
 
+    /**
+     * Есть ли у компании хоть одна несистемная статья ДДС — признак, что дерево уже своё.
+     */
+    public function hasRegularByCompany(Company $company): bool
+    {
+        return null !== $this->createQueryBuilder('c')
+            ->select('c.id')
+            ->where('c.company = :company')
+            ->andWhere('c.isSystem = false')
+            ->setParameter('company', $company)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     private function collectTree(CashflowCategory $category, array &$result): void
     {
         $result[] = $category;

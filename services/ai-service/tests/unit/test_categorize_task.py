@@ -144,3 +144,13 @@ def test_example_with_category_outside_the_tree_is_an_input_error() -> None:
     payload["examples"] = [{"direction": "outflow", "description": "x", "counterparty": None, "category_id": "foreign"}]
     with pytest.raises(PydanticValidationError, match="example category ids"):
         CategorizeInput.model_validate(payload)
+
+
+def test_category_description_reaches_the_model_only_when_given() -> None:
+    _, adapter = run(items((OP1, RENT, 0.9), (OP2, None, 0.0)))
+    assert '"description": null' not in adapter.requests[0].user.split('"operations"')[0]
+
+    payload = example("categorize_payload")
+    payload["categories"][1]["description"] = "Аренда офиса, склада, точки продаж"
+    _, adapter = run(items((OP1, RENT, 0.9), (OP2, None, 0.0)), payload)
+    assert "Аренда офиса, склада, точки продаж" in adapter.requests[0].user
