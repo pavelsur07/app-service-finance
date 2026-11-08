@@ -1,4 +1,4 @@
-### Stage 4: CSS из шаблонов — PLANNED
+### Stage 4: CSS из шаблонов — IN PROGRESS (PR A на handoff)
 
 **Risk:** LOW (перенос правил 1:1 в страничные CSS-файлы, затем токены; визуал не меняется)
 **Stage base commit:** master после закрывающего PR Stage 3
@@ -31,8 +31,8 @@
 - PR D (4.2, часть 3): `style="…"` легаси (~96) → классы Tabler (`w-1`, `text-end`, `mw-*`) или страничный CSS.
 
 #### Чек-лист приёмки
-- [ ] 4.0 — скриншоты «до» 7 страниц 4.1 в `docs/tasks/twig-ui-systematization/screens/stage-4/`
-- [ ] 4.1 — 7 блоков перенесены, `grep -rl '<style' templates | grep -v notifications/email` → 8
+- [x] 4.0 — скриншоты «до» 7 страниц 4.1 в `docs/tasks/twig-ui-systematization/screens/stage-4/` (PR A, 1366×900 fullPage)
+- [x] 4.1 — 7 блоков перенесены, `grep -rl '<style' templates | grep -v notifications/email` → 8 (PR A)
 - [ ] 4.2 — `<style>` вне писем → 0; `grep -rho 'style="' templates | wc -l` ≤ 20, каждое оставшееся — динамическое значение
 - [ ] Значения в новых CSS — токены `--vf-*`; остатки hex/px — с `TODO(ds)`, их число в отчёте
 - [ ] Каждый PR: `npm run build`, `make site-cs-twig`, `make site-test`, внешнее ревью; скриншоты до/после для 4.1
@@ -43,3 +43,33 @@
 - Порядок загрузки проверен: `_layout/legacy` подключает Tabler CDN, затем `design_tokens`, `vf_custom_classes`,
   `legacy_app` — бандл идёт после Tabler, как и прежние `<style>`; каскад не меняется. Специфичность внутри страничного
   файла сохранять как в блоке (не «упрощать» селекторы).
+
+#### PR A (4.0 + 4.1) — семь блоков `<style>` → `assets/styles/pages/*.css`
+
+##### Что сделано
+- Новые файлы в `assets/styles/pages/`: `cashflow-categories.css`, `pl-categories.css`, `pl-report.css` (`.table.pl-table`),
+  `pl-preview.css` (`.table.pl-preview-table`), `cashflow-report.css` (`.table.cf-table`), `dashboard.css`, `integrations.css`
+  и общий `pl-filter-controls.css` (бывший партиал `finance/report/_filter_controls_styles.html.twig`, включался в три блока —
+  удалён). Все подключены в `assets/legacy-app.js` (entry `legacy_app`); порядок каскада прежний — бандл грузится после Tabler.
+- Правила перенесены 1:1 (dedent, без правки значений). Пять файлов с уникальными префиксами (`cashflow-category-*`,
+  `pl-category-*`, `pl-table`, `pl-preview-table`, `cf-table`) — без обёртки. Два блока содержали общие селекторы
+  (`body`, `.row-cards`, `.card-title`, `.card-body-p-0`, `.section-title`, `#modal-setup`) и в общем бандле утекли бы на все
+  страницы — обёрнуты классом `<body>`: `_layout/legacy` получил `{% block body_class %}`, страницы задают
+  `page-dashboard` / `page-integrations`.
+- `{% block stylesheets %}` удалён там, где остался пустым; `home/index` сохраняет свой (entry `finance_balance_dynamics`).
+- Токены: значения не менялись (переносы 1:1); hex/px без токена остались как были — замена на `--vf-*` и `TODO(ds)` — отдельным
+  проходом после 4.2, когда весь CSS будет в файлах.
+
+##### Проверка визуала
+- Стенд (память `local-visual-check`): `npm run build`, логин, 7 страниц, 1366×900 fullPage, до и после.
+  Пиксельное сравнение (Pillow `ImageChops.difference`): все 7 — identical. Скриншоты «до» — `screens/stage-4/`.
+
+##### Files changed (PR A)
+- `site/assets/styles/pages/{cashflow-categories,pl-categories,pl-report,pl-preview,cashflow-report,dashboard,integrations,pl-filter-controls}.css` (new),
+  `site/assets/legacy-app.js`, `site/templates/_layout/legacy.html.twig`, 7 шаблонов, партиал `_filter_controls_styles` удалён,
+  `docs/tasks/twig-ui-systematization/screens/stage-4/*.png` (7), `tests/Functional/Finance/PlReportPreviewControllerTest.php` (assert на CSS-файл)
+
+##### Проверки (PR A)
+- `make site-cs-twig` — twigcs 0, `lint:twig` OK (323); `npm run lint` — 0; `npm run build` — OK; CS fixer и PHPStan точечно по изменённому тесту — чисто
+- `make site-test` — OK — 8554 тестов, 48 145 assertions (один тест `PlReportPreviewControllerTest::testGroupingUsesReadableDataColumnWidths` искал переменные ширин колонок в HTML страницы, где был `<style>`; теперь проверяет `col.pl-col-total` в HTML и переменные в `pl-report.css`; класс перепрогнан зелёным, 16/16)
+- Внешнее ревью (codex): REVIEW_GREEN (effort medium, дифф 1773 строк, замечаний нет)

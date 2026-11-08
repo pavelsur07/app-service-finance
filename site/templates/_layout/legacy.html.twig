@@ -22,7 +22,7 @@
         {{ vite_entry_script_tags('legacy_app') }}
     {% endblock %}
 </head>
-<body class="layout-fluid layout-fluid-vertical">
+<body class="layout-fluid layout-fluid-vertical{% block body_class %}{% endblock %}">
     <div class="page">
         <aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="light">
             <div class="container-fluid">

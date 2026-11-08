@@ -1,0 +1,127 @@
+/* Статьи ДДС — дерево статей (templates/cashflow_category/index). Перенесено из <style> страницы 1:1 (Stage 4). */
+
+.cashflow-category-item {
+    border-radius: .5rem;
+    padding: .5rem .75rem;
+    transition: background-color .2s ease-in-out;
+}
+
+.cashflow-category-item:hover,
+.cashflow-category-item:focus-within {
+    background-color: var(--vf-navy-50); /* DS-Table: hover */
+}
+
+.cashflow-category-link {
+    display: inline-block;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Колонки справа фиксированной ширины: отступ вложенности сужает только
+   название, поэтому «ОПиУ» стоит на одной вертикали на любом уровне. */
+.cashflow-category-col {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    margin-left: .5rem;
+}
+
+.cashflow-category-col--code {
+    width: 10rem;
+    justify-content: flex-end;
+}
+
+.cashflow-category-col--code .badge {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cashflow-category-col--pl {
+    width: 3.5rem;
+    justify-content: center;
+}
+
+.cashflow-category-col--actions {
+    width: 2.5rem;
+    justify-content: flex-end;
+}
+
+.cashflow-category-pl-yes {
+    color: var(--vf-ok-text);
+    font-weight: var(--vf-weight-bold);
+}
+
+.cashflow-category-pl-no {
+    color: var(--vf-text-muted);
+}
+
+/* Шапка списка (DS-Table): Navy 50 · 11/16 · 700 · +5% · Muted. */
+.cashflow-category-head {
+    border-radius: .5rem;
+    padding: .625rem .75rem;
+    margin-bottom: .25rem;
+    background: var(--vf-navy-50);
+    color: var(--vf-text-muted);
+    font-size: .6875rem;
+    line-height: 1rem;
+    font-weight: var(--vf-weight-bold);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+
+.cashflow-category-head-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-left: 2rem; /* стрелка 1.5rem + me-2 */
+}
+
+.cashflow-category-toggle {
+    color: inherit;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.cashflow-category-toggle::before {
+    content: '\25B8';
+    font-size: .8rem;
+    transition: transform .2s ease-in-out;
+}
+
+.cashflow-category-toggle:hover,
+.cashflow-category-toggle:focus {
+    text-decoration: none;
+}
+
+.cashflow-category-toggle:not(.collapsed)::before {
+    transform: rotate(90deg);
+}
+
+.cashflow-category-toggle-placeholder {
+    display: inline-flex;
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.cashflow-category-children {
+    margin-left: 1.5rem;
+}
+
+/* Узкий экран: код статьи виден в карточке статьи, место отдаём названию. */
+@media (max-width: 575.98px) {
+    .cashflow-category-col--code {
+        display: none;
+    }
+
+    .cashflow-category-children {
+        margin-left: 1rem;
+    }
+}

@@ -1,74 +1,7 @@
 {% extends 'base.html.twig' %}
+{% block body_class %} page-integrations{% endblock %}
 
 {% block title %}Интеграции - Финансовый учет{% endblock %}
-
-{% block stylesheets %}
-  {{ parent() }}
-  <style>
-    body {
-      background-color: var(--vf-bg);
-    }
-
-    /* Выравнивание высоты карточек */
-    .row-cards {
-      display: flex;
-      flex-wrap: wrap;
-    }
-
-    .row-cards > [class*='col-'] {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .card-integration {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      transition: transform 0.2s;
-      border: 1px solid var(--vf-border);
-    }
-
-    .card-integration .card-body {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-    }
-
-    .card-integration .mt-auto {
-      margin-top: auto !important;
-    }
-
-    .card-integration:hover {
-      transform: translateY(-4px);
-      box-shadow: var(--vf-shadow-md);
-    }
-
-    .badge-free {
-      background-color: var(--vf-ok-bg);
-      color: var(--vf-ok-text);
-      border: none;
-      font-weight: 500;
-    }
-
-    .section-title {
-      font-weight: 700;
-      margin-bottom: 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    #modal-setup .steps {
-      max-width: 220px;
-      margin: 0 auto;
-      overflow: hidden;
-    }
-
-    #modal-setup .steps .step-item {
-      flex: 1;
-    }
-  </style>
-{% endblock %}
 
 {% block body %}
   {% embed 'partials/_page_header.html.twig' with {title: 'Интеграции и маркетплейс'} %}

@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 3 DONE (#2924–#2927 на проде 08.11 06:00Z) → закрывающий PR на handoff → Stage 4 PLANNED
-**Status:** Stage 1–3 на проде (#2909–#2927); закрывающий PR Stage 3 (отчёт DONE + план Stage 4) на handoff
-**Stage base commit:** master 2d3ac4257 (после #2927) · ветка `refactor/twig-ui-stage-3-close`
+**Phase:** Stage 3 DONE (#2924–#2927 на проде 08.11 06:00Z) → закрывающий PR #2928 на handoff → Stage 4 PR A на handoff
+**Status:** Stage 1–3 на проде (#2909–#2927); #2928 (закрытие Stage 3) и Stage 4 PR A (4.0 + 4.1) на handoff
+**Stage base commit:** master 2d3ac4257 (после #2927) · ветки `refactor/twig-ui-stage-3-close` → `refactor/twig-ui-stage-4a`
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -75,7 +75,7 @@
 - Stage 3 на проде 08.11 06:00Z (деплой с головы master после #2927; прогон #2926 упал на flaky-тесте, rerun не нужен).
 
 ### Exact next action
-- handoff закрывающего PR Stage 3 («merge and deploy»); затем Stage 4 PR A (4.0 скриншоты «до» + 4.1 семь блоков `<style>`) с ветки от master — план `stages/stage-4.md`
+- handoff #2928 и Stage 4 PR A («merge and deploy»); затем PR B (4.2 часть 1: 8 оставшихся `<style>`, два admin — в `admin_shell`) с ветки от PR A — план `stages/stage-4.md`
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`

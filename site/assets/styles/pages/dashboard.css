@@ -1,0 +1,41 @@
+/* Дашборд (templates/home/index). Перенесено из <style> страницы 1:1 (Stage 4); правила были общими (.card-title, .card-body-p-0) — обёрнуты body.page-dashboard; фильтры — pl-filter-controls.css. */
+
+body.page-dashboard .card-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--vf-text-muted);
+  text-transform: uppercase;
+}
+
+body.page-dashboard .card-body-p-0 {
+  padding: 1.25rem 0 0 0 !important;
+}
+
+body.page-dashboard .card-body-p-0 .px-3 {
+  padding-left: 1.25rem !important;
+  padding-right: 1.25rem !important;
+}
+
+body.page-dashboard .chart-sparkline {
+  width: 100% !important;
+  margin-top: 15px;
+}
+
+body.page-dashboard .kpi-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.35rem;
+}
+
+body.page-dashboard .kpi-trend i {
+  font-size: 1rem;
+}
+
+@media (max-width: 767.98px) {
+  body.page-dashboard [data-dashboard-filter-controls] .pl-preview-segmented {
+    flex-wrap: wrap;
+  }
+}

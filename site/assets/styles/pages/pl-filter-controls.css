@@ -1,3 +1,5 @@
+/* Панель фильтров отчётов (ОПиУ, ДДС, дашборд): .pl-preview-controls-*, чипы, dropdown. Перенесено из templates/finance/report/_filter_controls_styles.html.twig 1:1 (Stage 4). */
+
 .pl-preview-controls-card {
     border-color: var(--vf-border);
     box-shadow: none;
