@@ -12,6 +12,8 @@ parameters:
         UNIVERSAL: '%kernel.project_dir%/config/finance/pl_templates/universal.json'
     # «Базовый» шаблон со статьями маркетплейса: дополнение дерева компании UNIVERSAL (ExtendPLTreeWithMarketplaceAction).
     finance.pl_marketplace_extension: '%kernel.project_dir%/config/finance/pl_templates/universal_marketplace_extension.json'
+    # Ядро статей ДДС новой компании, одно на все профили (ApplyCashflowCoreTemplateAction).
+    cash.cashflow_core_template: '%kernel.project_dir%/config/cash/cashflow_templates/core.yaml'
     balance.structure_templates:
         MARKETPLACE: '%kernel.project_dir%/config/balance/templates/marketplace.yaml'
         UNIVERSAL: '%kernel.project_dir%/config/balance/templates/universal.yaml'

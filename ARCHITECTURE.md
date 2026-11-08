@@ -2318,6 +2318,7 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 |---|---|---|
 | Company (`CompanyOwnerMembershipCreator`, до события) | участник-владелец, проект «Общий» (`PROJECT_GENERAL`), ЦФО «Общий» (`CFO_GENERAL`) и их связь | — |
 | Cash `EnsureCashflowSystemCategoriesOnCompanyCreated` | 7 системных статей ДДС | по `system_code` |
+| Cash `ApplyCashflowCoreTemplateOnCompanyCreated` (priority −10, после системных) | ядро ДДС `config/cash/cashflow_templates/core.yaml`: 7 групп и 30 статей с направлением и описанием «что входит и почему» с пометкой «ОПиУ: …»; связи с ОПиУ не ставит; одно на все профили; backfill не применяет | нет ни одной несистемной статьи ДДС |
 | Cash `EnsureDefaultMoneyAccountsOnCompanyCreated` | «Основной счет» BANK RUB, касса «Основная» CASH RUB | нет ни одного денежного счёта |
 | Finance `ApplyDefaultPLTreeOnCompanyCreated` | дерево ОПиУ шаблона профиля (`config/finance/pl_templates/`) | нет ни одной статьи ОПиУ |
 | Balance `SeedBalanceStructureOnCompanyCreated` | книга (не инициализирована), статьи и учётные счета шаблона профиля (`config/balance/templates/`) | статьи — нет статей; счета — нет ни одного счёта |
@@ -5195,6 +5196,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.156 | 2026-11-08 | Cash: ядро статей ДДС новой компании — `ApplyCashflowCoreTemplateAction` по `CompanyCreatedEvent`, шаблон `config/cash/cashflow_templates/core.yaml` (30 статей с описаниями, без связей с ОПиУ); описания системных технических статей при создании; ai-service принимает необязательное `description` статьи (cashflow-core-template) |
 | 2.155 | 2026-11-06 | Settlement: independent Money documents, explicit Cash/Finance sources, manual M:N allocation, dated history/reversals, source guards, verify/rebuild and native UI; additive Version20261106183000 (counterparty-settlements, Stages 1–5) |
 | 2.155 | 2026-11-07 | Marketplace/MarketplaceAnalytics: `ListingMetaDTO` получил `?size` (`UNKNOWN` → `null`, `ListingMetaQuery`); отчёт «Оборачиваемость» показывает размер рядом с названием и колонкой «Размер» в xlsx — размеры WB одного артикула были неразличимы (проверка на проде 07.11) |
 | 2.154 | 2026-11-06 | MarketplaceAnalytics: отчёт «Оборачиваемость» перенесён во вкладки «Товары и остатки» после «Остатки» (решение Владельца): маршруты `/inventory/stock-turnover` и `/inventory/stock-turnover/export.xlsx` (`inventory_stock_turnover_*`), layout `inventory/layout.html.twig`; из вкладок аналитики маркетплейсов убран. Контроллеры и Query остаются в модуле |

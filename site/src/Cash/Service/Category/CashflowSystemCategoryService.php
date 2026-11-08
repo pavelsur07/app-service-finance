@@ -13,6 +13,10 @@ use Ramsey\Uuid\Uuid;
 
 class CashflowSystemCategoryService
 {
+    // Описания задаются только при создании: у существующих компаний текст мог быть исправлен вручную.
+    private const TECHNICAL_IN_DESCRIPTION = 'Деньги, пришедшие с другого своего счёта или кассы: переводы между своими счетами, внесение наличных на счёт. ОПиУ — не попадает.';
+    private const TECHNICAL_OUT_DESCRIPTION = 'Деньги, ушедшие на другой свой счёт или в кассу: переводы между своими счетами, снятие наличных. ОПиУ — не попадает.';
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly CashflowCategoryRepository $cashflowCategoryRepository,
@@ -28,8 +32,8 @@ class CashflowSystemCategoryService
         $financing = $this->ensureCategory($company, CashflowCategory::CODE_FINANCING, 'Финансовая деятельность', CashflowFlowKind::FINANCING, 20);
         $investing = $this->ensureCategory($company, CashflowCategory::CODE_INVESTING, 'Инвестиционная деятельность', CashflowFlowKind::INVESTING, 30);
         $technical = $this->ensureCategory($company, CashflowCategory::CODE_TECHNICAL, 'Технические операции', CashflowFlowKind::TECHNICAL, 40);
-        $technicalIn = $this->ensureCategory($company, CashflowCategory::CODE_TECHNICAL_IN, 'Поступления', CashflowFlowKind::TECHNICAL, 10, $technical);
-        $technicalOut = $this->ensureCategory($company, CashflowCategory::CODE_TECHNICAL_OUT, 'Выбытия', CashflowFlowKind::TECHNICAL, 20, $technical);
+        $technicalIn = $this->ensureCategory($company, CashflowCategory::CODE_TECHNICAL_IN, 'Поступления', CashflowFlowKind::TECHNICAL, 10, $technical, self::TECHNICAL_IN_DESCRIPTION);
+        $technicalOut = $this->ensureCategory($company, CashflowCategory::CODE_TECHNICAL_OUT, 'Выбытия', CashflowFlowKind::TECHNICAL, 20, $technical, self::TECHNICAL_OUT_DESCRIPTION);
         $unallocated = $this->getOrCreateUnallocated($company);
 
         return [
@@ -66,13 +70,14 @@ class CashflowSystemCategoryService
         CashflowFlowKind $flowKind,
         int $sort,
         ?CashflowCategory $parent = null,
+        ?string $description = null,
     ): CashflowCategory {
         $existing = $this->cashflowCategoryRepository->findOneByCompanyAndCode($company, $code);
         if (null !== $existing) {
             return $this->assertSystemCategory($existing, $code);
         }
 
-        return $this->createCategory($company, $code, $name, $flowKind, $sort, $parent);
+        return $this->createCategory($company, $code, $name, $flowKind, $sort, $parent, $description);
     }
 
     private function createCategory(
@@ -82,9 +87,11 @@ class CashflowSystemCategoryService
         CashflowFlowKind $flowKind,
         int $sort,
         ?CashflowCategory $parent = null,
+        ?string $description = null,
     ): CashflowCategory {
         $category = new CashflowCategory(Uuid::uuid4()->toString(), $company);
         $category->setName($name);
+        $category->setDescription($description);
         $category->setParent($parent);
         $category->setSort($sort);
         $category->setFlowKind($flowKind);

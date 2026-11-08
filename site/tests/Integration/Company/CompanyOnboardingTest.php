@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Company;
 
 use App\Admin\Application\CreateAccountAction;
+use App\Cash\Application\CashflowCoreTemplateReader;
+use App\Cash\Exception\CashflowCoreTemplateException;
 use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Entity\User;
 use App\Company\Enum\BusinessProfile;
@@ -27,6 +29,8 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         'project' => 'PROJECT_GENERAL:Общий',
         'responsibility_center' => 'CFO_GENERAL:Общий',
         'cashflow_system_categories' => 7,
+        // Ядро ДДС: группы:статьи, статьи с описанием, статьи с направлением, связи с ОПиУ.
+        'cashflow_core' => '7:30:30:30:0',
         'pl_categories' => 72,
         'balance_articles' => 33,
         'balance_accounts' => 'ACC_MAIN_BANK, ACC_MAIN_REGISTER',
@@ -108,6 +112,20 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         self::assertSame(0, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM companies WHERE name = 'Rollback Co'"));
     }
 
+    public function testBrokenCashflowCoreTemplateRollsBackCompany(): void
+    {
+        self::getContainer()->set(CashflowCoreTemplateReader::class, new CashflowCoreTemplateReader('/nonexistent/core.yaml'));
+
+        try {
+            (self::getContainer()->get(CreateCompanyOwnerAccountAction::class))($this->newUser(), 'plain-password', 'Cash Rollback Co', false);
+            self::fail('Создание компании должно упасть вместе с шаблоном ядра ДДС.');
+        } catch (CashflowCoreTemplateException $e) {
+            self::assertStringContainsString('core.yaml', $e->getMessage());
+        }
+
+        self::assertSame(0, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM companies WHERE name = 'Cash Rollback Co'"));
+    }
+
     private function newUser(): User
     {
         return UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail(Uuid::uuid7()->toString().'@example.test')->build();
@@ -125,6 +143,15 @@ final class CompanyOnboardingTest extends IntegrationTestCase
             'project' => $list("SELECT system_code || ':' || name FROM project_directions WHERE company_id = ?"),
             'responsibility_center' => $list("SELECT code || ':' || name FROM financial_responsibility_centers WHERE company_id = ?"),
             'cashflow_system_categories' => (int) $this->connection->fetchOne('SELECT COUNT(*) FROM cashflow_categories WHERE company_id = ? AND system_code IS NOT NULL', [$companyId]),
+            'cashflow_core' => (string) $this->connection->fetchOne(
+                "SELECT COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM cashflow_categories ch WHERE ch.parent_id = c.id))
+                    || ':' || COUNT(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM cashflow_categories ch WHERE ch.parent_id = c.id))
+                    || ':' || COUNT(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM cashflow_categories ch WHERE ch.parent_id = c.id) AND c.description LIKE '%ОПиУ — %')
+                    || ':' || COUNT(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM cashflow_categories ch WHERE ch.parent_id = c.id) AND c.operation_type IN ('INFLOW', 'OUTFLOW'))
+                    || ':' || COUNT(*) FILTER (WHERE c.pl_category_id IS NOT NULL OR c.allow_pl_document)
+                 FROM cashflow_categories c WHERE c.company_id = ? AND c.is_system = false",
+                [$companyId],
+            ),
             'pl_categories' => (int) $this->connection->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [$companyId]),
             'balance_articles' => (int) $this->connection->fetchOne('SELECT COUNT(*) FROM balance_articles WHERE company_id = ?', [$companyId]),
             'balance_accounts' => $list('SELECT code FROM balance_accounts WHERE company_id = ? ORDER BY code'),
