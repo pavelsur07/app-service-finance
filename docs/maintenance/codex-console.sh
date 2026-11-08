@@ -209,10 +209,7 @@ case "$cmd" in
       esac
     done
     ;;
-  app:finance:pl-tree:apply-default|app:finance:pl-tree:upgrade-universal-v4)
-    # upgrade-universal-v4 — разовая (08.11.2026): дерево «Базовый» v2–v3 → v4,
-    # переименования групп, удаление двух неиспользуемых статей, новая статья;
-    # те же аргументы и то же правило --execute. Убрать вместе с командой.
+  app:finance:pl-tree:apply-default)
     # Базовый шаблон дерева ОПиУ (config/finance/default_pl_tree.json) для одной
     # компании — то же, что экран /pl-categories/import?source=template.
     # Без --execute read-only план; с --execute пишет pl_categories (только
