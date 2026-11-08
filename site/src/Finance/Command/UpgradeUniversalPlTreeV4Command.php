@@ -129,22 +129,36 @@ final class UpgradeUniversalPlTreeV4Command extends Command
                 $output->writeln(\sprintf('keep    %-26s «%s» — используется: %s', $code, $byCode[$code]->getName(), $used->summary()));
                 continue;
             }
+            // Бюджет и маппинг затрат PLCategoryUsageQuery не видит: у бюджета нет FK, у маппинга — SET NULL.
+            $refs = (int) $this->em->getConnection()->fetchOne(
+                'SELECT (SELECT COUNT(*) FROM budget_lines WHERE company_id = :c AND pl_category_id = :id)
+                      + (SELECT COUNT(*) FROM budget_rules WHERE company_id = :c AND (pl_category_id = :id OR base_category_id = :id))
+                      + (SELECT COUNT(*) FROM marketplace_cost_categories WHERE company_id = :c AND pl_category_id = :id)',
+                ['c' => $companyId, 'id' => $id],
+            );
+            if ($refs > 0) {
+                $output->writeln(\sprintf('keep    %-26s «%s» — используется в бюджете или маппинге затрат: %d', $code, $byCode[$code]->getName(), $refs));
+                continue;
+            }
             $removals[] = $byCode[$code];
             $output->writeln(\sprintf('delete  %-26s «%s»', $code, $byCode[$code]->getName()));
         }
 
-        if ($execute) {
-            $this->em->wrapInTransaction(static function () use ($renames): void {
+        // Весь сценарий — одной транзакцией: вложенные транзакции Action становятся точками сохранения,
+        // сбой любого шага откатывает и переименования, и удаления.
+        $result = $execute
+            ? $this->em->wrapInTransaction(function () use ($renames, $removals, $companyId) {
                 foreach ($renames as [$category, $name]) {
                     $category->setName($name);
                 }
-            });
-            foreach ($removals as $category) {
-                ($this->delete)($category, $companyId);
-            }
-        }
+                $this->em->flush();
+                foreach ($removals as $category) {
+                    ($this->delete)($category, $companyId);
+                }
 
-        $result = ($this->applyTemplate)($companyId, !$execute, PLTemplateApplicationSource::COMMAND);
+                return ($this->applyTemplate)($companyId, false, PLTemplateApplicationSource::COMMAND);
+            })
+            : ($this->applyTemplate)($companyId, true, PLTemplateApplicationSource::COMMAND);
         foreach ($result->created as $row) {
             $output->writeln(\sprintf('create  %-26s %s', $row->code ?? '', $row->path));
         }

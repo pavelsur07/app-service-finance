@@ -9,9 +9,11 @@ use App\Company\Enum\BusinessProfile;
 use App\Finance\Application\Action\ApplyDefaultPLTemplateAction;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLTemplateApplicationSource;
+use App\Finance\Exception\PLTemplateProfileMismatchException;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
+use App\Tests\Builders\Finance\PLTemplateApplicationBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -56,6 +58,40 @@ final class UpgradeUniversalPlTreeV4CommandTest extends IntegrationTestCase
         self::assertSame(Command::FAILURE, $tester->execute(['companyId' => $companyId, '--execute' => true]));
         self::assertStringContainsString('коды вне шаблона «Базовый»: OPEX_WH_STORAGE', $tester->getDisplay());
         self::assertSame(45, $this->categories($companyId));
+    }
+
+    public function testArticleMappedFromMarketplaceCostIsKept(): void
+    {
+        $companyId = $this->v3Company();
+        $this->connection->executeStatement(
+            "INSERT INTO marketplace_cost_categories (id, company_id, marketplace, name, code, pl_category_id, is_active, created_at, updated_at)
+             SELECT gen_random_uuid(), company_id, 'wildberries', 'Фото', 'photo', id, true, now(), now() FROM pl_categories WHERE company_id = ? AND code = 'OVERHEAD_SALES_CONTENT'",
+            [$companyId],
+        );
+        $tester = new CommandTester((new Application(self::bootKernel()))->find('app:finance:pl-tree:upgrade-universal-v4'));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['companyId' => $companyId, '--execute' => true]));
+        self::assertStringContainsString('«Фото, видео, дизайн» — используется в бюджете или маппинге затрат: 1', $tester->getDisplay());
+        self::assertStringContainsString('applied: rename 2, delete 1, create 1', $tester->getDisplay());
+        self::assertSame(44, $this->categories($companyId));
+    }
+
+    public function testFailureOnLastStepRollsBackRenamesAndDeletions(): void
+    {
+        $companyId = $this->v3Company();
+        // Применение шаблона откажет внутри транзакции: последнее происхождение — другой профиль.
+        $this->em->persist(PLTemplateApplicationBuilder::anApplication()->forCompany($companyId)->withProfile(BusinessProfile::MARKETPLACE)->appliedAt(new \DateTimeImmutable('+1 day'))->build());
+        $this->em->flush();
+        $tester = new CommandTester((new Application(self::bootKernel()))->find('app:finance:pl-tree:upgrade-universal-v4'));
+
+        try {
+            $tester->execute(['companyId' => $companyId, '--execute' => true]);
+            self::fail('ожидался отказ применения шаблона');
+        } catch (PLTemplateProfileMismatchException) {
+        }
+
+        self::assertSame(44, $this->categories($companyId));
+        self::assertSame('Операционные расходы', $this->connection->fetchOne("SELECT name FROM pl_categories WHERE company_id = ? AND code = 'OVERHEAD_TOTAL'", [$companyId]));
     }
 
     /**
