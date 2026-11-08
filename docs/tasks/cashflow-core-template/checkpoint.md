@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** handoff PR 1
-**Status:** reviewing
+**Phase:** handoff PR 1 (#2934)
+**Status:** done — ждёт «merge and deploy #2934»
 **Stage base commit:** bd27418fb (origin/master)
 
 ### Completed
@@ -15,5 +15,7 @@
 
 - Stage 2: ai-service принимает description (schemas, контракт v1.2.0), ruff/mypy/unit 178 OK.
 
+- Гейты: CS/strict-types 0 of 3923, PHPStan OK, PHPUnit 8566 OK; ревью — внутреннее исправлено, Codex REVIEW_GREEN.
+
 ### Exact next action
-- Финальное ревью PR 1, гейты, Draft PR → Ready.
+- После деплоя #2934: проверить чек-лист приёмки, затем PR 2 (Stage 3) от master.
