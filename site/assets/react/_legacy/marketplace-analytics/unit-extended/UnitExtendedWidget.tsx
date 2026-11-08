@@ -196,6 +196,17 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
                 />
             </ErrorBoundary>
 
+            {/* Карточки и «Итого» таблицы считают по разным правилам — подпись, чтобы
+                расхождение прибыли не читалось как ошибка. С фильтром по тегам карточки
+                тоже берут только затраты товаров, и первая часть подписи неверна. */}
+            {selectedTagIds.length === 0 && widgets.summary && (
+                <p className="text-muted small mb-3">
+                    Карточки — все начисления маркетплейса за период, включая затраты без
+                    привязки к товару: хранение, маркетинговые акции, оплату за клик.
+                    Поэтому прибыль в карточках отличается от «Итого» в таблице.
+                </p>
+            )}
+
             {isError && (
                 <div className="alert alert-danger mb-3">
                     {errorMessage ?? 'Не удалось загрузить данные'}
@@ -224,7 +235,13 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
 
             <div className="card">
                 <div className="card-header flex-wrap">
-                    <h3 className="card-title">Юнит-экономика по листингам</h3>
+                    <div>
+                        <h3 className="card-title">Юнит-экономика по листингам</h3>
+                        <div className="text-muted small">
+                            Только затраты, привязанные к товарам; реклама — по статистике
+                            рекламного кабинета
+                        </div>
+                    </div>
                     <div className="ms-3 ue-ext-listing-search">
                         <input
                             type="search"
