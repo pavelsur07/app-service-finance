@@ -2289,8 +2289,9 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 Шаблоны выбираются по профилю через реестры `finance.pl_templates` и `balance.structure_templates`
 (`config/services.yaml`): у каждого профиля запись, профиль без своего шаблона указывает на
 маркетплейсный явно. Шаблоны: `MARKETPLACE` — `pl_templates/marketplace.json` (72 статьи, CM1–CM4, ДРР),
-`templates/marketplace.yaml` (33 статьи); `UNIVERSAL` — `pl_templates/universal.json` (44 статьи: выручка,
-себестоимость, валовая прибыль и маржа, операционные расходы, EBITDA, чистая прибыль),
+`templates/marketplace.yaml` (33 статьи); `UNIVERSAL` — `pl_templates/universal.json` (43 статьи, версия 3: выручка,
+себестоимость, валовая прибыль и маржа, косвенные расходы с группой «Помещения и производство», EBITDA, чистая прибыль;
+«Фото, видео, дизайн» — только в расширении маркетплейса),
 `templates/universal.yaml` (31 статья — без расчётов и складов маркетплейсов). Код статьи значит одно и то же во всех шаблонах:
 ОПиУ — тип, поток, формат, код родителя; Баланс — сторона, вид, код родителя, статья счёта.
 Согласие держит `tests/Integration/Onboarding/TemplateRegistryTest`. В обоих ОПиУ «Расходы ниже EBITDA»
@@ -5198,6 +5199,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.158 | 2026-11-08 | Finance: универсальный шаблон ОПиУ v3 — «Операционные расходы» → «Косвенные расходы», «Производственные» → «Помещения и производство», «Фото, видео, дизайн» (`OVERHEAD_SALES_CONTENT`) убрана (43 статьи; остаётся в расширении маркетплейса, оно добавляет 25); существующие компании не меняются |
 | 2.157 | 2026-11-08 | Cash: описание статьи ДДС уходит в ИИ-категоризацию (`CashCategorizationQuery::findLeafCategories`, `CashCategorizationPayloadMapper::category`), промпт `categorize_transactions/v4`; подсказка у поля описания в форме статьи (cashflow-core-template, Stage 3) |
 | 2.156 | 2026-11-08 | Cash: ядро статей ДДС новой компании — `ApplyCashflowCoreTemplateAction` по `CompanyCreatedEvent`, шаблон `config/cash/cashflow_templates/core.yaml` (30 статей с описаниями, без связей с ОПиУ); описания системных технических статей при создании; ai-service принимает необязательное `description` статьи (cashflow-core-template) |
 | 2.155 | 2026-11-06 | Settlement: independent Money documents, explicit Cash/Finance sources, manual M:N allocation, dated history/reversals, source guards, verify/rebuild and native UI; additive Version20261106183000 (counterparty-settlements, Stages 1–5) |

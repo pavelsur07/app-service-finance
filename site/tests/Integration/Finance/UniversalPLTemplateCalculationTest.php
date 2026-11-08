@@ -108,12 +108,12 @@ final class UniversalPLTemplateCalculationTest extends IntegrationTestCase
     public static function profiles(): iterable
     {
         yield 'marketplace' => [BusinessProfile::MARKETPLACE, 72];
-        yield 'universal' => [BusinessProfile::UNIVERSAL, 44];
+        yield 'universal' => [BusinessProfile::UNIVERSAL, 43];
     }
 
     private function companyWithUniversalTree(): Company
     {
-        return $this->companyWithTree(BusinessProfile::UNIVERSAL, 44);
+        return $this->companyWithTree(BusinessProfile::UNIVERSAL, 43);
     }
 
     private function companyWithTree(BusinessProfile $profile, int $categories): Company

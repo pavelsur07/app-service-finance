@@ -1,7 +1,7 @@
 {
   "version": 1,
   "profile": "UNIVERSAL",
-  "templateVersion": 1,
+  "templateVersion": 2,
   "exportedAt": "2026-10-21T00:00:00+03:00",
   "company": "Базовый шаблон ОПиУ — статьи маркетплейса",
   "categories": [
@@ -497,7 +497,7 @@
       ]
     },
     {
-      "name": "Операционные расходы",
+      "name": "Косвенные расходы",
       "code": "OVERHEAD_TOTAL",
       "type": "SUBTOTAL",
       "format": "MONEY",
@@ -510,7 +510,7 @@
       "sortOrder": 50,
       "children": [
         {
-          "name": "Производственные",
+          "name": "Помещения и производство",
           "code": "OVERHEAD_PROD_TOTAL",
           "type": "SUBTOTAL",
           "format": "MONEY",

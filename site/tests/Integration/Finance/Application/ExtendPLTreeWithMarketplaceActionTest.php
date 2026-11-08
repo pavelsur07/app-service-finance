@@ -40,12 +40,12 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
         self::assertTrue($this->facade()->needsMarketplacePlExtension((string) $company->getId()));
 
         $preview = $this->extend($company, true);
-        self::assertCount(24, $preview->import->created);
-        self::assertSame(44, $this->categoryCount($company), 'предпросмотр ничего не пишет');
+        self::assertCount(25, $preview->import->created);
+        self::assertSame(43, $this->categoryCount($company), 'предпросмотр ничего не пишет');
 
         $result = $this->extend($company, false);
 
-        self::assertCount(24, $result->import->created);
+        self::assertCount(25, $result->import->created);
         self::assertEquals([
             new PLFormulaChange('REV_TOTAL', 'Выручка', 'REV_SALES_TOTAL', 'REV_SALES_TOTAL + REV_NOT_SPP_TOTAL'),
             new PLFormulaChange('EBITDA', 'EBITDA', 'GROSS_PROFIT + OVERHEAD_TOTAL', 'GROSS_PROFIT + PROMO_TOTAL + OPEX_WH_TOTAL + PRODUCT_INFRA_TOTAL + OVERHEAD_TOTAL'),
@@ -130,7 +130,7 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
             self::assertStringContainsString('Формулу «EBITDA» изменили вручную', $e->getMessage());
         }
 
-        self::assertSame(44, $this->categoryCount($company));
+        self::assertSame(43, $this->categoryCount($company));
         self::assertSame('REV_SALES_TOTAL', $this->connection->fetchOne("SELECT formula FROM pl_categories WHERE company_id = ? AND code = 'REV_TOTAL'", [(string) $company->getId()]));
     }
 
@@ -153,7 +153,7 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
             }
         }
 
-        self::assertSame(45, $this->categoryCount($company));
+        self::assertSame(44, $this->categoryCount($company));
         self::assertSame('GROSS_PROFIT + OVERHEAD_TOTAL', $this->connection->fetchOne("SELECT formula FROM pl_categories WHERE company_id = ? AND code = 'EBITDA'", [(string) $company->getId()]));
     }
 
@@ -319,7 +319,7 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
             self::assertStringContainsString('COGS_DELIVERY', $e->getMessage());
         }
 
-        self::assertSame(44, $this->categoryCount($company));
+        self::assertSame(43, $this->categoryCount($company));
     }
 
     /**
@@ -427,7 +427,7 @@ final class ExtendPLTreeWithMarketplaceActionTest extends IntegrationTestCase
     private function universalCompany(): Company
     {
         $company = $this->company(BusinessProfile::UNIVERSAL);
-        self::assertSame(44, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId()));
+        self::assertSame(43, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId()));
 
         return $company;
     }

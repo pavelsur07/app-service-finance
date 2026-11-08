@@ -25,10 +25,10 @@ final class ApplyDefaultPLTemplateActionTest extends IntegrationTestCase
     {
         $company = $this->company(BusinessProfile::UNIVERSAL);
 
-        self::assertSame(44, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId()));
+        self::assertSame(43, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId()));
         $this->apply($company, dryRun: false, source: PLTemplateApplicationSource::SCREEN);
 
-        self::assertSame([['UNIVERSAL', 2, 44, 'onboarding']], $this->records($company), 'повтор ничего не создал — записи нет');
+        self::assertSame([['UNIVERSAL', 3, 43, 'onboarding']], $this->records($company), 'повтор ничего не создал — записи нет');
     }
 
     public function testDryRunWritesNothing(): void
@@ -70,8 +70,8 @@ final class ApplyDefaultPLTemplateActionTest extends IntegrationTestCase
         $this->em->persist(PLTemplateApplicationBuilder::anApplication()->forCompany((string) $company->getId())->withProfile(BusinessProfile::MARKETPLACE)->appliedAt(new \DateTimeImmutable('2026-10-01 10:00'))->build());
         $this->em->flush();
 
-        self::assertSame(44, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId(), dryRun: true));
-        self::assertSame(44, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId()));
+        self::assertSame(43, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId(), dryRun: true));
+        self::assertSame(43, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId()));
 
         self::assertSame(['MARKETPLACE', 'UNIVERSAL'], array_map(static fn (array $r): string => $r[0], $this->records($company)));
         self::assertCount(0, $this->apply($company, dryRun: true)->created, 'дальше — дерево «Базового»');
@@ -102,8 +102,8 @@ final class ApplyDefaultPLTemplateActionTest extends IntegrationTestCase
     {
         $company = $this->company(BusinessProfile::UNIVERSAL);
 
-        self::assertCount(44, $this->apply($company, dryRun: false, source: PLTemplateApplicationSource::COMMAND)->created);
-        self::assertSame([['UNIVERSAL', 2, 44, 'command']], $this->records($company));
+        self::assertCount(43, $this->apply($company, dryRun: false, source: PLTemplateApplicationSource::COMMAND)->created);
+        self::assertSame([['UNIVERSAL', 3, 43, 'command']], $this->records($company));
     }
 
     private function apply(Company $company, bool $dryRun, PLTemplateApplicationSource $source = PLTemplateApplicationSource::SCREEN): ImportPLCategoryTreeResult
