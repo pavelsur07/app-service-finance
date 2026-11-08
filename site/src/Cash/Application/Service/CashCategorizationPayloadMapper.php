@@ -16,6 +16,7 @@ final readonly class CashCategorizationPayloadMapper
 {
     /** Лимиты контракта categorize_payload. */
     private const MAX_PATH = 500;
+    private const MAX_DESCRIPTION = 500;
     private const MAX_COUNTERPARTY = 255;
     private const AMOUNT = '/^\d{1,16}\.\d{2}$/D';
 
@@ -66,11 +67,13 @@ final readonly class CashCategorizationPayloadMapper
     }
 
     /**
+     * Описание «что входит и почему» — только непустое: ai-service принимает его с контракта ai-task v1.2.0.
+     *
      * @return array<string, string>
      */
     public function category(CashCategorizationCategory $category): array
     {
-        return [
+        $result = [
             'id' => $category->id,
             'path' => mb_substr($category->path, -self::MAX_PATH),
             'direction' => match ($category->operationType) {
@@ -79,6 +82,13 @@ final readonly class CashCategorizationPayloadMapper
                 default => 'any',
             },
         ];
+
+        $description = trim((string) $category->description);
+        if ('' !== $description) {
+            $result['description'] = mb_substr($description, 0, self::MAX_DESCRIPTION);
+        }
+
+        return $result;
     }
 
     /**

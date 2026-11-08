@@ -14,6 +14,8 @@ final readonly class CashCategorizationCategory
         public string $path,
         /** INFLOW | OUTFLOW | null — любое направление */
         public ?string $operationType,
+        /** «Что входит и почему» — описание статьи компании; null — не задано */
+        public ?string $description = null,
     ) {
     }
 }

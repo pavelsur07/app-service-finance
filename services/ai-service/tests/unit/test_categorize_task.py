@@ -103,7 +103,7 @@ def test_model_sees_masked_purpose_but_intact_ids_and_amounts() -> None:
 
 def test_prompt_names_marketplace_legal_entities() -> None:
     prompt = categorize.build().prompt
-    assert prompt.version == "v3"
+    assert prompt.version == "v4"
     for name in ("Интернет Решения", "РВБ", "Вайлдберриз", "Яндекс Маркет", "Маркетплейс"):
         assert name in prompt.text
 

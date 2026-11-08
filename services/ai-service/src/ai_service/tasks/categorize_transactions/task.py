@@ -15,7 +15,7 @@ from ai_service.tasks.categorize_transactions.schemas import CategorizeInput, Ca
 
 TASK_TYPE = "categorize_transactions"
 # Версию знает и Symfony (повтор no_answer прошлой версии): tests/unit/test_symfony_prompt_version.py.
-PROMPT_VERSION = "v3"
+PROMPT_VERSION = "v4"
 
 INSTRUCTION = (
     "Подбери статью ДДС для каждой операции из блока данных. "

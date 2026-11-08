@@ -43,6 +43,7 @@ class CashflowCategoryType extends AbstractType
             ->add('description', TextareaType::class, [
                 'label' => 'Описание',
                 'required' => false,
+                'help' => 'Что входит в статью, что не входит и почему. По описанию ИИ подбирает статью для операций.',
             ])
             ->add('status', EnumType::class, [
                 'class' => CashflowCategoryStatus::class,

@@ -2441,7 +2441,7 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   перемещение» без слов «депозит/кредит/займ/процент» исключает операцию, пока у
   компании меньше 3 таких операций в несистемной статье (`TRANSFER_LIKE`; число
   исключённых — `CashCategorizationStats::$transferLikeSkipped` на странице «ИИ» кабинета).
-  Примеры (`examples` в `categorize_payload`, промпт `categorize_transactions/v3`): к пачке —
+  Примеры (`examples` в `categorize_payload`, промпт `categorize_transactions/v4`): к пачке —
   `CashCategorizationQuery::findExamplesFor` одним запросом, до 3 на операцию и 30 на пачку,
   операции компании за 365 дней в несистемной статье с одной разбивкой (человек или автоправило;
   подсказки ИИ `accepted`/`auto_applied` не берутся), того же направления, сначала тот же контрагент,
@@ -2495,7 +2495,9 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   всех commit. В списке операций у автоприменённой статьи значок «ИИ» с
   уверенностью (`autoAppliedConfidence`), пока статья операции та же.
 - Payload задачи строит `Application\Service\CashCategorizationPayloadMapper` —
-  один код для постановки и выгрузки золотого набора.
+  один код для постановки и выгрузки золотого набора. Статья справочника — `id`, путь,
+  направление и непустое описание «что входит и почему» (`description`, до 500 символов,
+  ai-task v1.2.0); промпт v4 велит сверяться с ним.
 - `app:cash:ai-eval-export --company-id= [--per-category=20] [--limit=400]` —
   read-only, JSON `cash-categorize-history/v1` в stdout: справочник и кейсы
   «операция → статья» из `CashCategorizationQuery::findManuallyCategorized`
@@ -5196,6 +5198,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.157 | 2026-11-08 | Cash: описание статьи ДДС уходит в ИИ-категоризацию (`CashCategorizationQuery::findLeafCategories`, `CashCategorizationPayloadMapper::category`), промпт `categorize_transactions/v4`; подсказка у поля описания в форме статьи (cashflow-core-template, Stage 3) |
 | 2.156 | 2026-11-08 | Cash: ядро статей ДДС новой компании — `ApplyCashflowCoreTemplateAction` по `CompanyCreatedEvent`, шаблон `config/cash/cashflow_templates/core.yaml` (30 статей с описаниями, без связей с ОПиУ); описания системных технических статей при создании; ai-service принимает необязательное `description` статьи (cashflow-core-template) |
 | 2.155 | 2026-11-06 | Settlement: independent Money documents, explicit Cash/Finance sources, manual M:N allocation, dated history/reversals, source guards, verify/rebuild and native UI; additive Version20261106183000 (counterparty-settlements, Stages 1–5) |
 | 2.155 | 2026-11-07 | Marketplace/MarketplaceAnalytics: `ListingMetaDTO` получил `?size` (`UNKNOWN` → `null`, `ListingMetaQuery`); отчёт «Оборачиваемость» показывает размер рядом с названием и колонкой «Размер» в xlsx — размеры WB одного артикула были неразличимы (проверка на проде 07.11) |

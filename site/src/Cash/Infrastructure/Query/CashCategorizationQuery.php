@@ -502,16 +502,16 @@ final readonly class CashCategorizationQuery
 
         $rows = $this->connection->fetchAllAssociative(
             'WITH RECURSIVE tree AS (
-                 SELECT c.id, c.parent_id, c.name::text AS path, c.status, c.is_system, c.operation_type
+                 SELECT c.id, c.parent_id, c.name::text AS path, c.status, c.is_system, c.operation_type, c.description
                  FROM "cashflow_categories" c
                  WHERE c.company_id = :companyId AND c.parent_id IS NULL
                  UNION ALL
-                 SELECT c.id, c.parent_id, tree.path || \' / \' || c.name, c.status, c.is_system, c.operation_type
+                 SELECT c.id, c.parent_id, tree.path || \' / \' || c.name, c.status, c.is_system, c.operation_type, c.description
                  FROM "cashflow_categories" c
                  JOIN tree ON tree.id = c.parent_id
                  WHERE c.company_id = :companyId
              )
-             SELECT tree.id, tree.path, tree.operation_type
+             SELECT tree.id, tree.path, tree.operation_type, tree.description
              FROM tree
              WHERE tree.status = \'active\'
                AND tree.is_system = false
@@ -524,6 +524,7 @@ final readonly class CashCategorizationQuery
             id: (string) $row['id'],
             path: (string) $row['path'],
             operationType: null === $row['operation_type'] ? null : (string) $row['operation_type'],
+            description: null === $row['description'] ? null : (string) $row['description'],
         ), $rows);
     }
 
