@@ -71,9 +71,30 @@ final class UpgradeUniversalPlTreeV4CommandTest extends IntegrationTestCase
         $tester = new CommandTester((new Application(self::bootKernel()))->find('app:finance:pl-tree:upgrade-universal-v4'));
 
         self::assertSame(Command::SUCCESS, $tester->execute(['companyId' => $companyId, '--execute' => true]));
-        self::assertStringContainsString('«Фото, видео, дизайн» — используется в бюджете или маппинге затрат: 1', $tester->getDisplay());
+        self::assertStringContainsString('«Фото, видео, дизайн» — на неё ссылается: marketplace_cost_categories.pl_category_id', $tester->getDisplay());
         self::assertStringContainsString('applied: rename 2, delete 1, create 1', $tester->getDisplay());
         self::assertSame(44, $this->categories($companyId));
+    }
+
+    public function testArticleReferencedOnlyByCostPlMappingIsKept(): void
+    {
+        $companyId = $this->v3Company();
+        $costId = '01960000-0000-7000-8000-000000000001';
+        $this->connection->executeStatement(
+            "INSERT INTO marketplace_cost_categories (id, company_id, marketplace, name, code, pl_category_id, is_active, created_at, updated_at)
+             VALUES (?, ?, 'wildberries', 'Фото', 'photo', NULL, true, now(), now())",
+            [$costId, $companyId],
+        );
+        $this->connection->executeStatement(
+            "INSERT INTO marketplace_cost_pl_mappings (id, company_id, cost_category_id, pl_category_id, include_in_pl, is_negative, sort_order, created_at, updated_at)
+             SELECT gen_random_uuid(), company_id, ?, id, true, false, 0, now(), now() FROM pl_categories WHERE company_id = ? AND code = 'OVERHEAD_SALES_SUBS'",
+            [$costId, $companyId],
+        );
+        $tester = new CommandTester((new Application(self::bootKernel()))->find('app:finance:pl-tree:upgrade-universal-v4'));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['companyId' => $companyId, '--execute' => true]));
+        self::assertStringContainsString('на неё ссылается: marketplace_cost_pl_mappings.pl_category_id', $tester->getDisplay());
+        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM pl_categories c JOIN marketplace_cost_pl_mappings m ON m.pl_category_id = c.id WHERE c.company_id = ? AND c.code = 'OVERHEAD_SALES_SUBS'", [$companyId]));
     }
 
     public function testFailureOnLastStepRollsBackRenamesAndDeletions(): void

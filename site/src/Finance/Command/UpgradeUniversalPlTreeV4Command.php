@@ -129,15 +129,11 @@ final class UpgradeUniversalPlTreeV4Command extends Command
                 $output->writeln(\sprintf('keep    %-26s «%s» — используется: %s', $code, $byCode[$code]->getName(), $used->summary()));
                 continue;
             }
-            // Бюджет и маппинг затрат PLCategoryUsageQuery не видит: у бюджета нет FK, у маппинга — SET NULL.
-            $refs = (int) $this->em->getConnection()->fetchOne(
-                'SELECT (SELECT COUNT(*) FROM budget_lines WHERE company_id = :c AND pl_category_id = :id)
-                      + (SELECT COUNT(*) FROM budget_rules WHERE company_id = :c AND (pl_category_id = :id OR base_category_id = :id))
-                      + (SELECT COUNT(*) FROM marketplace_cost_categories WHERE company_id = :c AND pl_category_id = :id)',
-                ['c' => $companyId, 'id' => $id],
-            );
-            if ($refs > 0) {
-                $output->writeln(\sprintf('keep    %-26s «%s» — используется в бюджете или маппинге затрат: %d', $code, $byCode[$code]->getName(), $refs));
+            // PLCategoryUsageQuery видит не все ссылки (бюджет, маппинги затрат — без FK или SET NULL):
+            // проверяем каждую колонку схемы со ссылкой на статью, кроме агрегатов, которые удаление переносит.
+            $refs = $this->references($id);
+            if ([] !== $refs) {
+                $output->writeln(\sprintf('keep    %-26s «%s» — на неё ссылается: %s', $code, $byCode[$code]->getName(), implode(', ', $refs)));
                 continue;
             }
             $removals[] = $byCode[$code];
@@ -180,5 +176,30 @@ final class UpgradeUniversalPlTreeV4Command extends Command
         }
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Таблицы, где на статью есть ссылка, кроме `pl_daily_totals` (их переносит удаление). Id статьи
+     * глобально уникален, поэтому фильтр по компании не нужен.
+     *
+     * @return list<string> «таблица.колонка»
+     */
+    private function references(string $categoryId): array
+    {
+        $db = $this->em->getConnection();
+        $columns = $db->fetchAllNumeric(
+            "SELECT table_name, column_name FROM information_schema.columns
+             WHERE table_schema = current_schema() AND (column_name LIKE '%pl_category_id' OR column_name = 'base_category_id')
+               AND table_name <> 'pl_daily_totals' ORDER BY 1, 2",
+        );
+        $found = [];
+        foreach ($columns as [$table, $column]) {
+            $sql = \sprintf('SELECT 1 FROM %s WHERE %s = :id LIMIT 1', $db->quoteSingleIdentifier((string) $table), $db->quoteSingleIdentifier((string) $column));
+            if (false !== $db->fetchOne($sql, ['id' => $categoryId])) {
+                $found[] = $table.'.'.$column;
+            }
+        }
+
+        return $found;
     }
 }
