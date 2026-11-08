@@ -106,22 +106,15 @@
 {% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Категории ОПиУ (PnL)</h2>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <div class="btn-list">
-                        <a href="{{ path('pl_category_new') }}" class="btn btn-primary">+ Добавить категорию</a>
-                        <a href="{{ path('pl_category_import') }}" class="btn btn-outline-secondary">Импорт категорий</a>
-                        <a href="{{ path('pl_category_export_json') }}" class="btn btn-outline-secondary" download>Выгрузить в файл</a>
-                    </div>
-                </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Категории ОПиУ (PnL)'} %}
+        {% block actions %}
+            <div class="btn-list">
+                <a href="{{ path('pl_category_new') }}" class="btn btn-primary">+ Добавить категорию</a>
+                <a href="{{ path('pl_category_import') }}" class="btn btn-outline-secondary">Импорт категорий</a>
+                <a href="{{ path('pl_category_export_json') }}" class="btn btn-outline-secondary" download>Выгрузить в файл</a>
             </div>
-        </div>
-    </div>
+        {% endblock %}
+    {% endembed %}
     <div class="container-xl mt-3">
         <div class="card">
             <div class="card-body">

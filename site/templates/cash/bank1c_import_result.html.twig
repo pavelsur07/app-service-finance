@@ -3,23 +3,18 @@
 {% block title %}Результат импорта 1С{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Импорт банковской выписки 1С завершён</h2>
-                    <div class="text-muted small">
-                        {% if filename %}
-                            Файл: <strong>{{ filename }}</strong>
-                        {% endif %}
-                        {% if selectedAccount %}
-                            · Счёт: <strong>{{ selectedAccount.name }}</strong>
-                        {% endif %}
-                    </div>
-                </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Импорт банковской выписки 1С завершён'} %}
+        {% block subtitle %}
+            <div class="text-muted small">
+                {% if filename %}
+                    Файл: <strong>{{ filename }}</strong>
+                {% endif %}
+                {% if selectedAccount %}
+                    · Счёт: <strong>{{ selectedAccount.name }}</strong>
+                {% endif %}
             </div>
-        </div>
-    </div>
+        {% endblock %}
+    {% endembed %}
 
     <div class="container-xl mt-3">
         {% if importLog is defined and importLog %}

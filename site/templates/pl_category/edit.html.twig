@@ -9,25 +9,20 @@
     {% set expense_variables = available_categories|filter(category => category.code is not empty and category.flow.value == 'EXPENSE') %}
     {% set calculated_variables = available_categories|filter(category => category.code is not empty and category.type.value == 'KPI') %}
 
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <div class="page-pretitle">Справочники · Категории ОПиУ</div>
-                    <h2 class="page-title">{{ is_new ? 'Новая строка ОПиУ' : 'Редактирование строки ОПиУ' }}</h2>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <div class="btn-list">
-                        <a href="{{ path('pl_category_index') }}" class="btn btn-ghost-secondary d-none d-sm-inline-flex"><i class="ti ti-arrow-left me-1"></i>К списку</a>
-                        {% if not is_new %}
-                            {{ include('pl_category/_delete_trigger.html.twig', {category: item, usage: usage|default(null), class: 'btn btn-ghost-danger', label: '<i class="ti ti-trash me-1"></i>Удалить', list_link: true}, with_context=false) }}
-                        {% endif %}
-                        <button type="submit" form="pl-category-edit-form" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Сохранить</button>
-                    </div>
-                </div>
+    {% embed 'partials/_page_header.html.twig' with {pretitle: 'Справочники · Категории ОПиУ'} %}
+        {% block title %}
+            {{ is_new ? 'Новая строка ОПиУ' : 'Редактирование строки ОПиУ' }}
+        {% endblock %}
+        {% block actions %}
+            <div class="btn-list">
+                <a href="{{ path('pl_category_index') }}" class="btn btn-ghost-secondary d-none d-sm-inline-flex"><i class="ti ti-arrow-left me-1"></i>К списку</a>
+                {% if not is_new %}
+                    {{ include('pl_category/_delete_trigger.html.twig', {category: item, usage: usage|default(null), class: 'btn btn-ghost-danger', label: '<i class="ti ti-trash me-1"></i>Удалить', list_link: true}, with_context=false) }}
+                {% endif %}
+                <button type="submit" form="pl-category-edit-form" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Сохранить</button>
             </div>
-        </div>
-    </div>
+        {% endblock %}
+    {% endembed %}
 
     <div id="pl-category-edit-page" class="page-body">
         <div class="container-xl">

@@ -3,15 +3,7 @@
 {% block title %}Импорт выписки 1С{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Импорт банковской выписки 1С</h2>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include 'partials/_page_header.html.twig' with {title: 'Импорт банковской выписки 1С'} only %}
 
     <div class="container-xl mt-3">
         <div class="card">

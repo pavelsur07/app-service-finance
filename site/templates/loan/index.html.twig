@@ -2,23 +2,16 @@
 {% block title %}Займы{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Займы</h2>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <div class="btn-list">
-                        <a href="{{ path('loan_report') }}" class="btn btn-outline-secondary btn-sm">Отчёт</a>
-                        <a href="{{ path('loan_create') }}" class="btn btn-primary">
-                            + Новый займ
-                        </a>
-                    </div>
-                </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Займы'} %}
+        {% block actions %}
+            <div class="btn-list">
+                <a href="{{ path('loan_report') }}" class="btn btn-outline-secondary btn-sm">Отчёт</a>
+                <a href="{{ path('loan_create') }}" class="btn btn-primary">
+                    + Новый займ
+                </a>
             </div>
-        </div>
-    </div>
+        {% endblock %}
+    {% endembed %}
 
     <div class="page-body">
         <div class="container-xl">

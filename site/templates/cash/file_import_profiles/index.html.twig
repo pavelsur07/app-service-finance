@@ -3,18 +3,11 @@
 {% block title %}Профили импорта{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Профили импорта</h2>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <a href="{{ path('cash_file_import_profile_new') }}" class="btn btn-primary">Добавить профиль</a>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Профили импорта'} %}
+        {% block actions %}
+            <a href="{{ path('cash_file_import_profile_new') }}" class="btn btn-primary">Добавить профиль</a>
+        {% endblock %}
+    {% endembed %}
 
     <div class="container-xl mt-3">
         <div class="card">

@@ -5,25 +5,18 @@
 {% block body %}
     {% include 'marketplace_ads/_tabs.html.twig' with {activeTab: 'load'} %}
 
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Реклама маркетплейсов</h2>
-                </div>
-                {% if is_granted('ROLE_SUPER_ADMIN') %}
-                    <div class="col-auto ms-auto">
-                        <a href="{{ path('marketplace_ads_admin_logs', {'lines': 500}) }}"
-                           target="_blank"
-                           rel="noopener"
-                           class="btn btn-outline-secondary btn-sm">
-                            Открыть логи
-                        </a>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Реклама маркетплейсов'} %}
+        {% block actions %}
+            {% if is_granted('ROLE_SUPER_ADMIN') %}
+                <a href="{{ path('marketplace_ads_admin_logs', {'lines': 500}) }}"
+                   target="_blank"
+                   rel="noopener"
+                   class="btn btn-outline-secondary btn-sm">
+                    Открыть логи
+                </a>
+            {% endif %}
+        {% endblock %}
+    {% endembed %}
 
     {# Адреса с id — шаблоны с плейсхолдером-UUID: path() с requirements не примет '__ID__'. #}
     <div class="page-body" data-marketplace-ads

@@ -1,0 +1,33 @@
+{#
+  Шапка страницы легаси-shell'а (Tabler) — единственная разметка `page-header` в шаблонах.
+  Переход на DS vf-page-head — Stage 6; здесь прежняя Tabler-разметка.
+
+  Параметры: title (строка; с разметкой — блок title), pretitle (строка; с разметкой — блок pretitle),
+  class — дополнительные классы корня ('mb-3'), container (по умолчанию true — внутри <div class="container-xl">),
+  print (по умолчанию false — корень с d-print-none).
+  Блоки: subtitle — строка под заголовком со своими классами (<div class="text-secondary mt-1">…</div>),
+  actions — кнопки справа; при пустом блоке колонка col-auto не рендерится.
+
+  {% include 'partials/_page_header.html.twig' with {title: '…', pretitle: '…'} only %}
+  {% embed 'partials/_page_header.html.twig' with {title: '…'} %}
+      {% block actions %}<a class="btn btn-primary" href="…">…</a>{% endblock %}
+  {% endembed %}
+#}
+{% set page_header_pretitle %}{% block pretitle %}{{ pretitle|default }}{% endblock %}{% endset %}
+{% set page_header_actions %}{% block actions %}{% endblock %}{% endset %}
+<div class="page-header{{ print|default(false) ? '' : ' d-print-none' }}{{ class|default ? ' ' ~ class : '' }}">
+    {% if container is not defined or container %}<div class="container-xl">{% endif %}
+    <div class="row g-2 align-items-center">
+        <div class="col">
+            {% if page_header_pretitle|trim is not empty %}
+                <div class="page-pretitle">{{ page_header_pretitle|raw }}</div>
+            {% endif %}
+            <h2 class="page-title">{% block title %}{{ title }}{% endblock %}</h2>
+            {% block subtitle %}{% endblock %}
+        </div>
+        {% if page_header_actions|trim is not empty %}
+            <div class="col-auto ms-auto d-print-none">{{ page_header_actions|raw }}</div>
+        {% endif %}
+    </div>
+    {% if container is not defined or container %}</div>{% endif %}
+</div>

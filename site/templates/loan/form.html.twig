@@ -3,18 +3,14 @@
 {% block title %}{{ isEdit ? 'Редактирование займа' : 'Новый займ' }}{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">{{ isEdit ? 'Редактирование займа' : 'Новый займ' }}</h2>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <a href="{{ path('loan_index') }}" class="btn btn-link">Назад к списку</a>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% embed 'partials/_page_header.html.twig' %}
+        {% block title %}
+            {{ isEdit ? 'Редактирование займа' : 'Новый займ' }}
+        {% endblock %}
+        {% block actions %}
+            <a href="{{ path('loan_index') }}" class="btn btn-link">Назад к списку</a>
+        {% endblock %}
+    {% endembed %}
 
     <div class="page-body">
         <div class="container-xl">

@@ -3,15 +3,7 @@
 {% block title %}API-ключ отчётов{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">API-ключ отчётов</h2>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include 'partials/_page_header.html.twig' with {title: 'API-ключ отчётов'} only %}
 
     <div class="container-xl mt-3">
         <div class="card">

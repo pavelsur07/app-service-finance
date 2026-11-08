@@ -12,27 +12,22 @@
 {% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Предпросмотр импорта банковской выписки 1С</h2>
-                    <div class="text-muted small">
-                        Файл: <strong>{{ filename }}</strong>
-                        {% if selectedAccount %}
-                            · Счёт: <strong>{{ selectedAccount.name }}</strong>
-                            {% if statementAccountDisplay is defined and statementAccountDisplay %}
-                                <span class="text-muted">(№ {{ statementAccountDisplay }})</span>
-                            {% endif %}
-                        {% endif %}
-                        {% if totalRows is defined %}
-                            · Всего операций: <strong>{{ totalRows }}</strong>
-                        {% endif %}
-                    </div>
-                </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Предпросмотр импорта банковской выписки 1С'} %}
+        {% block subtitle %}
+            <div class="text-muted small">
+                Файл: <strong>{{ filename }}</strong>
+                {% if selectedAccount %}
+                    · Счёт: <strong>{{ selectedAccount.name }}</strong>
+                    {% if statementAccountDisplay is defined and statementAccountDisplay %}
+                        <span class="text-muted">(№ {{ statementAccountDisplay }})</span>
+                    {% endif %}
+                {% endif %}
+                {% if totalRows is defined %}
+                    · Всего операций: <strong>{{ totalRows }}</strong>
+                {% endif %}
             </div>
-        </div>
-    </div>
+        {% endblock %}
+    {% endembed %}
 
     <div class="container-xl mt-3">
         <div class="card mb-3">

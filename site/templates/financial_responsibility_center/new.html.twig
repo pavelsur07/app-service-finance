@@ -2,19 +2,11 @@
 {% block title %}Новый ЦФО{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <div class="page-pretitle">Справочники · ЦФО</div>
-                    <h2 class="page-title">Новый ЦФО</h2>
-                </div>
-                <div class="col-auto ms-auto">
-                    <a href="{{ path('financial_responsibility_center_index') }}" class="btn btn-ghost-secondary">К списку</a>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Новый ЦФО', pretitle: 'Справочники · ЦФО'} %}
+        {% block actions %}
+            <a href="{{ path('financial_responsibility_center_index') }}" class="btn btn-ghost-secondary">К списку</a>
+        {% endblock %}
+    {% endembed %}
 
     <div class="container-xl mt-3">
         <div class="card">

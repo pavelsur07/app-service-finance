@@ -3,18 +3,11 @@
 {% block title %}Товары и остатки{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Товары и остатки</h2>
-                </div>
-                <div class="col-auto ms-auto">
-                    <a href="{{ path('inventory_snapshots_index') }}" class="btn btn-outline-secondary">К загрузкам</a>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Товары и остатки'} %}
+        {% block actions %}
+            <a href="{{ path('inventory_snapshots_index') }}" class="btn btn-outline-secondary">К загрузкам</a>
+        {% endblock %}
+    {% endembed %}
 
     <div class="page-body">
         <div class="container-xl">

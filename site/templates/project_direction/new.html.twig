@@ -2,15 +2,7 @@
 {% block title %}Новое направление{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Новое направление</h2>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include 'partials/_page_header.html.twig' with {title: 'Новое направление'} only %}
     <div class="container-xl mt-3">
         <div class="card">
             <div

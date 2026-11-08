@@ -3,19 +3,15 @@
 {% block title %}Шаблоны доступа{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Шаблоны доступа {{ company.name }}</h2>
-                </div>
-                <div class="col-auto">
-                    <a href="{{ path('company_role_new') }}" class="btn btn-primary">Создать шаблон</a>
-                    <a href="{{ path('company_users_index') }}" class="btn btn-secondary">Участники</a>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% embed 'partials/_page_header.html.twig' %}
+        {% block title %}
+            Шаблоны доступа {{ company.name }}
+        {% endblock %}
+        {% block actions %}
+            <a href="{{ path('company_role_new') }}" class="btn btn-primary">Создать шаблон</a>
+            <a href="{{ path('company_users_index') }}" class="btn btn-secondary">Участники</a>
+        {% endblock %}
+    {% endembed %}
 
     <div class="container-xl mt-3">
         <div class="card mb-3">

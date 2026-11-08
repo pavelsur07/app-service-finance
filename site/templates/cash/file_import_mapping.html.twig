@@ -3,18 +3,13 @@
 {% block title %}Маппинг колонок{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Маппинг колонок файла</h2>
-                    {% if fileName %}
-                        <div class="text-muted">{{ fileName }}</div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Маппинг колонок файла'} %}
+        {% block subtitle %}
+            {% if fileName %}
+                <div class="text-muted">{{ fileName }}</div>
+            {% endif %}
+        {% endblock %}
+    {% endembed %}
 
     <div class="container-xl mt-3">
         <div class="card mb-3">
