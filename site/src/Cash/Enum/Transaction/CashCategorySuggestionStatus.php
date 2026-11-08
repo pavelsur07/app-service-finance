@@ -28,4 +28,19 @@ enum CashCategorySuggestionStatus: string
 
     /** Открытые статусы держат частичный unique: не больше одной подсказки на операцию. */
     public const OPEN = [self::REQUESTED, self::SUGGESTED];
+
+    /** Подпись для админки ИИ (admin/ai/company). */
+    public function label(): string
+    {
+        return match ($this) {
+            self::REQUESTED => 'ждут ответа',
+            self::SUGGESTED => 'показаны, без решения',
+            self::NO_ANSWER => 'без ответа модели',
+            self::FAILED => 'ошибка',
+            self::STALE => 'устарели',
+            self::ACCEPTED => 'приняты',
+            self::DISMISSED => 'отклонены',
+            self::AUTO_APPLIED => 'применены автоматически',
+        };
+    }
 }

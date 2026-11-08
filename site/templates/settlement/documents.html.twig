@@ -12,7 +12,7 @@
     <tbody>{% for document in documents %}<tr>
         <td class="text-nowrap"><a class="vf-ops-strong" href="{{ path('settlement_document', {id: document.id}) }}">{{ document.effectiveDate|date('d.m.Y') }}</a><div class="vf-ops-sub">{{ document.eventSequence ? '№' ~ document.eventSequence : 'Без номера' }}</div></td>
         <td><a href="{{ path('settlement_card', {id: document.counterpartyId}) }}">{{ labels[document.counterpartyId]|default('Контрагент недоступен') }}</a></td>
-        <td><div class="vf-ops-strong">{{ kindLabels[document.kind.value] }}</div><div class="vf-ops-sub settlement-reason">{{ document.reason }}</div></td>
+        <td><div class="vf-ops-strong">{{ document.kind.label() }}</div><div class="vf-ops-sub settlement-reason">{{ document.reason }}</div></td>
         <td class="text-end text-nowrap">{{ document.amount.toDecimalString|vf_amount(2) }}</td>
         <td>{% include 'settlement/_status.html.twig' with {status: document.status.value, reversalUrl: reversalIds[document.id] is defined ? path('settlement_document', {id: reversalIds[document.id]}) : null} only %}</td>
         <td class="text-nowrap"><div class="dropdown">

@@ -33,4 +33,21 @@ enum DocumentType: string
             self::MARKETPLACE_PL => 'ОПиУ маркетплейса',
         };
     }
+
+    /** Короткое имя для списков и чипов фильтра; полное с номером — label(). */
+    public function shortLabel(): string
+    {
+        return match ($this) {
+            self::DEAL_SALE => 'Сделка',
+            self::PAYROLL => 'Зарплата',
+            self::TAXES => 'Налоги',
+            self::LOANS => 'Кредиты',
+            self::OBLIGATIONS => 'Обязательства',
+            self::ASSETS => 'Имущество',
+            self::CASH => 'Касса',
+            self::CASHFLOW_EXPENSE => 'Расход из ДДС',
+            self::OTHER => 'Прочие',
+            self::MARKETPLACE_PL => $this->label(),
+        };
+    }
 }

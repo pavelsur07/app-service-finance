@@ -1,4 +1,4 @@
-### Stage 3: общие партиалы и подписи — IN PROGRESS (PR A, B, C на handoff)
+### Stage 3: общие партиалы и подписи — IN PROGRESS (PR A–D на handoff)
 
 **Risk:** LOW–MEDIUM (разметка 65+17+10 мест меняется на include/embed; визуал не меняется)
 **Stage base commit:** master после закрывающего PR Stage 2
@@ -42,7 +42,9 @@
 - [x] 3.2 — `grep -rl 'class="empty"' templates` → только `partials/_empty` (PR B)
 - [~] 3.3 — `grep -rl 'class="page-header' templates` → `partials/_page_header` + 15 файлов с другой разметкой
       (без `container-xl`/`row g-2`, вкладки внутри шапки, печатная шапка отчёта, h1) — см. PR C; добивать в Stage 6 при переходе на DS `vf-page-head`
-- [ ] 3.4 — `grep -rn '{% set [a-zA-Z]*Labels' templates` → 0
+- [~] 3.4 — `grep -rn '{% set [a-zA-Z]*Labels' templates` → 8 из 16 (PR D): все словари, у которых есть Enum, переехали в `label()`;
+      остались подписи без Enum (`sourceLabels`, `fieldLabels` ×2, `skipLabels`, `directionLabels`) и две не-словаря
+      (`responsibilityCenterLabels` — карта id→имя из данных, `userRoleLabels` — производный список); решение — в PR D
 - [ ] Каждый PR: `make site-cs-twig`, `make site-test` (crawler-тесты видят flash и заголовки),
       внешнее ревью, стенд-скриншот не требуется (разметка побайтно та же, кроме include)
 
@@ -175,3 +177,36 @@
 - целевые тесты (партиал, Company, Finance, Cash, Loan, BankSync) — OK (386 tests, 2479 assertions после фикса `container`)
 - `make site-test` — OK (8547 tests, 48137 assertions), 8 мин 05 с; после правки по ревью — Cash + Integration/Shared OK (241 tests)
 - Внешнее ревью (codex): REVIEW_GREEN за 2 раунда (база — ветка PR B b5a541e37, дифф 1836 строк, `site/var/external-review/b5a541e3/review.txt`). Раунд 1, IMPORTANT: в `cash/file_import_mapping` блок subtitle сохранил прежний `<h2 class="page-title">` — дубль заголовка (срез скрипта начинался с начала строки, когда после h2 шёл Twig-тег). Исправлено, остальные 50 файлов проверены grep'ом, добавлен тест-скан шаблонов `testPagesUsingThePartialDoNotRenderTheirOwnPageTitle`
+
+#### PR D (3.4) — подписи из Enum вместо словарей в шаблонах
+
+##### Что сделано
+- `label()` добавлен в `DocumentStatus`, `SettlementBucket`, `SettlementDocumentKind`, `MoneyAccountType`,
+  `CashCategorySuggestionStatus`; `DocumentType::shortLabel()` (короткие имена списков; `MARKETPLACE_PL` → `label()`,
+  как и раньше через `??`). Тексты — в точности из удалённых словарей.
+- Шаблоны: `document/{_list_layout,_page,show,index,operations}` (`statusLabels` ×3, `typeShortLabels`; select статуса —
+  `enum_cases('…DocumentStatus')`), `settlement/{layout,card,_positions,documents,document}` (`bucketLabels`, `kindLabels`),
+  `report/account_balances` (`typeLabels` → `enum('…MoneyAccountType').from(type).label()`),
+  `admin/ai/company` (`statusLabels` → `tryFrom(status)`, неизвестный статус показывается как есть, как раньше `?? status`).
+- Удалено 8 словарей из 16. Оставлены сознательно:
+  `transaction/edit` `sourceLabels` (import_source — строка, Enum нет), `cash_transaction_auto_rule/*` `fieldLabels` ×2
+  (поля правила, не Enum; разная длина подписи по контексту), `admin/ai/company` `skipLabels` (причины пропуска — строки
+  из `RequestCashAiCategorizationAction`), `document/_list_layout` `directionLabels` (фильтр income/expense поверх `PLFlow`;
+  в форме статьи тот же Enum подписан в единственном числе — общий `label()` дал бы разночтение);
+  `report/cashflow` `responsibilityCenterLabels` (карта id→имя из данных) и `admin/users` `userRoleLabels` (производный
+  список) словарями подписей не являются. Введение Enum для строковых полей — отдельная задача, не рефакторинг шаблонов.
+
+##### Тесты
+- `tests/Unit/Shared/EnumLabelsTest.php` — для каждого из 6 Enum: все case'ы, тексты как в удалённых словарях.
+- Существующие функциональные тесты Finance (документы ОПиУ, чипы фильтров), Settlement, Admin — без правок.
+
+##### Files changed (PR D)
+- `site/src/Finance/Enum/{DocumentStatus,DocumentType}.php`, `site/src/Settlement/Enum/{SettlementBucket,SettlementDocumentKind}.php`,
+  `site/src/Cash/Enum/Accounts/MoneyAccountType.php`, `site/src/Cash/Enum/Transaction/CashCategorySuggestionStatus.php`
+- 12 шаблонов; `site/tests/Unit/Shared/EnumLabelsTest.php` (new)
+
+##### Проверки (PR D)
+- `make site-cs-twig` — twigcs 0, `lint:twig` OK (324); `make site-cs-check` — 0 of 3917 (после cs-fix теста); `make site-cs-strict-types` — 0; `make site-stan` — OK
+- целевые тесты (unit Enum, Finance, Settlement, Admin) — OK (270 tests, 3258 assertions)
+- `make site-test` — OK (8554 tests, 48144 assertions), 8 мин 18 с
+- Внешнее ревью (codex): REVIEW_GREEN (1 раунд, база — ветка PR C 00f3f3434, дифф 535 строк, `site/var/external-review/00f3f343/review.txt`)

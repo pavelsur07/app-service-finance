@@ -2,7 +2,6 @@
 {% block title %}Документ ОПиУ{{ item.number ? ' № ' ~ item.number : '' }}{% endblock %}
 {% block body %}
 {# Просмотр документа: те же токены и таблица, что у списка и формы; новых функций нет. #}
-{% set statusLabels = {'DRAFT': 'Черновик', 'ACTIVE': 'Активен', 'INACTIVE': 'Неактивен', 'TO_DELETE': 'На удаление'} %}
 {# Документ из операции ДДС копирует её сумму без пересчёта — валюта операции; ручной документ — рубли. #}
 {% set doc_currency = item.cashTransaction ? item.cashTransaction.currency : 'RUB' %}
 
@@ -17,7 +16,7 @@
         </nav>
         <div class="vf-docform-head__line">
             <h1>Документ ОПиУ{{ item.number ? ' № ' ~ item.number : '' }}</h1>
-            <span class="badge vf-docform-status vf-docform-status--{{ item.status.value|lower }}">{{ statusLabels[item.status.value] ?? item.status.value }}</span>
+            <span class="badge vf-docform-status vf-docform-status--{{ item.status.value|lower }}">{{ item.status.label() ?? item.status.value }}</span>
             {% if item.isCreatedWithViolation %}
                 <span class="vf-ops-badge-warn" title="Документ создан без полного маппинга категорий ОПиУ">Без маппинга</span>
             {% endif %}

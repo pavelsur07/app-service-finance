@@ -11,7 +11,6 @@
 #}
 {% set doc = item ?? form.vars.value %}
 {% set isEdit = item is defined and item is not null %}
-{% set statusLabels = {'DRAFT': 'Черновик', 'ACTIVE': 'Активен', 'INACTIVE': 'Неактивен', 'TO_DELETE': 'На удаление'} %}
 {% set title = isEdit ? 'Документ ОПиУ' ~ (doc.number ? ' № ' ~ doc.number : '') : (app.request.attributes.get('_route') == 'document_copy' ? 'Копия документа ОПиУ' : 'Новый документ ОПиУ') %}
 {% set allocation = transactionAllocation ?? null %}
 {% set cashTransaction = isEdit ? doc.cashTransaction : null %}
@@ -136,7 +135,7 @@
         <div class="vf-docform-head__line">
             <h1>{{ title }}</h1>
             {% if isEdit %}
-                <span class="badge vf-docform-status vf-docform-status--{{ doc.status.value|lower }}">{{ statusLabels[doc.status.value] ?? doc.status.value }}</span>
+                <span class="badge vf-docform-status vf-docform-status--{{ doc.status.value|lower }}">{{ doc.status.label() ?? doc.status.value }}</span>
             {% endif %}
             {% if isEdit and doc.isCreatedWithViolation %}
                 <span class="vf-ops-badge-warn" title="Документ создан без полного маппинга категорий ОПиУ">Без маппинга</span>
