@@ -1,3 +1,5 @@
 /* Реклама маркетплейсов (templates/marketplace_ads/index). Из style="…" шаблона, значения 1:1 (Stage 4). */
 .ad-progress { height: 6px; }
 .progress-bar[data-ad-progress-bar] { width: 0; }   /* стартовое значение; JS (pages/marketplace_ads.js) пишет inline width поверх */
+
+/* TODO(ds): без токена — px-значений 1 (размеры колонок, отступы, шрифты; перенос 1:1, замена на токены --vf-space-N, --vf-size-N и цветовые --vf- — DS-проходом, когда токены для них появятся). */

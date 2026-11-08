@@ -81,3 +81,5 @@
     .table.pl-preview-table { --pl-col-name: 160px; --pl-col-value: 120px; }
     .table.pl-preview-table .pl-cell-total { position: static; box-shadow: none; }
 }
+
+/* TODO(ds): без токена — px-значений 8 (размеры колонок, отступы, шрифты; перенос 1:1, замена на токены --vf-space-N, --vf-size-N и цветовые --vf- — DS-проходом, когда токены для них появятся). */
