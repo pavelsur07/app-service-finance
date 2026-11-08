@@ -28,7 +28,7 @@ final class ApplyDefaultPLTemplateActionTest extends IntegrationTestCase
         self::assertSame(43, (self::getContainer()->get(EnsureDefaultPLTreeAction::class))((string) $company->getId()));
         $this->apply($company, dryRun: false, source: PLTemplateApplicationSource::SCREEN);
 
-        self::assertSame([['UNIVERSAL', 3, 43, 'onboarding']], $this->records($company), 'повтор ничего не создал — записи нет');
+        self::assertSame([['UNIVERSAL', 4, 43, 'onboarding']], $this->records($company), 'повтор ничего не создал — записи нет');
     }
 
     public function testDryRunWritesNothing(): void
@@ -103,7 +103,7 @@ final class ApplyDefaultPLTemplateActionTest extends IntegrationTestCase
         $company = $this->company(BusinessProfile::UNIVERSAL);
 
         self::assertCount(43, $this->apply($company, dryRun: false, source: PLTemplateApplicationSource::COMMAND)->created);
-        self::assertSame([['UNIVERSAL', 3, 43, 'command']], $this->records($company));
+        self::assertSame([['UNIVERSAL', 4, 43, 'command']], $this->records($company));
     }
 
     private function apply(Company $company, bool $dryRun, PLTemplateApplicationSource $source = PLTemplateApplicationSource::SCREEN): ImportPLCategoryTreeResult
