@@ -1,7 +1,7 @@
 {
   "version": 1,
   "profile": "UNIVERSAL",
-  "templateVersion": 3,
+  "templateVersion": 4,
   "exportedAt": "2026-10-20T00:00:00+03:00",
   "company": "Базовый шаблон ОПиУ — универсальный",
   "categories": [
@@ -380,19 +380,6 @@
               "formula": null,
               "calcOrder": null,
               "sortOrder": 20
-            },
-            {
-              "name": "Сервисы и подписки (коммерческие)",
-              "code": "OVERHEAD_SALES_SUBS",
-              "type": "LEAF_INPUT",
-              "format": "MONEY",
-              "flow": "EXPENSE",
-              "expenseType": "other",
-              "weightInParent": "1.0000",
-              "isVisible": true,
-              "formula": null,
-              "calcOrder": null,
-              "sortOrder": 40
             }
           ]
         }
@@ -501,6 +488,19 @@
           "formula": null,
           "calcOrder": null,
           "sortOrder": 30
+        },
+        {
+          "name": "Штрафы, пени и разовые убытки",
+          "code": "BELOW_EBITDA_OTHER_EXPENSE",
+          "type": "LEAF_INPUT",
+          "format": "MONEY",
+          "flow": "EXPENSE",
+          "expenseType": "other",
+          "weightInParent": "1.0000",
+          "isVisible": true,
+          "formula": null,
+          "calcOrder": null,
+          "sortOrder": 35
         }
       ]
     },

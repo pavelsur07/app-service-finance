@@ -1,0 +1,155 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Integration\Finance\Command;
+
+use App\Company\Entity\Company;
+use App\Company\Enum\BusinessProfile;
+use App\Finance\Application\Action\ApplyDefaultPLTemplateAction;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLTemplateApplicationSource;
+use App\Finance\Exception\PLTemplateProfileMismatchException;
+use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Builders\Finance\PLCategoryBuilder;
+use App\Tests\Builders\Finance\PLTemplateApplicationBuilder;
+use App\Tests\Support\Kernel\IntegrationTestCase;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
+
+final class UpgradeUniversalPlTreeV4CommandTest extends IntegrationTestCase
+{
+    public function testDryRunThenExecuteBringsV3TreeToV4OnceAndKeepsUserName(): void
+    {
+        $companyId = $this->v3Company();
+        $this->connection->executeStatement("UPDATE pl_categories SET name = 'Производство' WHERE company_id = ? AND code = 'OVERHEAD_PROD_TOTAL'", [$companyId]);
+        $tester = new CommandTester((new Application(self::bootKernel()))->find('app:finance:pl-tree:upgrade-universal-v4'));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['companyId' => $companyId]));
+        self::assertStringContainsString('plan (dry run): rename 1, delete 2, create 1', $tester->getDisplay());
+        self::assertStringContainsString('«Производство» — название изменено пользователем', $tester->getDisplay());
+        self::assertSame(44, $this->categories($companyId));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['companyId' => $companyId, '--execute' => true]));
+        self::assertStringContainsString('applied: rename 1, delete 2, create 1', $tester->getDisplay());
+        self::assertSame(43, $this->categories($companyId));
+        self::assertSame(
+            ['BELOW_EBITDA_OTHER_EXPENSE' => 'Штрафы, пени и разовые убытки', 'OVERHEAD_PROD_TOTAL' => 'Производство', 'OVERHEAD_TOTAL' => 'Косвенные расходы'],
+            $this->connection->fetchAllKeyValue("SELECT code, name FROM pl_categories WHERE company_id = ? AND code IN ('OVERHEAD_TOTAL', 'OVERHEAD_PROD_TOTAL', 'BELOW_EBITDA_OTHER_EXPENSE', 'OVERHEAD_SALES_CONTENT', 'OVERHEAD_SALES_SUBS') ORDER BY code", [$companyId]),
+        );
+
+        $this->em->clear();
+        self::assertSame(Command::SUCCESS, $tester->execute(['companyId' => $companyId, '--execute' => true]));
+        self::assertStringContainsString('applied: rename 0, delete 0, create 0', $tester->getDisplay());
+        self::assertSame(43, $this->categories($companyId));
+    }
+
+    public function testTreeWithMarketplaceCodesIsRefused(): void
+    {
+        $companyId = $this->v3Company();
+        $company = $this->em->find(Company::class, $companyId);
+        self::assertInstanceOf(Company::class, $company);
+        $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('Хранение')->withCode('OPEX_WH_STORAGE')->build());
+        $this->em->flush();
+        $tester = new CommandTester((new Application(self::bootKernel()))->find('app:finance:pl-tree:upgrade-universal-v4'));
+
+        self::assertSame(Command::FAILURE, $tester->execute(['companyId' => $companyId, '--execute' => true]));
+        self::assertStringContainsString('коды вне шаблона «Базовый»: OPEX_WH_STORAGE', $tester->getDisplay());
+        self::assertSame(45, $this->categories($companyId));
+    }
+
+    public function testArticleMappedFromMarketplaceCostIsKept(): void
+    {
+        $companyId = $this->v3Company();
+        $this->connection->executeStatement(
+            "INSERT INTO marketplace_cost_categories (id, company_id, marketplace, name, code, pl_category_id, is_active, created_at, updated_at)
+             SELECT gen_random_uuid(), company_id, 'wildberries', 'Фото', 'photo', id, true, now(), now() FROM pl_categories WHERE company_id = ? AND code = 'OVERHEAD_SALES_CONTENT'",
+            [$companyId],
+        );
+        $tester = new CommandTester((new Application(self::bootKernel()))->find('app:finance:pl-tree:upgrade-universal-v4'));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['companyId' => $companyId, '--execute' => true]));
+        self::assertStringContainsString('«Фото, видео, дизайн» — на неё ссылается: marketplace_cost_categories.pl_category_id', $tester->getDisplay());
+        self::assertStringContainsString('applied: rename 2, delete 1, create 1', $tester->getDisplay());
+        self::assertSame(44, $this->categories($companyId));
+    }
+
+    public function testArticleReferencedOnlyByCostPlMappingIsKept(): void
+    {
+        $companyId = $this->v3Company();
+        $costId = '01960000-0000-7000-8000-000000000001';
+        $this->connection->executeStatement(
+            "INSERT INTO marketplace_cost_categories (id, company_id, marketplace, name, code, pl_category_id, is_active, created_at, updated_at)
+             VALUES (?, ?, 'wildberries', 'Фото', 'photo', NULL, true, now(), now())",
+            [$costId, $companyId],
+        );
+        $this->connection->executeStatement(
+            "INSERT INTO marketplace_cost_pl_mappings (id, company_id, cost_category_id, pl_category_id, include_in_pl, is_negative, sort_order, created_at, updated_at)
+             SELECT gen_random_uuid(), company_id, ?, id, true, false, 0, now(), now() FROM pl_categories WHERE company_id = ? AND code = 'OVERHEAD_SALES_SUBS'",
+            [$costId, $companyId],
+        );
+        $tester = new CommandTester((new Application(self::bootKernel()))->find('app:finance:pl-tree:upgrade-universal-v4'));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['companyId' => $companyId, '--execute' => true]));
+        self::assertStringContainsString('на неё ссылается: marketplace_cost_pl_mappings.pl_category_id', $tester->getDisplay());
+        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM pl_categories c JOIN marketplace_cost_pl_mappings m ON m.pl_category_id = c.id WHERE c.company_id = ? AND c.code = 'OVERHEAD_SALES_SUBS'", [$companyId]));
+    }
+
+    public function testFailureOnLastStepRollsBackRenamesAndDeletions(): void
+    {
+        $companyId = $this->v3Company();
+        // Применение шаблона откажет внутри транзакции: последнее происхождение — другой профиль.
+        $this->em->persist(PLTemplateApplicationBuilder::anApplication()->forCompany($companyId)->withProfile(BusinessProfile::MARKETPLACE)->appliedAt(new \DateTimeImmutable('+1 day'))->build());
+        $this->em->flush();
+        $tester = new CommandTester((new Application(self::bootKernel()))->find('app:finance:pl-tree:upgrade-universal-v4'));
+
+        try {
+            $tester->execute(['companyId' => $companyId, '--execute' => true]);
+            self::fail('ожидался отказ применения шаблона');
+        } catch (PLTemplateProfileMismatchException) {
+        }
+
+        self::assertSame(44, $this->categories($companyId));
+        self::assertSame('Операционные расходы', $this->connection->fetchOne("SELECT name FROM pl_categories WHERE company_id = ? AND code = 'OVERHEAD_TOTAL'", [$companyId]));
+    }
+
+    /**
+     * Компания с деревом «Базовый» v3: 44 статьи, старые названия групп, без статьи разовых убытков.
+     */
+    private function v3Company(): string
+    {
+        $user = UserBuilder::aUser()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $company->setBusinessProfile(BusinessProfile::UNIVERSAL);
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->flush();
+        $companyId = (string) $company->getId();
+        (self::getContainer()->get(ApplyDefaultPLTemplateAction::class))($companyId, false, PLTemplateApplicationSource::ONBOARDING);
+
+        $db = $this->connection;
+        $db->executeStatement("DELETE FROM pl_categories WHERE company_id = ? AND code = 'BELOW_EBITDA_OTHER_EXPENSE'", [$companyId]);
+        $db->executeStatement("UPDATE pl_categories SET name = 'Операционные расходы' WHERE company_id = ? AND code = 'OVERHEAD_TOTAL'", [$companyId]);
+        $db->executeStatement("UPDATE pl_categories SET name = 'Производственные' WHERE company_id = ? AND code = 'OVERHEAD_PROD_TOTAL'", [$companyId]);
+        $this->em->clear();
+        $company = $this->em->find(Company::class, $companyId);
+        self::assertInstanceOf(Company::class, $company);
+        $sales = $this->em->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'code' => 'OVERHEAD_SALES_TOTAL']);
+        self::assertInstanceOf(PLCategory::class, $sales);
+        foreach (['OVERHEAD_SALES_CONTENT' => 'Фото, видео, дизайн', 'OVERHEAD_SALES_SUBS' => 'Сервисы и подписки (коммерческие)'] as $code => $name) {
+            $this->em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withParent($sales)->withName($name)->withCode($code)->build());
+        }
+        $this->em->flush();
+        $this->em->clear();
+        self::assertSame(44, $this->categories($companyId));
+
+        return $companyId;
+    }
+
+    private function categories(string $companyId): int
+    {
+        return (int) $this->connection->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [$companyId]);
+    }
+}
