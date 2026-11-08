@@ -5200,6 +5200,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.160 | 2026-11-08 | Finance: разовая `app:finance:pl-tree:upgrade-universal-v4` удалена — применена 08.11 к 5 компаниям «Базовый» (все на v4, 43 статьи) |
 | 2.159 | 2026-11-08 | Finance: универсальный шаблон ОПиУ v4 (расширение v3) — убрана «Сервисы и подписки (коммерческие)» (`OVERHEAD_SALES_SUBS`), добавлена «Штрафы, пени и разовые убытки» (`BELOW_EBITDA_OTHER_EXPENSE`) в «Расходы ниже EBITDA»; разовая `app:finance:pl-tree:upgrade-universal-v4 <companyId> [--execute]` приводит деревья v2–v3 к v4 (удалить после применения) |
 | 2.158 | 2026-11-08 | Finance: универсальный шаблон ОПиУ v3 — «Операционные расходы» → «Косвенные расходы», «Производственные» → «Помещения и производство», «Фото, видео, дизайн» (`OVERHEAD_SALES_CONTENT`) убрана (43 статьи; остаётся в расширении маркетплейса, оно добавляет 25); существующие компании не меняются |
 | 2.157 | 2026-11-08 | Cash: описание статьи ДДС уходит в ИИ-категоризацию (`CashCategorizationQuery::findLeafCategories`, `CashCategorizationPayloadMapper::category`), промпт `categorize_transactions/v4`; подсказка у поля описания в форме статьи (cashflow-core-template, Stage 3) |
