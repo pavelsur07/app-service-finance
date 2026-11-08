@@ -1,4 +1,4 @@
-### Stage 4: CSS из шаблонов — IN PROGRESS (PR A на проде, PR B на handoff)
+### Stage 4: CSS из шаблонов — IN PROGRESS (PR A на проде, PR B и PR C на handoff)
 
 **Risk:** LOW (перенос правил 1:1 в страничные CSS-файлы, затем токены; визуал не меняется)
 **Stage base commit:** master после закрывающего PR Stage 3
@@ -35,6 +35,7 @@
 - [x] 4.1 — 7 блоков перенесены, `grep -rl '<style' templates | grep -v notifications/email` → 8 (PR A)
 - [~] 4.2 — `<style>` вне писем → 0; `grep -rho 'style="' templates | wc -l` ≤ 20, каждое оставшееся — динамическое значение
   - [x] часть 1 (PR B): 8 блоков `<style>` → страничные CSS, `grep -rl '<style' templates | grep -v notifications/email` → 0
+  - [x] часть 2 (PR C): `style=` в шаблонах admin-shell 94 → 2 (оба — CSS-переменные из данных: `--cov-days`, `--cov-span`); всего в templates 182 → 90
 - [ ] Значения в новых CSS — токены `--vf-*`; остатки hex/px — с `TODO(ds)`, их число в отчёте
 - [ ] Каждый PR: `npm run build`, `make site-cs-twig`, `make site-test`, внешнее ревью; скриншоты до/после для 4.1
 
@@ -103,3 +104,45 @@
 - `make site-cs-twig` — twigcs 0, `lint:twig` OK (323); `npm run lint` — 0; `npm run build` — OK; PHP не менялся
 - `make site-test` — OK — 8554 тестов, 48 146 assertions
 - Внешнее ревью (codex): REVIEW_GREEN (effort medium, дифф 422 строк, замечаний нет)
+
+#### PR C (4.2, часть 2) — `style="…"` админки → классы
+
+##### Что сделано
+- 7 шаблонов, extends `admin/base`: `billing/admin/company` 36, `admin/ai/company` 22, `admin/ingestion/external_categories/index` 16,
+  `admin/users/index` 13, `admin/users/update_roles` 3, `telegram/admin/bot/index` 2, `admin/service_gateway/coverage` 2 — всего 94.
+  Осталось 2 (coverage: `--cov-days`, `--cov-span` — значения из данных, по плану остаются). Факт: план считал 86 — `templates/admin/` без
+  `billing/admin` и `telegram/admin`, которые тоже на admin-shell.
+- Значения 1:1 (цель — пиксельная идентичность; унификация под DS — отдельный проход):
+  - утилиты `u-*` в `admin-shell.css` (entry `admin_shell`, только админка): `u-tnum`, `u-fw-600`, `u-fs-11/12/15/16`, `u-mono`,
+    `u-text-faint`, `u-muted`, `u-m-0`, `u-mt-1/4/5`, `u-mb-1/3/4`, `u-p-4`, `u-flex`, `u-inline`, `u-gap-1/2/3`, `u-w-120/160`,
+    `u-max-w-520`, `u-min-w-300`, `u-break-all`, `u-btn-reset`. Порядок в файле: `u-m-0` раньше `u-mb-N`/`u-mt-N`
+    (комбинация `u-m-0 u-mb-3` = `margin:0 0 12px`).
+  - общие элементы админ-экранов там же: `.wz-subtitle` (подзаголовок под `.wz-title`), `.wz-stat-row`, `.wz-card-grid`,
+    `.wz-card-intro` (шапка карточки с таблицей), `.wz-card-title`.
+  - страничные: `admin-users.css` (`.admin-users-filter`, `.admin-cabinet-row` + `:not(:last-child)` вместо
+    `{% if not loop.last %}margin-bottom{% endif %}`), `admin-external-categories.css` (`.ext-cat-confirm-form`, `.ext-cat-stack`,
+    `.mdl--ext-cat`, `.ext-cat-mdl-body`) — подключены `@import` в `admin-shell.css`.
+- Ловушка кита: `.card > h2:not([class])` (card.css) давал прямым детям карточки line-height 24px и weight 600; `<h2 style=…>` без
+  класса под него попадал, `<h2 class=…>` — уже нет. Пять таких заголовков (billing ×2, ai ×3) получили `.wz-card-title`, где эти два
+  значения повторены явно; h2 внутри `.wz-card-intro` под правило кита не попадали и остаются `u-fs-15 u-m-0` (UA bold). Найдено
+  пиксельным сравнением, не ревью.
+- Замечено, не трогали: классы `u-text-muted` (billing) и `u-p-3` (users) в шаблонах есть, но нигде не определены (no-op). Определять —
+  изменит вид; решение — в DS-проход (`[[twig-ui-ds-pass]]`).
+
+##### Проверка визуала
+- Админ-страницы живут за отдельным firewall `^/admin` с собственной формой `/admin/login`: в скрипт скриншотов добавлен вход в
+  админку (с очисткой поля `_username`, которое предзаполняется `last_username` общей сессии; иначе логин «склеивается» и вход падает).
+  Роль `owner@app.ru` на стенде временно `ROLE_SUPER_ADMIN`, возвращена в `["ROLE_ADMIN"]`. Страница ролей — для `manager@app.ru`
+  (на свою — 403).
+- 7 страниц, 1366×900 fullPage, до (HEAD = PR B) и после — все identical (Pillow); первый прогон поймал расхождение по h2 (см. выше).
+  Скриншоты «до» — `screens/stage-4/pr-c/`. Оговорка: на стенде таблицы оплат/запусков/внешних категорий пусты — ячейки с `u-tnum`,
+  `u-break-all` отрисованы только в таблице тарифов и списке пользователей; остальное — сверка значений 1:1.
+
+##### Files changed (PR C)
+- `site/assets/styles/pages/admin-shell.css`, `site/assets/styles/pages/{admin-users,admin-external-categories}.css` (new), 7 шаблонов,
+  `screens/stage-4/pr-c/*.png` (7)
+
+##### Проверки (PR C)
+- `make site-cs-twig` — twigcs 0, `lint:twig` OK (323); `npm run build` — OK; PHP и JS не менялись
+- `make site-test` — OK — 8554 тестов, 48 146 assertions
+- Внешнее ревью (codex): REVIEW_GREEN (effort medium, дифф 737 строк, замечаний нет)

@@ -13,7 +13,7 @@
   <div class="wz-head">
     <div>
       <h1 class="wz-title">Тариф кабинета</h1>
-      <div style="margin-top:var(--s-1); font-size:var(--font-13); color:var(--text-secondary);">
+      <div class="wz-subtitle">
         {{ company.name }}{% if company.inn %} · ИНН {{ company.inn }}{% endif %}
       </div>
     </div>
@@ -21,12 +21,12 @@
   </div>
 
   {# Текущее состояние #}
-  <section class="card" style="margin-bottom:var(--s-4);">
+  <section class="card u-mb-4">
     {% set view = statusView[access.status.value] %}
-    <div style="display:flex; flex-wrap:wrap; gap:var(--s-5); align-items:baseline;">
+    <div class="wz-stat-row">
       <div>
         <div class="form-hint">Тариф</div>
-        <div style="font-size:var(--font-16); font-weight:600;">{{ access.tariffName ?? '—' }}</div>
+        <div class="u-fs-16 u-fw-600">{{ access.tariffName ?? '—' }}</div>
       </div>
       <div>
         <div class="form-hint">Статус</div>
@@ -34,11 +34,11 @@
       </div>
       <div>
         <div class="form-hint">Оплачено с</div>
-        <div style="font-variant-numeric:tabular-nums;">{{ paidFrom ? paidFrom|date('d.m.Y') : '—' }}</div>
+        <div class="u-tnum">{{ paidFrom ? paidFrom|date('d.m.Y') : '—' }}</div>
       </div>
       <div>
         <div class="form-hint">Оплачено по</div>
-        <div style="font-variant-numeric:tabular-nums;">
+        <div class="u-tnum">
           {% if subscription is null %}—{% elseif access.paidUntil is null %}бессрочно{% else %}{{ access.paidUntil|date('d.m.Y') }}{% endif %}
         </div>
       </div>
@@ -46,7 +46,7 @@
         <div data-billing-next-tariff>
           <div class="form-hint">Запланировано</div>
           <div>С {{ access.nextTariffFrom|date('d.m.Y') }} — тариф «{{ access.nextTariffName }}»</div>
-          <form method="post" action="{{ path('admin_billing_company_cancel_next', {companyId: company.id}) }}" style="margin-top:var(--s-1);" data-billing-cancel-next>
+          <form method="post" action="{{ path('admin_billing_company_cancel_next', {companyId: company.id}) }}" class="u-mt-1" data-billing-cancel-next>
             <input type="hidden" name="_token" value="{{ csrf_token('billing_cancel_next_' ~ company.id) }}">
             <button type="submit" class="btn btn-sm btn-secondary" title="До {{ access.paidUntil|date('d.m.Y') }} останется тариф «{{ access.tariffName }}» — дни, оплаченные по цене «{{ access.nextTariffName }}», клиент получит на текущем тарифе. Онлайн-повышение до этой даты — только через вас.">Отменить переход</button>
           </form>
@@ -55,17 +55,17 @@
       {% if access.daysLeft is not null %}
         <div>
           <div class="form-hint">Осталось дней</div>
-          <div style="font-variant-numeric:tabular-nums;">{{ access.daysLeft }}</div>
+          <div class="u-tnum">{{ access.daysLeft }}</div>
         </div>
       {% endif %}
     </div>
   </section>
 
-  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:var(--s-4); margin-bottom:var(--s-4);">
+  <div class="wz-card-grid">
     {# Назначить тариф #}
     <section class="card">
-      <h2 style="font-size:var(--font-15); margin:0 0 var(--s-1);">Назначить тариф</h2>
-      <p class="form-hint" style="margin:0 0 var(--s-3);">Без оплаты: «Друг» — бессрочно; остальные — с периодом (договор сопровождения, особые условия, ручная правка).</p>
+      <h2 class="wz-card-title">Назначить тариф</h2>
+      <p class="form-hint u-m-0 u-mb-3">Без оплаты: «Друг» — бессрочно; остальные — с периодом (договор сопровождения, особые условия, ручная правка).</p>
       <form method="post" action="{{ path('admin_billing_company_assign', {companyId: company.id}) }}">
         <input type="hidden" name="_token" value="{{ csrf_token('billing_assign_' ~ company.id) }}">
         <div class="form-field">
@@ -78,7 +78,7 @@
             {% endfor %}
           </select>
         </div>
-        <div style="display:flex; gap:var(--s-3);">
+        <div class="u-flex u-gap-3">
           <div class="form-field u-flex-1">
             <label class="form-label" for="assign-from">С</label>
             <input id="assign-from" type="date" name="from" class="input" value="{{ paidFrom ? paidFrom|date('Y-m-d') : today }}" required>
@@ -88,8 +88,8 @@
             <input id="assign-until" type="date" name="until" class="input" value="{{ subscription and subscription.paidUntil ? subscription.paidUntil|date('Y-m-d') : '' }}">
           </div>
         </div>
-        <div class="form-hint" style="margin-bottom:var(--s-3);">Для бессрочного тарифа дата «По» не учитывается. Назначение снимает запланированный переход.</div>
-        <label class="checkbox-label" style="margin-bottom:var(--s-3);" data-billing-confirm-shorten>
+        <div class="form-hint u-mb-3">Для бессрочного тарифа дата «По» не учитывается. Назначение снимает запланированный переход.</div>
+        <label class="checkbox-label u-mb-3" data-billing-confirm-shorten>
           <input type="checkbox" class="checkbox" name="confirm_shorten" value="1">
           <span>Сократить оплаченный период (например, после возврата)</span>
         </label>
@@ -99,12 +99,12 @@
 
     {# Отметить оплату #}
     <section class="card">
-      <h2 style="font-size:var(--font-15); margin:0 0 var(--s-1);">Отметить оплату по счёту</h2>
-      <p class="form-hint" style="margin:0 0 var(--s-3);">Период считается от даты зачисления; оплата до окончания продлевает текущий период. Другой тариф: дороже — сразу, остаток пересчитывается в дни; дешевле — со следующего периода.</p>
+      <h2 class="wz-card-title">Отметить оплату по счёту</h2>
+      <p class="form-hint u-m-0 u-mb-3">Период считается от даты зачисления; оплата до окончания продлевает текущий период. Другой тариф: дороже — сразу, остаток пересчитывается в дни; дешевле — со следующего периода.</p>
       <form method="post" action="{{ path('admin_billing_company_payment', {companyId: company.id}) }}">
         <input type="hidden" name="_token" value="{{ csrf_token('billing_payment_' ~ company.id) }}">
         <input type="hidden" name="payment_id" value="{{ paymentFormId }}">
-        <div style="display:flex; gap:var(--s-3);">
+        <div class="u-flex u-gap-3">
           <div class="form-field u-flex-1">
             <label class="form-label" for="payment-tariff">Тариф</label>
             <select id="payment-tariff" name="tariff" class="select" required>
@@ -113,14 +113,14 @@
               {% endfor %}
             </select>
           </div>
-          <div class="form-field" style="width:120px;">
+          <div class="form-field u-w-120">
             <label class="form-label" for="payment-months">Срок</label>
             <select id="payment-months" name="months" class="select">
               {% for m in [1, 3, 6, 12] %}<option value="{{ m }}">{{ m }} мес</option>{% endfor %}
             </select>
           </div>
         </div>
-        <div style="display:flex; gap:var(--s-3);">
+        <div class="u-flex u-gap-3">
           <div class="form-field u-flex-1">
             <label class="form-label" for="payment-amount">Сумма, ₽</label>
             <input id="payment-amount" type="text" inputmode="decimal" name="amount" class="input" placeholder="4970" required>
@@ -136,7 +136,7 @@
           <div class="form-hint">Тот же номер второй раз не зачисляется.</div>
         </div>
         {% if subscription and subscription.tariff.perpetual %}
-          <label class="checkbox-label" style="margin-bottom:var(--s-3);">
+          <label class="checkbox-label u-mb-3">
             <input type="checkbox" class="checkbox" name="confirm_leave_perpetual" value="1">
             <span>Перевести с бессрочного «{{ subscription.tariff.name }}» на платный тариф</span>
           </label>
@@ -145,7 +145,7 @@
       </form>
 
       {% if pricesByTariff is not empty %}
-        <table class="t-table" style="margin-top:var(--s-4);">
+        <table class="t-table u-mt-4">
           <thead>
             <tr><th>Цены</th>{% for m in [1, 3, 6, 12] %}<th class="t-cell--right">{{ m }} мес</th>{% endfor %}</tr>
           </thead>
@@ -154,7 +154,7 @@
               <tr>
                 <td>{{ tariff.name }}</td>
                 {% for m in [1, 3, 6, 12] %}
-                  <td class="t-cell--right" style="font-variant-numeric:tabular-nums;">{{ (pricesByTariff[tariff.code.value][m] ?? null)|vf_minor|vf_money(0) }}</td>
+                  <td class="t-cell--right u-tnum">{{ (pricesByTariff[tariff.code.value][m] ?? null)|vf_minor|vf_money(0) }}</td>
                 {% endfor %}
               </tr>
             {% endfor %}
@@ -166,10 +166,10 @@
 
   {# Онлайн-оплаты, которые не зачислились сами: деньги получены — зачислить вручную формой выше или вернуть #}
   {% if failedCheckouts is not empty %}
-    <section class="card u-p-0" style="overflow-x:auto; margin-bottom:var(--s-4);" data-billing-failed-checkouts>
-      <div style="padding:var(--s-4) var(--s-4) 0;">
-        <h2 style="font-size:var(--font-15); margin:0;">Онлайн-оплаты без зачисления</h2>
-        <p class="u-text-muted" style="margin:var(--s-1) 0 0;">Продлить автоматически не удалось, или платёж больше суток не доходит до конечного статуса. Проверьте платёж в кабинете ЮKassa: если деньги списаны — отметьте оплату вручную (номер — ID платежа ЮKassa) или оформите возврат.</p>
+    <section class="card u-p-0 wz-scroll u-mb-4" data-billing-failed-checkouts>
+      <div class="wz-card-intro">
+        <h2 class="u-fs-15 u-m-0">Онлайн-оплаты без зачисления</h2>
+        <p class="u-text-muted u-m-0 u-mt-1">Продлить автоматически не удалось, или платёж больше суток не доходит до конечного статуса. Проверьте платёж в кабинете ЮKassa: если деньги списаны — отметьте оплату вручную (номер — ID платежа ЮKassa) или оформите возврат.</p>
       </div>
       <table class="t-table">
         <thead>
@@ -185,11 +185,11 @@
         <tbody>
           {% for c in failedCheckouts %}
             <tr>
-              <td style="font-variant-numeric:tabular-nums;">{{ c.createdAt|date('d.m.Y H:i') }}</td>
+              <td class="u-tnum">{{ c.createdAt|date('d.m.Y H:i') }}</td>
               <td>{{ c.tariff.name }}</td>
               <td class="t-cell--right">{{ c.months }} мес</td>
-              <td class="t-cell--right" style="font-variant-numeric:tabular-nums;">{{ c.amountKopecks|vf_minor|vf_money }}</td>
-              <td style="word-break:break-all;">{{ c.providerPaymentId ?? '—' }}</td>
+              <td class="t-cell--right u-tnum">{{ c.amountKopecks|vf_minor|vf_money }}</td>
+              <td class="u-break-all">{{ c.providerPaymentId ?? '—' }}</td>
               <td>{{ c.failureReason ?? (c.status.value == 'pending' ? 'нет конечного статуса больше суток' : '—') }}</td>
             </tr>
           {% endfor %}
@@ -199,9 +199,9 @@
   {% endif %}
 
   {# История оплат #}
-  <section class="card u-p-0" style="overflow-x:auto;">
-    <div style="padding:var(--s-4) var(--s-4) 0;">
-      <h2 style="font-size:var(--font-15); margin:0;">История оплат</h2>
+  <section class="card u-p-0 wz-scroll">
+    <div class="wz-card-intro">
+      <h2 class="u-fs-15 u-m-0">История оплат</h2>
     </div>
     {% if payments.nbResults > 0 %}
       <table class="t-table">
@@ -219,13 +219,13 @@
         <tbody>
           {% for payment in payments.currentPageResults %}
             <tr>
-              <td style="font-variant-numeric:tabular-nums;">{{ payment.receivedAt|date('d.m.Y') }}</td>
+              <td class="u-tnum">{{ payment.receivedAt|date('d.m.Y') }}</td>
               <td>{{ payment.tariff.name }}</td>
               <td class="t-cell--right">{{ payment.months }} мес</td>
-              <td class="t-cell--right" style="font-variant-numeric:tabular-nums;">{{ payment.amountKopecks|vf_minor|vf_money }}</td>
-              <td style="font-variant-numeric:tabular-nums;">{{ payment.periodFrom|date('d.m.Y') }} — {{ payment.periodUntil|date('d.m.Y') }}{% if payment.carriedDays > 0 %}<div class="form-hint" data-billing-carried>+{{ payment.carriedDays }} дн. за остаток ({{ payment.carriedKopecks|vf_minor|vf_money }})</div>{% endif %}</td>
+              <td class="t-cell--right u-tnum">{{ payment.amountKopecks|vf_minor|vf_money }}</td>
+              <td class="u-tnum">{{ payment.periodFrom|date('d.m.Y') }} — {{ payment.periodUntil|date('d.m.Y') }}{% if payment.carriedDays > 0 %}<div class="form-hint" data-billing-carried>+{{ payment.carriedDays }} дн. за остаток ({{ payment.carriedKopecks|vf_minor|vf_money }})</div>{% endif %}</td>
               <td>{{ payment.source.label }}</td>
-              <td style="word-break:break-all;">{{ payment.externalId ?? '—' }}</td>
+              <td class="u-break-all">{{ payment.externalId ?? '—' }}</td>
             </tr>
           {% endfor %}
         </tbody>

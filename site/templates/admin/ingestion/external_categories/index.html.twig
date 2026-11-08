@@ -51,7 +51,7 @@
     <div class="wz-sec-title">Новые типы Ozon</div>
     <p class="field-helper">Типы из справочника Ozon с неразобранными начислениями. Подтверждение ставит маппинг по умолчанию: код из справочника, название и группа — ваши; тип операции не меняется. Строки обновит ночной refresh или refresh metadata за период.</p>
     {% if ozon_type_queue is empty %}
-      <p style="color:var(--text-faint);">Неразобранных типов из справочника нет.</p>
+      <p class="u-text-faint">Неразобранных типов из справочника нет.</p>
     {% else %}
       <div class="t-wrap">
         <table class="t">
@@ -69,17 +69,17 @@
           <tbody>
             {% for item in ozon_type_queue %}
               <tr>
-                <td style="font-variant-numeric:tabular-nums;">{{ item.typeId }}{% if item.removed %} <span class="status status--neutral"><span class="dot"></span>убран Ozon</span>{% endif %}</td>
+                <td class="u-tnum">{{ item.typeId }}{% if item.removed %} <span class="status status--neutral"><span class="dot"></span>убран Ozon</span>{% endif %}</td>
                 <td><code>{{ item.name }}</code><br>{{ item.description ?? '—' }}</td>
                 <td class="t-cell--right">{{ item.transactions }}</td>
-                <td style="font-variant-numeric:tabular-nums;">{{ item.firstDate|date('d.m.Y') }} — {{ item.lastDate|date('d.m.Y') }}</td>
+                <td class="u-tnum">{{ item.firstDate|date('d.m.Y') }} — {{ item.lastDate|date('d.m.Y') }}</td>
                 <td>{{ item.transactionType }}</td>
-                <td><code>{{ item.proposal.code }}</code><br>{{ item.proposal.groupLabel ?? '—' }} <span style="color:var(--text-faint);">({{ group_source_labels[item.proposal.groupSource] ?? item.proposal.groupSource }})</span></td>
+                <td><code>{{ item.proposal.code }}</code><br>{{ item.proposal.groupLabel ?? '—' }} <span class="u-text-faint">({{ group_source_labels[item.proposal.groupSource] ?? item.proposal.groupSource }})</span></td>
                 <td>
                   {% if item.awaitingRefresh %}
                     <span class="status status--pending"><span class="dot"></span>Подтверждён, ждёт refresh</span>
                   {% else %}
-                  <form action="{{ path('admin_ingestion_external_categories_confirm_ozon_type', {typeId: item.typeId}) }}" method="POST" style="display:flex; flex-direction:column; gap:4px; min-width:240px;">
+                  <form action="{{ path('admin_ingestion_external_categories_confirm_ozon_type', {typeId: item.typeId}) }}" method="POST" class="ext-cat-confirm-form">
                     <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_confirm_ozon_type_' ~ item.typeId) }}">
                     <input class="input" name="label" value="{{ item.proposal.label }}" aria-label="Название статьи" maxlength="255" required>
                     <select class="select" name="group_code" aria-label="Группа" required>
@@ -119,11 +119,11 @@
             {% for dispute in ozon_type_disputes %}
               <tr>
                 <td>{{ dispute.typeId }}{% if dispute.typeName %} · <code>{{ dispute.typeName }}</code>{% endif %}</td>
-                <td>{{ dispute.currentGroupLabel }} <span style="color:var(--text-faint);">({{ dispute.currentVotes }} голосов)</span></td>
-                <td>{{ dispute.disputedGroupLabel }} <span style="color:var(--text-faint);">({{ dispute.disputedVotes }} голосов{% if dispute.disputedAt %}, {{ dispute.disputedAt }}{% endif %})</span></td>
+                <td>{{ dispute.currentGroupLabel }} <span class="u-text-faint">({{ dispute.currentVotes }} голосов)</span></td>
+                <td>{{ dispute.disputedGroupLabel }} <span class="u-text-faint">({{ dispute.disputedVotes }} голосов{% if dispute.disputedAt %}, {{ dispute.disputedAt }}{% endif %})</span></td>
                 <td><code>{{ dispute.disputedCompanyId ?? '—' }}</code></td>
                 <td>
-                  <form action="{{ path('admin_ingestion_external_categories_resolve_ozon_type_group_dispute', {typeId: dispute.typeId}) }}" method="POST" style="display:flex; gap:4px;">
+                  <form action="{{ path('admin_ingestion_external_categories_resolve_ozon_type_group_dispute', {typeId: dispute.typeId}) }}" method="POST" class="u-flex u-gap-1">
                     <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_resolve_dispute_' ~ dispute.typeId) }}">
                     <input type="hidden" name="group_code" value="{{ dispute.currentGroupCode }}">
                     <input type="hidden" name="disputed_group_code" value="{{ dispute.disputedGroupCode }}">
@@ -173,7 +173,7 @@
         <button type="submit" class="btn btn-md btn-secondary">Обновить базовые Ozon-маппинги</button>
       </form>
 
-      <form action="{{ path('admin_ingestion_external_categories_discover') }}" method="POST" style="margin-top:var(--s-5);">
+      <form action="{{ path('admin_ingestion_external_categories_discover') }}" method="POST" class="u-mt-5">
         <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_discover') }}">
         <div class="field">
           <label class="field-label" for="discover_limit">Лимит discovery</label>
@@ -184,7 +184,7 @@
         </div>
       </form>
 
-      <form action="{{ path('admin_ingestion_external_categories_import_ozon_details') }}" method="POST" enctype="multipart/form-data" style="margin-top:var(--s-5);">
+      <form action="{{ path('admin_ingestion_external_categories_import_ozon_details') }}" method="POST" enctype="multipart/form-data" class="u-mt-5">
         <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_import_ozon_details') }}">
         <div class="wz-sec-title">Отчёт Ozon «Детализация начислений»</div>
         <div class="field">
@@ -351,22 +351,22 @@
                 <td>{{ row.scope }}</td>
                 <td><code>{{ row.external_code ?? row.normalized_key }}</code></td>
                 <td>{{ row.provider_label ?? row.external_name ?? '' }}</td>
-                <td style="font-variant-numeric:tabular-nums;">{{ row.external_type_id ?? '' }}</td>
+                <td class="u-tnum">{{ row.external_type_id ?? '' }}</td>
                 <td>
-                  <div style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;">
+                  <div class="ext-cat-stack">
                     {% if row.canonical_code %}
                       <span class="status status--{{ mapping_status_tone[row.mapping_status ?? 'active'] ?? 'neutral' }}"><span class="dot"></span>{{ mapping_status_labels[row.mapping_status ?? 'active'] ?? row.mapping_status }}</span>
                       <code>{{ row.canonical_code }}{% if row.canonical_group %} · {{ row.canonical_group }}{% endif %}</code>
                       <span>{{ row.canonical_label ?? '' }}</span>
                     {% else %}
-                      <span style="color:var(--text-faint);">—</span>
+                      <span class="u-text-faint">—</span>
                     {% endif %}
                     <button type="button" class="btn btn-sm btn-secondary" data-admin-dialog-open="mapping-dialog-{{ row.id }}">Настроить</button>
                   </div>
                 </td>
                 <td class="t-cell--right">{{ row.company_overrides }}</td>
                 <td class="t-cell--right">{{ row.seen_count }}</td>
-                <td style="font-variant-numeric:tabular-nums;">{{ row.last_seen_at|date('d.m.Y H:i') }}</td>
+                <td class="u-tnum">{{ row.last_seen_at|date('d.m.Y H:i') }}</td>
               </tr>
             {% endfor %}
           </tbody>
@@ -380,7 +380,7 @@
   {% for row in latest_categories %}
     <dialog id="mapping-dialog-{{ row.id }}" class="dlg" aria-labelledby="mapping-title-{{ row.id }}">
       {# <dialog> сжимается по контенту — задаём ширину .mdl (--modal-width-standard) явно #}
-      <div class="mdl" style="width:520px; max-width:92vw;">
+      <div class="mdl mdl--ext-cat">
         <form action="{{ path('admin_ingestion_external_categories_update_mapping', {id: row.id}) }}" method="POST">
           <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_update_mapping_' ~ row.id) }}">
           <div class="mdl-head">
@@ -393,7 +393,7 @@
             </button>
           </div>
           {# модалка выше вьюпорта на мелких экранах — скроллим тело, шапка и футер остаются видны #}
-          <div class="mdl-body" style="max-height:66vh; overflow-y:auto;">
+          <div class="mdl-body ext-cat-mdl-body">
             <div class="wz-form-grid">
               <div class="field wz-span-all">
                 <label class="field-label" for="display_label_{{ row.id }}">Display label</label>
