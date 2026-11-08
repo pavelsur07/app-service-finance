@@ -1,4 +1,4 @@
-### Stage 3: общие партиалы и подписи — IN PROGRESS (PR A–D на handoff)
+### Stage 3: общие партиалы и подписи — DONE (PR A–D #2924–#2927 на проде 08.11.2026)
 
 **Risk:** LOW–MEDIUM (разметка 65+17+10 мест меняется на include/embed; визуал не меняется)
 **Stage base commit:** master после закрывающего PR Stage 2
@@ -210,3 +210,24 @@
 - целевые тесты (unit Enum, Finance, Settlement, Admin) — OK (270 tests, 3258 assertions)
 - `make site-test` — OK (8554 tests, 48144 assertions), 8 мин 18 с
 - Внешнее ревью (codex): REVIEW_GREEN (1 раунд, база — ветка PR C 00f3f3434, дифф 535 строк, `site/var/external-review/00f3f343/review.txt`)
+
+#### Деплой (Stage 3)
+- Владелец одобрил стек одним сообщением; #2924 влит 05:36Z → деплой 05:49Z, #2925 → 05:53Z, #2927 (голова master,
+  включает #2926) → 06:00Z; все с маркером «Деплой завершён без даунтайма», 12 контейнеров healthy, GlitchTip — только
+  штатные ночные записи.
+- Прогон deploy.yml для #2926 упал в фазе тестов на flaky `SettlementSourceLockOrderTest` (таймаут 90 с после #2922 не
+  спас; тот же тест уронил CI PR D, rerun прошёл). Деплой с головы master покрыл все четыре PR, rerun старого прогона
+  не делали — он задеплоил бы устаревший sha. Четыре параллельных прогона deploy.yml на общих runner'ах — фактор:
+  из четырёх два упали на этом тесте. Предложение Владельцу — правка теста: тайминги фаз (boot → ready → waiting → locked)
+  и снимок `pg_stat_activity` дочернего backend'а в сообщении об ошибке, чтобы следующий сбой показал причину.
+
+#### Итог этапа
+- Flash: три рендера (`partials/_flash`, `admin/_toasts`, `app/_ui/_flash`) с одним маппингом label → variant; 9 inline-копий
+  удалены; побочно закрыт дефект карточки приглашения (`invite_token`).
+- `partials/_empty` — 17 страниц; `partials/_page_header` — 51 страница (15 нестандартных шапок до Stage 6);
+  подписи 6 Enum вместо 8 словарей (8 словарей без Enum остались с обоснованием).
+- Тесты: `FlashShellsTest`, `EmptyStatePartialTest`, `PageHeaderPartialTest` (+ скан шаблонов на дубль заголовка),
+  `EnumLabelsTest`, регрессия `CompanyMemberInviteFlowTest`.
+- Ловушки этапа: Twig `x|default(true)` возвращает default и для `false`; срез скрипта переписи захватил `<h2>`, когда
+  после него шёл Twig-тег; внешнее ревью диффует рабочее дерево с базой — `git fetch origin master:master` перед запуском.
+
