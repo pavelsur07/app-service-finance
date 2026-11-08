@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** Stage 2
-**Status:** implementing
+**Phase:** handoff PR 1
+**Status:** reviewing
 **Stage base commit:** bd27418fb (origin/master)
 
 ### Completed
@@ -13,5 +13,7 @@
   набор Cash (Unit+Integration+Functional) — 879 OK.
 - PHPStan по изменённым файлам — OK; php-cs-fixer — OK после правки phpdoc.
 
+- Stage 2: ai-service принимает description (schemas, контракт v1.2.0), ruff/mypy/unit 178 OK.
+
 ### Exact next action
-- Stage 2: ai-service `Category.description`, промпт, контракт ai-task/v1, тесты.
+- Финальное ревью PR 1, гейты, Draft PR → Ready.
