@@ -1,0 +1,87 @@
+/* Отчёт ОПиУ (templates/finance/report/preview): таблица .table.pl-table с залипшими колонками. Перенесено из <style> страницы 1:1 (Stage 4); фильтры — pl-filter-controls.css. */
+
+/* Таблица P&L: «Строка» закреплена слева, остальные колонки фиксированной ширины и
+   прокручиваются вместе с .table-responsive. Рецепт тот же, что в отчёте ДДС
+   (templates/report/cashflow.html.twig).
+   Селекторы .table.pl-table — чтобы правила не перебивались .table из legacy_app,
+   который грузится до этого блока. */
+.table.pl-table {
+    --pl-col-name: 280px;
+    --pl-col-meta-code: 110px;
+    --pl-col-meta-type: 120px;
+    --pl-col-period: 160px;
+    --pl-col-project: 200px;
+    --pl-col-total: 180px;
+    /* table-layout: fixed работает только при определённой ширине таблицы;
+       при width:auto браузер молча откатывается на auto-раскладку.
+       Ширину даёт .table (width:100%), а min-width задаётся инлайном по числу колонок. */
+    table-layout: fixed;
+}
+.table.pl-table th,
+.table.pl-table td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.table.pl-table col.pl-col-name { width: var(--pl-col-name); }
+.table.pl-table col.pl-col-meta-code { width: var(--pl-col-meta-code); }
+.table.pl-table col.pl-col-meta-type { width: var(--pl-col-meta-type); }
+.table.pl-table col.pl-col-period { width: var(--pl-col-period); }
+.table.pl-table col.pl-col-project { width: var(--pl-col-project); }
+.table.pl-table col.pl-col-total { width: var(--pl-col-total); }
+/* строки данных, а не ячейка пустого состояния с colspan: её нельзя залипать целиком */
+.table.pl-table thead th:first-child,
+.table.pl-table tbody tr.pl-row > td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--tblr-bg-surface);
+    /* при border-collapse граница залипшей ячейки не рисуется поверх уезжающих — подменяем тенью */
+    box-shadow: inset -1px 0 0 var(--tblr-border-color);
+}
+.table.pl-table th.pl-cell-total,
+.table.pl-table td.pl-cell-total {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: var(--tblr-bg-surface);
+    box-shadow: inset 1px 0 0 var(--tblr-border-color);
+}
+/* DS-Table: шапка — Navy 50, включая залипшие ячейки. */
+.table.pl-table thead th:first-child,
+.table.pl-table thead th.pl-cell-total { background: var(--vf-navy-50); }
+.table.pl-table .text-end { font-variant-numeric: tabular-nums; }
+.table.pl-table .pl-name {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0 0 0 20px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.table.pl-table .pl-toggle {
+    position: relative;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    -webkit-user-select: text;
+    user-select: text;
+}
+.table.pl-table .pl-toggle::before {
+    position: absolute;
+    left: 0;
+    width: 16px;
+    content: '\25B6';
+    text-align: center;
+}
+.table.pl-table .pl-toggle[aria-expanded='true']::before {
+    content: '\25BC';
+}
+.table.pl-table .pl-toggle:focus-visible {
+    outline: 2px solid var(--tblr-primary);
+    outline-offset: -2px;
+}

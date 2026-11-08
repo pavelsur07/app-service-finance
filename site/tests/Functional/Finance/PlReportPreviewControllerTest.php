@@ -83,10 +83,13 @@ final class PlReportPreviewControllerTest extends WebTestCaseBase
         $client->request('GET', '/finance/report/preview?layout=projects');
         self::assertResponseIsSuccessful();
 
-        $html = $client->getResponse()->getContent();
-        self::assertIsString($html);
-        self::assertStringContainsString('--pl-col-project: 200px', $html);
-        self::assertStringContainsString('--pl-col-total: 180px', $html);
+        // Компания без проектов: колонок проектов нет, колонка «Итого» одна.
+        self::assertCount(1, $client->getCrawler()->filter('table.pl-table col.pl-col-total'));
+
+        // Ширины колонок — переменные в assets/styles/pages/pl-report.css (Stage 4 вынес их из <style> страницы).
+        $css = (string) file_get_contents(dirname(__DIR__, 3).'/assets/styles/pages/pl-report.css');
+        self::assertStringContainsString('--pl-col-project: 200px', $css);
+        self::assertStringContainsString('--pl-col-total: 180px', $css);
     }
 
     public function testNumericCellsExposeFullValueInTitle(): void

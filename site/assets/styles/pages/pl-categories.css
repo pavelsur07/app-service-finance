@@ -1,0 +1,60 @@
+/* Статьи ОПиУ — дерево статей (templates/pl_category/index). Перенесено из <style> страницы 1:1 (Stage 4). */
+
+.pl-category-item {
+    border-radius: .5rem;
+    padding: .5rem .75rem;
+    transition: background-color .2s ease-in-out;
+}
+
+.pl-category-item:hover,
+.pl-category-item:focus-within {
+    background-color: var(--vf-navy-50); /* DS-Table: hover */
+}
+
+.pl-category-item--kpi {
+    background-color: var(--vf-navy-100);
+}
+
+.pl-category-item--kpi:hover,
+.pl-category-item--kpi:focus-within {
+    background-color: var(--vf-navy-100);
+}
+
+.pl-category-link {
+    display: inline-block;
+}
+
+.pl-category-toggle {
+    color: inherit;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.pl-category-toggle::before {
+    content: '\25B8';
+    font-size: .8rem;
+    transition: transform .2s ease-in-out;
+}
+
+.pl-category-toggle:hover,
+.pl-category-toggle:focus {
+    text-decoration: none;
+}
+
+.pl-category-toggle:not(.collapsed)::before {
+    transform: rotate(90deg);
+}
+
+.pl-category-toggle-placeholder {
+    display: inline-flex;
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.pl-category-children {
+    margin-left: 1.5rem;
+}

@@ -1,48 +1,5 @@
 {% extends 'base.html.twig' %}
 
-{% block stylesheets %}
-    {{ parent() }}
-    <style>
-        /* Таблица ДДС: «Категория» закреплена слева, столбцы периодов фиксированной ширины.
-           Селекторы .table.cf-table — чтобы правила не перебивались .table из app.css, который грузится ниже. */
-        .table.cf-table {
-            --cf-col-name: 280px;
-            --cf-col-period: 120px;
-            /* table-layout: fixed работает только при определённой ширине таблицы;
-               при width:auto браузер молча откатывается на auto-раскладку.
-               Ширину даёт .table (width:100%), а min-width задаётся инлайном по числу периодов. */
-            table-layout: fixed;
-        }
-        .table.cf-table th,
-        .table.cf-table td {
-            white-space: nowrap;
-        }
-        .table.cf-table col.cf-col-name { width: var(--cf-col-name); }
-        .table.cf-table col.cf-col-period { width: var(--cf-col-period); }
-        .table.cf-table th:first-child,
-        .table.cf-table td:first-child {
-            position: sticky;
-            left: 0;
-            z-index: 2;
-            background: var(--tblr-bg-surface);
-            /* при border-collapse граница залипшей ячейки не рисуется поверх уезжающих — подменяем тенью */
-            box-shadow: inset -1px 0 0 var(--tblr-border-color);
-        }
-        /* DS-Table: шапка — Navy 50, включая залипшую ячейку. */
-        .table.cf-table thead th:first-child { background: var(--vf-navy-50); }
-        .table.cf-table .cf-toggle,
-        .table.cf-table .cf-toggle-spacer {
-            flex: none;
-            width: 16px;
-            margin-right: 4px;
-            text-align: center;
-        }
-        .table.cf-table .cf-toggle { cursor: pointer; }
-
-        {% include 'finance/report/_filter_controls_styles.html.twig' %}
-    </style>
-{% endblock %}
-
 {#{% block breadcrumbs %}
     {% include 'partials/_breadcrumbs.html.twig' with {
         breadcrumbs: [
