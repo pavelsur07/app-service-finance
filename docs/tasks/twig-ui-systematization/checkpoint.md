@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 3 — PR A–C (#2924–#2926) влиты 08.11 05:36Z, деплои идут; PR D на handoff
-**Status:** Stage 1 (#2909) и Stage 2 (#2910–#2923) на проде 07–08.11; Stage 3 PR A #2924 на handoff
-**Stage base commit:** master a6bddf09a (после #2923) · ветки `refactor/twig-ui-stage-3a` (PR A, #2924) → `refactor/twig-ui-stage-3b` (PR B, #2925) → `refactor/twig-ui-stage-3c` (PR C, #2926) → `refactor/twig-ui-stage-3d` (PR D)
+**Phase:** Stage 3 DONE (#2924–#2927 на проде 08.11 06:00Z) → закрывающий PR на handoff → Stage 4 PLANNED
+**Status:** Stage 1–3 на проде (#2909–#2927); закрывающий PR Stage 3 (отчёт DONE + план Stage 4) на handoff
+**Stage base commit:** master 2d3ac4257 (после #2927) · ветка `refactor/twig-ui-stage-3-close`
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -72,8 +72,10 @@
 - Stage 3 PR D (3.4): `label()` в 6 Enum (+ `DocumentType::shortLabel()`), 8 словарей из 12 шаблонов удалены, 8 оставлены
   (строки без Enum / карты данных — обоснование в stage-3.md); ветка от PR C.
 
+- Stage 3 на проде 08.11 06:00Z (деплой с головы master после #2927; прогон #2926 упал на flaky-тесте, rerun не нужен).
+
 ### Exact next action
-- сверить деплои #2924–#2926 (маркер, 12 healthy, GlitchTip); handoff PR D («merge and deploy»); затем закрывающий PR Stage 3 (отчёт DONE, план Stage 4)
+- handoff закрывающего PR Stage 3 («merge and deploy»); затем Stage 4 PR A (4.0 скриншоты «до» + 4.1 семь блоков `<style>`) с ветки от master — план `stages/stage-4.md`
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`
