@@ -319,13 +319,11 @@
   {% endif %}
 
   {% if latest_categories is empty %}
-    <div class="empty">
-      <div class="empty-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
-      </div>
-      <div class="empty-title">Категорий пока нет</div>
-      <div class="empty-text">Запустите discovery — найденные внешние категории Ozon появятся в этом списке.</div>
-    </div>
+    {% embed 'partials/_empty.html.twig' with {title: 'Категорий пока нет', hint: 'Запустите discovery — найденные внешние категории Ozon появятся в этом списке.', variant: 'app'} %}
+        {% block icon %}
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+        {% endblock %}
+    {% endembed %}
   {% else %}
     <div class="card u-p-0">
       <div class="wz-card-head">Последние внешние категории</div>

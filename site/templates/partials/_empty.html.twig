@@ -1,0 +1,28 @@
+{#
+  Пустое состояние списка или таблицы — единственная разметка `class="empty"` в шаблонах.
+
+  Параметры: title (обязателен), hint (необязателен), variant — 'legacy' (Tabler, по умолчанию) или 'app'
+  (DS админки и кита: admin/base, _layout/app). Классы те же, что были в страницах: легаси —
+  <p class="empty-title"> + <p class="empty-subtitle text-muted">, DS — <div class="empty-title"> + <div class="empty-text">.
+
+  Без иконки и кнопки: {% include 'partials/_empty.html.twig' with {title: '…', hint: '…'} only %}
+  С иконкой или кнопкой — embed с блоками icon (SVG), action (кнопки/ссылки), attrs (атрибуты корневого div):
+  {% embed 'partials/_empty.html.twig' with {title: '…', hint: '…', variant: 'app'} %}
+      {% block icon %}<svg …>…</svg>{% endblock %}
+      {% block action %}<a class="btn btn-md btn-primary" href="…">…</a>{% endblock %}
+  {% endembed %}
+#}
+{% set empty_icon %}{% block icon %}{% endblock %}{% endset %}
+<div class="empty"{% block attrs %}{% endblock %}>
+    {% if empty_icon|trim is not empty %}
+        <div class="empty-icon">{{ empty_icon|raw }}</div>
+    {% endif %}
+    {% if variant|default('legacy') == 'app' %}
+        <div class="empty-title">{{ title }}</div>
+        {% if hint|default %}<div class="empty-text">{{ hint }}</div>{% endif %}
+    {% else %}
+        <p class="empty-title">{{ title }}</p>
+        {% if hint|default %}<p class="empty-subtitle text-muted">{{ hint }}</p>{% endif %}
+    {% endif %}
+    {% block action %}{% endblock %}
+</div>

@@ -127,15 +127,10 @@
 
             {% if pager.nbResults == 0 %}
                 <div class="card-body">
-                    <div class="empty">
-                        {% if has_filters %}
-                            <p class="empty-title">Ничего не найдено</p>
-                            <p class="empty-subtitle text-muted">Измените запрос или сбросьте фильтры.</p>
-                        {% else %}
-                            <p class="empty-title">Нет листингов</p>
-                            <p class="empty-subtitle text-muted">Измените фильтр или загрузите данные из маркетплейса.</p>
-                        {% endif %}
-                    </div>
+                    {% include 'partials/_empty.html.twig' with {
+                        title: has_filters ? 'Ничего не найдено' : 'Нет листингов',
+                        hint: has_filters ? 'Измените запрос или сбросьте фильтры.' : 'Измените фильтр или загрузите данные из маркетплейса.',
+                    } only %}
                 </div>
             {% else %}
                 {# data-applied-filter — фильтр, который применил сервер: назначение «все N» уходит

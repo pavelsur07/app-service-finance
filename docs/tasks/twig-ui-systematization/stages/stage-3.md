@@ -1,4 +1,4 @@
-### Stage 3: общие партиалы и подписи — IN PROGRESS (PR A на handoff)
+### Stage 3: общие партиалы и подписи — IN PROGRESS (PR A, PR B на handoff)
 
 **Risk:** LOW–MEDIUM (разметка 65+17+10 мест меняется на include/embed; визуал не меняется)
 **Stage base commit:** master после закрывающего PR Stage 2
@@ -39,7 +39,7 @@
 - [x] 3.0 — функциональный тест: три shell'а рендерят flash каждого label одинаковыми классами (PR A, `FlashShellsTest`)
 - [x] 3.1 — `grep -rl app.flashes templates` → `partials/_flash`, `admin/_toasts`, `app/_ui/_flash` + два служебных ключа
       (`company_member/index` — `invite_token`, `telegram/admin/bot/index` — `webhook_status`): это данные страницы, не сообщения (PR A)
-- [ ] 3.2 — `grep -rl 'class="empty"' templates` → только `partials/_empty`
+- [x] 3.2 — `grep -rl 'class="empty"' templates` → только `partials/_empty` (PR B)
 - [ ] 3.3 — `grep -rl 'class="page-header' templates` → только `partials/_page_header`
 - [ ] 3.4 — `grep -rn '{% set [a-zA-Z]*Labels' templates` → 0
 - [ ] Каждый PR: `make site-cs-twig`, `make site-test` (crawler-тесты видят flash и заголовки),
@@ -104,3 +104,33 @@
 - Страницы кита без сессии: `app/_ui/_flash` читает `app.flashes` в `_layout/app` — все страницы кита (Баланс, права API,
   `balance_error`) под stateful-firewall; `BalanceLedgerUiTest` покрывает 404/422 HTML.
 - Новый ключ `addFlash` вне семи известных молча пропадёт: проверка — `grep -rhoE "addFlash\('[a-z_]+'" src | sort -u`.
+
+#### PR B (3.2) — `partials/_empty`: одно пустое состояние на две разметки
+
+##### Что сделано
+- `partials/_empty.html.twig`: параметры `title`, `hint`, `variant` (`legacy` — Tabler `<p class="empty-title">` +
+  `<p class="empty-subtitle text-muted">`; `app` — DS `<div class="empty-title">` + `<div class="empty-text">`),
+  блоки `icon` (SVG страницы, обёртка `empty-icon` появляется только при непустом блоке), `action`, `attrs`.
+  Без иконки и кнопки — `include … only`, иначе `embed`.
+- 17 файлов переведены (9 легаси, 8 DS: 7 `admin/base` + `api/settings`). SVG-иконки остались в страницах
+  (контент, не разметка); тексты с условиями (`listings/index`, `mapping_error_list`) — тернарники в параметрах;
+  `coverage` — `data-coverage-empty` через блок `attrs`, текст с `service` — конкатенация.
+- Разметка та же, кроме двух мест DS: `api/settings/index` `<h3 class="empty-title">` → `<div>`, `coverage`
+  `<p class="empty-text">` → `<div>` — классы задают размер/вес/отступы, визуально без изменений.
+- `onclick="openAddPriceModal()"` в `catalog/product/show` оставлен как был — inline-обработчик страницы вне
+  scope PR (в замере Stage 2 эта страница не значилась; кандидат на Stage 4).
+
+##### Тесты
+- `tests/Integration/Shared/EmptyStatePartialTest.php` — обе ветки разметки, необязательные блоки, экранирование.
+- Существующие: `ApiSettingsControllerTest` (`.empty-title`), `MarketplaceMappingErrorsPageTest` (`.empty`, текст,
+  без ссылок), `MarketplaceListingsSearchTest` («Ничего не найдено») — без правок.
+
+##### Files changed (PR B)
+- `site/templates/partials/_empty.html.twig` (new), 17 шаблонов из замера «до»
+- `site/tests/Integration/Shared/EmptyStatePartialTest.php` (new)
+
+##### Проверки (PR B)
+- `make site-cs-twig` — twigcs 0, `lint:twig` OK (323); `make site-cs-check` — 0 of 3915; `make site-cs-strict-types` — 0; `make site-stan` — OK
+- целевые тесты (партиал, Api settings, mapping errors, listings search) — OK (21 tests, 221 assertions)
+- `make site-test` — OK (8543 tests, 48121 assertions), 8 мин 12 с
+- Внешнее ревью (codex): REVIEW_GREEN (1 раунд, база — ветка PR A d447ade59, дифф 564 строк, `site/var/external-review/d447ade5/review.txt`)

@@ -39,10 +39,9 @@
   </div>
 
   {% if heatmap.empty %}
-    <div class="empty" data-coverage-empty>
-      <div class="empty-title">Данных о покрытии ещё нет</div>
-      <p class="empty-text">Витрина обновляется из сервиса раз в 10 минут. Если пусто дольше — проверьте, что {{ service }} запущен и задан {{ services[service].tokenEnv }}.</p>
-    </div>
+    {% embed 'partials/_empty.html.twig' with {title: 'Данных о покрытии ещё нет', hint: 'Витрина обновляется из сервиса раз в 10 минут. Если пусто дольше — проверьте, что ' ~ service ~ ' запущен и задан ' ~ services[service].tokenEnv ~ '.', variant: 'app'} %}
+      {% block attrs %} data-coverage-empty{% endblock %}
+    {% endembed %}
   {% else %}
     <div class="wz-kpi-row">
       <div class="kpi u-flex-1 u-min-w-200">

@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 закрывающий PR #2923 на handoff → Stage 3 PR A на handoff
-**Status:** Stage 1 (#2909) и Stage 2 PR A–I (#2910–#2921) на проде 07.11; закрывающий PR Stage 2 на handoff
-**Stage base commit:** master 4ac412c42 · ветки `refactor/twig-ui-stage-2j` (#2923) → `refactor/twig-ui-stage-3a` (PR A)
+**Phase:** Stage 3 — PR A (#2924) на handoff, PR B на handoff
+**Status:** Stage 1 (#2909) и Stage 2 (#2910–#2923) на проде 07–08.11; Stage 3 PR A #2924 на handoff
+**Stage base commit:** master a6bddf09a (после #2923) · ветки `refactor/twig-ui-stage-3a` (PR A, #2924) → `refactor/twig-ui-stage-3b` (PR B)
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -63,8 +63,11 @@
 - Stage 3 PR A (3.0 + 3.1): один маппинг flash на три shell'а, `app/_ui/_flash` для кита, 9 inline-копий
   удалены, дефект `invite_token` закрыт; ветка `refactor/twig-ui-stage-3a` от 2j — после мержа #2923 дифф только PR A.
 
+- #2923 влит 08.11 04:43Z. Stage 3 PR B (3.2): `partials/_empty` (variant legacy/app, блоки icon/action/attrs),
+  17 файлов; ветка `refactor/twig-ui-stage-3b` от PR A.
+
 ### Exact next action
-- handoff #2923 и Stage 3 PR A («merge and deploy»); затем PR B (3.2, `partials/_empty`, 17 замен) с ветки от PR A
+- handoff #2924 и PR B («merge and deploy»); затем PR C (3.3, `partials/_page_header` embed, 65 файлов — порциями по модулям) с ветки от PR B
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`

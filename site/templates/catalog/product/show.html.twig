@@ -111,13 +111,13 @@
                 </div>
                 {% if priceHistory is empty %}
                     <div class="card-body">
-                        <div class="empty">
-                            <p class="empty-title">Нет записей</p>
-                            <p class="empty-subtitle text-muted">Добавьте первую закупочную цену</p>
-                            <button class="btn btn-primary" onclick="openAddPriceModal()">
+                        {% embed 'partials/_empty.html.twig' with {title: 'Нет записей', hint: 'Добавьте первую закупочную цену'} %}
+                            {% block action %}
+                                <button class="btn btn-primary" onclick="openAddPriceModal()">
                                 Добавить цену
-                            </button>
-                        </div>
+                                </button>
+                            {% endblock %}
+                        {% endembed %}
                     </div>
                 {% else %}
                     <div class="table-responsive">

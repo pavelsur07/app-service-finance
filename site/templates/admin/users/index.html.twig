@@ -153,14 +153,14 @@
       {% include 'app/_ui/_pagination.html.twig' with {pager: pager, route: 'admin_user_index', params: app.request.query.all} %}
     </div>
   {% else %}
-    <div class="empty">
-      <div class="empty-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      </div>
-      <div class="empty-title">Нет зарегистрированных пользователей</div>
-      <div class="empty-text">Создайте первый аккаунт — пользователь и его компания появятся в этом списке.</div>
-      <button type="button" class="btn btn-md btn-primary" data-admin-dialog-open="account-create-dialog">Добавить аккаунт</button>
-    </div>
+    {% embed 'partials/_empty.html.twig' with {title: 'Нет зарегистрированных пользователей', hint: 'Создайте первый аккаунт — пользователь и его компания появятся в этом списке.', variant: 'app'} %}
+        {% block icon %}
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        {% endblock %}
+        {% block action %}
+            <button type="button" class="btn btn-md btn-primary" data-admin-dialog-open="account-create-dialog">Добавить аккаунт</button>
+        {% endblock %}
+    {% endembed %}
   {% endif %}
 {% endblock %}
 

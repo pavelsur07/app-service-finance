@@ -3,23 +3,21 @@
 {% block tab_content %}
     <div class="container-xl py-4">
         {% if unmapped_count == 0 %}
-            <div class="empty">
-                <div class="empty-icon">
+            {% embed 'partials/_empty.html.twig' with {title: 'Все листинги привязаны!', hint: 'У вас нет листингов без привязки к продуктам.'} %}
+                {% block icon %}
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                        <path d="M5 12l5 5l10 -10"></path>
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                    <path d="M5 12l5 5l10 -10"></path>
                     </svg>
-                </div>
-                <p class="empty-title">Все листинги привязаны!</p>
-                <p class="empty-subtitle text-muted">
-                    У вас нет листингов без привязки к продуктам.
-                </p>
-                <div class="empty-action">
+                {% endblock %}
+                {% block action %}
+                    <div class="empty-action">
                     <a href="{{ path('marketplace_products_index') }}" class="btn btn-primary">
-                        Перейти к листингам
+                    Перейти к листингам
                     </a>
-                </div>
-            </div>
+                    </div>
+                {% endblock %}
+            {% endembed %}
         {% else %}
             <div class="card">
                 <div class="card-header">
