@@ -47,7 +47,7 @@ final class PLMarketplaceExtensionControllerTest extends WebTestCaseBase
         $client->request('POST', '/pl-categories/import/marketplace-extension', ['_token' => 'bad']);
 
         self::assertResponseStatusCodeSame(403);
-        self::assertSame(44, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [(string) $company->getId()]));
+        self::assertSame(43, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [(string) $company->getId()]));
     }
 
     public function testMarketplaceCompanyHasNoCardAndApplyIsRefused(): void

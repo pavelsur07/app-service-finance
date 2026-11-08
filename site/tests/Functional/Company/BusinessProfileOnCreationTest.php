@@ -124,7 +124,7 @@ final class BusinessProfileOnCreationTest extends WebTestCaseBase
 
         $connection = $this->em()->getConnection();
         $plBefore = (int) $connection->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [(string) $company->getId()]);
-        self::assertSame(44, $plBefore);
+        self::assertSame(43, $plBefore);
 
         $crawler = $client->request('GET', sprintf('/company/%s/edit', $company->getId()));
         self::assertResponseIsSuccessful();

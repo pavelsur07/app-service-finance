@@ -1,7 +1,7 @@
 {
   "version": 1,
   "profile": "UNIVERSAL",
-  "templateVersion": 2,
+  "templateVersion": 3,
   "exportedAt": "2026-10-20T00:00:00+03:00",
   "company": "Базовый шаблон ОПиУ — универсальный",
   "categories": [
@@ -170,7 +170,7 @@
       "sortOrder": 27
     },
     {
-      "name": "Операционные расходы",
+      "name": "Косвенные расходы",
       "code": "OVERHEAD_TOTAL",
       "type": "SUBTOTAL",
       "format": "MONEY",
@@ -183,7 +183,7 @@
       "sortOrder": 50,
       "children": [
         {
-          "name": "Производственные",
+          "name": "Помещения и производство",
           "code": "OVERHEAD_PROD_TOTAL",
           "type": "SUBTOTAL",
           "format": "MONEY",
@@ -380,19 +380,6 @@
               "formula": null,
               "calcOrder": null,
               "sortOrder": 20
-            },
-            {
-              "name": "Фото, видео, дизайн",
-              "code": "OVERHEAD_SALES_CONTENT",
-              "type": "LEAF_INPUT",
-              "format": "MONEY",
-              "flow": "EXPENSE",
-              "expenseType": "other",
-              "weightInParent": "1.0000",
-              "isVisible": true,
-              "formula": null,
-              "calcOrder": null,
-              "sortOrder": 30
             },
             {
               "name": "Сервисы и подписки (коммерческие)",
