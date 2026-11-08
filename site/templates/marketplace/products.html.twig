@@ -19,13 +19,11 @@
             {% if pager.nbResults == 0 %}
                 <tr>
                     <td colspan="6" class="text-center text-muted py-4">
-                        <div class="empty">
-                            <div class="empty-icon">
+                        {% embed 'partials/_empty.html.twig' with {title: 'Нет товаров', hint: 'Товары создаются автоматически при обработке продаж'} %}
+                            {% block icon %}
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></svg>
-                            </div>
-                            <p class="empty-title">Нет товаров</p>
-                            <p class="empty-subtitle text-muted">Товары создаются автоматически при обработке продаж</p>
-                        </div>
+                            {% endblock %}
+                        {% endembed %}
                     </td>
                 </tr>
             {% else %}

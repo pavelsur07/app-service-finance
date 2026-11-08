@@ -151,12 +151,7 @@
                             {% else %}
                                 <tr>
                                     <td colspan="13" class="text-center py-5">
-                                        <div class="empty">
-                                            <p class="empty-title">Снапшоты не найдены</p>
-                                            <p class="empty-subtitle text-muted">
-                                                Измените фильтры или запустите пересчёт
-                                            </p>
-                                        </div>
+                                        {% include 'partials/_empty.html.twig' with {title: 'Снапшоты не найдены', hint: 'Измените фильтры или запустите пересчёт'} only %}
                                     </td>
                                 </tr>
                             {% endfor %}

@@ -23,12 +23,7 @@
         <div class="card">
             {% if tags is empty %}
                 <div class="card-body">
-                    <div class="empty">
-                        <p class="empty-title">Тегов пока нет</p>
-                        <p class="empty-subtitle text-muted">
-                            Нажмите «Добавить» или создайте тег на странице листингов: выделите строки и введите название в панели.
-                        </p>
-                    </div>
+                    {% include 'partials/_empty.html.twig' with {title: 'Тегов пока нет', hint: 'Нажмите «Добавить» или создайте тег на странице листингов: выделите строки и введите название в панели.'} only %}
                 </div>
             {% else %}
                 <div class="table-responsive">

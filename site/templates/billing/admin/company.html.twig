@@ -232,10 +232,7 @@
       </table>
       {% include 'app/_ui/_pagination.html.twig' with {pager: payments} %}
     {% else %}
-      <div class="empty">
-        <div class="empty-title">Оплат пока нет</div>
-        <div class="empty-text">Отметьте оплату по счёту формой выше — она появится здесь.</div>
-      </div>
+      {% include 'partials/_empty.html.twig' with {title: 'Оплат пока нет', hint: 'Отметьте оплату по счёту формой выше — она появится здесь.', variant: 'app'} only %}
     {% endif %}
   </section>
 {% endblock %}

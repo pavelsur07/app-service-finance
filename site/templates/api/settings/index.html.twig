@@ -20,7 +20,11 @@
 <div class="wz-row"><section class="card card--flush">
     <h2 class="card-head">API-ключи <span class="card-head-aside">{{ pager.nbResults }}</span></h2>
     {% if pager.nbResults == 0 %}
-        <div class="empty"><h3 class="empty-title">API-ключей пока нет</h3><p class="empty-text">Создайте отдельный именованный ключ для каждого подключения.</p><a class="btn btn-md btn-primary" href="{{ path('settings_api_create') }}">Создать первый ключ</a></div>
+        {% embed 'partials/_empty.html.twig' with {title: 'API-ключей пока нет', hint: 'Создайте отдельный именованный ключ для каждого подключения.', variant: 'app'} %}
+            {% block action %}
+                <a class="btn btn-md btn-primary" href="{{ path('settings_api_create') }}">Создать первый ключ</a>
+            {% endblock %}
+        {% endembed %}
     {% else %}
         <div class="report-scroll" role="region" aria-label="Список API-ключей" tabindex="0">
         <table class="t-table">

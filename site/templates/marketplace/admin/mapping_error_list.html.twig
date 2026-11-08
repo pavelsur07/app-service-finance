@@ -80,23 +80,17 @@
   </div>
 
   {% if errors is empty %}
-    <div class="empty">
-      <div class="empty-icon">
+    {% embed 'partials/_empty.html.twig' with {
+        title: show_all ? 'Ошибок маппинга нет' : 'Все ошибки разобраны',
+        hint: show_all ? 'Новые неизвестные затраты появятся здесь после обработки отчётов.' : 'Сейчас нет затрат, которые требуют ручной проверки маппинга.',
+        variant: 'app',
+    } %}
+      {% block icon %}
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M20 6 9 17l-5-5"/>
         </svg>
-      </div>
-      <div class="empty-title">
-        {% if show_all %}Ошибок маппинга нет{% else %}Все ошибки разобраны{% endif %}
-      </div>
-      <div class="empty-text">
-        {% if show_all %}
-          Новые неизвестные затраты появятся здесь после обработки отчётов.
-        {% else %}
-          Сейчас нет затрат, которые требуют ручной проверки маппинга.
-        {% endif %}
-      </div>
-    </div>
+      {% endblock %}
+    {% endembed %}
   {% else %}
     <div class="card card--flush">
       <div class="card-head">
