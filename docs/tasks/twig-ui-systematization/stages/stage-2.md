@@ -1,4 +1,4 @@
-### Stage 2: JS из шаблонов в `assets/` — IN PROGRESS (PR A–G на проде; PR H #2920 на handoff; PR I готов)
+### Stage 2: JS из шаблонов в `assets/` — DONE (PR A–I на проде 07.11.2026, #2910–#2921; закрывающий PR — удаление демо-партиалов dashboard)
 
 **Risk:** MEDIUM (поведение страниц; финансовые формы — в PR C)
 **Stage base commit:** `3c7bb858c` (master после Stage 1)
@@ -387,6 +387,9 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
   REVIEW_GREEN без замечаний. Первый запуск шёл против отставшего локального `master` (97b51546, дифф 5421 строк
   с уже выкаченными PR F/G) — тоже REVIEW_GREEN; локальный `master` подтянут.
 
+#### Деплой (PR H)
+- #2920 влит 07.11, деплой 19:07Z без даунтайма, 12 контейнеров healthy, GlitchTip чист.
+
 #### Risks / reviewer focus (PR H)
 - Flash «Создать на основании» вставляется перед карточкой (`root.before`), как раньше `card.before`.
 - `data-bs-toggle="modal"` на кнопке «Автоправило» остался: Bootstrap открывает модал сам, модуль дублирует
@@ -420,6 +423,10 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
 
 #### External review (PR I)
 - rounds: 1 (codex, effort medium, база — ветка PR H 0d64b52a5, дифф 1268 строк, `site/var/external-review/0d64b52a/review.txt`): REVIEW_GREEN без замечаний
+
+#### Деплой (PR I)
+- #2921 влит 07.11, деплой 19:24Z без даунтайма (перезапуск CI после flaky `SettlementSourceLockOrderTest`;
+  фикс таймаута — PR #2922), 12 контейнеров healthy, GlitchTip чист.
 
 #### Risks / reviewer focus (PR I)
 - HIGH-LOCAL по плану (финансовые формы): контроллеры и формы не менялись, разметка не менялась.
@@ -471,7 +478,12 @@ GlitchTip чист, контейнеры healthy (12). PR E: #2916, merge `97b51
   в `data-confirm-title` через автоэкранирование, прежний JS конкатенировал строку.
 
 #### Next
-- PR H (#2920, CI 16/16) и PR I → handoff «merge and deploy» (PR I открывать после мержа PR H).
-- Chart-острова (`dashboard/_demo_chart`, `dashboard/_money_balance_chart`, Chart.js с CDN): партиалы нигде
-  не подключены (ни `include`, ни `render` в `src/`, `templates/`, `tests/`; история — «dashboard demo» 2024 г.) —
-  переносить нечего, удалить закрывающим PR этапа вместе с отметкой Stage 2 DONE.
+- Закрывающий PR Stage 2 (эта ветка): удалены `dashboard/_demo_chart` и `dashboard/_money_balance_chart`
+  (Chart.js с CDN, нигде не подключены — ни `include`, ни `render` в `src/`, `templates/`, `tests/`; история —
+  «dashboard demo»); переносить было нечего. `lint:twig` — 321 файл; `make site-test` — OK (8538 tests, 48074 assertions). Итог этапа: 0 `<script>` с логикой страниц
+  вне исключений конвенции (`_layout/*`, `admin/base`, `notifications/email`, JSON-данные `type="application/json"`).
+- Внешнее ревью закрывающего PR (codex, база master 4ac412c42): по коду замечаний нет; единственная находка —
+  артефакт скрипта: он диффует рабочее дерево двумя точками (`git diff master`), и в дифф попал «откат» чужого
+  PR #2919 (`marketplace/index`, `data-busy-submit`), которого нет в ветке (три точки — только наши 5 файлов).
+  Урок: перед ревью ветку с отставшей базой перебазировать на master или читать находки через `git diff master...HEAD`.
+- Дальше — Stage 3 (`stages/stage-3.md`, план и замер «до» записаны).
