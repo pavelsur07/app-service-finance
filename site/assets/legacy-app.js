@@ -17,6 +17,7 @@ import './styles/pages/marketplace-ads-debug.css';
 import './styles/pages/bank1c-import-preview.css';
 import './styles/pages/payment-calendar.css';
 import './styles/pages/money-account-new.css';
+import './styles/pages/marketplace-ads.css';
 import './bootstrap.js';
 import './project_direction_picker.js';
 import './counterparty_picker.js';

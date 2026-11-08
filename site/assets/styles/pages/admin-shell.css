@@ -119,6 +119,7 @@
 .u-w-120 { width: 120px; }
 .u-w-160 { width: 160px; }
 .u-max-w-520 { max-width: 520px; }
+.u-max-w-640 { max-width: 640px; }
 .u-min-w-300 { min-width: 300px; }
 .u-break-all { word-break: break-all; }
 .u-btn-reset { border: 0; cursor: pointer; font: inherit; }   /* кнопка-бейдж без рамки (статус ИИ в списке пользователей) */

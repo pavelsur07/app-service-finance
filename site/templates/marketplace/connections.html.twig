@@ -77,7 +77,7 @@
                                                     <small>Последняя синхронизация: {{ connection.lastSyncAt|date('d.m.Y H:i') }}</small>
                                                 {% else %}
                                                     <small class="text-warning">
-                                                        <span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem"></span>
+                                                        <span class="spinner-border spinner-border-sm me-1 vf-spinner-xs"></span>
                                                         Первичная загрузка данных...
                                                     </small>
                                                 {% endif %}
@@ -103,13 +103,13 @@
                                                 <a href="{{ path('marketplace_connection_edit', {id: connection.id}) }}" class="btn btn-sm btn-primary">Обновить ключ</a>
                                             {% endif %}
                                             <a href="{{ path('marketplace_connection_edit', {id: connection.id}) }}" class="btn btn-sm btn-outline-secondary">Настройки</a>
-                                            <form method="post" action="{{ path('marketplace_connection_test', {id: connection.id}) }}" style="display:inline">
+                                            <form method="post" action="{{ path('marketplace_connection_test', {id: connection.id}) }}" class="d-inline">
                                                 <input type="hidden" name="_token" value="{{ csrf_token('test' ~ connection.id) }}">
                                                 <button type="submit" class="btn btn-sm btn-outline-info">Проверить</button>
                                             </form>
                                             {% if is_seller %}
                                                 {% if can_manual_sync %}
-                                                    <form method="post" action="{{ path('marketplace_connection_sync', {id: connection.id}) }}" style="display:inline">
+                                                    <form method="post" action="{{ path('marketplace_connection_sync', {id: connection.id}) }}" class="d-inline">
                                                         <input type="hidden" name="_token" value="{{ csrf_token('sync' ~ connection.id) }}">
                                                         <button type="submit" class="btn btn-sm btn-primary">Синхронизировать</button>
                                                     </form>
@@ -145,7 +145,7 @@
                                                     Переобработать
                                                 </button>
                                             {% endif %}
-                                            <form method="post" action="{{ path('marketplace_connection_toggle', {id: connection.id}) }}" style="display:inline">
+                                            <form method="post" action="{{ path('marketplace_connection_toggle', {id: connection.id}) }}" class="d-inline">
                                                 <input type="hidden" name="_token" value="{{ csrf_token('toggle' ~ connection.id) }}">
                                                 <button type="submit" class="btn btn-sm btn-outline-secondary">
                                                     {{ connection.isActive ? 'Деактивировать' : 'Активировать' }}

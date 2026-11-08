@@ -102,8 +102,7 @@
                                     <div class="text-secondary small mb-1">Доступные коды:</div>
                                     {% for code in available_codes %}
                                         <span
-                                            class="badge bg-azure-lt me-1 mb-1"
-                                            style="cursor: pointer;"
+                                            class="badge bg-azure-lt me-1 mb-1 cursor-pointer"
                                             data-insert-code="{{ code }}"
                                             data-insert-target="#{{ form.formula.vars.id }}"
                                         >{{ code }}</span>

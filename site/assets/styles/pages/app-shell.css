@@ -1,0 +1,2 @@
+/* Общий shell кита (_layout/app): правила уровня приложения, которых нет в UI Kit. Stage 4: из style="…" шаблонов, 1:1. */
+.billing-expiry-notice { margin: var(--s-3) var(--s-4) 0; }   /* billing/_partials/expiry_notice под шапкой */

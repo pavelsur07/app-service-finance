@@ -218,14 +218,14 @@
             <div class="vf-pf{{ by_rows ? ' vf-pf--rows' : '' }}{{ by_columns ? ' vf-pf--columns' : '' }}" data-pf-mode="{{ all ? 'all-' ~ layout : show }}">
                 <table class="vf-pf__table" style="width: {{ table_width }}px;">
                     <colgroup>
-                        <col style="width: 260px;">
+                        <col class="u-w-260">
                         {% for column in periodColumns %}
                             {% for metric in metrics %}<col class="vf-pf__period" style="width: {{ period_width }}px;">{% endfor %}
                         {% endfor %}
                         {% if has_total %}
-                            <col class="vf-pf__mhide" style="width: 118px;"><col class="vf-pf__mhide" style="width: 118px;"><col style="width: 118px;"><col style="width: 82px;">
+                            <col class="vf-pf__mhide u-w-118"><col class="vf-pf__mhide u-w-118"><col class="u-w-118"><col class="u-w-82">
                         {% endif %}
-                        <col class="vf-pf__mhide" style="width: 118px;">
+                        <col class="vf-pf__mhide u-w-118">
                     </colgroup>
                     <thead>
                         <tr>

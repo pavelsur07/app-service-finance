@@ -4,14 +4,14 @@
     <table class="table table-vcenter table-striped table-compact align-middle">
         <thead>
         <tr>
-            <th class="nowrap" style="width: 120px;">Дата</th>
+            <th class="nowrap u-w-120">Дата</th>
             <th>Категория ДДС</th>
             <th class="text-truncate">Контрагент</th>
             {# DS-Money: «₽» в заголовке — только если все платежи по рублёвым счетам; иначе валюта в строке. #}
             {% set amounts_in_rub = payments|filter(p => p.moneyAccount and p.moneyAccount.currency != 'RUB')|length == 0 %}
-            <th class="text-end nowrap" style="width: 140px;">Сумма{% if amounts_in_rub %}, ₽{% endif %}</th>
-            <th class="text-truncate" style="width: 160px;">Счёт</th>
-            <th style="width: 140px;">Статус</th>
+            <th class="text-end nowrap u-w-140">Сумма{% if amounts_in_rub %}, ₽{% endif %}</th>
+            <th class="text-truncate u-w-160">Счёт</th>
+            <th class="u-w-140">Статус</th>
             <th class="d-none d-lg-table-cell text-truncate">Комментарий</th>
             <th class="w-1 text-end">Действия</th>
         </tr>

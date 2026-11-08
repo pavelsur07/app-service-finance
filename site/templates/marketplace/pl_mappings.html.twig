@@ -182,7 +182,7 @@
                                     Редактировать
                                 </a>
 
-                                <form method="post" action="{{ path('marketplace_pl_mappings_toggle', {id: m.id}) }}" style="display:inline">
+                                <form method="post" action="{{ path('marketplace_pl_mappings_toggle', {id: m.id}) }}" class="d-inline">
                                     <input type="hidden" name="_token" value="{{ csrf_token('toggle' ~ m.id) }}">
                                     <input type="hidden" name="redirect_op" value="{{ operationType }}">
                                     <input type="hidden" name="redirect_marketplace" value="{{ marketplaceFilterValue }}">

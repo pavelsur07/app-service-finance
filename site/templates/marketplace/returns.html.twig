@@ -40,7 +40,7 @@
                 <th class="text-end">Кол-во</th>
                 <th class="text-end">Возврат, ₽</th>
                 <th class="text-end">Себес., ₽</th>
-                <th style="max-width: 180px">Причина</th>
+                <th class="u-max-w-180">Причина</th>
                 <th>ID</th>
             </tr>
             </thead>
@@ -78,9 +78,9 @@
                                 <span class="text-muted">—</span>
                             {% endif %}
                         </td>
-                        <td style="max-width: 180px">
+                        <td class="u-max-w-180">
                             {% if return.return_reason %}
-                                <span class="badge bg-yellow-lt text-truncate d-inline-block" style="max-width: 100%"
+                                <span class="badge bg-yellow-lt text-truncate d-inline-block mw-100"
                                       title="{{ return.return_reason }}">
                                         {{ return.return_reason }}
                                     </span>

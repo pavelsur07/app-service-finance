@@ -2311,3 +2311,26 @@
 }
 
 /* Бюджет ОПиУ, «План–факт» — стили в assets/styles/pages/budget.css (BUDGET-SPEC §6). */
+
+/* ---------------------------------------------------------------------------
+   Утилиты легаси-слоя (Stage 4: вынесены из style="…" шаблонов, значения 1:1).
+   Tabler закрывает d-inline / text-nowrap / cursor-pointer / mw-100; здесь — то, чего у него нет.
+   Имена и значения совпадают с u-* в pages/admin-shell.css (другой бандл); унификация — DS-проход.
+   --------------------------------------------------------------------------- */
+.u-tnum { font-variant-numeric: tabular-nums; }
+.u-w-50 { width: 50px; }
+.u-w-60 { width: 60px; }
+.u-w-82 { width: 82px; }
+.u-w-118 { width: 118px; }
+.u-w-120 { width: 120px; }
+.u-w-140 { width: 140px; }
+.u-w-160 { width: 160px; }
+.u-w-200 { width: 200px; }
+.u-w-260 { width: 260px; }
+.u-max-w-180 { max-width: 180px; }
+.u-max-w-220 { max-width: 220px; }
+.u-max-w-320 { max-width: 320px; }
+.u-max-w-420 { max-width: 420px; }
+.u-min-w-280 { min-width: 280px; }
+.u-min-w-16r { min-width: 16rem; }
+.vf-spinner-xs { width: .7rem; height: .7rem; }   /* spinner-border-sm ещё меньше (кнопка «Проверить» в подключениях) */

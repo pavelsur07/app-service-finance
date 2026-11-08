@@ -333,7 +333,7 @@
                                     <td>{{ r.direction }}</td>
                                     <td>{{ r.category_name ?? '—' }}</td>
                                     <td>{{ r.import_source ?? '—' }}</td>
-                                    <td class="text-truncate" style="max-width: 220px;" title="{{ r.external_id ?? '' }}">{{ r.external_id ?? '—' }}</td>
+                                    <td class="text-truncate u-max-w-220" title="{{ r.external_id ?? '' }}">{{ r.external_id ?? '—' }}</td>
                                     <td>
                                         {% if r.flag_wrong_sign %}<span class="badge bg-danger me-1"><i class="ti ti-alert-triangle me-1"></i>Знак</span>{% endif %}
                                         {% if r.flag_no_category %}<span class="badge bg-warning-lt me-1"><i class="ti ti-tag-off me-1"></i>Нет категории</span>{% endif %}
