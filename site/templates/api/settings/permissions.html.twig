@@ -4,7 +4,6 @@
 <div class="wz-head"><h1 class="wz-title">Права API-ключа<span class="wz-sub">Подготовьте доступ отдельно для каждого подключения</span></h1><div class="wz-head-actions"><a class="btn btn-md btn-secondary" href="{{ path('settings_api_index') }}">К списку ключей</a></div></div>
 <div class="wz-row"><section class="card">
     <div class="form-field"><label class="form-label" for="api-key-current-name">Ключ</label><input id="api-key-current-name" class="input" readonly value="{{ key.name }}"></div>
-    {% for message in app.flashes('api_permissions_success') %}<div class="alert alert--success" role="status"><div class="a-body"><p class="a-text">{{ message }}</p></div></div>{% endfor %}
     <div class="alert alert--warning"><div class="a-body"><p class="a-text">Права подготовлены. Доступ появится после подключения раздела и вашего включения</p></div></div>
     <p>Подготовлено прав: {{ key.selectedScopes|length }}. Действующих прав: {{ effectiveScopes|length }}.</p>
     <p>Новые разделы и права не выдаются автоматически. Сохранение прав не продлевает срок действия ключа.</p>

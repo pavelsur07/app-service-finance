@@ -41,6 +41,12 @@ final class CompanyMemberInviteFlowTest extends WebTestCaseBase
 
         self::assertTrue($client->getResponse()->isRedirect());
 
+        // Ссылка приходит flash-ключом invite_token: общий flash shell'а его не забирает (Stage 3 twig-ui).
+        $crawler = $client->followRedirect();
+        self::assertSelectorTextContains('.card-title', 'Ссылка для приглашения');
+        self::assertStringContainsString('/invite/', (string) $crawler->filter('.js-copy-invite')->attr('data-copy'));
+        self::assertSelectorNotExists('.toast.text-bg-invite_token');
+
         /** @var CompanyInviteRepository $inviteRepository */
         $inviteRepository = self::getContainer()->get(CompanyInviteRepository::class);
         $invite = $inviteRepository->findPendingByCompanyAndEmail(
