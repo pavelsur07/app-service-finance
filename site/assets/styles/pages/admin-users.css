@@ -1,0 +1,4 @@
+/* Admin · Пользователи (templates/admin/users/index). Из style="…" шаблона, значения 1:1 (Stage 4). */
+.admin-users-filter { display: flex; gap: var(--s-3); align-items: flex-end; flex-wrap: wrap; margin-bottom: var(--s-3); }
+.admin-cabinet-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); }
+.admin-cabinet-row:not(:last-child) { margin-bottom: var(--s-2); }   /* было {% if not loop.last %}margin-bottom{% endif %} */

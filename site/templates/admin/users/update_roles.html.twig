@@ -6,11 +6,11 @@
   <div class="wz-head">
     <div>
       <h1 class="wz-title">Изменение роли пользователя</h1>
-      <div style="margin-top:var(--s-1); font-size:var(--font-13); color:var(--text-secondary);">{{ user.email }}</div>
+      <div class="wz-subtitle">{{ user.email }}</div>
     </div>
   </div>
 
-  <div class="card" style="max-width:520px;">
+  <div class="card u-max-w-520">
     <form method="post" action="{{ path('admin_user_update_roles', {id: user.id}) }}">
       <input type="hidden" name="_token" value="{{ csrf_token('admin_user_roles_' ~ user.id) }}">
 
@@ -31,7 +31,7 @@
         </select>
       </div>
 
-      <div style="display:flex; gap:var(--s-2); margin-top:var(--s-4);">
+      <div class="u-flex u-gap-2 u-mt-4">
         <button type="submit" class="btn btn-md btn-primary">Сохранить</button>
         <a href="{{ path('admin_user_index') }}" class="btn btn-md btn-secondary">Назад к списку</a>
       </div>

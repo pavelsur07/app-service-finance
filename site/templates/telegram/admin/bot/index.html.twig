@@ -59,7 +59,7 @@
           {% if status.lastErrorDate or status.lastErrorMessage %}
             <span>{{ status.lastErrorMessage ?: 'сообщение отсутствует' }}</span>
             {% if status.lastErrorDate %}
-              <span style="color:var(--text-muted); font-size:var(--font-11);">{{ status.lastErrorDate|date('d.m.Y H:i:s') }}</span>
+              <span class="u-muted u-fs-11">{{ status.lastErrorDate|date('d.m.Y H:i:s') }}</span>
             {% endif %}
           {% else %}
             <span>Ошибок не зафиксировано</span>
@@ -99,7 +99,7 @@
             {% for bot in bots %}
               <tr>
                 <td>{{ bot.username ?? '—' }}</td>
-                <td style="color:var(--text-muted); font-family:var(--font-mono);">
+                <td class="u-muted u-mono">
                   {{ bot.token ? bot.token|slice(0, 6) ~ '****' : '—' }}
                 </td>
                 <td>{{ bot.webhookUrl ?? '—' }}</td>

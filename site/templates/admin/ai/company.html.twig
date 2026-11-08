@@ -16,7 +16,7 @@
   <div class="wz-head">
     <div>
       <h1 class="wz-title">ИИ кабинета</h1>
-      <div style="margin-top:var(--s-1); font-size:var(--font-13); color:var(--text-secondary);">
+      <div class="wz-subtitle">
         {{ company.name }}{% if company.inn %} · ИНН {{ company.inn }}{% endif %}
       </div>
     </div>
@@ -24,8 +24,8 @@
   </div>
 
   {# Состояние #}
-  <section class="card" style="margin-bottom:var(--s-4);" data-ai-state>
-    <div style="display:flex; flex-wrap:wrap; gap:var(--s-5); align-items:baseline;">
+  <section class="card u-mb-4" data-ai-state>
+    <div class="wz-stat-row">
       <div>
         <div class="form-hint">Подключение</div>
         {% if overview.connected %}
@@ -37,7 +37,7 @@
       </div>
       <div data-ai-spent>
         <div class="form-hint">Расход за месяц</div>
-        <div style="font-variant-numeric:tabular-nums; font-weight:600;">
+        <div class="u-tnum u-fw-600">
           {{ budget.spentRub|number_format(2, ',', ' ') }} ₽ из {{ budget.limitRub|number_format(0, ',', ' ') }} ₽
         </div>
         {% if overview.connected and budget.companyExceeded %}
@@ -46,14 +46,14 @@
       </div>
       <div>
         <div class="form-hint">Все компании за месяц</div>
-        <div style="font-variant-numeric:tabular-nums;">{{ budget.totalSpentRub|number_format(2, ',', ' ') }} ₽ из {{ budget.totalLimitRub|number_format(0, ',', ' ') }} ₽</div>
+        <div class="u-tnum">{{ budget.totalSpentRub|number_format(2, ',', ' ') }} ₽ из {{ budget.totalLimitRub|number_format(0, ',', ' ') }} ₽</div>
         {% if budget.totalExceeded %}
           <span class="status status--danger"><span class="dot"></span>Общий лимит исчерпан</span>
         {% endif %}
       </div>
       <div>
         <div class="form-hint">Результатов / токенов за месяц</div>
-        <div style="font-variant-numeric:tabular-nums;">
+        <div class="u-tnum">
           {{ overview.resultsThisMonth }} · {{ overview.inputTokensThisMonth|number_format(0, ',', ' ') }} вход / {{ overview.outputTokensThisMonth|number_format(0, ',', ' ') }} выход
         </div>
       </div>
@@ -61,7 +61,7 @@
         <div class="form-hint">Последний запуск</div>
         {% set last = overview.lastRun %}
         {% if last %}
-          <div style="font-variant-numeric:tabular-nums;">{{ last.ranAt|date('d.m.Y H:i') }}</div>
+          <div class="u-tnum">{{ last.ranAt|date('d.m.Y H:i') }}</div>
           <div class="form-hint">
             {%- if last.error -%}сбой: {{ last.error }}
             {%- elseif last.skippedReason -%}пропуск: {{ skipLabels[last.skippedReason] ?? last.skippedReason }}
@@ -74,23 +74,23 @@
     </div>
   </section>
 
-  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:var(--s-4); margin-bottom:var(--s-4);">
+  <div class="wz-card-grid">
     {# Лимиты / подключение #}
     <section class="card">
       {% if overview.connected %}
-        <h2 style="font-size:var(--font-15); margin:0 0 var(--s-1);">Лимиты</h2>
-        <p class="form-hint" style="margin:0 0 var(--s-3);">Расход считается по календарному месяцу; при исчерпании новые операции не отправляются до нового месяца или повышения лимита.</p>
+        <h2 class="wz-card-title">Лимиты</h2>
+        <p class="form-hint u-m-0 u-mb-3">Расход считается по календарному месяцу; при исчерпании новые операции не отправляются до нового месяца или повышения лимита.</p>
         <form method="post" action="{{ path('admin_ai_company_limits', {companyId: company.id}) }}" data-ai-limits-form>
           <input type="hidden" name="_token" value="{{ csrf_token('ai_company_limits_' ~ company.id) }}">
       {% else %}
-        <h2 style="font-size:var(--font-15); margin:0 0 var(--s-1);">Подключить ИИ</h2>
-        <p class="form-hint" style="margin:0 0 var(--s-3);">Операции без статьи за выбранный период уйдут в ближайший запуск (в :25 каждого часа) — это платные запросы к LLM.</p>
+        <h2 class="wz-card-title">Подключить ИИ</h2>
+        <p class="form-hint u-m-0 u-mb-3">Операции без статьи за выбранный период уйдут в ближайший запуск (в :25 каждого часа) — это платные запросы к LLM.</p>
         <form method="post" action="{{ path('admin_ai_company_access', {companyId: company.id}) }}" data-ai-connect-form>
           <input type="hidden" name="_token" value="{{ csrf_token('ai_company_access_' ~ company.id) }}">
           <input type="hidden" name="enabled" value="1">
           <input type="hidden" name="return_to" value="company">
       {% endif %}
-          <div style="display:flex; gap:var(--s-3);">
+          <div class="u-flex u-gap-3">
             <div class="form-field u-flex-1">
               <label class="form-label" for="ai-limit">Лимит в месяц, ₽</label>
               <input id="ai-limit" type="text" inputmode="decimal" name="monthly_limit_rub" class="input" value="{{ budget.limitRub|number_format(2, ',', '') }}" required>
@@ -110,13 +110,13 @@
 
     {# Подсказки #}
     <section class="card" data-ai-suggestions>
-      <h2 style="font-size:var(--font-15); margin:0 0 var(--s-1);">Подсказки за {{ statsDays }} дней</h2>
+      <h2 class="wz-card-title">Подсказки за {{ statsDays }} дней</h2>
       {% set precision = stats.precision %}
-      <p class="form-hint" style="margin:0 0 var(--s-3);">
+      <p class="form-hint u-m-0 u-mb-3">
         Доля верных среди решённых людьми: {{ precision is null ? '— (решений нет)' : (precision * 100)|round(0) ~ ' %' }}
         {%- if stats.corrected or stats.confirmedByEdit %} · правкой операции: подтверждено {{ stats.confirmedByEdit }}, исправлено {{ stats.corrected }}{% endif %}
       </p>
-      <p class="form-hint" style="margin:0 0 var(--s-3);" data-ai-transfer-skipped>
+      <p class="form-hint u-m-0 u-mb-3" data-ai-transfer-skipped>
         Похоже на перевод собственных средств, в ИИ не отправлено (операции за {{ transferWindowDays }} дней): {{ stats.transferLikeSkipped }}
       </p>
       {% if stats.byStatus is empty %}
@@ -125,7 +125,7 @@
         <table class="t-table">
           <tbody>
             {% for status, count in stats.byStatus %}
-              {% set statusEnum = enum('App\\Cash\\Enum\\Transaction\\CashCategorySuggestionStatus').tryFrom(status) %}<tr><td>{{ statusEnum ? statusEnum.label() : status }}</td><td class="t-cell--right" style="font-variant-numeric:tabular-nums;">{{ count }}</td></tr>
+              {% set statusEnum = enum('App\\Cash\\Enum\\Transaction\\CashCategorySuggestionStatus').tryFrom(status) %}<tr><td>{{ statusEnum ? statusEnum.label() : status }}</td><td class="t-cell--right u-tnum">{{ count }}</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -134,10 +134,10 @@
   </div>
 
   {# Журнал запусков #}
-  <section class="card u-p-0" style="overflow-x:auto;" data-ai-runs>
-    <div style="padding:var(--s-4) var(--s-4) 0;"><h2 style="font-size:var(--font-15); margin:0;">Запуски</h2></div>
+  <section class="card u-p-0 wz-scroll" data-ai-runs>
+    <div class="wz-card-intro"><h2 class="u-fs-15 u-m-0">Запуски</h2></div>
     {% if overview.runs is empty %}
-      <div class="form-hint" style="padding:var(--s-4);">Запусков ещё не было: cron идёт в :25 каждого часа.</div>
+      <div class="form-hint u-p-4">Запусков ещё не было: cron идёт в :25 каждого часа.</div>
     {% else %}
       <table class="t-table">
         <thead>
@@ -153,7 +153,7 @@
         <tbody>
           {% for run in overview.runs %}
             <tr>
-              <td style="font-variant-numeric:tabular-nums;">{{ run.ranAt|date('d.m.Y H:i') }}</td>
+              <td class="u-tnum">{{ run.ranAt|date('d.m.Y H:i') }}</td>
               <td class="t-cell--right">{{ run.requested }}</td>
               <td class="t-cell--right">{{ run.tasks }}</td>
               <td class="t-cell--right">{{ run.redispatched }}</td>

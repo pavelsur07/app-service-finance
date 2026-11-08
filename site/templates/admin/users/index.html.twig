@@ -23,8 +23,8 @@
     </div>
   </div>
 
-  <form method="get" action="{{ path('admin_user_index') }}" class="card u-p-3" style="display:flex;gap:var(--s-3);align-items:flex-end;flex-wrap:wrap;margin-bottom:var(--s-3);">
-    <div class="form-field" style="margin:0;min-width:300px;">
+  <form method="get" action="{{ path('admin_user_index') }}" class="card u-p-3 admin-users-filter">
+    <div class="form-field u-m-0 u-min-w-300">
       <label class="form-label" for="filter-company">Кабинет</label>
       <select id="filter-company" name="company" class="select">
         <option value="" {% if filter.companyId is null and not filter.withoutCompany %}selected{% endif %}>Все кабинеты</option>
@@ -54,15 +54,15 @@
   </form>
 
   {% if users is not empty %}
-    <div class="card u-p-0" style="overflow-x:auto;">
+    <div class="card u-p-0 wz-scroll">
       <table class="t-table">
         <thead>
           <tr>
             <th>Email</th>
             <th>Кабинеты</th>
-            <th style="width:160px">Дата регистрации</th>
+            <th class="u-w-160">Дата регистрации</th>
             <th>Роли</th>
-            <th class="t-cell--right" style="width:160px">Действия</th>
+            <th class="t-cell--right u-w-160">Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -75,9 +75,9 @@
                 {% set cabinets = userCabinets[user.id] ?? [] %}
                 {% if cabinets is not empty %}
                   {% for cabinet in cabinets %}
-                    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:var(--s-2);{% if not loop.last %}margin-bottom:var(--s-2);{% endif %}">
+                    <div class="admin-cabinet-row">
                       <span>{{ cabinet.name }}</span>
-                      {% if cabinet.inn %}<span style="color:var(--text-muted);font-size:12px;">ИНН {{ cabinet.inn }}</span>{% endif %}
+                      {% if cabinet.inn %}<span class="u-muted u-fs-12">ИНН {{ cabinet.inn }}</span>{% endif %}
                       {% if cabinet.owner %}
                         <span class="status status--success"><span class="dot"></span>Владелец</span>
                       {% else %}
@@ -100,13 +100,12 @@
                       {# Без данных ИИ (рендер после ошибки формы аккаунта) отметку не показываем — иначе «выкл» у подключённых #}
                       {% if aiCabinets is defined %}
                       {% set aiOn = aiCabinets[cabinet.id|lower] ?? false %}
-                      <form method="post" action="{{ path('admin_ai_company_access', {companyId: cabinet.id}) }}" style="display:inline;">
+                      <form method="post" action="{{ path('admin_ai_company_access', {companyId: cabinet.id}) }}" class="u-inline">
                         <input type="hidden" name="_token" value="{{ csrf_token('ai_company_access_' ~ cabinet.id) }}">
                         <input type="hidden" name="enabled" value="{{ aiOn ? 0 : 1 }}">
                         <input type="hidden" name="return_query" value="{{ app.request.queryString }}">
                         <button type="submit"
-                                class="status status--{{ aiOn ? (aiServiceEnabled ? 'success' : 'warning') : 'neutral' }}"
-                                style="border:0;cursor:pointer;font:inherit;"
+                                class="status status--{{ aiOn ? (aiServiceEnabled ? 'success' : 'warning') : 'neutral' }} u-btn-reset"
                                 data-ai-badge="{{ cabinet.id }}"
                                 title="{{ aiOn and not aiServiceEnabled ? 'Подключён, но ИИ-сервис выключен (AI_SERVICE_ENABLED)' : 'ИИ-функции кабинета' }}"
                                 {% if aiOn %}
@@ -131,15 +130,15 @@
                     </div>
                   {% endfor %}
                 {% else %}
-                  <span style="color:var(--text-faint);">Без кабинета</span>
+                  <span class="u-text-faint">Без кабинета</span>
                 {% endif %}
               </td>
-              <td style="font-variant-numeric:tabular-nums;">{{ user.createdAt|date('d.m.Y') }}</td>
+              <td class="u-tnum">{{ user.createdAt|date('d.m.Y') }}</td>
               <td>
                 {% if userRoleLabels is not empty %}
                   {{ userRoleLabels|join(', ') }}
                 {% else %}
-                  <span style="color:var(--text-faint);">—</span>
+                  <span class="u-text-faint">—</span>
                 {% endif %}
               </td>
               <td class="t-cell--right">
@@ -179,7 +178,7 @@
         </div>
         <div class="mdl-body">
           {% if accountForm.vars.errors|length > 0 %}
-            <div class="alert alert--danger" role="alert" style="margin-bottom:var(--s-3);">
+            <div class="alert alert--danger u-mb-3" role="alert">
               <div class="a-body">
                 <div class="a-text">{{ form_errors(accountForm) }}</div>
               </div>

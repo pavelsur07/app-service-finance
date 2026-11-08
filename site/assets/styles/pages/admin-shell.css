@@ -9,6 +9,8 @@
 /* Страничные стили админки (Stage 4: вынесены из <style> шаблонов). @import — до остальных правил. */
 @import url('./service-gateway-coverage.css');
 @import url('./mapping-errors.css');
+@import url('./admin-users.css');
+@import url('./admin-external-categories.css');
 
 /* Brand logo in app-header (moved out of inline twig styles). */
 .app-header-brand a { display: block; text-decoration: none; }
@@ -79,3 +81,44 @@
 .admin-danger-zone__title { margin: 0 0 var(--s-1); font-size: 16px; line-height: 24px; font-weight: 600; }
 .admin-danger-zone__text { margin: 0 0 var(--s-3); color: var(--text-tertiary); }
 .admin-delete-field { margin: var(--s-4) 0; max-width: 420px; }
+
+/* Общие элементы админ-экранов (Stage 4: из style="…" шаблонов, значения 1:1). */
+.wz-subtitle { margin-top: var(--s-1); font-size: var(--font-13); color: var(--text-secondary); }   /* подзаголовок под .wz-title */
+.wz-stat-row { display: flex; flex-wrap: wrap; gap: var(--s-5); align-items: baseline; }           /* ряд «показатель — значение» в карточке */
+.wz-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--s-4); margin-bottom: var(--s-4); }
+.wz-card-intro { padding: var(--s-4) var(--s-4) 0; }                                                /* шапка карточки с таблицей (.card.u-p-0) */
+/* Заголовок карточки-формы: был <h2 style="font-size:15; margin:0 0 4px"> поверх кита .card > h2:not([class])
+   (line-height 24px, weight 600); класс снимает правило кита, поэтому эти два значения повторены явно. */
+.wz-card-title { margin: 0 0 var(--s-1); font-size: var(--font-15); line-height: 24px; font-weight: 600; }                                                /* шапка карточки с таблицей (.card.u-p-0) */
+
+/* Утилиты админки (Stage 4: из style="…", значения 1:1). Кит держит свои u-* в components/button.css;
+   эти — только admin_shell. ponytail: при втором потребителе вне админки — в кит через screen-intake.
+   Порядок важен: u-m-0 раньше u-mb-N и u-mt-N, чтобы «u-m-0 u-mb-3» давало margin:0 0 12px. */
+.u-tnum { font-variant-numeric: tabular-nums; }
+.u-fw-600 { font-weight: 600; }
+.u-fs-11 { font-size: var(--font-11); }
+.u-fs-12 { font-size: 12px; }
+.u-fs-15 { font-size: var(--font-15); }
+.u-fs-16 { font-size: var(--font-16); }
+.u-mono { font-family: var(--font-mono); }
+.u-text-faint { color: var(--text-faint); }
+.u-muted { color: var(--text-muted); }   /* .u-text-muted в шаблонах встречается, но нигде не определён — не трогаем, см. отчёт */
+.u-m-0 { margin: 0; }
+.u-mt-1 { margin-top: var(--s-1); }
+.u-mt-4 { margin-top: var(--s-4); }
+.u-mt-5 { margin-top: var(--s-5); }
+.u-mb-1 { margin-bottom: var(--s-1); }
+.u-mb-3 { margin-bottom: var(--s-3); }
+.u-mb-4 { margin-bottom: var(--s-4); }
+.u-p-4 { padding: var(--s-4); }
+.u-flex { display: flex; }
+.u-inline { display: inline; }
+.u-gap-1 { gap: 4px; }
+.u-gap-2 { gap: var(--s-2); }
+.u-gap-3 { gap: var(--s-3); }
+.u-w-120 { width: 120px; }
+.u-w-160 { width: 160px; }
+.u-max-w-520 { max-width: 520px; }
+.u-min-w-300 { min-width: 300px; }
+.u-break-all { word-break: break-all; }
+.u-btn-reset { border: 0; cursor: pointer; font: inherit; }   /* кнопка-бейдж без рамки (статус ИИ в списке пользователей) */

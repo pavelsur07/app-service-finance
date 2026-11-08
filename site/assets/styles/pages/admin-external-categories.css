@@ -1,0 +1,5 @@
+/* Admin · Внешние категории Ozon (templates/admin/ingestion/external_categories/index). Из style="…" шаблона, значения 1:1 (Stage 4). */
+.ext-cat-confirm-form { display: flex; flex-direction: column; gap: 4px; min-width: 240px; }
+.ext-cat-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.mdl--ext-cat { width: 520px; max-width: 92vw; }            /* <dialog> сжимается по контенту — ширина .mdl явно */
+.ext-cat-mdl-body { max-height: 66vh; overflow-y: auto; }
