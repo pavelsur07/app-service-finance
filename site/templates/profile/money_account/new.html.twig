@@ -4,23 +4,6 @@
 
 {% block title %}{{ is_edit ? 'Редактирование счёта' : 'Новый счёт' }}{% endblock %}
 
-{% block stylesheets %}
-    <style>
-        #money-account-create-page .money-account-type-description {
-            font-size: .78rem;
-        }
-
-        #money-account-create-page .money-account-currency {
-            max-width: 6rem;
-        }
-
-        #money-account-create-page .money-account-info {
-            font-size: .85rem;
-            line-height: 1.5;
-        }
-    </style>
-{% endblock %}
-
 {% block body %}
     {% embed 'partials/_page_header.html.twig' with {pretitle: 'Счета и кассы'} %}
         {% block title %}

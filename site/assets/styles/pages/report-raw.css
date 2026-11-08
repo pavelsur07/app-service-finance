@@ -1,0 +1,6 @@
+/* Сырые транзакции ОПиУ (templates/finance/report/raw). Перенесено из <style> страницы 1:1 (Stage 4).
+   Имена классов общие (.muted/.warn/.ok/.mono), поэтому правила привязаны к body.page-report-raw. */
+body.page-report-raw .muted { color: var(--vf-text-muted); }
+body.page-report-raw .warn  { background: var(--vf-warn-bg); }
+body.page-report-raw .ok    { background: var(--vf-ok-bg); }
+body.page-report-raw .mono  { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }

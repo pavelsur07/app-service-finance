@@ -1,0 +1,7 @@
+/* Admin · Покрытие Сервис GO (templates/admin/service_gateway/coverage): только раскладка,
+   цвета и состояния — классы кита coverage.css. Перенесено из <style> страницы 1:1 (Stage 4). */
+.sgw-cov-span { grid-column: span var(--cov-span); justify-content: flex-start; padding-left: var(--s-1); }
+.sgw-cov-cell-wide { max-width: 96px; }
+.sgw-cov-cell-week { max-width: none; margin: 0 3px; } /* неделя — полосой на свои дни */
+.sgw-cov-tabs-gap { margin-bottom: var(--s-4); }
+.sgw-cov-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-3); margin: var(--s-4) 0 var(--s-3); }

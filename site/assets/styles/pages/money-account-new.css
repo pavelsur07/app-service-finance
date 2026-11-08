@@ -1,0 +1,13 @@
+/* Новый счёт / редактирование счёта (templates/profile/money_account/new). Перенесено из <style> страницы 1:1 (Stage 4). */
+#money-account-create-page .money-account-type-description {
+    font-size: .78rem;
+}
+
+#money-account-create-page .money-account-currency {
+    max-width: 6rem;
+}
+
+#money-account-create-page .money-account-info {
+    font-size: .85rem;
+    line-height: 1.5;
+}

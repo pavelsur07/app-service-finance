@@ -2,41 +2,6 @@
 
 {% block title %}Неизвестные затраты — Маркетплейсы{% endblock %}
 
-{% block admin_styles %}
-  <style>
-    table.t-table[data-mapping-errors-table] {
-      --mapping-errors-col-company: 180px;
-      --mapping-errors-col-marketplace: 150px;
-      --mapping-errors-col-service: 280px;
-      --mapping-errors-col-amount: 150px;
-      --mapping-errors-col-rows: 70px;
-      --mapping-errors-col-detected: 145px;
-      --mapping-errors-col-status: 110px;
-      --mapping-errors-col-actions: 170px;
-      --mapping-errors-table-width: calc(
-        var(--mapping-errors-col-company) + var(--mapping-errors-col-marketplace) +
-        var(--mapping-errors-col-service) + var(--mapping-errors-col-amount) +
-        var(--mapping-errors-col-rows) + var(--mapping-errors-col-detected) +
-        var(--mapping-errors-col-status) + var(--mapping-errors-col-actions)
-      );
-      width: 100%;
-      min-width: var(--mapping-errors-table-width);
-      table-layout: fixed;
-    }
-    [data-mapping-errors-table] col:nth-child(1) { width: var(--mapping-errors-col-company); }
-    [data-mapping-errors-table] col:nth-child(2) { width: var(--mapping-errors-col-marketplace); }
-    [data-mapping-errors-table] col:nth-child(3) { width: var(--mapping-errors-col-service); }
-    [data-mapping-errors-table] col:nth-child(4) { width: var(--mapping-errors-col-amount); }
-    [data-mapping-errors-table] col:nth-child(5) { width: var(--mapping-errors-col-rows); }
-    [data-mapping-errors-table] col:nth-child(6) { width: var(--mapping-errors-col-detected); }
-    [data-mapping-errors-table] col:nth-child(7) { width: var(--mapping-errors-col-status); }
-    [data-mapping-errors-table] col:nth-child(8) { width: var(--mapping-errors-col-actions); }
-    [data-mapping-errors-table] :is(td:nth-child(1), td:nth-child(3) code) { overflow-wrap: anywhere; }
-    [data-mapping-errors-table] :is(th, td):nth-child(4),
-    [data-mapping-errors-table] :is(th, td):nth-child(6) { white-space: nowrap; }
-  </style>
-{% endblock %}
-
 {% block body %}
   {% set marketplace_tones = {
     'ozon': 'ozon',

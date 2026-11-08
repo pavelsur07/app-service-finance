@@ -1,4 +1,4 @@
-### Stage 4: CSS из шаблонов — IN PROGRESS (PR A на handoff)
+### Stage 4: CSS из шаблонов — IN PROGRESS (PR A на проде, PR B на handoff)
 
 **Risk:** LOW (перенос правил 1:1 в страничные CSS-файлы, затем токены; визуал не меняется)
 **Stage base commit:** master после закрывающего PR Stage 3
@@ -33,7 +33,8 @@
 #### Чек-лист приёмки
 - [x] 4.0 — скриншоты «до» 7 страниц 4.1 в `docs/tasks/twig-ui-systematization/screens/stage-4/` (PR A, 1366×900 fullPage)
 - [x] 4.1 — 7 блоков перенесены, `grep -rl '<style' templates | grep -v notifications/email` → 8 (PR A)
-- [ ] 4.2 — `<style>` вне писем → 0; `grep -rho 'style="' templates | wc -l` ≤ 20, каждое оставшееся — динамическое значение
+- [~] 4.2 — `<style>` вне писем → 0; `grep -rho 'style="' templates | wc -l` ≤ 20, каждое оставшееся — динамическое значение
+  - [x] часть 1 (PR B): 8 блоков `<style>` → страничные CSS, `grep -rl '<style' templates | grep -v notifications/email` → 0
 - [ ] Значения в новых CSS — токены `--vf-*`; остатки hex/px — с `TODO(ds)`, их число в отчёте
 - [ ] Каждый PR: `npm run build`, `make site-cs-twig`, `make site-test`, внешнее ревью; скриншоты до/после для 4.1
 
@@ -73,3 +74,32 @@
 - `make site-cs-twig` — twigcs 0, `lint:twig` OK (323); `npm run lint` — 0; `npm run build` — OK; CS fixer и PHPStan точечно по изменённому тесту — чисто
 - `make site-test` — OK — 8554 тестов, 48 145 assertions (один тест `PlReportPreviewControllerTest::testGroupingUsesReadableDataColumnWidths` искал переменные ширин колонок в HTML страницы, где был `<style>`; теперь проверяет `col.pl-col-total` в HTML и переменные в `pl-report.css`; класс перепрогнан зелёным, 16/16)
 - Внешнее ревью (codex): REVIEW_GREEN (effort medium, дифф 1773 строк, замечаний нет)
+
+#### PR B (4.2, часть 1) — оставшиеся 8 блоков `<style>` → страничные CSS
+
+##### Что сделано
+- Легаси (entry `legacy_app`, импорт в `assets/legacy-app.js`): `auto-rules.css` (`.auto-rule-list`), `report-raw.css`,
+  `marketplace-ads-debug.css` (`.debug-pre`), `bank1c-import-preview.css` (`.preview-row-*`), `payment-calendar.css`
+  (`.table-sticky-head`, используется в `index` и `_table_compact` одной страницы), `money-account-new.css`
+  (`#money-account-create-page …`).
+- Админка (entry `admin_shell`): `service-gateway-coverage.css` (`.sgw-cov-*`) и `mapping-errors.css`
+  (`[data-mapping-errors-table]`) подключены `@import` в начале `admin-shell.css` — до остальных правил, как требует CSS;
+  блоки `{% block admin_styles %}` у двух страниц удалены. Селекторы уникальны, утечки на другие админ-экраны нет.
+- `finance/report/raw` держал общие имена `.muted/.warn/.ok/.mono` (`.warn`/`.ok` есть у документов и маркетплейса,
+  `.mono` — у Telegram-бота): правила привязаны к `body.page-report-raw` через `{% block body_class %}` из PR A.
+- Правила перенесены 1:1: сверка множеств деклараций «удалено из шаблонов» ↔ «новые файлы» — совпадают (58 деклараций).
+- Пустые `{% block stylesheets %}` сняты. Вне писем `<style>` в шаблонах больше нет (0).
+
+##### Проверка визуала
+- Стенд, 8 страниц (все GET), 1366×900 fullPage, до и после — все identical (Pillow). Скриншоты «до» —
+  `screens/stage-4/pr-b/`. Оговорка: автоправила, платёжный календарь, предпросмотр 1С и неизвестные затраты на стенде
+  без данных — строки таблиц (sticky-шапка, подсветка строк) не отрисованы; для них гарантия — сверка деклараций 1:1.
+
+##### Files changed (PR B)
+- `site/assets/styles/pages/{auto-rules,report-raw,marketplace-ads-debug,bank1c-import-preview,payment-calendar,money-account-new,service-gateway-coverage,mapping-errors}.css` (new),
+  `site/assets/legacy-app.js`, `site/assets/styles/pages/admin-shell.css`, 8 шаблонов, `screens/stage-4/pr-b/*.png` (8)
+
+##### Проверки (PR B)
+- `make site-cs-twig` — twigcs 0, `lint:twig` OK (323); `npm run lint` — 0; `npm run build` — OK; PHP не менялся
+- `make site-test` — OK — 8554 тестов, 48 146 assertions
+- Внешнее ревью (codex): REVIEW_GREEN (effort medium, дифф 422 строк, замечаний нет)

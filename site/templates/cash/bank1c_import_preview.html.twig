@@ -2,15 +2,6 @@
 
 {% block title %}Предпросмотр импорта 1С{% endblock %}
 
-{% block stylesheets %}
-    {{ parent() }}
-    <style>
-        /* DS-Money: приход — OK, расход — без подсветки (не красный), перевод между своими — категориальный Purple. */
-        .preview-row-inflow { --tblr-table-bg: var(--vf-ok-bg); }
-        .preview-row-self-transfer { --tblr-table-bg: var(--tblr-purple-lt); }
-    </style>
-{% endblock %}
-
 {% block body %}
     {% embed 'partials/_page_header.html.twig' with {title: 'Предпросмотр импорта банковской выписки 1С'} %}
         {% block subtitle %}

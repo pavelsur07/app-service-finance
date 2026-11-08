@@ -1,14 +1,9 @@
 {% extends 'base.html.twig' %}
 {% block title %}Сырые транзакции ОПиУ (P&L){% endblock %}
 
-{% block body %}
-<style>
-  .muted { color: var(--vf-text-muted); }
-  .warn  { background: var(--vf-warn-bg); }
-  .ok    { background: var(--vf-ok-bg); }
-  .mono  { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-</style>
+{% block body_class %} page-report-raw{% endblock %}
 
+{% block body %}
 <div class="page-body">
   <div class="container-xl">
     <div class="card">
