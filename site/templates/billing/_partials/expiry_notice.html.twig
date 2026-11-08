@@ -19,7 +19,7 @@
     {%- endif -%}
   {% endset %}
   {% if variant|default('legacy') == 'app' %}
-    <div class="alert alert--{{ level }}" role="status" data-billing-notice="{{ notice.kind }}" style="margin:var(--s-3) var(--s-4) 0;">
+    <div class="alert alert--{{ level }} billing-expiry-notice" role="status" data-billing-notice="{{ notice.kind }}">
       <div class="a-body"><p class="a-text">{{ text }} <a href="{{ path('company_price_index') }}">Тарифы и оплата</a></p></div>
     </div>
   {% else %}

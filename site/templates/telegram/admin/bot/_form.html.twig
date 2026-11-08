@@ -1,7 +1,7 @@
 {{ form_start(form) }}
-<div class="card" style="max-width:640px;">
+<div class="card u-max-w-640">
   {% if form.vars.errors|length > 0 %}
-    <div class="alert alert--danger" role="alert" style="margin-bottom:var(--s-4);">
+    <div class="alert alert--danger u-mb-4" role="alert">
       <div class="a-body">
         <div class="a-text">{{ form_errors(form) }}</div>
       </div>

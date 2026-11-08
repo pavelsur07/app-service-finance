@@ -47,7 +47,7 @@
         </div>
         <div class="col-sm-auto">
           <div class="text-secondary small">{{ access.trial ? 'Пробный период до' : 'Оплачено по' }}</div>
-          <div style="font-variant-numeric:tabular-nums;">
+          <div class="u-tnum">
             {% if access.tariffName is null %}—{% elseif access.paidUntil is null %}бессрочно{% else %}{{ access.paidUntil|date('d.m.Y') }}{% endif %}
           </div>
         </div>
@@ -60,7 +60,7 @@
         {% if access.daysLeft is not null and access.daysLeft > 0 %}
           <div class="col-sm-auto">
             <div class="text-secondary small">Осталось дней</div>
-            <div style="font-variant-numeric:tabular-nums;">{{ access.daysLeft }}</div>
+            <div class="u-tnum">{{ access.daysLeft }}</div>
           </div>
         {% endif %}
       </div>
@@ -85,7 +85,7 @@
                 <td class="fw-medium">{{ offer.tariff.name }}</td>
                 {% for m in months %}
                   {% set price = offer.prices[m] ?? null %}
-                  <td class="text-end" style="font-variant-numeric:tabular-nums;">
+                  <td class="text-end u-tnum">
                     {% if price %}
                       <div>{{ price.total|vf_minor|vf_money(0) }}</div>
                       {% if m > 1 %}
@@ -193,11 +193,11 @@
             <tbody>
               {% for payment in payments.currentPageResults %}
                 <tr>
-                  <td style="font-variant-numeric:tabular-nums;">{{ payment.receivedAt|date('d.m.Y') }}</td>
+                  <td class="u-tnum">{{ payment.receivedAt|date('d.m.Y') }}</td>
                   <td>{{ payment.tariff.name }}</td>
                   <td class="text-end">{{ payment.months }} мес</td>
-                  <td class="text-end" style="font-variant-numeric:tabular-nums;">{{ payment.amountKopecks|vf_minor|vf_money }}</td>
-                  <td style="font-variant-numeric:tabular-nums;">{{ payment.periodFrom|date('d.m.Y') }} — {{ payment.periodUntil|date('d.m.Y') }}{% if payment.carriedDays > 0 %}<div class="text-secondary small" data-billing-carried>+{{ payment.carriedDays }} дн. за остаток прежнего тарифа</div>{% endif %}</td>
+                  <td class="text-end u-tnum">{{ payment.amountKopecks|vf_minor|vf_money }}</td>
+                  <td class="u-tnum">{{ payment.periodFrom|date('d.m.Y') }} — {{ payment.periodUntil|date('d.m.Y') }}{% if payment.carriedDays > 0 %}<div class="text-secondary small" data-billing-carried>+{{ payment.carriedDays }} дн. за остаток прежнего тарифа</div>{% endif %}</td>
                   <td>{{ payment.source.label }}</td>
                   <td class="text-break">{{ payment.externalId ?? '—' }}</td>
                 </tr>

@@ -66,7 +66,7 @@
                                 <td>{{ company.name }}</td>
                                 <td>{{ company.deletionDueAt|date('d.m.Y') }}</td>
                                 <td>
-                                    <form method="post" action="{{ path('company_restore', {'id': company.id}) }}" style="display:inline;">
+                                    <form method="post" action="{{ path('company_restore', {'id': company.id}) }}" class="d-inline">
                                         <input type="hidden" name="_token" value="{{ csrf_token('restore' ~ company.id) }}">
                                         <button class="btn btn-sm btn-outline-primary">Восстановить</button>
                                     </form>

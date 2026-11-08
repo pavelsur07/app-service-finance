@@ -60,8 +60,7 @@
                                 {% if isOwner and member.role != 'OWNER' %}
                                     <form method="post"
                                           action="{{ path('company_member_access_role', {memberId: member.id}) }}"
-                                          class="mt-1"
-                                          style="display:inline;">
+                                          class="mt-1 d-inline">
                                         <input type="hidden" name="_token" value="{{ csrf_token('member_access_role_' ~ member.id) }}">
                                         <select name="roleId" class="form-select form-select-sm d-inline-block w-auto">
                                             {% for role in availableRoles %}
@@ -86,15 +85,13 @@
                                 {% if isOwner %}
                                     {% if member.status == 'ACTIVE' %}
                                         <form method="post"
-                                              action="{{ path('company_member_disable', {memberId: member.id}) }}"
-                                              style="display:inline;">
+                                              action="{{ path('company_member_disable', {memberId: member.id}) }}" class="d-inline">
                                             <input type="hidden" name="_token" value="{{ csrf_token('member_disable_' ~ member.id) }}">
                                             <button class="btn btn-sm btn-warning">Отключить</button>
                                         </form>
                                     {% else %}
                                         <form method="post"
-                                              action="{{ path('company_member_enable', {memberId: member.id}) }}"
-                                              style="display:inline;">
+                                              action="{{ path('company_member_enable', {memberId: member.id}) }}" class="d-inline">
                                             <input type="hidden" name="_token" value="{{ csrf_token('member_enable_' ~ member.id) }}">
                                             <button class="btn btn-sm btn-success">Включить</button>
                                         </form>
@@ -135,8 +132,7 @@
                             <td>
                                 {% if isOwner %}
                                     <form method="post"
-                                          action="{{ path('company_invite_revoke', {inviteId: invite.id}) }}"
-                                          style="display:inline;">
+                                          action="{{ path('company_invite_revoke', {inviteId: invite.id}) }}" class="d-inline">
                                         <input type="hidden" name="_token" value="{{ csrf_token('invite_revoke_' ~ invite.id) }}">
                                         <button class="btn btn-sm btn-danger">Отозвать</button>
                                     </form>

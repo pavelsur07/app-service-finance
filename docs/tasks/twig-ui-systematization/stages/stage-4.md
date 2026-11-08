@@ -1,4 +1,4 @@
-### Stage 4: CSS из шаблонов — IN PROGRESS (PR A на проде, PR B и PR C на handoff)
+### Stage 4: CSS из шаблонов — IN PROGRESS (PR A–B на проде, PR C и PR D на handoff)
 
 **Risk:** LOW (перенос правил 1:1 в страничные CSS-файлы, затем токены; визуал не меняется)
 **Stage base commit:** master после закрывающего PR Stage 3
@@ -33,9 +33,11 @@
 #### Чек-лист приёмки
 - [x] 4.0 — скриншоты «до» 7 страниц 4.1 в `docs/tasks/twig-ui-systematization/screens/stage-4/` (PR A, 1366×900 fullPage)
 - [x] 4.1 — 7 блоков перенесены, `grep -rl '<style' templates | grep -v notifications/email` → 8 (PR A)
-- [~] 4.2 — `<style>` вне писем → 0; `grep -rho 'style="' templates | wc -l` ≤ 20, каждое оставшееся — динамическое значение
+- [x] 4.2 — `<style>` вне писем → 0; `grep -rho 'style="' templates | wc -l` ≤ 20, каждое оставшееся — динамическое значение
   - [x] часть 1 (PR B): 8 блоков `<style>` → страничные CSS, `grep -rl '<style' templates | grep -v notifications/email` → 0
   - [x] часть 2 (PR C): `style=` в шаблонах admin-shell 94 → 2 (оба — CSS-переменные из данных: `--cov-days`, `--cov-span`); всего в templates 182 → 90
+  - [x] часть 3 (PR D): `style=` вне писем 65 → 20, все 20 — динамические значения или состояние, которым управляет JS (список ниже);
+    письма (`notifications/email`, 23) — inline по природе e-mail, в лимит не входят
 - [ ] Значения в новых CSS — токены `--vf-*`; остатки hex/px — с `TODO(ds)`, их число в отчёте
 - [ ] Каждый PR: `npm run build`, `make site-cs-twig`, `make site-test`, внешнее ревью; скриншоты до/после для 4.1
 
@@ -146,3 +148,41 @@
 - `make site-cs-twig` — twigcs 0, `lint:twig` OK (323); `npm run build` — OK; PHP и JS не менялись
 - `make site-test` — OK — 8554 тестов, 48 146 assertions
 - Внешнее ревью (codex): REVIEW_GREEN (effort medium, дифф 737 строк, замечаний нет)
+
+#### PR D (4.2, часть 3) — `style="…"` легаси и кита → классы
+
+##### Что сделано
+- 21 шаблон, 47 статических `style=` → классы. Где Tabler даёт точно то же значение — его утилиты: `d-inline` (формы-кнопки ×9),
+  `text-nowrap`, `cursor-pointer`, `mw-100`. Остальное — утилиты 1:1 в `vf-custom-classes.css` (entry `vf_custom_classes`, грузится на
+  всех легаси-страницах): `u-tnum`, `u-w-50/60/82/118/120/140/160/200/260` (ширины колонок таблиц), `u-max-w-180/220/320/420`,
+  `u-min-w-280`, `u-min-w-16r`, `vf-spinner-xs`. Имена и значения те же, что у `u-*` админки (другой бандл) — унификация в DS-проход.
+- Страничные/слоевые: `pages/marketplace-ads.css` (`.ad-progress`; стартовая ширина прогресс-бара через CSS без `!important` — JS потом
+  пишет inline width поверх), `pages/app-shell.css` (новый слой «общее для shell кита», импорт в `app.js` после `app.css`:
+  `.billing-expiry-notice`), `u-max-w-640` в `admin-shell.css` (форма Telegram-бота в админке).
+- `style="z-index: 1090"` у `.toast-container` снят без замены: Tabler 1.2.0 задаёт `.toast-container { z-index: var(--tblr-toast-zindex) }`
+  с тем же 1090 (проверено по CSS CDN).
+- Оставлено 20 `style=` вне писем — все обоснованы:
+  - 14 значений из данных: отступы уровня дерева (`padding-left: {{ level*20 }}px` ×5, `--lvl` ×2, `--vf-pick-level`), ширины
+    колонок из числа периодов (`min-width: calc(…)` ×2, `width: {{ table_width }}px` ×2, `--pl-col-period`), `--cov-days`/`--cov-label-w`;
+  - 2 в админке (`--cov-days`, `--cov-span`, PR C);
+  - 4 — состояние, которым управляет JS через `el.style.display = ''|'none'`: три блока формы подключения
+    (`marketplace/connections`) и свёрнутые строки дерева в `report/cashflow`. Класс `d-none` сломал бы показ (JS пишет `''`); перевод
+    на атрибут `hidden` — правка JS, вне 1:1.
+- Проверено до правок: JS подключений и отчёта ДДС действительно пишет `style.display`; `marketplace_ads.js` пишет `style.width`
+  прогресс-бара (поэтому в CSS без `!important`, а Tabler `w-0` с `!important` не подходит).
+
+##### Проверка визуала
+- 20 страниц (все, где менялась статика; партиалы — через страницы, где они включены: `_table_compact` → платёжный календарь,
+  `pl_category/_form` → новая статья, `telegram/admin/bot/_form` → новый бот в админке), до (HEAD = PR C) и после — все identical.
+  Не сняты: `partials/_flash` (тост появляется только после действия; замена — удаление избыточного атрибута) и
+  `billing/_partials/expiry_notice` (показывается при истекающем доступе; на стенде нет) — для них сверка значений 1:1.
+  Скриншоты «до» — `screens/stage-4/pr-d/`.
+
+##### Files changed (PR D)
+- `site/assets/styles/vf-custom-classes.css`, `site/assets/styles/pages/{marketplace-ads,app-shell}.css` (new), `site/assets/styles/pages/admin-shell.css`,
+  `site/assets/legacy-app.js`, `site/assets/app.js`, 21 шаблон, `screens/stage-4/pr-d/*.png` (20)
+
+##### Проверки (PR D)
+- `make site-cs-twig` — twigcs 0, `lint:twig` OK (323); `npm run lint` — 0; `npm run build` — OK; PHP не менялся
+- `make site-test` — OK — 8554 тестов, 48 146 assertions
+- Внешнее ревью (codex): REVIEW_GREEN (effort medium, дифф 550 строк, замечаний нет)
