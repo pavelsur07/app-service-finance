@@ -1,0 +1,7 @@
+/* Платёжный календарь (templates/payment_calendar/index + _table_compact). Перенесено из <style> страницы 1:1 (Stage 4). */
+.table-sticky-head thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--tblr-bg-surface);
+}

@@ -2,18 +2,6 @@
 
 {% block title %}Платёжный календарь{% endblock %}
 
-{% block stylesheets %}
-    {{ parent() }}
-    <style>
-        .table-sticky-head thead th {
-            position: sticky;
-            top: 0;
-            z-index: 1;
-            background: var(--tblr-bg-surface);
-        }
-    </style>
-{% endblock %}
-
 {% block body %}
     {% embed 'partials/_page_header.html.twig' with {title: 'Платёжный календарь'} %}
         {% block subtitle %}

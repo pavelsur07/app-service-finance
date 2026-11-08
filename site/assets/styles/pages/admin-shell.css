@@ -6,6 +6,10 @@
  * Only what UI Kit doesn't cover for the admin base document remains.
  */
 
+/* Страничные стили админки (Stage 4: вынесены из <style> шаблонов). @import — до остальных правил. */
+@import url('./service-gateway-coverage.css');
+@import url('./mapping-errors.css');
+
 /* Brand logo in app-header (moved out of inline twig styles). */
 .app-header-brand a { display: block; text-decoration: none; }
 .app-header-brand img { display: block; height: 32px; width: auto; max-width: 100%; }

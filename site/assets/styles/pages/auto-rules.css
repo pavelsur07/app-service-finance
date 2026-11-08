@@ -1,0 +1,6 @@
+/* Автоправила ДДС (templates/cash_transaction_auto_rule/index). Перенесено из <style> страницы 1:1 (Stage 4).
+   Карточка обрезает выпадающее меню последних строк, как это уже было в списке операций ДДС — там лечится тем же overflow. */
+.auto-rule-list,
+.auto-rule-list .card-body {
+    overflow: visible;
+}

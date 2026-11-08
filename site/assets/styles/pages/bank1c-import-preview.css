@@ -1,0 +1,4 @@
+/* Предпросмотр импорта 1С (templates/cash/bank1c_import_preview). Перенесено из <style> страницы 1:1 (Stage 4).
+   DS-Money: приход — OK, расход — без подсветки (не красный), перевод между своими — категориальный Purple. */
+.preview-row-inflow { --tblr-table-bg: var(--vf-ok-bg); }
+.preview-row-self-transfer { --tblr-table-bg: var(--tblr-purple-lt); }
