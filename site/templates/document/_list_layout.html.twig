@@ -14,23 +14,6 @@
 {% set tab = tab ?? 'index' %}
 {% import 'document/_list_macros.html.twig' as ui %}
 
-{% set typeShortLabels = {
-    'DEAL_SALE': 'Сделка',
-    'PAYROLL': 'Зарплата',
-    'TAXES': 'Налоги',
-    'LOANS': 'Кредиты',
-    'OBLIGATIONS': 'Обязательства',
-    'ASSETS': 'Имущество',
-    'CASH': 'Касса',
-    'CASHFLOW_EXPENSE': 'Расход из ДДС',
-    'OTHER': 'Прочие'
-} %}
-{% set statusLabels = {
-    'DRAFT': 'Черновик',
-    'ACTIVE': 'Активен',
-    'INACTIVE': 'Неактивен',
-    'TO_DELETE': 'На удаление'
-} %}
 {% set directionLabels = {'income': 'Доходы', 'expense': 'Расходы'} %}
 {% set directionValue = filters.direction ? (filters.direction.value == 'INCOME' ? 'income' : 'expense') : null %}
 
@@ -60,7 +43,7 @@
 {% set clipLen = 22 %}
 {# Родители — по parent уже загруженного дерева: p.children — ленивая коллекция, запрос на каждый проект. #}
 {% set parentProjectIds = projectDirections|filter(p => p.parent)|map(p => p.parent.id) %}
-{% set typeName = filters.type ? (typeShortLabels[filters.type.value] ?? filters.type.label()) : '' %}
+{% set typeName = filters.type ? filters.type.shortLabel() : '' %}
 {% set projectName = project ? project.name : '' %}
 {% set centerName = center ? center.name : '' %}
 {% set category = filters.categoryId ? categories|filter(c => c.id == filters.categoryId)|first : null %}
@@ -176,7 +159,7 @@
                     <div class="vf-ops-pop__list">
                         <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['type'])) }}"{% if not filters.type %} aria-current="true"{% endif %}>Все типы</a>
                         {% for documentType in enum_cases('App\\Finance\\Enum\\DocumentType') %}
-                            <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['type'])|merge({type: documentType.value})) }}"{% if filters.type and filters.type.value == documentType.value %} aria-current="true"{% endif %}>{{ typeShortLabels[documentType.value] ?? documentType.label() }}</a>
+                            <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['type'])|merge({type: documentType.value})) }}"{% if filters.type and filters.type.value == documentType.value %} aria-current="true"{% endif %}>{{ documentType.shortLabel() }}</a>
                         {% endfor %}
                     </div>
                 </div>
@@ -309,13 +292,13 @@
         filters.q ? {label: 'Поиск: «' ~ filters.q ~ '»', keys: ['q']} : null,
         filters.dateFrom or filters.dateTo ? {label: 'Период: ' ~ periodLabel, keys: ['dateFrom', 'dateTo']} : null,
         directionValue ? {label: directionLabels[directionValue], keys: ['direction']} : null,
-        filters.type ? {label: 'Тип: ' ~ (typeShortLabels[filters.type.value] ?? filters.type.label()), keys: ['type']} : null,
+        filters.type ? {label: 'Тип: ' ~ filters.type.shortLabel(), keys: ['type']} : null,
         filters.projectDirectionId ? {label: 'Проект: ' ~ (project ? project.name : 'не найден'), keys: ['projectDirection']} : null,
         filters.responsibilityCenterId ? {label: 'ЦФО: ' ~ (center ? center.name : (responsibilityCenterNames[filters.responsibilityCenterId] ?? 'не найден')), keys: ['responsibilityCenter']} : null,
         filters.categoryId ? {label: 'Статья: ' ~ (category ? category.name : 'не найдена'), keys: ['category']} : null,
         filters.counterpartyId ? {label: 'Контрагент: ' ~ (filterCounterparty ? (filterCounterparty.displayName ?? filterCounterparty.name) : 'не найден'), keys: ['counterpartyId']} : null,
         amountLabel ? {label: 'Сумма: ' ~ amountLabel, keys: ['amountFrom', 'amountTo']} : null,
-        filters.status ? {label: 'Статус: ' ~ (statusLabels[filters.status.value] ?? filters.status.value), keys: ['status']} : null,
+        filters.status ? {label: 'Статус: ' ~ filters.status.label(), keys: ['status']} : null,
         filters.number ? {label: 'Номер: ' ~ filters.number, keys: ['number']} : null,
     ]|filter(c => c) %}
     {% if chips is not empty %}
@@ -370,7 +353,7 @@
                     {# Список ведётся от самого enum: тип, добавленный в DocumentType,
                        обязан появиться и здесь, иначе отфильтровать его через интерфейс нельзя. #}
                     {% for documentType in enum_cases('App\\Finance\\Enum\\DocumentType') %}
-                        <option value="{{ documentType.value }}" {% if filters.type and filters.type.value == documentType.value %}selected{% endif %}>{{ typeShortLabels[documentType.value] ?? documentType.label() }}</option>
+                        <option value="{{ documentType.value }}" {% if filters.type and filters.type.value == documentType.value %}selected{% endif %}>{{ documentType.shortLabel() }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -378,8 +361,8 @@
                 <label class="form-label" for="document-filter-status">Статус</label>
                 <select id="document-filter-status" name="status" class="form-select">
                     <option value="">Все</option>
-                    {% for value, label in statusLabels %}
-                        <option value="{{ value }}" {% if filters.status and filters.status.value == value %}selected{% endif %}>{{ label }}</option>
+                    {% for documentStatus in enum_cases('App\\Finance\\Enum\\DocumentStatus') %}
+                        <option value="{{ documentStatus.value }}" {% if filters.status and filters.status.value == documentStatus.value %}selected{% endif %}>{{ documentStatus.label() }}</option>
                     {% endfor %}
                 </select>
             </div>

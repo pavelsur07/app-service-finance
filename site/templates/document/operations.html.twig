@@ -72,15 +72,15 @@
                         {% set counterpartyName = opCounterparty ? (opCounterparty.displayName ?? opCounterparty.name) : null %}
                         {% set opCount = operationCounts[document.id] ?? 1 %}
                         {% set statusValue = document.status.value %}
-                        {% set documentLabel = (typeShortLabels[document.type.value] ?? document.type.label()) ~ (document.number ? ' № ' ~ document.number : '') %}
+                        {% set documentLabel = document.type.shortLabel() ~ (document.number ? ' № ' ~ document.number : '') %}
                         <tr data-operation-row="{{ op.id }}">
                             <td class="vf-docs-table__date text-nowrap">{{ document.date|date('d.m.Y') }}</td>
                             <td class="vf-doc__main">
                                 <div class="vf-doc__title">
-                                    <a href="{{ path('document_show', {id: document.id}) }}" class="vf-strong">{{ typeShortLabels[document.type.value] ?? document.type.label() }}</a>
+                                    <a href="{{ path('document_show', {id: document.id}) }}" class="vf-strong">{{ document.type.shortLabel() }}</a>
                                     {% if document.number %}<span class="vf-doc__number">№ {{ document.number }}</span>{% endif %}
                                     {% if document.cashTransaction %}<span class="badge vf-doc-badge">Из ДДС</span>{% endif %}
-                                    {% if statusValue in ['DRAFT', 'INACTIVE'] %}<span class="badge vf-doc-badge">{{ statusLabels[statusValue] }}</span>{% endif %}
+                                    {% if statusValue in ['DRAFT', 'INACTIVE'] %}<span class="badge vf-doc-badge">{{ document.status.label() }}</span>{% endif %}
                                 </div>
                                 {% if document.description %}
                                     <div class="vf-sub vf-doc__desc" title="{{ document.description }}">{{ document.description }}</div>

@@ -10,16 +10,6 @@
   no_categories: 'нет статей',
   too_many_categories: 'статей больше лимита',
 } %}
-{% set statusLabels = {
-  requested: 'ждут ответа',
-  suggested: 'показаны, без решения',
-  accepted: 'приняты',
-  dismissed: 'отклонены',
-  auto_applied: 'применены автоматически',
-  no_answer: 'без ответа модели',
-  failed: 'ошибка',
-  stale: 'устарели',
-} %}
 {% set budget = overview.budget %}
 
 {% block body %}
@@ -135,7 +125,7 @@
         <table class="t-table">
           <tbody>
             {% for status, count in stats.byStatus %}
-              <tr><td>{{ statusLabels[status] ?? status }}</td><td class="t-cell--right" style="font-variant-numeric:tabular-nums;">{{ count }}</td></tr>
+              {% set statusEnum = enum('App\\Cash\\Enum\\Transaction\\CashCategorySuggestionStatus').tryFrom(status) %}<tr><td>{{ statusEnum ? statusEnum.label() : status }}</td><td class="t-cell--right" style="font-variant-numeric:tabular-nums;">{{ count }}</td></tr>
             {% endfor %}
           </tbody>
         </table>

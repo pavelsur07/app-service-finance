@@ -70,13 +70,6 @@
         </div>
     </div>
 
-    {% set typeLabels = {
-        'bank': 'Банк',
-        'cash': 'Касса',
-        'ewallet': 'Кошелёк',
-        'crypto_wallet': 'Крипто-кошелёк'
-    } %}
-
     {% for currency, groups in accountsByCurrency %}
         <div class="card mb-4">
             <div class="card-header">
@@ -97,7 +90,7 @@
                             {% for account in accounts %}
                                 <tr>
                                     {% if loop.first %}
-                                        <td rowspan="{{ accounts|length }}" class="align-middle">{{ typeLabels[type] }}</td>
+                                        <td rowspan="{{ accounts|length }}" class="align-middle">{{ enum('App\\Cash\\Enum\\Accounts\\MoneyAccountType').from(type).label() }}</td>
                                     {% endif %}
                                     <td>{{ account.name }}</td>
                                     {% set bal = balancesByAccountId[account.id]|default('0') %}

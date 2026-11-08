@@ -104,10 +104,10 @@
                             <td class="vf-docs-table__date text-nowrap">{{ item.date|date('d.m.Y') }}</td>
                             <td class="vf-doc__main">
                                 <div class="vf-doc__title">
-                                    <a href="{{ path('document_show', {id: item.id}) }}" class="vf-strong">{{ typeShortLabels[item.type.value] ?? item.type.label() }}</a>
+                                    <a href="{{ path('document_show', {id: item.id}) }}" class="vf-strong">{{ item.type.shortLabel() }}</a>
                                     {% if item.number %}<span class="vf-doc__number">№ {{ item.number }}</span>{% endif %}
                                     {% if item.cashTransaction %}<span class="badge vf-doc-badge">Из ДДС</span>{% endif %}
-                                    {% if statusValue in ['DRAFT', 'INACTIVE'] %}<span class="badge vf-doc-badge">{{ statusLabels[statusValue] }}</span>{% endif %}
+                                    {% if statusValue in ['DRAFT', 'INACTIVE'] %}<span class="badge vf-doc-badge">{{ item.status.label() }}</span>{% endif %}
                                     {% if item.isCreatedWithViolation %}
                                         <span class="vf-ops-badge-warn" title="Документ создан без полного маппинга категорий ОПиУ">Без маппинга</span>
                                     {% endif %}

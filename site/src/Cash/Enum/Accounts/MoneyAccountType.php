@@ -10,4 +10,14 @@ enum MoneyAccountType: string
     case CASH = 'cash';
     case EWALLET = 'ewallet';
     case CRYPTO_WALLET = 'crypto_wallet';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::BANK => 'Банк',
+            self::CASH => 'Касса',
+            self::EWALLET => 'Кошелёк',
+            self::CRYPTO_WALLET => 'Крипто-кошелёк',
+        };
+    }
 }
