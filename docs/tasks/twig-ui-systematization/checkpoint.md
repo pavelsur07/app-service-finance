@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 3 — PR A (#2924) на handoff, PR B на handoff
+**Phase:** Stage 3 — PR A (#2924), PR B (#2925), PR C на handoff
 **Status:** Stage 1 (#2909) и Stage 2 (#2910–#2923) на проде 07–08.11; Stage 3 PR A #2924 на handoff
-**Stage base commit:** master a6bddf09a (после #2923) · ветки `refactor/twig-ui-stage-3a` (PR A, #2924) → `refactor/twig-ui-stage-3b` (PR B)
+**Stage base commit:** master a6bddf09a (после #2923) · ветки `refactor/twig-ui-stage-3a` (PR A, #2924) → `refactor/twig-ui-stage-3b` (PR B, #2925) → `refactor/twig-ui-stage-3c` (PR C)
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -66,8 +66,11 @@
 - #2923 влит 08.11 04:43Z. Stage 3 PR B (3.2): `partials/_empty` (variant legacy/app, блоки icon/action/attrs),
   17 файлов; ветка `refactor/twig-ui-stage-3b` от PR A.
 
+- Stage 3 PR C (3.3): `partials/_page_header` (title/pretitle/class/container/print, блоки subtitle/actions), 51 файл
+  (49 скриптом `header_rewrite.py`, 2 вручную), 15 нестандартных шапок оставлены до Stage 6; ветка от PR B.
+
 ### Exact next action
-- handoff #2924 и PR B («merge and deploy»); затем PR C (3.3, `partials/_page_header` embed, 65 файлов — порциями по модулям) с ветки от PR B
+- handoff #2924 → #2925 → PR C («merge and deploy», стек); затем PR D (3.4, подписи из Enum/DTO — сначала `settlement/layout`, `document/_list_layout`) с ветки от PR C
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`

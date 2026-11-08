@@ -3,28 +3,21 @@
 {% block title %}Подключения банков{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Подключения банков</h2>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    {% for start in oauth_starts %}
-                        <form method="post" action="{{ path('bank_sync_oauth_start') }}" class="d-inline">
-                            <input type="hidden" name="_token" value="{{ csrf_token(oauth_start_csrf_id) }}">
-                            <input type="hidden" name="bank_code" value="{{ start.bank_code }}">
-                            <input type="hidden" name="base_url" value="{{ start.base_url }}">
-                            <button class="btn btn-outline-primary">Подключить через {{ start.label }}</button>
-                        </form>
-                    {% endfor %}
-                    {% if can_add_with_token %}
-                        <a href="{{ path('bank_sync_connection_new') }}" class="btn btn-primary">Добавить</a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Подключения банков'} %}
+        {% block actions %}
+            {% for start in oauth_starts %}
+                <form method="post" action="{{ path('bank_sync_oauth_start') }}" class="d-inline">
+                    <input type="hidden" name="_token" value="{{ csrf_token(oauth_start_csrf_id) }}">
+                    <input type="hidden" name="bank_code" value="{{ start.bank_code }}">
+                    <input type="hidden" name="base_url" value="{{ start.base_url }}">
+                    <button class="btn btn-outline-primary">Подключить через {{ start.label }}</button>
+                </form>
+            {% endfor %}
+            {% if can_add_with_token %}
+                <a href="{{ path('bank_sync_connection_new') }}" class="btn btn-primary">Добавить</a>
+            {% endif %}
+        {% endblock %}
+    {% endembed %}
     <div class="container-xl mt-3">
         <div class="card">
             <div class="card-body">

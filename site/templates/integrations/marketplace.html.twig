@@ -71,16 +71,11 @@
 {% endblock %}
 
 {% block body %}
-  <div class="page-header d-print-none">
-    <div class="container-xl">
-      <div class="row g-2 align-items-center">
-        <div class="col">
-          <h2 class="page-title">Интеграции и маркетплейс</h2>
+  {% embed 'partials/_page_header.html.twig' with {title: 'Интеграции и маркетплейс'} %}
+      {% block subtitle %}
           <div class="text-muted mt-1">Подключите ваши банковские счета и сервисы для автоматизации учета</div>
-        </div>
-      </div>
-    </div>
-  </div>
+      {% endblock %}
+  {% endembed %}
 
   <div class="container-xl">
     <h3 class="section-title text-primary">Банки</h3>

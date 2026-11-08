@@ -2,20 +2,13 @@
 {% block title %}Сопоставить с шаблоном ОПиУ{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Сопоставить с шаблоном ОПиУ</h2>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <div class="btn-list">
-                        <a href="{{ path('pl_category_import') }}" class="btn btn-outline-secondary">Назад к импорту</a>
-                    </div>
-                </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Сопоставить с шаблоном ОПиУ'} %}
+        {% block actions %}
+            <div class="btn-list">
+                <a href="{{ path('pl_category_import') }}" class="btn btn-outline-secondary">Назад к импорту</a>
             </div>
-        </div>
-    </div>
+        {% endblock %}
+    {% endembed %}
     <div class="container-xl mt-3">
         <div class="card">
             <div class="card-body">

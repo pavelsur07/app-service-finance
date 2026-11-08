@@ -2,20 +2,16 @@
 {% block title %}Отчёт по кредитам{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Отчёт по кредитам за {{ year }} год</h2>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <div class="btn-list">
-                        <a href="{{ path('loan_index') }}" class="btn btn-outline-secondary btn-sm">К списку займов</a>
-                    </div>
-                </div>
+    {% embed 'partials/_page_header.html.twig' %}
+        {% block title %}
+            Отчёт по кредитам за {{ year }} год
+        {% endblock %}
+        {% block actions %}
+            <div class="btn-list">
+                <a href="{{ path('loan_index') }}" class="btn btn-outline-secondary btn-sm">К списку займов</a>
             </div>
-        </div>
-    </div>
+        {% endblock %}
+    {% endembed %}
 
     <div class="page-body">
         <div class="container-xl">

@@ -2,49 +2,42 @@
 {% block title %}Автоправила ДДС{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title mb-0">Автоправила ДДС</h2>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <div class="btn-list">
-                        {# Поиск отдельной GET-формой: остальные фильтры переезжают
-                           скрытыми полями, иначе строка поиска сбрасывала бы их. #}
-                        <form method="get" class="d-flex" role="search">
-                            {# Сравнение с пустой строкой, а не проверка на truthy:
-                               значение «0» в Twig ложно и молча потерялось бы. #}
-                            {% for name, value in filters %}
-                                {% if name != 'q' and value is not null and value != '' %}
-                                    <input type="hidden" name="{{ name }}" value="{{ value }}">
-                                {% endif %}
-                            {% endfor %}
-                            <input type="search"
-                                   name="q"
-                                   value="{{ filters.q }}"
-                                   class="form-control"
-                                   style="min-width: 16rem;"
-                                   placeholder="Название, контрагент, условие"
-                                   aria-label="Поиск правил">
-                            <button type="submit" class="btn btn-outline-secondary ms-2">Найти</button>
-                        </form>
-                        <a href="{{ path('cash_transaction_auto_rule_candidates') }}" class="btn btn-outline-primary">
-                            Кандидаты правил
-                        </a>
-                        <a href="#"
-                           class="btn btn-outline-secondary"
-                           data-bs-toggle="offcanvas"
-                           data-bs-target="#auto-rule-filters-offcanvas">
-                            <i class="ti ti-filter"></i>
-                            Фильтры
-                        </a>
-                        <a href="{{ path('cash_transaction_auto_rule_new') }}" class="btn btn-success">+ Добавить</a>
-                    </div>
-                </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Автоправила ДДС'} %}
+        {% block actions %}
+            <div class="btn-list">
+                {# Поиск отдельной GET-формой: остальные фильтры переезжают
+                   скрытыми полями, иначе строка поиска сбрасывала бы их. #}
+                <form method="get" class="d-flex" role="search">
+                    {# Сравнение с пустой строкой, а не проверка на truthy:
+                       значение «0» в Twig ложно и молча потерялось бы. #}
+                    {% for name, value in filters %}
+                        {% if name != 'q' and value is not null and value != '' %}
+                            <input type="hidden" name="{{ name }}" value="{{ value }}">
+                        {% endif %}
+                    {% endfor %}
+                    <input type="search"
+                           name="q"
+                           value="{{ filters.q }}"
+                           class="form-control"
+                           style="min-width: 16rem;"
+                           placeholder="Название, контрагент, условие"
+                           aria-label="Поиск правил">
+                    <button type="submit" class="btn btn-outline-secondary ms-2">Найти</button>
+                </form>
+                <a href="{{ path('cash_transaction_auto_rule_candidates') }}" class="btn btn-outline-primary">
+                    Кандидаты правил
+                </a>
+                <a href="#"
+                   class="btn btn-outline-secondary"
+                   data-bs-toggle="offcanvas"
+                   data-bs-target="#auto-rule-filters-offcanvas">
+                    <i class="ti ti-filter"></i>
+                    Фильтры
+                </a>
+                <a href="{{ path('cash_transaction_auto_rule_new') }}" class="btn btn-success">+ Добавить</a>
             </div>
-        </div>
-    </div>
+        {% endblock %}
+    {% endembed %}
     {# Карточка обрезает выпадающее меню последних строк, как это уже было в списке
        операций ДДС — там лечится тем же overflow. #}
     <style>

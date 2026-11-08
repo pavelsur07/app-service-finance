@@ -2,19 +2,11 @@
 {% block title %}Кандидаты автоправил ДДС{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <div class="page-pretitle">Автоправила ДДС</div>
-                    <h2 class="page-title mb-0">Кандидаты правил</h2>
-                </div>
-                <div class="col-auto ms-auto">
-                    <a href="{{ path('cash_transaction_auto_rule_index') }}" class="btn btn-outline-secondary">К списку правил</a>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Кандидаты правил', pretitle: 'Автоправила ДДС'} %}
+        {% block actions %}
+            <a href="{{ path('cash_transaction_auto_rule_index') }}" class="btn btn-outline-secondary">К списку правил</a>
+        {% endblock %}
+    {% endembed %}
 
     <div class="container-xl mt-3">
         <div class="alert alert-info" role="status">

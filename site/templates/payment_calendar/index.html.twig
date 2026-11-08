@@ -15,40 +15,35 @@
 {% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Платёжный календарь</h2>
-                    <div class="text-secondary">
-                        {% if period %}
-                            Период: {{ period.from|date('d.m.Y') }} — {{ period.to|date('d.m.Y') }}
-                        {% else %}
-                            Укажите период, чтобы увидеть прогноз поступлений и платежей
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <div class="btn-list">
-                        <div class="btn-group" role="group" aria-label="View switch">
-                            <input type="radio" class="btn-check" name="calendar-view" id="payment-calendar-view-day">
-                            <label class="btn" for="payment-calendar-view-day"><i class="ti ti-calendar-day"></i> День</label>
-                            <input type="radio" class="btn-check" name="calendar-view" id="payment-calendar-view-week" checked>
-                            <label class="btn" for="payment-calendar-view-week"><i class="ti ti-calendar-week"></i> Неделя</label>
-                            <input type="radio" class="btn-check" name="calendar-view" id="payment-calendar-view-month">
-                            <label class="btn" for="payment-calendar-view-month"><i class="ti ti-calendar-month"></i> Месяц</label>
-                        </div>
-                        <a href="#" class="btn" data-bs-toggle="offcanvas" data-bs-target="#payment-calendar-filters">
-                            <i class="ti ti-filter"></i> Фильтры
-                        </a>
-                        <a href="{{ path('payment_calendar_new', filterQuery) }}" class="btn btn-primary">
-                            <i class="ti ti-plus"></i> Добавить
-                        </a>
-                    </div>
-                </div>
+    {% embed 'partials/_page_header.html.twig' with {title: 'Платёжный календарь'} %}
+        {% block subtitle %}
+            <div class="text-secondary">
+                {% if period %}
+                    Период: {{ period.from|date('d.m.Y') }} — {{ period.to|date('d.m.Y') }}
+                {% else %}
+                    Укажите период, чтобы увидеть прогноз поступлений и платежей
+                {% endif %}
             </div>
-        </div>
-    </div>
+        {% endblock %}
+        {% block actions %}
+            <div class="btn-list">
+                <div class="btn-group" role="group" aria-label="View switch">
+                    <input type="radio" class="btn-check" name="calendar-view" id="payment-calendar-view-day">
+                    <label class="btn" for="payment-calendar-view-day"><i class="ti ti-calendar-day"></i> День</label>
+                    <input type="radio" class="btn-check" name="calendar-view" id="payment-calendar-view-week" checked>
+                    <label class="btn" for="payment-calendar-view-week"><i class="ti ti-calendar-week"></i> Неделя</label>
+                    <input type="radio" class="btn-check" name="calendar-view" id="payment-calendar-view-month">
+                    <label class="btn" for="payment-calendar-view-month"><i class="ti ti-calendar-month"></i> Месяц</label>
+                </div>
+                <a href="#" class="btn" data-bs-toggle="offcanvas" data-bs-target="#payment-calendar-filters">
+                    <i class="ti ti-filter"></i> Фильтры
+                </a>
+                <a href="{{ path('payment_calendar_new', filterQuery) }}" class="btn btn-primary">
+                    <i class="ti ti-plus"></i> Добавить
+                </a>
+            </div>
+        {% endblock %}
+    {% endembed %}
 
     <div class="page-body" data-forecast-series="{{ forecastSeries|json_encode|e('html_attr') }}">
         <div class="container-xl">

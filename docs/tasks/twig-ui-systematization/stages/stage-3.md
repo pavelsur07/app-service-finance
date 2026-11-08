@@ -1,4 +1,4 @@
-### Stage 3: общие партиалы и подписи — IN PROGRESS (PR A, PR B на handoff)
+### Stage 3: общие партиалы и подписи — IN PROGRESS (PR A, B, C на handoff)
 
 **Risk:** LOW–MEDIUM (разметка 65+17+10 мест меняется на include/embed; визуал не меняется)
 **Stage base commit:** master после закрывающего PR Stage 2
@@ -40,7 +40,8 @@
 - [x] 3.1 — `grep -rl app.flashes templates` → `partials/_flash`, `admin/_toasts`, `app/_ui/_flash` + два служебных ключа
       (`company_member/index` — `invite_token`, `telegram/admin/bot/index` — `webhook_status`): это данные страницы, не сообщения (PR A)
 - [x] 3.2 — `grep -rl 'class="empty"' templates` → только `partials/_empty` (PR B)
-- [ ] 3.3 — `grep -rl 'class="page-header' templates` → только `partials/_page_header`
+- [~] 3.3 — `grep -rl 'class="page-header' templates` → `partials/_page_header` + 15 файлов с другой разметкой
+      (без `container-xl`/`row g-2`, вкладки внутри шапки, печатная шапка отчёта, h1) — см. PR C; добивать в Stage 6 при переходе на DS `vf-page-head`
 - [ ] 3.4 — `grep -rn '{% set [a-zA-Z]*Labels' templates` → 0
 - [ ] Каждый PR: `make site-cs-twig`, `make site-test` (crawler-тесты видят flash и заголовки),
       внешнее ревью, стенд-скриншот не требуется (разметка побайтно та же, кроме include)
@@ -134,3 +135,43 @@
 - целевые тесты (партиал, Api settings, mapping errors, listings search) — OK (21 tests, 221 assertions)
 - `make site-test` — OK (8543 tests, 48121 assertions), 8 мин 12 с
 - Внешнее ревью (codex): REVIEW_GREEN (1 раунд, база — ветка PR A d447ade59, дифф 564 строк, `site/var/external-review/d447ade5/review.txt`)
+
+#### PR C (3.3) — `partials/_page_header`: одна Tabler-шапка на 51 страницу
+
+##### Что сделано
+- `partials/_page_header.html.twig`: параметры `title`, `pretitle` (строки; с разметкой — блоки `title`/`pretitle`),
+  `class` (доп. классы корня — `mb-3`), `container` (по умолчанию `container-xl`), `print` (по умолчанию `d-print-none`);
+  блоки `subtitle` (строка под заголовком со своими классами) и `actions` — колонка `col-auto ms-auto d-print-none`
+  рендерится только при непустом блоке, поэтому условные кнопки (`{% if isOwner %}`) живут внутри блока.
+- 51 файл переведён: 49 скриптом (`scratchpad/header_rewrite.py` — структурный парсер по вложенности div: корень →
+  `container-xl` → `row g-2 align-items-center` → `col` [pretitle] h2 [subtitle] [+ `col-auto…`]), 2 вручную
+  (`company_member/index`, `marketplace_ads/index` — колонка кнопок под `{% if %}`).
+- Гармонизировано без визуальных изменений: класс колонки кнопок (`col-auto` / `col-auto ms-auto` /
+  `… d-print-none` → один вариант: `ms-auto` при `col` рядом не действует, `d-print-none` внутри уже скрытой при
+  печати шапки избыточен); `h2.page-title mb-0` → `page-title` (Tabler задаёт `margin: 0`).
+- Не переведены 15 файлов с другой структурой — остаются как есть до Stage 6 (DS `vf-page-head`):
+  без `container-xl` и/или с `row align-items-center` без `g-2` (`inventory/snapshots/index`, `ingestion/verification/*`,
+  `telegram/integration/index`, `marketplace/connection/edit`, `moy_sklad/layout` — h1), без `row` (`billing/client/tariff`,
+  `cash/file_import_{preview,result}`, `home/dashboard`, `marketplace_ads/admin_debug`), вкладки внутри шапки
+  (`marketplace_ads/_tabs`, `marketplace_analytics/_tabs`, `ingestion/verification/_finance_tabs`), печатная шапка отчёта
+  с `align-items-start` (`report/cashflow`, `finance/report/preview`). Перевод с подгонкой структуры изменил бы отступы.
+
+##### Ловушка
+`container|default(true)` в Twig возвращает default и для `false` (фильтр проверяет «пусто», не «не определено») —
+параметр `container: false` игнорировался; поймано тестом партиала, исправлено на `container is not defined or container`.
+
+##### Тесты
+- `tests/Integration/Shared/PageHeaderPartialTest.php` — include/embed, пустые условные actions без колонки,
+  `container`/`print`/`class`, экранирование `title`.
+- Существующие: `h2.page-title` в тестах Company (ЦФО, шаблоны доступа, участники), MoneyAccount, Cashflow JSON export,
+  PlReportPreview — без правок; crawler-тесты Cash/Loan/BankSync — OK.
+
+##### Files changed (PR C)
+- `site/templates/partials/_page_header.html.twig` (new), 51 шаблон
+- `site/tests/Integration/Shared/PageHeaderPartialTest.php` (new)
+
+##### Проверки (PR C)
+- `make site-cs-twig` — twigcs 0, `lint:twig` OK (324); `make site-cs-check` — 0 of 3916; `make site-cs-strict-types` — 0; `make site-stan` — OK
+- целевые тесты (партиал, Company, Finance, Cash, Loan, BankSync) — OK (386 tests, 2479 assertions после фикса `container`)
+- `make site-test` — OK (8547 tests, 48137 assertions), 8 мин 05 с; после правки по ревью — Cash + Integration/Shared OK (241 tests)
+- Внешнее ревью (codex): REVIEW_GREEN за 2 раунда (база — ветка PR B b5a541e37, дифф 1836 строк, `site/var/external-review/b5a541e3/review.txt`). Раунд 1, IMPORTANT: в `cash/file_import_mapping` блок subtitle сохранил прежний `<h2 class="page-title">` — дубль заголовка (срез скрипта начинался с начала строки, когда после h2 шёл Twig-тег). Исправлено, остальные 50 файлов проверены grep'ом, добавлен тест-скан шаблонов `testPagesUsingThePartialDoNotRenderTheirOwnPageTitle`

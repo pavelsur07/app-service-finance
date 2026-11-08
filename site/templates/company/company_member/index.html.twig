@@ -3,25 +3,19 @@
 {% block title %}Участники компании{% endblock %}
 
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Участники {{ company.name }}</h2>
+    {% embed 'partials/_page_header.html.twig' %}
+        {% block title %}Участники {{ company.name }}{% endblock %}
+        {% block actions %}
+            {% if isOwner %}
+                <div class="btn-list">
+                    <a href="{{ path('company_role_index') }}" class="btn btn-secondary">Шаблоны доступа</a>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-invite-member">
+                        Добавить
+                    </button>
                 </div>
-                {% if isOwner %}
-                    <div class="col-auto">
-                        <div class="btn-list">
-                            <a href="{{ path('company_role_index') }}" class="btn btn-secondary">Шаблоны доступа</a>
-                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-invite-member">
-                                Добавить
-                            </button>
-                        </div>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+            {% endif %}
+        {% endblock %}
+    {% endembed %}
 
     <div class="container-xl mt-3">
         {% set inviteTokens = app.flashes('invite_token') %}

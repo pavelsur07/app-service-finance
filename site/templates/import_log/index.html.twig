@@ -2,11 +2,8 @@
 {% block title %}Журнал импортов{% endblock %}
 
 {% block body %}
-<div class="page-header d-print-none">
-  <div class="container-xl">
-    <div class="row g-2 align-items-center">
-      <div class="col"><h2 class="page-title">Журнал импортов</h2></div>
-      <div class="col-auto ms-auto">
+{% embed 'partials/_page_header.html.twig' with {title: 'Журнал импортов'} %}
+    {% block actions %}
         <form class="row g-2" method="get">
           <div class="col-auto"><input type="date" class="form-control" name="date_from" value="{{ date_from }}"></div>
           <div class="col-auto"><input type="date" class="form-control" name="date_to" value="{{ date_to }}"></div>
@@ -18,10 +15,8 @@
           </div>
           <div class="col-auto"><button class="btn btn-primary" type="submit">Фильтровать</button></div>
         </form>
-      </div>
-    </div>
-  </div>
-</div>
+    {% endblock %}
+{% endembed %}
 
 <div class="page-body">
   <div class="container-xl">
