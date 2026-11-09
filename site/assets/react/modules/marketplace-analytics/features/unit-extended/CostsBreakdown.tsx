@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { CostGroupBreakdown } from './unitExtended.types';
-import { formatMoney } from '../utils/utils';
+import { formatMoney } from '@/react/shared/format/number';
 
 interface CostsBreakdownProps {
     groups: CostGroupBreakdown[];

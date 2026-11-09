@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { downloadUnitExtendedExport } from './unitExtended.api';
 
 interface ExportXlsButtonProps {
     marketplace: string;
@@ -7,33 +8,6 @@ interface ExportXlsButtonProps {
     tagIds?: string[];
     tagsMatchAll?: boolean;
     disabled?: boolean;
-}
-
-const EXPORT_URL = '/api/marketplace-analytics/unit-extended/export';
-const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-function buildExportUrl(
-    marketplace: string,
-    periodFrom: string,
-    periodTo: string,
-    tagIds: string[],
-    tagsMatchAll: boolean,
-): string {
-    const params = new URLSearchParams({ periodFrom, periodTo });
-    if (marketplace) {
-        params.set('marketplace', marketplace);
-    }
-    tagIds.forEach((tagId) => params.append('tags[]', tagId));
-    if (tagIds.length > 0 && tagsMatchAll) {
-        params.set('tagsMatch', 'all');
-    }
-    return `${EXPORT_URL}?${params.toString()}`;
-}
-
-function extractFilename(disposition: string | null, fallback: string): string {
-    if (!disposition) return fallback;
-    const match = disposition.match(/filename="([^"]+)"/);
-    return match?.[1] ?? fallback;
 }
 
 function triggerDownload(blob: Blob, filename: string): void {
@@ -62,23 +36,7 @@ const ExportXlsButton: React.FC<ExportXlsButtonProps> = ({
 
         setIsLoading(true);
         try {
-            const response = await fetch(
-                buildExportUrl(marketplace, periodFrom, periodTo, tagIds, tagsMatchAll),
-                { credentials: 'same-origin' },
-            );
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const contentType = response.headers.get('Content-Type') ?? '';
-            if (response.redirected || !contentType.startsWith(XLSX_MIME)) {
-                throw new Error('Unexpected response (likely auth redirect)');
-            }
-
-            const blob = await response.blob();
-            const fallbackName = `unit_extended_${marketplace || 'all'}_${periodFrom}_${periodTo}.xlsx`;
-            const filename = extractFilename(response.headers.get('Content-Disposition'), fallbackName);
+            const { blob, filename } = await downloadUnitExtendedExport({ marketplace, periodFrom, periodTo, tagIds, tagsMatchAll });
             triggerDownload(blob, filename);
         } catch (error) {
             console.error('Unit-extended export failed', error);

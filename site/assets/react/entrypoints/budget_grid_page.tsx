@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BudgetGridWidget } from '@/react/modules/budget/features/budget-grid/BudgetGridWidget';
 import type { BudgetGridProps } from '@/react/modules/budget/features/budget-grid/budget-grid.types';
-import { ErrorBoundary } from '../_legacy/shared/ui/ErrorBoundary';
+import { ErrorBoundary } from '@/react/shared/ui/ErrorBoundary';
 
 /** Остров `budget-grid` на экране варианта бюджета (templates/budget/show.html.twig). Только монтирование. */
 function mount(): void {

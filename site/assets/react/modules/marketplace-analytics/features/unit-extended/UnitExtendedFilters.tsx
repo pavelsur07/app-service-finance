@@ -1,7 +1,6 @@
 import React from 'react';
-import { PeriodFilter } from '../../../shared/period/PeriodFilter';
-import type { MarketplaceOption } from '../types/analytics.types';
-import type { ListingTag } from './unitExtended.types';
+import { PeriodFilter } from '@/react/shared/period/PeriodFilter';
+import type { ListingTag, MarketplaceOption } from './unitExtended.types';
 
 interface UnitExtendedFiltersProps {
     marketplaces: MarketplaceOption[];

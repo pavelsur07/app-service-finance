@@ -2,14 +2,14 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useUnitExtended } from './useUnitExtended';
 import { useWidgets } from './widgets/useWidgets';
 import WidgetsGrid from './widgets/WidgetsGrid';
-import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
-import { defaultPeriod } from '../../../shared/period/periodPresets';
-import type { MarketplaceOption } from '../types/analytics.types';
-import type { ListingTag } from './unitExtended.types';
+import { ErrorBoundary } from '@/react/shared/ui/ErrorBoundary';
+import { defaultPeriod } from '@/react/shared/period/periodPresets';
+import type { ListingTag, MarketplaceOption } from './unitExtended.types';
 import UnitExtendedFilters from './UnitExtendedFilters';
 import UnitExtendedTable from './UnitExtendedTable';
 import TagSummaryTable from './TagSummaryTable';
 import ExportXlsButton from './ExportXlsButton';
+import styles from './UnitExtendedWidget.module.css';
 
 interface UnitExtendedWidgetProps {
     marketplaces: MarketplaceOption[];
@@ -21,20 +21,6 @@ interface Filters {
     dateFrom: string;
     dateTo: string;
 }
-
-const UNIT_EXTENDED_WIDGET_STYLES = `
-    .ue-ext-listing-search {
-        width: 320px;
-        max-width: 100%;
-    }
-
-    @media (max-width: 767.98px) {
-        .ue-ext-listing-search {
-            width: 100%;
-            margin-left: 0 !important;
-        }
-    }
-`;
 
 /**
  * Период — только dateFrom/dateTo в URL; активный пресет считает PeriodFilter по совпадению дат.
@@ -124,8 +110,6 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
 
     return (
         <>
-            <style>{UNIT_EXTENDED_WIDGET_STYLES}</style>
-
             <div className="page-header d-print-none mb-3">
                 <div className="row g-2 align-items-center">
                     <div className="col">
@@ -195,7 +179,7 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
                             перед «Итого»; реклама — по статистике рекламного кабинета
                         </div>
                     </div>
-                    <div className="ms-3 ue-ext-listing-search">
+                    <div className={`ms-3 ${styles.listingSearch}`}>
                         <input
                             type="search"
                             className="form-control"

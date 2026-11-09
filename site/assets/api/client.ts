@@ -50,6 +50,8 @@ export interface ApiFetchOptions {
     csrfToken?: string;
     /** Запрос при закрытии страницы: браузер доотправит его после ухода. */
     keepalive?: boolean;
+    /** Отмена: прерванный запрос бросает `AbortError` как есть, не `ApiError`. */
+    signal?: AbortSignal;
 }
 
 /**
@@ -79,8 +81,12 @@ export async function apiFetch<T>(url: string, options: ApiFetchOptions = {}): P
             headers,
             body: options.body === undefined ? undefined : (multipart ? options.body as FormData : JSON.stringify(options.body)),
             keepalive: options.keepalive,
+            signal: options.signal,
         });
-    } catch {
+    } catch (error) {
+        if (options.signal?.aborted) {
+            throw error;
+        }
         throw new ApiError(0, 'network_error', 'Нет связи с сервером.');
     }
 

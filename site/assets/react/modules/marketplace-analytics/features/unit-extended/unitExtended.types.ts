@@ -132,3 +132,8 @@ export interface UnitExtendedResponse {
     unallocated: UnallocatedCosts | null;
     tagSummary?: TagSummaryRow[];
 }
+
+export interface MarketplaceOption {
+    value: string;
+    label: string;
+}

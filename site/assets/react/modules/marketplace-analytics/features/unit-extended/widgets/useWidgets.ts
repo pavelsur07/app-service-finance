@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ApiError } from '../../../shared/http/client';
+import { ApiError } from '@/api/client';
 import type { CostGroupBreakdown } from '../unitExtended.types';
-import { fetchWidgetsSummary } from './widgets.api';
+import { fetchWidgetsSummary } from '../unitExtended.api';
 import { WIDGET_KEY_TO_GROUPS } from './widgetsConfig';
 import type { WidgetsApiResponse, WidgetsSummary } from './widgets.types';
 
@@ -25,9 +25,8 @@ interface UseWidgetsResult {
 /**
  * Хук для загрузки сводки виджетов и управления раскрытием детализации.
  *
- * Использует fetchWidgetsSummary как единую точку входа в API
- * (URL и query инкапсулированы там). Abort предыдущего запроса при
- * смене параметров и при unmount.
+ * Запрос — fetchWidgetsSummary (unitExtended.api.ts), тот же фильтр, что у таблицы.
+ * Abort предыдущего запроса при смене параметров и при unmount.
  */
 export function useWidgets(params: UseWidgetsParams): UseWidgetsResult {
     const [data, setData] = useState<WidgetsApiResponse | null>(null);
@@ -50,11 +49,13 @@ export function useWidgets(params: UseWidgetsParams): UseWidgetsResult {
         setError(null);
 
         fetchWidgetsSummary(
-            params.marketplace,
-            params.periodFrom,
-            params.periodTo,
-            params.tagIds ?? [],
-            params.tagsMatchAll ?? false,
+            {
+                marketplace: params.marketplace,
+                periodFrom: params.periodFrom,
+                periodTo: params.periodTo,
+                tagIds: params.tagIds ?? [],
+                tagsMatchAll: params.tagsMatchAll ?? false,
+            },
             ac.signal,
         )
             .then((response) => {
@@ -65,8 +66,8 @@ export function useWidgets(params: UseWidgetsParams): UseWidgetsResult {
                 setIsLoading(false);
             })
             .catch((e: unknown) => {
-                // AbortError — не считаем ошибкой
-                if ((e as { name?: string })?.name === 'AbortError' || ac.signal.aborted) {
+                // Отменённый запрос — не ошибка
+                if (ac.signal.aborted) {
                     return;
                 }
                 const message = e instanceof ApiError

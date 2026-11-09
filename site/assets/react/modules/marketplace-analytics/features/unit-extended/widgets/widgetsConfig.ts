@@ -1,4 +1,4 @@
-import { formatMoney } from '../../utils/utils';
+import { formatMoney } from '@/react/shared/format/number';
 import type { WidgetCardConfig, WidgetsSummary } from './widgets.types';
 
 /**

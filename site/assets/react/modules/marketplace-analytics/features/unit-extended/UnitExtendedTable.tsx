@@ -2,8 +2,10 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import type { AbcClass, ListingTag, UnallocatedCosts, UnitExtendedItem, UnitExtendedTotals } from './unitExtended.types';
 import CostsBreakdown from './CostsBreakdown';
-import { formatMoney, formatQty } from '../utils/utils';
+import { formatMoney, formatQty } from '@/react/shared/format/number';
 import { useFixedHeader } from './useFixedHeader';
+import { cn } from '@/react/shared/lib/cn';
+import styles from './UnitExtendedTable.module.css';
 
 type SortField =
     | 'sku'
@@ -46,109 +48,6 @@ interface UnitExtendedTableProps {
     onToggleTag: (tagId: string) => void;
 }
 
-const TABLE_STYLES = `
-.ue-ext-scroll {
-    overflow-x: auto;
-    max-width: 100%;
-    width: 100%;
-}
-.ue-ext-floating-scrollbar {
-    position: fixed;
-    bottom: 0;
-    height: 16px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    z-index: 1045;
-    background: var(--tblr-bg-surface);
-    border-top: 1px solid var(--tblr-border-color);
-}
-.ue-ext-floating-scrollbar.is-hidden {
-    display: none;
-}
-.ue-ext-floating-scrollbar-inner {
-    height: 1px;
-}
-.ue-ext-table {
-    border-collapse: separate;
-    border-spacing: 0;
-    width: max-content;
-    min-width: 100%;
-    margin: 0;
-}
-.ue-ext-table td.ue-ext-frozen,
-.ue-ext-table th.ue-ext-frozen {
-    position: sticky;
-    background: var(--tblr-bg-surface);
-}
-.ue-ext-table td.ue-ext-frozen-sku,
-.ue-ext-table th.ue-ext-frozen-sku {
-    left: 0;
-    min-width: 140px;
-    max-width: 140px;
-    width: 140px;
-}
-.ue-ext-table td.ue-ext-frozen-title,
-.ue-ext-table th.ue-ext-frozen-title {
-    left: 140px;
-    min-width: 240px;
-    max-width: 240px;
-    width: 240px;
-}
-.ue-ext-table td.ue-ext-frozen { z-index: 1; }
-.ue-ext-table thead th.ue-ext-frozen { z-index: 3; }
-.ue-ext-table tfoot td.ue-ext-frozen { z-index: 1; }
-.ue-ext-table .ue-ext-frozen-title::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: -4px;
-    bottom: 0;
-    width: 4px;
-    background: linear-gradient(to right, rgba(0,0,0,0.08), transparent);
-    pointer-events: none;
-}
-.ue-ext-table td.ue-ext-tags,
-.ue-ext-table th.ue-ext-tags {
-    min-width: 180px;
-    max-width: 180px;
-    width: 180px;
-}
-.ue-ext-tags-list {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: nowrap;
-    overflow: hidden;
-}
-.ue-ext-tag-chip {
-    display: inline-block;
-    /* flex-shrink + min-width:0 — иначе два длинных имени распирают ячейку
-       и обрезаются по её краю вместо многоточия в каждом чипе. */
-    flex: 0 1 auto;
-    min-width: 0;
-    max-width: 100%;
-    padding: 3px 9px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    /* .tag-chip задан для span и font-family не выставляет: на button
-       без inherit браузер подставил бы свой системный шрифт. */
-    font-family: inherit;
-    cursor: pointer;
-}
-.ue-ext-tag-chip.is-active {
-    border-color: var(--tblr-primary);
-    background: rgba(var(--tblr-primary-rgb), 0.1);
-    color: var(--tblr-primary);
-}
-.ue-ext-table tbody tr:hover td {
-    background: var(--tblr-bg-surface-secondary);
-}
-.ue-ext-table tbody tr:hover td.ue-ext-frozen {
-    background: var(--tblr-bg-surface-secondary);
-}
-`;
-
 type ExpandedType = 'other' | 'all';
 
 /** Ключ раскрытия строки «Не распределено по товарам» — не пересекается с UUID листингов. */
@@ -188,7 +87,7 @@ const HEADERS: { field: SortField; label: React.ReactNode; align?: string; toolt
     { field: 'sku', label: 'SKU' },
     { field: 'title', label: 'Наименование' },
     { field: 'sellerArticle', label: 'Артикул' },
-    { field: 'tags', label: 'Теги', className: 'ue-ext-tags' },
+    { field: 'tags', label: 'Теги', className: styles.tags },
     { field: 'abcRevenue', label: 'ABC выр.', align: 'text-center', tooltip: 'ABC по нетто-выручке (выручка − возвраты): A — первые 80% выручки, B — следующие 15%, C — остальные 5% и товары без выручки' },
     { field: 'abcProfit', label: 'ABC приб.', align: 'text-center', tooltip: 'ABC по прибыли: A — первые 80% прибыли, B — следующие 15%, C — остальные 5%, D — убыток (прибыль ≤ 0)' },
     { field: 'revenue', label: 'Выручка', align: 'text-end' },
@@ -308,22 +207,22 @@ interface TagCellProps {
 
 const TagCell: React.FC<TagCellProps> = ({ tags, selectedTagIds, onToggleTag }) => {
     if (tags.length === 0) {
-        return <td className="ue-ext-tags text-muted">—</td>;
+        return <td className={`${styles.tags} text-muted`}>—</td>;
     }
 
     const visible = tags.slice(0, visibleTagCount(tags));
     const hiddenCount = tags.length - visible.length;
 
     return (
-        <td className="ue-ext-tags" title={tags.map((tag) => tag.name).join(', ')}>
-            <div className="ue-ext-tags-list">
+        <td className={styles.tags} title={tags.map((tag) => tag.name).join(', ')}>
+            <div className={styles.tagsList}>
                 {visible.map((tag) => {
                     const isActive = selectedTagIds.includes(tag.id);
                     return (
                         <button
                             key={tag.id}
                             type="button"
-                            className={`tag-chip ue-ext-tag-chip${isActive ? ' is-active' : ''}`}
+                            className={cn('tag-chip', styles.tagChip, isActive && styles.active)}
                             aria-pressed={isActive}
                             title={isActive
                                 ? `Убрать «${tag.name}» из фильтра`
@@ -390,7 +289,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
             return;
         }
 
-        const table = wrapper.querySelector('.ue-ext-table') as HTMLTableElement | null;
+        const table = wrapper.querySelector(`.${styles.table}`) as HTMLTableElement | null;
         const contentScrollWidth = table?.scrollWidth ?? wrapper.scrollWidth;
         const rect = wrapper.getBoundingClientRect();
         const viewportLeft = Math.max(rect.left, 0);
@@ -456,7 +355,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
         const syncWidths = () => {
             const inner = floating.firstElementChild as HTMLDivElement | null;
             if (!inner) return;
-            const table = wrapper.querySelector('.ue-ext-table') as HTMLTableElement | null;
+            const table = wrapper.querySelector(`.${styles.table}`) as HTMLTableElement | null;
             const contentScrollWidth = table?.scrollWidth ?? wrapper.scrollWidth;
             inner.style.width = `${contentScrollWidth}px`;
             syncFloatingState();
@@ -520,8 +419,8 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
         };
 
         const frozenClass = (field: SortField): string => {
-            if (field === 'sku') return 'ue-ext-frozen ue-ext-frozen-sku';
-            if (field === 'title') return 'ue-ext-frozen ue-ext-frozen-title';
+            if (field === 'sku') return `${styles.frozen} ${styles.frozenSku}`;
+            if (field === 'title') return `${styles.frozen} ${styles.frozenTitle}`;
             return '';
         };
 
@@ -590,8 +489,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
 
     return (
         <>
-            <style>{TABLE_STYLES}</style>
-
+            
             {showFixed && wrapperRect && createPortal(
                 <div style={{
                     position: 'fixed',
@@ -620,8 +518,8 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                 document.body
             )}
 
-            <div ref={tableWrapperRef} className="ue-ext-scroll">
-                <table className="table table-vcenter card-table ue-ext-table">
+            <div ref={tableWrapperRef} className={styles.scroll}>
+                <table className={`table table-vcenter card-table ${styles.table}`}>
                     <thead ref={theadRef}>
                         {renderHeaderCells()}
                     </thead>
@@ -633,10 +531,10 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                             return (
                                 <React.Fragment key={row.listingId}>
                                     <tr>
-                                        <td className="ue-ext-frozen ue-ext-frozen-sku">
+                                        <td className={`${styles.frozen} ${styles.frozenSku}`}>
                                             <div className="text-muted small text-truncate">{row.sku || '—'}</div>
                                         </td>
-                                        <td className="ue-ext-frozen ue-ext-frozen-title">
+                                        <td className={`${styles.frozen} ${styles.frozenTitle}`}>
                                             <div className="text-truncate">{row.title || '—'}</div>
                                         </td>
                                         <td>
@@ -734,15 +632,15 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                             {unallocated && (
                                 <>
                                     <tr>
-                                        <td className="ue-ext-frozen ue-ext-frozen-sku"></td>
-                                        <td className="ue-ext-frozen ue-ext-frozen-title">
+                                        <td className={`${styles.frozen} ${styles.frozenSku}`}></td>
+                                        <td className={`${styles.frozen} ${styles.frozenTitle}`}>
                                             Не распределено по товарам
                                             <div className="text-muted small">
                                                 Общие затраты кабинета без привязки к товару
                                             </div>
                                         </td>
                                         <td></td>
-                                        <td className="ue-ext-tags"></td>
+                                        <td className={styles.tags}></td>
                                         <td></td>
                                         <td></td>
                                         <td className="text-end">{'—'}</td>
@@ -794,10 +692,10 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                 </>
                             )}
                             <tr className="fw-bold">
-                                <td className="ue-ext-frozen ue-ext-frozen-sku"></td>
-                                <td className="ue-ext-frozen ue-ext-frozen-title">Итого</td>
+                                <td className={`${styles.frozen} ${styles.frozenSku}`}></td>
+                                <td className={`${styles.frozen} ${styles.frozenTitle}`}>Итого</td>
                                 <td></td>
-                                <td className="ue-ext-tags"></td>
+                                <td className={styles.tags}></td>
                                 <td></td>
                                 <td></td>
                                 <td className="text-end">{formatMoney(totals.revenue)}</td>
@@ -844,11 +742,11 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
             {createPortal(
                 <div
                     ref={floatingScrollbarRef}
-                    className={`ue-ext-floating-scrollbar ${showFloatingScrollbar ? '' : 'is-hidden'}`}
+                    className={cn(styles.floatingScrollbar, !showFloatingScrollbar && styles.hidden)}
                     style={floatingScrollbarStyle}
                     aria-hidden="true"
                 >
-                    <div className="ue-ext-floating-scrollbar-inner" />
+                    <div className={styles.floatingScrollbarInner} />
                 </div>,
                 document.body
             )}

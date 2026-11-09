@@ -1,0 +1,12 @@
+/* Поле поиска в шапке карточки таблицы. */
+.listingSearch {
+    width: 320px;
+    max-width: 100%;
+}
+
+@media (max-width: 767.98px) {
+    .listingSearch {
+        width: 100%;
+        margin-left: 0 !important;
+    }
+}

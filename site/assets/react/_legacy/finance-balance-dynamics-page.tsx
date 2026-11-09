@@ -2,7 +2,7 @@ import React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import "../../styles/components/financial-chart.css";
 import { BalanceDynamicsWidget } from "./finance-balance-dynamics/BalanceDynamicsWidget";
-import { ErrorBoundary } from "./shared/ui/ErrorBoundary";
+import { ErrorBoundary } from "@/react/shared/ui/ErrorBoundary";
 
 interface ReactMountElement extends HTMLElement {
     __reactRoot?: Root;
