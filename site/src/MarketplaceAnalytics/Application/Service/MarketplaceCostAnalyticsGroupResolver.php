@@ -21,21 +21,6 @@ final class MarketplaceCostAnalyticsGroupResolver
     ) {
     }
 
-    public function resolveWidgetGroup(?string $marketplace, string $code, string $name): string
-    {
-        if ($marketplace === MarketplaceType::WILDBERRIES->value) {
-            return $this->wb($code)->widgetGroup ?? 'Другие услуги и штрафы';
-        }
-
-        if ($marketplace === MarketplaceType::OZON->value) {
-            return $this->ozon($code)->widgetGroup ?? 'Другие услуги и штрафы';
-        }
-
-        return $this->ozon($code)->widgetGroup
-            ?? $this->wb($code)->widgetGroup
-            ?? 'Другие услуги и штрафы';
-    }
-
     public function resolveBreakdownGroup(?string $marketplace, string $code, string $name): string
     {
         if ($marketplace === MarketplaceType::WILDBERRIES->value) {

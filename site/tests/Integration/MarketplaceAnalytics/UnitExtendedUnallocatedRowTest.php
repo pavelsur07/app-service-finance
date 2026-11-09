@@ -17,19 +17,22 @@ use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
 use App\MarketplaceAnalytics\Infrastructure\Query\WidgetSummaryQuery;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Builders\Marketplace\MarketplaceListingTagBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 
 /**
- * Строка «Не распределено по товарам»: затраты без листинга входят в «Итого», и прибыль
- * «Итого» совпадает с карточками (WidgetSummaryQuery), когда реклама по учёту равна
- * статистике. Расхождение двух цифр на одной странице — исходная жалоба (issue #2940).
+ * Карточки (WidgetSummaryQuery) = «Итого» таблицы (UnitExtendedQuery) — без тегов и под
+ * тегом. Две разные «Прибыли» на одной странице — исходная жалоба (issue #2940); с этапа 3
+ * реклама везде по статистике, учётные рекламные категории — только справка adAccrued.
  */
 final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-000000002940';
     private const OWNER_ID = '22222222-2222-2222-2222-000000002940';
     private const LISTING_ID = '55555555-5555-5555-5555-000000002940';
+    private const AD_ONLY_LISTING_ID = '55555555-5555-5555-5555-000000002941';
+    private const TAG_ID = '66666666-6666-6666-6666-000000002940';
     private const FROM = '2026-11-01';
     private const TO = '2026-11-30';
 
@@ -46,12 +49,9 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
         $this->em->persist($owner);
         $this->em->persist($this->company);
 
-        $listing = new MarketplaceListing(self::LISTING_ID, $this->company, null, MarketplaceType::OZON);
-        $listing->setMarketplaceSku('SKU-1');
-        $listing->setSize('UNKNOWN');
-        $listing->setPrice('0.00');
-        $listing->setName('Товар');
-        $this->em->persist($listing);
+        $listing = $this->listing(self::LISTING_ID, 'SKU-1');
+        // Только реклама в периоде: ни продаж, ни затрат, ни остатков.
+        $adOnly = $this->listing(self::AD_ONLY_LISTING_ID, 'SKU-2');
 
         $sale = new MarketplaceSale(Uuid::uuid4()->toString(), $this->company, $listing, MarketplaceType::OZON);
         $sale->setExternalOrderId('ORD-1');
@@ -61,60 +61,69 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
         $sale->setTotalRevenue('1000.00');
         $this->em->persist($sale);
 
-        // К товару: комиссия 100. Без товара: хранение 50, акции 30 − сторно 10, клики 70.
+        // К товару: комиссия 100 и учётные клики 40 (реклама уже в статистике — не затрата).
         $this->cost('ozon_sale_commission', '100.00', MarketplaceCostOperationType::CHARGE, $listing);
+        $this->cost('ozon_cpc', '40.00', MarketplaceCostOperationType::CHARGE, $listing);
+        // Без товара: хранение 50, акции 30 − сторно 10, клики 70, предоплата рекламы 500.
         $this->cost('ozon_storage', '50.00', MarketplaceCostOperationType::CHARGE);
         $this->cost('ozon_marketing_action', '30.00', MarketplaceCostOperationType::CHARGE);
         $this->cost('ozon_marketing_action', '10.00', MarketplaceCostOperationType::STORNO);
         $this->cost('ozon_cpc', '70.00', MarketplaceCostOperationType::CHARGE);
-        // Предоплата рекламного баланса: расход из неё уже в статистике — в строку не входит.
         $this->cost('ozon_marketing_services', '500.00', MarketplaceCostOperationType::CHARGE);
         // Вне периода — не считается.
         $this->cost('ozon_storage', '999.00', MarketplaceCostOperationType::CHARGE, null, '2026-10-31');
-        $this->em->flush();
 
-        // Статистика рекламы = учёту (70): тогда «Итого» и карточки обязаны совпасть.
-        $doc = new AdDocument(
-            companyId: self::COMPANY_ID,
-            marketplace: MarketplaceType::OZON,
-            reportDate: new \DateTimeImmutable('2026-11-05'),
-            campaignId: 'C-1',
-            campaignName: 'C-1',
-            parentSku: 'SKU-1',
-            totalCost: '70.00',
-            totalImpressions: 0,
-            totalClicks: 0,
-            adRawDocumentId: Uuid::uuid4()->toString(),
-        );
-        $this->em->persist($doc);
-        $this->em->persist(new AdDocumentLine($doc, self::LISTING_ID, '100.00', '70.00', 0, 0));
+        $tag = MarketplaceListingTagBuilder::aTag()->withId(self::TAG_ID)->forCompanyId(self::COMPANY_ID)->build();
+        $this->em->persist($tag);
+        $this->em->flush();
+        foreach ([self::LISTING_ID, self::AD_ONLY_LISTING_ID] as $listingId) {
+            $this->connection->executeStatement(
+                'INSERT INTO marketplace_listing_tag_assignments (listing_id, tag_id, company_id, created_at) VALUES (?, ?, ?, NOW())',
+                [$listingId, self::TAG_ID, self::COMPANY_ID],
+            );
+        }
+
+        // Статистика: 70 на товар с продажей, 30 на товар только с рекламой — всего 100.
+        $this->adStatistics('SKU-1', self::LISTING_ID, '70.00');
+        $this->adStatistics('SKU-2', self::AD_ONLY_LISTING_ID, '30.00');
         $this->em->flush();
         $this->em->clear();
     }
 
-    public function testUnallocatedRowExcludesAdCategoryAndTotalsMatchWidgets(): void
+    public function testWidgetsEqualTotalsWithoutTags(): void
     {
         $result = self::getContainer()->get(UnitExtendedQuery::class)
             ->execute(self::COMPANY_ID, 'ozon', self::FROM, self::TO);
 
-        $row = $result['unallocated'];
-        self::assertNotNull($row);
-        // 50 + 30 − 10 = 70; ozon_cpc и предоплата в строку не входят — реклама из статистики.
-        self::assertEqualsWithDelta(70.0, $row['totalCosts'], 0.001);
-        self::assertEqualsWithDelta(170.0 + 70.0, $result['totals']['totalCosts'], 0.001);
+        // 50 + 30 − 10 = 70; клики и предоплата в строку не входят — реклама из статистики.
+        self::assertNotNull($result['unallocated']);
+        self::assertEqualsWithDelta(70.0, $result['unallocated']['totalCosts'], 0.001);
+        // Строка товара: учётные клики 40 не входят в «Прочие» — иначе реклама дважды.
+        $row = $this->row($result['items'], self::LISTING_ID);
+        self::assertEqualsWithDelta(0.0, $row['otherCosts'], 0.001);
+        // Товар только с рекламой — строка с убытком на её сумму.
+        self::assertEqualsWithDelta(-30.0, $this->row($result['items'], self::AD_ONLY_LISTING_ID)['profit'], 0.001);
+        // 1000 − 100 − 70 − 100 (статистика) = 730.
+        self::assertEqualsWithDelta(730.0, $result['totals']['profit'], 0.001);
 
-        $widgets = self::getContainer()->get(WidgetSummaryQuery::class)->getSummary(
-            self::COMPANY_ID,
-            'ozon',
-            new \DateTimeImmutable(self::FROM),
-            new \DateTimeImmutable(self::TO),
-        );
-        // «Итого»: 1000 − 100 − 70 (без товара) − 70 (реклама по статистике) = 760.
-        self::assertEqualsWithDelta(760.0, $result['totals']['profit'], 0.001);
-        // Карточки — все начисления, включая предоплату рекламного баланса (500): расходятся
-        // с «Итого» ровно на неё, остальное (клики = статистике) совпадает.
-        self::assertEqualsWithDelta(260.0, $widgets['profit'], 0.001);
-        self::assertEqualsWithDelta(-500.0, $widgets['profit'] - $result['totals']['profit'], 0.001);
+        $widgets = $this->widgets(null);
+        $this->assertWidgetsMatchTotals($widgets, $result['totals']);
+        // Справка: учёт рекламы 40 + 70 + 500.
+        self::assertEqualsWithDelta(-610.0, $widgets['adAccrued'], 0.001);
+    }
+
+    public function testWidgetsEqualTotalsUnderTag(): void
+    {
+        $result = self::getContainer()->get(UnitExtendedQuery::class)
+            ->execute(self::COMPANY_ID, 'ozon', self::FROM, self::TO, tagIds: [self::TAG_ID]);
+
+        self::assertNull($result['unallocated']);
+        // 1000 − 100 − 70 − 30 = 800: реклама товара только с рекламой — в «Итого».
+        self::assertEqualsWithDelta(800.0, $result['totals']['profit'], 0.001);
+
+        $widgets = $this->widgets([self::LISTING_ID, self::AD_ONLY_LISTING_ID]);
+        $this->assertWidgetsMatchTotals($widgets, $result['totals']);
+        self::assertNull($widgets['adAccrued']);
     }
 
     public function testOtherMarketplaceHasNoRow(): void
@@ -123,6 +132,88 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
             ->execute(self::COMPANY_ID, 'wildberries', self::FROM, self::TO);
 
         self::assertNull($result['unallocated']);
+    }
+
+    /**
+     * Каждая карточка — одноимённая величина «Итого» (в P&L-знаке).
+     *
+     * @param array<string, mixed> $widgets
+     * @param array<string, mixed> $totals
+     */
+    private function assertWidgetsMatchTotals(array $widgets, array $totals): void
+    {
+        $groups = array_column($widgets['widgetGroups'], 'netAmount', 'serviceGroup');
+
+        self::assertEqualsWithDelta($totals['revenue'], $widgets['revenue'], 0.001);
+        self::assertEqualsWithDelta(-$totals['returnsTotal'], $widgets['returnsTotal'], 0.001);
+        self::assertEqualsWithDelta(-$totals['costPriceTotal'], $widgets['costPriceTotal'], 0.001);
+        self::assertEqualsWithDelta(-$totals['commission'], $groups['Комиссия'], 0.001);
+        self::assertEqualsWithDelta(-$totals['logistics'], $groups['Логистика'], 0.001);
+        self::assertEqualsWithDelta(-$totals['adSpend'], $groups['Реклама'], 0.001);
+        self::assertEqualsWithDelta(-$totals['otherCosts'], $groups['Прочие'], 0.001);
+        self::assertEqualsWithDelta(-$totals['totalCosts'], $widgets['totalCosts'], 0.001);
+        self::assertEqualsWithDelta($totals['profit'], $widgets['profit'], 0.001);
+    }
+
+    /**
+     * @param list<string>|null $listingIds
+     *
+     * @return array<string, mixed>
+     */
+    private function widgets(?array $listingIds): array
+    {
+        return self::getContainer()->get(WidgetSummaryQuery::class)->getSummary(
+            self::COMPANY_ID,
+            'ozon',
+            new \DateTimeImmutable(self::FROM),
+            new \DateTimeImmutable(self::TO),
+            $listingIds,
+        );
+    }
+
+    /**
+     * @param list<array<string, mixed>> $items
+     *
+     * @return array<string, mixed>
+     */
+    private function row(array $items, string $listingId): array
+    {
+        foreach ($items as $item) {
+            if ($item['listingId'] === $listingId) {
+                return $item;
+            }
+        }
+        self::fail('Нет строки листинга '.$listingId);
+    }
+
+    private function listing(string $id, string $sku): MarketplaceListing
+    {
+        $listing = new MarketplaceListing($id, $this->company, null, MarketplaceType::OZON);
+        $listing->setMarketplaceSku($sku);
+        $listing->setSize('UNKNOWN');
+        $listing->setPrice('0.00');
+        $listing->setName('Товар '.$sku);
+        $this->em->persist($listing);
+
+        return $listing;
+    }
+
+    private function adStatistics(string $sku, string $listingId, string $cost): void
+    {
+        $doc = new AdDocument(
+            companyId: self::COMPANY_ID,
+            marketplace: MarketplaceType::OZON,
+            reportDate: new \DateTimeImmutable('2026-11-05'),
+            campaignId: 'C-'.$sku,
+            campaignName: 'C-'.$sku,
+            parentSku: $sku,
+            totalCost: $cost,
+            totalImpressions: 0,
+            totalClicks: 0,
+            adRawDocumentId: Uuid::uuid4()->toString(),
+        );
+        $this->em->persist($doc);
+        $this->em->persist(new AdDocumentLine($doc, $listingId, '100.00', $cost, 0, 0));
     }
 
     private function cost(

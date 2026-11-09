@@ -196,16 +196,6 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
                 />
             </ErrorBoundary>
 
-            {/* Карточки и «Итого» таблицы расходятся только источником рекламы: затраты без
-                товара в «Итого» входят строкой «Не распределено по товарам» (#2940). */}
-            {widgets.summary && (
-                <p className="text-muted small mb-3">
-                    Реклама в карточках — по начислениям маркетплейса, в таблице — по статистике
-                    рекламного кабинета; на эту разницу прибыль в карточках может отличаться
-                    от «Итого».
-                </p>
-            )}
-
             {isError && (
                 <div className="alert alert-danger mb-3">
                     {errorMessage ?? 'Не удалось загрузить данные'}

@@ -8,10 +8,12 @@ use App\Marketplace\DTO\ListingReturnAggregateDTO;
 use App\Marketplace\DTO\ListingSalesAggregateDTO;
 use App\Marketplace\Facade\CostCategoryCatalogFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
+use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use App\MarketplaceAnalytics\Infrastructure\Query\WidgetSummaryQuery;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class WidgetSummaryQueryPnlTest extends TestCase
@@ -19,6 +21,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
     private const COMPANY_ID = '11111111-1111-1111-1111-111111111111';
 
     private MarketplaceFacade $facade;
+    private MockObject $adsFacade;
     private Connection $connection;
     private MarketplaceCostAnalyticsGroupResolver $groupResolver;
     private WidgetSummaryQuery $query;
@@ -26,9 +29,10 @@ final class WidgetSummaryQueryPnlTest extends TestCase
     protected function setUp(): void
     {
         $this->facade = $this->createMock(MarketplaceFacade::class);
+        $this->adsFacade = $this->mockObject(MarketplaceAdsFacade::class);
         $this->connection = $this->createMock(Connection::class);
         $this->groupResolver = new MarketplaceCostAnalyticsGroupResolver(new CostCategoryCatalogFacade());
-        $this->query = new WidgetSummaryQuery($this->facade, $this->connection, $this->groupResolver);
+        $this->query = new WidgetSummaryQuery($this->facade, $this->asAdsFacade($this->adsFacade), $this->connection, $this->groupResolver);
     }
 
     public function testReturnsNegativeReturnsTotal(): void
@@ -71,7 +75,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
 
         $result = $this->executeSummary();
 
-        $group = $this->findGroup($result['widgetGroups'], 'Вознаграждение');
+        $group = $this->findGroup($result['widgetGroups'], 'Комиссия');
         self::assertNotNull($group);
         self::assertSame(-500.0, $group['netAmount']);
         self::assertSame(-500.0, $group['costsAmount']);
@@ -88,7 +92,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
 
         $result = $this->executeSummary();
 
-        $group = $this->findGroup($result['widgetGroups'], 'Вознаграждение');
+        $group = $this->findGroup($result['widgetGroups'], 'Комиссия');
         self::assertNotNull($group);
         self::assertSame(-700.0, $group['netAmount']);
         self::assertSame(300.0, $group['stornoAmount']);
@@ -170,9 +174,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         );
         $groupNames = array_values($groupNames);
 
-        self::assertSame('Услуги доставки и FBO', $groupNames[0]);
-        self::assertSame('Вознаграждение', $groupNames[1]);
-        self::assertSame('Продвижение и реклама', $groupNames[2]);
+        self::assertSame(['Логистика', 'Комиссия'], $groupNames, 'ozon_cpc — не группа затрат, реклама из статистики');
     }
 
     public function testCompensationStornoBecomesPositiveNet(): void
@@ -185,7 +187,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
 
         $result = $this->executeSummary();
 
-        $group = $this->findGroup($result['widgetGroups'], 'Другие услуги и штрафы');
+        $group = $this->findGroup($result['widgetGroups'], 'Прочие');
         self::assertNotNull($group);
         self::assertSame(1799.0, $group['netAmount']);
 
@@ -213,7 +215,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
 
         $result = $this->executeSummary();
 
-        $group = $this->findGroup($result['widgetGroups'], 'Другие услуги и штрафы');
+        $group = $this->findGroup($result['widgetGroups'], 'Прочие');
         self::assertNotNull($group);
         self::assertSame(5480.0, $group['netAmount']);
 
@@ -236,7 +238,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
 
         $result = $this->executeSummary();
 
-        $group = $this->findGroup($result['widgetGroups'], 'Другие услуги и штрафы');
+        $group = $this->findGroup($result['widgetGroups'], 'Прочие');
         self::assertNotNull($group);
         self::assertSame(-1274.0, $group['netAmount']);
 
@@ -262,7 +264,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
 
         $result = $this->executeSummary();
 
-        $group = $this->findGroup($result['widgetGroups'], 'Другие услуги и штрафы');
+        $group = $this->findGroup($result['widgetGroups'], 'Прочие');
         self::assertNotNull($group);
         self::assertSame(4206.0, $group['netAmount']);
     }
@@ -312,11 +314,14 @@ final class WidgetSummaryQueryPnlTest extends TestCase
 
         $result = $this->executeSummaryFor('wildberries');
 
-        self::assertSame('commission', $this->findCategory($result['widgetGroups'], 'Вознаграждение')['code']);
-        self::assertSame('logistics_delivery', $this->findCategory($result['widgetGroups'], 'Услуги доставки и FBO')['code']);
-        self::assertSame('acquiring', $this->findCategory($result['widgetGroups'], 'Услуги партнёров')['code']);
-        self::assertSame('wb_okazanie_uslug_wb_prodvizhenie', $this->findCategory($result['widgetGroups'], 'Продвижение и реклама')['code']);
-        self::assertSame('penalty', $this->findCategory($result['widgetGroups'], 'Другие услуги и штрафы')['code']);
+        // Группы — колонки таблицы (resolveUnitBucket); «Продвижение» WB — справка adAccrued.
+        self::assertSame('commission', $this->findCategory($result['widgetGroups'], 'Комиссия')['code']);
+        self::assertSame('logistics_delivery', $this->findCategory($result['widgetGroups'], 'Логистика')['code']);
+        $otherCodes = array_column($this->findGroup($result['widgetGroups'], 'Прочие')['categories'] ?? [], 'code');
+        sort($otherCodes);
+        self::assertSame(['acquiring', 'penalty'], $otherCodes);
+        self::assertSame(-400.0, $result['adAccrued']);
+        self::assertSame(-1100.0, $result['totalCosts']);
     }
 
     public function testUnknownWbCodeFallsBackToOtherServicesAndPenalties(): void
@@ -328,7 +333,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         ]);
 
         $result = $this->executeSummaryFor('wildberries');
-        self::assertSame('wb_unknown_code', $this->findCategory($result['widgetGroups'], 'Другие услуги и штрафы')['code']);
+        self::assertSame('wb_unknown_code', $this->findCategory($result['widgetGroups'], 'Прочие')['code']);
     }
 
     public function testMarketplaceNullDoesNotMergeCategoriesWithSameCode(): void
@@ -342,9 +347,55 @@ final class WidgetSummaryQueryPnlTest extends TestCase
 
         $result = $this->executeSummaryFor(null);
 
-        $group = $this->findGroup($result['widgetGroups'], 'Другие услуги и штрафы');
+        $group = $this->findGroup($result['widgetGroups'], 'Прочие');
         self::assertNotNull($group);
         self::assertCount(2, $group['categories']);
+    }
+
+    /**
+     * Реклама — статистика за период, как totals.adSpend таблицы; учётные рекламные
+     * категории (ozon_cpc, предоплата) в затраты не входят и отдаются справкой. Иначе
+     * прибыль карточки расходилась с «Итого» на (учёт − статистика) — жалоба 08.11.2026.
+     */
+    public function testAdSpendFromStatisticsAndAccrualIsReference(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l1', 'Товар', 'SKU1', 'ozon', '10000.00', 10, '2000.00', 10),
+        ]);
+        $this->stubReturns([]);
+        $this->stubCostRows([
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_sale_commission', 'category_name' => 'Комиссия', 'costs_amount' => '-1000.00', 'storno_amount' => '0.00', 'net_amount' => '-1000.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_cpc', 'category_name' => 'Оплата за клик', 'costs_amount' => '-300.00', 'storno_amount' => '0.00', 'net_amount' => '-300.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_marketing_services', 'category_name' => 'Рекламные услуги', 'costs_amount' => '-5000.00', 'storno_amount' => '0.00', 'net_amount' => '-5000.00'],
+        ]);
+        $this->adsFacade->expects(self::once())->method('getTotalAdCostForPeriod')->willReturn('700.00');
+        $this->adsFacade->expects(self::never())->method('getAdSpendByListingForPeriod');
+
+        $result = $this->executeSummary();
+
+        self::assertSame(-700.0, $this->findGroup($result['widgetGroups'], 'Реклама')['netAmount'] ?? null);
+        self::assertSame(-5300.0, $result['adAccrued']);
+        self::assertSame(-1700.0, $result['totalCosts']);
+        // 10000 − 2000 − 1000 − 700
+        self::assertSame(6300.0, $result['profit']);
+    }
+
+    /**
+     * Под тегами реклама — статистика по листингам набора, справки нет.
+     */
+    public function testAdSpendUnderListingScopeIsAttributedOnly(): void
+    {
+        $this->stubSales([]);
+        $this->stubReturns([]);
+        $this->stubCostRows([]);
+        $this->adsFacade->expects(self::never())->method('getTotalAdCostForPeriod');
+        $this->adsFacade->method('getAdSpendByListingForPeriod')->willReturn(['l1' => '120.50', 'l2' => '999.00']);
+
+        $result = $this->executeSummaryScopedTo(['l1']);
+
+        self::assertSame(-120.5, $this->findGroup($result['widgetGroups'], 'Реклама')['netAmount'] ?? null);
+        self::assertSame(-120.5, $result['profit']);
+        self::assertNull($result['adAccrued']);
     }
 
     /**
@@ -425,6 +476,24 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         self::assertSame(0.0, $result['totalCosts']);
         self::assertSame(0.0, $result['profit']);
         self::assertNull($result['marginPercent']);
+    }
+
+    /**
+     * Мок final-класса через class-string без литерала: PHPStan видит MockObject, а не
+     * неразрешимое пересечение final&MockObject (иначе — рост baseline).
+     *
+     * @param class-string $class
+     */
+    private function mockObject(string $class): MockObject
+    {
+        return $this->createMock($class);
+    }
+
+    private function asAdsFacade(object $mock): MarketplaceAdsFacade
+    {
+        self::assertInstanceOf(MarketplaceAdsFacade::class, $mock);
+
+        return $mock;
     }
 
     /**

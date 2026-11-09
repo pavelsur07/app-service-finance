@@ -7,6 +7,8 @@ export interface WidgetsSummary {
     totalCosts: number;
     profit: number;
     marginPercent: number | null;
+    /** Реклама по начислениям маркетплейса (P&L-знак) — справка; null под фильтром тегов. */
+    adAccrued: number | null;
     widgetGroups: CostGroupBreakdown[];
 }
 
@@ -29,4 +31,6 @@ export interface WidgetCardConfig {
     type: WidgetType;
     icon: string;
     getValue: (s: WidgetsSummary) => number;
+    /** Строка-справка под суммой карточки; null — не показывать. */
+    getNote?: (s: WidgetsSummary) => string | null;
 }

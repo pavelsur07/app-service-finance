@@ -6963,24 +6963,6 @@ parameters:
 			path: src/MarketplaceAnalytics/Infrastructure/Query/WidgetSummaryQuery.php
 
 		-
-			message: '#^Offset ''netAmount'' might not exist on array\{costsAmount\: float, stornoAmount\: float\}\|array\{serviceGroup\?\: ''Вознаграждение''\|''Другие услуги и…''\|''Продвижение и…''\|''Услуги доставки и…''\|''Услуги партнёров'', costsAmount\: float, stornoAmount\: float, netAmount\: float, categories\: array\<non\-falsy\-string, array\{code\: string, name\: string, costsAmount\: float, stornoAmount\: float, netAmount\: float\}\>\}\.$#'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: src/MarketplaceAnalytics/Infrastructure/Query/WidgetSummaryQuery.php
-
-		-
-			message: '#^Offset ''serviceGroup'' might not exist on array\{serviceGroup\?\: ''Вознаграждение''\|''Другие услуги и…''\|''Продвижение и…''\|''Услуги доставки и…''\|''Услуги партнёров'', costsAmount\: float, stornoAmount\: float, netAmount\: float, categories\: array\<non\-falsy\-string, array\{code\: string, name\: string, costsAmount\: float, stornoAmount\: float, netAmount\: float\}\>\}\.$#'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: src/MarketplaceAnalytics/Infrastructure/Query/WidgetSummaryQuery.php
-
-		-
-			message: '#^Offset ''stornoAmount'' might not exist on array\{costsAmount\: float\}\|array\{serviceGroup\?\: ''Вознаграждение''\|''Другие услуги и…''\|''Продвижение и…''\|''Услуги доставки и…''\|''Услуги партнёров'', costsAmount\: float, stornoAmount\: float, netAmount\: float, categories\: array\<non\-falsy\-string, array\{code\: string, name\: string, costsAmount\: float, stornoAmount\: float, netAmount\: float\}\>\}\.$#'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: src/MarketplaceAnalytics/Infrastructure/Query/WidgetSummaryQuery.php
-
-		-
 			message: '#^Class App\\MarketplaceAnalytics\\Repository\\ListingDailySnapshotRepository extends generic class Doctrine\\Bundle\\DoctrineBundle\\Repository\\ServiceEntityRepository but does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1

@@ -18,6 +18,12 @@ final readonly class ListingCostAggregateQuery
     }
 
     /**
+     * Затраты листингов по категориям за период — строки товаров Unit-экономики.
+     *
+     * Рекламные категории под статистикой (AdStatisticsCostCategories::codes()) исключены,
+     * как в executeUnallocatedByPeriod(): реклама в этих строках идёт из статистики
+     * MarketplaceAds, учётная сумма с привязкой к листингу посчитала бы её второй раз.
+     *
      * @return array<string, list<ListingCostCategoryAggregateDTO>> keyed by listingId
      */
     public function executeByPeriod(
@@ -57,6 +63,7 @@ final readonly class ListingCostAggregateQuery
               AND c.cost_date >= :periodFrom
               AND c.cost_date <= :periodTo
               AND c.listing_id IS NOT NULL
+              AND cc.code NOT IN (:adCodes)
               {$mpFilter}
             GROUP BY c.listing_id, cc.code, cc.name
             SQL,
@@ -64,8 +71,10 @@ final readonly class ListingCostAggregateQuery
                 'companyId' => $companyId,
                 'periodFrom' => $from->format('Y-m-d'),
                 'periodTo' => $to->format('Y-m-d'),
+                'adCodes' => AdStatisticsCostCategories::codes(),
                 'marketplace' => $marketplace,
             ], static fn ($v) => null !== $v),
+            ['adCodes' => ArrayParameterType::STRING],
         );
 
         $result = [];
