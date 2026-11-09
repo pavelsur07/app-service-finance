@@ -1,0 +1,27 @@
+{# Фильтры: период и счёт. Параметры: filters (date_from, date_to, account), accounts. #}
+<form method="get" class="card card-body mb-4">
+    <div class="row g-3">
+        <div class="col-sm-6 col-md-3">
+            <label class="form-label">Дата с</label>
+            <input type="date" name="date_from" value="{{ filters.date_from|date('Y-m-d') }}" class="form-control" required>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <label class="form-label">Дата по</label>
+            <input type="date" name="date_to" value="{{ filters.date_to|date('Y-m-d') }}" class="form-control" required>
+        </div>
+        <div class="col-sm-6 col-md-4">
+            <label class="form-label">Счёт</label>
+            <select name="account" class="form-select">
+                <option value="">Все счета</option>
+                {% for acc in accounts %}
+                    <option value="{{ acc.id }}" {{ filters.account == acc.id ? 'selected' : '' }}>{{ acc.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-sm-6 col-md-2 align-self-end">
+            <button class="btn btn-primary w-100">
+                <i class="ti ti-search me-1"></i> Показать
+            </button>
+        </div>
+    </div>
+</form>

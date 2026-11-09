@@ -1,0 +1,53 @@
+{# Макросы отчёта ДДС: суммы, рекурсивная строка статьи, строки матрицы Проект × ЦФО. #}
+{# DS-Money: приход — зелёный, расход и отрицательное сальдо — основной цвет с U+2212, ноль приглушён. #}
+{% macro format_amount(value) %}
+    {{ value|vf_amount(2, value > 0 ? 'income' : null) }}
+{% endmacro %}
+
+{% macro render_category(cat, totals, currency, periodCount, parentId) %}
+{% set hasChildren = cat.children|length > 0 %}
+{% set hidden = cat.level >= 2 %}
+<tr data-id="{{ cat.id }}" data-parent="{{ parentId }}" data-level="{{ cat.level }}"{% if hidden %} style="display:none"{% endif %}>
+    <td style="padding-left: {{ (cat.level - 1) * 20 }}px;">
+        <div class="d-flex align-items-center">
+            {%- if hasChildren -%}
+                <span class="cf-toggle" data-target="{{ cat.id }}">&#9654;</span>
+            {%- else -%}
+                <span class="cf-toggle-spacer"></span>
+            {%- endif -%}
+            <span class="text-truncate" title="{{ cat.name }}">{{ cat.name }}</span>
+        </div>
+    </td>
+    {% for i in 0..periodCount - 1 %}
+        {% set val = totals[cat.id].totals[currency][i] ?? 0 %}
+        <td class="text-end">{{ _self.format_amount(val)|raw }}</td>
+    {% endfor %}
+</tr>
+{% for child in cat.children %}
+    {{ _self.render_category(child, totals, currency, periodCount, cat.id) }}
+{% endfor %}
+{% endmacro %}
+
+{% macro center_label(row, centerLabels) %}
+    {{ row.responsibility_center_name ?? centerLabels[row.responsibility_center_id]|default(row.responsibility_center_id) }}
+{% endmacro %}
+
+{% macro render_project_center_rows(rows, currency, periods, primary, centerLabels) %}
+    {% for row in rows %}
+        {% set vals = row.totals[currency]|default([]) %}
+        {% if vals is not empty %}
+            <tr>
+                {% if primary == 'center' %}
+                    <td>{{ _self.center_label(row, centerLabels) }}</td>
+                    <td>{{ row.project_name }}</td>
+                {% else %}
+                    <td>{{ row.project_name }}</td>
+                    <td>{{ _self.center_label(row, centerLabels) }}</td>
+                {% endif %}
+                {% for i, p in periods %}
+                    <td class="text-end">{{ _self.format_amount(vals[i]|default(0))|raw }}</td>
+                {% endfor %}
+            </tr>
+        {% endif %}
+    {% endfor %}
+{% endmacro %}

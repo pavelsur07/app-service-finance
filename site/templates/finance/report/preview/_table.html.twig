@@ -1,0 +1,93 @@
+{#
+  Таблица ОПиУ: по периодам или по проектам, дерево строк, необязательные колонки «Код» и «Тип».
+  Параметры: rows, formats, periods, compareProjects, layout, grouping, showMetaColumns.
+#}
+{% import 'finance/report/preview/_macros.html.twig' as pl_ui %}
+
+{# Ширины колонок фиксированные: table-layout:fixed + colgroup. min-width считается по
+   числу колонок, иначе таблица сожмётся до контейнера вместо горизонтальной прокрутки. #}
+{% set meta_width = showMetaColumns ? ' + var(--pl-col-meta-code) + var(--pl-col-meta-type)' : '' %}
+{# Инлайн-значение — источник истины для группировки; объявление в CSS выше остаётся fallback. #}
+{% set period_col_width = grouping == 'week' ? '220px' : '160px' %}
+{% if layout == 'projects' %}
+    {% set table_min_width = 'calc(var(--pl-col-name)' ~ meta_width ~ ' + ' ~ compareProjects|length ~ ' * var(--pl-col-project) + var(--pl-col-total))' %}
+{% else %}
+    {% set table_min_width = 'calc(var(--pl-col-name)' ~ meta_width ~ ' + ' ~ periods|length ~ ' * var(--pl-col-period))' %}
+{% endif %}
+
+<div class="card table-responsive">
+    {# Для этой таблицы согласован бухгалтерский формат: отрицательные значения в скобках вместо UI Kit U+2212. #}
+    <table class="table table-vcenter pl-table" data-pl-tree style="--pl-col-period: {{ period_col_width }}; min-width: {{ table_min_width }};">
+        <colgroup>
+            <col class="pl-col-name">
+            {% if showMetaColumns %}
+                <col class="pl-col-meta-code">
+                <col class="pl-col-meta-type">
+            {% endif %}
+            {% if layout == 'projects' %}
+                {% for p in compareProjects %}<col class="pl-col-project">{% endfor %}
+                <col class="pl-col-total">
+            {% else %}
+                {% for period in periods %}<col class="pl-col-period">{% endfor %}
+            {% endif %}
+        </colgroup>
+        <thead>
+            <tr>
+                <th>Строка</th>
+                {% if showMetaColumns %}
+                    <th>Код</th>
+                    <th>Тип</th>
+                {% endif %}
+                {% if layout == 'projects' %}
+                    {% for p in compareProjects %}
+                        <th class="text-end" title="{{ p.name }}{% if p.isOverhead %} (Shared){% endif %}">
+                            {{ p.name }}{% if p.isOverhead %} <span class="text-muted">(Shared)</span>{% endif %}
+                        </th>
+                    {% endfor %}
+                    <th class="text-end pl-cell-total">Итого</th>
+                {% else %}
+                    {% for period in periods %}
+                        <th class="text-end" title="{{ period.label }}">{{ period.label }}</th>
+                    {% endfor %}
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+                {# rows отсортированы depth-first, поэтому более глубокая следующая строка означает наличие вложенных строк. #}
+                {% set has_children = rows[loop.index] is defined and rows[loop.index].level > r.level %}
+                <tr class="pl-row{{ has_children ? ' fw-bold' : '' }}" data-row-id="{{ r.id }}" data-level="{{ r.level }}">
+                    <td style="padding-left: {{ (r.level - 1) * 20 }}px;">
+                        {% if has_children %}
+                            <button class="pl-name pl-toggle" type="button" data-target="{{ r.id }}" aria-expanded="true" title="{{ r.name }}">{{ r.name }}</button>
+                        {% else %}
+                            <span class="pl-name" title="{{ r.name }}">{{ r.name }}</span>
+                        {% endif %}
+                    </td>
+                    {% if showMetaColumns %}
+                        <td><code>{{ r.code ?? '—' }}</code></td>
+                        <td>{{ r.type }}</td>
+                    {% endif %}
+                    {% if layout == 'projects' %}
+                        {% for p in compareProjects %}
+                            {{ pl_ui.cell(r.values[p.id] ?? null, formats[r.id] ?? null, 'text-end') }}
+                        {% endfor %}
+                        {{ pl_ui.cell(r.values['_total'] ?? null, formats[r.id] ?? null, 'text-end fw-bold pl-cell-total') }}
+                    {% else %}
+                        {% for period in periods %}
+                            {{ pl_ui.cell(r.values[period.id] ?? null, formats[r.id] ?? null, 'text-end') }}
+                        {% endfor %}
+                    {% endif %}
+                </tr>
+            {% else %}
+                {% set column_count = periods|length + 1 + (showMetaColumns ? 2 : 0) %}
+                {% if layout == 'projects' %}
+                    {% set column_count = compareProjects|length + 2 + (showMetaColumns ? 2 : 0) %}
+                {% endif %}
+                <tr>
+                    <td colspan="{{ column_count }}" class="text-muted">Нет строк отчёта</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

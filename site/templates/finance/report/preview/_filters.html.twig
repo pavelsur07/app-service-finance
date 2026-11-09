@@ -1,0 +1,218 @@
+{#
+  Фильтры отчёта ОПиУ: период, группировка, режим, проекты, ЦФО, «Код и тип» (форма pl-preview-filter-form).
+  Параметры: from, to, grouping, layout, projectFilterTracked, projectFilterActive, uiSelectedProjectDirectionIds,
+  projectDirections, responsibilityCenterFilterTracked, responsibilityCenterFilterActive, selectedResponsibilityCenterIds,
+  responsibilityCenters, showMetaColumns, filtersActive, resetState.
+#}
+<form id="pl-preview-filter-form" data-report-filters class="card card-body pl-preview-controls-card mb-3" method="get">
+    <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}" data-pl-exact-from>
+    <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}" data-pl-exact-to>
+    <input type="hidden" name="grouping" value="{{ grouping }}" data-pl-grouping>
+    <input type="hidden" name="layout" value="{{ layout }}" data-pl-layout>
+    {% if projectFilterTracked %}
+        <input type="hidden" name="projectFiltersPresent" value="1">
+    {% endif %}
+    {% if responsibilityCenterFilterTracked %}
+        <input type="hidden" name="responsibilityCenterFiltersPresent" value="1">
+    {% endif %}
+
+    <div class="pl-preview-controls-row">
+        <details class="pl-preview-dropdown">
+            <summary class="pl-preview-period-button">
+                <i class="ti ti-calendar" aria-hidden="true"></i>
+                <span>{{ from|date('d.m.Y') }} — {{ to|date('d.m.Y') }}</span>
+                <i class="ti ti-chevron-down" aria-hidden="true"></i>
+            </summary>
+            <div class="pl-preview-dropdown-menu">
+                <button
+                    class="pl-preview-preset"
+                    type="button"
+                    data-pl-period-from="{{ date('now')|date('Y') }}-01-01"
+                    data-pl-period-to="{{ date('last day of this month')|date('Y-m-d') }}"
+                >
+                    С начала года
+                </button>
+                <button
+                    class="pl-preview-preset"
+                    type="button"
+                    data-pl-period-from="{{ date('first day of -2 months')|date('Y-m-d') }}"
+                    data-pl-period-to="{{ date('last day of this month')|date('Y-m-d') }}"
+                >
+                    Последние 3 месяца
+                </button>
+                <button
+                    class="pl-preview-preset"
+                    type="button"
+                    data-pl-period-from="{{ date('first day of last month')|date('Y-m-d') }}"
+                    data-pl-period-to="{{ date('last day of last month')|date('Y-m-d') }}"
+                >
+                    Предыдущий месяц
+                </button>
+                <button
+                    class="pl-preview-preset"
+                    type="button"
+                    data-pl-period-from="{{ date('first day of this month')|date('Y-m-d') }}"
+                    data-pl-period-to="{{ date('last day of this month')|date('Y-m-d') }}"
+                >
+                    Текущий месяц
+                </button>
+                <div class="pl-preview-month-range">
+                    <div class="pl-preview-month-field">
+                        <label for="pl-preview-month-from">С</label>
+                        <input
+                            class="form-control"
+                            id="pl-preview-month-from"
+                            type="month"
+                            value="{{ from|date('Y-m') }}"
+                            data-pl-month-from
+                        >
+                    </div>
+                    <div class="pl-preview-month-field">
+                        <label for="pl-preview-month-to">По</label>
+                        <input
+                            class="form-control"
+                            id="pl-preview-month-to"
+                            type="month"
+                            value="{{ to|date('Y-m') }}"
+                            data-pl-month-to
+                        >
+                    </div>
+                </div>
+            </div>
+        </details>
+
+        <div class="pl-preview-control-group">
+            <span class="pl-preview-control-label">Группировка</span>
+            <div class="pl-preview-segmented{{ layout == 'projects' ? ' is-disabled' }}" role="group" aria-label="Группировка">
+                <button
+                    class="{{ grouping == 'month' ? 'is-active' }}"
+                    type="button"
+                    data-pl-set="grouping"
+                    data-pl-value="month"
+                    {% if layout == 'projects' %}disabled aria-disabled="true"{% endif %}
+                >Месяц</button>
+                <button
+                    class="{{ grouping == 'quarter' ? 'is-active' }}"
+                    type="button"
+                    data-pl-set="grouping"
+                    data-pl-value="quarter"
+                    {% if layout == 'projects' %}disabled aria-disabled="true"{% endif %}
+                >Квартал</button>
+            </div>
+        </div>
+
+        <div class="pl-preview-control-group">
+            <span class="pl-preview-control-label">Режим</span>
+            <div class="pl-preview-segmented" role="group" aria-label="Режим отображения">
+                <button
+                    class="{{ layout == 'periods' ? 'is-active' }}"
+                    type="button"
+                    data-pl-set="layout"
+                    data-pl-value="periods"
+                >По периодам</button>
+                <button
+                    class="{{ layout == 'projects' ? 'is-active' }}"
+                    type="button"
+                    data-pl-set="layout"
+                    data-pl-value="projects"
+                >По проектам</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="pl-preview-filters-row">
+        <span class="pl-preview-control-label">Фильтры:</span>
+
+        <details class="pl-preview-dropdown">
+            <summary class="pl-preview-filter-chip{{ projectFilterActive ? ' is-active' }}">
+                <i class="ti ti-briefcase" aria-hidden="true"></i>
+                {% if uiSelectedProjectDirectionIds is null %}
+                    Проекты: Все
+                {% else %}
+                    Проекты: {{ uiSelectedProjectDirectionIds|length }}
+                {% endif %}
+                <i class="ti ti-chevron-down" aria-hidden="true"></i>
+            </summary>
+            <div class="pl-preview-dropdown-menu pl-preview-filter-menu">
+                {% for projectDirection in projectDirections %}
+                    <label class="pl-preview-filter-option" for="pl-preview-project-{{ projectDirection.id }}">
+                        <input
+                            id="pl-preview-project-{{ projectDirection.id }}"
+                            type="checkbox"
+                            name="projectDirectionIds[]"
+                            value="{{ projectDirection.id }}"
+                            data-pl-filter-input="projects"
+                            {{ uiSelectedProjectDirectionIds is null or projectDirection.id in uiSelectedProjectDirectionIds ? 'checked' }}
+                        >
+                        <span>{{ projectDirection.name }}</span>
+                    </label>
+                {% else %}
+                    <div class="pl-preview-filter-menu-empty">Нет доступных проектов</div>
+                {% endfor %}
+                {% if projectDirections is not empty %}
+                    <div class="pl-preview-filter-menu-footer">
+                        <button type="button" data-pl-select-all="projects">Выбрать все</button>
+                    </div>
+                {% endif %}
+            </div>
+        </details>
+
+        <details class="pl-preview-dropdown pl-preview-dropdown-align-end">
+            <summary class="pl-preview-filter-chip{{ responsibilityCenterFilterActive ? ' is-active' }}">
+                <i class="ti ti-building-warehouse" aria-hidden="true"></i>
+                {% if selectedResponsibilityCenterIds is null %}
+                    ЦФО: Все
+                {% else %}
+                    ЦФО: {{ selectedResponsibilityCenterIds|length }}
+                {% endif %}
+                <i class="ti ti-chevron-down" aria-hidden="true"></i>
+            </summary>
+            <div class="pl-preview-dropdown-menu pl-preview-filter-menu">
+                {% for responsibilityCenter in responsibilityCenters %}
+                    <label class="pl-preview-filter-option" for="pl-preview-cfo-{{ responsibilityCenter.id }}">
+                        <input
+                            id="pl-preview-cfo-{{ responsibilityCenter.id }}"
+                            type="checkbox"
+                            name="responsibilityCenterIds[]"
+                            value="{{ responsibilityCenter.id }}"
+                            data-pl-filter-input="responsibility-centers"
+                            {{ selectedResponsibilityCenterIds is null or responsibilityCenter.id in selectedResponsibilityCenterIds ? 'checked' }}
+                        >
+                        <span>{{ responsibilityCenter.name }}</span>
+                    </label>
+                {% else %}
+                    <div class="pl-preview-filter-menu-empty">Нет доступных ЦФО</div>
+                {% endfor %}
+                {% if responsibilityCenters is not empty %}
+                    <div class="pl-preview-filter-menu-footer">
+                        <button type="button" data-pl-select-all="responsibility-centers">Выбрать все</button>
+                    </div>
+                {% endif %}
+            </div>
+        </details>
+
+        <label class="pl-preview-meta-chip">
+            <input
+                type="checkbox"
+                name="show_meta"
+                value="1"
+                data-pl-auto-submit
+                {{ showMetaColumns ? 'checked' }}
+            >
+            <span class="pl-preview-filter-chip{{ showMetaColumns ? ' is-active' }}">
+                <i class="ti ti-code" aria-hidden="true"></i>
+                Код и тип
+            </span>
+        </label>
+
+        {% if filtersActive %}
+            <a
+                class="pl-preview-reset"
+                href="{{ path('finance_report_preview', resetState) }}"
+            >
+                <i class="ti ti-x" aria-hidden="true"></i>
+                Сбросить фильтры
+            </a>
+        {% endif %}
+    </div>
+</form>

@@ -124,258 +124,34 @@
     </div>
 </div>
 
-<div class="card pl-preview-controls-card mb-3">
-    <form id="cashflow-filter-form" data-report-filters class="card-body" method="get">
-        <input type="hidden" name="from" value="{{ date_from|date('Y-m-d') }}" data-pl-exact-from>
-        <input type="hidden" name="to" value="{{ date_to|date('Y-m-d') }}" data-pl-exact-to>
-        <input type="hidden" name="group" value="{{ group }}" data-pl-group>
-        {% if dashboard_reconciliation_active %}
-            <input type="hidden" name="reconcile" value="{{ dashboard_reconciliation.mode }}">
-            <input type="hidden" name="activity" value="{{ dashboard_reconciliation.activity }}">
-            <input type="hidden" name="currency" value="{{ dashboard_reconciliation.currency }}">
-        {% endif %}
-        {% if project_filter_tracked %}
-            <input type="hidden" name="projectFiltersPresent" value="1">
-        {% endif %}
-        {% if legacy_responsibility_center_filter %}
-            <input
-                type="hidden"
-                name="responsibilityCenterId"
-                value="{{ selectedResponsibilityCenterId }}"
-                data-pl-legacy-filter="responsibility-centers"
-            >
-            <input
-                type="hidden"
-                name="responsibilityCenterFiltersPresent"
-                value="1"
-                data-pl-filter-marker="responsibility-centers"
-                disabled
-            >
-        {% elseif responsibility_center_filter_tracked %}
-            <input type="hidden" name="responsibilityCenterFiltersPresent" value="1">
-        {% endif %}
-
-        <div class="pl-preview-controls-row">
-            <details class="pl-preview-dropdown">
-                <summary class="pl-preview-period-button">
-                    <i class="ti ti-calendar" aria-hidden="true"></i>
-                    <span>{{ date_from|date('d.m.Y') }} — {{ date_to|date('d.m.Y') }}</span>
-                    <i class="ti ti-chevron-down" aria-hidden="true"></i>
-                </summary>
-                <div class="pl-preview-dropdown-menu">
-                    <button
-                        class="pl-preview-preset"
-                        type="button"
-                        data-pl-period-from="{{ date('now')|date('Y') }}-01-01"
-                        data-pl-period-to="{{ date('last day of this month')|date('Y-m-d') }}"
-                    >С начала года</button>
-                    <button
-                        class="pl-preview-preset"
-                        type="button"
-                        data-pl-period-from="{{ date('first day of -2 months')|date('Y-m-d') }}"
-                        data-pl-period-to="{{ date('last day of this month')|date('Y-m-d') }}"
-                    >Последние 3 месяца</button>
-                    <button
-                        class="pl-preview-preset"
-                        type="button"
-                        data-pl-period-from="{{ date('first day of last month')|date('Y-m-d') }}"
-                        data-pl-period-to="{{ date('last day of last month')|date('Y-m-d') }}"
-                    >Предыдущий месяц</button>
-                    <button
-                        class="pl-preview-preset"
-                        type="button"
-                        data-pl-period-from="{{ date('first day of this month')|date('Y-m-d') }}"
-                        data-pl-period-to="{{ date('last day of this month')|date('Y-m-d') }}"
-                    >Текущий месяц</button>
-                    <div class="pl-preview-month-range">
-                        <div class="pl-preview-month-field">
-                            <label for="cashflow-month-from">С</label>
-                            <input
-                                class="form-control"
-                                id="cashflow-month-from"
-                                type="month"
-                                value="{{ date_from|date('Y-m') }}"
-                                data-pl-month-from
-                            >
-                        </div>
-                        <div class="pl-preview-month-field">
-                            <label for="cashflow-month-to">По</label>
-                            <input
-                                class="form-control"
-                                id="cashflow-month-to"
-                                type="month"
-                                value="{{ date_to|date('Y-m') }}"
-                                data-pl-month-to
-                            >
-                        </div>
-                    </div>
-                </div>
-            </details>
-
-            <div class="pl-preview-control-group">
-                <span class="pl-preview-control-label">Режим отображения</span>
-                <div class="pl-preview-segmented" role="group" aria-label="Режим отображения">
-                    <button
-                        class="{{ group == 'month' ? 'is-active' }}"
-                        type="button"
-                        data-pl-set="group"
-                        data-pl-value="month"
-                    >Месяц</button>
-                    <button
-                        class="{{ group == 'quarter' ? 'is-active' }}"
-                        type="button"
-                        data-pl-set="group"
-                        data-pl-value="quarter"
-                    >Квартал</button>
-                    <button
-                        class="{{ group == 'year' ? 'is-active' }}"
-                        type="button"
-                        data-pl-set="group"
-                        data-pl-value="year"
-                    >Год</button>
-                </div>
-            </div>
-        </div>
-
-        {% if not dashboard_reconciliation_active %}
-        <div class="pl-preview-filters-row">
-            <span class="pl-preview-control-label">Фильтры:</span>
-
-            <details class="pl-preview-dropdown">
-                <summary class="pl-preview-filter-chip{{ project_filter_active ? ' is-active' }}">
-                    <i class="ti ti-briefcase" aria-hidden="true"></i>
-                    {% if selectedProjectDirectionIds is null %}
-                        Проекты: Все
-                    {% else %}
-                        Проекты: {{ selectedProjectDirectionIds|length }}
-                    {% endif %}
-                    <i class="ti ti-chevron-down" aria-hidden="true"></i>
-                </summary>
-                <div class="pl-preview-dropdown-menu pl-preview-filter-menu">
-                    {% for project_direction in projectDirections|default([]) %}
-                        <label class="pl-preview-filter-option" for="cashflow-project-{{ project_direction.id }}">
-                            <input
-                                id="cashflow-project-{{ project_direction.id }}"
-                                type="checkbox"
-                                name="projectDirectionIds[]"
-                                value="{{ project_direction.id }}"
-                                data-pl-filter-input="projects"
-                                {{ selectedProjectDirectionIds is null or project_direction.id in selectedProjectDirectionIds ? 'checked' }}
-                            >
-                            <span>{{ project_direction.name }}</span>
-                        </label>
-                    {% else %}
-                        <div class="pl-preview-filter-menu-empty">Нет доступных проектов</div>
-                    {% endfor %}
-                    {% if projectDirections|default([]) is not empty %}
-                        <div class="pl-preview-filter-menu-footer">
-                            <button type="button" data-pl-select-all="projects">Выбрать все</button>
-                        </div>
-                    {% endif %}
-                </div>
-            </details>
-
-            <details class="pl-preview-dropdown pl-preview-dropdown-align-end">
-                <summary class="pl-preview-filter-chip{{ responsibility_center_filter_active ? ' is-active' }}">
-                    <i class="ti ti-building-warehouse" aria-hidden="true"></i>
-                    {% if selectedResponsibilityCenterIds is null %}
-                        ЦФО: Все
-                    {% else %}
-                        ЦФО: {{ selectedResponsibilityCenterIds|length }}
-                    {% endif %}
-                    <i class="ti ti-chevron-down" aria-hidden="true"></i>
-                </summary>
-                <div class="pl-preview-dropdown-menu pl-preview-filter-menu">
-                    {% for responsibility_center in responsibilityCenters|default([]) %}
-                        <label class="pl-preview-filter-option" for="cashflow-cfo-{{ responsibility_center.id }}">
-                            <input
-                                id="cashflow-cfo-{{ responsibility_center.id }}"
-                                type="checkbox"
-                                {% if legacy_responsibility_center_filter %}
-                                    data-pl-filter-name="responsibilityCenterIds[]"
-                                {% else %}
-                                    name="responsibilityCenterIds[]"
-                                {% endif %}
-                                value="{{ responsibility_center.id }}"
-                                data-pl-filter-input="responsibility-centers"
-                                {{ selectedResponsibilityCenterIds is null or responsibility_center.id in selectedResponsibilityCenterIds ? 'checked' }}
-                            >
-                            <span>{{ responsibility_center.name }}</span>
-                        </label>
-                    {% else %}
-                        <div class="pl-preview-filter-menu-empty">Нет доступных ЦФО</div>
-                    {% endfor %}
-                    {% if responsibilityCenters|default([]) is not empty %}
-                        <div class="pl-preview-filter-menu-footer">
-                            <button type="button" data-pl-select-all="responsibility-centers">Выбрать все</button>
-                        </div>
-                    {% endif %}
-                </div>
-            </details>
-
-            {% if filters_active %}
-                <a class="pl-preview-reset" href="{{ path('report_cashflow_index', reset_state) }}">
-                    <i class="ti ti-x" aria-hidden="true"></i>
-                    Сбросить фильтры
-                </a>
-            {% endif %}
-        </div>
-        {% endif %}
-    </form>
-</div>
+{% include 'report/cashflow/_filters.html.twig' with {
+    date_from: date_from,
+    date_to: date_to,
+    group: group,
+    dashboard_reconciliation_active: dashboard_reconciliation_active,
+    dashboard_reconciliation: dashboard_reconciliation,
+    project_filter_tracked: project_filter_tracked,
+    project_filter_active: project_filter_active,
+    selectedProjectDirectionIds: selectedProjectDirectionIds,
+    projectDirections: projectDirections|default([]),
+    responsibility_center_filter_tracked: responsibility_center_filter_tracked,
+    responsibility_center_filter_active: responsibility_center_filter_active,
+    selectedResponsibilityCenterIds: selectedResponsibilityCenterIds,
+    selectedResponsibilityCenterId: selectedResponsibilityCenterId|default(null),
+    responsibilityCenters: responsibilityCenters|default([]),
+    legacy_responsibility_center_filter: legacy_responsibility_center_filter,
+    filters_active: filters_active,
+    reset_state: reset_state
+} only %}
 
 {% if dashboard_reconciliation_active %}
-    <div class="alert alert-info" data-cashflow-reconciliation>
-        <div class="d-flex justify-content-between align-items-start gap-3">
-            <div>
-                <div class="fw-bold mb-1">Сверка с показателями дашборда</div>
-                <div>
-                    Период: {{ date_from|date('d.m.Y') }} – {{ date_to|date('d.m.Y') }} ·
-                    Вид деятельности: {{ dashboard_activity_labels[dashboard_reconciliation.activity]|default(dashboard_reconciliation.activity) }} ·
-                    Валюта: {{ dashboard_reconciliation.currency }}
-                </div>
-                <div class="mt-2">
-                    Движения рассчитаны по тем же правилам, что и оборотные виджеты: переводы, удалённые операции и технические статьи исключены.
-                    {% if dashboard_reconciliation.activity == 'all' %}
-                        Нераспределённые статьи включены.
-                    {% else %}
-                        Нераспределённые статьи исключены для выбранного вида деятельности.
-                    {% endif %}
-                </div>
-                <div class="mt-2">
-                    Сальдо ДДС остаётся общим по компании: учитывает в выбранной валюте архивные счета, переводы и технические статьи. Поэтому оно может отличаться от остатка дашборда, где учитываются только активные счета.
-                </div>
-            </div>
-            <a href="{{ path('report_cashflow_index', reset_state) }}" class="btn btn-outline-secondary btn-sm" data-cashflow-reconciliation-exit>Обычный ДДС</a>
-        </div>
-    </div>
-
-    <div class="row row-cards mb-3" role="group" aria-label="Показатели для сверки с дашбордом">
-        <div class="col-sm-4">
-            <div class="card">
-                <div class="card-body">
-                    <div class="text-secondary">Приход</div>
-                    <div class="h2 mb-0" data-cashflow-reconciliation-kpi="inflow" data-value="{{ dashboard_reconciliation.inflow }}">{{ dashboard_reconciliation.inflow|vf_money(2, dashboard_reconciliation.currency) }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-4">
-            <div class="card">
-                <div class="card-body">
-                    <div class="text-secondary">Расход</div>
-                    <div class="h2 mb-0" data-cashflow-reconciliation-kpi="outflow" data-value="{{ dashboard_reconciliation.outflow }}">{{ dashboard_reconciliation.outflow|vf_money(2, dashboard_reconciliation.currency) }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-4">
-            <div class="card">
-                <div class="card-body">
-                    <div class="text-secondary">Чистый поток</div>
-                    <div class="h2 mb-0" data-cashflow-reconciliation-kpi="net" data-value="{{ dashboard_reconciliation.net }}">{{ dashboard_reconciliation.net|vf_money(2, dashboard_reconciliation.currency) }}</div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include 'report/cashflow/_reconciliation.html.twig' with {
+        dashboard_reconciliation: dashboard_reconciliation,
+        dashboard_activity_labels: dashboard_activity_labels,
+        date_from: date_from,
+        date_to: date_to,
+        reset_state: reset_state
+    } only %}
 {% endif %}
 
 {% if filters_active %}
@@ -385,149 +161,20 @@
 {% endif %}
 
 {% set periodCount = periods|length %}
-{% import _self as macros %}
 
-{# DS-Money: приход — зелёный, расход и отрицательное сальдо — основной цвет с U+2212, ноль приглушён. #}
-{% macro format_amount(value) %}
-    {{ value|vf_amount(2, value > 0 ? 'income' : null) }}
-{% endmacro %}
+{% include 'report/cashflow/_table.html.twig' with {
+    openings: openings,
+    closings: closings,
+    periods: periods,
+    periodCount: periodCount,
+    categories: categories,
+    categoryTotals: categoryTotals
+} only %}
 
-{% macro render_category(cat, totals, currency, periodCount, parentId) %}
-{% set hasChildren = cat.children|length > 0 %}
-{% set hidden = cat.level >= 2 %}
-<tr data-id="{{ cat.id }}" data-parent="{{ parentId }}" data-level="{{ cat.level }}"{% if hidden %} style="display:none"{% endif %}>
-    <td style="padding-left: {{ (cat.level - 1) * 20 }}px;">
-        <div class="d-flex align-items-center">
-            {%- if hasChildren -%}
-                <span class="cf-toggle" data-target="{{ cat.id }}">&#9654;</span>
-            {%- else -%}
-                <span class="cf-toggle-spacer"></span>
-            {%- endif -%}
-            <span class="text-truncate" title="{{ cat.name }}">{{ cat.name }}</span>
-        </div>
-    </td>
-    {% for i in 0..periodCount - 1 %}
-        {% set val = totals[cat.id].totals[currency][i] ?? 0 %}
-        <td class="text-end">{{ _self.format_amount(val)|raw }}</td>
-    {% endfor %}
-</tr>
-{% for child in cat.children %}
-    {{ _self.render_category(child, totals, currency, periodCount, cat.id) }}
-{% endfor %}
-{% endmacro %}
-
-{% macro center_label(row, centerLabels) %}
-    {{ row.responsibility_center_name ?? centerLabels[row.responsibility_center_id]|default(row.responsibility_center_id) }}
-{% endmacro %}
-
-{% macro render_project_center_rows(rows, currency, periods, primary, centerLabels) %}
-    {% for row in rows %}
-        {% set vals = row.totals[currency]|default([]) %}
-        {% if vals is not empty %}
-            <tr>
-                {% if primary == 'center' %}
-                    <td>{{ _self.center_label(row, centerLabels) }}</td>
-                    <td>{{ row.project_name }}</td>
-                {% else %}
-                    <td>{{ row.project_name }}</td>
-                    <td>{{ _self.center_label(row, centerLabels) }}</td>
-                {% endif %}
-                {% for i, p in periods %}
-                    <td class="text-end">{{ _self.format_amount(vals[i]|default(0))|raw }}</td>
-                {% endfor %}
-            </tr>
-        {% endif %}
-    {% endfor %}
-{% endmacro %}
-
-{% set responsibilityCenterLabels = {} %}
-{% for center in responsibilityCenters|default([]) %}
-    {% set responsibilityCenterLabels = responsibilityCenterLabels|merge({(center.id): center.name}) %}
-{% endfor %}
-
-{% for currency, values in openings %}
-    <div class="card mb-4">
-        <div class="table-responsive">
-            <table class="table table-bordered cf-table" data-cashflow-report style="min-width: calc(var(--cf-col-name) + {{ periodCount }} * var(--cf-col-period));">
-                <colgroup>
-                    <col class="cf-col-name">
-                    {% for p in periods %}<col class="cf-col-period">{% endfor %}
-                </colgroup>
-                <thead>
-                    <tr>
-                        <th>Категория</th>
-                        {% for p in periods %}
-                            <th>{{ p.label }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr class="fw-bold">
-                        <td>Сальдо на начало</td>
-                        {% for i in 0..periodCount - 1 %}
-                            <td class="text-end">{{ macros.format_amount(openings[currency][i])|raw }}</td>
-                        {% endfor %}
-                    </tr>
-                    {% for cat in categories %}
-                        {{ macros.render_category(cat, categoryTotals, currency, periodCount, '') }}
-                    {% endfor %}
-                    <tr class="fw-bold">
-                        <td>Сальдо на конец</td>
-                        {% for i in 0..periodCount - 1 %}
-                            <td class="text-end">{{ macros.format_amount(closings[currency][i])|raw }}</td>
-                        {% endfor %}
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-{% endfor %}
-
-{% if projectCenterMatrix.rowsByCenter|default([]) is not empty %}
-    {% for currency in projectCenterMatrix.currencies %}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h3 class="card-title">Матрица Проект × ЦФО: {{ currency }}</h3>
-            </div>
-            <div class="card-body">
-                <h4>ЦФО → проекты</h4>
-                <div class="table-responsive mb-4">
-                    <table class="table table-sm table-bordered table-striped">
-                        <thead>
-                            <tr>
-                                <th>ЦФО</th>
-                                <th>Проект</th>
-                                {% for p in periods %}
-                                    <th>{{ p.label }}</th>
-                                {% endfor %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {{ macros.render_project_center_rows(projectCenterMatrix.rowsByCenter, currency, periods, 'center', responsibilityCenterLabels) }}
-                        </tbody>
-                    </table>
-                </div>
-
-                <h4>Проект → ЦФО</h4>
-                <div class="table-responsive">
-                    <table class="table table-sm table-bordered table-striped">
-                        <thead>
-                            <tr>
-                                <th>Проект</th>
-                                <th>ЦФО</th>
-                                {% for p in periods %}
-                                    <th>{{ p.label }}</th>
-                                {% endfor %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {{ macros.render_project_center_rows(projectCenterMatrix.rowsByProject, currency, periods, 'project', responsibilityCenterLabels) }}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    {% endfor %}
-{% endif %}
+{% include 'report/cashflow/_projects.html.twig' with {
+    projectCenterMatrix: projectCenterMatrix|default(null),
+    periods: periods,
+    responsibilityCenters: responsibilityCenters|default([])
+} only %}
 
 {% endblock %}

@@ -22,6 +22,9 @@ flash и шапку раздела. Новый shell не создаётся.
 
 - Страница — `<module>/<page>.html.twig`; партиал — `<module>/_<name>.html.twig`;
   макросы — `<module>/_macros.html.twig`, импорт `{% import ... as ui %}`.
+- Партиалы одной крупной страницы — в её каталоге: `<module>/<page>/_<part>.html.twig`
+  (`report/cashflow/_filters.html.twig`); макросы страницы — `<module>/<page>/_macros.html.twig`,
+  импортируются в каждом партиале, где вызываются (include импорт не наследует).
 - Общие партиалы: легаси — `partials/_*.html.twig` (`@Partials/…`), новый слой —
   `app/_ui/_*.html.twig`. Прежде чем писать свой — поискать там: пагинация,
   вкладки, диалог подтверждения, выбор из справочника, пресеты периода уже есть.

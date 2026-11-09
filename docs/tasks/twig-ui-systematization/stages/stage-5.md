@@ -300,3 +300,32 @@ A1 — 1 PR, A2 — 1–2 PR, B–F — по 1 PR, G — 1 PR: всего 8–9 
 - PHPStan — OK после сокращения `phpstan-baseline.neon` (переписанные тесты админки сняли 2 записанные ошибки `argument.type`:
   одна запись удалена, у второй count 2 → 1; урок A1 — PHPStan до push).
 - Внешнее ревью Codex против master adf346c84 — `REVIEW_GREEN` с первого раунда (дифф 1895 строк).
+
+#### B — финансовые отчёты на партиалы (09.11.2026, ветка `refactor/twig-ui-stage-5b`)
+
+| Шаблон | Строк до → после | Партиалы (строк) |
+|---|---|---|
+| `report/cashflow` | 533 → 180 | `report/cashflow/`: `_filters` (206), `_reconciliation` (55), `_macros` (53), `_table` (42), `_projects` (56) |
+| `finance/report/preview` | 456 → 156 | `finance/report/preview/`: `_filters` (218), `_table` (93), `_macros` (25) |
+| `report/cashflow_ops_check` | 412 → 56 | `report/cashflow_ops_check/`: `_help` (99), `_faq` (131), `_filters` (27), `_transactions` (51), `_reconciliation` (58) |
+
+- Все include — `with {…} only` (у `_help`, `_faq` — `only` без параметров), параметры перечислены комментарием в начале партиала.
+- `import _self` в страницах не осталось: макросы — в `_macros` страницы, импорт в каждом партиале, где вызываются
+  (`_table`, `_projects` у ДДС; `_table` у ОПиУ). Внутри файла макросов рекурсия по-прежнему через `_self`.
+- Отличия от предложенной разбивки (§5): у ОПиУ нет `_row` — строка таблицы 25 строк без рекурсии и читает соседнюю строку
+  (`rows[loop.index]`), вынос потребовал бы передавать весь список; у проверки ДДС нет `_kpi` (карточек флагов на странице нет),
+  вместо него — `_faq` (аккордеон 130 строк).
+- Расчёт состояния фильтров (`reset_state`, `export_state`, подпись периода) остался в странице: он нужен и шапке, и фильтрам.
+- Отступы партиалов сдвинуты влево (whitespace-only); текст, атрибуты, `id`/`data-*`/`name` не менялись.
+- `docs/workflow/twig-conventions.md` — строка о партиалах страницы `<module>/<page>/_<part>.html.twig` и импорте макросов.
+
+**Проверки B:**
+- HTML-сверка (`site/bin/html-snapshot.sh`) 24 URL — нормализованный diff пуст, whitespace-only отличий после нормализации нет.
+  ДДС (9): по умолчанию, месяц/квартал/год, фильтр проектов, проекты + ЦФО, устаревший `responsibilityCenterId`, сверка с
+  дашбордом (`operating`, `all`); матрица Проект × ЦФО отрисована в 3 из них. ОПиУ (10): по умолчанию, день/неделя/квартал,
+  `show_meta`, `layout=projects` с фильтром и без, фильтры проектов, ЦФО, устаревшие единичные параметры. Проверка ДДС (5): по
+  умолчанию, `part=recon`, период, счёт, счёт + `recon`. Снимок «до» снят дважды — идентичен (страницы детерминированы); что стенд
+  отдал новые шаблоны — проверено по кэшу Twig.
+- Функциональные тесты страниц на 200 уже были: ДДС — `CompanyTaxProfileTest`, ОПиУ — `PlReportPreviewControllerTest`, проверка
+  ДДС — `SoftDeleteExclusionRegressionTest`; вместе с `CashflowJsonExportControllerTest`, `HomeCashflowActivityTest` — OK (43 tests).
+- `composer cs:twig` — No violation; `lint:twig` по `templates/report`, `templates/finance/report` — 24 файла OK.
