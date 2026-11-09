@@ -1,0 +1,38 @@
+{# Модалка «Себестоимость»; action, токен и название листинга подставляет JS по кнопке. Без параметров. #}
+<div class="modal modal-blur fade" id="modal-set-cost" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form method="post" id="form-set-cost" action="">
+                <input type="hidden" name="_token" id="set-cost-token" value="">
+                <div class="modal-header">
+                    <h5 class="modal-title">Себестоимость</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-muted small mb-3" id="modal-set-cost-name"></div>
+                    <div class="mb-3">
+                        <label class="form-label required">Сумма, ₽</label>
+                        <input type="number" name="price_amount" class="form-control"
+                               step="0.01" min="0" placeholder="850.00" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label required">Действует с</label>
+                        <input type="date" name="effective_from" class="form-control"
+                               value="{{ 'now'|date('Y-m-d') }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Примечание</label>
+                        <input type="text" name="note" class="form-control"
+                               placeholder="Новая партия, пересмотр цен...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">
+                        Отмена
+                    </button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

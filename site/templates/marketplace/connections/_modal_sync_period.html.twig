@@ -1,0 +1,31 @@
+{# Модалка «Синхронизировать за период»; action и токен подставляет JS по кнопке. Без параметров. #}
+<div class="modal modal-blur fade" id="modal-sync-period" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form method="post" id="form-sync-period" action="">
+                <input type="hidden" name="_token" id="sync-period-token" value="">
+                <div class="modal-header">
+                    <h5 class="modal-title">Синхронизировать за период</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label required">Дата начала</label>
+                        <input type="date" name="date_from" class="form-control" required
+                               value="{{ 'now'|date_modify('-7 days')|date('Y-m-d') }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label required">Дата окончания</label>
+                        <input type="date" name="date_to" class="form-control" required
+                               value="{{ 'now'|date('Y-m-d') }}">
+                    </div>
+                    <div class="text-muted small">Максимальный период — 31 день.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Синхронизировать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
