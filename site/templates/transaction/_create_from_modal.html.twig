@@ -1,0 +1,30 @@
+{# Модалка «Создание без маппинга категории ОПиУ»; текст и токен подставляет JS. Без параметров. #}
+<div class="modal fade" id="createFromWarningModal" data-create-from-modal
+     tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="ti ti-alert-triangle text-warning me-2"></i>
+          Создание без маппинга категории ОПиУ
+        </h5>
+        <button type="button" class="btn-close"
+                data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0" data-create-from-body></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn"
+                data-bs-dismiss="modal">Отмена</button>
+        <form method="post" class="d-inline" data-create-from-form>
+          <input type="hidden" name="_token" value="">
+          <input type="hidden" name="confirmed" value="1">
+          <button type="submit" class="btn btn-warning">
+            Продолжить
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

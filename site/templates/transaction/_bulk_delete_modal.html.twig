@@ -1,0 +1,30 @@
+{# Модалка массового удаления выбранных операций; id подставляет JS. Без параметров. #}
+<div class="modal fade" id="bulkDeleteModal" data-bulk-delete-modal tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="ti ti-alert-triangle text-warning me-2"></i>
+          Удалить выбранные транзакции?
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        <p>Выбрано транзакций: <strong data-bulk-delete-count>0</strong>.</p>
+        <p class="mb-0 text-muted">
+          Транзакции будут перемещены во вкладку «Удалённые». При необходимости их можно восстановить.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+        <form method="post"
+              action="{{ path('cash_transaction_bulk_delete', app.request.query.all) }}"
+              data-bulk-delete-form>
+          <input type="hidden" name="_token" value="{{ csrf_token('cash_transaction_bulk_delete') }}">
+          <div data-bulk-delete-ids></div>
+          <button type="submit" class="btn btn-danger">Удалить</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

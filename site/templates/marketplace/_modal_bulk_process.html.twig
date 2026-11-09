@@ -1,0 +1,34 @@
+{# Модалка «Обработать месяц». Параметры: availableMarketplaces. #}
+<div class="modal modal-blur fade" id="bulkProcessModal" tabindex="-1" role="dialog" aria-hidden="true"
+     data-bulk-process-url="{{ path('marketplace_bulk_process') }}">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Обработать месяц</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label required">Маркетплейс</label>
+                    <select class="form-select" required data-bulk-marketplace>
+                        <option value="">Выберите маркетплейс</option>
+                        {% for marketplace in availableMarketplaces %}
+                            <option value="{{ marketplace.value }}">{{ marketplace.displayName }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label required">Месяц</label>
+                    <input type="month" class="form-control" required data-bulk-month
+                           value="{{ 'now'|date_modify('first day of last month')|date('Y-m') }}">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-warning" data-bulk-process-submit>
+                    Запустить обработку
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

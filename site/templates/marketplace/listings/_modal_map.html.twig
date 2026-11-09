@@ -1,0 +1,33 @@
+{# Модалка «Привязать листинг к товару»; список товаров и отправку ведёт модуль listings_index.js. Без параметров. #}
+<div class="modal modal-blur fade" id="mapListingModal" tabindex="-1" role="dialog" data-map-listing-modal>
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Привязать листинг к товару</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label text-muted">Листинг</label>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-azure-lt">WB</span>
+                        <code data-map-listing-sku></code>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="product-select">
+                        Товар <span class="text-danger">*</span>
+                    </label>
+                    <select class="form-select" id="product-select" data-map-product>
+                        <option value="">— выберите товар —</option>
+                    </select>
+                </div>
+                <div class="alert alert-danger d-none" role="alert" data-map-error></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link me-auto" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" data-map-submit>Привязать</button>
+            </div>
+        </div>
+    </div>
+</div>

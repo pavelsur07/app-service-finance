@@ -153,161 +153,14 @@
         {% endif %}
     {% endif %}
 
-    <div class="table-responsive"{% if transactions is empty %} hidden{% endif %}>
-        <table class="table card-table table-vcenter vf-ops-table">
-            <thead class="sticky-top">
-                <tr>
-                    <th class="w-1">
-                        <input type="checkbox"
-                               class="form-check-input m-0"
-                               id="cash-transactions-select-all"
-                               data-select-all
-                               aria-label="Выбрать все транзакции на странице"
-                               {{ not hasStandaloneTransactions ? 'disabled' : '' }}>
-                    </th>
-                    <th>Дата / счёт</th>
-                    {# DS-Money: «₽» в заголовке — только когда вся колонка в рублях; суммы не пересчитываются. #}
-                    {% set amounts_in_rub = transactions|filter(t => t.currency != 'RUB')|length == 0 %}
-                    <th class="text-end text-nowrap">Сумма{% if amounts_in_rub %}, ₽{% endif %}</th>
-                    <th>Статья / проект</th>
-                    <th>Контрагент</th>
-                    <th class="text-center text-nowrap" title="Зелёная — документы ОПиУ созданы, серая — можно создать, жёлтая — создан без полного маппинга">ОПиУ</th>
-                    <th><span class="visually-hidden">Действия</span></th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for tx in transactions %}
-                {% set transfer = transferByTransactionId[tx.id]|default(null) %}
-                <tr>
-                    <td>
-                        <input type="checkbox"
-                               class="form-check-input m-0{{ transfer ? '' : ' js-cash-transaction-select' }}"
-                               value="{{ tx.id }}"
-                               aria-label="Выбрать транзакцию от {{ tx.occurredAt|date('d.m.Y') }}"
-                               {{ transfer ? 'disabled' : '' }}>
-                    </td>
-                    <td>
-                        <div class="vf-ops-date">{{ tx.occurredAt|date('d.m.Y') }}</div>
-                        {% if tx.moneyAccount %}
-                            <div class="vf-ops-sub vf-ops-clip" title="{{ tx.moneyAccount.name }}">{{ tx.moneyAccount.name }}</div>
-                        {% endif %}
-                    </td>
-                    {# DS-Money: ₽ — в заголовке, если вся колонка в рублях; иначе валюта в каждой строке, включая ₽. Приход — зелёный с плюсом, расход — основной цвет с минусом. #}
-                    {% set inflow = tx.direction.value == 'INFLOW' %}
-                    <td class="text-end vf-ops-amount">{{ tx.amount|vf_amount(2, inflow ? 'income' : null, signed: true, currency: amounts_in_rub or tx.currency != 'RUB' ? tx.currency : '₽', negate: not inflow) }}</td>
-                    <td>
-                        {% if tx.splits is empty %}
-                            <span class="vf-ops-badge-warn">Не распределено</span>
-                        {% else %}
-                            <div class="vf-ops-strong">{% for s in tx.splits %}{{ s.cashflowCategory.name }}{% if not loop.last %}, {% endif %}{% endfor %}
-                                {%- set aiAutoApplied = aiAutoAppliedByTransactionId[tx.id]|default(null) %}
-                                {%- if aiAutoApplied is not null %} <span class="badge bg-azure-lt vf-ops-ai-auto" title="Статья проставлена ИИ автоматически, уверенность {{ aiAutoApplied }}%. Изменить — в операции."><i class="ti ti-bulb me-1" aria-hidden="true"></i>ИИ</span>{% endif %}</div>
-                        {% endif %}
-                        {% set aiSuggestion = aiSuggestionByTransactionId[tx.id]|default(null) %}
-                        {% if aiSuggestion %}
-                            {{ include('transaction/_ai_suggestion.html.twig', {suggestion: aiSuggestion}) }}
-                        {% endif %}
-                        <div class="vf-ops-sub">
-                            {% if tx.projectDirection %}{{ tx.projectDirection.name }} · {% endif %}
-                            {% if transfer %}
-                                <a href="{{ path('cash_transfer_show', {id: transfer.id}) }}">Открыть перевод</a>
-                            {% else %}
-                                <a href="{{ path('cash_transaction_splits', {id: tx.id}) }}"
-                                   title="Разнести операцию по нескольким статьям">{{ tx.splits|length > 1 ? 'изменить разбивку' : 'разбить' }}</a>
-                            {% endif %}
-                        </div>
-                    </td>
-                    <td>
-                        {% if tx.counterparty %}
-                            <div class="vf-ops-strong vf-ops-clip" title="{{ tx.counterparty.displayName ?? tx.counterparty.name }}">{{ tx.counterparty.displayName ?? tx.counterparty.name }}</div>
-                        {% else %}
-                            <div class="text-secondary">—</div>
-                        {% endif %}
-                        {% set description = tx.description|default('') %}
-                        {% if description %}
-                            <div class="vf-ops-sub vf-ops-clip" title="{{ description }}">{{ description }}</div>
-                        {% endif %}
-                    </td>
-                    <td class="text-center text-nowrap" data-tx-id="{{ tx.id }}">
-                        {% if tx.isHasViolatedDocument %}
-                            <i class="ti ti-alert-triangle text-warning" role="img" aria-label="Документ создан без полного маппинга категорий ОПиУ"
-                               title="Документ создан без полного маппинга категорий ОПиУ"></i>
-                        {% elseif tx.remainingAmount == 0 and tx.documents is not empty %}
-                            <i class="ti ti-file-check text-success" role="img" aria-label="Документы ОПиУ созданы на всю сумму"
-                               title="Документы ОПиУ созданы на всю сумму"></i>
-                        {# Документ ОПиУ строится из одной категории (решение D1),
-                           поэтому предлагаем его только при единственной строке разбивки. #}
-                        {% elseif not tx.isTransfer and tx.splits|length == 1 and tx.splits|first.cashflowCategory.allowPlDocument and tx.remainingAmount > 0 %}
-                            <i class="ti ti-file-plus text-secondary" role="img" aria-label="Можно создать документ ОПиУ"
-                               title="Можно создать документ ОПиУ"></i>
-                        {% else %}
-                            <span class="text-secondary" title="ОПиУ недоступна">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-end">
-                        {% if transfer %}
-                            <a href="{{ path('cash_transfer_show', {id: transfer.id}) }}" class="btn btn-link btn-sm">Перевод</a>
-                        {% else %}
-                        <div class="dropdown position-static {{ loop.last ? 'dropup' : '' }}">
-                            <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-bs-toggle="dropdown" aria-haspopup="menu" aria-expanded="false" aria-label="Действия с операцией">
-                                <i class="ti ti-dots" aria-hidden="true"></i>
-                            </button>
-
-                            <div class="dropdown-menu dropdown-menu-end">
-                                <a class="dropdown-item"
-                                 href="{{ path('cash_transaction_edit', query|merge({'id': tx.id})) }}">
-                                <i class="ti ti-pencil me-2" aria-hidden="true"></i> Редактировать
-                                </a>
-
-                                <button type="button"
-                                      class="dropdown-item"
-                                      data-auto-rule
-                                      data-transaction-id="{{ tx.id }}"
-                                      data-url="{{ path('cash_transaction_auto_rule_match_one', {transactionId: tx.id}) }}"
-                                      data-bs-toggle="modal"
-                                      data-bs-target="#autoRuleModal">
-                                <i class="ti ti-settings-automation me-2" aria-hidden="true"></i> Автоправило
-                                </button>
-
-                                <a class="dropdown-item"
-                                   href="{{ path('cash_transaction_auto_rule_new', {fromTransaction: tx.id}) }}">
-                                <i class="ti ti-wand me-2" aria-hidden="true"></i> Создать правило из операции
-                                </a>
-
-                                {% if not tx.isTransfer %}
-                                  {% set createFromDisabled = tx.isHasViolatedDocument or tx.remainingAmount <= 0 %}
-                                  <button type="button"
-                                          class="dropdown-item d-flex align-items-center gap-2 {{ createFromDisabled ? 'disabled' : '' }}"
-                                          data-create-from
-                                          data-transaction-id="{{ tx.id }}"
-                                          data-url="{{ path('cash_transaction_create_from', {id: tx.id}) }}"
-                                          {% if createFromDisabled %}
-                                            title="{{ tx.isHasViolatedDocument ? 'Сначала исправьте маппинг категорий ОПиУ' : 'Транзакция уже полностью разнесена' }}"
-                                            disabled
-                                          {% endif %}>
-                                    <i class="ti ti-copy" aria-hidden="true"></i> Создать на основании
-                                  </button>
-                                {% endif %}
-
-                                <div class="dropdown-divider"></div>
-
-                                <button type="button"
-                                      class="dropdown-item text-danger"
-                                      data-bs-toggle="modal"
-                                      data-bs-target="#delete-modal-{{ tx.id }}">
-                                <i class="ti ti-trash me-2" aria-hidden="true"></i> Удалить
-                                </button>
-                            </div>
-                        </div>
-
-                      {{ include('transaction/_delete_modal.html.twig', {tx: tx}) }}
-                        {% endif %}
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    {% include 'transaction/_table.html.twig' with {
+        transactions: transactions,
+        hasStandaloneTransactions: hasStandaloneTransactions,
+        transferByTransactionId: transferByTransactionId|default({}),
+        query: query,
+        aiAutoAppliedByTransactionId: aiAutoAppliedByTransactionId|default({}),
+        aiSuggestionByTransactionId: aiSuggestionByTransactionId|default({}),
+    } only %}
     {% if totalFound > 0 %}
         <div class="card-footer d-flex align-items-center">
             {% include 'partials/_pagination.html.twig' with {pager: pager} %}
@@ -315,80 +168,12 @@
     {% endif %}
 </div>
 
-<div class="modal fade" id="bulkDeleteModal" data-bulk-delete-modal tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">
-          <i class="ti ti-alert-triangle text-warning me-2"></i>
-          Удалить выбранные транзакции?
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
-      </div>
-      <div class="modal-body">
-        <p>Выбрано транзакций: <strong data-bulk-delete-count>0</strong>.</p>
-        <p class="mb-0 text-muted">
-          Транзакции будут перемещены во вкладку «Удалённые». При необходимости их можно восстановить.
-        </p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
-        <form method="post"
-              action="{{ path('cash_transaction_bulk_delete', app.request.query.all) }}"
-              data-bulk-delete-form>
-          <input type="hidden" name="_token" value="{{ csrf_token('cash_transaction_bulk_delete') }}">
-          <div data-bulk-delete-ids></div>
-          <button type="submit" class="btn btn-danger">Удалить</button>
-        </form>
-      </div>
-    </div>
-  </div>
-</div>
+{% include 'transaction/_bulk_delete_modal.html.twig' only %}
 
 {{ include('transaction/_filters.html.twig') }}
 
-<div class="modal fade" id="autoRuleModal" data-auto-rule-modal tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Автоправило</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
-      </div>
-      <div class="modal-body" data-auto-rule-body>
-        <div class="text-muted">Загрузка…</div>
-      </div>
-    </div>
-  </div>
-</div>
+{% include 'transaction/_auto_rule_modal.html.twig' only %}
 
-<div class="modal fade" id="createFromWarningModal" data-create-from-modal
-     tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">
-          <i class="ti ti-alert-triangle text-warning me-2"></i>
-          Создание без маппинга категории ОПиУ
-        </h5>
-        <button type="button" class="btn-close"
-                data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <p class="mb-0" data-create-from-body></p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn"
-                data-bs-dismiss="modal">Отмена</button>
-        <form method="post" class="d-inline" data-create-from-form>
-          <input type="hidden" name="_token" value="">
-          <input type="hidden" name="confirmed" value="1">
-          <button type="submit" class="btn btn-warning">
-            Продолжить
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-</div>
+{% include 'transaction/_create_from_modal.html.twig' only %}
 
 {% endblock %}

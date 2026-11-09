@@ -1,0 +1,28 @@
+{# Модалка «Применить выручку?»; action и токен подставляет JS. Без параметров. #}
+<div class="modal modal-blur fade" id="modal-apply-realization" tabindex="-1" role="dialog" aria-hidden="true" data-apply-realization-modal>
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-title">Применить выручку?</div>
+                <div class="text-muted mt-2">
+                    Значения выручки в существующих продажах будут обновлены данными из отчёта реализации Ozon.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn w-100" data-bs-dismiss="modal">Отмена</button>
+                        </div>
+                        <div class="col">
+                            <form method="post" action="" data-apply-realization-form data-busy-submit data-busy-label="Применяем выручку…">
+                                <input type="hidden" name="_token" value="" data-apply-realization-token>
+                                <button type="submit" class="btn btn-teal w-100">Применить</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

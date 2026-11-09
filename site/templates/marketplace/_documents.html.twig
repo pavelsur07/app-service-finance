@@ -1,0 +1,134 @@
+{# История raw-документов: фильтр маркетплейса, таблица с обработкой и нераспознанными затратами, пагинация.
+   Параметры: rawDocumentsPager, selectedMarketplace, availableMarketplaces. #}
+<div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <h3 class="card-title mb-0">История raw-документов</h3>
+            <form data-autosubmit method="get" action="{{ path('marketplace_index') }}" class="d-flex align-items-center gap-2 mb-0">
+                {% if app.request.query.get('month') %}
+                    <input type="hidden" name="month" value="{{ app.request.query.get('month') }}">
+                {% endif %}
+                <label for="sync-history-marketplace" class="form-label mb-0">Маркетплейсы</label>
+                <select id="sync-history-marketplace"
+                        name="marketplace"
+                        class="form-select">
+                    <option value="" {{ selectedMarketplace is null ? 'selected' : '' }}>Все маркетплейсы</option>
+                    {% for marketplace in availableMarketplaces %}
+                        <option value="{{ marketplace.value }}" {{ selectedMarketplace is not null and selectedMarketplace.value == marketplace.value ? 'selected' : '' }}>
+                            {{ marketplace.syncHistoryFilterName }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+        <button type="button" class="btn btn-warning btn-sm ms-auto" data-bs-toggle="modal" data-bs-target="#bulkProcessModal">
+            Обработать месяц
+        </button>
+    </div>
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+            <thead>
+            <tr>
+                <th>Маркетплейс</th>
+                <th>Тип документа</th>
+                <th>Период</th>
+                <th>Записей</th>
+                <th>Создано</th>
+                <th>Пропущено</th>
+                <th>Дата</th>
+                <th>Обработка</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% if rawDocumentsPager.nbResults == 0 %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted">Нет данных</td>
+                </tr>
+            {% else %}
+                {% for doc in rawDocumentsPager.currentPageResults %}
+                    <tr>
+                        <td><span class="badge bg-azure text-azure-fg">{{ doc.marketplace.displayName }}</span></td>
+                        <td>{{ doc.documentType }}</td>
+                        <td><small>{{ doc.periodFrom|date('d.m.Y') }} — {{ doc.periodTo|date('d.m.Y') }}</small></td>
+                        <td>{{ doc.recordsCount }}</td>
+                        <td><span class="badge bg-success text-success-fg">{{ doc.recordsCreated }}</span></td>
+                        <td><span class="badge bg-secondary">{{ doc.recordsSkipped }}</span></td>
+                        <td><small>{{ doc.syncedAt|date('d.m.Y H:i') }}</small></td>
+                        <td>
+                            {% if doc.documentType == 'realization' and doc.processingStatus is null %}
+                                {# У «Реализации» нет статуса конвейера: применена ли она, видно по созданным строкам. #}
+                                {% if doc.recordsCreated > 0 %}
+                                    <span class="badge bg-success" data-testid="realization-applied">Применена</span>
+                                {% else %}
+                                    <span class="badge bg-secondary" data-testid="realization-not-applied">Не применена</span>
+                                {% endif %}
+                            {% elseif doc.processingStatus is not null %}
+                                {% if doc.processingStatus.value == 'completed' %}
+                                    <span class="badge bg-success">Готово</span>
+                                {% elseif doc.processingStatus.value == 'running' %}
+                                    <span class="badge bg-info">В работе</span>
+                                {% elseif doc.processingStatus.value == 'failed' %}
+                                    <span class="badge bg-danger">Ошибка</span>
+                                {% elseif doc.processingStatus.value == 'pending' %}
+                                    <span class="badge bg-secondary">Очередь</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-list">
+                                <a href="{{ path('marketplace_raw_view', {id: doc.id}) }}" class="btn btn-sm btn-ghost-primary" target="_blank">JSON</a>
+                                {% if doc.documentType == 'realization' %}
+                                    <button type="button"
+                                            class="btn btn-sm btn-teal"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modal-apply-realization"
+                                            data-action="{{ path('marketplace_raw_process_realization', {id: doc.id}) }}"
+                                            data-token="{{ csrf_token('marketplace_raw_process_realization' ~ doc.id) }}">
+                                        Применить выручку
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% if doc.unprocessedCostsCount is defined and doc.unprocessedCostsCount > 0 %}
+                        <tr class="bg-warning-lt">
+                            <td colspan="9">
+                                <div class="d-flex align-items-center">
+                                    <div>
+                                        <strong>Нераспознано затрат: {{ doc.unprocessedCostsCount }}</strong>
+                                        <div class="text-muted small mt-1">
+                                            {% for type, count in doc.unprocessedCostTypes %}
+                                                <span class="badge bg-warning-lt me-1">{{ type }} ({{ count }})</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    <div class="ms-auto">
+                                        <form method="post" action="{{ path('marketplace_raw_process_costs', {id: doc.id}) }}" class="m-0">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('marketplace_raw_process_costs' ~ doc.id) }}">
+                                            {% if selectedMarketplace is not null %}
+                                                <input type="hidden" name="marketplace" value="{{ selectedMarketplace.value }}">
+                                            {% endif %}
+                                            <input type="hidden" name="page" value="{{ rawDocumentsPager.currentPage }}">
+                                            <button type="submit" class="btn btn-sm btn-warning">
+                                                Обработать повторно
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+            </tbody>
+        </table>
+    </div>
+    {% if rawDocumentsPager.haveToPaginate %}
+        <div class="card-footer d-flex align-items-center">
+            {% include 'partials/_pagination.html.twig' with {
+                'pager': rawDocumentsPager
+            } %}
+        </div>
+    {% endif %}
+</div>
