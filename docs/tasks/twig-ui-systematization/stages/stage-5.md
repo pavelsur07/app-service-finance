@@ -1,6 +1,6 @@
 ### Stage 5: крупные шаблоны — остаток JS и разбиение на партиалы — IN PROGRESS
 
-**Статус:** старт по команде Владельца 09.11.2026; A1 — на проде (#2944, 09.11 07:56Z); A2 — PR на handoff.
+**Статус:** старт по команде Владельца 09.11.2026; A1 — на проде (#2944, 09.11 07:56Z); A2 — на проде (#2945, 09.11 10:33Z); B — PR на handoff.
 **Risk:** подэтап A — MEDIUM (переносится поведение JS), B–F — LOW (только структура шаблонов, HTML 1:1), G — LOW (документы).
 **Base:** master после #2933 (cd09f6917).
 **Work items:** 5.0–5.7 (ниже), `plan.md` — раздел Stage 5 и чек-лист приёмки задачи.
@@ -301,6 +301,9 @@ A1 — 1 PR, A2 — 1–2 PR, B–F — по 1 PR, G — 1 PR: всего 8–9 
   одна запись удалена, у второй count 2 → 1; урок A1 — PHPStan до push).
 - Внешнее ревью Codex против master adf346c84 — `REVIEW_GREEN` с первого раунда (дифф 1895 строк).
 
+**Деплой A2:** #2945 влит 09.11.2026 (merge 00260267e), деплой 10:33Z — маркер «Деплой завершён без даунтайма», `codex-docker-ps` — все
+сервисы на образе 00260267, с healthcheck — healthy; GlitchTip — новых событий после деплоя нет.
+
 #### B — финансовые отчёты на партиалы (09.11.2026, ветка `refactor/twig-ui-stage-5b`)
 
 | Шаблон | Строк до → после | Партиалы (строк) |
@@ -329,3 +332,5 @@ A1 — 1 PR, A2 — 1–2 PR, B–F — по 1 PR, G — 1 PR: всего 8–9 
 - Функциональные тесты страниц на 200 уже были: ДДС — `CompanyTaxProfileTest`, ОПиУ — `PlReportPreviewControllerTest`, проверка
   ДДС — `SoftDeleteExclusionRegressionTest`; вместе с `CashflowJsonExportControllerTest`, `HomeCashflowActivityTest` — OK (43 tests).
 - `composer cs:twig` — No violation; `lint:twig` по `templates/report`, `templates/finance/report` — 24 файла OK.
+- `make site-test` (полный, своя БД `app_test_a1`) — OK (8571 tests, 48242 assertions). PHP-кода в PR нет — PHPStan не затронут.
+- Внешнее ревью Codex против master 00260267e — `REVIEW_GREEN` с первого раунда (дифф 2461 строка).
