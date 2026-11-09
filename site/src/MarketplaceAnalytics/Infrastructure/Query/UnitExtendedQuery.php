@@ -50,11 +50,6 @@ final readonly class UnitExtendedQuery
         $returns = $this->marketplaceFacade->getReturnAggregatesByListing($companyId, $marketplace, $from, $to);
         $costs = $this->marketplaceFacade->getCostAggregatesByListing($companyId, $marketplace, $from, $to);
 
-        // Per-listing ad spend (only attributed). Listings present here but absent from
-        // sales/returns/costs are intentionally NOT merged into $allListingIds — the row
-        // would be empty otherwise; their spend is still counted in totals via
-        // getTotalAdCostForPeriod() below (which includes non-attributed too).
-
         // Контракт фасада Inventory отдаёт происхождение данных (дата снапшота, протухшие
         // источники). Здесь пока используется только карта количеств — замена нуля на
         // явное «нет данных» идёт отдельным этапом.
@@ -79,17 +74,18 @@ final readonly class UnitExtendedQuery
             $marketplace,
         );
 
-        // Merge all unique listing IDs from four sources so listings
-        // with only returns, costs or stock are not lost.
+        // Merge all unique listing IDs from five sources so listings
+        // with only returns, costs, ad spend or stock are not lost.
         //
-        // Для рекламы выше принято обратное решение — не мёржить, потому что строка
-        // получилась бы пустой. С остатками рассуждение противоположное: строка не
-        // пустая, в ней остаток и капитал в остатках, и именно залежавшийся товар
-        // без движения — то, ради чего остатки и загружаются.
+        // Листинг только с рекламой — строка с убытком на её сумму: товар, на который
+        // тратили без продаж, и есть то, что тянет прибыль вниз. Без строки его реклама
+        // под фильтром тегов выпадала бы из «Итого», а в карточках оставалась.
+        // Остатки — залежавшийся товар без движения, ради него остатки и загружаются.
         $allListingIds = array_unique(array_merge(
             array_keys($sales),
             array_keys($returns),
             array_keys($costs),
+            array_map('strval', array_keys($adSpendByListing)),
             $stockedListingIds,
         ));
 
@@ -108,6 +104,15 @@ final readonly class UnitExtendedQuery
         // Fetch metadata (title, sku, marketplace) for listings not present in sales
         $nonSalesIds = array_values(array_diff($allListingIds, array_keys($sales)));
         $listingMeta = $this->marketplaceFacade->getListingsMetaByIds($companyId, $nonSalesIds);
+        // Статистика рекламы может ссылаться на листинг, которого у компании нет (висячий
+        // listing_id): строки у него не будет, его расход остаётся только в totals.adSpend.
+        $stockedSet = array_flip($stockedListingIds);
+        $allListingIds = array_values(array_filter(
+            $allListingIds,
+            static fn (string $listingId): bool => isset($listingMeta[$listingId])
+                || isset($sales[$listingId]) || isset($returns[$listingId]) || isset($costs[$listingId])
+                || isset($stockedSet[$listingId]),
+        ));
 
         // Остаток без проданных в периоде единиц с известной себестоимостью оценивается по
         // истории цен листинга на конец периода — иначе залежавшийся товар, ради которого

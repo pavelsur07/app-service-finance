@@ -536,7 +536,11 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertSame(400.0, $result['totals']['profit']);
     }
 
-    public function testListingWithAdSpendOnlyDoesNotAppearInRows(): void
+    /**
+     * Листинг только с рекламой — строка с убытком на её сумму: без строки его реклама под
+     * фильтром тегов выпадала из «Итого», а в карточках оставалась (этап 3 #2940).
+     */
+    public function testListingWithAdSpendOnlyAppearsAsLossRow(): void
     {
         // Sales on l-A, ad spend on l-A AND on l-B (without sales/costs/returns)
         $this->stubSales([
@@ -547,12 +551,19 @@ final class UnitExtendedQueryTest extends TestCase
             'l-B' => '777.77', // listing not present in sales/returns/costs
         ]);
         $this->stubTotalAdSpend('877.77');
+        $this->listingMeta = [
+            'l-B' => new ListingMetaDTO('l-B', 'Товар Б', 'SKU-B', 'ozon', 'SUP-B'),
+        ];
 
         $result = $this->execute();
 
         $ids = array_map(static fn (array $r): string => (string) $r['listingId'], $result['items']);
         self::assertContains('l-A', $ids);
-        self::assertNotContains('l-B', $ids, 'Листинг с РР, но без sales/returns/costs не должен попасть в строки');
+        self::assertContains('l-B', $ids);
+        $row = $this->findRow($result['items'], 'l-B');
+        self::assertNotNull($row);
+        self::assertSame(777.77, $row['adSpend']);
+        self::assertSame(-777.77, $row['profit']);
     }
 
     public function testTotalsAdSpendComesFromGetTotalAdCostForPeriodNotFromRowsSum(): void

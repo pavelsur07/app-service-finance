@@ -1,12 +1,11 @@
+import { formatMoney } from '../../utils/utils';
 import type { WidgetCardConfig, WidgetsSummary } from './widgets.types';
 
 /**
- * Имя serviceGroup «Другие услуги и штрафы» на бэке (см. WidgetServiceGroupMap).
- * Единая точка правды — используется и в WIDGET_KEY_TO_GROUPS, и в
- * WidgetDetailPanel для определения группы, внутри которой нужно
- * показать подгруппы «обычные услуги» + «компенсации».
+ * Группа «Прочие» на бэке (WidgetSummaryQuery) — колонка «Прочие» таблицы.
+ * Внутри неё WidgetDetailPanel отдельно показывает подгруппу компенсаций.
  */
-export const OTHER_SERVICES_GROUP = 'Другие услуги и штрафы';
+export const OTHER_SERVICES_GROUP = 'Прочие';
 
 /**
  * Считает сумму netAmount по выбранным widgetGroup.
@@ -18,7 +17,9 @@ function getGroupNet(s: WidgetsSummary, ...names: string[]): number {
 }
 
 /**
- * Конфигурация 8 виджетов витрины MarketplaceAnalytics.
+ * 8 карточек — величины строки «Итого» таблицы под ними (в P&L-знаке: расход < 0).
+ * Реклама — по статистике рекламного кабинета, как в таблице; начисления маркетплейса
+ * по рекламе — справкой под карточкой (#2940, этап 3).
  */
 export const WIDGETS: readonly WidgetCardConfig[] = [
     {
@@ -36,36 +37,39 @@ export const WIDGETS: readonly WidgetCardConfig[] = [
         getValue: (s) => s.returnsTotal,
     },
     {
+        key: 'cost_price',
+        label: 'Себестоимость',
+        type: 'expense',
+        icon: 'ti ti-package',
+        getValue: (s) => s.costPriceTotal,
+    },
+    {
         key: 'commission',
-        label: 'Вознаграждение',
+        label: 'Комиссия',
         type: 'expense',
         icon: 'ti ti-receipt',
-        getValue: (s) => getGroupNet(s, 'Вознаграждение'),
+        getValue: (s) => getGroupNet(s, 'Комиссия'),
     },
     {
-        key: 'delivery_fbo',
-        label: 'Услуги доставки и FBO',
+        key: 'logistics',
+        label: 'Логистика',
         type: 'expense',
         icon: 'ti ti-truck-delivery',
-        getValue: (s) => getGroupNet(s, 'Услуги доставки и FBO'),
+        getValue: (s) => getGroupNet(s, 'Логистика'),
     },
     {
-        key: 'partners',
-        label: 'Услуги партнёров',
-        type: 'expense',
-        icon: 'ti ti-users',
-        getValue: (s) => getGroupNet(s, 'Услуги партнёров'),
-    },
-    {
-        key: 'promo',
-        label: 'Продвижение и реклама',
+        key: 'ads',
+        label: 'Реклама',
         type: 'expense',
         icon: 'ti ti-speakerphone',
-        getValue: (s) => getGroupNet(s, 'Продвижение и реклама'),
+        getValue: (s) => getGroupNet(s, 'Реклама'),
+        getNote: (s) => (s.adAccrued === null
+            ? null
+            : `по начислениям маркетплейса: ${formatMoney(s.adAccrued)}`),
     },
     {
         key: 'other',
-        label: 'Прочее и компенсации',
+        label: 'Прочие',
         type: 'expense',
         icon: 'ti ti-alert-triangle',
         getValue: (s) => getGroupNet(s, OTHER_SERVICES_GROUP),
@@ -83,16 +87,14 @@ export const WIDGETS: readonly WidgetCardConfig[] = [
  * Маппинг ключа виджета → список serviceGroup, которые раскрываются
  * в WidgetDetailPanel при клике.
  *
- * Виджеты revenue/returns/profit не раскрываются (нет групп).
+ * Выручка, возвраты, себестоимость, реклама (статистика без категорий) и прибыль
+ * не раскрываются.
  */
 export const WIDGET_KEY_TO_GROUPS: Record<string, string[]> = {
-    commission: ['Вознаграждение'],
-    delivery_fbo: ['Услуги доставки и FBO'],
-    partners: ['Услуги партнёров'],
-    promo: ['Продвижение и реклама'],
-    // Компенсации и декомпенсации на бэке входят в "Другие услуги и штрафы"
-    // (см. WidgetServiceGroupMap). На фронте они визуально разделяются
-    // на подгруппы в WidgetDetailPanel через COMPENSATION_CODES.
+    commission: ['Комиссия'],
+    logistics: ['Логистика'],
+    // Компенсации и декомпенсации входят в «Прочие»; в WidgetDetailPanel они
+    // визуально выделяются в подгруппу через COMPENSATION_CODES.
     other: [OTHER_SERVICES_GROUP],
 };
 
@@ -101,7 +103,7 @@ export const WIDGET_KEY_TO_GROUPS: Record<string, string[]> = {
  *
  * Используется в WidgetDetailPanel для визуального выделения
  * подгруппы «Компенсации и декомпенсации» внутри группы
- * «Другие услуги и штрафы».
+ * «Прочие».
  */
 export const COMPENSATION_CODES: readonly string[] = [
     'ozon_compensation',

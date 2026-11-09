@@ -4,21 +4,25 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
+use App\Marketplace\Domain\PlPreview\AdStatisticsCostCategories;
 use App\Marketplace\Facade\MarketplaceFacade;
+use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 /**
- * Сводка для виджета MarketplaceAnalytics за период.
+ * Сводка для карточек «Unit — Экономика» за период — та же арифметика, что «Итого»
+ * таблицы (UnitExtendedQuery): на экране одна прибыль (решение Владельца 09.11.2026).
  *
  * Все суммы возвращаются в P&L-конвенции (как в Ozon ЛК):
  *   доходы > 0, расходы < 0, profit = revenue + returnsTotal + costPriceTotal + totalCosts.
  *
- * Затраты берутся напрямую из marketplace_costs БЕЗ фильтра listing_id IS NOT NULL,
- * чтобы захватить категории, не привязанные к листингу (CPC, хранение, кросс-докинг и т.п.).
- * Sales/returns остаются per-listing через MarketplaceFacade — они всегда
- * привязаны к товарам.
+ * Затраты берутся напрямую из marketplace_costs БЕЗ фильтра listing_id IS NOT NULL —
+ * это товары плюс строка «Не распределено по товарам» таблицы — и раскладываются по
+ * колонкам таблицы (resolveUnitBucket). Реклама — статистика MarketplaceAds, как
+ * totals.adSpend; учётные рекламные категории (AdStatisticsCostCategories) в группы
+ * не входят и отдаются справкой adAccrued.
  *
  * Исключение — фильтр по тегам: тег живёт на листинге, поэтому под фильтром
  * считаются только затраты отфильтрованных листингов, а строки с
@@ -26,17 +30,17 @@ use Doctrine\DBAL\Connection;
  */
 final readonly class WidgetSummaryQuery
 {
-    /** @var list<string> */
+    /** @var array<string, string> unit bucket → группа карточек */
     private const WIDGET_GROUPS = [
-        'Вознаграждение',
-        'Услуги доставки и FBO',
-        'Услуги партнёров',
-        'Продвижение и реклама',
-        'Другие услуги и штрафы',
+        'commission' => 'Комиссия',
+        'logistics' => 'Логистика',
+        'ads' => 'Реклама',
+        'other' => 'Прочие',
     ];
 
     public function __construct(
         private MarketplaceFacade $marketplaceFacade,
+        private MarketplaceAdsFacade $adsFacade,
         private Connection $connection,
         private MarketplaceCostAnalyticsGroupResolver $groupResolver,
     ) {
@@ -56,6 +60,7 @@ final readonly class WidgetSummaryQuery
      *     totalCosts: float,
      *     profit: float,
      *     marginPercent: float|null,
+     *     adAccrued: float|null,
      *     widgetGroups: list<array<string, mixed>>,
      * }
      */
@@ -106,6 +111,8 @@ final readonly class WidgetSummaryQuery
 
         // Costs — плоский список категорий (без листингов).
         // Включает категории с listing_id = NULL (CPC, хранение и т.п.).
+        $adCodes = AdStatisticsCostCategories::codes();
+        $adAccrued = 0.0;
         foreach ($costRows as $row) {
             $code = (string) $row['category_code'];
             $name = (string) $row['category_name'];
@@ -113,8 +120,18 @@ final readonly class WidgetSummaryQuery
             $stornoAmt = (float) $row['storno_amount'];
             $netAmt = (float) $row['net_amount'];
 
+            // Расход на рекламу уже в статистике (группа «Реклама» ниже): учётная сумма
+            // посчитала бы его второй раз. Она — только справка под карточкой.
+            if (in_array($code, $adCodes, true)) {
+                $adAccrued += $netAmt;
+
+                continue;
+            }
+
             $marketplaceFromRow = (string) $row['marketplace'];
-            $group = $this->groupResolver->resolveWidgetGroup($marketplaceFromRow, $code, $name);
+            $bucket = $this->groupResolver->resolveUnitBucket($marketplaceFromRow, $code, $name);
+            // Как в таблице: всё, что не комиссия и не логистика, — «Прочие».
+            $group = self::WIDGET_GROUPS[$bucket] ?? self::WIDGET_GROUPS['other'];
 
             $groups[$group]['costsAmount'] += $costsAmt;
             $groups[$group]['stornoAmount'] += $stornoAmt;
@@ -138,6 +155,20 @@ final readonly class WidgetSummaryQuery
             $groups[$group]['categories'][$categoryKey]['stornoAmount'] += $stornoAmt;
             $groups[$group]['categories'][$categoryKey]['netAmount'] += $netAmt;
         }
+
+        // Реклама — как totals.adSpend таблицы: без тегов вся за период (с неатрибутированной),
+        // под тегами — атрибутированная по листингам набора.
+        $adSpend = null === $listingIds
+            ? (float) $this->adsFacade->getTotalAdCostForPeriod($companyId, $dateFrom, $dateTo, $marketplace)
+            : array_sum(array_map(
+                'floatval',
+                array_intersect_key(
+                    $this->adsFacade->getAdSpendByListingForPeriod($companyId, $dateFrom, $dateTo, $marketplace),
+                    array_flip($listingIds),
+                ),
+            ));
+        $groups[self::WIDGET_GROUPS['ads']]['costsAmount'] -= $adSpend;
+        $groups[self::WIDGET_GROUPS['ads']]['netAmount'] -= $adSpend;
 
         // Build widgetGroups list with rounding and sorting
         $widgetGroups = [];
@@ -185,6 +216,8 @@ final readonly class WidgetSummaryQuery
             'totalCosts' => $totalCosts,
             'profit' => $profit,
             'marginPercent' => $marginPercent,
+            // Под тегами учётную рекламу не к чему относить — она лежит на кабинете.
+            'adAccrued' => null === $listingIds ? round($adAccrued, 2) : null,
             'widgetGroups' => $widgetGroups,
         ];
     }

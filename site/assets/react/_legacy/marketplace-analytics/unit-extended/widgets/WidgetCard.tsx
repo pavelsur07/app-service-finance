@@ -40,6 +40,7 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
     const currentValue = config.getValue(current);
     const previousValue = config.getValue(previous);
     const delta = calcDeltaPercent(currentValue, previousValue);
+    const note = config.getNote?.(current) ?? null;
 
     const handleClick = () => {
         if (isExpandable) {
@@ -76,6 +77,7 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
                 </div>
 
                 <div className="h2 mb-1">{formatMoney(currentValue)}</div>
+                {note && <div className="text-muted small mb-1">{note}</div>}
 
                 <div className="d-flex align-items-center">
                     {delta === null ? (

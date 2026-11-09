@@ -2937,6 +2937,12 @@ getReturnsForListingAndDate(string $companyId, string $listingId, \DateTimeImmut
 // @return CostData[]
 getCostsForListingAndDate(string $companyId, string $listingId, \DateTimeImmutable $date): array
 
+// Затраты листингов (listing_id IS NOT NULL) по категориям за период — строки товаров
+// Unit-экономики. Учётные рекламные категории (AdStatisticsCostCategories::codes())
+// исключены: реклама в этих строках — статистика MarketplaceAds. Только чтение.
+// @return array<string, list<ListingCostCategoryAggregateDTO>> по listingId
+getCostAggregatesByListing(string $companyId, ?string $marketplace, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+
 // Затраты без листинга (listing_id IS NULL) по категориям за период — строка «Не
 // распределено по товарам» в Unit-экономике. Рекламные категории под статистикой
 // и предоплата рекламного баланса (AdStatisticsCostCategories::codes(): ozon_cpc,
@@ -4137,8 +4143,13 @@ enum AbcClass: string
 Без фильтра по тегам `UnitExtendedQuery` отдаёт `unallocated` — затраты без листинга
 (комиссия/логистика/прочие по `resolveUnitBucket`, `profit = −totalCosts`, разбивка), и
 они входят в `totals`; под фильтром тегов и без таких затрат — `null`. Реклама в
-`totals.adSpend` — по статистике (паритет с efficiency), поэтому «Итого» отличается от
-`WidgetSummaryQuery.profit` только на (учёт рекламы − статистика).
+`totals.adSpend` — по статистике (паритет с efficiency); листинг только с рекламой —
+строка с убытком (висячий `listing_id` статистики — только в `totals`). Учётные рекламные
+категории (`AdStatisticsCostCategories::codes()`) не входят ни в строки, ни в `unallocated`.
+Карточки (`WidgetSummaryQuery`) = «Итого» в P&L-знаке, с тегами и без: группы
+`Комиссия`/`Логистика`/`Реклама`/`Прочие` по `resolveUnitBucket`, реклама — та же
+статистика, `adAccrued` — учёт рекламы справкой (`null` под тегами). Сходимость —
+`UnitExtendedUnallocatedRowTest`.
 
 ### `src/MarketplaceAnalytics/Enum/TurnoverBucket.php`
 ```php
@@ -5212,6 +5223,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.163 | 2026-11-09 | MarketplaceAnalytics: карточки «Unit — Экономика» = «Итого» таблицы — реклама по статистике, группы как колонки таблицы, `adAccrued` справкой; учётная реклама исключена из строк товаров (`ListingCostAggregateQuery::executeByPeriod`); листинг только с рекламой — строка; `resolveWidgetGroup` удалён (issue #2940, этап 3) |
 | 2.162 | 2026-11-09 | Marketplace: предоплата рекламы Ozon (`ozon_marketing_services`, тип начисления `Marketing`) исключена из строки «Не распределено по товарам» — расход из неё уже в статистике (`AdStatisticsCostCategories::codes()`) |
 | 2.161 | 2026-11-09 | Marketplace/MarketplaceAnalytics: `MarketplaceFacade::getUnallocatedCostAggregates()`; Unit-экономика — строка «Не распределено по товарам» в таблице, `totals` и xlsx (issue #2940) |
 | 2.160 | 2026-11-08 | Finance: разовая `app:finance:pl-tree:upgrade-universal-v4` удалена — применена 08.11 к 5 компаниям «Базовый» (все на v4, 43 статьи) |
