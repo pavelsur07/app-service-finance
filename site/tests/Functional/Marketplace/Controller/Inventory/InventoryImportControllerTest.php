@@ -174,10 +174,13 @@ final class InventoryImportControllerTest extends WebTestCaseBase
             'Артикул продавца',
             trim($crawler->filter('select[name="identifier_type"] option[value="supplier_sku"]')->text()),
         );
-        self::assertStringContainsString('Артикул продавца Wildberries / vendorCode', $client->getResponse()->getContent());
-        self::assertStringContainsString('регистр букв не учитывается', $client->getResponse()->getContent());
-        self::assertStringContainsString('Одна цена будет применена ко всем размерам', $client->getResponse()->getContent());
-        self::assertStringContainsString('отличающиеся только регистром, будут пропущены с ошибкой', $client->getResponse()->getContent());
+        // Подсказки по артикулу продавца показывает модуль страницы по корню [data-marketplace-inventory].
+        self::assertCount(1, $crawler->filter('[data-marketplace-inventory]'));
+        $module = (string) file_get_contents(dirname(__DIR__, 5).'/assets/pages/marketplace_inventory.js');
+        self::assertStringContainsString('Артикул продавца Wildberries / vendorCode', $module);
+        self::assertStringContainsString('регистр букв не учитывается', $module);
+        self::assertStringContainsString('Одна цена будет применена ко всем размерам', $module);
+        self::assertStringContainsString('отличающиеся только регистром, будут пропущены с ошибкой', $module);
     }
 
     public function testInventoryPageShowsSuccessfulOverwriteImportAsWarning(): void

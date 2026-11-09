@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 4 DONE (#2929–#2933 на проде 09.11.2026) → Stage 5 PLANNED (план подэтапов A–G на handoff) → старт по команде Владельца
-**Status:** Stage 1–4 на проде (#2909–#2933); Stage 5 — план `stages/stage-5.md`; найдено расхождение с отчётом Stage 2 (23 инлайн-скрипта)
-**Stage base commit:** master 2d3ac4257 (после #2927) · ветка `refactor/twig-ui-stage-4-close` от master после #2932
+**Phase:** Stage 5 IN PROGRESS (старт 09.11.2026) — A1 на handoff
+**Status:** Stage 1–4 на проде (#2909–#2933); Stage 5 A1 — инструмент сверки HTML + JS пяти страниц, отчёт в `stages/stage-5.md`
+**Stage base commit:** master f00d9e26f (после #2943) · ветка `refactor/twig-ui-stage-5a1`
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -75,7 +75,7 @@
 - Stage 3 на проде 08.11 06:00Z (деплой с головы master после #2927; прогон #2926 упал на flaky-тесте, rerun не нужен).
 
 ### Exact next action
-- Stage 5: ждёт команды Владельца на старт; первым — подэтап A1 (инструмент сверки HTML + JS пяти крупных страниц), план `stages/stage-5.md`
+- A1 — PR на handoff; после merge and deploy — A2 (JS остальных 18 файлов) с ветки от свежего master, сценарии — по образцу A1
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`

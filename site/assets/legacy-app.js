@@ -47,6 +47,10 @@ import { initListingsIndex } from './pages/listings_index.js';
 import { initListingTags } from './pages/listing_tags.js';
 import { initCashTransactions } from './pages/cash_transactions.js';
 import { initPnlDocument } from './pages/pnl_document.js';
+import { initMarketplaceConnections } from './pages/marketplace_connections.js';
+import { initPlTree } from './pages/pl_tree.js';
+import { initMarketplaceInventory } from './pages/marketplace_inventory.js';
+import { initCashflowReport } from './pages/cashflow_report.js';
 
 // Period presets (partials/_period_presets.html.twig): dates come from the server.
 document.addEventListener('click', (event) => {
@@ -97,6 +101,10 @@ const initDds = () => {
   initListingTags();
   initCashTransactions();
   initPnlDocument();
+  initMarketplaceConnections();
+  initPlTree();
+  initMarketplaceInventory();
+  initCashflowReport();
   showFlashToasts();
 };
 if (document.readyState === 'loading') {

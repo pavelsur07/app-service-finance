@@ -165,7 +165,7 @@
                 </div>
             {% endif %}
             <div class="card table-responsive mb-4">
-                <table class="table table-vcenter pl-preview-table mb-0" data-testid="pl-preview-table"
+                <table class="table table-vcenter pl-preview-table mb-0" data-testid="pl-preview-table" data-pl-tree
                        style="min-width: calc(var(--pl-col-name) + {{ value_columns }} * var(--pl-col-value));">
                     <colgroup>
                         <col class="pl-col-name">
@@ -366,98 +366,4 @@
             {% endif %}
         {% endif %}
     </div>
-
-    <script>
-    {# Переключатель «Колонки» показывает список своего разреза; оба списка уходят в ссылку. #}
-    document.addEventListener('DOMContentLoaded', function () {
-        var mode = document.querySelector('[data-pl-columns-mode]');
-        if (!mode) { return; }
-        mode.addEventListener('change', function () {
-            document.querySelectorAll('[data-pl-columns-for]').forEach(function (el) {
-                el.hidden = el.getAttribute('data-pl-columns-for') !== mode.value;
-            });
-        });
-    });
-
-    {# Дерево открывается свёрнутым до уровня 1; клик по статье раскрывает её прямых потомков,
-       повторный — сворачивает всю ветку. Без JS таблица остаётся развёрнутой. #}
-    document.addEventListener('DOMContentLoaded', function () {
-        var table = document.querySelector('[data-testid="pl-preview-table"]');
-        var rows = table ? Array.from(table.querySelectorAll('tr.pl-row')) : [];
-        if (!rows.length) return;
-
-        var rowsById = {};
-        var childrenMap = {};
-        var levelStack = [];
-        rows.forEach(function (row) {
-            var id = row.getAttribute('data-row-id');
-            var level = parseInt(row.getAttribute('data-level'), 10);
-            rowsById[id] = row;
-            while (levelStack.length && levelStack[levelStack.length - 1].level >= level) {
-                levelStack.pop();
-            }
-            if (levelStack.length) {
-                var parentId = levelStack[levelStack.length - 1].id;
-                (childrenMap[parentId] = childrenMap[parentId] || []).push(id);
-            }
-            levelStack.push({ id: id, level: level });
-        });
-
-        function setExpanded(row, expanded) {
-            var toggle = row.querySelector('.pl-toggle[data-target]');
-            if (toggle) toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        }
-
-        function collapseAll() {
-            rows.forEach(function (row) {
-                setExpanded(row, false);
-                row.style.display = parseInt(row.getAttribute('data-level'), 10) > 1 ? 'none' : '';
-            });
-        }
-
-        function expandAll() {
-            rows.forEach(function (row) {
-                setExpanded(row, true);
-                row.style.display = '';
-            });
-        }
-
-        function showDirectChildren(parentId) {
-            (childrenMap[parentId] || []).forEach(function (childId) {
-                rowsById[childId].style.display = '';
-                setExpanded(rowsById[childId], false);
-            });
-        }
-
-        function hideDescendants(parentId) {
-            (childrenMap[parentId] || []).forEach(function (childId) {
-                rowsById[childId].style.display = 'none';
-                setExpanded(rowsById[childId], false);
-                hideDescendants(childId);
-            });
-        }
-
-        collapseAll();
-
-        table.addEventListener('click', function (e) {
-            var toggle = e.target.closest('.pl-toggle[data-target]');
-            if (!toggle) return;
-            // Выделение текста названия — не клик по переключателю.
-            var selection = window.getSelection();
-            if (selection && !selection.isCollapsed && selection.anchorNode && toggle.contains(selection.anchorNode)) return;
-
-            var targetId = toggle.getAttribute('data-target');
-            if (toggle.getAttribute('aria-expanded') === 'true') {
-                toggle.setAttribute('aria-expanded', 'false');
-                hideDescendants(targetId);
-            } else {
-                toggle.setAttribute('aria-expanded', 'true');
-                showDirectChildren(targetId);
-            }
-        });
-
-        document.querySelector('[data-pl-expand-all]').addEventListener('click', expandAll);
-        document.querySelector('[data-pl-collapse-all]').addEventListener('click', collapseAll);
-    });
-    </script>
 {% endblock %}
