@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 5 IN PROGRESS (старт 09.11.2026) — A1, A2, B, C, D, E на проде, F на handoff
-**Status:** Stage 1–4 на проде (#2909–#2933); Stage 5 A1 (#2944), A2 (#2945), B (#2946), C (#2947), D (#2948), E (#2949, 09.11 13:04Z) на проде; F — внешние категории, импорт ОПиУ, закрытие месяца и план–факт на партиалы, отчёт в `stages/stage-5.md`
-**Stage base commit:** master bd795de04 (после #2949) · ветка `refactor/twig-ui-stage-5f`
+**Phase:** ЗАДАЧА ЗАКРЫТА 09.11.2026 — Stage 1–5 на проде, Stage 5 DONE (G — PR закрытия)
+**Status:** Stage 1–4 на проде (#2909–#2933); Stage 5 A1–F на проде (#2944–#2950, F 09.11 13:28Z); G — счётчики «до → после» и чек-лист приёмки в `stages/stage-5.md` (раздел G), `plan.md` — DONE
+**Stage base commit:** master 66934471b (после #2950) · ветка `refactor/twig-ui-stage-5g`
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -75,8 +75,9 @@
 - Stage 3 на проде 08.11 06:00Z (деплой с головы master после #2927; прогон #2926 упал на flaky-тесте, rerun не нужен).
 
 ### Exact next action
-- F — PR на handoff; после merge and deploy — G (приёмка Stage 5 и всей задачи по чек-листу G в `stages/stage-5.md`:
-  пересчёт страниц > 300 строк (15 → 0) и счётчиков, галочки B–F, Stage 5 DONE, закрытие задачи) с ветки от свежего master
+- Нет: задача закрыта. Follow-up вне задачи — `plan.md` «Вне рамок» (Stage 6: 15 нестандартных шапок, layout'ы модулей),
+  `onclick` в `integrations/marketplace`, `number_format` в `admin/ai/company`, smoke-тесты шаблонов из списка 1.0 ниже,
+  которых касался только Stage 1.
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`
