@@ -24,16 +24,27 @@ final class AdStatisticsCostCategories
         'wildberries' => 'wb_okazanie_uslug_wb_prodvizhenie',
     ];
 
+    // Предоплата рекламного баланса (тип начисления Ozon `Marketing`, «Рекламные услуги»):
+    // крупная сумма в начале месяца, из которой Ozon списывает клики; дневные `ozon_cpc`
+    // приходят только когда предоплата кончилась (сверка на проде 09.11.2026: в день
+    // окончания — часть дневной статистики, дальше дни сходятся до рубля). Расход периода —
+    // статистика, поэтому в отчётах, где реклама из статистики, эта категория посчитала бы
+    // его второй раз.
+    // В codeFor() её нет: разносить по тегам предоплату не на чем.
+    private const array PREPAYMENT_CODES = ['ozon_marketing_services'];
+
     public static function codeFor(MarketplaceType $marketplace): ?string
     {
         return self::CODES[$marketplace->value] ?? null;
     }
 
     /**
+     * Все учётные категории, расход по которым уже есть в рекламной статистике.
+     *
      * @return list<string>
      */
     public static function codes(): array
     {
-        return array_values(self::CODES);
+        return [...array_values(self::CODES), ...self::PREPAYMENT_CODES];
     }
 }

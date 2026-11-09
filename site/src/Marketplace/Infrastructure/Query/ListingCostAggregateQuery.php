@@ -86,9 +86,9 @@ final readonly class ListingCostAggregateQuery
     /**
      * Затраты без листинга (хранение, акции, подписки…) по категориям за период.
      *
-     * Рекламные категории под статистикой (AdStatisticsCostCategories) исключены: в отчётах
-     * по листингам реклама идёт из статистики MarketplaceAds, и учётная сумма здесь посчитала
-     * бы её второй раз.
+     * Рекламные категории под статистикой и предоплата рекламного баланса
+     * (AdStatisticsCostCategories::codes()) исключены: в отчётах по листингам реклама идёт из
+     * статистики MarketplaceAds, и учётная сумма здесь посчитала бы её второй раз.
      *
      * @return list<UnallocatedCostCategoryAggregateDTO>
      */
