@@ -448,7 +448,7 @@
 {% for currency, values in openings %}
     <div class="card mb-4">
         <div class="table-responsive">
-            <table class="table table-bordered cf-table" style="min-width: calc(var(--cf-col-name) + {{ periodCount }} * var(--cf-col-period));">
+            <table class="table table-bordered cf-table" data-cashflow-report style="min-width: calc(var(--cf-col-name) + {{ periodCount }} * var(--cf-col-period));">
                 <colgroup>
                     <col class="cf-col-name">
                     {% for p in periods %}<col class="cf-col-period">{% endfor %}
@@ -530,45 +530,4 @@
     {% endfor %}
 {% endif %}
 
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.cf-toggle').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var parentId = btn.getAttribute('data-target');
-            var expanded = btn.textContent.trim() === '\u25BC';
-
-            if (expanded) {
-                btn.innerHTML = '&#9654;';
-                hideDescendants(parentId);
-            } else {
-                btn.innerHTML = '&#9660;';
-                showDirectChildren(parentId);
-            }
-        });
-    });
-
-    function showDirectChildren(parentId) {
-        document.querySelectorAll('tr[data-parent="' + parentId + '"]').forEach(function (row) {
-            row.style.display = '';
-            var toggle = row.querySelector('.cf-toggle');
-            if (toggle) {
-                toggle.innerHTML = '&#9654;';
-            }
-        });
-    }
-
-    function hideDescendants(parentId) {
-        document.querySelectorAll('tr[data-parent="' + parentId + '"]').forEach(function (row) {
-            row.style.display = 'none';
-            var childId = row.getAttribute('data-id');
-            var toggle = row.querySelector('.cf-toggle');
-            if (toggle) {
-                toggle.innerHTML = '&#9654;';
-            }
-            hideDescendants(childId);
-        });
-    }
-});
-</script>
 {% endblock %}

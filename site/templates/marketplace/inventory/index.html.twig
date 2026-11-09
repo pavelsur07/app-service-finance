@@ -3,7 +3,7 @@
 {% set active_tab = 'inventory' %}
 
 {% block tab_content %}
-    <div class="p-3">
+    <div class="p-3" data-marketplace-inventory>
 
         <div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
 
@@ -384,73 +384,4 @@
             </div>
         </div>
     </div>
-
-    <script>
-        document.getElementById('modal-set-cost').addEventListener('show.bs.modal', function (event) {
-            var btn = event.relatedTarget;
-            document.getElementById('form-set-cost').action = btn.getAttribute('data-action');
-            document.getElementById('set-cost-token').value = btn.getAttribute('data-token');
-            document.getElementById('modal-set-cost-name').textContent = btn.getAttribute('data-listing-name');
-        });
-
-        (function () {
-            var modal = document.getElementById('modal-import-cost');
-            if (!modal) {
-                return;
-            }
-
-            var marketplaceSelect = modal.querySelector('select[name="marketplace"]');
-            var identifierSelect = document.getElementById('import-cost-identifier-type');
-            var formatALabel = document.getElementById('import-cost-format-a');
-            var supplierWarning = document.getElementById('import-cost-supplier-warning');
-            var supplierWarningText = document.getElementById('import-cost-supplier-warning-text');
-
-            if (!marketplaceSelect || !identifierSelect || !formatALabel || !supplierWarning || !supplierWarningText) {
-                return;
-            }
-
-            function updateState() {
-                var isOzon = marketplaceSelect.value === 'ozon';
-                var isWildberries = marketplaceSelect.value === 'wildberries';
-
-                Array.prototype.forEach.call(identifierSelect.options, function (option) {
-                    if (option.value === 'marketplace_sku') {
-                        option.disabled = !isOzon;
-                        option.hidden = !isOzon;
-                    }
-                });
-
-                if (!isOzon && identifierSelect.value === 'marketplace_sku') {
-                    identifierSelect.value = 'barcode';
-                }
-
-                if (identifierSelect.value === 'marketplace_sku') {
-                    formatALabel.textContent = 'Колонка A — SKU Ozon';
-                } else if (identifierSelect.value === 'supplier_sku') {
-                    formatALabel.textContent = isWildberries
-                        ? 'Колонка A — Артикул продавца Wildberries / vendorCode'
-                        : (isOzon
-                            ? 'Колонка A — Артикул продавца Ozon / offer_id'
-                            : 'Колонка A — Артикул продавца');
-                } else {
-                    formatALabel.textContent = 'Колонка A — Баркод товара';
-                }
-
-                supplierWarning.classList.toggle('d-none', identifierSelect.value !== 'supplier_sku');
-                if (isWildberries) {
-                    supplierWarningText.textContent = 'Артикул продавца Wildberries берется из vendorCode карточки, регистр букв не учитывается. Одна цена будет применена ко всем размерам с этим артикулом. Артикулы, отличающиеся только регистром, будут пропущены с ошибкой — для них используйте импорт по баркоду.';
-                } else if (isOzon) {
-                    supplierWarningText.textContent = 'Артикул продавца Ozon берется из offer_id. Перед загрузкой по артикулу продавца убедитесь, что выполнена синхронизация баркодов/артикулов Ozon.';
-                } else {
-                    supplierWarningText.textContent = 'Выберите маркетплейс, чтобы увидеть правила импорта по артикулу продавца.';
-                }
-            }
-
-            marketplaceSelect.addEventListener('change', updateState);
-            identifierSelect.addEventListener('change', updateState);
-            modal.addEventListener('show.bs.modal', updateState);
-
-            updateState();
-        })();
-    </script>
 {% endblock %}

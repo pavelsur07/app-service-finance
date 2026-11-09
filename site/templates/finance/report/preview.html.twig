@@ -377,7 +377,7 @@
 
         <div class="card table-responsive">
             {# Для этой таблицы согласован бухгалтерский формат: отрицательные значения в скобках вместо UI Kit U+2212. #}
-            <table class="table table-vcenter pl-table" style="--pl-col-period: {{ period_col_width }}; min-width: {{ table_min_width }};">
+            <table class="table table-vcenter pl-table" data-pl-tree style="--pl-col-period: {{ period_col_width }}; min-width: {{ table_min_width }};">
                 <colgroup>
                     <col class="pl-col-name">
                     {% if showMetaColumns %}
@@ -453,85 +453,4 @@
         </div>
     </main>
 
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    var rows = Array.from(document.querySelectorAll('tr.pl-row'));
-    if (!rows.length) return;
-
-    var childrenMap = {};
-    var levelStack = [];
-
-    rows.forEach(function (row) {
-        var id = row.getAttribute('data-row-id');
-        var level = parseInt(row.getAttribute('data-level'), 10);
-
-        while (levelStack.length && levelStack[levelStack.length - 1].level >= level) {
-            levelStack.pop();
-        }
-
-        var parentId = levelStack.length ? levelStack[levelStack.length - 1].id : null;
-
-        if (parentId) {
-            if (!childrenMap[parentId]) childrenMap[parentId] = [];
-            childrenMap[parentId].push(id);
-        }
-
-        levelStack.push({ id: id, level: level });
-    });
-
-    rows.forEach(function (row) {
-        var level = parseInt(row.getAttribute('data-level'), 10);
-        var toggle = row.querySelector('.pl-toggle[data-target]');
-
-        if (toggle) toggle.setAttribute('aria-expanded', 'false');
-
-        if (level >= 2) {
-            row.style.display = 'none';
-        }
-    });
-
-    document.addEventListener('click', function (e) {
-        var toggle = e.target.closest('.pl-toggle[data-target]');
-        if (!toggle) return;
-
-        var selection = window.getSelection();
-        if (selection && !selection.isCollapsed && selection.anchorNode && toggle.contains(selection.anchorNode)) return;
-
-        var targetId = toggle.getAttribute('data-target');
-        var expanded = toggle.getAttribute('aria-expanded') === 'true';
-
-        if (expanded) {
-            toggle.setAttribute('aria-expanded', 'false');
-            hideDescendants(targetId);
-        } else {
-            toggle.setAttribute('aria-expanded', 'true');
-            showDirectChildren(targetId);
-        }
-    });
-
-    function showDirectChildren(parentId) {
-        (childrenMap[parentId] || []).forEach(function (childId) {
-            var row = document.querySelector('tr[data-row-id="' + childId + '"]');
-            if (row) {
-                row.style.display = '';
-                var toggle = row.querySelector('.pl-toggle[data-target]');
-                if (toggle) toggle.setAttribute('aria-expanded', 'false');
-            }
-        });
-    }
-
-    function hideDescendants(parentId) {
-        (childrenMap[parentId] || []).forEach(function (childId) {
-            var row = document.querySelector('tr[data-row-id="' + childId + '"]');
-            if (row) {
-                row.style.display = 'none';
-                var toggle = row.querySelector('.pl-toggle[data-target]');
-                if (toggle) toggle.setAttribute('aria-expanded', 'false');
-            }
-            hideDescendants(childId);
-        });
-    }
-});
-</script>
 {% endblock %}
