@@ -67,6 +67,8 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
         $this->cost('ozon_marketing_action', '30.00', MarketplaceCostOperationType::CHARGE);
         $this->cost('ozon_marketing_action', '10.00', MarketplaceCostOperationType::STORNO);
         $this->cost('ozon_cpc', '70.00', MarketplaceCostOperationType::CHARGE);
+        // Предоплата рекламного баланса: расход из неё уже в статистике — в строку не входит.
+        $this->cost('ozon_marketing_services', '500.00', MarketplaceCostOperationType::CHARGE);
         // Вне периода — не считается.
         $this->cost('ozon_storage', '999.00', MarketplaceCostOperationType::CHARGE, null, '2026-10-31');
         $this->em->flush();
@@ -97,7 +99,7 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
 
         $row = $result['unallocated'];
         self::assertNotNull($row);
-        // 50 + 30 − 10 = 70; ozon_cpc в строку не входит — он в колонке «Реклама» из статистики.
+        // 50 + 30 − 10 = 70; ozon_cpc и предоплата в строку не входят — реклама из статистики.
         self::assertEqualsWithDelta(70.0, $row['totalCosts'], 0.001);
         self::assertEqualsWithDelta(170.0 + 70.0, $result['totals']['totalCosts'], 0.001);
 
@@ -107,9 +109,12 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
             new \DateTimeImmutable(self::FROM),
             new \DateTimeImmutable(self::TO),
         );
-        // 1000 − 100 − 70 (без товара) − 70 (реклама) = 760.
-        self::assertEqualsWithDelta(760.0, $widgets['profit'], 0.001);
-        self::assertEqualsWithDelta($widgets['profit'], $result['totals']['profit'], 0.001);
+        // «Итого»: 1000 − 100 − 70 (без товара) − 70 (реклама по статистике) = 760.
+        self::assertEqualsWithDelta(760.0, $result['totals']['profit'], 0.001);
+        // Карточки — все начисления, включая предоплату рекламного баланса (500): расходятся
+        // с «Итого» ровно на неё, остальное (клики = статистике) совпадает.
+        self::assertEqualsWithDelta(260.0, $widgets['profit'], 0.001);
+        self::assertEqualsWithDelta(-500.0, $widgets['profit'] - $result['totals']['profit'], 0.001);
     }
 
     public function testOtherMarketplaceHasNoRow(): void

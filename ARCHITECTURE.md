@@ -2939,7 +2939,8 @@ getCostsForListingAndDate(string $companyId, string $listingId, \DateTimeImmutab
 
 // Затраты без листинга (listing_id IS NULL) по категориям за период — строка «Не
 // распределено по товарам» в Unit-экономике. Рекламные категории под статистикой
-// (AdStatisticsCostCategories: ozon_cpc, WB «Продвижение») исключены. Только чтение.
+// и предоплата рекламного баланса (AdStatisticsCostCategories::codes(): ozon_cpc,
+// WB «Продвижение», ozon_marketing_services) исключены. Только чтение.
 // @return list<UnallocatedCostCategoryAggregateDTO> расход > 0, сторно уменьшает
 getUnallocatedCostAggregates(string $companyId, ?string $marketplace, \DateTimeImmutable $from, \DateTimeImmutable $to): array
 
@@ -5211,6 +5212,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.162 | 2026-11-09 | Marketplace: предоплата рекламы Ozon (`ozon_marketing_services`, тип начисления `Marketing`) исключена из строки «Не распределено по товарам» — расход из неё уже в статистике (`AdStatisticsCostCategories::codes()`) |
 | 2.161 | 2026-11-09 | Marketplace/MarketplaceAnalytics: `MarketplaceFacade::getUnallocatedCostAggregates()`; Unit-экономика — строка «Не распределено по товарам» в таблице, `totals` и xlsx (issue #2940) |
 | 2.160 | 2026-11-08 | Finance: разовая `app:finance:pl-tree:upgrade-universal-v4` удалена — применена 08.11 к 5 компаниям «Базовый» (все на v4, 43 статьи) |
 | 2.159 | 2026-11-08 | Finance: универсальный шаблон ОПиУ v4 (расширение v3) — убрана «Сервисы и подписки (коммерческие)» (`OVERHEAD_SALES_SUBS`), добавлена «Штрафы, пени и разовые убытки» (`BELOW_EBITDA_OTHER_EXPENSE`) в «Расходы ниже EBITDA»; разовая `app:finance:pl-tree:upgrade-universal-v4 <companyId> [--execute]` приводит деревья v2–v3 к v4 (удалить после применения) |
