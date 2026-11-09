@@ -7725,12 +7725,6 @@ parameters:
 			path: tests/Builders/MarketplaceAnalytics/ListingDailySnapshotBuilder.php
 
 		-
-			message: '#^Parameter \#2 \$haystack of static method PHPUnit\\Framework\\Assert\:\:assertStringContainsString\(\) expects string, string\|false given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Functional/Admin/AdminUserCreateAccountTest.php
-
-		-
 			message: '#^Parameter \$companyId of class App\\Marketplace\\Entity\\MappingError constructor expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 2
@@ -7745,7 +7739,7 @@ parameters:
 		-
 			message: '#^Parameter \#2 \$haystack of static method PHPUnit\\Framework\\Assert\:\:assertStringContainsString\(\) expects string, string\|false given\.$#'
 			identifier: argument.type
-			count: 2
+			count: 1
 			path: tests/Functional/Admin/UserCreateAccountControllerTest.php
 
 		-
