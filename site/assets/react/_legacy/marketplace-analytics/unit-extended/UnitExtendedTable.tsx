@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import type { AbcClass, ListingTag, UnitExtendedItem, UnitExtendedTotals } from './unitExtended.types';
+import type { AbcClass, ListingTag, UnallocatedCosts, UnitExtendedItem, UnitExtendedTotals } from './unitExtended.types';
 import CostsBreakdown from './CostsBreakdown';
 import { formatMoney, formatQty } from '../utils/utils';
 import { useFixedHeader } from './useFixedHeader';
@@ -39,6 +39,7 @@ type SortDir = 'asc' | 'desc';
 interface UnitExtendedTableProps {
     items: UnitExtendedItem[];
     totals: UnitExtendedTotals | null;
+    unallocated: UnallocatedCosts | null;
     isLoading: boolean;
     emptyMessage?: string;
     selectedTagIds: string[];
@@ -149,6 +150,9 @@ const TABLE_STYLES = `
 `;
 
 type ExpandedType = 'other' | 'all';
+
+/** Ключ раскрытия строки «Не распределено по товарам» — не пересекается с UUID листингов. */
+const UNALLOCATED_KEY = '__unallocated__';
 
 interface ExpandedState {
     listingId: string;
@@ -348,6 +352,7 @@ const TagCell: React.FC<TagCellProps> = ({ tags, selectedTagIds, onToggleTag }) 
 const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
     items,
     totals,
+    unallocated,
     isLoading,
     emptyMessage = 'Нет данных за выбранный период',
     selectedTagIds,
@@ -581,6 +586,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
     }
 
     const colCount = HEADERS.length + 1;
+    const isUnallocatedExpanded = expanded?.listingId === UNALLOCATED_KEY && expanded?.type === 'all';
 
     return (
         <>
@@ -725,6 +731,68 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                     </tbody>
                     {totals && (
                         <tfoot>
+                            {unallocated && (
+                                <>
+                                    <tr>
+                                        <td className="ue-ext-frozen ue-ext-frozen-sku"></td>
+                                        <td className="ue-ext-frozen ue-ext-frozen-title">
+                                            Не распределено по товарам
+                                            <div className="text-muted small">
+                                                Общие затраты кабинета без привязки к товару
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                        <td className="ue-ext-tags"></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{formatMoney(unallocated.commission)}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{formatMoney(unallocated.logistics)}</td>
+                                        <td className="text-end">{formatMoney(unallocated.otherCosts)}</td>
+                                        <td className="text-end">{formatMoney(unallocated.totalCosts)}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">
+                                            <span className={unallocated.profit >= 0 ? 'text-green' : 'text-red'}>
+                                                {formatMoney(unallocated.profit)}
+                                            </span>
+                                        </td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">
+                                            <button
+                                                type="button"
+                                                className={`btn btn-sm ${isUnallocatedExpanded ? 'btn-primary' : 'btn-ghost-secondary'} p-1`}
+                                                onClick={() => handleExpandToggle(UNALLOCATED_KEY, 'all')}
+                                                title="Показать затраты по категориям"
+                                            >
+                                                <i className="ti ti-list-details" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {isUnallocatedExpanded && (
+                                        <tr>
+                                            <td colSpan={colCount} className="p-0 bg-light">
+                                                <CostsBreakdown
+                                                    groups={unallocated.allCostsBreakdown}
+                                                    title="Затраты без привязки к товару"
+                                                />
+                                            </td>
+                                        </tr>
+                                    )}
+                                </>
+                            )}
                             <tr className="fw-bold">
                                 <td className="ue-ext-frozen ue-ext-frozen-sku"></td>
                                 <td className="ue-ext-frozen ue-ext-frozen-title">Итого</td>

@@ -6,6 +6,7 @@ namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Inventory\Facade\InventoryFacade;
 use App\Marketplace\DTO\ListingTagDTO;
+use App\Marketplace\DTO\UnallocatedCostCategoryAggregateDTO;
 use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
@@ -28,7 +29,7 @@ final readonly class UnitExtendedQuery
     /**
      * @param list<string> $tagIds фильтр по тегам листингов; пустой = без фильтра
      *
-     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>, tagSummary: list<array<string, mixed>>, stock: array{snapshotDateBySource: array<string, string>, staleSources: array<string, string>}}
+     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>, unallocated: array<string, mixed>|null, tagSummary: list<array<string, mixed>>, stock: array{snapshotDateBySource: array<string, string>, staleSources: array<string, string>}}
      */
     public function execute(
         string $companyId,
@@ -322,6 +323,18 @@ final readonly class UnitExtendedQuery
         // Sort by revenue DESC
         usort($items, static fn (array $a, array $b): int => $b['revenue'] <=> $a['revenue']);
 
+        // Затраты без привязки к товару — отдельная строка и часть totals: без них «Итого»
+        // расходилось с карточками над таблицей, которые считают все начисления. Под фильтром
+        // по тегам строки нет — такие затраты к тегу не относятся (как и в карточках).
+        $unallocated = $tagFilterActive
+            ? null
+            : $this->buildUnallocated($companyId, $marketplace, $from, $to);
+        if (null !== $unallocated) {
+            $totals['commission'] += $unallocated['commission'];
+            $totals['logistics'] += $unallocated['logistics'];
+            $totals['otherCosts'] += $unallocated['otherCosts'];
+        }
+
         // Round totals (computed from ALL listings before limit)
         foreach ($totals as $key => $val) {
             $totals[$key] = is_float($val) ? round($val, 2) : $val;
@@ -374,6 +387,7 @@ final readonly class UnitExtendedQuery
         return [
             'items' => $items,
             'totals' => $totals,
+            'unallocated' => $unallocated,
             'tagSummary' => $withTagSummary ? $this->buildTagSummary($summaryRows) : [],
             // Происхождение остатков: на какой момент они показаны и какие источники
             // отброшены как протухшие. Без этого прочерк в колонке остатка неотличим
@@ -516,6 +530,58 @@ final readonly class UnitExtendedQuery
         $buckets[$key]['logistics'] += $row['logistics'];
         $buckets[$key]['otherCosts'] += $row['otherCosts'];
         $buckets[$key]['adSpend'] += $row['adSpend'];
+    }
+
+    /**
+     * @return array{commission: float, logistics: float, otherCosts: float, totalCosts: float, profit: float, otherCostsBreakdown: list<array<string, mixed>>, allCostsBreakdown: list<array<string, mixed>>}|null
+     */
+    private function buildUnallocated(
+        string $companyId,
+        ?string $marketplace,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): ?array {
+        $rows = $this->marketplaceFacade->getUnallocatedCostAggregates($companyId, $marketplace, $from, $to);
+        if ([] === $rows) {
+            return null;
+        }
+
+        $buckets = ['commission' => 0.0, 'logistics' => 0.0, 'other' => 0.0];
+        $categories = [];
+        foreach ($rows as $row) {
+            /** @var UnallocatedCostCategoryAggregateDTO $row */
+            $net = (float) $row->netAmount;
+            $bucket = $this->groupResolver->resolveUnitBucket($row->marketplace, $row->categoryCode, $row->categoryName);
+            // Как в строках листингов: всё, что не комиссия и не логистика, — «Прочие».
+            $bucket = 'commission' === $bucket || 'logistics' === $bucket ? $bucket : 'other';
+            $buckets[$bucket] += $net;
+            $categories[] = [
+                'marketplace' => $row->marketplace,
+                'code' => $row->categoryCode,
+                'name' => $row->categoryName,
+                'costsAmount' => round((float) $row->costsAmount, 2),
+                'stornoAmount' => round((float) $row->stornoAmount, 2),
+                'netAmount' => round($net, 2),
+            ];
+        }
+
+        $commission = round($buckets['commission'], 2);
+        $logistics = round($buckets['logistics'], 2);
+        $otherCosts = round($buckets['other'], 2);
+
+        $totalCosts = round($commission + $logistics + $otherCosts, 2);
+
+        return [
+            'commission' => $commission,
+            'logistics' => $logistics,
+            'otherCosts' => $otherCosts,
+            'totalCosts' => $totalCosts,
+            // Выручки у строки нет, прибыль — минус её затраты: так прибыль строк складывается
+            // в прибыль «Итого» (с точностью до нераспределённой рекламы из статистики).
+            'profit' => -$totalCosts,
+            'otherCostsBreakdown' => $this->buildBreakdown($categories, true),
+            'allCostsBreakdown' => $this->buildBreakdown($categories, false),
+        ];
     }
 
     private function averagePerNetSoldQty(float $amount, int $netSoldQty): ?float
