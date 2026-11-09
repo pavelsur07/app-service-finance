@@ -1,0 +1,108 @@
+{#
+  Таблица план–факта: шапка периодов, строки статей, итог и план года.
+  Параметры: view, periodColumns, metrics, row_metrics, has_total, ytd, by_columns, by_rows, all, layout, show, quarter_names, month_names, metric_labels, period_width, table_width, total_label, report_linkable, report_filters.
+#}
+{% import 'budget/plan_fact/_macros.html.twig' as macros %}
+<div class="vf-pf{{ by_rows ? ' vf-pf--rows' : '' }}{{ by_columns ? ' vf-pf--columns' : '' }}" data-pf-mode="{{ all ? 'all-' ~ layout : show }}">
+    <table class="vf-pf__table" style="width: {{ table_width }}px;">
+        <colgroup>
+            <col class="u-w-260">
+            {% for column in periodColumns %}
+                {% for metric in metrics %}<col class="vf-pf__period" style="width: {{ period_width }}px;">{% endfor %}
+            {% endfor %}
+            {% if has_total %}
+                <col class="vf-pf__mhide u-w-118"><col class="vf-pf__mhide u-w-118"><col class="u-w-118"><col class="u-w-82">
+            {% endif %}
+            <col class="vf-pf__mhide u-w-118">
+        </colgroup>
+        <thead>
+            <tr>
+                <th rowspan="2" class="vf-pf__name" scope="col">Статья, ₽</th>
+                {% for column in periodColumns %}
+                    {% if column.kind == 'quarter' %}
+                        {% set label = quarter_names[column.key|slice(-1) - 1] %}
+                        {% if column.state == 'partial' %}
+                            {% set label = label ~ ' (' ~ month_names[column.months|first|slice(5, 2) - 1] ~ (column.months|length > 1 ? '–' ~ month_names[column.months|last|slice(5, 2) - 1] : '') ~ ')' %}
+                        {% endif %}
+                    {% else %}
+                        {% set label = month_names[column.key|slice(5, 2) - 1] %}
+                    {% endif %}
+                    <th class="vf-pf__period{{ by_columns ? ' vf-pf__group-start text-center' : '' }}" scope="col" data-pf-col="{{ column.key }}"{% if by_columns %} colspan="{{ metrics|length }}"{% else %} rowspan="2"{% endif %}>
+                        {{ label }}{% if column.state == 'current' %} <span class="vf-pf__state">идёт</span>{% endif %}
+                    </th>
+                {% endfor %}
+                {% if has_total %}
+                    <th colspan="4" class="vf-pf__group-start text-center" scope="colgroup" data-pf-total-head>{{ total_label }}</th>
+                {% endif %}
+                <th rowspan="2" class="vf-pf__mhide vf-pf__group-start" scope="col">План года</th>
+            </tr>
+            <tr>
+                {% if by_columns %}
+                    {% for column in periodColumns %}
+                        {% for metric in metrics %}
+                            <th class="vf-pf__period{{ loop.first ? ' vf-pf__group-start' : '' }}" scope="col">{{ metric_labels[metric] }}</th>
+                        {% endfor %}
+                    {% endfor %}
+                {% endif %}
+                {% if has_total %}
+                    <th class="vf-pf__mhide vf-pf__group-start" scope="col">План</th>
+                    <th class="vf-pf__mhide" scope="col">Факт</th>
+                    <th scope="col">Откл.</th>
+                    <th scope="col">%</th>
+                {% endif %}
+            </tr>
+        </thead>
+        {% for row in view.rows %}
+            {% set next = view.rows[loop.index] ?? null %}
+            {% set has_children = next is not null and next.level > row.level %}
+            {% set row_class = has_children ? 'vf-pf__row--group' : (row.type == 'SUBTOTAL' ? 'vf-pf__row--calc' : (row.type == 'KPI' ? 'vf-pf__row--kpi' : '')) %}
+            <tbody data-pf-row="{{ row.code }}" data-pf-id="{{ row.id }}" data-pf-level="{{ row.level }}"{% if has_children %} data-pf-group{% endif %}>
+            {% for row_metric in row_metrics %}
+                <tr class="{{ row_class }}{{ row_metric ? ' vf-pf__metric vf-pf__metric--' ~ row_metric : '' }}"{% if row_metric %} data-pf-metric="{{ row_metric }}"{% endif %}>
+                    <th scope="row" class="vf-pf__name">
+                        <span class="vf-pf__name-in" style="padding-left: {{ (row.level - 1) * 20 }}px;">
+                            {% if loop.first %}
+                                {% if has_children %}
+                                    <button type="button" class="vf-pf__chev" aria-expanded="true" aria-label="Свернуть «{{ row.name }}»" data-pf-toggle><i class="ti ti-chevron-down" aria-hidden="true"></i></button>
+                                {% else %}
+                                    <span class="vf-pf__chev-sp" aria-hidden="true"></span>
+                                {% endif %}
+                                <span class="vf-pf__title" title="{{ row.name }}">{{ row.name }}</span>
+                            {% else %}
+                                {# В «Строками» на телефоне видна только строка «Откл.» — название и шеврон дублируются в ней. #}
+                                {% if row_metric == 'diff' and has_children %}
+                                    <button type="button" class="vf-pf__chev vf-pf__chev--mobile" aria-expanded="true" aria-label="Свернуть «{{ row.name }}»" data-pf-toggle><i class="ti ti-chevron-down" aria-hidden="true"></i></button>
+                                {% endif %}
+                                <span class="vf-pf__chev-sp{{ row_metric == 'diff' and has_children ? ' vf-pf__chev-sp--desktop' : '' }}" aria-hidden="true"></span>
+                                {% if row_metric == 'diff' %}<span class="vf-pf__title vf-pf__title--mobile">{{ row.name }}</span>{% endif %}
+                                <span class="visually-hidden">{{ row.name }}</span>
+                            {% endif %}
+                            {% if row_metric %}<span class="vf-pf__tag">{{ metric_labels[row_metric] }}</span>{% endif %}
+                        </span>
+                    </th>
+                    {% for column in periodColumns %}
+                        {% set cell = row.cells[column.key] %}
+                        {% set link = null %}
+                        {% if report_linkable and column.kind == 'month' and row.format == 'MONEY' %}
+                            {% set link = path('finance_report_preview', {from: column.key ~ '-01', to: (column.key ~ '-01')|date_modify('last day of this month')|date('Y-m-d')}|merge(report_filters)) %}
+                        {% endif %}
+                        {% for metric in (row_metric ? [row_metric] : metrics) %}
+                            <td class="vf-pf__period{{ by_columns and loop.first ? ' vf-pf__group-start' : '' }}{{ metric == 'plan' and all ? ' vf-pf__plan' : '' }}{{ macros.hl(metric, cell) }}" data-pf-cell="{{ column.key }}"{% if all %} data-pf-cell-metric="{{ metric }}"{% endif %}>{{ macros.content(metric, cell, row.format, link) }}</td>
+                        {% endfor %}
+                    {% endfor %}
+                    {% if has_total %}
+                        {% set cell = row.cells[ytd.key] %}
+                        {% for metric in ['plan', 'fact', 'diff', 'percent'] %}
+                            {% set filled = row_metric is null or row_metric == metric or (row_metric == 'diff' and metric == 'percent') %}
+                            <td class="{{ metric in ['plan', 'fact'] ? 'vf-pf__mhide' : '' }}{{ loop.first ? ' vf-pf__group-start' : '' }}{{ metric == 'plan' ? ' vf-pf__plan' : '' }}{{ filled ? macros.hl(metric, cell) : '' }}" data-pf-ytd="{{ metric }}">
+                                {%- if filled -%}{{ macros.content(metric, cell, row.format, null) }}{%- endif -%}
+                            </td>
+                        {% endfor %}
+                    {% endif %}
+                    <td class="vf-pf__mhide vf-pf__group-start vf-pf__plan" data-pf-year>{% if row_metric is null or row_metric == 'plan' %}{{ macros.value(row.cells['total'].plan, row.format) }}{% endif %}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        {% endfor %}
+    </table>
+</div>

@@ -1,0 +1,90 @@
+{#
+  История закрытий по маркетплейсу.
+  Параметры: history, marketplace.
+#}
+{# История закрытий #}
+{% if history is not empty %}
+    <h4 class="mb-3">История закрытий — {{ marketplace|upper }}</h4>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+            <thead>
+            <tr>
+                <th>Период</th>
+                <th>Продажи / Возвраты</th>
+                <th>Затраты</th>
+                <th>Сверка</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for mc in history %}
+                {% set salesReturnsPreliminary = mc.isStageLastCloseWasPreliminary(constant('App\\Marketplace\\Enum\\CloseStage::SALES_RETURNS')) %}
+                {% set costsPreliminary = mc.isStageLastCloseWasPreliminary(constant('App\\Marketplace\\Enum\\CloseStage::COSTS')) %}
+                <tr>
+                    <td>
+                        <a href="{{ path('marketplace_month_close_index', {
+                            marketplace: marketplace,
+                            year: mc.year,
+                            month: mc.month
+                        }) }}" class="fw-medium">
+                            {{ ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                                'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'][mc.month] }}
+                            {{ mc.year }}
+                        </a>
+                    </td>
+                    <td>
+                        {% if mc.stageSalesReturnsStatus.value == 'closed' %}
+                            {% if salesReturnsPreliminary %}
+                                <span class="badge bg-warning-lt">Оперативное закрытие</span>
+                            {% else %}
+                                <span class="badge bg-success-lt">Закрыт</span>
+                            {% endif %}
+                            <span class="text-muted small ms-1">{{ mc.stageSalesReturnsClosedAt|date('d.m.Y') }}</span>
+                        {% elseif mc.stageSalesReturnsStatus.value == 'reopened' %}
+                            <span class="badge bg-warning-lt" title="Документы ОПиУ этапа удалены — оперативного ОПиУ нет, пока этап не закрыт">Переоткрыт</span>
+                        {% else %}
+                            <span class="badge bg-secondary-lt">Не закрыт</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if mc.stageCostsStatus.value == 'closed' %}
+                            {% if costsPreliminary %}
+                                <span class="badge bg-warning-lt">Оперативное закрытие</span>
+                            {% else %}
+                                <span class="badge bg-success-lt">Закрыт</span>
+                            {% endif %}
+                            <span class="text-muted small ms-1">{{ mc.stageCostsClosedAt|date('d.m.Y') }}</span>
+                        {% elseif mc.stageCostsStatus.value == 'reopened' %}
+                            <span class="badge bg-warning-lt" title="Документы ОПиУ этапа удалены — оперативного ОПиУ нет, пока этап не закрыт">Переоткрыт</span>
+                        {% else %}
+                            <span class="badge bg-secondary-lt">Не закрыт</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if mc.stageCostsStatus.value == 'closed' %}
+                            {% if mc.hasCostsReconciliation %}
+                                {% if mc.costsReconciliationStatus == 'matched' %}
+                                    <span class="text-success" title="Сверка выполнена: данные совпадают">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10"/></svg>
+                                    </span>
+                                {% else %}
+                                    <span class="text-warning" title="Сверка выполнена: есть расхождение">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z"/><path d="M12 16h.01"/></svg>
+                                    </span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-warning"
+                                      title="Период закрыт без сверки с xlsx">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z"/><path d="M12 16h.01"/></svg>
+                                    <span class="text-muted small ms-1">Без сверки</span>
+                                </span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}

@@ -1,0 +1,81 @@
+{#
+  Операции справочника и форма refresh metadata Ozon accrual.
+  Параметры: нет.
+#}
+<div class="wz-row">
+  <div class="card u-flex-1 u-min-w-200">
+    <div class="wz-sec-title">Операции</div>
+
+    <form action="{{ path('admin_ingestion_external_categories_seed_defaults') }}" method="POST">
+      <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_seed_defaults') }}">
+      <button type="submit" class="btn btn-md btn-secondary">Обновить базовые Ozon-маппинги</button>
+    </form>
+
+    <form action="{{ path('admin_ingestion_external_categories_discover') }}" method="POST" class="u-mt-5">
+      <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_discover') }}">
+      <div class="field">
+        <label class="field-label" for="discover_limit">Лимит discovery</label>
+        <input type="number" min="1" max="5000" class="input" id="discover_limit" name="limit" value="500">
+      </div>
+      <div class="wz-form-actions">
+        <button type="submit" class="btn btn-md btn-primary">Найти новые категории</button>
+      </div>
+    </form>
+
+    <form action="{{ path('admin_ingestion_external_categories_import_ozon_details') }}" method="POST" enctype="multipart/form-data" class="u-mt-5">
+      <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_import_ozon_details') }}">
+      <div class="wz-sec-title">Отчёт Ozon «Детализация начислений»</div>
+      <div class="field">
+        <label class="field-label" for="details_company_id">Компания, из кабинета которой отчёт<span class="req">*</span></label>
+        <input type="text" class="input" id="details_company_id" name="company_id" placeholder="UUID компании" required>
+      </div>
+      <div class="field">
+        <label class="field-label" for="details_report">Файл xlsx<span class="req">*</span></label>
+        <input type="file" class="input" id="details_report" name="report" accept=".xlsx" required>
+        <span class="field-helper">Файл не сохраняется: в базу попадают только группы по типам.</span>
+      </div>
+      <div class="wz-form-actions">
+        <button type="submit" name="mode" value="dry-run" class="btn btn-md btn-secondary">Dry-run</button>
+        <button type="submit" name="mode" value="execute" class="btn btn-md btn-primary">Импортировать</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card u-flex-1 u-min-w-200">
+    <div class="wz-sec-title">Refresh metadata Ozon accrual</div>
+
+    <form action="{{ path('admin_ingestion_external_categories_refresh_ozon_metadata') }}" method="POST">
+      <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_refresh_ozon_metadata') }}">
+      <div class="wz-form-grid">
+        <div class="field wz-span-all">
+          <label class="field-label" for="refresh_company_id">Company ID<span class="req">*</span></label>
+          <input type="text" class="input" id="refresh_company_id" name="company_id" placeholder="UUID компании" required>
+        </div>
+        <div class="field">
+          <label class="field-label" for="refresh_shop_ref">Shop ref</label>
+          <input type="text" class="input" id="refresh_shop_ref" name="shop_ref" placeholder="опционально">
+        </div>
+        <div class="field">
+          <label class="field-label" for="refresh_from">From<span class="req">*</span></label>
+          <input type="date" class="input" id="refresh_from" name="from" required>
+        </div>
+        <div class="field">
+          <label class="field-label" for="refresh_to">To<span class="req">*</span></label>
+          <input type="date" class="input" id="refresh_to" name="to" required>
+        </div>
+        <div class="field">
+          <label class="field-label" for="refresh_limit">Raw limit</label>
+          <input type="number" min="1" max="500" class="input" id="refresh_limit" name="limit" value="100">
+        </div>
+      </div>
+      <div class="wz-form-actions">
+        <button type="submit" name="mode" value="dry-run" class="btn btn-md btn-secondary">Dry-run</button>
+        <button type="submit" name="mode" value="execute" class="btn btn-md btn-danger-solid"
+                data-admin-confirm="Metadata выбранных raw-записей будет перезаписана. Продолжить?"
+                data-admin-confirm-title="Выполнить refresh?"
+                data-admin-confirm-label="Выполнить"
+                data-admin-confirm-tone="danger">Execute refresh</button>
+      </div>
+    </form>
+  </div>
+</div>

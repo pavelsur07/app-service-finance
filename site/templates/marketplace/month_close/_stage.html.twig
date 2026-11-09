@@ -1,0 +1,210 @@
+{#
+  Карточка этапа закрытия месяца: статус, сверка с xlsx, кнопки.
+  Параметры: stage, month_close, marketplace, year, month, is_current_month.
+#}
+{% set stageStatus = month_close ? month_close.getStageStatus(stage) : null %}
+{% set isClosed = stageStatus and stageStatus.value == 'closed' %}
+{% set isReopened = stageStatus and stageStatus.value == 'reopened' %}
+{% set isPreliminary = isClosed and month_close and month_close.isStageLastCloseWasPreliminary(stage) %}
+{% set preliminaryAt = isPreliminary ? month_close.getStagePreliminaryCalculatedAt(stage) : null %}
+
+<div class="col-md-6">
+    <div class="card h-100 {{ isPreliminary ? 'border-warning' : (isClosed ? 'border-success' : (isReopened ? 'border-warning' : '')) }}">
+        <div class="card-header d-flex align-items-center">
+            <h4 class="card-title mb-0 me-auto">
+                {% if isPreliminary %}
+                    <span class="text-warning me-2">●</span>
+                {% elseif isClosed %}
+                    <span class="text-success me-2">✓</span>
+                {% elseif isReopened %}
+                    <span class="text-warning me-2">↺</span>
+                {% else %}
+                    <span class="text-muted me-2">○</span>
+                {% endif %}
+                {{ stage.label }}
+            </h4>
+            {% if isPreliminary %}
+                <span class="badge bg-warning-lt"
+                      title="Документ ОПиУ создан автоматически и будет перезаписан при следующем закрытии">
+                    Оперативное закрытие
+                    {% if preliminaryAt %}· {{ preliminaryAt|date('d.m H:i') }}{% endif %}
+                </span>
+            {% elseif isClosed %}
+                <span class="badge bg-success-lt">Закрыт</span>
+            {% elseif isReopened %}
+                <span class="badge bg-warning-lt">Переоткрыт</span>
+            {% else %}
+                <span class="badge bg-secondary-lt">Не закрыт</span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if isClosed %}
+                {% if stage.value == 'sales_returns' %}
+                    <div class="text-muted small mb-3">
+                        Закрыт: {{ month_close.stageSalesReturnsClosedAt|date('d.m.Y H:i') }}
+                    </div>
+                    {% set docIds = month_close.stageSalesReturnsPLDocumentIds %}
+                {% else %}
+                    <div class="text-muted small mb-3">
+                        Закрыт: {{ month_close.stageCostsClosedAt|date('d.m.Y H:i') }}
+                    </div>
+                    {% set docIds = month_close.stageCostsPLDocumentIds %}
+
+                    {# Блок сверки с xlsx (только для COSTS) #}
+                    {% set reconciliation = month_close.costsReconciliation %}
+                    {% if reconciliation %}
+                        {% if reconciliation.status == 'matched' %}
+                            <div class="alert alert-success alert-sm py-2 mb-3">
+                                <div class="d-flex align-items-center">
+                                    <span class="me-2">✓</span>
+                                    <div>
+                                        <div class="fw-medium">Сверка с xlsx: совпадает</div>
+                                        <div class="text-muted small">
+                                            API: {{ reconciliation.xlsx_comparable|vf_money(2, '₽') }} ·
+                                            xlsx: {{ reconciliation.xlsx_total|vf_money(2, '₽') }} ·
+                                            delta: {{ reconciliation.delta|vf_money(2, '₽') }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-warning alert-sm py-2 mb-3">
+                                <div class="d-flex align-items-center">
+                                    <span class="me-2">⚠</span>
+                                    <div>
+                                        <div class="fw-medium">Сверка с xlsx: расхождение</div>
+                                        <div class="text-muted small">
+                                            Delta: {{ reconciliation.delta|vf_money(2, '₽') }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        {# Форма пересверки — всегда доступна когда этап закрыт #}
+                        <div class="mb-3">
+                            <form method="post"
+                                  action="{{ path('marketplace_month_close_reconcile') }}"
+                                  enctype="multipart/form-data"
+                                  data-busy-submit data-busy-label="Обработка...">
+                                <input type="hidden" name="_token" value="{{ csrf_token('marketplace_month_close_reconcile') }}">
+                                <input type="hidden" name="marketplace" value="{{ marketplace }}">
+                                <input type="hidden" name="year" value="{{ year }}">
+                                <input type="hidden" name="month" value="{{ month }}">
+                                <div class="mb-2">
+                                    <input type="file" name="xlsx_file" class="form-control" accept=".xlsx" required>
+                                    <small class="text-muted">Загрузите актуальный отчёт «Детализация начислений»</small>
+                                </div>
+                                <button type="submit" class="btn btn-secondary">Пересверить</button>
+                            </form>
+                        </div>
+                    {% else %}
+                        <div class="mb-3">
+                            <form method="post"
+                                  action="{{ path('marketplace_month_close_reconcile') }}"
+                                  enctype="multipart/form-data"
+                                  data-busy-submit data-busy-label="Обработка...">
+                                <input type="hidden" name="_token" value="{{ csrf_token('marketplace_month_close_reconcile') }}">
+                                <input type="hidden" name="marketplace" value="{{ marketplace }}">
+                                <input type="hidden" name="year" value="{{ year }}">
+                                <input type="hidden" name="month" value="{{ month }}">
+                                <div class="mb-2">
+                                    <input type="file" name="xlsx_file" class="form-control" accept=".xlsx" required>
+                                    <small class="text-muted">Загрузите отчёт «Детализация начислений» из ЛК Ozon</small>
+                                </div>
+                                <button type="submit" class="btn btn-secondary">Сверить с xlsx</button>
+                            </form>
+                        </div>
+                    {% endif %}
+                {% endif %}
+
+                {% if docIds %}
+                    <div class="text-muted small mb-3">
+                        Документов ОПиУ: {{ docIds|length }}
+                    </div>
+                {% endif %}
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-warning"
+                            data-bs-toggle="modal" data-bs-target="#month-close-confirm"
+                            data-confirm-action="{{ path('marketplace_month_close_reopen') }}"
+                            data-confirm-token="{{ csrf_token('marketplace_month_close_reopen') }}"
+                            data-confirm-fields="{{ {marketplace: marketplace, year: year, month: month, stage: stage.value}|json_encode }}"
+                            data-confirm-title="Переоткрыть этап?"
+                            data-confirm-body="Документы ОПиУ нужно будет удалить вручную."
+                            data-confirm-submit="Переоткрыть" data-confirm-variant="danger">
+                        Переоткрыть
+                    </button>
+                    {% if is_current_month and isPreliminary %}
+                        <button type="button"
+                                class="btn btn-sm btn-outline-warning"
+                                data-preliminary-rebuild
+                                data-marketplace="{{ marketplace }}"
+                                data-year="{{ year }}"
+                                data-month="{{ month }}"
+                                data-token="{{ csrf_token('marketplace_month_preliminary_rebuild') }}">
+                            Пересчитать сейчас
+                        </button>
+                    {% endif %}
+                </div>
+            {% else %}
+                {% if isReopened %}
+                    {# Переоткрытие удаляет документы ОПиУ этапа: оперативных цифр по нему нет #}
+                    <div class="alert alert-warning alert-sm py-2 mb-3" data-role="reopened-notice">
+                        <div class="fw-medium">Оперативного ОПиУ по этапу нет</div>
+                        <div class="small">
+                            {% if is_current_month %}
+                                Этап переоткрыт, документы ОПиУ этапа удалены. Ежедневный пересчёт попробует закрыть этап оперативно, если проверка готовности пройдёт; можно закрыть вручную.
+                            {% else %}
+                                Этап переоткрыт, документы ОПиУ этапа удалены. Прошлые месяцы автоматически не пересчитываются — закройте этап вручную.
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+                {# Кнопка Preflight + закрытие #}
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm mb-3"
+                        data-preflight
+                        data-stage="{{ stage.value }}"
+                        data-marketplace="{{ marketplace }}"
+                        data-year="{{ year }}"
+                        data-month="{{ month }}"
+                        data-token="{{ csrf_token('marketplace_month_close_preflight') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4"/><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"/></svg>
+                    Проверить готовность
+                </button>
+
+                <div data-preflight-result="{{ stage.value }}" class="mb-3" hidden></div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <form method="post"
+                          action="{{ path('marketplace_month_close_stage') }}"
+                          data-busy-submit data-busy-label="Закрываем...">
+                        <input type="hidden" name="_token" value="{{ csrf_token('marketplace_month_close_stage') }}">
+                        <input type="hidden" name="marketplace" value="{{ marketplace }}">
+                        <input type="hidden" name="year" value="{{ year }}">
+                        <input type="hidden" name="month" value="{{ month }}">
+                        <input type="hidden" name="stage" value="{{ stage.value }}">
+                        <button type="submit"
+                                class="btn btn-primary btn-sm"
+                                data-close-stage="{{ stage.value }}"
+                                disabled>
+                            Закрыть этап
+                        </button>
+                    </form>
+                    {% if is_current_month %}
+                        <button type="button"
+                                class="btn btn-sm btn-outline-warning"
+                                data-preliminary-rebuild
+                                data-marketplace="{{ marketplace }}"
+                                data-year="{{ year }}"
+                                data-month="{{ month }}"
+                                data-token="{{ csrf_token('marketplace_month_preliminary_rebuild') }}">
+                            Пересчитать сейчас
+                        </button>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

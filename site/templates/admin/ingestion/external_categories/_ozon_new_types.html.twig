@@ -1,0 +1,63 @@
+{#
+  Очередь новых типов Ozon из справочника с формой подтверждения.
+  Параметры: ozon_type_queue, ozon_groups.
+#}
+{% set group_source_labels = {
+  'ozon_report': 'отчёт Ozon',
+  'rule': 'правило',
+  'rule_medium': 'правило (подсказка)',
+  'none': 'нет',
+} %}
+
+<div class="card">
+  <div class="wz-sec-title">Новые типы Ozon</div>
+  <p class="field-helper">Типы из справочника Ozon с неразобранными начислениями. Подтверждение ставит маппинг по умолчанию: код из справочника, название и группа — ваши; тип операции не меняется. Строки обновит ночной refresh или refresh metadata за период.</p>
+  {% if ozon_type_queue is empty %}
+    <p class="u-text-faint">Неразобранных типов из справочника нет.</p>
+  {% else %}
+    <div class="t-wrap">
+      <table class="t">
+        <thead>
+          <tr>
+            <th>type_id</th>
+            <th>Код Ozon / описание</th>
+            <th class="t-cell--right">Строк</th>
+            <th>Период</th>
+            <th>Тип операции</th>
+            <th>Предложение</th>
+            <th>Подтвердить</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in ozon_type_queue %}
+            <tr>
+              <td class="u-tnum">{{ item.typeId }}{% if item.removed %} <span class="status status--neutral"><span class="dot"></span>убран Ozon</span>{% endif %}</td>
+              <td><code>{{ item.name }}</code><br>{{ item.description ?? '—' }}</td>
+              <td class="t-cell--right">{{ item.transactions }}</td>
+              <td class="u-tnum">{{ item.firstDate|date('d.m.Y') }} — {{ item.lastDate|date('d.m.Y') }}</td>
+              <td>{{ item.transactionType }}</td>
+              <td><code>{{ item.proposal.code }}</code><br>{{ item.proposal.groupLabel ?? '—' }} <span class="u-text-faint">({{ group_source_labels[item.proposal.groupSource] ?? item.proposal.groupSource }})</span></td>
+              <td>
+                {% if item.awaitingRefresh %}
+                  <span class="status status--pending"><span class="dot"></span>Подтверждён, ждёт refresh</span>
+                {% else %}
+                <form action="{{ path('admin_ingestion_external_categories_confirm_ozon_type', {typeId: item.typeId}) }}" method="POST" class="ext-cat-confirm-form">
+                  <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_confirm_ozon_type_' ~ item.typeId) }}">
+                  <input class="input" name="label" value="{{ item.proposal.label }}" aria-label="Название статьи" maxlength="255" required>
+                  <select class="select" name="group_code" aria-label="Группа" required>
+                    <option value="">— группа —</option>
+                    {% for group in ozon_groups %}
+                      <option value="{{ group.code }}" {% if group.code == item.proposal.groupCode %}selected{% endif %}>{{ group.label }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="btn btn-sm btn-primary">Подтвердить</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>

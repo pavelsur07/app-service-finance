@@ -1,0 +1,40 @@
+{#
+  Спорные группы Ozon: действующая группа против группы из нового отчёта.
+  Параметры: ozon_type_disputes.
+#}
+<div class="card">
+  <div class="wz-sec-title">Спорные группы Ozon</div>
+  <p class="field-helper">Отчёт кабинета подтвердил другую группу, чем уже действующая. Действует прежняя, пока вы не решите. Решение касается всех компаний.</p>
+  <div class="t-wrap">
+    <table class="t">
+      <thead>
+        <tr>
+          <th>type_id</th>
+          <th>Действует</th>
+          <th>Новый отчёт</th>
+          <th>Компания отчёта</th>
+          <th>Решение</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for dispute in ozon_type_disputes %}
+          <tr>
+            <td>{{ dispute.typeId }}{% if dispute.typeName %} · <code>{{ dispute.typeName }}</code>{% endif %}</td>
+            <td>{{ dispute.currentGroupLabel }} <span class="u-text-faint">({{ dispute.currentVotes }} голосов)</span></td>
+            <td>{{ dispute.disputedGroupLabel }} <span class="u-text-faint">({{ dispute.disputedVotes }} голосов{% if dispute.disputedAt %}, {{ dispute.disputedAt }}{% endif %})</span></td>
+            <td><code>{{ dispute.disputedCompanyId ?? '—' }}</code></td>
+            <td>
+              <form action="{{ path('admin_ingestion_external_categories_resolve_ozon_type_group_dispute', {typeId: dispute.typeId}) }}" method="POST" class="u-flex u-gap-1">
+                <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_resolve_dispute_' ~ dispute.typeId) }}">
+                <input type="hidden" name="group_code" value="{{ dispute.currentGroupCode }}">
+                <input type="hidden" name="disputed_group_code" value="{{ dispute.disputedGroupCode }}">
+                <button type="submit" name="decision" value="accept" class="btn btn-sm btn-primary">Принять новую</button>
+                <button type="submit" name="decision" value="dismiss" class="btn btn-sm btn-secondary">Оставить</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

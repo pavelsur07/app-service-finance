@@ -1,0 +1,52 @@
+{#
+  Таблица последних внешних категорий с кнопкой настройки маппинга.
+  Параметры: latest_categories, category_status_tone, category_status_labels, mapping_status_tone, mapping_status_labels.
+#}
+<div class="card u-p-0">
+  <div class="wz-card-head">Последние внешние категории</div>
+  <div class="wz-scroll">
+    <table class="t-table">
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Scope</th>
+          <th>External code</th>
+          <th>Provider label</th>
+          <th>type_id</th>
+          <th>Mapping</th>
+          <th class="t-cell--right">Overrides</th>
+          <th class="t-cell--right">Seen</th>
+          <th>Last seen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in latest_categories %}
+          <tr>
+            <td>
+              <span class="status status--{{ category_status_tone[row.status] ?? 'neutral' }}"><span class="dot"></span>{{ category_status_labels[row.status] ?? row.status }}</span>
+            </td>
+            <td>{{ row.scope }}</td>
+            <td><code>{{ row.external_code ?? row.normalized_key }}</code></td>
+            <td>{{ row.provider_label ?? row.external_name ?? '' }}</td>
+            <td class="u-tnum">{{ row.external_type_id ?? '' }}</td>
+            <td>
+              <div class="ext-cat-stack">
+                {% if row.canonical_code %}
+                  <span class="status status--{{ mapping_status_tone[row.mapping_status ?? 'active'] ?? 'neutral' }}"><span class="dot"></span>{{ mapping_status_labels[row.mapping_status ?? 'active'] ?? row.mapping_status }}</span>
+                  <code>{{ row.canonical_code }}{% if row.canonical_group %} · {{ row.canonical_group }}{% endif %}</code>
+                  <span>{{ row.canonical_label ?? '' }}</span>
+                {% else %}
+                  <span class="u-text-faint">—</span>
+                {% endif %}
+                <button type="button" class="btn btn-sm btn-secondary" data-admin-dialog-open="mapping-dialog-{{ row.id }}">Настроить</button>
+              </div>
+            </td>
+            <td class="t-cell--right">{{ row.company_overrides }}</td>
+            <td class="t-cell--right">{{ row.seen_count }}</td>
+            <td class="u-tnum">{{ row.last_seen_at|date('d.m.Y H:i') }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

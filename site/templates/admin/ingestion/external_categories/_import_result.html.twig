@@ -1,0 +1,26 @@
+{#
+  Итог последнего импорта отчёта «Детализация начислений».
+  Параметры: last_import.
+#}
+<div class="card">
+  <div class="wz-sec-title">{{ last_import.dryRun ? 'Dry-run импорта отчёта' : 'Импорт отчёта' }}: {{ last_import.periodFrom ?? '—' }} — {{ last_import.periodTo ?? '—' }}, строк {{ last_import.rows }}</div>
+  <div class="t-wrap">
+    <table class="t">
+      <thead>
+        <tr><th>Итог</th><th>type_id</th><th>Группа</th><th class="t-cell--right">Голоса / строки</th><th>Группа в отчёте</th><th>Тип в отчёте</th></tr>
+      </thead>
+      <tbody>
+        {% for type in last_import.types %}
+          <tr>
+            <td>{{ type.outcome }}</td>
+            <td>{{ type.typeId ?? '—' }}</td>
+            <td>{{ type.groupCode ?? '—' }}</td>
+            <td class="t-cell--right">{{ type.votes }} / {{ type.rowsTotal }}</td>
+            <td>{{ type.xlsxGroupLabel }}</td>
+            <td>{{ type.xlsxTypeName }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
