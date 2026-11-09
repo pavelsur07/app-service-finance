@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 5 IN PROGRESS (старт 09.11.2026) — A1, A2, B, C, D на проде, E на handoff
-**Status:** Stage 1–4 на проде (#2909–#2933); Stage 5 A1 (#2944), A2 (#2945), B (#2946), C (#2947), D (#2948, 09.11 12:27Z) на проде; E — операции ДДС, документы и листинги маркетплейса на партиалы, отчёт в `stages/stage-5.md`
-**Stage base commit:** master a4739d132 (после #2948) · ветка `refactor/twig-ui-stage-5e`
+**Phase:** Stage 5 IN PROGRESS (старт 09.11.2026) — A1, A2, B, C, D, E на проде, F на handoff
+**Status:** Stage 1–4 на проде (#2909–#2933); Stage 5 A1 (#2944), A2 (#2945), B (#2946), C (#2947), D (#2948), E (#2949, 09.11 13:04Z) на проде; F — внешние категории, импорт ОПиУ, закрытие месяца и план–факт на партиалы, отчёт в `stages/stage-5.md`
+**Stage base commit:** master bd795de04 (после #2949) · ветка `refactor/twig-ui-stage-5f`
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -75,9 +75,8 @@
 - Stage 3 на проде 08.11 06:00Z (деплой с головы master после #2927; прогон #2926 упал на flaky-тесте, rerun не нужен).
 
 ### Exact next action
-- E — PR на handoff; после merge and deploy — F (формы и админка: `admin/ingestion/external_categories/index`,
-  `pl_category/import`, `marketplace/month_close/index`, `budget/plan_fact`) с ветки от свежего master; без данных на стенде — сверка ответов функциональных тестов
-  временным слушателем `kernel.response` (приём в отчётах C, D)
+- F — PR на handoff; после merge and deploy — G (приёмка Stage 5 и всей задачи по чек-листу G в `stages/stage-5.md`:
+  пересчёт страниц > 300 строк (15 → 0) и счётчиков, галочки B–F, Stage 5 DONE, закрытие задачи) с ветки от свежего master
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`
