@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { ErrorBoundary } from './shared/ui/ErrorBoundary';
+import { ErrorBoundary } from '@/react/shared/ui/ErrorBoundary';
 import type { MarketplaceOption } from './marketplace-analytics/types/analytics.types';
 import UnitEconomicsWidget from './marketplace-analytics/widgets/UnitEconomicsWidget';
 

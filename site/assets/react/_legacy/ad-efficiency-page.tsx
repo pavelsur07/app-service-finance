@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { ErrorBoundary } from './shared/ui/ErrorBoundary';
+import { ErrorBoundary } from '@/react/shared/ui/ErrorBoundary';
 import type { MarketplaceOption } from './marketplace-ads/ad-efficiency/adEfficiency.types';
 import AdEfficiencyPage from './marketplace-ads/ad-efficiency/AdEfficiencyPage';
 

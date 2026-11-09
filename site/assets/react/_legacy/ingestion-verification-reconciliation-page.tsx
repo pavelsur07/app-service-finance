@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { ErrorBoundary } from './shared/ui/ErrorBoundary';
+import { ErrorBoundary } from '@/react/shared/ui/ErrorBoundary';
 import ReconciliationSummaryWidget from './ingestion-verification/widgets/ReconciliationSummaryWidget';
 
 interface ReactMountElement extends HTMLElement {

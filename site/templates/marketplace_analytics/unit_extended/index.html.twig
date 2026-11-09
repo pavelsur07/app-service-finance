@@ -2,6 +2,11 @@
 
 {% block title %}Unit — Экономика — Аналитика маркетплейсов{% endblock %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    {{ vite_entry_link_tags('unit_extended_page') }}
+{% endblock %}
+
 {% block content %}
     <div
         id="react-unit-extended"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatMoney } from '../../utils/utils';
+import { formatMoney } from '@/react/shared/format/number';
 import type { CostCategory, CostGroupBreakdown } from '../unitExtended.types';
 import { COMPENSATION_CODES, OTHER_SERVICES_GROUP } from './widgetsConfig';
 

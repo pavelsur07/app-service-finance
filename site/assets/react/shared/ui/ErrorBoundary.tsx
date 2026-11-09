@@ -23,7 +23,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
         return { hasError: true, error };
     }
 
-    componentDidCatch(error: Error, errorInfo: any) {
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
         console.error(
             `[ErrorBoundary${this.props.widgetName ? ` ${this.props.widgetName}` : ""}]`,
             error,

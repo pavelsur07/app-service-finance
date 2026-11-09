@@ -1,0 +1,104 @@
+/*
+ * Таблица «Unit — Экономика»: закреплённые колонки SKU и наименования, плавающая
+ * полоса прокрутки, чипы тегов. Только обёртки модуля; токены — легаси-слой Tabler.
+ */
+.scroll {
+    overflow-x: auto;
+    max-width: 100%;
+    width: 100%;
+}
+.floatingScrollbar {
+    position: fixed;
+    bottom: 0;
+    height: 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    z-index: 1045;
+    background: var(--tblr-bg-surface);
+    border-top: 1px solid var(--tblr-border-color);
+}
+.floatingScrollbar.hidden {
+    display: none;
+}
+.floatingScrollbarInner {
+    height: 1px;
+}
+.table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
+    margin: 0;
+}
+.table td.frozen,
+.table th.frozen {
+    position: sticky;
+    background: var(--tblr-bg-surface);
+}
+.table td.frozenSku,
+.table th.frozenSku {
+    left: 0;
+    min-width: 140px;
+    max-width: 140px;
+    width: 140px;
+}
+.table td.frozenTitle,
+.table th.frozenTitle {
+    left: 140px;
+    min-width: 240px;
+    max-width: 240px;
+    width: 240px;
+}
+.table td.frozen { z-index: 1; }
+.table thead th.frozen { z-index: 3; }
+.table tfoot td.frozen { z-index: 1; }
+.table .frozenTitle::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -4px;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(to right, rgba(0,0,0,0.08), transparent);
+    pointer-events: none;
+}
+.table td.tags,
+.table th.tags {
+    min-width: 180px;
+    max-width: 180px;
+    width: 180px;
+}
+.tagsList {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+}
+.tagChip {
+    display: inline-block;
+    /* flex-shrink + min-width:0 — иначе два длинных имени распирают ячейку
+       и обрезаются по её краю вместо многоточия в каждом чипе. */
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    padding: 3px 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    /* .tag-chip задан для span и font-family не выставляет: на button
+       без inherit браузер подставил бы свой системный шрифт. */
+    font-family: inherit;
+    cursor: pointer;
+}
+.tagChip.active {
+    border-color: var(--tblr-primary);
+    background: rgba(var(--tblr-primary-rgb), 0.1);
+    color: var(--tblr-primary);
+}
+.table tbody tr:hover td {
+    background: var(--tblr-bg-surface-secondary);
+}
+.table tbody tr:hover td.frozen {
+    background: var(--tblr-bg-surface-secondary);
+}

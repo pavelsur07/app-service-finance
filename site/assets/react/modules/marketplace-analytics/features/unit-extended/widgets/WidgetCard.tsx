@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatMoney } from '../../utils/utils';
+import { formatMoney } from '@/react/shared/format/number';
 import type { WidgetCardConfig, WidgetsSummary, WidgetType } from './widgets.types';
 
 interface WidgetCardProps {

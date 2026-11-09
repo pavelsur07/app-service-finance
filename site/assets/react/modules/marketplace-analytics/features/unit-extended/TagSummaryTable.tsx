@@ -1,6 +1,6 @@
 import React from 'react';
 import type { TagSummaryRow } from './unitExtended.types';
-import { formatMoney } from '../utils/utils';
+import { formatMoney } from '@/react/shared/format/number';
 
 interface TagSummaryTableProps {
     rows: TagSummaryRow[];
