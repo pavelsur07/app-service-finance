@@ -1,0 +1,37 @@
+{# «Операции WB». Параметры: report. #}
+{% import 'marketplace/wb_finance_report/_macros.html.twig' as report_ui %}
+<details class="card mb-3">
+    <summary class="card-header cursor-pointer">
+        <span class="card-title">Операции WB ({{ report.operations|length }})</span>
+    </summary>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+            <thead>
+            <tr>
+                <th>Операция</th>
+                <th>Тип документа</th>
+                <th class="text-end">Строк</th>
+                <th class="text-end">reportId</th>
+                <th class="text-end">Влияние</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in report.operations %}
+                <tr>
+                    <td>{{ row.operation_name }}</td>
+                    <td class="text-secondary">{{ row.doc_type }}</td>
+                    <td class="text-end">{{ row.row_count|vf_number }}</td>
+                    <td class="text-end">{{ row.report_count }}</td>
+                    <td class="text-end text-nowrap">
+                        {{ report_ui.money(row.payout_minor) }}
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-secondary py-4">Операций нет.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</details>

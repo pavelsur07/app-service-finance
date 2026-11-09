@@ -1,0 +1,20 @@
+{# Макросы отчёта WB: деньги с «₽», сумма в денежной колонке, процент. #}
+{# DS-Money: копейки → точная десятичная строка; KPI, итоги и подписи — с «₽». #}
+{% macro money(minor) %}
+    {{ minor|vf_minor|vf_money(2, 'RUB') }}
+{% endmacro %}
+
+{# Сумма в денежной колонке таблицы: «₽» — в заголовке колонки. #}
+{% macro amount(minor) %}
+    {{ minor|vf_minor|vf_amount }}
+{% endmacro %}
+
+{% macro percent(value) %}
+    {% if value is null %}
+        —
+    {% elseif value == '0.0' %}
+        0,0%
+    {% else %}
+        {{ value|vf_number(1) }}%
+    {% endif %}
+{% endmacro %}

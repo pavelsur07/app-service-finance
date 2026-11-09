@@ -1,0 +1,70 @@
+{# «Расшифровка по статьям WB» с итогами перечисления. Параметры: report. #}
+{% import 'marketplace/wb_finance_report/_macros.html.twig' as report_ui %}
+<div class="card mb-3">
+    <div class="card-header">
+        <div>
+            <h4 class="card-title mb-1">Расшифровка по статьям WB</h4>
+            <div class="text-secondary small">
+                «Влияние» показывает знак относительно расчётного перечисления продавцу.
+                Для статьи «Удержания и выплаты» колонка «Возврат / сторно» показывает выплаты WB.
+            </div>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+            <thead>
+            <tr>
+                <th>Статья</th>
+                <th>Источник / формула</th>
+                <th class="text-end">Начислено, ₽</th>
+                <th class="text-end">Возврат / сторно, ₽</th>
+                <th class="text-end">Влияние, ₽</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% set current_group = null %}
+            {% for article in report.articles %}
+                {% if current_group != article.group %}
+                    {% set current_group = article.group %}
+                    <tr class="table-light">
+                        <td colspan="5" class="fw-semibold">{{ current_group }}</td>
+                    </tr>
+                {% endif %}
+                <tr>
+                    <td class="fw-medium">
+                        {% if article.key == 'deduction' and report.deductions is not empty %}
+                            <a href="#wb-deduction-breakdown">{{ article.label }}</a>
+                        {% else %}
+                            {{ article.label }}
+                        {% endif %}
+                    </td>
+                    <td class="text-secondary"><code>{{ article.source }}</code></td>
+                    <td class="text-end text-nowrap">{{ report_ui.amount(article.accrual_minor) }}</td>
+                    <td class="text-end text-nowrap">{{ report_ui.amount(article.reversal_minor) }}</td>
+                    <td class="text-end text-nowrap fw-semibold {{ article.net_minor > 0 ? 'text-success' : '' }}">
+                        {{ report_ui.amount(article.net_minor) }}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot>
+            <tr>
+                <th colspan="4" class="text-end">К перечислению за товар</th>
+                <th class="text-end text-nowrap">{{ report_ui.money(report.summary.for_pay_minor) }}</th>
+            </tr>
+            <tr>
+                <th colspan="4" class="text-end">Прочие начисления и удержания</th>
+                <th class="text-end text-nowrap {{ report.summary.post_product_minor > 0 ? 'text-success' : '' }}">
+                    {{ report_ui.money(report.summary.post_product_minor) }}
+                </th>
+            </tr>
+            <tr>
+                <th colspan="4" class="text-end">Расчётное перечисление</th>
+                <th class="text-end text-nowrap fs-3">
+                    {{ report_ui.money(report.summary.payout_minor) }}
+                </th>
+            </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
