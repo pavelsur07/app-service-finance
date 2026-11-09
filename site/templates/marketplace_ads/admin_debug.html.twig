@@ -13,7 +13,7 @@
         </div>
     </div>
 
-    <div class="page-body">
+    <div class="page-body" data-ozon-ads-debug>
         <div class="container-xl">
             {% if companies|length == 0 %}
                 <div class="alert alert-warning">
@@ -71,115 +71,4 @@
             {% endif %}
         </div>
     </div>
-
-    <script>
-        (function () {
-            var companySel = document.getElementById('debug-company-id');
-            if (!companySel) { return; }
-
-            var pretty = function (value) {
-                try {
-                    return JSON.stringify(value, null, 2);
-                } catch (e) {
-                    return String(value);
-                }
-            };
-
-            var renderResult = function (elId, payload, okFlag) {
-                var el = document.getElementById(elId);
-                el.textContent = pretty(payload);
-                el.style.borderLeft = okFlag ? '4px solid var(--vf-ok-text)' : '4px solid var(--vf-danger-text)';
-            };
-
-            var companyId = function () { return companySel.value; };
-
-            var withBusy = function (btn, cb) {
-                var original = btn.innerHTML;
-                btn.disabled = true;
-                btn.innerHTML = 'Выполняется...';
-                Promise.resolve(cb()).finally(function () {
-                    btn.disabled = false;
-                    btn.innerHTML = original;
-                });
-            };
-
-            var doFetch = function (url) {
-                return fetch(url, {
-                    credentials: 'same-origin',
-                    headers: {'X-Requested-With': 'XMLHttpRequest'},
-                }).then(function (r) {
-                    return r.json().then(function (data) {
-                        return {ok: r.ok, status: r.status, data: data};
-                    }).catch(function () {
-                        return {ok: r.ok, status: r.status, data: {error: 'Invalid JSON response'}};
-                    });
-                });
-            };
-
-            var renderBadges = function (container, values, toneResolver) {
-                container.innerHTML = '';
-                Object.keys(values || {}).forEach(function (key) {
-                    var badge = document.createElement('span');
-                    badge.className = 'badge me-2 ' + toneResolver(key, values[key]);
-                    badge.textContent = key + ': ' + values[key];
-                    container.appendChild(badge);
-                });
-            };
-
-            document.getElementById('btn-fetch-campaigns').addEventListener('click', function (e) {
-                withBusy(e.currentTarget, function () {
-                    var url = '/debug/ozon-ads/all-campaigns?companyId=' + encodeURIComponent(companyId());
-                    return doFetch(url).then(function (res) {
-                        renderResult('result-campaigns', res.data, res.ok);
-                        var summary = document.getElementById('campaigns-summary');
-                        summary.innerHTML = '';
-                        if (!res.ok || !res.data) {
-                            return;
-                        }
-
-                        var total = document.createElement('span');
-                        total.className = 'badge bg-secondary me-2';
-                        total.textContent = 'Всего кампаний: ' + (res.data.total_campaigns || 0);
-                        summary.appendChild(total);
-
-                        renderBadges(summary, res.data.by_state || {}, function () {
-                            return 'bg-info';
-                        });
-                    });
-                });
-            });
-
-            document.getElementById('btn-fetch-reports-list').addEventListener('click', function (e) {
-                withBusy(e.currentTarget, function () {
-                    var url = '/debug/ozon-ads/list-reports?companyId=' + encodeURIComponent(companyId());
-                    return doFetch(url).then(function (res) {
-                        renderResult('result-reports-list', res.data, res.ok);
-                        var summary = document.getElementById('reports-list-summary');
-                        summary.innerHTML = '';
-                        if (!res.ok || !res.data) {
-                            return;
-                        }
-
-                        var collected = document.createElement('span');
-                        collected.className = 'badge bg-secondary me-2';
-                        collected.textContent = 'Собрано из Ozon: ' + (res.data.total_items_collected || 0);
-                        summary.appendChild(collected);
-
-                        var pending = (res.data.our_uuids || []).filter(function (item) {
-                            return item && item.found_in_list;
-                        }).length;
-                        var pendingBadge = document.createElement('span');
-                        pendingBadge.className = 'badge me-2 ' + (pending > 0 ? 'bg-warning' : 'bg-success');
-                        pendingBadge.textContent = 'Наши UUID в списке Ozon: ' + pending;
-                        summary.appendChild(pendingBadge);
-
-                        var pages = document.createElement('span');
-                        pages.className = 'badge bg-info me-2';
-                        pages.textContent = 'Страниц опрошено: ' + ((res.data.list_pages || []).length);
-                        summary.appendChild(pages);
-                    });
-                });
-            });
-        })();
-    </script>
 {% endblock %}

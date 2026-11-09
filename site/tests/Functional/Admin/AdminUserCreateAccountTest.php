@@ -53,6 +53,7 @@ final class AdminUserCreateAccountTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('button[data-admin-dialog-open="account-create-dialog"]', 'Добавить аккаунт');
+        self::assertSelectorNotExists('dialog#account-create-dialog[data-admin-dialog-autoopen]');
     }
 
     public function testValidPostCreatesUserCompanyAndOwnerCompanyMemberWithoutAdminRole(): void
@@ -123,10 +124,8 @@ final class AdminUserCreateAccountTest extends WebTestCaseBase
 
         self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
         self::assertSelectorTextContains('.invalid-feedback', 'There is already an account with this email');
-        self::assertStringContainsString(
-            "document.getElementById('account-create-dialog')?.showModal();",
-            $client->getResponse()->getContent(),
-        );
+        // Диалог с ошибками открывает admin_shell_runtime.js по атрибуту data-admin-dialog-autoopen.
+        self::assertSelectorExists('dialog#account-create-dialog[data-admin-dialog-autoopen]');
 
         $em = $this->em();
         self::assertSame(2, $em->getRepository(User::class)->count([]));

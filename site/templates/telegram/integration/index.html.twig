@@ -3,7 +3,7 @@
 {% block title %}Интеграция с Telegram{% endblock %}
 
 {% block body %}
-<div class="container-xl">
+<div class="container-xl" data-telegram-integration>
   <div class="page-header d-print-none">
     <div class="row align-items-center">
       <div class="col">
@@ -79,34 +79,4 @@
     </div>
   </div>
 </div>
-{% endblock %}
-
-{# Небольшой inline-скрипт для копирования команды в буфер обмена #}
-{% block javascripts %}
-  {{ parent() }}
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const copyButtons = document.querySelectorAll('[data-copy-text]');
-
-      copyButtons.forEach((button) => {
-        button.addEventListener('click', () => {
-          const text = button.getAttribute('data-copy-text');
-
-          if (!text) {
-            return;
-          }
-
-          navigator.clipboard.writeText(text).then(() => {
-            const originalText = button.textContent;
-            button.textContent = 'Скопировано';
-
-            // Возвращаем исходный текст через короткую задержку, чтобы пользователь понял, что копирование прошло.
-            setTimeout(() => {
-              button.textContent = originalText;
-            }, 2000);
-          });
-        });
-      });
-    });
-  </script>
 {% endblock %}

@@ -88,9 +88,7 @@ final class UserCreateAccountControllerTest extends WebTestCaseBase
         self::assertSelectorTextContains('h1.wz-title', 'Зарегистрированные пользователи');
         self::assertStringContainsString('existing@example.test', $client->getResponse()->getContent());
         self::assertSelectorTextContains('.invalid-feedback', 'There is already an account with this email');
-        self::assertStringContainsString(
-            "document.getElementById('account-create-dialog')?.showModal();",
-            $client->getResponse()->getContent()
-        );
+        // Диалог с ошибками открывает admin_shell_runtime.js по атрибуту data-admin-dialog-autoopen.
+        self::assertSelectorExists('dialog#account-create-dialog[data-admin-dialog-autoopen]');
     }
 }

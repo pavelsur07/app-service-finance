@@ -53,19 +53,3 @@
         </form>
     </div>
 {% endblock %}
-
-{% block scripts %}
-    {{ parent() }}
-    <script>
-        (() => {
-            const form = document.querySelector('[data-description-selection]');
-            if (!form) return;
-            const checkboxes = Array.from(form.querySelectorAll('input[name="selected[]"]'));
-            const output = form.querySelector('[data-description-count]');
-            const offPage = Number(form.dataset.selectedCount) - checkboxes.filter((input) => input.checked).length;
-            const update = () => { output.textContent = String(offPage + checkboxes.filter((input) => input.checked).length); };
-            checkboxes.forEach((input) => input.addEventListener('change', update));
-            update();
-        })();
-    </script>
-{% endblock %}

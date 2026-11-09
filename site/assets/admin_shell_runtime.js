@@ -305,9 +305,15 @@
         });
     }
 
+    // Диалог формы с ошибками валидации сервер помечает data-admin-dialog-autoopen — он открывается сразу.
+    function openAutoDialogs() {
+        document.querySelectorAll("dialog[data-admin-dialog-autoopen]").forEach((dialog) => openDialog(dialog));
+    }
+
     function initAdminShellRuntime() {
         initExistingToasts();
         initSidebarGroups();
+        openAutoDialogs();
     }
 
     function onReady(callback) {
@@ -468,6 +474,13 @@
 
     onReady(initAdminShellRuntime);
     document.addEventListener("turbo:load", initAdminShellRuntime);
+
+    // Кнопки опасной зоны (admin/partials/_danger_zone.html.twig) — системный confirm перед переходом.
+    document.addEventListener("click", (event) => {
+        if (event.target.closest('[data-confirm="true"]') && !confirm("Вы уверены? Это опасное действие.")) {
+            event.preventDefault();
+        }
+    });
 
     window.addEventListener("admin:toast", (event) => {
         createToast(event.detail || {});

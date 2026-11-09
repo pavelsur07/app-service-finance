@@ -17,7 +17,7 @@
         {% endblock %}
     {% endembed %}
 
-    <div class="container-xl mt-3">
+    <div class="container-xl mt-3" data-company-members>
         {% set inviteTokens = app.flashes('invite_token') %}
         {% if inviteTokens is not empty %}
             <div class="card mb-3">
@@ -218,22 +218,4 @@
             </div>
         </div>
     {% endif %}
-{% endblock %}
-
-{% block javascripts %}
-    <script>
-        document.querySelectorAll('.js-copy-invite').forEach((button) => {
-            button.addEventListener('click', () => {
-                const value = button.getAttribute('data-copy');
-                if (!value) {
-                    return;
-                }
-                navigator.clipboard.writeText(value);
-                button.textContent = 'Скопировано';
-                setTimeout(() => {
-                    button.textContent = 'Копировать';
-                }, 1500);
-            });
-        });
-    </script>
 {% endblock %}

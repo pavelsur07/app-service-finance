@@ -1,7 +1,7 @@
 {% extends 'marketplace/layout.html.twig' %}
 
 {% block tab_content %}
-    <div class="container-xl py-4">
+    <div class="container-xl py-4" data-marketplace-unmapped>
         {% if unmapped_count == 0 %}
             {% embed 'partials/_empty.html.twig' with {title: 'Все листинги привязаны!', hint: 'У вас нет листингов без привязки к продуктам.'} %}
                 {% block icon %}
@@ -129,112 +129,4 @@
             </div>
         </div>
     </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const mapModalElement = document.getElementById('mapListingModal');
-            const BootstrapModal = window.bootstrap && typeof window.bootstrap.Modal === 'function'
-                ? window.bootstrap.Modal
-                : null;
-            let currentListingId = null;
-
-            function showMapModal() {
-                if (!mapModalElement) {
-                    return;
-                }
-
-                if (!BootstrapModal) {
-                    mapModalElement.classList.add('show');
-                    mapModalElement.style.display = 'block';
-                    mapModalElement.removeAttribute('aria-hidden');
-                    mapModalElement.setAttribute('aria-modal', 'true');
-                    return;
-                }
-
-                BootstrapModal.getOrCreateInstance(mapModalElement).show();
-            }
-
-            if (mapModalElement && !BootstrapModal) {
-                mapModalElement.querySelectorAll('[data-bs-dismiss="modal"]').forEach(button => {
-                    button.addEventListener('click', function() {
-                        mapModalElement.classList.remove('show');
-                        mapModalElement.style.display = 'none';
-                        mapModalElement.setAttribute('aria-hidden', 'true');
-                        mapModalElement.removeAttribute('aria-modal');
-                    });
-                });
-            }
-
-            document.querySelectorAll('.map-listing-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    currentListingId = this.dataset.listingId;
-                    document.getElementById('modal-listing-sku').textContent = this.dataset.listingSku;
-                    loadProducts();
-                    showMapModal();
-                });
-            });
-
-            async function loadProducts() {
-                const select = document.getElementById('product-select');
-                select.innerHTML = '<option value="">Загрузка...</option>';
-                try {
-                    const response = await fetch('/api/products');
-                    const products = await response.json();
-                    select.innerHTML = '<option value="">-- Выберите продукт --</option>';
-                    products.forEach(product => {
-                        const option = document.createElement('option');
-                        option.value = product.id;
-                        option.textContent = `${product.sku} - ${product.name}`;
-                        select.appendChild(option);
-                    });
-                } catch (error) {
-                    select.innerHTML = '<option value="">Ошибка загрузки</option>';
-                }
-            }
-
-            document.getElementById('confirm-mapping-btn').addEventListener('click', async function() {
-                const productId = document.getElementById('product-select').value;
-                const errorDiv = document.getElementById('mapping-error');
-                errorDiv.classList.add('d-none');
-                if (!productId) {
-                    errorDiv.textContent = 'Выберите продукт';
-                    errorDiv.classList.remove('d-none');
-                    return;
-                }
-                this.disabled = true;
-                this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Привязка...';
-                try {
-                    const response = await fetch(`/api/marketplace/listings/${currentListingId}/map`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ productId })
-                    });
-                    const data = await response.json();
-                    if (response.ok) {
-                        window.location.reload();
-                    } else {
-                        errorDiv.textContent = data.error || 'Не удалось привязать листинг';
-                        errorDiv.classList.remove('d-none');
-                        this.disabled = false;
-                        this.textContent = 'Привязать';
-                    }
-                } catch (error) {
-                    errorDiv.textContent = 'Ошибка сети';
-                    errorDiv.classList.remove('d-none');
-                    this.disabled = false;
-                    this.textContent = 'Привязать';
-                }
-            });
-
-            const searchInput = document.getElementById('search-input');
-            if (searchInput) {
-                searchInput.addEventListener('input', function() {
-                    const searchTerm = this.value.toLowerCase();
-                    document.querySelectorAll('tbody tr').forEach(row => {
-                        row.style.display = row.textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
-                    });
-                });
-            }
-        });
-    </script>
 {% endblock %}

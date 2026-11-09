@@ -145,20 +145,6 @@
           </p>
         {% endfor %}
         <p class="text-secondary small mt-2 mb-0">Картой, СБП или другим способом на странице ЮKassa. Сумма — по таблице выше. Расчёт — на день оплаты.{% for reason in online.unavailable %} {{ reason }}{% endfor %}</p>
-        <script>
-          (() => {
-            const card = document.currentScript.closest('[data-billing-online]');
-            const tariff = card.querySelector('[name="tariff"]');
-            const months = card.querySelector('[name="months"]');
-            const update = () => {
-              const key = tariff.value + ':' + months.value;
-              card.querySelectorAll('[data-billing-plan]').forEach((el) => { el.hidden = el.dataset.billingPlan !== key; });
-            };
-            tariff.addEventListener('change', update);
-            months.addEventListener('change', update);
-            update();
-          })();
-        </script>
       </div>
     </div>
   {% endif %}
