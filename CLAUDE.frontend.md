@@ -17,13 +17,13 @@ Fast Path / Small / Large, STOP-список §3.4, политика ревью 
 
 | Целевое | Факт |
 |---|---|
-| `assets/react/modules/<module>/features/*` | один модуль — `modules/budget/features/budget-grid/` (04.11.2026); остальной React в `assets/react/_legacy/`, 100 файлов |
+| `assets/react/modules/<module>/features/*` | один модуль — `modules/budget/features/budget-grid/` (04.11.2026); остальной React в `assets/react/_legacy/`, 90 файлов (09.11.2026) |
 | `assets/react/entrypoints/` | один entry — `budget_grid_page.tsx`; остальные entry указывают прямо на файлы `_legacy/` |
 | `mountIsland`, `AppProviders`, `ErrorBoundary` | не реализованы; entry берёт `ErrorBoundary` из `_legacy/shared/ui/` |
 | `apiFetch` в `assets/api/client.ts` | есть с 04.11.2026: JSON, `X-CSRF-Token`, ошибка `{error:{code,message}}` → `ApiError`, 401 → вход |
 | `templates/_macros/ui-kit.html.twig` | нет |
 | React-обёртки кита | одна: `assets/react/ui-kit/Button/` |
-| `assets/react/shared/` | один файл `lib/cn.ts` |
+| `assets/react/shared/` | `lib/cn.ts`; `period/` — фильтр периода по DS (`PeriodFilter`: пресеты + окно «Дата с / по», как «Транзакции ДДС»), с 09.11.2026 на «Unit — Экономика» и старой юнит-экономике |
 
 Не установлены и потому не применяются: TanStack Query, React Hook Form, Zod,
 `clsx`, тест-раннер. Установка любой из них — отдельное одобрение Владельца
@@ -202,7 +202,7 @@ _legacy        ← карантин, импортируется только и�
 `assets/react/_legacy/` — карантин. Правка legacy-файла означает задачу на
 миграцию в `modules/`, а не точечный патч. После миграции файлы из `_legacy/`
 удаляются в том же PR: две параллельные реализации запрещены. Цель — пустой
-`_legacy/`, сейчас в нём 100 файлов.
+`_legacy/`, сейчас в нём 90 файлов.
 
 ## Naming
 

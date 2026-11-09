@@ -1,6 +1,5 @@
 import React from 'react';
-import PeriodPresets from '../components/PeriodPresets';
-import type { PeriodKey } from '../components/PeriodPresets';
+import { PeriodFilter } from '../../../shared/period/PeriodFilter';
 import type { MarketplaceOption } from '../types/analytics.types';
 import type { ListingTag } from './unitExtended.types';
 
@@ -9,14 +8,11 @@ interface UnitExtendedFiltersProps {
     marketplace: string;
     dateFrom: string;
     dateTo: string;
-    period: PeriodKey;
     tags: ListingTag[];
     selectedTagIds: string[];
     tagsMatchAll: boolean;
     onMarketplaceChange: (mp: string) => void;
-    onDateFromChange: (date: string) => void;
-    onDateToChange: (date: string) => void;
-    onDateRangeChange: (from: string, to: string, period: PeriodKey) => void;
+    onDateRangeChange: (from: string, to: string) => void;
     onToggleTag: (tagId: string) => void;
     onTagsMatchAllChange: (matchAll: boolean) => void;
     onClearTags: () => void;
@@ -27,56 +23,31 @@ const UnitExtendedFilters: React.FC<UnitExtendedFiltersProps> = ({
     marketplace,
     dateFrom,
     dateTo,
-    period,
     tags,
     selectedTagIds,
     tagsMatchAll,
     onMarketplaceChange,
-    onDateFromChange,
-    onDateToChange,
     onDateRangeChange,
     onToggleTag,
     onTagsMatchAllChange,
     onClearTags,
 }) => (
     <>
-        <PeriodPresets
-            onSelect={onDateRangeChange}
-            currentPeriod={period}
-        />
-
-        <div className="row g-2 mb-3">
-            <div className="col-auto">
-                <select
-                    className="form-select"
-                    value={marketplace}
-                    onChange={(e) => onMarketplaceChange(e.target.value)}
-                >
-                    {marketplaces.map((mp) => (
-                        <option key={mp.value} value={mp.value}>
-                            {mp.label}
-                        </option>
-                    ))}
-                </select>
-            </div>
-            <div className="col-auto">
-                <input
-                    type="date"
-                    className="form-control"
-                    value={dateFrom}
-                    aria-label="Дата с"
-                    onChange={(e) => onDateFromChange(e.target.value)}
-                />
-            </div>
-            <div className="col-auto">
-                <input
-                    type="date"
-                    className="form-control"
-                    value={dateTo}
-                    aria-label="Дата по"
-                    onChange={(e) => onDateToChange(e.target.value)}
-                />
-            </div>
+        {/* Период — как фильтр «Транзакции ДДС»: пресеты DS и одно окно «Дата с / по». */}
+        <div className="d-flex flex-wrap align-items-center gap-3 mb-3">
+            <select
+                className="form-select w-auto"
+                value={marketplace}
+                aria-label="Маркетплейс"
+                onChange={(e) => onMarketplaceChange(e.target.value)}
+            >
+                {marketplaces.map((mp) => (
+                    <option key={mp.value} value={mp.value}>
+                        {mp.label}
+                    </option>
+                ))}
+            </select>
+            <PeriodFilter from={dateFrom} to={dateTo} onChange={onDateRangeChange} />
         </div>
 
         {tags.length > 0 && (

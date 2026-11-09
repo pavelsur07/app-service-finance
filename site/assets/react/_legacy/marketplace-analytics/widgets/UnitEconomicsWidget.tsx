@@ -59,16 +59,6 @@ const UnitEconomicsWidget: React.FC<UnitEconomicsWidgetProps> = ({
         setPage(1);
     }, []);
 
-    const handleDateFromChange = useCallback((date: string) => {
-        setFilters((prev) => ({ ...prev, dateFrom: date }));
-        setPage(1);
-    }, []);
-
-    const handleDateToChange = useCallback((date: string) => {
-        setFilters((prev) => ({ ...prev, dateTo: date }));
-        setPage(1);
-    }, []);
-
     const handleDateRangeChange = useCallback((from: string, to: string) => {
         setFilters((prev) => ({ ...prev, dateFrom: from, dateTo: to }));
         setPage(1);
@@ -95,8 +85,6 @@ const UnitEconomicsWidget: React.FC<UnitEconomicsWidgetProps> = ({
             recalcError={recalc.error}
             recalcLastJob={recalc.lastJob}
             onMarketplaceChange={handleMarketplaceChange}
-            onDateFromChange={handleDateFromChange}
-            onDateToChange={handleDateToChange}
             onDateRangeChange={handleDateRangeChange}
             onPageChange={setPage}
             onOpenRecalcModal={() => setRecalcModalOpen(true)}

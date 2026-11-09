@@ -3,7 +3,7 @@ import type { UnitEconomicsRow, PortfolioSummary, UnitEconomicsMeta } from '../t
 import type { MarketplaceOption, RecalculateJobResponse } from '../types/analytics.types';
 import KpiCards from '../components/KpiCards';
 import UnitEconomicsTable from '../components/UnitEconomicsTable';
-import PeriodPresets from '../components/PeriodPresets';
+import { PeriodFilter } from '../../../shared/period/PeriodFilter';
 import RecalcModal from '../components/RecalcModal';
 
 interface UnitEconomicsViewProps {
@@ -22,8 +22,6 @@ interface UnitEconomicsViewProps {
     recalcError: string | null;
     recalcLastJob: RecalculateJobResponse | null;
     onMarketplaceChange: (mp: string) => void;
-    onDateFromChange: (date: string) => void;
-    onDateToChange: (date: string) => void;
     onDateRangeChange: (from: string, to: string) => void;
     onPageChange: (page: number) => void;
     onOpenRecalcModal: () => void;
@@ -50,42 +48,20 @@ const UnitEconomicsView: React.FC<UnitEconomicsViewProps> = (props) => {
                 </div>
             </div>
 
-            <PeriodPresets
-                onSelect={props.onDateRangeChange}
-                currentFrom={props.dateFrom}
-                currentTo={props.dateTo}
-            />
-
-            <div className="row g-2 mb-3">
-                <div className="col-auto">
-                    <select
-                        className="form-select"
-                        value={props.marketplace}
-                        onChange={(e) => props.onMarketplaceChange(e.target.value)}
-                    >
-                        {props.marketplaces.map((mp) => (
-                            <option key={mp.value} value={mp.value}>
-                                {mp.label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div className="col-auto">
-                    <input
-                        type="date"
-                        className="form-control"
-                        value={props.dateFrom}
-                        onChange={(e) => props.onDateFromChange(e.target.value)}
-                    />
-                </div>
-                <div className="col-auto">
-                    <input
-                        type="date"
-                        className="form-control"
-                        value={props.dateTo}
-                        onChange={(e) => props.onDateToChange(e.target.value)}
-                    />
-                </div>
+            <div className="d-flex flex-wrap align-items-center gap-3 mb-3">
+                <select
+                    className="form-select w-auto"
+                    value={props.marketplace}
+                    aria-label="Маркетплейс"
+                    onChange={(e) => props.onMarketplaceChange(e.target.value)}
+                >
+                    {props.marketplaces.map((mp) => (
+                        <option key={mp.value} value={mp.value}>
+                            {mp.label}
+                        </option>
+                    ))}
+                </select>
+                <PeriodFilter from={props.dateFrom} to={props.dateTo} onChange={props.onDateRangeChange} />
             </div>
 
             {props.isError && (
