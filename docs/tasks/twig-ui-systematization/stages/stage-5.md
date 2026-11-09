@@ -1,6 +1,6 @@
 ### Stage 5: крупные шаблоны — остаток JS и разбиение на партиалы — IN PROGRESS
 
-**Статус:** старт по команде Владельца 09.11.2026; A1 — PR на handoff.
+**Статус:** старт по команде Владельца 09.11.2026; A1 — на проде (#2944, 09.11 07:56Z); A2 — PR на handoff.
 **Risk:** подэтап A — MEDIUM (переносится поведение JS), B–F — LOW (только структура шаблонов, HTML 1:1), G — LOW (документы).
 **Base:** master после #2933 (cd09f6917).
 **Work items:** 5.0–5.7 (ниже), `plan.md` — раздел Stage 5 и чек-лист приёмки задачи.
@@ -148,12 +148,12 @@ A идёт первым: после выноса JS пять страниц ум
 #### 6. Чек-лист приёмки
 
 ##### Подэтап A (A1, A2)
-- [ ] `grep -rl '<script>' templates` → только `_layout/*`, `admin/base`, `notifications/email`; `<script type="application/json">` — как были
-- [ ] Twig-выражений внутри JS — 0 (`messenger_ping` переведён на `data-*`)
-- [ ] Каждый модуль: `init…()` по корню `data-<page>`, без корня — выход; импорт в `legacy-app.js` / `admin_shell_runtime.js`
-- [ ] Изменения HTML подэтапа — только добавленные корневые `data-*`; перечислены в отчёте PR
-- [ ] Сценарии поведения до/после на стенде совпали по каждой странице; функциональные тесты страниц зелёные
-- [ ] `npm run lint` 0, `npm run build` OK
+- [x] Инлайн-`<script>` с логикой в шаблонах — 0 (A2). Остались: `<script type="application/json">` (2, как были), `_layout/legacy` (Tabler с CDN + строка `window.bootstrap`), `<script src>` Tabler на страницах входа (`security/base`, `admin/security/login` — самостоятельные shell'ы)
+- [x] Twig-выражений внутри JS — 0: единственное (`admin/tools/messenger_ping`) ушло вместе с мёртвым шаблоном
+- [x] Каждый модуль: `init…()` по корню `data-<page>`, без корня — выход; импорт в `legacy-app.js` / `admin_shell_runtime.js`
+- [x] Изменения HTML подэтапа — только добавленные корневые `data-*` (и `onclick` → `data-add-price-open` в карточке товара); перечислены в отчётах A1, A2
+- [x] Сценарии поведения до/после на стенде совпали по каждой странице (кроме перечисленных намеренных отличий); функциональные тесты страниц зелёные
+- [x] `npm run lint` 0, `npm run build` OK
 - [x] Поправка к итогу `stage-2.md` внесена (A1; внесена ещё планом #2943)
 - [x] 5.0: скрипт сверки HTML в репозитории, проверен на одной странице «сам с собой» (пустой diff) и на заведомом изменении (diff не пуст)
 
@@ -240,3 +240,60 @@ A1 — 1 PR, A2 — 1–2 PR, B–F — по 1 PR, G — 1 PR: всего 8–9 
   правки одного теста.
 - `make site-test` (полный, своя БД `app_test_a1`) — OK (8571 tests, 48241 assertions).
 - Внешнее ревью Codex против master f00d9e26f — `REVIEW_GREEN` с первого раунда (дифф 1062 строки).
+- Влит 09.11 (adf346c84), на проде 09.11 07:56Z: маркер «Деплой завершён без даунтайма», контейнеры на новом образе (12 healthy),
+  GlitchTip — новых событий нет. Перед мержем CI упал на Static analysis: правка теста остатков сняла ошибку из
+  `phpstan-baseline.neon` («Ignored error pattern … was not matched») — запись удалена коммитом 14fbe2740 (baseline −1).
+
+#### A2 — JS остальных 18 файлов (09.11.2026, ветка `refactor/twig-ui-stage-5a2`)
+
+**Мёртвые шаблоны удалены (2 из 18):** `pl_category/_form` (не подключается нигде: страница статьи с Stage 2 — `edit.html.twig`
+и модуль `pl_category_edit.js`, где копирование кода и вставка в формулу уже есть) и `admin/tools/messenger_ping` (контроллер
+и маршрут `admin_messenger_ping_status` удалены давно; шаблон с единственным Twig-выражением в JS не рендерился).
+
+**Модули `assets/pages/` (13) и корни:**
+
+| Шаблон | Модуль | Корень (добавлен в HTML) |
+|---|---|---|
+| `marketplace_ads/admin_debug` | `ozon_ads_debug.js` | `data-ozon-ads-debug` на `.page-body` |
+| `marketplace/unmapped/index` | `marketplace_unmapped.js` | `data-marketplace-unmapped` на контейнере |
+| `payment_calendar/index` | `payment_calendar.js` | `data-payment-plan-autoopen` на `#payment-plan-modal` при `showForm` (было условием вокруг `<script>`) |
+| `transaction/splits` | `transaction_splits.js` | `[data-splits-form]` — был |
+| `document/index` | `document_delete.js` | `data-document-delete-modal` на модале |
+| `pl_category/index`, `cashflow_category/index` | `category_tree.js` (общий) | `data-category-tree="pl-category"` / `"cashflow-category"` на `.card` |
+| `telegram/integration/index` | `telegram_integration.js` | `data-telegram-integration` на контейнере |
+| `marketplace/ozon_reconciliation/index` | `ozon_reconciliation.js` | `data-ozon-reconciliation-run` на форме |
+| `company/company_member/index` | `company_members.js` | `data-company-members` на контейнере |
+| `catalog/product/show` | `product_show.js` | `onclick="openAddPriceModal()"` → `data-add-price-open` (2 кнопки) |
+| `billing/client/tariff` | `billing_tariff.js` | `[data-billing-online]` — был (`document.currentScript` → обход всех карточек) |
+| `cash/file_import_preview` | `cash_import_preview.js` | `[data-description-selection]` — был |
+| `integrations/marketplace` | `integrations_marketplace.js` | `data-integration-setup` на `#modal-setup` |
+
+**Админка (`admin_shell_runtime.js`, 2 общих поведения):** `dialog[data-admin-dialog-autoopen]` открывается при загрузке
+(`admin/users/index` ставит атрибут при `showAccountModal` — было условием вокруг `<script>`); `[data-confirm="true"]` —
+системный `confirm()` перед переходом (кнопки `admin/partials/_danger_zone`, вызывается с дашборда).
+
+Логика перенесена как есть; запасные пути без Tabler (модалы вручную) сохранены, Bootstrap берётся через `bootstrapModal()`.
+Убраны только мёртвые подписки `turbo:load` (Turbo выключен в `controllers.json`). Пустые после переноса блоки `javascripts`/`scripts`/`admin_scripts` удалены.
+
+**Намеренные отличия поведения:**
+1. Отладка Ozon Ads: исходный `renderBadges` начинался с `innerHTML = ''` и стирал только что добавленный бейдж
+   «Всего кампаний: N» — теперь бейдж виден (страница админская, отладочная).
+2. Сверка Ozon: текст «Идёт пересчёт…» дописывается в кнопку как текст, не HTML (значение из шаблона, результат тот же).
+
+**Тесты:** `UserCreateAccountControllerTest`, `AdminUserCreateAccountTest` проверяли текст инлайн-скрипта автооткрытия —
+теперь проверяют атрибут `data-admin-dialog-autoopen` (и его отсутствие на обычном GET).
+
+**Проверки A2:**
+- HTML-сверка 15 URL (все страницы, кроме двух мёртвых, `/finance/payment-calendar/new` — ветка с модалом): отличия — хеши бандлов,
+  добавленные корни, удалённые `<script>`; плюс `payment_plan[idempotencyKey]` (UUIDv7 генерируется на каждый рендер).
+- Сценарии поведения (`zenika/alpine-chrome:with-puppeteer`, 54 состояния): отладка Ozon Ads (ответ OK и ошибка), привязка листинга
+  (загрузка продуктов, пустой выбор, ошибка API, поиск), автооткрытие формы календаря и его отсутствие на списке, разбивка (ввод в
+  копейках, добавление, «остаток в последнюю», удаление, последняя строка не удаляется), модал удаления документа (без данных не
+  открывается, открытие, сброс, submit), оба дерева, копирование Telegram и приглашения (буфер обмена и возврат надписи), блокировка
+  повторной сверки Ozon, карточка оплаты и счётчик описаний, модал «Интеграции», обе кнопки «Добавить цену», confirm опасной зоны
+  админки, автооткрытие формы аккаунта после ошибки валидации. Данных на стенде нет для части страниц — компании Ozon Performance,
+  непривязанные листинги, вложенные статьи ДДС, ссылки копирования, карточка ЮKassa, сессия импорта: разметка подставлялась в ответ
+  сервера одинаково для «до» и «после» (в «до» — с исходными инлайн-скриптами). Совпали все шаги, кроме намеренного (1); ошибок JS — 0.
+- `npm run lint` 0; `vite build` OK; `composer cs:twig` — No violation; `lint:twig` — 321 файл OK; функциональные тесты затронутых
+  модулей — OK (803 tests).
+
