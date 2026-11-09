@@ -693,11 +693,14 @@
 }
 
 .vf-ops-seg > a,
-.vf-seg > a {
+.vf-seg > a,
+.vf-seg > button {
   display: inline-flex;
   align-items: center;
   height: 34px;
   padding: 0 12px;
+  border: 0; /* сегменты-кнопки островов (PeriodFilter) выглядят как ссылки-сегменты */
+  background: transparent;
   color: var(--vf-text);
   font-weight: var(--vf-weight-medium);
   white-space: nowrap;
@@ -705,18 +708,21 @@
 }
 
 .vf-ops-seg > a + a,
-.vf-seg > a + a {
+.vf-seg > a + a,
+.vf-seg > button + button {
   border-left: 1px solid var(--vf-border-control);
 }
 
 .vf-ops-seg > a:hover,
-.vf-seg > a:hover {
+.vf-seg > a:hover,
+.vf-seg > button:hover {
   background: var(--vf-hover-bg);
   color: var(--vf-text);
 }
 
 .vf-ops-seg > a.active,
-.vf-seg > a.active {
+.vf-seg > a.active,
+.vf-seg > button.active {
   background: var(--vf-primary-lt);
   color: var(--vf-primary);
   font-weight: var(--vf-weight-semibold);
@@ -724,9 +730,28 @@
 
 /* Кольцо внутрь: снаружи его обрезал бы overflow сегмента. */
 .vf-ops-seg > a:focus-visible,
-.vf-seg > a:focus-visible {
+.vf-seg > a:focus-visible,
+.vf-seg > button:focus-visible {
   outline: 2px solid var(--vf-primary);
   outline-offset: -2px;
+}
+
+/* Окно периода острова (shared/period/PeriodFilter): без Popper — позиция от обёртки .dropdown,
+   отступ 6px, как data-bs-offset="0,6" у фильтра ДДС. Кнопка диапазона стоит последней в ряду,
+   поэтому окно выровнено по её правому краю; на узком экране ряд переносится и кнопка
+   оказывается слева — там окно от левого края. */
+.vf-period-pop {
+  top: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  margin: 0;
+}
+
+@media (max-width: 767.98px) {
+  .vf-period-pop {
+    right: auto;
+    left: 0;
+  }
 }
 
 .vf-ops-filterbar__count {
@@ -909,6 +934,11 @@
 
 .vf-ops-pop__body .vf-ops-pop__pair {
   padding: 0;
+}
+
+/* Поле даты не сжимается ниже своей ширины: без min-width: 0 второе поле уходило за край окна. */
+.vf-ops-pop__pair > * {
+  min-width: 0;
 }
 
 .vf-ops-pop .form-label {

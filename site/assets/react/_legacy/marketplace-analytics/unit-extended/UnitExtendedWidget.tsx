@@ -3,9 +3,7 @@ import { useUnitExtended } from './useUnitExtended';
 import { useWidgets } from './widgets/useWidgets';
 import WidgetsGrid from './widgets/WidgetsGrid';
 import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
-import { getMonthRange } from '../utils/utils';
-import { getMonthPeriodKey, getPeriodKeyForRange, getPeriodRange, normalizePeriod } from '../components/PeriodPresets';
-import type { PeriodKey } from '../components/PeriodPresets';
+import { defaultPeriod } from '../../../shared/period/periodPresets';
 import type { MarketplaceOption } from '../types/analytics.types';
 import type { ListingTag } from './unitExtended.types';
 import UnitExtendedFilters from './UnitExtendedFilters';
@@ -22,7 +20,6 @@ interface Filters {
     marketplace: string;
     dateFrom: string;
     dateTo: string;
-    period: PeriodKey;
 }
 
 const UNIT_EXTENDED_WIDGET_STYLES = `
@@ -39,40 +36,19 @@ const UNIT_EXTENDED_WIDGET_STYLES = `
     }
 `;
 
+/**
+ * Период — только dateFrom/dateTo в URL; активный пресет считает PeriodFilter по совпадению дат.
+ * Старый параметр `period` (month_2026_11, current_month…) больше не читается: даты в старых
+ * ссылках есть всегда — их писал прежний setFiltersToUrl.
+ */
 function getFiltersFromUrl(): Filters {
     const params = new URLSearchParams(window.location.search);
-    const currentMonth = getMonthRange(0);
-    const currentMonthPeriod = getMonthPeriodKey(new Date());
-    const urlDateFrom = params.get('dateFrom') ?? params.get('from');
-    const urlDateTo = params.get('dateTo') ?? params.get('to');
-
-    if (params.has('period')) {
-        const requestedPeriod = normalizePeriod(params.get('period'));
-        const requestedRange = getPeriodRange(requestedPeriod);
-
-        return {
-            marketplace: params.get('marketplace') ?? 'ozon',
-            dateFrom: requestedPeriod === 'custom'
-                ? (urlDateFrom ?? currentMonth.from)
-                : (requestedRange?.from ?? currentMonth.from),
-            dateTo: requestedPeriod === 'custom'
-                ? (urlDateTo ?? currentMonth.to)
-                : (requestedRange?.to ?? currentMonth.to),
-            period: requestedRange === null && requestedPeriod !== 'custom' ? 'custom' : requestedPeriod,
-        };
-    }
-
-    const hasAnyDateParam = Boolean(urlDateFrom || urlDateTo);
-    const inferredPeriod = urlDateFrom && urlDateTo
-        ? getPeriodKeyForRange(urlDateFrom, urlDateTo)
-        : (hasAnyDateParam ? 'custom' : currentMonthPeriod);
-    const inferredRange = getPeriodRange(inferredPeriod);
+    const fallback = defaultPeriod();
 
     return {
         marketplace: params.get('marketplace') ?? 'ozon',
-        dateFrom: urlDateFrom ?? inferredRange?.from ?? currentMonth.from,
-        dateTo: urlDateTo ?? inferredRange?.to ?? currentMonth.to,
-        period: inferredPeriod,
+        dateFrom: params.get('dateFrom') ?? params.get('from') ?? fallback.from,
+        dateTo: params.get('dateTo') ?? params.get('to') ?? fallback.to,
     };
 }
 
@@ -81,7 +57,6 @@ function setFiltersToUrl(filters: Filters): void {
     if (filters.marketplace) params.set('marketplace', filters.marketplace);
     if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
     if (filters.dateTo) params.set('dateTo', filters.dateTo);
-    params.set('period', filters.period);
     const search = params.toString();
     window.history.replaceState(null, '', window.location.pathname + (search ? `?${search}` : ''));
 }
@@ -133,16 +108,8 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
         setFilters((prev) => ({ ...prev, marketplace: mp }));
     }, []);
 
-    const handleDateFromChange = useCallback((date: string) => {
-        setFilters((prev) => ({ ...prev, dateFrom: date, period: 'custom' }));
-    }, []);
-
-    const handleDateToChange = useCallback((date: string) => {
-        setFilters((prev) => ({ ...prev, dateTo: date, period: 'custom' }));
-    }, []);
-
-    const handleDateRangeChange = useCallback((from: string, to: string, period: PeriodKey) => {
-        setFilters((prev) => ({ ...prev, dateFrom: from, dateTo: to, period }));
+    const handleDateRangeChange = useCallback((from: string, to: string) => {
+        setFilters((prev) => ({ ...prev, dateFrom: from, dateTo: to }));
     }, []);
 
     const handleToggleTag = useCallback((tagId: string) => {
@@ -172,13 +139,10 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
                 marketplace={filters.marketplace}
                 dateFrom={filters.dateFrom}
                 dateTo={filters.dateTo}
-                period={filters.period}
                 tags={tags}
                 selectedTagIds={selectedTagIds}
                 tagsMatchAll={tagsMatchAll}
                 onMarketplaceChange={handleMarketplaceChange}
-                onDateFromChange={handleDateFromChange}
-                onDateToChange={handleDateToChange}
                 onDateRangeChange={handleDateRangeChange}
                 onToggleTag={handleToggleTag}
                 onTagsMatchAllChange={setTagsMatchAll}
