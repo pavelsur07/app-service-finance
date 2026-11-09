@@ -183,7 +183,7 @@
     </div>
 
     {% if form is defined and form.vars is defined %}
-        <div class="modal modal-blur fade" id="payment-plan-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal modal-blur fade" id="payment-plan-modal"{% if showForm is defined and showForm %} data-payment-plan-autoopen{% endif %} tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -196,79 +196,5 @@
                 </div>
             </div>
         </div>
-    {% endif %}
-{% endblock %}
-
-{% block javascripts %}
-    {{ parent() }}
-    {% if showForm is defined and showForm and form is defined and form.vars is defined %}
-        <script>
-            function hideFallbackModal(modalElement) {
-                var activeElement = document.activeElement;
-                if (activeElement && modalElement.contains(activeElement)) {
-                    if (typeof activeElement.blur === 'function') {
-                        activeElement.blur();
-                    }
-
-                    if (document.body && typeof document.body.focus === 'function') {
-                        document.body.focus({preventScroll: true});
-                    }
-                }
-
-                modalElement.classList.remove('show');
-                modalElement.style.display = 'none';
-                modalElement.setAttribute('aria-hidden', 'true');
-                modalElement.removeAttribute('aria-modal');
-            }
-
-            function setupFallbackDismiss(modalElement) {
-                var dismissButtons = modalElement.querySelectorAll('[data-bs-dismiss="modal"]');
-                dismissButtons.forEach(function (button) {
-                    if (button.dataset.dismissListenerAttached === 'true') {
-                        return;
-                    }
-
-                    button.addEventListener('click', function (event) {
-                        event.preventDefault();
-                        hideFallbackModal(modalElement);
-                    });
-
-                    button.dataset.dismissListenerAttached = 'true';
-                });
-            }
-
-            function showPaymentPlanModal() {
-                var modalElement = document.getElementById('payment-plan-modal');
-                if (!modalElement) {
-                    return;
-                }
-
-                var BootstrapModal = window.bootstrap && typeof window.bootstrap.Modal === 'function'
-                    ? window.bootstrap.Modal
-                    : null;
-
-                if (!BootstrapModal) {
-                    modalElement.classList.add('show');
-                    modalElement.style.display = 'block';
-                    modalElement.removeAttribute('aria-hidden');
-                    modalElement.setAttribute('aria-modal', 'true');
-                    modalElement.scrollTop = 0;
-
-                    setupFallbackDismiss(modalElement);
-
-                    return;
-                }
-
-                var modal = BootstrapModal.getInstance(modalElement);
-                if (!modal) {
-                    modal = new BootstrapModal(modalElement);
-                }
-
-                modal.show();
-            }
-
-            document.addEventListener('DOMContentLoaded', showPaymentPlanModal);
-            document.addEventListener('turbo:load', showPaymentPlanModal);
-        </script>
     {% endif %}
 {% endblock %}

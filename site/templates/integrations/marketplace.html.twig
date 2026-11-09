@@ -142,7 +142,7 @@
     </div>
   </div>
 
-  <div class="modal modal-blur fade" id="modal-setup" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal modal-blur fade" id="modal-setup" data-integration-setup tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
       <div class="modal-content">
         <div class="modal-header">
@@ -171,16 +171,4 @@
       </div>
     </div>
   </div>
-{% endblock %}
-
-{% block javascripts %}
-  {{ parent() }}
-  <script>
-    const modal = document.getElementById('modal-setup');
-    modal.addEventListener('show.bs.modal', function (event) {
-      const button = event.relatedTarget;
-      const service = button.getAttribute('data-service');
-      document.getElementById('target-service').textContent = service;
-    });
-  </script>
 {% endblock %}

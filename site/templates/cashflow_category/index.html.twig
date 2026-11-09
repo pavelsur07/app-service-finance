@@ -68,7 +68,7 @@
         {% endblock %}
     {% endembed %}
     <div class="container-xl mt-3">
-            <div class="card">
+            <div class="card" data-category-tree="cashflow-category">
             <div class="card-body">
                 <div class="cashflow-category-head d-flex align-items-center" aria-hidden="true">
                     <span class="cashflow-category-head-name">Статья</span>
@@ -81,43 +81,4 @@
         </div>
     </div>
     {% include 'partials/_confirm_modal.html.twig' with {id: 'cashflow-category-confirm'} only %}
-{% endblock %}
-
-{% block javascripts %}
-    {{ parent() }}
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('.cashflow-category-toggle').forEach(function (button) {
-                button.addEventListener('click', function () {
-                    var node = button.closest('.cashflow-category-node');
-                    if (!node) {
-                        return;
-                    }
-
-                    var children = null;
-                    for (var i = 0; i < node.children.length; i++) {
-                        var child = node.children[i];
-                        if (child.classList && child.classList.contains('cashflow-category-children')) {
-                            children = child;
-                            break;
-                        }
-                    }
-
-                    if (!children) {
-                        return;
-                    }
-
-                    var isHidden = children.hasAttribute('hidden');
-                    if (isHidden) {
-                        children.removeAttribute('hidden');
-                    } else {
-                        children.setAttribute('hidden', '');
-                    }
-
-                    button.classList.toggle('collapsed', !isHidden);
-                    button.setAttribute('aria-expanded', String(isHidden));
-                });
-            });
-        });
-    </script>
 {% endblock %}

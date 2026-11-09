@@ -53,50 +53,11 @@
         {% endblock %}
     {% endembed %}
     <div class="container-xl mt-3">
-        <div class="card">
+        <div class="card" data-category-tree="pl-category">
             <div class="card-body">
                 {{ macros.render_items(items, usage) }}
             </div>
         </div>
     </div>
     {% include 'partials/_confirm_modal.html.twig' with {id: 'pl-category-confirm'} only %}
-{% endblock %}
-
-{% block javascripts %}
-    {{ parent() }}
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('.pl-category-toggle').forEach(function (button) {
-                button.addEventListener('click', function () {
-                    var node = button.closest('.pl-category-node');
-                    if (!node) {
-                        return;
-                    }
-
-                    var children = null;
-                    for (var i = 0; i < node.children.length; i++) {
-                        var child = node.children[i];
-                        if (child.classList && child.classList.contains('pl-category-children')) {
-                            children = child;
-                            break;
-                        }
-                    }
-
-                    if (!children) {
-                        return;
-                    }
-
-                    var isHidden = children.hasAttribute('hidden');
-                    if (isHidden) {
-                        children.removeAttribute('hidden');
-                    } else {
-                        children.setAttribute('hidden', '');
-                    }
-
-                    button.classList.toggle('collapsed', !isHidden);
-                    button.setAttribute('aria-expanded', String(isHidden));
-                });
-            });
-        });
-    </script>
 {% endblock %}

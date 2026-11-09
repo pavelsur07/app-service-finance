@@ -42,7 +42,7 @@
             <div class="card">
                 <div class="card-header d-flex align-items-center">
                     <h3 class="card-title me-auto mb-0">Закупочная цена</h3>
-                    <button class="btn btn-sm btn-primary" onclick="openAddPriceModal()">
+                    <button class="btn btn-sm btn-primary" data-add-price-open>
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24"
                              viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -113,7 +113,7 @@
                     <div class="card-body">
                         {% embed 'partials/_empty.html.twig' with {title: 'Нет записей', hint: 'Добавьте первую закупочную цену'} %}
                             {% block action %}
-                                <button class="btn btn-primary" onclick="openAddPriceModal()">
+                                <button class="btn btn-primary" data-add-price-open>
                                 Добавить цену
                                 </button>
                             {% endblock %}
@@ -221,22 +221,4 @@
             </div>
         </div>
     </div>
-{% endblock %}
-
-{% block javascripts %}
-    {{ parent() }}
-    <script>
-        function openAddPriceModal() {
-            const modalEl = document.getElementById('modal-add-price');
-            if (!modalEl) return;
-            const Modal = window.bootstrap?.Modal ?? window.Modal;
-            if (Modal) {
-                Modal.getOrCreateInstance(modalEl).show();
-            } else {
-                modalEl.style.display = 'block';
-                modalEl.classList.add('show');
-                document.body.classList.add('modal-open');
-            }
-        }
-    </script>
 {% endblock %}

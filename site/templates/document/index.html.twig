@@ -221,6 +221,7 @@
 {% import 'document/_list_macros.html.twig' as ui %}
 <div class="modal modal-blur fade"
      id="document-delete-modal"
+     data-document-delete-modal
      tabindex="-1"
      role="dialog"
      aria-labelledby="document-delete-modal-title"
@@ -248,51 +249,4 @@
         </div>
     </div>
 </div>
-
-<script>
-    (function () {
-        var modal = document.getElementById('document-delete-modal');
-        var form = document.getElementById('document-delete-form');
-        var token = document.getElementById('document-delete-token');
-        var label = document.getElementById('document-delete-label');
-        var submit = document.getElementById('document-delete-submit');
-        var lastTrigger = null;
-
-        modal.addEventListener('show.bs.modal', function (event) {
-            var trigger = event.relatedTarget;
-            var action = trigger && trigger.getAttribute('data-delete-action');
-            var csrfToken = trigger && trigger.getAttribute('data-delete-token');
-
-            if (!action || !csrfToken) {
-                event.preventDefault();
-                return;
-            }
-
-            form.action = action;
-            token.value = csrfToken;
-            label.textContent = trigger.getAttribute('data-delete-label') || 'Выбранный документ';
-            submit.disabled = false;
-            lastTrigger = trigger;
-        });
-
-        modal.addEventListener('hidden.bs.modal', function () {
-            var dropdown = lastTrigger && lastTrigger.closest('.dropdown');
-            var dropdownToggle = dropdown && dropdown.querySelector('[data-bs-toggle="dropdown"]');
-
-            form.removeAttribute('action');
-            token.value = '';
-            label.textContent = 'Выбранный документ';
-            submit.disabled = true;
-
-            if (dropdownToggle) {
-                dropdownToggle.focus();
-            }
-            lastTrigger = null;
-        });
-
-        form.addEventListener('submit', function () {
-            submit.disabled = true;
-        });
-    })();
-</script>
 {% endblock %}

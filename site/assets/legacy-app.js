@@ -51,6 +51,19 @@ import { initMarketplaceConnections } from './pages/marketplace_connections.js';
 import { initPlTree } from './pages/pl_tree.js';
 import { initMarketplaceInventory } from './pages/marketplace_inventory.js';
 import { initCashflowReport } from './pages/cashflow_report.js';
+import { initOzonAdsDebug } from './pages/ozon_ads_debug.js';
+import { initMarketplaceUnmapped } from './pages/marketplace_unmapped.js';
+import { initPaymentCalendar } from './pages/payment_calendar.js';
+import { initTransactionSplits } from './pages/transaction_splits.js';
+import { initDocumentDelete } from './pages/document_delete.js';
+import { initCategoryTree } from './pages/category_tree.js';
+import { initTelegramIntegration } from './pages/telegram_integration.js';
+import { initOzonReconciliation } from './pages/ozon_reconciliation.js';
+import { initCompanyMembers } from './pages/company_members.js';
+import { initProductShow } from './pages/product_show.js';
+import { initBillingTariff } from './pages/billing_tariff.js';
+import { initCashImportPreview } from './pages/cash_import_preview.js';
+import { initIntegrationsMarketplace } from './pages/integrations_marketplace.js';
 
 // Period presets (partials/_period_presets.html.twig): dates come from the server.
 document.addEventListener('click', (event) => {
@@ -105,6 +118,19 @@ const initDds = () => {
   initPlTree();
   initMarketplaceInventory();
   initCashflowReport();
+  initOzonAdsDebug();
+  initMarketplaceUnmapped();
+  initPaymentCalendar();
+  initTransactionSplits();
+  initDocumentDelete();
+  initCategoryTree();
+  initTelegramIntegration();
+  initOzonReconciliation();
+  initCompanyMembers();
+  initProductShow();
+  initBillingTariff();
+  initCashImportPreview();
+  initIntegrationsMarketplace();
   showFlashToasts();
 };
 if (document.readyState === 'loading') {

@@ -164,7 +164,7 @@
 {% endblock %}
 
 {% block admin_modals %}
-  <dialog id="account-create-dialog" class="dlg" aria-labelledby="account-create-title">
+  <dialog id="account-create-dialog" class="dlg"{% if showAccountModal %} data-admin-dialog-autoopen{% endif %} aria-labelledby="account-create-title">
     <div class="mdl">
       {{ form_start(accountForm, {action: path('admin_user_create_account'), method: 'POST'}) }}
         <div class="mdl-head">
@@ -241,15 +241,4 @@
       {{ form_end(accountForm) }}
     </div>
   </dialog>
-{% endblock %}
-
-{% block admin_scripts %}
-  {{ parent() }}
-  {% if showAccountModal %}
-    <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('account-create-dialog')?.showModal();
-      });
-    </script>
-  {% endif %}
 {% endblock %}

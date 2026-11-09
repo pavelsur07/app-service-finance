@@ -19,7 +19,7 @@
             </form>
 
             {% if is_granted('module.marketplace.write') %}
-                <form method="post" action="{{ path('marketplace_ozon_reconciliation_run') }}" data-testid="ozon-reconciliation-run-form"
+                <form method="post" action="{{ path('marketplace_ozon_reconciliation_run') }}" data-testid="ozon-reconciliation-run-form" data-ozon-reconciliation-run
                       data-busy-text="Идёт пересчёт…">
                     <input type="hidden" name="_token" value="{{ csrf_token('marketplace_ozon_reconciliation_run') }}">
                     <input type="hidden" name="month" value="{{ month }}">
@@ -184,23 +184,4 @@
             {% endfor %}
         {% endif %}
     </div>
-
-    <script>
-        // Пересчёт идёт на сервере синхронно: даём понять, что страница не зависла, и не даём запустить его повторно.
-        (function () {
-            var form = document.querySelector('[data-testid="ozon-reconciliation-run-form"]');
-            if (!form) { return; }
-            form.addEventListener('submit', function (event) {
-                if (form.dataset.submitted === '1') { event.preventDefault(); return; }
-                form.dataset.submitted = '1';
-                var button = form.querySelector('button[type="submit"]');
-                if (button) {
-                    button.disabled = true;
-                    button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>' + form.dataset.busyText;
-                }
-                var banner = document.getElementById('ozon-reconciliation-busy');
-                if (banner) { banner.classList.remove('d-none'); }
-            });
-        })();
-    </script>
 {% endblock %}
