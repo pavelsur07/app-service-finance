@@ -1,0 +1,91 @@
+{# Макросы план–факта: значения, отклонения, скрытые поля, пилюля мультивыбора. #}
+{% macro value(amount, format) %}
+    {%- if amount is null -%}
+        —
+    {%- elseif format == 'MONEY' -%}
+        {{ amount|vf_amount(0) }}
+    {%- elseif format == 'PERCENT' -%}
+        {{ amount|vf_number(1) }}&nbsp;%
+    {%- elseif format == 'RATIO' -%}
+        {{ amount|vf_number(4) }}
+    {%- else -%}
+        {{ amount|vf_number(2) }}
+    {%- endif -%}
+{% endmacro %}
+
+{# Отклонение со знаком «+» у положительного; у показателя в процентах — п. п. (BUDGET-SPEC §6). #}
+{% macro signed(amount, format) %}
+    {%- if format == 'MONEY' -%}
+        {{ amount|vf_amount(0, signed: true) }}
+    {%- else -%}
+        {%- set digits = format == 'PERCENT' ? 1 : (format == 'RATIO' ? 4 : 2) -%}
+        {{- (amount starts with '-' or amount|round(digits) == 0) ? '' : '+' -}}{{ amount|vf_number(digits) }}{{ format == 'PERCENT' ? '&nbsp;п.&nbsp;п.' : '' }}
+    {%- endif -%}
+{% endmacro %}
+
+{# ▲/▼ у каждого ненулевого сравниваемого отклонения; минус — хуже для прибыли. #}
+{% macro mark(cell) %}
+    {%- if cell.diff is not null and cell.diff|round(4) != 0 -%}
+        {%- set better = not (cell.diff starts with '-') -%}
+        <span class="vf-pf__mark vf-pf__mark--{{ better ? 'up' : 'down' }}" aria-hidden="true">{{ better ? '▲' : '▼' }}</span><span class="visually-hidden"> {{ better ? 'лучше плана' : 'хуже плана' }}</span>
+    {%- endif -%}
+{% endmacro %}
+
+{# Содержимое ячейки показателя metric (plan/fact/diff/percent). ctx: link — адрес отчёта ОПиУ для факта или null. #}
+{% macro content(metric, cell, format, link) %}
+    {%- if metric == 'plan' -%}
+        {{ _self.value(cell.plan, format) }}
+    {%- elseif metric == 'fact' -%}
+        {%- if link and cell.fact is not null -%}
+            <a href="{{ link }}" title="Отчёт ОПиУ за месяц">{{ _self.value(cell.fact, format) }}</a>
+        {%- else -%}
+            {{ _self.value(cell.fact, format) }}
+        {%- endif -%}
+    {%- elseif metric == 'diff' -%}
+        {%- if cell.diff is null -%}—{%- else -%}{{ _self.signed(cell.diff, format) }}{{ _self.mark(cell) }}{%- endif -%}
+    {%- else -%}
+        {%- if cell.percent is null -%}—{%- else -%}{{ (cell.percent starts with '-' or cell.percent|round(1) == 0) ? '' : '+' }}{{ cell.percent|vf_number(1) }}&nbsp;%{{ _self.mark(cell) }}{%- endif -%}
+    {%- endif -%}
+{% endmacro %}
+
+{# Подсветка значимого отклонения (> порога или факт без плана): у факта, отклонения и %. #}
+{# Скрытые поля из параметров адреса; списки — `name[]`. #}
+{% macro hidden(query) %}
+    {%- for key, value in query -%}
+        {%- if value is iterable -%}
+            {%- for item in value %}<input type="hidden" name="{{ key }}[]" value="{{ item }}">{% endfor -%}
+        {%- else -%}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {%- endif -%}
+    {%- endfor -%}
+{% endmacro %}
+
+{# Пилюля мультивыбора (BUDGET-SPEC §6): меню с флажками, «все / ни одной», «Применить» (budget_plan_fact.js). #}
+{% macro picker(name, label, value, options, query, note) %}
+    <details class="vf-pf-pick" data-pf-pick="{{ name }}">
+        <summary class="vf-pf-pick__pill"><span class="vf-pf-pick__label">{{ label }}:</span> <span class="vf-pf-pick__value" data-pf-pick-value>{{ value }}</span><i class="ti ti-chevron-down" aria-hidden="true"></i></summary>
+        <form method="get" action="{{ path('budget_plan_fact') }}" class="vf-pf-pick__menu" data-pf-pick-form>
+            {{ _self.hidden(query) }}
+            <div class="vf-pf-pick__head">
+                <span>{{ label }}</span>
+                <span class="vf-pf-pick__bulk"><button type="button" class="btn btn-link btn-sm p-0" data-pf-pick-all>все</button> / <button type="button" class="btn btn-link btn-sm p-0" data-pf-pick-none>ни одной</button></span>
+            </div>
+            <fieldset class="vf-pf-pick__list">
+                <legend class="visually-hidden">{{ label }}</legend>
+                {% for option in options %}
+                    <label class="form-check vf-pf-pick__option" style="--vf-pick-level: {{ (option.level ?? 1) - 1 }}">
+                        <input class="form-check-input" type="checkbox" name="{{ name }}[]" value="{{ option.id }}" data-pf-level="{{ option.level ?? 1 }}"{% if option.selected %} checked{% endif %}>
+                        <span class="form-check-label">{{ option.system ?? false ? option.name ~ ' (включая «Не задано»)' : option.name }}</span>
+                    </label>
+                {% endfor %}
+            </fieldset>
+            {% if note %}<div class="vf-pf-pick__note">{{ note }}</div>{% endif %}
+            <div class="vf-pf-pick__foot">
+                <span class="vf-pf-pick__hint" data-pf-pick-hint hidden>Выберите хотя бы одно значение.</span>
+                <button type="submit" class="btn btn-primary btn-sm" data-pf-pick-apply>Применить</button>
+            </div>
+        </form>
+    </details>
+{% endmacro %}
+
+{% macro hl(metric, cell) %}{{ cell.significant and metric != 'plan' ? ' vf-pf__hl' : '' }}{% endmacro %}

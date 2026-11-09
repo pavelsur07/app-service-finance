@@ -1,0 +1,23 @@
+{#
+  Карточка загрузки дерева из файла выгрузки (JSON).
+  Параметры: targetCompanyId.
+#}
+<div class="card mb-3">
+    <div class="card-body">
+        <h3 class="card-title">Из файла</h3>
+        <p class="text-secondary">
+            Файл выгружается кнопкой «Выгрузить в файл» на экране категорий той компании,
+            откуда переносим. Так дерево можно перенести и в другой аккаунт.
+        </p>
+        <form method="post" action="{{ path('pl_category_import_upload') }}" enctype="multipart/form-data" class="row g-2 align-items-end">
+            <input type="hidden" name="_token" value="{{ csrf_token('pl-category-import-file' ~ targetCompanyId) }}">
+            <div class="col-auto">
+                <label class="form-label" for="import_file">Файл выгрузки (JSON)</label>
+                <input type="file" class="form-control" id="import_file" name="import_file" accept="application/json,.json" required>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary">Показать предпросмотр</button>
+            </div>
+        </form>
+    </div>
+</div>

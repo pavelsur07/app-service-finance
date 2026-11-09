@@ -1,0 +1,37 @@
+{#
+  Фильтры периода закрытия: маркетплейс, год, месяц.
+  Параметры: available_marketplaces, marketplace, year, month.
+#}
+{# Фильтры периода #}
+<form method="get" action="{{ path('marketplace_month_close_index') }}"
+      class="mb-4 d-flex align-items-end gap-3" data-autosubmit>
+    <div>
+        <label class="form-label">Маркетплейс</label>
+        <select name="marketplace" class="form-select w-auto">
+            {% for mp in available_marketplaces %}
+                <option value="{{ mp.value }}" {{ marketplace == mp.value ? 'selected' : '' }}>
+                    {{ mp.value|upper }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label class="form-label">Год</label>
+        <select name="year" class="form-select w-auto">
+            {% for y in range('now'|date('Y'), 'now'|date('Y') - 2, -1) %}
+                <option value="{{ y }}" {{ year == y ? 'selected' : '' }}>{{ y }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label class="form-label">Месяц</label>
+        <select name="month" class="form-select w-auto">
+            {% set monthNames = {1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель',
+                5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Август',
+                9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь'} %}
+            {% for n, name in monthNames %}
+                <option value="{{ n }}" {{ month == n ? 'selected' : '' }}>{{ name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</form>

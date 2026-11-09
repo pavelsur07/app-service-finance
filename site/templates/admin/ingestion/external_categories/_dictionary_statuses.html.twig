@@ -1,0 +1,41 @@
+{#
+  Статусы справочника внешних категорий или пустое состояние.
+  Параметры: status_summary, category_status_tone, category_status_labels.
+#}
+{% if status_summary is empty %}
+  <div class="empty wz-sec">
+    <div class="empty-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18"/><path d="M3 12h18"/><path d="M3 17h10"/></svg>
+    </div>
+    <div class="empty-title">Справочник ещё не заполнен</div>
+    <div class="empty-text">Запустите «Обновить базовые Ozon-маппинги» или discovery — статусы появятся здесь.</div>
+  </div>
+{% else %}
+  <div class="card u-p-0 wz-sec">
+    <div class="wz-card-head">Статусы справочника</div>
+    <div class="wz-scroll">
+      <table class="t-table">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Resource</th>
+            <th>Status</th>
+            <th class="t-cell--right">Categories</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in status_summary %}
+            <tr>
+              <td>{{ row.source }}</td>
+              <td>{{ row.resource_type }}</td>
+              <td>
+                <span class="status status--{{ category_status_tone[row.status] ?? 'neutral' }}"><span class="dot"></span>{{ category_status_labels[row.status] ?? row.status }}</span>
+              </td>
+              <td class="t-cell--right">{{ row.categories }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}

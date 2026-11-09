@@ -1,0 +1,87 @@
+{#
+  Диалог маппинга внешней категории (одна строка latest_categories).
+  Параметры: row, ozon_groups, transaction_types, mapping_statuses.
+#}
+<dialog id="mapping-dialog-{{ row.id }}" class="dlg" aria-labelledby="mapping-title-{{ row.id }}">
+  {# <dialog> сжимается по контенту — задаём ширину .mdl (--modal-width-standard) явно #}
+  <div class="mdl mdl--ext-cat">
+    <form action="{{ path('admin_ingestion_external_categories_update_mapping', {id: row.id}) }}" method="POST">
+      <input type="hidden" name="_token" value="{{ csrf_token('admin_ingestion_external_categories_update_mapping_' ~ row.id) }}">
+      <div class="mdl-head">
+        <div class="u-flex-1">
+          <h3 id="mapping-title-{{ row.id }}">Маппинг категории</h3>
+          <div class="sub">{{ row.external_code ?? row.normalized_key }}{% if row.provider_label ?? row.external_name %} · {{ row.provider_label ?? row.external_name }}{% endif %}</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-ghost u-w-28 u-p-0" data-admin-dialog-close aria-label="Закрыть">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+        </button>
+      </div>
+      {# модалка выше вьюпорта на мелких экранах — скроллим тело, шапка и футер остаются видны #}
+      <div class="mdl-body ext-cat-mdl-body">
+        <div class="wz-form-grid">
+          <div class="field wz-span-all">
+            <label class="field-label" for="display_label_{{ row.id }}">Display label</label>
+            <input class="input" id="display_label_{{ row.id }}" name="display_label" value="{{ row.display_label ?? row.provider_label ?? row.external_name ?? '' }}" placeholder="как показывать в отчётах">
+          </div>
+          <div class="field wz-span-all">
+            <label class="field-label" for="company_id_{{ row.id }}">Company override</label>
+            <input class="input" id="company_id_{{ row.id }}" name="company_id" value="" placeholder="UUID компании">
+            <span class="field-helper">Пусто — глобальный маппинг для всех компаний.</span>
+          </div>
+          <div class="field">
+            <label class="field-label" for="canonical_code_{{ row.id }}">Canonical code<span class="req">*</span></label>
+            <input class="input" id="canonical_code_{{ row.id }}" name="canonical_code" value="{{ row.canonical_code ?? '' }}" required>
+          </div>
+          <div class="field">
+            <label class="field-label" for="canonical_group_{{ row.id }}">Canonical group<span class="req">*</span></label>
+            <select class="select" id="canonical_group_{{ row.id }}" name="canonical_group" required>
+              <option value="">— группа —</option>
+              {% set current_group = (row.canonical_group ?? '')|replace({"\n": ' ', "\r": ' '})|split(' ')|filter(part => part != '')|join(' ') %}
+              {% for group in ozon_groups %}
+                <option value="{{ group.label }}" {% if current_group == group.label %}selected{% endif %}>{{ group.label }}</option>
+              {% endfor %}
+            </select>
+            {% if row.canonical_group and current_group not in ozon_groups|map(group => group.label) %}
+              <span class="field-helper">Текущая группа «{{ row.canonical_group }}» вне закрытого списка — выберите группу.</span>
+            {% endif %}
+          </div>
+          <div class="field wz-span-all">
+            <label class="field-label" for="canonical_label_{{ row.id }}">Canonical label<span class="req">*</span></label>
+            <input class="input" id="canonical_label_{{ row.id }}" name="canonical_label" value="{{ row.canonical_label ?? '' }}" required>
+          </div>
+          <div class="field">
+            <label class="field-label" for="transaction_type_{{ row.id }}">Тип операции<span class="req">*</span></label>
+            <select class="select" id="transaction_type_{{ row.id }}" name="transaction_type" required>
+              {% for type in transaction_types %}
+                <option value="{{ type.value }}" {% if row.transaction_type == type.value %}selected{% endif %}>{{ type.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label" for="mapping_status_{{ row.id }}">Статус маппинга<span class="req">*</span></label>
+            <select class="select" id="mapping_status_{{ row.id }}" name="mapping_status" required>
+              {% for status in mapping_statuses %}
+                <option value="{{ status.value }}" {% if (row.mapping_status ?? 'active') == status.value %}selected{% endif %}>{{ status.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label" for="sort_order_{{ row.id }}">Sort order<span class="req">*</span></label>
+            <input type="number" min="1" max="100000" class="input" id="sort_order_{{ row.id }}" name="sort_order" value="{{ row.sort_order ?? 9000 }}" required>
+          </div>
+          <div class="field">
+            <span class="field-label">Признак</span>
+            <label class="checkbox-label">
+              <input type="checkbox" class="checkbox" name="known" value="1" {% if row.known is same as(true) or row.known is null %}checked{% endif %}>
+              <span>Known — категория распознана</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="mdl-foot">
+        <button type="button" class="btn btn-md btn-secondary" data-admin-dialog-close>Отмена</button>
+        <button type="submit" class="btn btn-md btn-primary">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</dialog>

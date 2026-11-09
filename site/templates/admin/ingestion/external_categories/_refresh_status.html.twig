@@ -1,0 +1,40 @@
+{#
+  Результат последнего refresh metadata по raw-записям.
+  Параметры: last_refresh.
+#}
+{% set refresh_status_tone = {'done': 'success', 'dry-run': 'pending', 'error': 'danger'} %}
+<div class="card u-p-0 wz-sec">
+  <div class="wz-card-head">Последний refresh: {{ last_refresh.mode }}</div>
+  <div class="wz-scroll">
+    <table class="t-table">
+      <thead>
+        <tr>
+          <th>Raw ID</th>
+          <th>Status</th>
+          <th class="t-cell--right">Scanned</th>
+          <th class="t-cell--right">Matched</th>
+          <th class="t-cell--right">Updated</th>
+          <th class="t-cell--right">Unchanged</th>
+          <th class="t-cell--right">Missing</th>
+          <th>Error</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in last_refresh.results %}
+          <tr>
+            <td><code>{{ row.rawId }}</code></td>
+            <td>
+              <span class="status status--{{ refresh_status_tone[row.status] ?? 'neutral' }}"><span class="dot"></span>{{ row.status }}</span>
+            </td>
+            <td class="t-cell--right">{{ row.scanned }}</td>
+            <td class="t-cell--right">{{ row.matched }}</td>
+            <td class="t-cell--right">{{ row.updated }}</td>
+            <td class="t-cell--right">{{ row.unchanged }}</td>
+            <td class="t-cell--right">{{ row.missing }}</td>
+            <td>{{ row.error|default('') }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
