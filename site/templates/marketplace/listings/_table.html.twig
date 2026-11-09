@@ -1,0 +1,108 @@
+{# Таблица листингов с привязкой к товару и тегами, пагинация. Параметры: pager, tags_by_listing, filter_params. #}
+<div class="table-responsive">
+    <table class="table card-table table-vcenter">
+        <thead>
+        <tr>
+            <th class="w-1">
+                <input type="checkbox" class="form-check-input m-0" data-select-all
+                       aria-label="Выбрать все листинги на странице">
+            </th>
+            <th>Маркет</th>
+            <th>SKU</th>
+            <th>Наименование</th>
+            <th>Артикул</th>
+            <th>Размер</th>
+            <th class="text-end">Цена, ₽</th>
+            <th>Товар</th>
+            <th>Теги</th>
+            <th class="w-1"></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for listing in pager %}
+            <tr>
+                <td>
+                    <input type="checkbox" class="form-check-input m-0 row-select"
+                           value="{{ listing.id }}"
+                           aria-label="Выбрать листинг {{ listing.marketplaceSku }}">
+                </td>
+                <td><span class="badge bg-azure-lt">{{ listing.marketplace.value|upper }}</span></td>
+                <td><strong>{{ listing.marketplaceSku }}</strong></td>
+                <td>
+                    {% if listing.name %}
+                        <span class="text-truncate d-inline-block u-max-w-220" title="{{ listing.name }}">{{ listing.name }}</span>
+                    {% else %}
+                        <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if listing.supplierSku %}
+                        <code>{{ listing.supplierSku }}</code>
+                    {% else %}
+                        <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td>{% include 'marketplace/listings/_listing_size.html.twig' with {size: listing.size} only %}</td>
+                <td class="text-end">{{ listing.price|vf_amount }}</td>
+                <td>
+                    {% if listing.product %}
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-success-lt">{{ listing.product.sku }}</span>
+                            <span class="text-muted small text-truncate u-max-w-180">
+                    {{ listing.product.name }}
+                </span>
+                        </div>
+                    {% else %}
+                        <button type="button" class="btn btn-sm btn-warning" data-map-listing
+                                data-listing-id="{{ listing.id }}"
+                                data-listing-sku="{{ listing.marketplaceSku }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="16" height="16"
+                                 viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Привязать
+                        </button>
+                    {% endif %}
+                </td>
+                <td class="listing-tags" data-listing-id="{{ listing.id }}">
+                    <div class="d-flex flex-wrap gap-1">
+                        {% for tag in tags_by_listing[listing.id]|default([]) %}
+                            <span class="tag-chip">{{ tag.name }}
+                                <button type="button" class="x" data-detach-tag
+                                        data-listing-id="{{ listing.id }}"
+                                        data-tag-id="{{ tag.id }}"
+                                        title="Снять тег {{ tag.name }}"
+                                        aria-label="Снять тег {{ tag.name }}">×</button>
+                            </span>
+                        {% endfor %}
+                    </div>
+                </td>
+                <td>
+                    {% if listing.product %}
+                        <button type="button" class="btn btn-sm btn-ghost-secondary" data-map-listing
+                                data-listing-id="{{ listing.id }}"
+                                data-listing-sku="{{ listing.marketplaceSku }}"
+                                title="Изменить привязку">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16"
+                                 viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4"></path>
+                            </svg>
+                        </button>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card-footer d-flex align-items-center">
+    {% include 'partials/_pagination.html.twig' with {
+        pager: pager,
+        route: 'marketplace_listings_index',
+        params: filter_params
+    } %}
+</div>

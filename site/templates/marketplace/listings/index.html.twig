@@ -16,73 +16,14 @@
                     {% elseif filter == 'unmapped' %}Листинги без привязки
                     {% else %}Все листинги{% endif %}
                 </h3>
-                <form method="post" action="{{ path('marketplace_listings_sync_ozon_catalog') }}" class="d-inline">
-                    <input type="hidden" name="_token"
-                           value="{{ csrf_token('marketplace_listings_sync_ozon_catalog') }}">
-                    <button type="submit" class="btn btn-ghost-secondary"
-                            title="Загрузить наименования, артикулы и даты создания товаров из каталога Ozon">
-                        Обновить каталог Ozon
-                    </button>
-                </form>
-
-                {% if ozon_catalog_last_run %}
-                    <span class="text-secondary small" data-testid="ozon-catalog-last-run">
-                        {% if ozon_catalog_last_run.status.value == 'done' %}
-                            Каталог обновлён {{ ozon_catalog_last_run.finishedAt|date('d.m.Y H:i') }},
-                            товаров: {{ ozon_catalog_last_run.summary.products_fetched ?? 0 }}
-                        {% elseif ozon_catalog_last_run.status.value == 'failed' %}
-                            Последний прогон завершился ошибкой
-                            {{ ozon_catalog_last_run.finishedAt|date('d.m.Y H:i') }}
-                        {% else %}
-                            Загрузка каталога выполняется…
-                        {% endif %}
-                    </span>
-                {% endif %}
-
-                <a href="{{ path('marketplace_listing_tags_manage') }}" class="btn btn-ghost-secondary me-auto">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="16" height="16"
-                         viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                        <path d="M7.859 6h-2.834a2.025 2.025 0 0 0 -2.025 2.025v2.834c0 .537 .213 1.052 .593 1.432l6.116 6.116a2.025 2.025 0 0 0 2.864 0l2.834 -2.834a2.025 2.025 0 0 0 0 -2.864l-6.117 -6.116a2.025 2.025 0 0 0 -1.431 -.593z"></path>
-                        <path d="M17.573 18.407l2.834 -2.834a2.025 2.025 0 0 0 0 -2.864l-6.117 -6.116"></path>
-                        <path d="M6 9h-.01"></path>
-                    </svg>
-                    Управление тегами
-                </a>
-                <form method="get" action="{{ path('marketplace_listings_index') }}"
-                      class="d-flex align-items-center gap-2 flex-wrap" id="listings-filter-form" role="search" data-listings-filter>
-                    <select class="form-select w-auto" name="filter" aria-label="Привязка к товару" data-autosubmit>
-                        <option value="all" {{ filter == 'all' ? 'selected' : '' }}>Привязка: все</option>
-                        <option value="mapped" {{ filter == 'mapped' ? 'selected' : '' }}>Привязанные</option>
-                        <option value="unmapped" {{ filter == 'unmapped' ? 'selected' : '' }}>Без привязки</option>
-                    </select>
-                    <select class="form-select w-auto" name="marketplace" aria-label="Маркетплейс" data-autosubmit>
-                        <option value="">Все маркетплейсы</option>
-                        {% for mp in available_marketplaces %}
-                            <option value="{{ mp.value }}" {{ marketplace == mp.value ? 'selected' : '' }}>{{ mp.value|upper }}</option>
-                        {% endfor %}
-                    </select>
-                    <select class="form-select w-auto" name="tag" aria-label="Тег" data-autosubmit>
-                        <option value="">Все теги</option>
-                        <option value="none" {{ listings_filter.withoutTags ? 'selected' : '' }}>Без тегов</option>
-                        {% for tag in all_tags %}
-                            <option value="{{ tag.id }}" {{ listings_filter.tagId == tag.id ? 'selected' : '' }}>{{ tag.name }}</option>
-                        {% endfor %}
-                    </select>
-                    <div class="input-icon">
-                        <input type="search" class="form-control" name="q" value="{{ listings_filter.search }}"
-                               maxlength="100" placeholder="Поиск по названию, артикулу, SKU"
-                               aria-label="Поиск по названию, артикулу, SKU">
-                        <span class="input-icon-addon">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24"
-                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                <circle cx="10" cy="10" r="7"></circle>
-                                <line x1="21" y1="21" x2="15" y2="15"></line>
-                            </svg>
-                        </span>
-                    </div>
-                </form>
+                {% include 'marketplace/listings/_toolbar.html.twig' with {
+                    ozon_catalog_last_run: ozon_catalog_last_run,
+                    filter: filter,
+                    available_marketplaces: available_marketplaces,
+                    marketplace: marketplace,
+                    all_tags: all_tags,
+                    listings_filter: listings_filter,
+                } only %}
             </div>
 
             {# Описание фильтра — для строки «Найдено» и диалога подтверждения. #}
@@ -135,190 +76,26 @@
             {% else %}
                 {# data-applied-filter — фильтр, который применил сервер: назначение «все N» уходит
                    по нему, а не по тексту в поле поиска, изменённому без Enter. #}
-                <div class="card-body border-bottom py-2 d-none" id="bulk-tag-panel" data-bulk-tag-panel
-                     data-all-tags="{{ all_tags|json_encode|e('html_attr') }}"
-                     data-applied-filter="{{ filter_params|json_encode|e('html_attr') }}"
-                     data-filter-summary="{{ filter_summary }}"
-                     data-nb-results="{{ pager.nbResults }}">
-                    <div class="d-flex align-items-center gap-3 flex-wrap">
-                        <span class="text-muted small"><span data-bulk-count>0</span> выбрано</span>
-                        <span class="small d-none" data-bulk-scope-offer>
-                            Выбраны все на странице.
-                            {% if pager.nbResults <= max_filter_match %}
-                                <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-bulk-select-filter>
-                                    Выбрать все {{ pager.nbResults|vf_number }} по текущему фильтру
-                                </button>
-                            {% else %}
-                                {# Сервер отклонит назначение больше лимита (filter_too_broad). #}
-                                <span class="text-secondary">
-                                    Тег сразу всем можно присвоить, если под фильтр попадает не больше {{ max_filter_match|vf_number }} листингов — сузьте фильтр.
-                                </span>
-                            {% endif %}
-                        </span>
-                        <span class="small d-none" data-bulk-scope-filter>
-                            Выбраны все {{ pager.nbResults|vf_number }} по фильтру.
-                            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-bulk-clear-filter>
-                                Снять выбор
-                            </button>
-                        </span>
-                        <div class="tags-input u-max-w-320" data-bulk-tag-input>
-                            <input type="text" placeholder="Тег…" autocomplete="off" data-bulk-tag-name
-                                   aria-label="Тег для выбранных листингов">
-                            <div class="suggest d-none" data-bulk-tag-suggest></div>
-                        </div>
-                        {# Скрытый триггер диалога «присвоить всем по фильтру»: тексты подставляет модуль. #}
-                        <button type="button" hidden data-bulk-assign-trigger
-                                data-bs-target="#listings-confirm"
-                                data-confirm-token="{{ csrf_token('listing_tags') }}"
-                                data-confirm-submit="Присвоить"></button>
-                    </div>
-                </div>
+                {% include 'marketplace/listings/_bulk_tag_panel.html.twig' with {
+                    all_tags: all_tags,
+                    filter_params: filter_params,
+                    filter_summary: filter_summary,
+                    pager: pager,
+                    max_filter_match: max_filter_match,
+                } only %}
 
-                <div class="table-responsive">
-                    <table class="table card-table table-vcenter">
-                        <thead>
-                        <tr>
-                            <th class="w-1">
-                                <input type="checkbox" class="form-check-input m-0" data-select-all
-                                       aria-label="Выбрать все листинги на странице">
-                            </th>
-                            <th>Маркет</th>
-                            <th>SKU</th>
-                            <th>Наименование</th>
-                            <th>Артикул</th>
-                            <th>Размер</th>
-                            <th class="text-end">Цена, ₽</th>
-                            <th>Товар</th>
-                            <th>Теги</th>
-                            <th class="w-1"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for listing in pager %}
-                            <tr>
-                                <td>
-                                    <input type="checkbox" class="form-check-input m-0 row-select"
-                                           value="{{ listing.id }}"
-                                           aria-label="Выбрать листинг {{ listing.marketplaceSku }}">
-                                </td>
-                                <td><span class="badge bg-azure-lt">{{ listing.marketplace.value|upper }}</span></td>
-                                <td><strong>{{ listing.marketplaceSku }}</strong></td>
-                                <td>
-                                    {% if listing.name %}
-                                        <span class="text-truncate d-inline-block u-max-w-220" title="{{ listing.name }}">{{ listing.name }}</span>
-                                    {% else %}
-                                        <span class="text-muted">—</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if listing.supplierSku %}
-                                        <code>{{ listing.supplierSku }}</code>
-                                    {% else %}
-                                        <span class="text-muted">—</span>
-                                    {% endif %}
-                                </td>
-                                <td>{% include 'marketplace/listings/_listing_size.html.twig' with {size: listing.size} only %}</td>
-                                <td class="text-end">{{ listing.price|vf_amount }}</td>
-                                <td>
-                                    {% if listing.product %}
-                                        <div class="d-flex align-items-center gap-2">
-                                            <span class="badge bg-success-lt">{{ listing.product.sku }}</span>
-                                            <span class="text-muted small text-truncate u-max-w-180">
-                                    {{ listing.product.name }}
-                                </span>
-                                        </div>
-                                    {% else %}
-                                        <button type="button" class="btn btn-sm btn-warning" data-map-listing
-                                                data-listing-id="{{ listing.id }}"
-                                                data-listing-sku="{{ listing.marketplaceSku }}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="16" height="16"
-                                                 viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
-                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                                            </svg>
-                                            Привязать
-                                        </button>
-                                    {% endif %}
-                                </td>
-                                <td class="listing-tags" data-listing-id="{{ listing.id }}">
-                                    <div class="d-flex flex-wrap gap-1">
-                                        {% for tag in tags_by_listing[listing.id]|default([]) %}
-                                            <span class="tag-chip">{{ tag.name }}
-                                                <button type="button" class="x" data-detach-tag
-                                                        data-listing-id="{{ listing.id }}"
-                                                        data-tag-id="{{ tag.id }}"
-                                                        title="Снять тег {{ tag.name }}"
-                                                        aria-label="Снять тег {{ tag.name }}">×</button>
-                                            </span>
-                                        {% endfor %}
-                                    </div>
-                                </td>
-                                <td>
-                                    {% if listing.product %}
-                                        <button type="button" class="btn btn-sm btn-ghost-secondary" data-map-listing
-                                                data-listing-id="{{ listing.id }}"
-                                                data-listing-sku="{{ listing.marketplaceSku }}"
-                                                title="Изменить привязку">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16"
-                                                 viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
-                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                                <path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4"></path>
-                                            </svg>
-                                        </button>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="card-footer d-flex align-items-center">
-                    {% include 'partials/_pagination.html.twig' with {
-                        pager: pager,
-                        route: 'marketplace_listings_index',
-                        params: filter_params
-                    } %}
-                </div>
+                {% include 'marketplace/listings/_table.html.twig' with {
+                    pager: pager,
+                    tags_by_listing: tags_by_listing,
+                    filter_params: filter_params,
+                } only %}
             {% endif %}
         </div>
     </div>
 {% endblock %}
 
 {% block modals %}
-    <div class="modal modal-blur fade" id="mapListingModal" tabindex="-1" role="dialog" data-map-listing-modal>
-        <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Привязать листинг к товару</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label text-muted">Листинг</label>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="badge bg-azure-lt">WB</span>
-                            <code data-map-listing-sku></code>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" for="product-select">
-                            Товар <span class="text-danger">*</span>
-                        </label>
-                        <select class="form-select" id="product-select" data-map-product>
-                            <option value="">— выберите товар —</option>
-                        </select>
-                    </div>
-                    <div class="alert alert-danger d-none" role="alert" data-map-error></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-link me-auto" data-bs-dismiss="modal">Отмена</button>
-                    <button type="button" class="btn btn-primary" data-map-submit>Привязать</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include 'marketplace/listings/_modal_map.html.twig' only %}
 
     {% include 'partials/_confirm_modal.html.twig' with {id: 'listings-confirm'} only %}
 {% endblock %}

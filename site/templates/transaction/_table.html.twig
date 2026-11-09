@@ -1,0 +1,43 @@
+{#
+  Таблица операций ДДС (скрыта, если операций нет).
+  Параметры: transactions, hasStandaloneTransactions, transferByTransactionId, query,
+  aiAutoAppliedByTransactionId, aiSuggestionByTransactionId.
+#}
+<div class="table-responsive"{% if transactions is empty %} hidden{% endif %}>
+    <table class="table card-table table-vcenter vf-ops-table">
+        <thead class="sticky-top">
+            <tr>
+                <th class="w-1">
+                    <input type="checkbox"
+                           class="form-check-input m-0"
+                           id="cash-transactions-select-all"
+                           data-select-all
+                           aria-label="Выбрать все транзакции на странице"
+                           {{ not hasStandaloneTransactions ? 'disabled' : '' }}>
+                </th>
+                <th>Дата / счёт</th>
+                {# DS-Money: «₽» в заголовке — только когда вся колонка в рублях; суммы не пересчитываются. #}
+                {% set amounts_in_rub = transactions|filter(t => t.currency != 'RUB')|length == 0 %}
+                <th class="text-end text-nowrap">Сумма{% if amounts_in_rub %}, ₽{% endif %}</th>
+                <th>Статья / проект</th>
+                <th>Контрагент</th>
+                <th class="text-center text-nowrap" title="Зелёная — документы ОПиУ созданы, серая — можно создать, жёлтая — создан без полного маппинга">ОПиУ</th>
+                <th><span class="visually-hidden">Действия</span></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for tx in transactions %}
+            {% set transfer = transferByTransactionId[tx.id]|default(null) %}
+            {% include 'transaction/_row.html.twig' with {
+                tx: tx,
+                transfer: transfer,
+                amounts_in_rub: amounts_in_rub,
+                query: query,
+                is_last: loop.last,
+                aiAutoAppliedByTransactionId: aiAutoAppliedByTransactionId,
+                aiSuggestionByTransactionId: aiSuggestionByTransactionId,
+            } only %}
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
