@@ -662,6 +662,21 @@ final readonly class MarketplaceFacade
     }
 
     /**
+     * Затраты без привязки к листингу по категориям за период — строка «Не распределено
+     * по товарам» в отчётах по листингам. Рекламные категории под статистикой исключены.
+     *
+     * @return list<\App\Marketplace\DTO\UnallocatedCostCategoryAggregateDTO>
+     */
+    public function getUnallocatedCostAggregates(
+        string $companyId,
+        ?string $marketplace,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): array {
+        return $this->costAggregateQuery->executeUnallocatedByPeriod($companyId, $marketplace, $from, $to);
+    }
+
+    /**
      * @param list<string> $listingIds
      *
      * @return array<string, \App\Marketplace\DTO\ListingMetaDTO> keyed by id

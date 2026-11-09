@@ -28,4 +28,12 @@ final class AdStatisticsCostCategories
     {
         return self::CODES[$marketplace->value] ?? null;
     }
+
+    /**
+     * @return list<string>
+     */
+    public static function codes(): array
+    {
+        return array_values(self::CODES);
+    }
 }

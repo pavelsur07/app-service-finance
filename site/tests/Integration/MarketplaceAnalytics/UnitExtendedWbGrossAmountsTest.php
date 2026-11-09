@@ -187,8 +187,12 @@ final class UnitExtendedWbGrossAmountsTest extends IntegrationTestCase
 
         self::assertSame(0.0, $result['items'][0]['otherCosts']);
         self::assertSame(1000.0, $result['items'][0]['profit']);
-        self::assertSame(0.0, $result['totals']['totalCosts']);
-        self::assertSame(1000.0, $result['totals']['profit']);
+        // Выплата без SKU — строка «Не распределено по товарам» (#2940): доход в «Итого»,
+        // как и в карточках ниже.
+        self::assertNotNull($result['unallocated']);
+        self::assertSame(-49155.0, $result['unallocated']['totalCosts']);
+        self::assertSame(-49155.0, $result['totals']['totalCosts']);
+        self::assertSame(50155.0, $result['totals']['profit']);
 
         $widgetSummary = $this->widgetSummaryQuery->getSummary(
             (string) $company->getId(),

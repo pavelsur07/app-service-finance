@@ -106,7 +106,7 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
         return () => window.clearTimeout(timerId);
     }, [searchQuery]);
 
-    const { items, totals, tagSummary, isLoading, isError, errorMessage } = useUnitExtended({
+    const { items, totals, unallocated, tagSummary, isLoading, isError, errorMessage } = useUnitExtended({
         marketplace: filters.marketplace,
         periodFrom: filters.dateFrom,
         periodTo: filters.dateTo,
@@ -196,14 +196,13 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
                 />
             </ErrorBoundary>
 
-            {/* Карточки и «Итого» таблицы считают по разным правилам — подпись, чтобы
-                расхождение прибыли не читалось как ошибка. С фильтром по тегам карточки
-                тоже берут только затраты товаров, и первая часть подписи неверна. */}
-            {selectedTagIds.length === 0 && widgets.summary && (
+            {/* Карточки и «Итого» таблицы расходятся только источником рекламы: затраты без
+                товара в «Итого» входят строкой «Не распределено по товарам» (#2940). */}
+            {widgets.summary && (
                 <p className="text-muted small mb-3">
-                    Карточки — все начисления маркетплейса за период, включая затраты без
-                    привязки к товару: хранение, маркетинговые акции, оплату за клик.
-                    Поэтому прибыль в карточках отличается от «Итого» в таблице.
+                    Реклама в карточках — по начислениям маркетплейса, в таблице — по статистике
+                    рекламного кабинета; на эту разницу прибыль в карточках может отличаться
+                    от «Итого».
                 </p>
             )}
 
@@ -238,8 +237,8 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
                     <div>
                         <h3 className="card-title">Юнит-экономика по листингам</h3>
                         <div className="text-muted small">
-                            Только затраты, привязанные к товарам; реклама — по статистике
-                            рекламного кабинета
+                            Общие затраты кабинета — строкой «Не распределено по товарам»
+                            перед «Итого»; реклама — по статистике рекламного кабинета
                         </div>
                     </div>
                     <div className="ms-3 ue-ext-listing-search">
@@ -273,6 +272,7 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
                 <UnitExtendedTable
                     items={items}
                     totals={totals}
+                    unallocated={unallocated}
                     isLoading={isLoading}
                     emptyMessage={tableEmptyMessage}
                     selectedTagIds={selectedTagIds}

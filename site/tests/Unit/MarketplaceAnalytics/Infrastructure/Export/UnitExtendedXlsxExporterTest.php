@@ -350,21 +350,70 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         self::assertSame('', (string) ($totalsRow[$tagsColumnIndex] ?? ''), 'Теги не суммируются — в строке ИТОГО ячейка пустая');
     }
 
+    public function testUnallocatedRowGoesRightBeforeTotals(): void
+    {
+        $items = [[
+            'listingId' => 'l-1',
+            'title' => 'Товар А',
+            'sku' => 'SKU-A',
+            'marketplace' => 'ozon',
+            'tags' => [],
+            'revenue' => 1000.0,
+            'otherCosts' => 10.0,
+            'profit' => 990.0,
+        ]];
+        $unallocated = ['commission' => 0.0, 'logistics' => 0.0, 'otherCosts' => 300.0, 'totalCosts' => 300.0, 'profit' => -300.0];
+        $totals = ['revenue' => 1000.0, 'otherCosts' => 310.0, 'profit' => 690.0];
+
+        $exporter = new UnitExtendedXlsxExporter($this->queryReturning($items, $totals, $unallocated));
+        $this->tempFile = tempnam(sys_get_temp_dir(), 'unit_extended_unalloc_').'.xlsx';
+        $exporter->export(new UnitExtendedExportRequest(
+            companyId: self::COMPANY_ID,
+            marketplace: 'ozon',
+            periodFrom: '2026-01-01',
+            periodTo: '2026-01-31',
+        ), $this->tempFile);
+
+        $rows = $this->readXlsxRows($this->tempFile);
+        $headerRowIndex = null;
+        foreach ($rows as $index => $row) {
+            if (in_array('SKU', $row, true)) {
+                $headerRowIndex = $index;
+
+                break;
+            }
+        }
+        self::assertNotNull($headerRowIndex);
+        $header = $rows[$headerRowIndex];
+        $otherIndex = array_search('Прочие затраты', $header, true);
+        $revenueIndex = array_search('Выручка', $header, true);
+        self::assertNotFalse($otherIndex);
+        self::assertNotFalse($revenueIndex);
+
+        $unallocatedRow = $rows[$headerRowIndex + 2];
+        self::assertSame('Не распределено по товарам', $unallocatedRow[0]);
+        self::assertSame('300', $unallocatedRow[$otherIndex]);
+        // Выручки у строки нет — пустая ячейка, а не ноль.
+        self::assertSame('', $unallocatedRow[$revenueIndex] ?? '');
+        self::assertSame('ИТОГО', $rows[$headerRowIndex + 3][0]);
+    }
+
     /**
      * Мок Query держим в одном месте: UnitExtendedQuery — final, и каждый вызов
      * createMock() даёт PHPStan-ошибку, вынесенную в baseline поштучно.
      *
      * @param list<array<string, mixed>> $items
      * @param array<string, mixed> $totals
+     * @param array<string, mixed>|null $unallocated
      */
-    private function queryReturning(array $items, array $totals): UnitExtendedQuery
+    private function queryReturning(array $items, array $totals, ?array $unallocated = null): UnitExtendedQuery
     {
         $query = $this->createMock(UnitExtendedQuery::class);
         $query
             ->expects(self::once())
             ->method('execute')
             ->with(self::COMPANY_ID, 'ozon', '2026-01-01', '2026-01-31', \PHP_INT_MAX)
-            ->willReturn(['items' => $items, 'totals' => $totals]);
+            ->willReturn(['items' => $items, 'totals' => $totals, 'unallocated' => $unallocated]);
 
         return $query;
     }

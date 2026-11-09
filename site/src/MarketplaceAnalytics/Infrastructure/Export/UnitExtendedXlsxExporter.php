@@ -95,7 +95,11 @@ final readonly class UnitExtendedXlsxExporter
                 $writer->addRow($this->buildDataRow($item, $dataStyles));
             }
 
-            $writer->addRow($this->buildTotalsRow($result['totals'], $totalsStyles));
+            if (null !== ($result['unallocated'] ?? null)) {
+                $writer->addRow($this->buildTotalsRow($result['unallocated'], $dataStyles, 'Не распределено по товарам'));
+            }
+
+            $writer->addRow($this->buildTotalsRow($result['totals'], $totalsStyles, 'ИТОГО'));
         } finally {
             $writer->close();
         }
@@ -155,12 +159,12 @@ final readonly class UnitExtendedXlsxExporter
      * @param array<string, mixed> $totals
      * @param array<string, Style> $styles keyed by column type, plus 'blank' for filler cells
      */
-    private function buildTotalsRow(array $totals, array $styles): Row
+    private function buildTotalsRow(array $totals, array $styles, string $label): Row
     {
         $cells = [];
         foreach (self::COLUMNS as $index => $column) {
             if (0 === $index) {
-                $cells[] = Cell::fromValue('ИТОГО', $styles['blank']);
+                $cells[] = Cell::fromValue($label, $styles['blank']);
 
                 continue;
             }
@@ -219,6 +223,7 @@ final readonly class UnitExtendedXlsxExporter
     private function buildDataStyles(): array
     {
         return [
+            'blank' => new Style(),
             'string' => new Style(),
             'tags' => new Style(),
             'money' => (new Style())->setFormat(self::FORMAT_MONEY),

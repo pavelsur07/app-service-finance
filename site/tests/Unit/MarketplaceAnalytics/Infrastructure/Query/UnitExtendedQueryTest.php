@@ -11,6 +11,7 @@ use App\Marketplace\DTO\ListingMetaDTO;
 use App\Marketplace\DTO\ListingReturnAggregateDTO;
 use App\Marketplace\DTO\ListingSalesAggregateDTO;
 use App\Marketplace\DTO\ListingTagDTO;
+use App\Marketplace\DTO\UnallocatedCostCategoryAggregateDTO;
 use App\Marketplace\Facade\CostCategoryCatalogFacade;
 use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
@@ -52,6 +53,8 @@ final class UnitExtendedQueryTest extends TestCase
     private array $costAggregates = [];
     /** @var array<string, ListingMetaDTO> */
     private array $listingMeta = [];
+    /** @var list<UnallocatedCostCategoryAggregateDTO> */
+    private array $unallocatedAggregates = [];
     /** @var array<string, float> */
     private array $stockQtyByListing = [];
     /** @var array{string, \DateTimeImmutable, ?string}|null */
@@ -119,6 +122,8 @@ final class UnitExtendedQueryTest extends TestCase
             ->willReturnCallback(fn (): array => $this->returnAggregates);
         $this->marketplaceFacade->method('getCostAggregatesByListing')
             ->willReturnCallback(fn (): array => $this->costAggregates);
+        $this->marketplaceFacade->method('getUnallocatedCostAggregates')
+            ->willReturnCallback(fn (): array => $this->unallocatedAggregates);
         $this->marketplaceFacade->method('getListingsMetaByIds')
             ->willReturnCallback(fn (): array => $this->listingMeta);
         $this->inventoryFacade->method('getStockQtyByListingOnReportDate')
@@ -241,6 +246,63 @@ final class UnitExtendedQueryTest extends TestCase
         // No tag filter → parity with /marketplace-ads/efficiency: full-period ad cost.
         self::assertSame(999.0, $result['totals']['adSpend']);
         self::assertNotNull($this->lastTotalAdSpendCall);
+    }
+
+    public function testUnallocatedCostsFormSeparateRowAndEnterTotals(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-1', 'Товар', 'SKU-1', 'ozon', '1000.00', 5, '300.00', 5),
+        ]);
+        $this->stubCosts([
+            'l-1' => [new ListingCostCategoryAggregateDTO('l-1', 'ozon_sale_commission', 'Комиссия', '100.00', '100.00', '0.00')],
+        ]);
+        $this->unallocatedAggregates = [
+            new UnallocatedCostCategoryAggregateDTO('ozon', 'ozon_sale_commission', 'Комиссия', '30.00', '30.00', '0.00'),
+            new UnallocatedCostCategoryAggregateDTO('ozon', 'ozon_marketing_action', 'Маркетинговые акции', '200.00', '210.00', '10.00'),
+        ];
+        $this->stubTotalAdSpend('0');
+
+        $result = $this->execute();
+
+        // Строка не становится листингом: в items её нет.
+        self::assertCount(1, $result['items']);
+        $row = $result['unallocated'];
+        self::assertNotNull($row);
+        self::assertSame(30.0, $row['commission']);
+        self::assertSame(200.0, $row['otherCosts']);
+        self::assertSame(230.0, $row['totalCosts']);
+        self::assertSame(-230.0, $row['profit']);
+
+        // Итого = листинги + строка: комиссия 100 + 30, прочие 200.
+        self::assertSame(130.0, $result['totals']['commission']);
+        self::assertSame(200.0, $result['totals']['otherCosts']);
+        self::assertSame(330.0, $result['totals']['totalCosts']);
+        // profit = 1000 − 300 − 130 − 200 = 370; прибыль строк 700 + (−230) + … сходится.
+        self::assertSame(370.0, $result['totals']['profit']);
+        self::assertSame(
+            $result['totals']['profit'],
+            round(array_sum(array_column($result['items'], 'profit')) + $row['profit'], 2),
+        );
+    }
+
+    public function testNoUnallocatedRowUnderTagFilterOrWithoutCosts(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-1', 'Товар', 'SKU-1', 'ozon', '1000.00', 5, '300.00', 5),
+        ]);
+        $this->stubTags(['l-1' => ['t-1']]);
+        $this->unallocatedAggregates = [
+            new UnallocatedCostCategoryAggregateDTO('ozon', 'ozon_marketing_action', 'Маркетинговые акции', '200.00', '200.00', '0.00'),
+        ];
+
+        $filtered = $this->execute(['t-1']);
+        self::assertNull($filtered['unallocated']);
+        // Под тегами затраты без товара к тегу не относятся — totals без них.
+        self::assertSame(0.0, $filtered['totals']['otherCosts']);
+        self::assertSame(700.0, $filtered['totals']['profit']);
+
+        $this->unallocatedAggregates = [];
+        self::assertNull($this->execute()['unallocated']);
     }
 
     public function testTagFilterMatchAllRequiresEveryTag(): void
@@ -1050,7 +1112,7 @@ final class UnitExtendedQueryTest extends TestCase
     /**
      * @param list<string> $tagIds
      *
-     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>, tagSummary: list<array<string, mixed>>, stock: array{snapshotDateBySource: array<string, string>, staleSources: array<string, string>}}
+     * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>, unallocated: array<string, mixed>|null, tagSummary: list<array<string, mixed>>, stock: array{snapshotDateBySource: array<string, string>, staleSources: array<string, string>}}
      */
     private function execute(array $tagIds = [], bool $tagsMatchAll = false, bool $withTagSummary = false, ?string $search = null): array
     {

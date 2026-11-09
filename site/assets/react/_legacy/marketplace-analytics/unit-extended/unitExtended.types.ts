@@ -84,6 +84,20 @@ export interface UnitExtendedTotals {
     roiPercent: number | null;
 }
 
+/**
+ * Затраты маркетплейса без привязки к товару (хранение, акции, подписки…) — строка
+ * «Не распределено по товарам» перед «Итого»; уже входят в totals. null — фильтр по
+ * тегам или таких затрат нет. Реклама сюда не входит: она в колонке «Реклама» из статистики.
+ */
+export interface UnallocatedCosts {
+    commission: number;
+    logistics: number;
+    otherCosts: number;
+    totalCosts: number;
+    profit: number;
+    allCostsBreakdown: CostGroupBreakdown[];
+}
+
 export interface TagSummaryRow {
     tagId: string | null;
     name: string;
@@ -115,5 +129,6 @@ export interface TagSummaryRow {
 export interface UnitExtendedResponse {
     items: UnitExtendedItem[];
     totals: UnitExtendedTotals;
+    unallocated: UnallocatedCosts | null;
     tagSummary?: TagSummaryRow[];
 }

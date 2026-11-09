@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import { useAbortableQuery } from '../../shared/hooks/useAbortableQuery';
-import type { UnitExtendedItem, UnitExtendedTotals, UnitExtendedResponse, TagSummaryRow } from './unitExtended.types';
+import type { UnitExtendedItem, UnitExtendedTotals, UnitExtendedResponse, TagSummaryRow, UnallocatedCosts } from './unitExtended.types';
 
 interface UseUnitExtendedParams {
     marketplace: string;
@@ -15,6 +15,7 @@ interface UseUnitExtendedParams {
 interface UseUnitExtendedResult {
     items: UnitExtendedItem[];
     totals: UnitExtendedTotals | null;
+    unallocated: UnallocatedCosts | null;
     tagSummary: TagSummaryRow[];
     isLoading: boolean;
     isError: boolean;
@@ -67,6 +68,7 @@ export function useUnitExtended(params: UseUnitExtendedParams): UseUnitExtendedR
     return {
         items: data?.items ?? [],
         totals: data?.totals ?? null,
+        unallocated: data?.unallocated ?? null,
         tagSummary: data?.tagSummary ?? [],
         isLoading,
         isError: error !== null,
