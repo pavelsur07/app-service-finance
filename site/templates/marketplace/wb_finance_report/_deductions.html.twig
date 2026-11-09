@@ -1,0 +1,65 @@
+{# «Расшифровка удержаний и выплат» (если есть). Параметры: report. #}
+{% import 'marketplace/wb_finance_report/_macros.html.twig' as report_ui %}
+{% if report.deductions is not empty %}
+    <details id="wb-deduction-breakdown" class="card mb-3" open>
+        <summary class="card-header cursor-pointer">
+            <span class="d-block">
+                <span class="card-title d-block mb-1">
+                    Расшифровка удержаний и выплат
+                    <span class="badge bg-secondary ms-1">{{ report.deductions|length }}</span>
+                </span>
+                <span class="text-secondary small d-block">
+                    Точное основание из raw-поля <code>bonusTypeName</code>.
+                    <code>deduction &gt; 0</code> — удержание,
+                    <code>deduction &lt; 0</code> — выплата WB.
+                </span>
+            </span>
+        </summary>
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+                <thead>
+                <tr>
+                    <th>Основание операции WB</th>
+                    <th>Период</th>
+                    <th class="text-end">Строк</th>
+                    <th class="text-end">reportId с номером</th>
+                    <th class="text-end">Удержано, ₽</th>
+                    <th class="text-end">Выплачено WB, ₽</th>
+                    <th class="text-end">Влияние, ₽</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in report.deductions %}
+                    <tr>
+                        <td class="text-break">{{ row.reason }}</td>
+                        <td class="text-secondary text-nowrap">
+                            {% if row.date_from == row.date_to %}
+                                {{ row.date_from|date('d.m.Y') }}
+                            {% else %}
+                                {{ row.date_from|date('d.m.Y') }} — {{ row.date_to|date('d.m.Y') }}
+                            {% endif %}
+                        </td>
+                        <td class="text-end">{{ row.row_count|vf_number }}</td>
+                        <td class="text-end">{{ row.report_count|vf_number }}</td>
+                        <td class="text-end text-nowrap">{{ report_ui.amount(row.withheld_minor) }}</td>
+                        <td class="text-end text-nowrap">{{ report_ui.amount(row.paid_minor) }}</td>
+                        <td class="text-end text-nowrap fw-semibold {{ row.impact_minor > 0 ? 'text-success' : '' }}">
+                            {{ report_ui.amount(row.impact_minor) }}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+                <tfoot>
+                <tr class="fw-semibold">
+                    <th colspan="4" class="text-end">Итого</th>
+                    <th class="text-end text-nowrap">{{ report_ui.money(report.summary.deduction_withheld_minor) }}</th>
+                    <th class="text-end text-nowrap">{{ report_ui.money(report.summary.deduction_paid_minor) }}</th>
+                    <th class="text-end text-nowrap {{ report.summary.deduction_impact_minor > 0 ? 'text-success' : '' }}">
+                        {{ report_ui.money(report.summary.deduction_impact_minor) }}
+                    </th>
+                </tr>
+                </tfoot>
+            </table>
+        </div>
+    </details>
+{% endif %}

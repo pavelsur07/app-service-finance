@@ -1,0 +1,24 @@
+{# «Качество данных». Параметры: report. #}
+<div class="card h-100">
+    <div class="card-header">
+        <div class="d-flex align-items-center justify-content-between w-100">
+            <h4 class="card-title">Качество данных</h4>
+            <span class="badge bg-{{ report.quality.issue_count > 0 ? 'yellow' : 'green' }} text-{{ report.quality.issue_count > 0 ? 'dark' : 'white' }}">
+                {{ report.quality.issue_count > 0 ? report.quality.issue_count ~ ' замечаний' : 'Без замечаний' }}
+            </span>
+        </div>
+    </div>
+    <div class="list-group list-group-flush">
+        {% for key, label in report.quality_labels %}
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <span>{{ label }}</span>
+                <span class="badge bg-{{ attribute(report.quality, key) > 0 ? 'yellow' : 'secondary' }} text-dark">
+                    {{ attribute(report.quality, key) }}
+                </span>
+            </div>
+        {% endfor %}
+    </div>
+    <div class="card-footer text-secondary small">
+        Не классифицированные поля не включаются в итог до фиксации их финансовой семантики.
+    </div>
+</div>

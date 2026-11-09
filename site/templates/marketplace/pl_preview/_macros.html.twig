@@ -1,0 +1,22 @@
+{#
+  Значение строки ОПиУ по формату строки, как в отчёте ОПиУ (finance/report/preview.html.twig):
+  деньги — vf_amount, процент и коэффициент — vf_number; отрицательные — в скобках
+  (согласованный для ОПиУ бухгалтерский формат, DS-Money). title совпадает с видимым текстом.
+#}
+{% macro cell(value, format, class) %}
+    {%- set kind = format.value ?? 'MONEY' -%}
+    {%- set negative = value < 0 -%}
+    {%- set abs = negative ? -value : value -%}
+    {%- if kind == 'PERCENT' -%}
+        {%- set plain = (abs * 100)|vf_number(1) ~ ' %' -%}
+    {%- elseif kind == 'RATIO' -%}
+        {%- set plain = abs|vf_number(4) -%}
+    {%- else -%}
+        {%- set plain = abs|vf_number(2) -%}
+    {%- endif -%}
+    <td class="{{ class }}" title="{{ negative ? '(' ~ plain ~ ')' : plain }}">
+        {%- if negative %}({% endif -%}
+        {%- if kind == 'MONEY' %}{{ abs|vf_amount }}{% else %}{{ plain }}{% endif -%}
+        {%- if negative %}){% endif -%}
+    </td>
+{% endmacro %}

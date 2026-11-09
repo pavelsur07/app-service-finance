@@ -1,0 +1,51 @@
+{# «Сводка по reportId». Параметры: report, filters. #}
+{% import 'marketplace/wb_finance_report/_macros.html.twig' as report_ui %}
+<div class="card h-100">
+    <div class="card-header">
+        <h4 class="card-title">Сводка по reportId</h4>
+    </div>
+    {% if report.reports is empty %}
+        <div class="card-body text-center text-secondary py-5">
+            Для выбранных фильтров нет строк с reportId.
+        </div>
+    {% else %}
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+                <thead>
+                <tr>
+                    <th>reportId</th>
+                    <th>Период raw</th>
+                    <th class="text-end">Строк</th>
+                    <th class="text-end">Расчётное перечисление</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in report.reports %}
+                    <tr>
+                        <td>
+                            {% if row.report_id == 'Без reportId' %}
+                                <span class="text-warning">{{ row.report_id }}</span>
+                            {% elseif row.report_id matches '/^[1-9][0-9]{0,31}$/' %}
+                                <a href="{{ path('marketplace_wb_finance_report', {
+                                    date_from: filters.date_from,
+                                    date_to: filters.date_to,
+                                    report_id: row.report_id
+                                }) }}">{{ row.report_id }}</a>
+                            {% else %}
+                                {{ row.report_id }}
+                            {% endif %}
+                        </td>
+                        <td class="text-secondary text-nowrap">
+                            {{ row.date_from|date('d.m.Y') }} — {{ row.date_to|date('d.m.Y') }}
+                        </td>
+                        <td class="text-end">{{ row.row_count|vf_number }}</td>
+                        <td class="text-end text-nowrap fw-semibold">
+                            {{ report_ui.money(row.payout_minor) }}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>

@@ -1,0 +1,53 @@
+{#
+  Таблица ОПиУ: статьи × колонки (теги или проекты), дерево строк. Параметры: report, filter.
+#}
+{% import 'marketplace/pl_preview/_macros.html.twig' as ui %}
+{% set value_columns = report.columns|length %}
+{% set visible_rows = report.visibleRows(filter.showEmptyRows) %}
+{% if visible_rows is not empty %}
+    <div class="d-flex gap-2 mb-2" data-testid="pl-preview-tree-controls">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-pl-expand-all>Развернуть все</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-pl-collapse-all>Свернуть до уровня 1</button>
+    </div>
+{% endif %}
+<div class="card table-responsive mb-4">
+    <table class="table table-vcenter pl-preview-table mb-0" data-testid="pl-preview-table" data-pl-tree
+           style="min-width: calc(var(--pl-col-name) + {{ value_columns }} * var(--pl-col-value));">
+        <colgroup>
+            <col class="pl-col-name">
+            {% for column in report.columns %}<col class="pl-col-value">{% endfor %}
+        </colgroup>
+        <thead>
+            <tr>
+                <th>Статья</th>
+                {% for column in report.columns %}
+                    <th class="text-end{{ column.kind.value == 'total' ? ' pl-cell-total' }}" title="{{ column.indentedLabel }}" data-column="{{ column.key }}">{{ column.indentedLabel }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in visible_rows %}
+                {% set has_children = visible_rows[loop.index] is defined and visible_rows[loop.index].level > row.level %}
+                <tr class="pl-row{{ has_children ? ' fw-bold' }}" data-row-id="{{ row.id }}" data-row-code="{{ row.code }}" data-level="{{ row.level }}">
+                    <td style="padding-left: {{ 12 + (row.level - 1) * 20 }}px;" title="{{ row.name }}">
+                        {%- if has_children -%}
+                            <button class="pl-name pl-toggle" type="button" data-target="{{ row.id }}" aria-expanded="true">{{ row.name }}</button>
+                        {%- else -%}
+                            <span class="pl-name">{{ row.name }}</span>
+                        {%- endif -%}
+                    </td>
+                    {% for column in report.columns %}
+                        {{ ui.cell(row.values[column.key] ?? 0, row.format, 'text-end' ~ (column.kind.value == 'total' ? ' fw-bold pl-cell-total')) }}
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+            {% if visible_rows is empty %}
+                <tr>
+                    <td colspan="{{ value_columns + 1 }}" class="text-secondary" data-testid="pl-preview-empty">
+                        {{ report.rows is empty ? 'У компании нет дерева статей ОПиУ.' : 'За период нет сумм, которые попадут в ОПиУ.' }}
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>

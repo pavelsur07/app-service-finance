@@ -1,0 +1,96 @@
+{#
+  Фильтры предпросмотра: период, маркетплейс, колонки (теги / проекты), пустые строки, выгрузка xlsx, пресеты периода.
+  Параметры: filter, marketplaces, tags, projects, projects_mode, base_query, report.
+#}
+<form method="get" class="d-flex flex-wrap align-items-end gap-3 mb-2" data-testid="pl-preview-filter">
+    <div>
+        <label class="form-label" for="pl-preview-from">С</label>
+        <input class="form-control" type="date" id="pl-preview-from" name="dateFrom" value="{{ filter.from|date('Y-m-d') }}">
+    </div>
+    <div>
+        <label class="form-label" for="pl-preview-to">По</label>
+        <input class="form-control" type="date" id="pl-preview-to" name="dateTo" value="{{ filter.to|date('Y-m-d') }}">
+    </div>
+    <div>
+        <label class="form-label" for="pl-preview-marketplace">Маркетплейс</label>
+        <select class="form-select" id="pl-preview-marketplace" name="marketplace">
+            <option value="">Все</option>
+            {% for marketplace in marketplaces %}
+                <option value="{{ marketplace.value }}" {{ filter.marketplace == marketplace ? 'selected' }}>{{ marketplace.displayName }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label class="form-label" for="pl-preview-columns">Колонки</label>
+        <select class="form-select" id="pl-preview-columns" name="columns" data-pl-columns-mode data-testid="pl-preview-columns">
+            <option value="tags" {{ not projects_mode ? 'selected' }}>По тегам</option>
+            <option value="projects" {{ projects_mode ? 'selected' }}>По проектам</option>
+        </select>
+    </div>
+    {% if tags is not empty %}
+        <div class="dropdown" data-pl-columns-for="tags" {{ projects_mode ? 'hidden' }}>
+            <span class="form-label d-block" id="pl-preview-tags-label">Теги</span>
+            <input type="hidden" name="tags_set" value="1">
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" id="pl-preview-tags-button" aria-labelledby="pl-preview-tags-label pl-preview-tags-button">
+                {{ filter.tagIds is null ? 'Все теги' : 'Выбрано: ' ~ filter.tagIds|length }}
+            </button>
+            <div class="dropdown-menu p-2 pl-preview-tags" data-testid="pl-preview-tags">
+                {% for tag in tags %}
+                    <label class="form-check dropdown-item">
+                        <input class="form-check-input" type="checkbox" name="tags[]" value="{{ tag.id }}"
+                               {{ filter.tagIds is null or tag.id in filter.tagIds ? 'checked' }}>
+                        <span class="form-check-label">{{ tag.name }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+    {% if projects is not empty %}
+        <div class="dropdown" data-pl-columns-for="projects" {{ not projects_mode ? 'hidden' }}>
+            <span class="form-label d-block" id="pl-preview-projects-label">Проекты</span>
+            <input type="hidden" name="projects_set" value="1">
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" id="pl-preview-projects-button" aria-labelledby="pl-preview-projects-label pl-preview-projects-button">
+                {{ filter.projectIds is null ? 'Все проекты' : 'Выбрано: ' ~ filter.projectIds|length }}
+            </button>
+            <div class="dropdown-menu p-2 pl-preview-tags" data-testid="pl-preview-projects">
+                {% for project in projects %}
+                    <label class="form-check dropdown-item">
+                        <input class="form-check-input" type="checkbox" name="projects[]" value="{{ project.id }}"
+                               {{ filter.projectIds is null or project.id in filter.projectIds ? 'checked' }}>
+                        <span class="form-check-label">{% if project.level > 1 %}{% for i in 2..project.level %}— {% endfor %}{% endif %}{{ project.name }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+    <label class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" name="empty" value="1" {{ filter.showEmptyRows ? 'checked' }}>
+        <span class="form-check-label">Показывать пустые строки</span>
+    </label>
+    <button type="submit" class="btn btn-primary">Показать</button>
+    {% if report is not null %}
+        <div class="dropdown" data-testid="pl-preview-export">
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="pl-preview-export-button">
+                <i class="ti ti-file-spreadsheet" aria-hidden="true"></i>
+                Скачать xlsx
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" aria-labelledby="pl-preview-export-button">
+                <a class="dropdown-item flex-column align-items-start" href="{{ path('marketplace_pl_preview_xlsx', base_query) }}" data-testid="pl-preview-xlsx">
+                    <span>Таблица как на экране</span>
+                    <small class="text-secondary">Статьи × {{ projects_mode ? 'проекты' : 'теги' }} — для просмотра и печати</small>
+                </a>
+                <a class="dropdown-item flex-column align-items-start" href="{{ path('marketplace_pl_preview_rows_xlsx', base_query) }}" data-testid="pl-preview-rows-xlsx">
+                    <span>Строками для план-факта</span>
+                    <small class="text-secondary">Одна сумма — одна строка, по каналам и {{ projects_mode ? 'проектам' : 'тегам' }}</small>
+                </a>
+            </div>
+        </div>
+    {% endif %}
+</form>
+{% include 'partials/_period_presets.html.twig' with {
+    route: 'marketplace_pl_preview_index',
+    params: base_query|filter((v, k) => k != 'dateFrom' and k != 'dateTo'),
+    current_from: filter.from|date('Y-m-d'),
+    current_to: filter.to|date('Y-m-d'),
+    class: 'vf-seg mb-3',
+} only %}

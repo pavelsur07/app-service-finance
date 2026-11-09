@@ -1,0 +1,77 @@
+{# «Не попадёт в ОПиУ»: затраты и продажи без правила, правила на отсутствующие статьи. Параметры: report. #}
+{% set unmapped = report.unmappedCosts %}
+{% set unmapped_sales = report.salesWithoutMapping %}
+<h3 class="mb-2">Не попадёт в ОПиУ</h3>
+{% if unmapped is empty and unmapped_sales is empty and report.unplaced is empty %}
+    <p class="text-secondary" data-testid="pl-preview-all-mapped">Все данные периода попадут в ОПиУ.</p>
+{% endif %}
+
+{% if unmapped is not empty %}
+    <div class="card mb-3" data-testid="pl-preview-unmapped-costs">
+        <div class="card-header">
+            <h4 class="card-title mb-0">Затраты без решения по ОПиУ</h4>
+            <a class="ms-auto" href="{{ path('marketplace_cost_pl_mapping_index') }}">Маппинг затрат</a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+                <thead><tr><th>Маркетплейс</th><th>Категория затрат</th><th class="text-end">Строк</th><th class="text-end">Сумма, ₽</th></tr></thead>
+                <tbody>
+                    {% for row in unmapped %}
+                        <tr>
+                            <td>{{ row.marketplace.displayName }}</td>
+                            <td>{{ row.costCategoryName ?? 'Без категории' }}{% if row.costCategoryCode %} <code>{{ row.costCategoryCode }}</code>{% endif %}</td>
+                            <td class="text-end">{{ row.rowsCount|vf_number }}</td>
+                            <td class="text-end">{{ row.netAmount|vf_amount }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+{% if unmapped_sales is not empty %}
+    <div class="card mb-3" data-testid="pl-preview-unmapped-sales">
+        <div class="card-header">
+            <h4 class="card-title mb-0">Продажи и возвраты без правила ОПиУ</h4>
+            <a class="ms-auto" href="{{ path('marketplace_pl_mappings_index') }}">Маппинг ОПиУ</a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+                <thead><tr><th>Маркетплейс</th><th>Вид</th><th class="text-end">Строк</th><th class="text-end">Сумма, ₽</th></tr></thead>
+                <tbody>
+                    {% for row in unmapped_sales %}
+                        <tr>
+                            <td>{{ row.marketplace.displayName }}</td>
+                            <td>{{ row.kind.label }}</td>
+                            <td class="text-end">{{ row.rowsCount|vf_number }}</td>
+                            <td class="text-end">{{ row.amount|vf_amount }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+{% if report.unplaced is not empty %}
+    <div class="card mb-3" data-testid="pl-preview-unplaced">
+        <div class="card-header">
+            <h4 class="card-title mb-0">Правила ведут на статьи, которых нет в отчёте ОПиУ</h4>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+                <thead><tr><th>Статья</th><th>Причина</th><th class="text-end">Сумма, ₽</th></tr></thead>
+                <tbody>
+                    {% for item in report.unplaced %}
+                        <tr>
+                            <td>{{ item.categoryName ?? 'Статья удалена или недоступна' }}</td>
+                            <td>{{ item.reason.label }}</td>
+                            <td class="text-end">{{ (item.values['total'] ?? 0)|vf_amount }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}

@@ -1,0 +1,83 @@
+{# Источник данных, предупреждение о пустом отчёте и KPI. Параметры: report. #}
+{% import 'marketplace/wb_finance_report/_macros.html.twig' as report_ui %}
+<div class="alert alert-info mb-3" role="status">
+    <div class="d-flex">
+            <div>
+                <div class="fw-semibold">Источник: завершённые raw-документы WB</div>
+                <div>
+                    В итог попадают только документы, связанные со статусами дневной загрузки.
+                    Частично загруженные staging-документы и финансовые транзакции не читаются.
+                </div>
+                {% if report.meta.last_sync_at %}
+                    <div class="mt-1">
+                        Последняя загрузка:
+                        {{ report.meta.last_sync_at|date('d.m.Y H:i', 'Europe/Moscow') }}
+                    </div>
+                {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if report.summary.row_count == 0 %}
+    <div class="alert alert-warning mb-3" role="status">
+        В завершённых raw-документах нет строк по выбранным фильтрам.
+        Проверьте покрытие загрузки ниже или измените период/reportId.
+    </div>
+{% endif %}
+
+<div class="row row-cards mb-3">
+    <div class="col-sm-6 col-xl">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-secondary mb-1">Строк raw</div>
+                <div class="h2 mb-0">{{ report.summary.row_count|vf_number }}</div>
+                <div class="text-secondary small">
+                    Загружено: {{ report.coverage.loaded_rows|vf_number }},
+                    reportId: {{ report.summary.report_count }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-secondary mb-1">Продажи без СПП</div>
+                <div class="h2 mb-0">{{ report_ui.money(report.summary.sale_without_spp_minor) }}</div>
+                <div class="text-secondary small">Продажи минус возвраты</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-secondary mb-1">Расходы WB (нетто)</div>
+                <div class="h2 mb-0">{{ report_ui.money(report.summary.wb_costs_minor) }}</div>
+                <div class="text-secondary small">Комиссия, эквайринг, удержания и выплаты</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl">
+        <div class="card h-100 border-primary">
+            <div class="card-body">
+                <div class="text-secondary mb-1">Расчётное перечисление</div>
+                <div class="h2 mb-0">
+                    {{ report_ui.money(report.summary.payout_minor) }}
+                </div>
+                <div class="text-secondary small">forPay + прочие начисления/удержания</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-secondary mb-1">Покрытие загрузки</div>
+                <div class="h2 mb-0">
+                    {{ report.coverage.days_with_status }} / {{ report.coverage.expected_days }}
+                </div>
+                <div class="text-secondary small">
+                    дней со статусом
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

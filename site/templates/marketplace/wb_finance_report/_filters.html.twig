@@ -1,0 +1,45 @@
+{# Фильтры: период и reportId. Параметры: filters (date_from, date_to, report_id). #}
+<form method="get" class="card card-body mb-3">
+    <div class="row g-3 align-items-end">
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label" for="wb-report-date-from">Дата с</label>
+            <input
+                id="wb-report-date-from"
+                type="date"
+                name="date_from"
+                class="form-control"
+                value="{{ filters.date_from }}"
+                required
+            >
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label" for="wb-report-date-to">Дата по</label>
+            <input
+                id="wb-report-date-to"
+                type="date"
+                name="date_to"
+                class="form-control"
+                value="{{ filters.date_to }}"
+                required
+            >
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label" for="wb-report-id">reportId</label>
+            <input
+                id="wb-report-id"
+                type="text"
+                inputmode="numeric"
+                name="report_id"
+                class="form-control"
+                value="{{ filters.report_id }}"
+                maxlength="32"
+                placeholder="Все отчёты"
+            >
+        </div>
+        <div class="col-sm-6 col-lg-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-fill">Сформировать</button>
+            <a href="{{ path('marketplace_wb_finance_report') }}" class="btn btn-outline-secondary">Сбросить</a>
+        </div>
+    </div>
+    <div class="form-hint mt-2">Максимальный период — 93 календарных дня.</div>
+</form>
