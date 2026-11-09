@@ -238,3 +238,5 @@ A1 — 1 PR, A2 — 1–2 PR, B–F — по 1 PR, G — 1 PR: всего 8–9 
 - `npm run lint` 0; `vite build` OK; `composer cs:twig` — No violation; `lint:twig` — 323 файла OK;
   функциональные тесты страниц (117 тестов: предпросмотр ОПиУ, остатки, подключения, отчёт ОПиУ, ДДС) — OK после
   правки одного теста.
+- `make site-test` (полный, своя БД `app_test_a1`) — OK (8571 tests, 48241 assertions).
+- Внешнее ревью Codex против master f00d9e26f — `REVIEW_GREEN` с первого раунда (дифф 1062 строки).
