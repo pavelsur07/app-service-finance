@@ -62,3 +62,5 @@ body.page-integrations #modal-setup .steps {
 body.page-integrations #modal-setup .steps .step-item {
   flex: 1;
 }
+
+/* TODO(ds): без токена — px-значений 3 (размеры колонок, отступы, шрифты; перенос 1:1, замена на токены --vf-space-N, --vf-size-N и цветовые --vf- — DS-проходом, когда токены для них появятся). */

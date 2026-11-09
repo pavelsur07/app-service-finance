@@ -30,3 +30,5 @@ table.t-table[data-mapping-errors-table] {
 [data-mapping-errors-table] :is(td:nth-child(1), td:nth-child(3) code) { overflow-wrap: anywhere; }
 [data-mapping-errors-table] :is(th, td):nth-child(4),
 [data-mapping-errors-table] :is(th, td):nth-child(6) { white-space: nowrap; }
+
+/* TODO(ds): без токена — px-значений 8 (размеры колонок, отступы, шрифты; перенос 1:1, замена на токены --vf-space-N, --vf-size-N и цветовые --vf- — DS-проходом, когда токены для них появятся). */

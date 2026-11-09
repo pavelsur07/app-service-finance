@@ -35,3 +35,5 @@
     text-align: center;
 }
 .table.cf-table .cf-toggle { cursor: pointer; }
+
+/* TODO(ds): без токена — px-значений 4 (размеры колонок, отступы, шрифты; перенос 1:1, замена на токены --vf-space-N, --vf-size-N и цветовые --vf- — DS-проходом, когда токены для них появятся). */
