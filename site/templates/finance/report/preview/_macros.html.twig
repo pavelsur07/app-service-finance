@@ -1,0 +1,25 @@
+{#
+  Ячейка значения ОПиУ. Значения приходят из PHP строкой ValueFormatter (её же отдаёт
+  JSON): деньги и количество «-1 234.50», коэффициент — 4 знака, процент — «12.5 %».
+  Разбираем строку здесь по формату строки: деньги — vf_amount (копейки приглушены),
+  остальное — vf_number с прежней точностью. Отрицательные — в скобках: бухгалтерский
+  формат допустим в отчётах (DS-Money). title совпадает с видимым текстом.
+#}
+{% macro cell(raw, format, class) %}
+    {%- if raw is null or raw == '—' -%}
+        <td class="{{ class }}" title="—">—</td>
+    {%- else -%}
+        {%- set kind = format.value ?? 'MONEY' -%}
+        {%- set n = raw|replace({' ': '', '%': ''}) -%}
+        {%- set negative = n starts with '-' -%}
+        {%- set abs = negative ? n|slice(1) : n -%}
+        {%- set digits = {'MONEY': 2, 'QTY': 2, 'RATIO': 4, 'PERCENT': 1}[kind] ?? 2 -%}
+        {%- set suffix = kind == 'PERCENT' ? ' %' : '' -%}
+        {%- set plain = abs|vf_number(digits) ~ suffix -%}
+        <td class="{{ class }}" title="{{ negative ? '(' ~ plain ~ ')' : plain }}">
+            {%- if negative %}({% endif -%}
+            {%- if kind == 'MONEY' %}{{ abs|vf_amount }}{% else %}{{ plain }}{% endif -%}
+            {%- if negative %}){% endif -%}
+        </td>
+    {%- endif -%}
+{% endmacro %}

@@ -1,0 +1,42 @@
+{#
+  Основная таблица ДДС по каждой валюте: сальдо на начало, статьи, сальдо на конец.
+  Параметры: openings, closings, periods, periodCount, categories, categoryTotals.
+#}
+{% import 'report/cashflow/_macros.html.twig' as macros %}
+{% for currency, values in openings %}
+    <div class="card mb-4">
+        <div class="table-responsive">
+            <table class="table table-bordered cf-table" data-cashflow-report style="min-width: calc(var(--cf-col-name) + {{ periodCount }} * var(--cf-col-period));">
+                <colgroup>
+                    <col class="cf-col-name">
+                    {% for p in periods %}<col class="cf-col-period">{% endfor %}
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Категория</th>
+                        {% for p in periods %}
+                            <th>{{ p.label }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="fw-bold">
+                        <td>Сальдо на начало</td>
+                        {% for i in 0..periodCount - 1 %}
+                            <td class="text-end">{{ macros.format_amount(openings[currency][i])|raw }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% for cat in categories %}
+                        {{ macros.render_category(cat, categoryTotals, currency, periodCount, '') }}
+                    {% endfor %}
+                    <tr class="fw-bold">
+                        <td>Сальдо на конец</td>
+                        {% for i in 0..periodCount - 1 %}
+                            <td class="text-end">{{ macros.format_amount(closings[currency][i])|raw }}</td>
+                        {% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endfor %}

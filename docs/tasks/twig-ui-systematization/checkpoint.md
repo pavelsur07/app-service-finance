@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 5 IN PROGRESS (старт 09.11.2026) — A1 на проде, A2 на handoff
-**Status:** Stage 1–4 на проде (#2909–#2933); Stage 5 A1 на проде (#2944, 09.11 07:56Z); A2 — JS остальных 18 файлов, отчёт в `stages/stage-5.md`
-**Stage base commit:** master adf346c84 (после #2944) · ветка `refactor/twig-ui-stage-5a2`
+**Phase:** Stage 5 IN PROGRESS (старт 09.11.2026) — A1, A2 на проде, B на handoff
+**Status:** Stage 1–4 на проде (#2909–#2933); Stage 5 A1 (#2944) и A2 (#2945, 09.11 10:33Z) на проде; B — финансовые отчёты на партиалы, отчёт в `stages/stage-5.md`
+**Stage base commit:** master 00260267e (после #2945) · ветка `refactor/twig-ui-stage-5b`
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -75,8 +75,8 @@
 - Stage 3 на проде 08.11 06:00Z (деплой с головы master после #2927; прогон #2926 упал на flaky-тесте, rerun не нужен).
 
 ### Exact next action
-- A2 — PR на handoff; после merge and deploy — B (финансовые отчёты: `report/cashflow`, `finance/report/preview`,
-  `report/cashflow_ops_check`) с ветки от свежего master, сверка `site/bin/html-snapshot.sh`
+- B — PR на handoff; после merge and deploy — C (отчёты маркетплейса: `marketplace/wb_finance_report`,
+  `marketplace/pl_preview/index`) с ветки от свежего master, сверка `site/bin/html-snapshot.sh`
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`

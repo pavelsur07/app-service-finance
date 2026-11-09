@@ -1,0 +1,99 @@
+{# «Что это за отчёт»: описание обоих блоков, фильтров и экспорта. Без параметров. #}
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="d-flex align-items-center mb-2">
+            <i class="ti ti-report-search me-2"></i>
+            <h3 class="card-title mb-0">Что это за отчёт</h3>
+        </div>
+
+        <div class="alert alert-info mt-3" role="alert">
+            <div class="d-flex">
+                <div class="me-3"><i class="ti ti-info-circle"></i></div>
+                <div>
+                    <strong>Проверка операций ДДС</strong> — диагностика денег после импорта и автоправил.
+                    Помогает найти: неверные знаки сумм (приход/расход), операции без категории, возможные дубли
+                    и расхождения между операциями за день и ежедневными остатками по счёту.
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card card-borderless">
+                    <div class="card-header px-0">
+                        <h4 class="card-title">1) Транзакции — быстрые флаги</h4>
+                    </div>
+                    <div class="card-body px-0 pt-0">
+                        <ul class="list-unstyled mb-2">
+                            <li class="mb-1">
+                                <span class="badge bg-danger me-1">Знак</span>
+                                сумма не соответствует направлению (INFLOW/OUTFLOW).
+                            </li>
+                            <li class="mb-1">
+                                <span class="badge bg-warning-lt me-1">Нет категории</span>
+                                операцию нужно привязать к статье ДДС.
+                            </li>
+                            <li class="mb-1">
+                                <span class="badge bg-danger me-1">Дубль</span>
+                                одинаковые <code>import_source + external_id</code> встретились более одного раза.
+                            </li>
+                        </ul>
+                        <div class="text-muted small">
+                            Совет: сначала исправь ошибки в этой таблице — это часто снимает расхождения в сверке.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card card-borderless">
+                    <div class="card-header px-0">
+                        <h4 class="card-title">2) Сверка «дата × счёт»</h4>
+                    </div>
+                    <div class="card-body px-0 pt-0">
+                        <p class="mb-2">
+                            Сравнивает дневные итоги из <em>ежедневных остатков</em> с суммой операций за тот же день и счёт.
+                            Если строка подсвечена красным и <strong>Δ закрытия</strong> ≠ 0 — где-то недостаёт операция,
+                            перепутан знак или есть дубль.
+                        </p>
+                        <ul class="text-muted small ps-3">
+                            <li>Формула: <code>Открытие + Приход - Расход = Закрытие</code>.</li>
+                            <li>«по транз.» — расчёт по сумме операций за день (CashTransaction).</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <hr class="my-3"/>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <h4 class="card-title">Фильтры</h4>
+                <ul class="text-muted mb-0">
+                    <li><strong>Период</strong> — по дате операции.</li>
+                    <li><strong>Счёт</strong> — можно анализировать все счета или один конкретный.</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h4 class="card-title">Экспорт</h4>
+                <p class="text-muted mb-0">
+                    Кнопки «Экспорт CSV» выгружают обе части отчёта отдельно (удобно для Excel/разбора).
+                </p>
+            </div>
+        </div>
+
+        <div class="alert alert-secondary mt-3" role="alert">
+            <div class="d-flex">
+                <div class="me-3"><i class="ti ti-bulb"></i></div>
+                <div class="small">
+                    <strong>Как разруливать расхождения:</strong>
+                    1) проверь знак и категорию в «Транзакциях»;
+                    2) убедись, что все операции за день импортированы (нет пропусков);
+                    3) проверь дубли по <code>import_source + external_id</code>.
+                    После исправлений пересчёт ежедневных остатков снимет красные строки.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

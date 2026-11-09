@@ -1,0 +1,55 @@
+{#
+  Режим сверки с дашбордом: пояснение и карточки прихода, расхода, чистого потока.
+  Параметры: dashboard_reconciliation, dashboard_activity_labels, date_from, date_to, reset_state.
+#}
+<div class="alert alert-info" data-cashflow-reconciliation>
+    <div class="d-flex justify-content-between align-items-start gap-3">
+        <div>
+            <div class="fw-bold mb-1">Сверка с показателями дашборда</div>
+            <div>
+                Период: {{ date_from|date('d.m.Y') }} – {{ date_to|date('d.m.Y') }} ·
+                Вид деятельности: {{ dashboard_activity_labels[dashboard_reconciliation.activity]|default(dashboard_reconciliation.activity) }} ·
+                Валюта: {{ dashboard_reconciliation.currency }}
+            </div>
+            <div class="mt-2">
+                Движения рассчитаны по тем же правилам, что и оборотные виджеты: переводы, удалённые операции и технические статьи исключены.
+                {% if dashboard_reconciliation.activity == 'all' %}
+                    Нераспределённые статьи включены.
+                {% else %}
+                    Нераспределённые статьи исключены для выбранного вида деятельности.
+                {% endif %}
+            </div>
+            <div class="mt-2">
+                Сальдо ДДС остаётся общим по компании: учитывает в выбранной валюте архивные счета, переводы и технические статьи. Поэтому оно может отличаться от остатка дашборда, где учитываются только активные счета.
+            </div>
+        </div>
+        <a href="{{ path('report_cashflow_index', reset_state) }}" class="btn btn-outline-secondary btn-sm" data-cashflow-reconciliation-exit>Обычный ДДС</a>
+    </div>
+</div>
+
+<div class="row row-cards mb-3" role="group" aria-label="Показатели для сверки с дашбордом">
+    <div class="col-sm-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="text-secondary">Приход</div>
+                <div class="h2 mb-0" data-cashflow-reconciliation-kpi="inflow" data-value="{{ dashboard_reconciliation.inflow }}">{{ dashboard_reconciliation.inflow|vf_money(2, dashboard_reconciliation.currency) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="text-secondary">Расход</div>
+                <div class="h2 mb-0" data-cashflow-reconciliation-kpi="outflow" data-value="{{ dashboard_reconciliation.outflow }}">{{ dashboard_reconciliation.outflow|vf_money(2, dashboard_reconciliation.currency) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="text-secondary">Чистый поток</div>
+                <div class="h2 mb-0" data-cashflow-reconciliation-kpi="net" data-value="{{ dashboard_reconciliation.net }}">{{ dashboard_reconciliation.net|vf_money(2, dashboard_reconciliation.currency) }}</div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,32 +1,5 @@
 {% extends 'base.html.twig' %}
 
-{#
-  Ячейка значения ОПиУ. Значения приходят из PHP строкой ValueFormatter (её же отдаёт
-  JSON): деньги и количество «-1 234.50», коэффициент — 4 знака, процент — «12.5 %».
-  Разбираем строку здесь по формату строки: деньги — vf_amount (копейки приглушены),
-  остальное — vf_number с прежней точностью. Отрицательные — в скобках: бухгалтерский
-  формат допустим в отчётах (DS-Money). title совпадает с видимым текстом.
-#}
-{% macro cell(raw, format, class) %}
-    {%- if raw is null or raw == '—' -%}
-        <td class="{{ class }}" title="—">—</td>
-    {%- else -%}
-        {%- set kind = format.value ?? 'MONEY' -%}
-        {%- set n = raw|replace({' ': '', '%': ''}) -%}
-        {%- set negative = n starts with '-' -%}
-        {%- set abs = negative ? n|slice(1) : n -%}
-        {%- set digits = {'MONEY': 2, 'QTY': 2, 'RATIO': 4, 'PERCENT': 1}[kind] ?? 2 -%}
-        {%- set suffix = kind == 'PERCENT' ? ' %' : '' -%}
-        {%- set plain = abs|vf_number(digits) ~ suffix -%}
-        <td class="{{ class }}" title="{{ negative ? '(' ~ plain ~ ')' : plain }}">
-            {%- if negative %}({% endif -%}
-            {%- if kind == 'MONEY' %}{{ abs|vf_amount }}{% else %}{{ plain }}{% endif -%}
-            {%- if negative %}){% endif -%}
-        </td>
-    {%- endif -%}
-{% endmacro %}
-{% import _self as pl_ui %}
-
 {% block title %}Отчёт о прибылях и убытках{% endblock %}
 
 {% block body %}
@@ -142,218 +115,23 @@
             </div>
         </header>
 
-        <form id="pl-preview-filter-form" data-report-filters class="card card-body pl-preview-controls-card mb-3" method="get">
-            <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}" data-pl-exact-from>
-            <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}" data-pl-exact-to>
-            <input type="hidden" name="grouping" value="{{ grouping }}" data-pl-grouping>
-            <input type="hidden" name="layout" value="{{ layout }}" data-pl-layout>
-            {% if projectFilterTracked %}
-                <input type="hidden" name="projectFiltersPresent" value="1">
-            {% endif %}
-            {% if responsibilityCenterFilterTracked %}
-                <input type="hidden" name="responsibilityCenterFiltersPresent" value="1">
-            {% endif %}
-
-            <div class="pl-preview-controls-row">
-                <details class="pl-preview-dropdown">
-                    <summary class="pl-preview-period-button">
-                        <i class="ti ti-calendar" aria-hidden="true"></i>
-                        <span>{{ from|date('d.m.Y') }} — {{ to|date('d.m.Y') }}</span>
-                        <i class="ti ti-chevron-down" aria-hidden="true"></i>
-                    </summary>
-                    <div class="pl-preview-dropdown-menu">
-                        <button
-                            class="pl-preview-preset"
-                            type="button"
-                            data-pl-period-from="{{ date('now')|date('Y') }}-01-01"
-                            data-pl-period-to="{{ date('last day of this month')|date('Y-m-d') }}"
-                        >
-                            С начала года
-                        </button>
-                        <button
-                            class="pl-preview-preset"
-                            type="button"
-                            data-pl-period-from="{{ date('first day of -2 months')|date('Y-m-d') }}"
-                            data-pl-period-to="{{ date('last day of this month')|date('Y-m-d') }}"
-                        >
-                            Последние 3 месяца
-                        </button>
-                        <button
-                            class="pl-preview-preset"
-                            type="button"
-                            data-pl-period-from="{{ date('first day of last month')|date('Y-m-d') }}"
-                            data-pl-period-to="{{ date('last day of last month')|date('Y-m-d') }}"
-                        >
-                            Предыдущий месяц
-                        </button>
-                        <button
-                            class="pl-preview-preset"
-                            type="button"
-                            data-pl-period-from="{{ date('first day of this month')|date('Y-m-d') }}"
-                            data-pl-period-to="{{ date('last day of this month')|date('Y-m-d') }}"
-                        >
-                            Текущий месяц
-                        </button>
-                        <div class="pl-preview-month-range">
-                            <div class="pl-preview-month-field">
-                                <label for="pl-preview-month-from">С</label>
-                                <input
-                                    class="form-control"
-                                    id="pl-preview-month-from"
-                                    type="month"
-                                    value="{{ from|date('Y-m') }}"
-                                    data-pl-month-from
-                                >
-                            </div>
-                            <div class="pl-preview-month-field">
-                                <label for="pl-preview-month-to">По</label>
-                                <input
-                                    class="form-control"
-                                    id="pl-preview-month-to"
-                                    type="month"
-                                    value="{{ to|date('Y-m') }}"
-                                    data-pl-month-to
-                                >
-                            </div>
-                        </div>
-                    </div>
-                </details>
-
-                <div class="pl-preview-control-group">
-                    <span class="pl-preview-control-label">Группировка</span>
-                    <div class="pl-preview-segmented{{ layout == 'projects' ? ' is-disabled' }}" role="group" aria-label="Группировка">
-                        <button
-                            class="{{ grouping == 'month' ? 'is-active' }}"
-                            type="button"
-                            data-pl-set="grouping"
-                            data-pl-value="month"
-                            {% if layout == 'projects' %}disabled aria-disabled="true"{% endif %}
-                        >Месяц</button>
-                        <button
-                            class="{{ grouping == 'quarter' ? 'is-active' }}"
-                            type="button"
-                            data-pl-set="grouping"
-                            data-pl-value="quarter"
-                            {% if layout == 'projects' %}disabled aria-disabled="true"{% endif %}
-                        >Квартал</button>
-                    </div>
-                </div>
-
-                <div class="pl-preview-control-group">
-                    <span class="pl-preview-control-label">Режим</span>
-                    <div class="pl-preview-segmented" role="group" aria-label="Режим отображения">
-                        <button
-                            class="{{ layout == 'periods' ? 'is-active' }}"
-                            type="button"
-                            data-pl-set="layout"
-                            data-pl-value="periods"
-                        >По периодам</button>
-                        <button
-                            class="{{ layout == 'projects' ? 'is-active' }}"
-                            type="button"
-                            data-pl-set="layout"
-                            data-pl-value="projects"
-                        >По проектам</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="pl-preview-filters-row">
-                <span class="pl-preview-control-label">Фильтры:</span>
-
-                <details class="pl-preview-dropdown">
-                    <summary class="pl-preview-filter-chip{{ projectFilterActive ? ' is-active' }}">
-                        <i class="ti ti-briefcase" aria-hidden="true"></i>
-                        {% if uiSelectedProjectDirectionIds is null %}
-                            Проекты: Все
-                        {% else %}
-                            Проекты: {{ uiSelectedProjectDirectionIds|length }}
-                        {% endif %}
-                        <i class="ti ti-chevron-down" aria-hidden="true"></i>
-                    </summary>
-                    <div class="pl-preview-dropdown-menu pl-preview-filter-menu">
-                        {% for projectDirection in projectDirections %}
-                            <label class="pl-preview-filter-option" for="pl-preview-project-{{ projectDirection.id }}">
-                                <input
-                                    id="pl-preview-project-{{ projectDirection.id }}"
-                                    type="checkbox"
-                                    name="projectDirectionIds[]"
-                                    value="{{ projectDirection.id }}"
-                                    data-pl-filter-input="projects"
-                                    {{ uiSelectedProjectDirectionIds is null or projectDirection.id in uiSelectedProjectDirectionIds ? 'checked' }}
-                                >
-                                <span>{{ projectDirection.name }}</span>
-                            </label>
-                        {% else %}
-                            <div class="pl-preview-filter-menu-empty">Нет доступных проектов</div>
-                        {% endfor %}
-                        {% if projectDirections is not empty %}
-                            <div class="pl-preview-filter-menu-footer">
-                                <button type="button" data-pl-select-all="projects">Выбрать все</button>
-                            </div>
-                        {% endif %}
-                    </div>
-                </details>
-
-                <details class="pl-preview-dropdown pl-preview-dropdown-align-end">
-                    <summary class="pl-preview-filter-chip{{ responsibilityCenterFilterActive ? ' is-active' }}">
-                        <i class="ti ti-building-warehouse" aria-hidden="true"></i>
-                        {% if selectedResponsibilityCenterIds is null %}
-                            ЦФО: Все
-                        {% else %}
-                            ЦФО: {{ selectedResponsibilityCenterIds|length }}
-                        {% endif %}
-                        <i class="ti ti-chevron-down" aria-hidden="true"></i>
-                    </summary>
-                    <div class="pl-preview-dropdown-menu pl-preview-filter-menu">
-                        {% for responsibilityCenter in responsibilityCenters %}
-                            <label class="pl-preview-filter-option" for="pl-preview-cfo-{{ responsibilityCenter.id }}">
-                                <input
-                                    id="pl-preview-cfo-{{ responsibilityCenter.id }}"
-                                    type="checkbox"
-                                    name="responsibilityCenterIds[]"
-                                    value="{{ responsibilityCenter.id }}"
-                                    data-pl-filter-input="responsibility-centers"
-                                    {{ selectedResponsibilityCenterIds is null or responsibilityCenter.id in selectedResponsibilityCenterIds ? 'checked' }}
-                                >
-                                <span>{{ responsibilityCenter.name }}</span>
-                            </label>
-                        {% else %}
-                            <div class="pl-preview-filter-menu-empty">Нет доступных ЦФО</div>
-                        {% endfor %}
-                        {% if responsibilityCenters is not empty %}
-                            <div class="pl-preview-filter-menu-footer">
-                                <button type="button" data-pl-select-all="responsibility-centers">Выбрать все</button>
-                            </div>
-                        {% endif %}
-                    </div>
-                </details>
-
-                <label class="pl-preview-meta-chip">
-                    <input
-                        type="checkbox"
-                        name="show_meta"
-                        value="1"
-                        data-pl-auto-submit
-                        {{ showMetaColumns ? 'checked' }}
-                    >
-                    <span class="pl-preview-filter-chip{{ showMetaColumns ? ' is-active' }}">
-                        <i class="ti ti-code" aria-hidden="true"></i>
-                        Код и тип
-                    </span>
-                </label>
-
-                {% if filtersActive %}
-                    <a
-                        class="pl-preview-reset"
-                        href="{{ path('finance_report_preview', resetState) }}"
-                    >
-                        <i class="ti ti-x" aria-hidden="true"></i>
-                        Сбросить фильтры
-                    </a>
-                {% endif %}
-            </div>
-        </form>
+        {% include 'finance/report/preview/_filters.html.twig' with {
+            from: from,
+            to: to,
+            grouping: grouping,
+            layout: layout,
+            projectFilterTracked: projectFilterTracked,
+            projectFilterActive: projectFilterActive,
+            uiSelectedProjectDirectionIds: uiSelectedProjectDirectionIds,
+            projectDirections: projectDirections,
+            responsibilityCenterFilterTracked: responsibilityCenterFilterTracked,
+            responsibilityCenterFilterActive: responsibilityCenterFilterActive,
+            selectedResponsibilityCenterIds: selectedResponsibilityCenterIds,
+            responsibilityCenters: responsibilityCenters,
+            showMetaColumns: showMetaColumns,
+            filtersActive: filtersActive,
+            resetState: resetState
+        } only %}
 
         {% if warnings is not empty %}
             <div class="alert alert-warning mb-3">
@@ -364,93 +142,15 @@
             </div>
         {% endif %}
 
-        {# Ширины колонок фиксированные: table-layout:fixed + colgroup. min-width считается по
-           числу колонок, иначе таблица сожмётся до контейнера вместо горизонтальной прокрутки. #}
-        {% set meta_width = showMetaColumns ? ' + var(--pl-col-meta-code) + var(--pl-col-meta-type)' : '' %}
-        {# Инлайн-значение — источник истины для группировки; объявление в CSS выше остаётся fallback. #}
-        {% set period_col_width = grouping == 'week' ? '220px' : '160px' %}
-        {% if layout == 'projects' %}
-            {% set table_min_width = 'calc(var(--pl-col-name)' ~ meta_width ~ ' + ' ~ compareProjects|length ~ ' * var(--pl-col-project) + var(--pl-col-total))' %}
-        {% else %}
-            {% set table_min_width = 'calc(var(--pl-col-name)' ~ meta_width ~ ' + ' ~ periods|length ~ ' * var(--pl-col-period))' %}
-        {% endif %}
-
-        <div class="card table-responsive">
-            {# Для этой таблицы согласован бухгалтерский формат: отрицательные значения в скобках вместо UI Kit U+2212. #}
-            <table class="table table-vcenter pl-table" data-pl-tree style="--pl-col-period: {{ period_col_width }}; min-width: {{ table_min_width }};">
-                <colgroup>
-                    <col class="pl-col-name">
-                    {% if showMetaColumns %}
-                        <col class="pl-col-meta-code">
-                        <col class="pl-col-meta-type">
-                    {% endif %}
-                    {% if layout == 'projects' %}
-                        {% for p in compareProjects %}<col class="pl-col-project">{% endfor %}
-                        <col class="pl-col-total">
-                    {% else %}
-                        {% for period in periods %}<col class="pl-col-period">{% endfor %}
-                    {% endif %}
-                </colgroup>
-                <thead>
-                    <tr>
-                        <th>Строка</th>
-                        {% if showMetaColumns %}
-                            <th>Код</th>
-                            <th>Тип</th>
-                        {% endif %}
-                        {% if layout == 'projects' %}
-                            {% for p in compareProjects %}
-                                <th class="text-end" title="{{ p.name }}{% if p.isOverhead %} (Shared){% endif %}">
-                                    {{ p.name }}{% if p.isOverhead %} <span class="text-muted">(Shared)</span>{% endif %}
-                                </th>
-                            {% endfor %}
-                            <th class="text-end pl-cell-total">Итого</th>
-                        {% else %}
-                            {% for period in periods %}
-                                <th class="text-end" title="{{ period.label }}">{{ period.label }}</th>
-                            {% endfor %}
-                        {% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for r in rows %}
-                        {# rows отсортированы depth-first, поэтому более глубокая следующая строка означает наличие вложенных строк. #}
-                        {% set has_children = rows[loop.index] is defined and rows[loop.index].level > r.level %}
-                        <tr class="pl-row{{ has_children ? ' fw-bold' : '' }}" data-row-id="{{ r.id }}" data-level="{{ r.level }}">
-                            <td style="padding-left: {{ (r.level - 1) * 20 }}px;">
-                                {% if has_children %}
-                                    <button class="pl-name pl-toggle" type="button" data-target="{{ r.id }}" aria-expanded="true" title="{{ r.name }}">{{ r.name }}</button>
-                                {% else %}
-                                    <span class="pl-name" title="{{ r.name }}">{{ r.name }}</span>
-                                {% endif %}
-                            </td>
-                            {% if showMetaColumns %}
-                                <td><code>{{ r.code ?? '—' }}</code></td>
-                                <td>{{ r.type }}</td>
-                            {% endif %}
-                            {% if layout == 'projects' %}
-                                {% for p in compareProjects %}
-                                    {{ pl_ui.cell(r.values[p.id] ?? null, formats[r.id] ?? null, 'text-end') }}
-                                {% endfor %}
-                                {{ pl_ui.cell(r.values['_total'] ?? null, formats[r.id] ?? null, 'text-end fw-bold pl-cell-total') }}
-                            {% else %}
-                                {% for period in periods %}
-                                    {{ pl_ui.cell(r.values[period.id] ?? null, formats[r.id] ?? null, 'text-end') }}
-                                {% endfor %}
-                            {% endif %}
-                        </tr>
-                    {% else %}
-                        {% set column_count = periods|length + 1 + (showMetaColumns ? 2 : 0) %}
-                        {% if layout == 'projects' %}
-                            {% set column_count = compareProjects|length + 2 + (showMetaColumns ? 2 : 0) %}
-                        {% endif %}
-                        <tr>
-                            <td colspan="{{ column_count }}" class="text-muted">Нет строк отчёта</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        {% include 'finance/report/preview/_table.html.twig' with {
+            rows: rows,
+            formats: formats|default({}),
+            periods: periods,
+            compareProjects: compareProjects|default([]),
+            layout: layout,
+            grouping: grouping,
+            showMetaColumns: showMetaColumns
+        } only %}
     </main>
 
 {% endblock %}

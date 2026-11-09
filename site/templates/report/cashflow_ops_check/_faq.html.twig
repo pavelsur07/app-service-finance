@@ -1,0 +1,131 @@
+{# Часто задаваемые вопросы (аккордеон faqCashflowOps). Без параметров. #}
+<div class="card mt-4 mb-4">
+    <div class="card-header">
+        <h3 class="card-title d-flex align-items-center">
+            <i class="ti ti-question-mark me-2 text-primary"></i>
+            Часто задаваемые вопросы (FAQ)
+        </h3>
+    </div>
+
+    <div class="card-body">
+        <div class="accordion" id="faqCashflowOps">
+            {# 1. Почему Δ закрытия не сходится? #}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="faq1">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#faq1body" aria-expanded="true" aria-controls="faq1body">
+                        Почему <strong>Δ закрытия</strong> не равен нулю?
+                    </button>
+                </h2>
+                <div id="faq1body" class="accordion-collapse collapse show" aria-labelledby="faq1"
+                     data-bs-parent="#faqCashflowOps">
+                    <div class="accordion-body">
+                        Это значит, что фактический баланс на конец дня (<em>MoneyAccountDailyBalance</em>)
+                        не совпадает с расчётом по операциям (<em>CashTransaction</em>).
+                        <br><br>
+                        Возможные причины:
+                        <ul>
+                            <li>Отсутствует хотя бы одна операция за этот день;</li>
+                            <li>Есть операция с неверным знаком (приход вместо расхода или наоборот);</li>
+                            <li>Задвоение одной и той же операции в импорте;</li>
+                            <li>Ещё не выполнен пересчёт ежедневных остатков (cron).</li>
+                        </ul>
+                        После исправлений запусти пересчёт — красные строки исчезнут.
+                    </div>
+                </div>
+            </div>
+
+            {# 2. Дубли операций #}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="faq2">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#faq2body" aria-expanded="false" aria-controls="faq2body">
+                        Как найти и убрать дубли операций?
+                    </button>
+                </h2>
+                <div id="faq2body" class="accordion-collapse collapse" aria-labelledby="faq2"
+                     data-bs-parent="#faqCashflowOps">
+                    <div class="accordion-body">
+                        Дубль определяется по комбинации <code>company_id + import_source + external_id</code>.
+                        <br><br>
+                        Что делать:
+                        <ul>
+                            <li>Отфильтруй период/счёт, где виден флаг «Дубль»;</li>
+                            <li>Проверь <code>external_id</code> — если одинаковые, оставь один;</li>
+                            <li>Удалить лишние можно через журнал импорта или вручную (в тестовой БД);</li>
+                            <li>Пересчитай ежедневные остатки за день.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            {# 3. Флаг "Знак" #}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="faq3">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#faq3body" aria-expanded="false" aria-controls="faq3body">
+                        Что значит флаг <strong>«Знак»</strong>?
+                    </button>
+                </h2>
+                <div id="faq3body" class="accordion-collapse collapse" aria-labelledby="faq3"
+                     data-bs-parent="#faqCashflowOps">
+                    <div class="accordion-body">
+                        Флаг <span class="badge bg-danger">Знак</span> означает, что направление операции
+                        (приход/расход) не совпадает с её суммой.
+                        <br><br>
+                        Примеры:
+                        <ul>
+                            <li><code>direction = INFLOW</code>, но сумма отрицательная;</li>
+                            <li><code>direction = OUTFLOW</code>, но сумма положительная.</li>
+                        </ul>
+                        Такие операции нужно исправить: поменять знак суммы или направление.
+                    </div>
+                </div>
+            </div>
+
+            {# 4. Категории ДДС #}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="faq4">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#faq4body" aria-expanded="false" aria-controls="faq4body">
+                        Зачем нужны категории ДДС?
+                    </button>
+                </h2>
+                <div id="faq4body" class="accordion-collapse collapse" aria-labelledby="faq4"
+                     data-bs-parent="#faqCashflowOps">
+                    <div class="accordion-body">
+                        Категория ДДС — «смысл» операции: на что потратили / откуда пришли деньги.
+                        Без неё отчёты по движению денег и план-факт будут неполными.
+                        Если операция без категории, появится флаг
+                        <span class="badge bg-warning-lt">Нет категории</span>.
+                        <br>
+                        Исправление:
+                        <ul>
+                            <li>Проверь справочник <em>Категории ДДС</em>;</li>
+                            <li>Назначь категорию вручную или настрой автоправило;</li>
+                            <li>При необходимости повтори импорт с новыми правилами.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            {# 5. Частота обновления #}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="faq5">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#faq5body" aria-expanded="false" aria-controls="faq5body">
+                        Как часто обновляется отчёт?
+                    </button>
+                </h2>
+                <div id="faq5body" class="accordion-collapse collapse" aria-labelledby="faq5"
+                     data-bs-parent="#faqCashflowOps">
+                    <div class="accordion-body">
+                        Отчёт строится «на лету» при открытии страницы из текущих данных
+                        <em>CashTransaction</em> и <em>MoneyAccountDailyBalance</em>.
+                        После исправлений обнови страницу или дождись ночного пересчёта (если включен cron).
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
