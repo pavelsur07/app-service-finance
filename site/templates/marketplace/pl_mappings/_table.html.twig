@@ -1,0 +1,114 @@
+{#
+  Таблица правил маппинга с модалкой редактирования на строку.
+  Параметры: mappings, marketplaceFilterValue, isOzon, operationType, plCategories, projectDirections.
+#}
+<div class="table-responsive">
+    <table class="table card-table table-vcenter">
+        <thead>
+        <tr>
+            {% if marketplaceFilterValue == 'all' %}
+                <th>Маркетплейс</th>
+            {% endif %}
+            <th>{{ isOzon ? 'Откуда берём сумму' : 'Источник суммы' }}</th>
+            <th>{{ isOzon ? 'Статья ОПиУ' : 'Категория ОПиУ' }}</th>
+            <th>Проект</th>
+            <th>Знак</th>
+            <th>Статус</th>
+            <th class="w-1"></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% if mappings is empty %}
+            <tr>
+                <td colspan="{{ marketplaceFilterValue == 'all' ? 7 : 6 }}" class="text-center text-muted py-4">
+                    {% embed 'partials/_empty.html.twig' with {title: 'Правила маппинга не настроены', hint: 'Добавьте правило, чтобы генерация ОПиУ начала формировать строки по продажам/возвратам'} %}
+                        {% block icon %}
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5v9l-8 4.5l-8 -4.5v-9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12v9" /><path d="M12 12l-8 -4.5" /></svg>
+                        {% endblock %}
+                    {% endembed %}
+                </td>
+            </tr>
+        {% else %}
+            {% for m in mappings %}
+                <tr>
+                    {% if marketplaceFilterValue == 'all' %}
+                        <td><span class="badge bg-azure">{{ m.marketplace.displayName }}</span></td>
+                    {% endif %}
+
+                    <td>
+                        <div class="fw-bold">{{ m.amountSource.getDisplayNameForMarketplace(m.marketplace) }}</div>
+                        {% if m.marketplace.value == 'ozon' %}
+                            <div class="text-muted small">{{ m.amountSource.ozonDescription }}</div>
+                        {% else %}
+                            <div class="text-muted small"><code>{{ m.amountSource.value }}</code></div>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <div class="fw-bold">{{ m.plCategory.name }}</div>
+                        <div class="text-muted small">
+                            {% if m.marketplace.value == 'ozon' %}
+                            {% elseif m.plCategory.code %}
+                                <code>{{ m.plCategory.code }}</code>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </div>
+                    </td>
+
+                    <td>
+                        {% if m.projectDirection %}
+                            <span class="badge bg-blue-lt">{{ m.projectDirection.name }}</span>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if m.isNegative %}
+                            <span class="badge bg-danger-lt">Отрицательная</span>
+                        {% else %}
+                            <span class="badge bg-success-lt">Положительная</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if m.isActive %}
+                            <span class="badge bg-success">Активно</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Неактивно</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="text-end">
+                        <div class="btn-list flex-nowrap">
+                            <a href="#" class="btn btn-sm btn-ghost-secondary"
+                               data-bs-toggle="modal" data-bs-target="#modal-edit-mapping-{{ m.id }}">
+                                Редактировать
+                            </a>
+
+                            <form method="post" action="{{ path('marketplace_pl_mappings_toggle', {id: m.id}) }}" class="d-inline">
+                                <input type="hidden" name="_token" value="{{ csrf_token('toggle' ~ m.id) }}">
+                                <input type="hidden" name="redirect_op" value="{{ operationType }}">
+                                <input type="hidden" name="redirect_marketplace" value="{{ marketplaceFilterValue }}">
+                                <button type="submit" class="btn btn-sm {{ m.isActive ? 'btn-ghost-warning' : 'btn-ghost-success' }}">
+                                    {{ m.isActive ? 'Выключить' : 'Включить' }}
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+
+                {% include 'marketplace/pl_mappings/_modal_edit.html.twig' with {
+                    m: m,
+                    isOzon: isOzon,
+                    operationType: operationType,
+                    marketplaceFilterValue: marketplaceFilterValue,
+                    plCategories: plCategories,
+                    projectDirections: projectDirections,
+                } only %}
+            {% endfor %}
+        {% endif %}
+        </tbody>
+    </table>
+</div>

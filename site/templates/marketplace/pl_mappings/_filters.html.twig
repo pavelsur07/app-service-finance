@@ -1,0 +1,70 @@
+{#
+  Операция, маркетплейс, кнопка автонастройки и предупреждение о ненастроенных источниках суммы.
+  Параметры: operationType, marketplaceFilterValue, availableMarketplaces, missingAmountSources, isOzon, ozonMarketplace.
+#}
+<div class="row g-3 align-items-end">
+    <div class="col-md-4">
+        <label class="form-label">Операция</label>
+        <div class="btn-group w-100">
+            <a class="btn {{ operationType == 'sale' ? 'btn-primary' : 'btn-outline-primary' }}"
+               href="{{ path('marketplace_pl_mappings_index', {op: 'sale', marketplace: marketplaceFilterValue}) }}">
+                Продажи
+            </a>
+            <a class="btn {{ operationType == 'return' ? 'btn-primary' : 'btn-outline-primary' }}"
+               href="{{ path('marketplace_pl_mappings_index', {op: 'return', marketplace: marketplaceFilterValue}) }}">
+                Возвраты
+            </a>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <form data-autosubmit method="get" action="{{ path('marketplace_pl_mappings_index') }}">
+            <input type="hidden" name="op" value="{{ operationType }}">
+            <label class="form-label">Маркетплейс</label>
+            <select name="marketplace" class="form-select">
+                <option value="all" {{ marketplaceFilterValue == 'all' ? 'selected' : '' }}>Все</option>
+                {% for mp in availableMarketplaces %}
+                    <option value="{{ mp.value }}" {{ marketplaceFilterValue == mp.value ? 'selected' : '' }}>
+                        {{ mp.displayName }}
+                    </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
+    <div class="col-md-4 text-end">
+        {% if marketplaceFilterValue != 'all' and missingAmountSources is not empty %}
+            <span class="badge bg-yellow-lt me-2">
+                Не настроено: {{ missingAmountSources|length }}
+            </span>
+        {% endif %}
+        {% if marketplaceFilterValue != 'all' %}
+            <button type="button"
+                    class="btn btn-outline-primary"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modal-default-sale-mapping">
+                Настроить автоматически
+            </button>
+        {% else %}
+            <span class="text-muted small">Выберите маркетплейс, чтобы настроить маппинг автоматически</span>
+        {% endif %}
+    </div>
+</div>
+
+{% if marketplaceFilterValue != 'all' and missingAmountSources is not empty %}
+    <div class="alert alert-warning mt-3 mb-0">
+        <div class="d-flex">
+            <div>
+                <strong>{{ isOzon ? 'Не все статьи настроены:' : 'Есть ненастроенные источники суммы:' }}</strong>
+                <div class="mt-1">
+                    {% for src in missingAmountSources %}
+                        <span class="badge bg-orange-lt me-1">{{ isOzon ? src.getDisplayNameForMarketplace(ozonMarketplace) : src.displayName }}</span>
+                    {% endfor %}
+                </div>
+                <div class="text-muted small mt-2">
+                    Пока активного правила нет — генерация ОПиУ по этому источнику не сформирует строку.
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}

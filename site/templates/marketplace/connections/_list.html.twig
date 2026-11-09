@@ -1,0 +1,136 @@
+{# Список подключений: статус, ошибки ключа, кнопки синхронизации и управления. Параметры: connections. #}
+<div class="list-group list-group-flush">
+    {% for connection in connections %}
+        {% set is_seller = connection.connectionType.value == 'seller' %}
+        {% set has_connection_error = connection.lastSyncError is not empty and not connection.isActive %}
+        {# Ключ отверг сам маркетплейс. Отдельно от is_active:
+           то выключает Владелец руками, это ставит конвейер. #}
+        {% set has_auth_error = connection.authStatus.isFailed %}
+        {# Ручная синхронизация по мёртвому ключу упадёт так же,
+           как автоматическая: кнопка обязана быть недоступна. #}
+        {% set can_manual_sync = is_seller and connection.isActive and not has_auth_error %}
+        <div class="list-group-item">
+            <div class="row align-items-center">
+                <div class="col-auto">
+                    <span class="avatar">{{ connection.marketplace.value|slice(0, 2)|upper }}</span>
+                </div>
+                <div class="col text-truncate">
+                    <div class="text-reset d-block">
+                        {{ connection.marketplace.displayName }}{% if not is_seller %} (Реклама){% endif %}
+                    </div>
+                    <div class="d-block text-muted text-truncate mt-n1">
+                        {% if connection.clientId %}
+                            Client-Id: {{ connection.clientId }}{% if is_seller %} &middot;{% endif %}
+                        {% endif %}
+                        {% if is_seller %}
+                            API Key: {{ connection.apiKey|slice(0, 20) }}***
+                        {% endif %}
+                    </div>
+                    {% if is_seller %}
+                        <div class="d-block text-muted mt-1"
+                             data-connection-id="{{ connection.id }}"
+                             data-status-url="{{ path('marketplace_connection_status', {id: connection.id}) }}"
+                             data-synced="{{ connection.lastSyncAt or has_connection_error or has_auth_error or not connection.isActive ? '1' : '0' }}"
+                             id="connection-status-{{ connection.id }}">
+                            {% if has_auth_error %}
+                                <small class="text-danger">
+                                    Ключ не принимается{% if connection.authFailedAt %} с {{ connection.authFailedAt|date('d.m.Y') }}{% endif %}.
+                                    Загрузка данных остановлена.
+                                </small>
+                            {% elseif has_connection_error %}
+                                <small class="text-danger">Ошибка: {{ connection.lastSyncError|slice(0, 100) }}</small>
+                            {% elseif not connection.isActive %}
+                                <small>Последняя синхронизация: —</small>
+                            {% elseif connection.lastSyncAt %}
+                                <small>Последняя синхронизация: {{ connection.lastSyncAt|date('d.m.Y H:i') }}</small>
+                            {% else %}
+                                <small class="text-warning">
+                                    <span class="spinner-border spinner-border-sm me-1 vf-spinner-xs"></span>
+                                    Первичная загрузка данных...
+                                </small>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="d-block text-muted mt-1">
+                            <small>Последняя синхронизация: —</small>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="col-auto">
+                    {% if has_auth_error %}
+                        <span class="badge bg-danger">Ключ не принимается</span>
+                    {% else %}
+                        <span class="badge bg-{{ has_connection_error ? 'danger' : (connection.isActive ? 'success' : 'secondary') }}">
+                            {{ has_connection_error ? 'Ошибка подключения' : (connection.isActive ? 'Активно' : 'Неактивно') }}
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="col-auto">
+                    <div class="btn-list">
+                        {% if has_auth_error %}
+                            <a href="{{ path('marketplace_connection_edit', {id: connection.id}) }}" class="btn btn-sm btn-primary">Обновить ключ</a>
+                        {% endif %}
+                        <a href="{{ path('marketplace_connection_edit', {id: connection.id}) }}" class="btn btn-sm btn-outline-secondary">Настройки</a>
+                        <form method="post" action="{{ path('marketplace_connection_test', {id: connection.id}) }}" class="d-inline">
+                            <input type="hidden" name="_token" value="{{ csrf_token('test' ~ connection.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-info">Проверить</button>
+                        </form>
+                        {% if is_seller %}
+                            {% if can_manual_sync %}
+                                <form method="post" action="{{ path('marketplace_connection_sync', {id: connection.id}) }}" class="d-inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('sync' ~ connection.id) }}">
+                                    <button type="submit" class="btn btn-sm btn-primary">Синхронизировать</button>
+                                </form>
+                                <a href="#" class="btn btn-sm btn-outline-primary"
+                                   data-bs-toggle="modal"
+                                   data-bs-target="#modal-sync-period"
+                                   data-connection-id="{{ connection.id }}"
+                                   data-token="{{ csrf_token('sync_period' ~ connection.id) }}">За период</a>
+                            {% else %}
+                                <button type="button" class="btn btn-sm btn-primary" disabled>Синхронизировать</button>
+                                <button type="button" class="btn btn-sm btn-outline-primary" disabled>За период</button>
+                            {% endif %}
+                            {% if connection.marketplace.value == 'ozon' %}
+                                {% if can_manual_sync %}
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-teal"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modal-sync-realization"
+                                            data-connection-id="{{ connection.id }}"
+                                            data-action="{{ path('marketplace_connection_sync_realization', {id: connection.id}) }}"
+                                            data-token="{{ csrf_token('sync_realization' ~ connection.id) }}">
+                                        Реализация
+                                    </button>
+                                {% else %}
+                                    <button type="button" class="btn btn-sm btn-outline-teal" disabled>Реализация</button>
+                                {% endif %}
+                            {% endif %}
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-warning"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modal-reprocess"
+                                    data-marketplace="{{ connection.marketplace.value }}">
+                                Переобработать
+                            </button>
+                        {% endif %}
+                        <form method="post" action="{{ path('marketplace_connection_toggle', {id: connection.id}) }}" class="d-inline">
+                            <input type="hidden" name="_token" value="{{ csrf_token('toggle' ~ connection.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                {{ connection.isActive ? 'Деактивировать' : 'Активировать' }}
+                            </button>
+                        </form>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-danger"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modal-delete-connection"
+                                data-connection-id="{{ connection.id }}"
+                                data-action="{{ path('marketplace_connection_delete', {id: connection.id}) }}"
+                                data-token="{{ csrf_token('delete' ~ connection.id) }}">
+                            Удалить
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>

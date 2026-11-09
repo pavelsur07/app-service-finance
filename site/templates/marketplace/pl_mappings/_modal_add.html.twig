@@ -1,0 +1,96 @@
+{#
+  Модалка «Добавить правило / настройку Ozon».
+  Параметры: isOzon, operationType, marketplaceFilterValue, availableMarketplaces, amountSources, ozonMarketplace,
+  plCategories, projectDirections.
+#}
+<div class="modal modal-blur fade" id="modal-add-mapping" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form method="post" action="{{ path('marketplace_pl_mappings_create') }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('marketplace_pl_mappings_create') }}">
+                <input type="hidden" name="redirect_op" value="{{ operationType }}">
+                <input type="hidden" name="redirect_marketplace" value="{{ marketplaceFilterValue }}">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ isOzon ? 'Добавить настройку Ozon' : 'Добавить правило маппинга' }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Маркетплейс</label>
+                            {% if isOzon %}
+                                <input type="hidden" name="marketplace" value="ozon">
+                                <input class="form-control" value="Ozon" readonly>
+                            {% else %}
+                                <select name="marketplace" class="form-select" required>
+                                    {% for mp in availableMarketplaces %}
+                                        <option value="{{ mp.value }}" {{ marketplaceFilterValue == mp.value ? 'selected' : '' }}>
+                                            {{ mp.displayName }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">{{ isOzon ? 'Откуда берём сумму' : 'Источник суммы' }}</label>
+                            <select name="amount_source" class="form-select" required>
+                                {% for src in amountSources %}
+                                    <option value="{{ src.value }}">{{ isOzon ? src.getDisplayNameForMarketplace(ozonMarketplace) : src.displayName }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label">{{ isOzon ? 'Статья ОПиУ' : 'Категория ОПиУ' }}</label>
+                            <select name="pl_category_id" class="form-select" required>
+                                {% for c in plCategories %}
+                                    {% set indent = '' %}
+                                    {% for i in 1..(c.level - 1) %}{% set indent = indent ~ '— ' %}{% endfor %}
+                                    <option value="{{ c.id }}">{{ indent }}{{ c.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_negative" value="1">
+                                <span class="form-check-label">Инвертировать знак (делать отрицательной)</span>
+                            </label>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_active" value="1" checked>
+                                <span class="form-check-label">Активное правило</span>
+                            </label>
+                        </div>
+
+                        <div class="col-md-12">
+                            <a class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" href="#collapse-advanced-create" role="button" aria-expanded="false">
+                                Доп. параметры (опционально)
+                            </a>
+                            <div class="collapse mt-3" id="collapse-advanced-create">
+                                <label class="form-label">Проект</label>
+                                <select name="project_direction_id" class="form-select">
+                                    <option value="" selected>— Не выбран —</option>
+                                    {% for pd in projectDirections %}
+                                        <option value="{{ pd.id }}">{{ pd.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn me-auto" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

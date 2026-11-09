@@ -1,0 +1,63 @@
+{# Фильтр (маркетплейс, поиск), загрузка себестоимости из файла, синхронизация баркодов Ozon. Параметры: marketplace, search. #}
+<div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
+
+    <form method="get"
+          action="{{ path('marketplace_inventory_index') }}"
+          class="d-flex align-items-center gap-2 mb-0 flex-wrap">
+
+        <select name="marketplace" class="form-select form-select-sm w-auto">
+            <option value="" {{ marketplace is null ? 'selected' : '' }}>
+                Все маркетплейсы
+            </option>
+            <option value="wildberries" {{ marketplace == 'wildberries' ? 'selected' : '' }}>
+                Wildberries
+            </option>
+            <option value="ozon" {{ marketplace == 'ozon' ? 'selected' : '' }}>
+                Ozon
+            </option>
+        </select>
+
+        <input type="search"
+               name="q"
+               class="form-control form-control-sm u-min-w-280"
+               placeholder="Поиск по названию, SKU или артикулу"
+               value="{{ search ?? '' }}"
+               autocomplete="off">
+
+        <button type="submit" class="btn btn-sm btn-primary">Применить</button>
+
+        {% if marketplace or search %}
+            <a href="{{ path('marketplace_inventory_index') }}"
+               class="btn btn-sm btn-link">Сбросить</a>
+        {% endif %}
+    </form>
+
+    <button type="button"
+            class="btn btn-sm btn-outline-secondary ms-auto"
+            data-bs-toggle="modal"
+            data-bs-target="#modal-import-cost">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24"
+             viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/>
+            <path d="M7 11l5 5l5 -5"/>
+            <path d="M12 4l0 12"/>
+        </svg>
+        Загрузить из файла
+    </button>
+
+    <form method="post" action="{{ path('marketplace_inventory_sync_barcodes') }}" class="mb-0">
+        <input type="hidden" name="_token" value="{{ csrf_token('marketplace_inventory_sync_barcodes') }}">
+        <button type="submit" class="btn btn-sm btn-outline-secondary">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24"
+                 viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/>
+                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>
+            </svg>
+            Синхронизировать баркоды Ozon
+        </button>
+    </form>
+</div>

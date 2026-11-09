@@ -1,0 +1,28 @@
+{# Модалка «Удалить подключение?»; action и токен подставляет JS. Без параметров. #}
+<div class="modal modal-blur fade" id="modal-delete-connection" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-title">Удалить подключение?</div>
+                <div class="text-muted mt-2">
+                    Все данные синхронизации для этого подключения будут удалены. Это действие необратимо.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn w-100" data-bs-dismiss="modal">Отмена</button>
+                        </div>
+                        <div class="col">
+                            <form method="post" id="form-delete-connection" action="">
+                                <input type="hidden" name="_token" id="delete-connection-token" value="">
+                                <button type="submit" class="btn btn-danger w-100">Удалить</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

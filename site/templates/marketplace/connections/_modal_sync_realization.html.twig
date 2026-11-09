@@ -1,0 +1,29 @@
+{# Модалка «Загрузка реализации Ozon»; action и токен подставляет JS. Без параметров. #}
+<div class="modal modal-blur fade" id="modal-sync-realization" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-title">Загрузка реализации Ozon</div>
+                <div class="text-muted mt-2">
+                    Если данных ещё нет — будут загружены все месяцы с начала года.<br>
+                    Если данные уже есть — будет обновлён прошлый месяц.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn w-100" data-bs-dismiss="modal">Отмена</button>
+                        </div>
+                        <div class="col">
+                            <form method="post" id="form-sync-realization" action="">
+                                <input type="hidden" name="_token" id="sync-realization-token" value="">
+                                <button type="submit" class="btn btn-teal w-100">Запустить</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
