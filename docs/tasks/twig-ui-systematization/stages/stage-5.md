@@ -296,4 +296,7 @@ A1 — 1 PR, A2 — 1–2 PR, B–F — по 1 PR, G — 1 PR: всего 8–9 
   сервера одинаково для «до» и «после» (в «до» — с исходными инлайн-скриптами). Совпали все шаги, кроме намеренного (1); ошибок JS — 0.
 - `npm run lint` 0; `vite build` OK; `composer cs:twig` — No violation; `lint:twig` — 321 файл OK; функциональные тесты затронутых
   модулей — OK (803 tests).
-
+- `make site-test` (полный, своя БД `app_test_a1`) — OK (8571 tests, 48242 assertions).
+- PHPStan — OK после сокращения `phpstan-baseline.neon` (переписанные тесты админки сняли 2 записанные ошибки `argument.type`:
+  одна запись удалена, у второй count 2 → 1; урок A1 — PHPStan до push).
+- Внешнее ревью Codex против master adf346c84 — `REVIEW_GREEN` с первого раунда (дифф 1895 строк).
