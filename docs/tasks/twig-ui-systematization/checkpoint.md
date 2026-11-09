@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 5 IN PROGRESS (старт 09.11.2026) — A1, A2 на проде, B на handoff
-**Status:** Stage 1–4 на проде (#2909–#2933); Stage 5 A1 (#2944) и A2 (#2945, 09.11 10:33Z) на проде; B — финансовые отчёты на партиалы, отчёт в `stages/stage-5.md`
-**Stage base commit:** master 00260267e (после #2945) · ветка `refactor/twig-ui-stage-5b`
+**Phase:** Stage 5 IN PROGRESS (старт 09.11.2026) — A1, A2, B на проде, C на handoff
+**Status:** Stage 1–4 на проде (#2909–#2933); Stage 5 A1 (#2944), A2 (#2945), B (#2946, 09.11 10:56Z) на проде; C — отчёты маркетплейса на партиалы, отчёт в `stages/stage-5.md`
+**Stage base commit:** master 2a25f5be8 (после #2946) · ветка `refactor/twig-ui-stage-5c`
 
 ### Completed
 - Stage 1 — см. `stages/stage-1.md`; на проде 07.11.
@@ -75,8 +75,9 @@
 - Stage 3 на проде 08.11 06:00Z (деплой с головы master после #2927; прогон #2926 упал на flaky-тесте, rerun не нужен).
 
 ### Exact next action
-- B — PR на handoff; после merge and deploy — C (отчёты маркетплейса: `marketplace/wb_finance_report`,
-  `marketplace/pl_preview/index`) с ветки от свежего master, сверка `site/bin/html-snapshot.sh`
+- C — PR на handoff; после merge and deploy — D (модалки, часть 1: `marketplace/connections`,
+  `marketplace/inventory/index`, `marketplace/pl_mappings`) с ветки от свежего master; без данных на стенде — сверка
+  ответов функциональных тестов временным слушателем `kernel.response` (приём в отчёте C)
 
 ### Files to inspect first on resume
 - `docs/tasks/twig-ui-systematization/plan.md`, `stages/stage-2.md`
