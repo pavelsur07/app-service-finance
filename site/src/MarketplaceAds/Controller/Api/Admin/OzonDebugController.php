@@ -9,6 +9,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -16,12 +17,13 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * НЕ временный, несмотря на прежнюю пометку. Вызывается боевым кодом:
  * templates/marketplace_ads/admin_debug.html.twig дёргает
- * `/debug/ozon-ads/all-campaigns` через fetch. Сама страница висит в сайдбаре под
- * `is_granted('ROLE_SUPER_ADMIN')`. Удаление ломает её.
+ * `/debug/ozon-ads/all-campaigns` через fetch. Сама страница и этот API — только
+ * ROLE_SUPER_ADMIN: `companyId` берётся из запроса, контекста компании нет. Удаление ломает её.
  * Прежний докблок предписывал удалить контроллер после инцидента 23.04.2026;
  * страницу с тех пор оставили в интерфейсе.
  */
 #[Route('/debug/ozon-ads', name: 'debug_ozon_ads_')]
+#[IsGranted('ROLE_SUPER_ADMIN')]
 final class OzonDebugController extends AbstractController
 {
     public function __construct(
@@ -34,7 +36,7 @@ final class OzonDebugController extends AbstractController
      * Возвращает ВСЕ кампании company из Ozon /api/client/campaign,
      * чтобы увидеть какие campaignId у неё существуют и когда они были созданы.
      *
-     * Пример: GET /debug/ozon-ads/all-campaigns?companyId=b57d7682-505f-4b74-86f8-953d32d59874
+     * Пример: GET /debug/ozon-ads/all-campaigns?companyId=<uuid>
      */
     #[Route('/all-campaigns', name: 'all_campaigns', methods: ['GET'])]
     public function allCampaigns(Request $request): JsonResponse

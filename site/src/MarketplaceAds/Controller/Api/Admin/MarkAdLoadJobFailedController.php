@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAds\Controller\Api\Admin;
 
 use App\Company\Entity\User;
+use App\Company\Security\ModuleAccess;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\MarketplaceAds\Repository\AdScheduledBatchRepository;
 use App\Shared\Service\ActiveCompanyService;
@@ -23,6 +24,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
     methods: ['POST'],
 )]
 #[IsGranted('ROLE_COMPANY_OWNER')]
+#[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
 final class MarkAdLoadJobFailedController extends AbstractController
 {
     private const REASON_MAX_LENGTH = 1000;
