@@ -2458,7 +2458,7 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   нет ответа по операции → `failed` (`missing_item`); операция уже со статьёй →
   `stale`; статья не активная конечная статья компании → `stale`; иначе
   `suggested`/`no_answer`. Только `persist()`, коммитит импорт.
-- Список операций (`CashTransactionController` index): у операции без статьи
+- Список операций (`CashTransactionIndexController`): у операции без статьи
   со статусом `suggested` — «ИИ: статья · %» и «Принять» / «Отклонить»
   (`POST /finance/cash-transactions/ai-suggestions/{id}/accept|dismiss`,
   `FINANCE_WRITE`, CSRF `cash_category_suggestion_{id}`).
@@ -2581,10 +2581,18 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
 
 ### Cash: плановые платежи — сопоставление и правила повтора
 
-- Форма `payment_calendar_new` выдаёт `PaymentPlanDTO::$idempotencyKey` (UUIDv7, опция `idempotency_key`); `CreatePaymentPlanAction` делает его ID плана: план компании с этим ID уже есть — возвращается он; гонка — через PK, как у ручной транзакции. Без ключа (не из формы) — UUIDv4, повтор не распознаётся. Так же форма движения по фонду (`money_fund_movement[idempotencyKey]`, `FundMovementController::__invoke`) и `CreateMoneyFundMovementAction` (`MoneyFundMovementRepository::findOneByIdAndCompanyId()`).
+- Форма `payment_calendar_new` выдаёт `PaymentPlanDTO::$idempotencyKey` (UUIDv7, опция `idempotency_key`); `CreatePaymentPlanAction` делает его ID плана: план компании с этим ID уже есть — возвращается он; гонка — через PK, как у ручной транзакции. Без ключа (не из формы) — UUIDv7, повтор не распознаётся. Так же форма движения по фонду (`money_fund_movement[idempotencyKey]`, `FundMovementController::__invoke`) и `CreateMoneyFundMovementAction` (`MoneyFundMovementRepository::findOneByIdAndCompanyId()`).
 
 - Один план — одно сопоставление: `payment_plan_match` уникален и по `transaction_id`, и по `plan_id` (`uniq_payment_plan_match_plan`). `PaymentPlanMatcher::matchForTransaction()` ранжирует кандидатов (score, разница суммы, разница даты) и берёт первый, для которого `PaymentPlanRepository::lockIfAvailableForMatch()` под `FOR UPDATE` строки плана подтверждает статус не `PAID`/`CANCELED` и отсутствие сопоставления; занятый параллельно план — следующий кандидат. Требует активной транзакции вызывающего, сам не коммитит.
 - Правила повтора (`PaymentRecurrenceRule`): пути создания в коде нет (ни формы, ни API), `MaterializeRecurringPaymentPlansAction` вызывается при открытии календаря, но без правил ничего не создаёт (на проде правил 0); схема под неё не меняется. Решение Владельца (23.10.2026) для будущего UI правил: экземпляр правила идентифицирует пара «правило + исходная дата»; правка суммы или статьи меняет тот же план, а не порождает новый; ключ держит unique в БД.
+
+### Cash: HTTP-контракты и восстановление доставки импорта
+
+- Контроллеры Cash — final `__invoke` с constructor injection; общий HTTP-контекст находится в `Cash\Http`, записи/оркестрация — в Actions. `SaveCashflowCategoryAction::createDraft()` и `SaveCashTransactionAutoRuleAction::createDraft()` выдают новые UUIDv7 без записи; существующие ID не преобразуются. `EnqueueCashAutoRulesAction` отправляет существующее `EnqueueAutoRulesForRange` за текущий год, сохраняя режим/инициатора и прежний transport.
+- `StartCashFileImportJobAction` проверяет компанию счёта и атомарно сохраняет журнал + queued job, в том числе без confirmation ID. Повтор confirmation возвращает прежнее задание. `DispatchCashFileImportJobAction` отправляет существующее сообщение; TransportException/Redis transport errors оставляют durable queued-намерение и пишет только IDs/класс ошибки. HTTP сохраняет committed_job_id до отправки; повтор подтверждения не создаёт второго job.
+- `app:cash:import:recover-delivery [companyId] [--execute]`: по умолчанию dry-run; queued старше 120 секунд; без компании — все подходящие компании. `CashImportDeliveryLock` берёт session advisory lease `cash_import_delivery` по компании до общего снимка очереди, занятые компании пропускаются. `CashFileImportDeliveryQuery` читает keyset-порции 100 с продвижением через пропущенные записи; Redis-проверка одна на запуск для всех кандидатов (два прохода, stream XRANGE по500, delayed ZSCAN COUNT500). Перед отправкой заново проверяются queued/возраст/failed. Сетевой I/O не держит row locks или новую DB-транзакцию. Очередь недоступна — FAILURE без объявления сообщений отсутствующими. processing/done/failed/lost-closed не перезапускаются; дубли безопасно принимает существующий Handler. Команда не включает расписание; production-периодичность/--execute требуют отдельного согласования. Восстановление потерянного processing вне гарантии.
+- `CashExceptionListener` обслуживает CashApiExceptionInterface на `/api/` и явно `cash_transaction_create_from` вне API. Формат `{error:{code,message}}`; `CashTransactionNotFoundException` —404, `CashInvalidCsrfException` —403, `CashDocumentOperationException`/multi-split —422; успех прежний. HTML-маршруты не перехватываются.
+- Списки счетов, фондов, файловых профилей и планов используют `CashListPagination` + Pagerfanta QueryAdapter: page=1, limit=50, максимум200; ошибочный параметр/недоступная страница —422. Repository listQuery/calendarQuery всегда scoped; сортировка заканчивается ID. `PaymentCalendarQuery` отдаёт query плана и полный forecast за период; form choices/иерархии/экспорт не обрезаются.
 
 ### Cash → Analytics: событие `CashTransactionsChanged`
 
@@ -5234,6 +5242,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.164 | 2026-11-10 | Cash remediation: атомарные queued jobs, recovery CLI, JSON-контракт, контроллеры по действиям и backend-пагинация |
 | 2.163 | 2026-11-09 | MarketplaceAnalytics: карточки «Unit — Экономика» = «Итого» таблицы — реклама по статистике, группы как колонки таблицы, `adAccrued` справкой; учётная реклама исключена из строк товаров (`ListingCostAggregateQuery::executeByPeriod`); листинг только с рекламой — строка; `resolveWidgetGroup` удалён (issue #2940, этап 3) |
 | 2.162 | 2026-11-09 | Marketplace: предоплата рекламы Ozon (`ozon_marketing_services`, тип начисления `Marketing`) исключена из строки «Не распределено по товарам» — расход из неё уже в статистике (`AdStatisticsCostCategories::codes()`) |
 | 2.161 | 2026-11-09 | Marketplace/MarketplaceAnalytics: `MarketplaceFacade::getUnallocatedCostAggregates()`; Unit-экономика — строка «Не распределено по товарам» в таблице, `totals` и xlsx (issue #2940) |

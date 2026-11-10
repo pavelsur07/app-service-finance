@@ -15,31 +15,23 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
 #[Route('/cash/transactions')]
-class CashTransactionAuditController extends AbstractController
+final class CashTransactionAuditController extends AbstractController
 {
-    public function __construct(private readonly ActiveCompanyService $companyService)
-    {
+    public function __construct(
+        private readonly ActiveCompanyService $companyService,
+        private readonly AuditLogRepository $auditLogRepository,
+    ) {
     }
 
     #[Route('/audit', name: 'cash_transaction_audit_index', methods: ['GET'])]
-    public function index(Request $request, AuditLogRepository $auditLogRepository): Response
+    public function __invoke(Request $request): Response
     {
         $companyId = (string) $this->companyService->getActiveCompany()->getId();
         $page = max(1, (int) $request->query->get('page', 1));
         $perPage = 50;
-
-        $auditPager = $auditLogRepository->paginateForEntityClass(
-            $companyId,
-            CashTransaction::class,
-            $page,
-            $perPage,
-        );
-
+        $auditPager = $this->auditLogRepository->paginateForEntityClass($companyId, CashTransaction::class, $page, $perPage);
         $auditLogs = iterator_to_array($auditPager->getCurrentPageResults());
 
-        return $this->render('cash/transaction/audit_index.html.twig', [
-            'auditPager' => $auditPager,
-            'auditLogs' => $auditLogs,
-        ]);
+        return $this->render('cash/transaction/audit_index.html.twig', ['auditPager' => $auditPager, 'auditLogs' => $auditLogs]);
     }
 }

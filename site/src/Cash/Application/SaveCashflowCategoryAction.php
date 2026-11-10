@@ -23,6 +23,11 @@ final class SaveCashflowCategoryAction
     ) {
     }
 
+    public function createDraft(\App\Company\Entity\Company $company): CashflowCategory
+    {
+        return new CashflowCategory(\Ramsey\Uuid\Uuid::uuid7()->toString(), $company);
+    }
+
     public function __invoke(CashflowCategory $category): void
     {
         $companyId = $category->getCompany()->getId();

@@ -28,11 +28,11 @@ final readonly class PaymentCalendarQuery
      */
     public function __invoke(Company $company, ?\DateTimeImmutable $from, ?\DateTimeImmutable $to, array $filters): array
     {
-        $plans = [];
+        $plansQuery = null;
         $forecast = new ForecastDTO();
         $period = null;
         if (null !== $from && null !== $to) {
-            $plans = $this->plans->findForCalendar($company, $from, $to, $filters);
+            $plansQuery = $this->plans->calendarQuery($company, $from, $to, $filters);
             $period = ['from' => $from, 'to' => $to];
             $account = '' !== $filters['account_id'] ? $this->accounts->findOneByIdAndCompanyId($filters['account_id'], (string) $company->getId()) : null;
             $forecast = $this->forecasts->buildForecast($company, $from, $to, $account);
@@ -43,7 +43,7 @@ final readonly class PaymentCalendarQuery
         }
 
         return [
-            'plans' => $plans,
+            'plansQuery' => $plansQuery,
             'filters' => $filters,
             'period' => $period,
             'accounts' => $this->accounts->findBy(['company' => $company], ['name' => 'ASC']),

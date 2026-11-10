@@ -11,6 +11,11 @@ final class OpeningBalanceDateInFutureException extends \RuntimeException implem
         parent::__construct('Дата ввода начального сальдо не может быть позже сегодняшнего дня.');
     }
 
+    public function httpStatus(): int
+    {
+        return 422;
+    }
+
     public function errorCode(): string
     {
         return 'opening_balance_date_in_future';

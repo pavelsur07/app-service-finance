@@ -19,35 +19,31 @@ use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
-#[Route(
-    '/finance/cash-transactions/ai-suggestions/{id}/accept',
-    name: 'cash_category_suggestion_accept',
-    requirements: ['id' => Requirement::UUID],
-    methods: ['POST'],
-)]
+#[Route('/finance/cash-transactions/ai-suggestions/{id}/accept', name: 'cash_category_suggestion_accept', requirements: ['id' => Requirement::UUID], methods: ['POST'])]
 final class CashCategorySuggestionAcceptController extends AbstractController
 {
+    public function __construct(
+        private readonly AuditContextProvider $auditContextProvider,
+        private readonly AcceptCashCategorySuggestionAction $action,
+        private readonly ActiveCompanyService $companyService,
+    ) {
+    }
+
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
-    public function __invoke(
-        string $id,
-        Request $request,
-        ActiveCompanyService $companyService,
-        AuditContextProvider $auditContextProvider,
-        AcceptCashCategorySuggestionAction $action,
-    ): RedirectResponse {
+    public function __invoke(string $id, Request $request): RedirectResponse
+    {
         $back = $this->redirectToRoute('cash_transaction_index', $request->query->all());
         if (!$this->isCsrfTokenValid('cash_category_suggestion_'.$id, (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Неверный CSRF токен.');
 
             return $back;
         }
-        $userId = $auditContextProvider->getActorUserId();
+        $userId = $this->auditContextProvider->getActorUserId();
         if (null === $userId) {
             throw $this->createAccessDeniedException();
         }
-
         try {
-            $outcome = $action((string) $companyService->getActiveCompany()->getId(), $id, $userId);
+            $outcome = ($this->action)((string) $this->companyService->getActiveCompany()->getId(), $id, $userId);
             if (CashCategorySuggestionDecisionOutcome::ACCEPTED === $outcome) {
                 $this->addFlash('success', 'Статья из подсказки ИИ проставлена.');
             } else {

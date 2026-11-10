@@ -166,13 +166,22 @@ final class CashCompanyIsolationTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
     }
 
+    public function testCreateFromInvalidCsrfHasStableJsonError(): void
+    {
+        $this->client->request('POST', sprintf('/finance/cash-transactions/%s/create-from', $this->own['transaction']), ['_token' => 'invalid']);
+        self::assertResponseStatusCodeSame(403);
+        self::assertSame('cash_invalid_csrf', json_decode((string) $this->client->getResponse()->getContent(), true)['error']['code']);
+        $logs = self::getContainer()->get(\Monolog\Handler\TestHandler::class);
+        self::assertCount(0, array_filter($logs->getRecords(), static fn (\Monolog\LogRecord $record): bool => $record->level->value >= \Monolog\Level::Error->value), 'Expected Cash CSRF refusal must not trigger an incident.');
+    }
+
     public function testForeignCreateFromAnswersJsonNotFound(): void
     {
         $this->client->request('POST', sprintf('/finance/cash-transactions/%s/create-from', $this->foreign['transaction']));
 
         self::assertResponseStatusCodeSame(404);
         self::assertSame(
-            ['error' => true, 'message' => 'Транзакция не найдена.'],
+            ['error' => ['code' => 'cash_transaction_not_found', 'message' => 'Транзакция не найдена.']],
             json_decode((string) $this->client->getResponse()->getContent(), true),
         );
     }

@@ -15,6 +15,14 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class CashFileImportProfileRepository extends ServiceEntityRepository
 {
+    public function listQuery(string $companyId): \Doctrine\ORM\QueryBuilder
+    {
+        return $this->createQueryBuilder('profile')
+            ->andWhere('IDENTITY(profile.company) = :company')->setParameter('company', $companyId)
+            ->andWhere('profile.type = :type')->setParameter('type', CashFileImportProfile::TYPE_CASH_TRANSACTION)
+            ->orderBy('profile.name', \SortDirection::Ascending)->addOrderBy('profile.id', \SortDirection::Ascending);
+    }
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, CashFileImportProfile::class);

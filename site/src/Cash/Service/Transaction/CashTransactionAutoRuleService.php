@@ -42,6 +42,21 @@ class CashTransactionAutoRuleService
         return $this->match($t)->rule;
     }
 
+    /** @return array<string, mixed> */
+    public function previewTransaction(CashTransaction $transaction): array
+    {
+        $skipReason = $this->getSkipReason($transaction);
+        $match = null === $skipReason ? $this->match($transaction) : null;
+        $hasPairConflict = null !== $match && (isset($match->conflicts['projectDirection']) || isset($match->conflicts['responsibilityCenterId']));
+        $plan = null !== $match && ($match->hasWinners() || $hasPairConflict) ? $this->createApplicationPlan($match, $transaction) : null;
+        $labels = [];
+        foreach ($this->responsibilityCenterFacade->getActiveChoices((string) $transaction->getCompany()->getId()) as $center) {
+            $labels[$center->id] = $center->name;
+        }
+
+        return ['transaction' => $transaction, 'rule' => $match?->rule, 'conflictingRules' => $match->conflictingRules ?? [], 'conflicts' => $match->conflicts ?? [], 'skipReason' => $skipReason, 'plan' => $plan, 'responsibilityCenterLabels' => $labels];
+    }
+
     public function match(CashTransaction $t): CashTransactionAutoRuleMatchResult
     {
         if (null !== $this->getSkipReason($t)) {

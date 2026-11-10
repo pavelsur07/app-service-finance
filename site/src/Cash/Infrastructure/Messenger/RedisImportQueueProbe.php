@@ -14,8 +14,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * Messenger переносит повтор из `__queue` в stream (ZPOPMIN, затем XADD), поэтому:
  * - сначала читается `__queue`, потом stream — перенос после чтения `__queue` попадает в stream;
  * - проход повторяется после паузы — сообщение в промежутке между ZPOPMIN и XADD второй проход
- *   застаёт уже в stream. Доставленное сообщение остаётся в stream до ack, а Handler ждёт
- *   FOR UPDATE задания, которое держит вызывающий.
+ *   застаёт уже в stream. Доставленное сообщение остаётся в stream до ack.
+ * Остаточная гонка доставки допустима: Handler сериализует и идемпотентно обрабатывает дубли.
  */
 final readonly class RedisImportQueueProbe implements ImportQueueProbeInterface
 {
@@ -46,18 +46,24 @@ final readonly class RedisImportQueueProbe implements ImportQueueProbeInterface
 
         [$redis, $stream] = $this->connect();
 
+        $wanted = array_fill_keys($jobIds, true);
         $found = [];
-        for ($pass = 1; $pass <= self::PASSES; ++$pass) {
-            if ($pass > 1) {
-                ($this->pause)();
-            }
-            foreach ($this->payloads($redis, $stream) as $payload) {
-                foreach ($jobIds as $jobId) {
-                    if (str_contains($payload, $jobId)) {
-                        $found[$jobId] = true;
+        try {
+            for ($pass = 1; $pass <= self::PASSES; ++$pass) {
+                if ($pass > 1) {
+                    ($this->pause)();
+                }
+                foreach ($this->payloads($redis, $stream) as $payload) {
+                    preg_match_all('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i', $payload, $matches);
+                    foreach ($matches[0] as $jobId) {
+                        if (isset($wanted[$jobId])) {
+                            $found[$jobId] = true;
+                        }
                     }
                 }
             }
+        } finally {
+            $redis->close();
         }
 
         return array_keys($found);
@@ -105,13 +111,20 @@ final readonly class RedisImportQueueProbe implements ImportQueueProbeInterface
      */
     private function payloads(\Redis $redis, string $stream): iterable
     {
-        $delayed = $redis->zRange($stream.'__queue', 0, -1);
-        if (!\is_array($delayed)) {
-            throw new \RuntimeException('Чтение отложенных сообщений очереди импорта не удалось.');
-        }
-        foreach ($delayed as $payload) {
-            yield (string) $payload;
-        }
+        $cursor = null;
+        do {
+            // Rank offsets shift during Messenger ZPOPMIN; SCAN retains members present throughout the scan.
+            $delayed = $redis->zScan($stream.'__queue', $cursor, null, self::PAGE);
+            if (!is_array($delayed)) {
+                if (false !== $delayed || $redis->getLastError()) {
+                    throw new \RuntimeException('Чтение отложенных сообщений очереди импорта не удалось.');
+                }
+                $delayed = [];
+            }
+            foreach ($delayed as $payload => $score) {
+                yield (string) $payload;
+            }
+        } while (0 !== $cursor);
 
         $start = '-';
         do {

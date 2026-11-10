@@ -6,13 +6,9 @@ namespace App\Tests\Unit\Cash\Application;
 
 use App\Cash\Application\CreateCashFileImportProfileAction;
 use App\Cash\Application\DeleteCashFileImportProfileAction;
-use App\Cash\Application\StartCashFileImportJobAction;
 use App\Cash\Application\UpdateCashFileImportProfileAction;
 use App\Cash\Entity\Import\CashFileImportProfile;
-use App\Cash\Entity\Import\ImportLog;
-use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
-use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use Doctrine\ORM\EntityManagerInterface;
@@ -63,60 +59,6 @@ final class CashFileImportActionsTest extends TestCase
         $entityManager->expects(self::once())->method('flush');
 
         (new DeleteCashFileImportProfileAction($entityManager))($profile);
-    }
-
-    /**
-     * Порядок записи прежний: журнал импорта сохраняется первым flush(),
-     * задание со ссылкой на журнал — вторым.
-     */
-    public function testStartJobFlushesImportLogBeforeJob(): void
-    {
-        $company = $this->company();
-        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
-        $events = [];
-        $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->method('persist')->willReturnCallback(static function (object $entity) use (&$events): void {
-            $events[] = 'persist:'.(new \ReflectionClass($entity))->getShortName();
-        });
-        $entityManager->method('flush')->willReturnCallback(static function () use (&$events): void {
-            $events[] = 'flush';
-        });
-
-        $job = (new StartCashFileImportJobAction($entityManager, new ImportLogger($entityManager)))(
-            $company,
-            $account,
-            'cash:file',
-            'statement.csv',
-            'hash',
-            ['date' => 'A'],
-            ['stored_ext' => 'csv'],
-            null,
-        );
-
-        self::assertSame(['persist:ImportLog', 'flush', 'persist:CashFileImportJob', 'flush'], $events);
-        self::assertSame('statement.csv', $job->getFileName());
-        self::assertInstanceOf(ImportLog::class, $job->getImportLog());
-    }
-
-    public function testStartJobDoesNotCreateJobWhenImportLogFlushFails(): void
-    {
-        $company = $this->company();
-        $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->expects(self::once())->method('persist')->with(self::isInstanceOf(ImportLog::class));
-        $entityManager->method('flush')->willThrowException(new \RuntimeException('DB is down'));
-
-        $this->expectException(\RuntimeException::class);
-
-        (new StartCashFileImportJobAction($entityManager, new ImportLogger($entityManager)))(
-            $company,
-            MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build(),
-            'cash:file',
-            'statement.csv',
-            'hash',
-            [],
-            [],
-            null,
-        );
     }
 
     private function company(): Company

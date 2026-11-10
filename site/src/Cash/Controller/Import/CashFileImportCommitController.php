@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Import;
 
+use App\Cash\Application\DispatchCashFileImportJobAction;
 use App\Cash\Entity\Import\CashFileImportJob;
-use App\Cash\Message\Import\CashFileImportMessage;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\Storage\ObjectStorageException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -25,7 +24,7 @@ final class CashFileImportCommitController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly \App\Cash\Http\CashFileImportPage $page,
         private readonly \App\Cash\Application\ConfirmCashFileImportAction $confirmImport,
-        private readonly MessageBusInterface $messageBus,
+        private readonly DispatchCashFileImportJobAction $dispatchJob,
     ) {
     }
 
@@ -103,11 +102,11 @@ final class CashFileImportCommitController extends AbstractController
             return $this->redirectToRoute('cash_file_import_upload');
         }
         $importPayload['selected_descriptions'] = $job->getOptions()['selected_descriptions'] ?? [];
-        if (CashFileImportJob::STATUS_QUEUED === $job->getStatus()) {
-            $this->messageBus->dispatch(new CashFileImportMessage((string) $job->getId()));
-        }
         $importPayload['committed_job_id'] = $job->getId();
         $session->set('cash_file_import', $importPayload);
+        if (CashFileImportJob::STATUS_QUEUED === $job->getStatus() && !($this->dispatchJob)((string) $account->getCompany()->getId(), (string) $job->getId())) {
+            $this->addFlash('warning', 'Задание сохранено, но очередь временно недоступна. Доставка может быть повторена восстановителем; повторная загрузка файла не требуется.');
+        }
         if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
             return $this->redirectToRoute('cash_file_import_result', ['id' => $job->getId()]);
         }

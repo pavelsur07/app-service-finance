@@ -25,18 +25,21 @@ class PaymentPlanRepository extends ServiceEntityRepository
     }
 
     /** @param array<string, string> $filters
-     * @return list<PaymentPlan>
      */
-    public function findForCalendar(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, array $filters): array
+    public function calendarQuery(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, array $filters): \Doctrine\ORM\QueryBuilder
     {
         $qb = $this->createQueryBuilder('plan')
+            ->leftJoin('plan.moneyAccount', 'account')->addSelect('account')
+            ->leftJoin('plan.cashflowCategory', 'category')->addSelect('category')
+            ->leftJoin('plan.counterparty', 'counterparty')->addSelect('counterparty')
             ->andWhere('plan.company = :company')
             ->andWhere('plan.plannedAt BETWEEN :from AND :to')
             ->setParameter('company', $company)
             ->setParameter('from', $from, Types::DATE_IMMUTABLE)
             ->setParameter('to', $to, Types::DATE_IMMUTABLE)
             ->orderBy('plan.plannedAt', \SortDirection::Ascending)
-            ->addOrderBy('plan.createdAt', \SortDirection::Ascending);
+            ->addOrderBy('plan.createdAt', \SortDirection::Ascending)
+            ->addOrderBy('plan.id', \SortDirection::Ascending);
 
         if (!empty($filters['account_id'])) {
             $qb->andWhere('plan.moneyAccount = :accountId')
@@ -61,10 +64,7 @@ class PaymentPlanRepository extends ServiceEntityRepository
             }
         }
 
-        /** @var list<PaymentPlan> $result */
-        $result = $qb->getQuery()->getResult();
-
-        return $result;
+        return $qb;
     }
 
     /**

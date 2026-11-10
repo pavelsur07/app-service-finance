@@ -266,6 +266,23 @@ final class CashFileDescriptionPreviewTest extends WebTestCaseBase
         yield ['POST', 'commit'];
     }
 
+    public function testDispatchFailureKeepsQueuedJobAndCommittedSessionForRecovery(): void
+    {
+        [$client, $company] = $this->context();
+        $transport = $this->createMock(\Symfony\Component\Messenger\Transport\TransportInterface::class);
+        $transport->expects(self::once())->method('send')->willThrowException(new \Symfony\Component\Messenger\Exception\TransportException('Synthetic delivery failure.'));
+        $client->getContainer()->set('messenger.transport.async_sync', $transport);
+        $client->request('GET', '/cash/import/file/preview');
+        $client->request('POST', '/cash/import/file/commit', ['_token' => $this->csrfToken($client, 'cash_file_import_commit')]);
+        self::assertSame(200, $client->getResponse()->getStatusCode());
+        $payload = $client->getRequest()->getSession()->get('cash_file_import');
+        self::assertNotEmpty($payload['committed_job_id']);
+        self::assertSame('queued', $this->em()->getConnection()->fetchOne('SELECT status FROM cash_file_import_jobs WHERE id = :id', ['id' => $payload['committed_job_id']]));
+        $client->request('POST', '/cash/import/file/commit', ['_token' => $this->csrfToken($client, 'cash_file_import_commit')]);
+        self::assertSame('/cash/import/file/result/'.$payload['committed_job_id'], $client->getResponse()->headers->get('Location'));
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM cash_file_import_jobs WHERE company_id = :company', ['company' => $company->getId()]));
+    }
+
     private function damagePlan(KernelBrowser $client, Company $company): void
     {
         $payload = $client->getRequest()->getSession()->get('cash_file_import');

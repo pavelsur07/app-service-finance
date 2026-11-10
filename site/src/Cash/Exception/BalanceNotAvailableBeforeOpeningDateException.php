@@ -11,6 +11,11 @@ final class BalanceNotAvailableBeforeOpeningDateException extends \RuntimeExcept
         parent::__construct('Остаток недоступен до даты ввода начального сальдо.');
     }
 
+    public function httpStatus(): int
+    {
+        return 422;
+    }
+
     public function errorCode(): string
     {
         return 'balance_not_available_before_opening_date';

@@ -34,7 +34,7 @@ Reviewer focus: company isolation, current data under source lock, atomicity, fi
 
 ## Stage 4: Восстановление доставки и backend-контракты
 Risk: HIGH-LOCAL
-stage_base_commit: record before implementation
+stage_base_commit: 967ac022d
 Definition of Done: Stream/delayed/failed не переотправляются; Redis outage fail-closed; cursor проходит пропущенные; idempotent handler; контроллеры без flush/SQL/entities; прогноз не зависит от страницы.
 Work items: 4.1 журнал/job атомарны, retry возвращает job; 4.2 dry-run recovery queued >120s, cursor 100, один пакетный paged queue scan и dispatcher company lock; 4.3 Transaction controllers и новые UUIDv7 в Actions; 4.4 JSON error listener 404/403/422; 4.5 Pagerfanta page=1 limit=50 max=200, неверные/недоступные страницы 422.
 Checks: RED→GREEN regressions per bug; Cash module integration/functional/unit tests and focused PHP lint/PHPStan. External review at HIGH-LOCAL Stage if diff >500 lines.
@@ -56,3 +56,10 @@ Recurring materialization on GET; lost processing message recovery; historical d
 
 ## Pre-flight interfaces
 Stage 1→2: common source lock retained for update/restore. Stage 3→4: company-scoped session guard and structural mapping validator feed preparation/confirmation Actions; completeness belongs to normalizer. Stage 4→5: Pagerfanta objects retain full-period forecast and unbounded form choices.
+
+## Stage 4 implementation notes
+- Dispatcher takes company session advisory locks before the shared queue snapshot; DB candidates keyset pages of 100, advancing by last examined ID even when messages are skipped. One queue probe across all locked companies/candidates; existing two transition-safe passes remain constant, delayed/stream reads paginated 500.
+- Recheck queued/age/failed membership before each send; no row locks/DB transaction across network. Busy companies skipped safely. Default dry-run, execute only by flag; terminal/lost-closed statuses excluded. Existing Handler owns duplicate/idempotent execution.
+- Test atomic no-confirmation log/job rollback, dispatch-failure committed state, 201+ skipped-head candidates, multiple companies/one probe, failed/stream/delayed exclusions, unavailable Redis, lock exclusion/status races, bounded large-queue scan, existing duplicate Handler behavior.
+- Backend page helper validates page/limit and wraps existing Pagerfanta adapters; calendar forecast/form choices remain unpaginated. Templates only Stage 5.
+- Existing owner design/plan and autonomy contract supply implementation authorization; brainstorming does not reopen already decided business semantics or add intermediate approval gates.

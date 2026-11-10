@@ -19,6 +19,14 @@ use Webmozart\Assert\Assert;
  */
 class MoneyAccountRepository extends ServiceEntityRepository
 {
+    public function listQuery(string $companyId): \Doctrine\ORM\QueryBuilder
+    {
+        return $this->createQueryBuilder('account')
+            ->andWhere('IDENTITY(account.company) = :company')->setParameter('company', $companyId)
+
+            ->orderBy('account.name', \SortDirection::Ascending)->addOrderBy('account.id', \SortDirection::Ascending);
+    }
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, MoneyAccount::class);

@@ -13,6 +13,11 @@ final class CashTransactionMultiSplitException extends \RuntimeException impleme
         parent::__construct('У операции несколько строк разбивки. Сумму, валюту и статьи меняйте через разбивку; создание документа ОПиУ недоступно.');
     }
 
+    public function httpStatus(): int
+    {
+        return 422;
+    }
+
     public function errorCode(): string
     {
         return 'cash_transaction_multi_split';

@@ -383,7 +383,7 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
         $this->em->persist($tx);
         $this->em->flush();
 
-        $this->expectException(\DomainException::class);
+        $this->expectException(\App\Cash\Exception\CashDocumentOperationException::class);
         $this->expectExceptionMessage('Для переводов нельзя создать документ ОПиУ.');
 
         ($this->action)($tx, confirmed: false);
@@ -411,7 +411,7 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
         $this->em->persist($document);
         $this->em->flush();
 
-        $this->expectException(\DomainException::class);
+        $this->expectException(\App\Cash\Exception\CashDocumentOperationException::class);
         $this->expectExceptionMessage('Транзакция уже полностью разнесена.');
 
         ($this->action)($tx, confirmed: false);
@@ -427,7 +427,7 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
         try {
             ($this->action)($tx, confirmed: false);
             self::fail('Второй документ на тот же остаток создан.');
-        } catch (\DomainException $exception) {
+        } catch (\App\Cash\Exception\CashDocumentOperationException $exception) {
             self::assertSame('Транзакция уже полностью разнесена.', $exception->getMessage());
         }
 

@@ -87,7 +87,29 @@ final class CashTransactionCreatePnlDocumentTest extends WebTestCaseBase
             'confirmed' => $confirmed ? 'true' : 'false',
         ]);
         self::assertResponseStatusCodeSame(422);
+        self::assertSame('cash_transaction_multi_split', json_decode((string) $client->getResponse()->getContent(), true)['error']['code']);
         self::assertSame(0, $this->documentCount($tx));
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('confirmations')]
+    public function testSingleSplitJsonSuccessAndForbiddenCategory(bool $allowed): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->prepareCompanyContext();
+        [$tx, $category] = $this->persistTransaction($company);
+        $category->setAllowPlDocument($allowed);
+        $this->em()->flush();
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $client->request('POST', '/finance/cash-transactions/'.$tx->getId().'/create-from', ['_token' => $this->csrfToken($client, 'cash_transaction_create_from'), 'confirmed' => 'true']);
+        $response = json_decode((string) $client->getResponse()->getContent(), true);
+        self::assertResponseStatusCodeSame($allowed ? 200 : 422);
+        if ($allowed) {
+            self::assertSame(['success' => true, 'flash' => 'Документ ОПиУ создан.'], $response);
+        } else {
+            self::assertSame('cash_document_operation_not_allowed', $response['error']['code']);
+        }
+        self::assertSame($allowed ? 1 : 0, $this->documentCount($tx));
     }
 
     /** @return iterable<array{bool}> */

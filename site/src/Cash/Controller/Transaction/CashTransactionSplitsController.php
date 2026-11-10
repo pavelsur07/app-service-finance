@@ -24,45 +24,39 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_USER')]
 final class CashTransactionSplitsController extends AbstractController
 {
-    #[Route('/finance/cash-transactions/{id}/splits', name: 'cash_transaction_splits', methods: ['GET', 'POST'])]
-    public function __invoke(
-        string $id,
-        Request $request,
-        ActiveCompanyService $companyService,
-        CashTransactionRepository $transactionRepository,
-        CashTransferRepository $transferRepository,
-        CashflowCategoryRepository $categoryRepository,
-        SaveCashTransactionSplitsAction $saveSplits,
-    ): Response {
-        $company = $companyService->getActiveCompany();
+    public function __construct(
+        private readonly ActiveCompanyService $companyService,
+        private readonly CashTransactionRepository $transactionRepository,
+        private readonly CashTransferRepository $transferRepository,
+        private readonly CashflowCategoryRepository $categoryRepository,
+        private readonly SaveCashTransactionSplitsAction $saveSplits,
+    ) {
+    }
 
+    #[Route('/finance/cash-transactions/{id}/splits', name: 'cash_transaction_splits', methods: ['GET', 'POST'])]
+    public function __invoke(string $id, Request $request): Response
+    {
+        $company = $this->companyService->getActiveCompany();
         // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
         if ($request->isMethod('POST')) {
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
-
-        $transaction = $transactionRepository->findOneByIdAndCompanyId($id, (string) $company->getId());
+        $transaction = $this->transactionRepository->findOneByIdAndCompanyId($id, (string) $company->getId());
         if (!$transaction instanceof CashTransaction) {
             throw $this->createNotFoundException();
         }
-        $transfer = $transferRepository->findOneByTransactionAndCompanyId($transaction, $company->getId());
+        $transfer = $this->transferRepository->findOneByTransactionAndCompanyId($transaction, $company->getId());
         if (null !== $transfer) {
             $this->addFlash('danger', 'Разбивку операции перевода нельзя изменить отдельно.');
 
             return $this->redirectToRoute('cash_transfer_show', ['id' => $transfer->getId()]);
         }
-
-        $categories = $categoryRepository->findTreeByCompany($company);
-
-        $form = $this->createForm(CashTransactionSplitsType::class, $this->buildInput($transaction), [
-            'categories' => $categories,
-        ]);
+        $categories = $this->categoryRepository->findTreeByCompany($company);
+        $form = $this->createForm(CashTransactionSplitsType::class, $this->buildInput($transaction), ['categories' => $categories]);
         $form->handleRequest($request);
-
         if ($form->isSubmitted() && $form->isValid()) {
             try {
-                $saveSplits($transaction, $form->getData());
-
+                ($this->saveSplits)($transaction, $form->getData());
                 $this->addFlash('success', 'Разбивка сохранена.');
 
                 return $this->redirectToRoute('cash_transaction_show', ['id' => $id]);
@@ -73,16 +67,12 @@ final class CashTransactionSplitsController extends AbstractController
             }
         }
 
-        return $this->render('transaction/splits.html.twig', [
-            'transaction' => $transaction,
-            'form' => $form->createView(),
-        ]);
+        return $this->render('transaction/splits.html.twig', ['transaction' => $transaction, 'form' => $form->createView()]);
     }
 
     private function buildInput(CashTransaction $transaction): CashTransactionSplitsInput
     {
         $input = new CashTransactionSplitsInput();
-
         foreach ($transaction->getSplits() as $split) {
             /* @var CashTransactionSplit $split */
             $row = new CashTransactionSplitInput();
@@ -90,7 +80,6 @@ final class CashTransactionSplitsController extends AbstractController
             $row->amount = $split->getAmount();
             $input->rows[] = $row;
         }
-
         if ([] === $input->rows) {
             // У транзакции без категории строк нет: показываем одну пустую,
             // иначе форма открывается без единого поля.

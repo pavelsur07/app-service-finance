@@ -16,6 +16,7 @@ final class PaymentCalendarPage extends AbstractController
     public function __construct(
         private readonly MaterializeRecurringPaymentPlansAction $materializeRecurringPlans,
         private readonly \App\Cash\Query\PaymentCalendarQuery $query,
+        private readonly CashListPagination $pagination,
     ) {
     }
 
@@ -36,6 +37,12 @@ final class PaymentCalendarPage extends AbstractController
             ($this->materializeRecurringPlans)($company, $from, $to);
         }
         $context = ($this->query)($company, $from, $to, $filters);
+        $plansQuery = $context['plansQuery'];
+        $adapter = $plansQuery instanceof \Doctrine\ORM\QueryBuilder ? new \Pagerfanta\Doctrine\ORM\QueryAdapter($plansQuery) : new \Pagerfanta\Adapter\ArrayAdapter([]);
+        $pager = ($this->pagination)($request, $adapter);
+        unset($context['plansQuery']);
+        $context['pager'] = $pager;
+        $context['plans'] = iterator_to_array($pager->getCurrentPageResults());
         $context['filterQuery'] = $this->buildFilterQuery($filters);
 
         return $this->render('payment_calendar/index.html.twig', array_merge($context, $extra));

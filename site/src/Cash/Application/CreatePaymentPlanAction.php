@@ -48,7 +48,7 @@ final class CreatePaymentPlanAction
         }
 
         $plan = new PaymentPlan(
-            $key ?? Uuid::uuid4()->toString(),
+            $key ?? Uuid::uuid7()->toString(),
             $company,
             $category,
             \DateTimeImmutable::createFromInterface($dto->plannedAt),

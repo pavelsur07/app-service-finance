@@ -21,15 +21,17 @@ final class FundIndexController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly MoneyFundRepository $fundRepository,
         private readonly FundBalanceService $fundBalanceService,
+        private readonly \App\Cash\Http\CashListPagination $pagination,
     ) {
     }
 
     #[Route('', name: 'finance_funds_index', methods: ['GET'])]
-    public function __invoke(): Response
+    public function __invoke(\Symfony\Component\HttpFoundation\Request $request): Response
     {
         /* $this->assertFeatureEnabled(); */
         $company = $this->activeCompanyService->getActiveCompany();
-        $funds = $this->fundRepository->findByCompany($company);
+        $pager = ($this->pagination)($request, new \Pagerfanta\Doctrine\ORM\QueryAdapter($this->fundRepository->listQuery((string) $company->getId())));
+        $funds = $pager->getCurrentPageResults();
         $balances = [];
         $balancesDecimal = [];
         foreach ($this->fundBalanceService->getFundBalances((string) $company->getId()) as $row) {
@@ -37,6 +39,6 @@ final class FundIndexController extends AbstractController
             $balancesDecimal[$row['fundId']] = Money::fromMinor($row['balanceMinor'], $row['currency'])->toDecimalString();
         }
 
-        return $this->render('fund/index.html.twig', ['funds' => $funds, 'balances' => $balances, 'balancesDecimal' => $balancesDecimal]);
+        return $this->render('fund/index.html.twig', ['pager' => $pager, 'funds' => $funds, 'balances' => $balances, 'balancesDecimal' => $balancesDecimal]);
     }
 }
