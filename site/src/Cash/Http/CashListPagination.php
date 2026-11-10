@@ -21,10 +21,7 @@ final readonly class CashListPagination
     {
         $query = $request->query->all();
         $page = $this->positiveInteger($query['page'] ?? 1);
-        $limit = $this->positiveInteger($query['limit'] ?? 50);
-        if ($limit > 200) {
-            throw new UnprocessableEntityHttpException('Размер страницы не может превышать 200.');
-        }
+        $limit = $this->limit($request);
         $pager = new Pagerfanta($adapter);
         try {
             $pager->setMaxPerPage($limit)->setCurrentPage($page);
@@ -35,9 +32,19 @@ final readonly class CashListPagination
         return $pager;
     }
 
+    public function limit(Request $request): int
+    {
+        $limit = $this->positiveInteger($request->query->all()['limit'] ?? 50);
+        if ($limit > 200) {
+            throw new UnprocessableEntityHttpException('Размер страницы не может превышать 200.');
+        }
+
+        return $limit;
+    }
+
     private function positiveInteger(mixed $value): int
     {
-        if ((!is_string($value) && !is_int($value)) || false === ($integer = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]))) {
+        if ((!is_string($value) && !is_int($value)) || false === ($integer = filter_var($value, \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]))) {
             throw new UnprocessableEntityHttpException('page и limit должны быть положительными целыми числами.');
         }
 

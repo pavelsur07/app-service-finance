@@ -344,8 +344,8 @@ class ClientBank1CImportService
     }
 
     /**
-     * @param array<int, mixed>    $preview
-     * @param \Closure(): void     $commit
+     * @param array<int, mixed> $preview
+     * @param \Closure(): void $commit
      * @param array<string, mixed> $context
      *
      * @return array<string, mixed>

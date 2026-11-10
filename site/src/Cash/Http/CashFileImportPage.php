@@ -53,10 +53,8 @@ final class CashFileImportPage extends AbstractController
         foreach ($mapping as $field => $value) {
             $mapping[$field] = is_string($value) && '' !== trim($value) ? trim($value) : null;
         }
-        if (null !== $mapping['inflow'] && null !== $mapping['outflow']) {
+        if (null !== $mapping['inflow'] || null !== $mapping['outflow']) {
             $mapping['amount'] = null;
-        } elseif (null !== $mapping['amount']) {
-            $mapping['inflow'] = $mapping['outflow'] = null;
         }
 
         return $mapping;
@@ -73,7 +71,7 @@ final class CashFileImportPage extends AbstractController
     /**
      * @return array<string, mixed>|null
      */
-    public function decodeJson(string $payload, string $label): ?array
+    public function decodeJson(string $payload, string $label, bool $validateMapping = false): ?array
     {
         if ('' === trim($payload)) {
             return [];
@@ -84,7 +82,7 @@ final class CashFileImportPage extends AbstractController
 
             return null;
         }
-        if ('маппинга' === $label) {
+        if ($validateMapping) {
             try {
                 $this->mappingValidator->validate($decoded);
             } catch (\App\Cash\Exception\InvalidCashFileMappingException $exception) {

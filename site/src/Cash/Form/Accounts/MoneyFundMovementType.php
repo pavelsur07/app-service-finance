@@ -25,7 +25,7 @@ class MoneyFundMovementType extends AbstractType
                 'input' => 'datetime_immutable',
             ])
             ->add('amount', TextType::class, [
-                'label' => 'Сумма',
+                'label' => 'Сумма ('.$options['currency'].')',
                 'mapped' => false,
                 'required' => false,
                 'empty_data' => '',

@@ -27,7 +27,7 @@ final readonly class ConfirmCashFileImportAction
         $this->mappingValidator->validateForImport($mapping);
         $plan = $this->plans->load((string) $account->getCompany()->getId(), $planHash);
         if ($plan['accountId'] !== $account->getId() || $plan['fileHash'] !== $fileHash || $plan['actor'] !== $actor
-            || $plan['mappingHash'] !== hash('sha256', json_encode($mapping, JSON_THROW_ON_ERROR))) {
+            || $plan['mappingHash'] !== hash('sha256', json_encode($mapping, \JSON_THROW_ON_ERROR))) {
             throw new CashFileImportSelectionException('План импорта не соответствует текущему файлу.');
         }
         $selection = $this->plans->selectDescriptions($plan, $currentSelection, '', $visible, $selected);

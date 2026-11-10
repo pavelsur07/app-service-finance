@@ -30,11 +30,14 @@ final class FundMovementAmountTest extends WebTestCaseBase
             $this->setClientSessionValue($client, 'active_company_id', $company->getId());
             $crawler = $client->request('GET', '/finance/funds/'.$fund->getId().'/movement');
             self::assertResponseIsSuccessful();
+            self::assertStringContainsString($currency, $crawler->filter('label[for="money_fund_movement_amount"]')->text());
             $form = $crawler->filter('form[name="money_fund_movement"]')->form();
             $form['money_fund_movement[amount]'] = $input;
             $client->submit($form);
             if (null === $expected) {
                 self::assertResponseStatusCodeSame(422);
+                self::assertStringContainsString('Некорректная сумма', (string) $client->getResponse()->getContent());
+                self::assertSame($input, $client->getCrawler()->filter('#money_fund_movement_amount')->attr('value'));
             } else {
                 self::assertResponseRedirects('/finance/funds');
             }

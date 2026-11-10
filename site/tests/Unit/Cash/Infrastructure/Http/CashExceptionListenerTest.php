@@ -45,10 +45,13 @@ final class CashExceptionListenerTest extends TestCase
         $request->attributes->set('_route', 'cash_transaction_create_from');
         $event = new ExceptionEvent($this->createMock(HttpKernelInterface::class), $request, HttpKernelInterface::MAIN_REQUEST, $error);
         (new CashExceptionListener())->onKernelException($event);
-        self::assertSame($status, $event->getResponse()?->getStatusCode());
-        self::assertSame($code, json_decode((string) $event->getResponse()?->getContent(), true)['error']['code']);
+        $response = $event->getResponse();
+        self::assertNotNull($response);
+        self::assertSame($status, $response->getStatusCode());
+        self::assertSame($code, json_decode((string) $response->getContent(), true)['error']['code']);
     }
 
+    /** @return iterable<array{\Throwable, int, string}> */
     public static function namedRouteErrors(): iterable
     {
         yield [new \App\Cash\Exception\CashTransactionNotFoundException(), 404, 'cash_transaction_not_found'];

@@ -75,10 +75,10 @@ final class CashFileImportValidationTest extends WebTestCaseBase
     /** @return iterable<array{string, string, int}> */
     public static function invalidUploads(): iterable
     {
-        yield 'TXT' => ['statement.txt', "date;amount\n2026-11-01;10", UPLOAD_ERR_OK];
-        yield 'damaged XLSX' => ['statement.xlsx', 'not a ZIP workbook', UPLOAD_ERR_OK];
-        yield 'empty' => ['statement.csv', '', UPLOAD_ERR_OK];
-        yield 'failed upload' => ['statement.csv', 'partial', UPLOAD_ERR_PARTIAL];
+        yield 'TXT' => ['statement.txt', "date;amount\n2026-11-01;10", \UPLOAD_ERR_OK];
+        yield 'damaged XLSX' => ['statement.xlsx', 'not a ZIP workbook', \UPLOAD_ERR_OK];
+        yield 'empty' => ['statement.csv', '', \UPLOAD_ERR_OK];
+        yield 'failed upload' => ['statement.csv', 'partial', \UPLOAD_ERR_PARTIAL];
     }
 
     #[DataProvider('invalidMappings')]
@@ -158,7 +158,7 @@ final class CashFileImportValidationTest extends WebTestCaseBase
         }
         $payload = null;
         try {
-            $client->request('POST', '/cash/import/file/preview/upload', ['_token' => $this->csrfToken($client, 'cash_file_import_upload'), 'money_account_id' => $account->getId()], ['import_file' => new UploadedFile($path, 'statement.'.$extension, null, UPLOAD_ERR_OK, true)]);
+            $client->request('POST', '/cash/import/file/preview/upload', ['_token' => $this->csrfToken($client, 'cash_file_import_upload'), 'money_account_id' => $account->getId()], ['import_file' => new UploadedFile($path, 'statement.'.$extension, null, \UPLOAD_ERR_OK, true)]);
             self::assertSame('/cash/import/file/mapping', $client->getResponse()->headers->get('Location'));
             $payload = $client->getRequest()->getSession()->get('cash_file_import');
             self::assertSame($account->getCompany()->getId(), $payload['company_id']);

@@ -245,13 +245,13 @@ final class CashFileDescriptionPreviewTest extends WebTestCaseBase
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('incompleteMappingEndpoints')]
-    public function testHalfPairDraftCannotBePreviewedOrConfirmed(string $method, string $endpoint): void
+    public function testMissingAmountDraftCannotBePreviewedOrConfirmed(string $method, string $endpoint): void
     {
         [$client, $company] = $this->context();
         $client->request('GET', '/cash/import/file/preview');
         $payload = $client->getRequest()->getSession()->get('cash_file_import');
         $payload['mapping']['amount'] = null;
-        $payload['mapping']['inflow'] = 'Amount';
+        $payload['mapping']['inflow'] = null;
         $payload['mapping']['outflow'] = null;
         $this->setClientSessionValue($client, 'cash_file_import', $payload);
         $client->request($method, '/cash/import/file/'.$endpoint, 'POST' === $method ? ['_token' => $this->csrfToken($client, 'cash_file_import_commit')] : []);
@@ -264,6 +264,62 @@ final class CashFileDescriptionPreviewTest extends WebTestCaseBase
     {
         yield ['GET', 'preview'];
         yield ['POST', 'commit'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('directionalProfiles')]
+    public function testOneSidedProfilePreservesNormalizerDirectionAndAmount(string $field, bool $withAmount): void
+    {
+        [$client, $company] = $this->context();
+        $project = new \App\Company\Entity\ProjectDirection(Uuid::uuid7()->toString(), $company, 'Общий', \App\Company\Entity\ProjectDirection::CODE_GENERAL);
+        $center = new \App\Company\Entity\FinancialResponsibilityCenter((string) $company->getId(), \App\Company\Entity\FinancialResponsibilityCenter::CODE_GENERAL, \App\Company\Entity\FinancialResponsibilityCenter::NAME_GENERAL);
+        foreach ([$project, $center, new \App\Company\Entity\FinancialResponsibilityCenterProject((string) $company->getId(), $project, $center)] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+        $client->request('GET', '/cash/import/file/mapping');
+        $payload = $client->getRequest()->getSession()->get('cash_file_import');
+        $csv = "Date;Amount;Credit;Debit;Description\n01.10.2026;-999;100;200;Directional import\n";
+        $hash = hash('sha256', $csv);
+        self::getContainer()->get(ObjectStorageInterface::class)->write('cash-file-imports/'.$hash.'.csv', $csv);
+        $payload['file_hash'] = $hash;
+        $payload['file_name'] = 'directional.csv';
+        $this->setClientSessionValue($client, 'cash_file_import', $payload);
+        $mapping = ['date' => 'Date', $field => 'inflow' === $field ? 'Credit' : 'Debit', 'amount' => $withAmount ? 'Amount' : null, 'description' => 'Description'];
+        $profile = new CashFileImportProfile(Uuid::uuid7()->toString(), $company, 'Directional profile', $mapping);
+        $this->em()->persist($profile);
+        $this->em()->flush();
+        $client->request('POST', '/cash/import/file/mapping/profile/apply', ['_token' => $this->csrfToken($client, 'cash_file_import_profile_apply'), 'profile_id' => $profile->getId()]);
+        self::assertResponseRedirects('/cash/import/file/mapping');
+        $crawler = $client->followRedirect();
+        $client->submit($crawler->selectButton('Далее')->form());
+        self::assertResponseRedirects('/cash/import/file/preview');
+        $client->followRedirect();
+        self::assertResponseIsSuccessful();
+        $payload = $client->getRequest()->getSession()->get('cash_file_import');
+        $plan = self::getContainer()->get(\App\Cash\Service\Import\File\CashFileDescriptionPlan::class)->load((string) $company->getId(), $payload['description_plan']);
+        self::assertCount(1, $plan['rows']);
+        $input = array_values($plan['rows'])[0]['input'];
+        self::assertTrue($input['ok']);
+        self::assertSame('inflow' === $field ? 'INFLOW' : 'OUTFLOW', $input['direction']);
+        self::assertSame('inflow' === $field ? '100.00' : '200.00', $input['amount']);
+        $client->request('POST', '/cash/import/file/commit', ['_token' => $this->csrfToken($client, 'cash_file_import_commit')]);
+        self::assertResponseIsSuccessful();
+        $payload = $client->getRequest()->getSession()->get('cash_file_import');
+        self::getContainer()->get(\App\Cash\MessageHandler\Import\CashFileImportHandler::class)(new \App\Cash\Message\Import\CashFileImportMessage($payload['committed_job_id']));
+        self::assertSame('done', $this->em()->getConnection()->fetchOne('SELECT status FROM cash_file_import_jobs WHERE id = :id', ['id' => $payload['committed_job_id']]));
+        $row = $this->em()->getConnection()->fetchAssociative('SELECT amount, direction FROM cash_transaction WHERE company_id = :company AND description = :description', ['company' => $company->getId(), 'description' => 'Directional import']);
+        self::assertIsArray($row);
+        self::assertSame($input['amount'], $row['amount']);
+        self::assertSame($input['direction'], $row['direction']);
+    }
+
+    /** @return iterable<array{string, bool}> */
+    public static function directionalProfiles(): iterable
+    {
+        yield ['inflow', false];
+        yield ['outflow', false];
+        yield ['inflow', true];
+        yield ['outflow', true];
     }
 
     public function testDispatchFailureKeepsQueuedJobAndCommittedSessionForRecovery(): void

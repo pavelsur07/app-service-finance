@@ -44,6 +44,7 @@ final readonly class PaymentCalendarQuery
 
         return [
             'plansQuery' => $plansQuery,
+            'hasAnyPlans' => $this->plans->count(['company' => $company]) > 0,
             'filters' => $filters,
             'period' => $period,
             'accounts' => $this->accounts->findBy(['company' => $company], ['name' => 'ASC']),

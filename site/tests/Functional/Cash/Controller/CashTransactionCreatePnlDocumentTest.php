@@ -140,6 +140,8 @@ final class CashTransactionCreatePnlDocumentTest extends WebTestCaseBase
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
         $crawler = $client->request('GET', '/finance/cash-transactions/'.$tx->getId().'/edit');
         self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('[data-multi-split-notice] a[href$="/splits"]'));
+        self::assertStringContainsString('Общую сумму, валюту и статью', $crawler->text());
         $form = $crawler->filter('form[name="cash_transaction"]')->form();
         $form['cash_transaction[description]'] = 'Description changed';
         $client->submit($form);

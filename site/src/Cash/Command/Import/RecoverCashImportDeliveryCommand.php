@@ -51,7 +51,7 @@ final class RecoverCashImportDeliveryCommand extends Command
         $execute = true === $input->getOption('execute');
         $before = new \DateTimeImmutable('-120 seconds');
         $companies = null === $companyId ? $this->companies->withQueuedImportJobsBefore($before) : [$companyId];
-        sort($companies, SORT_STRING);
+        sort($companies, \SORT_STRING);
         $locked = [];
         $candidates = [];
         $missing = 0;

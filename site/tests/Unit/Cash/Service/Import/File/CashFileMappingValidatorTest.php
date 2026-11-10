@@ -41,8 +41,10 @@ final class CashFileMappingValidatorTest extends TestCase
         yield 'pair plus amount' => [['date' => 'Date', 'amount' => 'Amount', 'inflow' => 'In', 'outflow' => 'Out'], true];
         yield 'draft' => [[], false];
         yield 'no amount' => [['date' => 'Date'], false];
-        yield 'half pair' => [['date' => 'Date', 'inflow' => 'In'], false];
-        yield 'half pair plus amount' => [['date' => 'Date', 'inflow' => 'In', 'amount' => 'Amount'], false];
+        yield 'inflow only' => [['date' => 'Date', 'inflow' => 'In'], true];
+        yield 'outflow only' => [['date' => 'Date', 'outflow' => 'Out'], true];
+        yield 'inflow plus amount' => [['date' => 'Date', 'inflow' => 'In', 'amount' => 'Amount'], true];
+        yield 'outflow plus amount' => [['date' => 'Date', 'outflow' => 'Out', 'amount' => 'Amount'], true];
         yield 'missing date' => [['amount' => 'Amount'], false];
     }
 

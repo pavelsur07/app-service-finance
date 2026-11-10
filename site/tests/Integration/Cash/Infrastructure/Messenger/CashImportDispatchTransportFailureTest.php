@@ -26,6 +26,7 @@ final class CashImportDispatchTransportFailureTest extends TestCase
         self::assertFalse((new DispatchCashFileImportJobAction($bus, new NullLogger()))('company', 'job'));
     }
 
+    /** @return iterable<string, array{bool}> */
     public static function initializationModes(): iterable
     {
         yield 'eager transport initialization' => [false];

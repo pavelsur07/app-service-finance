@@ -87,6 +87,13 @@
         </div>
     {% endif %}
 
+    {% if tx.splits|length > 1 %}
+        <div class="alert alert-info d-block" role="status" data-multi-split-notice>
+            Общую сумму, валюту и статью операции с несколькими строками разбивки нельзя изменить здесь. Остальные поля доступны для изменения.
+            <a href="{{ path('cash_transaction_splits', {id: tx.id}) }}" class="alert-link">Изменить строки и статьи разбивки</a>
+        </div>
+    {% endif %}
+
     {% set formErrors = form.vars.errors|length %}
     {% for child in form.children %}{% set formErrors = formErrors + child.vars.errors|length %}{% endfor %}
     <div class="dds-op__summary" data-dds-op-summary role="alert" tabindex="-1"{% if formErrors == 0 %} hidden{% endif %}>
@@ -107,7 +114,7 @@
             <section class="dds-card" aria-labelledby="dds-op-docs-title">
                 <div class="dds-card__head">
                     <h2 class="dds-card__title" id="dds-op-docs-title">Документы ОПиУ на основании операции</h2>
-                    {% if canCreatePnlDocument and not isDeleted %}
+                    {% if canCreatePnlDocument and not isDeleted and is_granted('module.finance.write') %}
                         <form method="post" action="{{ path('cash_transaction_create_pnl_document', {id: tx.id}) }}">
                             <input type="hidden" name="_token" value="{{ csrf_token('create_pnl_document' ~ tx.id) }}">
                             <button type="submit" class="btn dds-op__btn">Создать документ ОПиУ</button>

@@ -40,6 +40,11 @@ final class PaymentCalendarEditController extends AbstractController
         }
         $plan = $this->findPlanOrNotFound($id, $company);
         $filters = $this->page->extractFilters($request);
+        if (null === $plan->getPlannedAt()) {
+            $this->addFlash('danger', 'У платежа не указана дата. Редактирование недоступно.');
+
+            return $this->redirectToRoute('payment_calendar_index', $this->page->buildFilterQuery($filters));
+        }
         $dto = PaymentPlanDTO::fromPlan($plan);
         $form = $this->createForm(PaymentPlanType::class, $dto, ['company' => $company, 'action' => $this->generateUrl('payment_calendar_edit', array_merge(['id' => (string) $plan->getId()], $this->page->buildFilterQuery($filters)))]);
         $form->handleRequest($request);

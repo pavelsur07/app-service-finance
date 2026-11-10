@@ -42,7 +42,7 @@ Reviewer focus: company isolation, current data under source lock, atomicity, fi
 
 ## Stage 5: Шаблоны и интерфейсная приёмка
 Risk: MEDIUM
-stage_base_commit: record before implementation
+stage_base_commit: b67af3f0b
 Definition of Done: Все страницы доступны без пропусков; фильтры сохранены; Money format/layout/access прежние; Twig lint и функциональные проверки проходят.
 Work items: 5.1 существующий pagination partial для счетов/фондов/профилей/календаря; 5.2 фильтры/limit/empty states; 5.3 ошибки и подсказка мультиразбивки; 5.4 READ-only/responsive smoke.
 Checks: RED→GREEN regressions per bug; Cash module integration/functional/unit tests and focused PHP lint/PHPStan. External review at HIGH-LOCAL Stage if diff >500 lines.
@@ -63,3 +63,5 @@ Stage 1→2: common source lock retained for update/restore. Stage 3→4: compan
 - Test atomic no-confirmation log/job rollback, dispatch-failure committed state, 201+ skipped-head candidates, multiple companies/one probe, failed/stream/delayed exclusions, unavailable Redis, lock exclusion/status races, bounded large-queue scan, existing duplicate Handler behavior.
 - Backend page helper validates page/limit and wraps existing Pagerfanta adapters; calendar forecast/form choices remain unpaginated. Templates only Stage 5.
 - Existing owner design/plan and autonomy contract supply implementation authorization; brainstorming does not reopen already decided business semantics or add intermediate approval gates.
+
+Stage5 UI notes: existing partial only, preserve explicit limit and calendar filters, reset page on filter submit; calendar total footer describes page total. Empty-vs-filtered requires only read-model context (hasAnyPlans); no financial formulas/recurrence changes.

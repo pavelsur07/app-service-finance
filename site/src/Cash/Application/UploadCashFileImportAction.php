@@ -25,7 +25,7 @@ final readonly class UploadCashFileImportAction
     /** @return array<string, string> */
     public function __invoke(MoneyAccount $account, string $path, string $name, bool $uploadValid): array
     {
-        $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        $extension = strtolower(pathinfo($name, \PATHINFO_EXTENSION));
         if (!$uploadValid || !is_file($path) || !is_readable($path)) {
             throw new InvalidCashImportFileException('Не удалось загрузить или прочитать файл. Повторите загрузку.');
         }

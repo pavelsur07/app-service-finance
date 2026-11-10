@@ -66,6 +66,7 @@ final class PaymentCalendarPage extends AbstractController
      *     account_id: string,
      *     category_id: string,
      *     status: string,
+     *     limit: string,
      *     counterparty_id: string
      * }
      */
@@ -83,7 +84,7 @@ final class PaymentCalendarPage extends AbstractController
             $to = $defaultTo;
         }
 
-        return ['from' => $from, 'to' => $to, 'account_id' => $this->uuidFilter($request, 'account_id'), 'category_id' => $this->uuidFilter($request, 'category_id'), 'status' => (string) $request->query->get('status', ''), 'counterparty_id' => $this->uuidFilter($request, 'counterparty_id')];
+        return ['limit' => $request->query->has('limit') ? (string) $this->pagination->limit($request) : '', 'from' => $from, 'to' => $to, 'account_id' => $this->uuidFilter($request, 'account_id'), 'category_id' => $this->uuidFilter($request, 'category_id'), 'status' => (string) $request->query->get('status', ''), 'counterparty_id' => $this->uuidFilter($request, 'counterparty_id')];
     }
 
     private function parseDate(?string $value): ?\DateTimeImmutable

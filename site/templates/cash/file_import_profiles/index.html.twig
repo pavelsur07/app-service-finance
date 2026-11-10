@@ -5,13 +5,15 @@
 {% block body %}
     {% embed 'partials/_page_header.html.twig' with {title: 'Профили импорта'} %}
         {% block actions %}
-            <a href="{{ path('cash_file_import_profile_new') }}" class="btn btn-primary">Добавить профиль</a>
+            {% if is_granted('module.finance.write') %}
+                <a href="{{ path('cash_file_import_profile_new') }}" class="btn btn-primary">Добавить профиль</a>
+            {% endif %}
         {% endblock %}
     {% endembed %}
 
     <div class="container-xl mt-3">
         <div class="card">
-            <div class="card-body">
+            <div class="card-body table-responsive">
                 <table class="table table-vcenter">
                     <thead>
                         <tr>
@@ -31,12 +33,14 @@
                                 <a href="{{ path('cash_file_import_profile_edit', {'id': profile.id}) }}" class="btn btn-icon" title="Редактировать">
                                     <i class="ti ti-pencil"></i>
                                 </a>
+                                {% if is_granted('module.finance.write') %}
                                 <button type="button" class="btn btn-icon btn-danger" title="Удалить"
                                         data-bs-toggle="modal" data-bs-target="#import-profile-confirm"
                                         data-confirm-action="{{ path('cash_file_import_profile_delete', {'id': profile.id}) }}"
                                         data-confirm-token="{{ csrf_token('delete' ~ profile.id) }}"
                                         data-confirm-title="Удалить профиль?"
                                         data-confirm-submit="Удалить" data-confirm-variant="danger"><i class="ti ti-trash"></i></button>
+                                {% endif %}
                             </td>
                         </tr>
                     {% else %}
@@ -46,6 +50,9 @@
                     {% endfor %}
                     </tbody>
                 </table>
+            </div>
+            <div class="card-footer">
+                {% include 'partials/_pagination.html.twig' with {pager: pager} only %}
             </div>
         </div>
     </div>

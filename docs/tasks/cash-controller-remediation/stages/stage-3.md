@@ -43,3 +43,6 @@
 
 #### Next
 - Continue to Stage 4 automatically.
+
+#### Handoff correction
+Fresh-context review established that the prior external half-pair finding conflicted with the owner's unchanged-normalizer requirement: the existing normalizer intentionally supports either directional column and gives it priority over amount. That prior IMPORTANT is reclassified as rejected with code/behavior evidence. Handoff removes only the both-columns restriction; real inflow-only/outflow-only profile apply→preview→confirm→Handler cases assert persisted direction/amount, including simultaneous amount mapping. Draft structure validation and missing-source refusal retained.

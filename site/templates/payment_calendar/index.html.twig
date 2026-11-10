@@ -26,9 +26,11 @@
                 <a href="#" class="btn" data-bs-toggle="offcanvas" data-bs-target="#payment-calendar-filters">
                     <i class="ti ti-filter"></i> Фильтры
                 </a>
+                {% if is_granted('module.finance.write') %}
                 <a href="{{ path('payment_calendar_new', filterQuery) }}" class="btn btn-primary">
                     <i class="ti ti-plus"></i> Добавить
                 </a>
+                {% endif %}
             </div>
         {% endblock %}
     {% endembed %}
@@ -101,9 +103,16 @@
             {% if plans is defined and plans|length == 0 %}
                 <div class="card my-3">
                     <div class="card-body text-center">
-                        <h3 class="mb-2">Пока нет плановых платежей</h3>
-                        <p class="text-muted mb-3">Создайте первую запись, чтобы спланировать движение средств.</p>
-                        <a href="{{ path('payment_calendar_new', filterQuery) }}" class="btn btn-primary">Создать плановый платёж</a>
+                        {% if hasAnyPlans %}
+                            <h3 class="mb-2">Нет платежей по выбранным фильтрам</h3>
+                            <p class="text-muted mb-0">Измените период или фильтры, чтобы увидеть другие платежи.</p>
+                        {% else %}
+                            <h3 class="mb-2">Пока нет плановых платежей</h3>
+                            {% if is_granted('module.finance.write') %}
+                                <p class="text-muted mb-3">Создайте первую запись, чтобы спланировать движение средств.</p>
+                                <a href="{{ path('payment_calendar_new', filterQuery) }}" class="btn btn-primary">Создать плановый платёж</a>
+                            {% endif %}
+                        {% endif %}
                     </div>
                 </div>
             {% endif %}
@@ -119,6 +128,9 @@
                 </div>
                 {% set payments = plans %}
                 {% include 'payment_calendar/_table_compact.html.twig' with {payments: payments} %}
+                <div class="card-footer">
+                    {% include 'partials/_pagination.html.twig' with {pager: pager, route: 'payment_calendar_index'} only %}
+                </div>
             </div>
         </div>
     </div>
@@ -130,6 +142,7 @@
         </div>
         <div class="offcanvas-body">
             <form method="get" action="{{ path('payment_calendar_index') }}" class="d-flex flex-column gap-3">
+                <input type="hidden" name="limit" value="{{ pager.maxPerPage }}">
                 <div>
                     <label for="filter-from" class="form-label">С</label>
                     <input type="date" id="filter-from" name="from" class="form-control" value="{{ filters.from }}" required>
@@ -170,13 +183,13 @@
                     <select id="filter-counterparty" name="counterparty_id" class="form-select">
                         <option value="">Все контрагенты</option>
                         {% for counterparty in counterparties %}
-                            <option value="{{ counterparty.id }}" {% if filters.counterparty_id == counterparty.id %}selected{% endif %}>{{ counterparty.name }}</option>
+                            <option value="{{ counterparty.id }}" {% if filters.counterparty_id == counterparty.id %}selected{% endif %}>{{ counterparty.shownName }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="d-grid gap-2 mt-2">
                     <button type="submit" class="btn btn-primary">Применить</button>
-                    <a class="btn" href="{{ path('payment_calendar_index', {'from': filters.from, 'to': filters.to}) }}">Сбросить</a>
+                    <a class="btn" href="{{ path('payment_calendar_index', {'from': filters.from, 'to': filters.to, 'limit': pager.maxPerPage}) }}">Сбросить</a>
                 </div>
             </form>
         </div>

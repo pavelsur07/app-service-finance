@@ -27,7 +27,7 @@ final class RecoverCashImportDeliveryTest extends IntegrationTestCase
 {
     public function testCommandIsRegistered(): void
     {
-        self::assertTrue((new Application(self::$kernel))->has('app:cash:import:recover-delivery'));
+        self::assertTrue((new Application(self::$kernel ?? throw new \LogicException('Kernel not booted.')))->has('app:cash:import:recover-delivery'));
     }
 
     public function testPagesAdvanceThroughSkippedJobsAndQueueIsReadOnceAcrossCompanies(): void
@@ -91,7 +91,7 @@ final class RecoverCashImportDeliveryTest extends IntegrationTestCase
         $this->jobs($company, 1);
         $db = \Doctrine\DBAL\DriverManager::getConnection($this->connection->getParams());
         $lock = new CashImportDeliveryLock($db);
-        self::assertTrue($lock->tryAcquire($company->getId()));
+        self::assertTrue($lock->tryAcquire((string) $company->getId()));
         try {
             [$tester, $bus, $probe] = $this->command();
             $tester->execute(['companyId' => $company->getId(), '--execute' => true]);
@@ -99,7 +99,7 @@ final class RecoverCashImportDeliveryTest extends IntegrationTestCase
             self::assertSame([], $bus->ids);
             self::assertSame(0, $probe->calls);
         } finally {
-            $lock->release($company->getId());
+            $lock->release((string) $company->getId());
             $db->close();
         }
         [$tester, $bus] = $this->command();
@@ -107,10 +107,14 @@ final class RecoverCashImportDeliveryTest extends IntegrationTestCase
         self::assertCount(1, $bus->ids);
     }
 
+    /** @param list<string> $present
+     * @return array{CommandTester, object{ids: list<string>}, object{calls: int, seen: list<string>}}
+     */
     private function command(array $present = [], bool $failProbe = false, ?\Closure $afterProbe = null, bool $failSend = false): array
     {
         $level = $this->connection->getTransactionNestingLevel();
         $bus = new class($failSend, $this->connection, $level) implements MessageBusInterface {
+            /** @var list<string> */
             public array $ids = [];
 
             public function __construct(private bool $fail, private \Doctrine\DBAL\Connection $db, private int $level)
@@ -125,6 +129,9 @@ final class RecoverCashImportDeliveryTest extends IntegrationTestCase
                 if ($this->fail) {
                     throw new \Symfony\Component\Messenger\Exception\TransportException('secret');
                 }
+                if (!$message instanceof \App\Cash\Message\Import\CashFileImportMessage) {
+                    throw new \LogicException('Expected import message.');
+                }
                 $this->ids[] = $message->getJobId();
 
                 return new Envelope($message);
@@ -132,8 +139,10 @@ final class RecoverCashImportDeliveryTest extends IntegrationTestCase
         };
         $probe = new class($present, $failProbe, $afterProbe) implements ImportQueueProbeInterface {
             public int $calls = 0;
+            /** @var list<string> */
             public array $seen = [];
 
+            /** @param list<string> $present */
             public function __construct(private array $present, private bool $fail, private ?\Closure $after)
             {
             }

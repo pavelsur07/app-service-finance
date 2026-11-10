@@ -1,9 +1,9 @@
 ## Current checkpoint
 
-**Phase:** Stage 4 / Work item 4.1
-**Status:** implementing
+**Phase:** Handoff / delivery verification
+**Status:** all five stages implemented and reviewed; local gates PASS; verify current PR-head CI and Ready before owner release request
 **Task base:** 22b07f6ba
-**Stage base commit:** 967ac022d
+**Stage base commit:** b67af3f0b
 
 ### Completed
 - Phase 0: isolated managed worktree `/home/deploy/.codex/worktrees/f30b/app-service-finance`; branch `fix/cash-controller-remediation`.
@@ -19,11 +19,10 @@
 - Stage 1 external: 1 round; fixed without re-run.
 
 ### Exact next action
-- Implement atomic job/log creation, durable delivery failure handling and queued recovery command; finish Transaction controllers/JSON listener and backend pagination.
-- Keep Stage 2 red test files outside Stage 1 commit.
+- Ensure final Stage5/handoff commit is pushed; verify current PR-head CI green and mark Ready, then ask the single merge+deploy question. Merge/deploy and production schedule are not approved. PR current state is authoritative for delivery progress.
 
 ### Files to inspect first on resume
-- plan.md, git status; SaveMoneyAccountAction, AccountBalanceService, MoneyAccountRepository, RestoreCashTransactionAction; Stage 2 red tests.
+- Current checkpoint tail, git status, stages/stage-4.md; Stage5 changes; /tmp/vf-cash-handoff-static.log and site/var/cash-handoff-review/spec.md.
 
 ### Rulings
 - Closed-period checks in both document Actions are authorized by owner §1.2; rejected reviewer scope objection.
@@ -54,3 +53,16 @@
 
 - Stage4 real transport follow-up uncovered IMPORTANT: eager sender initialization throws raw RedisException before Symfony wrapping; Dispatch Action catches concrete Redis transport errors too. Real eager RED→GREEN and lazy outage tested. Delayed cursor scan guards non-array/error responses; no queue rank offsets.
 - Stage4 DONE: post-review Cash module1038 tests/3956 assertions PASS; focused review73 tests/126 assertions PASS; focusedPHPStan/CS clean;74 route contracts retained. External1 round accepted withoutre-run (reportedIMPORTANT1 rejected with evidence; MINOR3fixed). InternalIMPORTANT1 eagerRedis failure fixedRED→GREEN. Next: Stage5 templates, baseline1038/3956; commitStage4 then recordStage5base.
+
+- Stage5 START: stage_base_commit b67af3f0b; baseline Cash1038/3956 GREEN. DoD pagination links/filterlimit/reset, empty-vs-filtered, multi-split notice, exact-currency hint and READ-only; Twig lint +functional +desktop/narrow browser smoke. Backend read-model/HTTP context only where required by template, no backend business refactor.
+- 5.1–5.3 GREEN: existing pager partial on4lists, filters/limit preserved and page reset, truthful page-total label, empty-vs-filtered calendar, shownName counterparty choices, READ-only mutation controls hidden, multi-split notice/link, exact fund currency label and invalidinput retained. Initial UI regression9failures RED→GREEN; focused30tests/180assertions PASS; Twigcs no violations; focusedPHPStan clean. Next5.4 desktop390/1440 smoke andhandoff gates.
+- Final fresh-context internalreview: BLOCKER0,IMPORTANT2,MINOR1. Confirmed pagination current-route bug on calendar edit; confirmed single-direction mapping compatibility regression (existing normalizer accepts either flow). Fix bothRED→GREEN, clarify split hint. Ruling supersedes Stage3 pair-completeness reviewer advice: owner requires existing normalizer financial behavior, including one-sided profiles and flow-over-amount priority; structural drafts remainallowed. FullPHPStan first run found17 newtest annotations/typeissues; fixing withoutbaselinegrowth before rerun. No productionchanges.
+- Freshreview fixes: calendar edit regression originally500 now scoped list links; directional profile apply/preview/confirm/realHandler persisted4cases PASS (100.00INFLOW/200.00OUTFLOW, amountpriority unchanged). Split hint corrected. TesttypefocusedPHPStan clean after17taskownedannotations; fullstaticrerunongoing. FullunitPASS4610tests/25544assertions. Fulltest notstarted yet (waitstaticcachegate tofinish).
+- Browser1440/390:12page/widthcases incl4paginatedlists,funderror,splitnotice. Initial horizontal-scroll automation timing failure investigated; diagnostic rerun completed with contained scroll/noJSerrors/nohorizontalpageoverflow. Updatednotice exportedfromrealtemplate. apiFetch source transpile smoke403/404/422 preservesstatus/code/message. Build: initial sharedcacheEACCES; configLoader runnerbuildPASS, noassetsourcechanges. node_modulessymlinkcreatedforbuildremoved.
+- Finalexternalread-onlyClaude round launched againstbase22b07f6ba; awaiting result. Remaining: fullstatic +make site-test (DBprep), finalreviewfixesifany, Stage5/handoff docs, commit/push/Ready/CIverificationthenownerreleasequestion.
+
+- Handoff fixes confirmed with actual Handler:4directional profile cases PASS4/48assertions after fixture includes requiredsystemCFO/projectpair; no change tofinancialparser. FreshreviewcalendarGETedit500regression fixed; bothmustfixescovered. Finalbrowserdiagnostic12casesPASS withhorizontalcontainedtable scroll,noJSerrors/noPAGEoverflow. FullunitPASS4610/25544. Remaining fullstatic/fulltest/externalhandoffreview anddeliverydocs/Ready.
+
+- Handoff externalround1: IMPORTANT1 real UI path—mapping form discarded lone flow when amount also selected; enhance tests throughactualmappingPOST beforefix. Ruling: keep existing row normalizer as owner-defined authority (any directional column precedes amount), align HTTPmappingpreparation; no row parser/formula changes. MINOR2: explicit mapping-validation flag instead of UI-label comparison; null expected_at edit safe-refusal withflash, no guesseddate. Nullable expected_at confirmedinORM; add realNULLrowregression. Fullsuite8725 inprogress on pre-external-fix snapshot; no concurrent DBregressionruns untilitfinishes. FullstaticPHPStanPASS,mainCS/stricttypes/Twig396PASS; fullunit4610/25544PASS.
+
+- Stage5/handoff ACCEPTED locally: final Cash1053/4090,unit4611/25546; fullproject8725/48824 PASS then scoped whole-Cash verification after external fixes. MainPHPStan/CS/strict/Twig396 PASS. Finalrouter74/74. Internal10IMPORTANTfixed total; external6reported/3fixed/3rejected,0BLOCKER/openIMPORTANT;5externalpoints1roundeach. Sourcefrozen; remainingdeliveryCI/Ready/releasequestiononly.

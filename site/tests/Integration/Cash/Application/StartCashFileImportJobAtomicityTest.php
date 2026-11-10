@@ -47,7 +47,9 @@ final class StartCashFileImportJobAtomicityTest extends IntegrationTestCase
     public function testJobCannotUseAnAccountFromAnotherCompany(): void
     {
         [$company, $account] = $this->context();
-        $other = CompanyBuilder::aCompany()->withId(Uuid::uuid7()->toString())->withOwner($company->getUser())->build();
+        $owner = $company->getUser();
+        self::assertNotNull($owner);
+        $other = CompanyBuilder::aCompany()->withId(Uuid::uuid7()->toString())->withOwner($owner)->build();
         $this->em->persist($other);
         $this->em->flush();
         $this->expectException(\App\Cash\Exception\CashImportAccountMismatchException::class);

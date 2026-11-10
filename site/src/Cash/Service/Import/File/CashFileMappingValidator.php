@@ -20,7 +20,9 @@ final readonly class CashFileMappingValidator
         }
     }
 
-    /** Drafts remain structurally valid; importing requires a complete configuration.
+    /** Drafts remain structurally valid; import requires a date and an amount source.
+     * Either directional column is supported, with precedence defined by the existing row normalizer.
+     *
      * @param array<array-key, mixed> $mapping
      */
     public function validateForImport(array $mapping): void
@@ -30,11 +32,8 @@ final readonly class CashFileMappingValidator
         if (!$has('date')) {
             throw new InvalidCashFileMappingException('Укажите колонку с датой операции перед импортом.');
         }
-        if ($has('inflow') !== $has('outflow')) {
-            throw new InvalidCashFileMappingException('Выберите обе колонки приход/расход или общую сумму перед импортом.');
-        }
-        if (!$has('amount') && !$has('inflow')) {
-            throw new InvalidCashFileMappingException('Укажите колонку суммы или пару колонок приход/расход перед импортом.');
+        if (!$has('amount') && !$has('inflow') && !$has('outflow')) {
+            throw new InvalidCashFileMappingException('Укажите колонку суммы, прихода или расхода перед импортом.');
         }
     }
 }

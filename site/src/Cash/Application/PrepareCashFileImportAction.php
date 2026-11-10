@@ -22,7 +22,7 @@ final readonly class PrepareCashFileImportAction
     public function __invoke(MoneyAccount $account, string $fileHash, string $storageKey, array $mapping, ?string $actor, ?string $storedContext, ?string $storedPlan): array
     {
         $this->mappingValidator->validateForImport($mapping);
-        $context = hash('sha256', json_encode([$account->getCompany()->getId(), $account->getId(), $fileHash, $mapping, $actor], JSON_THROW_ON_ERROR));
+        $context = hash('sha256', json_encode([$account->getCompany()->getId(), $account->getId(), $fileHash, $mapping, $actor], \JSON_THROW_ON_ERROR));
         $changed = $storedContext !== $context || null === $storedPlan;
         if ($changed) {
             $plan = $this->files->with($storageKey, fn (string $path): array => $this->plans->build($path, $account, $mapping, $fileHash, $actor));

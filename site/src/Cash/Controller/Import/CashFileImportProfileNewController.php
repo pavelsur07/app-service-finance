@@ -46,7 +46,7 @@ final class CashFileImportProfileNewController extends AbstractController
 
                 return $this->render('cash/file_import_profiles/new.html.twig', $formData, new Response(status: 422));
             }
-            $mapping = $this->page->decodeJson($formData['mapping'], 'маппинга');
+            $mapping = $this->page->decodeJson($formData['mapping'], 'маппинга', validateMapping: true);
             if (null === $mapping) {
                 return $this->render('cash/file_import_profiles/new.html.twig', $formData, new Response(status: 422));
             }
