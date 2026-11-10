@@ -172,6 +172,7 @@ final readonly class BuildMarketplacePlPreviewAction
                 onListings: bcsub($spend->total, $unallocated, 2),
                 unallocated: $unallocated,
                 difference: bcsub($ledgerSpend, $spend->total, 2),
+                outsideStatistics: $ledger->signed($ledger->outsideAmount),
             );
         }
 

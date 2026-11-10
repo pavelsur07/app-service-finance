@@ -54,6 +54,7 @@
                         <th class="text-end">На товарах, ₽</th>
                         <th class="text-end">Без товара, ₽</th>
                         <th class="text-end">Расхождение, ₽</th>
+                        <th class="text-end">Реклама вне статистики, ₽</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -65,6 +66,7 @@
                             <td class="text-end">{{ ads.onListings|vf_amount }}</td>
                             <td class="text-end">{{ ads.unallocated|vf_amount }}</td>
                             <td class="text-end">{{ ads.difference|vf_amount }}</td>
+                            <td class="text-end" data-testid="pl-preview-ads-outside">{{ ads.outsideStatistics|vf_amount }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -72,7 +74,9 @@
         </div>
         <div class="card-footer text-secondary small">
             Расхождение = учёт − статистика. Частые причины: дни, которых нет в одном из источников;
-            недельные удержания WB на стыке месяцев; реклама, оплаченная предоплатой.
+            недельные удержания WB на стыке месяцев; реклама, оплаченная предоплатой.<br>
+            Реклама вне статистики — прочие затраты маркетплейса в той же статье ОПиУ, которых нет в
+            рекламной статистике (оплата за заказ, рассылки, подписки). Учёт + реклама вне статистики = строка статьи в ОПиУ.
         </div>
     </div>
 {% endif %}

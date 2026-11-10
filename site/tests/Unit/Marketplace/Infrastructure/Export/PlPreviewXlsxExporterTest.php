@@ -57,6 +57,7 @@ final class PlPreviewXlsxExporterTest extends TestCase
 
         self::assertArrayHasKey('ОПиУ по тегам', $sheets);
         self::assertContains(['Реклама: учёт и статистика (в колонках тегов — по статистике)'], $sheets['Сверка']);
+        self::assertContains(['Маркетплейс', 'Учёт, ₽', 'Статистика, ₽', 'На товарах, ₽', 'Без товара, ₽', 'Расхождение, ₽', 'Реклама вне статистики, ₽'], $sheets['Сверка']);
     }
 
     /**
@@ -77,7 +78,7 @@ final class PlPreviewXlsxExporterTest extends TestCase
             costReconciliationDelta: '0.00',
             salesCoverage: [],
             warnings: [],
-            adReconciliation: [new PlPreviewAdReconciliationDTO(MarketplaceType::WILDBERRIES, '-100.00', '90.00', '80.00', '10.00', '-10.00')],
+            adReconciliation: [new PlPreviewAdReconciliationDTO(MarketplaceType::WILDBERRIES, '-100.00', '90.00', '80.00', '10.00', '-10.00', '5.00')],
             mode: $mode,
         );
     }
