@@ -7112,11 +7112,6 @@ parameters:
 			count: 1
 			path: src/Report/Cashflow/CashflowReportRequestMapper.php
 
-		-
-			message: '#^Call to an undefined method PhpOffice\\PhpSpreadsheet\\Reader\\IReader\:\:listWorksheetInfo\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Shared/Command/ConvertLegacyXlsCommand.php
 
 		-
 			message: '#^Property App\\Shared\\Entity\\AuditLog\:\:\$diff type has no value type specified in iterable type array\.$#'

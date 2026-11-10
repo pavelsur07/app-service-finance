@@ -47,7 +47,9 @@ final class WbFinanceSalesReportsQuotaControllerTest extends WebTestCaseBase
         self::assertFalse($denied['shared_cooldown']);
         self::assertIsInt($denied['wait_seconds']);
         self::assertGreaterThanOrEqual(1, $denied['wait_seconds']);
-        self::assertLessThanOrEqual(70, $denied['wait_seconds']);
+        // Окно 70 с; symfony/rate-limiter (с 7.4.23) округляет retryAfter вверх до целой
+        // секунды, поэтому ожидание может быть на секунду больше окна.
+        self::assertLessThanOrEqual(71, $denied['wait_seconds']);
     }
 
     public function testSlotSharesBucketWithSymfonyImport(): void
