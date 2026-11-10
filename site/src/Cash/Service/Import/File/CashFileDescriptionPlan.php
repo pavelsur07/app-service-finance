@@ -82,6 +82,50 @@ final readonly class CashFileDescriptionPlan
         ];
     }
 
+    /** @param Plan $plan
+     * @param array<array-key, mixed> $current
+     * @param array<array-key, mixed> $visible
+     * @param array<array-key, mixed> $selected
+     *
+     * @return list<string>
+     */
+    public function selectDescriptions(array $plan, array $current, string $operation = '', array $visible = [], array $selected = []): array
+    {
+        $available = [];
+        foreach ($plan['rows'] as $id => $row) {
+            if ('update_description' === $row['action']) {
+                $available[(string) $id] = true;
+            }
+        }
+        $selection = [];
+        foreach ($current as $id) {
+            if (!is_string($id) || !isset($available[$id])) {
+                throw new \App\Cash\Exception\CashFileImportSelectionException('Недоступная строка плана.');
+            }
+            $selection[$id] = true;
+        }
+        if ('all' === $operation) {
+            return array_map('strval', array_keys($available));
+        }
+        if ('none' === $operation) {
+            return [];
+        }
+        foreach ($visible as $id) {
+            if (!is_string($id) || !isset($available[$id])) {
+                throw new \App\Cash\Exception\CashFileImportSelectionException('Недоступная строка плана.');
+            }
+            unset($selection[$id]);
+        }
+        foreach ($selected as $id) {
+            if (!is_string($id) || !isset($available[$id])) {
+                throw new \App\Cash\Exception\CashFileImportSelectionException('Недоступная строка плана.');
+            }
+            $selection[$id] = true;
+        }
+
+        return array_map('strval', array_keys($selection));
+    }
+
     private function counterpartyKey(?string $name): ?string
     {
         if (null === $name || '' === trim($name)) {

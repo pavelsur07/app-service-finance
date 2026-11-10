@@ -50,6 +50,90 @@ class ClientBank1CImportService
         $this->logger ??= new NullLogger();
     }
 
+    /**
+     * Нормализация кодировки входного файла (UTF-8/UTF-16/CP1251) и чистка «странных» символов.
+     */
+    public function normalizeEncoding(string $rawContent): string
+    {
+        // Если уже валидный UTF-8 — снимем BOM и почистим
+        if (mb_check_encoding($rawContent, 'UTF-8')) {
+            return $this->normalizeWeirdSpaces($this->stripUtf8Bom($rawContent));
+        }
+
+        // Явные BOM'ы UTF-16
+        if (str_starts_with($rawContent, "\xFF\xFE") || str_starts_with($rawContent, "\xFE\xFF")) {
+            $enc = str_starts_with($rawContent, "\xFF\xFE") ? 'UTF-16LE' : 'UTF-16BE';
+            $converted = @iconv($enc, 'UTF-8//TRANSLIT//IGNORE', $rawContent);
+            $content = false !== $converted ? $converted : @mb_convert_encoding($rawContent, 'UTF-8', $enc);
+
+            return $this->normalizeWeirdSpaces($content);
+        }
+
+        // Детект частых кодировок
+        $enc = mb_detect_encoding($rawContent, ['UTF-8', 'UTF-16LE', 'UTF-16BE', 'Windows-1251', 'CP1251'], true);
+
+        if ('UTF-16LE' === $enc || 'UTF-16BE' === $enc) {
+            $converted = @iconv($enc, 'UTF-8//TRANSLIT//IGNORE', $rawContent);
+            $content = false !== $converted ? $converted : @mb_convert_encoding($rawContent, 'UTF-8', $enc);
+
+            return $this->normalizeWeirdSpaces($content);
+        }
+
+        // По умолчанию считаем CP1251
+        $from = $enc ?: 'CP1251';
+        $converted = @iconv($from, 'UTF-8//TRANSLIT//IGNORE', $rawContent);
+        $content = false !== $converted ? $converted : @mb_convert_encoding($rawContent, 'UTF-8', $from);
+
+        return $this->normalizeWeirdSpaces(false !== $content ? $content : $rawContent);
+    }
+
+    private function stripUtf8Bom(string $s): string
+    {
+        return str_starts_with($s, "\xEF\xBB\xBF") ? substr($s, 3) : $s;
+    }
+
+    /**
+     * Чистим NBSP/узкие пробелы/нулевой ширины/мягкие переносы/маркер направления/REPLACEMENT CHAR.
+     * Единообразим пробелы вокруг "•" и переносы строк.
+     */
+    public function normalizeWeirdSpaces(string $s): string
+    {
+        // Заменяем на обычный пробел
+        $s = str_replace([
+            "\xC2\xA0",         // NBSP
+            "\xE2\x80\xAF",     // NARROW NBSP
+            "\xE2\x80\x89",     // THIN SPACE
+            "\xE2\x80\x88",     // PUNCTUATION SPACE
+            "\xE2\x80\x87",     // FIGURE SPACE
+            "\xE2\x80\x8A",     // HAIR SPACE
+        ], ' ', $s);
+
+        // Удаляем невидимые и служебные
+        $s = str_replace([
+            "\xE2\x80\x8B",     // ZWSP
+            "\xE2\x80\x8C",     // ZWNJ
+            "\xE2\x80\x8D",     // ZWJ
+            "\xE2\x80\x8E",     // LRM
+            "\xE2\x80\x8F",     // RLM
+            "\xC2\xAD",         // SOFT HYPHEN
+            "\xEF\xBF\xBD",     // REPLACEMENT CHARACTER (�)
+        ], '', $s);
+
+        // Неразрывный дефис → обычный
+        $s = str_replace("\xE2\x80\x91", '-', $s);
+
+        // Пробелы вокруг "•" убираем
+        $s = preg_replace('/\s*•\s*/u', '•', $s) ?? $s;
+
+        // Единообразные переводы строк
+        $s = str_replace(["\r\n", "\r"], "\n", $s);
+
+        // Умеренно схлопываем длинные последовательности пробелов/табов
+        $s = preg_replace('/[ \t]{3,}/u', '  ', $s) ?? $s;
+
+        return $s;
+    }
+
     // --- parseHeaderAndDocuments (без изменений) ---
     public function parseHeaderAndDocuments(string $content): array
     {
@@ -260,8 +344,8 @@ class ClientBank1CImportService
     }
 
     /**
-     * @param array<int, mixed> $preview
-     * @param \Closure(): void $commit
+     * @param array<int, mixed>    $preview
+     * @param \Closure(): void     $commit
      * @param array<string, mixed> $context
      *
      * @return array<string, mixed>

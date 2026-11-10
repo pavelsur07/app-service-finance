@@ -215,7 +215,7 @@ final class CashCompanyIsolationTest extends WebTestCaseBase
         ]);
 
         self::assertResponseRedirects('/cash/import/bank1c', 303);
-        self::assertSame(['Выбранный счёт недоступен. Пожалуйста, повторите загрузку файла.'], $this->flashes('danger'));
+        self::assertSame(['Сессия импорта не найдена. Пожалуйста, загрузите файл заново.'], $this->flashes('danger'));
     }
 
     public function testBank1cPreviewRejectsForeignAccountFromSession(): void
@@ -228,7 +228,7 @@ final class CashCompanyIsolationTest extends WebTestCaseBase
         $this->client->request('GET', '/cash/import/bank1c/preview');
 
         self::assertResponseRedirects('/cash/import/bank1c', 303);
-        self::assertSame(['Выбранный счёт недоступен.'], $this->flashes('danger'));
+        self::assertSame(['Сессия предпросмотра не найдена. Пожалуйста, загрузите файл заново.'], $this->flashes('danger'));
     }
 
     public function testPaymentCalendarIgnoresInvalidIdFilters(): void

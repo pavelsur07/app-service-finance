@@ -30,7 +30,7 @@ final class CashFileImportActionsTest extends TestCase
         $entityManager->expects(self::once())->method('persist')->with(self::isInstanceOf(CashFileImportProfile::class));
         $entityManager->expects(self::once())->method('flush');
 
-        $profile = (new CreateCashFileImportProfileAction($entityManager))(
+        $profile = (new CreateCashFileImportProfileAction($entityManager, new \App\Cash\Service\Import\File\CashFileMappingValidator()))(
             $this->company(),
             'Сбер',
             ['date' => 'A'],
@@ -49,7 +49,7 @@ final class CashFileImportActionsTest extends TestCase
         $entityManager->expects(self::never())->method('persist');
         $entityManager->expects(self::once())->method('flush');
 
-        (new UpdateCashFileImportProfileAction($entityManager))($profile, 'Новое', ['date' => 'B'], [], CashFileImportProfile::TYPE_CASH_TRANSACTION);
+        (new UpdateCashFileImportProfileAction($entityManager, new \App\Cash\Service\Import\File\CashFileMappingValidator()))($profile, 'Новое', ['date' => 'B'], [], CashFileImportProfile::TYPE_CASH_TRANSACTION);
 
         self::assertSame('Новое', $profile->getName());
         self::assertSame(['date' => 'B'], $profile->getMapping());

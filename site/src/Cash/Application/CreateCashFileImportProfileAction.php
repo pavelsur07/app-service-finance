@@ -14,7 +14,7 @@ use Ramsey\Uuid\Uuid;
  */
 final class CreateCashFileImportProfileAction
 {
-    public function __construct(private readonly EntityManagerInterface $entityManager)
+    public function __construct(private readonly EntityManagerInterface $entityManager, private readonly \App\Cash\Service\Import\File\CashFileMappingValidator $mappingValidator)
     {
     }
 
@@ -24,7 +24,8 @@ final class CreateCashFileImportProfileAction
      */
     public function __invoke(Company $company, string $name, array $mapping, array $options, string $type): CashFileImportProfile
     {
-        $profile = new CashFileImportProfile(Uuid::uuid4()->toString(), $company, $name, $mapping, $options, $type);
+        $this->mappingValidator->validate($mapping);
+        $profile = new CashFileImportProfile(Uuid::uuid7()->toString(), $company, $name, $mapping, $options, $type);
 
         $this->entityManager->persist($profile);
         $this->entityManager->flush();

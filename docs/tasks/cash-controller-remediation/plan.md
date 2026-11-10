@@ -26,7 +26,7 @@ Reviewer focus: company isolation, current data under source lock, atomicity, fi
 
 ## Stage 3: Изоляция и валидация импорта
 Risk: HIGH-LOCAL
-stage_base_commit: record before implementation
+stage_base_commit: 32ba6693e
 Definition of Done: Сессия другой/неизвестной компании сброшена до чтения; чужие IDs недоступны; ожидаемые ошибки ввода отображаются без 500; финансовые правила импорта сохранены.
 Work items: 3.1 company_id и scoped guard до storage; 3.2 общий структурный mapping validator, черновики допустимы; 3.3 CSV/XLS/XLSX ≤32MiB и строгие даты журнала; 3.4 одноэкшеновые контроллеры и Actions подготовки/подтверждения.
 Checks: RED→GREEN regressions per bug; Cash module integration/functional/unit tests and focused PHP lint/PHPStan. External review at HIGH-LOCAL Stage if diff >500 lines.

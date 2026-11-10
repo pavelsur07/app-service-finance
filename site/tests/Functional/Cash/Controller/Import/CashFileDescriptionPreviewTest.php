@@ -244,6 +244,28 @@ final class CashFileDescriptionPreviewTest extends WebTestCaseBase
         self::assertArrayNotHasKey('description_plan', $client->getRequest()->getSession()->get('cash_file_import'));
     }
 
+    #[\PHPUnit\Framework\Attributes\DataProvider('incompleteMappingEndpoints')]
+    public function testHalfPairDraftCannotBePreviewedOrConfirmed(string $method, string $endpoint): void
+    {
+        [$client, $company] = $this->context();
+        $client->request('GET', '/cash/import/file/preview');
+        $payload = $client->getRequest()->getSession()->get('cash_file_import');
+        $payload['mapping']['amount'] = null;
+        $payload['mapping']['inflow'] = 'Amount';
+        $payload['mapping']['outflow'] = null;
+        $this->setClientSessionValue($client, 'cash_file_import', $payload);
+        $client->request($method, '/cash/import/file/'.$endpoint, 'POST' === $method ? ['_token' => $this->csrfToken($client, 'cash_file_import_commit')] : []);
+        self::assertSame('/cash/import/file/mapping', $client->getResponse()->headers->get('Location'));
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM cash_file_import_jobs WHERE company_id = :company', ['company' => $company->getId()]));
+    }
+
+    /** @return iterable<array{string, string}> */
+    public static function incompleteMappingEndpoints(): iterable
+    {
+        yield ['GET', 'preview'];
+        yield ['POST', 'commit'];
+    }
+
     private function damagePlan(KernelBrowser $client, Company $company): void
     {
         $payload = $client->getRequest()->getSession()->get('cash_file_import');
@@ -279,6 +301,7 @@ final class CashFileDescriptionPreviewTest extends WebTestCaseBase
         $hash = hash('sha256', $csv);
         static::getContainer()->get(ObjectStorageInterface::class)->write('cash-file-imports/'.$hash.'.csv', $csv);
         $this->setClientSessionValue($client, 'cash_file_import', [
+            'company_id' => $company->getId(),
             'file_hash' => $hash, 'file_name' => 'preview.csv', 'stored_ext' => 'csv', 'account_id' => $account->getId(),
             'mapping' => ['date' => 'Date', 'amount' => 'Amount', 'inflow' => null, 'outflow' => null, 'counterparty' => null, 'description' => 'Description', 'currency' => null, 'doc_number' => 'Document'],
         ]);
