@@ -12,6 +12,7 @@ use App\Cash\Service\Accounts\AccountMasker;
 use App\Cash\Service\Import\ClientBank1CImportService;
 use App\Company\Entity\User;
 use App\Company\Security\ModuleAccess;
+use App\Shared\Infrastructure\Export\SpreadsheetText;
 use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -278,20 +279,20 @@ class Bank1CImportController extends AbstractController
                 }
 
                 fputcsv($handle, [
-                    (string) ($row['docDate'] ?? ''),
-                    (string) ($row['docType'] ?? ''),
-                    (string) ($row['docNumber'] ?? ''),
+                    SpreadsheetText::safe((string) ($row['docDate'] ?? '')),
+                    SpreadsheetText::safe((string) ($row['docType'] ?? '')),
+                    SpreadsheetText::safe((string) ($row['docNumber'] ?? '')),
                     $direction,
                     $amountValue ?? '',
-                    (string) ($row['purpose'] ?? ''),
-                    (string) ($row['payerName'] ?? ''),
-                    (string) ($row['payerInn'] ?? ''),
+                    SpreadsheetText::safe((string) ($row['purpose'] ?? '')),
+                    SpreadsheetText::safe((string) ($row['payerName'] ?? '')),
+                    SpreadsheetText::safe((string) ($row['payerInn'] ?? '')),
                     // Тут можно оставить маску из AccountMasker, но она уже «чистая» после sanitizeAccountForView
                     $this->accountMasker->mask(is_string($row['payerAccount'] ?? null) ? $row['payerAccount'] : null),
-                    (string) ($row['receiverName'] ?? ''),
-                    (string) ($row['receiverInn'] ?? ''),
+                    SpreadsheetText::safe((string) ($row['receiverName'] ?? '')),
+                    SpreadsheetText::safe((string) ($row['receiverInn'] ?? '')),
                     $this->accountMasker->mask(is_string($row['receiverAccount'] ?? null) ? $row['receiverAccount'] : null),
-                    (string) ($row['counterpartyStatus'] ?? ''),
+                    SpreadsheetText::safe((string) ($row['counterpartyStatus'] ?? '')),
                 ], ';', '"', '');
             }
 

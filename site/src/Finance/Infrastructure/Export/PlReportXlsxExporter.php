@@ -6,6 +6,7 @@ namespace App\Finance\Infrastructure\Export;
 
 use App\Finance\Enum\PLValueFormat;
 use OpenSpout\Common\Entity\Cell;
+use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\CellAlignment;
 use OpenSpout\Common\Entity\Style\CellVerticalAlignment;
@@ -86,7 +87,8 @@ final readonly class PlReportXlsxExporter
             ->setCellAlignment(CellAlignment::CENTER)
             ->setCellVerticalAlignment(CellVerticalAlignment::CENTER);
 
-        return Row::fromValues($headers, $style);
+        // Метки колонок в разрезе по проектам — названия проектов пользователя: только текст.
+        return new Row(array_map(static fn (string $label): StringCell => new StringCell($label, $style), $headers));
     }
 
     /**
@@ -102,10 +104,10 @@ final readonly class PlReportXlsxExporter
         bool $showMetaColumns,
         bool $hasChildren,
     ): Row {
-        $cells = [Cell::fromValue(str_repeat("\u{00A0}\u{00A0}", max(0, $row['level'] - 1)).$row['name'])];
+        $cells = [new StringCell(str_repeat("\u{00A0}\u{00A0}", max(0, $row['level'] - 1)).$row['name'], null)];
         if ($showMetaColumns) {
-            $cells[] = Cell::fromValue($row['code'] ?? '—');
-            $cells[] = Cell::fromValue($row['type']);
+            $cells[] = new StringCell((string) ($row['code'] ?? '—'), null);
+            $cells[] = new StringCell((string) $row['type'], null);
         }
 
         $valueStyle = (new Style())

@@ -7,6 +7,7 @@ namespace App\Finance\Controller;
 use App\Cash\Application\DTO\MoneyAccountSummary;
 use App\Cash\Facade\CashFacade;
 use App\Company\Entity\Company;
+use App\Shared\Infrastructure\Export\SpreadsheetText;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -94,14 +95,14 @@ final class ReportCashflowOpsCheckController extends AbstractController
                 foreach ($this->fetchTrxRows($ctx) as $r) {
                     fputcsv($out, [
                         $r['date'] instanceof \DateTimeInterface ? $r['date']->format('Y-m-d') : $r['date'],
-                        $r['account_name'],
+                        SpreadsheetText::safe((string) $r['account_name']),
                         $r['currency'],
                         $r['direction'],
                         number_format((float) $r['amount_abs'], 2, '.', ''),
                         number_format((float) $r['amount_signed'], 2, '.', ''),
-                        $r['category_name'] ?? '',
+                        SpreadsheetText::safe((string) ($r['category_name'] ?? '')),
                         $r['import_source'] ?? '',
-                        $r['external_id'] ?? '',
+                        SpreadsheetText::safe((string) ($r['external_id'] ?? '')),
                         (int) $r['flag_wrong_sign'],
                         (int) $r['flag_no_category'],
                         (int) $r['flag_dup'],
@@ -123,7 +124,7 @@ final class ReportCashflowOpsCheckController extends AbstractController
                 foreach ($this->fetchReconRows($ctx) as $r) {
                     fputcsv($out, [
                         $r['date'] instanceof \DateTimeInterface ? $r['date']->format('Y-m-d') : $r['date'],
-                        $r['account_name'],
+                        SpreadsheetText::safe((string) $r['account_name']),
                         number_format((float) $r['opening'], 2, '.', ''),
                         number_format((float) $r['inflow_bal'], 2, '.', ''),
                         number_format((float) $r['outflow_bal'], 2, '.', ''),

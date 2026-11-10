@@ -224,6 +224,27 @@ final class PublicRegistrationFlowTest extends WebTestCaseBase
         self::assertSame(0, $this->em()->getRepository(User::class)->count([]));
     }
 
+    public function testPasswordShorterThanTenCharactersIsRejected(): void
+    {
+        $client = static::createClient();
+        $client->getContainer()->set(RegistrationRateLimiter::class, new RegistrationRateLimiter());
+        $client->setServerParameter('REMOTE_ADDR', $this->uniqueClientIp());
+
+        $crawler = $client->request('GET', '/register');
+        $form = $crawler->selectButton('Создать аккаунт')->form([
+            'registration_form[companyName]' => 'Short Password LLC',
+            'registration_form[email]' => 'short-password@example.test',
+            'registration_form[plainPassword]' => 'abcdefghi',
+            'registration_form[agreeTerms]' => 1,
+            'registration_form[agreePersonalData]' => 1,
+            'registration_form[website]' => '',
+        ]);
+        $client->submit($form);
+
+        self::assertSame(422, $client->getResponse()->getStatusCode());
+        self::assertSame(0, $this->em()->getRepository(User::class)->count([]));
+    }
+
     /**
      * Занятый email — плашка над формой со ссылкой на вход, а не ошибка у поля;
      * второй аккаунт не создаётся.
@@ -257,16 +278,5 @@ final class PublicRegistrationFlowTest extends WebTestCaseBase
         self::assertCount(0, $crawler->filter('#registration_form_email_error1'));
         self::assertSame('true', $crawler->filter('#registration_form_email')->attr('aria-invalid'));
         self::assertSame(1, $this->em()->getRepository(User::class)->count(['email' => 'taken@example.test']));
-    }
-
-    private function uniqueClientIp(): string
-    {
-        return sprintf(
-            '2001:db8:%x:%x:%x:%x::1',
-            random_int(0, 0xFFFF),
-            random_int(0, 0xFFFF),
-            random_int(0, 0xFFFF),
-            random_int(0, 0xFFFF),
-        );
     }
 }

@@ -75,15 +75,4 @@ final class InviteRegistrationFlowTest extends WebTestCaseBase
         self::assertNotNull($updatedInvite);
         self::assertNotNull($updatedInvite->getAcceptedAt());
     }
-
-    private function uniqueClientIp(): string
-    {
-        return sprintf(
-            '2001:db8:%x:%x:%x:%x::1',
-            random_int(0, 0xFFFF),
-            random_int(0, 0xFFFF),
-            random_int(0, 0xFFFF),
-            random_int(0, 0xFFFF),
-        );
-    }
 }

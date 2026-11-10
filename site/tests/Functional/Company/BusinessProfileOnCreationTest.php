@@ -211,9 +211,4 @@ final class BusinessProfileOnCreationTest extends WebTestCaseBase
 
         return $company;
     }
-
-    private function uniqueClientIp(): string
-    {
-        return sprintf('2001:db8:%x:%x:%x:%x::2', random_int(0, 0xFFFF), random_int(0, 0xFFFF), random_int(0, 0xFFFF), random_int(0, 0xFFFF));
-    }
 }

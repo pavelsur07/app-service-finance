@@ -23,7 +23,7 @@
                             Client-Id: {{ connection.clientId }}{% if is_seller %} &middot;{% endif %}
                         {% endif %}
                         {% if is_seller %}
-                            API Key: {{ connection.apiKey|slice(0, 20) }}***
+                            API Key: {{ connection.apiKey|slice(0, 4) }}***
                         {% endif %}
                     </div>
                     {% if is_seller %}

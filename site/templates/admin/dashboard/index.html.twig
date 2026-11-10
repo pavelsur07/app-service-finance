@@ -4,9 +4,6 @@
 {% block body %}
   <div class="wz-head">
     <h1 class="wz-title">Добро пожаловать в админ-панель<span class="wz-sub">Тестовый экран. Здесь появятся метрики, очереди, статусы интеграций.</span></h1>
-    <div class="wz-head-actions">
-      <a class="btn btn-md btn-secondary" href="{{ path('admin_debug_log_test') }}">Test Loggs</a>
-    </div>
   </div>
 
   {% include 'admin/partials/_danger_zone.html.twig' with {

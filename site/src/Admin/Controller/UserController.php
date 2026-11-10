@@ -13,6 +13,7 @@ use App\Company\Entity\User;
 use App\Company\Repository\UserRepository;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Clock\ClockInterface;
@@ -39,6 +40,7 @@ final class UserController extends AbstractController
         private readonly BillingFacadeInterface $billing,
         private readonly AiTaskFacadeInterface $ai,
         private readonly ClockInterface $clock,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -115,6 +117,7 @@ final class UserController extends AbstractController
     }
 
     #[Route('/{id}/roles', name: 'update_roles', methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_SUPER_ADMIN')]
     public function updateRoles(
         User $user,
         Request $request,
@@ -123,6 +126,12 @@ final class UserController extends AbstractController
         $currentUser = $this->getUser();
         if ($currentUser instanceof User && $currentUser->getId() === $user->getId()) {
             throw $this->createAccessDeniedException('Вы не можете изменить собственные права.');
+        }
+
+        // ROLE_SUPER_ADMIN нет в ROLE_LABELS: setRoles() молча снял бы её. Выдаётся и снимается
+        // только консольной командой app:user:promote-super-admin.
+        if (\in_array('ROLE_SUPER_ADMIN', $user->getRoles(), true)) {
+            throw $this->createAccessDeniedException('Права супер-администратора меняются только консольной командой.');
         }
 
         if ($request->isMethod('POST')) {
@@ -139,9 +148,17 @@ final class UserController extends AbstractController
             }
 
             $normalizedRoles = '' === $selectedRole ? [] : [$selectedRole];
+            $previousRoles = $user->getRoles();
 
             $user->setRoles($normalizedRoles);
             $entityManager->flush();
+
+            $this->logger->info('Admin: роли пользователя изменены', [
+                'actor_user_id' => $currentUser instanceof User ? $currentUser->getId() : null,
+                'target_user_id' => $user->getId(),
+                'roles_before' => $previousRoles,
+                'roles_after' => $user->getRoles(),
+            ]);
 
             $this->addFlash('success', sprintf('Права пользователя %s успешно обновлены.', $user->getEmail()));
 
