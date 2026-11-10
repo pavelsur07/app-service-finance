@@ -43,6 +43,23 @@ final class PaymentPlanDTO
     /** Ключ повтора формы создания = ID плана (UUIDv7 из скрытого поля). */
     public ?string $idempotencyKey = null;
 
+    public static function fromPlan(\App\Cash\Entity\PaymentPlan\PaymentPlan $plan): self
+    {
+        $dto = new self();
+        $dto->plannedAt = $plan->getPlannedAt() ?? throw new \LogicException('Плановый платёж не имеет даты.');
+        $dto->amount = $plan->getAmount();
+        $dto->cashflowCategory = $plan->getCashflowCategory();
+        $dto->moneyAccount = $plan->getMoneyAccount();
+        $dto->counterparty = $plan->getCounterparty();
+        $dto->comment = $plan->getComment();
+        $dto->status = $plan->getStatus()->value;
+        $dto->probability = $plan->getProbability();
+        $dto->isFrozen = $plan->isFrozen();
+        $dto->expectedAt = $plan->getExpectedAt();
+
+        return $dto;
+    }
+
     public function __construct()
     {
         $this->plannedAt = new \DateTimeImmutable();

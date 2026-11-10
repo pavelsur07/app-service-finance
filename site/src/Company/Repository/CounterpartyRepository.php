@@ -57,7 +57,7 @@ class CounterpartyRepository extends ServiceEntityRepository
      *
      * @return list<Counterparty>
      */
-    public function findSelectableByCompany(string $companyId, ?string $keepId = null): array
+    public function findSelectableByCompany(string $companyId, ?string $keepId = null, bool $includeArchived = false): array
     {
         $qb = $this->createQueryBuilder('c')
             ->andWhere('c.company = :companyId')
@@ -66,9 +66,9 @@ class CounterpartyRepository extends ServiceEntityRepository
             ->addSelect('COALESCE(c.displayName, c.name) AS HIDDEN shownName')
             ->orderBy('shownName', \SortDirection::Ascending);
 
-        if (null === $keepId) {
+        if (!$includeArchived && null === $keepId) {
             $qb->andWhere('c.isArchived = false');
-        } else {
+        } elseif (!$includeArchived) {
             $qb->andWhere($qb->expr()->orX('c.isArchived = false', 'c.id = :keepId'))
                 ->setParameter('keepId', $keepId);
         }

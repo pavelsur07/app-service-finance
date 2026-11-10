@@ -259,12 +259,6 @@ parameters:
 			path: src/Cash/Command/VerifyCashTransactionSplitsCommand.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Service\\Accounts\\FundBalanceService\:\:getFundBalances\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Accounts/FundController.php
-
-		-
 			message: '#^Call to function is_string\(\) with non\-empty\-string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
@@ -329,54 +323,6 @@ parameters:
 			identifier: argument.type
 			count: 2
 			path: src/Cash/Controller/Import/CashFileImportProfileController.php
-
-		-
-			message: '#^Method App\\Cash\\Controller\\PaymentPlan\\PaymentCalendarController\:\:renderCalendar\(\) has parameter \$extra with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Offset ''approve''\|''cancel''\|''pay'' on array\{approve\: ''Платёж одобрен\.'', pay\: ''Платёж помечен как…'', cancel\: ''Платёж отменён\.''\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Offset ''from'' on array\{from\: string, to\: string, account_id\: string, category_id\: string, status\: string, counterparty_id\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Offset ''to'' on array\{from\: string, to\: string, account_id\: string, category_id\: string, status\: string, counterparty_id\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Property App\\Cash\\Controller\\PaymentPlan\\PaymentCalendarController\:\:\$paymentPlanService is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Property App\\Cash\\DTO\\PaymentPlanDTO\:\:\$plannedAt \(DateTimeInterface\) does not accept DateTimeImmutable\|null\.$#'
-			identifier: assign.propertyType
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between null and App\\Cash\\Entity\\Transaction\\CashflowCategory will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between null and string will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
 
 		-
 			message: '#^Method App\\Cash\\Controller\\Transaction\\CashTransactionAutoRuleController\:\:validatePairTarget\(\) has parameter \$form with generic interface Symfony\\Component\\Form\\FormInterface but does not specify its types\: TData$#'
@@ -473,42 +419,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: src/Cash/Controller/Transaction/CashflowCategoryController.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of class App\\Cash\\Application\\DTO\\CreateCashTransferCommand constructor expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transfer/CashTransferController.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Facade\\CashFacade\:\:deleteTransfer\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transfer/CashTransferController.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Facade\\CashFacade\:\:restoreTransfer\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transfer/CashTransferController.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Repository\\Transfer\\CashTransferRepository\:\:paginateDeletedByCompanyId\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transfer/CashTransferController.php
-
-		-
-			message: '#^Parameter \#2 \$companyId of method App\\Cash\\Repository\\Transfer\\CashTransferRepository\:\:findOneByIdAndCompanyId\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Cash/Controller/Transfer/CashTransferController.php
-
-		-
-			message: '#^Parameter \#2 \$companyId of method App\\Cash\\Repository\\Transfer\\CashTransferRepository\:\:findOneDetailedByIdAndCompanyId\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transfer/CashTransferController.php
 
 		-
 			message: '#^Method App\\Cash\\Entity\\Accounts\\MoneyAccount\:\:getBankAuth\(\) return type has no value type specified in iterable type array\.$#'

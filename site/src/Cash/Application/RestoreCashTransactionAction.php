@@ -16,6 +16,7 @@ final class RestoreCashTransactionAction
         private readonly Service\CashSettlementSourceLifecycle $settlementLifecycle,
         private readonly CashTransactionService $transactions,
         private readonly DailyBalanceRecalculator $recalculator,
+        private readonly \Symfony\Contracts\EventDispatcher\EventDispatcherInterface $events,
     ) {
     }
 
@@ -51,5 +52,6 @@ final class RestoreCashTransactionAction
             // Пересчёт по счёту
             $this->recalculator->recalcRange($company, $from, $to, [(string) $account->getId()]);
         });
+        $this->events->dispatch(new \App\Cash\Domain\Event\CashTransactionsChanged((string) $tx->getCompany()->getId()));
     }
 }

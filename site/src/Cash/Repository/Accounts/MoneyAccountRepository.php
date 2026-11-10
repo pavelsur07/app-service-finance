@@ -24,18 +24,22 @@ class MoneyAccountRepository extends ServiceEntityRepository
         parent::__construct($registry, MoneyAccount::class);
     }
 
-    public function findOneByIdAndCompanyId(string $id, string $companyId): ?MoneyAccount
+    public function findOneByIdAndCompanyId(string $id, string $companyId, bool $refresh = false): ?MoneyAccount
     {
         Assert::uuid($id);
         Assert::uuid($companyId);
 
-        return $this->createQueryBuilder('account')
+        $query = $this->createQueryBuilder('account')
             ->andWhere('account.id = :id')
             ->andWhere('IDENTITY(account.company) = :companyId')
             ->setParameter('id', $id)
             ->setParameter('companyId', $companyId)
-            ->getQuery()
-            ->getOneOrNullResult();
+            ->getQuery();
+        if ($refresh) {
+            $query->setHint(Query::HINT_REFRESH, true);
+        }
+
+        return $query->getOneOrNullResult();
     }
 
     /**

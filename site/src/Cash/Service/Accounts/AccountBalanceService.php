@@ -22,6 +22,7 @@ final class AccountBalanceService
         private readonly CashTransactionRepository $txRepo,
         private readonly MoneyAccountDailyBalanceRepository $balanceRepo,
         private readonly Connection $connection,
+        private readonly \App\Cash\Repository\Accounts\MoneyAccountRepository $accounts,
     ) {
     }
 
@@ -78,6 +79,7 @@ final class AccountBalanceService
         return new DailyBalancesDTO($balances, $account->getCurrency());
     }
 
+    /** The account must be flushed first: persisted parameters are reloaded under the lock. */
     public function recalculateDailyRange(Company $company, MoneyAccount $account, \DateTimeImmutable $from, \DateTimeImmutable $to): void
     {
         $from = $from->setTime(0, 0);
@@ -86,19 +88,25 @@ final class AccountBalanceService
             [$from, $to] = [$to, $from];
         }
 
-        $openingDate = $account->getOpeningBalanceDate()->setTime(0, 0);
-        $today = (new \DateTimeImmutable('today'))->setTime(0, 0);
-        if ($openingDate->format('Y-m-d') > $today->format('Y-m-d')) {
-            throw new OpeningBalanceDateInFutureException();
-        }
-
-        $from = max($from, $openingDate);
-
-        $this->connection->transactional(function () use ($company, $account, $from, $to, $openingDate, $today): void {
+        $recalculate = function () use ($company, $account, $from, $to): void {
             $this->balanceRepo->acquireRecalculationLock($account);
+            // The entity may have been loaded before waiting for a concurrent save.
+            $account = $this->accounts->findOneByIdAndCompanyId((string) $account->getId(), (string) $company->getId(), refresh: true)
+                ?? throw new \DomainException('Счёт не найден.');
+            $openingDate = $account->getOpeningBalanceDate()->setTime(0, 0);
+            $today = (new \DateTimeImmutable('today'))->setTime(0, 0);
+            if ($openingDate > $today) {
+                throw new OpeningBalanceDateInFutureException();
+            }
+            $from = max($from, $openingDate);
             $this->balanceRepo->deleteBeforeOpeningDate($company, $account, $openingDate);
             $this->recalculateLocked($company, $account, $from, $to, $openingDate, $today);
-        });
+        };
+        if ($this->connection->isTransactionActive()) {
+            $recalculate();
+        } else {
+            $this->connection->transactional($recalculate);
+        }
     }
 
     private function recalculateLocked(

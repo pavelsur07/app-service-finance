@@ -16,6 +16,11 @@ final class SaveMoneyFundAction
     {
     }
 
+    public function createDraft(\App\Company\Entity\Company $company): MoneyFund
+    {
+        return new MoneyFund(\Ramsey\Uuid\Uuid::uuid7()->toString(), $company, '', 'RUB');
+    }
+
     public function __invoke(MoneyFund $fund): void
     {
         $this->entityManager->persist($fund);

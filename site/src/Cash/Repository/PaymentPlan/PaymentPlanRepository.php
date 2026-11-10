@@ -24,6 +24,49 @@ class PaymentPlanRepository extends ServiceEntityRepository
         parent::__construct($registry, PaymentPlan::class);
     }
 
+    /** @param array<string, string> $filters
+     * @return list<PaymentPlan>
+     */
+    public function findForCalendar(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, array $filters): array
+    {
+        $qb = $this->createQueryBuilder('plan')
+            ->andWhere('plan.company = :company')
+            ->andWhere('plan.plannedAt BETWEEN :from AND :to')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from, Types::DATE_IMMUTABLE)
+            ->setParameter('to', $to, Types::DATE_IMMUTABLE)
+            ->orderBy('plan.plannedAt', \SortDirection::Ascending)
+            ->addOrderBy('plan.createdAt', \SortDirection::Ascending);
+
+        if (!empty($filters['account_id'])) {
+            $qb->andWhere('plan.moneyAccount = :accountId')
+                ->setParameter('accountId', $filters['account_id']);
+        }
+
+        if (!empty($filters['category_id'])) {
+            $qb->andWhere('plan.cashflowCategory = :categoryId')
+                ->setParameter('categoryId', $filters['category_id']);
+        }
+
+        if (!empty($filters['counterparty_id'])) {
+            $qb->andWhere('plan.counterparty = :counterpartyId')
+                ->setParameter('counterpartyId', $filters['counterparty_id']);
+        }
+
+        if (!empty($filters['status'])) {
+            $status = PaymentPlanStatus::tryFrom((string) $filters['status']);
+            if ($status) {
+                $qb->andWhere('plan.status = :status')
+                    ->setParameter('status', $status);
+            }
+        }
+
+        /** @var list<PaymentPlan> $result */
+        $result = $qb->getQuery()->getResult();
+
+        return $result;
+    }
+
     /**
      * Невалидный UUID — «не найдено», а не ошибка БД: id приходит из URL и формы.
      */

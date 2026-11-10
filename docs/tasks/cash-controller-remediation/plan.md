@@ -18,7 +18,7 @@ Reviewer focus: company isolation, current data under source lock, atomicity, fi
 
 ## Stage 2: Атомарность счетов и восстановление транзакций
 Risk: HIGH-LOCAL
-stage_base_commit: record before implementation
+stage_base_commit: 97c0d7495
 Definition of Done: Сбой пересчёта откатывает источник и остатки; ORM не затирает DBAL; восстановление инвалидирует dashboard после commit; маршруты/доступ/CSRF сохранены.
 Work items: 2.1 SaveMoneyAccountAction владеет сохранением и пересчётом под общей блокировкой; 2.2 событие после успешного восстановления; 2.3 разделение контроллеров счетов/фондов/переводов/календаря и CompanyFacade.
 Checks: RED→GREEN regressions per bug; Cash module integration/functional/unit tests and focused PHP lint/PHPStan. External review at HIGH-LOCAL Stage if diff >500 lines.

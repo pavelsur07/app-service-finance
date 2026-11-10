@@ -1326,9 +1326,10 @@ PostgreSQL выдаёт номер из `companies_public_id_seq` (INTEGER, на
 ```php
 // Варианты выбора как DTO: Entity чужого модуля в формы не попадает.
 // Архивные не предлагаются, но уже выбранный архивный остаётся (keepId).
+// includeArchived=true — полный набор для фильтров календаря; обычные формы сохраняют default=false.
 // @return list<CounterpartyChoiceDTO>  id, name, inn, kpp, isArchived, displayName, type, shownName(), label()
 // label() и data-name пикера — по shownName() = displayName ?? name
-getSelectable(string $companyId, ?string $keepId = null): array
+getSelectable(string $companyId, ?string $keepId = null, bool $includeArchived = false): array
 
 // Контрагент строго в рамках компании — для форм, которым нужна сама сущность.
 findEntityByIdAndCompany(string $counterpartyId, string $companyId): ?Counterparty
@@ -2583,7 +2584,7 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
 
 - `App\Cash\Domain\Event\CashTransactionsChanged(string $companyId)` — синхронное
   доменное событие «данные ДДС компании изменились». Отправляется после `flush()` и
-  пересчёта остатков из `Add/Update/Delete/BulkDeleteCashTransactionsAction`,
+  пересчёта остатков из `Add/Update/Delete/RestoreCashTransactionAction`, `BulkDeleteCashTransactionsAction`,
   `CreateCashTransferAction`, `CashTransferLifecycleAction` и
   `SoftDeleteCompanyTransactionsCommand`.
 - Подписчик `Analytics\Infrastructure\Cache\InvalidateSnapshotOnCashChangeListener`
@@ -2775,7 +2776,10 @@ DTO `MoneyAccountSummary`, `MoneyAccountDailyBalanceRow`, `CashStatementLine`, `
 - Soft-deleted операции исключаются. `isTransfer` не влияет на остаток: направление определяется только `INFLOW`/`OUTFLOW`.
 - Денежная арифметика выполняется decimal-строками через BCMath; снапшоты создаются непрерывно по календарным дням.
 - Методы чтения не запускают пересчёт: снапшоты создаются после изменения счёта, операций, импорта или явной команды пересчёта.
-- Пересчёт одного счёта выполняется в DBAL-транзакции под PostgreSQL advisory lock, удаляет производные снапшоты до актуальной `openingBalanceDate` и сериализует конкурентные запуски.
+- `SaveMoneyAccountAction` сохраняет счёт, параметры банковской ссылки (`MoneyAccountBankLinkInput`) и пересчитывает остатки одной ORM/DBAL-транзакцией на соединении EM. Общая advisory-блокировка счёта берётся до первого сохранения параметров; ожидающий сохранения сценарий не держит блокировку строки, чтобы не блокировать завершающий пересчёт. После DBAL-пересчёта управляемый счёт обновляется (`refresh`), чтобы следующий ORM flush не затёр баланс.
+- Пересчёт одного счёта берёт PostgreSQL advisory lock и перечитывает сохранённые параметры счёта после ожидания; если вызывающий уже открыл транзакцию, сервис её не завершает. Самостоятельный вызов оборачивается в DBAL-транзакцию. Более ранние снапшоты удаляются по актуальной `openingBalanceDate`; формулы не изменены.
+- `SaveMoneyAccountAction::createDraft()`, `SaveMoneyFundAction::createDraft()` и `CreateMoneyFundMovementAction::createDraft()` создают новые объекты для существующих entity-bound форм; новые счета/фонды получают UUIDv7. Сумма движения фонда обрабатывается `CreateMoneyFundMovementAction::setAmount()` через общий Money, строка сохраняется до преобразования; пользователь задаётся Action при сохранении.
+- `PaymentCalendarPage` — общий HTTP-presenter index/new/edit: фильтры и формы, существующая материализация при GET. `PaymentCalendarQuery` и `PaymentPlanRepository::findForCalendar()` читают scoped данные/forecast; контрагенты — только через `CounterpartyFacade`.
 - `MoneyAccount.currentBalance` пока сохраняется как совместимое поле и обновляется DBAL-запросом до последнего `closing` не позже текущей даты; источником истины остаётся `MoneyAccountDailyBalance`.
 
 **Идемпотентность внешних источников:**
