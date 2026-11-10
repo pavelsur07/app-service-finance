@@ -36,6 +36,36 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
         $this->action = self::getContainer()->get(CreateDocumentFromTransactionAction::class);
     }
 
+    #[\PHPUnit\Framework\Attributes\DataProvider('multiSplitEntryPoints')]
+    public function testMultiSplitCannotCreateDocument(string $entry, bool $confirmed): void
+    {
+        $company = $this->makeCompany();
+        $tx = $this->makeTx($company, $this->makeMoneyAccount($company));
+        $a = $this->makeCashflowCategory($company);
+        $b = $this->makeCashflowCategory($company);
+        $a->setAllowPlDocument(false);
+        $b->setAllowPlDocument(false);
+        $tx->replaceSplits([
+            new \App\Cash\Entity\Transaction\CashTransactionSplit($tx, $a, '600.00', \App\Cash\Enum\Transaction\CashTransactionSplitSource::MANUAL),
+            new \App\Cash\Entity\Transaction\CashTransactionSplit($tx, $b, '400.00', \App\Cash\Enum\Transaction\CashTransactionSplitSource::MANUAL),
+        ]);
+        $this->em->flush();
+        $this->expectException(\App\Cash\Exception\CashTransactionMultiSplitException::class);
+        if ('json' === $entry) {
+            ($this->action)($tx, $confirmed);
+        } else {
+            self::getContainer()->get(CreatePnlDocumentFromTransactionAction::class)($tx);
+        }
+    }
+
+    /** @return iterable<array{string, bool}> */
+    public static function multiSplitEntryPoints(): iterable
+    {
+        yield 'JSON unconfirmed' => ['json', false];
+        yield 'JSON confirmed' => ['json', true];
+        yield 'HTML' => ['html', false];
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------

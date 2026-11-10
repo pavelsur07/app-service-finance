@@ -37,7 +37,7 @@ final class UpdateCashTransactionAction
         $this->transactions->assertStandaloneTransaction($tx);
 
         $result = $this->entityManager->wrapInTransaction(function () use ($tx, $dto): CashTransaction {
-            $this->settlementLifecycle->lock($tx);
+            $this->settlementLifecycle->lockWithComposition($tx);
 
             $this->transactions->assertStandaloneTransaction($tx);
 
@@ -56,6 +56,13 @@ final class UpdateCashTransactionAction
             $currentMoney = \App\Shared\Domain\ValueObject\Money::fromString($tx->getAmount(), $tx->getCurrency());
             $amount = $this->transactions->requireAmount($dto);
             $newMoney = \App\Shared\Domain\ValueObject\Money::fromString($amount, $currency);
+            if ($tx->getSplits()->count() > 1 && (
+                !$currentMoney->equals($newMoney)
+                || $tx->getCashflowCategory()?->getId() !== $dto->cashflowCategoryId
+            )) {
+                throw new \App\Cash\Exception\CashTransactionMultiSplitException();
+            }
+
             $materialChange = !$currentMoney->equals($newMoney) || $tx->getMoneyAccount()->getId() !== $account->getId() || $tx->getDirection() !== $dto->direction || $tx->getOccurredAt()->format('Y-m-d') !== $dto->occurredAt->format('Y-m-d') || $tx->getCounterparty()?->getId() !== $dto->counterpartyId;
             $this->settlementLifecycle->changing($tx, $materialChange);
 

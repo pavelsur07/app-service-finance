@@ -8,8 +8,8 @@ use App\Cash\Entity\Accounts\MoneyFundMovement;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\DateTimeType;
 use Symfony\Component\Form\Extension\Core\Type\HiddenType;
-use Symfony\Component\Form\Extension\Core\Type\MoneyType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
+use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
@@ -17,8 +17,6 @@ class MoneyFundMovementType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $currency = $options['currency'];
-
         $builder
             ->add('occurredAt', DateTimeType::class, [
                 'label' => 'Дата и время',
@@ -26,11 +24,12 @@ class MoneyFundMovementType extends AbstractType
                 'with_seconds' => false,
                 'input' => 'datetime_immutable',
             ])
-            ->add('amount', MoneyType::class, [
+            ->add('amount', TextType::class, [
                 'label' => 'Сумма',
-                'currency' => $currency,
                 'mapped' => false,
-                'input' => 'string',
+                'required' => false,
+                'empty_data' => '',
+                'attr' => ['inputmode' => 'decimal'],
             ])
             ->add('note', TextareaType::class, [
                 'label' => 'Комментарий',

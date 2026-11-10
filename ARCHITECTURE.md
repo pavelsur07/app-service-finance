@@ -1759,6 +1759,7 @@ manage — только владелец. Новые права автомати
 - Потоковый экспорт (`iterateByCompanyWithFilters`) переведён с `toIterable()` на `getArrayResult()`: Doctrine запрещает итерировать запрос с join коллекции, а одна строка выгрузки на строку разбивки без такого join не получается. Потолок зафиксирован в коде.
 
 - Stage 4 разбивки ДДС: ручная разбивка сделана отдельным действием `/finance/cash-transactions/{id}/splits` (`CashTransactionSplitsController`), а не переделкой формы транзакции — обычная операция с одной статьёй пишется прежним путём. `SaveCashTransactionSplitsAction` собирает строки с `source = manual`, отдаёт проверку инвариантов агрегату, проецирует legacy-колонку и снимает устаревший `PaymentPlanMatch`.
+- `SaveCashTransactionSplitsAction` сохраняет состав, проекцию, аудит и снятие сопоставления одной транзакцией под блокировкой исходной `cash_transaction`. `UpdateCashTransactionAction` использует ту же блокировку через `CashSettlementSourceLifecycle::lockWithComposition()`, который перечитывает источник, компанию и загруженные дочерние строки. Для мультиразбивки обычная форма запрещает изменение нормализованной суммы, валюты и категории (`CashTransactionMultiSplitException`); остальные поля можно редактировать. Операция с действующими документами ОПиУ не переводится в мультиразбивку.
 - При разбивке колонка `cash_transaction.cashflow_category_id` проецируется в системную «Не распределено», а не в `NULL`: суммы отчёта по колонке остаются верными, и точкой невозврата остаётся только `DROP COLUMN`.
 - Автоправила не трогают вручную разбитые операции: `CashTransactionAutoRuleService::getSkipReason()` возвращает `CashTransactionAutoRuleSkipReason::MANUAL_SPLIT`. Проверка стоит там же, где «удалено» и «закрытый период», а не в синхронизаторе строк — ранний выход в синхронизаторе оставил бы колонку и строки рассинхронизированными.
 - `CashflowCategoryRepository::findOneByIdAndCompanyId()` — выбор статьи из формы строго в пределах компании.
@@ -2393,7 +2394,7 @@ dry-run; каждая компания — своя транзакция; ост
 
 ### Cash: документ ОПиУ из транзакции ДДС
 
-- `CreateDocumentFromTransactionAction` и `CreatePnlDocumentFromTransactionAction` выполняют проверку остатка, создание документа, `flush()` и `FinanceFacade::updatePLRegisterForDocument()` одним `wrapInTransaction()`.
+- `CreateDocumentFromTransactionAction` и `CreatePnlDocumentFromTransactionAction` отвергают мультиразбивку (`CashTransactionMultiSplitException`), перевод и закрытый период после блокировки источника; выполняют проверку остатка, создание документа, `flush()` и `FinanceFacade::updatePLRegisterForDocument()` одним `wrapInTransaction()`.
 - Внутри: `EntityManager::clear()` и `CashTransactionRepository::findOneByIdAndCompanyIdForUpdate()` — вызывающий загрузил транзакцию (и коллекцию документов) до блокировки, поэтому она перечитывается под `FOR UPDATE`. Параллельный или повторный запрос ждёт commit первого и видит остаток 0: отказ «Транзакция уже полностью разнесена» / «Сумма документа должна быть больше нуля», второй документ не создаётся. Ключа повтора нет: оба пути создают документ на весь остаток.
 - Сущность, переданная в Action, после вызова отсоединена (`clear()`): вызывающий использует только её id.
 

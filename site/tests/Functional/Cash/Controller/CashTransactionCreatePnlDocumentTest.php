@@ -69,6 +69,65 @@ final class CashTransactionCreatePnlDocumentTest extends WebTestCaseBase
         self::assertStringContainsString('указан справочник другой компании', (string) $client->getResponse()->getContent());
     }
 
+    #[\PHPUnit\Framework\Attributes\DataProvider('confirmations')]
+    public function testJsonRejectsMultiSplit(bool $confirmed): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->prepareCompanyContext();
+        [$tx, $category] = $this->persistTransaction($company);
+        $category->setAllowPlDocument(false);
+        $other = (new CashflowCategory(Uuid::uuid7()->toString(), $company))->setName('Other')->setAllowPlDocument(false);
+        $this->em()->persist($other);
+        $tx->replaceSplits([new CashTransactionSplit($tx, $category, '600', CashTransactionSplitSource::MANUAL), new CashTransactionSplit($tx, $other, '400', CashTransactionSplitSource::MANUAL)]);
+        $this->em()->flush();
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $client->request('POST', '/finance/cash-transactions/'.$tx->getId().'/create-from', [
+            '_token' => $this->csrfToken($client, 'cash_transaction_create_from'),
+            'confirmed' => $confirmed ? 'true' : 'false',
+        ]);
+        self::assertResponseStatusCodeSame(422);
+        self::assertSame(0, $this->documentCount($tx));
+    }
+
+    /** @return iterable<array{bool}> */
+    public static function confirmations(): iterable
+    {
+        yield [false];
+        yield [true];
+    }
+
+    public function testOrdinaryFormCanEditMultiSplitDescription(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->prepareCompanyContext();
+        [$tx, $category] = $this->persistTransaction($company);
+        $category->setAllowPlDocument(false);
+        $other = (new CashflowCategory(Uuid::uuid7()->toString(), $company))->setName('Other')->setAllowPlDocument(false);
+        $this->em()->persist($other);
+        $this->em()->flush();
+        $input = new \App\Cash\Application\DTO\CashTransactionSplitsInput();
+        foreach ([[$category->getId(), '600'], [$other->getId(), '400']] as [$id, $amount]) {
+            $row = new \App\Cash\Application\DTO\CashTransactionSplitInput();
+            $row->cashflowCategoryId = $id;
+            $row->amount = $amount;
+            $input->rows[] = $row;
+        }
+        self::getContainer()->get(\App\Cash\Application\SaveCashTransactionSplitsAction::class)($tx, $input);
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $crawler = $client->request('GET', '/finance/cash-transactions/'.$tx->getId().'/edit');
+        self::assertResponseIsSuccessful();
+        $form = $crawler->filter('form[name="cash_transaction"]')->form();
+        $form['cash_transaction[description]'] = 'Description changed';
+        $client->submit($form);
+        self::assertResponseRedirects('/finance/cash-transactions/');
+        $stored = $this->em()->getConnection()->fetchAssociative('SELECT amount, description FROM cash_transaction WHERE id = :id', ['id' => $tx->getId()]);
+        self::assertIsArray($stored);
+        self::assertSame('1000.00', $stored['amount']);
+        self::assertSame('Description changed', $stored['description']);
+    }
+
     private function post(KernelBrowser $client, User $user, Company $company, CashTransaction $tx): void
     {
         $client->loginUser($user);

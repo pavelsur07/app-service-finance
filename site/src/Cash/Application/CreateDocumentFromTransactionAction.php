@@ -22,6 +22,7 @@ final class CreateDocumentFromTransactionAction
         private readonly FinanceFacade $financeFacade,
         private readonly EntityManagerInterface $entityManager,
         private readonly CashTransactionRepository $transactions,
+        private readonly \App\Cash\Service\Transaction\CashTransactionService $transactionService,
     ) {
     }
 
@@ -37,6 +38,12 @@ final class CreateDocumentFromTransactionAction
             $this->entityManager->clear();
             $tx = $this->transactions->findOneByIdAndCompanyIdForUpdate($transactionId, $companyId)
                 ?? throw new \DomainException('Транзакция ДДС не найдена.');
+
+            if ($tx->getSplits()->count() > 1) {
+                throw new \App\Cash\Exception\CashTransactionMultiSplitException();
+            }
+            $this->transactionService->assertStandaloneTransaction($tx);
+            $this->transactionService->assertNotLockedForCompany($tx->getCompany(), $tx->getOccurredAt());
 
             return $this->create($tx, $confirmed);
         });

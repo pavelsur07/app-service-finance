@@ -260,7 +260,7 @@ class CashTransactionController extends AbstractController
             $this->addFlash('success', 'Документ ОПиУ создан.');
 
             return $this->redirectToRoute('document_edit', ['id' => $document->getId()]);
-        } catch (\DomainException $e) {
+        } catch (\App\Cash\Exception\CashTransactionMultiSplitException|\DomainException $e) {
             $this->addFlash('danger', $e->getMessage());
         } catch (DocumentForeignReferenceException $e) {
             // Испорченные данные: статья ДДС, контрагент или проект операции ссылаются на
@@ -425,7 +425,7 @@ class CashTransactionController extends AbstractController
                         $request->query->all(),
                         static fn ($value) => null !== $value && '' !== $value
                     ));
-                } catch (\DomainException $e) {
+                } catch (\App\Cash\Exception\CashTransactionMultiSplitException|\DomainException $e) {
                     // Период закрыт — показать ошибку и остаться на форме
                     $form->addError(new FormError($e->getMessage()));
                     $this->addFlash('danger', $e->getMessage());

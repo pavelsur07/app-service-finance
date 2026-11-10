@@ -14,13 +14,15 @@ use App\Cash\Repository\Accounts\MoneyFundRepository;
 use App\Cash\Service\Accounts\FundBalanceService;
 use App\Company\Entity\User;
 use App\Company\Security\ModuleAccess;
+use App\Shared\Domain\Exception\MoneyOverflowException;
+use App\Shared\Domain\ValueObject\Money;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\FeatureFlagService;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Intl\Currencies;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -117,9 +119,15 @@ class FundController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $amountInput = (string) $form->get('amount')->getData();
-            $movement->setAmountMinor($this->convertToMinorUnits($amountInput, $fund->getCurrency()));
+            $amountInput = str_replace(["\u{202F}", "\u{2009}"], ' ', (string) $form->get('amount')->getData());
+            try {
+                $movement->setAmountMinor(Money::fromString('' === trim($amountInput) ? '0' : $amountInput, $fund->getCurrency())->amountMinor());
+            } catch (\InvalidArgumentException|MoneyOverflowException) {
+                $form->get('amount')->addError(new FormError('Некорректная сумма или превышен допустимый размер.'));
+            }
+        }
 
+        if ($form->isSubmitted() && $form->isValid()) {
             $user = $this->getUser();
             $movement->setUserId($user instanceof User ? $user->getId() : null);
 
@@ -133,7 +141,7 @@ class FundController extends AbstractController
         return $this->render('fund/movement.html.twig', [
             'fund' => $fund,
             'form' => $form->createView(),
-        ]);
+        ], new Response(status: $form->isSubmitted() ? 422 : 200));
     }
 
     /**
@@ -152,28 +160,5 @@ class FundController extends AbstractController
         if (!$this->featureFlagService->isFundsAndWidgetEnabled()) {
             throw $this->createNotFoundException();
         }
-    }
-
-    private function convertToMinorUnits(string $amount, string $currency): int
-    {
-        $normalized = str_replace(["\xC2\xA0", ' '], '', str_replace(',', '.', trim($amount)));
-        if ('' === $normalized) {
-            return 0;
-        }
-
-        if (!is_numeric($normalized)) {
-            throw new \InvalidArgumentException('Некорректная сумма.');
-        }
-
-        $fractionDigits = Currencies::getFractionDigits($currency);
-
-        if (0 === $fractionDigits) {
-            return (int) round((float) $normalized);
-        }
-
-        $scale = (string) 10 ** $fractionDigits;
-        $scaled = bcmul($normalized, $scale, 0);
-
-        return (int) $scaled;
     }
 }

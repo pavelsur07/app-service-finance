@@ -51,7 +51,7 @@ final class CashTransactionCreateFromController extends AbstractController
 
         try {
             $result = ($this->action)($tx, $confirmed);
-        } catch (\DomainException $e) {
+        } catch (\App\Cash\Exception\CashTransactionMultiSplitException|\DomainException $e) {
             return new JsonResponse(['error' => true, 'message' => $e->getMessage()], 422);
         }
 

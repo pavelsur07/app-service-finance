@@ -272,6 +272,68 @@ final class SaveCashTransactionSplitsActionTest extends IntegrationTestCase
         }
     }
 
+    #[\PHPUnit\Framework\Attributes\DataProvider('ordinaryEditCases')]
+    public function testOrdinaryMultiSplitEdit(string $field, string $value, bool $rejected): void
+    {
+        $company = $this->company();
+        $tx = $this->transaction($company, '1000.00');
+        $rent = $this->category($company, 'Аренда');
+        $ads = $this->category($company, 'Реклама');
+        $this->action()($tx, $this->input([[$rent->getId(), '600.00'], [$ads->getId(), '400.00']]));
+        $dto = new \App\Cash\DTO\CashTransactionDTO();
+        $dto->moneyAccountId = (string) $tx->getMoneyAccount()->getId();
+        $dto->currency = $tx->getCurrency();
+        $dto->amount = $tx->getAmount();
+        $dto->direction = $tx->getDirection();
+        $dto->occurredAt = $tx->getOccurredAt();
+        $dto->cashflowCategoryId = $tx->getCashflowCategory()?->getId();
+        $dto->{$field} = 'category' === $value ? $rent->getId() : $value;
+        try {
+            self::getContainer()->get(\App\Cash\Application\UpdateCashTransactionAction::class)($tx, $dto);
+            self::assertFalse($rejected, 'An ordinary edit must reject changing a multi-split total/category.');
+        } catch (\App\Cash\Exception\CashTransactionMultiSplitException) {
+            self::assertTrue($rejected);
+        }
+        $row = $this->connection->fetchAssociative('SELECT amount, description, cashflow_category_id FROM cash_transaction WHERE id = :id', ['id' => $tx->getId()]);
+        self::assertIsArray($row);
+        self::assertSame('1000.00', $row['amount']);
+        self::assertSame($tx->getCashflowCategory()?->getId(), $row['cashflow_category_id']);
+        self::assertSame(2, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM cash_transaction_split WHERE cash_transaction_id = :id', ['id' => $tx->getId()]));
+        if ('description' === $field) {
+            self::assertSame('Updated description', $row['description']);
+        }
+    }
+
+    /** @return iterable<array{string, string, bool}> */
+    public static function ordinaryEditCases(): iterable
+    {
+        yield 'amount cannot change' => ['amount', '900', true];
+        yield 'category cannot change' => ['cashflowCategoryId', 'category', true];
+        yield 'normalized amount is unchanged' => ['amount', '1000', false];
+        yield 'description can change' => ['description', 'Updated description', false];
+    }
+
+    public function testSplitSaveRereadsCurrentSourceAfterLock(): void
+    {
+        $company = $this->company();
+        $tx = $this->transaction($company, '1000.00');
+        $category = $this->category($company, 'Аренда');
+        $this->connection->executeStatement('UPDATE cash_transaction SET amount = :amount WHERE id = :id', ['amount' => '900.00', 'id' => $tx->getId()]);
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('не равна сумме транзакции');
+        $this->action()($tx, $this->input([[$category->getId(), '1000.00']]));
+    }
+
+    public function testSplitSaveUsesCurrentClosedPeriod(): void
+    {
+        $company = $this->company();
+        $tx = $this->transaction($company, '1000.00');
+        $category = $this->category($company, 'Аренда');
+        $this->connection->executeStatement('UPDATE companies SET finance_lock_before = :date WHERE id = :id', ['date' => '2026-06-01', 'id' => $company->getId()]);
+        $this->expectException(FinancePeriodLockedException::class);
+        $this->action()($tx, $this->input([[$category->getId(), '1000.00']]));
+    }
+
     private function action(): SaveCashTransactionSplitsAction
     {
         return self::getContainer()->get(SaveCashTransactionSplitsAction::class);
