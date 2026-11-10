@@ -238,6 +238,17 @@ final class PlPreviewFixture
     }
 
     /**
+     * Категория WB с правилом на статью $plCategory и одним начислением в периоде.
+     */
+    public function addWbCost(string $code, PLCategory $plCategory, string $amount): void
+    {
+        $category = $this->costCategory($code);
+        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid4()->toString(), (string) $this->company->getId(), $category, $plCategory->getId()));
+        $this->cost($category, null, $amount, MarketplaceCostOperationType::CHARGE);
+        $this->em->flush();
+    }
+
+    /**
      * Рекламная категория WB «Продвижение» с правилом на статью COST и учётными строками.
      *
      * @param list<array{0: string, 1: ?MarketplaceCostOperationType}> $extraRows ещё строки: сумма, тип операции

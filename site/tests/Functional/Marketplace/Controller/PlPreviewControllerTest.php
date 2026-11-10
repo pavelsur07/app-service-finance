@@ -234,10 +234,11 @@ final class PlPreviewControllerTest extends WebTestCaseBase
         self::assertSelectorTextContains('[data-testid="pl-preview-ads-note"]', 'Реклама WB («Продвижение»)');
         self::assertSelectorTextNotContains('[data-testid="pl-preview-ads-note"]', 'Ozon');
         $cells = $crawler->filter('[data-testid="pl-preview-ads"] tr[data-marketplace="wildberries"] td')->each(static fn ($td): string => str_replace("\u{00A0}", ' ', trim($td->text())));
-        self::assertSame(['Wildberries', '1 000,00', '950,00', '900,00', '50,00', '50,00'], $cells);
+        // Последняя колонка — реклама вне статистики: логистика фикстуры в той же статье (220 − сторно 30).
+        self::assertSame(['Wildberries', '1 000,00', '950,00', '900,00', '50,00', '50,00', '190,00'], $cells);
 
         $client->request('GET', '/marketplace/pl-preview/xlsx?dateFrom=2026-01-01&dateTo=2026-01-31');
-        self::assertContains(['Wildberries', 1000.0, 950.0, 900.0, 50.0, 50.0], $this->readXlsx($client->getInternalResponse()->getContent())['Сверка']);
+        self::assertContains(['Wildberries', 1000.0, 950.0, 900.0, 50.0, 50.0, 190.0], $this->readXlsx($client->getInternalResponse()->getContent())['Сверка']);
     }
 
     public function testNoAdsBlockWithoutAdCategories(): void

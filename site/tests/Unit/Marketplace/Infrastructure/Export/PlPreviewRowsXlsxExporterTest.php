@@ -169,7 +169,7 @@ final class PlPreviewRowsXlsxExporterTest extends TestCase
             costReconciliationDelta: '0.00',
             salesCoverage: [new PlPreviewSalesCoverageDTO(MarketplaceType::WILDBERRIES, PlPreviewSalesKind::RETURN, 2, '-300.00', false)],
             warnings: ['=Нет проекта у подключения'],
-            adReconciliation: [new PlPreviewAdReconciliationDTO(MarketplaceType::WILDBERRIES, '-500.00', '-480.00', '-450.00', '-30.00', '-20.00')],
+            adReconciliation: [new PlPreviewAdReconciliationDTO(MarketplaceType::WILDBERRIES, '-500.00', '-480.00', '-450.00', '-30.00', '-20.00', '-70.00')],
         );
 
         $sheets = $this->export(new PlPreviewRowsExport($base->from, $base->to, [$base->channels[0], $wb], $base->all));
@@ -185,8 +185,8 @@ final class PlPreviewRowsXlsxExporterTest extends TestCase
         self::assertEqualsWithDelta(-15.5, self::v($coverage[4][7]), 1e-9);
         self::assertInstanceOf(NumericCell::class, $coverage[1][7]);
 
-        self::assertSame(['period_key', 'marketplace', 'ads_ledger', 'ads_statistics', 'ads_on_listings', 'ads_unallocated', 'ads_difference'], self::values($sheets['Реклама'][0]));
-        self::assertEquals(['2026-10-12_2026-10-18', 'wildberries', -500.0, -480.0, -450.0, -30.0, -20.0], self::values($sheets['Реклама'][1]));
+        self::assertSame(['period_key', 'marketplace', 'ads_ledger', 'ads_statistics', 'ads_on_listings', 'ads_unallocated', 'ads_difference', 'ads_outside_statistics'], self::values($sheets['Реклама'][0]));
+        self::assertEquals(['2026-10-12_2026-10-18', 'wildberries', -500.0, -480.0, -450.0, -30.0, -20.0, -70.0], self::values($sheets['Реклама'][1]));
 
         self::assertSame([['period_key', 'marketplace', 'text'], ['2026-10-12_2026-10-18', 'wildberries', '=Нет проекта у подключения']], array_map(self::values(...), $sheets['Предупреждения']));
         self::assertStringNotContainsString('<f>', $this->sheetXml(5));

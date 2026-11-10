@@ -27,7 +27,7 @@ use OpenSpout\Writer\XLSX\Writer;
  */
 final readonly class PlPreviewRowsXlsxExporter
 {
-    public const string FORMAT_VERSION = '1.1';
+    public const string FORMAT_VERSION = '1.2';
     private const string DATE_FORMAT = 'yyyy-mm-dd';
     private const string DATETIME_FORMAT = 'yyyy-mm-dd hh:mm:ss';
 
@@ -220,7 +220,7 @@ final readonly class PlPreviewRowsXlsxExporter
 
     private function writeAdsSheet(Writer $writer, PlPreviewRowsExport $export): void
     {
-        $this->startSheet($writer, 'Реклама', ['period_key', 'marketplace', 'ads_ledger', 'ads_statistics', 'ads_on_listings', 'ads_unallocated', 'ads_difference']);
+        $this->startSheet($writer, 'Реклама', ['period_key', 'marketplace', 'ads_ledger', 'ads_statistics', 'ads_on_listings', 'ads_unallocated', 'ads_difference', 'ads_outside_statistics']);
 
         foreach ($export->channels as $report) {
             foreach ($report->adReconciliation as $ads) {
@@ -232,6 +232,7 @@ final readonly class PlPreviewRowsXlsxExporter
                     self::money($ads->onListings),
                     self::money($ads->unallocated),
                     self::money($ads->difference),
+                    self::money($ads->outsideStatistics),
                 ]));
             }
         }

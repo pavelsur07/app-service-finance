@@ -213,6 +213,23 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
         self::assertSame(['1000.00', '950.00', '900.00', '50.00', '50.00'], [$ads->ledger, $ads->statistics, $ads->onListings, $ads->unallocated, $ads->difference]);
     }
 
+    public function testAdsOutsideStatisticsAreOtherCategoriesOfTheSameArticle(): void
+    {
+        $this->wbPromotion(includeInPl: true, ledger: '1000.00');
+        // Статья возвратов — другая статья, в рекламу вне статистики не попадает.
+        $this->fixture->addWbCost('wb_other_article', $this->fixture->returns, '333.00');
+        // Чужая компания со своей категорией в той же статье ничего не меняет.
+        $this->fixture->addWbPromotion(true, '99999.00', [], $this->fixture->foreign);
+
+        $ads = $this->build()->adReconciliation[0];
+
+        // В статье COST кроме «Продвижения» — логистика 220 − сторно 30. Исключённая (500),
+        // неразмеченная (400) и без правила (25) не входят, как и в саму статью.
+        self::assertSame('190.00', $ads->outsideStatistics);
+        // Учёт + реклама вне статистики = строка статьи в ОПиУ.
+        self::assertSame(-1190.0, $this->values($this->build())['COST']['total']);
+    }
+
     public function testColumnsAddUpToLedgerWithStornoNullTypeAndStatisticsAboveLedger(): void
     {
         // Учёт: начисление 1000, сторно 100, начисление без типа 50 → −950. Статистика 1500 > учёта.
