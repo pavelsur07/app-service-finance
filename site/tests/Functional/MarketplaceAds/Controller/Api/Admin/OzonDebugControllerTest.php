@@ -11,6 +11,7 @@ use App\MarketplaceAds\Entity\OzonAdPendingReport;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -21,6 +22,8 @@ final class OzonDebugControllerTest extends WebTestCaseBase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-abcd00000001';
     private const ADMIN_ID = '22222222-2222-2222-2222-abcd00000001';
+    private const OWNER_ID = '22222222-2222-2222-2222-abcd00000002';
+    private const OWN_COMPANY_ID = '11111111-1111-1111-1111-abcd00000002';
 
     private const URL_ALL_CAMPAIGNS = '/debug/ozon-ads/all-campaigns';
     private const URL_LIST_REPORTS = '/debug/ozon-ads/list-reports';
@@ -150,6 +153,48 @@ final class OzonDebugControllerTest extends WebTestCaseBase
         $data = $this->decode($client);
         self::assertSame('token', $data['step']);
         self::assertSame(401, $data['http_code']);
+    }
+
+    /**
+     * Диагностика доступна только ROLE_SUPER_ADMIN: владелец своей компании не получает
+     * ни ответа, ни исходящего запроса к Ozon — пустой мок упадёт при любом вызове.
+     */
+    #[DataProvider('debugUrls')]
+    public function testNonSuperAdminIsDenied(string $url): void
+    {
+        $client = static::createClient();
+        $this->setHttpClient($client, []);
+
+        $this->seedAdminAndCompany(withConnection: true);
+        $owner = UserBuilder::aUser()
+            ->withId(self::OWNER_ID)
+            ->withEmail('ozon-debug-owner@example.test')
+            ->withRoles(['ROLE_COMPANY_OWNER'])
+            ->build();
+        $ownCompany = CompanyBuilder::aCompany()
+            ->withId(self::OWN_COMPANY_ID)
+            ->withOwner($owner)
+            ->build();
+        $em = $this->em();
+        $em->persist($owner);
+        $em->persist($ownCompany);
+        $em->flush();
+
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', self::OWN_COMPANY_ID);
+
+        $client->request('GET', $url.'?companyId='.self::COMPANY_ID);
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function debugUrls(): iterable
+    {
+        yield 'all-campaigns' => [self::URL_ALL_CAMPAIGNS];
+        yield 'list-reports' => [self::URL_LIST_REPORTS];
     }
 
     /**

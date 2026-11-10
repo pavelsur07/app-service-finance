@@ -106,7 +106,7 @@
                 </div>
                 <div class="table-responsive">
                     <table class="table card-table table-vcenter" data-ad-jobs
-                           data-is-company-owner="{{ is_granted('ROLE_COMPANY_OWNER') ? '1' : '0' }}">
+                           data-is-company-owner="{{ is_granted('ROLE_COMPANY_OWNER') and is_granted('module.marketplace.write') ? '1' : '0' }}">
                         <thead>
                         <tr>
                             <th>Период</th>

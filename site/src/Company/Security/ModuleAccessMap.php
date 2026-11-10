@@ -112,7 +112,7 @@ final class ModuleAccessMap
         'App\\Marketplace\\Controller\\Admin\\', // маппинг-админка под ROLE_ADMIN, без контекста компании
         'App\\Billing\\Controller\\Admin\\',     // /admin/billing/*, ROLE_ADMIN, тариф любого кабинета
         'App\\ServiceGateway\\Controller\\Admin\\', // /admin/services/*, ROLE_ADMIN, сводки сервисов без компаний
-        'App\\MarketplaceAds\\Controller\\Api\\Admin\\', // админ-API под ROLE_SUPER_ADMIN
+        'App\\MarketplaceAds\\Controller\\Api\\Admin\\', // ROLE_SUPER_ADMIN на классе; mark-failed — свой MARKETPLACE_WRITE
     ];
 
     public function resolve(string $className): ?Module
