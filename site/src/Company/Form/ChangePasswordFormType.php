@@ -65,7 +65,7 @@ class ChangePasswordFormType extends AbstractType
                 'message' => 'Введите новый пароль',
             ]),
             new Length([
-                'min' => 8,
+                'min' => RegistrationFormType::PASSWORD_MIN_LENGTH,
                 'minMessage' => 'Пароль должен содержать минимум {{ limit }} символов',
                 // max length allowed by Symfony for security reasons
                 'max' => 4096,

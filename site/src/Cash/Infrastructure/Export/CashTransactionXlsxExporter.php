@@ -8,6 +8,7 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
 use OpenSpout\Common\Entity\Cell;
+use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\CellAlignment;
 use OpenSpout\Common\Entity\Style\CellVerticalAlignment;
@@ -98,11 +99,11 @@ final readonly class CashTransactionXlsxExporter
 
         return new Row([
             Cell::fromValue($row['occurredAt'], $dateStyle),
-            Cell::fromValue($row['accountName']),
+            new StringCell((string) $row['accountName'], null),
             Cell::fromValue($amount, $moneyStyle),
-            Cell::fromValue($row['categoryName'] ?? ''),
-            Cell::fromValue($row['description'] ?? ''),
-            Cell::fromValue($row['counterpartyName'] ?? ''),
+            new StringCell((string) ($row['categoryName'] ?? ''), null),
+            new StringCell((string) ($row['description'] ?? ''), null),
+            new StringCell((string) ($row['counterpartyName'] ?? ''), null),
         ]);
     }
 }

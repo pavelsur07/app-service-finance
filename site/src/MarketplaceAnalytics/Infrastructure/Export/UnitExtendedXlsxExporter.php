@@ -6,6 +6,7 @@ namespace App\MarketplaceAnalytics\Infrastructure\Export;
 
 use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
 use OpenSpout\Common\Entity\Cell;
+use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\CellAlignment;
 use OpenSpout\Common\Entity\Style\CellVerticalAlignment;
@@ -193,8 +194,8 @@ final readonly class UnitExtendedXlsxExporter
             'money', 'percent' => Cell::fromValue((float) $value, $style),
             'integer' => Cell::fromValue((int) $value, $style),
             'number' => Cell::fromValue((float) $value, $style),
-            'tags' => Cell::fromValue($this->formatTags($value), $style),
-            default => Cell::fromValue((string) $value, $style),
+            'tags' => new StringCell($this->formatTags($value), $style),
+            default => new StringCell((string) $value, $style),
         };
     }
 

@@ -142,7 +142,9 @@
                 {% endif %}
               </td>
               <td class="t-cell--right">
-                <a href="{{ path('admin_user_update_roles', {id: user.id}) }}" class="btn btn-sm btn-secondary">Изменить роль</a>
+                {% if is_granted('ROLE_SUPER_ADMIN') and 'ROLE_SUPER_ADMIN' not in user.roles %}
+                  <a href="{{ path('admin_user_update_roles', {id: user.id}) }}" class="btn btn-sm btn-secondary">Изменить роль</a>
+                {% endif %}
               </td>
             </tr>
           {% endfor %}

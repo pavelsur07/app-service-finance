@@ -20,7 +20,7 @@ use Symfony\Component\Validator\Constraints\Regex;
 class RegistrationFormType extends AbstractType
 {
     /** Минимальная длина пароля: правило сервера и подсказка на странице регистрации. */
-    public const PASSWORD_MIN_LENGTH = 6;
+    public const PASSWORD_MIN_LENGTH = 10;
 
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {

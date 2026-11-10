@@ -252,6 +252,41 @@ final class CashTransactionExportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('dateTo=2026-01-31', $href);
     }
 
+    /**
+     * Назначение платежа приходит из банковской выписки и может начинаться с «=».
+     * В файле это должна быть строковая ячейка, а не формула. Проверка по XML листа:
+     * OpenSpout Reader сам превращает строку на «=» в FormulaCell и разницы не покажет.
+     */
+    public function testDescriptionStartingWithEqualsIsExportedAsText(): void
+    {
+        $client = static::createClient();
+        $em = $this->em();
+
+        $owner = UserBuilder::aUser()->withEmail('cash-export-formula@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $em->persist($owner);
+        $em->persist($company);
+        $this->persistTransaction($em, $company, '=HYPERLINK("https://example.test","счёт")');
+        $em->flush();
+
+        $this->authenticate($client, $owner, $company);
+        $client->request('GET', self::PERIOD_URL);
+        self::assertResponseIsSuccessful();
+
+        $path = tempnam(sys_get_temp_dir(), 'cash_tx_export_formula_');
+        self::assertNotFalse($path);
+        file_put_contents($path, (string) $client->getInternalResponse()->getContent());
+        $zip = new \ZipArchive();
+        self::assertTrue($zip->open($path));
+        $sheet = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        $shared = (string) $zip->getFromName('xl/sharedStrings.xml');
+        $zip->close();
+        unlink($path);
+
+        self::assertStringNotContainsString('<f>', $sheet);
+        self::assertStringContainsString('HYPERLINK', $sheet.$shared);
+    }
+
     private function persistTransaction(EntityManagerInterface $em, Company $company, string $description): void
     {
         $account = MoneyAccountBuilder::aMoneyAccount()
