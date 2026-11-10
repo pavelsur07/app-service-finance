@@ -55,21 +55,6 @@ abstract class WebTestCaseBase extends WebTestCase
         return $client->request('POST', (string) $trigger->attr('data-confirm-action'), ['_token' => (string) $trigger->attr('data-confirm-token')] + $fields);
     }
 
-    /**
-     * Уникальный адрес клиента для тестов с лимитерами (регистрация, вход): счётчики
-     * лежат в общем Redis-пуле и переживают прогоны, а все запросы иначе идут с 127.0.0.1.
-     */
-    protected function uniqueClientIp(): string
-    {
-        return sprintf(
-            '2001:db8:%x:%x:%x:%x::1',
-            random_int(0, 0xFFFF),
-            random_int(0, 0xFFFF),
-            random_int(0, 0xFFFF),
-            random_int(0, 0xFFFF),
-        );
-    }
-
     protected function csrfToken(KernelBrowser $client, string $tokenId): string
     {
         $session = $client->getContainer()->get('session.factory')->createSession();

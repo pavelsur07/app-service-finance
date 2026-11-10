@@ -279,4 +279,15 @@ final class PublicRegistrationFlowTest extends WebTestCaseBase
         self::assertSame('true', $crawler->filter('#registration_form_email')->attr('aria-invalid'));
         self::assertSame(1, $this->em()->getRepository(User::class)->count(['email' => 'taken@example.test']));
     }
+
+    private function uniqueClientIp(): string
+    {
+        return sprintf(
+            '2001:db8:%x:%x:%x:%x::1',
+            random_int(0, 0xFFFF),
+            random_int(0, 0xFFFF),
+            random_int(0, 0xFFFF),
+            random_int(0, 0xFFFF),
+        );
+    }
 }

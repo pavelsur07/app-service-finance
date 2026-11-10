@@ -71,4 +71,15 @@ final class AdminLoginThrottlingTest extends WebTestCaseBase
             '_csrf_token' => $token,
         ]);
     }
+
+    private function uniqueClientIp(): string
+    {
+        return sprintf(
+            '2001:db8:%x:%x:%x:%x::1',
+            random_int(0, 0xFFFF),
+            random_int(0, 0xFFFF),
+            random_int(0, 0xFFFF),
+            random_int(0, 0xFFFF),
+        );
+    }
 }
