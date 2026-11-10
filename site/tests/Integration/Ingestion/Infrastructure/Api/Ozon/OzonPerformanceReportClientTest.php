@@ -353,6 +353,39 @@ final class OzonPerformanceReportClientTest extends IntegrationTestCase
         self::assertStringNotContainsString('Authorization:', implode("\n", $this->headerLines($calls[1]['options'])));
     }
 
+    public function testDownloadReportSkipsOzonTitleLineBeforeHeader(): void
+    {
+        $company = $this->seedCompany('11111111-1111-4111-8111-00000000b203', 9203);
+        $connection = $this->seedPerformanceConnection($company, '77777777-7777-4777-8777-00000000b203');
+        $this->em->flush();
+
+        // Живая форма отчёта по заказам «Оплаты за заказ» (10.11.2026): первая строка — название
+        // отчёта с запятой и ведущим «;», колонки — со второй.
+        $csv = "\xEF\xBB\xBF;Отчёт по заказам, период 02.11.2026-09.11.2026\n"
+            ."Дата;ID заказа;SKU;Артикул;Расход, ₽\n"
+            ."03.11.2026;111;222;ART-1;50,00\n";
+        $http = new MockHttpClient(static function (string $method, string $url) use ($csv): MockResponse {
+            if (str_ends_with($url, '/api/client/token')) {
+                return new MockResponse('{"access_token":"test-token","expires_in":1800}', ['http_code' => 200]);
+            }
+
+            return new MockResponse($csv, ['http_code' => 200]);
+        });
+
+        $page = $this->client($http)->downloadReport((string) $company->getId(), $connection->getId(), 'report-uuid-3', 'https://download.example.test/report.csv');
+
+        self::assertSame([
+            [
+                'Дата' => '03.11.2026',
+                'ID заказа' => '111',
+                'SKU' => '222',
+                'Артикул' => 'ART-1',
+                'Расход, ₽' => '50,00',
+                '_ingestion_metadata' => ['reportUuid' => 'report-uuid-3'],
+            ],
+        ], $page->rows);
+    }
+
     public function testDownloadReportNormalizesRelativeOzonLinkAndKeepsBearerAuth(): void
     {
         $company = $this->seedCompany('11111111-1111-4111-8111-00000000b205', 9205);

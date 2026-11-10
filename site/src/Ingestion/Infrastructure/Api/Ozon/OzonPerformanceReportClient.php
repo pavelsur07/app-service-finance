@@ -614,8 +614,19 @@ final readonly class OzonPerformanceReportClient implements OzonPerformanceRepor
             if (false === $firstLine) {
                 return [];
             }
+            // Отчёты Ozon начинаются строкой-названием с пустой первой ячейкой
+            // («;Отчёт по заказам, период …»), колонки — со второй строки. Правило то же,
+            // что у OzonPerformanceCsvParser модуля MarketplaceAds.
+            $headerOffset = 0;
+            if (str_starts_with($firstLine, ';') || str_starts_with($firstLine, ',')) {
+                $headerOffset = strlen($firstLine);
+                $firstLine = fgets($stream);
+                if (false === $firstLine) {
+                    return [];
+                }
+            }
             $separator = substr_count($firstLine, ';') > substr_count($firstLine, ',') ? ';' : ',';
-            rewind($stream);
+            fseek($stream, $headerOffset);
 
             $header = fgetcsv($stream, 0, $separator, '"', '');
             if (false === $header) {
