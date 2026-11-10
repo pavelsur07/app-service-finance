@@ -48,6 +48,32 @@ final class IngestRawRecordRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /**
+     * Последняя версия каждого сырого объекта ресурса с непустым payload: по external_id —
+     * запись с наибольшим last_seen_at; порядок — от давно виденных к свежим.
+     *
+     * @return list<string> id записей
+     */
+    public function findLatestIdsByCompanyAndResource(string $companyId, string $resourceType, string $externalIdLike): array
+    {
+        /** @var list<string> $ids */
+        $ids = $this->getEntityManager()->getConnection()->fetchFirstColumn(
+            'SELECT latest.id FROM (
+                 SELECT DISTINCT ON (external_id) id, last_seen_at
+                 FROM ingest_raw_records
+                 WHERE company_id = :companyId
+                     AND resource_type = :resourceType
+                     AND external_id LIKE :externalIdLike
+                     AND payload_deleted_at IS NULL
+                 ORDER BY external_id, last_seen_at DESC, id DESC
+             ) latest
+             ORDER BY latest.last_seen_at, latest.id',
+            ['companyId' => $companyId, 'resourceType' => $resourceType, 'externalIdLike' => $externalIdLike],
+        );
+
+        return $ids;
+    }
+
     public function findByIdAndCompany(string $rawRecordId, string $companyId): ?IngestRawRecord
     {
         return $this->findOneByIdAndCompany($companyId, $rawRecordId);

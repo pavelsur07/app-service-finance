@@ -95,6 +95,17 @@ case "$cmd" in
       esac
     done
     ;;
+  app:ingestion:ozon-performance:search-promo-orders-summary)
+    # Read-only: сводка по дням сохранённого отчёта по заказам «Оплаты за заказ»
+    # Ozon (читает S3 и ingest_raw_records, во внешний API не ходит, ничего не
+    # пишет; номера заказов не печатает). Для сверки с начислениями Ozon (10.11.2026).
+    for arg in "$@"; do
+      if [[ "$arg" =~ ^--company-id=[0-9a-f-]{36}$ ]]; then :
+      elif [[ "$arg" =~ ^--(from|to)=[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    ;;
   app:marketplace:ozon-financial-reports:freshness-check)
     # Read-only гейт: проверяет, что у каждого активного seller-подключения есть
     # документ начислений за вчера. Ничего не пишет и во внешний API не ходит,
