@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Cash\DTO;
+namespace App\Cash\Application\DTO;
 
 /**
  * Где используется статья ДДС: каждая такая ссылка запрещает её удалить (FK без ON DELETE).

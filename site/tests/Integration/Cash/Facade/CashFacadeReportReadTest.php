@@ -96,6 +96,23 @@ final class CashFacadeReportReadTest extends IntegrationTestCase
         self::assertSame([], $this->facade->listDailyBalances($id, new \DateTimeImmutable('2026-03-31'), new \DateTimeImmutable('2026-03-01'), []));
     }
 
+    public function testTurnoversByAccountIgnoreOtherCurrencyDeletedAndOutOfPeriod(): void
+    {
+        $this->tx($this->bank, CashDirection::INFLOW, '50.00', '2026-03-01');
+        $this->tx($this->bank, CashDirection::OUTFLOW, '30.00', '2026-03-31');
+        $usdLeg = $this->tx($this->bank, CashDirection::INFLOW, '700.00', '2026-03-10');
+        $usdLeg->setCurrency('USD');
+        $this->tx($this->bank, CashDirection::INFLOW, '800.00', '2026-03-10', deleted: true);
+        $this->tx($this->bank, CashDirection::INFLOW, '900.00', '2026-02-28');
+        $this->tx($this->bank, CashDirection::OUTFLOW, '600.00', '2026-04-01');
+        $this->em->flush();
+
+        self::assertSame(
+            [(string) $this->bank->getId() => ['inflow' => '50.00', 'outflow' => '30.00']],
+            $this->facade->sumTurnoversByAccount((string) $this->company->getId(), [(string) $this->bank->getId()], new \DateTimeImmutable('2026-03-01'), new \DateTimeImmutable('2026-03-31')),
+        );
+    }
+
     public function testGrossTurnoverExcludesTransfersAndFiltersFlowKind(): void
     {
         $rent = $this->category('Аренда', CashflowFlowKind::OPERATING);
@@ -110,6 +127,35 @@ final class CashFacadeReportReadTest extends IntegrationTestCase
 
         self::assertSame(['inflow' => '100.00', 'outflow' => '40.00'], $this->facade->sumGrossTurnoverExcludingTransfers($id, $from, $to, 'RUB', null));
         self::assertSame(['inflow' => '0.00', 'outflow' => '40.00'], $this->facade->sumGrossTurnoverExcludingTransfers($id, $from, $to, 'RUB', CashflowFlowKind::OPERATING));
+    }
+
+    public function testGrossTurnoverIgnoresForeignCompanyTechnicalOtherCurrencyAndDeleted(): void
+    {
+        $rent = $this->category('Аренда', CashflowFlowKind::OPERATING);
+        $technical = $this->category('Техническая', CashflowFlowKind::TECHNICAL);
+        $unallocated = $this->category('Нераспределённое', CashflowFlowKind::OPERATING);
+        $unallocated->markAsSystem(CashflowCategory::CODE_UNALLOCATED);
+        $foreignRent = CashflowCategoryBuilder::aCashflowCategory()->withId(Uuid::uuid4()->toString())->withCompany($this->foreign)->withName('Чужая аренда')->build();
+        $foreignRent->setFlowKind(CashflowFlowKind::OPERATING);
+        $this->em->persist($foreignRent);
+        $usd = $this->account($this->company, 'Валютный', MoneyAccountType::BANK, 'USD');
+        $foreignAccount = $this->account($this->foreign, 'Чужой', MoneyAccountType::BANK, 'RUB');
+
+        $this->tx($this->bank, CashDirection::OUTFLOW, '40.00', '2026-03-03', $rent);
+        $this->tx($this->bank, CashDirection::OUTFLOW, '5.00', '2026-03-03', $unallocated);
+        $this->tx($this->bank, CashDirection::INFLOW, '700.00', '2026-03-03', $technical);
+        $this->tx($this->bank, CashDirection::OUTFLOW, '800.00', '2026-03-03', $rent, deleted: true);
+        $this->tx($this->bank, CashDirection::OUTFLOW, '900.00', '2026-04-01', $rent);
+        $this->tx($usd, CashDirection::OUTFLOW, '600.00', '2026-03-03', $rent);
+        $this->tx($foreignAccount, CashDirection::OUTFLOW, '999.00', '2026-03-03', $foreignRent);
+        $this->em->flush();
+        $id = (string) $this->company->getId();
+        $from = new \DateTimeImmutable('2026-03-01');
+        $to = new \DateTimeImmutable('2026-03-31');
+
+        self::assertSame(['inflow' => '0.00', 'outflow' => '45.00'], $this->facade->sumGrossTurnoverExcludingTransfers($id, $from, $to, 'RUB', null));
+        self::assertSame(['inflow' => '0.00', 'outflow' => '40.00'], $this->facade->sumGrossTurnoverExcludingTransfers($id, $from, $to, 'RUB', CashflowFlowKind::OPERATING));
+        self::assertSame(['inflow' => '0.00', 'outflow' => '999.00'], $this->facade->sumGrossTurnoverExcludingTransfers((string) $this->foreign->getId(), $from, $to, 'RUB', null));
     }
 
     public function testStatementLinesSplitTransactionsAndFilter(): void

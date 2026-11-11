@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Service\PaymentPlan;
 
-use App\Cash\DTO\PaymentPlanDTO;
+use App\Cash\Application\DTO\PaymentPlanDTO;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;

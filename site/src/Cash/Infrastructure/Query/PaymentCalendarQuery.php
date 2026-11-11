@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Cash\Query;
+namespace App\Cash\Infrastructure\Query;
 
-use App\Cash\DTO\ForecastDTO;
+use App\Cash\Application\DTO\ForecastDTO;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;

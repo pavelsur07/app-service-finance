@@ -694,9 +694,9 @@ if ($product === null) {
 ```php
 #[AsDoctrineListener(event: Events::postPersist)]
 #[AsDoctrineListener(event: Events::postUpdate)]
-final class AuditLogSubscriber
+final class AuditLogListener // в {Module}/EventListener/, без implements EventSubscriber
 {
-    public function postPersist(LifecycleEventArgs $args): void
+    public function postPersist(PostPersistEventArgs $args): void
     {
         if (!$args->getObject() instanceof CashTransaction) {
             return;

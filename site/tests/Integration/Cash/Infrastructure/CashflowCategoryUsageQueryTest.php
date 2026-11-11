@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Infrastructure;
 
-use App\Cash\DTO\CashflowCategoryUsage;
+use App\Cash\Application\DTO\CashflowCategoryUsage;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Entity\Transaction\CashTransactionSplit;

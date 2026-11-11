@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Cash\Controller;
 
-use App\Cash\DTO\CashTransactionDTO;
+use App\Cash\Application\DTO\CashTransactionDTO;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType;

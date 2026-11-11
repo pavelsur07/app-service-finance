@@ -16,6 +16,7 @@ use App\Cash\Application\DTO\CashflowCategoryNode;
 use App\Cash\Application\DTO\CashflowReportRow;
 use App\Cash\Application\DTO\CashflowReportRowFilter;
 use App\Cash\Application\DTO\CashStatementLine;
+use App\Cash\Application\DTO\CashTransactionDTO;
 use App\Cash\Application\DTO\CreateCashTransactionCommand;
 use App\Cash\Application\DTO\CreateCashTransactionResult;
 use App\Cash\Application\DTO\CreateCashTransferCommand;
@@ -28,7 +29,6 @@ use App\Cash\Application\DTO\StatementImportSummary;
 use App\Cash\Application\DTO\StatementLinkCandidate;
 use App\Cash\Application\ImportBankStatementDayAction;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
-use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
@@ -532,7 +532,9 @@ final readonly class CashFacade
      */
     public function sumTurnoversByAccount(string $companyId, array $accountIds, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
-        return $this->cashTransactionRepository->sumByAccountAndPeriod($this->requireCompany($companyId), $accountIds, $from, $to);
+        $this->requireCompany($companyId);
+
+        return $this->reportQuery->sumTurnoversByAccount($companyId, $accountIds, $from, $to);
     }
 
     /**
@@ -548,8 +550,10 @@ final readonly class CashFacade
         string $currency,
         ?CashflowFlowKind $flowKind,
     ): array {
-        return $this->cashTransactionRepository->sumGrossTurnoverByPeriodExcludeTransfers(
-            $this->requireCompany($companyId),
+        $this->requireCompany($companyId);
+
+        return $this->reportQuery->sumGrossTurnoverExcludingTransfers(
+            $companyId,
             $from,
             $to,
             $currency,

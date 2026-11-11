@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Cash\Application;
 
+use App\Cash\Application\DTO\CashTransactionDTO;
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Application\Service\DailyBalanceRecalculator;
 use App\Cash\Domain\Event\CashTransactionsChanged;
-use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -70,7 +70,7 @@ final class AddCashTransactionAction
 
         $existingTransaction = null;
         if (null !== $dto->importSource && null !== $dto->externalId) {
-            $existingTransaction = $this->txRepo->findOneByImport(
+            $existingTransaction = $this->txRepo->findOneByCompanyImportSourceExternalId(
                 $dto->companyId,
                 $dto->importSource,
                 $dto->externalId,

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\Service\Accounts;
 
-use App\Cash\DTO\DailyBalancesDTO;
-use App\Cash\DTO\MoneyBalanceDTO;
+use App\Cash\Application\DTO\DailyBalancesDTO;
+use App\Cash\Application\DTO\MoneyBalanceDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
 use App\Cash\Exception\BalanceNotAvailableBeforeOpeningDateException;

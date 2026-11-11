@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Cash\EventSubscriber\Transaction;
+namespace App\Tests\Unit\Cash\EventListener;
 
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Application\Service\DebouncedRangeEnqueuer;
-use App\Cash\EventSubscriber\Transaction\CashTransactionAutoRulesSubscriber;
+use App\Cash\EventListener\CashTransactionAutoRulesListener;
 use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\Message\EnqueueAutoRulesForRange;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Event\PostUpdateEventArgs;
 use Doctrine\ORM\UnitOfWork;
-use Doctrine\Persistence\Event\LifecycleEventArgs;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Lock\LockFactory;
@@ -22,7 +22,7 @@ use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 
-final class CashTransactionAutoRulesSubscriberTest extends TestCase
+final class CashTransactionAutoRulesListenerTest extends TestCase
 {
     public function testPostPersistEnqueuesDelayedRangesWithDistinctCorrelations(): void
     {
@@ -46,14 +46,15 @@ final class CashTransactionAutoRulesSubscriberTest extends TestCase
         );
         $subscriber = $this->createSubscriber($bus, $lockFactory);
 
-        $subscriber->postPersist(new LifecycleEventArgs($transaction, $entityManager));
-        $subscriber->postPersist(new LifecycleEventArgs($secondTransaction, $entityManager));
+        $subscriber->postPersist(new PostPersistEventArgs($transaction, $entityManager));
+        $subscriber->postPersist(new PostPersistEventArgs($secondTransaction, $entityManager));
 
         self::assertCount(2, $dispatched);
         self::assertInstanceOf(EnqueueAutoRulesForRange::class, $dispatched[0][0]);
         self::assertInstanceOf(DelayStamp::class, $dispatched[0][1][0]);
         self::assertSame(10000, $dispatched[0][1][0]->getDelay());
         self::assertTrue(Uuid::isValid((string) $dispatched[0][0]->correlationId));
+        self::assertInstanceOf(EnqueueAutoRulesForRange::class, $dispatched[1][0]);
         self::assertTrue(Uuid::isValid((string) $dispatched[1][0]->correlationId));
         self::assertNotSame($dispatched[0][0]->correlationId, $dispatched[1][0]->correlationId);
     }
@@ -91,7 +92,7 @@ final class CashTransactionAutoRulesSubscriberTest extends TestCase
         );
 
         $this->createSubscriber($bus, $lockFactory)
-            ->postPersist(new LifecycleEventArgs($transaction, $entityManager));
+            ->postPersist(new PostPersistEventArgs($transaction, $entityManager));
 
         self::assertCount(1, $dispatched);
         self::assertInstanceOf(ApplyAutoRulesForTransaction::class, $dispatched[0][0]);
@@ -149,14 +150,17 @@ final class CashTransactionAutoRulesSubscriberTest extends TestCase
         MessageBusInterface $bus,
         LockFactory $lockFactory,
         ?AutoRuleDispatchGuard $guard = null,
-    ): CashTransactionAutoRulesSubscriber {
-        return new CashTransactionAutoRulesSubscriber(
+    ): CashTransactionAutoRulesListener {
+        return new CashTransactionAutoRulesListener(
             $bus,
             new DebouncedRangeEnqueuer($lockFactory),
             $guard ?? new AutoRuleDispatchGuard(),
         );
     }
 
+    /**
+     * @param array<string, array{mixed, mixed}> $changeSet
+     */
     private function createPostUpdateArgs(object $entity, array $changeSet): PostUpdateEventArgs
     {
         $unitOfWork = $this->createMock(UnitOfWork::class);

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Cash\EventSubscriber\Audit;
+namespace App\Cash\EventListener;
 
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Entity\Transaction\CashTransaction;
@@ -10,15 +10,14 @@ use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Entity\AuditLog;
 use App\Shared\Enum\AuditLogAction;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
-use Doctrine\Common\EventSubscriber;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Event\PostUpdateEventArgs;
 use Doctrine\ORM\Events;
-use Doctrine\Persistence\Event\LifecycleEventArgs;
 
 #[AsDoctrineListener(event: Events::postPersist)]
 #[AsDoctrineListener(event: Events::postUpdate)]
-final class AuditLogSubscriber implements EventSubscriber
+final class AuditLogListener
 {
     public function __construct(
         private readonly AuditContextProvider $auditContextProvider,
@@ -27,12 +26,7 @@ final class AuditLogSubscriber implements EventSubscriber
     ) {
     }
 
-    public function getSubscribedEvents(): array
-    {
-        return [Events::postPersist, Events::postUpdate];
-    }
-
-    public function postPersist(LifecycleEventArgs $args): void
+    public function postPersist(PostPersistEventArgs $args): void
     {
         $entity = $args->getObject();
 
@@ -46,11 +40,6 @@ final class AuditLogSubscriber implements EventSubscriber
 
         // ИСПРАВЛЕНИЕ: Используем безопасный метод получения ID компании
         $companyId = $this->resolveCompanyId($entity);
-
-        if (null === $companyId) {
-            // Если компанию определить невозможно (ни из сессии, ни из сущности) — выходим
-            return;
-        }
 
         // Получаем ID пользователя (или null, если это делает система)
         $actorUserId = $this->resolveActorUserId();
@@ -86,10 +75,6 @@ final class AuditLogSubscriber implements EventSubscriber
         // ИСПРАВЛЕНИЕ: Используем безопасный метод получения ID компании
         $companyId = $this->resolveCompanyId($entity);
 
-        if (null === $companyId) {
-            return;
-        }
-
         $changeSet = $args->getObjectManager()->getUnitOfWork()->getEntityChangeSet($entity);
         $diff = [];
         foreach ($changeSet as $field => $changes) {
@@ -122,7 +107,7 @@ final class AuditLogSubscriber implements EventSubscriber
      * 1. Сначала из контекста (сессия пользователя)
      * 2. Если нет (мы в консоли/воркере) — берет из самой сущности
      */
-    private function resolveCompanyId(CashTransaction $entity): ?string
+    private function resolveCompanyId(CashTransaction $entity): string
     {
         // 1. Пробуем взять из провайдера (если есть сессия)
         try {
@@ -135,13 +120,7 @@ final class AuditLogSubscriber implements EventSubscriber
         }
 
         // 2. Если контекста нет (мы в Воркере), берем ID из самой транзакции
-        $company = $entity->getCompany();
-        // Убедимся, что компания загружена и имеет ID
-        if (method_exists($company, 'getId')) {
-            return (string) $company->getId();
-        }
-
-        return null;
+        return (string) $entity->getCompany()->getId();
     }
 
     /**

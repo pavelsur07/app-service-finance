@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash;
 
-use App\Cash\DTO\CashTransactionFilters;
+use App\Cash\Application\DTO\CashTransactionFilters;
 use PHPUnit\Framework\TestCase;
 
 final class CashTransactionFiltersTest extends TestCase

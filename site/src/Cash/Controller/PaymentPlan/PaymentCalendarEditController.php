@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\PaymentPlan;
 
+use App\Cash\Application\DTO\PaymentPlanDTO;
 use App\Cash\Application\UpdatePaymentPlanAction;
-use App\Cash\DTO\PaymentPlanDTO;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Form\PaymentPlan\PaymentPlanType;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;

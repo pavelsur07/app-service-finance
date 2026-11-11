@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Application\DTO\CashTransactionDTO;
 use App\Cash\Application\UpdateCashTransactionAction;
-use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Form\Transaction\CashTransactionType;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionService;

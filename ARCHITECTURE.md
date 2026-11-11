@@ -2391,7 +2391,7 @@ dry-run; каждая компания — своя транзакция; ост
 - Помощники представления Cash живут в модуле: Twig-расширения
   `Cash\Infrastructure\Twig\MaskingExtension` (`mask_account`) и `MoneyTotalsExtension`
   (`money_totals_widget`, `is_funds_feature_enabled`); аудит изменений `CashTransaction` —
-  `Cash\EventSubscriber\Audit\AuditLogSubscriber` (пишет `Shared\Entity\AuditLog`).
+  `Cash\EventListener\AuditLogListener` (пишет `Shared\Entity\AuditLog`).
 
 ### Cash: документ ОПиУ из транзакции ДДС
 
@@ -2491,7 +2491,7 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   `app:cash:ai-categorize`: ворота закрыты → ничего; иначе до 200 подсказок
   (`findAutoApplicable`, операция «без статьи»), по каждой своя
   `wrapInTransaction` с `apply(..., null)` под `AutoRuleDispatchGuard::suppress`
-  (общая запись `AuditLogSubscriber` и постановка автоправил подавлены); applier
+  (общая запись `AuditLogListener` и постановка автоправил подавлены); applier
   пишет свою запись `audit_log` с `aiSuggestion` и `changes.cashflowCategory` —
   по ней `CashTransactionAutoRuleProvenanceResolver` считает статью
   авто-назначенной, и автоправила в режиме `replace_auto_assigned` её
@@ -2593,6 +2593,18 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
 - `app:cash:import:recover-delivery [companyId] [--execute]`: по умолчанию dry-run; queued старше 120 секунд; без компании — все подходящие компании. `CashImportDeliveryLock` берёт session advisory lease `cash_import_delivery` по компании до общего снимка очереди, занятые компании пропускаются. `CashFileImportDeliveryQuery` читает keyset-порции 100 с продвижением через пропущенные записи; Redis-проверка одна на запуск для всех кандидатов (два прохода, stream XRANGE по500, delayed ZSCAN COUNT500). Перед отправкой заново проверяются queued/возраст/failed. Сетевой I/O не держит row locks или новую DB-транзакцию. Очередь недоступна — FAILURE без объявления сообщений отсутствующими. processing/done/failed/lost-closed не перезапускаются; дубли безопасно принимает существующий Handler. Команда не включает расписание; production-периодичность/--execute требуют отдельного согласования. Восстановление потерянного processing вне гарантии.
 - `CashExceptionListener` обслуживает CashApiExceptionInterface на `/api/` и явно `cash_transaction_create_from` вне API. Формат `{error:{code,message}}`; `CashTransactionNotFoundException` —404, `CashInvalidCsrfException` —403, `CashDocumentOperationException`/multi-split —422; успех прежний. HTML-маршруты не перехватываются.
 - Списки счетов, фондов, файловых профилей и планов используют `CashListPagination` + Pagerfanta QueryAdapter: page=1, limit=50, максимум200; ошибочный параметр/недоступная страница —422. Repository listQuery/calendarQuery всегда scoped; сортировка заканчивается ID. `PaymentCalendarQuery` отдаёт query плана и полный forecast за период; form choices/иерархии/экспорт не обрезаются.
+
+### Cash: размещение классов
+
+Куда класть новый класс модуля Cash (раскладка слоёв — `site/src/Cash/README.md`):
+
+| Что | Куда |
+|---|---|
+| DTO: входы, команды, результаты, данные форм | `Application/DTO/` |
+| Read-запросы, отчёты, проекции | `Infrastructure/Query/` |
+| Слушатели событий Symfony и Doctrine (`#[AsEventListener]`, `#[AsDoctrineListener]`) | `EventListener/` |
+| Новый stateless-сервис | `Application/Service/` |
+| `Service/` | новое не класть; переносить при касании |
 
 ### Cash → Analytics: событие `CashTransactionsChanged`
 
@@ -2733,7 +2745,8 @@ getReportOpeningBalances(string $companyId, \DateTimeImmutable $date, ?string $c
 
 DTO `MoneyAccountSummary`, `MoneyAccountDailyBalanceRow`, `CashStatementLine`, `CashflowCategoryNode`,
 `CashflowReportRow`, `CashflowReportRowFilter`, `MoneyAccountOpeningBalance` — в
-`src/Cash/Application/DTO/`; выборки выписки — `Cash\Infrastructure\Query\CashReportQuery`.
+`src/Cash/Application/DTO/`; выборки выписки, отчёта ДДС, оборотов по счетам и валовых
+оборотов — `Cash\Infrastructure\Query\CashReportQuery`.
 
 Все методы принимают `companyId` и бросают `\DomainException`, если компания или
 запрошенная сущность к ней не относится.
@@ -5185,7 +5198,7 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 
 | Что удалено | Почему | Чем закрыто сегодня |
 |---|---|---|
-| `app:cash:auto-rules:enqueue` (`*/5 * * * *`) | Автоправила ДДС работают событийно (`CashTransactionAutoRulesSubscriber` → `ApplyAutoRulesForTransaction`); команда требует `companyId`, а строка без аргумента неработоспособна; возврат cron породил бы дублирующую массовую работу | Событийный путь. Сама CLI-команда остаётся ручным инструментом (по компании), на неё ссылается страница «Авто-правило прим.» |
+| `app:cash:auto-rules:enqueue` (`*/5 * * * *`) | Автоправила ДДС работают событийно (`CashTransactionAutoRulesListener` → `ApplyAutoRulesForTransaction`); команда требует `companyId`, а строка без аргумента неработоспособна; возврат cron породил бы дублирующую массовую работу | Событийный путь. Сама CLI-команда остаётся ручным инструментом (по компании), на неё ссылается страница «Авто-правило прим.» |
 | `app:money-account:snapshot` (`10 2 * * *`) | Команды не существует; ночной пересчёт остатков как обязательное задание не нужен | `AccountBalanceService::recalculateDailyRange` из записывающих путей и CLI `app:daily-balance:recalc` вручную |
 
 **Messenger: транспорты и воркеры** (источник — `config/packages/messenger.yaml`, `docker-compose*.yml`).
@@ -5242,6 +5255,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.165 | 2026-11-11 | Cash: правило размещения классов; `Query/`, `DTO/`, `EventSubscriber/` перенесены в `Infrastructure/Query/`, `Application/DTO/`, `EventListener/`; обороты по счетам и валовые обороты — `CashReportQuery` (этапы 2–3 `docs/tasks/cash-module-structure`) |
 | 2.164 | 2026-11-10 | Cash remediation: атомарные queued jobs, recovery CLI, JSON-контракт, контроллеры по действиям и backend-пагинация |
 | 2.163 | 2026-11-09 | MarketplaceAnalytics: карточки «Unit — Экономика» = «Итого» таблицы — реклама по статистике, группы как колонки таблицы, `adAccrued` справкой; учётная реклама исключена из строк товаров (`ListingCostAggregateQuery::executeByPeriod`); листинг только с рекламой — строка; `resolveWidgetGroup` удалён (issue #2940, этап 3) |
 | 2.162 | 2026-11-09 | Marketplace: предоплата рекламы Ozon (`ozon_marketing_services`, тип начисления `Marketing`) исключена из строки «Не распределено по товарам» — расход из неё уже в статистике (`AdStatisticsCostCategories::codes()`) |

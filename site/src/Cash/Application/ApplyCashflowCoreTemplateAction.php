@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Application;
 
-use App\Cash\DTO\Template\CashflowCoreTemplateNode;
+use App\Cash\Application\DTO\Template\CashflowCoreTemplateNode;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;

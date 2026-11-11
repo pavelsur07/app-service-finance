@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Form\Transaction;
 
-use App\Cash\DTO\CashTransactionDTO;
+use App\Cash\Application\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;

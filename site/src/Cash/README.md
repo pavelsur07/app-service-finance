@@ -50,12 +50,12 @@ Analytics).
 |---|---|
 | `Controller` | HTTP in/out, компания — `ActiveCompanyService`, данные — через Repository с `companyId` или Action |
 | `Application` | Action'ы — граница транзакции; `flush()` — только в Action, MessageHandler и Command (гейт `FlushOutsideTransactionBoundaryRule`), исключения в baseline — сервисы импорта выписок |
-| `Application/DTO` | входы и результаты фасада |
-| `Infrastructure/Query` | read-модели: для фасада — `CashDashboardQuery`, `CashReportQuery`; внутренние — `CashTransactionAutoRuleCandidateQuery` |
+| `Application/DTO` | входы и результаты фасада, Action'ов и форм |
+| `Infrastructure/Query` | read-модели: для фасада — `CashDashboardQuery`, `CashReportQuery`; внутренние — `CashTransactionAutoRuleCandidateQuery`, `PaymentCalendarQuery` |
 | `Repository` | доступ к своим сущностям; каждый метод-запрос принимает компанию (`RepositoryCompanyScopeRule`), санкционированные исключения помечены `@companyScopeExempt` |
-| `Service` | legacy-сервисы модуля: `persist()` без `flush()`; исключение — сервисы импорта выписок (`flush` порциями, журнал импорта) |
+| `Service` | legacy-сервисы модуля, новое сюда не класть (см. `ARCHITECTURE.md`, «Cash: размещение классов»): `persist()` без `flush()`; исключение — сервисы импорта выписок (`flush` порциями, журнал импорта) |
 | `Domain/Event` | синхронные события «данные ДДС изменились» — только для теряемых последствий (кэш) |
-| `EventListener`, `EventSubscriber` | реакция на события Company и Doctrine (системные статьи, аудит, автоправила) |
+| `EventListener` | реакция на события Company и Doctrine (системные статьи, аудит, автоправила) |
 
 Деньги — `App\Shared\Domain\ValueObject\Money` и decimal string; приведение
 сумм к `float` ловит `MoneyFloatCastRule`.

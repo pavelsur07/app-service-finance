@@ -34,7 +34,7 @@ use Doctrine\ORM\EntityManagerInterface;
  * разбивка `auto` и своя запись истории с `aiSuggestion` — по ней
  * `CashTransactionAutoRuleProvenanceResolver` считает статью авто-назначенной, и её
  * перезаписывают автоправила в режиме `replace_auto_assigned` и человек; закрытый период и
- * перевод — подсказка устаревает, решать некому. Общую запись `AuditLogSubscriber` вызывающий
+ * перевод — подсказка устаревает, решать некому. Общую запись `AuditLogListener` вызывающий
  * подавляет (`AutoRuleDispatchGuard::suppress`), иначе она перекрыла бы эту.
  */
 final readonly class CashCategorySuggestionApplier
