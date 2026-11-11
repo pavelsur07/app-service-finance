@@ -23,6 +23,11 @@ final class SaveCashTransactionAutoRuleAction
     ) {
     }
 
+    public function createDraft(\App\Company\Entity\Company $company, ?string $actorUserId): CashTransactionAutoRule
+    {
+        return new CashTransactionAutoRule(\Ramsey\Uuid\Uuid::uuid7()->toString(), $company, '', \App\Cash\Enum\Transaction\CashTransactionAutoRuleAction::FILL, \App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType::ANY, createdByUserId: $actorUserId);
+    }
+
     public function __invoke(
         CashTransactionAutoRule $rule,
         ?string $actorUserId = null,

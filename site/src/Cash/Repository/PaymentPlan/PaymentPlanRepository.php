@@ -24,6 +24,49 @@ class PaymentPlanRepository extends ServiceEntityRepository
         parent::__construct($registry, PaymentPlan::class);
     }
 
+    /** @param array<string, string> $filters
+     */
+    public function calendarQuery(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, array $filters): \Doctrine\ORM\QueryBuilder
+    {
+        $qb = $this->createQueryBuilder('plan')
+            ->leftJoin('plan.moneyAccount', 'account')->addSelect('account')
+            ->leftJoin('plan.cashflowCategory', 'category')->addSelect('category')
+            ->leftJoin('plan.counterparty', 'counterparty')->addSelect('counterparty')
+            ->andWhere('plan.company = :company')
+            ->andWhere('plan.plannedAt BETWEEN :from AND :to')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from, Types::DATE_IMMUTABLE)
+            ->setParameter('to', $to, Types::DATE_IMMUTABLE)
+            ->orderBy('plan.plannedAt', \SortDirection::Ascending)
+            ->addOrderBy('plan.createdAt', \SortDirection::Ascending)
+            ->addOrderBy('plan.id', \SortDirection::Ascending);
+
+        if (!empty($filters['account_id'])) {
+            $qb->andWhere('plan.moneyAccount = :accountId')
+                ->setParameter('accountId', $filters['account_id']);
+        }
+
+        if (!empty($filters['category_id'])) {
+            $qb->andWhere('plan.cashflowCategory = :categoryId')
+                ->setParameter('categoryId', $filters['category_id']);
+        }
+
+        if (!empty($filters['counterparty_id'])) {
+            $qb->andWhere('plan.counterparty = :counterpartyId')
+                ->setParameter('counterpartyId', $filters['counterparty_id']);
+        }
+
+        if (!empty($filters['status'])) {
+            $status = PaymentPlanStatus::tryFrom((string) $filters['status']);
+            if ($status) {
+                $qb->andWhere('plan.status = :status')
+                    ->setParameter('status', $status);
+            }
+        }
+
+        return $qb;
+    }
+
     /**
      * Невалидный UUID — «не найдено», а не ошибка БД: id приходит из URL и формы.
      */

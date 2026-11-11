@@ -12,7 +12,7 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 final class UpdateCashFileImportProfileAction
 {
-    public function __construct(private readonly EntityManagerInterface $entityManager)
+    public function __construct(private readonly EntityManagerInterface $entityManager, private readonly \App\Cash\Service\Import\File\CashFileMappingValidator $mappingValidator)
     {
     }
 
@@ -22,6 +22,7 @@ final class UpdateCashFileImportProfileAction
      */
     public function __invoke(CashFileImportProfile $profile, string $name, array $mapping, array $options, string $type): void
     {
+        $this->mappingValidator->validate($mapping);
         $profile->setName($name);
         $profile->setMapping($mapping);
         $profile->setOptions($options);

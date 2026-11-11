@@ -18,33 +18,27 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/finance/cash-transactions/bulk-delete', name: 'cash_transaction_bulk_delete', methods: ['POST'])]
 final class CashTransactionBulkDeleteController extends AbstractController
 {
+    public function __construct(
+        private readonly BulkDeleteCashTransactionsAction $action,
+        private readonly ActiveCompanyService $companyService,
+        private readonly AuditContextProvider $auditContextProvider,
+    ) {
+    }
+
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
-    public function __invoke(
-        Request $request,
-        ActiveCompanyService $companyService,
-        AuditContextProvider $auditContextProvider,
-        BulkDeleteCashTransactionsAction $action,
-    ): RedirectResponse {
-        if (!$this->isCsrfTokenValid(
-            'cash_transaction_bulk_delete',
-            (string) $request->request->get('_token'),
-        )) {
+    public function __invoke(Request $request): RedirectResponse
+    {
+        if (!$this->isCsrfTokenValid('cash_transaction_bulk_delete', (string) $request->request->get('_token'))) {
             $this->addFlash('danger', 'Неверный CSRF токен.');
 
             return $this->redirectToRoute('cash_transaction_index', $request->query->all());
         }
-
         $transactionIds = $request->request->all()['transaction_ids'] ?? [];
         if (!\is_array($transactionIds)) {
             $transactionIds = [];
         }
-
         try {
-            $deletedCount = $action(
-                $companyService->getActiveCompany(),
-                $transactionIds,
-                $auditContextProvider->getActorUserId(),
-            );
+            $deletedCount = ($this->action)($this->companyService->getActiveCompany(), $transactionIds, $this->auditContextProvider->getActorUserId());
             $this->addFlash('success', sprintf('Удалено транзакций: %d.', $deletedCount));
         } catch (\DomainException $exception) {
             $this->addFlash('danger', $exception->getMessage());

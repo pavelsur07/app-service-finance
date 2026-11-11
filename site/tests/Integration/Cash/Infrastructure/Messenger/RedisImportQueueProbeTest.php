@@ -103,6 +103,30 @@ final class RedisImportQueueProbeTest extends TestCase
         (new RedisImportQueueProbe('doctrine://default'))->findQueued([Uuid::uuid4()->toString()]);
     }
 
+    public function testLargeStreamAndDelayedQueueArePaged(): void
+    {
+        $lastStream = Uuid::uuid7()->toString();
+        $lastDelayed = Uuid::uuid7()->toString();
+        for ($i = 0; $i < 1201; ++$i) {
+            $this->redis->xAdd($this->stream, '*', ['message' => 1200 === $i ? $lastStream : Uuid::uuid7()->toString()]);
+            $this->redis->zAdd($this->stream.'__queue', $i, 1200 === $i ? $lastDelayed : Uuid::uuid7()->toString());
+        }
+        $before = $this->redis->info('commandstats');
+        $found = $this->probe()->findQueued([$lastStream, $lastDelayed]);
+        $after = $this->redis->info('commandstats');
+        self::assertEqualsCanonicalizing([$lastStream, $lastDelayed], $found);
+        $calls = static function (array $stats, string $command): int {
+            preg_match('/calls=(\d+)/', $stats['cmdstat_'.$command] ?? '', $matches);
+
+            return (int) ($matches[1] ?? 0);
+        };
+        self::assertSame(0, $calls($after, 'zrange') - $calls($before, 'zrange'), 'Rank paging can skip members during concurrent ZPOPMIN.');
+        $scanCalls = $calls($after, 'zscan') - $calls($before, 'zscan');
+        self::assertGreaterThanOrEqual(6, $scanCalls);
+        self::assertLessThanOrEqual(10, $scanCalls, 'Two cursor scans, COUNT500 hint; never one scan per candidate.');
+        self::assertSame(6, $calls($after, 'xrange') - $calls($before, 'xrange'));
+    }
+
     private function probe(): RedisImportQueueProbe
     {
         return new RedisImportQueueProbe($this->dsn, static function (): void {});

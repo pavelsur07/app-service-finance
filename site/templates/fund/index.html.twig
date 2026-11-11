@@ -10,9 +10,11 @@
 {% endblock %}
 
 {% block body %}
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <h2 class="page-title">Фонды / Резервы</h2>
+        {% if is_granted('module.finance.write') %}
         <a class="btn btn-primary" href="{{ path('finance_funds_new') }}">Создать фонд</a>
+        {% endif %}
     </div>
 
     <div class="card">
@@ -47,15 +49,20 @@
                                 {{ balanceValue|vf_amount(currency: fund.currency == 'RUB' ? '₽' : fund.currency) }}
                             </td>
                             <td class="text-end">
+                                {% if is_granted('module.finance.write') %}
                                 <a class="btn btn-sm btn-outline-primary" href="{{ path('finance_funds_add_movement', {id: fund.id}) }}">
                                     Добавить движение
                                 </a>
+                                {% endif %}
                             </td>
                         </tr>
                     {% endfor %}
                 {% endif %}
                 </tbody>
             </table>
+        </div>
+        <div class="card-footer">
+            {% include 'partials/_pagination.html.twig' with {pager: pager} only %}
         </div>
     </div>
 {% endblock %}

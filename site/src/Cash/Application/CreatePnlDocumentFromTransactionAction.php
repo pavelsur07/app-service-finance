@@ -22,6 +22,7 @@ final class CreatePnlDocumentFromTransactionAction
         private readonly EntityManagerInterface $entityManager,
         private readonly CashTransactionToDocumentService $documents,
         private readonly CashTransactionRepository $transactions,
+        private readonly \App\Cash\Service\Transaction\CashTransactionService $transactionService,
     ) {
     }
 
@@ -36,6 +37,12 @@ final class CreatePnlDocumentFromTransactionAction
             $this->entityManager->clear();
             $transaction = $this->transactions->findOneByIdAndCompanyIdForUpdate($transactionId, $companyId)
                 ?? throw new \DomainException('Транзакция ДДС не найдена.');
+
+            if ($transaction->getSplits()->count() > 1) {
+                throw new \App\Cash\Exception\CashTransactionMultiSplitException();
+            }
+            $this->transactionService->assertStandaloneTransaction($transaction);
+            $this->transactionService->assertNotLockedForCompany($transaction->getCompany(), $transaction->getOccurredAt());
 
             $document = $this->documents->createFromCashTransaction($transaction);
 

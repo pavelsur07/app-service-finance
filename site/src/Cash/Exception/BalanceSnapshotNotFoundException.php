@@ -11,6 +11,11 @@ final class BalanceSnapshotNotFoundException extends \RuntimeException implement
         parent::__construct('Снапшот остатка за выбранную дату не найден. Выполните пересчёт остатков.');
     }
 
+    public function httpStatus(): int
+    {
+        return 422;
+    }
+
     public function errorCode(): string
     {
         return 'balance_snapshot_not_found';

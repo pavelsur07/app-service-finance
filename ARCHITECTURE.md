@@ -1326,9 +1326,10 @@ PostgreSQL выдаёт номер из `companies_public_id_seq` (INTEGER, на
 ```php
 // Варианты выбора как DTO: Entity чужого модуля в формы не попадает.
 // Архивные не предлагаются, но уже выбранный архивный остаётся (keepId).
+// includeArchived=true — полный набор для фильтров календаря; обычные формы сохраняют default=false.
 // @return list<CounterpartyChoiceDTO>  id, name, inn, kpp, isArchived, displayName, type, shownName(), label()
 // label() и data-name пикера — по shownName() = displayName ?? name
-getSelectable(string $companyId, ?string $keepId = null): array
+getSelectable(string $companyId, ?string $keepId = null, bool $includeArchived = false): array
 
 // Контрагент строго в рамках компании — для форм, которым нужна сама сущность.
 findEntityByIdAndCompany(string $counterpartyId, string $companyId): ?Counterparty
@@ -1759,6 +1760,7 @@ manage — только владелец. Новые права автомати
 - Потоковый экспорт (`iterateByCompanyWithFilters`) переведён с `toIterable()` на `getArrayResult()`: Doctrine запрещает итерировать запрос с join коллекции, а одна строка выгрузки на строку разбивки без такого join не получается. Потолок зафиксирован в коде.
 
 - Stage 4 разбивки ДДС: ручная разбивка сделана отдельным действием `/finance/cash-transactions/{id}/splits` (`CashTransactionSplitsController`), а не переделкой формы транзакции — обычная операция с одной статьёй пишется прежним путём. `SaveCashTransactionSplitsAction` собирает строки с `source = manual`, отдаёт проверку инвариантов агрегату, проецирует legacy-колонку и снимает устаревший `PaymentPlanMatch`.
+- `SaveCashTransactionSplitsAction` сохраняет состав, проекцию, аудит и снятие сопоставления одной транзакцией под блокировкой исходной `cash_transaction`. `UpdateCashTransactionAction` использует ту же блокировку через `CashSettlementSourceLifecycle::lockWithComposition()`, который перечитывает источник, компанию и загруженные дочерние строки. Для мультиразбивки обычная форма запрещает изменение нормализованной суммы, валюты и категории (`CashTransactionMultiSplitException`); остальные поля можно редактировать. Операция с действующими документами ОПиУ не переводится в мультиразбивку.
 - При разбивке колонка `cash_transaction.cashflow_category_id` проецируется в системную «Не распределено», а не в `NULL`: суммы отчёта по колонке остаются верными, и точкой невозврата остаётся только `DROP COLUMN`.
 - Автоправила не трогают вручную разбитые операции: `CashTransactionAutoRuleService::getSkipReason()` возвращает `CashTransactionAutoRuleSkipReason::MANUAL_SPLIT`. Проверка стоит там же, где «удалено» и «закрытый период», а не в синхронизаторе строк — ранний выход в синхронизаторе оставил бы колонку и строки рассинхронизированными.
 - `CashflowCategoryRepository::findOneByIdAndCompanyId()` — выбор статьи из формы строго в пределах компании.
@@ -2393,7 +2395,7 @@ dry-run; каждая компания — своя транзакция; ост
 
 ### Cash: документ ОПиУ из транзакции ДДС
 
-- `CreateDocumentFromTransactionAction` и `CreatePnlDocumentFromTransactionAction` выполняют проверку остатка, создание документа, `flush()` и `FinanceFacade::updatePLRegisterForDocument()` одним `wrapInTransaction()`.
+- `CreateDocumentFromTransactionAction` и `CreatePnlDocumentFromTransactionAction` отвергают мультиразбивку (`CashTransactionMultiSplitException`), перевод и закрытый период после блокировки источника; выполняют проверку остатка, создание документа, `flush()` и `FinanceFacade::updatePLRegisterForDocument()` одним `wrapInTransaction()`.
 - Внутри: `EntityManager::clear()` и `CashTransactionRepository::findOneByIdAndCompanyIdForUpdate()` — вызывающий загрузил транзакцию (и коллекцию документов) до блокировки, поэтому она перечитывается под `FOR UPDATE`. Параллельный или повторный запрос ждёт commit первого и видит остаток 0: отказ «Транзакция уже полностью разнесена» / «Сумма документа должна быть больше нуля», второй документ не создаётся. Ключа повтора нет: оба пути создают документ на весь остаток.
 - Сущность, переданная в Action, после вызова отсоединена (`clear()`): вызывающий использует только её id.
 
@@ -2456,7 +2458,7 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
   нет ответа по операции → `failed` (`missing_item`); операция уже со статьёй →
   `stale`; статья не активная конечная статья компании → `stale`; иначе
   `suggested`/`no_answer`. Только `persist()`, коммитит импорт.
-- Список операций (`CashTransactionController` index): у операции без статьи
+- Список операций (`CashTransactionIndexController`): у операции без статьи
   со статусом `suggested` — «ИИ: статья · %» и «Принять» / «Отклонить»
   (`POST /finance/cash-transactions/ai-suggestions/{id}/accept|dismiss`,
   `FINANCE_WRITE`, CSRF `cash_category_suggestion_{id}`).
@@ -2527,6 +2529,12 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
 
 ### Cash: идемпотентность файлового импорта и ручной транзакции
 
+- Состояния `cash_file_import` и `bank1c_import` несут `company_id` и `account_id`. `CashImportSession::read()` проверяет активную компанию и scoped счёт до storage/preview/перехода к committed job, возвращает `CashImportSessionState` (payload + проверенный account), без повторного scoped запроса; состояние без компании или с недоступным счётом удаляется, требуется повторная загрузка.
+- `CashFileMappingValidator::validate()` используется профилями (создание/правка), сохранением mapping, применением профиля и подготовкой/подтверждением плана. Допустимы только `date`, `amount`, `inflow`, `outflow`, `counterparty`, `description`, `currency`, `doc_number` со строкой/null. Неполный черновик допустим; `validateForImport()` перед подготовкой/подтверждением требует дату и хотя бы один источник суммы (amount/inflow/outflow). Односторонние приходные/расходные профили поддерживаются как прежде. Пригодность отдельных строк и финансовые правила определяет прежний normalizer. При выборе любой колонки приход/расход сохраняется приоритет нормализатора перед amount, включая POST формы mapping. Неполная направленная пара не отбрасывается в пользу amount.
+- `UploadCashFileImportAction` проверяет успешную загрузку, доступность/размер (непустой, ≤32 MiB), расширение CSV/XLS/XLSX и читаемый заголовок до записи storage. Формат/конвертация дают ошибку ввода; технический сбой storage остаётся отдельной ошибкой. Существующие пределы LegacyXlsConverter (включая 20 MiB исходника) сохранены. `TemporaryFileFactory::withExtensionPath()` обеспечивает временный файл с расширением и cleanup. Канонический storage key задаёт `CashFileImportService::storageKey()`, включая legacy чтение без расширения.
+- `PrepareCashFileImportAction` создаёт либо загружает immutable план по прежнему context hash; `ConfirmCashFileImportAction` проверяет company/account/file/mapping/actor, применяет явный выбор и вызывает существующий Start Action. `CashFileDescriptionPlan::selectDescriptions()` валидирует выбранные строки, поддерживает all/none/видимую страницу и возвращает только разрешённые update_description IDs. HTTP-сессия и CSRF остаются в одноэкшеновых контроллерах; ошибки несовпадения плана/строк дают 403.
+- Контроллеры импорта — final `__invoke`, зависимости constructor readonly; Session получена из Request. `CashFileImportPage` переиспользует HTTP mapping/JSON/input/actor helpers; `Bank1CImportPage` форматирует представление. Прежняя нормализация кодировки 1С вынесена в `ClientBank1CImportService`, правила финансового импорта не меняются.
+- Фильтры журнала `date_from/date_to` принимают только существующие даты `Y-m-d` и прямой диапазон; неверный фильтр рендерится с HTTP 422 без DB date cast.
 - `CashFileDescriptionPlan` анализирует первый лист целиком через общую `CashFileImportService::normalizedRows()`/`planInput()`. `CashFileDescriptionMatcher` распределяет точные совпадения прежде предложений, учитывает количественность, документ/контрагента и конфликтующие требования. Пустой текст не очищает описание; технические различия краёв/переносов игнорируются, внутреннее форматирование сохраняется. Неоднозначность не превращается в create.
 - План хранится immutable JSON в `cash-file-plans/<companyId>/<sha256>.json`; reference/context связан с компанией, счётом, оригинальными bytes, mapping, инициатором и версией. В `CashFileImportJob::options` — ссылка `description_plan`, явные `selected_descriptions` и прогресс; суммы и target ID из браузера не принимаются. `StartCashFileImportJobAction` канонизирует выбор и под advisory transaction lock возвращает один job на confirmation ID.
 - `ApplyCashFileDescriptionsAction` под существующим account lock обрабатывает выбранные обновления пачками100. `CashTransactionRepository::findImportCandidates` возвращает scoped scalar snapshot; `findForDescriptionUpdate` требует активную транзакцию, блокирует отсортированные company/account ID и затем читает только реально заблокированные строки с контрагентами. Проверка snapshot, описание, audit и `description_finished` атомарны. Новый managed-граф освобождается после пачки; старые managed-объекты вызывающего кода сохраняются.
@@ -2573,16 +2581,24 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
 
 ### Cash: плановые платежи — сопоставление и правила повтора
 
-- Форма `payment_calendar_new` выдаёт `PaymentPlanDTO::$idempotencyKey` (UUIDv7, опция `idempotency_key`); `CreatePaymentPlanAction` делает его ID плана: план компании с этим ID уже есть — возвращается он; гонка — через PK, как у ручной транзакции. Без ключа (не из формы) — UUIDv4, повтор не распознаётся. Так же форма движения по фонду (`money_fund_movement[idempotencyKey]`, `FundController::addMovement`) и `CreateMoneyFundMovementAction` (`MoneyFundMovementRepository::findOneByIdAndCompanyId()`).
+- Форма `payment_calendar_new` выдаёт `PaymentPlanDTO::$idempotencyKey` (UUIDv7, опция `idempotency_key`); `CreatePaymentPlanAction` делает его ID плана: план компании с этим ID уже есть — возвращается он; гонка — через PK, как у ручной транзакции. Без ключа (не из формы) — UUIDv7, повтор не распознаётся. Так же форма движения по фонду (`money_fund_movement[idempotencyKey]`, `FundMovementController::__invoke`) и `CreateMoneyFundMovementAction` (`MoneyFundMovementRepository::findOneByIdAndCompanyId()`).
 
 - Один план — одно сопоставление: `payment_plan_match` уникален и по `transaction_id`, и по `plan_id` (`uniq_payment_plan_match_plan`). `PaymentPlanMatcher::matchForTransaction()` ранжирует кандидатов (score, разница суммы, разница даты) и берёт первый, для которого `PaymentPlanRepository::lockIfAvailableForMatch()` под `FOR UPDATE` строки плана подтверждает статус не `PAID`/`CANCELED` и отсутствие сопоставления; занятый параллельно план — следующий кандидат. Требует активной транзакции вызывающего, сам не коммитит.
 - Правила повтора (`PaymentRecurrenceRule`): пути создания в коде нет (ни формы, ни API), `MaterializeRecurringPaymentPlansAction` вызывается при открытии календаря, но без правил ничего не создаёт (на проде правил 0); схема под неё не меняется. Решение Владельца (23.10.2026) для будущего UI правил: экземпляр правила идентифицирует пара «правило + исходная дата»; правка суммы или статьи меняет тот же план, а не порождает новый; ключ держит unique в БД.
+
+### Cash: HTTP-контракты и восстановление доставки импорта
+
+- Контроллеры Cash — final `__invoke` с constructor injection; общий HTTP-контекст находится в `Cash\Http`, записи/оркестрация — в Actions. `SaveCashflowCategoryAction::createDraft()` и `SaveCashTransactionAutoRuleAction::createDraft()` выдают новые UUIDv7 без записи; существующие ID не преобразуются. `EnqueueCashAutoRulesAction` отправляет существующее `EnqueueAutoRulesForRange` за текущий год, сохраняя режим/инициатора и прежний transport.
+- `StartCashFileImportJobAction` проверяет компанию счёта и атомарно сохраняет журнал + queued job, в том числе без confirmation ID. Повтор confirmation возвращает прежнее задание. `DispatchCashFileImportJobAction` отправляет существующее сообщение; TransportException/Redis transport errors оставляют durable queued-намерение и пишет только IDs/класс ошибки. HTTP сохраняет committed_job_id до отправки; повтор подтверждения не создаёт второго job.
+- `app:cash:import:recover-delivery [companyId] [--execute]`: по умолчанию dry-run; queued старше 120 секунд; без компании — все подходящие компании. `CashImportDeliveryLock` берёт session advisory lease `cash_import_delivery` по компании до общего снимка очереди, занятые компании пропускаются. `CashFileImportDeliveryQuery` читает keyset-порции 100 с продвижением через пропущенные записи; Redis-проверка одна на запуск для всех кандидатов (два прохода, stream XRANGE по500, delayed ZSCAN COUNT500). Перед отправкой заново проверяются queued/возраст/failed. Сетевой I/O не держит row locks или новую DB-транзакцию. Очередь недоступна — FAILURE без объявления сообщений отсутствующими. processing/done/failed/lost-closed не перезапускаются; дубли безопасно принимает существующий Handler. Команда не включает расписание; production-периодичность/--execute требуют отдельного согласования. Восстановление потерянного processing вне гарантии.
+- `CashExceptionListener` обслуживает CashApiExceptionInterface на `/api/` и явно `cash_transaction_create_from` вне API. Формат `{error:{code,message}}`; `CashTransactionNotFoundException` —404, `CashInvalidCsrfException` —403, `CashDocumentOperationException`/multi-split —422; успех прежний. HTML-маршруты не перехватываются.
+- Списки счетов, фондов, файловых профилей и планов используют `CashListPagination` + Pagerfanta QueryAdapter: page=1, limit=50, максимум200; ошибочный параметр/недоступная страница —422. Repository listQuery/calendarQuery всегда scoped; сортировка заканчивается ID. `PaymentCalendarQuery` отдаёт query плана и полный forecast за период; form choices/иерархии/экспорт не обрезаются.
 
 ### Cash → Analytics: событие `CashTransactionsChanged`
 
 - `App\Cash\Domain\Event\CashTransactionsChanged(string $companyId)` — синхронное
   доменное событие «данные ДДС компании изменились». Отправляется после `flush()` и
-  пересчёта остатков из `Add/Update/Delete/BulkDeleteCashTransactionsAction`,
+  пересчёта остатков из `Add/Update/Delete/RestoreCashTransactionAction`, `BulkDeleteCashTransactionsAction`,
   `CreateCashTransferAction`, `CashTransferLifecycleAction` и
   `SoftDeleteCompanyTransactionsCommand`.
 - Подписчик `Analytics\Infrastructure\Cache\InvalidateSnapshotOnCashChangeListener`
@@ -2774,7 +2790,10 @@ DTO `MoneyAccountSummary`, `MoneyAccountDailyBalanceRow`, `CashStatementLine`, `
 - Soft-deleted операции исключаются. `isTransfer` не влияет на остаток: направление определяется только `INFLOW`/`OUTFLOW`.
 - Денежная арифметика выполняется decimal-строками через BCMath; снапшоты создаются непрерывно по календарным дням.
 - Методы чтения не запускают пересчёт: снапшоты создаются после изменения счёта, операций, импорта или явной команды пересчёта.
-- Пересчёт одного счёта выполняется в DBAL-транзакции под PostgreSQL advisory lock, удаляет производные снапшоты до актуальной `openingBalanceDate` и сериализует конкурентные запуски.
+- `SaveMoneyAccountAction` сохраняет счёт, параметры банковской ссылки (`MoneyAccountBankLinkInput`) и пересчитывает остатки одной ORM/DBAL-транзакцией на соединении EM. Общая advisory-блокировка счёта берётся до первого сохранения параметров; ожидающий сохранения сценарий не держит блокировку строки, чтобы не блокировать завершающий пересчёт. После DBAL-пересчёта управляемый счёт обновляется (`refresh`), чтобы следующий ORM flush не затёр баланс.
+- Пересчёт одного счёта берёт PostgreSQL advisory lock и перечитывает сохранённые параметры счёта после ожидания; если вызывающий уже открыл транзакцию, сервис её не завершает. Самостоятельный вызов оборачивается в DBAL-транзакцию. Более ранние снапшоты удаляются по актуальной `openingBalanceDate`; формулы не изменены.
+- `SaveMoneyAccountAction::createDraft()`, `SaveMoneyFundAction::createDraft()` и `CreateMoneyFundMovementAction::createDraft()` создают новые объекты для существующих entity-bound форм; новые счета/фонды получают UUIDv7. Сумма движения фонда обрабатывается `CreateMoneyFundMovementAction::setAmount()` через общий Money, строка сохраняется до преобразования; пользователь задаётся Action при сохранении.
+- `PaymentCalendarPage` — общий HTTP-presenter index/new/edit: фильтры и формы, существующая материализация при GET. `PaymentCalendarQuery` и `PaymentPlanRepository::findForCalendar()` читают scoped данные/forecast; контрагенты — только через `CounterpartyFacade`.
 - `MoneyAccount.currentBalance` пока сохраняется как совместимое поле и обновляется DBAL-запросом до последнего `closing` не позже текущей даты; источником истины остаётся `MoneyAccountDailyBalance`.
 
 **Идемпотентность внешних источников:**
@@ -5223,6 +5242,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.164 | 2026-11-10 | Cash remediation: атомарные queued jobs, recovery CLI, JSON-контракт, контроллеры по действиям и backend-пагинация |
 | 2.163 | 2026-11-09 | MarketplaceAnalytics: карточки «Unit — Экономика» = «Итого» таблицы — реклама по статистике, группы как колонки таблицы, `adAccrued` справкой; учётная реклама исключена из строк товаров (`ListingCostAggregateQuery::executeByPeriod`); листинг только с рекламой — строка; `resolveWidgetGroup` удалён (issue #2940, этап 3) |
 | 2.162 | 2026-11-09 | Marketplace: предоплата рекламы Ozon (`ozon_marketing_services`, тип начисления `Marketing`) исключена из строки «Не распределено по товарам» — расход из неё уже в статистике (`AdStatisticsCostCategories::codes()`) |
 | 2.161 | 2026-11-09 | Marketplace/MarketplaceAnalytics: `MarketplaceFacade::getUnallocatedCostAggregates()`; Unit-экономика — строка «Не распределено по товарам» в таблице, `totals` и xlsx (issue #2940) |

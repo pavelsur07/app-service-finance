@@ -259,256 +259,10 @@ parameters:
 			path: src/Cash/Command/VerifyCashTransactionSplitsCommand.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Service\\Accounts\\FundBalanceService\:\:getFundBalances\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Accounts/FundController.php
-
-		-
-			message: '#^Call to function is_string\(\) with non\-empty\-string will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: src/Cash/Controller/Import/Bank1CImportController.php
-
-		-
-			message: '#^Call to function is_string\(\) with null will always evaluate to false\.$#'
-			identifier: function.impossibleType
-			count: 1
-			path: src/Cash/Controller/Import/Bank1CImportController.php
-
-		-
-			message: '#^Offset ''payerAccount'' on non\-empty\-array\<mixed, mixed\> on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Cash/Controller/Import/Bank1CImportController.php
-
-		-
-			message: '#^Offset ''receiverAccount'' on non\-empty\-array\<mixed\> on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Cash/Controller/Import/Bank1CImportController.php
-
-		-
-			message: '#^Parameter \#1 \$s of method App\\Cash\\Controller\\Import\\Bank1CImportController\:\:normalizeWeirdSpaces\(\) expects string, string\|false given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Import/Bank1CImportController.php
-
-		-
-			message: '#^Variable \$content on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.variable
-			count: 3
-			path: src/Cash/Controller/Import/Bank1CImportController.php
-
-		-
-			message: '#^Call to function is_string\(\) with non\-empty\-string will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: src/Cash/Controller/Import/CashFileImportController.php
-
-		-
-			message: '#^Call to function is_string\(\) with null will always evaluate to false\.$#'
-			identifier: function.impossibleType
-			count: 1
-			path: src/Cash/Controller/Import/CashFileImportController.php
-
-		-
-			message: '#^Parameter \#1 \$jobId of class App\\Cash\\Message\\Import\\CashFileImportMessage constructor expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Import/CashFileImportController.php
-
-		-
-			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
-			identifier: argument.type
-			count: 5
-			path: src/Cash/Controller/Import/CashFileImportController.php
-
-		-
-			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Cash/Controller/Import/CashFileImportProfileController.php
-
-		-
-			message: '#^Method App\\Cash\\Controller\\PaymentPlan\\PaymentCalendarController\:\:renderCalendar\(\) has parameter \$extra with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Offset ''approve''\|''cancel''\|''pay'' on array\{approve\: ''Платёж одобрен\.'', pay\: ''Платёж помечен как…'', cancel\: ''Платёж отменён\.''\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Offset ''from'' on array\{from\: string, to\: string, account_id\: string, category_id\: string, status\: string, counterparty_id\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Offset ''to'' on array\{from\: string, to\: string, account_id\: string, category_id\: string, status\: string, counterparty_id\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Property App\\Cash\\Controller\\PaymentPlan\\PaymentCalendarController\:\:\$paymentPlanService is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Property App\\Cash\\DTO\\PaymentPlanDTO\:\:\$plannedAt \(DateTimeInterface\) does not accept DateTimeImmutable\|null\.$#'
-			identifier: assign.propertyType
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between null and App\\Cash\\Entity\\Transaction\\CashflowCategory will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between null and string will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
-			count: 1
-			path: src/Cash/Controller/PaymentPlan/PaymentCalendarController.php
-
-		-
-			message: '#^Method App\\Cash\\Controller\\Transaction\\CashTransactionAutoRuleController\:\:validatePairTarget\(\) has parameter \$form with generic interface Symfony\\Component\\Form\\FormInterface but does not specify its types\: TData$#'
-			identifier: missingType.generics
-			count: 1
-			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
-
-		-
-			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
-			identifier: argument.type
-			count: 3
-			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
-
-		-
-			message: '#^Parameter \#3 \$availableCategories of method App\\Cash\\Application\\Service\\CashTransactionAutoRulePrefiller\:\:prefill\(\) expects list\<App\\Cash\\Entity\\Transaction\\CashflowCategory\>, array\<App\\Cash\\Entity\\Transaction\\CashflowCategory\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>conflictingRules" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>conflicts" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: src/Cash/Controller/Transaction/CashTransactionAutoRuleController.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of class App\\Cash\\Message\\EnqueueAutoRulesForRange constructor expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transaction/CashTransactionController.php
-
-		-
-			message: '#^Parameter \#1 \$transactionIds of method App\\Cash\\Repository\\Transfer\\CashTransferRepository\:\:findByTransactionIdsAndCompanyId\(\) expects list\<string\>, array\<string\> given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Cash/Controller/Transaction/CashTransactionController.php
-
-		-
-			message: '#^Parameter \#1 \$transactions of method App\\Cash\\Repository\\Transaction\\CashTransactionRepository\:\:warmSplits\(\) expects list\<App\\Cash\\Entity\\Transaction\\CashTransaction\>, array\<mixed\> given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Cash/Controller/Transaction/CashTransactionController.php
-
-		-
-			message: '#^Parameter \#2 \$companyId of method App\\Cash\\Repository\\Transfer\\CashTransferRepository\:\:findByTransactionIdsAndCompanyId\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transaction/CashTransactionController.php
-
-		-
-			message: '#^Parameter \#2 \$companyId of method App\\Cash\\Repository\\Transfer\\CashTransferRepository\:\:findOneByTransactionAndCompanyId\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transaction/CashTransactionController.php
-
-		-
-			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
-			identifier: argument.type
-			count: 3
-			path: src/Cash/Controller/Transaction/CashTransactionController.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between null and array\<mixed\>\|bool\|float\|int\|string will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
-			count: 2
-			path: src/Cash/Controller/Transaction/CashTransactionController.php
-
-		-
 			message: '#^Parameter \#2 \$companyId of method App\\Cash\\Repository\\Transfer\\CashTransferRepository\:\:findOneByTransactionAndCompanyId\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Cash/Controller/Transaction/CashTransactionSplitsController.php
-
-		-
-			message: '#^Method App\\Cash\\Controller\\Transaction\\CashflowCategoryController\:\:serializeCategory\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Controller/Transaction/CashflowCategoryController.php
-
-		-
-			message: '#^Parameter \#1 \$categories of method App\\Cash\\Controller\\Transaction\\CashflowCategoryController\:\:regularParentChoices\(\) expects list\<App\\Cash\\Entity\\Transaction\\CashflowCategory\>, array\<App\\Cash\\Entity\\Transaction\\CashflowCategory\> given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Cash/Controller/Transaction/CashflowCategoryController.php
-
-		-
-			message: '#^Parameter \#2 \$token of method Symfony\\Bundle\\FrameworkBundle\\Controller\\AbstractController\:\:isCsrfTokenValid\(\) expects string\|null, bool\|float\|int\|string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transaction/CashflowCategoryController.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of class App\\Cash\\Application\\DTO\\CreateCashTransferCommand constructor expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transfer/CashTransferController.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Facade\\CashFacade\:\:deleteTransfer\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transfer/CashTransferController.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Facade\\CashFacade\:\:restoreTransfer\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transfer/CashTransferController.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Repository\\Transfer\\CashTransferRepository\:\:paginateDeletedByCompanyId\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transfer/CashTransferController.php
-
-		-
-			message: '#^Parameter \#2 \$companyId of method App\\Cash\\Repository\\Transfer\\CashTransferRepository\:\:findOneByIdAndCompanyId\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Cash/Controller/Transfer/CashTransferController.php
-
-		-
-			message: '#^Parameter \#2 \$companyId of method App\\Cash\\Repository\\Transfer\\CashTransferRepository\:\:findOneDetailedByIdAndCompanyId\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Controller/Transfer/CashTransferController.php
 
 		-
 			message: '#^Method App\\Cash\\Entity\\Accounts\\MoneyAccount\:\:getBankAuth\(\) return type has no value type specified in iterable type array\.$#'
@@ -887,7 +641,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: src/Cash/Repository/Accounts/MoneyAccountRepository.php
-
 
 		-
 			message: '#^Parameter \#2 \$normalized of method App\\Cash\\Repository\\Accounts\\MoneyAccountRepository\:\:findOneByNormalizedAccountNumber\(\) expects string, string\|null given\.$#'
@@ -2040,7 +1793,6 @@ parameters:
 			identifier: vashfindir.repositoryCompanyScope
 			count: 1
 			path: src/Company/Repository/CompanyMemberRepository.php
-
 
 		-
 			message: '#^Метод\-запрос App\\Company\\Repository\\CounterpartyRepository\:\:findAllForBackfill\(\) не принимает \$companyId — выборка не ограничена компанией \(IDOR\)\.$#'
@@ -7112,7 +6864,6 @@ parameters:
 			count: 1
 			path: src/Report/Cashflow/CashflowReportRequestMapper.php
 
-
 		-
 			message: '#^Property App\\Shared\\Entity\\AuditLog\:\:\$diff type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
@@ -11966,8 +11717,6 @@ parameters:
 			identifier: method.unresolvableReturnType
 			count: 1
 			path: tests/Unit/Marketplace/Wildberries/Application/FinancialReport/WbFinancialReportSyncPlannerTest.php
-
-
 
 		-
 			message: '#^Return type of call to method PHPUnit\\Framework\\TestCase\:\:createMock\(\) contains unresolvable type\.$#'

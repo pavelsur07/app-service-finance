@@ -22,12 +22,23 @@ final class TemporaryFileFactory
      */
     public function withXlsxPath(callable $consumer): mixed
     {
+        return $this->withExtensionPath('xlsx', $consumer);
+    }
+
+    /** @template T
+     * @param callable(string): T $consumer
+     *
+     * @return T
+     */
+    public function withExtensionPath(string $extension, callable $consumer): mixed
+    {
+        \Webmozart\Assert\Assert::regex($extension, '/^[a-z0-9]+$/D');
         $path = tempnam(sys_get_temp_dir(), 'xls-convert-');
         if (false === $path) {
             throw new ObjectStorageException('Failed to allocate a temporary file.');
         }
 
-        $pathWithExtension = $path.'.xlsx';
+        $pathWithExtension = $path.'.'.$extension;
         if (!@rename($path, $pathWithExtension)) {
             @unlink($path);
 

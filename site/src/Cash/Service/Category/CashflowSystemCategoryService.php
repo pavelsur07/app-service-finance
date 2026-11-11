@@ -89,7 +89,7 @@ class CashflowSystemCategoryService
         ?CashflowCategory $parent = null,
         ?string $description = null,
     ): CashflowCategory {
-        $category = new CashflowCategory(Uuid::uuid4()->toString(), $company);
+        $category = new CashflowCategory(Uuid::uuid7()->toString(), $company);
         $category->setName($name);
         $category->setDescription($description);
         $category->setParent($parent);

@@ -36,6 +36,36 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
         $this->action = self::getContainer()->get(CreateDocumentFromTransactionAction::class);
     }
 
+    #[\PHPUnit\Framework\Attributes\DataProvider('multiSplitEntryPoints')]
+    public function testMultiSplitCannotCreateDocument(string $entry, bool $confirmed): void
+    {
+        $company = $this->makeCompany();
+        $tx = $this->makeTx($company, $this->makeMoneyAccount($company));
+        $a = $this->makeCashflowCategory($company);
+        $b = $this->makeCashflowCategory($company);
+        $a->setAllowPlDocument(false);
+        $b->setAllowPlDocument(false);
+        $tx->replaceSplits([
+            new \App\Cash\Entity\Transaction\CashTransactionSplit($tx, $a, '600.00', \App\Cash\Enum\Transaction\CashTransactionSplitSource::MANUAL),
+            new \App\Cash\Entity\Transaction\CashTransactionSplit($tx, $b, '400.00', \App\Cash\Enum\Transaction\CashTransactionSplitSource::MANUAL),
+        ]);
+        $this->em->flush();
+        $this->expectException(\App\Cash\Exception\CashTransactionMultiSplitException::class);
+        if ('json' === $entry) {
+            ($this->action)($tx, $confirmed);
+        } else {
+            self::getContainer()->get(CreatePnlDocumentFromTransactionAction::class)($tx);
+        }
+    }
+
+    /** @return iterable<array{string, bool}> */
+    public static function multiSplitEntryPoints(): iterable
+    {
+        yield 'JSON unconfirmed' => ['json', false];
+        yield 'JSON confirmed' => ['json', true];
+        yield 'HTML' => ['html', false];
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -353,7 +383,7 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
         $this->em->persist($tx);
         $this->em->flush();
 
-        $this->expectException(\DomainException::class);
+        $this->expectException(\App\Cash\Exception\CashDocumentOperationException::class);
         $this->expectExceptionMessage('Для переводов нельзя создать документ ОПиУ.');
 
         ($this->action)($tx, confirmed: false);
@@ -381,7 +411,7 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
         $this->em->persist($document);
         $this->em->flush();
 
-        $this->expectException(\DomainException::class);
+        $this->expectException(\App\Cash\Exception\CashDocumentOperationException::class);
         $this->expectExceptionMessage('Транзакция уже полностью разнесена.');
 
         ($this->action)($tx, confirmed: false);
@@ -397,7 +427,7 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
         try {
             ($this->action)($tx, confirmed: false);
             self::fail('Второй документ на тот же остаток создан.');
-        } catch (\DomainException $exception) {
+        } catch (\App\Cash\Exception\CashDocumentOperationException $exception) {
             self::assertSame('Транзакция уже полностью разнесена.', $exception->getMessage());
         }
 

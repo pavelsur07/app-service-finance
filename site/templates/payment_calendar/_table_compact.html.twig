@@ -38,10 +38,10 @@
                 {% set badgeClass = 'bg-gray-lt text-body' %}
             {% endif %}
             {% set status = payment.status.value %}
-            {% set allowApprove = status == 'PLANNED' %}
-            {% set allowPay = status in ['PLANNED', 'APPROVED'] %}
-            {% set allowCancel = status in ['PLANNED', 'APPROVED'] %}
-            {% set allowPostpone = status in ['PLANNED', 'APPROVED'] %}
+            {% set allowApprove = status == 'PLANNED' and is_granted('module.finance.write') %}
+            {% set allowPay = status in ['PLANNED', 'APPROVED'] and is_granted('module.finance.write') %}
+            {% set allowCancel = status in ['PLANNED', 'APPROVED'] and is_granted('module.finance.write') %}
+            {% set allowPostpone = status in ['PLANNED', 'APPROVED'] and is_granted('module.finance.write') %}
             <tr>
                 <td class="nowrap">{{ payment.plannedAt|date('d.m.Y') }}</td>
                 <td><span class="badge {{ badgeClass }}">{{ payment.cashflowCategory.name }}</span></td>
@@ -125,7 +125,7 @@
         <tfoot>
         {% set netTotal = totalInflow - totalOutflow %}
         <tr>
-            <td colspan="3" class="text-end fw-bold">Итого за период:</td>
+            <td colspan="3" class="text-end fw-bold">Итого на странице:</td>
             {# DS-Money: в итогах символ валюты указан всегда, знак — только у отрицательных. #}
             <td class="text-end fw-bold nowrap">{{ amounts_in_rub ? netTotal|vf_money(2, '₽') : netTotal|vf_number(2) }}</td>
             <td colspan="4"></td>

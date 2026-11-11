@@ -7,7 +7,6 @@ namespace App\Tests\Unit\Cash\Application;
 use App\Cash\Application\ChangeCashTransactionAutoRuleActivityAction;
 use App\Cash\Application\CreateMoneyFundMovementAction;
 use App\Cash\Application\DeleteCashflowCategoryAction;
-use App\Cash\Application\SaveMoneyAccountAction;
 use App\Cash\Application\SaveMoneyFundAction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
@@ -16,7 +15,6 @@ use App\Cash\Infrastructure\Query\CashflowCategoryUsageQuery;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
-use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Cash\MoneyFundBuilder;
 use App\Tests\Builders\Cash\MoneyFundMovementBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -29,7 +27,7 @@ use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
 /**
- * Action'ы — граница транзакции: сохраняют сущность и делают ровно один flush().
+ * Простые Action'ы сохраняют агрегат; атомарный сценарий счетов проверен интеграционно.
  * Этап 5.1 плана Cash: flush() перенесён сюда из сервисов и контроллеров.
  */
 final class PersistenceActionsTest extends TestCase
@@ -39,14 +37,6 @@ final class PersistenceActionsTest extends TestCase
     protected function setUp(): void
     {
         $this->entityManager = $this->createMock(EntityManagerInterface::class);
-    }
-
-    public function testSaveMoneyAccountPersistsAndFlushes(): void
-    {
-        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($this->company())->build();
-        $this->expectPersistAndFlush($account);
-
-        (new SaveMoneyAccountAction($this->entityManager))($account);
     }
 
     public function testSaveMoneyFundPersistsAndFlushes(): void

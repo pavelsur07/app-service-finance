@@ -65,6 +65,11 @@ final class CashFileImportService
     ) {
     }
 
+    public static function storageKey(string $fileHash, string $extension = ''): string
+    {
+        return 'cash-file-imports/'.$fileHash.('' !== $extension ? '.'.$extension : '');
+    }
+
     public function withReadablePath(string $path, \Closure $operation): mixed
     {
         return $this->xlsConverter->withReadablePath($path, $operation);
@@ -360,9 +365,9 @@ final class CashFileImportService
 
         $candidates = [];
         foreach (array_values(array_unique($extensions)) as $extension) {
-            $candidates[] = sprintf('cash-file-imports/%s.%s', $fileHash, $extension);
+            $candidates[] = self::storageKey($fileHash, $extension);
         }
-        $candidates[] = sprintf('cash-file-imports/%s', $fileHash);
+        $candidates[] = self::storageKey($fileHash);
 
         foreach ($candidates as $candidate) {
             if ($this->objectStorage->exists($candidate)) {

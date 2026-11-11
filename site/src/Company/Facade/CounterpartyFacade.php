@@ -45,7 +45,7 @@ final class CounterpartyFacade
      *
      * @return list<CounterpartyChoiceDTO>
      */
-    public function getSelectable(string $companyId, ?string $keepId = null): array
+    public function getSelectable(string $companyId, ?string $keepId = null, bool $includeArchived = false): array
     {
         if (!Uuid::isValid($companyId)) {
             return [];
@@ -63,7 +63,7 @@ final class CounterpartyFacade
                 $counterparty->getDisplayName(),
                 $counterparty->getType(),
             ),
-            $this->repository->findSelectableByCompany($companyId, $keepId),
+            $this->repository->findSelectableByCompany($companyId, $keepId, $includeArchived),
         );
     }
 

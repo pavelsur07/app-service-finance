@@ -25,7 +25,18 @@ final class CreateMoneyFundMovementAction
     ) {
     }
 
-    public function __invoke(MoneyFundMovement $movement): MoneyFundMovement
+    public function createDraft(\App\Cash\Entity\Accounts\MoneyFund $fund, string $id): MoneyFundMovement
+    {
+        return new MoneyFundMovement($id, $fund->getCompany(), $fund, new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
+    }
+
+    public function setAmount(MoneyFundMovement $movement, string $input): void
+    {
+        $input = str_replace(["\u{202F}", "\u{2009}"], ' ', $input);
+        $movement->setAmountMinor(\App\Shared\Domain\ValueObject\Money::fromString('' === trim($input) ? '0' : $input, $movement->getFund()->getCurrency())->amountMinor());
+    }
+
+    public function __invoke(MoneyFundMovement $movement, ?string $actorId = null): MoneyFundMovement
     {
         $id = (string) $movement->getId();
         $companyId = (string) $movement->getCompany()->getId();
@@ -36,6 +47,9 @@ final class CreateMoneyFundMovementAction
         }
 
         try {
+            if (null !== $actorId) {
+                $movement->setUserId($actorId);
+            }
             $this->entityManager->persist($movement);
             $this->entityManager->flush();
         } catch (UniqueConstraintViolationException $exception) {

@@ -31,6 +31,14 @@ use Ramsey\Uuid\Uuid;
  */
 final class CashTransactionService
 {
+    /** @return array{allocated: string, unallocated: string} */
+    public function pnlSummary(CashTransaction $transaction): array
+    {
+        $allocated = $transaction->recalculateAllocatedAmount()->getAllocatedMoney();
+
+        return ['allocated' => $allocated->toDecimalString(), 'unallocated' => Money::fromString($transaction->getAmount(), $transaction->getCurrency())->subtract($allocated)->toDecimalString()];
+    }
+
     public function __construct(
         private readonly VatPolicy $vatPolicy,
         private readonly VatCalculator $vatCalculator,

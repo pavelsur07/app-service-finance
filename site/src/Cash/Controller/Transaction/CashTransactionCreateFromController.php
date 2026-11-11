@@ -39,21 +39,17 @@ final class CashTransactionCreateFromController extends AbstractController
         // что транзакция с таким id есть у другой компании.
         $tx = $this->transactions->findOneByIdAndCompanyId($id, (string) $company->getId());
         if (null === $tx) {
-            return new JsonResponse(['error' => true, 'message' => 'Транзакция не найдена.'], 404);
+            throw new \App\Cash\Exception\CashTransactionNotFoundException();
         }
 
         $token = (string) $request->request->get('_token', '');
         if (!$this->isCsrfTokenValid('cash_transaction_create_from', $token)) {
-            return new JsonResponse(['error' => true, 'message' => 'Неверный CSRF-токен.'], 403);
+            throw new \App\Cash\Exception\CashInvalidCsrfException();
         }
 
         $confirmed = filter_var($request->request->get('confirmed', false), \FILTER_VALIDATE_BOOLEAN);
 
-        try {
-            $result = ($this->action)($tx, $confirmed);
-        } catch (\DomainException $e) {
-            return new JsonResponse(['error' => true, 'message' => $e->getMessage()], 422);
-        }
+        $result = ($this->action)($tx, $confirmed);
 
         if ($result->needsConfirmation) {
             return new JsonResponse([

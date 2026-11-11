@@ -26,7 +26,7 @@ use Symfony\Component\Routing\RouterInterface;
  *
  * Параметры пути подставляются случайным UUID, поэтому на POST допустимы два исхода:
  * 403 (сработал гейт) и 404 (сущности нет или эндпоинт закрыт биллинговым флагом —
- * например FundController::new вызывает assertFeatureEnabled() до гейта). Оба означают,
+ * например FundNewController::new вызывает assertFeatureEnabled() до гейта). Оба означают,
  * что до записи дело не дошло. Любой другой код — 200, 302, 422, 5xx — означает, что путь
  * записи выполнился, и тест падает.
  */
@@ -39,7 +39,7 @@ final class ModuleMixedRouteGateTest extends WebTestCaseBase
 
     /**
      * Беспараметрические маршруты, где 404 приходит раньше гейта по биллинговому флагу
-     * (`assertFeatureEnabled()` в FundController). Перечислены поимённо, чтобы послабление
+     * (`assertFeatureEnabled()` в FundNewController). Перечислены поимённо, чтобы послабление
      * не расползалось: для всех остальных беспараметрических маршрутов требуется ровно 403.
      *
      * @var list<string>

@@ -33,7 +33,10 @@ final class CashFileImportMappingProfileSaveTest extends WebTestCaseBase
 
         $client->loginUser($owner);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
-        $this->setClientSessionValue($client, 'cash_file_import', []);
+        $account = \App\Tests\Builders\Cash\MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
+        $em->persist($account);
+        $em->flush();
+        $this->setClientSessionValue($client, 'cash_file_import', ['company_id' => $company->getId(), 'account_id' => $account->getId()]);
 
         $token = $this->csrfToken($client, 'cash_file_import_mapping');
 

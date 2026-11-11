@@ -1,0 +1,414 @@
+{
+  "api_report_cashflow_json": {
+    "path": "/api/public/reports/cashflow.json",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "api_report_cashflow_csv": {
+    "path": "/api/public/reports/cashflow.csv",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "report_cashflow_export_json": {
+    "path": "/finance/reports/cashflow/export.json",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "report_cashflow_index": {
+    "path": "/finance/reports/cashflow",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "report_cashflow_ops_check_index": {
+    "path": "/finance/reports/cashflow-ops-check",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "finance_funds_index": {
+    "path": "/finance/funds",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "finance_funds_new": {
+    "path": "/finance/funds/new",
+    "method": "GET|POST",
+    "requirements": "NO CUSTOM"
+  },
+  "finance_funds_add_movement": {
+    "path": "/finance/funds/{id}/movement",
+    "method": "GET|POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "money_account_index": {
+    "path": "/accounts/",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "money_account_new": {
+    "path": "/accounts/new",
+    "method": "GET|POST",
+    "requirements": "NO CUSTOM"
+  },
+  "money_account_edit": {
+    "path": "/accounts/{id}/edit",
+    "method": "GET|POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_bank1c_import_upload": {
+    "path": "/cash/import/bank1c",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_bank1c_import_preview": {
+    "path": "/cash/import/bank1c/preview",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_bank1c_import_preview_upload": {
+    "path": "/cash/import/bank1c/preview/upload",
+    "method": "POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_bank1c_import_preview_csv": {
+    "path": "/cash/import/bank1c/preview/csv",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_bank1c_import_commit": {
+    "path": "/cash/import/bank1c/commit",
+    "method": "POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_file_import_upload": {
+    "path": "/cash/import/file",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_file_import_upload_post": {
+    "path": "/cash/import/file/preview/upload",
+    "method": "POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_file_import_mapping": {
+    "path": "/cash/import/file/mapping",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_file_import_mapping_save": {
+    "path": "/cash/import/file/mapping",
+    "method": "POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_file_import_mapping_profile_apply": {
+    "path": "/cash/import/file/mapping/profile/apply",
+    "method": "POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_file_import_mapping_profile_save": {
+    "path": "/cash/import/file/mapping/profile/save",
+    "method": "POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_file_import_preview": {
+    "path": "/cash/import/file/preview",
+    "method": "GET|POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_file_import_commit": {
+    "path": "/cash/import/file/commit",
+    "method": "POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_file_import_result": {
+    "path": "/cash/import/file/result/{id}",
+    "method": "GET",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_file_import_profile_index": {
+    "path": "/cash/import/file/profiles",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_file_import_profile_new": {
+    "path": "/cash/import/file/profiles/new",
+    "method": "GET|POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_file_import_profile_edit": {
+    "path": "/cash/import/file/profiles/{id}/edit",
+    "method": "GET|POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_file_import_profile_delete": {
+    "path": "/cash/import/file/profiles/{id}/delete",
+    "method": "POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_file_import_template": {
+    "path": "/cash/import/file/template",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "import_logs_index": {
+    "path": "/import-logs",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "payment_calendar_index": {
+    "path": "/finance/payment-calendar",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "payment_calendar_new": {
+    "path": "/finance/payment-calendar/new",
+    "method": "GET|POST",
+    "requirements": "NO CUSTOM"
+  },
+  "payment_calendar_edit": {
+    "path": "/finance/payment-calendar/{id}/edit",
+    "method": "GET|POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "payment_calendar_status": {
+    "path": "/finance/payment-calendar/{id}/status",
+    "method": "POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "payment_calendar_postpone": {
+    "path": "/finance/payment-calendar/{id}/postpone",
+    "method": "POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_category_suggestion_accept": {
+    "path": "/finance/cash-transactions/ai-suggestions/{id}/accept",
+    "method": "POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_category_suggestion_dismiss": {
+    "path": "/finance/cash-transactions/ai-suggestions/{id}/dismiss",
+    "method": "POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_transaction_audit_index": {
+    "path": "/cash/transactions/audit",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_auto_rule_candidates": {
+    "path": "/cash-transaction-auto-rules/candidates",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_auto_rule_index": {
+    "path": "/cash-transaction-auto-rules/",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_auto_rule_new": {
+    "path": "/cash-transaction-auto-rules/new",
+    "method": "GET|POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_auto_rule_edit": {
+    "path": "/cash-transaction-auto-rules/{id}/edit",
+    "method": "GET|POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_auto_rule_check": {
+    "path": "/cash-transaction-auto-rules/{id}/check",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_auto_rule_match_one": {
+    "path": "/cash-transaction-auto-rules/match/{transactionId}",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_auto_rule_apply_one": {
+    "path": "/cash-transaction-auto-rules/apply/{transactionId}",
+    "method": "POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_auto_rule_disable": {
+    "path": "/cash-transaction-auto-rules/{id}/disable",
+    "method": "POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_auto_rule_enable": {
+    "path": "/cash-transaction-auto-rules/{id}/enable",
+    "method": "POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_auto_rule_delete": {
+    "path": "/cash-transaction-auto-rules/{id}/delete",
+    "method": "POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_bulk_delete": {
+    "path": "/finance/cash-transactions/bulk-delete",
+    "method": "POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_index": {
+    "path": "/finance/cash-transactions/",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_auto_rule_apply_page": {
+    "path": "/finance/cash-transactions/auto-rule-apply",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_auto_rule_apply_enqueue": {
+    "path": "/finance/cash-transactions/auto-rule-apply",
+    "method": "POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_deleted_index": {
+    "path": "/finance/cash-transactions/deleted",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_show": {
+    "path": "/finance/cash-transactions/{id}",
+    "method": "GET",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_transaction_create_pnl_document": {
+    "path": "/finance/cash-transactions/{id}/create-pnl-document",
+    "method": "POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_transaction_new": {
+    "path": "/finance/cash-transactions/new",
+    "method": "GET|POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_edit": {
+    "path": "/finance/cash-transactions/{id}/edit",
+    "method": "GET|POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_transaction_restore": {
+    "path": "/finance/cash-transactions/{id}/restore",
+    "method": "POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_transaction_delete": {
+    "path": "/finance/cash-transactions/{id}/delete",
+    "method": "POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_transaction_create_from": {
+    "path": "/finance/cash-transactions/{id}/create-from",
+    "method": "POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_transaction_export": {
+    "path": "/finance/cash-transactions/export",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transaction_splits": {
+    "path": "/finance/cash-transactions/{id}/splits",
+    "method": "GET|POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cashflow_category_index": {
+    "path": "/cashflow-categories/",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cashflow_category_export_json": {
+    "path": "/cashflow-categories/export/json",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cashflow_category_new": {
+    "path": "/cashflow-categories/new",
+    "method": "GET|POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cashflow_category_edit": {
+    "path": "/cashflow-categories/{id}/edit",
+    "method": "GET|POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cashflow_category_delete": {
+    "path": "/cashflow-categories/{id}/delete",
+    "method": "POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_transfer_new": {
+    "path": "/finance/cash-transfers/new",
+    "method": "GET|POST",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transfer_deleted_index": {
+    "path": "/finance/cash-transfers/deleted",
+    "method": "GET",
+    "requirements": "NO CUSTOM"
+  },
+  "cash_transfer_show": {
+    "path": "/finance/cash-transfers/{id}",
+    "method": "GET",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_transfer_delete": {
+    "path": "/finance/cash-transfers/{id}/delete",
+    "method": "POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "cash_transfer_restore": {
+    "path": "/finance/cash-transfers/{id}/restore",
+    "method": "POST",
+    "requirements": {
+      "id": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+    }
+  },
+  "settlement_source_cash": {
+    "path": "/settlements/sources/cash/{id}",
+    "method": "GET|POST",
+    "requirements": "NO CUSTOM"
+  }
+}

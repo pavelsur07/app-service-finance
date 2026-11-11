@@ -9,7 +9,7 @@ use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;
 use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Application\Service\CashTransactionAutoRuleProvenanceResolver;
-use App\Cash\Controller\Transaction\CashTransactionAutoRuleController;
+use App\Cash\Controller\Transaction\CashAutoRuleApplyController;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
@@ -78,12 +78,13 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
         $auditContextProvider = $this->createMock(AuditContextProvider::class);
         $auditContextProvider->expects(self::never())->method('getActorUserId');
 
-        $response = (new CashTransactionAutoRuleController())->applyOne(
+        $response = (new CashAutoRuleApplyController(
+            $csrfTokenManager,
+            $companyService,
+            $this->action($entityManager, $transactionRepository, $autoRuleService, new AutoRuleDispatchGuard(), $auditContextProvider),
+        ))(
             (string) $transaction->getId(),
             Request::create('/', 'POST', ['ruleId' => Uuid::uuid4()->toString(), '_token' => 'valid-token']),
-            $companyService,
-            $csrfTokenManager,
-            $this->action($entityManager, $transactionRepository, $autoRuleService, new AutoRuleDispatchGuard(), $auditContextProvider),
         );
 
         self::assertSame([
@@ -192,12 +193,13 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
                 self::assertSame($applicationPlan, $dispatchGuard->getApplicationPlan());
             });
 
-        $response = (new CashTransactionAutoRuleController())->applyOne(
+        $response = (new CashAutoRuleApplyController(
+            $csrfTokenManager,
+            $companyService,
+            $this->action($entityManager, $transactionRepository, $autoRuleService, $dispatchGuard, $auditContextProvider),
+        ))(
             (string) $transaction->getId(),
             Request::create('/', 'POST', ['ruleId' => $rule->getId(), '_token' => 'valid-token']),
-            $companyService,
-            $csrfTokenManager,
-            $this->action($entityManager, $transactionRepository, $autoRuleService, $dispatchGuard, $auditContextProvider),
         );
 
         self::assertTrue(json_decode((string) $response->getContent(), true)['changed']);
@@ -222,12 +224,13 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
         $auditContextProvider = $this->createMock(AuditContextProvider::class);
         $auditContextProvider->expects(self::never())->method('getActorUserId');
 
-        $response = (new CashTransactionAutoRuleController())->applyOne(
+        $response = (new CashAutoRuleApplyController(
+            $csrfTokenManager,
+            $companyService,
+            $this->action($entityManager, $transactionRepository, $autoRuleService, new AutoRuleDispatchGuard(), $auditContextProvider),
+        ))(
             Uuid::uuid4()->toString(),
             Request::create('/', 'POST', ['_token' => $submittedToken]),
-            $companyService,
-            $csrfTokenManager,
-            $this->action($entityManager, $transactionRepository, $autoRuleService, new AutoRuleDispatchGuard(), $auditContextProvider),
         );
 
         self::assertSame(403, $response->getStatusCode());
@@ -255,12 +258,13 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
         $autoRuleService->method('getSkipReason')->willReturn(CashTransactionAutoRuleSkipReason::MANUAL_SPLIT);
         $autoRuleService->expects(self::never())->method('match');
 
-        $response = (new CashTransactionAutoRuleController())->applyOne(
+        $response = (new CashAutoRuleApplyController(
+            $csrfTokenManager,
+            $companyService,
+            $this->action($entityManager, $transactionRepository, $autoRuleService, new AutoRuleDispatchGuard(), $this->createMock(AuditContextProvider::class)),
+        ))(
             (string) $transaction->getId(),
             Request::create('/', 'POST', ['_token' => 'valid-token']),
-            $companyService,
-            $csrfTokenManager,
-            $this->action($entityManager, $transactionRepository, $autoRuleService, new AutoRuleDispatchGuard(), $this->createMock(AuditContextProvider::class)),
         );
 
         self::assertSame([
@@ -293,12 +297,13 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
         ));
         $autoRuleService->expects(self::never())->method('applyRule');
 
-        $response = (new CashTransactionAutoRuleController())->applyOne(
+        $response = (new CashAutoRuleApplyController(
+            $csrfTokenManager,
+            $companyService,
+            $this->action($entityManager, $transactionRepository, $autoRuleService, new AutoRuleDispatchGuard(), $this->createMock(AuditContextProvider::class)),
+        ))(
             (string) $transaction->getId(),
             Request::create('/', 'POST', ['_token' => 'valid-token']),
-            $companyService,
-            $csrfTokenManager,
-            $this->action($entityManager, $transactionRepository, $autoRuleService, new AutoRuleDispatchGuard(), $this->createMock(AuditContextProvider::class)),
         );
 
         self::assertSame([
@@ -345,12 +350,13 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
 
         $this->expectException(NotFoundHttpException::class);
 
-        (new CashTransactionAutoRuleController())->applyOne(
+        (new CashAutoRuleApplyController(
+            $csrfTokenManager,
+            $companyService,
+            $this->action($entityManager, $transactionRepository, $autoRuleService, new AutoRuleDispatchGuard(), $this->createMock(AuditContextProvider::class)),
+        ))(
             Uuid::uuid4()->toString(),
             Request::create('/', 'POST', ['_token' => 'valid-token']),
-            $companyService,
-            $csrfTokenManager,
-            $this->action($entityManager, $transactionRepository, $autoRuleService, new AutoRuleDispatchGuard(), $this->createMock(AuditContextProvider::class)),
         );
     }
 

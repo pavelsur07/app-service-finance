@@ -32,6 +32,7 @@ final class SaveCashTransactionSplitsAction
         private readonly PaymentPlanMatchRepository $paymentPlanMatchRepository,
         private readonly AuditContextProvider $auditContextProvider,
         private readonly CashTransferRepository $cashTransferRepository,
+        private readonly Service\CashSettlementSourceLifecycle $settlementLifecycle,
     ) {
     }
 
@@ -39,38 +40,48 @@ final class SaveCashTransactionSplitsAction
     {
         $this->assertTransactionEditable($transaction);
 
-        $before = $transaction->splitsAuditSnapshot();
+        $this->entityManager->wrapInTransaction(function () use ($transaction, $input): void {
+            $this->settlementLifecycle->lockWithComposition($transaction);
+            $transaction->recalculateAllocatedAmount();
+            $this->assertTransactionEditable($transaction);
 
-        $splits = array_map(
-            fn (CashTransactionSplitInput $row): CashTransactionSplit => new CashTransactionSplit(
-                $transaction,
-                $this->requireCategory($row->cashflowCategoryId, $transaction),
-                $row->normalizedAmount(),
-                CashTransactionSplitSource::MANUAL,
-            ),
-            $input->rows,
-        );
+            if (count($input->rows) > 1 && $transaction->getAllocatedMoney()->isPositive()) {
+                throw new \DomainException('Операция с документами ОПиУ не поддерживает мультиразбивку.');
+            }
 
-        // Инварианты набора проверяет агрегат: равенство суммы, уникальность категорий
-        // и запрет мультиразбивки по категориям с документами ОПиУ (решение D1).
-        $transaction->composeSplitsManually($splits);
+            $before = $transaction->splitsAuditSnapshot();
 
-        $this->projectLegacyColumn($transaction);
-        $this->dropStalePaymentPlanMatch($transaction);
+            $splits = array_map(
+                fn (CashTransactionSplitInput $row): CashTransactionSplit => new CashTransactionSplit(
+                    $transaction,
+                    $this->requireCategory($row->cashflowCategoryId, $transaction),
+                    $row->normalizedAmount(),
+                    CashTransactionSplitSource::MANUAL,
+                ),
+                $input->rows,
+            );
 
-        $after = $transaction->splitsAuditSnapshot();
-        if ($before !== $after) {
-            $this->entityManager->persist(new AuditLog(
-                (string) $transaction->getCompany()->getId(),
-                CashTransaction::class,
-                (string) $transaction->getId(),
-                AuditLogAction::UPDATE,
-                ['splits' => [$before, $after]],
-                $this->resolveActorUserId(),
-            ));
-        }
+            // Инварианты набора проверяет агрегат: равенство суммы, уникальность категорий
+            // и запрет мультиразбивки по категориям с документами ОПиУ (решение D1).
+            $transaction->composeSplitsManually($splits);
 
-        $this->entityManager->flush();
+            $this->projectLegacyColumn($transaction);
+            $this->dropStalePaymentPlanMatch($transaction);
+
+            $after = $transaction->splitsAuditSnapshot();
+            if ($before !== $after) {
+                $this->entityManager->persist(new AuditLog(
+                    (string) $transaction->getCompany()->getId(),
+                    CashTransaction::class,
+                    (string) $transaction->getId(),
+                    AuditLogAction::UPDATE,
+                    ['splits' => [$before, $after]],
+                    $this->resolveActorUserId(),
+                ));
+            }
+
+            $this->entityManager->flush();
+        });
     }
 
     /**

@@ -19,23 +19,35 @@ use Webmozart\Assert\Assert;
  */
 class MoneyAccountRepository extends ServiceEntityRepository
 {
+    public function listQuery(string $companyId): \Doctrine\ORM\QueryBuilder
+    {
+        return $this->createQueryBuilder('account')
+            ->andWhere('IDENTITY(account.company) = :company')->setParameter('company', $companyId)
+
+            ->orderBy('account.name', \SortDirection::Ascending)->addOrderBy('account.id', \SortDirection::Ascending);
+    }
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, MoneyAccount::class);
     }
 
-    public function findOneByIdAndCompanyId(string $id, string $companyId): ?MoneyAccount
+    public function findOneByIdAndCompanyId(string $id, string $companyId, bool $refresh = false): ?MoneyAccount
     {
         Assert::uuid($id);
         Assert::uuid($companyId);
 
-        return $this->createQueryBuilder('account')
+        $query = $this->createQueryBuilder('account')
             ->andWhere('account.id = :id')
             ->andWhere('IDENTITY(account.company) = :companyId')
             ->setParameter('id', $id)
             ->setParameter('companyId', $companyId)
-            ->getQuery()
-            ->getOneOrNullResult();
+            ->getQuery();
+        if ($refresh) {
+            $query->setHint(Query::HINT_REFRESH, true);
+        }
+
+        return $query->getOneOrNullResult();
     }
 
     /**

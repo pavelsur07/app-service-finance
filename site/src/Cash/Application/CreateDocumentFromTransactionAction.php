@@ -22,6 +22,7 @@ final class CreateDocumentFromTransactionAction
         private readonly FinanceFacade $financeFacade,
         private readonly EntityManagerInterface $entityManager,
         private readonly CashTransactionRepository $transactions,
+        private readonly \App\Cash\Service\Transaction\CashTransactionService $transactionService,
     ) {
     }
 
@@ -30,16 +31,26 @@ final class CreateDocumentFromTransactionAction
         $companyId = (string) $tx->getCompany()->getId();
         $transactionId = (string) $tx->getId();
 
-        $result = $this->entityManager->wrapInTransaction(function () use ($companyId, $transactionId, $confirmed): CreateDocumentResult {
-            // Остаток считается по документам транзакции. Вызывающий уже загрузил транзакцию и,
-            // возможно, её документы до блокировки — сбрасываем identity map и читаем заново
-            // под FOR UPDATE, иначе ожидавший запрос проверит остаток по устаревшей коллекции.
-            $this->entityManager->clear();
-            $tx = $this->transactions->findOneByIdAndCompanyIdForUpdate($transactionId, $companyId)
-                ?? throw new \DomainException('Транзакция ДДС не найдена.');
+        try {
+            $result = $this->entityManager->wrapInTransaction(function () use ($companyId, $transactionId, $confirmed): CreateDocumentResult {
+                // Остаток считается по документам транзакции. Вызывающий уже загрузил транзакцию и,
+                // возможно, её документы до блокировки — сбрасываем identity map и читаем заново
+                // под FOR UPDATE, иначе ожидавший запрос проверит остаток по устаревшей коллекции.
+                $this->entityManager->clear();
+                $tx = $this->transactions->findOneByIdAndCompanyIdForUpdate($transactionId, $companyId)
+                    ?? throw new \App\Cash\Exception\CashTransactionNotFoundException();
 
-            return $this->create($tx, $confirmed);
-        });
+                if ($tx->getSplits()->count() > 1) {
+                    throw new \App\Cash\Exception\CashTransactionMultiSplitException();
+                }
+                $this->transactionService->assertStandaloneTransaction($tx);
+                $this->transactionService->assertNotLockedForCompany($tx->getCompany(), $tx->getOccurredAt());
+
+                return $this->create($tx, $confirmed);
+            });
+        } catch (\DomainException $exception) {
+            throw new \App\Cash\Exception\CashDocumentOperationException($exception->getMessage(), $exception);
+        }
 
         if (null !== $result->documentId) {
             $this->financeFacade->invalidatePLRegisterCache($companyId);

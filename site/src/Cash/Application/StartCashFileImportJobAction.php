@@ -14,8 +14,8 @@ use Ramsey\Uuid\Uuid;
 /**
  * Заводит задание файлового импорта перед отправкой в очередь.
  *
- * Порядок записи прежний (был `CashFileImportFacade::createJob` + `commitJob`):
- * сначала журнал импорта, затем задание со ссылкой на него.
+ * Журнал и queued-задание фиксируются одной транзакцией. Confirmation ID
+ * сериализует повтор; queued остаётся намерением доставки при сбое транспорта.
  */
 final class StartCashFileImportJobAction
 {
@@ -40,6 +40,9 @@ final class StartCashFileImportJobAction
         ?string $userIdentifier,
         ?string $jobId = null,
     ): CashFileImportJob {
+        if ($moneyAccount->getCompany()->getId() !== $company->getId()) {
+            throw new \App\Cash\Exception\CashImportAccountMismatchException();
+        }
         if (isset($options['selected_descriptions'])) {
             if (!is_array($options['selected_descriptions'])) {
                 throw new \DomainException('Некорректный выбор строк.');
@@ -52,12 +55,11 @@ final class StartCashFileImportJobAction
             $options['selected_descriptions'] = array_values(array_unique($options['selected_descriptions']));
             sort($options['selected_descriptions'], \SORT_STRING);
         }
-        if (null === $jobId) {
-            return $this->create($company, $moneyAccount, $source, $fileName, $fileHash, $mapping, $options, $userIdentifier, null);
-        }
 
         return $this->entityManager->wrapInTransaction(function () use ($company, $moneyAccount, $source, $fileName, $fileHash, $mapping, $options, $userIdentifier, $jobId): CashFileImportJob {
-            $this->entityManager->getConnection()->executeQuery("SELECT pg_advisory_xact_lock(hashtext('cash_file_confirmation'), hashtext(:key))", ['key' => $company->getId().':'.$jobId]);
+            if (null !== $jobId) {
+                $this->entityManager->getConnection()->executeQuery("SELECT pg_advisory_xact_lock(hashtext('cash_file_confirmation'), hashtext(:key))", ['key' => $company->getId().':'.$jobId]);
+            }
 
             return $this->create($company, $moneyAccount, $source, $fileName, $fileHash, $mapping, $options, $userIdentifier, $jobId);
         });

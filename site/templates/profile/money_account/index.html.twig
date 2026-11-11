@@ -5,12 +5,14 @@
 {% block body %}
     {% embed 'partials/_page_header.html.twig' with {title: 'Денежные счета'} %}
         {% block actions %}
-            <a href="{{ path('money_account_new') }}" class="btn btn-primary">Добавить счёт</a>
+            {% if is_granted('module.finance.write') %}
+                <a href="{{ path('money_account_new') }}" class="btn btn-primary">Добавить счёт</a>
+            {% endif %}
         {% endblock %}
     {% endembed %}
     <div class="container-xl mt-3">
         <div class="card">
-            <div class="card-body">
+            <div class="card-body table-responsive">
                 <table class="table table-vcenter">
                     <thead>
                         <tr>
@@ -39,6 +41,9 @@
                     {% endfor %}
                     </tbody>
                 </table>
+            </div>
+            <div class="card-footer">
+                {% include 'partials/_pagination.html.twig' with {pager: pager} only %}
             </div>
         </div>
     </div>

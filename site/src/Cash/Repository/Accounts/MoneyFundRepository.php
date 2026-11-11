@@ -15,6 +15,14 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class MoneyFundRepository extends ServiceEntityRepository
 {
+    public function listQuery(string $companyId): \Doctrine\ORM\QueryBuilder
+    {
+        return $this->createQueryBuilder('fund')
+            ->andWhere('IDENTITY(fund.company) = :company')->setParameter('company', $companyId)
+
+            ->orderBy('fund.name', \SortDirection::Ascending)->addOrderBy('fund.id', \SortDirection::Ascending);
+    }
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, MoneyFund::class);
