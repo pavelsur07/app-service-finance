@@ -10,7 +10,7 @@ export function EmptyState({ title, children }: EmptyStateProps) {
   return (
     <section className="empty">
       <h2 className="empty-title">{title}</h2>
-      <p className="empty-text">{children}</p>
+      <div className="empty-text">{children}</div>
     </section>
   );
 }

@@ -1,9 +1,9 @@
 # Current checkpoint
 
-**Phase:** Stage 3 / Work item 3.1
+**Phase:** Stage 4 / Work item 4.1
 **Status:** implementing
 **Branch:** `feat/account-admin-auth`
-**Stage base commit:** `137cc1173f769904960cb9773da6db5efabb9b8c`
+**Stage base commit:** `ce991770b0c74d3ec7cbdc8b47c81eceeb174436`
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/2971 (Draft, master)
 
 ## Authorization and rulings
@@ -44,7 +44,7 @@
 
 ## Exact next action
 
-- Implement SPA session adapters and login/company UI, tests first. Stage 3 base is the Stage 2 commit in git log.
+- Implement real backend HTTP tests/routing and CI; Stage 4 base is the Stage 3 commit in git log.
 
 ## Inspect first on resume
 
@@ -83,3 +83,17 @@
 - Next: Stage 2 complete diff review/external review, then report/commit and Stage 3.
 
 - Stage 2 external review: REVIEW_GREEN, one round B0/I0/M1. Fixed schema permissions to explicit required properties; both generators/checks pass. Stage 2 closed.
+
+## Stage 3 progress
+
+- 3.1 session adapters/store and generation+Abort guards implemented. Unit RED
+  absent module; UI RED expected /login but initial placeholder remained.
+  Initial typecheck and 27 tests per app GREEN; company reconciliation test added.
+- Session orchestration remains per app, pure cookie/CSRF transport shared;
+  password is never persisted. Old adapter unchanged.
+- 3.2 login/protected shell/company pagination implemented. UI mock glob initially
+  intercepted Vite source /packages/api, narrowed to exact realm API prefix.
+  Shared EmptyState container changed to div to allow valid block content.
+- Next: finish dev/preview UI checks, review Stage 3, then actual HTTP Stage 4.
+
+- Stage 3 closed: both typecheck/lint/build; Vitest 28 account/27 admin; dev and preview E2E 12 account/10 admin each. Internal B0/I0; external at handoff.

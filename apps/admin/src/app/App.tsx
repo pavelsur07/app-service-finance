@@ -3,6 +3,9 @@ import { ErrorBoundary } from '@vashfindir/ui';
 import { HomePage } from '../pages/HomePage';
 import { AboutPage } from '../pages/AboutPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { SessionProvider } from './SessionProvider';
+import { RequireSession } from './RequireSession';
+import { LoginPage } from '../pages/LoginPage';
 import styles from './App.module.css';
 
 export function App() {
@@ -19,7 +22,12 @@ export function App() {
           </header>
           <main id="main">
             <Routes>
-              <Route path="/" element={<HomePage />} />
+              <Route element={<SessionProvider />}>
+                <Route path="/login" element={<LoginPage />} />
+                <Route element={<RequireSession />}>
+                  <Route path="/" element={<HomePage />} />
+                </Route>
+              </Route>
               <Route path="/about" element={<AboutPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>

@@ -29,10 +29,10 @@ test('production fallback, cache policy, assets and private paths', async ({
   expect((await page.request.get('/.env')).status()).toBe(404);
   expect((await page.request.get('/.git/config')).status()).toBe(404);
   expect((await page.request.get('/assets/missing.js.map')).status()).toBe(404);
-  await page.goto('/');
+  await page.goto('/about');
   await expect(
     page.getByRole('heading', {
-      name: 'Административный интерфейс',
+      name: 'О приложении',
       exact: true,
     }),
   ).toBeVisible();
