@@ -24,6 +24,15 @@ case "$action" in
         "${compose[@]}" run --rm --no-deps "$app" npm run "$action"
       fi
     done ;;
+  prod-build|prod-test)
+    for app in "${apps[@]}"; do
+      if [[ $action == prod-build ]]; then
+        docker build --build-arg "APP=$app" -f docker/frontend/Dockerfile \
+          -t "vf-finance/$app:${FRONT_IMAGE_TAG:-local}" .
+      else
+        APP="$app" bin/frontend-production-test.sh
+      fi
+    done ;;
   e2e)
     if [[ $FRONT_MODE == preview ]]; then bin/frontend.sh build; fi
     "${compose[@]}" up -d "${apps[@]}"

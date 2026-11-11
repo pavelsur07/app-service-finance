@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Browser contract against an immutable nginx image, never a Vite server.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/.."
 case "${APP:-}" in account|admin) ;; *) echo 'APP must be account or admin' >&2; exit 2 ;; esac
 image=${IMAGE:-vf-finance/$APP:${FRONT_IMAGE_TAG:-local}}
 network="vf-spa-${APP}-$$"

@@ -48,14 +48,14 @@ React runtime, exposed files, labels collision, no published dev server.
 
 ## Stage 2: build/release integration и handoff
 Risk: HIGH-LOCAL (CI/CD behavior внутри явного поручения).
-stage_base_commit: записать после Stage 1.
+stage_base_commit: d5cfcecfc.
 Definition of Done:
-- [ ] Path filters видят apps, packages, kit, Dockerfile; PR matrix и master/
+- [x] Path filters видят apps, packages, kit, Dockerfile; PR matrix и master/
       dispatch matrix включают нужные SPA images по тому же SHA.
-- [ ] Typecheck/lint/test и реальный image browser smoke гейтят публикацию.
-- [ ] Deploy явно pull/up --wait оба SPA, ошибки блокируют завершение.
-- [ ] Исправлен старый проверочный contract async_sync, прочие invariants сохранены.
-- [ ] Docs/DNS preflight, full gates, fresh internal/external review, Ready PR.
+- [x] Typecheck/lint/test и реальный image browser smoke гейтят публикацию.
+- [x] Deploy явно pull/up --wait оба SPA, ошибки блокируют завершение.
+- [x] Исправлен старый проверочный contract async_sync, прочие invariants сохранены.
+- [x] Docs/DNS preflight, full gates, fresh internal/external review, Ready PR.
 Work items:
 - 2.1 — RED tests для path/matrix/deploy, затем workflow и regression test fix.
 - 2.2 — документация, DNS, all checks, review/fixes, отчёт, handoff.

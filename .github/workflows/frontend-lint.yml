@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'site/assets/**'
+      - 'site/packages/**'
       - 'site/.eslintrc.cjs'
       - 'site/package.json'
       - 'site/yarn.lock'

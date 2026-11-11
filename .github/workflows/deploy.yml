@@ -27,6 +27,7 @@ jobs:
             backend: ${{ steps.matrix.outputs.backend }}
             static_analysis: ${{ steps.matrix.outputs.static_analysis }}
             frontend: ${{ steps.matrix.outputs.frontend }}
+            spa: ${{ steps.matrix.outputs.spa }}
             landing: ${{ steps.matrix.outputs.landing }}
             services: ${{ steps.matrix.outputs.services }}
             ai_service: ${{ steps.matrix.outputs.ai_service }}
@@ -69,9 +70,21 @@ jobs:
                         # assets/** включает CSS кита (assets/styles/kit): app.css тянет его
                         # через @import, nginx-образ пекёт в бандл (COPY . . + yarn build).
                         - 'site/assets/**'
+                        - 'site/packages/**'
                         - 'site/vite.config.js'
                         - 'site/package.json'
                         - 'site/yarn.lock'
+                      spa:
+                        - 'apps/account/**'
+                        - 'apps/admin/**'
+                        - 'site/packages/**'
+                        - 'site/assets/styles/kit/**'
+                        - 'docker/frontend/**'
+                        - 'bin/frontend-production-test.sh'
+                        - 'tests/shell/frontend-release-test.py'
+                        - 'tests/shell/deploy-workflow-test.sh'
+                        - 'docker-compose.prod.yml'
+                        - '.github/workflows/deploy.yml'
                       landing:
                         - 'landing/**'
                       # Go-сервис загрузки Ozon (docs/tasks/ozon-fetcher-ingestion).
@@ -96,6 +109,7 @@ jobs:
             #   frontend        → site-nginx + site-php-fpm (оба пекут public/build)
             #   backend         → site-nginx + site-php-fpm + site-php-cli
             #   landing         → land-nginx
+            #   spa             → account-nginx + admin-nginx
             # На push в master с deployable-изменениями собираем полный набор:
             # rolling deploy тянет все образы по единому commit SHA.
             - name: 🧩 Build image matrix
@@ -105,6 +119,7 @@ jobs:
               run: |
                   be='${{ steps.f.outputs.backend }}'
                   fe='${{ steps.f.outputs.frontend }}'
+                  sp='${{ steps.f.outputs.spa }}'
                   la='${{ steps.f.outputs.landing }}'
                   sa='${{ steps.f.outputs.static_analysis }}'
                   sv='${{ steps.f.outputs.services }}'
@@ -113,8 +128,9 @@ jobs:
                   # На master деплой тянет ВСЕ образы по SHA коммита, включая
                   # ozon-fetcher, — поэтому его образ собирается вместе с остальными.
                   if [ "$GITHUB_EVENT_NAME" = 'push' ] && [ "$GITHUB_REF" = 'refs/heads/master' ]; then
-                    if [ "$be" = 'true' ] || [ "$fe" = 'true' ] || [ "$la" = 'true' ] || [ "$sv" = 'true' ] || [ "$ai" = 'true' ]; then
+                    if [ "$be" = 'true' ] || [ "$fe" = 'true' ] || [ "$la" = 'true' ] || [ "$sv" = 'true' ] || [ "$ai" = 'true' ] || [ "$sp" = 'true' ]; then
                       be=true
+                      sp=true
                       la=true
                       sv=true
                       ai=true
@@ -124,6 +140,7 @@ jobs:
                   if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ]; then
                     be=false
                     fe=false
+                    sp=false
                     la=false
                     sa=false
                     sv=false
@@ -141,6 +158,7 @@ jobs:
                     # `manifest unknown`, хотя код был готов. Поэтому dispatch собирает сам.
                     if [ "$PRODUCTION_ACTION" = 'deploy' ] || [ "$PRODUCTION_ACTION" = 'migrations' ]; then
                       be=true
+                      sp=true
                       la=true
                       sv=true
                       ai=true
@@ -169,9 +187,14 @@ jobs:
                   if [ "$ai" = "true" ]; then
                     items+=('{"service":"ai-service","context":"./services/ai-service","file":"./services/ai-service/docker/Dockerfile","image":"ai-service"}')
                   fi
+                  if [ "$sp" = "true" ]; then
+                    items+=('{"service":"account","context":".","file":"./docker/frontend/Dockerfile","image":"account-nginx","frontend_app":"account"}')
+                    items+=('{"service":"admin","context":".","file":"./docker/frontend/Dockerfile","image":"admin-nginx","frontend_app":"admin"}')
+                  fi
                   IFS=,
                   echo "backend=$be" >> "$GITHUB_OUTPUT"
                   echo "frontend=$fe" >> "$GITHUB_OUTPUT"
+                  echo "spa=$sp" >> "$GITHUB_OUTPUT"
                   echo "landing=$la" >> "$GITHUB_OUTPUT"
                   echo "static_analysis=$sa" >> "$GITHUB_OUTPUT"
                   echo "services=$sv" >> "$GITHUB_OUTPUT"
@@ -648,11 +671,39 @@ jobs:
                     -e PYTHONPATH=/repo/services/ai-service/src:/repo/services/ai-service \
                     ai-service-dev:ci pytest -m "not evals"
 
+    spa-checks:
+        name: SPA checks (${{ matrix.app }})
+        needs: changes
+        if: ${{ needs.changes.outputs.spa == 'true' }}
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                app: [account, admin]
+        defaults:
+            run:
+                working-directory: apps/${{ matrix.app }}
+        steps:
+            - uses: actions/checkout@v6
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: '24'
+                  cache: npm
+                  cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
+            - run: npm ci
+            - run: npm run typecheck
+            - run: npm run lint
+            - run: npm run test
+            - run: npm run build
+            - name: Release contracts
+              working-directory: .
+              run: make test-deploy-workflow test-frontend-release
+
     build-and-push:
-        needs: [ changes, unit-tests, cs-check, services-go, services-python ]
+        needs: [ changes, unit-tests, cs-check, services-go, services-python, spa-checks ]
         # !cancelled() — чтобы job стартовал даже когда unit-tests/cs-check пропущены (frontend/landing-only).
         # != 'failure'  — но НЕ собираем, если бэкенд-тесты, проверка стиля или гейты сервиса упали.
-        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.unit-tests.result != 'failure' && needs['cs-check'].result != 'failure' && needs['services-go'].result != 'failure' && needs['services-python'].result != 'failure' && needs.changes.outputs.matrix != '{"include":[]}' }}
+        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.unit-tests.result != 'failure' && needs['cs-check'].result != 'failure' && needs['services-go'].result != 'failure' && needs['services-python'].result != 'failure' && needs['spa-checks'].result != 'failure' && needs.changes.outputs.matrix != '{"include":[]}' }}
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
@@ -679,12 +730,43 @@ jobs:
               with:
                   context: ${{ matrix.context }}
                   file: ${{ matrix.file }}
-                  push: ${{ github.event_name != 'pull_request' }}
+                  build-args: ${{ matrix.frontend_app && format('APP={0}', matrix.frontend_app) || '' }}
+                  load: ${{ matrix.frontend_app != '' }}
+                  push: ${{ github.event_name != 'pull_request' && matrix.frontend_app == '' }}
                   tags: |
                       ghcr.io/pavelsur07/${{ matrix.image }}:latest
                       ghcr.io/pavelsur07/${{ matrix.image }}:${{ github.sha }}
                   cache-from: type=gha,scope=${{ matrix.service }}
                   cache-to: type=gha,scope=${{ matrix.service }},mode=max
+
+            - name: Node for SPA browser tests
+              if: ${{ matrix.frontend_app != '' }}
+              uses: actions/setup-node@v6
+              with:
+                  node-version: '24'
+                  cache: npm
+                  cache-dependency-path: apps/${{ matrix.frontend_app }}/package-lock.json
+
+            - name: Install SPA test runner
+              if: ${{ matrix.frontend_app != '' }}
+              working-directory: apps/${{ matrix.frontend_app }}
+              run: npm ci
+
+            - name: Browser smoke of the actual nginx image
+              if: ${{ matrix.frontend_app != '' }}
+              env:
+                  APP: ${{ matrix.frontend_app }}
+                  IMAGE: ghcr.io/pavelsur07/${{ matrix.image }}:${{ github.sha }}
+              run: bin/frontend-production-test.sh
+
+            - name: Publish verified SPA image
+              if: ${{ github.event_name != 'pull_request' && matrix.frontend_app != '' }}
+              env:
+                  IMAGE_SHA: ghcr.io/pavelsur07/${{ matrix.image }}:${{ github.sha }}
+                  IMAGE_LATEST: ghcr.io/pavelsur07/${{ matrix.image }}:latest
+              run: |
+                  docker push "$IMAGE_SHA"
+                  docker push "$IMAGE_LATEST"
 
     # 2. ПРОВЕРКА СХЕМЫ — перед автоматическим или ручным deploy.
     schema-ready:
@@ -939,7 +1021,7 @@ jobs:
                     printf 'IMAGE_TAG=%s\n' "$IMAGE_TAG" > .env
 
                     echo "🚚 Скачивание свежих образов из GHCR"
-                    docker compose -f docker-compose.prod.yml pull land site site-php-fpm site-php-cli
+                    docker compose -f docker-compose.prod.yml pull land site site-php-fpm site-php-cli account admin
 
                     # ───────────────────────────────────────────────
                     # ROLLING UPDATE: обновляем сервисы в правильном порядке
@@ -1036,6 +1118,10 @@ jobs:
                       echo "⏸ ai-service выключен (vars.AI_SERVICE_ENABLED != true)"
                       docker compose -f docker-compose.prod.yml --profile ai-service stop ai-service ai-service-worker 2>/dev/null || true
                     fi
+
+                    echo "🐳 Обновляем account/admin SPA"
+                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait account admin
+                    echo "✅ account/admin healthy"
 
                     echo "🐳 [5/5] Поднимаем остальные сервисы (если есть новые)"
                     docker compose -f docker-compose.prod.yml up -d --remove-orphans
