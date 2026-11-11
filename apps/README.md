@@ -1,4 +1,4 @@
-# Локальные фронтэнды account и admin
+# Фронтэнды account и admin
 
 `account` — клиентский кабинет; `admin` — административный интерфейс.
 Оба — независимые React 19 / TypeScript / Vite SPA. Главная, `/about` и 404
@@ -79,11 +79,69 @@ ESLint запрещает прямой fetch вне транспорта, имп
 
 MSW включается только в Vitest и блокирует необработанные запросы; Playwright
 проверяет оба viewport в dev и preview, историю, прямые URL, CSS, клавиатуру,
-переполнение и отсутствие fetch/XHR/внешней сети. Настоящие бизнес-эндпоинты,
-авторизация, production-хостинг, Traefik и CI/CD в этот этап не входят.
+переполнение и отсутствие fetch/XHR/внешней сети. Настоящие бизнес-эндпоинты и авторизация пока не реализованы.
+Production-публикация описана ниже.
 
 Dev-контейнеры видят только `apps`, общие пакеты и CSS кита (CSS read-only).
 `server.fs.allow` ограничен выбранным приложением, пакетами и стилями;
 корневые служебные файлы, локальные секреты и `site/var` им недоступны.
 Тест необработанного запроса MSW использует встроенную стратегию `error`,
 проверяет отклонение запроса и отсутствие вызова сетевого fallback.
+
+
+## Production: account.vashfindir.ru / admin.vashfindir.ru
+
+Собранную статику обслуживают два независимых Nginx-контейнера `account` и
+`admin` в `docker-compose.prod.yml`. Dockerfile и nginx.conf общие:
+`docker/frontend/`. Node используется только для сборки, Vite dev/preview
+на сервере не запускаются. Runtime содержит dist, работает с read-only root
+и tmpfs для cache/pid; исходники, зависимости, .env и site/var туда не попадают.
+Build context ограничен allowlist в Dockerfile.dockerignore.
+
+Traefik уже настроен в production Compose: Docker provider, сеть
+`traefik-public`, entrypoints `http`/`https`, resolver `letsEncrypt` с HTTP
+challenge и постоянным хранилищем сертификатов. Новые сервисы добавляют только
+Host routers, сертификаты и HTTP→HTTPS через существующий `redirect-to-https`.
+Прямые порты наружу не публикуются, backend/default network не подключена.
+Публичны только заглушки; проксирования Symfony API и авторизации нет.
+
+DNS обоих имён должен указывать на тот же сервер, что `app.vashfindir.ru`
+(например, CNAME account/admin → app.vashfindir.ru). Для ACME должны быть
+доступны 80/443. Маршрут существующего app.vashfindir.ru сохраняется.
+
+Локальная проверка именно production images (после `front-install`):
+
+```sh
+make front-prod-build
+make front-prod-test
+# Можно ограничить одним приложением:
+make front-prod-build front-prod-test APP=account
+```
+
+Образы по умолчанию: `vf-finance/account:local`, `vf-finance/admin:local`.
+`FRONT_IMAGE_TAG` меняет локальный тег. Image runner
+`bin/frontend-production-test.sh` также принимает `APP` и `IMAGE`.
+Он создаёт временную Docker-сеть, запускает настоящий read-only Nginx без
+публикации портов, выполняет Playwright Chromium и удаляет только свои
+контейнер/сеть. Проверяются desktop/mobile, history/reload/404, отсутствие
+запросов данных, HTML no-cache, fingerprinted assets immutable, missing asset
+404, private paths и readiness `/health` (наличие index.html).
+
+В CI `spa-checks` выполняет npm ci/typecheck/lint/test/build обоих приложений.
+Изменения apps, общих packages, CSS кита и production Docker/CI запускают SPA
+проверки. Общие packages также запускают старый frontend lint/build, поскольку
+site продолжает их использовать. PR собирает выбранные images; master и
+ручные release gates собирают полный набор с единым SHA. SPA image сначала
+загружается в локальный Docker runner и проходит browser smoke, затем при
+успехе публикуется в GHCR (`account-nginx`/`admin-nginx`, SHA и latest).
+
+Production deploy явно скачивает оба образа по release SHA и выполняет
+`up -d --no-deps --wait account admin`; ошибка readiness блокирует завершение.
+Релиз проходит обычный Draft PR → checks/reviews → Ready → merge+deploy.
+Миграций или действий с БД для SPA нет. Откат — revert PR через тот же pipeline.
+
+Первый релиз новых GHCR packages: после master build проверьте, что production
+Docker может скачать `account-nginx` и `admin-nginx` (public visibility либо
+существующий доступ к registry). Начальный общий `pull` в deploy проверяет
+доступ к обоим образам до обновления любых сервисов; отказ прерывает выкатку.
+Публичность packages или сохранённые credentials из исходников не проверяются.

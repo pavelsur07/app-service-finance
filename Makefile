@@ -294,3 +294,10 @@ ai-service-evals:
 .PHONY: front-install front-dev front-typecheck front-lint front-test front-build front-e2e
 front-install front-dev front-typecheck front-lint front-test front-build front-e2e:
 	APP="$(APP)" MODE="$(or $(MODE),dev)" ./bin/frontend.sh $(@:front-%=%)
+
+.PHONY: test-frontend-release front-prod-build front-prod-test
+test-frontend-release:
+	python3 tests/shell/frontend-release-test.py
+
+front-prod-build front-prod-test:
+	APP="$(APP)" ./bin/frontend.sh $(@:front-%=%)
