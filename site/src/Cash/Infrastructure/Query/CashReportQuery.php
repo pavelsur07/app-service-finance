@@ -16,6 +16,7 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query;
 use Webmozart\Assert\Assert;
 
 /**
@@ -208,7 +209,7 @@ final readonly class CashReportQuery
             ->setParameter('to', $to->setTime(23, 59, 59));
 
         if ($filter->dashboardScope) {
-            // Тот же охват, что у CashTransactionRepository::sumGrossTurnoverByPeriodExcludeTransfers().
+            // Тот же охват, что у sumGrossTurnoverExcludingTransfers() ниже.
             $qb->innerJoin('split.cashflowCategory', 'cashflowCategory')
                 ->andWhere('t.currency = :dashboardCurrency')
                 ->andWhere('t.isTransfer = :dashboardTransfer')
@@ -319,5 +320,111 @@ final readonly class CashReportQuery
         }
 
         return $result;
+    }
+
+    /**
+     * Обороты по счетам в их валюте за период; `isTransfer` не исключается —
+     * оборот счёта следует направлению каждой транзакции.
+     *
+     * @param list<string> $accountIds
+     *
+     * @return array<string, array{inflow: string, outflow: string}>
+     */
+    public function sumTurnoversByAccount(string $companyId, array $accountIds, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        Assert::uuid($companyId);
+        if ([] === $accountIds) {
+            return [];
+        }
+
+        $result = $this->em->createQueryBuilder()
+            ->select(
+                'IDENTITY(t.moneyAccount) as accountId',
+                'SUM(CASE WHEN t.direction = :inflow THEN t.amount ELSE 0 END) as inflow',
+                'SUM(CASE WHEN t.direction = :outflow THEN t.amount ELSE 0 END) as outflow'
+            )
+            ->from(CashTransaction::class, 't')
+            ->join('t.moneyAccount', 'ma')
+            ->where('t.company = :company')
+            ->andWhere('IDENTITY(t.moneyAccount) IN (:accountIds)')
+            ->andWhere('t.currency = ma.currency')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.deletedAt IS NULL')
+            ->groupBy('accountId')
+            ->setParameter('company', $companyId)
+            ->setParameter('accountIds', $accountIds)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->setParameter('inflow', CashDirection::INFLOW)
+            ->setParameter('outflow', CashDirection::OUTFLOW)
+            ->getQuery()
+            ->getArrayResult();
+
+        $byAccountId = [];
+        foreach ($result as $row) {
+            $accountId = (string) $row['accountId'];
+            $byAccountId[$accountId] = [
+                'inflow' => bcadd((string) ($row['inflow'] ?? '0'), '0', 2),
+                'outflow' => bcadd((string) ($row['outflow'] ?? '0'), '0', 2),
+            ];
+        }
+
+        return $byAccountId;
+    }
+
+    /**
+     * Валовые обороты по положительным строкам разбивки в разрезе направления
+     * транзакции. Переводы и технические статьи исключены; с `$flowKind` — только
+     * этот вид потока без «нераспределённого».
+     *
+     * @return array{inflow: string, outflow: string}
+     */
+    public function sumGrossTurnoverExcludingTransfers(
+        string $companyId,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        string $currency,
+        ?CashflowFlowKind $flowKind,
+    ): array {
+        Assert::uuid($companyId);
+        $qb = $this->em->createQueryBuilder()
+            ->select(
+                'COALESCE(SUM(CASE WHEN t.direction = :inflow THEN split.amount ELSE 0 END), 0) AS inflow',
+                'COALESCE(SUM(CASE WHEN t.direction = :outflow THEN split.amount ELSE 0 END), 0) AS outflow',
+            )
+            ->from(CashTransaction::class, 't')
+            ->innerJoin('t.splits', 'split')
+            ->innerJoin('split.cashflowCategory', 'category')
+            ->where('t.company = :company')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.currency = :currency')
+            ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('t.deletedAt IS NULL')
+            ->andWhere('category.flowKind != :technicalFlowKind')
+            ->setParameter('company', $companyId)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->setParameter('currency', $currency)
+            ->setParameter('isTransfer', false)
+            ->setParameter('technicalFlowKind', CashflowFlowKind::TECHNICAL)
+            ->setParameter('inflow', CashDirection::INFLOW)
+            ->setParameter('outflow', CashDirection::OUTFLOW);
+
+        if (null !== $flowKind) {
+            $qb->andWhere('category.flowKind = :flowKind')
+                ->andWhere('(category.systemCode IS NULL OR category.systemCode NOT IN (:unallocatedCodes))')
+                ->setParameter('flowKind', $flowKind)
+                ->setParameter('unallocatedCodes', [
+                    CashflowCategory::CODE_UNALLOCATED,
+                    CashflowCategory::SYSTEM_UNALLOCATED,
+                ]);
+        }
+
+        $row = $qb->getQuery()->getSingleResult(Query::HYDRATE_ARRAY);
+
+        return [
+            'inflow' => bcadd((string) ($row['inflow'] ?? '0'), '0', 2),
+            'outflow' => bcadd((string) ($row['outflow'] ?? '0'), '0', 2),
+        ];
     }
 }

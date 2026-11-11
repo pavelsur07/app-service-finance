@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Cash\Repository\Transaction;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
-use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\ArrayParameterType;
@@ -345,11 +343,6 @@ SQL,
             ->getOneOrNullResult();
     }
 
-    public function findOneByImport(string $companyId, string $source, string $externalId): ?CashTransaction
-    {
-        return $this->findOneByCompanyImportSourceExternalId($companyId, $source, $externalId);
-    }
-
     /**
      * Какие из внешних идентификаторов источника уже загружены, включая удалённые
      * пользователем строки: уникальный индекс `uniq_cashflow_import` удалённые тоже держит.
@@ -397,24 +390,6 @@ SQL,
             ->setParameter('externalId', $externalId)
             ->getQuery()
             ->getOneOrNullResult();
-    }
-
-    public function findIdByCompanyImportSourceExternalIdDbal(string $companyId, string $importSource, string $externalId): ?string
-    {
-        $id = $this->getEntityManager()->getConnection()->fetchOne(
-            'SELECT id FROM cash_transaction WHERE company_id = :companyId AND import_source = :importSource AND external_id = :externalId AND deleted_at IS NULL LIMIT 1',
-            [
-                'companyId' => $companyId,
-                'importSource' => $importSource,
-                'externalId' => $externalId,
-            ],
-        );
-
-        if (false === $id || null === $id) {
-            return null;
-        }
-
-        return (string) $id;
     }
 
     /**
@@ -650,147 +625,5 @@ SQL,
         }
 
         return $qb;
-    }
-
-    /**
-     * @param list<string> $accountIds
-     *
-     * @return array<string, array{inflow: string, outflow: string}>
-     */
-    public function sumByAccountAndPeriod(Company $company, array $accountIds, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
-        if ([] === $accountIds) {
-            return [];
-        }
-
-        $qb = $this->createQueryBuilder('t')
-            ->select(
-                'IDENTITY(t.moneyAccount) as accountId',
-                'SUM(CASE WHEN t.direction = :inflow THEN t.amount ELSE 0 END) as inflow',
-                'SUM(CASE WHEN t.direction = :outflow THEN t.amount ELSE 0 END) as outflow'
-            )
-            ->join('t.moneyAccount', 'ma')
-            ->where('t.company = :company')
-            ->andWhere('IDENTITY(t.moneyAccount) IN (:accountIds)')
-            ->andWhere('t.currency = ma.currency')
-            ->andWhere('t.occurredAt BETWEEN :from AND :to')
-            ->andWhere('t.deletedAt IS NULL')
-            ->groupBy('accountId')
-            ->setParameter('company', $company)
-            ->setParameter('accountIds', $accountIds)
-            ->setParameter('from', $from->setTime(0, 0))
-            ->setParameter('to', $to->setTime(23, 59, 59))
-            ->setParameter('inflow', CashDirection::INFLOW)
-            ->setParameter('outflow', CashDirection::OUTFLOW);
-
-        // isTransfer is metadata only; account turnover follows INFLOW/OUTFLOW for every transaction.
-
-        $result = $qb->getQuery()->getArrayResult();
-
-        $byAccountId = [];
-        foreach ($result as $row) {
-            $accountId = (string) $row['accountId'];
-            $byAccountId[$accountId] = [
-                'inflow' => bcadd((string) ($row['inflow'] ?? '0'), '0', 2),
-                'outflow' => bcadd((string) ($row['outflow'] ?? '0'), '0', 2),
-            ];
-        }
-
-        return $byAccountId;
-    }
-
-    /**
-     * Returns gross turnover from positive split amounts split by transaction direction.
-     * Transfers and technical categories are excluded; unallocated is excluded for a selected flow kind.
-     *
-     * @return array{inflow:string,outflow:string}
-     */
-    public function sumGrossTurnoverByPeriodExcludeTransfers(
-        Company $company,
-        \DateTimeImmutable $from,
-        \DateTimeImmutable $to,
-        string $currency,
-        ?CashflowFlowKind $flowKind,
-    ): array {
-        $qb = $this->createQueryBuilder('t')
-            ->select(
-                'COALESCE(SUM(CASE WHEN t.direction = :inflow THEN split.amount ELSE 0 END), 0) AS inflow',
-                'COALESCE(SUM(CASE WHEN t.direction = :outflow THEN split.amount ELSE 0 END), 0) AS outflow',
-            )
-            ->innerJoin('t.splits', 'split')
-            ->innerJoin('split.cashflowCategory', 'category')
-            ->where('t.company = :company')
-            ->andWhere('t.occurredAt BETWEEN :from AND :to')
-            ->andWhere('t.currency = :currency')
-            ->andWhere('t.isTransfer = :isTransfer')
-            ->andWhere('t.deletedAt IS NULL')
-            ->andWhere('category.flowKind != :technicalFlowKind')
-            ->setParameter('company', $company)
-            ->setParameter('from', $from->setTime(0, 0))
-            ->setParameter('to', $to->setTime(23, 59, 59))
-            ->setParameter('currency', $currency)
-            ->setParameter('isTransfer', false)
-            ->setParameter('technicalFlowKind', CashflowFlowKind::TECHNICAL)
-            ->setParameter('inflow', CashDirection::INFLOW)
-            ->setParameter('outflow', CashDirection::OUTFLOW);
-
-        if (null !== $flowKind) {
-            $qb->andWhere('category.flowKind = :flowKind')
-                ->andWhere('(category.systemCode IS NULL OR category.systemCode NOT IN (:unallocatedCodes))')
-                ->setParameter('flowKind', $flowKind)
-                ->setParameter('unallocatedCodes', [
-                    CashflowCategory::CODE_UNALLOCATED,
-                    CashflowCategory::SYSTEM_UNALLOCATED,
-                ]);
-        }
-
-        $row = $qb->getQuery()->getSingleResult(Query::HYDRATE_ARRAY);
-
-        return [
-            'inflow' => bcadd((string) ($row['inflow'] ?? '0'), '0', 2),
-            'outflow' => bcadd((string) ($row['outflow'] ?? '0'), '0', 2),
-        ];
-    }
-
-    /**
-     * @return list<array{date:string,value:float}>
-     */
-    public function sumCapexOutflowByDayExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
-        $rows = $this->createQueryBuilder('t')
-            ->select('t.occurredAt as date', 'COALESCE(SUM(split.amount), 0) as value')
-            ->leftJoin('t.splits', 'split')
-            ->leftJoin('split.cashflowCategory', 'category')
-            ->where('t.company = :company')
-            ->andWhere('t.direction = :outflow')
-            ->andWhere('t.occurredAt BETWEEN :from AND :to')
-            ->andWhere('t.isTransfer = :isTransfer')
-            ->andWhere('category.systemCode = :systemCode')
-            ->andWhere('t.deletedAt IS NULL')
-            ->groupBy('date')
-            ->orderBy('date', \SortDirection::Ascending)
-            ->setParameter('company', $company)
-            ->setParameter('from', $from->setTime(0, 0))
-            ->setParameter('to', $to->setTime(23, 59, 59))
-            ->setParameter('outflow', CashDirection::OUTFLOW)
-            ->setParameter('isTransfer', false)
-            ->setParameter('systemCode', 'CAPEX')
-            ->getQuery()
-            ->getArrayResult();
-
-        $series = [];
-        foreach ($rows as $row) {
-            $date = $row['date'];
-            if ($date instanceof \DateTimeInterface) {
-                $date = $date->format('Y-m-d');
-            }
-
-            $series[] = [
-                'date' => (string) $date,
-                'value' => abs((float) ($row['value'] ?? 0)),
-            ];
-        }
-
-        return $series;
     }
 }

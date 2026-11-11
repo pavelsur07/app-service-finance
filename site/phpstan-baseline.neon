@@ -8911,12 +8911,6 @@ parameters:
 			path: tests/Integration/Cash/Service/Import/CashTransactionRepositoryTest.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Repository\\Transaction\\CashTransactionRepository\:\:findIdByCompanyImportSourceExternalIdDbal\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Integration/Cash/Service/Import/CashTransactionRepositoryTest.php
-
-		-
 			message: '#^Call to an undefined method object\:\:getDeletedAt\(\)\.$#'
 			identifier: method.notFound
 			count: 1

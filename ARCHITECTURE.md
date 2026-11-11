@@ -2733,7 +2733,8 @@ getReportOpeningBalances(string $companyId, \DateTimeImmutable $date, ?string $c
 
 DTO `MoneyAccountSummary`, `MoneyAccountDailyBalanceRow`, `CashStatementLine`, `CashflowCategoryNode`,
 `CashflowReportRow`, `CashflowReportRowFilter`, `MoneyAccountOpeningBalance` — в
-`src/Cash/Application/DTO/`; выборки выписки — `Cash\Infrastructure\Query\CashReportQuery`.
+`src/Cash/Application/DTO/`; выборки выписки, отчёта ДДС, оборотов по счетам и валовых
+оборотов — `Cash\Infrastructure\Query\CashReportQuery`.
 
 Все методы принимают `companyId` и бросают `\DomainException`, если компания или
 запрошенная сущность к ней не относится.

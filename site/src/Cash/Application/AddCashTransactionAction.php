@@ -70,7 +70,7 @@ final class AddCashTransactionAction
 
         $existingTransaction = null;
         if (null !== $dto->importSource && null !== $dto->externalId) {
-            $existingTransaction = $this->txRepo->findOneByImport(
+            $existingTransaction = $this->txRepo->findOneByCompanyImportSourceExternalId(
                 $dto->companyId,
                 $dto->importSource,
                 $dto->externalId,

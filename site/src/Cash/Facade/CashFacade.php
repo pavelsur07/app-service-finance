@@ -532,7 +532,9 @@ final readonly class CashFacade
      */
     public function sumTurnoversByAccount(string $companyId, array $accountIds, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
-        return $this->cashTransactionRepository->sumByAccountAndPeriod($this->requireCompany($companyId), $accountIds, $from, $to);
+        $this->requireCompany($companyId);
+
+        return $this->reportQuery->sumTurnoversByAccount($companyId, $accountIds, $from, $to);
     }
 
     /**
@@ -548,8 +550,10 @@ final readonly class CashFacade
         string $currency,
         ?CashflowFlowKind $flowKind,
     ): array {
-        return $this->cashTransactionRepository->sumGrossTurnoverByPeriodExcludeTransfers(
-            $this->requireCompany($companyId),
+        $this->requireCompany($companyId);
+
+        return $this->reportQuery->sumGrossTurnoverExcludingTransfers(
+            $companyId,
             $from,
             $to,
             $currency,
