@@ -77,6 +77,7 @@ final class ModuleAccessMap
      * @var list<string>
      */
     private const EXEMPT_EXACT = [
+        \App\Shared\Controller\Spa\LogoutController::class, // Symfony logout + token, CSRF and Origin gates; no company required.
         ProfileController::class,   // личный профиль (смена пароля), доступен любому участнику
         UiModeController::class,    // переключение темы UI, личная настройка
         CompanyController::class,   // список/создание/переключение компаний; работает и без активной компании, свои owner-проверки
