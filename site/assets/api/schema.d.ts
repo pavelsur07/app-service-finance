@@ -4,6 +4,57 @@
  */
 
 export interface paths {
+    "/api/account/v1/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Доступные текущему пользователю компании */
+        get: operations["get_spa_account_companies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/v1/active-company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Выбрать доступную компанию текущей сессии */
+        post: operations["post_spa_account_select_company"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/v1/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Текущий пользователь, компания и права */
+        get: operations["get_spa_account_session"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health/live": {
         parameters: {
             query?: never;
@@ -106,6 +157,57 @@ export interface paths {
         get: operations["get_api_ingestion_verification_reconciliation"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/v1/auth/csrf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** CSRF-токены текущей сессии */
+        get: operations["get_spa_account_csrf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Войти существующей учётной записью */
+        post: operations["post_spa_account_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Завершить сессию только текущего хоста */
+        post: operations["post_spa_account_logout"];
         delete?: never;
         options?: never;
         head?: never;
@@ -226,10 +328,88 @@ export interface components {
              */
             instance?: string;
         };
+        AccessibleCompaniesRequest: {
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            perPage: number;
+        };
+        SelectActiveCompanyRequest: {
+            targetCompanyId: string;
+        };
         /** @description Тело запроса на создание маркетплейс-аналитики */
         CreateMarketplaceAnalyticsRequest: {
             /** @example Аналитика за Q1 2026 */
             title: string;
+        };
+        /** @description Метаданные пагинации для list-эндпоинтов */
+        PaginationMeta: {
+            /**
+             * @description Общее количество элементов
+             * @example 7308
+             */
+            total: number;
+            /**
+             * @description Текущая страница (1-based)
+             * @example 1
+             */
+            page: number;
+            /**
+             * @description Элементов на странице
+             * @example 20
+             */
+            per_page: number;
+            /**
+             * @description Общее количество страниц
+             * @example 366
+             */
+            pages: number;
+        };
+        AccessibleCompaniesResponse: {
+            data: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            }[];
+            meta: components["schemas"]["PaginationMeta"];
+        };
+        AccountSessionResponse: {
+            user: {
+                /** Format: uuid */
+                id: string;
+                /** Format: email */
+                email: string;
+            };
+            active_company: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            permissions: {
+                /** @enum {string} */
+                finance: "none" | "read" | "write";
+                /** @enum {string} */
+                marketplace: "none" | "read" | "write";
+                /** @enum {string} */
+                deals: "none" | "read" | "write";
+                /** @enum {string} */
+                catalog: "none" | "read" | "write";
+                /** @enum {string} */
+                admin: "none" | "read" | "write";
+            };
+        };
+        SpaCsrfResponse: {
+            tokens: {
+                login: string;
+                logout: string;
+                company_select: string;
+            };
+        };
+        SpaLoginRequest: {
+            /** @default  */
+            email: string;
+            /** @default  */
+            password: string;
         };
         /** @description Разбивка себестоимости по статьям (decimal as string) */
         CostBreakdown: {
@@ -372,29 +552,6 @@ export interface components {
             cost_breakdown: components["schemas"]["CostBreakdown"];
             advertising_details: components["schemas"]["AdvertisingDetails"];
         };
-        /** @description Метаданные пагинации для list-эндпоинтов */
-        PaginationMeta: {
-            /**
-             * @description Общее количество элементов
-             * @example 7308
-             */
-            total: number;
-            /**
-             * @description Текущая страница (1-based)
-             * @example 1
-             */
-            page: number;
-            /**
-             * @description Элементов на странице
-             * @example 20
-             */
-            per_page: number;
-            /**
-             * @description Общее количество страниц
-             * @example 366
-             */
-            pages: number;
-        };
         /** @description Пагинированный список снэпшотов маркетплейс-аналитики */
         SnapshotListResponse: {
             data: components["schemas"]["SnapshotResponse"][];
@@ -409,6 +566,124 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_spa_account_companies: {
+        parameters: {
+            query?: {
+                page?: number;
+                perPage?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Страница компаний */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessibleCompaniesResponse"];
+                };
+            };
+            /** @description Нет сессии */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Некорректная пагинация */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_spa_account_select_company: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelectActiveCompanyRequest"];
+            };
+        };
+        responses: {
+            /** @description Обновлённый контекст */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountSessionResponse"];
+                };
+            };
+            /** @description Нет сессии */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description CSRF/Origin не прошли проверку */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Компания недоступна */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Некорректный идентификатор */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_spa_account_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Контекст */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountSessionResponse"];
+                };
+            };
+            /** @description Нет сессии */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_api_health_live: {
         parameters: {
             query?: never;
@@ -766,6 +1041,126 @@ export interface operations {
                         };
                     };
                 };
+            };
+        };
+    };
+    get_spa_account_csrf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Токены операций */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpaCsrfResponse"];
+                };
+            };
+        };
+    };
+    post_spa_account_login: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpaLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Вход выполнен; получить /session */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Некорректный JSON */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Неверный email или пароль */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Недопустимый CSRF/Origin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Требуется JSON */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Некорректные поля */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Лимит попыток, Retry-After */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_spa_account_logout: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Выход выполнен */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Сессия уже завершена */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Недопустимый CSRF/Origin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -3,3 +3,6 @@ dist
 playwright-report
 test-results
 package-lock.json
+
+# Verified by front-api-types-check; preserve generator output.
+**/api/src/generated/**

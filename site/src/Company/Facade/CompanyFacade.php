@@ -289,21 +289,10 @@ final class CompanyFacade
      */
     private function accessibleCompaniesForUser(string $userId): array
     {
-        $owned = $this->repository->findByUserId($userId);
-        $memberCompanies = array_map(
-            static fn (CompanyMember $member): Company => $member->getCompany(),
-            $this->companyMemberRepository->findActiveByUserId($userId),
-        );
+        // The paginated SPA discovery and legacy access checks use the same policy.
+        /** @var list<Company> $companies */
+        $companies = $this->repository->createAccessibleForUserQueryBuilder($userId)->getQuery()->getResult();
 
-        $byId = [];
-        foreach ([...$owned, ...$memberCompanies] as $company) {
-            // Помеченная к удалению компания недоступна никому, кроме пути восстановления у владельца.
-            if ($company->isDeletionRequested()) {
-                continue;
-            }
-            $byId[$company->getId()] = $company;
-        }
-
-        return array_values($byId);
+        return $companies;
     }
 }

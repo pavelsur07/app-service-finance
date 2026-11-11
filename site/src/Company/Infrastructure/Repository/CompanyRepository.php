@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Company\Infrastructure\Repository;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\CompanyMember;
 use App\Company\Entity\User;
 use App\Company\Enum\BusinessProfile;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Connection;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 class CompanyRepository extends ServiceEntityRepository
@@ -56,6 +58,20 @@ class CompanyRepository extends ServiceEntityRepository
             ->orderBy('c.name', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
+    }
+
+    /** @companyScopeExempt Company discovery before selection; restricted to the authenticated user ID. */
+    public function createAccessibleForUserQueryBuilder(string $userId): QueryBuilder
+    {
+        return $this->createQueryBuilder('c')
+            ->distinct()
+            ->leftJoin(CompanyMember::class, 'membership', 'ON', 'membership.company = c AND membership.user = :accessUser AND membership.status = :active')
+            ->andWhere('c.user = :accessUser OR membership.id IS NOT NULL')
+            ->andWhere('c.deletionRequestedAt IS NULL')
+            ->setParameter('accessUser', $userId)
+            ->setParameter('active', CompanyMember::STATUS_ACTIVE)
+            ->orderBy('c.name', \SortDirection::Ascending)
+            ->addOrderBy('c.id', \SortDirection::Ascending);
     }
 
     /**

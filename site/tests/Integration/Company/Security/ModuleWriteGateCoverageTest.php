@@ -61,6 +61,12 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
      * @var array<string, array{0: string, 1: string}>
      */
     private const ROUTE_POLICY = [
+        // SPA session-only mutations: Symfony token + Origin/CSRF; company selection
+        // additionally checks owner/active membership. Covered by SpaAuthenticationTest
+        // and SelectActiveCompanyTest; never grants a module write permission.
+        'spa_account_logout' => ['authenticated-self', 'App\Shared\Controller\Spa\LogoutController::__invoke'],
+        'spa_admin_logout' => ['authenticated-self', 'App\Shared\Controller\Spa\LogoutController::__invoke'],
+        'spa_account_select_company' => ['authenticated-self', 'App\Company\Controller\Api\Session\SelectActiveCompanyController::__invoke'],
         // BalanceAccess reads fresh FINANCE rights and applies company-scoped grants.
         // Every route remains individually bound to its controller and exact actor gate.
         // Negative behavior: ModuleMixedRouteGateTest, BalanceLedgerUiTest and

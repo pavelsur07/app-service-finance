@@ -1,9 +1,10 @@
 # Current checkpoint
 
-**Phase:** Stage 2 / Work item 2.1
+**Phase:** Stage 3 / Work item 3.1
 **Status:** implementing
 **Branch:** `feat/account-admin-auth`
-**Stage base commit:** `34ef67560afe0675e082d0c607cfb553ca2b6a17`
+**Stage base commit:** `137cc1173f769904960cb9773da6db5efabb9b8c`
+**PR:** https://github.com/pavelsur07/app-service-finance/pull/2971 (Draft, master)
 
 ## Authorization and rulings
 
@@ -43,7 +44,7 @@
 
 ## Exact next action
 
-- Implement account/admin session and paginated company discovery, starting with functional RED tests. Stage 2 base is the Stage 1 commit recorded in git log.
+- Implement SPA session adapters and login/company UI, tests first. Stage 3 base is the Stage 2 commit in git log.
 
 ## Inspect first on resume
 
@@ -61,3 +62,24 @@
 - Internal review: B0/I0; fixed priority ordering before review (Security exception
   listener must handle 401/403 before SPA error renderer; preserve error logging).
 - External round 1 B0/I1/M1; logging IMPORTANT reproduced RED and fixed; role-revocation MINOR test added. Final 37 tests /165 assertions, PHPStan and CS clean. Fixed without re-run. Stage 1 closed; see stages/stage-1.md.
+
+## Stage 2 progress
+
+- 2.1: account/admin session and company discovery implemented. Before code,
+  eight functional tests RED (404); now account/member/no-company, admin identity,
+  pagination and removal behavior GREEN.
+- 2.2: company selection requires current owner/active membership, Origin/CSRF;
+  foreign/deleted/disabled/random IDs preserve current context. Account OpenAPI
+  area + generated shared types and legacy schema; both generation/check targets PASS.
+- Combined module tests: 48 /227 assertions PASS; focused PHPStan clean; both
+  apps typecheck/lint clean. New generated types excluded only from formatting/lint,
+  verified by reproducible generator check.
+- CI of Stage 1 revealed ModuleWriteGateCoverage route-policy entries missing for
+  logout (and now selection). Targeted check RED, added exact route/controller and
+  authenticated-self policy with functional test pointers, GREEN 2 tests/15 assertions.
+- One combined run overlapped PHPStan kernel compilation and throttle test failed;
+  narrowed throttle check PASS, sequential module run PASS. Symfony limiter keys
+  use container.build_hash; avoid concurrent kernel rebuilds during auth tests.
+- Next: Stage 2 complete diff review/external review, then report/commit and Stage 3.
+
+- Stage 2 external review: REVIEW_GREEN, one round B0/I0/M1. Fixed schema permissions to explicit required properties; both generators/checks pass. Stage 2 closed.
