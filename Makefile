@@ -309,3 +309,17 @@ test-frontend-release:
 
 front-prod-build front-prod-test:
 	APP="$(APP)" ./bin/frontend.sh $(@:front-%=%)
+
+.PHONY: front-auth-e2e test-frontend-auth-routing
+front-auth-e2e:
+	APP="$(APP)" MODE="$(MODE)" ./bin/frontend-auth.sh
+
+test-frontend-auth-routing:
+	python3 tests/shell/frontend-auth-routing-test.py
+
+.PHONY: front-auth-dev front-auth-stop
+front-auth-dev:
+	MODE="$(MODE)" ./bin/frontend-auth.sh serve
+
+front-auth-stop:
+	./bin/frontend-auth.sh stop

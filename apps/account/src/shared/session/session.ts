@@ -39,8 +39,13 @@ export function createSessionStore(base = '/api/account/v1') {
     controller = new AbortController();
     const signal = controller.signal;
     publish({
-      status: kind === 'login' ? 'anonymous' : 'loading',
-      data: null,
+      status:
+        kind === 'refresh' && state.data
+          ? 'authenticated'
+          : kind === 'login'
+            ? 'anonymous'
+            : 'loading',
+      data: kind === 'refresh' ? state.data : null,
       error: null,
       busy: true,
     });
@@ -64,8 +69,11 @@ export function createSessionStore(base = '/api/account/v1') {
             : error instanceof Error
               ? error.message
               : 'Не удалось выполнить запрос.';
-      // A lost POST response can mean the server already committed the change.
-      if (kind !== 'refresh' && (status === 0 || status >= 500)) {
+      // Restore actual context after a rejected selection or an ambiguous POST.
+      if (
+        kind !== 'refresh' &&
+        (kind === 'select' ? status !== 401 : status === 0 || status >= 500)
+      ) {
         try {
           const data = await api.getSession(signal);
           if (current === generation)
@@ -76,8 +84,27 @@ export function createSessionStore(base = '/api/account/v1') {
               busy: false,
             });
           return;
-        } catch {
-          /* The error below remains visible; retry re-reads the server. */
+        } catch (restorationError) {
+          if (current !== generation) return;
+          if (
+            restorationError instanceof ApiError &&
+            (restorationError.status === 401 || restorationError.status === 403)
+          ) {
+            publish({
+              status:
+                restorationError.status === 401 ? 'anonymous' : 'forbidden',
+              data: null,
+              error:
+                kind === 'logout' && restorationError.status === 401
+                  ? null
+                  : kind === 'login'
+                    ? message
+                    : restorationError.message,
+              busy: false,
+            });
+            return;
+          }
+          // Network/5xx still leaves the mutation unresolved; offer a fresh read.
         }
       }
       if (current !== generation) return;

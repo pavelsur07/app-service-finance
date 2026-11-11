@@ -66,14 +66,14 @@ endpoint-ы, статусы и UX зафиксированы в TASK. Не ра�
 
 ## Phase 0 — baseline перед кодом
 
-- [ ] Записать SHA и DoD Stage 1 в checkpoint; сверить существующий login,
+- [x] Записать SHA и DoD Stage 1 в checkpoint; сверить существующий login,
   ActiveCompanyService, CompanyFacade, ModuleAccessResolver и примеры
   `LoginControllerTest`, `AdminLoginThrottlingTest`, `CashExceptionListener`.
-- [ ] Подготовить отдельные локальные test DB/Redis без production credentials.
-- [ ] Выполнить `make front-typecheck front-lint front-test front-build`;
+- [x] Подготовить отдельные локальные test DB/Redis без production credentials.
+- [x] Выполнить `make front-typecheck front-lint front-test front-build`;
   существующий frontend — `npm run lint`, `npm run build`, `npm run test:unit`
   внутри site-frontend. Записать каждую предсуществующую ошибку.
-- [ ] В запущенном test PHP-контейнере выполнить `vendor/bin/phpunit` для
+- [x] В запущенном test PHP-контейнере выполнить `vendor/bin/phpunit` для
   `tests/Functional/Company/Controller/LoginControllerTest.php`,
   `tests/Functional/Admin/AdminLoginThrottlingTest.php`,
   `tests/Functional/Company/ModuleAccessTest.php`,
@@ -88,31 +88,31 @@ DoD: все auth endpoint-ы из ТЗ работают через тестов�
 
 ### 1.1. Host/path, firewall и JSON-контракт
 
-- [ ] Добавить `site/tests/Functional/Shared/Spa/SpaBoundaryTest.php`:
+- [x] Добавить `site/tests/Functional/Shared/Spa/SpaBoundaryTest.php`:
   корректный host+prefix → JSON 401, чужой prefix/host → 404,
   `/internal/` не публикуется, GET вместо POST → 405; никакого HTML/302.
-- [ ] Прогнать этот файл и записать RED на текущем коде.
-- [ ] Реализовать matcher `matches(Request): bool`, границу host/path,
+- [x] Прогнать этот файл и записать RED на текущем коде.
+- [x] Реализовать matcher `matches(Request): bool`, границу host/path,
   JSON handlers и новые `spa_account`/`spa_admin` contexts. Запрещённый
   SPA API на app-host отклоняется **до** legacy login redirect.
-- [ ] Повторить целевой тест до GREEN; добавить malformed JSON 400,
+- [x] Повторить целевой тест до GREEN; добавить malformed JSON 400,
   unsupported Content-Type 415, validation 422 и отсутствие деталей в 500.
 
 ### 1.2. CSRF, credentials и logout
 
-- [ ] Добавить `SpaAuthenticationTest.php` в тот же каталог: анонимный csrf,
+- [x] Добавить `SpaAuthenticationTest.php` в тот же каталог: анонимный csrf,
   login → 204 → авторизованный запрос, id rotation, reload, logout → 204,
   дальнейший session → 401, независимость трёх hosts, старый main/admin context.
   Logout проверять с пустым body без Content-Type, но с CSRF и Origin.
-- [ ] Добавить `SpaCsrfTest.php` и `SpaLoginThrottlingTest.php`: отсутствие/чужой
+- [x] Добавить `SpaCsrfTest.php` и `SpaLoginThrottlingTest.php`: отсутствие/чужой
   токен, другой Origin/Referer, оба отсутствуют, sibling-origin, токен другой
   сессии/операции, 5 ошибок и блокировка шестой попытки с правильным паролем.
-- [ ] Записать RED; реализовать Passport + UserBadge + PasswordCredentials +
+- [x] Записать RED; реализовать Passport + UserBadge + PasswordCredentials +
   CsrfTokenBadge, JSON success/failure и Symfony logout. CSRF bootstrap доступен
   до login, но не выдаёт сведения о пользователе. Auth input не логируется.
-- [ ] Проверить роль до успешной admin-сессии, ROLE_SUPER_ADMIN через hierarchy,
+- [x] Проверить роль до успешной admin-сессии, ROLE_SUPER_ADMIN через hierarchy,
   обычного пользователя с корректным паролем → 403 без рабочей admin-сессии.
-- [ ] Довести тесты до GREEN; повторить старые login/throttling тесты.
+- [x] Довести тесты до GREEN; повторить старые login/throttling тесты.
 
 Stage checks: `docker compose exec -T -e APP_ENV=test site-php-cli vendor/bin/phpunit
 tests/Functional/Shared/Spa` в изолированном test-окружении; focused PHPStan/CS
@@ -128,39 +128,39 @@ IDOR и роли проверены сервером, нулевая компа�
 
 ### 2.1. Контексты и доступные компании
 
-- [ ] `site/tests/Functional/Company/Api/AccountSessionTest.php`: владелец,
+- [x] `site/tests/Functional/Company/Api/AccountSessionTest.php`: владелец,
   активный участник, без компаний, удаляемая активная компания, нет шаблона прав,
   чужой шаблон, изменения членства/прав между запросами; никаких лишних полей.
   Owner/ROLE_OWNER сохраняют write без шаблона; обычный member получает none.
-- [ ] `AccessibleCompaniesTest.php`: owned + active membership без дублей,
+- [x] `AccessibleCompaniesTest.php`: owned + active membership без дублей,
   сортировка, page/perPage, максимум 200, invalid/out-of-range 422.
-- [ ] Записать RED; реализовать `AccountSessionQuery::__invoke(): SessionResponse`,
+- [x] Записать RED; реализовать `AccountSessionQuery::__invoke(): SessionResponse`,
   DTO и контроллеры. Список компаний использует общую access policy и Pagerfanta;
   запросы discovery ограничены текущим userId. Если PHPStan требует companyId
   до выбора компании, оформить точечное `@companyScopeExempt` с причиной, не
   ослаблять общий гейт и не принимать произвольный userId из запроса.
-- [ ] Права вычислять existing resolver/voter, при необходимости через новый
+- [x] Права вычислять existing resolver/voter, при необходимости через новый
   метод существующего CompanyFacade, возвращающий scalar/DTO-проекцию;
   не импортировать Company Security Service в чужой модуль и не дублировать RBAC.
-- [ ] `site/tests/Functional/Admin/Api/AdminSessionTest.php`: ROLE_ADMIN/super,
+- [x] `site/tests/Functional/Admin/Api/AdminSessionTest.php`: ROLE_ADMIN/super,
   запрет обычному пользователю, снятие роли в уже открытой сессии,
   admin без компании. Реализовать минимальный ответ, довести тесты до GREEN.
 
 ### 2.2. Переключение и контрактные типы
 
-- [ ] `SelectActiveCompanyTest.php`: owner/member success; неактивный member,
+- [x] `SelectActiveCompanyTest.php`: owner/member success; неактивный member,
   чужой/удаляемый/несуществующий UUID → 404 с неизменной сессией; invalid UUID →
   422; CSRF → 403; валидный выбор меняет permissions и следующий session.
-- [ ] RED → `SelectActiveCompanyRequest(targetCompanyId: string)` с Assert;
+- [x] RED → `SelectActiveCompanyRequest(targetCompanyId: string)` с Assert;
   контроллер использует `CompanyFacade::userHasAccess()` до изменения сессии,
   затем читает обновлённый контекст; сервисам не передаёт Request/Session.
-- [ ] Добавить точные ModuleAccessMap exceptions для bootstrap/выбора без
+- [x] Добавить точные ModuleAccessMap exceptions для bootstrap/выбора без
   привязки к праву company ADMIN; anonymous endpoints отдельно и минимально.
   Тест `ControllerAccessCoverageTest` обязан остаться зелёным.
-- [ ] Описать account endpoint-ы в Nelmio, с отдельными servers/security для
+- [x] Описать account endpoint-ы в Nelmio, с отдельными servers/security для
   SPA area. Сгенерировать account TS schema в shared API и прежнюю site schema;
   добавить команды генерации/check через контейнер и документировать их.
-- [ ] Admin DTO сопоставить локальным TS-типам через контрактные fixtures и
+- [x] Admin DTO сопоставить локальным TS-типам через контрактные fixtures и
   assertions; не менять общую политику документирования legacy admin API.
 
 Stage checks: новые Company/Admin API suites + CompanyMemberAccess/ModuleAccess,
@@ -175,29 +175,29 @@ DoD: обе SPA работают с контрактом Stage 1/2; все об�
 
 ### 3.1. Session adapters и состояние
 
-- [ ] Для каждого app добавить `src/shared/session/session.test.ts` (Vitest/MSW):
+- [x] Для каждого app добавить `src/shared/session/session.test.ts` (Vitest/MSW):
   csrf→login→session, initial 401, login 401 без global redirect, 403/429/network,
   logout, abort, старый ответ после logout/смены компании, ошибка восстановления.
-- [ ] RED → реализовать endpoint-функции `getSession(signal?)`,
+- [x] RED → реализовать endpoint-функции `getSession(signal?)`,
   `login({email,password})`, `logout()`; в account `getCompanies(page,signal?)`,
   `selectActiveCompany(targetCompanyId)`. Все через @vashfindir/api; типы из DTO.
-- [ ] Реализовать SessionProvider/RequireSession и отмену с generation guard;
+- [x] Реализовать SessionProvider/RequireSession и отмену с generation guard;
   на 401 очищать состояние, на network/5xx сохранять возможность повторить,
   пароли не сохранять. После неоднозначного POST перечитать session.
-- [ ] GREEN, MSW unhandled requests = error; старые API contract tests без
+- [x] GREEN, MSW unhandled requests = error; старые API contract tests без
   изменений поведения. Не добавлять Query/Zod/state library для этой оболочки.
 
 ### 3.2. Страницы и выбор компании
 
-- [ ] Добавить Playwright `auth.spec.ts`/`company-selection.spec.ts` с local
+- [x] Добавить Playwright `auth.spec.ts`/`company-selection.spec.ts` с local
   request fixtures для UI-ошибок: labels, keyboard, submit pending, no-company,
   forbidden, local return URL, login loop, reload protected route, public about.
-- [ ] RED → LoginPage, ForbiddenPage, shell с email/logout и account picker;
+- [x] RED → LoginPage, ForbiddenPage, shell с email/logout и account picker;
   HomePage сохраняет текст заглушки. Пикер поддерживает пагинацию, pending,
   отказ и перепроверку на focus; admin не показывает picker компаний.
-- [ ] Использовать существующие finance primitives; при добавлении общего
+- [x] Использовать существующие finance primitives; при добавлении общего
   visual-компонента сохранить React18/19 и старые reexports.
-- [ ] GREEN: `make front-typecheck front-lint front-test front-build`,
+- [x] GREEN: `make front-typecheck front-lint front-test front-build`,
   `make front-e2e MODE=dev` и `MODE=preview` для обеих SPA. Эти UI-тесты с mocks
   не заменяют actual-backend E2E следующего Stage.
 
@@ -262,6 +262,11 @@ Rollout: существующий backend получает совместимы�
 SPA, совместимая с возвращаемым backend; миграций и преобразования данных нет.
 Отдельные SPA-сессии после отката могут потребовать повторного входа; legacy
 sessions не инвалидируются глобально. Не очищать Redis для отката.
+
+Примечание к выполнению: имена тестовых файлов консолидированы (CSRF/throttle
+в SpaAuthenticationTest), а реальные cookie/host проверки вынесены в Stage4.
+SessionStatus реализует forbidden/error без отдельной страницы маршрутизации.
+Фактические команды и результаты — checkpoint и Stage Reports.
 
 ## Review focus и трассировка
 

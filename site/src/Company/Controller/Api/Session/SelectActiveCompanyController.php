@@ -32,7 +32,7 @@ final class SelectActiveCompanyController extends AbstractController
     #[OA\Response(response: 403, description: 'CSRF/Origin не прошли проверку')]
     #[OA\Response(response: 404, description: 'Компания недоступна')]
     #[OA\Response(response: 422, description: 'Некорректный идентификатор')]
-    public function __invoke(Request $request, #[MapRequestPayload] SelectActiveCompanyRequest $input, CompanyFacade $companies, SpaCsrf $csrf, AccountSessionQuery $query): JsonResponse
+    public function __invoke(Request $request, #[MapRequestPayload(acceptFormat: 'json')] SelectActiveCompanyRequest $input, CompanyFacade $companies, SpaCsrf $csrf, AccountSessionQuery $query): JsonResponse
     {
         $csrf->validate($request, 'company_select');
         $user = $this->getUser();

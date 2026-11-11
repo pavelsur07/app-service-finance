@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Company\Facade;
 
 use App\Company\Application\CreateCompanyOwnerAccountAction;
-use App\Company\Entity\CompanyMember;
+use App\Company\Entity\Company;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
@@ -20,82 +20,29 @@ use Ramsey\Uuid\Uuid;
 
 final class CompanyFacadeTest extends TestCase
 {
-    public function testListAccessibleCompaniesForUserMergesOwnedAndActiveMemberCompanies(): void
+    public function testListAccessibleCompaniesMapsRepositoryResultWithoutLeakingEntities(): void
     {
         $user = UserBuilder::aUser()->build();
-        $owned = CompanyBuilder::aCompany()->withIndex(1)->build();
-        $memberCompany = CompanyBuilder::aCompany()->withIndex(2)->build();
-        $member = new CompanyMember(Uuid::uuid7()->toString(), $memberCompany, $user, CompanyMember::ROLE_OPERATOR);
+        $first = CompanyBuilder::aCompany()->withIndex(1)->build();
+        $second = CompanyBuilder::aCompany()->withIndex(2)->build();
+        $facade = $this->facade([(string) $user->getId() => [$first, $second]]);
 
-        $facade = $this->facade(
-            findByUserId: [(string) $user->getId() => [$owned]],
-            findActiveByUserId: [(string) $user->getId() => [$member]],
-        );
-
-        self::assertSame(
-            [
-                ['id' => (string) $owned->getId(), 'name' => (string) $owned->getName()],
-                ['id' => (string) $memberCompany->getId(), 'name' => (string) $memberCompany->getName()],
-            ],
-            $facade->listAccessibleCompaniesForUser((string) $user->getId()),
-        );
+        self::assertSame([
+            ['id' => (string) $first->getId(), 'name' => (string) $first->getName()],
+            ['id' => (string) $second->getId(), 'name' => (string) $second->getName()],
+        ], $facade->listAccessibleCompaniesForUser((string) $user->getId()));
     }
 
-    public function testListAccessibleCompaniesForUserDeduplicatesCompanyOwnedAndAlsoMember(): void
+    public function testAccessUsesOnlyTheRequestingUsersAccessibleCompanies(): void
     {
         $user = UserBuilder::aUser()->build();
-        $company = CompanyBuilder::aCompany()->withIndex(1)->build();
-        $member = new CompanyMember(Uuid::uuid7()->toString(), $company, $user, CompanyMember::ROLE_OPERATOR);
+        $company = CompanyBuilder::aCompany()->build();
+        $facade = $this->facade([(string) $user->getId() => [$company]]);
 
-        $facade = $this->facade(
-            findByUserId: [(string) $user->getId() => [$company]],
-            findActiveByUserId: [(string) $user->getId() => [$member]],
-        );
-
-        self::assertSame(
-            [['id' => (string) $company->getId(), 'name' => (string) $company->getName()]],
-            $facade->listAccessibleCompaniesForUser((string) $user->getId()),
-        );
-    }
-
-    public function testUserHasAccessIsTrueForOwnedCompany(): void
-    {
-        $user = UserBuilder::aUser()->build();
-        $owned = CompanyBuilder::aCompany()->withIndex(1)->build();
-
-        $facade = $this->facade(
-            findByUserId: [(string) $user->getId() => [$owned]],
-            findActiveByUserId: [(string) $user->getId() => []],
-        );
-
-        self::assertTrue($facade->userHasAccess((string) $owned->getId(), (string) $user->getId()));
-    }
-
-    public function testUserHasAccessIsTrueForActiveMemberCompany(): void
-    {
-        $user = UserBuilder::aUser()->build();
-        $memberCompany = CompanyBuilder::aCompany()->withIndex(2)->build();
-        $member = new CompanyMember(Uuid::uuid7()->toString(), $memberCompany, $user, CompanyMember::ROLE_OPERATOR);
-
-        $facade = $this->facade(
-            findByUserId: [(string) $user->getId() => []],
-            findActiveByUserId: [(string) $user->getId() => [$member]],
-        );
-
-        self::assertTrue($facade->userHasAccess((string) $memberCompany->getId(), (string) $user->getId()));
-    }
-
-    public function testUserHasAccessIsFalseWithoutOwnershipOrMembership(): void
-    {
-        $user = UserBuilder::aUser()->build();
-        $foreignCompany = CompanyBuilder::aCompany()->withIndex(3)->build();
-
-        $facade = $this->facade(
-            findByUserId: [(string) $user->getId() => []],
-            findActiveByUserId: [(string) $user->getId() => []],
-        );
-
-        self::assertFalse($facade->userHasAccess((string) $foreignCompany->getId(), (string) $user->getId()));
+        self::assertTrue($facade->userHasAccess((string) $company->getId(), (string) $user->getId()));
+        self::assertFalse($facade->userHasAccess(Uuid::uuid7()->toString(), (string) $user->getId()));
+        self::assertFalse($facade->userHasAccess((string) $company->getId(), Uuid::uuid7()->toString()));
+        self::assertSame([], $facade->listAccessibleCompaniesForUser(Uuid::uuid7()->toString()));
     }
 
     public function testOwnerCheckUsesActualCompanyOwnerAndRejectsForeignOrMissingCompany(): void
@@ -107,7 +54,7 @@ final class CompanyFacadeTest extends TestCase
         $repository->method('findById')->willReturnCallback(
             static fn (string $id) => $id === $company->getId() ? $company : null,
         );
-        $facade = $this->facade([], [], $repository);
+        $facade = $this->facade([], $repository);
 
         self::assertTrue($facade->isOwner((string) $company->getId(), (string) $owner->getId()));
         self::assertFalse($facade->isOwner((string) $company->getId(), (string) $otherOwner->getId()));
@@ -117,21 +64,19 @@ final class CompanyFacadeTest extends TestCase
     }
 
     /**
-     * @param array<string, list<\App\Company\Entity\Company>> $findByUserId
-     * @param array<string, list<CompanyMember>> $findActiveByUserId
+     * @param array<string, list<Company>> $accessibleByUser
      * @param (CompanyRepository&MockObject)|null $repository
      */
-    private function facade(array $findByUserId, array $findActiveByUserId, ?CompanyRepository $repository = null): CompanyFacade
+    private function facade(array $accessibleByUser, ?CompanyRepository $repository = null): CompanyFacade
     {
         $companyRepository = $repository ?? $this->createMock(CompanyRepository::class);
-        $companyRepository->method('findByUserId')->willReturnCallback(
-            static fn (string $userId): array => $findByUserId[$userId] ?? [],
+        $companyRepository->method('findAccessibleByUserId')->willReturnCallback(
+            static fn (string $userId): array => $accessibleByUser[$userId] ?? [],
         );
-
+        $companyRepository->method('isAccessibleByUser')->willReturnCallback(
+            static fn (string $companyId, string $userId): bool => \in_array($companyId, array_map(static fn (Company $company): string => (string) $company->getId(), $accessibleByUser[$userId] ?? []), true),
+        );
         $companyMemberRepository = $this->createMock(CompanyMemberRepository::class);
-        $companyMemberRepository->method('findActiveByUserId')->willReturnCallback(
-            static fn (string $userId): array => $findActiveByUserId[$userId] ?? [],
-        );
 
         return new CompanyFacade(
             $companyRepository,

@@ -1,0 +1,8 @@
+# Optional loopback publication for interactive work with disposable test fixtures.
+services:
+  account:
+    ports: ["127.0.0.1:5174:5174", "127.0.0.1:4174:4174"]
+  admin:
+    ports: ["127.0.0.1:5175:5175", "127.0.0.1:4175:4175"]
+  site:
+    ports: ["127.0.0.1:8089:80"]

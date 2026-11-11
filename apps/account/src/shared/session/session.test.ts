@@ -176,3 +176,83 @@ test('company selection hides old context and lost POST response is reconciled f
   expect(store.getSnapshot().data?.active_company?.id).toBe('new');
   expect(store.getSnapshot().error).toBeTruthy();
 });
+
+test.each([401, 403])(
+  'lost logout response obeys authoritative session status %s',
+  async (status) => {
+    server.use(
+      http.get(`${base}/auth/csrf`, () =>
+        HttpResponse.json({ tokens: { logout: 'logout' } }),
+      ),
+      http.post(`${base}/auth/logout`, () => HttpResponse.error()),
+      http.get(`${base}/session`, () => HttpResponse.json({}, { status })),
+    );
+    const store = createSessionStore(base);
+    await store.logout();
+    expect(store.getSnapshot().status).toBe(
+      status === 401 ? 'anonymous' : 'forbidden',
+    );
+    expect(store.getSnapshot().data).toBeNull();
+  },
+);
+
+test('background refresh preserves the visible session until the response', async () => {
+  server.use(http.get(`${base}/session`, () => HttpResponse.json(identity)));
+  const store = createSessionStore(base);
+  await store.refresh();
+  server.use(
+    http.get(`${base}/session`, async () => {
+      await delay(20);
+      return HttpResponse.json(identity);
+    }),
+  );
+  const pending = store.refresh();
+  expect(store.getSnapshot()).toMatchObject({
+    status: 'authenticated',
+    busy: true,
+    data: { user: identity.user },
+  });
+  await pending;
+});
+
+test('lost login response followed by anonymous session retains the network message', async () => {
+  server.use(
+    http.get(`${base}/auth/csrf`, () =>
+      HttpResponse.json({ tokens: { login: 'login' } }),
+    ),
+    http.post(`${base}/auth/login`, () => HttpResponse.error()),
+    http.get(`${base}/session`, () => HttpResponse.json({}, { status: 401 })),
+  );
+  const store = createSessionStore(base);
+  await store.login({ email: 'one@example.test', password: 'password' });
+  expect(store.getSnapshot()).toMatchObject({
+    status: 'anonymous',
+    error: 'Нет связи с сервером.',
+  });
+});
+
+test.each([403, 404, 422])(
+  'rejected selection %s restores the server context and keeps the error',
+  async (status) => {
+    server.use(
+      http.get(`${base}/session`, () => HttpResponse.json(identity)),
+      http.get(`${base}/auth/csrf`, () =>
+        HttpResponse.json({ tokens: { company_select: 'select' } }),
+      ),
+      http.post(`${base}/active-company`, () =>
+        HttpResponse.json(
+          { error: { code: 'rejected', message: 'Компания недоступна' } },
+          { status },
+        ),
+      ),
+    );
+    const store = createSessionStore(base);
+    await store.refresh();
+    await store.selectCompany('unavailable');
+    expect(store.getSnapshot()).toMatchObject({
+      status: 'authenticated',
+      data: { user: identity.user },
+      error: 'Компания недоступна',
+    });
+  },
+);

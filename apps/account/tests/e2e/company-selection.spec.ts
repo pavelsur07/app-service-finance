@@ -11,6 +11,22 @@ test('company pagination, switching and revoked access on focus', async ({
       return route.fulfill({ json: { tokens: { company_select: 'token' } } });
     if (url.pathname.endsWith('/companies')) {
       const page = Number(url.searchParams.get('page'));
+      if (revoked)
+        return route.fulfill({
+          status: page > 1 ? 422 : 200,
+          json:
+            page > 1
+              ? {
+                  error: {
+                    code: 'invalid_page',
+                    message: 'Страница недоступна',
+                  },
+                }
+              : {
+                  data: [],
+                  meta: { page: 1, pages: 1, per_page: 50, total: 0 },
+                },
+        });
       return route.fulfill({
         json: {
           data: [
@@ -43,10 +59,15 @@ test('company pagination, switching and revoked access on focus', async ({
   await expect(page.getByText('Текущая компания:')).toContainText(
     'Вторая компания',
   );
+  await page.getByRole('button', { name: 'Следующая', exact: true }).click();
+  await expect(page.getByText('Страница 2 из 2')).toBeVisible();
   revoked = true;
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(page.getByText('Текущая компания:')).toContainText('Не выбрана');
   await expect(page.getByText('Текущая компания:')).not.toContainText(
     'Вторая компания',
   );
+  await expect(
+    page.getByText('Нет доступных компаний.', { exact: false }),
+  ).toBeVisible();
 });

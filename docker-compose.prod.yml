@@ -239,6 +239,18 @@ services:
             start_period: 10s
         labels:
             - traefik.enable=true
+            - traefik.http.routers.account-api.rule=Host(`account.vashfindir.ru`) && PathPrefix(`/api/account/v1/`)
+            - traefik.http.routers.account-api.priority=100
+            - traefik.http.routers.account-api.entrypoints=https
+            - traefik.http.routers.account-api.tls=true
+            - traefik.http.routers.account-api.tls.certresolver=letsEncrypt
+            - traefik.http.routers.account-api.service=myapp
+            - traefik.http.routers.admin-api.rule=Host(`admin.vashfindir.ru`) && PathPrefix(`/api/admin/v1/`)
+            - traefik.http.routers.admin-api.priority=100
+            - traefik.http.routers.admin-api.entrypoints=https
+            - traefik.http.routers.admin-api.tls=true
+            - traefik.http.routers.admin-api.tls.certresolver=letsEncrypt
+            - traefik.http.routers.admin-api.service=myapp
             - traefik.http.routers.myapp.rule=Host(`app.vashfindir.ru`)
             - traefik.http.routers.myapp.entrypoints=https
             - traefik.http.routers.myapp.tls=true

@@ -11,6 +11,20 @@ use Ramsey\Uuid\Uuid;
 
 final class SelectActiveCompanyTest extends SpaWebTestCase
 {
+    public function testSelectionAcceptsOnlyJsonPayloads(): void
+    {
+        $client = static::createClient();
+        $user = $this->user();
+        $company = $this->company($user, 'Owned');
+        $tokens = $this->login($client, $user);
+        $url = 'https://account.vashfindir.ru/api/account/v1/active-company';
+        $headers = ['HTTP_ORIGIN' => 'https://account.vashfindir.ru', 'HTTP_X_CSRF_TOKEN' => $tokens['company_select']];
+        $client->request('POST', $url, ['targetCompanyId' => $company->getId()], [], $headers + ['CONTENT_TYPE' => 'application/x-www-form-urlencoded']);
+        self::assertResponseStatusCodeSame(415);
+        $client->request('POST', $url, [], [], $headers + ['CONTENT_TYPE' => 'application/xml'], '<request><targetCompanyId>'.$company->getId().'</targetCompanyId></request>');
+        self::assertResponseStatusCodeSame(415);
+    }
+
     public function testSelectionAuthorizesOwnerAndMemberButKeepsContextOnInvalidTargets(): void
     {
         $client = static::createClient();

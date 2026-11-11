@@ -23,7 +23,9 @@ final readonly class SpaContext
 
     public function isApiPath(Request $request): bool
     {
-        return 1 === preg_match('#^/api/(account|admin)/v1(?:/|$)#D', $request->getPathInfo());
+        // Symfony's router decodes once. Detect encoded aliases before a request
+        // can fall through to the legacy firewall on a different host.
+        return 1 === preg_match('#^/api/(account|admin)/v1(?:/|$)#D', rawurldecode($request->getPathInfo()));
     }
 
     public function realm(Request $request): ?string

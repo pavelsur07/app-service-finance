@@ -219,13 +219,8 @@ final class CompanyFacade
      */
     public function userHasAccess(string $companyId, string $userId): bool
     {
-        foreach ($this->accessibleCompaniesForUser($userId) as $company) {
-            if ($company->getId() === $companyId) {
-                return true;
-            }
-        }
-
-        return false;
+        return Uuid::isValid($companyId) && Uuid::isValid($userId)
+            && $this->repository->isAccessibleByUser($companyId, $userId);
     }
 
     /**
@@ -290,9 +285,6 @@ final class CompanyFacade
     private function accessibleCompaniesForUser(string $userId): array
     {
         // The paginated SPA discovery and legacy access checks use the same policy.
-        /** @var list<Company> $companies */
-        $companies = $this->repository->createAccessibleForUserQueryBuilder($userId)->getQuery()->getResult();
-
-        return $companies;
+        return $this->repository->findAccessibleByUserId($userId);
     }
 }

@@ -3,7 +3,7 @@
 **Phase:** Stage 4 / Work item 4.1
 **Status:** implementing
 **Branch:** `feat/account-admin-auth`
-**Stage base commit:** `ce991770b0c74d3ec7cbdc8b47c81eceeb174436`
+**Stage base commit:** `0a255776cb41dc77cb3c2cc6504ea6b77be34aec`
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/2971 (Draft, master)
 
 ## Authorization and rulings
@@ -97,3 +97,94 @@
 - Next: finish dev/preview UI checks, review Stage 3, then actual HTTP Stage 4.
 
 - Stage 3 closed: both typecheck/lint/build; Vitest 28 account/27 admin; dev and preview E2E 12 account/10 admin each. Internal B0/I0; external at handoff.
+
+## Stage 4 progress
+
+- Routing contract RED 4 failures; exact Traefik routers, reserved nginx paths,
+  request_uri-based CORS mapping and mandatory CI auth E2E gate implemented.
+- Real HTTP stack uses isolated spa_e2e environment/database/Redis, test-only
+  dotenv path and trusted ephemeral CA; no production values. Production router
+  rules are read from the actual Compose labels into test Traefik configuration.
+- First actual dev run: login/cookie/selection passed, legacy login expectation
+  was wrong (existing /login always renders200), now checks protected / redirect
+  to finance. Unknown Vite API paths initially fell through to HTML (RED); exact
+  middleware boundary added to dev and preview.
+- CI Stage2 found old CompanyFacade unit mocks still referenced old two-query
+  implementation (5 errors). Targeted RED; repository now offers array accessor
+  over the same query and unit tests cover mapping/access by current user;
+  deduplication stays covered against real DB. Targeted 6 tests/44 assertions PASS.
+- Next: finish real dev/preview/HTTPS, full handoff gates, fresh and external review.
+
+- Real dev and preview suites GREEN for both apps (2 tests each/mode), with
+  Redis cookies, session rotation, owner company selection, independent sibling
+  and legacy sessions, logout/replay, CSRF/Origin and host/path rejection.
+- Fresh internal reviewer: B0/I2/M2. Both IMPORTANT reproduced RED and fixed:
+  selection requires JSON (form/XML415), reconciliation obeys definitive401/403.
+  Targeted PHP2/21, Vitest30 account/29 admin GREEN. Minors: CI account types
+  drift check and ARCHITECTURE context docs added. Follow-up review clean.
+- Full handoff gates launched once, sequential (session27625): site-stan,
+  site-cs-check, site-cs-strict-types, site-test-unit, site-test. Logs
+  /tmp/finance-auth-final-site-*.log. Do not run another full suite concurrently.
+- Legacy lint/build/test:unit GREEN92 tests. New frontend final lint/tests green
+  before reconciliation edit; format/lint/build to repeat for that change.
+- Production HTTP suite session12452 /tmp/finance-auth-stage4-production-fixed.log.
+  First run stopped before build because nested frontend.sh rejected MODE=production;
+  pass MODE=dev only to the image-build helper, keep auth test mode production.
+
+- Handoff full CS and strict-types PASS4072 files. PHPStan full run incomplete:
+  parallel worker jobs did not finish; host swap full during overlapping image/
+  browser workload. Production browser timed out including newPage creation.
+  Use full-scope serial PHPStan via ignored var/stan-serial.neon after current
+  suite ends, then repeat HTTPS without concurrent heavy work; no baseline changes.
+- Actionlint current and base both show same pre-existing SC2129/SC2086 shell
+  findings. New routing/release tests all pass (4+6 and deploy shell contract).
+
+- Final external round1 REVIEW_GREEN B0/I0/M3. Safe minors being fixed: preserve
+  authenticated tree on focus refresh; retain network message after ambiguous
+  login+401; bounded company access lookup reuses shared query instead of loading
+  all entities. UI minors reproduced RED2 then targeted verification pending.
+- Additional self-review found encoded SPA paths were not detected before legacy
+  firewall whereas Symfony router rawurldecodes paths. Classified BLOCKER (host
+  boundary contract). Unit request-event regression RED3; detect one decoded
+  path for deny decision, keeping canonical realm matching; GREEN4/10 assertions
+  including server500 JSON sanitization. Real HTTP encoded-path assertions added.
+  Fresh review follow-up and external round2 required for this boundary fix.
+
+- Final reviewer delta confirmed encoded-path fix. New bounded access query
+  initially retained ORDER BY from list query; PostgreSQL read-only diagnostic
+  reproduced aggregate failure. Cleared ordering and outer DISTINCT; bounded
+  COUNT(DISTINCT id) remains on shared access predicate. Real selection suite
+  to rerun after full tests complete (avoid concurrent DB tests).
+- UI minor fixes GREEN32 account/31 admin. Additional encoded-path unit GREEN4/10.
+- Full site-test is still running (~80% of8765); wait session27625, then run
+  changed backend targeted tests, full serial PHPStan, real production HTTPS and
+  image smoke sequentially. External final round1 REVIEW_GREEN; round2 required
+  because the subsequently discovered boundary BLOCKER was fixed.
+
+- Full handoff site-test PASS8765 tests/49102 assertions. Final targeted backend
+  after encoded-path/count-query fixes PASS42/223. Fresh reviewer confirms no
+  open B/I, including count SQL correction and picker recovery.
+- Picker page2 becoming invalid after revocation: browser RED2 → GREEN2;
+  resets GET pagination to1 only, never retries POST.
+- Full-scope serial PHPStan running session21153, log
+  /tmp/finance-auth-final-stan-serial.log. External final round2 running19308,
+  log /tmp/finance-auth-review-round2.log; previous round1 report saved
+  /tmp/finance-auth-external-round1.txt.
+- Next after serial analysis: both API schema drift checks, production HTTPS
+  repeat, production image smoke, frontend lint/build after latest formatting;
+  then Stage4 report/handoff commit+push and CI verification before Ready.
+
+- External final round2 REVIEW_GREEN B0/I0/M2. MINOR1 rejected selection context
+  recovery: RED3 cases403/404/422 → restore authoritative session without POST
+  retry, Vitest account35 GREEN. MINOR2 (avoid company list focus refetch) rejected:
+  membership/list may change while user and active company IDs stay the same;
+  TASK focus revalidation and revocation behavior require refreshing that list.
+  Brief loading state is intentional; no additional cache abstraction introduced.
+- External final total2 rounds, all BLOCKER/IMPORTANT clear; safe minors fixed
+  or technically rejected as recorded. Stage1/2 external reviews remain separately
+  documented. Last internal follow-up clean through picker page fallback.
+
+- Ruling: push a task-owned checkpoint commit to the existing Draft PR to execute
+  the newly added CI workflow. This is required CI verification, not Stage4
+  closure or Ready/handoff; local serial PHPStan/HTTPS are still pending.
+  Production deploy is impossible on this feature-branch pull_request event.

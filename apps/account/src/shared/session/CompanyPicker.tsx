@@ -24,6 +24,11 @@ export function CompanyPicker() {
           void store.refresh();
           return;
         }
+        if (error instanceof ApiError && error.status === 422 && page > 1) {
+          // Membership can change while the user is on a later page.
+          setPage(1);
+          return;
+        }
         setError(
           error instanceof Error
             ? error.message

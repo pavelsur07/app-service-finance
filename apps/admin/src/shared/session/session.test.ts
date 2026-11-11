@@ -154,3 +154,57 @@ test.each([
 ])('rejects unsafe return path %s', (value) => {
   expect(safeReturnPath(value)).toBe('/');
 });
+
+test.each([401, 403])(
+  'lost logout response obeys authoritative session status %s',
+  async (status) => {
+    server.use(
+      http.get(`${base}/auth/csrf`, () =>
+        HttpResponse.json({ tokens: { logout: 'logout' } }),
+      ),
+      http.post(`${base}/auth/logout`, () => HttpResponse.error()),
+      http.get(`${base}/session`, () => HttpResponse.json({}, { status })),
+    );
+    const store = createSessionStore(base);
+    await store.logout();
+    expect(store.getSnapshot().status).toBe(
+      status === 401 ? 'anonymous' : 'forbidden',
+    );
+    expect(store.getSnapshot().data).toBeNull();
+  },
+);
+
+test('background refresh preserves the visible session until the response', async () => {
+  server.use(http.get(`${base}/session`, () => HttpResponse.json(identity)));
+  const store = createSessionStore(base);
+  await store.refresh();
+  server.use(
+    http.get(`${base}/session`, async () => {
+      await delay(20);
+      return HttpResponse.json(identity);
+    }),
+  );
+  const pending = store.refresh();
+  expect(store.getSnapshot()).toMatchObject({
+    status: 'authenticated',
+    busy: true,
+    data: { user: identity.user },
+  });
+  await pending;
+});
+
+test('lost login response followed by anonymous session retains the network message', async () => {
+  server.use(
+    http.get(`${base}/auth/csrf`, () =>
+      HttpResponse.json({ tokens: { login: 'login' } }),
+    ),
+    http.post(`${base}/auth/login`, () => HttpResponse.error()),
+    http.get(`${base}/session`, () => HttpResponse.json({}, { status: 401 })),
+  );
+  const store = createSessionStore(base);
+  await store.login({ email: 'one@example.test', password: 'password' });
+  expect(store.getSnapshot()).toMatchObject({
+    status: 'anonymous',
+    error: 'Нет связи с сервером.',
+  });
+});

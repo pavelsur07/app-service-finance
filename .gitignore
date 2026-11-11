@@ -76,3 +76,5 @@ test_cert.zip
 playwright-report/
 test-results/
 .superpowers/
+
+/.frontend-auth/

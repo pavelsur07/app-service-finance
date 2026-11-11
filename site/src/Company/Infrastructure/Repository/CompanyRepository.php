@@ -75,6 +75,30 @@ class CompanyRepository extends ServiceEntityRepository
     }
 
     /**
+     * @return list<Company>
+     *
+     * @companyScopeExempt Discovery before company selection, restricted to the current user.
+     */
+    public function findAccessibleByUserId(string $userId): array
+    {
+        /** @var list<Company> $companies */
+        $companies = $this->createAccessibleForUserQueryBuilder($userId)->getQuery()->getResult();
+
+        return $companies;
+    }
+
+    public function isAccessibleByUser(string $companyId, string $userId): bool
+    {
+        return (int) $this->createAccessibleForUserQueryBuilder($userId)
+            ->distinct(false)
+            ->resetDQLPart('orderBy')
+            ->select('COUNT(DISTINCT c.id)')
+            ->andWhere('c.id = :targetCompany')
+            ->setParameter('targetCompany', $companyId)
+            ->getQuery()->getSingleScalarResult() > 0;
+    }
+
+    /**
      * Компании владельца, помеченные к удалению, — для блока «Будет удалена» в списке.
      *
      * @return list<Company>
