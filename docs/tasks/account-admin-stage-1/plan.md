@@ -14,7 +14,7 @@ Vitest/MSW, Playwright/Chromium; PHP/Node/npm только в контейнер
 
 ## Статус, ограничения и решения до старта
 
-План Large-задачи находится в реализации. Состояние и фактические проверки —
+Реализация четырёх Stage завершена; выполняется handoff и проверка CI. Состояние и фактические проверки —
 в [checkpoint.md](checkpoint.md); этот документ не заменяет Stage Reports.
 Документационный PR #2970 завершён отдельно; реализация начинается от `34ef67560`.
 
@@ -213,41 +213,41 @@ DoD: same-origin API и host isolation доказаны реальным nginx/S
 
 ### 4.1. Реальный HTTP-контур и CI
 
-- [ ] Добавить `tests/shell/frontend-auth-routing-test.py` и E2E
+- [x] Добавить `tests/shell/frontend-auth-routing-test.py` и E2E
   `session-isolation.spec.ts`: production nginx images + Traefik/test proxy +
   реальный test Symfony, PostgreSQL/Redis и заранее созданные fixtures.
   Никаких mocked auth responses, production env или реальных данных.
-- [ ] Записать RED на существующем SPA fallback/API routing. Добавить точные
+- [x] Записать RED на существующем SPA fallback/API routing. Добавить точные
   Traefik API routers с explicit priority и host-preserving site service;
   ограничить nginx host/path и CORS только новыми контурами.
-- [ ] В dev/preview настроить proxy для своего API и разные hostnames; Docker
+- [x] В dev/preview настроить proxy для своего API и разные hostnames; Docker
   browser должен резолвить их внутри сети, локальный браузер — в loopback.
   В production-like тесте использовать HTTPS с тестовым доверенным CA, чтобы
   проверить Secure/cookie isolation без `ignoreHTTPSErrors`.
-- [ ] Реальные login→reload→company→logout и независимые app/account/admin
+- [x] Реальные login→reload→company→logout и независимые app/account/admin
   проверить в одном browser context; cookies inspect без печати значений.
   Отдельно hostile sibling Origin, wrong host prefix и expired session.
-- [ ] Сохранить статический smoke `front-prod-test` (about/assets/health/404);
+- [x] Сохранить статический smoke `front-prod-test` (about/assets/health/404);
   protected home тесты перенести в actual-backend suite, не ожидать старую
   анонимную главную. Добавить `front-auth-e2e MODE=dev|preview|production`
   с APP=account|admin или обоими по умолчанию и описать в apps/README.
-- [ ] В CI добавить actual-backend suite как обязательную зависимость deploy;
+- [x] В CI добавить actual-backend suite как обязательную зависимость deploy;
   path filters учитывать auth/backend/shared/frontend/nginx изменения.
   Сохранить проверку реальных image artifacts перед публикацией и порядок
   backend→SPA; регрессионные release-contract тесты RED→GREEN.
 
 ### 4.2. Финальные проверки и выпуск
 
-- [ ] Один раз на handoff: `make site-stan site-cs-check site-cs-strict-types
+- [x] Один раз на handoff: `make site-stan site-cs-check site-cs-strict-types
   site-test-unit`, затем `make site-test` (затронута auth integration).
-- [ ] Новые SPA typecheck/lint/Vitest/build; dev/preview/production auth E2E;
+- [x] Новые SPA typecheck/lint/Vitest/build; dev/preview/production auth E2E;
   production image smoke; старый frontend lint/build/test:unit и API types check;
   `make test-frontend-release`, `make test-deploy-workflow`, actionlint.
-- [ ] Fresh internal review всего diff по backend/frontend checklist. External
+- [x] Fresh internal review всего diff по backend/frontend checklist. External
   review другой моделью через `site/bin/external-review.sh <base> --effort medium`
   с полным apps/infra diff в context при необходимости; правила и лимит раундов
   — docs/workflow/external-review.md. Устранить BLOCKER/IMPORTANT и безопасные MINOR.
-- [ ] Stage Report и handoff: результаты, baseline delta, ревью/метрики,
+- [x] Stage Report и handoff: результаты, baseline delta, ревью/метрики,
   ограничения, точные команды локального запуска, API-схемы, release acceptance.
 - [ ] Ready → один запрос «merge and deploy #N». Предыдущие одобрения #2965/#2967
   не распространяются на новый auth PR. После одобрения пройти pipeline до конца.

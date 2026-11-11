@@ -1,48 +1,73 @@
-# Handoff — account/admin authentication (in verification)
+# Account/admin Stage 1 — handoff
 
-PR #2971, branch feat/account-admin-auth, base34ef67560. Documentation PR2970
-merged separately; owner approval2970 does not authorize merging this code PR.
+**Branch:** `feat/account-admin-auth`
+**PR:** https://github.com/pavelsur07/app-service-finance/pull/2971
+**Product checkpoint:** `0943d7c07` (subsequent commit closes task documents only).
+**CI:** current results are the PR checks; final Ready transition requires green.
 
-## Delivered scope
+## Delivered
 
-Existing Symfony User/provider/passwords, independent host-only Redis sessions
-for account/admin, JSON CSRF/login/logout/session APIs. Account company discovery
-and selection reuse existing access policy and module rights. Admin requires
-system ROLE_ADMIN. React shells add login, retry/forbidden/no-company and company
-pagination. Public about/404 remain free of data requests. Legacy API/UI imports
-and login continue unchanged. No migrations or new financial rules.
+- Stage1: existing Symfony users/passwords, independent account/admin host-only
+  Redis sessions, JSON CSRF/login/logout, throttling and host/Origin boundary.
+- Stage2: account identity, current company, existing module permissions,
+  paginated accessible companies and guarded selection. Admin requires system
+  ROLE_ADMIN and works without a company. Generated account OpenAPI contract.
+- Stage3: login and protected React shells, company picker, error/retry/forbidden/
+  no-company states, cancellation and stale-response guards. Public about/404
+  remain independent of authentication. Finance kit and legacy adapters retained.
+- Stage4: exact same-origin routing, actual Symfony HTTP/HTTPS acceptance,
+  production image smoke, required CI gate and documented local/release workflow.
 
-Same-origin exact Traefik routers and nginx CORS/fallback boundary; isolated
-HTTP fixture stack plus required CI job (dev, preview, production HTTPS with
-trusted CA). Account OpenAPI types drift checked in CI. Local commands and
-rollout/rollback documented in apps/README.md.
+## Files and public contracts
 
-## Verification status
+Backend: `site/src/Shared/{Security/Spa,Controller/Spa,Infrastructure/Http}`,
+Company/Admin API controllers/DTOs, existing Company Facade/repository, security
+configuration and API schemas. Frontend: `apps/{account,admin}`, shared
+`site/packages/api` session transport and generated types. Infra: Compose/nginx,
+`bin/frontend-auth*`, Makefile, deploy workflow. Usage: [apps README](../../../apps/README.md).
 
-- New app typecheck/lint/build and Vitest30 account/29 admin PASS.
-- Legacy frontend lint/build/test:unit PASS92 tests.
-- UI desktop/mobile dev+preview: account12/admin10 each PASS before final
-  reconciliation-only fix; pure regression suites pass after that fix.
-- Real HTTP dev+preview: 2 tests each app/mode PASS, actual DB/Redis and three
-  independent host sessions, including legacy main login and logout isolation.
-- Full PHP CS/strict-types4072 files PASS; unit4609 tests/25550 assertions PASS.
-- Full site-test in progress. Full PHPStan parallel workers incomplete on local
-  resource pressure; serial full-scope retry pending. No baseline changes.
-- Production HTTPS run timed out under concurrent resource pressure; rerun pending.
-- Routing4/release6/deploy-shell contracts PASS. Actionlint structure PASS;
-  full actionlint has same pre-existing SC2129 and SC2086 as task base.
+New same-origin `/api/account/v1/` and `/api/admin/v1/` auth/session contracts;
+account includes companies/selection. Existing API/imports/login remain supported.
+No migrations, new dependencies, financial formulas or business screens.
 
-## Review
+## Verification
 
-Stage1 external one round B0/I1/M1, fixed without re-run; Stage2 external one
-round REVIEW_GREEN B0/I0/M1, minor schema fixed. Fresh final internal reviewer
-B0/I2/M2, all fixed, follow-up clean. IMPORTANT fixes proved RED→GREEN: JSON-only
-selection (form/XML415) and definitive401/403 after ambiguous mutations.
-Full final external review in progress. CI found two gaps during development:
-exact route-policy entries and legacy facade unit mocks; both fixed and verified.
+All local acceptance passed; detailed commands and failure recovery are in
+[Stage4 report](stages/stage-4.md).
 
-## Remaining
+- Full PHP suite8765/49102 and unit4609/25550; CS/strict-types; full-scope PHPStan.
+- Late focused backend42/223, account+legacy API drift checks.
+- New apps typecheck/lint/format/build; Vitest account35/admin31.
+- UI dev and preview account12/admin10 each; image smoke14/12.
+- Real backend dev, preview and trusted HTTPS account2/admin2 each.
+- Legacy frontend lint/build/test:unit92; routing/release/deploy shell contracts.
+- Structural actionlint passes; base and HEAD share existing SC2129/SC2086.
 
-Complete outstanding checks, final external review/fixes, Stage4 report and
-commit/push/Ready. Merge/deploy only after new owner decision. No production
-login/mutation performed. Post-deploy acceptance is read-only.
+Initial parallel PHPStan and production browser attempts suffered local memory
+contention; serial full-scope analysis and sequential browser runs passed. No
+analysis exclusions or test assertions weakened.
+
+## Reviews
+
+Final internal: B1/I3 found and fixed; no open B/I. Fresh reviewer confirmed all
+late changes. Final external: two rounds REVIEW_GREEN, B0/I0, safe minors fixed
+or technically rejected with reason in Stage4 report. Earlier Stage1 external
+B0/I1 fixed without rerun; Stage2 REVIEW_GREEN B0/I0.
+
+## Release and follow-ups
+
+PR2970 merged as34ef67560; its docs-only deploy was skipped. Auth code is not yet
+deployed. The new PR needs a separate merge decision. Existing pipeline deploys
+backend before SPA and gates on real-backend tests. No manual production commands.
+After deploy perform read-only SHA/health, public HTTPS, anonymous session/CSRF,
+wrong-host/path and legacy-login checks; authenticated scenarios were validated
+against isolated test data. No production login without separate authorization.
+Rollback through a standard revert, no Redis purge; SPA re-login may be required.
+Remaining product follow-up: business screens; no SSO is included. Existing
+actionlint shell warnings remain outside this change.
+
+## Owner decision
+
+Ready: PR #2971 "feat(auth): подключить авторизацию и контекст account/admin" —
+merge into master with automatic production deploy?
+Reply: "merge and deploy #2971"

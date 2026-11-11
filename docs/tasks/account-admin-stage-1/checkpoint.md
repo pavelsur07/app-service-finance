@@ -1,7 +1,7 @@
 # Current checkpoint
 
-**Phase:** Stage 4 / Work item 4.1
-**Status:** implementing
+**Phase:** handoff
+**Status:** checking
 **Branch:** `feat/account-admin-auth`
 **Stage base commit:** `0a255776cb41dc77cb3c2cc6504ea6b77be34aec`
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/2971 (Draft, master)
@@ -39,12 +39,15 @@
 
 ## Review status
 
-- Documentation internal fresh review B0/I0, two MINOR fixed; external not
-  required for documentation. Implementation reviews pending.
+- Final internal review: one self-review BLOCKER and three fresh-review IMPORTANT
+  fixed and verified; no open B/I. Final external: two rounds, REVIEW_GREEN;
+  Stage 1/2 reviews recorded in their reports. See handoff for final evidence.
 
 ## Exact next action
 
-- Implement real backend HTTP tests/routing and CI; Stage 4 base is the Stage 3 commit in git log.
+- Finish CI for the final documentation commit, update PR #2971, mark Ready
+  and request its own merge + deploy decision. Product code is verified at
+  0943d7c07; no production deployment of auth is authorized yet.
 
 ## Inspect first on resume
 
@@ -188,3 +191,28 @@
   the newly added CI workflow. This is required CI verification, not Stage4
   closure or Ready/handoff; local serial PHPStan/HTTPS are still pending.
   Production deploy is impossible on this feature-branch pull_request event.
+
+## Final verification and closure
+
+- Stage 4 Work items 4.1/4.2 implementation, local checks and reviews complete.
+  Stage report: stages/stage-4.md; final scope/acceptance: handoff.md.
+- Full site-test PASS8765/49102; unit PASS4609/25550; CS and strict-types
+  PASS4072 files. Full-scope serial PHPStan PASS with unchanged project rules
+  and baseline; first parallel run was incomplete under memory pressure.
+- Late backend regression set PASS42/223 after JSON, encoded host-boundary and
+  bounded access query fixes. Both OpenAPI drift checks PASS.
+- Final HTTPS real backend PASS2 account+2 admin, trusted test CA, no TLS bypass;
+  image smoke PASS14+12. Dev/preview actual backend PASS2+2 each.
+- Final UI dev/preview PASS12+10 each, Vitest PASS35+31, lint/format/typecheck/
+  build PASS. Legacy lint/build/test:unit PASS92. Sequential retries resolved
+  local resource contention without changing assertions or analysis scope.
+- Routing4/release6/deploy shell PASS; actionlint structure PASS. Full actionlint
+  has only unchanged base SC2129/SC2086 findings.
+- Fresh final reviewer confirmed rejected-selection recovery and membership
+  focus revalidation; no additional findings, no open B/I.
+- Product checkpoint 0943d7c07 pushed to Draft to verify new CI. Run43078065868:
+  dev and preview real backend steps passed; production HTTPS step was running
+  when this document was written. Live checks on PR are authoritative for the
+  subsequent documentation commit; no product changes follow the verified SHA.
+- Remaining release actions: green latest CI → Ready → new owner merge/deploy
+  decision → standard automatic deploy → read-only post-deploy acceptance.
