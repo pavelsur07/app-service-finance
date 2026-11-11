@@ -96,6 +96,23 @@ final class CashFacadeReportReadTest extends IntegrationTestCase
         self::assertSame([], $this->facade->listDailyBalances($id, new \DateTimeImmutable('2026-03-31'), new \DateTimeImmutable('2026-03-01'), []));
     }
 
+    public function testTurnoversByAccountIgnoreOtherCurrencyDeletedAndOutOfPeriod(): void
+    {
+        $this->tx($this->bank, CashDirection::INFLOW, '50.00', '2026-03-01');
+        $this->tx($this->bank, CashDirection::OUTFLOW, '30.00', '2026-03-31');
+        $usdLeg = $this->tx($this->bank, CashDirection::INFLOW, '700.00', '2026-03-10');
+        $usdLeg->setCurrency('USD');
+        $this->tx($this->bank, CashDirection::INFLOW, '800.00', '2026-03-10', deleted: true);
+        $this->tx($this->bank, CashDirection::INFLOW, '900.00', '2026-02-28');
+        $this->tx($this->bank, CashDirection::OUTFLOW, '600.00', '2026-04-01');
+        $this->em->flush();
+
+        self::assertSame(
+            [(string) $this->bank->getId() => ['inflow' => '50.00', 'outflow' => '30.00']],
+            $this->facade->sumTurnoversByAccount((string) $this->company->getId(), [(string) $this->bank->getId()], new \DateTimeImmutable('2026-03-01'), new \DateTimeImmutable('2026-03-31')),
+        );
+    }
+
     public function testGrossTurnoverExcludesTransfersAndFiltersFlowKind(): void
     {
         $rent = $this->category('Аренда', CashflowFlowKind::OPERATING);
