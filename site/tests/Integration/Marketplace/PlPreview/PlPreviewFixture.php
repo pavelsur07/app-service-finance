@@ -290,6 +290,46 @@ final class PlPreviewFixture
         $this->em->flush();
     }
 
+    /**
+     * Рекламная категория Ozon (клики `ozon_cpc` или оплата за заказ `ozon_marketing_action`) с правилом
+     * на статью COST и одной учётной строкой без листинга.
+     */
+    public function addOzonAdCost(string $code, string $ledger): void
+    {
+        $category = new MarketplaceCostCategory(Uuid::uuid4()->toString(), $this->company, MarketplaceType::OZON);
+        $category->setName($code);
+        $category->setCode($code);
+        $this->em->persist($category);
+        $this->em->persist(new MarketplaceCostPLMapping(Uuid::uuid4()->toString(), (string) $this->company->getId(), $category, $this->costs->getId()));
+        $cost = new MarketplaceCost(Uuid::uuid4()->toString(), $this->company, MarketplaceType::OZON, $category);
+        $cost->setAmount($ledger);
+        $cost->setCostDate(new \DateTimeImmutable('2026-01-18'));
+        $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
+        $this->em->persist($cost);
+        $this->em->flush();
+    }
+
+    /**
+     * Статистика Ozon на ozA: кампания кликов или служебная «Оплата за заказ» (`search-promo`).
+     */
+    public function addOzonAdStatistics(string $campaignId, string $amount, int $index): void
+    {
+        $raw = AdRawDocumentBuilder::aRawDocument()->withIndex($this->seed * 10 + $index)->withCompanyId((string) $this->company->getId())->withMarketplace(MarketplaceType::OZON)->build();
+        $this->em->persist($raw);
+        $document = AdDocumentBuilder::aDocument()
+            ->withIndex($this->seed * 10 + $index)
+            ->withCompanyId((string) $this->company->getId())
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withCampaignId($campaignId)
+            ->withReportDate(new \DateTimeImmutable('2026-01-15'))
+            ->withTotalCost($amount)
+            ->withAdRawDocumentId($raw->getId())
+            ->build();
+        $this->em->persist($document);
+        $this->em->persist(AdDocumentLineBuilder::aLine()->withIndex($this->seed * 10 + $index)->withAdDocument($document)->withListingId($this->ozA->getId())->withCost($amount)->build());
+        $this->em->flush();
+    }
+
     private function adDocument(int $index, string $cost, string $rawId): AdDocument
     {
         $document = AdDocumentBuilder::aDocument()

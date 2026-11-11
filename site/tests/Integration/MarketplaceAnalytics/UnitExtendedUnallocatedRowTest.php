@@ -19,6 +19,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingTagBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -126,6 +127,33 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
         self::assertNull($widgets['adAccrued']);
     }
 
+    /**
+     * @return iterable<string, array{0: string, 1: float, 2: float}>
+     */
+    public static function payPerOrderCases(): iterable
+    {
+        // Учёт «Маркетинговых акций» 30 − 10 = 20. Оплата за заказ из отчёта уже в рекламе листинга:
+        // без товара остаётся часть учёта, которой в отчёте нет.
+        yield 'отчёт меньше учёта' => ['15.00', 55.0, 115.0];
+        // Отчёт больше учёта (лаг D+2, предоплата): без товара 0, не минус.
+        yield 'отчёт больше учёта' => ['50.00', 50.0, 150.0];
+    }
+
+    #[DataProvider('payPerOrderCases')]
+    public function testPayPerOrderStatisticsLeavesOnlyUncoveredAccrualWithoutListing(string $payPerOrder, float $unallocated, float $adSpend): void
+    {
+        $this->adStatistics('SKU-1', self::LISTING_ID, $payPerOrder, 'search-promo');
+        $this->em->flush();
+
+        $result = self::getContainer()->get(UnitExtendedQuery::class)
+            ->execute(self::COMPANY_ID, 'ozon', self::FROM, self::TO);
+
+        self::assertNotNull($result['unallocated']);
+        self::assertEqualsWithDelta($unallocated, $result['unallocated']['totalCosts'], 0.001);
+        self::assertEqualsWithDelta($adSpend, $result['totals']['adSpend'], 0.001);
+        $this->assertWidgetsMatchTotals($this->widgets(null), $result['totals']);
+    }
+
     public function testOtherMarketplaceHasNoRow(): void
     {
         $result = self::getContainer()->get(UnitExtendedQuery::class)
@@ -198,14 +226,14 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
         return $listing;
     }
 
-    private function adStatistics(string $sku, string $listingId, string $cost): void
+    private function adStatistics(string $sku, string $listingId, string $cost, ?string $campaignId = null): void
     {
         $doc = new AdDocument(
             companyId: self::COMPANY_ID,
             marketplace: MarketplaceType::OZON,
             reportDate: new \DateTimeImmutable('2026-11-05'),
-            campaignId: 'C-'.$sku,
-            campaignName: 'C-'.$sku,
+            campaignId: $campaignId ?? 'C-'.$sku,
+            campaignName: $campaignId ?? 'C-'.$sku,
             parentSku: $sku,
             totalCost: $cost,
             totalImpressions: 0,

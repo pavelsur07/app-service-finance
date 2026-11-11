@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAds\Facade;
 
 use App\Marketplace\Application\DTO\PlPreviewAdSpendDTO;
+use App\Marketplace\Enum\AdSpendKind;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\PlPreviewAdSpendProviderInterface;
 
@@ -24,10 +25,11 @@ final readonly class PlPreviewAdSpendProvider implements PlPreviewAdSpendProvide
         MarketplaceType $marketplace,
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
+        ?AdSpendKind $kind = null,
     ): PlPreviewAdSpendDTO {
         return new PlPreviewAdSpendDTO(
-            $this->adsFacade->getAdSpendByListingForPeriod($companyId, $from, $to, $marketplace->value),
-            $this->adsFacade->getTotalAdCostForPeriod($companyId, $from, $to, $marketplace->value),
+            $this->adsFacade->getAdSpendByListingForPeriod($companyId, $from, $to, $marketplace->value, $kind),
+            $this->adsFacade->getTotalAdCostForPeriod($companyId, $from, $to, $marketplace->value, $kind),
         );
     }
 }

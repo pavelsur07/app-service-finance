@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Inventory\Facade\InventoryFacade;
+use App\Marketplace\Domain\PlPreview\AdStatisticsCostCategories;
 use App\Marketplace\DTO\ListingTagDTO;
 use App\Marketplace\DTO\UnallocatedCostCategoryAggregateDTO;
+use App\Marketplace\Enum\AdSpendKind;
+use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
@@ -556,6 +559,17 @@ final readonly class UnitExtendedQuery
         foreach ($rows as $row) {
             /** @var UnallocatedCostCategoryAggregateDTO $row */
             $net = (float) $row->netAmount;
+            $costs = (float) $row->costsAmount;
+            if (MarketplaceType::OZON->value === $row->marketplace && AdStatisticsCostCategories::payPerOrderCode() === $row->categoryCode) {
+                // Оплата за заказ из отчёта Ozon уже в рекламе листингов (adSpend): без товара остаётся
+                // только часть учёта, которой в отчёте нет.
+                $covered = min(
+                    (float) $this->adsFacade->getTotalAdCostForPeriod($companyId, $from, $to, MarketplaceType::OZON->value, AdSpendKind::PAY_PER_ORDER),
+                    max(0.0, $net),
+                );
+                $net -= $covered;
+                $costs -= $covered;
+            }
             $bucket = $this->groupResolver->resolveUnitBucket($row->marketplace, $row->categoryCode, $row->categoryName);
             // Как в строках листингов: всё, что не комиссия и не логистика, — «Прочие».
             $bucket = 'commission' === $bucket || 'logistics' === $bucket ? $bucket : 'other';
@@ -564,7 +578,7 @@ final readonly class UnitExtendedQuery
                 'marketplace' => $row->marketplace,
                 'code' => $row->categoryCode,
                 'name' => $row->categoryName,
-                'costsAmount' => round((float) $row->costsAmount, 2),
+                'costsAmount' => round($costs, 2),
                 'stornoAmount' => round((float) $row->stornoAmount, 2),
                 'netAmount' => round($net, 2),
             ];

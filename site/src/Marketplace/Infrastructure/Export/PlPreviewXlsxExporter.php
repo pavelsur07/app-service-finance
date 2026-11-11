@@ -157,7 +157,7 @@ final readonly class PlPreviewXlsxExporter
             $writer->addRow($this->headerRow(['Маркетплейс', 'Учёт, ₽', 'Статистика, ₽', 'На товарах, ₽', 'Без товара, ₽', 'Расхождение, ₽', 'Реклама вне статистики, ₽']));
             foreach ($report->adReconciliation as $ads) {
                 $writer->addRow(new Row([
-                    self::text($ads->marketplace->getDisplayName()),
+                    self::text($ads->title()),
                     Cell::fromValue((float) $ads->ledger, $money),
                     Cell::fromValue((float) $ads->statistics, $money),
                     Cell::fromValue((float) $ads->onListings, $money),

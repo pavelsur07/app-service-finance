@@ -13,6 +13,7 @@ use App\Marketplace\Application\DTO\MarketplacePlPreviewReport;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListingTag;
 use App\Marketplace\Entity\MarketplaceSaleMapping;
+use App\Marketplace\Enum\AdSpendKind;
 use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
@@ -228,6 +229,34 @@ final class BuildMarketplacePlPreviewActionTest extends IntegrationTestCase
         self::assertSame('190.00', $ads->outsideStatistics);
         // Учёт + реклама вне статистики = строка статьи в ОПиУ.
         self::assertSame(-1190.0, $this->values($this->build())['COST']['total']);
+    }
+
+    public function testOzonClicksAndPayPerOrderAreReconciledSeparately(): void
+    {
+        $this->fixture->addOzonAdCost('ozon_cpc', '100.00');
+        // Оплата за заказ: 300 в учёте, 250 в отчёте по заказам — 50 вторых списаний остаются в «Общих».
+        $this->fixture->addOzonAdCost('ozon_marketing_action', '300.00');
+        $this->fixture->addOzonAdStatistics('42', '100.00', 1);
+        $this->fixture->addOzonAdStatistics('search-promo', '250.00', 2);
+
+        $report = $this->build([$this->winter->getId()]);
+
+        self::assertSame(
+            [
+                [AdSpendKind::CLICKS, '100.00', '100.00', '100.00', '0.00'],
+                [AdSpendKind::PAY_PER_ORDER, '300.00', '250.00', '250.00', '50.00'],
+            ],
+            array_map(static fn ($ads): array => [$ads->kind, $ads->ledger, $ads->statistics, $ads->onListings, $ads->difference], $report->adReconciliation),
+        );
+        self::assertSame('Ozon — оплата за заказ', $report->adReconciliation[1]->title());
+        // «Вне статистики» у статьи одно — на первой строке Ozon, вторая не задваивает.
+        self::assertSame('0.00', $report->adReconciliation[1]->outsideStatistics);
+
+        $cost = $this->values($report)['COST'];
+        // ozA в теге «Зима»: на нём клики и оплата за заказ из статистики; «Итого» — учёт.
+        self::assertSame(-70.0 - 350.0, $cost['tag:'.$this->winter->getId()]);
+        self::assertEqualsWithDelta($cost['total'], $cost['tag:'.$this->winter->getId()] + $cost['common'], 0.001);
+        self::assertSame(-190.0 - 400.0, $cost['total']);
     }
 
     public function testColumnsAddUpToLedgerWithStornoNullTypeAndStatisticsAboveLedger(): void

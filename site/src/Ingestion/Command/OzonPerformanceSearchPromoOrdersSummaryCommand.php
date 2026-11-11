@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ingestion\Command;
 
-use App\Ingestion\Application\Source\Ozon\OzonResourceType;
-use App\Ingestion\Facade\RawStorageFacade;
-use App\Ingestion\Repository\IngestRawRecordRepository;
+use App\Ingestion\Application\Service\OzonSearchPromoOrdersReader;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -27,11 +25,8 @@ use Webmozart\Assert\Assert;
 )]
 final class OzonPerformanceSearchPromoOrdersSummaryCommand extends Command
 {
-    private const string ORDERS_EXTERNAL_ID_LIKE = 'performance-search-promo-stats:%:orders:%';
-
     public function __construct(
-        private readonly IngestRawRecordRepository $rawRecordRepository,
-        private readonly RawStorageFacade $rawStorageFacade,
+        private readonly OzonSearchPromoOrdersReader $ordersReader,
     ) {
         parent::__construct();
     }
@@ -61,46 +56,25 @@ final class OzonPerformanceSearchPromoOrdersSummaryCommand extends Command
             return Command::INVALID;
         }
 
-        $recordIds = $this->rawRecordRepository->findLatestIdsByCompanyAndResource(
-            $companyId,
-            OzonResourceType::PERFORMANCE_SEARCH_PROMO_STATISTICS,
-            self::ORDERS_EXTERNAL_ID_LIKE,
-        );
-
-        // ponytail: строки всех отчётов кабинета в памяти — сотни объектов по ~20 КБ; при росте — потоково по дням.
-        $orders = [];
-        $unreadable = 0;
-        foreach ($recordIds as $recordId) {
-            foreach ($this->rawStorageFacade->read($recordId, $companyId) as $row) {
-                $day = self::day($row['Дата'] ?? null);
-                $expense = self::money($row['Расход, ₽'] ?? null);
-                if (null === $day || null === $expense) {
-                    ++$unreadable;
-                    continue;
-                }
-                $sku = trim((string) ($row['SKU'] ?? ''));
-                $orders[(string) ($row['ID заказа'] ?? '').'|'.$sku.'|'.$day] = ['day' => $day, 'sku' => $sku, 'expense' => $expense];
-            }
-        }
+        $orders = $this->ordersReader->read($companyId, $from, $to);
 
         $byDay = [];
         $skus = [];
         $total = '0';
-        $count = 0;
-        foreach ($orders as $order) {
-            if ($order['day'] < $from->format('Y-m-d') || $order['day'] > $to->format('Y-m-d')) {
-                continue;
-            }
-            $byDay[$order['day']] ??= ['rows' => 0, 'expense' => '0', 'noSku' => 0];
-            ++$byDay[$order['day']]['rows'];
-            $byDay[$order['day']]['expense'] = bcadd($byDay[$order['day']]['expense'], $order['expense'], 2);
-            if ('' === $order['sku']) {
-                ++$byDay[$order['day']]['noSku'];
+        $mismatched = 0;
+        foreach ($orders->rows as $order) {
+            $byDay[$order->day] ??= ['rows' => 0, 'expense' => '0', 'noSku' => 0];
+            ++$byDay[$order->day]['rows'];
+            $byDay[$order->day]['expense'] = bcadd($byDay[$order->day]['expense'], $order->expense, 2);
+            if ('' === $order->sku) {
+                ++$byDay[$order->day]['noSku'];
             } else {
-                $skus[$order['sku']] = true;
+                $skus[$order->sku] = true;
             }
-            $total = bcadd($total, $order['expense'], 2);
-            ++$count;
+            if ('' !== $order->promotedSku && $order->promotedSku !== $order->sku) {
+                ++$mismatched;
+            }
+            $total = bcadd($total, $order->expense, 2);
         }
         ksort($byDay);
 
@@ -108,33 +82,16 @@ final class OzonPerformanceSearchPromoOrdersSummaryCommand extends Command
         foreach ($byDay as $day => $stat) {
             $rows[] = [$day, $stat['rows'], $stat['expense'], $stat['noSku']];
         }
-        $rows[] = ['Итого', $count, $total, array_sum(array_column($byDay, 'noSku'))];
+        $rows[] = ['Итого', count($orders->rows), $total, array_sum(array_column($byDay, 'noSku'))];
         $io->table(['Дата', 'Строк заказов', 'Расход, ₽', 'Без SKU'], $rows);
-        $io->writeln(sprintf('Отчётов прочитано: %d; разных SKU: %d; строк без даты или расхода: %d.', count($recordIds), count($skus), $unreadable));
+        $io->writeln(sprintf(
+            'Отчётов прочитано: %d; разных SKU: %d; строк без даты или расхода: %d; заказанный SKU ≠ продвигаемому: %d.',
+            $orders->reportsRead,
+            count($skus),
+            $orders->unreadable,
+            $mismatched,
+        ));
 
         return Command::SUCCESS;
-    }
-
-    private static function day(mixed $value): ?string
-    {
-        $value = trim((string) $value);
-        foreach (['!d.m.Y', '!Y-m-d'] as $format) {
-            $date = \DateTimeImmutable::createFromFormat($format, $value);
-            if (false !== $date && $date->format(str_replace('!', '', $format)) === $value) {
-                return $date->format('Y-m-d');
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @return numeric-string|null
-     */
-    private static function money(mixed $value): ?string
-    {
-        $value = str_replace([' ', "\u{00A0}", ','], ['', '', '.'], trim((string) $value));
-
-        return is_numeric($value) ? bcadd($value, '0', 2) : null;
     }
 }

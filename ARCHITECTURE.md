@@ -844,9 +844,14 @@ CSRF для repair привязан к active company: `ozon_pl_mapping_repair_<
   есть ли активное правило, по которому закрытие возьмёт сумму. Для продаж тождества сумм нет —
   одна продажа даёт несколько сумм по разным правилам.
 - Реклама из статистики: учётные категории, которые покрывает рекламная статистика, —
-  `Domain\PlPreview\AdStatisticsCostCategories::codeFor()` (одна на маркетплейс: Ozon `ozon_cpc`, WB
-  `wb_okazanie_uslug_wb_prodvizhenie`; список в коде — свойство источника данных, не настройка
-  компании). Расход по листингам — порт `Facade\PlPreviewAdSpendProviderInterface`
+  `Domain\PlPreview\AdStatisticsCostCategories::ledgerCategories()` с видом статистики каждой
+  (`Enum\AdSpendKind`): Ozon `ozon_cpc` ← клики, `ozon_marketing_action` ← оплата за заказ; WB
+  `wb_okazanie_uslug_wb_prodvizhenie` ← вся статистика (список в коде — свойство источника данных, не
+  настройка компании). `codes()` — категории, целиком замещённые статистикой (клики, WB, предоплата
+  `ozon_marketing_services`): отчёты по листингам их учёт не показывают. Оплату за заказ отчёт Ozon
+  покрывает не целиком, поэтому её в `codes()` нет: Unit-экономика и карточки оставляют без товара
+  `max(0, учёт − статистика оплаты за заказ)` (`payPerOrderCode()`); `allCodes()` — для «вне
+  статистики». Расход по листингам — порт `Facade\PlPreviewAdSpendProviderInterface`
   (`PlPreviewAdSpendDTO`: по листингам, всего, `unallocated()`), реализация —
   `MarketplaceAds\Facade\PlPreviewAdSpendProvider` поверх `MarketplaceAdsFacade`. Порт в
   Marketplace, а не вызов `MarketplaceAdsFacade`: MarketplaceAds уже зависит от Marketplace.
@@ -855,7 +860,8 @@ CSRF для repair привязан к active company: `ozon_pl_mapping_repair_<
   (`excludedCostCategoryIds`); вместо неё — расход статистики каждого листинга со знаком правила,
   а остаток «учёт − статистика по листингам» (статистика без товара + расхождение) — на статье без
   листинга, то есть в «Общих». «Итого» — учёт, как было. Сверка — `PlPreviewAdReconciliationDTO`
-  (учёт, статистика, на товарах, без товара, расхождение) в `MarketplacePlPreviewReport::$adReconciliation`.
+  (учёт, статистика, на товарах, без товара, расхождение, вид `kind`) в `MarketplacePlPreviewReport::$adReconciliation` —
+  строка на категорию, у Ozon две; «вне статистики» статьи — только на первой строке статьи.
   На экране — пометка над таблицей и блок «Реклама: учёт и статистика», в xlsx — раздел листа «Сверка».
 - Сборка — `Application\Action\BuildMarketplacePlPreviewAction(BuildMarketplacePlPreviewCommand(companyId,
   from, to, ?marketplace, ?tagIds, mode = PlPreviewColumnMode::TAGS, ?projectIds))` →
@@ -891,7 +897,7 @@ CSRF для repair привязан к active company: `ozon_pl_mapping_repair_<
   Ошибка периода — flash и redirect на вкладку.
 - Выгрузка строками для план-факта — `GET /marketplace/pl-preview/rows-xlsx`
   (`marketplace_pl_preview_rows_xlsx`, `PlPreviewRowsXlsxController`, `MARKETPLACE_READ`), формат
-  `PlPreviewRowsXlsxExporter::FORMAT_VERSION` = `1.1` (в режиме проектов `column_kind` =
+  `PlPreviewRowsXlsxExporter::FORMAT_VERSION` = `1.3` (в режиме проектов `column_kind` =
   `project`/`no_project`, `tag_id`/`tag_name` несут id и название проекта; «Паспорт» — `projects`), постановка — `docs/plan/TZ_vygruzka_plan_fakt.md`.
   `Application\Action\BuildPlPreviewRowsExportAction` → `Application\DTO\PlPreviewRowsExport`
   (`from`, `to`, `channels`, `?all`): канал задан — один отчёт, `all = null`; не задан — общий
@@ -1198,6 +1204,12 @@ getReconciliation(string $companyId, ?string $shopRef, int $year, int $month): a
 
 // @return array{items: list<IssueListItemView>, meta: PaginationMeta}
 listIssues(string $companyId, ?string $shopRef, ?int $year, ?int $month, int $page, int $limit): array
+
+// Строки загруженных отчётов Ozon Performance «Оплата за заказ» (`…:orders:…`, ресурс
+// ozon_performance_search_promo_statistics) за дни [from, to]: по одной на (заказ, SKU, день), из
+// последней версии; день, SKU заказанного и продвигаемого товара, расход. Только чтение. Читает
+// MarketplaceAds (SyncOzonSearchPromoSpendAction) и сводная команда search-promo-orders-summary.
+getOzonSearchPromoOrders(string $companyId, DateTimeImmutable $from, DateTimeImmutable $to): OzonSearchPromoOrders
 
 // @return array{byMonth: list<FinancialSummaryMonthView>, byCategory: list<FinancialSummaryCategoryView>, marketplaceCategories: list<FinancialSummaryMarketplaceCategoryView>}
 getFinancialSummary(string $companyId, ?string $shopRef, int $yearFrom, int $monthFrom, int $yearTo, int $monthTo): array
@@ -2838,12 +2850,15 @@ getAdCostsForListingAndDate(
 
 // Суммарные рекламные затраты компании за период.
 // $marketplace = MarketplaceType::value ('wildberries', 'ozon') или null (все).
+// $kind = Marketplace\Enum\AdSpendKind: CLICKS — всё, кроме служебной кампании оплаты за заказ
+// Ozon (`search-promo`, OzonSearchPromoCampaign), PAY_PER_ORDER — только она, null — всё.
 // Возвращает decimal-строку, например "4567.89"; "0" если данных нет.
 getTotalAdCostForPeriod(
     string $companyId,
     \DateTimeImmutable $dateFrom,
     \DateTimeImmutable $dateTo,
     ?string $marketplace = null,
+    ?AdSpendKind $kind = null,
 ): string
 
 // РР с разрезом по листингам за период.
@@ -2851,12 +2866,14 @@ getTotalAdCostForPeriod(
 // Возвращает только attributed listingId (те, что есть в marketplace_ad_document_lines).
 // Включает «висячие» listing_id без живого листинга — для согласованности с totals.
 // Для totals (полная сумма за период) использовать getTotalAdCostForPeriod().
+// $kind — как у getTotalAdCostForPeriod().
 // @return array<string, string>  listingId => decimal-string adSpend
 getAdSpendByListingForPeriod(
     string $companyId,
     \DateTimeImmutable $from,
     \DateTimeImmutable $to,
     ?string $marketplace = null,
+    ?AdSpendKind $kind = null,
 ): array
 ```
 
@@ -3594,6 +3611,30 @@ on state=OK:
 полный рекламный расход остаётся в totals. `AdDocumentLine` не создаётся, а
 `AdRawDocument` остаётся в `DRAFT` до исправления маппинга. Намеренный
 `__unallocated__` считается успешно обработанным и не требует листинга.
+
+### Ozon: оплата за заказ по SKU
+
+`app:marketplace-ads:ozon-search-promo:sync [--company-id=] [--from= --to=]` (cron 08:30, lock) —
+после загрузки Ingestion (07:25) переносит отчёты Ozon Performance по заказам продвижения в поиске в
+рекламную статистику всех компаний с активным Ozon Performance. Без дат — месяц вчерашнего дня
+(МСК) по вчера; 1-го числа — весь прошлый месяц.
+
+```text
+IngestionFacade::getOzonSearchPromoOrders()
+  -> AdRawDocument(OZON, sourceKey=ozon-search-promo:<date>, nested payload:
+     campaign_id=search-promo «Оплата за заказ», rows: sku (заказанный), promoted_sku, spend)
+  -> ProcessAdRawDocumentAction (SKU -> листинг; неизвестный SKU — AdDocument без строки, DRAFT)
+```
+
+- Расход — на заказанный SKU (решение Владельца 11.11.2026); продвигаемый SKU — только в payload.
+- Повтор: неизменённый PROCESSED-день пропускается, изменённый перезаписывается; день без строк
+  при существующем документе — пустой payload, документы дня удаляются.
+- Вид расхода (`Marketplace\Enum\AdSpendKind`) — по `campaign_id`, без отдельной колонки
+  (`OzonSearchPromoCampaign::campaignCondition()`).
+- CPC-конвейер Ozon эти документы не видит: `AdRawDocumentRepository::findByMarketplaceAndDate()` и
+  `countByCompanyMarketplaceAndDateRange()` исключают `source_key LIKE 'ozon-search-promo:%'`,
+  `ReconcileMarketplaceAdsCommand` считает только клики.
+- Сроки дня D: отчёт в Ingestion D+1 ~07:55, статистика D+1 08:30, начисление тип 54 — D+2 04:00.
 
 ### Wildberries daily ad spend orchestration
 
@@ -5156,6 +5197,7 @@ config/
 | `app:ingestion:ozon-accrual:verify-rolling-refresh --days-back=45 --limit=100` | `45 6 * * *` | Проверка результата rolling-refresh |
 | `app:ingestion:raw:prune --dry-run` | `50 5 * * *` | Retention сырья: СОЗНАТЕЛЬНО `--dry-run` — печатает, сколько записей и байт ушло бы; `--execute` — решение Владельца |
 | `app:ingestion:ozon-performance:daily-load --window=month-to-date` | `25 7 * * *` | Планирование Ozon Performance ingestion с начала месяца до вчерашнего дня; HTTP-загрузка выполняется `ingest_fetch` worker'ом |
+| `app:marketplace-ads:ozon-search-promo:sync` | `30 8 * * *` | Оплата за заказ Ozon из загруженных отчётов по заказам — в рекламную статистику по SKU, месяц вчерашнего дня |
 | **Инфраструктура** | | |
 | `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
 | `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (`AI_SERVICE_ENABLED`, адрес, токен) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
@@ -5255,6 +5297,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.166 | 2026-11-11 | MarketplaceAds: оплата за заказ Ozon по SKU — `app:marketplace-ads:ozon-search-promo:sync` (cron 08:30), служебная кампания `search-promo`, `AdSpendKind` в `MarketplaceAdsFacade` и порте предпросмотра; `IngestionFacade::getOzonSearchPromoOrders()`; предпросмотр ОПиУ — сверка по категориям Ozon (клики, оплата за заказ), выгрузка строк v1.3 `ads_kind`; Unit-экономика вычитает статистику оплаты за заказ из «Маркетинговых акций» без товара (этап 2 `docs/tasks/ozon-cpo-orders`) |
 | 2.165 | 2026-11-11 | Cash: правило размещения классов; `Query/`, `DTO/`, `EventSubscriber/` перенесены в `Infrastructure/Query/`, `Application/DTO/`, `EventListener/`; обороты по счетам и валовые обороты — `CashReportQuery` (этапы 2–3 `docs/tasks/cash-module-structure`) |
 | 2.164 | 2026-11-10 | Cash remediation: атомарные queued jobs, recovery CLI, JSON-контракт, контроллеры по действиям и backend-пагинация |
 | 2.163 | 2026-11-09 | MarketplaceAnalytics: карточки «Unit — Экономика» = «Итого» таблицы — реклама по статистике, группы как колонки таблицы, `adAccrued` справкой; учётная реклама исключена из строк товаров (`ListingCostAggregateQuery::executeByPeriod`); листинг только с рекламой — строка; `resolveWidgetGroup` удалён (issue #2940, этап 3) |

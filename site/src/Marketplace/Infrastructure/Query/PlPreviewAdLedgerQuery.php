@@ -37,21 +37,25 @@ final class PlPreviewAdLedgerQuery
             'periodFrom' => $from->format('Y-m-d'),
             'periodTo' => $to->format('Y-m-d'),
         ];
-        foreach (MarketplaceType::cases() as $i => $type) {
-            $code = AdStatisticsCostCategories::codeFor($type);
-            if (null === $code || (null !== $marketplace && $marketplace !== $type)) {
+        $kinds = [];
+        foreach (MarketplaceType::cases() as $type) {
+            if (null !== $marketplace && $marketplace !== $type) {
                 continue;
             }
-            $pairs[] = sprintf('(mcc.marketplace = :mp%1$d AND mcc.code = :code%1$d)', $i);
-            $params['mp'.$i] = $type->value;
-            $params['code'.$i] = $code;
+            foreach (AdStatisticsCostCategories::ledgerCategories($type) as $code => $kind) {
+                $i = count($pairs);
+                $pairs[] = sprintf('(mcc.marketplace = :mp%1$d AND mcc.code = :code%1$d)', $i);
+                $params['mp'.$i] = $type->value;
+                $params['code'.$i] = $code;
+                $kinds[$type->value.'|'.$code] = $kind;
+            }
         }
         if ([] === $pairs) {
             return [];
         }
 
         $sql = sprintf(
-            "SELECT mcc.marketplace, mcc.id AS cost_category_id, m.pl_category_id, m.is_negative,
+            "SELECT mcc.marketplace, mcc.code, mcc.id AS cost_category_id, m.pl_category_id, m.is_negative,
                     COALESCE((
                         SELECT SUM(g.amount)
                         FROM (
@@ -93,16 +97,17 @@ final class PlPreviewAdLedgerQuery
                  AND m.include_in_pl = true
                  AND m.pl_category_id IS NOT NULL
                  AND (%s)
-             ORDER BY mcc.marketplace",
+             ORDER BY mcc.marketplace, mcc.code",
             implode(' OR ', $pairs),
         );
 
-        $params['statisticsCodes'] = AdStatisticsCostCategories::codes();
+        $params['statisticsCodes'] = AdStatisticsCostCategories::allCodes();
 
         $result = [];
         foreach ($this->connection->fetchAllAssociative($sql, $params, ['statisticsCodes' => ArrayParameterType::STRING]) as $row) {
             $result[] = new PlPreviewAdLedgerDTO(
                 MarketplaceType::from((string) $row['marketplace']),
+                $kinds[$row['marketplace'].'|'.$row['code']] ?? null,
                 (string) $row['cost_category_id'],
                 (string) $row['pl_category_id'],
                 (bool) $row['is_negative'],

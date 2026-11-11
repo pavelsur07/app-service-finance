@@ -6295,12 +6295,6 @@ parameters:
 			path: src/MarketplaceAds/Repository/AdRawDocumentRepository.php
 
 		-
-			message: '#^Method App\\MarketplaceAds\\Repository\\AdRawDocumentRepository\:\:findByMarketplaceAndDate\(\) should return App\\MarketplaceAds\\Entity\\AdRawDocument\|null but returns object\|null\.$#'
-			identifier: return.type
-			count: 1
-			path: src/MarketplaceAds/Repository/AdRawDocumentRepository.php
-
-		-
 			message: '#^Method App\\MarketplaceAds\\Repository\\AdRawDocumentRepository\:\:findBySourceKey\(\) should return App\\MarketplaceAds\\Entity\\AdRawDocument\|null but returns object\|null\.$#'
 			identifier: return.type
 			count: 1

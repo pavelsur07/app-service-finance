@@ -8,6 +8,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\DTO\AdRawEntry;
 use App\MarketplaceAds\Domain\Service\AdCostDistributor;
 use App\MarketplaceAds\Domain\Service\ListingSalesProviderInterface;
+use App\MarketplaceAds\Domain\ValueObject\OzonSearchPromoCampaign;
 use App\MarketplaceAds\Entity\AdDocument;
 use App\MarketplaceAds\Entity\AdDocumentLine;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
@@ -29,6 +30,7 @@ use Doctrine\ORM\EntityManagerInterface;
  * - WB: сумма неизвестного nmId сохраняется в AdDocument без строки листинга,
  *   чтобы campaign totals сходились с фактическим /upd;
  * - WB __unallocated__: сохраняется без строки листинга и не считается ошибкой маппинга;
+ * - оплата за заказ Ozon (OzonSearchPromoCampaign): неизвестный SKU — как у WB, без строки листинга;
  * - статус PROCESSED ставится только при полной обработке без пропусков;
  * - bulk-fetch листингов и продаж: два запроса на весь документ вместо N+1.
  */
@@ -174,17 +176,19 @@ final readonly class ProcessAdRawDocumentAction
                 if ([] === $listings) {
                     $hasErrors = true;
                     ++$skippedEntries;
-                    if (MarketplaceType::WILDBERRIES === $marketplace) {
-                        // WB expense was already reconciled to /upd. Keep it in
-                        // campaign totals even while its nmId is not mapped to
-                        // an internal listing; the missing line remains visible
-                        // through DRAFT status and the warning below.
+                    // WB expense was already reconciled to /upd, Ozon pay-per-order
+                    // to the orders report. Keep it in campaign totals even while its
+                    // SKU is not mapped to an internal listing; the missing line
+                    // remains visible through DRAFT status and the warning below.
+                    $keepWithoutLine = MarketplaceType::WILDBERRIES === $marketplace
+                        || OzonSearchPromoCampaign::CAMPAIGN_ID === $entry->campaignId;
+                    if ($keepWithoutLine) {
                         $this->entityManager->persist($adDocument);
                         ++$processedCount;
                     }
                     $this->logger->warning(
-                        MarketplaceType::WILDBERRIES === $marketplace
-                            ? 'WB AdRawEntry сохранена без строки листинга: nmId не найден'
+                        $keepWithoutLine
+                            ? 'AdRawEntry сохранена без строки листинга: SKU не найден'
                             : 'AdRawEntry пропущена: листинги по parentSku не найдены',
                         [
                             'adRawDocumentId' => $adRawDocumentId,

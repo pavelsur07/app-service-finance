@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Infrastructure\Query;
 
+use App\Marketplace\Enum\AdSpendKind;
+use App\MarketplaceAds\Domain\ValueObject\OzonSearchPromoCampaign;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -45,6 +47,7 @@ final readonly class AdSpendByListingQuery
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
         ?string $marketplace = null,
+        ?AdSpendKind $kind = null,
     ): array {
         $params = [
             'companyId' => $companyId,
@@ -56,6 +59,10 @@ final readonly class AdSpendByListingQuery
         if (null !== $marketplace) {
             $mpFilter = 'AND ad.marketplace = :marketplace';
             $params['marketplace'] = $marketplace;
+        }
+        $kindCondition = OzonSearchPromoCampaign::campaignCondition('ad.campaign_id', $kind);
+        if (null !== $kindCondition) {
+            $mpFilter .= ' AND '.$kindCondition;
         }
 
         $sql = <<<SQL
