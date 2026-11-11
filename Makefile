@@ -289,3 +289,8 @@ ai-service-test:
 
 ai-service-evals:
 	$(AI_SERVICE_DEV) pytest -m evals
+
+# Standalone account/admin frontends; APP=account|admin, MODE=dev|preview.
+.PHONY: front-install front-dev front-typecheck front-lint front-test front-build front-e2e
+front-install front-dev front-typecheck front-lint front-test front-build front-e2e:
+	APP="$(APP)" MODE="$(or $(MODE),dev)" ./bin/frontend.sh $(@:front-%=%)

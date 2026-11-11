@@ -71,3 +71,8 @@ test_cert.zip
 
 # Локальные заметки с токенами — никогда в git (репозиторий публичный)
 /.secret/
+
+# Local frontend test artifacts
+playwright-report/
+test-results/
+.superpowers/

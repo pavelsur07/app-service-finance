@@ -1,0 +1,41 @@
+# Standalone local stack. Does not load/replace backend or production services.
+x-node: &node
+  image: node:24.18.1-bookworm-slim
+  user: "${CONTAINER_UID:-1000}:${CONTAINER_GID:-1000}"
+  environment:
+    HOME: /tmp
+  volumes:
+    - ./apps:/workspace/apps
+    - ./site/packages:/workspace/site/packages
+    - ./site/assets/styles:/workspace/site/assets/styles:ro
+
+services:
+  account:
+    <<: *node
+    working_dir: /workspace/apps/account
+    ports:
+      - "127.0.0.1:5174:5174"
+      - "127.0.0.1:4174:4174"
+    command: ["npm", "run", "${FRONT_MODE:-dev}"]
+  admin:
+    <<: *node
+    working_dir: /workspace/apps/admin
+    ports:
+      - "127.0.0.1:5175:5175"
+      - "127.0.0.1:4175:4175"
+    command: ["npm", "run", "${FRONT_MODE:-dev}"]
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.56.1-noble
+    user: "${CONTAINER_UID:-1000}:${CONTAINER_GID:-1000}"
+    environment:
+      HOME: /tmp
+      E2E_MODE: "${FRONT_MODE:-dev}"
+      E2E_CONTAINER: "1"
+    volumes:
+      - ./apps:/workspace/apps
+      - ./site/packages:/workspace/site/packages
+      - ./site/assets/styles:/workspace/site/assets/styles:ro
+    working_dir: /workspace
+    init: true
+    shm_size: 1gb
+    profiles: [test]

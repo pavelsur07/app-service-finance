@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "noEmit": true,
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "react-dom/*": ["./node_modules/@types/react-dom/*"],
+      "vitest": ["./node_modules/vitest"],
+      "msw": ["./node_modules/msw/lib/core"],
+      "msw/node": ["./node_modules/msw/lib/node"]
+    }
+  },
+  "include": [
+    "src",
+    "tests",
+    "*.config.ts",
+    "../../site/packages/api/src",
+    "../../site/packages/ui/src",
+    "../../site/packages/api/testing"
+  ]
+}

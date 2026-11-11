@@ -1,0 +1,6 @@
+/* Canonical finance kit: tokens and classes stay in site, never copied. */
+@import '../../assets/styles/kit/base.css';
+@import '../../assets/styles/kit/tokens/index.css';
+@import '../../assets/styles/kit/components/all.css';
+@import '../../assets/styles/kit/patterns/all.css';
+@import '../../assets/styles/kit/components/states.css';
