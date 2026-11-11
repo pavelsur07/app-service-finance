@@ -265,3 +265,14 @@ import * as Icons from '@tabler/icons-react';
   `docs/design-system/README.md` — как их читать.
 - `docs/plan/ds-legacy-tabler-audit.md` — решения по DS и расхождения с поручением.
 - `site/screens/README.md` — матрица реализации макетов.
+
+## Самостоятельные frontend-приложения (2026-11-11)
+
+`apps/account/` и `apps/admin/` — React 19 SPA, локальная подготовка интерфейсов.
+Правила выше про React 18, отсутствие typecheck и список установленных библиотек
+относятся к `site/`. Новые приложения имеют независимые npm lock-файлы,
+строгий typecheck, ESLint/Prettier, Vitest/MSW и Playwright. Команды и границы:
+`apps/README.md`. Общие UI/API исходники — `site/packages/` (внутри старого
+Docker build context); токены/CSS по-прежнему в `assets/styles/kit/`.
+Старые API/Button/cn импорты совместимы; только старый API-адаптер перенаправляет
+на `/login`. Новые экраны не выполняют API-запросы и не реализуют авторизацию.
