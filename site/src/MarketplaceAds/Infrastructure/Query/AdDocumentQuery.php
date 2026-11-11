@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Infrastructure\Query;
 
+use App\Marketplace\Enum\AdSpendKind;
 use App\MarketplaceAds\Application\DTO\AdCostForListingDTO;
+use App\MarketplaceAds\Domain\ValueObject\OzonSearchPromoCampaign;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -84,6 +86,7 @@ final readonly class AdDocumentQuery implements AdDocumentQueryInterface
         \DateTimeImmutable $dateFrom,
         \DateTimeImmutable $dateTo,
         ?string $marketplace = null,
+        ?AdSpendKind $kind = null,
     ): string {
         $qb = $this->connection->createQueryBuilder()
             ->select('COALESCE(SUM(d.total_cost), 0)')
@@ -97,6 +100,10 @@ final readonly class AdDocumentQuery implements AdDocumentQueryInterface
         if (null !== $marketplace) {
             $qb->andWhere('d.marketplace = :marketplace')
                ->setParameter('marketplace', $marketplace);
+        }
+        $kindCondition = OzonSearchPromoCampaign::campaignCondition('d.campaign_id', $kind);
+        if (null !== $kindCondition) {
+            $qb->andWhere($kindCondition);
         }
 
         // COALESCE в SQL гарантирует NOT NULL из БД, но fetchOne() при пустом

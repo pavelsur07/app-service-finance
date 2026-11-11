@@ -49,7 +49,7 @@ final class OzonPerformanceSearchPromoOrdersSummaryCommandTest extends Integrati
         self::assertStringContainsString('2026-11-05 1 1010.00 1', $display);
         self::assertStringNotContainsString('2026-11-08', $display);
         self::assertStringContainsString('Итого 3 1095.50 1', $display);
-        self::assertStringContainsString('Отчётов прочитано: 3; разных SKU: 2; строк без даты или расхода: 1.', $display);
+        self::assertStringContainsString('Отчётов прочитано: 3; разных SKU: 2; строк без даты или расхода: 1; заказанный SKU ≠ продвигаемому: 0.', $display);
         self::assertStringNotContainsString('9999', $display);
     }
 

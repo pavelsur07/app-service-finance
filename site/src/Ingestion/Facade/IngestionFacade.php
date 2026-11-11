@@ -9,11 +9,13 @@ use App\Ingestion\Application\DTO\FinancialSummaryCategoryView;
 use App\Ingestion\Application\DTO\FinancialSummaryMarketplaceCategoryView;
 use App\Ingestion\Application\DTO\FinancialSummaryMonthView;
 use App\Ingestion\Application\DTO\IssueListItemView;
+use App\Ingestion\Application\DTO\OzonSearchPromoOrders;
 use App\Ingestion\Application\DTO\PaginationMeta;
 use App\Ingestion\Application\DTO\ReconciliationByTypeView;
 use App\Ingestion\Application\DTO\ReconciliationSummaryView;
 use App\Ingestion\Application\DTO\ShopOptionView;
 use App\Ingestion\Application\Service\IssueDescriptionFormatter;
+use App\Ingestion\Application\Service\OzonSearchPromoOrdersReader;
 use App\Ingestion\Enum\NormalizationIssueKind;
 use App\Ingestion\Infrastructure\Query\CoverageQuery;
 use App\Ingestion\Infrastructure\Query\FinancialSummaryQuery;
@@ -33,7 +35,17 @@ final readonly class IngestionFacade
         private IssuesQuery $issuesQuery,
         private FinancialSummaryQuery $financialSummaryQuery,
         private IssueDescriptionFormatter $issueDescriptionFormatter,
+        private OzonSearchPromoOrdersReader $ozonSearchPromoOrdersReader,
     ) {
+    }
+
+    /**
+     * Строки загруженных отчётов Ozon Performance «Оплата за заказ» кабинета за дни [from, to]:
+     * по одной на (заказ, SKU, день), из последней загруженной версии. Только чтение.
+     */
+    public function getOzonSearchPromoOrders(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): OzonSearchPromoOrders
+    {
+        return $this->ozonSearchPromoOrdersReader->read($companyId, $from, $to);
     }
 
     /**

@@ -59,8 +59,8 @@
                 </thead>
                 <tbody>
                     {% for ads in report.adReconciliation %}
-                        <tr data-marketplace="{{ ads.marketplace.value }}">
-                            <td>{{ ads.marketplace.displayName }}</td>
+                        <tr data-marketplace="{{ ads.marketplace.value }}"{% if ads.kind %} data-kind="{{ ads.kind.value }}"{% endif %}>
+                            <td>{{ ads.title }}</td>
                             <td class="text-end">{{ ads.ledger|vf_amount }}</td>
                             <td class="text-end">{{ ads.statistics|vf_amount }}</td>
                             <td class="text-end">{{ ads.onListings|vf_amount }}</td>
@@ -74,9 +74,10 @@
         </div>
         <div class="card-footer text-secondary small">
             Расхождение = учёт − статистика. Частые причины: дни, которых нет в одном из источников;
-            недельные удержания WB на стыке месяцев; реклама, оплаченная предоплатой.<br>
+            недельные удержания WB на стыке месяцев; реклама, оплаченная предоплатой; у оплаты за заказ —
+            списания Ozon того же типа, которых нет в отчёте по заказам.<br>
             Реклама вне статистики — прочие затраты маркетплейса в той же статье ОПиУ, которых нет в
-            рекламной статистике (оплата за заказ, рассылки, подписки). Учёт + реклама вне статистики = строка статьи в ОПиУ.
+            рекламной статистике (рассылки, подписки). Учёт + реклама вне статистики = строка статьи в ОПиУ.
         </div>
     </div>
 {% endif %}

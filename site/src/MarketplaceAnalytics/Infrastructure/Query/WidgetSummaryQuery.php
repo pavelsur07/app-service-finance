@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Marketplace\Domain\PlPreview\AdStatisticsCostCategories;
+use App\Marketplace\Enum\AdSpendKind;
+use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
@@ -129,6 +131,16 @@ final readonly class WidgetSummaryQuery
             }
 
             $marketplaceFromRow = (string) $row['marketplace'];
+            if (MarketplaceType::OZON->value === $marketplaceFromRow && AdStatisticsCostCategories::payPerOrderCode() === $code) {
+                // Оплата за заказ из отчёта Ozon уже в группе «Реклама» (статистика): здесь остаётся
+                // только часть учёта, которой в отчёте нет. Расход в этих строках со знаком «−».
+                $covered = min(
+                    (float) $this->adsFacade->getTotalAdCostForPeriod($companyId, $dateFrom, $dateTo, MarketplaceType::OZON->value, AdSpendKind::PAY_PER_ORDER),
+                    max(0.0, -$netAmt),
+                );
+                $costsAmt += $covered;
+                $netAmt += $covered;
+            }
             $bucket = $this->groupResolver->resolveUnitBucket($marketplaceFromRow, $code, $name);
             // Как в таблице: всё, что не комиссия и не логистика, — «Прочие».
             $group = self::WIDGET_GROUPS[$bucket] ?? self::WIDGET_GROUPS['other'];

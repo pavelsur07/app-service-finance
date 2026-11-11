@@ -146,8 +146,9 @@ final readonly class BuildMarketplacePlPreviewAction
     {
         $facts = [];
         $reconciliation = [];
+        $outsideShown = [];
         foreach ($adLedgers as $ledger) {
-            $spend = $this->adSpend->spendForPeriod($companyId, $ledger->marketplace, $from, $to);
+            $spend = $this->adSpend->spendForPeriod($companyId, $ledger->marketplace, $from, $to, $ledger->kind);
 
             $allocated = '0';
             foreach ($spend->byListing as $listingId => $amount) {
@@ -165,6 +166,10 @@ final readonly class BuildMarketplacePlPreviewAction
 
             $ledgerSpend = $ledger->signed($ledger->ledgerAmount);
             $unallocated = $spend->unallocated();
+            // Две категории маркетплейса в одной статье: «вне статистики» у статьи одно — на первой строке.
+            $outsideKey = $ledger->marketplace->value.'|'.$ledger->plCategoryId;
+            $outside = isset($outsideShown[$outsideKey]) ? '0' : $ledger->outsideAmount;
+            $outsideShown[$outsideKey] = true;
             $reconciliation[] = new PlPreviewAdReconciliationDTO(
                 marketplace: $ledger->marketplace,
                 ledger: $ledgerSpend,
@@ -172,7 +177,8 @@ final readonly class BuildMarketplacePlPreviewAction
                 onListings: bcsub($spend->total, $unallocated, 2),
                 unallocated: $unallocated,
                 difference: bcsub($ledgerSpend, $spend->total, 2),
-                outsideStatistics: $ledger->signed($ledger->outsideAmount),
+                outsideStatistics: $ledger->signed($outside),
+                kind: $ledger->kind,
             );
         }
 

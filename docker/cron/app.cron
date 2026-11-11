@@ -280,6 +280,10 @@
 # Запуск вынесен после ночного marketplace/inventory/accrual окна.
 25 7 * * * cd /app && php bin/console app:ingestion:ozon-performance:daily-load --window=month-to-date --execute --dispatch-spacing-seconds=120 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Оплата за заказ Ozon по SKU: отчёты по заказам, загруженные строкой выше (к ~07:55), — в рекламную
+# статистику (кампания «Оплата за заказ»). Месяц вчерашнего дня, 1-го числа — весь прошлый месяц.
+30 8 * * * cd /app && php bin/console app:marketplace-ads:ozon-search-promo:sync --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Ежедневно в 03:00: чистка логов/временных таблиц
 #0 3 * * * php /app/bin/console app:maintenance:cleanup --env=prod
 

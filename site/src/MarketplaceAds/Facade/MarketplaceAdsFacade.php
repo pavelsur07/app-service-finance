@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Facade;
 
+use App\Marketplace\Enum\AdSpendKind;
 use App\MarketplaceAds\Application\DTO\AdCostForListingDTO;
 use App\MarketplaceAds\Infrastructure\Query\AdDocumentQueryInterface;
 use App\MarketplaceAds\Infrastructure\Query\AdSpendByListingQuery;
@@ -46,6 +47,7 @@ final readonly class MarketplaceAdsFacade
      *
      * @param string|null $marketplace значение MarketplaceType::value ('wildberries', 'ozon').
      *                                 Если null — суммируются все площадки.
+     * @param AdSpendKind|null $kind только оплата за клики или только за заказ; null — весь расход
      *
      * @return string decimal-строка, например "4567.89"; "0" если данных нет.
      */
@@ -54,8 +56,9 @@ final readonly class MarketplaceAdsFacade
         \DateTimeImmutable $dateFrom,
         \DateTimeImmutable $dateTo,
         ?string $marketplace = null,
+        ?AdSpendKind $kind = null,
     ): string {
-        return $this->adDocumentQuery->sumTotalCostForPeriod($companyId, $dateFrom, $dateTo, $marketplace);
+        return $this->adDocumentQuery->sumTotalCostForPeriod($companyId, $dateFrom, $dateTo, $marketplace, $kind);
     }
 
     /**
@@ -67,6 +70,7 @@ final readonly class MarketplaceAdsFacade
      *
      * @param string|null $marketplace значение MarketplaceType::value ('wildberries', 'ozon').
      *                                 Если null — суммируются все площадки.
+     * @param AdSpendKind|null $kind только оплата за клики или только за заказ; null — весь расход
      *
      * @return array<string, string> listingId => decimal-string adSpend
      */
@@ -75,12 +79,14 @@ final readonly class MarketplaceAdsFacade
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
         ?string $marketplace = null,
+        ?AdSpendKind $kind = null,
     ): array {
         return $this->adSpendByListingQuery->getByListingForPeriod(
             $companyId,
             $from,
             $to,
             $marketplace,
+            $kind,
         );
     }
 }

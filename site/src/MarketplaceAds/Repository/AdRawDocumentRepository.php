@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Repository;
 
+use App\MarketplaceAds\Domain\ValueObject\OzonSearchPromoCampaign;
 use App\MarketplaceAds\Entity\AdRawDocument;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\Persistence\ManagerRegistry;
 
 class AdRawDocumentRepository extends ServiceEntityRepository implements AdRawDocumentRepositoryInterface
@@ -23,16 +25,20 @@ class AdRawDocumentRepository extends ServiceEntityRepository implements AdRawDo
         \DateTimeImmutable $to,
         ?AdRawDocumentStatus $statusFilter = null,
     ): int {
+        // Документы оплаты за заказ (source_key ozon-search-promo:…) — не часть загрузки кликов:
+        // счётчик кормит финализацию job и сверку CPC-конвейера.
         $sql = 'SELECT COUNT(*) FROM marketplace_ad_raw_documents
                 WHERE company_id = :company_id
                   AND marketplace = :marketplace
-                  AND report_date BETWEEN :from AND :to';
+                  AND report_date BETWEEN :from AND :to
+                  AND (source_key IS NULL OR source_key NOT LIKE :searchPromo)';
 
         $params = [
             'company_id' => $companyId,
             'marketplace' => $marketplace,
             'from' => $from->format('Y-m-d'),
             'to' => $to->format('Y-m-d'),
+            'searchPromo' => OzonSearchPromoCampaign::SOURCE_KEY_PREFIX.'%',
         ];
 
         if (null !== $statusFilter) {
@@ -122,11 +128,23 @@ class AdRawDocumentRepository extends ServiceEntityRepository implements AdRawDo
         string $marketplace,
         \DateTimeImmutable $reportDate,
     ): ?AdRawDocument {
-        return $this->findOneBy([
-            'companyId' => $companyId,
-            'marketplace' => $marketplace,
-            'reportDate' => $reportDate,
-        ]);
+        // Документ дня загрузки кликов: документ оплаты за заказ того же дня (source_key
+        // ozon-search-promo:…) скачивание CPC перезаписало бы.
+        /** @var AdRawDocument|null $document */
+        $document = $this->createQueryBuilder('r')
+            ->where('r.companyId = :companyId')
+            ->andWhere('r.marketplace = :marketplace')
+            ->andWhere('r.reportDate = :reportDate')
+            ->andWhere('(r.sourceKey IS NULL OR r.sourceKey NOT LIKE :searchPromo)')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('reportDate', $reportDate, Types::DATE_IMMUTABLE)
+            ->setParameter('searchPromo', OzonSearchPromoCampaign::SOURCE_KEY_PREFIX.'%')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $document;
     }
 
     public function findBySourceKey(
