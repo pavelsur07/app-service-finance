@@ -4,6 +4,8 @@ test('placeholder routes, keyboard, styles, history and network isolation', asyn
   page,
   baseURL,
 }) => {
+  if (!baseURL) throw new Error('Missing test baseURL');
+  const origin = new URL(baseURL).origin;
   const errors: string[] = [];
   const forbidden: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -11,7 +13,7 @@ test('placeholder routes, keyboard, styles, history and network isolation', asyn
     const request = route.request();
     const url = new URL(request.url());
     if (
-      url.origin !== baseURL ||
+      url.origin !== origin ||
       ['fetch', 'xhr'].includes(request.resourceType())
     ) {
       forbidden.push(request.url());
@@ -52,7 +54,7 @@ test('placeholder routes, keyboard, styles, history and network isolation', asyn
     page.getByRole('heading', { name: 'О приложении' }),
   ).toBeVisible();
   await page.goBack();
-  await expect(page).toHaveURL(`${baseURL}/`);
+  await expect(page).toHaveURL(`${origin}/`);
   await page.goto('/about');
   await page.reload();
   await expect(
@@ -68,7 +70,7 @@ test('placeholder routes, keyboard, styles, history and network isolation', asyn
   }
   await expect(page.getByRole('heading', { name: 'Не найдено' })).toBeVisible();
   await page.getByRole('link', { name: 'На главную', exact: true }).click();
-  await expect(page).toHaveURL(`${baseURL}/`);
+  await expect(page).toHaveURL(`${origin}/`);
   expect(errors).toEqual([]);
   expect(forbidden).toEqual([]);
 });

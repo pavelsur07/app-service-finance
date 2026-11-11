@@ -89,6 +89,19 @@ x-php-env: &php-env
     APP_OBJECT_STORAGE_S3_ACCESS_KEY: ${APP_OBJECT_STORAGE_S3_ACCESS_KEY:-}
     APP_OBJECT_STORAGE_S3_SECRET_KEY: ${APP_OBJECT_STORAGE_S3_SECRET_KEY:-}
 
+# Immutable SPA images share only the public proxy network, no backend/DB access.
+x-spa: &spa
+    restart: always
+    logging: *default-logging
+    expose:
+        - "80"
+    networks:
+        - traefik-public
+    read_only: true
+    tmpfs:
+        - /var/cache/nginx
+        - /var/run
+
 services:
 
     traefik:
@@ -164,6 +177,42 @@ services:
             - traefik.http.routers.land-http.middlewares=redirect-to-https
             - traefik.http.routers.land-http.priority=10
             - traefik.docker.network=traefik-public
+
+    account:
+        <<: *spa
+        image: ghcr.io/pavelsur07/account-nginx:${IMAGE_TAG:-latest}
+        container_name: account-nginx
+        labels:
+            - traefik.enable=true
+            - traefik.docker.network=traefik-public
+            - traefik.http.routers.account.rule=Host(`account.vashfindir.ru`)
+            - traefik.http.routers.account.entrypoints=https
+            - traefik.http.routers.account.tls=true
+            - traefik.http.routers.account.tls.certresolver=letsEncrypt
+            - traefik.http.routers.account.service=account
+            - traefik.http.services.account.loadbalancer.server.port=80
+            - traefik.http.routers.account-http.rule=Host(`account.vashfindir.ru`)
+            - traefik.http.routers.account-http.entrypoints=http
+            - traefik.http.routers.account-http.middlewares=redirect-to-https
+            - traefik.http.routers.account-http.priority=10
+
+    admin:
+        <<: *spa
+        image: ghcr.io/pavelsur07/admin-nginx:${IMAGE_TAG:-latest}
+        container_name: admin-nginx
+        labels:
+            - traefik.enable=true
+            - traefik.docker.network=traefik-public
+            - traefik.http.routers.admin.rule=Host(`admin.vashfindir.ru`)
+            - traefik.http.routers.admin.entrypoints=https
+            - traefik.http.routers.admin.tls=true
+            - traefik.http.routers.admin.tls.certresolver=letsEncrypt
+            - traefik.http.routers.admin.service=admin
+            - traefik.http.services.admin.loadbalancer.server.port=80
+            - traefik.http.routers.admin-http.rule=Host(`admin.vashfindir.ru`)
+            - traefik.http.routers.admin-http.entrypoints=http
+            - traefik.http.routers.admin-http.middlewares=redirect-to-https
+            - traefik.http.routers.admin-http.priority=10
 
     site:
         image: ghcr.io/pavelsur07/site-nginx:${IMAGE_TAG:-latest}

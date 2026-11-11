@@ -1,8 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const preview = process.env.E2E_MODE === 'preview';
+const production = process.env.E2E_MODE === 'production';
 const host = process.env.E2E_CONTAINER ? 'account' : '127.0.0.1';
-const port = preview ? 4174 : 5174;
+const port = production ? 80 : preview ? 4174 : 5174;
 export default defineConfig({
   testDir: './tests/e2e',
   workers: 1,
