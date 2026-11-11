@@ -18,7 +18,7 @@ flush();
 try {
     switch (getenv('CASH_RACE_OPERATION')) {
         case 'update':
-            $dto = new App\Cash\DTO\CashTransactionDTO();
+            $dto = new App\Cash\Application\DTO\CashTransactionDTO();
             $dto->moneyAccountId = (string) $tx->getMoneyAccount()->getId();
             $dto->currency = $tx->getCurrency();
             $dto->direction = $tx->getDirection();

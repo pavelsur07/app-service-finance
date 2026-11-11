@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Cash\EventSubscriber\Transaction;
+namespace App\Cash\EventListener;
 
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Application\Service\DebouncedRangeEnqueuer;
@@ -10,10 +10,9 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\Message\EnqueueAutoRulesForRange;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
-use Doctrine\Common\EventSubscriber;
+use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Event\PostUpdateEventArgs;
 use Doctrine\ORM\Events;
-use Doctrine\Persistence\Event\LifecycleEventArgs;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -22,7 +21,7 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 
 #[AsDoctrineListener(event: Events::postPersist)]
 #[AsDoctrineListener(event: Events::postUpdate)]
-final class CashTransactionAutoRulesSubscriber implements EventSubscriber
+final class CashTransactionAutoRulesListener
 {
     private const MATCH_INPUT_FIELDS = [
         'moneyAccount',
@@ -42,11 +41,6 @@ final class CashTransactionAutoRulesSubscriber implements EventSubscriber
     ) {
     }
 
-    public function getSubscribedEvents(): array
-    {
-        return [Events::postPersist, Events::postUpdate];
-    }
-
     public function postUpdate(PostUpdateEventArgs $args): void
     {
         $entity = $args->getObject();
@@ -62,7 +56,7 @@ final class CashTransactionAutoRulesSubscriber implements EventSubscriber
         $this->enqueue($entity);
     }
 
-    public function postPersist(LifecycleEventArgs $args): void
+    public function postPersist(PostPersistEventArgs $args): void
     {
         $entity = $args->getObject();
         if (!$entity instanceof CashTransaction || $this->dispatchGuard->isSuppressed()) {

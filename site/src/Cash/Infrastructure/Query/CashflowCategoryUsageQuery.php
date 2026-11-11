@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Infrastructure\Query;
 
-use App\Cash\DTO\CashflowCategoryUsage;
+use App\Cash\Application\DTO\CashflowCategoryUsage;
 use Doctrine\DBAL\Connection;
 
 /**

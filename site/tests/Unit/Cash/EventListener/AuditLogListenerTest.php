@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Cash\EventSubscriber;
+namespace App\Tests\Unit\Cash\EventListener;
 
 use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;
 use App\Cash\Application\Service\AutoRuleDispatchGuard;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
-use App\Cash\EventSubscriber\Audit\AuditLogSubscriber;
+use App\Cash\EventListener\AuditLogListener;
 use App\Shared\Audit\AuditContextProvider;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
@@ -19,7 +19,7 @@ use Doctrine\ORM\Event\PostUpdateEventArgs;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
-final class AuditLogSubscriberTest extends TestCase
+final class AuditLogListenerTest extends TestCase
 {
     public function testDoesNotDuplicateExplicitAutoRuleApplicationAudit(): void
     {
@@ -43,7 +43,7 @@ final class AuditLogSubscriberTest extends TestCase
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager->expects(self::never())->method('persist');
         $guard = new AutoRuleDispatchGuard();
-        $subscriber = new AuditLogSubscriber(
+        $subscriber = new AuditLogListener(
             $this->createMock(AuditContextProvider::class),
             $entityManager,
             $guard,

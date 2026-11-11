@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\Application;
 
+use App\Cash\Application\DTO\PaymentPlanDTO;
 use App\Cash\Domain\Identifier\CanonicalUuid;
-use App\Cash\DTO\PaymentPlanDTO;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanDtoApplier;

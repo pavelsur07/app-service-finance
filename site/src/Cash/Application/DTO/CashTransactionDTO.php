@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Cash\DTO;
+namespace App\Cash\Application\DTO;
 
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;

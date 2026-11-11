@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Cash\DTO\Template;
+namespace App\Cash\Application\DTO\Template;
 
 use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 

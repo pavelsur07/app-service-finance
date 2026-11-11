@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Cash\Service\Accounts;
 
 use App\Cash\Application\AddCashTransactionAction;
-use App\Cash\DTO\CashTransactionDTO;
+use App\Cash\Application\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
 use App\Cash\Entity\Transaction\CashTransaction;

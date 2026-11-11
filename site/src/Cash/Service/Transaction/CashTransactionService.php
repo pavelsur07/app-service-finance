@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Service\Transaction;
 
-use App\Cash\DTO\CashTransactionDTO;
+use App\Cash\Application\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Form\PaymentPlan;
 
-use App\Cash\DTO\PaymentPlanDTO;
+use App\Cash\Application\DTO\PaymentPlanDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus;

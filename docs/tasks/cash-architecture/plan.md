@@ -901,8 +901,9 @@ Telegram-строка ДДС и балансы, плановые платежи,
 - **Правило бойскаута:** тронул файл Cash — закрыл его записи baseline, если
   это не меняет поведение.
 - Перенос в целевую раскладку: `Message/` → `Application/Message/`,
-  `DTO/` → `Application/DTO/`, `Service/` → `Application/` или `Domain/`.
-  Baseline-guard переносы пропускает.
+  `Service/` → `Application/` или `Domain/`. Baseline-guard переносы
+  пропускает. `DTO/`, `Query/`, `EventSubscriber/` перенесены отдельно —
+  этап 2 `docs/tasks/cash-module-structure/plan.md` (2026-11-11).
 - `final` на сервисах, репозиториях, контроллерах, формах; `final readonly` на
   DTO и Message.
 - Голое `\RuntimeException` / `\InvalidArgumentException` → доменное

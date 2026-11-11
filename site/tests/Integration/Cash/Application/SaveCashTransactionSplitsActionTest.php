@@ -280,7 +280,7 @@ final class SaveCashTransactionSplitsActionTest extends IntegrationTestCase
         $rent = $this->category($company, 'Аренда');
         $ads = $this->category($company, 'Реклама');
         $this->action()($tx, $this->input([[$rent->getId(), '600.00'], [$ads->getId(), '400.00']]));
-        $dto = new \App\Cash\DTO\CashTransactionDTO();
+        $dto = new \App\Cash\Application\DTO\CashTransactionDTO();
         $dto->moneyAccountId = (string) $tx->getMoneyAccount()->getId();
         $dto->currency = $tx->getCurrency();
         $dto->amount = $tx->getAmount();

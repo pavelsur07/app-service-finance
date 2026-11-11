@@ -6,8 +6,8 @@ namespace App\Tests\Integration\Settlement;
 
 use App\Cash\Application\BulkDeleteCashTransactionsAction;
 use App\Cash\Application\DeleteCashTransactionAction;
+use App\Cash\Application\DTO\CashTransactionDTO;
 use App\Cash\Application\UpdateCashTransactionAction;
-use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
 use App\Finance\Application\UpdateManualDocumentAction;

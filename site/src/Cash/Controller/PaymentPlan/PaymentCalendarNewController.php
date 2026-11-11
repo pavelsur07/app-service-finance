@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Controller\PaymentPlan;
 
 use App\Cash\Application\CreatePaymentPlanAction;
-use App\Cash\DTO\PaymentPlanDTO;
+use App\Cash\Application\DTO\PaymentPlanDTO;
 use App\Cash\Form\PaymentPlan\PaymentPlanType;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;

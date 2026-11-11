@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Exception;
 
-use App\Cash\DTO\CashflowCategoryUsage;
+use App\Cash\Application\DTO\CashflowCategoryUsage;
 
 final class CashflowCategoryInUseException extends \RuntimeException
 {

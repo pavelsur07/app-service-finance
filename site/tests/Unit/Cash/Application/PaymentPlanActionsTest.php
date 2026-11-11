@@ -6,9 +6,9 @@ namespace App\Tests\Unit\Cash\Application;
 
 use App\Cash\Application\ChangePaymentPlanStatusAction;
 use App\Cash\Application\CreatePaymentPlanAction;
+use App\Cash\Application\DTO\PaymentPlanDTO;
 use App\Cash\Application\PostponePaymentPlanAction;
 use App\Cash\Application\UpdatePaymentPlanAction;
-use App\Cash\DTO\PaymentPlanDTO;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;

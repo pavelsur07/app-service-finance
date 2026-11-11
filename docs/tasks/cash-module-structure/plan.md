@@ -69,9 +69,8 @@ Handler, Command; из чужих модулей импортируются то
 
 ## Этап 2. Правило размещения и перенос мелких каталогов
 
-**Решение Владельца перед стартом.** Отдельный PR противоречит попутному правилу
-первой волны («отдельных PR под них не делать»). За месяц попутно не сдвинулся
-ни один из 12 файлов. Без согласия этап не начинать.
+**Решение Владельца:** отдельный PR, вопреки попутному правилу первой волны, —
+одобрено 2026-11-11 («Начинай делать» после плана этапов 2–3).
 
 ### Задача
 
@@ -161,30 +160,49 @@ Handler, Command; из чужих модулей импортируются то
 
 ### Что выполнено
 
-—
+2026-11-11, ветка `refactor/cash-structure-stages-2-3`, после этапа 3.
+
+- 12 классов перенесены `git mv` по таблице, тесты — за ними; каталогов
+  `Cash/Query`, `Cash/DTO`, `Cash/EventSubscriber` нет.
+- У Doctrine-листенеров удалены мёртвые `implements EventSubscriber` и
+  `getSubscribedEvents()`; `LifecycleEventArgs` → `PostPersistEventArgs`;
+  в `AuditLogListener::resolveCompanyId` убран всегда истинный `method_exists`
+  (возвращаемый тип `string`, недостижимые ветки `null` удалены).
+- `debug:container --tag=doctrine.event_listener` до и после: те же события
+  (`postPersist`, `postUpdate`), по одному тегу, отличаются только имена классов.
+- Baseline: 5 записей по `EventSubscriber/*` закрыты исправлениями (3 в `src`,
+  2 в тесте листенера); в 5 записях про ошибки типов вне переноса
+  (`CashTransactionDTO::$companyId/$moneyAccountId` в форме и тестах) обновлено
+  только имя класса — это переименование, его пропускает baseline-guard.
+- CS-фиксер по изменённым файлам поправил порядок `use` в 14 файлах, других
+  изменений нет.
+- Документы: правило размещения — `ARCHITECTURE.md`, «Cash: размещение
+  классов»; `ARCHITECTURE.md` (аудит при создании компании), `site/src/Cash/README.md`,
+  попутные правила `docs/tasks/cash-architecture/plan.md`.
+- Проверки: тесты Cash/Settlement/Report/Analytics — 1132 OK; PHPStan полный — 0.
 
 ### Чек-лист приёмки
 
-- [ ] Каталогов `src/Cash/Query/`, `src/Cash/DTO/`, `src/Cash/EventSubscriber/` нет.
-- [ ] `grep -rF 'App\Cash\DTO\' src tests config` и то же для `App\Cash\Query\`,
+- [x] Каталогов `src/Cash/Query/`, `src/Cash/DTO/`, `src/Cash/EventSubscriber/` нет.
+- [x] `grep -rF 'App\Cash\DTO\' src tests config` и то же для `App\Cash\Query\`,
       `App\Cash\EventSubscriber\` — 0 строк.
 - [ ] `git diff -M --stat master` — 12 переименований в `src/`, тесты за ними;
       `git diff -M` по перенесённым файлам — только `namespace`/`use` (и у двух
       листенеров — удалённые интерфейс, `getSubscribedEvents()`, новое имя).
-- [ ] `debug:container --tag=doctrine.event_listener` до и после: те же события
+- [x] `debug:container --tag=doctrine.event_listener` до и после: те же события
       `postPersist`/`postUpdate` у обоих листенеров, ровно по одному тегу на
       событие; новые имена классов.
-- [ ] Тесты листенеров (`AuditLogSubscriberTest`,
+- [x] Тесты листенеров (`AuditLogSubscriberTest`,
       `CashTransactionAutoRulesSubscriberTest` под новыми именами) зелёные;
       аудит при создании транзакции и постановка автоправил проверены
       интеграционными тестами Cash.
-- [ ] `PaymentCalendarQueryTest`, `SettlementSourceMutationGuardTest`,
+- [x] `PaymentCalendarQueryTest`, `SettlementSourceMutationGuardTest`,
       `CashflowCoreTemplateReaderTest`, `CashTransferTypeTest` зелёные.
 - [ ] Baseline-guard зелёный без `[baseline-grow]`; три записи
       `EventSubscriber/*` исчезли (ошибки починены, baseline Cash 138 → 135).
 - [ ] `make site-stan`, `site-cs-check`, `site-cs-strict-types`, полный
       `make site-test` зелёные.
-- [ ] Правило размещения записано в раздел Cash `ARCHITECTURE.md`; ссылка
+- [x] Правило размещения записано в раздел Cash `ARCHITECTURE.md`; ссылка
       `ARCHITECTURE.md:2394` и `README.md:58` обновлены.
 - [ ] Перед handoff `gh pr view --json mergeable` = `MERGEABLE` (переносы
       конфликтуют с параллельными PR; `master` вливать только при конфликте).

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Integration\Cash\Query;
+namespace App\Tests\Integration\Cash\Infrastructure;
 
-use App\Cash\Query\PaymentCalendarQuery;
+use App\Cash\Infrastructure\Query\PaymentCalendarQuery;
 use App\Company\Facade\CounterpartyFacade;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CounterpartyBuilder;

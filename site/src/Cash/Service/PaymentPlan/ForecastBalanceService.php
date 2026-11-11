@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Service\PaymentPlan;
 
-use App\Cash\DTO\ForecastDTO;
+use App\Cash\Application\DTO\ForecastDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;

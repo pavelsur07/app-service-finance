@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Form\Transfer;
 
-use App\Cash\DTO\CashTransferFormData;
+use App\Cash\Application\DTO\CashTransferFormData;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Form\Transfer\CashTransferType;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;

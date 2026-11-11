@@ -15,7 +15,7 @@ final class PaymentCalendarPage extends AbstractController
 {
     public function __construct(
         private readonly MaterializeRecurringPaymentPlansAction $materializeRecurringPlans,
-        private readonly \App\Cash\Query\PaymentCalendarQuery $query,
+        private readonly \App\Cash\Infrastructure\Query\PaymentCalendarQuery $query,
         private readonly CashListPagination $pagination,
     ) {
     }

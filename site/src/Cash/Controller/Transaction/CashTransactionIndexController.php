@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
-use App\Cash\DTO\CashTransactionFilters;
+use App\Cash\Application\DTO\CashTransactionFilters;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Infrastructure\Query\CashCategorizationQuery;

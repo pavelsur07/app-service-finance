@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Cash\DTO;
+namespace App\Cash\Application\DTO;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use Symfony\Component\Validator\Constraints as Assert;

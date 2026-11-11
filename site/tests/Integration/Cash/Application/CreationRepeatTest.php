@@ -6,7 +6,7 @@ namespace App\Tests\Integration\Cash\Application;
 
 use App\Cash\Application\CreateMoneyFundMovementAction;
 use App\Cash\Application\CreatePaymentPlanAction;
-use App\Cash\DTO\PaymentPlanDTO;
+use App\Cash\Application\DTO\PaymentPlanDTO;
 use App\Cash\Entity\Accounts\MoneyFund;
 use App\Cash\Entity\Accounts\MoneyFundMovement;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;

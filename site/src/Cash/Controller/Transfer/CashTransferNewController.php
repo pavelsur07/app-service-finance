@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transfer;
 
+use App\Cash\Application\DTO\CashTransferFormData;
 use App\Cash\Application\DTO\CreateCashTransferCommand;
-use App\Cash\DTO\CashTransferFormData;
 use App\Cash\Facade\CashFacade;
 use App\Cash\Form\Transfer\CashTransferType;
 use App\Company\Security\ModuleAccess;
