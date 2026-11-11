@@ -106,6 +106,17 @@ case "$cmd" in
       fi
     done
     ;;
+  app:ingestion:ozon-performance:campaigns-probe)
+    # Read-only исследование: все кампании Ozon Performance кабинета любых типов
+    # (один GET /api/client/campaign, без названий) и их расход из сохранённого
+    # отчёта expense. Ничего не пишет (11.11.2026, этап 3 docs/tasks/ozon-cpo-orders).
+    for arg in "$@"; do
+      if [[ "$arg" =~ ^--company-id=[0-9a-f-]{36}$ ]]; then :
+      elif [[ "$arg" =~ ^--(from|to)=[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    ;;
   app:marketplace:ozon-financial-reports:freshness-check)
     # Read-only гейт: проверяет, что у каждого активного seller-подключения есть
     # документ начислений за вчера. Ничего не пишет и во внешний API не ходит,
