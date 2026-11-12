@@ -3,7 +3,9 @@
 **Branch:** `feat/account-admin-auth`
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/2971
 **Product checkpoint:** `0943d7c07` (subsequent commit closes task documents only).
-**CI:** current results are the PR checks; final Ready transition requires green.
+**Status:** CLOSED — owner acceptance received 2026-11-12.
+**CI/deploy:** [workflow43152801528](https://github.com/pavelsur07/app-service-finance/actions/runs/43152801528) SUCCESS.
+**Merge:** `4b965aaf7dfd0813548e55e765ea3c752db23f26` in master.
 
 ## Delivered
 
@@ -56,18 +58,27 @@ B0/I1 fixed without rerun; Stage2 REVIEW_GREEN B0/I0.
 
 ## Release and follow-ups
 
-PR2970 merged as34ef67560; its docs-only deploy was skipped. Auth code is not yet
-deployed. The new PR needs a separate merge decision. Existing pipeline deploys
-backend before SPA and gates on real-backend tests. No manual production commands.
-After deploy perform read-only SHA/health, public HTTPS, anonymous session/CSRF,
-wrong-host/path and legacy-login checks; authenticated scenarios were validated
-against isolated test data. No production login without separate authorization.
+PR2970 merged as34ef67560; its docs-only deploy was skipped. Owner approved
+`merge and deploy #2971`; implementation merged and production deploy succeeded.
+Read-only wrapper confirmed account-nginx, admin-nginx, site-nginx and site-php-fpm
+healthy on merge SHA4b965aaf7.
+
+Production browser acceptance passed with normal TLS verification: both login
+forms/reload, desktop/mobile width, public about/404 without API bootstrap,
+JSON401 session, CSRF200, Secure/HttpOnly/SameSite=Lax host-only cookies, reserved
+paths404 and no sibling CORS. Legacy login and encoded wrong-host API boundaries
+passed; no JavaScript errors. No credentials submitted or token values logged.
+The first browser attempt timed out on networkidle; narrow HTTP and DOM/login
+diagnostics passed, then full acceptance passed with DOM readiness and explicit
+UI assertions. Product code did not change during acceptance.
+
+Owner confirmed: «Подтверждаю все работает». Task complete.
+
 Rollback through a standard revert, no Redis purge; SPA re-login may be required.
 Remaining product follow-up: business screens; no SSO is included. Existing
 actionlint shell warnings remain outside this change.
 
 ## Owner decision
 
-Ready: PR #2971 "feat(auth): подключить авторизацию и контекст account/admin" —
-merge into master with automatic production deploy?
-Reply: "merge and deploy #2971"
+Received: `merge and deploy #2971`. Merge, deploy and acceptance completed.
+Subsequent instruction: close the task, remove merged branches and return to master.
