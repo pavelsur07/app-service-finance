@@ -113,6 +113,8 @@ case "$cmd" in
     for arg in "$@"; do
       if [[ "$arg" =~ ^--company-id=[0-9a-f-]{36}$ ]]; then :
       elif [[ "$arg" =~ ^--(from|to)=[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then :
+      # --campaign: живые read-only запросы по кампании, в т.ч. отчёт по заказам (12.11.2026, этап 4).
+      elif [[ "$arg" =~ ^--campaign=[0-9]{1,20}$ ]]; then :
       else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
       fi
     done

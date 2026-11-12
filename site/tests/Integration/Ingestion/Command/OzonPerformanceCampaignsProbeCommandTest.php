@@ -77,6 +77,57 @@ final class OzonPerformanceCampaignsProbeCommandTest extends IntegrationTestCase
         self::assertStringNotContainsString('2026-11-06', $display);
     }
 
+    public function testCampaignProbeSummarisesOrdersReportAndSurvivesFailedProbe(): void
+    {
+        $owner = UserBuilder::aUser()->withEmail('probe-campaign@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
+        $connection = new MarketplaceConnection(Uuid::uuid7()->toString(), $company, MarketplaceType::OZON, MarketplaceConnectionType::PERFORMANCE);
+        $connection->setApiKey('secret');
+        $connection->setClientId('client');
+        $connection->setIsActive(true);
+        $this->em->persist($owner);
+        $this->em->persist($company);
+        $this->em->persist($connection);
+        $this->em->flush();
+        $companyId = (string) $company->getId();
+        $connectionId = $connection->getId();
+
+        $client = $this->createMock(OzonPerformanceReportClientInterface::class);
+        $client->expects(self::never())->method('listCampaigns');
+        $client->method('fetchCampaignObjects')->willThrowException(new \RuntimeException('Ozon Performance returned HTTP 400'));
+        $client->method('fetchSearchPromoProducts')->willReturn(new OzonRawPage([['sku' => '111', 'bid' => '5']], false, null));
+        $client->expects(self::once())->method('generateSearchPromoReport')
+            ->with($companyId, $connectionId, 'orders', self::anything(), self::anything(), ['23660699'])
+            ->willReturn('uuid-1');
+        $client->method('pollReport')->willReturn('https://example.test/report');
+        $client->method('downloadReport')->willReturn(new OzonRawPage([
+            ['Дата' => '01.11.2026', 'SKU' => '111', 'Расход, ₽' => '3 000,12'],
+            ['Дата' => '01.11.2026', 'SKU' => '222', 'Расход, ₽' => '718,00'],
+            ['Дата' => '02.11.2026', 'SKU' => '', 'Расход, ₽' => '1574,60'],
+        ], false, null));
+        self::getContainer()->set(OzonPerformanceReportClientInterface::class, $client);
+
+        self::assertNotNull(self::$kernel);
+        $tester = new CommandTester((new Application(self::$kernel))->find('app:ingestion:ozon-performance:campaigns-probe'));
+        $status = $tester->execute(['--company-id' => $companyId, '--from' => '2026-11-01', '--to' => '2026-11-10', '--campaign' => '23660699']);
+
+        self::assertSame(Command::SUCCESS, $status);
+        $display = (string) preg_replace('/\s+/', ' ', $tester->getDisplay());
+        self::assertStringContainsString('objects: ОШИБКА RuntimeException: Ozon Performance returned HTTP 400', $display);
+        self::assertStringContainsString('search_promo/v2/products: строк 1; поля: sku, bid', $display);
+        self::assertStringContainsString('orders report: строк 3', $display);
+        self::assertStringContainsString('без SKU: 1; различных SKU: 2; всего: 5292.72', $display);
+        self::assertStringContainsString('01.11.2026 3718.12', $display);
+    }
+
+    public function testRejectsCampaignWithoutPeriod(): void
+    {
+        self::assertNotNull(self::$kernel);
+        $tester = new CommandTester((new Application(self::$kernel))->find('app:ingestion:ozon-performance:campaigns-probe'));
+
+        self::assertSame(Command::INVALID, $tester->execute(['--company-id' => Uuid::uuid7()->toString(), '--campaign' => '23660699']));
+    }
+
     public function testRejectsOnlyOneDate(): void
     {
         self::assertNotNull(self::$kernel);
