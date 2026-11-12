@@ -32,6 +32,8 @@ final class OzonPerformanceCampaignsProbeCommand extends Command
 {
     private const array LOADED_TYPES = ['SKU', 'SEARCH_PROMO'];
     private const array HIDDEN_FIELDS = ['title', 'name'];
+    private const int POLL_ATTEMPTS = 60;
+    private const int POLL_SECONDS = 15;
 
     public function __construct(
         private readonly MarketplaceFacade $marketplaceFacade,
@@ -47,7 +49,8 @@ final class OzonPerformanceCampaignsProbeCommand extends Command
         $this
             ->addOption('company-id', null, InputOption::VALUE_REQUIRED, 'Company UUID.')
             ->addOption('from', null, InputOption::VALUE_REQUIRED, 'Expense period start, YYYY-MM-DD.')
-            ->addOption('to', null, InputOption::VALUE_REQUIRED, 'Expense period end, YYYY-MM-DD.');
+            ->addOption('to', null, InputOption::VALUE_REQUIRED, 'Expense period end, YYYY-MM-DD.')
+            ->addOption('campaign', null, InputOption::VALUE_REQUIRED, 'Campaign id: live objects, products and orders report for the period.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -59,6 +62,8 @@ final class OzonPerformanceCampaignsProbeCommand extends Command
         try {
             Assert::uuid($companyId, 'Invalid --company-id.');
             Assert::true(false !== $from && false !== $to && ((null === $from) === (null === $to)), 'Invalid --from/--to, expected both YYYY-MM-DD.');
+            $campaign = $input->getOption('campaign');
+            Assert::true(null === $campaign || (null !== $to && 1 === preg_match('/^\d+$/', (string) $campaign)), 'Invalid --campaign, expected digits together with --from/--to.');
         } catch (\InvalidArgumentException $exception) {
             $io->error($exception->getMessage());
 
@@ -68,6 +73,14 @@ final class OzonPerformanceCampaignsProbeCommand extends Command
         $connections = $this->marketplaceFacade->getActiveOzonPerformanceConnections($companyId);
         if ([] === $connections) {
             $io->warning('No active Ozon Performance connection.');
+
+            return Command::SUCCESS;
+        }
+
+        if (null !== $campaign && null !== $from) {
+            foreach ($connections as $connection) {
+                $this->campaign($io, $companyId, $connection['connectionId'], (string) $campaign, $from, $to);
+            }
 
             return Command::SUCCESS;
         }
@@ -137,6 +150,85 @@ final class OzonPerformanceCampaignsProbeCommand extends Command
         $io->section(sprintf('Расход по отчёту expense %s–%s (отчётов: %d)', $from->format('Y-m-d'), $to->format('Y-m-d'), count($recordIds)));
         $io->writeln('Поля строк: '.implode(', ', array_keys($keys)));
         $io->table(['кампания', 'день', 'числовые поля'], $rows);
+    }
+
+    /**
+     * Живые read-only запросы по одной кампании: объекты, товары, отчёт по заказам за период.
+     * Ошибка одного запроса печатается и не мешает остальным.
+     */
+    private function campaign(SymfonyStyle $io, string $companyId, string $connectionId, string $campaignId, \DateTimeImmutable $from, \DateTimeImmutable $to): void
+    {
+        $io->section(sprintf('Кампания %s, подключение %s', $campaignId, $connectionId));
+        $probes = [
+            'objects' => fn (): array => $this->client->fetchCampaignObjects($companyId, $connectionId, $campaignId)->rows,
+            'search_promo/v2/products' => fn (): array => $this->client->fetchSearchPromoProducts($companyId, $connectionId, $campaignId, 1)->rows,
+            'orders report' => fn (): array => $this->ordersReport($io, $companyId, $connectionId, $campaignId, $from, $to),
+        ];
+        foreach ($probes as $name => $probe) {
+            try {
+                $rows = $probe();
+            } catch (\Throwable $exception) {
+                $io->writeln(sprintf('%s: ОШИБКА %s: %s', $name, $exception::class, mb_substr($exception->getMessage(), 0, 200)));
+                continue;
+            }
+            $keys = [];
+            foreach ($rows as $row) {
+                $keys += array_flip(array_keys($row));
+            }
+            $io->writeln(sprintf('%s: строк %d; поля: %s', $name, count($rows), implode(', ', array_keys($keys))));
+            if ('orders report' === $name) {
+                $this->ordersSummary($io, $rows);
+            }
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function ordersReport(SymfonyStyle $io, string $companyId, string $connectionId, string $campaignId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $uuid = $this->client->generateSearchPromoReport($companyId, $connectionId, 'orders', $from, $to, [$campaignId]);
+        // ponytail: синхронный опрос, ~15 мин максимум — разовое исследование, не конвейер.
+        for ($attempt = 0; $attempt < self::POLL_ATTEMPTS; ++$attempt) {
+            $link = $this->client->pollReport($companyId, $connectionId, $uuid);
+            if (null !== $link) {
+                return $this->client->downloadReport($companyId, $connectionId, $uuid, $link)->rows;
+            }
+            sleep(self::POLL_SECONDS);
+        }
+
+        throw new \RuntimeException(sprintf('report %s not ready', $uuid));
+    }
+
+    /**
+     * Расход по дням, строки без SKU, различные SKU. Колонки — по имени: «Дата», «SKU», «Расход…».
+     *
+     * @param list<array<string, mixed>> $rows
+     */
+    private function ordersSummary(SymfonyStyle $io, array $rows): void
+    {
+        $byDay = [];
+        $skus = [];
+        $withoutSku = 0;
+        foreach ($rows as $row) {
+            $expense = '0';
+            foreach ($row as $field => $value) {
+                if (str_starts_with((string) $field, 'Расход') && is_scalar($value)) {
+                    $expense = str_replace([' ', "\u{00A0}", ','], ['', '', '.'], (string) $value);
+                }
+            }
+            $day = (string) (is_scalar($row['Дата'] ?? null) ? $row['Дата'] : '');
+            $byDay[$day] = bcadd($byDay[$day] ?? '0', is_numeric($expense) ? $expense : '0', 2);
+            $sku = trim((string) (is_scalar($row['SKU'] ?? null) ? $row['SKU'] : ''));
+            if ('' === $sku) {
+                ++$withoutSku;
+            } else {
+                $skus[$sku] = true;
+            }
+        }
+        ksort($byDay);
+        $io->writeln(sprintf('без SKU: %d; различных SKU: %d; всего: %s', $withoutSku, count($skus), array_reduce($byDay, static fn (string $sum, string $v): string => bcadd($sum, $v, 2), '0')));
+        $io->table(['день', 'расход'], array_map(null, array_keys($byDay), array_values($byDay)));
     }
 
     /**
