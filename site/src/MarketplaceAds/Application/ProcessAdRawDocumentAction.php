@@ -29,7 +29,8 @@ use Doctrine\ORM\EntityManagerInterface;
  *   raw-документ остаётся в DRAFT для ручного разбора;
  * - WB: сумма неизвестного nmId сохраняется в AdDocument без строки листинга,
  *   чтобы campaign totals сходились с фактическим /upd;
- * - WB __unallocated__: сохраняется без строки листинга и не считается ошибкой маппинга;
+ * - WB и оплата за заказ Ozon __unallocated__: сохраняется без строки листинга и не считается
+ *   ошибкой маппинга;
  * - оплата за заказ Ozon (OzonSearchPromoCampaign): неизвестный SKU — как у WB, без строки листинга;
  * - статус PROCESSED ставится только при полной обработке без пропусков;
  * - bulk-fetch листингов и продаж: два запроса на весь документ вместо N+1.
@@ -162,8 +163,8 @@ final readonly class ProcessAdRawDocumentAction
                 );
 
                 if (
-                    MarketplaceType::WILDBERRIES === $marketplace
-                    && AdRawEntry::UNALLOCATED_PARENT_SKU === $entry->parentSku
+                    AdRawEntry::UNALLOCATED_PARENT_SKU === $entry->parentSku
+                    && (MarketplaceType::WILDBERRIES === $marketplace || OzonSearchPromoCampaign::isPayPerOrder($entry->campaignId))
                 ) {
                     $this->entityManager->persist($adDocument);
                     ++$processedCount;
@@ -181,7 +182,7 @@ final readonly class ProcessAdRawDocumentAction
                     // SKU is not mapped to an internal listing; the missing line
                     // remains visible through DRAFT status and the warning below.
                     $keepWithoutLine = MarketplaceType::WILDBERRIES === $marketplace
-                        || OzonSearchPromoCampaign::CAMPAIGN_ID === $entry->campaignId;
+                        || OzonSearchPromoCampaign::isPayPerOrder($entry->campaignId);
                     if ($keepWithoutLine) {
                         $this->entityManager->persist($adDocument);
                         ++$processedCount;

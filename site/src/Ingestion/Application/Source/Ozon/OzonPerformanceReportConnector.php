@@ -29,6 +29,8 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
 
     private const ADV_OBJECT_TYPE_SKU = 'SKU';
     private const ADV_OBJECT_TYPE_SEARCH_PROMO = 'SEARCH_PROMO';
+    /** Оплата за заказ «все товары»: расход только по кампании, товары — из search_promo/v2/products. */
+    private const ADV_OBJECT_TYPE_ALL_SKU_PROMO = 'ALL_SKU_PROMO';
 
     private const SEARCH_PROMO_REPORT_PRODUCTS = 'products';
     private const SEARCH_PROMO_REPORT_ORDERS = 'orders';
@@ -105,6 +107,7 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
         $page = $this->client->listCampaigns($request->companyId, $request->connectionRef, [
             self::ADV_OBJECT_TYPE_SKU,
             self::ADV_OBJECT_TYPE_SEARCH_PROMO,
+            self::ADV_OBJECT_TYPE_ALL_SKU_PROMO,
         ]);
 
         return $this->doneResult($request, $page, OzonResourceType::PERFORMANCE_CAMPAIGNS, 'performance-campaigns');
@@ -165,7 +168,7 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
 
     private function pullSearchPromoProducts(PullRequest $request): PullResult
     {
-        $campaigns = $this->campaignIds($request, self::ADV_OBJECT_TYPE_SEARCH_PROMO);
+        $campaigns = $this->campaignIds($request, self::ADV_OBJECT_TYPE_SEARCH_PROMO, self::ADV_OBJECT_TYPE_ALL_SKU_PROMO);
         if ([] === $campaigns) {
             return $this->doneEmptyResult($request, OzonResourceType::PERFORMANCE_SEARCH_PROMO_PRODUCTS, 'performance-search-promo-products:empty');
         }
@@ -420,9 +423,9 @@ final readonly class OzonPerformanceReportConnector implements SourceConnectorIn
     /**
      * @return list<string>
      */
-    private function campaignIds(PullRequest $request, string $advObjectType): array
+    private function campaignIds(PullRequest $request, string ...$advObjectTypes): array
     {
-        $page = $this->client->listCampaigns($request->companyId, $request->connectionRef, [$advObjectType]);
+        $page = $this->client->listCampaigns($request->companyId, $request->connectionRef, array_values($advObjectTypes));
         $campaignIds = [];
 
         foreach ($page->rows as $row) {

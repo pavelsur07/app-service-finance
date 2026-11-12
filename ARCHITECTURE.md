@@ -1211,6 +1211,13 @@ listIssues(string $companyId, ?string $shopRef, ?int $year, ?int $month, int $pa
 // MarketplaceAds (SyncOzonSearchPromoSpendAction) и сводная команда search-promo-orders-summary.
 getOzonSearchPromoOrders(string $companyId, DateTimeImmutable $from, DateTimeImmutable $to): OzonSearchPromoOrders
 
+// Расход кампаний Ozon Performance ALL_SKU_PROMO («оплата за заказ, все товары») за дни [from, to]:
+// по кампании и дню из отчёта expense (moneySpent + prepaymentSpent, последняя версия дня), SKU
+// товаров кампании — объединение загруженных search_promo/v2/products; кампании — из последнего
+// списка кампаний. Только чтение. Читает MarketplaceAds (SyncOzonAllSkuPromoSpendAction).
+// @return list<OzonAllSkuPromoCampaignSpend>
+getOzonAllSkuPromoSpend(string $companyId, DateTimeImmutable $from, DateTimeImmutable $to): array
+
 // @return array{byMonth: list<FinancialSummaryMonthView>, byCategory: list<FinancialSummaryCategoryView>, marketplaceCategories: list<FinancialSummaryMarketplaceCategoryView>}
 getFinancialSummary(string $companyId, ?string $shopRef, int $yearFrom, int $monthFrom, int $yearTo, int $monthTo): array
 ```
@@ -3636,6 +3643,23 @@ IngestionFacade::getOzonSearchPromoOrders()
   `ReconcileMarketplaceAdsCommand` считает только клики.
 - Сроки дня D: отчёт в Ingestion D+1 ~07:55, статистика D+1 08:30, начисление тип 54 — D+2 04:00.
 
+**Все товары (ALL_SKU_PROMO).** Та же команда после отчёта по заказам распределяет расход кампаний
+ALL_SKU_PROMO: Ozon отдаёт его только по кампании за день (`expense` = начисление тип 54), отчёт по
+заказам эти кампании не покрывает. Ingestion грузит кампании этого типа в список кампаний и их товары
+в `ozon_performance_search_promo_products`.
+
+```text
+IngestionFacade::getOzonAllSkuPromoSpend()
+  -> расход дня по листингам товаров кампании пропорционально продажам (штуки) за день;
+     без продаж за день — за период синхронизации; без продаж и листингов — __unallocated__
+  -> AdRawDocument(OZON, sourceKey=ozon-search-promo:all-sku:<date>,
+     campaign_id=all-sku-promo «Оплата за заказ (все товары)», rows: sku, spend)
+  -> ProcessAdRawDocumentAction (__unallocated__ — AdDocument без строки, не ошибка)
+```
+
+- Оценка, не данные Ozon (решение Владельца 12.11.2026); отдельная кампания, чтобы отличать от
+  точного разнесения. `AdSpendKind::PAY_PER_ORDER` включает обе служебные кампании.
+
 ### Wildberries daily ad spend orchestration
 
 `app:marketplace-ads:wb-daily-spend` is a locked, cron-driven command. By
@@ -5316,6 +5340,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.167 | 2026-11-12 | MarketplaceAds: оплата за заказ Ozon «все товары» (ALL_SKU_PROMO) — расход кампании распределяется по её товарам пропорционально продажам, служебная кампания `all-sku-promo` в `AdSpendKind::PAY_PER_ORDER`; Ingestion грузит кампании ALL_SKU_PROMO и их товары, `IngestionFacade::getOzonAllSkuPromoSpend()` (этап 5 `docs/tasks/ozon-cpo-orders`) |
 | 2.166 | 2026-11-11 | MarketplaceAds: оплата за заказ Ozon по SKU — `app:marketplace-ads:ozon-search-promo:sync` (cron 08:30), служебная кампания `search-promo`, `AdSpendKind` в `MarketplaceAdsFacade` и порте предпросмотра; `IngestionFacade::getOzonSearchPromoOrders()`; предпросмотр ОПиУ — сверка по категориям Ozon (клики, оплата за заказ), выгрузка строк v1.3 `ads_kind`; Unit-экономика вычитает статистику оплаты за заказ из «Маркетинговых акций» без товара (этап 2 `docs/tasks/ozon-cpo-orders`) |
 | 2.165 | 2026-11-11 | Cash: правило размещения классов; `Query/`, `DTO/`, `EventSubscriber/` перенесены в `Infrastructure/Query/`, `Application/DTO/`, `EventListener/`; обороты по счетам и валовые обороты — `CashReportQuery` (этапы 2–3 `docs/tasks/cash-module-structure`) |
 | 2.164 | 2026-11-10 | Cash remediation: атомарные queued jobs, recovery CLI, JSON-контракт, контроллеры по действиям и backend-пагинация |

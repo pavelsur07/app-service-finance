@@ -45,6 +45,7 @@ final class OzonPerformanceReportConnectorTest extends TestCase
         $client = new FakeOzonPerformanceReportClient();
         $client->campaignsByType['SKU'] = [['id' => '10', 'title' => 'SKU campaign']];
         $client->campaignsByType['SEARCH_PROMO'] = [['id' => '20', 'title' => 'Search campaign']];
+        $client->campaignsByType['ALL_SKU_PROMO'] = [['id' => '30', 'title' => 'All SKU campaign']];
 
         $result = $this->connector($client)->pull($this->request(OzonResourceType::PERFORMANCE_CAMPAIGNS));
 
@@ -56,7 +57,24 @@ final class OzonPerformanceReportConnectorTest extends TestCase
         self::assertSame([
             ['id' => '10', 'title' => 'SKU campaign'],
             ['id' => '20', 'title' => 'Search campaign'],
+            ['id' => '30', 'title' => 'All SKU campaign'],
         ], $result->rawBatch->rows);
+    }
+
+    public function testSearchPromoProductsCoverAllSkuPromoCampaigns(): void
+    {
+        $client = new FakeOzonPerformanceReportClient();
+        $client->campaignsByType['SEARCH_PROMO'] = [['id' => '20']];
+        $client->campaignsByType['ALL_SKU_PROMO'] = [['id' => '30']];
+        $connector = $this->connector($client);
+
+        $first = $connector->pull($this->request(OzonResourceType::PERFORMANCE_SEARCH_PROMO_PRODUCTS));
+        self::assertSame('{"campaignOffset":1,"page":1}', $first->nextCursorValue);
+        self::assertSame('performance-search-promo-products:20:2026-06-01:2026-06-07:page:1', $first->rawBatch?->externalId);
+
+        $second = $connector->pull($this->request(OzonResourceType::PERFORMANCE_SEARCH_PROMO_PRODUCTS, (string) $first->nextCursorValue));
+        self::assertFalse($second->hasMore);
+        self::assertSame('performance-search-promo-products:30:2026-06-01:2026-06-07:page:1', $second->rawBatch?->externalId);
     }
 
     public function testPullSkuStatisticsBatchesCampaignIdsByTen(): void
@@ -132,6 +150,8 @@ final class OzonPerformanceReportConnectorTest extends TestCase
     {
         $client = new FakeOzonPerformanceReportClient();
         $client->campaignsByType['SEARCH_PROMO'] = [['id' => 'search-1']];
+        // Отчёт по заказам фильтр кампании игнорирует — ALL_SKU_PROMO в него не передаётся.
+        $client->campaignsByType['ALL_SKU_PROMO'] = [['id' => 'all-sku-1']];
 
         $result = $this->connector($client)->pull($this->request(OzonResourceType::PERFORMANCE_SEARCH_PROMO_STATISTICS));
 
