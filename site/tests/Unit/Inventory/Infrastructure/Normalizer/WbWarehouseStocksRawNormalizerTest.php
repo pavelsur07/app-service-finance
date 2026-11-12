@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Inventory\Infrastructure\Normalizer;
 
+use App\Inventory\Application\DTO\NormalizedStockRow;
 use App\Inventory\Enum\StockStatus;
 use App\Inventory\Infrastructure\Normalizer\WbWarehouseStocksRawNormalizer;
 use App\Marketplace\Enum\MarketplaceType;
@@ -36,12 +37,13 @@ final class WbWarehouseStocksRawNormalizerTest extends TestCase
         $rows = $this->normalizer()->normalize([$first, $second]);
 
         self::assertCount(12, $rows);
-        $byVariantWarehouseAndStatus = [];
+        /** @var array<string, NormalizedStockRow> $byKey ключ «вариант|склад|статус» */
+        $byKey = [];
         foreach ($rows as $row) {
-            $byVariantWarehouseAndStatus[$row->sourceSku][$row->locationExternalId][$row->status->value] = $row;
+            $byKey[$row->sourceSku.'|'.$row->locationExternalId.'|'.$row->status->value] = $row;
         }
 
-        $available = $byVariantWarehouseAndStatus['1']['507'][StockStatus::Available->value];
+        $available = $byKey['1|507|'.StockStatus::Available->value];
         self::assertSame('1', $available->sourceSku);
         self::assertSame('100', $available->sourceOfferId);
         self::assertSame('4.000', $available->quantity);
@@ -49,11 +51,11 @@ final class WbWarehouseStocksRawNormalizerTest extends TestCase
         self::assertSame('WB-507', $available->locationCode);
         self::assertSame('Коледино', $available->locationName);
         self::assertSame(['regionName' => 'Центральный'], $available->locationMetadata);
-        self::assertSame('6.000', $byVariantWarehouseAndStatus['2']['507'][StockStatus::Available->value]->quantity);
-        self::assertSame('5.000', $byVariantWarehouseAndStatus['3']['507'][StockStatus::Available->value]->quantity);
-        self::assertSame('2.000', $byVariantWarehouseAndStatus['1']['507'][StockStatus::InTransitToCustomer->value]->quantity);
-        self::assertSame('2.000', $byVariantWarehouseAndStatus['3']['507'][StockStatus::InTransitFromCustomer->value]->quantity);
-        self::assertSame('7.000', $byVariantWarehouseAndStatus['3']['117'][StockStatus::Available->value]->quantity);
+        self::assertSame('6.000', $byKey['2|507|'.StockStatus::Available->value]->quantity);
+        self::assertSame('5.000', $byKey['3|507|'.StockStatus::Available->value]->quantity);
+        self::assertSame('2.000', $byKey['1|507|'.StockStatus::InTransitToCustomer->value]->quantity);
+        self::assertSame('2.000', $byKey['3|507|'.StockStatus::InTransitFromCustomer->value]->quantity);
+        self::assertSame('7.000', $byKey['3|117|'.StockStatus::Available->value]->quantity);
     }
 
     public function testSkipsRowsWithoutRequiredIdentifiers(): void

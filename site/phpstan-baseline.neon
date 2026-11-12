@@ -11413,24 +11413,6 @@ parameters:
 			path: tests/Unit/Inventory/Infrastructure/Api/Ozon/OzonInventoryClientTest.php
 
 		-
-			message: '#^Offset ''1'' does not exist on non\-empty\-array\<string, non\-empty\-array\<string, non\-empty\-array\{available\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, in_transit_to_customer\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, in_transit_from_customer\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, on_acceptance\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, defect\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, blocked\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow\}\>\>\.$#'
-			identifier: offsetAccess.notFound
-			count: 2
-			path: tests/Unit/Inventory/Infrastructure/Normalizer/WbWarehouseStocksRawNormalizerTest.php
-
-		-
-			message: '#^Offset ''2'' does not exist on non\-empty\-array\<string, non\-empty\-array\<string, non\-empty\-array\{available\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, in_transit_to_customer\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, in_transit_from_customer\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, on_acceptance\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, defect\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, blocked\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow\}\>\>\.$#'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: tests/Unit/Inventory/Infrastructure/Normalizer/WbWarehouseStocksRawNormalizerTest.php
-
-		-
-			message: '#^Offset ''3'' does not exist on non\-empty\-array\<string, non\-empty\-array\<string, non\-empty\-array\{available\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, in_transit_to_customer\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, in_transit_from_customer\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, on_acceptance\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, defect\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, blocked\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow\}\>\>\.$#'
-			identifier: offsetAccess.notFound
-			count: 3
-			path: tests/Unit/Inventory/Infrastructure/Normalizer/WbWarehouseStocksRawNormalizerTest.php
-
-		-
 			message: '#^Call to function property_exists\(\) with App\\Inventory\\Message\\SyncOzonInventorySnapshotMessage and ''apiKey'' will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 1
