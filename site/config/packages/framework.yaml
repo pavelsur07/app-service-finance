@@ -15,6 +15,10 @@ framework:
     # и засоряют GlitchTip. Понижаем уровень ТОЛЬКО у конкретных 4xx-подклассов.
     # Базовый HttpException и все 5xx НЕ трогаем — они должны оставаться error/critical.
     exceptions:
+        App\Shared\Security\Spa\SpaHttpException:
+            log_level: notice
+        Symfony\Component\HttpKernel\Exception\UnsupportedMediaTypeHttpException:
+            log_level: warning
         Symfony\Component\HttpKernel\Exception\NotFoundHttpException:
             log_level: notice
         Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException:

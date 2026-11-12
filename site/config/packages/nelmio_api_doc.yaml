@@ -59,6 +59,8 @@ nelmio_api_doc:
         security:
             - SessionCookie: []
         tags:
+            - name: Account session
+              description: 'Новый account: отдельная host-only сессия, JSON и CSRF'
             - name: External API
               description: 'Внешнее подключение, отдельный stateless Bearer firewall'
             - name: Health
@@ -68,5 +70,13 @@ nelmio_api_doc:
     areas:
         default:
             path_patterns:
-                - ^/api(?!/doc$|/doc\.json$)
+                - ^/api(?!/doc$|/doc\.json$|/admin/v1/)
             disable_default_routes: true
+        account:
+            path_patterns: ['^/api/account/v1/']
+            disable_default_routes: true
+            documentation:
+                servers:
+                    - url: 'https://account.vashfindir.ru'
+                info:
+                    description: 'Account SPA: независимая host-only сессия, X-CSRF-Token и same-origin запросы. Ошибки: {error:{code,message}}. Контекст компании определяется сервером.'

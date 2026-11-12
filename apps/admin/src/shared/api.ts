@@ -1,2 +1,2 @@
-// No login route exists yet: authentication failures remain ApiError(401).
+// This adapter does not navigate; the application owns session routing.
 export { apiFetch, ApiError } from '@vashfindir/api';

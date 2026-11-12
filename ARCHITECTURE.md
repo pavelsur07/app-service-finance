@@ -4548,11 +4548,30 @@ $money->amountMinor(): int;  $money->currency(): string
 ## Firewall и роли безопасности
 
 ```
+spa_account → stateful, SPA_ACCOUNT_HOST + /api/account/v1/, отдельный context
+spa_admin   → stateful, SPA_ADMIN_HOST + /api/admin/v1/, системный ROLE_ADMIN
 main        → form_login для пользователей
 admin       → отдельный firewall для /admin
 public_api  → stateless, анонимный /api/public/
 internal_api → stateless, /internal/* для сервисов services/
 ```
+
+### Same-origin account/admin API
+
+`Shared/Security/Spa` использует существующий provider User и password hasher.
+`SpaHttpSubscriber` до routing/security запрещает чужой host/prefix, проверяет
+Origin (Referer fallback), нормализует JSON и ставит no-store. CSRF purpose
+realm+login/logout/company_select; новый transport не делает redirect.
+Сессии Redis host-only, отдельные contexts, без SSO/Domain cookie. Admin role
+проверяется до выдачи сессии и при последующих запросах; company admin отдельно.
+
+`Company/Application/Query/AccountSessionQuery` возвращает user, active_company
+и permissions через текущий ActiveCompanyService/ModuleAccessResolver. Discovery
+и `CompanyFacade::listAccessibleCompaniesForUser` используют единый repository
+query: owner или ACTIVE membership, без deletionRequestedAt, DISTINCT, name/id.
+Выбор компании проверяет userHasAccess и меняет только active_company_id текущей
+сессии. Admin session не содержит компанию. Контракты — TASK/API area account;
+генерируемые TS-типы — site/packages/api/src/generated/account-schema.d.ts.
 
 ### Внутренний API `/internal/*` (сервисы `services/`)
 

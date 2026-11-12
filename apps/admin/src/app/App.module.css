@@ -5,3 +5,15 @@
   display: grid;
   gap: var(--s-5);
 }
+
+.root > *,
+.root main {
+  min-width: 0;
+}
+.root {
+  overflow-wrap: anywhere;
+}
+.root main {
+  display: grid;
+  gap: var(--s-4);
+}

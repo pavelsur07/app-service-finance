@@ -275,4 +275,7 @@ import * as Icons from '@tabler/icons-react';
 `apps/README.md`. Общие UI/API исходники — `site/packages/` (внутри старого
 Docker build context); токены/CSS по-прежнему в `assets/styles/kit/`.
 Старые API/Button/cn импорты совместимы; только старый API-адаптер перенаправляет
-на `/login`. Новые экраны не выполняют API-запросы и не реализуют авторизацию.
+на `/login`. Account/admin используют same-origin Symfony session API с отдельными host-only
+сессиями. Оркестрация находится в приложениях; shared API не делает redirect.
+Публичные about/404 не выполняют bootstrap. Команды реального HTTP E2E и
+изолированного локального входа описаны в `apps/README.md`.

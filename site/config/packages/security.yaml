@@ -36,6 +36,31 @@ security:
             lazy: false
             # без form_login, без custom_authenticators — доступ анонимный
             # если есть "logout", "remember_me" — НЕ добавлять сюда
+        spa_account:
+            request_matcher: spa.account_request_matcher
+            context: spa_account
+            provider: app_user_provider
+            custom_authenticators: [App\Shared\Security\Spa\SpaLoginAuthenticator]
+            entry_point: App\Shared\Security\Spa\SpaJsonHandler
+            access_denied_handler: App\Shared\Security\Spa\SpaJsonHandler
+            login_throttling:
+                max_attempts: 5
+                interval: '15 minutes'
+            logout:
+                path: spa_account_logout
+        spa_admin:
+            request_matcher: spa.admin_request_matcher
+            context: spa_admin
+            provider: app_user_provider
+            user_checker: App\Shared\Security\Spa\SpaAdminUserChecker
+            custom_authenticators: [App\Shared\Security\Spa\SpaLoginAuthenticator]
+            entry_point: App\Shared\Security\Spa\SpaJsonHandler
+            access_denied_handler: App\Shared\Security\Spa\SpaJsonHandler
+            login_throttling:
+                max_attempts: 5
+                interval: '15 minutes'
+            logout:
+                path: spa_admin_logout
         admin:
             pattern: ^/admin
             context: admin
@@ -77,6 +102,9 @@ security:
     # Easy way to control access for large sections of your site
     # Note: Only the *first* access control that matches will be used
     access_control:
+        - { path: '^/api/(account|admin)/v1/auth/(csrf|login)$', roles: PUBLIC_ACCESS }
+        - { path: '^/api/admin/v1/', roles: ROLE_ADMIN }
+        - { path: '^/api/account/v1/', roles: ROLE_USER }
         - { path: ^/internal/, roles: ROLE_INTERNAL_SERVICE }
         - { path: ^/api/external/v1/, roles: ROLE_EXTERNAL_API }
         - { path: ^/api/public/, roles: PUBLIC_ACCESS }

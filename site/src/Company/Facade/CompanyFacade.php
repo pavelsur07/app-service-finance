@@ -219,13 +219,8 @@ final class CompanyFacade
      */
     public function userHasAccess(string $companyId, string $userId): bool
     {
-        foreach ($this->accessibleCompaniesForUser($userId) as $company) {
-            if ($company->getId() === $companyId) {
-                return true;
-            }
-        }
-
-        return false;
+        return Uuid::isValid($companyId) && Uuid::isValid($userId)
+            && $this->repository->isAccessibleByUser($companyId, $userId);
     }
 
     /**
@@ -289,21 +284,7 @@ final class CompanyFacade
      */
     private function accessibleCompaniesForUser(string $userId): array
     {
-        $owned = $this->repository->findByUserId($userId);
-        $memberCompanies = array_map(
-            static fn (CompanyMember $member): Company => $member->getCompany(),
-            $this->companyMemberRepository->findActiveByUserId($userId),
-        );
-
-        $byId = [];
-        foreach ([...$owned, ...$memberCompanies] as $company) {
-            // Помеченная к удалению компания недоступна никому, кроме пути восстановления у владельца.
-            if ($company->isDeletionRequested()) {
-                continue;
-            }
-            $byId[$company->getId()] = $company;
-        }
-
-        return array_values($byId);
+        // The paginated SPA discovery and legacy access checks use the same policy.
+        return $this->repository->findAccessibleByUserId($userId);
     }
 }

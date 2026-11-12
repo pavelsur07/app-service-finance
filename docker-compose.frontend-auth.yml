@@ -1,0 +1,124 @@
+# Isolated disposable HTTP acceptance stack. No production environment files.
+x-php: &php
+  user: "${CONTAINER_UID:-1000}:${CONTAINER_GID:-1000}"
+  working_dir: /app
+  environment: &php-env
+    APP_ENV: spa_e2e
+    APP_DEBUG: "0"
+    APP_RUNTIME_OPTIONS: '{"dotenv_path":".env.test"}'
+    APP_SECRET: isolated_spa_http_test_secret
+    DATABASE_URL: postgresql://app:local_spa_http_test@site-postgres:5432/spa_auth?serverVersion=15&charset=utf8
+    REDIS_DSN: redis://site-redis:6379
+    MAILER_DSN: "null://null"
+    MESSENGER_TRANSPORT_DSN: "in-memory://"
+    SENTRY_DSN: ""
+    XDEBUG_MODE: "off"
+    SPA_ACCOUNT_HOST: account.auth.test
+    SPA_ADMIN_HOST: admin.auth.test
+  volumes:
+    - ./site:/app
+    - ./.frontend-auth/var:/app/var
+x-node: &node
+  image: node:24.18.1-bookworm-slim
+  user: "${CONTAINER_UID:-1000}:${CONTAINER_GID:-1000}"
+  environment:
+    HOME: /tmp
+    FRONT_API_TARGET: http://site
+  volumes:
+    - ./apps:/workspace/apps
+    - ./site/packages:/workspace/site/packages
+    - ./site/assets/styles:/workspace/site/assets/styles:ro
+services:
+  site-postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: spa_auth
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: local_spa_http_test
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U app -d spa_auth"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    tmpfs: [/var/lib/postgresql/data]
+  site-redis:
+    image: redis:7-alpine
+  site-php-cli:
+    <<: *php
+    image: ${AUTH_PHP_CLI_IMAGE:-app-service-finance-site-php-cli:latest}
+    build:
+      context: ./site/docker
+      dockerfile: development/php-cli/Dockerfile
+    entrypoint: [sleep, infinity]
+  site-php-fpm:
+    <<: *php
+    image: ${AUTH_PHP_FPM_IMAGE:-app-service-finance-site-php-fpm:latest}
+    build:
+      context: ./site/docker
+      dockerfile: development/php-fpm/Dockerfile
+    entrypoint: [php-fpm, -F]
+  site:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./site/public:/app/public:ro
+      - ./site/docker/common/nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      default:
+        aliases: ["${AUTH_APP_ALIAS:-app.auth.test}"]
+  account:
+    <<: *node
+    working_dir: /workspace/apps/account
+    command: [npm, run, "${AUTH_MODE:-dev}"]
+    networks:
+      default:
+        aliases: ["${AUTH_ACCOUNT_ALIAS:-account.auth.test}"]
+  admin:
+    <<: *node
+    working_dir: /workspace/apps/admin
+    command: [npm, run, "${AUTH_MODE:-dev}"]
+    networks:
+      default:
+        aliases: ["${AUTH_ADMIN_ALIAS:-admin.auth.test}"]
+  account-image:
+    image: vf-finance/account:${FRONT_IMAGE_TAG:-local}
+    profiles: [production]
+  admin-image:
+    image: vf-finance/admin:${FRONT_IMAGE_TAG:-local}
+    profiles: [production]
+  gateway:
+    image: traefik:3.3
+    command:
+      - --entrypoints.https.address=:443
+      - --providers.file.filename=/config/routes.json
+      - --log.level=ERROR
+    volumes:
+      - ./.frontend-auth/routes.json:/config/routes.json:ro
+      - ./.frontend-auth/certs:/certs:ro
+    networks:
+      default:
+        aliases:
+          - "${AUTH_GATEWAY_ACCOUNT_ALIAS:-gateway-account.auth.test}"
+          - "${AUTH_GATEWAY_ADMIN_ALIAS:-gateway-admin.auth.test}"
+          - "${AUTH_GATEWAY_APP_ALIAS:-gateway-app.auth.test}"
+    profiles: [production]
+  playwright:
+    image: vf-finance/auth-playwright:local
+    build:
+      context: .
+      dockerfile: docker/frontend/auth/Playwright.Dockerfile
+    user: "${CONTAINER_UID:-1000}:${CONTAINER_GID:-1000}"
+    working_dir: /workspace/apps/${APP:-account}
+    environment:
+      HOME: /tmp/auth-browser
+      AUTH_E2E: "1"
+      E2E_MODE: "${AUTH_MODE:-dev}"
+      NODE_EXTRA_CA_CERTS: /certs/ca.crt
+    volumes:
+      - ./apps:/workspace/apps
+      - ./site/packages:/workspace/site/packages
+      - ./.frontend-auth/certs:/certs:ro
+    entrypoint: [/bin/bash, -ec]
+    command: ["mkdir -p $$HOME/.pki/nssdb; certutil -N --empty-password -d sql:$$HOME/.pki/nssdb; certutil -A -d sql:$$HOME/.pki/nssdb -n finance-test-ca -t 'C,,' -i /certs/ca.crt; npm run test:e2e -- --config playwright.auth.config.ts"]
+    init: true
+    shm_size: 1gb
+    profiles: [test]

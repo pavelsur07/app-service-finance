@@ -175,7 +175,15 @@ codex-test-unit-filter: codex-prepare
 # site-php-cli экспортирует спеку через CLI-команду Nelmio (без HTTP/auth),
 # site-frontend перегоняет JSON → TypeScript через openapi-typescript.
 
-.PHONY: api-doc-export api-doc-lint api-types api-types-check
+.PHONY: api-doc-export api-doc-lint api-types api-types-check front-api-types front-api-types-check
+
+front-api-types:
+	$(DOCKER_COMPOSE) exec -T site-php-cli sh -c "php bin/console nelmio:apidoc:dump --area=account --format=json > var/account-openapi.json"
+	$(DOCKER_COMPOSE) exec -T site-frontend sh -c "mkdir -p packages/api/src/generated && npx openapi-typescript var/account-openapi.json -o packages/api/src/generated/account-schema.d.ts"
+
+front-api-types-check:
+	$(DOCKER_COMPOSE) exec -T site-php-cli sh -c "php bin/console nelmio:apidoc:dump --area=account --format=json > var/account-openapi.json"
+	$(DOCKER_COMPOSE) exec -T site-frontend sh -c "npx openapi-typescript var/account-openapi.json -o /tmp/account-schema.d.ts && diff /tmp/account-schema.d.ts packages/api/src/generated/account-schema.d.ts"
 
 # Экспорт OpenAPI-спеки в JSON-файл (через PHP CLI — не требует HTTP и auth)
 api-doc-export:
@@ -301,3 +309,17 @@ test-frontend-release:
 
 front-prod-build front-prod-test:
 	APP="$(APP)" ./bin/frontend.sh $(@:front-%=%)
+
+.PHONY: front-auth-e2e test-frontend-auth-routing
+front-auth-e2e:
+	APP="$(APP)" MODE="$(MODE)" ./bin/frontend-auth.sh
+
+test-frontend-auth-routing:
+	python3 tests/shell/frontend-auth-routing-test.py
+
+.PHONY: front-auth-dev front-auth-stop
+front-auth-dev:
+	MODE="$(MODE)" ./bin/frontend-auth.sh serve
+
+front-auth-stop:
+	./bin/frontend-auth.sh stop

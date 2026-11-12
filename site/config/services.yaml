@@ -4,6 +4,8 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    env(SPA_ACCOUNT_HOST): 'account.vashfindir.ru'
+    env(SPA_ADMIN_HOST): 'admin.vashfindir.ru'
     # Стартовые шаблоны онбординга по профилю бизнеса (App\Company\Enum\BusinessProfile).
     # Новый профиль — свой файл; без него запись указывает на маркетплейсный явно. Единый
     # словарь кодов во всех шаблонах держит TemplateRegistryTest.
@@ -107,6 +109,24 @@ services:
         # add more service definitions when explicit configuration is needed
         # please note that last definitions always *replace* previous ones
         # Клиент Redis для сессий
+    App\Shared\Security\Spa\SpaContext:
+        arguments:
+            $accountHost: '%env(SPA_ACCOUNT_HOST)%'
+            $adminHost: '%env(SPA_ADMIN_HOST)%'
+
+    App\Shared\Security\Spa\SpaRequestMatcher:
+        abstract: true
+
+    spa.account_request_matcher:
+        class: App\Shared\Security\Spa\SpaRequestMatcher
+        arguments:
+            $realm: 'account'
+
+    spa.admin_request_matcher:
+        class: App\Shared\Security\Spa\SpaRequestMatcher
+        arguments:
+            $realm: 'admin'
+
     session.redis:
         class: Predis\Client
         arguments:

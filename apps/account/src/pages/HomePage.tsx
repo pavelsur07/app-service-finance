@@ -1,3 +1,4 @@
+import { CompanyPicker } from '../shared/session/CompanyPicker';
 import { EmptyState } from '@vashfindir/ui';
 
 export function HomePage() {
@@ -6,8 +7,9 @@ export function HomePage() {
       <div className="wz-head">
         <h1 className="wz-title">Клиентский кабинет</h1>
       </div>
+      <CompanyPicker />
       <EmptyState title="Раздел находится в разработке">
-        Авторизация и подключение данных пока недоступны.
+        Рабочие разделы появятся на следующих этапах.
       </EmptyState>
     </>
   );

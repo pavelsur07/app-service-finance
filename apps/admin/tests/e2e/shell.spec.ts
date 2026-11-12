@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('placeholder routes, keyboard, styles, history and network isolation', async ({
+test('public routes, keyboard, styles, history and network isolation', async ({
   page,
   baseURL,
 }) => {
@@ -32,14 +32,16 @@ test('placeholder routes, keyboard, styles, history and network isolation', asyn
       { timeout: 30_000 },
     )
     .toBe(200);
-  await page.goto('/');
+  await page.goto('/about');
   await expect(
-    page.getByText('Раздел находится в разработке', { exact: true }),
+    page.getByRole('heading', { name: 'О приложении' }),
   ).toBeVisible();
   await expect(page.locator('h1')).toHaveCount(1);
   await expect(page.locator('body')).toHaveCSS('margin', '0px');
-  await expect(page.locator('.empty')).toHaveCSS('border-top-style', 'dashed');
-  await expect(page.locator('.card')).toHaveCSS('border-top-style', 'solid');
+  await expect(page.locator('.card').first()).toHaveCSS(
+    'border-top-style',
+    'solid',
+  );
   await page.keyboard.press('Tab');
   await expect(
     page.getByRole('link', { name: 'Главная', exact: true }),
@@ -53,14 +55,15 @@ test('placeholder routes, keyboard, styles, history and network isolation', asyn
   await expect(
     page.getByRole('heading', { name: 'О приложении' }),
   ).toBeVisible();
+  await page.goto('/missing/nested');
   await page.goBack();
-  await expect(page).toHaveURL(`${origin}/`);
+  await expect(page).toHaveURL(`${origin}/about`);
   await page.goto('/about');
   await page.reload();
   await expect(
     page.getByRole('heading', { name: 'О приложении' }),
   ).toBeVisible();
-  for (const path of ['/', '/about', '/missing/nested']) {
+  for (const path of ['/about', '/missing/nested']) {
     await page.goto(path);
     expect(
       await page.evaluate(
@@ -69,8 +72,7 @@ test('placeholder routes, keyboard, styles, history and network isolation', asyn
     ).toBe(true);
   }
   await expect(page.getByRole('heading', { name: 'Не найдено' })).toBeVisible();
-  await page.getByRole('link', { name: 'На главную', exact: true }).click();
-  await expect(page).toHaveURL(`${origin}/`);
+
   expect(errors).toEqual([]);
   expect(forbidden).toEqual([]);
 });
