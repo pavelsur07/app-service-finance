@@ -14,7 +14,7 @@ Vitest/MSW, Playwright/Chromium; PHP/Node/npm только в контейнер
 
 ## Статус, ограничения и решения до старта
 
-Реализация четырёх Stage завершена; выполняется handoff и проверка CI. Состояние и фактические проверки —
+Реализация четырёх Stage, merge, deploy и приёмка завершены 2026-11-12. Состояние и фактические проверки —
 в [checkpoint.md](checkpoint.md); этот документ не заменяет Stage Reports.
 Документационный PR #2970 завершён отдельно; реализация начинается от `34ef67560`.
 
@@ -249,9 +249,9 @@ DoD: same-origin API и host isolation доказаны реальным nginx/S
   — docs/workflow/external-review.md. Устранить BLOCKER/IMPORTANT и безопасные MINOR.
 - [x] Stage Report и handoff: результаты, baseline delta, ревью/метрики,
   ограничения, точные команды локального запуска, API-схемы, release acceptance.
-- [ ] Ready → один запрос «merge and deploy #N». Предыдущие одобрения #2965/#2967
+- [x] Ready → один запрос «merge and deploy #N». Предыдущие одобрения #2965/#2967
   не распространяются на новый auth PR. После одобрения пройти pipeline до конца.
-- [ ] После deploy: read-only wrappers, SHA/health, HTTPS обоих domains,
+- [x] После deploy: read-only wrappers, SHA/health, HTTPS обоих domains,
   GET csrf/session (без вывода токенов), wrong-host/path запреты, публичный about,
   отсутствие регрессии старого login. Authenticated сценарии уже доказаны на CI;
   production login/mutations не выполнять без отдельного разрешения.

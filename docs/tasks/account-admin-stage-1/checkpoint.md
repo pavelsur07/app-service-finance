@@ -1,10 +1,10 @@
 # Current checkpoint
 
-**Phase:** handoff
-**Status:** checking
+**Phase:** done
+**Status:** done
 **Branch:** `feat/account-admin-auth`
 **Stage base commit:** `0a255776cb41dc77cb3c2cc6504ea6b77be34aec`
-**PR:** https://github.com/pavelsur07/app-service-finance/pull/2971 (Draft, master)
+**PR:** https://github.com/pavelsur07/app-service-finance/pull/2971 (MERGED into master)
 
 ## Authorization and rulings
 
@@ -14,7 +14,8 @@
   stated in chat before implementation. No manual production mutations.
 - #2970 merged as `34ef67560`; workflow 43062783564 success, deploy skipped for
   documentation-only change. Both public SPA origins HTTPS 200.
-- Future implementation PR still requires its own merge + deploy decision.
+- Owner approved `merge and deploy #2971`; merge, automatic deploy and
+  read-only acceptance completed. Owner confirmed both applications work.
 - Ruling: repository checkpoint/Stage workflow takes precedence over skill
   per-task ledger/commit scripts; this document is the execution ledger.
 
@@ -45,9 +46,9 @@
 
 ## Exact next action
 
-- Finish CI for the final documentation commit, update PR #2971, mark Ready
-  and request its own merge + deploy decision. Product code is verified at
-  0943d7c07; no production deployment of auth is authorized yet.
+- None for implementation or release. Task closed after owner acceptance.
+  The subsequent owner request covers documentation closure and removal of
+  merged task branches, followed by returning the main workspace to master.
 
 ## Inspect first on resume
 
@@ -214,5 +215,9 @@
   dev and preview real backend steps passed; production HTTPS step was running
   when this document was written. Live checks on PR are authoritative for the
   subsequent documentation commit; no product changes follow the verified SHA.
-- Remaining release actions: green latest CI → Ready → new owner merge/deploy
-  decision → standard automatic deploy → read-only post-deploy acceptance.
+- Release completed: PR #2971 merge `4b965aaf7`, workflow43152801528 SUCCESS,
+  including schema readiness and production deploy. All four relevant containers
+  healthy on that SHA; both domains passed browser/HTTPS/API acceptance.
+- Owner acceptance: «Подтверждаю все работает». No remaining task work.
+- Earlier progress entries above are historical; final release evidence is in
+  handoff.md and the merged PR description.
