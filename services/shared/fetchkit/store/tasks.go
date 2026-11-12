@@ -345,6 +345,24 @@ func (t *Tasks) ContentPages(ctx context.Context, key TaskKey) (Content, error) 
 	return out, nil
 }
 
+// LatestContentPeriod — последний (по period_key) период ресурса кабинета, у
+// которого есть загруженная ревизия. Статус задачи не важен: перезагрузка
+// сегодняшнего снимка не прячет вчерашний. Нет ни одной — ErrNoContent.
+func (t *Tasks) LatestContentPeriod(ctx context.Context, connectionRef, resourceType string) (string, error) {
+	var period string
+	err := t.pool.QueryRow(ctx, `
+		SELECT period_key FROM fetch_task
+		WHERE connection_ref = $1 AND resource_type = $2 AND content_pages <> '' AND content_started_at IS NOT NULL
+		ORDER BY period_key DESC LIMIT 1`, connectionRef, resourceType).Scan(&period)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNoContent
+	}
+	if err != nil {
+		return "", fmt.Errorf("store: latest content period: %w", err)
+	}
+	return period, nil
+}
+
 // ReloadWithoutContent ставит на полную перезагрузку done-задачу, у которой
 // нет списка страниц ревизии или времени её начала (загрузка начата до
 // миграции 00004): зависимому ресурсу без них не из чего читать. У done-задачи

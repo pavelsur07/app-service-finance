@@ -144,3 +144,25 @@ func TestHealth(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, "ok", body["status"])
 }
+
+func TestSnapshotPublishesOnlySupplies(t *testing.T) {
+	d := deps(t)
+	d.Snapshot = &SnapshotDeps{
+		Resources:    []string{"ozon.finance.accrual-by-day"}, // переопределяется белым списком сервиса
+		LatestPeriod: func(context.Context, string, string) (string, error) { return "2026-11-12", nil },
+		ContentPages: func(context.Context, store.TaskKey) (store.Content, error) {
+			return store.Content{Pages: []store.RawObject{{PageNo: 1, StorageURI: "s3://b/p1", SHA256: "h1"}}, StartedAt: t0}, nil
+		},
+		ReadRawObject: func(context.Context, string, string) ([]byte, error) { return []byte(`{"order_ids":[]}`), nil },
+	}
+	h := New(d)
+
+	code, body := do(t, h, "/internal/snapshots/latest?connection_ref=ref-a&resource_type=ozon.supplies", "Bearer "+token)
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, "ozon-fetcher", body["service"])
+	assert.Len(t, body["pages"], 1)
+
+	code, body = do(t, h, "/internal/snapshots/latest?connection_ref=ref-a&resource_type=ozon.finance.accrual-by-day", "Bearer "+token)
+	assert.Equal(t, http.StatusUnprocessableEntity, code)
+	assert.Equal(t, "invalid_request", body["error"].(map[string]any)["code"])
+}

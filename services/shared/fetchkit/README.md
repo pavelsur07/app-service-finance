@@ -18,7 +18,7 @@ Go-модуль `services/shared/fetchkit`: общий код сервисов �
 | `fetch` | Исполнитель задачи: lease, страницы в S3, `content_hash`, таблица исходов | `Adapter[C]`: `Fetch`, свои исходы `Classify`, `ResumesConnection`, `LogLevel` |
 | `dispatcher` | До N задач параллельно, одна на кабинет | — |
 | `schedule` | Цикл планировщика: `Ensure` задач, перечитывания | `Builder[C]` — план по времени и кабинетам |
-| `httpapi` | `/health`, `/ready`, `/internal/fetch-status`, `/internal/coverage` (контракт `service-coverage` v1) | `Service`, `Expected()` — сколько кабинетов ждёт каждый ресурс |
+| `httpapi` | `/health`, `/ready`, `/internal/fetch-status`, `/internal/coverage` (контракт `service-coverage` v1), `/internal/snapshots/latest` (`service-snapshot` v1) | `Service`, `Expected()` — сколько кабинетов ждёт каждый ресурс; `Snapshot` — белый список и источники снимка |
 | `observability` | slog JSON + GlitchTip для ERROR | имя сервиса |
 
 ## Подключение

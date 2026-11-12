@@ -101,6 +101,8 @@ func run(setFlush func(func())) error {
 		deps.Status = ingestion.Tasks.Status
 		deps.Cabinets = ingestion.Cabinets.List
 		deps.Coverage = ingestion.Tasks.Coverage
+		deps.Snapshot = &httpapi.SnapshotDeps{LatestPeriod: ingestion.Tasks.LatestContentPeriod,
+			ContentPages: ingestion.Tasks.ContentPages, ReadRawObject: ingestion.RawRead.Get}
 		deps.Location = ingestion.Location
 	}
 

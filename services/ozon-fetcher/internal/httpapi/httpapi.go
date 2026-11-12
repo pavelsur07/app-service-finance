@@ -1,5 +1,5 @@
 // Package httpapi — HTTP ozon-fetcher поверх fetchkit/httpapi: /health,
-// /ready, /internal/fetch-status, /internal/coverage. Здесь — какие кабинеты
+// /ready, /internal/fetch-status, /internal/coverage, /internal/snapshots/latest. Здесь — какие кабинеты
 // ожидают ресурс: seller-ресурсы — с ключом Seller API, реклама — с ключом
 // Performance.
 package httpapi
@@ -19,6 +19,14 @@ import (
 // Service — имя сервиса в ответе покрытия.
 const Service = "ozon-fetcher"
 
+// SnapshotDeps — источники выдачи снимка (белый список подставляет New).
+type SnapshotDeps = fkhttp.SnapshotDeps
+
+// SnapshotResources — ресурсы, чей последний снимок отдаётся Symfony
+// (services/_contracts/service-snapshot/v1). Новый ресурс — правкой списка и
+// CHANGELOG контракта.
+var SnapshotResources = []string{executor.ResourceSupplies}
+
 // S3PingCache — результат проверки S3 держится 30 с: /ready дёргают часто.
 const S3PingCache = fkhttp.S3PingCache
 
@@ -32,14 +40,21 @@ type Deps struct {
 	Status        func(ctx context.Context, now time.Time, windowFrom string) (store.StatusReport, error)
 	Cabinets      func() []connections.Cabinet
 	Coverage      func(ctx context.Context, refs []string, from, to string) ([]store.CoverageRow, error)
-	Location      *time.Location
-	Now           func() time.Time
-	Logger        *slog.Logger
+	// Snapshot — выдача последнего снимка; Resources задаёт New (SnapshotResources).
+	Snapshot *SnapshotDeps
+	Location *time.Location
+	Now      func() time.Time
+	Logger   *slog.Logger
 }
 
 func New(d Deps) http.Handler {
 	deps := fkhttp.Deps{Service: Service, Token: d.Token, DBPing: d.DBPing, CabinetsReady: d.CabinetsReady, S3Ping: d.S3Ping,
 		Status: d.Status, Coverage: d.Coverage, Location: d.Location, Now: d.Now, Logger: d.Logger}
+	if d.Snapshot != nil {
+		snapshot := *d.Snapshot
+		snapshot.Resources = SnapshotResources
+		deps.Snapshot = &snapshot
+	}
 	if d.Cabinets != nil {
 		deps.Expected = func() fkhttp.Expectation { return expectation(d.Cabinets()) }
 	}

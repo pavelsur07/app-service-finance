@@ -1,5 +1,5 @@
 // Package httpapi — HTTP сервиса: /health, /ready, /internal/fetch-status,
-// /internal/coverage. Наружу сервис не публикуется; /internal/* — по токену
+// /internal/coverage, /internal/snapshots/latest. Наружу сервис не публикуется; /internal/* — по токену
 // направления «Symfony → сервис» (SERVICE_API_TOKEN).
 package httpapi
 
@@ -37,9 +37,11 @@ type Deps struct {
 	Status        func(ctx context.Context, now time.Time, windowFrom string) (store.StatusReport, error)
 	Expected      func() Expectation
 	Coverage      func(ctx context.Context, refs []string, from, to string) ([]store.CoverageRow, error)
-	Location      *time.Location
-	Now           func() time.Time
-	Logger        *slog.Logger
+	// Snapshot — выдача последнего снимка (service-snapshot v1); nil — 503.
+	Snapshot *SnapshotDeps
+	Location *time.Location
+	Now      func() time.Time
+	Logger   *slog.Logger
 }
 
 // S3PingCache — результат проверки S3 держится 30 с: /ready дёргают часто.
@@ -105,6 +107,12 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("GET /internal/coverage", func(w http.ResponseWriter, r *http.Request) {
 		if requireToken(w, r, d.Token) {
 			coverage(w, r, d)
+		}
+	})
+
+	mux.HandleFunc("GET /internal/snapshots/latest", func(w http.ResponseWriter, r *http.Request) {
+		if requireToken(w, r, d.Token) {
+			snapshot(w, r, d)
 		}
 	})
 	return mux
