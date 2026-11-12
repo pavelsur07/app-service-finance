@@ -31,6 +31,7 @@ type Ingestion struct {
 	Cabinets *connections.Cache
 	Tasks    *ozonstore.Tasks
 	Raw      *rawstore.Store
+	RawRead  *rawstore.Reader
 	Location *time.Location
 	wg       sync.WaitGroup
 }
@@ -83,8 +84,9 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 	execCfg := executor.DefaultConfig()
 	execCfg.Location = loc
 	perf := ozonperf.NewClient(cfg.OzonPerformanceBaseURL, &http.Client{Timeout: ozonperf.DefaultTimeout}, logger, now).WithLimiter(limits)
+	rawRead := rawstore.NewReader(s3Client, cfg.S3Bucket)
 	exec := executor.New(execCfg, tasks, raw, client, cabinets, logger, now, jitter, ozon.SleepContext).
-		WithRawReader(rawstore.NewReader(s3Client, cfg.S3Bucket)).
+		WithRawReader(rawRead).
 		WithPerformance(perf)
 
 	ordersFrom, err := time.ParseInLocation(time.DateOnly, cfg.OrdersFrom, loc)
@@ -105,7 +107,7 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 		Owner:        fmt.Sprintf("%s:%d", hostname, os.Getpid()),
 	}, tasks, cabinets, exec, logger, now, nil)
 
-	ing := &Ingestion{Cabinets: cabinets, Tasks: tasks, Raw: raw, Location: loc}
+	ing := &Ingestion{Cabinets: cabinets, Tasks: tasks, Raw: raw, RawRead: rawRead, Location: loc}
 	for _, run := range []func(context.Context){
 		func(c context.Context) { cabinets.Run(c, cfg.ConnectionsPollInterval) },
 		scheduler.Run,

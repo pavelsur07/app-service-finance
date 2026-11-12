@@ -76,6 +76,18 @@ final class RenormalizeInventorySnapshotsCommandTest extends IntegrationTestCase
         self::assertStringNotContainsString(self::MAPPED_SESSION, $tester->getDisplay());
     }
 
+    public function testUnmappedOzonSupplyRowDoesNotMakeSessionATarget(): void
+    {
+        // Строки поставок пишутся в сессию остатков, но нормализатор остатков их не привязывает:
+        // сессия выбиралась бы каждый прогон без пользы.
+        $this->persist(self::MAPPED_SESSION, '2026-08-28', '2026-08-28T04:05:00+00:00', StockSnapshotMappingStatus::Unmapped, null, 'SKU-SUPPLY', StockStatus::InSupply);
+        $this->em->flush();
+
+        $tester = $this->runCommand(['--from' => '2026-08-28', '--to' => '2026-08-28']);
+
+        self::assertStringContainsString('sessions count: 0', $tester->getDisplay());
+    }
+
     public function testOnlyLatestSessionOfADayIsTargeted(): void
     {
         // Пере-нормализация старой сессии дня затёрла бы строки, записанные новой:
@@ -187,6 +199,7 @@ final class RenormalizeInventorySnapshotsCommandTest extends IntegrationTestCase
         StockSnapshotMappingStatus $mappingStatus,
         ?string $listingId,
         string $sourceSku,
+        StockStatus $status = StockStatus::Available,
     ): void {
         $this->em->persist(
             StockSnapshotBuilder::aStockSnapshot()
@@ -198,7 +211,7 @@ final class RenormalizeInventorySnapshotsCommandTest extends IntegrationTestCase
                 ->withListingId($listingId)
                 ->withProductId(null)
                 ->withMappingStatus($mappingStatus)
-                ->withStatus(StockStatus::Available)
+                ->withStatus($status)
                 ->withSourceSku($sourceSku)
                 ->withQuantity('4.000')
                 ->build(),

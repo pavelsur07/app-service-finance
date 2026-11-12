@@ -3825,9 +3825,12 @@ buildQueryBuilder(
   (`snapshot_date = :snapshotDate`); на день по источнику существует ровно один срез
   за счёт уникального ключа `uniq_inventory_stock_snapshot_day_item` и `upsertDaySnapshot()`;
 - строка результата — **один `source_sku`** (`GROUP BY s.source_sku`): записи снимка по всем
-  складам, типам и статусам суммируются. `quantity`, `reserved_quantity` и
-  `available_for_sale = SUM(quantity - reserved_quantity)` — агрегаты, `snapshot_at`,
-  `source_offer_id`, `mapping_status` — `MAX()` внутри группы;
+  складам, типам и статусам суммируются, **кроме `in_supply`**. `quantity`, `reserved_quantity` и
+  `available_for_sale = SUM(quantity - reserved_quantity)` — агрегаты без поставок, `in_supply` —
+  отдельная сумма поставок Ozon в пути; `snapshot_at`, `source_offer_id`, `mapping_status` — `MAX()`
+  внутри группы. `getTotals()` — то же, итог `StockReportTotals::$inSupply`; разбивка
+  `getBreakdownColumns()` строки `in_supply` не учитывает. Колонка «В поставке» в отчёте — только при
+  `inSupply > 0`;
 - pagination через Pagerfanta; count-модификатор считает
   `COUNT(DISTINCT COALESCE(s.source_sku, ''))`, то есть страницы считаются по SKU,
   а не по записям снимка;
@@ -4078,6 +4081,7 @@ enum StockStatus: string
     case OnAcceptance = 'on_acceptance';
     case Defect = 'defect';
     case Blocked = 'blocked';
+    case InSupply = 'in_supply'; // «В поставке»: активная заявка на поставку FBO Ozon, в остаток не входит
 
     public function label(): string; // «На складе», «В пути к клиенту», «В пути от клиента», …
 }
@@ -4851,6 +4855,35 @@ GET /inventory/stocks
 - не покрывает возвраты от клиента;
 - эти потоки добавляются отдельными загрузками/normalizer-ами.
 
+### Ozon — поставки в пути (`in_supply`)
+
+Задача `docs/tasks/ozon-supplies-in-transit`. Источник — `ozon-fetcher`, а не Ozon: снимок
+`ozon.supplies` (05:00) по каналу `GET /internal/snapshots/latest` (контракт
+`services/_contracts/service-snapshot/v1`, токен `OZON_FETCHER_API_TOKEN`, адрес `OZON_FETCHER_BASE_URL`;
+пустые — команда пропускает всё).
+
+- `app:inventory:ozon-supplies-sync [--company-id]` (cron 05:50) → `SyncOzonSuppliesAction` по каждому
+  активному seller-подключению Ozon (`connection_ref` = id подключения). Action коммитит сам: HTTP —
+  до транзакции, запись дня — одна `wrapInTransaction()`.
+- `OzonSupplyOrdersParser`: страницы списка, деталей и состава; состав без `bundle_id` идёт по одной
+  поставке в порядке возрастания `bundle_id` до `has_next: false` — группы сопоставляются по этому
+  порядку, расхождение числа групп и поставок — `UnexpectedValueException` (команда — ERROR, exit 1,
+  ничего не пишет). Заявки `DATA_FILLING` (черновик) не учитываются.
+- Строки: `status = in_supply`, `fulfillment_type = fbo`, `reserved_quantity = 0`, одна строка на
+  SKU × склад назначения; локация `mp_acceptance`, `external_id = supply:<warehouse_id>` (без склада —
+  `supply`, «Ozon — поставки»). Сопоставление с листингом — как у остатков Ozon (ровно один листинг).
+- **Сессия.** Строки пишутся с `snapshot_session_id`/`snapshot_at` **последней сессии остатков
+  (`available`) той же даты**: «последняя сессия дня» у `StockQtyByListingOnDateQuery` и
+  `SessionsToRenormalizeQuery` не меняется, а фильтр `status = available` поставки не видит — остаток
+  юнит-экономики и оборачиваемости прежний. Ответ сервиса сохраняется отдельной сессией
+  (`InventoryRawSnapshot`, `source_endpoint` `ozon-fetcher …`), `raw_snapshot_id` строк — на неё.
+- Повтор за день — замена окна: DELETE строк `in_supply` дня + INSERT. Снимок старше 2 дней, нет
+  сессии остатков за дату снимка, 404 или 5xx/сеть сервиса — WARNING и пропуск кабинета; 401/403/422
+  и ответ вне контракта — ERROR, exit 1.
+- `in_supply` исключён из гейта непривязанных остатков (`UnmappedStockVariantsQuery`), подсчёта
+  непривязанных строк `SessionsToRenormalizeQuery` и выбора последней сессии
+  `StockQtyByListingOnDateQuery`.
+
 ## Inventory — Wildberries FBW stock normalization
 
 Orchestration: ночной cron `app:inventory:wb-daily-sync` (04:15 MSK) и ручной запуск
@@ -5219,6 +5252,7 @@ config/
 | `app:inventory:wb-daily-sync` | `15 4 * * *` | Диспатч загрузки Wildberries Inventory snapshot по активным WB SELLER подключениям |
 | `app:inventory:stock-freshness-check` | `30 5 * * *` | Read-only гейт: у каждого активного подключения есть свежий снимок остатков |
 | `app:inventory:unmapped-stock-check` | `40 5 * * *` | Read-only гейт: нет новых остатков по вариантам, которых нет в каталоге маркетплейса |
+| `app:inventory:ozon-supplies-sync` | `50 5 * * *` | Поставки Ozon в пути из снимка `ozon.supplies` ozon-fetcher → строки `in_supply` дня |
 | **MarketplaceAds** | | |
 | `app:marketplace-ads:daily-sync` | `30 4 * * *` | Создаёт `AdLoadJob` за вчера для компаний с подключением Ozon Performance |
 | `app:marketplace-ads:reconcile --marketplace=ozon --all-active --days-back=14 --include-rate-limited` | `10,40 6-23 * * *` | Дозагрузка пропущенных дат рекламных расходов Ozon за 14 дней |
@@ -5340,6 +5374,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.168 | 2026-11-12 | Inventory: поставки Ozon в пути — `StockStatus::InSupply`, `app:inventory:ozon-supplies-sync` (cron 05:50) из снимка `ozon.supplies` ozon-fetcher (`GET /internal/snapshots/latest`, контракт `service-snapshot` v1); отчёт «Остатки» — колонка «В поставке», поставки не входят в остаток (задача `docs/tasks/ozon-supplies-in-transit`) |
 | 2.167 | 2026-11-12 | MarketplaceAds: оплата за заказ Ozon «все товары» (ALL_SKU_PROMO) — расход кампании распределяется по её товарам пропорционально продажам, служебная кампания `all-sku-promo` в `AdSpendKind::PAY_PER_ORDER`; Ingestion грузит кампании ALL_SKU_PROMO и их товары, `IngestionFacade::getOzonAllSkuPromoSpend()` (этап 5 `docs/tasks/ozon-cpo-orders`) |
 | 2.166 | 2026-11-11 | MarketplaceAds: оплата за заказ Ozon по SKU — `app:marketplace-ads:ozon-search-promo:sync` (cron 08:30), служебная кампания `search-promo`, `AdSpendKind` в `MarketplaceAdsFacade` и порте предпросмотра; `IngestionFacade::getOzonSearchPromoOrders()`; предпросмотр ОПиУ — сверка по категориям Ozon (клики, оплата за заказ), выгрузка строк v1.3 `ads_kind`; Unit-экономика вычитает статистику оплаты за заказ из «Маркетинговых акций» без товара (этап 2 `docs/tasks/ozon-cpo-orders`) |
 | 2.165 | 2026-11-11 | Cash: правило размещения классов; `Query/`, `DTO/`, `EventSubscriber/` перенесены в `Infrastructure/Query/`, `Application/DTO/`, `EventListener/`; обороты по счетам и валовые обороты — `CashReportQuery` (этапы 2–3 `docs/tasks/cash-module-structure`) |

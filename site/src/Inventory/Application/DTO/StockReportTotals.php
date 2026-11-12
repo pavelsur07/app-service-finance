@@ -14,6 +14,8 @@ final readonly class StockReportTotals
         public string $quantity,
         public string $reservedQuantity,
         public string $availableForSale,
+        /** Поставки Ozon в пути (`in_supply`): в остаток и «доступно» не входят. */
+        public string $inSupply = '0.000',
     ) {
     }
 }

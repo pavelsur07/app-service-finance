@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://vashfindir.ru/contracts/service-snapshot/v1/schema.json",
+    "title": "Service Snapshot",
+    "description": "Ответ GET /internal/snapshots/latest?connection_ref=…&resource_type=…: страницы последней загруженной ревизии снимка ресурса кабинета — ответы маркетплейса как есть, по порядку.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["schema_version", "service", "connection_ref", "resource_type", "period_key", "loaded_at", "pages"],
+    "properties": {
+        "schema_version": {"const": "1"},
+        "service": {"type": "string", "minLength": 1, "description": "Имя сервиса, например ozon-fetcher"},
+        "connection_ref": {"type": "string", "minLength": 1, "maxLength": 64, "description": "Id подключения из marketplace-connections v1"},
+        "resource_type": {"type": "string", "minLength": 1, "description": "Ресурс из белого списка сервиса (README)"},
+        "period_key": {"type": "string", "format": "date", "description": "День МСК снимка (YYYY-MM-DD) — последний день, за который снимок загружен"},
+        "loaded_at": {"type": "string", "format": "date-time", "description": "Запись первой страницы ревизии: снимок не старше этого момента"},
+        "pages": {
+            "type": "array",
+            "description": "Тела ответов маркетплейса по порядку загрузки; формат страницы — у ресурса (README)",
+            "items": {}
+        }
+    }
+}

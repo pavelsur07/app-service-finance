@@ -947,3 +947,31 @@ func TestSaveCursorKeepsCursorOfOwnAttemptOnly(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "fp:0:uuid-1:1700000000:0", again.Cursor)
 }
+
+func TestLatestContentPeriodSkipsPeriodsWithoutRevision(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	const rt = "ozon.supplies"
+	_, err := tasks.LatestContentPeriod(ctx, "ref-a", rt)
+	require.ErrorIs(t, err, ErrNoContent)
+
+	load := func(period, page string) {
+		s := spec("ref-a", rt, period, 5)
+		require.NoError(t, tasks.Upsert(ctx, []TaskSpec{s}))
+		run, err := claim(t, tasks, []string{"ref-a"}, t0)
+		require.NoError(t, err)
+		require.NoError(t, tasks.RecordPage(ctx, run.TaskKey, run.AttemptID, RawObject{PageNo: 1, StorageURI: "s3://b/" + page, SHA256: hash(page), SizeBytes: 1, StoredBytes: 1, ContentType: "application/json"}, ""))
+		_, err = tasks.FinishTask(ctx, run.TaskKey, run.AttemptID, Outcome{Status: StatusDone, Label: "done", ContentHash: hash(page)}, t0)
+		require.NoError(t, err)
+	}
+	load("2026-11-10", "p10")
+	load("2026-11-11", "p11")
+	// Сегодняшний снимок поставлен, но ещё не загружен — отдаётся вчерашний.
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{spec("ref-a", rt, "2026-11-12", 5)}))
+	// Чужой кабинет и чужой ресурс не влияют.
+	require.NoError(t, tasks.Upsert(ctx, []TaskSpec{spec("ref-b", rt, "2026-11-13", 5), spec("ref-a", "ozon.actions", "2026-11-13", 5)}))
+
+	period, err := tasks.LatestContentPeriod(ctx, "ref-a", rt)
+	require.NoError(t, err)
+	assert.Equal(t, "2026-11-11", period)
+}

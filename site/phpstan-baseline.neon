@@ -11389,12 +11389,6 @@ parameters:
 			path: tests/Unit/Inventory/Entity/StockSnapshotTest.php
 
 		-
-			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with array\{''available'', ''in_transit_to…'', ''in_transit_from…'', ''on_acceptance'', ''defect'', ''blocked''\} and array\{''available'', ''in_transit_to…'', ''in_transit_from…'', ''on_acceptance'', ''defect'', ''blocked''\} will always evaluate to true\.$#'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Unit/Inventory/Enum/InventoryEnumsTest.php
-
-		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with array\{''mapped'', ''unmapped'', ''ambiguous''\} and array\{''mapped'', ''unmapped'', ''ambiguous''\} will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -11417,24 +11411,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: tests/Unit/Inventory/Infrastructure/Api/Ozon/OzonInventoryClientTest.php
-
-		-
-			message: '#^Offset ''1'' does not exist on non\-empty\-array\<string, non\-empty\-array\<string, non\-empty\-array\{available\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, in_transit_to_customer\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, in_transit_from_customer\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, on_acceptance\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, defect\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, blocked\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow\}\>\>\.$#'
-			identifier: offsetAccess.notFound
-			count: 2
-			path: tests/Unit/Inventory/Infrastructure/Normalizer/WbWarehouseStocksRawNormalizerTest.php
-
-		-
-			message: '#^Offset ''2'' does not exist on non\-empty\-array\<string, non\-empty\-array\<string, non\-empty\-array\{available\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, in_transit_to_customer\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, in_transit_from_customer\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, on_acceptance\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, defect\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, blocked\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow\}\>\>\.$#'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: tests/Unit/Inventory/Infrastructure/Normalizer/WbWarehouseStocksRawNormalizerTest.php
-
-		-
-			message: '#^Offset ''3'' does not exist on non\-empty\-array\<string, non\-empty\-array\<string, non\-empty\-array\{available\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, in_transit_to_customer\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, in_transit_from_customer\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, on_acceptance\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, defect\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow, blocked\?\: App\\Inventory\\Application\\DTO\\NormalizedStockRow\}\>\>\.$#'
-			identifier: offsetAccess.notFound
-			count: 3
-			path: tests/Unit/Inventory/Infrastructure/Normalizer/WbWarehouseStocksRawNormalizerTest.php
 
 		-
 			message: '#^Call to function property_exists\(\) with App\\Inventory\\Message\\SyncOzonInventorySnapshotMessage and ''apiKey'' will always evaluate to false\.$#'

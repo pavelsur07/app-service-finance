@@ -74,6 +74,8 @@ final class InventoryStockReportQuery
     {
         $values = $this->baseQueryBuilder($companyId, $source, $scheme, $snapshotDate)
             ->select(sprintf('DISTINCT %s AS breakdown_value', $this->breakdownExpression($source)))
+            ->andWhere('s.status <> :inSupply')
+            ->setParameter('inSupply', StockStatus::InSupply->value)
             ->executeQuery()
             ->fetchFirstColumn();
 
@@ -95,7 +97,8 @@ final class InventoryStockReportQuery
     }
 
     /**
-     * Строка отчёта — один SKU за день: количества суммируются по всем складам, типам и статусам.
+     * Строка отчёта — один SKU за день: количества суммируются по всем складам, типам и статусам,
+     * кроме поставок (`in_supply`): товар в пути на склад не входит в остаток, он — колонкой `in_supply`.
      *
      * @param array<string, BreakdownColumn> $breakdownColumns из getBreakdownColumns() с теми же фильтрами
      */
@@ -115,10 +118,12 @@ final class InventoryStockReportQuery
                 'MAX(s.source_offer_id) AS source_offer_id',
                 // mapping_status считается по source_sku, поэтому внутри группы он один и тот же.
                 'MAX(s.mapping_status) AS mapping_status',
-                'SUM(s.quantity) AS quantity',
-                'SUM(s.reserved_quantity) AS reserved_quantity',
-                'SUM(s.quantity - s.reserved_quantity) AS available_for_sale',
+                'COALESCE(SUM(s.quantity) FILTER (WHERE s.status <> :inSupply), 0.000) AS quantity',
+                'COALESCE(SUM(s.reserved_quantity) FILTER (WHERE s.status <> :inSupply), 0.000) AS reserved_quantity',
+                'COALESCE(SUM(s.quantity - s.reserved_quantity) FILTER (WHERE s.status <> :inSupply), 0.000) AS available_for_sale',
+                'COALESCE(SUM(s.quantity) FILTER (WHERE s.status = :inSupply), 0.000) AS in_supply',
             )
+            ->setParameter('inSupply', StockStatus::InSupply->value)
             ->groupBy('s.source_sku')
             ->orderBy('MAX(s.snapshot_at)', 'DESC')
             ->addOrderBy('s.source_sku', 'DESC');
@@ -129,7 +134,7 @@ final class InventoryStockReportQuery
             $parameter = 'breakdown_'.$index++;
             $qb
                 ->addSelect(sprintf(
-                    'COALESCE(SUM(s.quantity - s.reserved_quantity) FILTER (WHERE %s = :%s), 0.000) AS %s',
+                    'COALESCE(SUM(s.quantity - s.reserved_quantity) FILTER (WHERE %s = :%s AND s.status <> :inSupply), 0.000) AS %s',
                     $breakdownExpression,
                     $parameter,
                     $this->connection->quoteSingleIdentifier($alias),
@@ -163,10 +168,12 @@ final class InventoryStockReportQuery
     ): StockReportTotals {
         $row = $this->baseQueryBuilder($companyId, $source, $scheme, $snapshotDate)
             ->select(
-                'COALESCE(SUM(s.quantity), 0.000) AS quantity',
-                'COALESCE(SUM(s.reserved_quantity), 0.000) AS reserved_quantity',
-                'COALESCE(SUM(s.quantity - s.reserved_quantity), 0.000) AS available_for_sale',
+                'COALESCE(SUM(s.quantity) FILTER (WHERE s.status <> :inSupply), 0.000) AS quantity',
+                'COALESCE(SUM(s.reserved_quantity) FILTER (WHERE s.status <> :inSupply), 0.000) AS reserved_quantity',
+                'COALESCE(SUM(s.quantity - s.reserved_quantity) FILTER (WHERE s.status <> :inSupply), 0.000) AS available_for_sale',
+                'COALESCE(SUM(s.quantity) FILTER (WHERE s.status = :inSupply), 0.000) AS in_supply',
             )
+            ->setParameter('inSupply', StockStatus::InSupply->value)
             ->executeQuery()
             ->fetchAssociative();
 
@@ -174,6 +181,7 @@ final class InventoryStockReportQuery
             quantity: (string) ($row['quantity'] ?? '0.000'),
             reservedQuantity: (string) ($row['reserved_quantity'] ?? '0.000'),
             availableForSale: (string) ($row['available_for_sale'] ?? '0.000'),
+            inSupply: (string) ($row['in_supply'] ?? '0.000'),
         );
     }
 

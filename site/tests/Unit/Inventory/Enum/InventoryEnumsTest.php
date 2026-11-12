@@ -38,8 +38,9 @@ final class InventoryEnumsTest extends TestCase
                 'on_acceptance',
                 'defect',
                 'blocked',
+                'in_supply',
             ],
-            array_map(static fn (StockStatus $case): string => $case->value, StockStatus::cases()),
+            self::backingValues(StockStatus::class),
         );
     }
 

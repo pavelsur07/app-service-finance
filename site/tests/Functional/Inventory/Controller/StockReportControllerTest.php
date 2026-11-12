@@ -263,6 +263,48 @@ final class StockReportControllerTest extends WebTestCaseBase
         );
     }
 
+    public function testOzonSuppliesAreASeparateColumnOutsideStock(): void
+    {
+        $client = static::createClient();
+
+        $owner = UserBuilder::aUser()->withEmail('stocks-supply@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-111111112031')->withOwner($owner)->build();
+        $location = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->build();
+        $supplyLocation = LocationBuilder::aLocation()->withCompanyId((string) $company->getId())->withExternalId('supply:900')->build();
+
+        $this->persist(
+            $owner,
+            $company,
+            $location,
+            $supplyLocation,
+            $this->snapshot($company, $location, '311', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-LOW')
+                ->withFulfillmentType('fbo')->withQuantity('3.000')->withReservedQuantity('2.000'),
+            // Поставка в пути той же SKU: в остаток не входит.
+            $this->snapshot($company, $supplyLocation, '311', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-LOW')
+                ->withFulfillmentType('fbo')->withStatus(StockStatus::InSupply)->withQuantity('500.000'),
+            $this->snapshot($company, $location, '312', MarketplaceType::OZON, $this->daysAgo(1), 'SKU-FULL')
+                ->withFulfillmentType('fbo')->withQuantity('10.000'),
+        );
+
+        $this->login($client, $owner, $company);
+        $crawler = $client->request('GET', '/inventory/stocks?date='.$this->daysAgo(1)->format('Y-m-d'));
+
+        self::assertResponseIsSuccessful();
+        self::assertContains('В поставке', $crawler->filter('table thead th')->each(static fn (Crawler $th): string => trim($th->text())));
+        $cells = [];
+        foreach ($crawler->filter('table tbody tr') as $tr) {
+            $td = (new Crawler($tr))->filter('td');
+            $cells[trim($td->eq(2)->text())] = [trim($td->eq(4)->text()), trim($td->eq(6)->text()), trim($td->eq(7)->text())];
+        }
+        self::assertSame(['SKU-LOW' => ['3', '1', '500'], 'SKU-FULL' => ['10', '10', '—']], $cells);
+        self::assertSame(
+            'Итого по фильтру: остаток 13, резерв 2, доступно 11, в поставке 500',
+            preg_replace('/\s+/u', ' ', trim($crawler->filter('.vf-stocks-totals')->text())),
+        );
+        // Разбивки по типу склада нет: поставка не добавляет свой тип в «В том числе».
+        self::assertCount(0, $crawler->filter('th[scope="colgroup"]'));
+    }
+
     public function testFboSchemeIsDefaultAndHidesSellerWarehouseRows(): void
     {
         $client = static::createClient();

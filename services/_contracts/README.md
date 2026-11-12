@@ -18,6 +18,7 @@
 | [source-fact-envelope](source-fact-envelope/v1/) | v1 | producer: `services/*`; consumer: Symfony (pull + ack) | **проект**, не утверждённый API |
 | [marketplace-connections](marketplace-connections/v1/) | v1 | producer: Symfony; consumer: `services/*` (поллинг конфигурации) | **проект**, не утверждённый API |
 | [service-coverage](service-coverage/v1/) | v1 | producer: `services/*` (`GET /internal/coverage`); consumer: шлюз Symfony | действует |
+| [service-snapshot](service-snapshot/v1/) | v1 | producer: `services/*` (`GET /internal/snapshots/latest`); consumer: Symfony (pull, без ack) | действует, `ozon.supplies` |
 | [wb-finance-quota](wb-finance-quota/v1/) | v1 | producer: Symfony (слот и 429 лимитера WB finance); consumer: `services/wb-fetcher` | действует |
 | [ai-task](ai-task/v1/) | v1 | producer: `services/ai-service` (API задач); consumer: шлюз Symfony | действует, задача `echo` |
 
