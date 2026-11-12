@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Inventory\Infrastructure\Query;
 
 use App\Inventory\Enum\StockSnapshotMappingStatus;
+use App\Inventory\Enum\StockStatus;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -40,6 +41,9 @@ final readonly class SessionsToRenormalizeQuery
             // а не пишется строкой: то же определение использует гейт непривязанных
             // остатков, и расходиться им нельзя.
             'mappedStatus' => StockSnapshotMappingStatus::Mapped->value,
+            // Строки поставок Ozon живут в сессии остатков, но нормализатор остатков их не пишет:
+            // перенормализация их не привяжет, и сессия выбиралась бы каждый прогон.
+            'inSupply' => StockStatus::InSupply->value,
         ];
 
         $filter = '';
@@ -81,6 +85,7 @@ final readonly class SessionsToRenormalizeQuery
                AND s.source = l.source
                AND s.snapshot_date = l.snapshot_date
                AND s.snapshot_session_id = l.snapshot_session_id
+               AND s.status <> :inSupply
              GROUP BY l.company_id, l.source, l.snapshot_date, l.snapshot_session_id
              HAVING count(*) FILTER (WHERE s.mapping_status IS DISTINCT FROM :mappedStatus) > 0
              ORDER BY l.snapshot_date, l.source, l.company_id',

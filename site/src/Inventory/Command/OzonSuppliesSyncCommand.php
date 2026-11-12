@@ -6,8 +6,11 @@ namespace App\Inventory\Command;
 
 use App\Inventory\Application\DTO\OzonSuppliesSyncResult;
 use App\Inventory\Application\SyncOzonSuppliesAction;
+use App\Inventory\Exception\OzonSupplySnapshotUnavailableException;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\Shared\Service\AppLogger;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Command\LockableTrait;
@@ -32,6 +35,7 @@ final class OzonSuppliesSyncCommand extends Command
         private readonly MarketplaceFacade $marketplaceFacade,
         private readonly SyncOzonSuppliesAction $action,
         private readonly AppLogger $logger,
+        private readonly ManagerRegistry $doctrine,
     ) {
         parent::__construct();
     }
@@ -60,10 +64,20 @@ final class OzonSuppliesSyncCommand extends Command
             foreach ($connections as $connection) {
                 try {
                     $result = ($this->action)($connection['companyId'], $connection['connectionId'], $today);
+                } catch (OzonSupplySnapshotUnavailableException $e) {
+                    // Сервис недоступен — решение Владельца 12.11 (plan.md, п. 6): предупреждение и пропуск дня.
+                    $this->logger->warning('Ozon supplies skipped: ozon-fetcher unavailable.', ['companyId' => $connection['companyId'], 'connectionId' => $connection['connectionId'], 'exceptionClass' => $e::class]);
+                    $output->writeln(sprintf('%s: пропуск (unavailable)', $connection['companyId']));
+                    continue;
                 } catch (\Throwable $e) {
                     ++$failed;
                     $this->logger->error('Ozon supplies sync failed.', $e, ['companyId' => $connection['companyId'], 'connectionId' => $connection['connectionId']]);
                     $output->writeln(sprintf('%s: ошибка %s', $connection['companyId'], $e::class));
+                    // Откат wrapInTransaction() закрывает EntityManager: следующий кабинет — со свежим.
+                    $em = $this->doctrine->getManager();
+                    if ($em instanceof EntityManagerInterface && !$em->isOpen()) {
+                        $this->doctrine->resetManager();
+                    }
                     continue;
                 }
                 $output->writeln(OzonSuppliesSyncResult::WRITTEN === $result->outcome

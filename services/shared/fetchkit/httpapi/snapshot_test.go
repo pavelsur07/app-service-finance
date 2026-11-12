@@ -140,6 +140,11 @@ func TestSnapshotRejects(t *testing.T) {
 			f.contentErr = errors.New("db down")
 			return f
 		}, http.StatusServiceUnavailable, "snapshot_unavailable"},
+		{"страница без объекта", "connection_ref=ref-a&resource_type=" + supplies, true, func() *snapshotFake {
+			f := okFake()
+			f.contentErr = fmt.Errorf("%w: page 2", store.ErrMissingObject)
+			return f
+		}, http.StatusBadGateway, "snapshot_invalid"},
 		{"сбой S3", "connection_ref=ref-a&resource_type=" + supplies, true, func() *snapshotFake {
 			f := okFake()
 			f.readErr = errors.New("timeout")

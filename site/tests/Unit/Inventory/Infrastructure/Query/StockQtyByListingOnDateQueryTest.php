@@ -25,13 +25,16 @@ final class StockQtyByListingOnDateQueryTest extends TestCase
                 self::callback(static fn (string $sql): bool => str_contains($sql, 'DISTINCT ON (candidate.source)')
                     && str_contains($sql, 's.snapshot_session_id = latest.snapshot_session_id')
                     && str_contains($sql, 's.status = :status')
-                    && !str_contains($sql, 'candidate.status')
+                    // Последняя сессия — по любым статусам остатка, кроме поставок Ozon.
+                    && str_contains($sql, 'candidate.status <> :inSupply')
+                    && !str_contains($sql, 'candidate.status = ')
                     && str_contains($sql, 'candidate.listing_id IS NOT NULL')
                     && str_contains($sql, 'latest.snapshot_date >= :earliestAcceptableDate')
                 ),
                 self::callback(static fn (array $params): bool => self::COMPANY_ID === $params['companyId']
                     && '2026-04-30' === $params['reportDate']
                     && $params['status'] === StockStatus::Available->value
+                    && $params['inSupply'] === StockStatus::InSupply->value
                     && '2026-04-28' === $params['earliestAcceptableDate']
                 ),
             )

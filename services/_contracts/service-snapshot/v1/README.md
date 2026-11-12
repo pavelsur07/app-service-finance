@@ -33,5 +33,5 @@
 | 401 | `internal_auth_required` | нет или неверный токен |
 | 422 | `invalid_request` | нет `connection_ref` (или длиннее 64), ресурс вне белого списка |
 | 404 | `snapshot_not_found` | у кабинета ещё нет загруженного снимка ресурса |
-| 502 | `snapshot_invalid` | сохранённая страница повреждена или не JSON (ERROR в сервисе) |
+| 502 | `snapshot_invalid` | сохранённая страница повреждена, отсутствует или не JSON (ERROR в сервисе) |
 | 503 | `snapshot_unavailable`, `ingestion_disabled` | сбой БД или хранилища; загрузка выключена |

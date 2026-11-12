@@ -4878,7 +4878,11 @@ GET /inventory/stocks
   юнит-экономики и оборачиваемости прежний. Ответ сервиса сохраняется отдельной сессией
   (`InventoryRawSnapshot`, `source_endpoint` `ozon-fetcher …`), `raw_snapshot_id` строк — на неё.
 - Повтор за день — замена окна: DELETE строк `in_supply` дня + INSERT. Снимок старше 2 дней, нет
-  сессии остатков за дату снимка, 404 сервиса — WARNING и пропуск кабинета.
+  сессии остатков за дату снимка, 404 или 5xx/сеть сервиса — WARNING и пропуск кабинета; 401/403/422
+  и ответ вне контракта — ERROR, exit 1.
+- `in_supply` исключён из гейта непривязанных остатков (`UnmappedStockVariantsQuery`), подсчёта
+  непривязанных строк `SessionsToRenormalizeQuery` и выбора последней сессии
+  `StockQtyByListingOnDateQuery`.
 
 ## Inventory — Wildberries FBW stock normalization
 

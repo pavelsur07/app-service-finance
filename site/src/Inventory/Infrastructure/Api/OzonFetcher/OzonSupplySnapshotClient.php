@@ -36,6 +36,9 @@ final readonly class OzonSupplySnapshotClient
 
     /**
      * null — у кабинета ещё нет загруженного снимка (404 `snapshot_not_found`).
+     *
+     * @throws OzonSupplySnapshotUnavailableException сеть или статус 5xx/прочий — временно, повтор завтра
+     * @throws \UnexpectedValueException ответ вне контракта или 401/403/422 — дефект, будить человека
      */
     public function fetchLatest(string $connectionRef): ?OzonSupplySnapshot
     {
@@ -62,6 +65,10 @@ final readonly class OzonSupplySnapshotClient
         if (404 === $status) {
             return null;
         }
+        if (in_array($status, [401, 403, 422], true)) {
+            // Токен или запрос не приняты — конфигурация/дефект, сам не пройдёт.
+            throw new \UnexpectedValueException(sprintf('ozon-fetcher rejected snapshot request: status %d', $status));
+        }
         if (200 !== $status) {
             throw new OzonSupplySnapshotUnavailableException(sprintf('ozon-fetcher snapshot status %d', $status));
         }
@@ -69,16 +76,16 @@ final readonly class OzonSupplySnapshotClient
         try {
             $data = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
-            throw new OzonSupplySnapshotUnavailableException('ozon-fetcher snapshot is not JSON');
+            throw new \UnexpectedValueException('ozon-fetcher snapshot is not JSON');
         }
         if (!is_array($data) || '1' !== ($data['schema_version'] ?? null) || self::RESOURCE !== ($data['resource_type'] ?? null)
             || $connectionRef !== ($data['connection_ref'] ?? null) || !is_array($data['pages'] ?? null) || !array_is_list($data['pages'])) {
-            throw new OzonSupplySnapshotUnavailableException('ozon-fetcher snapshot violates service-snapshot v1');
+            throw new \UnexpectedValueException('ozon-fetcher snapshot violates service-snapshot v1');
         }
         $periodDate = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) ($data['period_key'] ?? ''));
         $loadedAt = \DateTimeImmutable::createFromFormat(\DATE_ATOM, (string) ($data['loaded_at'] ?? ''));
         if (false === $periodDate || false === $loadedAt || $periodDate->format('Y-m-d') !== ($data['period_key'] ?? null)) {
-            throw new OzonSupplySnapshotUnavailableException('ozon-fetcher snapshot has invalid period_key or loaded_at');
+            throw new \UnexpectedValueException('ozon-fetcher snapshot has invalid period_key or loaded_at');
         }
 
         /* @var array<string, mixed> $data */

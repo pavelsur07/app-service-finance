@@ -65,6 +65,12 @@ func snapshot(w http.ResponseWriter, r *http.Request, d Deps) {
 		return
 	}
 	content, err := s.ContentPages(r.Context(), store.TaskKey{ConnectionRef: ref, ResourceType: rt, PeriodKey: period})
+	if errors.Is(err, store.ErrMissingObject) {
+		// Нарушен инвариант ревизии — сам не пройдёт.
+		log.Error("snapshot revision broken", slog.String("period_key", period), slog.String("error", err.Error()))
+		writeError(w, http.StatusBadGateway, "snapshot_invalid", "stored snapshot page is invalid")
+		return
+	}
 	if err != nil {
 		// ErrNoContent между двумя запросами — ревизию только что заменили: повтор отдаст новую.
 		unavailable(err)

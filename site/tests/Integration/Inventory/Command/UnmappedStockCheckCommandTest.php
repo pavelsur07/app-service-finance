@@ -78,6 +78,18 @@ final class UnmappedStockCheckCommandTest extends IntegrationTestCase
         self::assertStringContainsString('standing unmapped variants count: 2', $tester->getDisplay());
     }
 
+    public function testOzonSupplyRowsDoNotFailTheGate(): void
+    {
+        // Поставки Ozon (in_supply) — не выгрузка остатков: новый SKU в поставке не алерт.
+        $company = $this->seedCompanyWithConnection('supply-unmapped@example.test', '77777777-7777-7777-7777-000000001009');
+        $this->seedUnmapped($company, 'variant-in-supply', 0, StockSnapshotMappingStatus::Unmapped, StockStatus::InSupply);
+
+        $tester = $this->runCommand();
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('new unmapped variants count: 0', $tester->getDisplay());
+    }
+
     public function testMappedRowsAreNotCountedAtAll(): void
     {
         $company = $this->seedCompanyWithConnection('mapped-only@example.test', '77777777-7777-7777-7777-000000001004');
@@ -189,6 +201,7 @@ final class UnmappedStockCheckCommandTest extends IntegrationTestCase
         string $sourceSku,
         int $daysAgo,
         StockSnapshotMappingStatus $status = StockSnapshotMappingStatus::Unmapped,
+        StockStatus $stockStatus = StockStatus::Available,
     ): void {
         $date = (new \DateTimeImmutable('today'))->modify(sprintf('-%d days', $daysAgo));
 
@@ -201,7 +214,7 @@ final class UnmappedStockCheckCommandTest extends IntegrationTestCase
                 ->withListingId(null)
                 ->withProductId(null)
                 ->withMappingStatus($status)
-                ->withStatus(StockStatus::Available)
+                ->withStatus($stockStatus)
                 ->withSourceSku($sourceSku)
                 ->build(),
         );

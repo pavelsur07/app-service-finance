@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Inventory\Infrastructure\Query;
 
 use App\Inventory\Enum\StockSnapshotMappingStatus;
+use App\Inventory\Enum\StockStatus;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
@@ -56,6 +57,7 @@ final readonly class UnmappedStockVariantsQuery
                 FROM inventory_stock_snapshots m
                 WHERE m.company_id IN (:companyIds)
                   AND m.mapping_status = :mappedStatus
+                  AND m.status <> :inSupply
                 GROUP BY m.company_id, m.source, m.source_sku
              ),
              unmapped AS (
@@ -73,6 +75,7 @@ final readonly class UnmappedStockVariantsQuery
                    AND lm.source_sku = s.source_sku
                 WHERE s.company_id IN (:companyIds)
                   AND s.mapping_status IS DISTINCT FROM :mappedStatus
+                  AND s.status <> :inSupply
                   -- Только текущий эпизод: дни после того, как вариант в последний
                   -- раз был привязан. Иначе разобранное и снова сломавшееся
                   -- расхождение унаследовало бы старую дату и прошло бы молча.
@@ -95,6 +98,8 @@ final readonly class UnmappedStockVariantsQuery
                 // Одно определение «не привязана» на весь модуль: см. SessionsToRenormalizeQuery.
                 'mappedStatus' => StockSnapshotMappingStatus::Mapped->value,
                 'newSince' => $newSince->format('Y-m-d'),
+                // Поставки Ozon (in_supply) — не остаток: гейт следит за выгрузкой остатков.
+                'inSupply' => StockStatus::InSupply->value,
             ],
             ['companyIds' => ArrayParameterType::STRING],
         );

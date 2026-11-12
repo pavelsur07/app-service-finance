@@ -49,6 +49,8 @@ final readonly class StockQtyByListingOnDateQuery
             'companyId' => $companyId,
             'reportDate' => $reportDate->format('Y-m-d'),
             'status' => StockStatus::Available->value,
+            // Выбор последней сессии — по строкам остатков, без поставок Ozon.
+            'inSupply' => StockStatus::InSupply->value,
             'earliestAcceptableDate' => $this->freshnessPolicy->earliestAcceptableDate($referenceDate)->format('Y-m-d'),
         ];
 
@@ -78,7 +80,8 @@ final readonly class StockQtyByListingOnDateQuery
                 FROM inventory_stock_snapshots candidate
                 WHERE candidate.company_id = :companyId
                   AND candidate.snapshot_date <= :reportDate
-                  AND candidate.listing_id IS NOT NULL'.$sourceFilter.'
+                  AND candidate.listing_id IS NOT NULL
+                  AND candidate.status <> :inSupply'.$sourceFilter.'
                 ORDER BY
                     candidate.source,
                     candidate.snapshot_date DESC,

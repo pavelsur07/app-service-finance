@@ -33,10 +33,12 @@ final class OzonSuppliesSyncCommandTest extends IntegrationTestCase
     private const CONNECTION_ID = '77777777-7777-7777-7777-000000000951';
     private const STOCK_SESSION = '22222222-2222-2222-2222-000000000951';
     private const LISTING_ID = '55555555-5555-5555-5555-000000000951';
+    private const OTHER_CONNECTION_ID = '77777777-7777-7777-7777-000000000952';
 
     private Company $company;
     private string $today;
-    private MockResponse $response;
+    /** @var array<string, MockResponse> ответ по connection_ref */
+    private array $responses = [];
 
     protected function setUp(): void
     {
@@ -71,7 +73,13 @@ final class OzonSuppliesSyncCommandTest extends IntegrationTestCase
 
         // Клиент подменяется один раз: ответ берётся из $this->response на момент запроса.
         self::getContainer()->set(OzonSupplySnapshotClient::class, new OzonSupplySnapshotClient(
-            new MockHttpClient(fn (): MockResponse => $this->response),
+            new MockHttpClient(function (string $method, string $url): MockResponse {
+                parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
+
+                $ref = $query['connection_ref'] ?? '';
+
+                return $this->responses[is_string($ref) ? $ref : ''];
+            }),
             new NullLogger(),
             'http://ozon-fetcher:8080',
             'test-token',
@@ -138,18 +146,90 @@ final class OzonSuppliesSyncCommandTest extends IntegrationTestCase
         self::assertSame([], $this->supplyRows());
     }
 
+    public function testRejectedTokenIsADefectNotASkip(): void
+    {
+        $this->responses[self::CONNECTION_ID] = new MockResponse('{"error":{"code":"unauthorized"}}', ['http_code' => 401]);
+
+        $tester = $this->runCommand();
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('ошибка UnexpectedValueException', $tester->getDisplay());
+    }
+
+    public function testUnavailableServiceIsSkippedWithoutFailure(): void
+    {
+        $this->responses[self::CONNECTION_ID] = new MockResponse('{"error":{"code":"snapshot_unavailable"}}', ['http_code' => 503]);
+        $tester = $this->runCommand();
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('пропуск (unavailable)', $tester->getDisplay());
+
+        $this->responses[self::CONNECTION_ID] = new MockResponse('', ['error' => 'timeout']);
+        $tester = $this->runCommand();
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('пропуск (unavailable)', $tester->getDisplay());
+        self::assertSame([], $this->supplyRows());
+    }
+
+    /**
+     * Сбой записи у первого кабинета (имя склада длиннее колонки) закрывает EntityManager —
+     * второй кабинет всё равно записывается.
+     */
+    public function testWriteFailureOfOneCompanyDoesNotBreakTheNext(): void
+    {
+        $other = $this->secondCompany();
+        $this->useSnapshot($this->snapshotBody($this->today, warehouse: str_repeat('Я', 300)));
+        $this->useSnapshot($this->snapshotBody($this->today, connectionId: self::OTHER_CONNECTION_ID), self::OTHER_CONNECTION_ID);
+
+        $tester = $this->runCommand(allCompanies: true);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString($this->company->getId().': ошибка', $tester->getDisplay());
+        self::assertStringContainsString($other.': снимок '.$this->today.', позиций 4', $tester->getDisplay());
+        self::assertSame([], $this->supplyRows());
+        self::assertSame(3, (int) $this->connection()->fetchOne(
+            'SELECT count(*) FROM inventory_stock_snapshots WHERE company_id = ? AND status = ?',
+            [$other, StockStatus::InSupply->value],
+        ));
+    }
+
+    private function secondCompany(): string
+    {
+        $user = UserBuilder::aUser()->withIndex(952)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(952)->withOwner($user)->build();
+        $connection = new MarketplaceConnection(self::OTHER_CONNECTION_ID, $company, MarketplaceType::OZON, MarketplaceConnectionType::SELLER);
+        $connection->setApiKey('test-key-2')->setClientId('test-client-2')->setIsActive(true);
+        foreach ([$user, $company, $connection] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->persist(StockSnapshotBuilder::aStockSnapshot()
+            ->withCompanyId((string) $company->getId())
+            ->withSnapshotSessionId('22222222-2222-2222-2222-000000000952')
+            ->withSnapshotDate(new \DateTimeImmutable($this->today))
+            ->withSnapshotAt(new \DateTimeImmutable($this->today.' 04:05:00'))
+            ->withSource(MarketplaceType::OZON)
+            ->withProductId(null)
+            ->withSourceSku('111')
+            ->withFulfillmentType('fbo')
+            ->withStatus(StockStatus::Available)
+            ->withQuantity('1')
+            ->build());
+        $this->em->flush();
+
+        return (string) $company->getId();
+    }
+
     /**
      * Заявка 11 (в пути): поставка b-1 без склада — 5 шт SKU 111; поставка b-2 на Тверь — 300 + 200 шт
      * SKU 111 (две страницы состава) и 7 шт SKU 222. Заявка 12 — черновик, не считается.
      *
      * @return array<string, mixed>
      */
-    private function snapshotBody(string $day, bool $arrived = false): array
+    private function snapshotBody(string $day, bool $arrived = false, string $connectionId = self::CONNECTION_ID, string $warehouse = 'Тверь'): array
     {
         $supplies = [['bundle_id' => 'b-1']];
         $pages = [['items' => [['sku' => 111, 'offer_id' => 'A', 'quantity' => 5]], 'has_next' => false]];
         if (!$arrived) {
-            $supplies[] = ['bundle_id' => 'b-2', 'storage_warehouse' => ['warehouse_id' => 900, 'name' => 'Тверь']];
+            $supplies[] = ['bundle_id' => 'b-2', 'storage_warehouse' => ['warehouse_id' => 900, 'name' => $warehouse]];
             $pages[] = ['items' => [['sku' => 111, 'offer_id' => 'A', 'quantity' => 300], ['sku' => 222, 'offer_id' => 'B', 'quantity' => 7]], 'has_next' => true, 'last_id' => 'n'];
             $pages[] = ['items' => [['sku' => 111, 'offer_id' => 'A', 'quantity' => 200]], 'has_next' => false];
         }
@@ -158,7 +238,7 @@ final class OzonSuppliesSyncCommandTest extends IntegrationTestCase
         return [
             'schema_version' => '1',
             'service' => 'ozon-fetcher',
-            'connection_ref' => self::CONNECTION_ID,
+            'connection_ref' => $connectionId,
             'resource_type' => 'ozon.supplies',
             'period_key' => $day,
             'loaded_at' => $day.'T02:05:00Z',
@@ -176,19 +256,19 @@ final class OzonSuppliesSyncCommandTest extends IntegrationTestCase
     /**
      * @param array<string, mixed>|null $body null — 404 snapshot_not_found
      */
-    private function useSnapshot(?array $body): void
+    private function useSnapshot(?array $body, string $connectionId = self::CONNECTION_ID): void
     {
-        $this->response = null === $body
+        $this->responses[$connectionId] = null === $body
             ? new MockResponse('{"error":{"code":"snapshot_not_found"}}', ['http_code' => 404])
             : new MockResponse((string) json_encode($body), ['http_code' => 200]);
     }
 
-    private function runCommand(): CommandTester
+    private function runCommand(bool $allCompanies = false): CommandTester
     {
         self::assertNotNull(self::$kernel);
         $application = new Application(self::$kernel);
         $tester = new CommandTester($application->find('app:inventory:ozon-supplies-sync'));
-        $tester->execute(['--company-id' => $this->company->getId()]);
+        $tester->execute($allCompanies ? [] : ['--company-id' => $this->company->getId()]);
 
         return $tester;
     }
