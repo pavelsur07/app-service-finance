@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Command;
 
+use App\MarketplaceAds\Application\SyncOzonAllSkuPromoSpendAction;
 use App\MarketplaceAds\Application\SyncOzonSearchPromoSpendAction;
 use App\MarketplaceAds\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
 use Doctrine\ORM\EntityManagerInterface;
@@ -21,7 +22,8 @@ use Webmozart\Assert\Assert;
 
 /**
  * Оплата за заказ Ozon по SKU: отчёты по заказам, загруженные Ingestion (cron 07:25), — в рекламную
- * статистику всех кабинетов с Ozon Performance. Без дат — месяц вчерашнего дня по вчера (1-го числа —
+ * статистику всех кабинетов с Ozon Performance; затем расход кампаний ALL_SKU_PROMO, распределённый по
+ * товарам кампании пропорционально продажам. Без дат — месяц вчерашнего дня по вчера (1-го числа —
  * весь прошлый месяц, последнее обновление месяца).
  */
 #[AsCommand(
@@ -36,6 +38,7 @@ final class OzonSearchPromoSyncCommand extends Command
 
     public function __construct(
         private readonly SyncOzonSearchPromoSpendAction $syncAction,
+        private readonly SyncOzonAllSkuPromoSpendAction $allSkuSyncAction,
         private readonly ActiveOzonPerformanceConnectionsQuery $connectionsQuery,
         private readonly ManagerRegistry $managerRegistry,
         private readonly ClockInterface $clock,
@@ -76,6 +79,7 @@ final class OzonSearchPromoSyncCommand extends Command
                 $this->logger->info('Ozon pay-per-order sync started.', $context);
                 try {
                     $result = ($this->syncAction)($companyId, $from, $to);
+                    $allSku = ($this->allSkuSyncAction)($companyId, $from, $to);
                 } catch (\Throwable $exception) {
                     ++$failed;
                     $this->logger->error('Ozon pay-per-order sync failed.', $context + ['exception' => $exception]);
@@ -93,6 +97,10 @@ final class OzonSearchPromoSyncCommand extends Command
                     'mismatchedSku' => $result->mismatchedSku,
                     'unreadable' => $result->unreadable,
                     'daysWithUnmappedSku' => $result->daysWithUnmappedSku,
+                    'allSkuCampaigns' => $allSku->campaigns,
+                    'allSkuDays' => $allSku->days,
+                    'allSkuTotal' => $allSku->total,
+                    'allSkuUnallocated' => $allSku->unallocated,
                 ]);
                 $output->writeln(sprintf(
                     '%s: дней записано %d, строк %d, расход %s, заказанный SKU ≠ продвигаемому %d, дней с SKU без листинга %d, нечитаемых строк сырья %d',
@@ -103,6 +111,14 @@ final class OzonSearchPromoSyncCommand extends Command
                     $result->mismatchedSku,
                     $result->daysWithUnmappedSku,
                     $result->unreadable,
+                ));
+                $output->writeln(sprintf(
+                    '%s: все товары (ALL_SKU_PROMO) — кампаний %d, дней записано %d, расход %s, без товара %s',
+                    $companyId,
+                    $allSku->campaigns,
+                    $allSku->days,
+                    $allSku->total,
+                    $allSku->unallocated,
                 ));
             }
 

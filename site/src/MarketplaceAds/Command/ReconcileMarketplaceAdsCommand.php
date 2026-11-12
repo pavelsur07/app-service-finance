@@ -146,12 +146,11 @@ final class ReconcileMarketplaceAdsCommand extends Command
                         AdRawDocumentStatus::DRAFT,
                     );
                     $adDocumentsCount = (int) $this->connection->fetchOne(
-                        'SELECT COUNT(*) FROM marketplace_ad_documents WHERE company_id = :company_id AND marketplace = :marketplace AND report_date = :report_date AND campaign_id <> :search_promo',
+                        'SELECT COUNT(*) FROM marketplace_ad_documents WHERE company_id = :company_id AND marketplace = :marketplace AND report_date = :report_date AND '.OzonSearchPromoCampaign::campaignCondition('campaign_id', AdSpendKind::CLICKS),
                         [
                             'company_id' => $companyId,
                             'marketplace' => MarketplaceType::OZON->value,
                             'report_date' => $day->format('Y-m-d'),
-                            'search_promo' => OzonSearchPromoCampaign::CAMPAIGN_ID,
                         ],
                     );
                     // Сверяется загрузка кликов (CPC); оплата за заказ грузится отдельно (ozon-search-promo:sync).
