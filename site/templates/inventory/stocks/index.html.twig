@@ -49,10 +49,14 @@
             Итого по фильтру:
             остаток&nbsp;<span class="vf-num vf-strong">{{ totals.quantity|vf_number }}</span>,
             резерв&nbsp;<span class="vf-num">{{ totals.reservedQuantity|vf_number }}</span>,
-            доступно&nbsp;<span class="vf-num vf-strong{{ totals.availableForSale < 0 ? ' text-danger' : '' }}">{{ totals.availableForSale|vf_number }}</span>
+            доступно&nbsp;<span class="vf-num vf-strong{{ totals.availableForSale < 0 ? ' text-danger' : '' }}">{{ totals.availableForSale|vf_number }}</span>{% if totals.inSupply > 0 %},
+            в&nbsp;поставке&nbsp;<span class="vf-num">{{ totals.inSupply|vf_number }}</span>{% endif %}
         </div>
         <div class="table-responsive">
             {% set hasBreakdown = breakdownColumns|length > 0 %}
+            {# Поставки Ozon в пути: товар едет на склад и в остаток не входит — отдельная колонка, только когда он есть. #}
+            {% set hasSupply = totals.inSupply > 0 %}
+            {% set extraColumns = breakdownColumns|length + (hasSupply ? 1 : 0) %}
             {% set rowspan = hasBreakdown ? 2 : 1 %}
             <table class="table table-vcenter card-table vf-table">
                 <caption class="visually-hidden">Остатки {{ source.getDisplayName() }}, схема {{ scheme.label() }}, на {{ (effectiveDate ?? date)|date('d.m.Y') }}</caption>
@@ -65,6 +69,9 @@
                     <th scope="col" rowspan="{{ rowspan }}" class="text-end text-nowrap">Остаток</th>
                     <th scope="col" rowspan="{{ rowspan }}" class="text-end text-nowrap d-none d-md-table-cell">Резерв</th>
                     <th scope="col" rowspan="{{ rowspan }}" class="text-end text-nowrap">Доступно</th>
+                    {% if hasSupply %}
+                        <th scope="col" rowspan="{{ rowspan }}" class="text-end text-nowrap" title="Активные заявки на поставку FBO: товар едет на склад Ozon, в остаток не входит">В поставке</th>
+                    {% endif %}
                     {% if hasBreakdown %}
                         <th scope="colgroup" colspan="{{ breakdownColumns|length }}" class="text-center text-secondary">В том числе</th>
                     {% endif %}
@@ -91,6 +98,9 @@
                         <td class="text-end vf-num text-secondary d-none d-md-table-cell">{{ row.reserved_quantity|vf_number }}</td>
                         {# Резерв больше остатка — расхождение данных маркетплейса, подсвечиваем, а не прячем. #}
                         <td class="text-end vf-num vf-strong{{ row.available_for_sale < 0 ? ' text-danger' : '' }}">{{ row.available_for_sale|vf_number }}</td>
+                        {% if hasSupply %}
+                            <td class="text-end vf-num">{{ row.in_supply == 0 ? '—' : row.in_supply|vf_number }}</td>
+                        {% endif %}
                         {% for alias in breakdownColumns|keys %}
                             {% set part = attribute(row, alias) %}
                             <td class="text-end vf-num text-secondary">{{ part == 0 ? '—' : part|vf_number }}</td>
@@ -101,7 +111,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="{{ 8 + breakdownColumns|length }}" class="text-center text-secondary py-4">
+                        <td colspan="{{ 8 + extraColumns }}" class="text-center text-secondary py-4">
                             Нет остатков на выбранную дату. Попробуйте другую дату, источник или схему FBO / FBS.
                         </td>
                     </tr>
@@ -118,6 +128,9 @@
                         <td class="text-end vf-num">{{ rows|map(r => r.quantity)|reduce((a, b) => a + b, 0)|vf_number }}</td>
                         <td class="text-end vf-num d-none d-md-table-cell">{{ rows|map(r => r.reserved_quantity)|reduce((a, b) => a + b, 0)|vf_number }}</td>
                         <td class="text-end vf-num{{ pageAvailable < 0 ? ' text-danger' : '' }}">{{ pageAvailable|vf_number }}</td>
+                        {% if hasSupply %}
+                            <td class="text-end vf-num">{{ rows|map(r => r.in_supply)|reduce((a, b) => a + b, 0)|vf_number }}</td>
+                        {% endif %}
                         <td colspan="{{ 1 + breakdownColumns|length }}"></td>
                     </tr>
                     </tfoot>

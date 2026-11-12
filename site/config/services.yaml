@@ -639,6 +639,12 @@ services:
             $token: '%env(default::OZON_FETCHER_API_TOKEN)%'
         tags: [{ name: 'app.service_coverage_client', priority: 20 }]
 
+    # Снимок поставок Ozon из ozon-fetcher (service-snapshot v1); пустые адрес или токен — выключено.
+    App\Inventory\Infrastructure\Api\OzonFetcher\OzonSupplySnapshotClient:
+        arguments:
+            $baseUrl: '%env(default::OZON_FETCHER_BASE_URL)%'
+            $token: '%env(default::OZON_FETCHER_API_TOKEN)%'
+
     app.service_gateway.coverage_client.wb_fetcher:
         class: App\ServiceGateway\Infrastructure\Client\ServiceCoverageHttpClient
         arguments:

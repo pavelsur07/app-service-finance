@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Inventory\Repository;
 
 use App\Inventory\Entity\StockSnapshot;
+use App\Inventory\Enum\StockStatus;
+use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\ParameterType;
 use Doctrine\Persistence\ManagerRegistry;
@@ -76,6 +78,44 @@ final class StockSnapshotRepository extends ServiceEntityRepository
                 'listingId' => ParameterType::STRING,
                 'productId' => ParameterType::STRING,
             ],
+        );
+    }
+
+    /**
+     * Последняя сессия дня по строкам «на складе» — та, что видят отчёты по правилу «последняя
+     * сессия дня»: snapshot_at DESC, snapshot_session_id DESC.
+     *
+     * @return array{sessionId: string, snapshotAt: \DateTimeImmutable}|null
+     */
+    public function findLatestAvailableDaySession(string $companyId, MarketplaceType $source, \DateTimeImmutable $snapshotDate): ?array
+    {
+        $row = $this->getEntityManager()->getConnection()->fetchAssociative(
+            'SELECT snapshot_session_id, snapshot_at
+             FROM inventory_stock_snapshots
+             WHERE company_id = :companyId AND source = :source AND snapshot_date = :snapshotDate AND status = :status
+             ORDER BY snapshot_at DESC, snapshot_session_id DESC
+             LIMIT 1',
+            ['companyId' => $companyId, 'source' => $source->value, 'snapshotDate' => $snapshotDate, 'status' => StockStatus::Available->value],
+            ['snapshotDate' => 'date_immutable'],
+        );
+        if (false === $row) {
+            return null;
+        }
+
+        return [
+            'sessionId' => (string) $row['snapshot_session_id'],
+            'snapshotAt' => new \DateTimeImmutable((string) $row['snapshot_at']),
+        ];
+    }
+
+    /** Удаляет строки дня одного статуса — замена окна перед повторной записью. */
+    public function deleteDayRowsByStatus(string $companyId, MarketplaceType $source, \DateTimeImmutable $snapshotDate, StockStatus $status): int
+    {
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            'DELETE FROM inventory_stock_snapshots
+             WHERE company_id = :companyId AND source = :source AND snapshot_date = :snapshotDate AND status = :status',
+            ['companyId' => $companyId, 'source' => $source->value, 'snapshotDate' => $snapshotDate, 'status' => $status->value],
+            ['snapshotDate' => 'date_immutable'],
         );
     }
 }

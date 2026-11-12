@@ -12,6 +12,8 @@ enum StockStatus: string
     case OnAcceptance = 'on_acceptance';
     case Defect = 'defect';
     case Blocked = 'blocked';
+    /** Товар активной заявки на поставку FBO Ozon: едет на склад, в остаток не входит. */
+    case InSupply = 'in_supply';
 
     public function label(): string
     {
@@ -22,6 +24,7 @@ enum StockStatus: string
             self::OnAcceptance => 'На приёмке',
             self::Defect => 'Брак',
             self::Blocked => 'Заблокировано',
+            self::InSupply => 'В поставке',
         };
     }
 }

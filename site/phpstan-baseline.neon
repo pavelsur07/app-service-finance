@@ -11389,7 +11389,7 @@ parameters:
 			path: tests/Unit/Inventory/Entity/StockSnapshotTest.php
 
 		-
-			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with array\{''available'', ''in_transit_to…'', ''in_transit_from…'', ''on_acceptance'', ''defect'', ''blocked''\} and array\{''available'', ''in_transit_to…'', ''in_transit_from…'', ''on_acceptance'', ''defect'', ''blocked''\} will always evaluate to true\.$#'
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with array\{''available'', ''in_transit_to…'', ''in_transit_from…'', ''on_acceptance'', ''defect'', ''blocked'', ''in_supply''\} and array\{''available'', ''in_transit_to…'', ''in_transit_from…'', ''on_acceptance'', ''defect'', ''blocked'', ''in_supply''\} will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Unit/Inventory/Enum/InventoryEnumsTest.php

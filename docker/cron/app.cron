@@ -132,6 +132,11 @@
 # команды: new 0, накопленных 9 вариантов / 309 строк, exit code 0.
 40 5 * * * cd /app && php bin/console app:inventory:unmapped-stock-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Поставки Ozon в пути (docs/tasks/ozon-supplies-in-transit): снимок ozon.supplies из
+# ozon-fetcher (05:00, готов к ~05:15) → строки остатков in_supply в сессию снимка 04:05.
+# После обоих инвентарных гейтов: они проверяют остатки, а не поставки.
+50 5 * * * cd /app && php bin/console app:inventory:ozon-supplies-sync --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Daily-sync: создаёт AdLoadJob за вчера для всех компаний с активным Ozon
 # Performance подключением. Дальше работу подхватывают cron-driven worker'ы
 # (scheduler → poller → finalizer → auto-extract), без ручных действий.
