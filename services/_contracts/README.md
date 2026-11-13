@@ -15,7 +15,7 @@
 
 | Контракт | Версии | Стороны | Статус |
 |---|---|---|---|
-| [source-fact-envelope](source-fact-envelope/v1/) | v1 | producer: `services/*`; consumer: Symfony (pull + ack) | **проект**, не утверждённый API |
+| [source-fact-envelope](source-fact-envelope/v1/) | v1 | producer: `services/*` (`GET /internal/source-facts`, `/page`, `POST …/ack`); consumer: Symfony (pull + ack) | действует, `ozon.finance.accrual-by-day` |
 | [marketplace-connections](marketplace-connections/v1/) | v1 | producer: Symfony; consumer: `services/*` (поллинг конфигурации) | **проект**, не утверждённый API |
 | [service-coverage](service-coverage/v1/) | v1 | producer: `services/*` (`GET /internal/coverage`); consumer: шлюз Symfony | действует |
 | [service-snapshot](service-snapshot/v1/) | v1 | producer: `services/*` (`GET /internal/snapshots/latest`); consumer: Symfony (pull, без ack) | действует, `ozon.supplies` |
@@ -24,8 +24,5 @@
 
 ## Статус «проект»
 
-`source-fact-envelope` v1 — проект контракта (по терминологии аудита
-`05-target-architecture.md`): до реализации Symfony inbox endpoint его нужно
-согласовать с финансовой моделью (события, идемпотентность, деньги и валюта)
-и natural keys Ingestion; проект Financial Core удалён из docs 22.10.2026 (история git). До согласования
-изменения в v1 допустимы; после — только через v2.
+Контракт в статусе «проект» можно менять в его `v1` до утверждения; после —
+только через `v2`. `source-fact-envelope` v1 утверждён 13.11.2026 (см. его CHANGELOG).

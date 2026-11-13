@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/executor"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/facts"
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
@@ -165,4 +167,44 @@ func TestSnapshotPublishesOnlySupplies(t *testing.T) {
 	code, body = do(t, h, "/internal/snapshots/latest?connection_ref=ref-a&resource_type=ozon.finance.accrual-by-day", "Bearer "+token)
 	assert.Equal(t, http.StatusUnprocessableEntity, code)
 	assert.Equal(t, "invalid_request", body["error"].(map[string]any)["code"])
+}
+
+func TestFactsPublishOnlyAccrualByDay(t *testing.T) {
+	assert.Equal(t, []string{executor.ResourceAccrualByDay}, facts.Resources, "имя ресурса в пакете facts — то же, что у загрузчика")
+
+	d := deps(t)
+	var asked []string
+	d.Facts = &FactsDeps{
+		Resources: []string{"ozon.orders.fbo"}, // переопределяется белым списком сервиса
+		NewBatches: func(_ context.Context, rt string, _ time.Time, _ string, _ int) ([]store.FactBatch, error) {
+			asked = append(asked, rt)
+			return nil, nil
+		},
+		Batch: func(context.Context, string) (store.FactBatch, error) {
+			return store.FactBatch{BatchID: "b", TaskKey: store.TaskKey{ResourceType: executor.ResourceAccrualByDay}, PageHashes: []string{"h1"}}, nil
+		},
+		BatchPage: func(context.Context, store.FactBatch, int) (store.RawObject, error) {
+			return store.RawObject{PageNo: 1, StorageURI: "s3://b/p1", SHA256: "h1"}, nil
+		},
+		ReadRawObject: func(context.Context, string, string) ([]byte, error) {
+			return []byte(`{"accruals":[{"accrual_id":"1001"}],"last_id":""}`), nil
+		},
+	}
+	h := New(d)
+
+	code, body := do(t, h, "/internal/source-facts?resource_type=ozon.finance.accrual-by-day", "Bearer "+token)
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, "ozon-fetcher", body["service"])
+	assert.Equal(t, []string{"ozon.finance.accrual-by-day"}, asked)
+
+	code, body = do(t, h, "/internal/source-facts?resource_type=ozon.orders.fbo", "Bearer "+token)
+	assert.Equal(t, http.StatusUnprocessableEntity, code)
+	assert.Equal(t, "invalid_request", body["error"].(map[string]any)["code"])
+
+	// Страница режется разбором сервиса: ключ записи — из accrual_id.
+	code, body = do(t, h, "/internal/source-facts/page?batch_id=b&page=1", "Bearer "+token)
+	assert.Equal(t, http.StatusOK, code)
+	records := body["records"].([]any)
+	require.Len(t, records, 1)
+	assert.Equal(t, "ozon:accrual-by-day:1001", records[0].(map[string]any)["source_key"])
 }

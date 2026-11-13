@@ -1,5 +1,5 @@
 // Package ozonstore — БД ozon-fetcher поверх общей очереди fetchkit/store:
-// история миграций сервиса (00001–00007), отдельный слот рекламы и запросы
+// история миграций сервиса (00001–00008), отдельный слот рекламы и запросы
 // к ресурсам Ozon, которых нет в ядре.
 package ozonstore
 
@@ -8,6 +8,7 @@ import (
 	"embed"
 	"fmt"
 
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/facts"
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
 
@@ -28,9 +29,10 @@ type Tasks struct {
 	*store.Tasks
 }
 
-// NewTasks — очередь с отдельным слотом рекламы.
+// NewTasks — очередь с отдельным слотом рекламы; ревизии ресурсов facts.Resources
+// публикуются фактами.
 func NewTasks(pool *store.Pool) *Tasks {
-	return &Tasks{Tasks: store.NewTasks(pool, store.Options{SeparateSlotPrefix: SeparateSlotPrefix})}
+	return &Tasks{Tasks: store.NewTasks(pool, store.Options{SeparateSlotPrefix: SeparateSlotPrefix, PublishResources: facts.Resources})}
 }
 
 // AdsReportInFlight — у кабинета есть другая незавершённая задача отчётов
