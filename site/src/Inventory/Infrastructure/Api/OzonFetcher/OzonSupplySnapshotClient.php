@@ -18,8 +18,12 @@ final readonly class OzonSupplySnapshotClient
 {
     public const RESOURCE = 'ozon.supplies';
     public const ENDPOINT = '/internal/snapshots/latest';
-    private const IDLE_TIMEOUT_SECONDS = 10.0;
-    private const MAX_DURATION_SECONDS = 60.0;
+    /**
+     * Сервис читает из S3 все страницы снимка до первого байта ответа: у крупных кабинетов это
+     * дольше 10 с (13.11.2026 два кабинета оборвались на idle 10 с). Cron ночной — ждать не жалко.
+     */
+    private const IDLE_TIMEOUT_SECONDS = 180.0;
+    private const MAX_DURATION_SECONDS = 180.0;
 
     public function __construct(
         private HttpClientInterface $httpClient,
