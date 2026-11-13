@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Cash\Service\Transaction;
 
 use App\Cash\Application\DTO\CashTransactionAutoRuleProvenance;
+use App\Cash\Application\Service\AutoRule\CashAutoRuleApplicationPlanner;
+use App\Cash\Application\Service\AutoRule\CashAutoRuleMatcher;
+use App\Cash\Application\Service\AutoRule\CashAutoRulePreviewBuilder;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
@@ -16,7 +20,6 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Enum\Transaction\CashTransactionAutoRulePairIssue;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
-use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Application\DTO\FinancialResponsibilityCenterProjectDTO;
 use App\Company\Entity\Company;
@@ -28,11 +31,59 @@ use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CounterpartyBuilder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
 final class CashTransactionAutoRuleServiceTest extends TestCase
 {
+    #[DataProvider('conditionBoundaries')]
+    public function testMatchesConditionBoundaries(
+        CashTransactionAutoRuleConditionField $field,
+        CashTransactionAutoRuleConditionOperator $operator,
+        string $value,
+        ?string $valueTo,
+        bool $expected,
+    ): void {
+        $company = CompanyBuilder::aCompany()->build();
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $transaction->setAmount('100.00')->setOccurredAt(new \DateTimeImmutable('2024-02-29 23:59:59'));
+        $transaction->setDescription('Оплата АРЕНДЫ офиса')->setCounterparty(CounterpartyBuilder::aCounterparty()->withCompany($company)->withName('ООО Ромашка')->build());
+        $rule = new CashTransactionAutoRule(Uuid::uuid4()->toString(), $company, 'Boundary', CashTransactionAutoRuleAction::FILL, CashTransactionAutoRuleOperationType::ANY);
+        $rule->addCondition(new CashTransactionAutoRuleCondition(autoRule: $rule, field: $field, operator: $operator, value: $value, valueTo: $valueTo, counterparty: CashTransactionAutoRuleConditionField::COUNTERPARTY === $field ? $transaction->getCounterparty() : null));
+
+        self::assertSame((int) $expected, $this->createService(rules: [$rule])->previewRule($rule, [$transaction], 1)->summary['matched']);
+    }
+
+    /** @return iterable<string, array{CashTransactionAutoRuleConditionField, CashTransactionAutoRuleConditionOperator, string, ?string, bool}> */
+    public static function conditionBoundaries(): iterable
+    {
+        $amount = CashTransactionAutoRuleConditionField::AMOUNT;
+        $date = CashTransactionAutoRuleConditionField::DATE;
+        $equal = CashTransactionAutoRuleConditionOperator::EQUAL;
+        $between = CashTransactionAutoRuleConditionOperator::BETWEEN;
+        $greater = CashTransactionAutoRuleConditionOperator::GREATER_THAN;
+        $less = CashTransactionAutoRuleConditionOperator::LESS_THAN;
+        yield 'localized equal' => [$amount, $equal, '100,00', null, true];
+        yield 'between lower inclusive' => [$amount, $between, '100', '200', true];
+        yield 'between upper inclusive' => [$amount, $between, '0', '100', true];
+        yield 'between outside' => [$amount, $between, '100.01', '200', false];
+        yield 'greater boundary excluded' => [$amount, $greater, '100', null, false];
+        yield 'greater' => [$amount, $greater, '99.99', null, true];
+        yield 'less boundary excluded' => [$amount, $less, '100', null, false];
+        yield 'less' => [$amount, $less, '100.01', null, true];
+        yield 'date final second' => [$date, $equal, '2024-02-29', null, true];
+        yield 'date range end' => [$date, $between, '2024-02-01', '2024-02-29', true];
+        yield 'date outside' => [$date, $between, '2024-02-01', '2024-02-28', false];
+        $contains = CashTransactionAutoRuleConditionOperator::CONTAINS;
+        yield 'description case folded' => [CashTransactionAutoRuleConditionField::DESCRIPTION, $contains, 'аренды', null, true];
+        yield 'counterparty name normalized' => [CashTransactionAutoRuleConditionField::COUNTERPARTY_NAME, $contains, 'ромашка', null, true];
+        yield 'counterparty name mismatch' => [CashTransactionAutoRuleConditionField::COUNTERPARTY_NAME, $contains, 'другая', null, false];
+        yield 'inn digits normalized' => [CashTransactionAutoRuleConditionField::INN, $contains, '7707 083 893', null, true];
+        yield 'inn partial is not equality' => [CashTransactionAutoRuleConditionField::INN, $contains, '7707', null, false];
+        yield 'counterparty identity' => [CashTransactionAutoRuleConditionField::COUNTERPARTY, $equal, '', null, true];
+    }
+
     public function testDoesNotApplyRuleToDeletedTransaction(): void
     {
         $company = CompanyBuilder::aCompany()->build();
@@ -678,7 +729,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
                 $centerId,
                 'Краснодар',
             )]);
-        $service = new CashTransactionAutoRuleService($repository, $facade);
+        $service = $this->buildService($repository, $facade);
 
         $preview = $service->previewRule($rule, [
             CashTransactionBuilder::aCashTransaction()->forCompany($company)->build(),
@@ -715,7 +766,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
             ->forCompany($company)
             ->build()
             ->setResponsibilityCenterId($centerId);
-        $service = new CashTransactionAutoRuleService($repository, $facade);
+        $service = $this->buildService($repository, $facade);
 
         $preview = $service->previewRule($rule, [$transaction], 10);
 
@@ -1097,7 +1148,18 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $facade = $this->createMock(FinancialResponsibilityCenterFacade::class);
         $facade->method('getActivePairs')->willReturn($pairs);
 
-        return new CashTransactionAutoRuleService($repository, $facade);
+        return $this->buildService($repository, $facade);
+    }
+
+    private function buildService(
+        CashTransactionAutoRuleRepository $repository,
+        FinancialResponsibilityCenterFacade $facade,
+    ): CashTransactionAutoRuleService {
+        $matcher = new CashAutoRuleMatcher();
+        $planner = new CashAutoRuleApplicationPlanner($facade);
+        $previewBuilder = new CashAutoRulePreviewBuilder($repository, $facade, $matcher, $planner);
+
+        return new CashTransactionAutoRuleService($repository, $matcher, $planner, $previewBuilder);
     }
 
     private function createRule(

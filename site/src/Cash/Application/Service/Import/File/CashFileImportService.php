@@ -62,7 +62,7 @@ final class CashFileImportService
      * Строки пишутся пачками: после каждой вызывается $commitBatch точки входа (Handler), сервис
      * сам не коммитит.
      *
-     * @param \Closure(): void          $commitBatch
+     * @param \Closure(): void $commitBatch
      * @param array<int, InputRow>|null $allowedRows
      */
     public function import(CashFileImportJob $job, \Closure $commitBatch, ?array $allowedRows = null): void
@@ -71,7 +71,7 @@ final class CashFileImportService
     }
 
     /**
-     * @param \Closure(): void          $commitBatch
+     * @param \Closure(): void $commitBatch
      * @param array<int, InputRow>|null $allowedRows
      */
     private function importRows(CashFileImportJob $job, \Closure $commitBatch, ?array $allowedRows): void
@@ -110,7 +110,7 @@ final class CashFileImportService
     }
 
     /**
-     * @param \Closure(): void          $commitBatch
+     * @param \Closure(): void $commitBatch
      * @param array<int, InputRow>|null $allowedRows
      */
     private function readAndPersist(string $filePath, CashFileImportJob $job, \Closure $commitBatch, ?array $allowedRows): void
@@ -119,7 +119,9 @@ final class CashFileImportService
         $moneyAccount = $job->getMoneyAccount();
         $importLog = $job->getImportLog();
         $mapping = $job->getMapping();
+        /** @var string $companyId Company constructor initializes its UUID; persisted IDs are non-null. */
         $companyId = $company->getId();
+        /** @var string $accountId MoneyAccount constructor initializes its UUID; persisted IDs are non-null. */
         $accountId = $moneyAccount->getId();
         $responsibilityPair = $this->responsibilityCenterResolver->resolveForCreate($companyId, null, null);
         $systemProject = $this->entityManager->getReference(

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Cash\Controller\Transaction;
 
 use App\Cash\Application\DTO\CashTransactionAutoRulePreviewFilter;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;

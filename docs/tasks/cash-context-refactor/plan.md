@@ -15,7 +15,7 @@
 текущие версии проекта, без новых зависимостей.
 
 **Spec:** [TASK.md](TASK.md). **Acceptance:** [acceptance.md](acceptance.md).
-**Статус:** план, реализация не начата, baseline реализации ещё не выполнялся.
+**Статус:** четыре Stage выполнены. Ниже сохранён исходный план; фактические результаты и исключения — в [acceptance-results.md](acceptance-results.md), [gate-corrections.md](gate-corrections.md) и [handoff.md](handoff.md).
 
 ## Общие ограничения
 

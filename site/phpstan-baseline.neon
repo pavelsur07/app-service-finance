@@ -889,30 +889,6 @@ parameters:
 			path: src/Cash/Service/Import/ClientBank1CImportService.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Application\\Service\\CashTransactionResponsibilityCenterResolver\:\:resolveForCreate\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Application/Service/Import/File/CashFileImportService.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Application\\Service\\Import\\File\\CashFileImportService\:\:getOrCreateCounterparty\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Application/Service/Import/File/CashFileImportService.php
-
-		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Application\\Service\\Import\\File\\CashFileDuplicatePlanner\:\:hash\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Application/Service/Import/File/CashFileImportService.php
-
-		-
-			message: '#^Parameter \#2 \$moneyAccountId of method App\\Cash\\Application\\Service\\Import\\File\\CashFileDuplicatePlanner\:\:hash\(\) expects string, string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Application/Service/Import/File/CashFileImportService.php
-
-		-
 			message: '#^Method App\\Cash\\Application\\Service\\Import\\File\\CashFileRowNormalizer\:\:getMappedValue\(\) has parameter \$rowByHeader with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -983,42 +959,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: src/Cash/Application/PaymentPlan/MaterializeRecurringPaymentPlansAction.php
-
-		-
-			message: '#^Match expression does not handle remaining value\: string$#'
-			identifier: match.unhandled
-			count: 1
-			path: src/Cash/Application/Service/AutoRule/CashTransactionAutoRuleService.php
-
-		-
-			message: '#^Method App\\Cash\\Application\\Service\\AutoRule\\CashTransactionAutoRuleService\:\:createApplicationPlan\(\) has parameter \$activePairs with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Cash/Application/Service/AutoRule/CashTransactionAutoRuleService.php
-
-		-
-			message: '#^Parameter \#1 \$rules of method App\\Cash\\Application\\Service\\AutoRule\\CashTransactionAutoRuleService\:\:rulesNeedPairSnapshot\(\) expects list\<App\\Cash\\Entity\\Transaction\\CashTransactionAutoRule\>, array\<App\\Cash\\Entity\\Transaction\\CashTransactionAutoRule\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Application/Service/AutoRule/CashTransactionAutoRuleService.php
-
-		-
-			message: '#^Parameter \#2 \$rules of method App\\Cash\\Application\\Service\\AutoRule\\CashTransactionAutoRuleService\:\:resolveMatch\(\) expects list\<App\\Cash\\Entity\\Transaction\\CashTransactionAutoRule\>, array\<App\\Cash\\Entity\\Transaction\\CashTransactionAutoRule\> given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Cash/Application/Service/AutoRule/CashTransactionAutoRuleService.php
-
-		-
-			message: '#^Parameter \#3 \$activePairs of method App\\Cash\\Application\\Service\\AutoRule\\CashTransactionAutoRuleService\:\:planPair\(\) expects list\<App\\Company\\Application\\DTO\\FinancialResponsibilityCenterProjectDTO\>, array given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Cash/Application/Service/AutoRule/CashTransactionAutoRuleService.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>changes" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: src/Cash/Application/Service/AutoRule/CashTransactionAutoRuleService.php
 
 		-
 			message: '#^Access to an undefined property App\\Catalog\\DTO\\CreateProductCommand\:\:\$vendorSku\.$#'
@@ -3751,18 +3691,6 @@ parameters:
 			path: src/Marketplace/Wildberries/Application/FinancialReport/WbRawFinancialReportProductEnricher.php
 
 		-
-			message: '#^If condition is always true\.$#'
-			identifier: if.alwaysTrue
-			count: 1
-			path: src/Marketplace/Command/AnalyzeProcessingCostCommand.php
-
-		-
-			message: '#^Offset 0 on array\{''acceptance''\|''acquiring_fee''\|''delivery_rub''\|''penalty''\|''ppvz_for_pay''\|''ppvz_reward''\|''ppvz_vw''\|''ppvz_vw_nds''\|''retail_amount''\|''storage_cost'', int\<0, max\>, int\<1, max\>, float, ''✅ ВЕРОЯТНО''\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Marketplace/Command/AnalyzeProcessingCostCommand.php
-
-		-
 			message: '#^Method App\\Marketplace\\Command\\GeneratedRowsDuplicatesAuditCommand\:\:renderSection\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -3785,48 +3713,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: src/Marketplace/Ozon/Command/OzonRealizationSyncCommand.php
-
-		-
-			message: '#^Call to an undefined method object\:\:get\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
-
-		-
-			message: '#^Call to an undefined method object\:\:scan\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
-
-		-
-			message: '#^Call to an undefined method object\:\:ttl\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
-
-		-
-			message: '#^Call to an undefined method object\:\:xlen\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
-
-		-
-			message: '#^Call to an undefined method object\:\:zcard\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
-
-		-
-			message: '#^Method App\\Marketplace\\Wildberries\\Command\\WbFinanceDiagnosticsCommand\:\:renderRows\(\) has parameter \$rows with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
-
-		-
-			message: '#^Parameter \#1 \$connection of method App\\Marketplace\\Wildberries\\Application\\Service\\WbFinanceRateLimiter\:\:resolveSalesReportsBucketId\(\) expects App\\Marketplace\\Entity\\MarketplaceConnection, object given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Marketplace/Wildberries/Command/WbFinanceDiagnosticsCommand.php
 
 		-
 			message: '#^Method App\\Marketplace\\Wildberries\\Command\\WbFinancialReportsReconcileLegacyCommand\:\:buildStatusFromRaw\(\) has parameter \$raw with no value type specified in iterable type array\.$#'
@@ -6749,12 +6635,6 @@ parameters:
 			identifier: missingType.generics
 			count: 1
 			path: src/MoySklad/Infrastructure/Repository/MoySkladConnectionWriteRepository.php
-
-		-
-			message: '#^Method App\\Notification\\Contract\\TemplateRendererInterface\:\:render\(\) has parameter \$vars with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Notification/Contract/TemplateRendererInterface.php
 
 		-
 			message: '#^Call to function method_exists\(\) with App\\Company\\Entity\\Company and ''getId'' will always evaluate to true\.$#'
@@ -12684,12 +12564,6 @@ parameters:
 			path: src/Loan/Controller/LoanScheduleEditController.php
 
 		-
-			message: '#^find\(\) сущности компании App\\Loan\\Entity\\Loan в контроллере\: загрузка без companyId \(IDOR\)\.$#'
-			identifier: vashfindir.controllerUnscopedFind
-			count: 1
-			path: src/Loan/Controller/LoanScheduleUploadController.php
-
-		-
 			message: '#^EntityType с сущностью чужого модуля App\\Finance\\Entity\\PLCategory в форме модуля Loan — только ChoiceType с данными из Facade \(CLAUDE\.md, «Формы»\)\.$#'
 			identifier: vashfindir.foreignEntityType
 			count: 2
@@ -12940,3 +12814,21 @@ parameters:
 			identifier: vashfindir.flushOutsideBoundary
 			count: 2
 			path: src/Telegram/Service/BotLinkService.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: src/Marketplace/Command/AnalyzeProcessingCostCommand.php
+
+		-
+			message: '#^Offset 0 on array\{''acceptance''\|''acquiring_fee''\|''delivery_rub''\|''penalty''\|''ppvz_for_pay''\|''ppvz_reward''\|''ppvz_vw''\|''ppvz_vw_nds''\|''retail_amount''\|''storage_cost'', int\<0, max\>, int\<1, max\>, float, ''✅ ВЕРОЯТНО''\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Marketplace/Command/AnalyzeProcessingCostCommand.php
+
+		-
+			message: '#^find\(\) сущности компании App\\Loan\\Entity\\Loan в контроллере\: загрузка без companyId \(IDOR\)\.$#'
+			identifier: vashfindir.controllerUnscopedFind
+			count: 1
+			path: src/Loan/Controller/LoanScheduleUploadController.php

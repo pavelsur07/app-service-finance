@@ -54,7 +54,7 @@ final readonly class CashflowCategoryTreeBuilder
 
     /**
      * @param array<string, CashflowCategory> $byId
-     * @param array<string, list<string>>     $childIds
+     * @param array<string, list<string>> $childIds
      *
      * @return TreeNode
      */

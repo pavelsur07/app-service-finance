@@ -14,7 +14,7 @@ namespace App\Cash\Application\Service\Import\File;
 final readonly class CashFileDescriptionMatcher
 {
     /**
-     * @param list<Row>       $rows
+     * @param list<Row> $rows
      * @param list<Candidate> $candidates
      *
      * @return array<string, Decision>
@@ -203,11 +203,11 @@ final readonly class CashFileDescriptionMatcher
     }
 
     /**
-     * @param Row                     $emptyRow
-     * @param list<Row>               $meaningfulRows
-     * @param list<int>               $indexes
-     * @param list<Candidate>         $candidates
-     * @param array<int, bool>        $available
+     * @param Row $emptyRow
+     * @param list<Row> $meaningfulRows
+     * @param list<int> $indexes
+     * @param list<Candidate> $candidates
+     * @param array<int, bool> $available
      * @param array<string, Decision> $result
      */
     private function emptyDescriptionCompetesWithUpdate(array $emptyRow, array $meaningfulRows, array $indexes, array $candidates, array $available, array $result): bool
@@ -254,7 +254,7 @@ final readonly class CashFileDescriptionMatcher
     }
 
     /**
-     * @param Row       $row
+     * @param Row $row
      * @param Candidate $candidate
      */
     private function documentCompatible(array $row, array $candidate): bool
@@ -268,7 +268,7 @@ final readonly class CashFileDescriptionMatcher
     /**
      * Counterparty values are normalized identities supplied by the caller.
      *
-     * @param Row       $row
+     * @param Row $row
      * @param Candidate $candidate
      */
     private function counterpartyCompatible(array $row, array $candidate): bool

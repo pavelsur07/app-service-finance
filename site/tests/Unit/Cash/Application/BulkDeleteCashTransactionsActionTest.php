@@ -215,7 +215,7 @@ final class BulkDeleteCashTransactionsActionTest extends TestCase
     }
 
     /**
-     * @param EntityManagerInterface&\PHPUnit\Framework\MockObject\MockObject    $entityManager
+     * @param EntityManagerInterface&\PHPUnit\Framework\MockObject\MockObject $entityManager
      * @param CashTransactionRepository&\PHPUnit\Framework\MockObject\MockObject $repository
      */
     private function lifecycle(EntityManagerInterface $entityManager, CashTransactionRepository $repository): \App\Cash\Application\Service\CashSettlementSourceLifecycle

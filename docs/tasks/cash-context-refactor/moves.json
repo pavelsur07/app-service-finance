@@ -291,6 +291,34 @@
     [
       "site/src/Cash/Service/Accounts/MoneyTotalsWidgetProvider.php",
       "site/src/Cash/Application/Service/Accounts/MoneyTotalsWidgetProvider.php"
+    ],
+    [
+      "site/src/Cash/Service/Import/File/CashFileImportService.php",
+      "site/src/Cash/Application/Service/Import/File/CashFileImportService.php"
+    ],
+    [
+      "site/src/Cash/Service/Import/File/CashFileRowNormalizer.php",
+      "site/src/Cash/Application/Service/Import/File/CashFileRowNormalizer.php"
+    ],
+    [
+      "site/src/Cash/Service/Import/File/CashFileDescriptionMatcher.php",
+      "site/src/Cash/Application/Service/Import/File/CashFileDescriptionMatcher.php"
+    ],
+    [
+      "site/src/Cash/Service/Import/File/CashFileDescriptionPlan.php",
+      "site/src/Cash/Application/Service/Import/File/CashFileDescriptionPlan.php"
+    ],
+    [
+      "site/src/Cash/Service/Import/File/HeaderAutoMapper.php",
+      "site/src/Cash/Application/Service/Import/File/HeaderAutoMapper.php"
+    ],
+    [
+      "site/src/Cash/Service/Import/File/FileTabularReader.php",
+      "site/src/Cash/Infrastructure/Import/File/FileTabularReader.php"
+    ],
+    [
+      "site/src/Cash/Service/Transaction/CashTransactionAutoRuleService.php",
+      "site/src/Cash/Application/Service/AutoRule/CashTransactionAutoRuleService.php"
     ]
   ],
   "excluded": [

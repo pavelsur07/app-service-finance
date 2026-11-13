@@ -17,7 +17,7 @@ final readonly class CashFileNormalizedRows
     }
 
     /**
-     * @param array<string, mixed>      $mapping
+     * @param array<string, mixed> $mapping
      * @param array<int, InputRow>|null $allowedRows
      *
      * @return \Generator<int, array{rowNumber: int, row: array<string, ?string>, normalized: NormalizedRow}>

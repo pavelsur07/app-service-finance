@@ -149,3 +149,15 @@ Import/Recovery. DTO остаются в Application/DTO, сообщения и 
 AddCashTransactionAction сохраняет FQCN для защищённого потребителя. Полная карта
 переносов и исключений — `docs/tasks/cash-context-refactor/moves.json`, защищённые
 пути — `docs/tasks/cash-context-refactor/protected-paths.txt`.
+
+Файловый импорт: `Application/Service/Import/File/CashFileImportService` оркестрирует
+запись, `CashFileNormalizedRows` нормализует строки, `CashFileDuplicatePlanner`
+рассчитывает квоты дублей; `Infrastructure/Import/File/CashFileStorage` владеет
+доступом к сохранённому файлу, `FileTabularReader` — чтением. Два прежних CSV
+детектора сохранены намеренно. `Service/Import/File/CashFileMappingValidator` и
+`Http/CashFileImportPage` остаются на месте как зависимости пути 1С.
+
+Автоправила: `Application/Service/AutoRule/CashAutoRuleMatcher` сопоставляет snapshot
+правил без запросов к БД; `CashAutoRuleApplicationPlanner` строит план без мутации;
+`CashAutoRulePreviewBuilder` использует эти же решения для предпросмотра.
+`CashTransactionAutoRuleService` сохраняет точку входа и применение готового плана.

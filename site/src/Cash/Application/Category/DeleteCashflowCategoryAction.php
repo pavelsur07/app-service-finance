@@ -23,7 +23,7 @@ final class DeleteCashflowCategoryAction
     }
 
     /**
-     * @throws \DomainException               статью удалить нельзя (системная, есть дочерние)
+     * @throws \DomainException статью удалить нельзя (системная, есть дочерние)
      * @throws CashflowCategoryInUseException на статью ссылаются другие записи
      */
     public function __invoke(CashflowCategory $category): void

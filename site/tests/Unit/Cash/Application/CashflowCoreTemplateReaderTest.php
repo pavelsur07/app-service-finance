@@ -73,7 +73,7 @@ final class CashflowCoreTemplateReaderTest extends TestCase
     }
 
     /**
-     * @param list<CashflowCoreTemplateNode>          $nodes
+     * @param list<CashflowCoreTemplateNode> $nodes
      * @param array<string, CashflowCoreTemplateNode> $leaves
      */
     private function collect(array $nodes, string $path, array &$leaves, int &$groups): void

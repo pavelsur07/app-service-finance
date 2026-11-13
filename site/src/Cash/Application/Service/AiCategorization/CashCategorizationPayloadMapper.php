@@ -32,9 +32,9 @@ final readonly class CashCategorizationPayloadMapper
      * Примеры со статьёй вне справочника пачки (архивная, стала группой) отбрасываются: сервис отверг бы
      * весь вход. Пустой список не передаётся — вход остаётся прежней формы.
      *
-     * @param list<CashCategorizationCategory>  $categories
+     * @param list<CashCategorizationCategory> $categories
      * @param list<CashCategorizationOperation> $operations
-     * @param list<CashCategorizationExample>   $examples
+     * @param list<CashCategorizationExample> $examples
      *
      * @return array{categories: list<array<string, string>>, operations: list<array<string, string|null>>, examples?: list<array<string, string|null>>}
      */
