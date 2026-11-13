@@ -107,6 +107,12 @@ final readonly class CashFacade
         $this->paymentIntake->cancel($companyId, $actorUserId, $draftId, $expectedRevision);
     }
 
+    /** Retry only the authorized actor's selected draft; safe for interactive poll callers. */
+    public function recoverPaymentIntakeDraft(string $companyId, string $actorUserId, string $draftId): int
+    {
+        return $this->paymentIntake->recoverDraft($companyId, $actorUserId, $draftId);
+    }
+
     public function recoverPaymentIntake(string $companyId): int
     {
         return $this->paymentIntake->recover($companyId);

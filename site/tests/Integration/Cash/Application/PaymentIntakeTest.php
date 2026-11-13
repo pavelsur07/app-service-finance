@@ -43,9 +43,12 @@ final class PaymentIntakeTest extends IntegrationTestCase
     private CashflowCategory $category;
     private AiTaskFacadeInterface&MockObject $ai;
     private PaymentIntakeAction $action;
+    private \Symfony\Component\Clock\MockClock $clock;
     /** @var list<array{key:string,payload:array<string,mixed>,task:string}> */
     private array $requests = [];
     private bool $failEnqueue = false;
+    private bool $aiEnabled = true;
+    private \App\ServiceGateway\Application\DTO\AiCompanyBudget $budget;
     /** @var list<string> */
     private array $failingDraftIds = [];
 
@@ -66,8 +69,10 @@ final class PaymentIntakeTest extends IntegrationTestCase
             $this->em->persist($entity);
         }
         $this->em->flush();
+        $this->budget = new \App\ServiceGateway\Application\DTO\AiCompanyBudget(1000, 0, 10000, 0, 90);
         $this->ai = $this->createMock(AiTaskFacadeInterface::class);
-        $this->ai->method('isEnabledForCompany')->willReturn(true);
+        $this->ai->method('budgetFor')->willReturnCallback(fn (): \App\ServiceGateway\Application\DTO\AiCompanyBudget => $this->budget);
+        $this->ai->method('isEnabledForCompany')->willReturnCallback(fn (): bool => $this->aiEnabled);
         $idFor = static fn (string $company, string $type, string $key): string => Uuid::uuid5(Uuid::NAMESPACE_URL, $company.'/'.$type.'/'.$key)->toString();
         $this->ai->method('taskIdFor')->willReturnCallback($idFor);
         $this->ai->method('requestTask')->willReturnCallback(function (string $company, string $type, array $payload, string $key) use ($idFor): string {
@@ -79,6 +84,7 @@ final class PaymentIntakeTest extends IntegrationTestCase
 
             return $task;
         });
+        $this->clock = new \Symfony\Component\Clock\MockClock('2026-11-13T12:00:00+03:00');
         $this->buildAction();
     }
 
@@ -152,7 +158,7 @@ final class PaymentIntakeTest extends IntegrationTestCase
         self::assertEquals($this->requests[0]['payload'], $this->requests[1]['payload'], 'JSONB object key order is immaterial; payload values and array order must remain equal.');
         $draft = $this->request();
         self::assertSame('queued', $draft->status);
-        self::assertCount(2, $this->requests);
+        self::assertCount(2, $this->recordedRequests());
     }
 
     public function testTerminalFailureExplicitRetryCreatesOnlyOneNewAttemptAndIgnoresOldAnswer(): void
@@ -167,7 +173,7 @@ final class PaymentIntakeTest extends IntegrationTestCase
         self::assertSame([], $this->get($retried)->items);
         $this->deliverResult($retried->taskId);
         self::assertCount(1, $this->get($retried)->items);
-        self::assertCount(2, $this->requests);
+        self::assertCount(2, $this->recordedRequests());
     }
 
     public function testClosedPeriodRecheckedAfterPreview(): void
@@ -358,10 +364,169 @@ final class PaymentIntakeTest extends IntegrationTestCase
         self::assertSame(100, $this->action->recover($this->companyId()));
     }
 
+    public function testInteractiveRecoveryOnlyAttemptsTheSelectedDraft(): void
+    {
+        $this->failEnqueue = true;
+        $drafts = [];
+        foreach (['2001', '2002'] as $messageId) {
+            try {
+                $this->request($messageId);
+                self::fail('Initial broker enqueue must fail.');
+            } catch (\RuntimeException) {
+                $draft = $this->action->getBySource('1', '2', $messageId, $this->actorId());
+                self::assertNotNull($draft);
+                $drafts[] = $draft;
+            }
+        }
+        $this->failEnqueue = false;
+        $before = \count($this->requests);
+        self::assertSame(1, $this->action->recoverDraft($this->companyId(), $this->actorId(), $drafts[1]->id));
+        self::assertCount($before + 1, $this->recordedRequests());
+        self::assertSame($drafts[1]->taskId, $this->requests[$before]['task']);
+        self::assertSame('pending', $this->get($drafts[0])->status);
+        self::assertSame('queued', $this->get($drafts[1])->status);
+        self::assertSame(0, $this->action->recoverDraft($this->companyId(), $this->actorId(), $drafts[1]->id));
+        self::assertCount($before + 1, $this->recordedRequests());
+    }
+
+    public function testInteractiveRecoveryRejectsAnotherWritableActor(): void
+    {
+        $draft = $this->ready();
+        $other = UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail('recovery-other@example.com')->build();
+        $this->em->persist($other);
+        $this->em->persist(new \App\Company\Entity\CompanyMember(Uuid::uuid7()->toString(), $this->company, $other, \App\Company\Entity\CompanyMember::ROLE_OWNER));
+        $this->em->flush();
+        $this->expectException(\DomainException::class);
+        $this->action->recoverDraft($this->companyId(), (string) $other->getId(), $draft->id);
+    }
+
+    public function testInteractiveRecoveryRejectsDraftFromAnotherAccessibleCompany(): void
+    {
+        $draft = $this->ready();
+        $otherCompany = CompanyBuilder::aCompany()->withId(Uuid::uuid7()->toString())->withOwner($this->user)->withName('Recovery other')->build();
+        $this->em->persist($otherCompany);
+        $this->em->flush();
+        $this->expectException(\DomainException::class);
+        $this->action->recoverDraft((string) $otherCompany->getId(), $this->actorId(), $draft->id);
+    }
+
+    public function testDroppedQueuedSubmissionIsRedispatchedWithSameIdentityAndPayloadAfterSixtySeconds(): void
+    {
+        $draft = $this->request();
+        self::assertSame('queued', $draft->status);
+        self::assertSame(0, $this->action->recoverDraft($this->companyId(), $this->actorId(), $draft->id));
+        $this->budget = new \App\ServiceGateway\Application\DTO\AiCompanyBudget(10, 10, 100, 0, 90);
+        $this->clock->sleep(59);
+        self::assertSame(0, $this->action->recover($this->companyId()));
+        self::assertCount(1, $this->recordedRequests());
+        $this->clock->sleep(1);
+        self::assertSame(1, $this->action->recover($this->companyId()));
+        self::assertCount(2, $this->recordedRequests());
+        self::assertSame($this->requests[0]['key'], $this->requests[1]['key']);
+        self::assertSame($this->requests[0]['task'], $this->requests[1]['task']);
+        self::assertEquals($this->requests[0]['payload'], $this->requests[1]['payload']);
+        self::assertSame(0, $this->action->recoverDraft($this->companyId(), $this->actorId(), $draft->id));
+        self::assertCount(2, $this->recordedRequests());
+        $this->deliverResult($draft->taskId);
+        $this->clock->sleep(120);
+        self::assertSame(0, $this->action->recover($this->companyId()));
+        self::assertCount(2, $this->recordedRequests());
+    }
+
+    public function testCancelledQueuedSubmissionIsNeverRedispatched(): void
+    {
+        $draft = $this->request();
+        $this->action->cancel($this->companyId(), $this->actorId(), $draft->id, $draft->revision);
+        $this->clock->sleep(120);
+        self::assertSame(0, $this->action->recover($this->companyId()));
+        self::assertSame(0, $this->action->recoverDraft($this->companyId(), $this->actorId(), $draft->id));
+        self::assertCount(1, $this->recordedRequests());
+    }
+
+    public function testQueuedRecoveryWaitsForServiceAccessWithoutLosingTheOriginalPayload(): void
+    {
+        $draft = $this->request();
+        $this->clock->sleep(60);
+        $this->aiEnabled = false;
+        self::assertSame(0, $this->action->recoverDraft($this->companyId(), $this->actorId(), $draft->id));
+        self::assertCount(1, $this->recordedRequests());
+        self::assertSame('queued', $this->get($draft)->status);
+        $this->aiEnabled = true;
+        self::assertSame(1, $this->action->recoverDraft($this->companyId(), $this->actorId(), $draft->id));
+        self::assertCount(2, $this->recordedRequests());
+        self::assertSame($this->requests[0]['task'], $this->requests[1]['task']);
+        self::assertEquals($this->requests[0]['payload'], $this->requests[1]['payload']);
+    }
+
+    public function testFailedQueuedRedispatchIsThrottledAndRetainsTheSameTask(): void
+    {
+        $draft = $this->request();
+        $this->clock->sleep(60);
+        $this->failEnqueue = true;
+        self::assertSame(0, $this->action->recoverDraft($this->companyId(), $this->actorId(), $draft->id));
+        self::assertCount(2, $this->recordedRequests());
+        self::assertSame(0, $this->action->recoverDraft($this->companyId(), $this->actorId(), $draft->id));
+        self::assertCount(2, $this->recordedRequests());
+        $this->clock->sleep(60);
+        $this->failEnqueue = false;
+        self::assertSame(1, $this->action->recoverDraft($this->companyId(), $this->actorId(), $draft->id));
+        self::assertCount(3, $this->recordedRequests());
+        self::assertSame($this->requests[0]['task'], $this->requests[2]['task']);
+        self::assertEquals($this->requests[0]['payload'], $this->requests[2]['payload']);
+    }
+
+    public function testExhaustedCompanyBudgetPersistsFailureWithoutSubmitting(): void
+    {
+        $this->budget = new \App\ServiceGateway\Application\DTO\AiCompanyBudget(10, 10, 100, 0, 90);
+        $draft = $this->request();
+        self::assertSame('failed', $draft->status);
+        self::assertSame('budget_exceeded', $draft->errorCode);
+        self::assertCount(0, $this->recordedRequests());
+    }
+
+    public function testExhaustedGlobalBudgetPersistsFailureWithoutSubmitting(): void
+    {
+        $this->budget = new \App\ServiceGateway\Application\DTO\AiCompanyBudget(100, 0, 10, 10, 90);
+        $draft = $this->request();
+        self::assertSame('failed', $draft->status);
+        self::assertSame('budget_exceeded', $draft->errorCode);
+        self::assertCount(0, $this->recordedRequests());
+    }
+
+    public function testLaterBudgetExhaustionDoesNotBlockManualPreviewConfirmation(): void
+    {
+        $draft = $this->ready();
+        $this->budget = new \App\ServiceGateway\Application\DTO\AiCompanyBudget(10, 10, 100, 0, 90);
+        $draft = $this->approve($draft);
+        $confirmation = $this->action->confirm(new ConfirmPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$draft->items[0]['id']]));
+        self::assertCount(1, $confirmation->transactionIds);
+        self::assertCount(1, $this->recordedRequests());
+    }
+
+    public function testBudgetGateIsRecheckedForExplicitRetryAndSourceReparse(): void
+    {
+        $draft = $this->request();
+        $this->deliverResult($draft->taskId, AiResultStatus::FAILED);
+        $this->budget = new \App\ServiceGateway\Application\DTO\AiCompanyBudget(10, 10, 100, 0, 90);
+        $retried = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, 1, retry: true));
+        self::assertSame('budget_exceeded', $retried->errorCode);
+        self::assertCount(1, $this->recordedRequests());
+        $reparsed = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $retried->revision, text: 'оплатил 200', sourceRevision: 'edited-budget'));
+        self::assertSame('failed', $reparsed->status);
+        self::assertSame('budget_exceeded', $reparsed->errorCode);
+        self::assertCount(1, $this->recordedRequests());
+    }
+
+    /** @return list<array{key: string, payload: array<string, mixed>, task: string}> */
+    private function recordedRequests(): array
+    {
+        return $this->requests;
+    }
+
     private function buildAction(?\Symfony\Contracts\EventDispatcher\EventDispatcherInterface $events = null): void
     {
         $c = self::getContainer();
-        $this->action = new PaymentIntakeAction($this->em, $c->get(PaymentIntakeDraftRepository::class), $c->get(CompanyFacade::class), $c->get(FinancialResponsibilityCenterFacade::class), $c->get(CashTransactionService::class), $c->get(CashTransactionResponsibilityCenterResolver::class), $c->get(CashCategorizationQuery::class), $this->ai, $c->get(AddCashTransactionAction::class), $events ?? $c->get('event_dispatcher'), new \Psr\Log\NullLogger(), $c->get(\App\Cash\Infrastructure\Query\PaymentIntakeDuplicateQuery::class));
+        $this->action = new PaymentIntakeAction($this->em, $c->get(PaymentIntakeDraftRepository::class), $c->get(CompanyFacade::class), $c->get(FinancialResponsibilityCenterFacade::class), $c->get(CashTransactionService::class), $c->get(CashTransactionResponsibilityCenterResolver::class), $c->get(CashCategorizationQuery::class), $this->ai, $c->get(AddCashTransactionAction::class), $events ?? $c->get('event_dispatcher'), new \Psr\Log\NullLogger(), $c->get(\App\Cash\Infrastructure\Query\PaymentIntakeDuplicateQuery::class), $this->clock);
     }
 
     private function request(string $messageId = '3'): PaymentIntakeDraftView

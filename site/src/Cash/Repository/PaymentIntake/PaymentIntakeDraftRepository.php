@@ -7,6 +7,7 @@ namespace App\Cash\Repository\PaymentIntake;
 use App\Cash\Entity\PaymentIntake\PaymentIntakeDraft;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\LockMode;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -40,9 +41,9 @@ final class PaymentIntakeDraftRepository extends ServiceEntityRepository
     }
 
     /** @return list<PaymentIntakeDraft> */
-    public function getRecoverable(string $companyId, int $limit = 100, ?string $afterId = null): array
+    public function getRecoverable(string $companyId, \DateTimeImmutable $now, int $limit = 100, ?string $afterId = null): array
     {
-        $query = $this->createQueryBuilder('d')->where('d.companyId = :company')->andWhere('d.dispatchPending = true OR d.cashEventPending = true')->setParameter('company', $companyId)->orderBy('d.id', \SortDirection::Ascending)->setMaxResults($limit);
+        $query = $this->createQueryBuilder('d')->where('d.companyId = :company')->andWhere("d.dispatchPending = true OR d.cashEventPending = true OR (d.status = 'queued' AND (d.lastEnqueuedAt IS NULL OR d.lastEnqueuedAt <= :retryBefore))")->setParameter('retryBefore', $now->modify('-60 seconds'), Types::DATETIMETZ_IMMUTABLE)->setParameter('company', $companyId)->orderBy('d.id', \SortDirection::Ascending)->setMaxResults($limit);
         if (null !== $afterId) {
             $query->andWhere('d.id > :afterId')->setParameter('afterId', $afterId);
         }

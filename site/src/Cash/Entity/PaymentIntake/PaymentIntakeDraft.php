@@ -50,19 +50,19 @@ class PaymentIntakeDraft
     #[ORM\Column(type: Types::GUID, nullable: true)]
     private ?string $taskId = null;
     /** @var list<array<string, mixed>> */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB)]
     private array $items = [];
     /** @var list<string> */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB)]
     private array $questions = [];
     /** @var array<string, mixed> */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB)]
     private array $payload = [];
     /** @var list<string> */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB)]
     private array $transactionIds = [];
     /** @var list<string> */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
+    #[ORM\Column(type: Types::JSONB)]
     private array $confirmedItemIds = [];
     #[ORM\Column(nullable: true)]
     private ?int $confirmedRevision = null;
@@ -72,6 +72,8 @@ class PaymentIntakeDraft
     private bool $dispatchPending = true;
     #[ORM\Column]
     private bool $cashEventPending = false;
+    #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $lastEnqueuedAt = null;
 
     public function __construct(string $companyId, string $actorUserId, string $moneyAccountId, string $sourceKey, string $sourceRevision, string $text, \DateTimeImmutable $receivedAt, string $timezone, string $currency)
     {
@@ -105,16 +107,35 @@ class PaymentIntakeDraft
         $this->dispatchPending = true;
         $this->status = 'pending';
         $this->errorCode = null;
+        $this->lastEnqueuedAt = null;
     }
 
-    public function markDispatched(string $taskId): void
+    public function markDispatched(string $taskId, ?\DateTimeImmutable $now = null): void
     {
-        if ($taskId === $this->taskId && $this->dispatchPending) {
+        if ($taskId === $this->taskId && $this->taskRevision === $this->revision && \in_array($this->status, ['pending', 'queued'], true)) {
             $this->dispatchPending = false;
+            $this->lastEnqueuedAt = $now ?? new \DateTimeImmutable();
             if ('pending' === $this->status) {
                 $this->status = 'queued';
             }
         }
+    }
+
+    public function needsRedispatch(\DateTimeImmutable $now): bool
+    {
+        return 'queued' === $this->status && $this->taskRevision === $this->revision && [] !== $this->payload
+            && (null === $this->lastEnqueuedAt || $this->lastEnqueuedAt <= $now->modify('-60 seconds'));
+    }
+
+    /** Reserve the throttle interval under the aggregate lock before enqueueing. */
+    public function reserveRedispatch(\DateTimeImmutable $now): bool
+    {
+        if (!$this->needsRedispatch($now)) {
+            return false;
+        }
+        $this->lastEnqueuedAt = $now;
+
+        return true;
     }
 
     public function fail(string $taskId, string $error): void

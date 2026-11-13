@@ -26,6 +26,7 @@ use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /** All writes own the transaction; neither the model nor Telegram owns ledger semantics. */
@@ -46,6 +47,7 @@ final readonly class PaymentIntakeAction
         private EventDispatcherInterface $events,
         private LoggerInterface $logger,
         private PaymentIntakeDuplicateQuery $duplicates,
+        private ClockInterface $clock,
     ) {
     }
 
@@ -195,36 +197,80 @@ final readonly class PaymentIntakeAction
         $count = 0;
         $afterId = null;
         do {
-            $batch = $this->drafts->getRecoverable($companyId, 100, $afterId);
+            $batch = $this->drafts->getRecoverable($companyId, $this->clock->now(), 100, $afterId);
             foreach ($batch as $draft) {
                 $afterId = $draft->getId();
-                $dispatchPending = $draft->isDispatchPending();
-                $eventPending = $draft->isCashEventPending();
-                try {
-                    if ($dispatchPending) {
-                        $this->dispatch($draft);
-                    }
-                    if ($eventPending) {
-                        $this->deliverCashEvent($draft);
-                    }
-                } catch (\Throwable $exception) {
-                    $this->logger->warning('Payment intake recovery remains pending.', ['companyId' => $companyId, 'draftId' => $draft->getId(), 'exceptionClass' => $exception::class]);
-                }
-                if (!$this->em->isOpen()) {
-                    throw new \RuntimeException('Payment intake recovery requires a fresh EntityManager after a database failure.');
-                }
-                $current = $this->drafts->getForCompany($companyId, $draft->getId());
-                if (null !== $current && (($dispatchPending && !$current->isDispatchPending()) || ($eventPending && !$current->isCashEventPending()))) {
-                    ++$count;
-                }
+                $count += $this->recoverOne($draft);
             }
         } while (100 === \count($batch));
 
         return $count;
     }
 
+    /** Interactive recovery is bounded to the authenticated actor's selected draft. */
+    public function recoverDraft(string $companyId, string $actorUserId, string $draftId): int
+    {
+        $this->authorize($companyId, $actorUserId);
+
+        return $this->recoverOne($this->owned($companyId, $actorUserId, $draftId));
+    }
+
+    private function recoverOne(PaymentIntakeDraft $draft): int
+    {
+        $companyId = $draft->getCompanyId();
+        $dispatchPending = $draft->isDispatchPending();
+        $eventPending = $draft->isCashEventPending();
+        $redispatched = false;
+        try {
+            if ($dispatchPending) {
+                $this->dispatch($draft);
+            }
+            if ($eventPending) {
+                $this->deliverCashEvent($draft);
+            }
+            if (!$dispatchPending && $draft->needsRedispatch($this->clock->now())) {
+                $redispatched = $this->redispatchQueued($draft);
+            }
+        } catch (\Throwable $exception) {
+            $this->logger->warning('Payment intake recovery remains pending.', ['companyId' => $companyId, 'draftId' => $draft->getId(), 'exceptionClass' => $exception::class]);
+        }
+        if (!$this->em->isOpen()) {
+            throw new \RuntimeException('Payment intake recovery requires a fresh EntityManager after a database failure.');
+        }
+        $current = $this->drafts->getForCompany($companyId, $draft->getId());
+
+        return $redispatched || (null !== $current && (($dispatchPending && !$current->isDispatchPending()) || ($eventPending && !$current->isCashEventPending()))) ? 1 : 0;
+    }
+
+    private function redispatchQueued(PaymentIntakeDraft $draft): bool
+    {
+        $claimed = $this->em->wrapInTransaction(function () use ($draft): ?PaymentIntakeDraft {
+            if (!$this->companies->financialAccess($draft->getCompanyId(), $draft->getActorUserId(), true)['write']) {
+                return null;
+            }
+            $current = $this->drafts->getForCompany($draft->getCompanyId(), $draft->getId(), true);
+            if (null === $current || !$this->ai->isEnabledForCompany($current->getCompanyId()) || !$current->reserveRedispatch($this->clock->now())) {
+                return null;
+            }
+
+            return $current;
+        });
+
+        return null !== $claimed && $this->dispatch($claimed, true);
+    }
+
     private function queue(PaymentIntakeDraft $draft): void
     {
+        $key = $this->taskKey($draft);
+        $taskId = $this->ai->taskIdFor($draft->getCompanyId(), self::TASK_TYPE, $key);
+        // The same spent-budget policy as Cash categorization, for new attempts only.
+        // Previously admitted attempts keep their identity during transport recovery.
+        if ($this->ai->budgetFor($draft->getCompanyId())->exceeded()) {
+            $draft->queue($taskId);
+            $draft->fail($taskId, 'budget_exceeded');
+
+            return;
+        }
         $categories = [];
         foreach ($this->categories->findLeafCategories($draft->getCompanyId()) as $category) {
             $categories[] = ['id' => $category->id, 'name' => mb_substr($category->path, -500), 'direction' => null === $category->operationType ? 'any' : strtolower($category->operationType)];
@@ -239,17 +285,16 @@ final readonly class PaymentIntakeAction
         if (\count($included) > 50) {
             throw new \DomainException('В черновике больше 50 включённых строк. Исключите несопоставленные повторы или разделите сообщение перед новым разбором.');
         }
-        $key = $this->taskKey($draft);
-        $draft->queue($this->ai->taskIdFor($draft->getCompanyId(), self::TASK_TYPE, $key), [
+        $draft->queue($taskId, [
             'text' => $draft->getText(), 'reference_at' => $draft->getReceivedAt()->format(\DATE_ATOM), 'timezone' => $draft->getTimezone(), 'currency' => $draft->getCurrency(),
             'categories' => $categories, 'projects' => $projects, 'cfos' => $centers, 'allowed_pairs' => $pairs, 'draft_items' => array_map(static fn (array $item): array => ['ref' => $item['id'], 'description' => $item['description']], $included),
         ]);
     }
 
-    private function dispatch(PaymentIntakeDraft $draft): void
+    private function dispatch(PaymentIntakeDraft $draft, bool $queuedRetry = false): bool
     {
-        if (!$draft->isDispatchPending() || null === $draft->getTaskId()) {
-            return;
+        if ((!$queuedRetry && !$draft->isDispatchPending()) || null === $draft->getTaskId()) {
+            return false;
         }
         $requestedTaskId = $draft->getTaskId();
         if (!$this->companies->financialAccess($draft->getCompanyId(), $draft->getActorUserId())['write']) {
@@ -257,9 +302,12 @@ final readonly class PaymentIntakeAction
                 $this->drafts->getForCompany($draft->getCompanyId(), $draft->getId(), true)?->fail($requestedTaskId, 'access_revoked');
             });
 
-            return;
+            return false;
         }
         $taskId = $this->ai->requestTask($draft->getCompanyId(), self::TASK_TYPE, $draft->getPayload(), $this->taskKey($draft), $draft->getActorUserId());
+        if (null === $taskId && $queuedRetry) {
+            return false;
+        }
         $this->em->wrapInTransaction(function () use ($draft, $taskId, $requestedTaskId): void {
             $locked = $this->drafts->getForCompany($draft->getCompanyId(), $draft->getId(), true);
             if (null === $locked) {
@@ -268,9 +316,11 @@ final readonly class PaymentIntakeAction
             if (null === $taskId) {
                 $locked->fail($requestedTaskId, 'service_disabled');
             } else {
-                $locked->markDispatched($taskId);
+                $locked->markDispatched($taskId, $this->clock->now());
             }
         });
+
+        return null !== $taskId;
     }
 
     private function deliverCashEvent(PaymentIntakeDraft $draft): void
