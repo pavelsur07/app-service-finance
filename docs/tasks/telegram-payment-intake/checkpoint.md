@@ -8,7 +8,8 @@ checks before the owner handoff. Next business step requires named live approval
 Branch: `docs/telegram-payment-intake-examples`.
 Draft PR: https://github.com/pavelsur07/app-service-finance/pull/2985, base master.
 Stage commits: dbfc6d5ff, 1b326aa9a, 0264aed23, 5fff92c58, 0984d7b62.
-Final Stage5 commit is branch/PR head (self-referential SHA is not stored here).
+Final Stage5 code commit: `7031b52992cbf7fadc6cbb27a516c987c5dcd73c`, pushed.
+Subsequent checkpoint-only commits do not change the verified runtime sources.
 Unrelated owner untracked workspace/design/integration/task files and
 site/bin/capture-wb-inventory.sh are untouched and excluded from commits.
 
@@ -59,8 +60,11 @@ host ~6GB RAM/full swap. No system/prod settings changed to work around memory.
 - Local full PHPStan failed incomplete worker under host OOM even unique cache/
   single worker; cgroup oom_kill3, Docker OOMKilledtrue. Never call it green.
   CI0984d7b62 full static/unit/integration/functional/Python/style/empty-migration
-  gates PASS. Final current-head CI receipt is in PR checks/description and the
-  owner's final message; inspect it on resume, do not equate previous SHA to head.
+  gates PASS. Automatic pull_request CI did not appear for7031b5299. Manual dispatch
+  production_action=none run43500484323 returned success but deliberately sets
+  every path gate false; it ran NO tests/static checks and is NOT acceptance.
+  A checkpoint-only push retriggers the standard PR event; inspect the exact
+  current-head CI in PR checks/final message, never equate old SHA to head.
 - Baseline only verified Webhook flush count6→4; baseline guard PASS. Do not
   delete unrelated unmatched entries: raw old/current probes show actual errors.
 
@@ -82,7 +86,7 @@ B0/I12 plus runner selfB0/I1; external B1/I15 across five rounds.
 ## Exact next action on resume
 
 1. Read handoff.md, live-eval.md, this checkpoint; verify git status/PR head and
-   current CI. Final code is committed/pushed in same Draft PR, never merged.
+   current CI. Final code7031b5299 is committed/pushed in same Draft PR, never merged.
 2. Without explicit named live approval do NOT run --execute. Owner must approve
    proposed deepseek/deepseek-flash via existing gateway,41 anonymized cases,
    max82calls, input guard65536/output16000, timeout60s, budget estimate300RUB.

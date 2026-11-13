@@ -96,3 +96,9 @@ runner self-review B0/I1; external B1/I15 по пяти раундам, open B0/
 Суммы — наблюдения review, возможны повторы, не число уникальных дефектов.
 Task commits до final Stage5: dbfc6d5ff, 1b326aa9a, 0264aed23, 5fff92c58,
 0984d7b62; final code commit доступен в голове той же ветки/PR.
+
+Final runtime code: `7031b52992cbf7fadc6cbb27a516c987c5dcd73c`.
+Automatic PR CI did not start for that push. Manual workflow43500484323 with
+production_action=none skipped every path gate; its SUCCESS is explicitly not
+accepted as a test/static result. A documentation checkpoint push retriggers
+normal PR validation; actual current-head receipt belongs in PR/final response.
