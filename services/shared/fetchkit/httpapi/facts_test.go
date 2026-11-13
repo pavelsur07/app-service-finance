@@ -229,7 +229,7 @@ func TestFactResponsesMatchContractExamples(t *testing.T) {
 		"page_response.json":    &factPageResponse{},
 	} {
 		t.Run(file, func(t *testing.T) {
-			raw, err := os.ReadFile(dir + file)
+			raw, err := os.ReadFile(dir + file) //nolint:gosec // G304: путь из констант теста
 			require.NoError(t, err)
 			dec := json.NewDecoder(bytes.NewReader(raw))
 			dec.DisallowUnknownFields()
