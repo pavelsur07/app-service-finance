@@ -13,7 +13,7 @@
 |---|---|---|
 | `Cash` | Денежные счета, транзакции, импорт выписок (файл, 1С, контракт для банков), план платежей | `Company $company` (legacy) |
 | `BankSync` | Подключения к API банков (Альфа), загрузка выписки в ДДС через `CashFacade` | `string $companyId` ✅ |
-| `Marketplace` | WB/Ozon: продажи, возвраты, расходы, закрытие месяца | смешанный |
+| `Marketplace` | **Легаси с 13.11.2026**, кроме листингов. WB/Ozon: продажи, возвраты, расходы, закрытие месяца. Развивается только работа с листингами (`MarketplaceListing`, баркоды, теги, связка с товаром) и себестоимость по датам (`MarketplaceInventoryCostPrice`) | смешанный |
 | `Catalog` | Товары, штрихкоды, закупочные цены | смешанный (`Product` ещё на `Company $company`) |
 | `Deals` | Сделки | `Company $company` (legacy) |
 | `Finance` | PnL-отчёты, кэшфлоу, фасады финансовой аналитики | `Company $company` (legacy) |
@@ -26,9 +26,9 @@
 | `MoySklad` | Интеграция с МойСклад | `string $companyId` ✅ |
 | `Analytics` | Аналитические запросы и дашборды | — |
 | `MarketplaceAnalytics` | Аналитика маркетплейсов (витрина) | — |
-| `MarketplaceAds` | Рекламные отчёты WB/Ozon: загрузка raw → распределение затрат | `string $companyId` ✅ |
+| `MarketplaceAds` | **Легаси с 13.11.2026.** Рекламные отчёты WB/Ozon: загрузка raw → распределение затрат | `string $companyId` ✅ |
 | `Inventory` | Загрузка raw-остатков маркетплейсов, нормализация в StockSnapshot, UI-отчёт остатков | `string $companyId` ✅ |
-| `Ingestion` | Каркас для будущих ingestion-пайплайнов, credential seam и unified raw-слой | `string $companyId` + Doctrine `company` filter ✅ |
+| `Ingestion` | **Легаси с 13.11.2026.** Каркас ingestion-пайплайнов, credential seam и unified raw-слой | `string $companyId` + Doctrine `company` filter ✅ |
 | `Notification` | Каналы уведомлений (email и др.) | — |
 | `Shared` | Общий код: ActiveCompanyService, аудит, безопасность, storage | — |
 | `Admin` | Административная панель (отдельный firewall) | — |
@@ -5375,6 +5375,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.169 | 2026-11-13 | `Ingestion`, `Marketplace` (кроме листингов) и `MarketplaceAds` объявлены легаси — ADR 2026-11-13 |
 | 2.168 | 2026-11-12 | Inventory: поставки Ozon в пути — `StockStatus::InSupply`, `app:inventory:ozon-supplies-sync` (cron 05:50) из снимка `ozon.supplies` ozon-fetcher (`GET /internal/snapshots/latest`, контракт `service-snapshot` v1); отчёт «Остатки» — колонка «В поставке», поставки не входят в остаток (задача `docs/tasks/ozon-supplies-in-transit`) |
 | 2.167 | 2026-11-12 | MarketplaceAds: оплата за заказ Ozon «все товары» (ALL_SKU_PROMO) — расход кампании распределяется по её товарам пропорционально продажам, служебная кампания `all-sku-promo` в `AdSpendKind::PAY_PER_ORDER`; Ingestion грузит кампании ALL_SKU_PROMO и их товары, `IngestionFacade::getOzonAllSkuPromoSpend()` (этап 5 `docs/tasks/ozon-cpo-orders`) |
 | 2.166 | 2026-11-11 | MarketplaceAds: оплата за заказ Ozon по SKU — `app:marketplace-ads:ozon-search-promo:sync` (cron 08:30), служебная кампания `search-promo`, `AdSpendKind` в `MarketplaceAdsFacade` и порте предпросмотра; `IngestionFacade::getOzonSearchPromoOrders()`; предпросмотр ОПиУ — сверка по категориям Ozon (клики, оплата за заказ), выгрузка строк v1.3 `ads_kind`; Unit-экономика вычитает статистику оплаты за заказ из «Маркетинговых акций» без товара (этап 2 `docs/tasks/ozon-cpo-orders`) |
@@ -5639,6 +5640,8 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 | 2026-10-31 | ai-service | Провайдеры моделей — только через свой шлюз `ai.vashfindir.ru`, сервис предъявляет токен шлюза; сторож `base_url` при старте | Ключи провайдеров не живут на app: компрометация app не раскрывает ключи, отзыв — смена токена (решение Владельца 31.10) |
 | 2026-10-30 | ServiceGateway | Обмен с ai-service — pull: Symfony ставит задачу (`Idempotency-Key`) и забирает результаты курсором с ack; сервис не пишет в Symfony | Сервис не знает о БД Symfony; повтор безопасен с обеих сторон |
 | 2026-10-30 | Cash | ИИ-категоризация ДДС — сначала только подсказки с решением человека; запись задачи (ключ, payload) и строки подсказок пишутся до постановки с предсказанным `task_id`, задача без ответа переотправляется тем же ключом и payload | Автоприменение — после периода подсказок (решение Владельца); падение между commit и dispatch или потерянное сообщение не теряют задачу, запоздалый ответ принимается |
+| 2026-11-13 | MarketplaceAds | `MarketplaceAds` — легаси на тех же условиях, что `Ingestion` и `Marketplace`: только исправления, без которых ломается прод, и удаление. Загрузка и разнесение рекламы переходят в переводчики каналов нового контура (`MarketplaceOzon`, `MarketplaceWb`, `docs/tasks/marketplace-profit-pipeline/DATA.md`); до перехода текущие cron и данные модуля работают без изменений | Разнесение рекламы зависит от канала (Ozon CPC, оплата за заказ, ALL_SKU_PROMO; WB `upd` + `fullstats`) и в новой схеме принадлежит переводчику канала (решение Владельца) |
+| 2026-11-13 | Marketplace, Ingestion | `Ingestion` и `Marketplace` — легаси: только исправления, без которых ломается прод, и удаление. Новых возможностей там нет, данные маркетплейсов для экономики, сверок и ОПиУ идут в новый контур (проектируется, `docs/tasks/marketplace-profit-pipeline`). Исключение — живая зона `Marketplace`: листинги (`MarketplaceListing`, `MarketplaceListingBarcode`, `MarketplaceListingTag`, их фасады) и себестоимость по датам (`MarketplaceInventoryCostPrice`): развиваются как прежде | Аудит 13.11 (`docs/tasks/marketplace-profit-pipeline/AUDIT.md`): оба модуля смешивают загрузку, хранение, классификацию и учёт; `Marketplace` — 555 файлов, 487 записей baseline, 119 из 273 коммитов с августа — исправления и ремонт (решение Владельца) |
 | 2026-10-30 | Cash | Автоприменение ИИ-подсказок — только по флагу компании и при открытых воротах (≥ 100 решений людей по уверенным подсказкам, точность ≥ 0.95); разбивка `auto`, статус `auto_applied`, исправление человеком считается ошибкой и закрывает ворота | Ошибочная статья тихо искажает ДДС и ОПиУ; автоприменение должно опираться на измеренную точность на данных компании и само выключаться при её падении |
 
 ## Api — внешние Bearer-ключи и подготовленные права (api-management)
