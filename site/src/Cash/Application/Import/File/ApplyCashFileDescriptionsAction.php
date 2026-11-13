@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Cash\Application\Import\File;
 
 use App\Cash\Application\Service\AutoRule\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\Import\File\CashFileDescriptionPlan;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Infrastructure\Import\File\CashFileStorage;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Cash\Application\Service\Import\File\CashFileDescriptionPlan;
-use App\Cash\Application\Service\Import\File\CashFileImportService;
 use App\Shared\Entity\AuditLog;
 use App\Shared\Enum\AuditLogAction;
 use Doctrine\ORM\EntityManagerInterface;
@@ -21,7 +21,7 @@ final readonly class ApplyCashFileDescriptionsAction
 {
     public function __construct(
         private CashFileDescriptionPlan $plans,
-        private CashFileImportService $importer,
+        private CashFileStorage $files,
         private CashTransactionRepository $transactions,
         private EntityManagerInterface $em,
         private AutoRuleDispatchGuard $guard,
@@ -41,7 +41,7 @@ final readonly class ApplyCashFileDescriptionsAction
             || $plan['mappingHash'] !== hash('sha256', json_encode($job->getMapping(), \JSON_THROW_ON_ERROR))) {
             throw new \DomainException('Настройки импорта изменились.');
         }
-        $actualHash = $this->importer->withJobFile($job, static fn (string $path): string => (string) hash_file('sha256', $path), false);
+        $actualHash = $this->files->withJobFile($job, static fn (string $path): string => (string) hash_file('sha256', $path), false);
         if (!hash_equals($plan['contentHash'], $actualHash)) {
             throw new \DomainException('Файл изменился после предпросмотра. Загрузите файл заново.');
         }
@@ -127,7 +127,7 @@ final readonly class ApplyCashFileDescriptionsAction
         }
         // Re-plan creation against the current DB; concurrent imports since preview
         // must never turn a stale create into another transaction or an implicit update.
-        $fresh = $this->importer->withJobFile($job, fn (string $path): array => $this->plans->build($path, $job->getMoneyAccount(), $job->getMapping(), $job->getFileHash(), $plan['actor']));
+        $fresh = $this->files->withJobFile($job, fn (string $path): array => $this->plans->build($path, $job->getMoneyAccount(), $job->getMapping(), $job->getFileHash(), $plan['actor']));
         $allowed = [];
         $creationConflicts = [];
         $alreadyPresent = 0;

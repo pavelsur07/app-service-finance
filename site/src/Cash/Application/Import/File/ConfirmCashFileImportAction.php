@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Cash\Application\Import\File;
 
+use App\Cash\Application\Service\Import\File\CashFileDescriptionPlan;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Exception\CashFileImportConfirmationException;
 use App\Cash\Exception\CashFileImportSelectionException;
-use App\Cash\Application\Service\Import\File\CashFileDescriptionPlan;
 use App\Cash\Service\Import\File\CashFileMappingValidator;
 
 final readonly class ConfirmCashFileImportAction

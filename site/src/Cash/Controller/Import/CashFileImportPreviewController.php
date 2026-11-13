@@ -64,7 +64,7 @@ final class CashFileImportPreviewController extends AbstractController
         }
         $account = $importState->account;
 
-        $storageKey = \App\Cash\Application\Service\Import\File\CashFileImportService::storageKey($fileHash, is_string($storedExtension) ? $storedExtension : '');
+        $storageKey = \App\Cash\Infrastructure\Import\File\CashFileStorage::storageKey($fileHash, is_string($storedExtension) ? $storedExtension : '');
         if (!$this->storage->exists($storageKey)) {
             $this->addFlash('error', 'Файл импорта не найден. Загрузите файл заново.');
 

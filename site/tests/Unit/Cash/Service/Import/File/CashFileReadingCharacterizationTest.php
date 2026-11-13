@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
 
 final class CashFileReadingCharacterizationTest extends TestCase
 {
+    /** @return iterable<string, array{string}> */
     public static function delimiters(): iterable
     {
         yield 'semicolon' => [';'];
@@ -24,8 +25,12 @@ final class CashFileReadingCharacterizationTest extends TestCase
     #[DataProvider('delimiters')]
     public function testHeaderSampleAndImportGolden(string $delimiter): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'cash-golden-').'.csv';
+        $path = tempnam(sys_get_temp_dir(), 'cash-golden-');
+        self::assertIsString($path);
+        rename($path, $path.'.csv');
+        $path .= '.csv';
         $handle = fopen($path, 'w');
+        self::assertIsResource($handle);
         fwrite($handle, "\xEF\xBB\xBF");
         fputcsv($handle, ['Дата', 'Сумма', '', 'Описание'], $delimiter, '"', '');
         fputcsv($handle, ['2026-09-01', '10.00', '', ' Text, with; delimiters '], $delimiter, '"', '');
@@ -46,7 +51,10 @@ final class CashFileReadingCharacterizationTest extends TestCase
 
     public function testLegacyCsvModesIntentionallyChooseDifferentDelimiters(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'cash-modes-').'.csv';
+        $path = tempnam(sys_get_temp_dir(), 'cash-modes-');
+        self::assertIsString($path);
+        rename($path, $path.'.csv');
+        $path .= '.csv';
         file_put_contents($path, "Дата;Описание\n2026-09-01;one,two,three,four\n");
         try {
             $reader = new FileTabularReader(new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6)));
@@ -58,20 +66,32 @@ final class CashFileReadingCharacterizationTest extends TestCase
         }
     }
 
-    public function testLegacyQuotaGoldenAllocationIsIndependentOfNumberedRowOrder(): void
+    public function testAllowedRowsAreExplicitAndDoNotLeakToTheNextIteration(): void
     {
-        $service = $this->importer();
-        $method = new \ReflectionMethod(CashFileImportService::class, 'allocateExistingMatches');
-        $existing = ['A' => 1, '' => 2, 'OTHER' => 1];
-        self::assertSame(['B' => 1, 'A' => 2, '' => 1], $method->invoke($service, ['B' => 1, 'A' => 2, '' => 3], $existing));
-        self::assertSame(['A' => 2, 'B' => 1, '' => 1], $method->invoke($service, ['' => 3, 'A' => 2, 'B' => 1], $existing));
+        $path = tempnam(sys_get_temp_dir(), 'cash-allowed-');
+        self::assertIsString($path);
+        rename($path, $path.'.csv');
+        $path .= '.csv';
+        file_put_contents($path, "Дата,Сумма\n2026-09-01,10.00\n2026-09-02,20.00\n");
+        try {
+            $rows = new \App\Cash\Application\Service\Import\File\CashFileNormalizedRows(new FileTabularReader(new LegacyXlsConverter(new TemporaryFileFactory(), '/app')), new CashFileRowNormalizer());
+            $mapping = ['date' => 'Дата', 'amount' => 'Сумма'];
+            $all = iterator_to_array($rows->iterate($path, $mapping, 'RUB'));
+            $allowed = [3 => CashFileImportService::planInput($all[1]['normalized'], 3)];
+            $selected = iterator_to_array($rows->iterate($path, $mapping, 'RUB', $allowed));
+            self::assertEquals([$all[1]], $selected);
+            self::assertSame([], iterator_to_array($rows->iterate($path, $mapping, 'RUB', [])));
+            self::assertEquals($all, iterator_to_array($rows->iterate($path, $mapping, 'RUB')));
+        } finally {
+            unlink($path);
+        }
     }
 
     private function importer(): CashFileImportService
     {
         $reflection = new \ReflectionClass(CashFileImportService::class);
         $service = $reflection->newInstanceWithoutConstructor();
-        $reflection->getProperty('rowNormalizer')->setValue($service, new CashFileRowNormalizer());
+        $reflection->getProperty('rows')->setValue($service, new \App\Cash\Application\Service\Import\File\CashFileNormalizedRows(new FileTabularReader(new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6))), new CashFileRowNormalizer()));
 
         return $service;
     }

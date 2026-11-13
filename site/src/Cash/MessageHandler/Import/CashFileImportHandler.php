@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Cash\MessageHandler\Import;
 
 use App\Cash\Application\Import\File\ApplyCashFileDescriptionsAction;
+use App\Cash\Application\Service\Import\File\CashFileImportService;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Infrastructure\Lock\CashImportAccountLock;
 use App\Cash\Message\Import\CashFileImportMessage;
-use App\Cash\Application\Service\Import\File\CashFileImportService;
 use App\Cash\Service\Import\ImportLogger;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;

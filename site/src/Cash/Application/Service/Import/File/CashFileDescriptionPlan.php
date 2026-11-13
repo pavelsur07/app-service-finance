@@ -6,6 +6,7 @@ namespace App\Cash\Application\Service\Import\File;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Infrastructure\Import\File\CashFileStorage;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use Ramsey\Uuid\Uuid;
@@ -21,7 +22,8 @@ use Ramsey\Uuid\Uuid;
 final readonly class CashFileDescriptionPlan
 {
     public function __construct(
-        private CashFileImportService $reader,
+        private CashFileNormalizedRows $reader,
+        private CashFileStorage $files,
         private CashFileDescriptionMatcher $matcher,
         private CashTransactionRepository $transactions,
         private ObjectStorageInterface $storage,
@@ -38,13 +40,13 @@ final readonly class CashFileDescriptionPlan
     {
         if ('xls' === strtolower(pathinfo($path, \PATHINFO_EXTENSION))) {
             // Preserve the existing legacy converter; no new format implementation.
-            $plan = $this->reader->withReadablePath($path, fn (string $readablePath): array => $this->build($readablePath, $account, $mapping, $fileHash, $actor));
+            $plan = $this->files->withReadablePath($path, fn (string $readablePath): array => $this->build($readablePath, $account, $mapping, $fileHash, $actor));
             $plan['contentHash'] = (string) hash_file('sha256', $path);
 
             return $plan;
         }
         $rows = [];
-        foreach ($this->reader->normalizedRows($path, $mapping, $account->getCurrency()) as $item) {
+        foreach ($this->reader->iterate($path, $mapping, $account->getCurrency()) as $item) {
             $rows[] = CashFileImportService::planInput($item['normalized'], $item['rowNumber']);
         }
         $dates = array_column(array_filter($rows, static fn (array $r): bool => $r['ok']), 'date');

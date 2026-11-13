@@ -8,6 +8,7 @@ use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\FiatCurrency;
+use App\Cash\Infrastructure\Import\File\CashFileStorage;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ImportLogger;
@@ -17,14 +18,7 @@ use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Enum\CounterpartyType;
 use App\Company\Facade\CounterpartyFacade;
-use App\Shared\Service\Storage\LegacyXlsConverter;
-use App\Shared\Service\Storage\ObjectStorageInterface;
-use App\Shared\Service\Storage\TemporaryLocalFile;
 use Doctrine\ORM\EntityManagerInterface;
-use OpenSpout\Reader\CSV\Options as CsvOptions;
-use OpenSpout\Reader\CSV\Reader as CsvReader;
-use OpenSpout\Reader\ReaderInterface;
-use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -44,67 +38,43 @@ final class CashFileImportService
 
     /**
      * dedupe_hash → номер документа ('' — без номера) → сколько строк файла с этим ключом
-     * закрываются транзакциями, бывшими в БД до импорта (см. planExistingMatches()).
+     * закрываются транзакциями, бывшими в БД до импорта (см. CashFileDuplicatePlanner::plan()).
      *
      * @var array<string, array<string, int>>
      */
     private array $matchQuota = [];
 
     public function __construct(
-        private readonly CashFileRowNormalizer $rowNormalizer,
+        private readonly CashFileNormalizedRows $rows,
+        private readonly CashFileDuplicatePlanner $duplicatePlanner,
         private readonly CounterpartyNameNormalizer $counterpartyNameNormalizer,
         private readonly CounterpartyFacade $counterpartyFacade,
         private readonly CashTransactionRepository $cashTransactionRepository,
         private readonly ImportLogger $importLogger,
         private readonly EntityManagerInterface $entityManager,
         private readonly AccountBalanceService $accountBalanceService,
-        private readonly ObjectStorageInterface $objectStorage,
-        private readonly TemporaryLocalFile $temporaryLocalFile,
-        private readonly LegacyXlsConverter $xlsConverter,
+        private readonly CashFileStorage $storage,
         private readonly CashTransactionResponsibilityCenterResolver $responsibilityCenterResolver,
     ) {
-    }
-
-    public static function storageKey(string $fileHash, string $extension = ''): string
-    {
-        return 'cash-file-imports/'.$fileHash.('' !== $extension ? '.'.$extension : '');
-    }
-
-    public function withReadablePath(string $path, \Closure $operation): mixed
-    {
-        return $this->xlsConverter->withReadablePath($path, $operation);
-    }
-
-    public function withJobFile(CashFileImportJob $job, \Closure $operation, bool $readable = true): mixed
-    {
-        $this->allowedRows = null;
-
-        return $this->temporaryLocalFile->with($this->resolveStorageKey($job),
-            fn (string $path) => $readable ? $this->withReadablePath($path, $operation) : $operation($path));
     }
 
     /**
      * Строки пишутся пачками: после каждой вызывается $commitBatch точки входа (Handler), сервис
      * сам не коммитит.
      *
-     * @param \Closure(): void $commitBatch
+     * @param \Closure(): void          $commitBatch
+     * @param array<int, InputRow>|null $allowedRows
      */
-    /** @var array<int, InputRow>|null */
-    private ?array $allowedRows = null;
-
-    /** @param array<int, InputRow>|null $allowedRows */
     public function import(CashFileImportJob $job, \Closure $commitBatch, ?array $allowedRows = null): void
     {
-        $this->allowedRows = $allowedRows;
-        try {
-            $this->importRows($job, $commitBatch);
-        } finally {
-            $this->allowedRows = null;
-        }
+        $this->importRows($job, $commitBatch, $allowedRows);
     }
 
-    /** @param \Closure(): void $commitBatch */
-    private function importRows(CashFileImportJob $job, \Closure $commitBatch): void
+    /**
+     * @param \Closure(): void          $commitBatch
+     * @param array<int, InputRow>|null $allowedRows
+     */
+    private function importRows(CashFileImportJob $job, \Closure $commitBatch, ?array $allowedRows): void
     {
         $company = $job->getCompany();
         $account = $job->getMoneyAccount();
@@ -112,7 +82,7 @@ final class CashFileImportService
             throw new \DomainException('Счёт импорта принадлежит другой компании.');
         }
         FiatCurrency::fromCode($account->getCurrency());
-        if ([] === $this->allowedRows) {
+        if ([] === $allowedRows) {
             if (null !== $job->getImportLog()) {
                 $this->importLogger->finish($job->getImportLog());
             }
@@ -121,29 +91,29 @@ final class CashFileImportService
             return;
         }
 
-        $storageKey = $this->resolveStorageKey($job);
-
         // Файл читается воркером через объектное хранилище: скачиваем во временную
         // локальную копию (readers OpenSpout требуют реальный путь), обрабатываем,
         // TemporaryLocalFile гарантированно удаляет её после.
-        $this->temporaryLocalFile->with(
-            $storageKey,
+        $this->storage->withJobFile(
+            $job,
             // Устаревший .xls конвертируется в .xlsx: ридера для него у OpenSpout нет,
             // и раньше задача молча умирала в очереди фатальной ошибкой.
-            function (string $filePath) use ($job, $commitBatch): void {
+            function (string $filePath) use ($job, $commitBatch, $allowedRows): void {
                 $expectedHash = $job->getOptions()['description_content_hash'] ?? null;
-                if (null !== $this->allowedRows && (!is_string($expectedHash) || !hash_equals($expectedHash, (string) hash_file('sha256', $filePath)))) {
+                if (null !== $allowedRows && (!is_string($expectedHash) || !hash_equals($expectedHash, (string) hash_file('sha256', $filePath)))) {
                     throw new \DomainException('Файл изменился после подтверждения.');
                 }
-                $this->xlsConverter->withReadablePath($filePath, fn (string $readablePath) => $this->readAndPersist($readablePath, $job, $commitBatch));
+                $this->storage->withReadablePath($filePath, fn (string $readablePath) => $this->readAndPersist($readablePath, $job, $commitBatch, $allowedRows));
             },
+            false,
         );
     }
 
     /**
-     * @param \Closure(): void $commitBatch
+     * @param \Closure(): void          $commitBatch
+     * @param array<int, InputRow>|null $allowedRows
      */
-    private function readAndPersist(string $filePath, CashFileImportJob $job, \Closure $commitBatch): void
+    private function readAndPersist(string $filePath, CashFileImportJob $job, \Closure $commitBatch, ?array $allowedRows): void
     {
         $company = $job->getCompany();
         $moneyAccount = $job->getMoneyAccount();
@@ -173,17 +143,17 @@ final class CashFileImportService
         // A confirmed plan has already allocated the full file against the current
         // snapshot under the account lock. Counting again on its filtered create
         // rows would consume existing matches twice and lose legitimate payments.
-        $this->matchQuota = null === $this->allowedRows ? $this->planExistingMatches($filePath, $job) : [];
+        $this->matchQuota = null === $allowedRows ? $this->duplicatePlanner->plan($filePath, $job) : [];
 
         try {
             try {
-                foreach ($this->normalizedRows($filePath, $mapping, $moneyAccount->getCurrency()) as $item) {
+                foreach ($this->rows->iterate($filePath, $mapping, $moneyAccount->getCurrency(), $allowedRows) as $item) {
                     $rowByHeader = $item['row'];
                     $normalized = $item['normalized'];
 
                     // The clock or parser context can change even after the final
                     // re-plan. Validate the exact values about to reach the entity.
-                    if (null !== $this->allowedRows && self::planInput($normalized, $item['rowNumber']) !== ($this->allowedRows[$item['rowNumber']] ?? null)) {
+                    if (null !== $allowedRows && self::planInput($normalized, $item['rowNumber']) !== ($allowedRows[$item['rowNumber']] ?? null)) {
                         $current = $job->getOptions();
                         $current['creation_conflicts']['r'.$item['rowNumber']] = 'Данные строки изменились после предпросмотра';
                         $job->setOptions($current);
@@ -214,7 +184,7 @@ final class CashFileImportService
 
                     $occurredAtUtc = $occurredAt->setTimezone(new \DateTimeZone('UTC'));
                     $amountMinor = (int) str_replace('.', '', $amount);
-                    $dedupeHash = $this->makeDedupeHash(
+                    $dedupeHash = $this->duplicatePlanner->hash(
                         $companyId,
                         $accountId,
                         $occurredAtUtc,
@@ -339,85 +309,6 @@ final class CashFileImportService
     }
 
     /**
-     * Ключ файла в объектном хранилище. Кандидаты в порядке приоритета
-     * (stored_ext → расширение из имени файла → без расширения) — первый,
-     * который существует. Кандидат по имени файла сохраняет совместимость
-     * с job'ами, созданными до персиста stored_ext в options.
-     */
-    private function resolveStorageKey(CashFileImportJob $job): string
-    {
-        $fileHash = $job->getFileHash();
-
-        $extensions = [];
-        $options = $job->getOptions();
-        $storedExtension = $options['stored_ext'] ?? $options['extension'] ?? null;
-        if (is_string($storedExtension)) {
-            $storedExtension = strtolower(trim($storedExtension));
-            if ('' !== $storedExtension) {
-                $extensions[] = $storedExtension;
-            }
-        }
-
-        $fileExtension = pathinfo($job->getFilename(), \PATHINFO_EXTENSION);
-        if ('' !== $fileExtension) {
-            $extensions[] = strtolower($fileExtension);
-        }
-
-        $candidates = [];
-        foreach (array_values(array_unique($extensions)) as $extension) {
-            $candidates[] = self::storageKey($fileHash, $extension);
-        }
-        $candidates[] = self::storageKey($fileHash);
-
-        foreach ($candidates as $candidate) {
-            if ($this->objectStorage->exists($candidate)) {
-                return $candidate;
-            }
-        }
-
-        throw new \RuntimeException(sprintf('Import file not found for hash %s', $fileHash));
-    }
-
-    private function openReaderByExtension(string $filePath): ReaderInterface
-    {
-        $extension = strtolower(pathinfo($filePath, \PATHINFO_EXTENSION));
-
-        return match ($extension) {
-            'csv' => (function () use ($filePath): CsvReader {
-                $options = new CsvOptions();
-                $options->FIELD_DELIMITER = $this->detectCsvDelimiter($filePath);
-
-                return new CsvReader($options);
-            })(),
-            'xlsx' => new XlsxReader(),
-            default => throw new \InvalidArgumentException(sprintf('Unsupported file extension: %s', $extension)),
-        };
-    }
-
-    private function normalizeValue(mixed $value, bool $trim): ?string
-    {
-        if (null === $value) {
-            return null;
-        }
-
-        if ($value instanceof \DateTimeInterface) {
-            $stringValue = $value->format('Y-m-d H:i:s');
-        } elseif (is_bool($value)) {
-            $stringValue = $value ? '1' : '0';
-        } elseif (is_scalar($value) || $value instanceof \Stringable) {
-            $stringValue = (string) $value;
-        } else {
-            $stringValue = (string) $value;
-        }
-
-        if ('' === trim($stringValue)) {
-            return null;
-        }
-
-        return $trim ? trim($stringValue) : $stringValue;
-    }
-
-    /**
      * Строки файла после нормализации. Ридер закрывается, когда обход закончен или прерван.
      *
      * @param array<string, mixed> $mapping
@@ -426,43 +317,7 @@ final class CashFileImportService
      */
     public function normalizedRows(string $filePath, array $mapping, string $currency): \Generator
     {
-        $reader = $this->openReaderByExtension($filePath);
-        $dataIndex = 0;
-
-        try {
-            $reader->open($filePath);
-            foreach ($reader->getSheetIterator() as $sheet) {
-                $headerLabels = null;
-                foreach ($sheet->getRowIterator() as $row) {
-                    $cells = $row->toArray();
-                    if (null === $headerLabels) {
-                        $headerLabels = [];
-                        foreach ($cells as $index => $value) {
-                            $header = $this->normalizeValue($value, true);
-                            $headerLabels[$index] = null === $header || '' === $header
-                                ? sprintf('Колонка %d', $index + 1)
-                                : $header;
-                        }
-
-                        continue;
-                    }
-
-                    $rowByHeader = [];
-                    foreach ($headerLabels as $index => $label) {
-                        $rowByHeader[$label] = $this->normalizeValue($cells[$index] ?? null, false);
-                    }
-
-                    ++$dataIndex;
-                    if (null !== $this->allowedRows && !isset($this->allowedRows[$dataIndex + 1])) {
-                        continue;
-                    }
-                    yield ['rowNumber' => $dataIndex + 1, 'row' => $rowByHeader, 'normalized' => $this->rowNormalizer->normalize($rowByHeader, $mapping, $currency)];
-                }
-                break;
-            }
-        } finally {
-            $reader->close();
-        }
+        yield from $this->rows->iterate($filePath, $mapping, $currency);
     }
 
     /**
@@ -492,94 +347,6 @@ final class CashFileImportService
         ];
     }
 
-    /**
-     * Дубль считается по количеству: каждая транзакция, бывшая в БД до импорта, закрывает не
-     * больше одной строки файла. Совпадения распределяются по всему файлу до записи, поэтому
-     * результат не зависит ни от порядка строк, ни от нарезки на пачки, ни от уже закоммиченных
-     * пачек самого импорта: повтор файла ничего не создаёт, прерванный импорт дописывает
-     * недостающее.
-     *
-     * Номер документа есть не у всех источников (файлы без колонки номера, выписки 1С с номером),
-     * поэтому пустой номер совпадает с любым. Для каждого dedupe_hash: сначала строки с номером
-     * закрывают транзакции того же номера; оставшиеся строки с номером — транзакции без номера
-     * (у них нет другого варианта); строки без номера — всё, что осталось. Такое распределение
-     * даёт максимум совпадений. Параллельные задания одного счёта сериализует
-     * CashFileImportHandler — иначе снимки обоих были бы одинаковыми.
-     *
-     * @return array<string, array<string, int>>
-     */
-    private function planExistingMatches(string $filePath, CashFileImportJob $job): array
-    {
-        $companyId = (string) $job->getCompany()->getId();
-        $accountId = (string) $job->getMoneyAccount()->getId();
-
-        /** @var array<string, array<string, int>> $fileCounts */
-        $fileCounts = [];
-        foreach ($this->normalizedRows($filePath, $job->getMapping(), $job->getMoneyAccount()->getCurrency()) as $item) {
-            $normalized = $item['normalized'];
-            if (false === $normalized['ok'] || !$normalized['occurredAt'] || !$normalized['direction'] || !$normalized['amount']) {
-                continue;
-            }
-
-            $hash = $this->makeDedupeHash(
-                $companyId,
-                $accountId,
-                $normalized['occurredAt']->setTimezone(new \DateTimeZone('UTC')),
-                (int) str_replace('.', '', $normalized['amount']),
-                $normalized['description'] ?? '',
-            );
-            $doc = trim((string) $normalized['docNumber']);
-            $fileCounts[$hash][$doc] = ($fileCounts[$hash][$doc] ?? 0) + 1;
-        }
-
-        $quota = [];
-        foreach ($fileCounts as $hash => $fileDocs) {
-            $quota[$hash] = $this->allocateExistingMatches(
-                $fileDocs,
-                $this->cashTransactionRepository->countActiveByCompanyDedupeGroupedByDocNumber($companyId, $hash),
-            );
-        }
-
-        return $quota;
-    }
-
-    /**
-     * @param array<string, int> $fileDocs номер документа → строк в файле
-     * @param array<string, int> $existing номер документа → транзакций в БД
-     *
-     * @return array<string, int> номер документа → сколько строк файла уже импортированы
-     */
-    private function allocateExistingMatches(array $fileDocs, array $existing): array
-    {
-        $matched = [];
-        $unmatchedNumbered = [];
-        foreach ($fileDocs as $doc => $count) {
-            $doc = (string) $doc;
-            if ('' === $doc) {
-                continue;
-            }
-            $exact = min($count, $existing[$doc] ?? 0);
-            $matched[$doc] = $exact;
-            $existing[$doc] = ($existing[$doc] ?? 0) - $exact;
-            $unmatchedNumbered[$doc] = $count - $exact;
-        }
-
-        ksort($unmatchedNumbered, \SORT_STRING);
-        $blank = $existing[''] ?? 0;
-        foreach ($unmatchedNumbered as $doc => $count) {
-            $viaBlank = min($count, $blank);
-            $matched[(string) $doc] += $viaBlank;
-            $blank -= $viaBlank;
-        }
-        $existing[''] = $blank;
-
-        if (isset($fileDocs[''])) {
-            $matched[''] = min($fileDocs[''], array_sum($existing));
-        }
-
-        return $matched;
-    }
-
     private function consumeExistingMatch(string $dedupeHash, ?string $docNumber): bool
     {
         $doc = trim((string) $docNumber);
@@ -590,32 +357,6 @@ final class CashFileImportService
         }
 
         return false;
-    }
-
-    private function normalizePurposeForDedupe(?string $value): string
-    {
-        $value = (string) $value;
-        $value = mb_strtolower($value);
-        $value = preg_replace('/[\(\)\[\]\{\}]/u', ' ', $value) ?? $value;
-        $value = preg_replace('/\s+/u', ' ', trim($value)) ?? trim($value);
-
-        return $value;
-    }
-
-    private function makeDedupeHash(
-        string $companyId,
-        string $moneyAccountId,
-        \DateTimeImmutable $occurredAtUtc,
-        int $amountMinor,
-        string $purposeRaw,
-    ): string {
-        $payload = $companyId
-            .'|'.$moneyAccountId
-            .'|'.$occurredAtUtc->format('Y-m-d')
-            .'|'.$amountMinor
-            .'|'.$this->normalizePurposeForDedupe($purposeRaw);
-
-        return hash('sha256', $payload);
     }
 
     private function getOrCreateCounterparty(string $companyId, string $name, Company $company): Counterparty
@@ -662,50 +403,5 @@ final class CashFileImportService
         }
         $this->batchTransactions = [];
         $this->counterpartyCache = [];
-    }
-
-    private function detectCsvDelimiter(string $filePath): string
-    {
-        $handle = fopen($filePath, 'r');
-        if (false === $handle) {
-            return ',';
-        }
-
-        $delimiters = [';', ',', "\t"];
-        $counts = array_fill_keys($delimiters, 0);
-        $linesRead = 0;
-
-        try {
-            while (!feof($handle) && $linesRead < 5) {
-                $line = fgets($handle);
-                if (false === $line) {
-                    break;
-                }
-
-                $trimmed = trim($line);
-                if ('' === $trimmed) {
-                    continue;
-                }
-
-                foreach ($delimiters as $delimiter) {
-                    $counts[$delimiter] += substr_count($line, $delimiter);
-                }
-
-                ++$linesRead;
-            }
-        } finally {
-            fclose($handle);
-        }
-
-        $bestDelimiter = ',';
-        $bestCount = 0;
-        foreach ($counts as $delimiter => $count) {
-            if ($count > $bestCount) {
-                $bestCount = $count;
-                $bestDelimiter = $delimiter;
-            }
-        }
-
-        return $bestDelimiter;
     }
 }

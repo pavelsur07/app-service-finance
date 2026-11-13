@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Service\Import\File;
 
-use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Application\Service\Import\File\CashFileRowNormalizer;
+use App\Cash\Enum\Transaction\CashDirection;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

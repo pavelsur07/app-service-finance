@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\Application\Import\File;
 
-use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Application\Service\Import\File\CashFileDescriptionPlan;
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Service\Import\File\CashFileMappingValidator;
 use App\Shared\Service\Storage\TemporaryLocalFile;
 
