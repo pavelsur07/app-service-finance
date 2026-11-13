@@ -73,7 +73,43 @@ final readonly class CashFacade
         private ImportLogger $importLogger,
         private ImportLogRepository $importLogRepository,
         private CashCategorizationQuery $categorizationQuery,
+        private \App\Cash\Application\PaymentIntake\PaymentIntakeAction $paymentIntake,
     ) {
+    }
+
+    public function requestPaymentIntake(\App\Cash\Application\DTO\PaymentIntake\RequestPaymentIntakeCommand $command): \App\Cash\Application\DTO\PaymentIntake\PaymentIntakeDraftView
+    {
+        return $this->paymentIntake->request($command);
+    }
+
+    public function getPaymentIntakeDraft(string $companyId, string $actorUserId, string $draftId): \App\Cash\Application\DTO\PaymentIntake\PaymentIntakeDraftView
+    {
+        return $this->paymentIntake->get($companyId, $actorUserId, $draftId);
+    }
+
+    public function findPaymentIntakeDraftBySource(string $botId, string $chatId, string $messageId, string $actorUserId): ?\App\Cash\Application\DTO\PaymentIntake\PaymentIntakeDraftView
+    {
+        return $this->paymentIntake->getBySource($botId, $chatId, $messageId, $actorUserId);
+    }
+
+    public function amendPaymentIntakeDraft(\App\Cash\Application\DTO\PaymentIntake\AmendPaymentIntakeDraftCommand $command): \App\Cash\Application\DTO\PaymentIntake\PaymentIntakeDraftView
+    {
+        return $this->paymentIntake->amend($command);
+    }
+
+    public function confirmPaymentIntakeDraft(\App\Cash\Application\DTO\PaymentIntake\ConfirmPaymentIntakeDraftCommand $command): \App\Cash\Application\DTO\PaymentIntake\PaymentIntakeConfirmation
+    {
+        return $this->paymentIntake->confirm($command);
+    }
+
+    public function cancelPaymentIntakeDraft(string $companyId, string $actorUserId, string $draftId, int $expectedRevision): void
+    {
+        $this->paymentIntake->cancel($companyId, $actorUserId, $draftId, $expectedRevision);
+    }
+
+    public function recoverPaymentIntake(string $companyId): int
+    {
+        return $this->paymentIntake->recover($companyId);
     }
 
     public function getSettlementSourceForUpdate(string $companyId, string $transactionId): \App\Cash\Application\DTO\CashSettlementSource

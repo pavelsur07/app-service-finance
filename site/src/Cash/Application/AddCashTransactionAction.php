@@ -44,7 +44,24 @@ final class AddCashTransactionAction
      *
      * @throws ORMException
      */
+    public function createInCurrentTransaction(CashTransactionDTO $dto): CashTransaction
+    {
+        if (!$this->entityManager->getConnection()->isTransactionActive()) {
+            throw new \LogicException('Caller-owned cash creation requires a transaction.');
+        }
+        if (null === $dto->idempotencyKey) {
+            throw new \LogicException('Caller-owned cash creation requires a stable transaction ID.');
+        }
+
+        return $this->create($dto, true);
+    }
+
     public function __invoke(CashTransactionDTO $dto): CashTransaction
+    {
+        return $this->create($dto, false);
+    }
+
+    private function create(CashTransactionDTO $dto, bool $callerOwnsTransaction): CashTransaction
     {
         $company = $this->transactions->resolveCompany($dto->companyId);
         $account = $this->transactions->resolveAccount($dto->moneyAccountId, $dto->companyId);
@@ -62,7 +79,9 @@ final class AddCashTransactionAction
             if ($repeated instanceof CashTransaction) {
                 // Транзакция и её остатки закоммичены одним действием; сброс кэша безопасно
                 // повторить — первый запрос мог упасть сразу после commit.
-                $this->eventDispatcher->dispatch(new CashTransactionsChanged($dto->companyId));
+                if (!$callerOwnsTransaction) {
+                    $this->eventDispatcher->dispatch(new CashTransactionsChanged($dto->companyId));
+                }
 
                 return $repeated;
             }
@@ -78,7 +97,7 @@ final class AddCashTransactionAction
         }
 
         if ($existingTransaction instanceof CashTransaction) {
-            return $this->entityManager->wrapInTransaction(function () use ($existingTransaction, $dto, $counterparty): CashTransaction {
+            $update = function () use ($existingTransaction, $dto, $counterparty): CashTransaction {
                 $this->settlementLifecycle->lock($existingTransaction);
                 $this->settlementLifecycle->changing($existingTransaction, $existingTransaction->getCounterparty()?->getId() !== $dto->counterpartyId);
                 $changed = false;
@@ -106,7 +125,9 @@ final class AddCashTransactionAction
                 }
 
                 return $existingTransaction;
-            });
+            };
+
+            return $callerOwnsTransaction ? $update() : $this->entityManager->wrapInTransaction($update);
         }
 
         // Создаём сущность транзакции
@@ -149,7 +170,7 @@ final class AddCashTransactionAction
         // иначе сбой после первого flush оставлял транзакцию с непересчитанными остатками, а
         // повтор формы по ключу возвращал её как готовую.
         try {
-            $this->entityManager->wrapInTransaction(function () use ($tx, $dto, $company, $account): void {
+            $write = function () use ($tx, $dto, $company, $account): void {
                 $this->entityManager->persist($tx);
                 $this->entityManager->flush(); // ← flush перед пересчётом обязателен
 
@@ -162,8 +183,16 @@ final class AddCashTransactionAction
                 $from = $dto->occurredAt->setTime(0, 0);
                 $to = (new \DateTimeImmutable('today'))->setTime(0, 0); // правая граница — сегодня, дальше DailyBalanceRecalculator сам расширит до макс. факта
                 $this->recalculator->recalcRange($company, $from, $to, [(string) $account->getId()]);
-            });
+            };
+            if ($callerOwnsTransaction) {
+                $write();
+            } else {
+                $this->entityManager->wrapInTransaction($write);
+            }
         } catch (UniqueConstraintViolationException $exception) {
+            if ($callerOwnsTransaction) {
+                throw $exception;
+            }
             // Две одновременные отправки одной формы: обе не нашли транзакцию по ключу,
             // вторая упёрлась в PK. Её результат — транзакция первой; сброс кэша повторяем —
             // первая могла упасть между commit и событием.
@@ -175,7 +204,9 @@ final class AddCashTransactionAction
 
         // После commit инвалидируем snapshot: виджеты dashboard читают агрегированные данные,
         // без инвалидации пользователь увидит устаревший слепок в пределах TTL.
-        $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
+        if (!$callerOwnsTransaction) {
+            $this->eventDispatcher->dispatch(new CashTransactionsChanged((string) $company->getId()));
+        }
 
         return $tx;
     }
