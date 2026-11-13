@@ -564,6 +564,31 @@
   (кабинет × ресурс) без применённых пачек дольше 36 ч — `error`, exit 1.
 - Фасада чтения нет: появится вместе с первым потребителем (переводчик `MarketplaceOzon`).
 
+### MarketplaceOperations: канон операций маркетплейсов
+
+Второй модуль нового контура (`docs/tasks/marketplace-profit-pipeline/DATA.md` §5, §9).
+
+**Устав.** Причина изменений — общая модель операций всех каналов. Модуль хранит операции, которые
+пишут переводчики каналов, и проверяет их вход. В модуле не должно быть: правил Ozon / WB, разбора
+исходных записей, статей ОПиУ и проектов, себестоимости, агрегатов и отчётов. От канала остаётся
+строка `channel` (гейт `ModuleBoundaryRules::test_marketplace_operations_knows_no_channels`); запись
+только через фасад (модуль в `MODULES_WITH_FACADE`).
+
+| Таблица | Что | Ключ |
+|---|---|---|
+| `mo_operation` | операция: `channel`, `connection_ref`, `operation_date`, `listing_id` (пусто — без SKU), `source_type` (код маркетплейса как есть), `kind`, `amount_minor` + `currency`, `quantity`, `source_refs` jsonb, `rules_version`, `allocation_key` | `id` UUID v7; индекс `(company_id, channel, connection_ref, operation_date)` |
+| `mo_dirty_window` | день кабинета заменён после последнего пересчёта витрины | `(company_id, channel, connection_ref, operation_date)` |
+
+- Вид — enum `OperationKind` с уровнем `CascadeLevel` (`revenue` / `md1` / `md2` / `overhead` /
+  `info`). Сверка с кабинетом — по `source_type`, экономика — по `kind`. Сторно — тот же вид и
+  `source_type` с обратным знаком.
+- `MarketplaceOperationsFacadeInterface::replaceDay(DayOperations): int` — замена дня кабинета
+  целиком: `pg_advisory_xact_lock` дня → `DELETE` дня → `INSERT` порциями по 500 → отметка
+  `mo_dirty_window`. **Коммитит вызывающий** (Action / Handler переводчика); без активной транзакции —
+  `\LogicException`. Блокировка одна на вызов; переводчик, который заменяет несколько дней в одной
+  транзакции, берёт их по возрастанию даты.
+- Фасада чтения нет: появится с витриной экономики (этап 5).
+
 ### Marketplace: WB financial report sync status (дневной статус)
 
 - Entity: `MarketplaceFinancialReportSyncStatus`.
@@ -5424,6 +5449,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.171 | 2026-11-13 | MarketplaceOperations: новый модуль — канон операций маркетплейсов (`mo_operation`, `mo_dirty_window`, `Version20261113175117`), `MarketplaceOperationsFacadeInterface::replaceDay`, enum `OperationKind` / `CascadeLevel`; PHPat — канон не знает каналов (задача `marketplace-profit-pipeline`, этап 3) |
 | 2.170 | 2026-11-13 | SourceFacts: новый модуль — приём фактов из сервисов (`sf_batch`, `sf_period`, `sf_fact`, `Version20261113130402`), `app:source-facts:pull` (cron `*/15`) и гейт `app:source-facts:health-check` (09:10); ServiceGateway: `SourceFactsGatewayFacadeInterface`, клиент `source-fact-envelope` v1; ozon-fetcher публикует `ozon.finance.accrual-by-day`; PHPat — `SourceFacts` не знает каналов и учёта (задача `marketplace-profit-pipeline`, этап 2) |
 | 2.169 | 2026-11-13 | `Ingestion`, `Marketplace` (кроме листингов) и `MarketplaceAds` объявлены легаси — ADR 2026-11-13 |
 | 2.168 | 2026-11-12 | Inventory: поставки Ozon в пути — `StockStatus::InSupply`, `app:inventory:ozon-supplies-sync` (cron 05:50) из снимка `ozon.supplies` ozon-fetcher (`GET /internal/snapshots/latest`, контракт `service-snapshot` v1); отчёт «Остатки» — колонка «В поставке», поставки не входят в остаток (задача `docs/tasks/ozon-supplies-in-transit`) |
