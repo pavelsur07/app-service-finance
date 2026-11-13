@@ -14,7 +14,7 @@ All four Stage complete; reports stages/stage-1.md through stage-4.md.80 logical
 
 Baseline first1025/4093 PASS. Final unit4656/25723 + integration2768/13202 + functional1403/10437 all PHPUnit OK:8827 tests/49362 assertions. Functional shell exit metadata lost after daemon restart, but full completed OK log preserved. Unified make site-test ended137, so not claimed green; complete test set verified sequentially without exclusions.
 
-Full serial site-stan exit0, full cs-check exit0, strict-types exit0. Postfix targeted74/278 PASS. Baseline3260→3238; rename guard NEW0/GREW0. Protected paths and git diff --check PASS. Initial static/style failures and fixes preserved in gate-corrections.md, no hidden failures.
+Full serial site-stan exit0, full cs-check exit0, strict-types exit0. Postfix targeted74/278 PASS. Baseline3260→3247; rename guard NEW0/GREW0. Protected paths and git diff --check PASS. Initial static/style failures and fixes preserved in gate-corrections.md, no hidden failures.
 
 Fresh final whole-task internal review0B/0I/0M; scoped gate-fix re-review0B/0I/0M. Stage3 external round1 REVIEW_GREEN4M fixed; combined Stage4/handoff external round1 REVIEW_GREEN, mode MINOR fixed, normalizedRows deletion rejected per approved FR4. Total external2 rounds;0B/0I open.
 
@@ -36,3 +36,6 @@ Await owner reply `merge and deploy #2978`. Then required CI→merge→automatic
 ## FOLLOW-UP outside scope
 
 1C refactor; test-only balance methods; CSV dialect convergence; upsert policy/AI recovery; atomic transfer decomposition. Existing normalizedRows signature intentionally kept per FR4. Soft size exceptions explained in reports. No BLOCKER/IMPORTANT remains.
+
+## Release approval and CI correction
+Owner approved `merge and deploy #2978`. Before merge, CI Static analysis failed:9 pre-existing warnings in8 Notification/Wildberries patterns incorrectly removed after local unmatched reports. Restored exact original records (source untouched), ratchet PASS. Final baseline3247 occurrences vs3260 original. No new suppressions. Local cache cleared, cold full analysis running /tmp/cash-cold-final-stan.log (exec9692); publish correction and wait allCI before merging. Approval covers full remaining pipeline, do not ask again.

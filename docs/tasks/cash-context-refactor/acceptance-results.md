@@ -21,7 +21,7 @@
 
 ## Ограничения и FOLLOW-UP
 
-Импорт 1С и test-only методы балансов исключены. Сведение двух CSV-алгоритмов, изменение upsert/idempotency, AI request/recovery и дробление атомарного перевода вне scope. Reader271 и file coordinator409LOC превышают мягкие ориентиры ради сохранения двух диалектов и cohesive write orchestration. Предупреждения nullable-ID устранены достоверными локальными типами без runtime casts/guards. Baseline сокращён3260→3238; ratchet NEW/GREW отсутствуют.
+Импорт 1С и test-only методы балансов исключены. Сведение двух CSV-алгоритмов, изменение upsert/idempotency, AI request/recovery и дробление атомарного перевода вне scope. Reader271 и file coordinator409LOC превышают мягкие ориентиры ради сохранения двух диалектов и cohesive write orchestration. Предупреждения nullable-ID устранены достоверными локальными типами без runtime casts/guards. Baseline сокращён3260→3247; ratchet NEW/GREW отсутствуют.
 
 ## Итоговые гейты
 

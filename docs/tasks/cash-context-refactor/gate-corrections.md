@@ -2,7 +2,7 @@
 
 ## PHPStan и baseline
 
-Первый `make site-stan` завершился с 11 `ignore.unmatched` вне Cash. Четыре исходных файла (LoanScheduleUploadController, AnalyzeProcessingCostCommand, WbFinanceDiagnosticsCommand, TemplateRendererInterface) byte-identical базе задачи. После повторного полного анализа три исходных предупреждения Loan/Marketplace воспроизвелись: их три прежних patterns восстановлены без изменений. Удалены только восемь действительно устаревших patterns остальных файлов; исходный код других модулей не исправлялся.
+Первый локальный `make site-stan` сообщил 11 `ignore.unmatched` вне Cash. Четыре исходных файла byte-identical базе задачи. Три записи Loan/Marketplace были восстановлены после последовательного анализа. Затем чистый CI PR #2978 (run43368032638, Static analysis) подтвердил ещё девять предупреждений в восьми исходных patterns Notification/Wildberries. Их удаление по локальному кэшу было ошибкой: все восемь восстановлены дословно из task base1f874580f. В итоге baseline других модулей сохранён; их исходники не менялись. Локальный result cache очищен для повторного полного анализа; CI новой головы обязан пройти перед merge.
 
 Отдельный `phpstan-baseline-guard.sh` выявил четыре NEW key после извлечения методов, хотя суммарный count уменьшился. Предупреждения устранены в Cash, а не перенесены в новые suppressions:
 
@@ -11,7 +11,7 @@
 - `$plan?->changes ?? []` заменено эквивалентным `$plan->changes ?? []`.
 - Удалены шесть разрешённых этим уточнением Cash patterns.
 
-Финальный serial `make site-stan`: exit0, No errors. Финальный ratchet: exit0, NEW/GREW отсутствуют; 79 обнаруженных git renames (80 логических переносов в moves.json), нормализована 41 строка базы. Сумма baseline occurrences 3260→3238. Ни одного нового suppression или ослабления правил нет.
+Serial локальный `make site-stan` ранее дал exit0; после исправления CI выполнен новый полный анализ с очищенным result cache. Канонический CI проверяется перед merge. Финальный ratchet: exit0, NEW/GREW отсутствуют; 79 обнаруженных git renames (80 логических переносов в moves.json), нормализована 41 строка базы. Сумма baseline occurrences 3260→3247. Ни одного нового suppression или ослабления правил нет.
 
 Свежий scoped re-review этих исправлений: BLOCKER0/IMPORTANT0/MINOR0, семантических изменений нет. Логи: `/tmp/cash-final-serial-stan.log`, `/tmp/cash-baseline-guard-final-restored.log`.
 

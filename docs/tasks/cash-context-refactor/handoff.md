@@ -23,7 +23,7 @@
 | phpunit --testsuite integration | exit0,OK2768/13202 |
 | phpunit --testsuite functional | полный итог OK1403/10437; shell metadata потеряна при daemon restart |
 | Полный набор | все8827 тестов,49362 assertions по трём suite |
-| Baseline guard | NEW0/GREW0, occurrences3260→3238 |
+| Baseline guard | NEW0/GREW0, occurrences3260→3247 |
 | Protected-path check | пустой diff, новых файлов внутри защиты нет |
 
 Единый `make site-test` завершился137 после7300+ тестов без assertion failure в выводе; причина SIGKILL не подтверждена. Полный набор завершён раздельно в последовательных PHP-процессах без исключения тестов. Начальные ошибки static/style и их исправления — [gate-corrections.md](gate-corrections.md); матрица A–E — [acceptance-results.md](acceptance-results.md).
