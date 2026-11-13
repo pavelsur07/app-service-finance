@@ -15,7 +15,7 @@ use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Exception\FinancePeriodLockedException;
-use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Company\Entity\Company;
 use App\Shared\Entity\AuditLog;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;

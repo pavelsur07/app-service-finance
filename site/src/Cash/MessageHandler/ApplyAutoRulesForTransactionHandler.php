@@ -13,7 +13,7 @@ use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Shared\Entity\AuditLog;
 use App\Shared\Enum\AuditLogAction;
 use Doctrine\ORM\EntityManagerInterface;

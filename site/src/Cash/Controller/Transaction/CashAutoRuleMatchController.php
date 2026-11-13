@@ -6,7 +6,7 @@ namespace App\Cash\Controller\Transaction;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;

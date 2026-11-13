@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Cash\Service\Transaction;
+namespace App\Cash\Application\Service\AutoRule;
 
 use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;
 use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;

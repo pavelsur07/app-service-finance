@@ -17,7 +17,7 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Company\Entity\Company;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Entity\AuditLog;

@@ -21,7 +21,7 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
 use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\MessageHandler\ApplyAutoRulesForTransactionHandler;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;

@@ -988,37 +988,37 @@ parameters:
 			message: '#^Match expression does not handle remaining value\: string$#'
 			identifier: match.unhandled
 			count: 1
-			path: src/Cash/Service/Transaction/CashTransactionAutoRuleService.php
+			path: src/Cash/Application/Service/AutoRule/CashTransactionAutoRuleService.php
 
 		-
-			message: '#^Method App\\Cash\\Service\\Transaction\\CashTransactionAutoRuleService\:\:createApplicationPlan\(\) has parameter \$activePairs with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Cash\\Application\\Service\\AutoRule\\CashTransactionAutoRuleService\:\:createApplicationPlan\(\) has parameter \$activePairs with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Cash/Service/Transaction/CashTransactionAutoRuleService.php
+			path: src/Cash/Application/Service/AutoRule/CashTransactionAutoRuleService.php
 
 		-
-			message: '#^Parameter \#1 \$rules of method App\\Cash\\Service\\Transaction\\CashTransactionAutoRuleService\:\:rulesNeedPairSnapshot\(\) expects list\<App\\Cash\\Entity\\Transaction\\CashTransactionAutoRule\>, array\<App\\Cash\\Entity\\Transaction\\CashTransactionAutoRule\> given\.$#'
+			message: '#^Parameter \#1 \$rules of method App\\Cash\\Application\\Service\\AutoRule\\CashTransactionAutoRuleService\:\:rulesNeedPairSnapshot\(\) expects list\<App\\Cash\\Entity\\Transaction\\CashTransactionAutoRule\>, array\<App\\Cash\\Entity\\Transaction\\CashTransactionAutoRule\> given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Cash/Service/Transaction/CashTransactionAutoRuleService.php
+			path: src/Cash/Application/Service/AutoRule/CashTransactionAutoRuleService.php
 
 		-
-			message: '#^Parameter \#2 \$rules of method App\\Cash\\Service\\Transaction\\CashTransactionAutoRuleService\:\:resolveMatch\(\) expects list\<App\\Cash\\Entity\\Transaction\\CashTransactionAutoRule\>, array\<App\\Cash\\Entity\\Transaction\\CashTransactionAutoRule\> given\.$#'
+			message: '#^Parameter \#2 \$rules of method App\\Cash\\Application\\Service\\AutoRule\\CashTransactionAutoRuleService\:\:resolveMatch\(\) expects list\<App\\Cash\\Entity\\Transaction\\CashTransactionAutoRule\>, array\<App\\Cash\\Entity\\Transaction\\CashTransactionAutoRule\> given\.$#'
 			identifier: argument.type
 			count: 2
-			path: src/Cash/Service/Transaction/CashTransactionAutoRuleService.php
+			path: src/Cash/Application/Service/AutoRule/CashTransactionAutoRuleService.php
 
 		-
-			message: '#^Parameter \#3 \$activePairs of method App\\Cash\\Service\\Transaction\\CashTransactionAutoRuleService\:\:planPair\(\) expects list\<App\\Company\\Application\\DTO\\FinancialResponsibilityCenterProjectDTO\>, array given\.$#'
+			message: '#^Parameter \#3 \$activePairs of method App\\Cash\\Application\\Service\\AutoRule\\CashTransactionAutoRuleService\:\:planPair\(\) expects list\<App\\Company\\Application\\DTO\\FinancialResponsibilityCenterProjectDTO\>, array given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Cash/Service/Transaction/CashTransactionAutoRuleService.php
+			path: src/Cash/Application/Service/AutoRule/CashTransactionAutoRuleService.php
 
 		-
 			message: '#^Using nullsafe property access "\?\-\>changes" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
-			path: src/Cash/Service/Transaction/CashTransactionAutoRuleService.php
+			path: src/Cash/Application/Service/AutoRule/CashTransactionAutoRuleService.php
 
 		-
 			message: '#^Access to an undefined property App\\Catalog\\DTO\\CreateProductCommand\:\:\$vendorSku\.$#'

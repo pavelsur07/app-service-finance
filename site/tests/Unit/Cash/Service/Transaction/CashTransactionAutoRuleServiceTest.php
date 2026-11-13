@@ -16,7 +16,7 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Enum\Transaction\CashTransactionAutoRulePairIssue;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
-use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Company\Application\DTO\FinancialResponsibilityCenterDTO;
 use App\Company\Application\DTO\FinancialResponsibilityCenterProjectDTO;
 use App\Company\Entity\Company;
@@ -667,8 +667,9 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
             ->setProjectDirection($project)
             ->setResponsibilityCenterId($centerId);
         $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
-        $repository->method('findActiveByCompany')->with($company)->willReturn([$rule]);
+        $repository->expects(self::once())->method('findActiveByCompany')->with($company)->willReturn([$rule]);
         $facade = $this->createMock(FinancialResponsibilityCenterFacade::class);
+        $facade->expects(self::never())->method('getActiveChoices');
         $facade->expects(self::once())
             ->method('getActivePairs')
             ->with($company->getId())
@@ -695,7 +696,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $centerId = Uuid::uuid4()->toString();
         $rule = $this->createRule($company);
         $repository = $this->createMock(CashTransactionAutoRuleRepository::class);
-        $repository->method('findActiveByCompany')->with($company)->willReturn([$rule]);
+        $repository->expects(self::once())->method('findActiveByCompany')->with($company)->willReturn([$rule]);
         $facade = $this->createMock(FinancialResponsibilityCenterFacade::class);
         $facade->expects(self::never())->method('getActivePairs');
         $facade->expects(self::once())
@@ -796,6 +797,11 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         self::assertSame($service->match($matchingTransaction)->rule, $preview->rows[0]['match']->rule);
         self::assertSame($rule, $preview->rows[0]['plan']?->rule);
         self::assertTrue($preview->rows[0]['plan']?->hasChanges());
+        self::assertNull($matchingTransaction->getCashflowCategory());
+        $appliedPlan = $service->applyMatch($matchingTransaction);
+        self::assertEquals($preview->rows[0]['plan'], $appliedPlan);
+        self::assertSame($appliedPlan?->cashflowCategory, $matchingTransaction->getCashflowCategory());
+        self::assertNull($service->applyMatch($matchingTransaction));
     }
 
     public function testMatchesLocalizedDecimalAmount(): void
