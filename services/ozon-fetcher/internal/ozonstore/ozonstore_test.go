@@ -171,3 +171,43 @@ func TestSchemaMatchesFetchkitCore(t *testing.T) {
 	assert.Equal(t, ozonColumns, columns(coreDSN, "test_schema_core"))
 	assert.Equal(t, indexes(ozonDSN, "test_schema_ozon"), indexes(coreDSN, "test_schema_core"))
 }
+
+// Миграция 00008 ставит в outbox уже загруженные дни начислений ровно теми же
+// пачками, что FinishTask: повторная постановка ничего не меняет.
+func TestMigrationEnqueuesLoadedAccrualDaysAsFinishTaskDoes(t *testing.T) {
+	tasks := testTasks(t)
+	ctx := context.Background()
+	_, err := tasks.Pool().Exec(ctx, `TRUNCATE outbox_batch, raw_object, fetch_attempt, fetch_task`)
+	require.NoError(t, err)
+	day := spec("a", "ozon.finance.accrual-by-day", "2026-10-20", 5)
+	pending := spec("a", "ozon.finance.accrual-by-day", "2026-10-21", 5)
+	orders := spec("b", "ozon.orders.fbo", "2026-10-20", 5)
+	require.NoError(t, tasks.Upsert(ctx, []store.TaskSpec{day, pending, orders}))
+	for _, s := range []store.TaskSpec{day, orders} {
+		task, err := claim(t, tasks, []string{s.ConnectionRef}, t0)
+		require.NoError(t, err)
+		require.Equal(t, s.TaskKey, task.TaskKey)
+		obj := store.RawObject{PageNo: 1, StorageURI: "s3://b/p", SHA256: strings.Repeat("a", 64), SizeBytes: 1, StoredBytes: 1, ContentType: "application/json"}
+		require.NoError(t, tasks.RecordPage(ctx, task.TaskKey, task.AttemptID, obj, ""))
+		_, err = tasks.FinishTask(ctx, task.TaskKey, task.AttemptID, store.Outcome{Status: store.StatusDone, Label: "done", ContentHash: strings.Repeat("c", 64)}, t0)
+		require.NoError(t, err)
+	}
+	fromFinish, err := tasks.NewFactBatches(ctx, "ozon.finance.accrual-by-day", time.Time{}, "", 10)
+	require.NoError(t, err)
+	require.Len(t, fromFinish, 1, "публикуются только начисления дня, и только загруженные")
+
+	up, err := migrationsFS.ReadFile("migrations/00008_publish_accrual_by_day_facts.sql")
+	require.NoError(t, err)
+	body, _, _ := strings.Cut(string(up), "-- +goose Down")
+	_, err = tasks.Pool().Exec(ctx, `TRUNCATE outbox_batch`)
+	require.NoError(t, err)
+	for range 2 {
+		_, err = tasks.Pool().Exec(ctx, body)
+		require.NoError(t, err)
+	}
+	fromMigration, err := tasks.NewFactBatches(ctx, "ozon.finance.accrual-by-day", time.Time{}, "", 10)
+	require.NoError(t, err)
+	require.Len(t, fromMigration, 1)
+	fromFinish[0].CreatedAt, fromMigration[0].CreatedAt = time.Time{}, time.Time{}
+	assert.Equal(t, fromFinish[0], fromMigration[0])
+}

@@ -1,5 +1,5 @@
 // Package httpapi — HTTP сервиса: /health, /ready, /internal/fetch-status,
-// /internal/coverage, /internal/snapshots/latest. Наружу сервис не публикуется; /internal/* — по токену
+// /internal/coverage, /internal/snapshots/latest, /internal/source-facts*. Наружу сервис не публикуется; /internal/* — по токену
 // направления «Symfony → сервис» (SERVICE_API_TOKEN).
 package httpapi
 
@@ -39,6 +39,8 @@ type Deps struct {
 	Coverage      func(ctx context.Context, refs []string, from, to string) ([]store.CoverageRow, error)
 	// Snapshot — выдача последнего снимка (service-snapshot v1); nil — 503.
 	Snapshot *SnapshotDeps
+	// Facts — выдача фактов (source-fact-envelope v1); nil — 503.
+	Facts    *FactsDeps
 	Location *time.Location
 	Now      func() time.Time
 	Logger   *slog.Logger
@@ -113,6 +115,22 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("GET /internal/snapshots/latest", func(w http.ResponseWriter, r *http.Request) {
 		if requireToken(w, r, d.Token) {
 			snapshot(w, r, d)
+		}
+	})
+
+	mux.HandleFunc("GET /internal/source-facts", func(w http.ResponseWriter, r *http.Request) {
+		if requireToken(w, r, d.Token) {
+			factBatches(w, r, d)
+		}
+	})
+	mux.HandleFunc("GET /internal/source-facts/page", func(w http.ResponseWriter, r *http.Request) {
+		if requireToken(w, r, d.Token) {
+			factPage(w, r, d)
+		}
+	})
+	mux.HandleFunc("POST /internal/source-facts/ack", func(w http.ResponseWriter, r *http.Request) {
+		if requireToken(w, r, d.Token) {
+			factAck(w, r, d)
 		}
 	})
 	return mux

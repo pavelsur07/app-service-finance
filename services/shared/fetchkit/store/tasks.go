@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -65,6 +66,10 @@ type Options struct {
 	// ресурсы. Префикс должен совпадать с выражением уникального индекса
 	// running-задач в миграциях сервиса.
 	SeparateSlotPrefix string
+	// PublishResources — ресурсы, чьи загруженные ревизии публикуются Symfony
+	// фактами (source-fact-envelope v1): новая ревизия ставит пачку в outbox_batch
+	// в транзакции FinishTask. Пусто — сервис фактов не публикует.
+	PublishResources []string
 }
 
 // Tasks — очередь fetch_task.
@@ -311,7 +316,16 @@ func (t *Tasks) ContentPages(ctx context.Context, key TaskKey) (Content, error) 
 	if err != nil {
 		return Content{}, fmt.Errorf("store: content pages: %w", err)
 	}
-	hashes := strings.Split(pages, ",")
+	objects, err := t.pageObjects(ctx, key, strings.Split(pages, ","))
+	if err != nil {
+		return Content{}, err
+	}
+	return Content{Pages: objects, StartedAt: *started}, nil
+}
+
+// pageObjects — объекты страниц задачи по их sha256, в порядке списка (PageNo с 1).
+// Страница без объекта — ErrMissingObject, не укороченный список.
+func (t *Tasks) pageObjects(ctx context.Context, key TaskKey, hashes []string) ([]RawObject, error) {
 	rows, err := t.pool.Query(ctx, `
 		SELECT DISTINCT ON (r.sha256) r.sha256, r.storage_uri, r.size_bytes, r.stored_bytes, r.content_type
 		FROM raw_object r JOIN fetch_attempt a ON a.attempt_id = r.attempt_id
@@ -319,28 +333,28 @@ func (t *Tasks) ContentPages(ctx context.Context, key TaskKey) (Content, error) 
 		ORDER BY r.sha256, r.created_at DESC`,
 		key.ConnectionRef, key.ResourceType, key.PeriodKey, hashes)
 	if err != nil {
-		return Content{}, fmt.Errorf("store: content objects: %w", err)
+		return nil, fmt.Errorf("store: content objects: %w", err)
 	}
 	defer rows.Close()
 	bySHA := map[string]RawObject{}
 	for rows.Next() {
 		var obj RawObject
 		if err := rows.Scan(&obj.SHA256, &obj.StorageURI, &obj.SizeBytes, &obj.StoredBytes, &obj.ContentType); err != nil {
-			return Content{}, fmt.Errorf("store: content objects scan: %w", err)
+			return nil, fmt.Errorf("store: content objects scan: %w", err)
 		}
 		bySHA[obj.SHA256] = obj
 	}
 	if err := rows.Err(); err != nil {
-		return Content{}, fmt.Errorf("store: content objects: %w", err)
+		return nil, fmt.Errorf("store: content objects: %w", err)
 	}
-	out := Content{Pages: make([]RawObject, 0, len(hashes)), StartedAt: *started}
+	out := make([]RawObject, 0, len(hashes))
 	for i, h := range hashes {
 		obj, ok := bySHA[h]
 		if !ok {
-			return Content{}, fmt.Errorf("%w: page %d of %s/%s/%s", ErrMissingObject, i+1, key.ConnectionRef, key.ResourceType, key.PeriodKey)
+			return nil, fmt.Errorf("%w: page %d of %s/%s/%s", ErrMissingObject, i+1, key.ConnectionRef, key.ResourceType, key.PeriodKey)
 		}
 		obj.PageNo = i + 1
-		out.Pages = append(out.Pages, obj)
+		out = append(out, obj)
 	}
 	return out, nil
 }
@@ -444,6 +458,8 @@ func (t *Tasks) FinishTask(ctx context.Context, key TaskKey, attemptID string, o
 	// итог попытки записывается; на окончательном итоге задача снова pending с
 	// первой страницы, на промежуточном (повтор с курсором) — флаг ждёт.
 	var revision int
+	var contentHash *string
+	var contentPages string
 	err = tx.QueryRow(ctx, `
 		UPDATE fetch_task SET
 			status       = CASE WHEN refresh_pending AND $5 IN ('done', 'failed_permanent') THEN 'pending' ELSE $5 END,
@@ -462,15 +478,20 @@ func (t *Tasks) FinishTask(ctx context.Context, key TaskKey, attemptID string, o
 			last_success_at  = CASE WHEN $5 = 'done' THEN $10 ELSE last_success_at END,
 			updated_at   = $10
 		WHERE connection_ref = $1 AND resource_type = $2 AND period_key = $3 AND status = 'running' AND attempt_id = $4
-		RETURNING revision`,
+		RETURNING revision, content_hash, content_pages`,
 		key.ConnectionRef, key.ResourceType, key.PeriodKey, attemptID,
 		out.Status, out.NextRunAt, out.KeepCursor, out.ContentHash, out.ErrorClass, now,
-	).Scan(&revision)
+	).Scan(&revision, &contentHash, &contentPages)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, ErrLeaseLost
 	}
 	if err != nil {
 		return 0, fmt.Errorf("store: finish task: %w", err)
+	}
+	if out.Status == StatusDone && contentHash != nil && contentPages != "" && slices.Contains(t.opts.PublishResources, key.ResourceType) {
+		if err := enqueueFactBatch(ctx, tx, key, revision, *contentHash, contentPages, now); err != nil {
+			return 0, err
+		}
 	}
 	if _, err := tx.Exec(ctx, `
 		UPDATE fetch_attempt SET finished_at = $2, outcome = $3, http_status = NULLIF($4, 0) WHERE attempt_id = $1`,

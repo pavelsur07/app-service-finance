@@ -73,7 +73,8 @@ Dev-БД: контейнер `services-postgres` (compose-профиль `servic
 `fetch_task.content_pages` (00004) — sha256 страниц текущей загруженной ревизии по порядку, 
 `content_started_at` — запись её первой страницы: по ним зависимый ресурс (начисления по
 отправлениям) читает страницы заказов из S3 и проверяет, что ревизия загружена после конца дня.
-| `sync_job`, `checkpoint`, `outbox_batch` | `00001`, под выдачу фактов (позже) |
+| `outbox_batch` | `00001`; очередь пачек фактов: указатель на ревизию дня, статус `new`/`acked`. Ставит `FinishTask` при новой ревизии публикуемого ресурса (`facts.Resources`); уже загруженные дни начислений поставила миграция `00008` |
+| `sync_job`, `checkpoint` | `00001`, не используются |
 
 Инварианты: у кабинета не больше одной `running`-задачи (частичный уникальный
 индекс); страница и курсор пишутся одной транзакцией; просроченный lease
@@ -123,8 +124,9 @@ gzip исходных байтов, `If-None-Match: *`, sha256 несжатых 
 
 | Метод | Назначение |
 |---|---|
-| `GET /internal/source-facts` | Выдача батчей `status=new` (фильтры `connection_ref`/`resource_type`/`business_period`, курсор) |
-| `POST /internal/source-facts/ack` | `{batch_ids}` → батчи в `acked`, payload purge (retention) |
+| `GET /internal/source-facts?resource_type=…&after=…&limit=…` | Неподтверждённые пачки фактов ресурса (метаданные), контракт `services/_contracts/source-fact-envelope/v1`. Пачка — загруженная ревизия дня кабинета. Белый список — `facts.Resources` (сейчас `ozon.finance.accrual-by-day`), вне него — 422 |
+| `GET /internal/source-facts/page?batch_id=…&page=N` | Записи страницы пачки: начисления Ozon целиком (`payload`) с ключом `ozon:accrual-by-day:{accrual_id}`. Нет пачки или страницы — 404; страница потеряна, повреждена или не режется — 502 + ERROR |
+| `POST /internal/source-facts/ack` | `{batch_ids}` → пачки в `acked`, списком больше не выдаются; повтор — не ошибка |
 | `POST /internal/fetch-requests` | Загрузка по запросу (отложено): `{request_id, connection_ref, resource_type, period_from, period_to}` → 202 после записи; повтор сливается в активный запрос |
 | `GET /internal/fetch-status` | Состояние загрузки по кабинетам и ресурсам: пропуски, последняя успешная загрузка, текущий лимит, 429, пауза (этап 12) |
 | `GET /internal/coverage?from=YYYY-MM-DD&to=YYYY-MM-DD` | Покрытие «ресурс × период → кабинетов по статусам», контракт `services/_contracts/service-coverage/v1`. По умолчанию окно M-2…конец M (МСК); окно шире 93 дней, `from > to`, кривая дата — 422 `invalid_period`. До первого снимка кабинетов — 503 `cabinets_not_ready`. Считаются только активные кабинеты с ключом Seller; без `connection_ref`, `company_id`, сумм |

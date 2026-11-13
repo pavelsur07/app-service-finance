@@ -1,5 +1,6 @@
 // Package httpapi — HTTP ozon-fetcher поверх fetchkit/httpapi: /health,
-// /ready, /internal/fetch-status, /internal/coverage, /internal/snapshots/latest. Здесь — какие кабинеты
+// /ready, /internal/fetch-status, /internal/coverage, /internal/snapshots/latest,
+// /internal/source-facts*. Здесь — какие кабинеты
 // ожидают ресурс: seller-ресурсы — с ключом Seller API, реклама — с ключом
 // Performance.
 package httpapi
@@ -12,6 +13,7 @@ import (
 
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/executor"
+	"github.com/pavelsur07/app-service-finance/services/ozon-fetcher/internal/facts"
 	fkhttp "github.com/pavelsur07/app-service-finance/services/shared/fetchkit/httpapi"
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 )
@@ -26,6 +28,9 @@ type SnapshotDeps = fkhttp.SnapshotDeps
 // (services/_contracts/service-snapshot/v1). Новый ресурс — правкой списка и
 // CHANGELOG контракта.
 var SnapshotResources = []string{executor.ResourceSupplies}
+
+// FactsDeps — источники выдачи фактов (белый список и разбор страниц подставляет New).
+type FactsDeps = fkhttp.FactsDeps
 
 // S3PingCache — результат проверки S3 держится 30 с: /ready дёргают часто.
 const S3PingCache = fkhttp.S3PingCache
@@ -42,6 +47,8 @@ type Deps struct {
 	Coverage      func(ctx context.Context, refs []string, from, to string) ([]store.CoverageRow, error)
 	// Snapshot — выдача последнего снимка; Resources задаёт New (SnapshotResources).
 	Snapshot *SnapshotDeps
+	// Facts — выдача фактов; Resources и Split задаёт New (пакет facts).
+	Facts    *FactsDeps
 	Location *time.Location
 	Now      func() time.Time
 	Logger   *slog.Logger
@@ -54,6 +61,11 @@ func New(d Deps) http.Handler {
 		snapshot := *d.Snapshot
 		snapshot.Resources = SnapshotResources
 		deps.Snapshot = &snapshot
+	}
+	if d.Facts != nil {
+		f := *d.Facts
+		f.Resources, f.Split = facts.Resources, facts.Split
+		deps.Facts = &f
 	}
 	if d.Cabinets != nil {
 		deps.Expected = func() fkhttp.Expectation { return expectation(d.Cabinets()) }

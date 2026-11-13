@@ -46,8 +46,11 @@ backoff, запись raw в S3 без перезаписи, журнал заг
 
 ## Внутренний API
 
-- `GET /internal/source-facts`, `POST /internal/source-facts/ack` — выдача
-  фактов (после первой волны).
+- `GET /internal/source-facts`, `GET /internal/source-facts/page`,
+  `POST /internal/source-facts/ack` — выдача фактов (`source-fact-envelope` v1):
+  пачка — ревизия дня, запись — начисление целиком. Публикуемые ресурсы и
+  разбор страницы на записи — пакет `internal/facts`; смысл записей сервис не
+  трогает (разбор начислений — Symfony).
 - `POST /internal/fetch-requests`, `GET /internal/fetch-requests/{id}` —
   загрузка по запросу (отложено; ляжет на `fetch_task` с приоритетом).
 - `GET /internal/fetch-status` — состояние загрузки по кабинетам (этап 12).

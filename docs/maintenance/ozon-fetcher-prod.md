@@ -38,6 +38,9 @@
 - Статус: `docker exec ozon-fetcher sh -c 'wget -qO- --header "Authorization: Bearer $SERVICE_API_TOKEN" http://127.0.0.1:8080/internal/fetch-status'`
   — кабинет «Вумджой», задачи идут в `done`, пауз нет.
 - Прод-синк Symfony: `app:marketplace:perf-report` — повторы `SyncOzonAccrualByDayMessage` не выросли.
+- Очередь фактов (с миграции `00008`): `docker exec ozon-fetcher sh -c 'wget -qO- --header "Authorization: Bearer $SERVICE_API_TOKEN" "http://127.0.0.1:8080/internal/source-facts?resource_type=ozon.finance.accrual-by-day&limit=1"'`
+  — 200 и пачка в `batches`. Пока Symfony факты не забирает (модуль `SourceFacts` не включён), очередь
+  только растёт: строка на ревизию дня кабинета, данных источника в ней нет — это штатно.
 
 ## Витрина покрытия и страница «Покрытие Сервис GO»
 
