@@ -1,0 +1,32 @@
+{
+  "text": "Вчера отдала 20 тысяч за аренду",
+  "reference_at": "2026-11-13T12:00:00+03:00",
+  "timezone": "Europe/Moscow",
+  "currency": "RUB",
+  "categories": [
+    {
+      "id": "rent-a",
+      "name": "Аренда",
+      "direction": "outflow"
+    }
+  ],
+  "projects": [
+    {
+      "id": "north-a",
+      "name": "Север"
+    }
+  ],
+  "cfos": [
+    {
+      "id": "main-a",
+      "name": "Основной"
+    }
+  ],
+  "allowed_pairs": [
+    {
+      "project_id": "north-a",
+      "cfo_id": "main-a"
+    }
+  ],
+  "draft_items": []
+}

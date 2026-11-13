@@ -1,0 +1,84 @@
+{
+  "company_a": {
+    "text": "Вчера отдала 20 тысяч за аренду",
+    "reference_at": "2026-11-13T12:00:00+03:00",
+    "timezone": "Europe/Moscow",
+    "currency": "RUB",
+    "categories": [
+      {
+        "id": "rent-a",
+        "name": "Аренда",
+        "direction": "outflow"
+      }
+    ],
+    "projects": [
+      {
+        "id": "north-a",
+        "name": "Север"
+      }
+    ],
+    "cfos": [
+      {
+        "id": "main-a",
+        "name": "Основной"
+      }
+    ],
+    "allowed_pairs": [
+      {
+        "project_id": "north-a",
+        "cfo_id": "main-a"
+      }
+    ],
+    "draft_items": []
+  },
+  "company_b": {
+    "text": "Вчера отдала 20 тысяч за аренду",
+    "reference_at": "2026-11-13T12:00:00+03:00",
+    "timezone": "Europe/Moscow",
+    "currency": "RUB",
+    "categories": [
+      {
+        "id": "rent-b",
+        "name": "Аренда",
+        "direction": "outflow"
+      }
+    ],
+    "projects": [
+      {
+        "id": "north-b",
+        "name": "Север"
+      }
+    ],
+    "cfos": [
+      {
+        "id": "main-b",
+        "name": "Основной"
+      }
+    ],
+    "allowed_pairs": [],
+    "draft_items": []
+  },
+  "archived_category": {
+    "id": "archived",
+    "included_in_payload": false
+  },
+  "missing_account": {
+    "expected": "Symfony rejects before requesting task"
+  },
+  "dialogs": [
+    {
+      "id": "correction-target",
+      "draft_refs": [
+        "first",
+        "second"
+      ],
+      "text": "Измени на 20000",
+      "question": "Какой черновик?"
+    },
+    {
+      "id": "personal-funds",
+      "text": "Оплатила сотрудница с личной карты 5000 руб.",
+      "question": "Источник денег и компенсация?"
+    }
+  ]
+}
