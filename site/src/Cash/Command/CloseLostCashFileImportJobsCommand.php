@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Command;
 
-use App\Cash\Application\CloseLostCashFileImportJobsAction;
+use App\Cash\Application\Import\Recovery\CloseLostCashFileImportJobsAction;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;

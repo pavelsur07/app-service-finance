@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application;
 
-use App\Cash\Application\AcceptCashCategorySuggestionAction;
-use App\Cash\Application\DismissCashCategorySuggestionAction;
+use App\Cash\Application\AiCategorization\AcceptCashCategorySuggestionAction;
+use App\Cash\Application\AiCategorization\DismissCashCategorySuggestionAction;
+use App\Cash\Application\AiCategorization\RequestCashAiCategorizationAction;
 use App\Cash\Application\DTO\CashCategorizationExample;
-use App\Cash\Application\RequestCashAiCategorizationAction;
-use App\Cash\Application\Service\CashCategorizationPayloadMapper;
-use App\Cash\Application\Service\CashCategorizationResultConsumer;
-use App\Cash\Application\Service\CashCategorySuggestionApplier;
+use App\Cash\Application\Service\AiCategorization\CashCategorizationPayloadMapper;
+use App\Cash\Application\Service\AiCategorization\CashCategorizationResultConsumer;
+use App\Cash\Application\Service\AiCategorization\CashCategorySuggestionApplier;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashCategorySuggestion;
 use App\Cash\Entity\Transaction\CashflowCategory;

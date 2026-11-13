@@ -199,7 +199,7 @@ final class CashFileImportValidationTest extends WebTestCaseBase
         fclose($file);
         try {
             try {
-                static::getContainer()->get(\App\Cash\Application\UploadCashFileImportAction::class)($account, $path, 'statement.csv', true);
+                static::getContainer()->get(\App\Cash\Application\Import\File\UploadCashFileImportAction::class)($account, $path, 'statement.csv', true);
                 self::fail('The server-side Action must enforce 32 MiB independently of PHP upload limits.');
             } catch (\App\Cash\Exception\InvalidCashImportFileException) {
                 self::assertSame([], $storage->calls);

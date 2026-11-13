@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Accounts;
 
+use App\Cash\Application\Service\Funds\FundBalanceService;
 use App\Cash\Entity\Accounts\MoneyFund;
 use App\Cash\Entity\Accounts\MoneyFundMovement;
-use App\Cash\Service\Accounts\FundBalanceService;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;

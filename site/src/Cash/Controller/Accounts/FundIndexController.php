@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Accounts;
 
+use App\Cash\Application\Service\Funds\FundBalanceService;
 use App\Cash\Repository\Accounts\MoneyFundRepository;
-use App\Cash\Service\Accounts\FundBalanceService;
 use App\Shared\Domain\ValueObject\Money;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

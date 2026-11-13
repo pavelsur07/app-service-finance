@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Application;
 
-use App\Cash\Application\CreateCashFileImportProfileAction;
-use App\Cash\Application\DeleteCashFileImportProfileAction;
-use App\Cash\Application\UpdateCashFileImportProfileAction;
+use App\Cash\Application\Import\File\CreateCashFileImportProfileAction;
+use App\Cash\Application\Import\File\DeleteCashFileImportProfileAction;
+use App\Cash\Application\Import\File\UpdateCashFileImportProfileAction;
 use App\Cash\Entity\Import\CashFileImportProfile;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;

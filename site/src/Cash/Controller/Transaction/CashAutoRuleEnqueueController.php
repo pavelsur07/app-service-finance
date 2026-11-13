@@ -21,7 +21,7 @@ final class CashAutoRuleEnqueueController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $companyService,
         private readonly AuditContextProvider $auditContextProvider,
-        private readonly \App\Cash\Application\EnqueueCashAutoRulesAction $enqueueRules,
+        private readonly \App\Cash\Application\AutoRule\EnqueueCashAutoRulesAction $enqueueRules,
     ) {
     }
 

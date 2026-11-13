@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Application;
 
-use App\Cash\Application\Service\CashflowCategoryTreeBuilder;
+use App\Cash\Application\Service\Category\CashflowCategoryTreeBuilder;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use App\Company\Entity\Company;

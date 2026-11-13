@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Command;
 
-use App\Cash\Application\CloseLostCashFileImportJobsAction;
-use App\Cash\Application\CloseOpenImportLogsAction;
-use App\Cash\Application\RecalculateAllocatedAmountsAction;
+use App\Cash\Application\Import\Recovery\CloseLostCashFileImportJobsAction;
+use App\Cash\Application\Import\Recovery\CloseOpenImportLogsAction;
+use App\Cash\Application\Transaction\RecalculateAllocatedAmountsAction;
 use App\Cash\Command\CashIntegrityCheckCommand;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;

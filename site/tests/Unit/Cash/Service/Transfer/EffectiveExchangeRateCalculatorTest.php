@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Service\Transfer;
 
+use App\Cash\Application\Service\Transfer\EffectiveExchangeRateCalculator;
 use App\Cash\Entity\Transfer\CashTransfer;
 use App\Cash\Enum\FiatCurrency;
-use App\Cash\Service\Transfer\EffectiveExchangeRateCalculator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

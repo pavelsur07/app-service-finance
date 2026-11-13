@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Import\File;
 
+use App\Cash\Application\Service\Import\File\CashFileImportService;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
-use App\Cash\Service\Import\File\CashFileImportService;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;

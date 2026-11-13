@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
-use App\Cash\Application\SaveCashTransactionAutoRuleAction;
-use App\Cash\Application\Service\CashTransactionAutoRulePrefiller;
-use App\Cash\Application\Service\CashTransactionAutoRuleTargetValidator;
+use App\Cash\Application\AutoRule\SaveCashTransactionAutoRuleAction;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRulePrefiller;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleTargetValidator;
 use App\Cash\Form\Transaction\CashTransactionAutoRuleType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;

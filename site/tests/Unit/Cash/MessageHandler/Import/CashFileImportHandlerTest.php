@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Cash\MessageHandler\Import;
 
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
+use App\Cash\Application\Service\Import\File\CashFileImportService;
+use App\Cash\Application\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Enum\Accounts\MoneyAccountType;
@@ -13,8 +15,6 @@ use App\Cash\Message\Import\CashFileImportMessage;
 use App\Cash\MessageHandler\Import\CashFileImportHandler;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
-use App\Cash\Service\Import\File\CashFileImportService;
-use App\Cash\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
@@ -150,7 +150,7 @@ final class CashFileImportHandlerTest extends TestCase
             new ImportLogger($entityManager),
             new NullLogger(),
             new CashImportAccountLock($connection),
-            (new \ReflectionClass(\App\Cash\Application\ApplyCashFileDescriptionsAction::class))->newInstanceWithoutConstructor(),
+            (new \ReflectionClass(\App\Cash\Application\Import\File\ApplyCashFileDescriptionsAction::class))->newInstanceWithoutConstructor(),
         );
         $handler(new CashFileImportMessage((string) $job->getId()));
 
@@ -203,7 +203,7 @@ final class CashFileImportHandlerTest extends TestCase
             new ImportLogger($freshManager),
             $logger,
             $this->accountLock(true),
-            (new \ReflectionClass(\App\Cash\Application\ApplyCashFileDescriptionsAction::class))->newInstanceWithoutConstructor(),
+            (new \ReflectionClass(\App\Cash\Application\Import\File\ApplyCashFileDescriptionsAction::class))->newInstanceWithoutConstructor(),
         );
         $handler(new CashFileImportMessage($jobId));
 
@@ -223,7 +223,7 @@ final class CashFileImportHandlerTest extends TestCase
             new ImportLogger($entityManager),
             new NullLogger(),
             $this->accountLock($accountLockFree),
-            (new \ReflectionClass(\App\Cash\Application\ApplyCashFileDescriptionsAction::class))->newInstanceWithoutConstructor(),
+            (new \ReflectionClass(\App\Cash\Application\Import\File\ApplyCashFileDescriptionsAction::class))->newInstanceWithoutConstructor(),
         );
     }
 
@@ -242,16 +242,15 @@ final class CashFileImportHandlerTest extends TestCase
         $facade = (new \ReflectionClass(FinancialResponsibilityCenterFacade::class))->newInstanceWithoutConstructor();
 
         return new CashFileImportService(
-            new CashFileRowNormalizer(),
+            new \App\Cash\Application\Service\Import\File\CashFileNormalizedRows(new \App\Cash\Infrastructure\Import\File\FileTabularReader(new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 5))), new CashFileRowNormalizer()),
+            new \App\Cash\Application\Service\Import\File\CashFileDuplicatePlanner(new \App\Cash\Application\Service\Import\File\CashFileNormalizedRows(new \App\Cash\Infrastructure\Import\File\FileTabularReader(new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 5))), new CashFileRowNormalizer()), $this->createMock(CashTransactionRepository::class)),
             new CounterpartyNameNormalizer(),
             new CounterpartyFacade($this->createMock(CounterpartyRepository::class), $this->createMock(EntityManagerInterface::class)),
             $this->createMock(CashTransactionRepository::class),
             new ImportLogger($entityManager),
             $entityManager,
             (new \ReflectionClass(AccountBalanceService::class))->newInstanceWithoutConstructor(),
-            $objectStorage,
-            new TemporaryLocalFile($objectStorage),
-            new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 5)),
+            new \App\Cash\Infrastructure\Import\File\CashFileStorage($objectStorage, new TemporaryLocalFile($objectStorage), new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 5))),
             new CashTransactionResponsibilityCenterResolver($facade),
         );
     }

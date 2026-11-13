@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Application\Service;
 
-use App\Cash\Application\Service\CashTransactionAutoRuleProvenanceResolver;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleProvenanceResolver;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\ProjectDirection;

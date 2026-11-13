@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Accounts;
 
+use App\Cash\Application\Service\Accounts\AccountBalanceProvider;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
 use App\Cash\Enum\Accounts\MoneyAccountType;
-use App\Cash\Service\Accounts\AccountBalanceProvider;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Tests\Support\Kernel\IntegrationTestCase;

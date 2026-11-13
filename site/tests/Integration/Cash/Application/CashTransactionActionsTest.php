@@ -6,10 +6,10 @@ namespace App\Tests\Integration\Cash\Application;
 
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Cash\Application\AddCashTransactionAction;
-use App\Cash\Application\CreatePnlDocumentFromTransactionAction;
-use App\Cash\Application\DeleteCashTransactionAction;
+use App\Cash\Application\Document\CreatePnlDocumentFromTransactionAction;
 use App\Cash\Application\DTO\CashTransactionDTO;
-use App\Cash\Application\RestoreCashTransactionAction;
+use App\Cash\Application\Transaction\DeleteCashTransactionAction;
+use App\Cash\Application\Transaction\RestoreCashTransactionAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\PaymentPlan\PaymentPlanMatch;
@@ -95,13 +95,13 @@ final class CashTransactionActionsTest extends IntegrationTestCase
         $action = new AddCashTransactionAction(
             $this->em,
             $container->get(\App\Cash\Application\Service\CashSettlementSourceLifecycle::class),
-            $container->get(\App\Cash\Service\Transaction\CashTransactionService::class),
-            $container->get(\App\Cash\Application\Service\DailyBalanceRecalculator::class),
+            $container->get(\App\Cash\Application\Service\Transaction\CashTransactionService::class),
+            $container->get(\App\Cash\Application\Service\Accounts\DailyBalanceRecalculator::class),
             $missingLookup,
-            $container->get(\App\Cash\Service\PaymentPlan\PaymentPlanMatcher::class),
+            $container->get(\App\Cash\Application\Service\PaymentPlan\PaymentPlanMatcher::class),
             $container->get('event_dispatcher'),
             $container->get(\App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver::class),
-            $container->get(\App\Cash\Service\Transaction\CashTransactionSplitSynchronizer::class),
+            $container->get(\App\Cash\Application\Service\Transaction\CashTransactionSplitSynchronizer::class),
             $registry,
         );
 
@@ -124,7 +124,7 @@ final class CashTransactionActionsTest extends IntegrationTestCase
         $key = Uuid::uuid7()->toString();
         $container = self::getContainer();
         $registry = $container->get(ManagerRegistry::class);
-        $failingRecalculator = new class($container->get(\App\Cash\Repository\Accounts\MoneyAccountRepository::class), $container->get(\App\Cash\Service\Accounts\AccountBalanceService::class)) extends \App\Cash\Application\Service\DailyBalanceRecalculator {
+        $failingRecalculator = new class($container->get(\App\Cash\Repository\Accounts\MoneyAccountRepository::class), $container->get(\App\Cash\Service\Accounts\AccountBalanceService::class)) extends \App\Cash\Application\Service\Accounts\DailyBalanceRecalculator {
             public function recalcRange(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, ?array $accountIds = null): void
             {
                 throw new \RuntimeException('Пересчёт упал.');
@@ -133,13 +133,13 @@ final class CashTransactionActionsTest extends IntegrationTestCase
         $failing = new AddCashTransactionAction(
             $this->em,
             $container->get(\App\Cash\Application\Service\CashSettlementSourceLifecycle::class),
-            $container->get(\App\Cash\Service\Transaction\CashTransactionService::class),
+            $container->get(\App\Cash\Application\Service\Transaction\CashTransactionService::class),
             $failingRecalculator,
             $container->get(CashTransactionRepository::class),
-            $container->get(\App\Cash\Service\PaymentPlan\PaymentPlanMatcher::class),
+            $container->get(\App\Cash\Application\Service\PaymentPlan\PaymentPlanMatcher::class),
             $container->get('event_dispatcher'),
             $container->get(\App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver::class),
-            $container->get(\App\Cash\Service\Transaction\CashTransactionSplitSynchronizer::class),
+            $container->get(\App\Cash\Application\Service\Transaction\CashTransactionSplitSynchronizer::class),
             $registry,
         );
 

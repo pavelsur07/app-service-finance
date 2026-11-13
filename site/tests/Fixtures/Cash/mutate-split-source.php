@@ -25,10 +25,10 @@ try {
             $dto->occurredAt = $tx->getOccurredAt();
             $dto->cashflowCategoryId = $tx->getCashflowCategory()?->getId();
             $dto->amount = '900';
-            $container->get(App\Cash\Application\UpdateCashTransactionAction::class)($tx, $dto);
+            $container->get(App\Cash\Application\Transaction\UpdateCashTransactionAction::class)($tx, $dto);
             break;
         case 'document':
-            $container->get(App\Cash\Application\CreateDocumentFromTransactionAction::class)($tx, true);
+            $container->get(App\Cash\Application\Document\CreateDocumentFromTransactionAction::class)($tx, true);
             break;
         case 'splits':
             $input = new App\Cash\Application\DTO\CashTransactionSplitsInput();
@@ -38,7 +38,7 @@ try {
                 $row->amount = $amount;
                 $input->rows[] = $row;
             }
-            $container->get(App\Cash\Application\SaveCashTransactionSplitsAction::class)($tx, $input);
+            $container->get(App\Cash\Application\Transaction\SaveCashTransactionSplitsAction::class)($tx, $input);
             break;
         default:
             throw new LogicException('Unknown test operation.');

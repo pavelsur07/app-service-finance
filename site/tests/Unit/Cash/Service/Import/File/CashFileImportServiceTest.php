@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Cash\Service\Import\File;
 
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
+use App\Cash\Application\Service\Import\File\CashFileImportService;
+use App\Cash\Application\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
-use App\Cash\Service\Import\File\CashFileImportService;
-use App\Cash\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Application\DTO\FinancialResponsibilityCenterProjectDTO;
 use App\Company\Domain\Service\CounterpartyNameNormalizer;
@@ -34,35 +34,24 @@ final class CashFileImportServiceTest extends TestCase
 {
     public function testDedupeHashIsStableForSameInput(): void
     {
-        $service = new CashFileImportService(
-            $this->createMock(CashFileRowNormalizer::class),
-            new CounterpartyNameNormalizer(),
-            new CounterpartyFacade($this->createMock(CounterpartyRepository::class), $this->createMock(EntityManagerInterface::class)),
+        $planner = new \App\Cash\Application\Service\Import\File\CashFileDuplicatePlanner(
+            new \App\Cash\Application\Service\Import\File\CashFileNormalizedRows(
+                new \App\Cash\Infrastructure\Import\File\FileTabularReader(new LegacyXlsConverter(new TemporaryFileFactory(), '/app')),
+                new CashFileRowNormalizer(),
+            ),
             $this->createMock(CashTransactionRepository::class),
-            new ImportLogger($this->createMock(EntityManagerInterface::class)),
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(AccountBalanceService::class),
-            $objectStorage = $this->createMock(ObjectStorageInterface::class),
-            new TemporaryLocalFile($objectStorage),
-            new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6)),
-            $this->createResolver(Uuid::uuid4()->toString(), Uuid::uuid4()->toString()),
         );
-
-        $method = new \ReflectionMethod(CashFileImportService::class, 'makeDedupeHash');
-        $method->setAccessible(true);
 
         $occurredAt = new \DateTimeImmutable('2025-12-01', new \DateTimeZone('UTC'));
 
-        $hashOne = $method->invoke(
-            $service,
+        $hashOne = $planner->hash(
             'company-id',
             'account-id',
             $occurredAt,
             1000,
             'Назначение платежа'
         );
-        $hashTwo = $method->invoke(
-            $service,
+        $hashTwo = $planner->hash(
             'company-id',
             'account-id',
             $occurredAt,
@@ -123,16 +112,15 @@ final class CashFileImportServiceTest extends TestCase
             ->method('recalculateDailyRange');
 
         $service = new CashFileImportService(
-            new CashFileRowNormalizer(),
+            new \App\Cash\Application\Service\Import\File\CashFileNormalizedRows(new \App\Cash\Infrastructure\Import\File\FileTabularReader(new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6))), new CashFileRowNormalizer()),
+            new \App\Cash\Application\Service\Import\File\CashFileDuplicatePlanner(new \App\Cash\Application\Service\Import\File\CashFileNormalizedRows(new \App\Cash\Infrastructure\Import\File\FileTabularReader(new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6))), new CashFileRowNormalizer()), $transactionRepository),
             new CounterpartyNameNormalizer(),
             new CounterpartyFacade($this->createMock(CounterpartyRepository::class), $this->createMock(EntityManagerInterface::class)),
             $transactionRepository,
             new ImportLogger($entityManager),
             $entityManager,
             $accountBalanceService,
-            $objectStorage,
-            new TemporaryLocalFile($objectStorage),
-            new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6)),
+            new \App\Cash\Infrastructure\Import\File\CashFileStorage($objectStorage, new TemporaryLocalFile($objectStorage), new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6))),
             $this->createResolver($projectId, $centerId),
         );
 
@@ -182,16 +170,15 @@ final class CashFileImportServiceTest extends TestCase
         $objectStorage->expects(self::never())->method('exists');
 
         $service = new CashFileImportService(
-            new CashFileRowNormalizer(),
+            new \App\Cash\Application\Service\Import\File\CashFileNormalizedRows(new \App\Cash\Infrastructure\Import\File\FileTabularReader(new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6))), new CashFileRowNormalizer()),
+            new \App\Cash\Application\Service\Import\File\CashFileDuplicatePlanner(new \App\Cash\Application\Service\Import\File\CashFileNormalizedRows(new \App\Cash\Infrastructure\Import\File\FileTabularReader(new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6))), new CashFileRowNormalizer()), $this->createMock(CashTransactionRepository::class)),
             new CounterpartyNameNormalizer(),
             new CounterpartyFacade($this->createMock(CounterpartyRepository::class), $this->createMock(EntityManagerInterface::class)),
             $this->createMock(CashTransactionRepository::class),
             new ImportLogger($this->createMock(EntityManagerInterface::class)),
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(AccountBalanceService::class),
-            $objectStorage,
-            new TemporaryLocalFile($objectStorage),
-            new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6)),
+            new \App\Cash\Infrastructure\Import\File\CashFileStorage($objectStorage, new TemporaryLocalFile($objectStorage), new LegacyXlsConverter(new TemporaryFileFactory(), \dirname(__DIR__, 6))),
             $this->createResolver(Uuid::uuid4()->toString(), Uuid::uuid4()->toString()),
         );
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Import\File;
 
-use App\Cash\Application\StartCashFileImportJobAction;
+use App\Cash\Application\Import\File\StartCashFileImportJobAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Import\ImportLog;

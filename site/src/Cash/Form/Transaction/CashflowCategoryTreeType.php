@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Form\Transaction;
 
-use App\Cash\Application\Service\CashflowCategoryTreeBuilder;
+use App\Cash\Application\Service\Category\CashflowCategoryTreeBuilder;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Transaction\CashDirection;
 use Symfony\Component\Form\AbstractType;

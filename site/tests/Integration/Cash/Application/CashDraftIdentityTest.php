@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application;
 
-use App\Cash\Application\SaveCashflowCategoryAction;
-use App\Cash\Application\SaveCashTransactionAutoRuleAction;
+use App\Cash\Application\AutoRule\SaveCashTransactionAutoRuleAction;
+use App\Cash\Application\Category\SaveCashflowCategoryAction;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;

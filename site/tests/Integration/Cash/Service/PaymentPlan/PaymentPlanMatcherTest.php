@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\PaymentPlan;
 
+use App\Cash\Application\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
@@ -12,7 +13,6 @@ use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
-use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;

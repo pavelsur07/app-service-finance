@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Service\Import\File;
 
-use App\Cash\Service\Import\File\CashFileDescriptionMatcher;
+use App\Cash\Application\Service\Import\File\CashFileDescriptionMatcher;
 use PHPUnit\Framework\TestCase;
 
 final class CashFileDescriptionMatcherTest extends TestCase

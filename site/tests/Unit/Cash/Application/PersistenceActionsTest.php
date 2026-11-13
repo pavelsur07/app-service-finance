@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Application;
 
-use App\Cash\Application\ChangeCashTransactionAutoRuleActivityAction;
-use App\Cash\Application\CreateMoneyFundMovementAction;
-use App\Cash\Application\DeleteCashflowCategoryAction;
-use App\Cash\Application\SaveMoneyFundAction;
+use App\Cash\Application\AutoRule\ChangeCashTransactionAutoRuleActivityAction;
+use App\Cash\Application\Category\DeleteCashflowCategoryAction;
+use App\Cash\Application\Funds\CreateMoneyFundMovementAction;
+use App\Cash\Application\Funds\SaveMoneyFundAction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;

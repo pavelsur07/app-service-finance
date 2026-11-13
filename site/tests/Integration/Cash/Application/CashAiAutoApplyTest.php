@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application;
 
-use App\Cash\Application\AutoApplyCashCategorySuggestionsAction;
-use App\Cash\Application\Service\AutoRuleDispatchGuard;
-use App\Cash\Application\Service\CashCategorySuggestionApplier;
-use App\Cash\Application\Service\CashTransactionAutoRuleProvenanceResolver;
+use App\Cash\Application\AiCategorization\AutoApplyCashCategorySuggestionsAction;
+use App\Cash\Application\Service\AiCategorization\CashCategorySuggestionApplier;
+use App\Cash\Application\Service\AutoRule\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleProvenanceResolver;
+use App\Cash\Application\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\Domain\Policy\CashAiAutoApplyPolicy;
 use App\Cash\Entity\Accounts\MoneyAccount;
@@ -21,7 +22,6 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Infrastructure\Query\CashCategorizationQuery;
 use App\Cash\Repository\Transaction\CashAiCategorizationSettingRepository;
-use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Cash\CashAiCategorizationSettingBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;

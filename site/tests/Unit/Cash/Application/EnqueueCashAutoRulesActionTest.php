@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Application;
 
-use App\Cash\Application\EnqueueCashAutoRulesAction;
+use App\Cash\Application\AutoRule\EnqueueCashAutoRulesAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Message\EnqueueAutoRulesForRange;
 use PHPUnit\Framework\TestCase;

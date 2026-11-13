@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Infrastructure\Twig;
 
-use App\Cash\Service\Accounts\MoneyTotalsWidgetProvider;
+use App\Cash\Application\Service\Accounts\MoneyTotalsWidgetProvider;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\FeatureFlagService;
 use Psr\Log\LoggerInterface;

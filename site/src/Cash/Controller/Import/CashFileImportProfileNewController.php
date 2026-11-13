@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Import;
 
-use App\Cash\Application\CreateCashFileImportProfileAction;
+use App\Cash\Application\Import\File\CreateCashFileImportProfileAction;
 use App\Cash\Entity\Import\CashFileImportProfile;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;

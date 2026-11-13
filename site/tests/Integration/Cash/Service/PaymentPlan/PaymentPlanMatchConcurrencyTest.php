@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\PaymentPlan;
 
+use App\Cash\Application\Service\PaymentPlan\PaymentPlanMatcher;
+use App\Cash\Application\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
@@ -13,8 +15,6 @@ use App\Cash\Enum\PaymentPlan\PaymentPlanStatus;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
-use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
-use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;

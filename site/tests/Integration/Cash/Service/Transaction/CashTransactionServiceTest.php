@@ -6,7 +6,7 @@ namespace App\Tests\Integration\Cash\Service\Transaction;
 
 use App\Cash\Application\AddCashTransactionAction;
 use App\Cash\Application\DTO\CashTransactionDTO;
-use App\Cash\Application\UpdateCashTransactionAction;
+use App\Cash\Application\Transaction\UpdateCashTransactionAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransactionSplit;

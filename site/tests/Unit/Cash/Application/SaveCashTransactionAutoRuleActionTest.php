@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Application;
 
-use App\Cash\Application\SaveCashTransactionAutoRuleAction;
-use App\Cash\Application\Service\CashTransactionAutoRuleTargetValidator;
+use App\Cash\Application\AutoRule\SaveCashTransactionAutoRuleAction;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleTargetValidator;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;

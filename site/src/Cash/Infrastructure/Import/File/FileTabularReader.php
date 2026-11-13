@@ -1,0 +1,271 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Cash\Infrastructure\Import\File;
+
+use App\Shared\Service\Storage\LegacyXlsConverter;
+use OpenSpout\Reader\CSV\Options as CsvOptions;
+use OpenSpout\Reader\CSV\Reader as CsvReader;
+use OpenSpout\Reader\ReaderInterface;
+use OpenSpout\Reader\XLSX\Reader as XlsxReader;
+
+class FileTabularReader
+{
+    public function __construct(private readonly LegacyXlsConverter $xlsConverter)
+    {
+    }
+
+    /**
+     * @return list<string|null>
+     */
+    public function readHeader(string $filePath): array
+    {
+        return $this->xlsConverter->withReadablePath($filePath, fn (string $path): array => $this->readHeaderFrom($path));
+    }
+
+    /**
+     * @return list<string|null>
+     */
+    private function readHeaderFrom(string $filePath): array
+    {
+        $reader = $this->openReaderByExtension($filePath);
+        $opened = false;
+        try {
+            $reader->open($filePath);
+            $opened = true;
+            foreach ($reader->getSheetIterator() as $sheet) {
+                foreach ($sheet->getRowIterator() as $row) {
+                    $cells = $row->toArray();
+
+                    return array_map(fn ($value) => $this->normalizeValue($value, true), $cells);
+                }
+                break;
+            }
+        } finally {
+            if ($opened) {
+                $reader->close();
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * @return list<list<string|null>>
+     */
+    public function readSampleRows(string $filePath, int $limit = 20): array
+    {
+        return $this->xlsConverter->withReadablePath(
+            $filePath,
+            fn (string $path): array => $this->readSampleRowsFrom($path, $limit),
+        );
+    }
+
+    /**
+     * @return list<list<string|null>>
+     */
+    private function readSampleRowsFrom(string $filePath, int $limit): array
+    {
+        if ($limit <= 0) {
+            return [];
+        }
+
+        $rows = [];
+        $reader = $this->openReaderByExtension($filePath);
+        try {
+            $reader->open($filePath);
+            foreach ($reader->getSheetIterator() as $sheet) {
+                $isHeaderRow = true;
+                foreach ($sheet->getRowIterator() as $row) {
+                    if ($isHeaderRow) {
+                        $isHeaderRow = false;
+                        continue;
+                    }
+
+                    $cells = $row->toArray();
+                    $rows[] = array_map(fn ($value) => $this->normalizeValue($value, false), $cells);
+
+                    if (count($rows) >= $limit) {
+                        break 2;
+                    }
+                }
+                break;
+            }
+        } finally {
+            $reader->close();
+        }
+
+        return $rows;
+    }
+
+    private function openReaderByExtension(string $filePath, bool $import = false): ReaderInterface
+    {
+        $extension = strtolower(pathinfo($filePath, \PATHINFO_EXTENSION));
+
+        return match ($extension) {
+            'csv' => $this->openCsvReader($filePath, $import),
+            'xlsx' => new XlsxReader(),
+            default => throw new \InvalidArgumentException(sprintf('Unsupported file extension: %s', $extension)),
+        };
+    }
+
+    private function openCsvReader(string $filePath, bool $import): CsvReader
+    {
+        $options = new CsvOptions();
+        $options->FIELD_DELIMITER = $import ? $this->detectImportCsvDelimiter($filePath) : $this->detectCsvDelimiter($filePath);
+
+        return new CsvReader($options);
+    }
+
+    private function detectCsvDelimiter(string $filePath): string
+    {
+        $handle = fopen($filePath, 'r');
+        if (false === $handle) {
+            return ';';
+        }
+
+        try {
+            $line = '';
+            while (!feof($handle)) {
+                $line = fgets($handle);
+                if (false === $line) {
+                    break;
+                }
+                $line = trim($line);
+                if ('' !== $line) {
+                    break;
+                }
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        if ('' === $line || false === $line) {
+            return ';';
+        }
+
+        $line = preg_replace('/^\xEF\xBB\xBF/', '', $line);
+        $candidates = [';', "\t", ','];
+        $bestDelimiter = ';';
+        $bestCount = 1;
+
+        foreach ($candidates as $delimiter) {
+            $columns = str_getcsv($line, $delimiter, '"', '\\');
+            $count = count($columns);
+            if ($count > $bestCount) {
+                $bestCount = $count;
+                $bestDelimiter = $delimiter;
+            }
+        }
+
+        return $bestDelimiter;
+    }
+
+    private function normalizeValue(mixed $value, bool $trim): ?string
+    {
+        if (null === $value) {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            $stringValue = $value->format('Y-m-d H:i:s');
+        } elseif (is_bool($value)) {
+            $stringValue = $value ? '1' : '0';
+        } elseif (is_scalar($value) || $value instanceof \Stringable) {
+            $stringValue = (string) $value;
+        } else {
+            $stringValue = (string) $value;
+        }
+
+        if ('' === trim($stringValue)) {
+            return null;
+        }
+
+        return $trim ? trim($stringValue) : $stringValue;
+    }
+
+    /** @return \Generator<int, array{rowNumber: int, row: array<string, ?string>}> */
+    public function readImportRows(string $filePath): \Generator
+    {
+        $reader = $this->openReaderByExtension($filePath, true);
+        $dataIndex = 0;
+
+        try {
+            $reader->open($filePath);
+            foreach ($reader->getSheetIterator() as $sheet) {
+                $headerLabels = null;
+                foreach ($sheet->getRowIterator() as $row) {
+                    $cells = $row->toArray();
+                    if (null === $headerLabels) {
+                        $headerLabels = [];
+                        foreach ($cells as $index => $value) {
+                            $header = $this->normalizeValue($value, true);
+                            $headerLabels[$index] = null === $header || '' === $header
+                                ? sprintf('Колонка %d', $index + 1)
+                                : $header;
+                        }
+
+                        continue;
+                    }
+
+                    $rowByHeader = [];
+                    foreach ($headerLabels as $index => $label) {
+                        $rowByHeader[$label] = $this->normalizeValue($cells[$index] ?? null, false);
+                    }
+
+                    ++$dataIndex;
+                    yield ['rowNumber' => $dataIndex + 1, 'row' => $rowByHeader];
+                }
+                break;
+            }
+        } finally {
+            $reader->close();
+        }
+    }
+
+    private function detectImportCsvDelimiter(string $filePath): string
+    {
+        $handle = fopen($filePath, 'r');
+        if (false === $handle) {
+            return ',';
+        }
+
+        $delimiters = [';', ',', "\t"];
+        $counts = array_fill_keys($delimiters, 0);
+        $linesRead = 0;
+
+        try {
+            while (!feof($handle) && $linesRead < 5) {
+                $line = fgets($handle);
+                if (false === $line) {
+                    break;
+                }
+
+                $trimmed = trim($line);
+                if ('' === $trimmed) {
+                    continue;
+                }
+
+                foreach ($delimiters as $delimiter) {
+                    $counts[$delimiter] += substr_count($line, $delimiter);
+                }
+
+                ++$linesRead;
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        $bestDelimiter = ',';
+        $bestCount = 0;
+        foreach ($counts as $delimiter => $count) {
+            if ($count > $bestCount) {
+                $bestCount = $count;
+                $bestDelimiter = $delimiter;
+            }
+        }
+
+        return $bestDelimiter;
+    }
+}

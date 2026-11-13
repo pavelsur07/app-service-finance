@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Import;
 
-use App\Cash\Service\Import\File\CashFileDescriptionPlan;
+use App\Cash\Application\Service\Import\File\CashFileDescriptionPlan;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\Storage\ObjectStorageException;
@@ -26,7 +26,7 @@ final class CashFileImportPreviewController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly \App\Cash\Http\CashFileImportPage $page,
         private readonly ObjectStorageInterface $storage,
-        private readonly \App\Cash\Application\PrepareCashFileImportAction $prepareImport,
+        private readonly \App\Cash\Application\Import\File\PrepareCashFileImportAction $prepareImport,
         private readonly CashFileDescriptionPlan $plans,
     ) {
     }
@@ -64,7 +64,7 @@ final class CashFileImportPreviewController extends AbstractController
         }
         $account = $importState->account;
 
-        $storageKey = \App\Cash\Service\Import\File\CashFileImportService::storageKey($fileHash, is_string($storedExtension) ? $storedExtension : '');
+        $storageKey = \App\Cash\Infrastructure\Import\File\CashFileStorage::storageKey($fileHash, is_string($storedExtension) ? $storedExtension : '');
         if (!$this->storage->exists($storageKey)) {
             $this->addFlash('error', 'Файл импорта не найден. Загрузите файл заново.');
 

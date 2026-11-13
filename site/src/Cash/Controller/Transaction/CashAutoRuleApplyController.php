@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
-use App\Cash\Application\ApplyAutoRuleToTransactionAction;
+use App\Cash\Application\AutoRule\ApplyAutoRuleToTransactionAction;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

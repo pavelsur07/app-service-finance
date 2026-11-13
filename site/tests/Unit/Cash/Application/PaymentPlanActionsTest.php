@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Application;
 
-use App\Cash\Application\ChangePaymentPlanStatusAction;
-use App\Cash\Application\CreatePaymentPlanAction;
 use App\Cash\Application\DTO\PaymentPlanDTO;
-use App\Cash\Application\PostponePaymentPlanAction;
-use App\Cash\Application\UpdatePaymentPlanAction;
+use App\Cash\Application\PaymentPlan\ChangePaymentPlanStatusAction;
+use App\Cash\Application\PaymentPlan\CreatePaymentPlanAction;
+use App\Cash\Application\PaymentPlan\PostponePaymentPlanAction;
+use App\Cash\Application\PaymentPlan\UpdatePaymentPlanAction;
+use App\Cash\Application\Service\PaymentPlan\PaymentPlanDtoApplier;
+use App\Cash\Application\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
-use App\Cash\Service\PaymentPlan\PaymentPlanDtoApplier;
-use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;

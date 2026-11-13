@@ -15,7 +15,7 @@ echo "ready\n";
 flush();
 if ('save' === getenv('CASH_RACE_OPERATION')) {
     $account->setOpeningBalance('234.56');
-    $container->get(App\Cash\Application\SaveMoneyAccountAction::class)($account);
+    $container->get(App\Cash\Application\Accounts\SaveMoneyAccountAction::class)($account);
 } else {
     $container->get(App\Cash\Service\Accounts\AccountBalanceService::class)->recalculateDailyRange($account->getCompany(), $account, new DateTimeImmutable('today'), new DateTimeImmutable('today'));
 }

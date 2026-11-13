@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Import;
 
+use App\Cash\Application\Service\Import\File\CashFileDescriptionPlan;
 use App\Cash\Entity\Import\CashFileImportJob;
-use App\Cash\Service\Import\File\CashFileDescriptionPlan;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\Storage\ObjectStorageException;

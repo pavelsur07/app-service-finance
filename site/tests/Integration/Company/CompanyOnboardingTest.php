@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Company;
 
 use App\Admin\Application\CreateAccountAction;
-use App\Cash\Application\CashflowCoreTemplateReader;
+use App\Cash\Application\Category\CashflowCoreTemplateReader;
 use App\Cash\Exception\CashflowCoreTemplateException;
 use App\Company\Application\CreateCompanyOwnerAccountAction;
 use App\Company\Entity\User;

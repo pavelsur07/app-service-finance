@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Application;
 
-use App\Cash\Application\BulkDeleteCashTransactionsAction;
-use App\Cash\Application\Service\DailyBalanceRecalculator;
+use App\Cash\Application\Service\Accounts\DailyBalanceRecalculator;
+use App\Cash\Application\Transaction\BulkDeleteCashTransactionsAction;
 use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashTransaction;

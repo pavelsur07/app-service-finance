@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Import;
 
-use App\Cash\Application\DeleteCashFileImportProfileAction;
+use App\Cash\Application\Import\File\DeleteCashFileImportProfileAction;
 use App\Cash\Repository\Import\CashFileImportProfileRepository;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;

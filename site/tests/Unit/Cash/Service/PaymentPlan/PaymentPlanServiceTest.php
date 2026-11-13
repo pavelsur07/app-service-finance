@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Service\PaymentPlan;
 
+use App\Cash\Application\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;
-use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use PHPUnit\Framework\TestCase;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Command\Import;
 
-use App\Cash\Application\DispatchCashFileImportJobAction;
+use App\Cash\Application\Import\File\DispatchCashFileImportJobAction;
 use App\Cash\Infrastructure\Lock\CashImportDeliveryLock;
 use App\Cash\Infrastructure\Messenger\ImportQueueProbeInterface;
 use App\Cash\Infrastructure\Query\CashFileImportDeliveryQuery;

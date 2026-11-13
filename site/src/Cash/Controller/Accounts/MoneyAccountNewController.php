@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Accounts;
 
-use App\Cash\Application\SaveMoneyAccountAction;
+use App\Cash\Application\Accounts\SaveMoneyAccountAction;
 use App\Cash\Form\Accounts\MoneyAccountType as MoneyAccountFormType;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;

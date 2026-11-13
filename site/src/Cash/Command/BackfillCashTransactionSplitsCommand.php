@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Command;
 
-use App\Cash\Application\Service\CashTransactionAutoRuleProvenanceResolver;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleProvenanceResolver;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;

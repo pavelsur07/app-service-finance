@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Category;
 
+use App\Cash\Application\Service\Category\CashflowCategoryStructureMigrator;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
-use App\Cash\Service\Category\CashflowCategoryStructureMigrator;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;

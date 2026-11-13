@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Service\Vat;
 
+use App\Cash\Application\Service\Transaction\Vat\VatPolicy;
+use App\Cash\Application\Service\Transaction\Vat\VatRates;
 use App\Cash\Enum\Transaction\CashDirection;
-use App\Cash\Service\Vat\VatPolicy;
-use App\Cash\Service\Vat\VatRates;
 use App\Company\Enum\TaxRegime;
 use App\Company\Enum\VatMode;
 use App\Company\Facade\CompanyTaxProfileFacadeInterface;

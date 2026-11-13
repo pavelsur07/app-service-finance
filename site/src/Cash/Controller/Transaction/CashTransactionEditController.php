@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Cash\Controller\Transaction;
 
 use App\Cash\Application\DTO\CashTransactionDTO;
-use App\Cash\Application\UpdateCashTransactionAction;
+use App\Cash\Application\Service\Transaction\CashTransactionService;
+use App\Cash\Application\Transaction\UpdateCashTransactionAction;
 use App\Cash\Form\Transaction\CashTransactionType;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Cash\Service\Transaction\CashTransactionService;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

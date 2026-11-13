@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Application;
 
-use App\Cash\Application\MaterializeRecurringPaymentPlansAction;
+use App\Cash\Application\PaymentPlan\MaterializeRecurringPaymentPlansAction;
+use App\Cash\Application\Service\PaymentPlan\PaymentPlanService;
+use App\Cash\Application\Service\PaymentPlan\PaymentRecurrenceService;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\PaymentPlan\PaymentRecurrenceRule;
@@ -14,8 +16,6 @@ use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Repository\PaymentPlan\PaymentRecurrenceRuleRepository;
-use App\Cash\Service\PaymentPlan\PaymentPlanService;
-use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
 use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;

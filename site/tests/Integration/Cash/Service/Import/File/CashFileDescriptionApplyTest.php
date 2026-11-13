@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Import\File;
 
-use App\Cash\Application\ApplyCashFileDescriptionsAction;
 use App\Cash\Application\DTO\BankStatementDayInput;
 use App\Cash\Application\DTO\BankStatementLineInput;
-use App\Cash\Application\ImportBankStatementDayAction;
-use App\Cash\Application\StartCashFileImportJobAction;
+use App\Cash\Application\Import\BankStatement\ImportBankStatementDayAction;
+use App\Cash\Application\Import\File\ApplyCashFileDescriptionsAction;
+use App\Cash\Application\Import\File\StartCashFileImportJobAction;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
+use App\Cash\Application\Service\Import\File\CashFileDescriptionPlan;
+use App\Cash\Application\Service\Import\File\CashFileImportService;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
@@ -19,9 +22,6 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
-use App\Cash\Service\Import\File\CashFileDescriptionPlan;
-use App\Cash\Service\Import\File\CashFileImportService;
-use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Shared\Service\Storage\ObjectStorageInterface;
@@ -108,9 +108,9 @@ final class CashFileDescriptionApplyTest extends CashFileImportTestCase
 
     public function testDateChangesOnlyDuringActualImportCannotCreateUnapprovedOperation(): void
     {
-        $normalizer = new \App\Cash\Service\Import\File\CashFileRowNormalizer();
+        $normalizer = new \App\Cash\Application\Service\Import\File\CashFileRowNormalizer();
         $calls = 0;
-        $changing = $this->createMock(\App\Cash\Service\Import\File\CashFileRowNormalizer::class);
+        $changing = $this->createMock(\App\Cash\Application\Service\Import\File\CashFileRowNormalizer::class);
         $changing->expects(self::exactly(3))->method('normalize')->willReturnCallback(static function (array $row, array $mapping, string $currency) use ($normalizer, &$calls): array {
             $normalized = $normalizer->normalize($row, $mapping, $currency);
             ++$calls;
@@ -118,28 +118,29 @@ final class CashFileDescriptionApplyTest extends CashFileImportTestCase
 
             return $normalized;
         });
+        $rows = new \App\Cash\Application\Service\Import\File\CashFileNormalizedRows(self::getContainer()->get(\App\Cash\Infrastructure\Import\File\FileTabularReader::class), $changing);
         $reflection = new \ReflectionClass(CashFileImportService::class);
         $original = self::getContainer()->get(CashFileImportService::class);
         $arguments = [];
         foreach ($reflection->getConstructor()?->getParameters() ?? [] as $parameter) {
-            $arguments[] = 'rowNormalizer' === $parameter->getName() ? $changing : $reflection->getProperty($parameter->getName())->getValue($original);
+            $arguments[] = 'rows' === $parameter->getName() ? $rows : $reflection->getProperty($parameter->getName())->getValue($original);
         }
         $importer = $reflection->newInstanceArgs($arguments);
         $plans = new CashFileDescriptionPlan(
-            $importer, self::getContainer()->get(\App\Cash\Service\Import\File\CashFileDescriptionMatcher::class),
+            $rows, self::getContainer()->get(\App\Cash\Infrastructure\Import\File\CashFileStorage::class), self::getContainer()->get(\App\Cash\Application\Service\Import\File\CashFileDescriptionMatcher::class),
             self::getContainer()->get(\App\Cash\Repository\Transaction\CashTransactionRepository::class),
             self::getContainer()->get(ObjectStorageInterface::class),
             new \App\Company\Domain\Service\CounterpartyNameNormalizer(),
         );
         $job = $this->queueCsvImport([$this->row('Новая операция')]);
-        $plan = $importer->withJobFile($job, fn (string $path): array => $plans->build($path, $job->getMoneyAccount(), $job->getMapping(), $job->getFileHash(), null));
+        $plan = self::getContainer()->get(\App\Cash\Infrastructure\Import\File\CashFileStorage::class)->withJobFile($job, fn (string $path): array => $plans->build($path, $job->getMoneyAccount(), $job->getMapping(), $job->getFileHash(), null));
         $hash = $plans->save($plan);
         $this->planKeys[] = 'cash-file-plans/'.$this->company->getId().'/'.$hash.'.json';
         $job->setOptions($job->getOptions() + ['description_plan' => $hash, 'selected_descriptions' => []]);
         $this->em->flush();
         $apply = new ApplyCashFileDescriptionsAction(
-            $plans, $importer, self::getContainer()->get(\App\Cash\Repository\Transaction\CashTransactionRepository::class),
-            $this->em, self::getContainer()->get(\App\Cash\Application\Service\AutoRuleDispatchGuard::class),
+            $plans, self::getContainer()->get(\App\Cash\Infrastructure\Import\File\CashFileStorage::class), self::getContainer()->get(\App\Cash\Repository\Transaction\CashTransactionRepository::class),
+            $this->em, self::getContainer()->get(\App\Cash\Application\Service\AutoRule\AutoRuleDispatchGuard::class),
         );
         $allowed = $apply($job);
         self::assertSame(2, $calls, 'Both preview and final re-plan must still see the approved date.');
@@ -695,7 +696,7 @@ final class CashFileDescriptionApplyTest extends CashFileImportTestCase
     {
         $plans = self::getContainer()->get(CashFileDescriptionPlan::class);
         $importer = self::getContainer()->get(CashFileImportService::class);
-        $plan = $importer->withJobFile($job, fn (string $path): array => $plans->build(
+        $plan = self::getContainer()->get(\App\Cash\Infrastructure\Import\File\CashFileStorage::class)->withJobFile($job, fn (string $path): array => $plans->build(
             $path, $job->getMoneyAccount(), $job->getMapping(), $job->getFileHash(), $actor,
         ));
         $hash = $plans->save($plan);

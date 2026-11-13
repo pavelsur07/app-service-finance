@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Service\Category;
 
+use App\Cash\Application\Service\Category\CashflowSystemCategoryService;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
-use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Tests\Builders\Company\CompanyBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;

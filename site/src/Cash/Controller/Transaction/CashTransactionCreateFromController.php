@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
-use App\Cash\Application\CreateDocumentFromTransactionAction;
+use App\Cash\Application\Document\CreateDocumentFromTransactionAction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;

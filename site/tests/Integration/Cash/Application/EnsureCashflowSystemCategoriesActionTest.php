@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application;
 
-use App\Cash\Application\EnsureCashflowSystemCategoriesAction;
+use App\Cash\Application\Category\EnsureCashflowSystemCategoriesAction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;

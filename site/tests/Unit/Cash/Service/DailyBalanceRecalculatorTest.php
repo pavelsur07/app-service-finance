@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Service;
 
-use App\Cash\Application\Service\DailyBalanceRecalculator;
+use App\Cash\Application\Service\Accounts\DailyBalanceRecalculator;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;

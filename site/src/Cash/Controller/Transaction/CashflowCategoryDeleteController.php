@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
-use App\Cash\Application\DeleteCashflowCategoryAction;
+use App\Cash\Application\Category\DeleteCashflowCategoryAction;
 use App\Cash\Exception\CashflowCategoryInUseException;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Security\ModuleAccess;

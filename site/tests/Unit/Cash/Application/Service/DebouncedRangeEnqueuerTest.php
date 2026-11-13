@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Application\Service;
 
-use App\Cash\Application\Service\DebouncedRangeEnqueuer;
+use App\Cash\Application\Service\AutoRule\DebouncedRangeEnqueuer;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Lock\LockFactory;

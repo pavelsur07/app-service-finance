@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Service\PaymentPlan;
 
+use App\Cash\Application\Service\PaymentPlan\PaymentRecurrenceService;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\PaymentPlan\PaymentRecurrenceRule;
 use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use PHPUnit\Framework\TestCase;

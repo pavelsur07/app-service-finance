@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\Command;
 
-use App\Cash\Application\AutoApplyCashCategorySuggestionsAction;
-use App\Cash\Application\RequestCashAiCategorizationAction;
+use App\Cash\Application\AiCategorization\AutoApplyCashCategorySuggestionsAction;
+use App\Cash\Application\AiCategorization\RequestCashAiCategorizationAction;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;

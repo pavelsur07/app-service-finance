@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application;
 
-use App\Cash\Application\StartCashFileImportJobAction;
+use App\Cash\Application\Import\File\StartCashFileImportJobAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;

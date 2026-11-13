@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Cash\Controller;
 
-use App\Cash\Service\Category\CashflowSystemCategoryService;
+use App\Cash\Application\Service\Category\CashflowSystemCategoryService;
 use App\Company\Entity\Company;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;

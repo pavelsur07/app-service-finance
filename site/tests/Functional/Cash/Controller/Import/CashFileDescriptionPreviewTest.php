@@ -296,7 +296,7 @@ final class CashFileDescriptionPreviewTest extends WebTestCaseBase
         $client->followRedirect();
         self::assertResponseIsSuccessful();
         $payload = $client->getRequest()->getSession()->get('cash_file_import');
-        $plan = self::getContainer()->get(\App\Cash\Service\Import\File\CashFileDescriptionPlan::class)->load((string) $company->getId(), $payload['description_plan']);
+        $plan = self::getContainer()->get(\App\Cash\Application\Service\Import\File\CashFileDescriptionPlan::class)->load((string) $company->getId(), $payload['description_plan']);
         self::assertCount(1, $plan['rows']);
         $input = array_values($plan['rows'])[0]['input'];
         self::assertTrue($input['ok']);

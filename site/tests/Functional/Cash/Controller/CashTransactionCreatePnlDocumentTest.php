@@ -135,7 +135,7 @@ final class CashTransactionCreatePnlDocumentTest extends WebTestCaseBase
             $row->amount = $amount;
             $input->rows[] = $row;
         }
-        self::getContainer()->get(\App\Cash\Application\SaveCashTransactionSplitsAction::class)($tx, $input);
+        self::getContainer()->get(\App\Cash\Application\Transaction\SaveCashTransactionSplitsAction::class)($tx, $input);
         $client->loginUser($user);
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
         $crawler = $client->request('GET', '/finance/cash-transactions/'.$tx->getId().'/edit');

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Import\File;
 
-use App\Cash\Service\Import\File\CashFileImportService;
+use App\Cash\Application\Service\Import\File\CashFileImportService;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Tests\Builders\Company\CompanyBuilder;
