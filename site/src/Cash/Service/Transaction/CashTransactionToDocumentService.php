@@ -52,24 +52,6 @@ class CashTransactionToDocumentService
         $this->financeFacade->invalidatePLRegisterCache($companyId);
     }
 
-    /**
-     * Создаёт операцию документа из транзакции ДДС.
-     */
-    public function createOperationFromTransaction(CashTransaction $transaction): DocumentOperation
-    {
-        $operation = new DocumentOperation();
-        $operation->setAmount($transaction->getAmount());
-        $operation->setProjectDirection($this->resolveProjectDirection($transaction));
-        $operation->setResponsibilityCenterId($transaction->getResponsibilityCenterId());
-
-        $category = $transaction->getSingleSplitCategory();
-        if ($category instanceof CashflowCategory) {
-            $operation->setCategory($this->resolvePlCategoryForCashflowCategory($category));
-        }
-
-        return $operation;
-    }
-
     private function resolvePlCategoryForCashflowCategory(CashflowCategory $category): ?PLCategory
     {
         return $category->getPlCategory();

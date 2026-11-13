@@ -43,7 +43,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $service = $this->createService();
 
         self::assertSame(CashTransactionAutoRuleSkipReason::DELETED, $service->getSkipReason($transaction));
-        self::assertNull($service->findMatchingRule($transaction));
+        self::assertNull($service->match($transaction)->rule);
         self::assertNull($service->applyRule($rule, $transaction));
         self::assertNull($transaction->getCashflowCategory());
     }
@@ -59,7 +59,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         $service = $this->createService();
 
         self::assertSame(CashTransactionAutoRuleSkipReason::LOCKED_PERIOD, $service->getSkipReason($transaction));
-        self::assertNull($service->findMatchingRule($transaction));
+        self::assertNull($service->match($transaction)->rule);
         self::assertNull($service->applyRule($rule, $transaction));
         self::assertNull($transaction->getCashflowCategory());
     }

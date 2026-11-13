@@ -33,15 +33,6 @@ class CashTransactionAutoRuleService
     ) {
     }
 
-    /**
-     * Найти основное правило-победитель для транзакции (в пределах компании транзакции).
-     * Возвращает null, если ни у одного поля нет однозначного победителя.
-     */
-    public function findMatchingRule(CashTransaction $t): ?CashTransactionAutoRule
-    {
-        return $this->match($t)->rule;
-    }
-
     /** @return array<string, mixed> */
     public function previewTransaction(CashTransaction $transaction): array
     {
