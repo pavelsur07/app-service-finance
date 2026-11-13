@@ -10,7 +10,8 @@ together; prompt contains no corpus example or saved financial data.
 
 Baseline make ai-service-test: 192 passed, 1 skipped, 7 deselected; two existing
 Sentry deprecation warnings. New schema test first failed (missing new contract);
-path root corrected to services; new schema examples/invalid cases then verified.
+path root corrected to services; new schema examples/invalid cases then verified: 7 passed (Docker pytest
+`tests/unit/test_payment_intake_contract.py -q`).
 Conservative unresolved business decisions become runtime questions per spec.
 No financial defaults or production/live calls added. Coordinator owns Stage
 commit/review gate and PHP contract tests. Internal review: 0 BLOCKER, 0 IMPORTANT.

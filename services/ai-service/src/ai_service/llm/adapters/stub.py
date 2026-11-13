@@ -23,6 +23,15 @@ class StubAdapter:
                 text = json.dumps({"text": extract_data_block(request.user)}, ensure_ascii=False)
             case "categorize":
                 text = json.dumps(_categorize(json.loads(extract_data_block(request.user))))
+            case "payment-intake":
+                text = json.dumps(
+                    {
+                        "intent": "payments",
+                        "items": [],
+                        "target_ref": None,
+                        "questions": ["Тестовый адаптер: разбор моделью не выполнялся."],
+                    }
+                )
             case "invalid":
                 text = "не JSON"
             case "fail":

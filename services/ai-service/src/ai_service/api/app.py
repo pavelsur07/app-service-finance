@@ -135,6 +135,11 @@ def create_app(pool: ConnectionPool[Any], api_token: str, task_types: list[str])
             raise ApiError(404, "task_not_found", "Задача не найдена")
         return TaskStatus.model_validate(row)
 
+    @app.get("/internal/tasks/{task_id}/result", dependencies=internal)
+    def task_result(task_id: UUID, company_id: UUID, conn: Conn) -> ResultsPage:
+        row = store.result_for_task(conn, company_id, task_id)
+        return ResultsPage(items=[] if row is None else [_result(row)], next_cursor=None)
+
     @app.get("/internal/tasks", dependencies=internal)
     def results(
         conn: Conn,

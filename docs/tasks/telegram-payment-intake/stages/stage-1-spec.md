@@ -21,12 +21,12 @@ cannot establish a guessed monetary scale. Input limits are 16000 characters,
 rejected, never truncated. Output limit is 50 candidates.
 
 Acceptance checklist:
-- [ ] All 41 unique source cases reviewed; all annotated spans present.
-- [ ] Source partial annotations are facts/constraints, never a saved-data oracle.
-- [ ] Questions recorded for short amounts, grouping, personal funds, future payment.
-- [ ] New schema/examples validate; wrong types, extra fields, bad money/limits fail.
-- [ ] Generic published ai-task/v1 unchanged; echo/categorization remain compatible.
-- [ ] Synthetic A/B directories and family-separated prompt/holdout documented.
+- [x] All 41 unique source cases reviewed; all annotated spans present.
+- [x] Source partial annotations are facts/constraints, never a saved-data oracle.
+- [x] Questions recorded for short amounts, grouping, personal funds, future payment.
+- [x] New schema/examples validate; wrong types, extra fields, bad money/limits fail.
+- [x] Generic published ai-task/v1 unchanged; echo/categorization remain compatible.
+- [x] Synthetic A/B directories and family-separated prompt/holdout documented.
 
 Checks: baseline `make ai-service-test`; new schema tests red then green;
 existing contract/unit suite. Live LLM is excluded.
