@@ -40,7 +40,7 @@ class MarketplaceOperation
     #[ORM\Column(type: 'string', length: 64)]
     private string $kind;
 
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'money_amount_minor')]
     private int $amountMinor;
 
     #[ORM\Column(type: 'string', length: 3)]
