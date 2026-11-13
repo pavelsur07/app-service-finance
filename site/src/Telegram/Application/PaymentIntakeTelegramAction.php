@@ -62,7 +62,14 @@ final readonly class PaymentIntakeTelegramAction
                 if (null === $candidateActor) {
                     continue;
                 }
-                $sourceDraft = $this->cash->findPaymentIntakeDraftBySource((string) $bot->getId(), $chatId, $messageId, $candidateActor);
+                try {
+                    $sourceDraft = $this->cash->findPaymentIntakeDraftBySource((string) $bot->getId(), $chatId, $messageId, $candidateActor);
+                } catch (\DomainException) {
+                    $knownSource = true;
+                    // Another binding can represent a different or revoked app actor.
+                    // Also close fallback if the source appeared after the metadata precheck.
+                    continue;
+                }
                 $knownSource = $knownSource || null !== $sourceDraft;
                 if (null !== $sourceDraft && $sourceDraft->companyId === $candidate->getCompany()->getId()) {
                     $session = new PaymentIntakeSession($candidate, $chatId, $messageId, $sourceDraft->id);

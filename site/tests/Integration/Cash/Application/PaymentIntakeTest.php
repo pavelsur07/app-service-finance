@@ -88,6 +88,29 @@ final class PaymentIntakeTest extends IntegrationTestCase
         $this->buildAction();
     }
 
+    public function testTransferLeafCategoryUsesTheExistingAnyDirectionPayloadContract(): void
+    {
+        $this->category->setOperationType(\App\Cash\Enum\PaymentPlan\PaymentPlanType::TRANSFER);
+        $this->em->flush();
+        $this->request();
+        $directions = array_column($this->requests[0]['payload']['categories'], 'direction', 'id');
+        self::assertSame('any', $directions[(string) $this->category->getId()]);
+    }
+
+    public function testTransferLeafCategoryCanBeManuallySelectedForEitherDirection(): void
+    {
+        $this->category->setOperationType(\App\Cash\Enum\PaymentPlan\PaymentPlanType::TRANSFER);
+        $this->em->flush();
+        $draft = $this->ready();
+        $itemId = $draft->items[0]['id'];
+        $draft = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$itemId => ['category_id' => (string) $this->category->getId(), 'direction' => 'outflow']]));
+        self::assertSame((string) $this->category->getId(), $draft->items[0]['category_id']);
+        self::assertSame('outflow', $draft->items[0]['direction']);
+        $draft = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$itemId => ['direction' => 'inflow']]));
+        self::assertSame((string) $this->category->getId(), $draft->items[0]['category_id']);
+        self::assertSame('inflow', $draft->items[0]['direction']);
+    }
+
     public function testPreviewDefaultsAndExplicitConfirmationCreateExactlyOneOperation(): void
     {
         $draft = $this->ready();
@@ -641,7 +664,7 @@ final class PaymentIntakeTest extends IntegrationTestCase
     private function buildAction(?\Symfony\Contracts\EventDispatcher\EventDispatcherInterface $events = null): void
     {
         $c = self::getContainer();
-        $this->action = new PaymentIntakeAction($this->em, $c->get(PaymentIntakeDraftRepository::class), $c->get(CompanyFacade::class), $c->get(FinancialResponsibilityCenterFacade::class), $c->get(CashTransactionService::class), $c->get(CashTransactionResponsibilityCenterResolver::class), $c->get(CashCategorizationQuery::class), $this->ai, $c->get(AddCashTransactionAction::class), $events ?? $c->get('event_dispatcher'), new \Psr\Log\NullLogger(), $c->get(\App\Cash\Infrastructure\Query\PaymentIntakeDuplicateQuery::class), $this->clock, $c->get(\App\Cash\Repository\PaymentIntake\PaymentIntakeReplyReceiptRepository::class));
+        $this->action = new PaymentIntakeAction($this->em, $c->get(PaymentIntakeDraftRepository::class), $c->get(CompanyFacade::class), $c->get(FinancialResponsibilityCenterFacade::class), $c->get(CashTransactionService::class), $c->get(CashTransactionResponsibilityCenterResolver::class), $c->get(CashCategorizationQuery::class), $this->ai, $c->get(AddCashTransactionAction::class), $events ?? $c->get('event_dispatcher'), new \Psr\Log\NullLogger(), $c->get(\App\Cash\Infrastructure\Query\PaymentIntakeDuplicateQuery::class), $this->clock, $c->get(\App\Cash\Repository\PaymentIntake\PaymentIntakeReplyReceiptRepository::class), $c->get(\App\Cash\Application\Service\AiCategorization\CashCategorizationPayloadMapper::class));
     }
 
     private function request(string $messageId = '3'): PaymentIntakeDraftView

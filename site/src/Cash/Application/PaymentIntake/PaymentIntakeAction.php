@@ -11,6 +11,7 @@ use App\Cash\Application\DTO\PaymentIntake\ConfirmPaymentIntakeDraftCommand;
 use App\Cash\Application\DTO\PaymentIntake\PaymentIntakeConfirmation;
 use App\Cash\Application\DTO\PaymentIntake\PaymentIntakeDraftView;
 use App\Cash\Application\DTO\PaymentIntake\RequestPaymentIntakeCommand;
+use App\Cash\Application\Service\AiCategorization\CashCategorizationPayloadMapper;
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Application\Service\Transaction\CashTransactionService;
 use App\Cash\Domain\Event\CashTransactionsChanged;
@@ -51,6 +52,7 @@ final readonly class PaymentIntakeAction
         private PaymentIntakeDuplicateQuery $duplicates,
         private ClockInterface $clock,
         private PaymentIntakeReplyReceiptRepository $replyReceipts,
+        private CashCategorizationPayloadMapper $categorizationMapper,
     ) {
     }
 
@@ -310,10 +312,7 @@ final readonly class PaymentIntakeAction
 
             return;
         }
-        $categories = [];
-        foreach ($this->categories->findLeafCategories($draft->getCompanyId()) as $category) {
-            $categories[] = ['id' => $category->id, 'name' => mb_substr($category->path, -500), 'direction' => null === $category->operationType ? 'any' : strtolower($category->operationType)];
-        }
+        $categories = $this->categoryChoices($draft->getCompanyId());
         $projects = array_map(static fn ($project): array => ['id' => $project->id, 'name' => mb_substr($project->name, 0, 500)], $this->companies->listProjectDirections($draft->getCompanyId()));
         $centers = array_map(static fn ($center): array => ['id' => $center->id, 'name' => mb_substr($center->name, 0, 500)], $this->centers->getActiveChoices($draft->getCompanyId()));
         $pairs = array_map(static fn ($pair): array => ['project_id' => $pair->projectDirectionId, 'cfo_id' => $pair->responsibilityCenterId], $this->centers->getActivePairs($draft->getCompanyId()));
@@ -379,8 +378,20 @@ final readonly class PaymentIntakeAction
         });
     }
 
+    /** @return list<array{id: string, name: string, direction: string}> */
+    private function categoryChoices(string $companyId): array
+    {
+        $choices = [];
+        foreach ($this->categories->findLeafCategories($companyId) as $category) {
+            $mapped = $this->categorizationMapper->category($category);
+            $choices[] = ['id' => $mapped['id'], 'name' => $mapped['path'], 'direction' => $mapped['direction']];
+        }
+
+        return $choices;
+    }
+
     /**
-     * @return array{MoneyAccount, array<string, ?string>}
+     * @return array{MoneyAccount, array<string, string>}
      */
     private function validationContext(PaymentIntakeDraft $draft): array
     {
@@ -389,14 +400,14 @@ final readonly class PaymentIntakeAction
         if (!$account->isActive()) {
             throw new \DomainException('Выбранный счёт недоступен.');
         }
-        $eligible = array_column(array_map(static fn ($category): array => ['id' => $category->id, 'direction' => null === $category->operationType ? null : strtolower($category->operationType)], $this->categories->findLeafCategories($draft->getCompanyId())), 'direction', 'id');
+        $eligible = array_column($this->categoryChoices($draft->getCompanyId()), 'direction', 'id');
 
         return [$account, $eligible];
     }
 
     /**
      * @param array<string, mixed> $item
-     * @param array<string, ?string> $eligible
+     * @param array<string, string> $eligible
      */
     private function validateReferences(PaymentIntakeDraft $draft, array $item, MoneyAccount $account, array $eligible): void
     {
@@ -405,7 +416,7 @@ final readonly class PaymentIntakeAction
             $this->transactions->resolveCurrencyForAccount($item['currency'], $account);
         }
         if (null !== $item['category_id']) {
-            if (!\array_key_exists($item['category_id'], $eligible) || (null !== $eligible[$item['category_id']] && $eligible[$item['category_id']] !== $item['direction'])) {
+            if (!\array_key_exists($item['category_id'], $eligible) || ('any' !== $eligible[$item['category_id']] && $eligible[$item['category_id']] !== $item['direction'])) {
                 throw new \DomainException('Статья недоступна или не подходит направлению платежа.');
             }
         }

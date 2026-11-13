@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Cash\PaymentIntake;
 
 use App\Cash\Entity\PaymentIntake\PaymentIntakeDraft;
+use App\Tests\Builders\Cash\PaymentIntakeDraftBuilder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
@@ -194,6 +195,6 @@ final class PaymentIntakeDraftTest extends TestCase
 
     private function draft(): PaymentIntakeDraft
     {
-        return new PaymentIntakeDraft(Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), 'bot/chat/msg', 'original', 'оплатил 100', new \DateTimeImmutable('2026-11-13T12:00:00+03:00'), 'Europe/Moscow', 'RUB');
+        return PaymentIntakeDraftBuilder::aDraft()->build();
     }
 }

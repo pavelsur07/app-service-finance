@@ -3920,7 +3920,7 @@ buildQueryBuilder(
 
 ### PaymentIntake: текстовые черновики
 
-Для компаний с доступом к новой ИИ-задаче текст обрабатывается как черновик
+Для компаний с существующим доступом к ai-service текст обрабатывается как черновик
 Cash PaymentIntake. Python `parse_payment_message` выполняется внутри существующего
 ai-service; payload/output — `services/_contracts/ai-parse-payment-message/v1`.
 Конверт `ai-task/v1` не изменён. Модель возвращает предложения с доказательными
@@ -3929,6 +3929,9 @@ ai-service; payload/output — `services/_contracts/ai-parse-payment-message/v1`
 умолчанию `0` (только test env `1`). Его включение до live-eval приёмки не
 является частью обычного доступа компании к ИИ. Если новый сценарий выбран,
 его недоступность не включает автоматически legacy запись первой цифры.
+Переключатель глобальный; отдельного company allowlist для intake нет, охват
+при включении задают существующие AI grants. Более узкий независимый пилот
+требует отдельного company gate до включения, без изменения общих grants молча.
 
 `CashFacade` предоставляет request/get/amend/confirm/cancel сценарии черновика
 через DTO `Application/DTO/PaymentIntake`. Компания и пользователь приходят из

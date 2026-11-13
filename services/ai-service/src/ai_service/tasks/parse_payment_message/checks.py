@@ -150,12 +150,19 @@ def _occurrence_errors(inp: PaymentInput, item: PaymentItem, start: int, end: in
         expected_direction = "inflow" if sign_value == "+" else "outflow"
     else:
         expected_direction = ("inflow" if inflow else "outflow") if inflow != outflow else None
-    if sign_value is None and inflow and outflow:
+    word_direction = ("inflow" if inflow else "outflow") if inflow != outflow else None
+    sign_conflict = sign_value is not None and word_direction is not None and expected_direction != word_direction
+    if sign_conflict or (sign_value is None and inflow and outflow):
         if item.direction is not None:
             errors.add("direction_ambiguous")
         elif not has_questions:
             errors.add("direction_question")
-    if item.direction is not None and expected_direction is not None and item.direction != expected_direction:
+    if (
+        not sign_conflict
+        and item.direction is not None
+        and expected_direction is not None
+        and item.direction != expected_direction
+    ):
         errors.add("direction_contradiction")
     reference = inp.reference_at.astimezone(ZoneInfo(inp.timezone)).date()
     anchored_dates = _dates(clause, reference, start - left, end - left)

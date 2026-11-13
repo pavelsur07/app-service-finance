@@ -253,7 +253,9 @@ final class TelegramWebhookController extends AbstractController
                 $this->entityManager->persist($clientBinding);
             }
 
-            $clientBinding->setActorUserId($botLink->getActorUserId());
+            if (null !== $botLink->getActorUserId()) {
+                $clientBinding->setActorUserId($botLink->getActorUserId());
+            }
 
             // Помечаем ссылку использованной
             $botLink->markUsed();

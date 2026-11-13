@@ -1,7 +1,8 @@
 # Stage 3 — Cash PaymentIntake
 
 Base: `8a1f51cac4dacac4d49dd6b5cf72e0940d26a895`. Risk HIGH-LOCAL.
-Status: implementation and module verification complete; parent independent reviews/commit pending.
+Status: implementation, module verification and parent Stage reviews complete;
+committed in 0264aed23 and 5fff92c58, later verified follow-ups in Stage 4/5.
 SPEC preceded implementation: [stage-3-spec.md](stage-3-spec.md).
 
 ## Delivered
@@ -122,3 +123,11 @@ Final identity guard refinement: a successfully applied correction reply is itse
 Owned verification before this final boolean refinement: **66 tests, 339 assertions green** (Cash intake, real concurrency, transaction boundary and old creation); focused PHPStan green; CS import formatting corrected. Latest source/reply/rollback/cascade cases after the refinement: **6 tests, 25 assertions green**. Schema dump contains only unrelated test-only `test_money_holder`; receipt table, indexes, unique key and FK match the migration/mapping. Final serial rechecks below coordinate with the Telegram agent to avoid concurrent heavy suites on the constrained host.
 
 Final serial verification after receipt-backed source ownership and canonical optional UUIDv7 receipt IDs: **67 tests, 341 assertions green** (including the parent source-edit paid-confirmation regression). Focused PHPStan over all changed Cash contracts/actions/repositories/entity/builder/tests: **exit 0**. Project CS dry-run: **0/9 files require changes**. `git diff --check` clean. Heavy process slot released to Telegram for its last checks; Cash implementation is frozen.
+
+## Final handoff external review — TRANSFER category contract
+
+The final external finding (**BLOCKER 0, IMPORTANT 1**) was confirmed: a non-system active leaf category with `PaymentPlanType::TRANSFER` produced invalid `direction: transfer` in the parse-task directory, and the same ad-hoc normalization rejected either manual cash direction. PaymentIntake now reuses existing `CashCategorizationPayloadMapper::category()` in both directory construction and current-reference validation: INFLOW → inflow, OUTFLOW → outflow, default (including TRANSFER) → any. This preserves the established Cash mapping and introduces no financial rule.
+
+Exact regression command: `docker exec vf-payment-intake-php php bin/phpunit tests/Integration/Cash/Application/PaymentIntakeTest.php --filter testTransferLeafCategory --no-progress`.
+
+RED: payload assertion expected `any`, got `transfer`; manual category amendment threw the direction-unavailable DomainException. GREEN after mapper reuse: **2 tests, 5 assertions**. Focused PHPStan over the Action, integration test, Cash Draft builder, Telegram Session builder and existing unit helper: **exit 0**. Project CS corrected only import ordering; `git diff --check` clean. All PHP checks ran serially after the parent's complete test gate 69480 finished. No broad suite or additional review round was run for this focused fix; confirmed IMPORTANT fixed and verified without re-run.

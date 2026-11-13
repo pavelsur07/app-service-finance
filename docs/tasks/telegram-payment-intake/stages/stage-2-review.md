@@ -41,3 +41,8 @@ Final gates: make ai-service-test 284 passed, 1 skipped; make ai-service-evals
 files. The existing source-mount skip, no-key live eval skip and two Sentry
 warnings remain. No live provider or production call was made. Actual model
 quality, recall, latency/cost and pilot readiness remain unverified.
+
+Handoff round 1 MINOR2 (Python): `Получил от клиента - 79000 руб` no longer
+gives the separator hyphen silent priority over the incoming verb. Either filled
+direction is ambiguous; null requires a question. Three counterexamples observed
+RED before the source/prompt fix and GREEN afterwards. Core pipeline unchanged.

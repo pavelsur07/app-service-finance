@@ -1,0 +1,65 @@
+{
+  "mode": "offline_manifest",
+  "manifest": {
+    "N": 41,
+    "families": {
+      "misc": [
+        "tg-001",
+        "tg-002",
+        "tg-003",
+        "tg-005",
+        "tg-006",
+        "tg-009",
+        "tg-010",
+        "tg-011",
+        "tg-012",
+        "tg-013",
+        "tg-014",
+        "tg-015",
+        "tg-041"
+      ],
+      "salary": [
+        "tg-004",
+        "tg-007",
+        "tg-008"
+      ],
+      "event-list": [
+        "tg-016",
+        "tg-017",
+        "tg-018",
+        "tg-019",
+        "tg-020",
+        "tg-021",
+        "tg-022",
+        "tg-023",
+        "tg-024",
+        "tg-025",
+        "tg-026",
+        "tg-027",
+        "tg-028",
+        "tg-029",
+        "tg-030",
+        "tg-031",
+        "tg-032",
+        "tg-033",
+        "tg-034",
+        "tg-035",
+        "tg-036",
+        "tg-037",
+        "tg-038",
+        "tg-039",
+        "tg-040"
+      ]
+    },
+    "corpus_sha256": "8e630000b77b64a932417322d2f65a2bac3a2316c3691a9ab2be13dfdb5723bf",
+    "review_sha256": "7356ac909c142191c0fe70353c57ed44cbf20eb1a55b0ca4aec57d9f484dd9b4",
+    "prompt": "parse_payment_message/v1",
+    "prompt_sha256": "0553ee321857d40bded13bb682f478cfc8b42e2526a1c7dbcf008037bcc1eeed",
+    "runner_sha256": "cbb2f1856bc1b87f2ca159c72869f7d1d97425edf8a3f769b4422cac7acbfb58",
+    "gold": "partial_annotations",
+    "schema_sha256": "904fbed170cdc02f503a66d72dd7cb0cbe20be32cdbda8605b47d9b791034d8a"
+  },
+  "network_calls": 0,
+  "live_approval": "pending_provider_model_budget",
+  "metrics": null
+}

@@ -621,6 +621,52 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction WHERE company_id = ?', [self::COMPANY]));
     }
 
+    public function testSourceRecoveryContinuesPastWrongActorBindingBeforeOwnedBinding(): void
+    {
+        $client = $this->setupClient(true, true);
+        $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
+        $original = $this->em()->getRepository(ClientBinding::class)->findOneBy(['company' => self::COMPANY]);
+        self::assertInstanceOf(ClientBinding::class, $original);
+        $company = $original->getCompany();
+        $bot = $original->getBot();
+        $telegramUser = $original->getTelegramUser();
+        $account = $original->getMoneyAccount();
+        $actor = $original->getActorUserId();
+        $this->em()->remove($original);
+        $this->em()->flush();
+        $this->em()->clear();
+        $company = $this->em()->getReference(\App\Company\Entity\Company::class, self::COMPANY);
+        $bot = $this->em()->getReference(TelegramBot::class, (string) $bot->getId());
+        $telegramUser = $this->em()->getReference(TelegramUser::class, (string) $telegramUser->getId());
+        $account = $this->em()->getReference(\App\Cash\Entity\Accounts\MoneyAccount::class, (string) $account?->getId());
+        self::assertInstanceOf(\App\Company\Entity\Company::class, $company);
+        self::assertInstanceOf(TelegramBot::class, $bot);
+        self::assertInstanceOf(TelegramUser::class, $telegramUser);
+        self::assertInstanceOf(\App\Cash\Entity\Accounts\MoneyAccount::class, $account);
+        $other = UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail('tg-wrong-actor@example.test')->build();
+        $otherCompany = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-abcd0000ee02')->withOwner($other)->build();
+        $wrong = new ClientBinding(Uuid::uuid7()->toString(), $otherCompany, $bot, $telegramUser);
+        $wrong->setActorUserId((string) $other->getId());
+        $wrong->select(true);
+        foreach ([$other, $otherCompany, $wrong] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+        $owned = new ClientBinding(Uuid::uuid7()->toString(), $company, $bot, $telegramUser);
+        $owned->setActorUserId($actor);
+        $owned->setMoneyAccount($account);
+        $this->em()->persist($owned);
+        $this->em()->flush();
+        $candidates = $this->em()->getRepository(ClientBinding::class)->findBy(['telegramUser' => $telegramUser, 'bot' => $bot, 'status' => ClientBinding::STATUS_ACTIVE]);
+        self::assertSame($wrong->getId(), $candidates[0]->getId(), 'Fixture must exercise wrong actor before the matching binding.');
+        $before = count($this->aiTaskKeys);
+        $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM telegram_payment_intake_session WHERE company_id = ?', [self::COMPANY]));
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM telegram_payment_intake_session WHERE company_id = ?', [(string) $otherCompany->getId()]));
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_payment_intake_draft WHERE company_id = ?', [self::COMPANY]));
+        self::assertCount($before, $this->aiTaskKeys);
+    }
+
     private function seedSessionHistory(int $count, bool $candidate, int $start = 1): void
     {
         $pending = $candidate ? 'TRUE' : 'FALSE';

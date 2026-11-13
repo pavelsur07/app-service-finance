@@ -190,3 +190,29 @@ pilot activation remain Stage 5 work; the rollout default remains disabled.
 Question strings remain untyped: explicit reviewed human decisions are used,
 not a mechanical classifier of model question text. Natural language analytics
 aliases are not inferred; exact unambiguous company names are required.
+
+## Final handoff MINOR closure
+
+The two final Telegram MINOR findings were verified and fixed locally:
+
+- A still-valid pre-migration link with NULL application actor preserves an
+  existing binding's actual actor. A non-NULL authenticated link still replaces
+  it explicitly. The regression uses an existing non-owner actor and verifies
+  that the legacy link is consumed successfully without erasing that identity.
+- Missing-session source recovery continues after an inaccessible/wrong actor
+  candidate and reaches a later matching binding. Only DomainException is caught;
+  database/infrastructure failures propagate. The catch sets `knownSource = true`
+  so a source created after the initial metadata check cannot revive legacy entry.
+
+Both regressions were proven red (actor erased to NULL; owned session count 0),
+then green: **2 tests, 16 assertions** on `vf-payment-intake-php`. Focused PHPStan
+on the two changed source files and their two functional test files passed.
+Canonical `.php-cs-fixer.php` dry-run passed on all four files; formatting fixes
+were limited to tests. An initial fixture issue from a managed session referencing
+a cascade-deleted binding was corrected by clearing/reloading the fixture's ORM
+references before proving the behavioral failures. No production action occurred.
+
+Before these narrow final changes, the parent verified the full application suite:
+**8942 tests, 50254 assertions, green**. No broad suite or additional external
+review was started by this author after the MINOR fixes. Source is frozen for
+the parent's final one-look review, commit and CI.

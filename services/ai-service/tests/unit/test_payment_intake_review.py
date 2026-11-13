@@ -199,3 +199,16 @@ def test_ambiguous_unknown_fields_also_need_explicit_question(
     source: str, changes: dict[str, None], wanted: str
 ) -> None:
     assert wanted in probe(source, "10000 руб", "10000.00", **changes)
+
+
+@pytest.mark.parametrize("direction", ["inflow", "outflow"])
+def test_separator_sign_conflicting_with_explicit_verb_requires_unknown(direction: str) -> None:
+    assert "direction_ambiguous" in probe(
+        "Получил от клиента - 79000 руб", "79000 руб", "79000.00", direction=direction
+    )
+
+
+def test_conflicting_sign_unknown_also_requires_question() -> None:
+    source = "Получил от клиента - 79000 руб"
+    assert "direction_question" in probe(source, "79000 руб", "79000.00", direction=None)
+    assert not probe(source, "79000 руб", "79000.00", direction=None, questions=["Это приход или расход?"])
