@@ -19,6 +19,8 @@ final class CashFileImportBatchBoundaryTest extends CashFileImportTestCase
      */
     public static function rowCounts(): iterable
     {
+        yield 'under batch' => [199];
+        yield 'exact batch' => [200];
         yield 'one batch plus one' => [201];
         yield 'two batches plus one' => [401];
     }
