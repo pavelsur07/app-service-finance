@@ -8,7 +8,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Exception\CashFileImportConfirmationException;
 use App\Cash\Exception\CashFileImportSelectionException;
-use App\Cash\Service\Import\File\CashFileDescriptionPlan;
+use App\Cash\Application\Service\Import\File\CashFileDescriptionPlan;
 use App\Cash\Service\Import\File\CashFileMappingValidator;
 
 final readonly class ConfirmCashFileImportAction

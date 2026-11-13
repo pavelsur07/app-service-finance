@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Cash\Service\Import\File;
+namespace App\Cash\Infrastructure\Import\File;
 
 use App\Shared\Service\Storage\LegacyXlsConverter;
 use OpenSpout\Reader\CSV\Options as CsvOptions;

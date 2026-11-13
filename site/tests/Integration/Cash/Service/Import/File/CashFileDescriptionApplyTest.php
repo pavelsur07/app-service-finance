@@ -19,8 +19,8 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
-use App\Cash\Service\Import\File\CashFileDescriptionPlan;
-use App\Cash\Service\Import\File\CashFileImportService;
+use App\Cash\Application\Service\Import\File\CashFileDescriptionPlan;
+use App\Cash\Application\Service\Import\File\CashFileImportService;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
@@ -108,9 +108,9 @@ final class CashFileDescriptionApplyTest extends CashFileImportTestCase
 
     public function testDateChangesOnlyDuringActualImportCannotCreateUnapprovedOperation(): void
     {
-        $normalizer = new \App\Cash\Service\Import\File\CashFileRowNormalizer();
+        $normalizer = new \App\Cash\Application\Service\Import\File\CashFileRowNormalizer();
         $calls = 0;
-        $changing = $this->createMock(\App\Cash\Service\Import\File\CashFileRowNormalizer::class);
+        $changing = $this->createMock(\App\Cash\Application\Service\Import\File\CashFileRowNormalizer::class);
         $changing->expects(self::exactly(3))->method('normalize')->willReturnCallback(static function (array $row, array $mapping, string $currency) use ($normalizer, &$calls): array {
             $normalized = $normalizer->normalize($row, $mapping, $currency);
             ++$calls;
@@ -126,7 +126,7 @@ final class CashFileDescriptionApplyTest extends CashFileImportTestCase
         }
         $importer = $reflection->newInstanceArgs($arguments);
         $plans = new CashFileDescriptionPlan(
-            $importer, self::getContainer()->get(\App\Cash\Service\Import\File\CashFileDescriptionMatcher::class),
+            $importer, self::getContainer()->get(\App\Cash\Application\Service\Import\File\CashFileDescriptionMatcher::class),
             self::getContainer()->get(\App\Cash\Repository\Transaction\CashTransactionRepository::class),
             self::getContainer()->get(ObjectStorageInterface::class),
             new \App\Company\Domain\Service\CounterpartyNameNormalizer(),

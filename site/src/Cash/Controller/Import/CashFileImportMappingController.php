@@ -6,8 +6,8 @@ namespace App\Cash\Controller\Import;
 
 use App\Cash\Entity\Import\CashFileImportProfile;
 use App\Cash\Repository\Import\CashFileImportProfileRepository;
-use App\Cash\Service\Import\File\FileTabularReader;
-use App\Cash\Service\Import\File\HeaderAutoMapper;
+use App\Cash\Infrastructure\Import\File\FileTabularReader;
+use App\Cash\Application\Service\Import\File\HeaderAutoMapper;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Shared\Service\Storage\TemporaryLocalFile;
@@ -50,7 +50,7 @@ final class CashFileImportMappingController extends AbstractController
 
             return $this->redirectToRoute('cash_file_import_upload');
         }
-        $storageKey = \App\Cash\Service\Import\File\CashFileImportService::storageKey($fileHash, is_string($storedExtension) ? $storedExtension : '');
+        $storageKey = \App\Cash\Application\Service\Import\File\CashFileImportService::storageKey($fileHash, is_string($storedExtension) ? $storedExtension : '');
         if (!$this->storage->exists($storageKey)) {
             $this->addFlash('error', 'Файл импорта не найден. Загрузите файл заново.');
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Cash\Controller;
 
 use App\Cash\Infrastructure\Export\CashImportTemplateXlsxWriter;
-use App\Cash\Service\Import\File\HeaderAutoMapper;
+use App\Cash\Application\Service\Import\File\HeaderAutoMapper;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;

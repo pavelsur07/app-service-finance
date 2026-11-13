@@ -889,76 +889,76 @@ parameters:
 			path: src/Cash/Service/Import/ClientBank1CImportService.php
 
 		-
-			message: '#^Method App\\Cash\\Service\\Import\\File\\CashFileImportService\:\:openReaderByExtension\(\) return type with generic interface OpenSpout\\Reader\\ReaderInterface does not specify its types\: T$#'
+			message: '#^Method App\\Cash\\Application\\Service\\Import\\File\\CashFileImportService\:\:openReaderByExtension\(\) return type with generic interface OpenSpout\\Reader\\ReaderInterface does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
-			path: src/Cash/Service/Import/File/CashFileImportService.php
+			path: src/Cash/Application/Service/Import/File/CashFileImportService.php
 
 		-
 			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Application\\Service\\CashTransactionResponsibilityCenterResolver\:\:resolveForCreate\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Cash/Service/Import/File/CashFileImportService.php
+			path: src/Cash/Application/Service/Import/File/CashFileImportService.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Service\\Import\\File\\CashFileImportService\:\:getOrCreateCounterparty\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Application\\Service\\Import\\File\\CashFileImportService\:\:getOrCreateCounterparty\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Cash/Service/Import/File/CashFileImportService.php
+			path: src/Cash/Application/Service/Import/File/CashFileImportService.php
 
 		-
-			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Service\\Import\\File\\CashFileImportService\:\:makeDedupeHash\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#1 \$companyId of method App\\Cash\\Application\\Service\\Import\\File\\CashFileImportService\:\:makeDedupeHash\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Cash/Service/Import/File/CashFileImportService.php
+			path: src/Cash/Application/Service/Import/File/CashFileImportService.php
 
 		-
-			message: '#^Parameter \#2 \$moneyAccountId of method App\\Cash\\Service\\Import\\File\\CashFileImportService\:\:makeDedupeHash\(\) expects string, string\|null given\.$#'
+			message: '#^Parameter \#2 \$moneyAccountId of method App\\Cash\\Application\\Service\\Import\\File\\CashFileImportService\:\:makeDedupeHash\(\) expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Cash/Service/Import/File/CashFileImportService.php
+			path: src/Cash/Application/Service/Import/File/CashFileImportService.php
 
 		-
-			message: '#^Method App\\Cash\\Service\\Import\\File\\CashFileRowNormalizer\:\:getMappedValue\(\) has parameter \$rowByHeader with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Cash\\Application\\Service\\Import\\File\\CashFileRowNormalizer\:\:getMappedValue\(\) has parameter \$rowByHeader with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Cash/Service/Import/File/CashFileRowNormalizer.php
+			path: src/Cash/Application/Service/Import/File/CashFileRowNormalizer.php
 
 		-
-			message: '#^Method App\\Cash\\Service\\Import\\File\\CashFileRowNormalizer\:\:resolveAmountAndDirection\(\) has parameter \$mapping with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Cash\\Application\\Service\\Import\\File\\CashFileRowNormalizer\:\:resolveAmountAndDirection\(\) has parameter \$mapping with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Cash/Service/Import/File/CashFileRowNormalizer.php
+			path: src/Cash/Application/Service/Import/File/CashFileRowNormalizer.php
 
 		-
-			message: '#^Method App\\Cash\\Service\\Import\\File\\CashFileRowNormalizer\:\:resolveAmountAndDirection\(\) has parameter \$rowByHeader with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Cash\\Application\\Service\\Import\\File\\CashFileRowNormalizer\:\:resolveAmountAndDirection\(\) has parameter \$rowByHeader with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Cash/Service/Import/File/CashFileRowNormalizer.php
+			path: src/Cash/Application/Service/Import/File/CashFileRowNormalizer.php
 
 		-
-			message: '#^Method App\\Cash\\Service\\Import\\File\\CashFileRowNormalizer\:\:resolveCurrency\(\) has parameter \$mapping with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Cash\\Application\\Service\\Import\\File\\CashFileRowNormalizer\:\:resolveCurrency\(\) has parameter \$mapping with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Cash/Service/Import/File/CashFileRowNormalizer.php
+			path: src/Cash/Application/Service/Import/File/CashFileRowNormalizer.php
 
 		-
-			message: '#^Method App\\Cash\\Service\\Import\\File\\CashFileRowNormalizer\:\:resolveCurrency\(\) has parameter \$rowByHeader with no value type specified in iterable type array\.$#'
+			message: '#^Method App\\Cash\\Application\\Service\\Import\\File\\CashFileRowNormalizer\:\:resolveCurrency\(\) has parameter \$rowByHeader with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
-			path: src/Cash/Service/Import/File/CashFileRowNormalizer.php
+			path: src/Cash/Application/Service/Import/File/CashFileRowNormalizer.php
 
 		-
-			message: '#^Method App\\Cash\\Service\\Import\\File\\FileTabularReader\:\:openReaderByExtension\(\) return type with generic interface OpenSpout\\Reader\\ReaderInterface does not specify its types\: T$#'
+			message: '#^Method App\\Cash\\Infrastructure\\Import\\File\\FileTabularReader\:\:openReaderByExtension\(\) return type with generic interface OpenSpout\\Reader\\ReaderInterface does not specify its types\: T$#'
 			identifier: missingType.generics
 			count: 1
-			path: src/Cash/Service/Import/File/FileTabularReader.php
+			path: src/Cash/Infrastructure/Import/File/FileTabularReader.php
 
 		-
 			message: '#^Parameter \#1 \$string of function str_getcsv expects string, string\|null given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Cash/Service/Import/File/FileTabularReader.php
+			path: src/Cash/Infrastructure/Import/File/FileTabularReader.php
 
 		-
 			message: '#^Cannot call method diff\(\) on DateTimeImmutable\|null\.$#'

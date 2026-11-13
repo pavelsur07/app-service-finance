@@ -6,7 +6,7 @@ namespace App\Cash\Application\Import\File;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Exception\InvalidCashImportFileException;
-use App\Cash\Service\Import\File\FileTabularReader;
+use App\Cash\Infrastructure\Import\File\FileTabularReader;
 use App\Shared\Service\Storage\LegacyXlsTooLargeException;
 use App\Shared\Service\Storage\LegacyXlsTooManyCellsException;
 use App\Shared\Service\Storage\LegacyXlsUnreadableException;
@@ -54,7 +54,7 @@ final readonly class UploadCashFileImportAction
             throw new InvalidCashImportFileException('Не удалось прочитать загруженный файл.');
         }
         $hash = hash('sha256', $contents);
-        $this->storage->write(\App\Cash\Service\Import\File\CashFileImportService::storageKey($hash, $extension), $contents);
+        $this->storage->write(\App\Cash\Application\Service\Import\File\CashFileImportService::storageKey($hash, $extension), $contents);
 
         return ['company_id' => (string) $account->getCompany()->getId(), 'account_id' => (string) $account->getId(), 'file_name' => $name, 'file_hash' => $hash, 'stored_ext' => $extension];
     }

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Cash\Service\Import\File;
+namespace App\Cash\Application\Service\Import\File;
 
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
 use App\Cash\Entity\Import\CashFileImportJob;

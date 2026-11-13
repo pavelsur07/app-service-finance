@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Service\Import\File;
 
-use App\Cash\Service\Import\File\CashFileImportService;
-use App\Cash\Service\Import\File\CashFileRowNormalizer;
-use App\Cash\Service\Import\File\FileTabularReader;
+use App\Cash\Application\Service\Import\File\CashFileImportService;
+use App\Cash\Application\Service\Import\File\CashFileRowNormalizer;
+use App\Cash\Infrastructure\Import\File\FileTabularReader;
 use App\Shared\Service\Storage\LegacyXlsConverter;
 use App\Shared\Service\Storage\TemporaryFileFactory;
 use PHPUnit\Framework\Attributes\DataProvider;

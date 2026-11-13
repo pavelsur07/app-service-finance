@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Cash\Service\Import\File;
+namespace App\Cash\Application\Service\Import\File;
 
 /**
  * Pure allocation of file rows to an already company/account-scoped snapshot.
