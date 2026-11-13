@@ -357,6 +357,13 @@
 # Сервис недоступен — WARNING и exit 0, витрина прежняя; нарушение контракта — ERROR и exit 1; повтор — следующий запуск (docs/architecture/service-gateway.md §2.6).
 */10 * * * * cd /app && php bin/console app:service-gateway:coverage:refresh --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Факты из сервисов (модуль SourceFacts, source-fact-envelope v1): забор пачек ozon-fetcher каждые 15 минут.
+# Выключено (SOURCE_FACTS_COMPANIES пуст) — exit 0. Сервис недоступен — WARNING и exit 0; нарушение контракта
+# списка пачек — ERROR и exit 1. Гейт 09:10 МСК: пачки в карантине или поток без применённых пачек > 36 ч —
+# ERROR и exit 1 (docs/workflow/health-gates.md).
+*/15 * * * * cd /app && php bin/console app:source-facts:pull --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+10 9 * * * cd /app && php bin/console app:source-facts:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # ai-service (docs/maintenance/ai-service-prod.md). Выключено (AI_SERVICE_ENABLED, адрес, токен) —
 # обе команды выходят с 0, ничего не делая. Импорт результатов: сервис недоступен — WARNING и exit 0,
 # нарушение контракта — ERROR и exit 1. Подсказки статей ДДС — все подключённые в админке компании (запуск пишется в ai_run),

@@ -645,6 +645,16 @@ services:
             $baseUrl: '%env(default::OZON_FETCHER_BASE_URL)%'
             $token: '%env(default::OZON_FETCHER_API_TOKEN)%'
 
+    # Канал фактов ozon-fetcher (source-fact-envelope v1) для модуля SourceFacts; пустые адрес
+    # или токен — источник выключен. Приём включает SOURCE_FACTS_COMPANIES.
+    App\ServiceGateway\Infrastructure\Client\SourceFactsHttpClient:
+        arguments:
+            $service: 'ozon-fetcher'
+            $baseUrl: '%env(default::OZON_FETCHER_BASE_URL)%'
+            $token: '%env(default::OZON_FETCHER_API_TOKEN)%'
+
+    App\ServiceGateway\Infrastructure\Client\SourceFactsClientInterface: '@App\ServiceGateway\Infrastructure\Client\SourceFactsHttpClient'
+
     app.service_gateway.coverage_client.wb_fetcher:
         class: App\ServiceGateway\Infrastructure\Client\ServiceCoverageHttpClient
         arguments:

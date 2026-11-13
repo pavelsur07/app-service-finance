@@ -570,6 +570,9 @@ services:
             # Пустой токен — обновление выключено (exit 0).
             OZON_FETCHER_BASE_URL: http://ozon-fetcher:8080
             OZON_FETCHER_API_TOKEN: ${OZON_FETCHER_API_TOKEN:-}
+            # Приём фактов из сервисов (cron app:source-facts:pull, модуль SourceFacts): UUID компаний
+            # через запятую, * — все, пусто — выключено. GitHub variable SOURCE_FACTS_COMPANIES + деплой.
+            SOURCE_FACTS_COMPANIES: ${SOURCE_FACTS_COMPANIES:-}
             # Витрина покрытия wb-fetcher (вкладка Wildberries), токен «Symfony → сервис».
             WB_FETCHER_BASE_URL: http://wb-fetcher:8080
             WB_FETCHER_API_TOKEN: ${WB_FETCHER_API_TOKEN:-}

@@ -143,6 +143,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/ServiceGateway/Entity'
                 prefix: 'App\ServiceGateway\Entity'
                 alias: ServiceGateway
+            SourceFacts:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/SourceFacts/Entity'
+                prefix: 'App\SourceFacts\Entity'
+                alias: SourceFacts
             MarketplaceAds:
                 type: attribute
                 is_bundle: false

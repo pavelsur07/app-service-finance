@@ -320,6 +320,36 @@ final class ModuleBoundaryRules
             );
     }
 
+    /**
+     * `SourceFacts` — приём фактов из сервисов, первый модуль нового контура
+     * (`docs/tasks/marketplace-profit-pipeline/DATA.md` §4, §6). Он не знает каналов и учёта:
+     * ресурс для него — непрозрачная строка, запись источника не разбирается. Единственная
+     * внешняя зависимость — шлюз `ServiceGateway` (фасад, типы контракта, исключения).
+     *
+     * Запрет перечисляет модули, знание которых превратило бы приём в ещё один `Ingestion`:
+     * легаси маркетплейсов и учёт. На момент добавления ссылок нет — гейт зелёный с первого дня.
+     */
+    public function test_source_facts_knows_neither_channels_nor_accounting(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\SourceFacts'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\Inventory'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->because(
+                'SourceFacts хранит записи источника как есть: разбор — в переводчике канала, '
+                .'компанию по подключению определяет фасад ServiceGateway.',
+            );
+    }
+
     public function test_legacy_zone_stays_empty(): Rule
     {
         $legacy = [];
