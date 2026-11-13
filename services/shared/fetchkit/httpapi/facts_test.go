@@ -240,3 +240,22 @@ func TestFactResponsesMatchContractExamples(t *testing.T) {
 		})
 	}
 }
+
+// Symfony проверяет свой клиент на копиях примеров контракта: копии обязаны совпадать с примерами.
+func TestSiteFixturesAreCopiesOfContractExamples(t *testing.T) {
+	const examples = "../../../_contracts/source-fact-envelope/v1/examples/"
+	const copies = "../../../../site/tests/Fixtures/ServiceGateway/source-fact-envelope-v1/"
+	if _, err := os.Stat(copies); err != nil {
+		t.Skip("каталог site/ недоступен (тест запущен без корня репозитория)")
+	}
+	files, err := os.ReadDir(examples)
+	require.NoError(t, err)
+	require.NotEmpty(t, files)
+	for _, f := range files {
+		want, err := os.ReadFile(examples + f.Name())
+		require.NoError(t, err)
+		got, err := os.ReadFile(copies + f.Name())
+		require.NoError(t, err, "нет копии %s", f.Name())
+		assert.Equal(t, string(want), string(got), f.Name())
+	}
+}

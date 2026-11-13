@@ -517,6 +517,53 @@
   `echo`; `app:ai-service:import-results` (lock) — один проход импорта.
   Cron импорта не подключён (вывод в прод — отдельное одобрение).
 
+### ServiceGateway: канал фактов
+
+Контракт — `services/_contracts/source-fact-envelope/v1` (pull + ack). Клиент —
+`SourceFactsHttpClient` (сейчас один сервис: ozon-fetcher, `OZON_FETCHER_BASE_URL`/`_API_TOKEN`).
+
+- `SourceFactsGatewayFacadeInterface`: `sources()` (сервис → публикуемые ресурсы; сейчас
+  `ozon.finance.accrual-by-day`), `batches()`, `page()`, `ack()`. Данных не меняет и не коммитит.
+- Компанию пачки определяет фасад по `connection_ref` из активных подключений
+  (`MarketplaceFacade::getActiveOzonSellerConnections()`); подключения нет — `companyId = null`.
+- Страница отдаётся телом ответа как есть (`SourceFactPage::body`), проверенным по контракту:
+  числа источника не проходят через `float` PHP. 404 и 502 страницы — `ContractViolationException`
+  (повтор бесполезен), остальные не-200 и транспорт — `ServiceUnavailableException`.
+
+### SourceFacts: приём фактов из сервисов
+
+Первый модуль нового контура данных маркетплейсов (`docs/tasks/marketplace-profit-pipeline`).
+
+**Устав.** Причина изменений — контракт и транспорт фактов. Модуль хранит записи источника как
+есть и ведёт ревизии периодов. В модуле не должно быть: имён каналов и маркетплейсов, разбора
+`payload`, категорий, сумм, листингов, операций ОПиУ, обращений к провайдерам. Ресурс — непрозрачная
+строка. Внешняя зависимость одна — фасад `ServiceGateway` (гейт
+`ModuleBoundaryRules::test_source_facts_knows_neither_channels_nor_accounting`).
+
+| Таблица | Что | Ключ |
+|---|---|---|
+| `sf_batch` | журнал пачек сервиса: `applied` / `superseded` / `quarantined` (+ `reason`, `attempts`) | unique `(service, batch_id)` |
+| `sf_period` | текущая ревизия периода кабинета, `fact_count` | unique `(company_id, connection_ref, resource_type, period_key)` |
+| `sf_fact` | версии записей: `source_key`, `payload_hash`, `payload` jsonb, `first_revision`, `last_seen_revision` | unique по периоду + `(source_key, payload_hash)` |
+
+- Действующие записи периода: `first_revision <= current_revision <= last_seen_revision`. Строки не
+  удаляются и не перезаписываются. Потребитель узнаёт об изменении периода, сравнивая
+  `current_revision` со своей обработанной ревизией.
+- `PullSourceFactsAction` (команда `app:source-facts:pull`, cron `*/15`) — точка входа и владелец
+  транзакций. Две фазы, каждая идемпотентна: загрузка страниц (HTTP вне транзакции, страница — один
+  оператор `INSERT … SELECT FROM jsonb_array_elements … ON CONFLICT`) и активация (одна транзакция:
+  `sf_period` + `sf_batch`). Ack — после commit. Блокировок нет: монотонность ревизии держит условие
+  `WHERE current_revision < EXCLUDED.current_revision` в самом операторе.
+- Ревизия не новее текущей — `superseded`, подтверждается без применения. Нет активного подключения
+  или ответ страницы не по контракту — `quarantined`: пачка **не** подтверждается и приходит снова;
+  `error` в журнал — один на прогон и только о новых пачках. Сервис недоступен — прогон прерван,
+  WARNING, повтор по расписанию.
+- Включение — `SOURCE_FACTS_COMPANIES` (окружение scheduler): UUID компаний через запятую, `*` — все,
+  пусто — выключено. Пачки компаний вне списка остаются в очереди сервиса.
+- Гейт `app:source-facts:health-check` (cron 09:10 МСК): пачки в карантине или поток
+  (кабинет × ресурс) без применённых пачек дольше 36 ч — `error`, exit 1.
+- Фасада чтения нет: появится вместе с первым потребителем (переводчик `MarketplaceOzon`).
+
 ### Marketplace: WB financial report sync status (дневной статус)
 
 - Entity: `MarketplaceFinancialReportSyncStatus`.
@@ -5277,6 +5324,8 @@ config/
 | `app:ingestion:ozon-performance:daily-load --window=month-to-date` | `25 7 * * *` | Планирование Ozon Performance ingestion с начала месяца до вчерашнего дня; HTTP-загрузка выполняется `ingest_fetch` worker'ом |
 | `app:marketplace-ads:ozon-search-promo:sync` | `30 8 * * *` | Оплата за заказ Ozon из загруженных отчётов по заказам — в рекламную статистику по SKU, месяц вчерашнего дня |
 | **Инфраструктура** | | |
+| `app:source-facts:pull` | `*/15 * * * *` | Забор пачек фактов из ozon-fetcher (`source-fact-envelope` v1) в `sf_*`, ack после commit; выключено без `SOURCE_FACTS_COMPANIES`; недоступен — WARNING; нарушение контракта списка — ERROR |
+| `app:source-facts:health-check` | `10 9 * * *` | Гейт приёма фактов: карантин или поток без применённых пачек > 36 ч — ERROR, exit 1 |
 | `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
 | `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (`AI_SERVICE_ENABLED`, адрес, токен) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
 | `app:cash:ai-categorize --all-enabled` | `25 * * * *` | Компании allowlist ai-service с операциями за 90 дней: автоприменение по флагу компании, затем постановка ИИ-подсказок статей ДДС; сбой компании — ERROR, остальные идут дальше |
@@ -5375,6 +5424,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.170 | 2026-11-13 | SourceFacts: новый модуль — приём фактов из сервисов (`sf_batch`, `sf_period`, `sf_fact`, `Version20261113130402`), `app:source-facts:pull` (cron `*/15`) и гейт `app:source-facts:health-check` (09:10); ServiceGateway: `SourceFactsGatewayFacadeInterface`, клиент `source-fact-envelope` v1; ozon-fetcher публикует `ozon.finance.accrual-by-day`; PHPat — `SourceFacts` не знает каналов и учёта (задача `marketplace-profit-pipeline`, этап 2) |
 | 2.169 | 2026-11-13 | `Ingestion`, `Marketplace` (кроме листингов) и `MarketplaceAds` объявлены легаси — ADR 2026-11-13 |
 | 2.168 | 2026-11-12 | Inventory: поставки Ozon в пути — `StockStatus::InSupply`, `app:inventory:ozon-supplies-sync` (cron 05:50) из снимка `ozon.supplies` ozon-fetcher (`GET /internal/snapshots/latest`, контракт `service-snapshot` v1); отчёт «Остатки» — колонка «В поставке», поставки не входят в остаток (задача `docs/tasks/ozon-supplies-in-transit`) |
 | 2.167 | 2026-11-12 | MarketplaceAds: оплата за заказ Ozon «все товары» (ALL_SKU_PROMO) — расход кампании распределяется по её товарам пропорционально продажам, служебная кампания `all-sku-promo` в `AdSpendKind::PAY_PER_ORDER`; Ingestion грузит кампании ALL_SKU_PROMO и их товары, `IngestionFacade::getOzonAllSkuPromoSpend()` (этап 5 `docs/tasks/ozon-cpo-orders`) |

@@ -913,6 +913,7 @@ jobs:
                   ALFA_SANDBOX_CLIENT_SECRET: ${{ secrets.ALFA_SANDBOX_CLIENT_SECRET }}
                   ALFA_SANDBOX_ID_SIGNING_CERT_PATH: ${{ secrets.ALFA_SANDBOX_ID_SIGNING_CERT_PATH }}
                   BILLING_READ_ONLY_ENFORCED: ${{ vars.BILLING_READ_ONLY_ENFORCED }}
+                  SOURCE_FACTS_COMPANIES: ${{ vars.SOURCE_FACTS_COMPANIES }}
                   YOOKASSA_SHOP_ID: ${{ vars.YOOKASSA_SHOP_ID }}
                   YOOKASSA_SECRET_KEY: ${{ secrets.YOOKASSA_SECRET_KEY }}
                   YOOKASSA_RECEIPT_VAT_CODE: ${{ vars.YOOKASSA_RECEIPT_VAT_CODE }}
@@ -957,6 +958,12 @@ jobs:
                   case "$WB_FETCHER_CONNECTION_ALLOWLIST" in
                     *[!A-Za-z0-9,_-]*)
                       echo "❌ WB_FETCHER_CONNECTION_ALLOWLIST: разрешены A-Za-z0-9,_-"
+                      exit 1 ;;
+                  esac
+                  # Приём фактов (SourceFacts): UUID компаний через запятую или *.
+                  case "$SOURCE_FACTS_COMPANIES" in
+                    *[!A-Fa-f0-9,*-]*)
+                      echo "❌ SOURCE_FACTS_COMPANIES: UUID через запятую или *"
                       exit 1 ;;
                   esac
                   # Billing (docs/tasks/billing): флаг «только чтение» и магазин ЮKassa.
@@ -1056,6 +1063,8 @@ jobs:
                     # Billing (docs/tasks/billing/yookassa-setup.md): пусто → «только чтение» выключен,
                     # онлайн-оплата скрыта. Символы проверены шагом выше.
                     export BILLING_READ_ONLY_ENFORCED='${{ vars.BILLING_READ_ONLY_ENFORCED }}'
+                    # Приём фактов из сервисов (SourceFacts): пусто — выключен. Символы проверены шагом выше.
+                    export SOURCE_FACTS_COMPANIES='${{ vars.SOURCE_FACTS_COMPANIES }}'
                     export YOOKASSA_SHOP_ID='${{ vars.YOOKASSA_SHOP_ID }}'
                     export YOOKASSA_SECRET_KEY='${{ secrets.YOOKASSA_SECRET_KEY }}'
                     export YOOKASSA_RECEIPT_VAT_CODE='${{ vars.YOOKASSA_RECEIPT_VAT_CODE }}'
