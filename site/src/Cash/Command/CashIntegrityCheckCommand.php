@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Cash\Command;
 
-use App\Cash\Application\CloseLostCashFileImportJobsAction;
-use App\Cash\Application\CloseOpenImportLogsAction;
-use App\Cash\Application\RecalculateAllocatedAmountsAction;
+use App\Cash\Application\Import\Recovery\CloseLostCashFileImportJobsAction;
+use App\Cash\Application\Import\Recovery\CloseOpenImportLogsAction;
+use App\Cash\Application\Transaction\RecalculateAllocatedAmountsAction;
 use App\Cash\Infrastructure\Query\CashIntegrityCompaniesQuery;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;

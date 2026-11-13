@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application;
 
-use App\Cash\Application\SaveMoneyAccountAction;
+use App\Cash\Application\Accounts\SaveMoneyAccountAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;

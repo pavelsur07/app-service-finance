@@ -26,7 +26,7 @@ final class CashFileImportPreviewController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly \App\Cash\Http\CashFileImportPage $page,
         private readonly ObjectStorageInterface $storage,
-        private readonly \App\Cash\Application\PrepareCashFileImportAction $prepareImport,
+        private readonly \App\Cash\Application\Import\File\PrepareCashFileImportAction $prepareImport,
         private readonly CashFileDescriptionPlan $plans,
     ) {
     }

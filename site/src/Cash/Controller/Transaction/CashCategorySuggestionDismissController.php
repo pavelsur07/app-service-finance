@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
-use App\Cash\Application\DismissCashCategorySuggestionAction;
+use App\Cash\Application\AiCategorization\DismissCashCategorySuggestionAction;
 use App\Cash\Exception\CashCategorySuggestionNotFoundException;
 use App\Cash\Exception\CashCategorySuggestionStateException;
 use App\Company\Security\ModuleAccess;

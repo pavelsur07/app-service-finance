@@ -6,7 +6,7 @@ namespace App\Cash\Controller\Transaction;
 
 use App\Cash\Application\DTO\CashTransactionSplitInput;
 use App\Cash\Application\DTO\CashTransactionSplitsInput;
-use App\Cash\Application\SaveCashTransactionSplitsAction;
+use App\Cash\Application\Transaction\SaveCashTransactionSplitsAction;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Form\Transaction\CashTransactionSplitsType;

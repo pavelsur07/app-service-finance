@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Cash\Application\Service;
 
 use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;
-use App\Cash\Application\Service\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\AutoRule\AutoRuleDispatchGuard;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;

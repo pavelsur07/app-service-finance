@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\PaymentPlan;
 
-use App\Cash\Application\PostponePaymentPlanAction;
+use App\Cash\Application\PaymentPlan\PostponePaymentPlanAction;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Company\Entity\Company;

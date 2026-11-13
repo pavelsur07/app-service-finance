@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\PaymentPlan;
 
-use App\Cash\Application\ChangePaymentPlanStatusAction;
+use App\Cash\Application\PaymentPlan\ChangePaymentPlanStatusAction;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;

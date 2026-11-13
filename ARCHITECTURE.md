@@ -2619,11 +2619,12 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
 
 | Что | Куда |
 |---|---|
+| Action сценария | `Application/<Context>/` (Transaction, Transfer, Accounts, Funds, Category, Document, AutoRule, AiCategorization, PaymentPlan, Import) |
 | DTO: входы, команды, результаты, данные форм | `Application/DTO/` |
 | Read-запросы, отчёты, проекции | `Infrastructure/Query/` |
 | Слушатели событий Symfony и Doctrine (`#[AsEventListener]`, `#[AsDoctrineListener]`) | `EventListener/` |
-| Новый stateless-сервис | `Application/Service/` |
-| `Service/` | новое не класть; переносить при касании |
+| Новый stateless-сервис | `Application/Service/<Context>/` |
+| `Service/` | новое не класть; переносить при касании, кроме защищённого пути 1С и его общих зависимостей (`docs/tasks/cash-context-refactor/protected-paths.txt`) |
 
 ### Cash → Analytics: событие `CashTransactionsChanged`
 

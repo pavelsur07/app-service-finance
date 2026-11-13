@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\EventListener;
 
-use App\Cash\Application\Service\AutoRuleDispatchGuard;
-use App\Cash\Application\Service\DebouncedRangeEnqueuer;
+use App\Cash\Application\Service\AutoRule\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\AutoRule\DebouncedRangeEnqueuer;
 use App\Cash\EventListener\CashTransactionAutoRulesListener;
 use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\Message\EnqueueAutoRulesForRange;

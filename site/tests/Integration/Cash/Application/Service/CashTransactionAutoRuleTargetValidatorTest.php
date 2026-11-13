@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application\Service;
 
-use App\Cash\Application\Service\CashTransactionAutoRuleTargetValidator;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleTargetValidator;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;

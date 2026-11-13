@@ -6,7 +6,7 @@ namespace App\Tests\Integration\Cash\Application;
 
 use App\Cash\Application\DTO\CashTransactionSplitInput;
 use App\Cash\Application\DTO\CashTransactionSplitsInput;
-use App\Cash\Application\SaveCashTransactionSplitsAction;
+use App\Cash\Application\Transaction\SaveCashTransactionSplitsAction;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\PaymentPlan\PaymentPlanMatch;
 use App\Cash\Entity\Transaction\CashflowCategory;
@@ -289,7 +289,7 @@ final class SaveCashTransactionSplitsActionTest extends IntegrationTestCase
         $dto->cashflowCategoryId = $tx->getCashflowCategory()?->getId();
         $dto->{$field} = 'category' === $value ? $rent->getId() : $value;
         try {
-            self::getContainer()->get(\App\Cash\Application\UpdateCashTransactionAction::class)($tx, $dto);
+            self::getContainer()->get(\App\Cash\Application\Transaction\UpdateCashTransactionAction::class)($tx, $dto);
             self::assertFalse($rejected, 'An ordinary edit must reject changing a multi-split total/category.');
         } catch (\App\Cash\Exception\CashTransactionMultiSplitException) {
             self::assertTrue($rejected);

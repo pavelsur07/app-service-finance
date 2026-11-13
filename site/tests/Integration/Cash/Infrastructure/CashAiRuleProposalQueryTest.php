@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Cash\Infrastructure;
 
 use App\Cash\Application\DTO\CashAiRuleProposal;
+use App\Cash\Application\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
@@ -19,7 +20,6 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
 use App\Cash\Infrastructure\Query\CashCategorizationQuery;
-use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Tests\Builders\Cash\CashTransactionBuilder;

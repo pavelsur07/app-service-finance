@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application;
 
-use App\Cash\Application\CreateCashFileImportProfileAction;
-use App\Cash\Application\UpdateCashFileImportProfileAction;
+use App\Cash\Application\Import\File\CreateCashFileImportProfileAction;
+use App\Cash\Application\Import\File\UpdateCashFileImportProfileAction;
 use App\Cash\Entity\Import\CashFileImportProfile;
 use App\Cash\Exception\InvalidCashFileMappingException;
 use App\Tests\Builders\Company\CompanyBuilder;

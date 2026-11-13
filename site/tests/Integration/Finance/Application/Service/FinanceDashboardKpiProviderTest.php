@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Finance\Application\Service;
 
+use App\Cash\Application\Service\Category\CashflowSystemCategoryService;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
 use App\Cash\Entity\Transaction\CashflowCategory;
@@ -12,7 +13,6 @@ use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
-use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Company\Entity\Company;
 use App\Finance\Application\Service\FinanceDashboardKpiProvider;
 use App\Report\Cashflow\CashflowReportBuilder;

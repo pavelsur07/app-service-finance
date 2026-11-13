@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Command;
 
-use App\Cash\Service\Category\CashflowCategoryStructureMigrator;
+use App\Cash\Application\Service\Category\CashflowCategoryStructureMigrator;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;

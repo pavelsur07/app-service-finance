@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Cash\Application\Import\File;
+
+use App\Cash\Entity\Import\CashFileImportProfile;
+use App\Company\Entity\Company;
+use Doctrine\ORM\EntityManagerInterface;
+use Ramsey\Uuid\Uuid;
+
+/**
+ * Создаёт профиль сопоставления колонок файлового импорта.
+ */
+final class CreateCashFileImportProfileAction
+{
+    public function __construct(private readonly EntityManagerInterface $entityManager, private readonly \App\Cash\Service\Import\File\CashFileMappingValidator $mappingValidator)
+    {
+    }
+
+    /**
+     * @param array<string, mixed> $mapping
+     * @param array<string, mixed> $options
+     */
+    public function __invoke(Company $company, string $name, array $mapping, array $options, string $type): CashFileImportProfile
+    {
+        $this->mappingValidator->validate($mapping);
+        $profile = new CashFileImportProfile(Uuid::uuid7()->toString(), $company, $name, $mapping, $options, $type);
+
+        $this->entityManager->persist($profile);
+        $this->entityManager->flush();
+
+        return $profile;
+    }
+}

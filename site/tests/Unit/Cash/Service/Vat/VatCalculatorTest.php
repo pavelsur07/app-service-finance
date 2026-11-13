@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Service\Vat;
 
-use App\Cash\Service\Vat\VatCalculator;
+use App\Cash\Application\Service\Transaction\Vat\VatCalculator;
 use App\Shared\Domain\ValueObject\Money;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;

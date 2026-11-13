@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Controller\Transaction;
 
-use App\Cash\Application\ApplyAutoRuleToTransactionAction;
+use App\Cash\Application\AutoRule\ApplyAutoRuleToTransactionAction;
 use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;
 use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;
-use App\Cash\Application\Service\AutoRuleDispatchGuard;
-use App\Cash\Application\Service\CashTransactionAutoRuleProvenanceResolver;
+use App\Cash\Application\Service\AutoRule\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleProvenanceResolver;
+use App\Cash\Application\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Cash\Controller\Transaction\CashAutoRuleApplyController;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
@@ -17,7 +18,6 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
-use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Company\Entity\Company;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Entity\AuditLog;

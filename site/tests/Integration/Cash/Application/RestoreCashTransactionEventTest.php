@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application;
 
-use App\Cash\Application\RestoreCashTransactionAction;
+use App\Cash\Application\Transaction\RestoreCashTransactionAction;
 use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;

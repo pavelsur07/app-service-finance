@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Application\Service;
 
-use App\Cash\Application\Service\CashTransactionAutoRulePrefiller;
+use App\Cash\Application\Service\AutoRule\CashTransactionAutoRulePrefiller;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;

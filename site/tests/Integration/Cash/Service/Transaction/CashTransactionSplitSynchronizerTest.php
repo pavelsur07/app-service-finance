@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Transaction;
 
+use App\Cash\Application\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
-use App\Cash\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Company\Entity\Company;
 use App\Shared\Entity\AuditLog;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;

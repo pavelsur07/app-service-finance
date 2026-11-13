@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\EventListener;
 
-use App\Cash\Application\EnsureCashflowSystemCategoriesAction;
+use App\Cash\Application\Category\EnsureCashflowSystemCategoriesAction;
 use App\Company\Event\CompanyCreatedEvent;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 

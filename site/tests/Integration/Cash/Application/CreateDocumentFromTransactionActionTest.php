@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application;
 
-use App\Cash\Application\CreateDocumentFromTransactionAction;
-use App\Cash\Application\CreatePnlDocumentFromTransactionAction;
+use App\Cash\Application\Document\CreateDocumentFromTransactionAction;
+use App\Cash\Application\Document\CreatePnlDocumentFromTransactionAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;

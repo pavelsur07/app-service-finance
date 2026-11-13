@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Cash\Application;
 
-use App\Cash\Application\CashflowCoreTemplateReader;
+use App\Cash\Application\Category\CashflowCoreTemplateReader;
 use App\Cash\Application\DTO\Template\CashflowCoreTemplateNode;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use App\Cash\Exception\CashflowCoreTemplateException;
@@ -73,7 +73,7 @@ final class CashflowCoreTemplateReaderTest extends TestCase
     }
 
     /**
-     * @param list<CashflowCoreTemplateNode> $nodes
+     * @param list<CashflowCoreTemplateNode>          $nodes
      * @param array<string, CashflowCoreTemplateNode> $leaves
      */
     private function collect(array $nodes, string $path, array &$leaves, int &$groups): void

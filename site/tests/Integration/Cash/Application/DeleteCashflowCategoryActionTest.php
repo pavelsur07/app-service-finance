@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application;
 
-use App\Cash\Application\DeleteCashflowCategoryAction;
+use App\Cash\Application\Category\DeleteCashflowCategoryAction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Exception\CashflowCategoryInUseException;
 use App\Cash\Infrastructure\Query\CashflowCategoryUsageQuery;

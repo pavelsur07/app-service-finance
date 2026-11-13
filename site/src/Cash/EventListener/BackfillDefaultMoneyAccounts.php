@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\EventListener;
 
-use App\Cash\Application\EnsureDefaultMoneyAccountsAction;
+use App\Cash\Application\Accounts\EnsureDefaultMoneyAccountsAction;
 use App\Company\Event\CompanyOnboardingBackfillEvent;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 

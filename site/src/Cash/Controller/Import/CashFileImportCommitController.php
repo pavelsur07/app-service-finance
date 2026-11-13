@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Import;
 
-use App\Cash\Application\DispatchCashFileImportJobAction;
+use App\Cash\Application\Import\File\DispatchCashFileImportJobAction;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
@@ -23,7 +23,7 @@ final class CashFileImportCommitController extends AbstractController
         private readonly \App\Cash\Http\CashImportSession $importSession,
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly \App\Cash\Http\CashFileImportPage $page,
-        private readonly \App\Cash\Application\ConfirmCashFileImportAction $confirmImport,
+        private readonly \App\Cash\Application\Import\File\ConfirmCashFileImportAction $confirmImport,
         private readonly DispatchCashFileImportJobAction $dispatchJob,
     ) {
     }

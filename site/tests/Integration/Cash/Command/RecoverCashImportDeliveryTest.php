@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Command;
 
-use App\Cash\Application\DispatchCashFileImportJobAction;
+use App\Cash\Application\Import\File\DispatchCashFileImportJobAction;
 use App\Cash\Command\Import\RecoverCashImportDeliveryCommand;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Infrastructure\Lock\CashImportDeliveryLock;

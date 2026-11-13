@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Command;
 
-use App\Cash\Application\AutoApplyCashCategorySuggestionsAction;
-use App\Cash\Application\RequestCashAiCategorizationAction;
+use App\Cash\Application\AiCategorization\AutoApplyCashCategorySuggestionsAction;
+use App\Cash\Application\AiCategorization\RequestCashAiCategorizationAction;
 use App\Cash\Command\CashAiCategorizeCommand;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashCategorySuggestion;

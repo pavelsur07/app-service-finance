@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
-use App\Cash\Application\CreatePnlDocumentFromTransactionAction;
+use App\Cash\Application\Document\CreatePnlDocumentFromTransactionAction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Finance\Exception\DocumentForeignReferenceException;

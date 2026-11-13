@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Command;
 
-use App\Cash\Application\Service\DailyBalanceRecalculator;
+use App\Cash\Application\Service\Accounts\DailyBalanceRecalculator;
 use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Company\Entity\Company;
 use App\Company\Facade\CompanyFacade;

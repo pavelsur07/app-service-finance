@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Accounts;
 
-use App\Cash\Application\CreateMoneyFundMovementAction;
+use App\Cash\Application\Funds\CreateMoneyFundMovementAction;
 use App\Cash\Form\Accounts\MoneyFundMovementType;
 use App\Cash\Repository\Accounts\MoneyFundRepository;
 use App\Company\Entity\User;

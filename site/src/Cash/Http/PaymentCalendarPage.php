@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Http;
 
-use App\Cash\Application\MaterializeRecurringPaymentPlansAction;
+use App\Cash\Application\PaymentPlan\MaterializeRecurringPaymentPlansAction;
 use App\Cash\Domain\Identifier\CanonicalUuid;
 use App\Company\Entity\Company;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

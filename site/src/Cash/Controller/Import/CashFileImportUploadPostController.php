@@ -22,7 +22,7 @@ final class CashFileImportUploadPostController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly MoneyAccountRepository $accountRepository,
-        private readonly \App\Cash\Application\UploadCashFileImportAction $uploadFile,
+        private readonly \App\Cash\Application\Import\File\UploadCashFileImportAction $uploadFile,
     ) {
     }
 

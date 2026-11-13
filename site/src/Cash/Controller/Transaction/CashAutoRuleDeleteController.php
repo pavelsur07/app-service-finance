@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
-use App\Cash\Application\DeleteCashTransactionAutoRuleAction;
+use App\Cash\Application\AutoRule\DeleteCashTransactionAutoRuleAction;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Audit\AuditContextProvider;

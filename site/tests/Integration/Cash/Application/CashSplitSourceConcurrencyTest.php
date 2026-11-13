@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application;
 
-use App\Cash\Application\CreateDocumentFromTransactionAction;
+use App\Cash\Application\Document\CreateDocumentFromTransactionAction;
 use App\Cash\Application\DTO\CashTransactionDTO;
 use App\Cash\Application\DTO\CashTransactionSplitInput;
 use App\Cash\Application\DTO\CashTransactionSplitsInput;
-use App\Cash\Application\SaveCashTransactionSplitsAction;
-use App\Cash\Application\UpdateCashTransactionAction;
+use App\Cash\Application\Transaction\SaveCashTransactionSplitsAction;
+use App\Cash\Application\Transaction\UpdateCashTransactionAction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;

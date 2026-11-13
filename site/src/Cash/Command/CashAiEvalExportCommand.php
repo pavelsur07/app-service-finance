@@ -6,7 +6,7 @@ namespace App\Cash\Command;
 
 use App\Cash\Application\DTO\CashCategorizationCategory;
 use App\Cash\Application\DTO\CashCategorizationHistoryCase;
-use App\Cash\Application\Service\CashCategorizationPayloadMapper;
+use App\Cash\Application\Service\AiCategorization\CashCategorizationPayloadMapper;
 use App\Cash\Infrastructure\Query\CashCategorizationQuery;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;

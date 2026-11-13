@@ -137,3 +137,15 @@ idempotency key и владения ногами проверяется двум
 Production migration, category `--execute`, smoke с записью и rollback всегда требуют
 отдельного явного разрешения Владельца; merge и deploy — по одному «merge and deploy»
 (`AGENTS.md` §3.2).
+
+## Контекстные подпапки Application
+
+Action размещаются в `Application/<Context>/`, сервисы — в
+`Application/Service/<Context>/`: Transaction, Transfer, Accounts, Funds, Category,
+Document, AutoRule, AiCategorization, PaymentPlan, Import/File, Import/BankStatement,
+Import/Recovery. DTO остаются в Application/DTO, сообщения и handlers не переносятся.
+
+Исключения: импорт 1С и общие зависимости остаются на прежних местах;
+AddCashTransactionAction сохраняет FQCN для защищённого потребителя. Полная карта
+переносов и исключений — `docs/tasks/cash-context-refactor/moves.json`, защищённые
+пути — `docs/tasks/cash-context-refactor/protected-paths.txt`.

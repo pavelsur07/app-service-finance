@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\EventListener;
 
-use App\Cash\Application\Service\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\AutoRule\AutoRuleDispatchGuard;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Entity\AuditLog;

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Service\Import\File;
 
-use App\Cash\Application\ApplyCashFileDescriptionsAction;
 use App\Cash\Application\DTO\BankStatementDayInput;
 use App\Cash\Application\DTO\BankStatementLineInput;
-use App\Cash\Application\ImportBankStatementDayAction;
-use App\Cash\Application\StartCashFileImportJobAction;
+use App\Cash\Application\Import\BankStatement\ImportBankStatementDayAction;
+use App\Cash\Application\Import\File\ApplyCashFileDescriptionsAction;
+use App\Cash\Application\Import\File\StartCashFileImportJobAction;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
@@ -139,7 +139,7 @@ final class CashFileDescriptionApplyTest extends CashFileImportTestCase
         $this->em->flush();
         $apply = new ApplyCashFileDescriptionsAction(
             $plans, $importer, self::getContainer()->get(\App\Cash\Repository\Transaction\CashTransactionRepository::class),
-            $this->em, self::getContainer()->get(\App\Cash\Application\Service\AutoRuleDispatchGuard::class),
+            $this->em, self::getContainer()->get(\App\Cash\Application\Service\AutoRule\AutoRuleDispatchGuard::class),
         );
         $allowed = $apply($job);
         self::assertSame(2, $calls, 'Both preview and final re-plan must still see the approved date.');

@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Application;
 
-use App\Cash\Application\CreateMoneyFundMovementAction;
-use App\Cash\Application\CreatePaymentPlanAction;
 use App\Cash\Application\DTO\PaymentPlanDTO;
+use App\Cash\Application\Funds\CreateMoneyFundMovementAction;
+use App\Cash\Application\PaymentPlan\CreatePaymentPlanAction;
+use App\Cash\Application\Service\PaymentPlan\PaymentPlanDtoApplier;
 use App\Cash\Entity\Accounts\MoneyFund;
 use App\Cash\Entity\Accounts\MoneyFundMovement;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
-use App\Cash\Service\PaymentPlan\PaymentPlanDtoApplier;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Cash\MoneyFundBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;

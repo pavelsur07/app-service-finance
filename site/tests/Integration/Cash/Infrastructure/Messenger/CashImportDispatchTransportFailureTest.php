@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\Infrastructure\Messenger;
 
-use App\Cash\Application\DispatchCashFileImportJobAction;
+use App\Cash\Application\Import\File\DispatchCashFileImportJobAction;
 use App\Cash\Message\Import\CashFileImportMessage;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

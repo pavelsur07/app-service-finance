@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Cash\Infrastructure\Query;
 
 use App\Cash\Application\DTO\ForecastDTO;
+use App\Cash\Application\Service\PaymentPlan\ForecastBalanceService;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
-use App\Cash\Service\PaymentPlan\ForecastBalanceService;
 use App\Company\Entity\Company;
 use App\Company\Facade\CounterpartyFacade;
 

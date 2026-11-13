@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Command;
 
-use App\Cash\Application\Service\DailyBalanceRecalculator;
+use App\Cash\Application\Service\Accounts\DailyBalanceRecalculator;
 use App\Company\Facade\CompanyFacade;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
