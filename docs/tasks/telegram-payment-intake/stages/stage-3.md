@@ -37,8 +37,8 @@ Recovery: `php bin/console app:cash:recover-payment-intake <company-uuid>` retri
 - [x] Cancel never posts; source/import IDs separate from legacy.
 - [x] No logging of raw text or credentials.
 - [x] Final module/format/static results appended below.
-- [ ] Parent fresh internal review and external review; findings fixed before Stage closes.
-- [ ] Parent commit/push/PR and ARCHITECTURE update (outside subagent ownership).
+- [x] Parent fresh internal review and external review; findings fixed before Stage closes.
+- [x] Parent commit/push/PR and ARCHITECTURE update (latest follow-up in Stage 4 commit).
 
 No claims of live-model quality or pilot readiness. Heuristic duplicate warnings compare same company/account/date/amount/currency/direction in one batched query and repeated candidates in memory; equal legitimate payments are retained and can both be confirmed. Recovery runs on explicit command/ingress; production scheduler changes require separate approval.
 
@@ -102,3 +102,23 @@ New initial/retry/reparse attempts now reuse the existing Cash categorization ad
 Evidence: queued-loss regression was red (no recovery after 60 seconds), then passed with controlled `MockClock` advancement and no real sleeps. Budget regressions were red for company/global admission and explicit retry/reparse, then green. Combined policy/throttle checks: **7 tests, 41 assertions green**; earlier queued recovery/fairness checks **7 tests, 140 assertions**, temporary-disable/broker-failure tests **2 tests, 15 assertions**. Focused PHPStan green and actual project CS config **0/5 fixes**. Final combined suite/schema output recorded below by implementer/parent.
 
 Final owned verification after both mandatory fixes: **60 tests, 315 assertions green** (aggregate, lifecycle, admission, throttled recovery, real concurrency, transaction boundary and old Cash creation). Focused PHPStan exit 0; project CS 0/5 fixes; diff check clean. Schema dump contains only the unrelated existing test-only `test_money_holder` fixture; the Cash migration/entity including `last_enqueued_at` match exactly.
+
+## Fresh final review — global source guard and durable reply identity
+
+Two additional confirmed IMPORTANT findings are fixed across Cash and Telegram:
+
+1. `CashFacade::hasPaymentIntakeSource(botId, chatId, messageId): bool` is a global **existence-only DBAL COUNT** over the immutable source key or a processed Telegram reply receipt hash. It never hydrates a draft or returns a company, actor, ID or content, and is independent of ORM company filters and current Telegram actor bindings. Invalid historical bot labels return false without a lookup. Telegram uses it before any legacy fallback and in the legacy creation action itself, so deleting a binding/session cannot route an already-owned intake source into another company's legacy parser.
+2. `AmendPaymentIntakeDraftCommand` adds optional trailing `replyIdempotencyKey`. Telegram supplies stable raw `telegram:<bot UUID>:<chat ID>:<reply message ID>`; Cash hashes it and guards that identity globally before modifying a draft. `cash_payment_intake_reply_receipt` stores a UUIDv7 ID, globally unique SHA256 `reply_key`, company/actor, original draft FK, item UUID, displayed revision and timestamp. A global transaction advisory lock and DB unique constraint serialize replay; receipt and amendment commit together. Replaying the same reply against the same or another row/draft/actor never applies another patch. The safe already-processed error is raised after the transaction completes, preserving a usable EntityManager. Original message-edit source revision is untouched.
+
+The receipt FK uses `ON DELETE CASCADE` with company and draft indexes; company deletion's existing Cash draft cleanup therefore also removes receipts. A receipt builder accompanies the new entity. The unpublished Cash migration includes the new table; authoritative local test schema was aligned without deleting draft data.
+
+Regression evidence: initial four tests were red before the metadata method/DTO argument existed. The first five cases passed **5 tests, 19 assertions** before additional source-marker and cascade assertions. Cases cover an active unrelated company filter, reply 56 originally patching row A then replaying after edit selection moves to B, cross-draft and another actor's own-draft replay, and an injected PostgreSQL CHECK failure after receipt insertion proving amendment and receipt rollback together. A separate test verifies the real cascade FK.
+
+A first ad-hoc DDL helper selected an alternate local test configuration because APP_ENV was not set before Dotenv; it created only an empty task-owned receipt table and failed its draft FK. That empty table was removed immediately after verifying the draft table was absent and row count zero. Correct schema changes then used the already verified `bin/console ... --env=test` entry point. No production or existing financial data was changed.
+
+
+Final identity guard refinement: a successfully applied correction reply is itself an intake-owned message even though it has no separate draft source row. The receipt-backed `hasPaymentIntakeSource` check therefore also recognizes `SHA256(telegram:<bot>:<chat>:<message>)`. A regression proved draft-only checking returned false for processed reply 56, which would let a later binding/session deletion expose that numeric correction to legacy creation; it is now green. This adds no content/tenant lookup and preserves the same boolean contract.
+
+Owned verification before this final boolean refinement: **66 tests, 339 assertions green** (Cash intake, real concurrency, transaction boundary and old creation); focused PHPStan green; CS import formatting corrected. Latest source/reply/rollback/cascade cases after the refinement: **6 tests, 25 assertions green**. Schema dump contains only unrelated test-only `test_money_holder`; receipt table, indexes, unique key and FK match the migration/mapping. Final serial rechecks below coordinate with the Telegram agent to avoid concurrent heavy suites on the constrained host.
+
+Final serial verification after receipt-backed source ownership and canonical optional UUIDv7 receipt IDs: **67 tests, 341 assertions green** (including the parent source-edit paid-confirmation regression). Focused PHPStan over all changed Cash contracts/actions/repositories/entity/builder/tests: **exit 0**. Project CS dry-run: **0/9 files require changes**. `git diff --check` clean. Heavy process slot released to Telegram for its last checks; Cash implementation is frozen.

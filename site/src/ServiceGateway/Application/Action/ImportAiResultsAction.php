@@ -125,6 +125,27 @@ final readonly class ImportAiResultsAction
         );
     }
 
+    public function importResult(AiTaskResult $result): bool
+    {
+        $consumer = $this->consumerFor($result);
+        if (null === $consumer) {
+            return false;
+        }
+        $failure = $this->consume($consumer, $result);
+        if (null !== $failure) {
+            $this->logger->error('AI single result consumer failed; left unacknowledged.', [
+                'companyId' => $result->companyId,
+                'taskId' => $result->taskId,
+                'exceptionClass' => $failure,
+            ]);
+
+            return false;
+        }
+        $this->client->ack([$result->taskId]);
+
+        return true;
+    }
+
     /**
      * @return string|null класс исключения потребителя; null — результат принят
      */

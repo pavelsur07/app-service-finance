@@ -20,10 +20,16 @@ final class Version20261113171344 extends AbstractMigration
         $this->addSql('CREATE INDEX idx_payment_intake_company_status ON cash_payment_intake_draft (company_id, status)');
         $this->addSql('CREATE INDEX idx_payment_intake_task ON cash_payment_intake_draft (company_id, task_id)');
         $this->addSql('CREATE UNIQUE INDEX uniq_payment_intake_source ON cash_payment_intake_draft (source_key)');
+        $this->addSql('CREATE TABLE cash_payment_intake_reply_receipt (id UUID NOT NULL, reply_key VARCHAR(64) NOT NULL, company_id UUID NOT NULL, actor_user_id UUID NOT NULL, draft_id UUID NOT NULL, item_id UUID NOT NULL, original_revision INT NOT NULL, created_at TIMESTAMP(0) WITH TIME ZONE NOT NULL, PRIMARY KEY (id))');
+        $this->addSql('CREATE UNIQUE INDEX uniq_payment_intake_reply_key ON cash_payment_intake_reply_receipt (reply_key)');
+        $this->addSql('CREATE INDEX idx_payment_intake_reply_company ON cash_payment_intake_reply_receipt (company_id)');
+        $this->addSql('CREATE INDEX idx_payment_intake_reply_draft ON cash_payment_intake_reply_receipt (draft_id)');
+        $this->addSql('ALTER TABLE cash_payment_intake_reply_receipt ADD CONSTRAINT fk_payment_intake_reply_draft FOREIGN KEY (draft_id) REFERENCES cash_payment_intake_draft (id) ON DELETE CASCADE NOT DEFERRABLE');
     }
 
     public function down(Schema $schema): void
     {
+        $this->addSql('DROP TABLE cash_payment_intake_reply_receipt');
         $this->addSql('DROP TABLE cash_payment_intake_draft');
     }
 }

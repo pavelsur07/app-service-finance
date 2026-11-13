@@ -11,6 +11,19 @@ use Ramsey\Uuid\Uuid;
 
 final class PaymentIntakeDraftTest extends TestCase
 {
+    public function testSourceEditImmediatelyInvalidatesPaidConfirmation(): void
+    {
+        $draft = $this->draft();
+        $task = Uuid::uuid7()->toString();
+        $draft->queue($task);
+        $draft->acceptResult($task, ['intent' => 'payments', 'items' => [['ref' => 'p1', 'amount' => '100.00', 'currency' => 'RUB', 'date' => '2026-11-13', 'direction' => 'outflow', 'execution_status' => 'paid', 'description' => 'Оплата', 'text_evidence' => '100', 'amount_evidence' => '100', 'category_id' => null, 'project_id' => null, 'cfo_id' => null, 'questions' => []]], 'questions' => [], 'target_ref' => null]);
+        $id = $draft->getItems()[0]['id'];
+        $draft->amend(1, [$id => ['paid_confirmed' => true]]);
+        $draft->amend(2, [], 'Теперь сумма 200', 'edit-1');
+
+        self::assertFalse($draft->getItems()[0]['paid_confirmed']);
+    }
+
     public function testCorrectionUsesOnlyExplicitStableTarget(): void
     {
         foreach ([true, false] as $hasTarget) {

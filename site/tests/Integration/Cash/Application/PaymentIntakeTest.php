@@ -517,6 +517,121 @@ final class PaymentIntakeTest extends IntegrationTestCase
         self::assertCount(1, $this->recordedRequests());
     }
 
+    public function testSourceExistenceDoesNotDependOnAnActorBindingOrExposeDraftData(): void
+    {
+        $this->ready();
+        $filters = $this->em->getFilters();
+        $filters->enable('company')->setParameter('companyId', Uuid::uuid7()->toString());
+        try {
+            self::assertTrue($this->action->hasSource('1', '2', '3'));
+        } finally {
+            $filters->disable('company');
+        }
+        self::assertFalse($this->action->hasSource('1', '2', '9999'));
+        self::assertFalse($this->action->hasSource('legacy-bot-label', '2', '3'));
+    }
+
+    public function testReplyReplayCannotMoveFromTheOriginalRowToANewEditSelection(): void
+    {
+        $draft = $this->request();
+        $this->deliverResult($draft->taskId, count: 2);
+        $draft = $this->get($draft);
+        $first = $draft->items[0]['id'];
+        $second = $draft->items[1]['id'];
+        $key = 'telegram:1:2:56';
+        $changed = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, 1, [$first => ['amount' => '200.00']], replyIdempotencyKey: $key));
+        self::assertTrue($this->action->hasSource('1', '2', '56'), 'A processed correction reply also belongs to intake and must never enter legacy creation.');
+        try {
+            $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $changed->revision, [$second => ['amount' => '200.00']], replyIdempotencyKey: $key));
+            self::fail('The same Telegram reply must never amend another row.');
+        } catch (\DomainException $exception) {
+            self::assertStringContainsString('уже обработан', $exception->getMessage());
+        }
+        self::assertTrue($this->em->isOpen(), 'An ordinary duplicate reply must not close EntityManager.');
+        $current = $this->get($draft);
+        self::assertSame('200.00', $current->items[0]['amount']);
+        self::assertSame('100.00', $current->items[1]['amount']);
+        self::assertSame(2, $current->revision);
+        self::assertSame('original', $this->connection->fetchOne('SELECT source_revision FROM cash_payment_intake_draft WHERE id=?', [$draft->id]));
+        $receipt = $this->connection->fetchAssociative('SELECT item_id, original_revision FROM cash_payment_intake_reply_receipt WHERE reply_key=?', [hash('sha256', $key)]);
+        self::assertIsArray($receipt);
+        self::assertSame($first, $receipt['item_id']);
+        self::assertSame(1, $receipt['original_revision']);
+    }
+
+    public function testReplyReplayCannotPatchAnotherDraft(): void
+    {
+        $first = $this->ready();
+        $key = 'telegram:1:2:reply-57';
+        $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $first->id, 1, [$first->items[0]['id'] => ['amount' => '200.00']], replyIdempotencyKey: $key));
+        $second = $this->request('3000');
+        $this->deliverResult($second->taskId);
+        $second = $this->get($second);
+        try {
+            $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $second->id, 1, [$second->items[0]['id'] => ['amount' => '200.00']], replyIdempotencyKey: $key));
+            self::fail('Reply identity is global across drafts.');
+        } catch (\DomainException $exception) {
+            self::assertStringContainsString('уже обработан', $exception->getMessage());
+        }
+        self::assertSame('100.00', $this->get($second)->items[0]['amount']);
+        self::assertSame(1, $this->get($second)->revision);
+    }
+
+    public function testReplyReplayCannotBeReboundToAnotherActorsOwnDraft(): void
+    {
+        $original = $this->ready();
+        $key = 'telegram:1:2:reply-59';
+        $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $original->id, 1, [$original->items[0]['id'] => ['amount' => '200.00']], replyIdempotencyKey: $key));
+        $other = UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail('reply-other@example.com')->build();
+        $this->em->persist($other);
+        $this->em->persist(new \App\Company\Entity\CompanyMember(Uuid::uuid7()->toString(), $this->company, $other, \App\Company\Entity\CompanyMember::ROLE_OWNER));
+        $this->em->flush();
+        $actorId = (string) $other->getId();
+        $draft = $this->action->request(new RequestPaymentIntakeCommand($this->companyId(), $actorId, (string) $this->account->getId(), '1', '2', '4001', 'оплатил 100', new \DateTimeImmutable('2026-11-13T00:30:00+03:00')));
+        $this->deliverResult($draft->taskId);
+        $draft = $this->action->get($this->companyId(), $actorId, $draft->id);
+        try {
+            $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $actorId, $draft->id, 1, [$draft->items[0]['id'] => ['amount' => '200.00']], replyIdempotencyKey: $key));
+            self::fail('Reply identity must not be rebound to another actor.');
+        } catch (\DomainException $exception) {
+            self::assertStringContainsString('уже обработан', $exception->getMessage());
+        }
+        $unchanged = $this->action->get($this->companyId(), $actorId, $draft->id);
+        self::assertSame('100.00', $unchanged->items[0]['amount']);
+        self::assertSame(1, $unchanged->revision);
+    }
+
+    public function testDeletingTheDraftCascadesItsReplyReceipts(): void
+    {
+        $draft = $this->ready();
+        $aggregate = $this->em->getReference(\App\Cash\Entity\PaymentIntake\PaymentIntakeDraft::class, $draft->id);
+        self::assertInstanceOf(\App\Cash\Entity\PaymentIntake\PaymentIntakeDraft::class, $aggregate);
+        $key = hash('sha256', 'telegram:delete:reply');
+        $receipt = \App\Tests\Builders\Cash\PaymentIntakeReplyReceiptBuilder::forDraft($aggregate, $draft->items[0]['id'])->withReplyKey($key)->build();
+        $this->em->persist($receipt);
+        $this->em->flush();
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM cash_payment_intake_reply_receipt WHERE reply_key=?', [$key]));
+        $this->connection->executeStatement('DELETE FROM cash_payment_intake_draft WHERE id=?', [$draft->id]);
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM cash_payment_intake_reply_receipt WHERE reply_key=?', [$key]));
+    }
+
+    public function testFailedAmendmentRollsBackTheReplyReceipt(): void
+    {
+        $draft = $this->ready();
+        $key = 'telegram:1:2:reply-58';
+        // UnitOfWork inserts the receipt before updating the draft; rejecting the
+        // update proves both writes roll back, rather than only prevalidation.
+        $this->connection->executeStatement('ALTER TABLE cash_payment_intake_draft ADD CONSTRAINT intake_test_reject_revision CHECK (revision <> 2)');
+        try {
+            $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, 1, [$draft->items[0]['id'] => ['amount' => '200.00']], replyIdempotencyKey: $key));
+            self::fail('The injected draft update failure must roll back the receipt.');
+        } catch (\Doctrine\DBAL\Exception\DriverException $exception) {
+            self::assertSame('23514', $exception->getSQLState());
+        }
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM cash_payment_intake_reply_receipt WHERE reply_key=?', [hash('sha256', $key)]));
+        self::assertSame(1, $this->connection->fetchOne('SELECT revision FROM cash_payment_intake_draft WHERE id=?', [$draft->id]));
+    }
+
     /** @return list<array{key: string, payload: array<string, mixed>, task: string}> */
     private function recordedRequests(): array
     {
@@ -526,7 +641,7 @@ final class PaymentIntakeTest extends IntegrationTestCase
     private function buildAction(?\Symfony\Contracts\EventDispatcher\EventDispatcherInterface $events = null): void
     {
         $c = self::getContainer();
-        $this->action = new PaymentIntakeAction($this->em, $c->get(PaymentIntakeDraftRepository::class), $c->get(CompanyFacade::class), $c->get(FinancialResponsibilityCenterFacade::class), $c->get(CashTransactionService::class), $c->get(CashTransactionResponsibilityCenterResolver::class), $c->get(CashCategorizationQuery::class), $this->ai, $c->get(AddCashTransactionAction::class), $events ?? $c->get('event_dispatcher'), new \Psr\Log\NullLogger(), $c->get(\App\Cash\Infrastructure\Query\PaymentIntakeDuplicateQuery::class), $this->clock);
+        $this->action = new PaymentIntakeAction($this->em, $c->get(PaymentIntakeDraftRepository::class), $c->get(CompanyFacade::class), $c->get(FinancialResponsibilityCenterFacade::class), $c->get(CashTransactionService::class), $c->get(CashTransactionResponsibilityCenterResolver::class), $c->get(CashCategorizationQuery::class), $this->ai, $c->get(AddCashTransactionAction::class), $events ?? $c->get('event_dispatcher'), new \Psr\Log\NullLogger(), $c->get(\App\Cash\Infrastructure\Query\PaymentIntakeDuplicateQuery::class), $this->clock, $c->get(\App\Cash\Repository\PaymentIntake\PaymentIntakeReplyReceiptRepository::class));
     }
 
     private function request(string $messageId = '3'): PaymentIntakeDraftView

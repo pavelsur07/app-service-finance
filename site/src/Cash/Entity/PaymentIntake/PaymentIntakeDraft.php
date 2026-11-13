@@ -339,6 +339,10 @@ class PaymentIntakeDraft
             $this->text = $text;
             $this->sourceRevision = $sourceRevision;
             $this->questions = [];
+            foreach ($this->items as &$item) {
+                $item['paid_confirmed'] = false;
+            }
+            unset($item);
         } else {
             foreach ($this->items as &$item) {
                 $patch = $patches[$item['id']] ?? [];

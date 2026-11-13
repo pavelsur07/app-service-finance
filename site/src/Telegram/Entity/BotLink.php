@@ -44,6 +44,9 @@ class BotLink
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $usedAt = null;
 
+    #[ORM\Column(type: 'guid', nullable: true)]
+    private ?string $actorUserId = null;
+
     // Дата создания записи
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -59,9 +62,14 @@ class BotLink
         string $token,
         string $scope,
         \DateTimeImmutable $expiresAt,
+        ?string $actorUserId = null,
     ) {
         Assert::uuid($id);
 
+        if (null !== $actorUserId) {
+            Assert::uuid($actorUserId);
+        }
+        $this->actorUserId = $actorUserId;
         $this->id = $id;
         $this->company = $company;
         $this->bot = $bot;
@@ -71,6 +79,11 @@ class BotLink
         $now = new \DateTimeImmutable();
         $this->createdAt = $now;
         $this->updatedAt = $now;
+    }
+
+    public function getActorUserId(): ?string
+    {
+        return $this->actorUserId;
     }
 
     // Отмечает ссылку как использованную

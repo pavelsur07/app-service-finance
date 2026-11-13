@@ -40,6 +40,12 @@ final class PaymentIntakeDraftRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('d')->where('d.sourceKey = :source')->setParameter('source', $sourceKey)->getQuery()->setHint(Query::HINT_REFRESH, true)->getOneOrNullResult();
     }
 
+    /** @companyScopeExempt Existence-only global source guard; returns no draft identity, content or tenant data. */
+    public function hasSource(string $sourceKey): bool
+    {
+        return (int) $this->getEntityManager()->getConnection()->fetchOne('SELECT count(*) FROM cash_payment_intake_draft WHERE source_key = :source', ['source' => $sourceKey]) > 0;
+    }
+
     /** @return list<PaymentIntakeDraft> */
     public function getRecoverable(string $companyId, \DateTimeImmutable $now, int $limit = 100, ?string $afterId = null): array
     {

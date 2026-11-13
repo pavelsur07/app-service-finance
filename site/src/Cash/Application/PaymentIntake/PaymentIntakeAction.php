@@ -16,10 +16,12 @@ use App\Cash\Application\Service\Transaction\CashTransactionService;
 use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\PaymentIntake\PaymentIntakeDraft;
+use App\Cash\Entity\PaymentIntake\PaymentIntakeReplyReceipt;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Infrastructure\Query\CashCategorizationQuery;
 use App\Cash\Infrastructure\Query\PaymentIntakeDuplicateQuery;
 use App\Cash\Repository\PaymentIntake\PaymentIntakeDraftRepository;
+use App\Cash\Repository\PaymentIntake\PaymentIntakeReplyReceiptRepository;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
@@ -48,6 +50,7 @@ final readonly class PaymentIntakeAction
         private LoggerInterface $logger,
         private PaymentIntakeDuplicateQuery $duplicates,
         private ClockInterface $clock,
+        private PaymentIntakeReplyReceiptRepository $replyReceipts,
     ) {
     }
 
@@ -106,10 +109,37 @@ final readonly class PaymentIntakeAction
         return $this->view($draft);
     }
 
+    /** Identity metadata only: safe even when the former actor binding no longer exists. */
+    public function hasSource(string $botId, string $chatId, string $messageId): bool
+    {
+        try {
+            $sourceKey = self::sourceKey($botId, $chatId, $messageId);
+        } catch (\DomainException) {
+            return false;
+        }
+
+        return $this->drafts->hasSource($sourceKey)
+            || $this->replyReceipts->hasReceipt(hash('sha256', 'telegram:'.$botId.':'.$chatId.':'.$messageId));
+    }
+
     public function amend(AmendPaymentIntakeDraftCommand $command): PaymentIntakeDraftView
     {
-        $draft = $this->em->wrapInTransaction(function () use ($command): PaymentIntakeDraft {
+        $replyKey = $command->replyIdempotencyKey;
+        if (null !== $replyKey && ('' === $replyKey || \strlen($replyKey) > 255 || 1 !== \count($command->items) || null !== $command->text || null !== $command->sourceRevision || $command->retry)) {
+            throw new \DomainException('Ответ должен исправлять одну строку отдельным действием.');
+        }
+        $receiptKey = null === $replyKey ? null : hash('sha256', $replyKey);
+        $alreadyProcessed = false;
+        $draft = $this->em->wrapInTransaction(function () use ($command, $receiptKey, &$alreadyProcessed): PaymentIntakeDraft {
             $this->authorize($command->companyId, $command->actorUserId, true);
+            if (null !== $receiptKey) {
+                $this->em->getConnection()->executeQuery('SELECT pg_advisory_xact_lock(hashtextextended(:reply, 0))', ['reply' => 'payment-intake-reply:'.$receiptKey]);
+                if ($this->replyReceipts->hasReceipt($receiptKey)) {
+                    $alreadyProcessed = true;
+
+                    return $this->owned($command->companyId, $command->actorUserId, $command->draftId, true);
+                }
+            }
             $draft = $this->owned($command->companyId, $command->actorUserId, $command->draftId, true);
             $changed = $draft->amend($command->expectedRevision, $command->items, $command->text, $command->sourceRevision, $command->questions, $command->retry);
             if ($changed && ($command->retry || null !== $command->text)) {
@@ -124,8 +154,17 @@ final readonly class PaymentIntakeAction
                 }
             }
 
+            if ($changed && null !== $receiptKey) {
+                $itemId = array_key_first($command->items);
+                \assert(\is_string($itemId));
+                $this->em->persist(new PaymentIntakeReplyReceipt($receiptKey, $draft, $itemId, $command->expectedRevision, $this->clock->now()));
+            }
+
             return $draft;
         });
+        if ($alreadyProcessed) {
+            throw new \DomainException('Этот ответ уже обработан. Обновите карточку черновика.');
+        }
         $this->dispatch($draft);
 
         return $this->view($draft);

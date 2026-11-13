@@ -3,6 +3,16 @@ framework:
         failure_transport: failed
 
         transports:
+            async_payment_intake:
+                dsn: 'doctrine://default?queue_name=payment_intake'
+                options:
+                    auto_setup: false
+                retry_strategy:
+                    max_retries: 3
+                    delay: 2000
+                    multiplier: 1
+                    max_delay: 2000
+
             async_sync:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN_SYNC)%'
                 retry_strategy:
@@ -69,6 +79,7 @@ framework:
             'App\Marketplace\Message\TriggerInitialSyncMessage': async_sync
             'App\BankSync\Message\SyncBankConnectionMessage': async_sync
             'App\ServiceGateway\Message\SubmitAiTaskMessage': async_sync
+            'App\Telegram\Message\RefreshPaymentIntakeMessage': async_payment_intake
             'App\Cash\Message\Import\CashFileImportMessage': async_sync
             'App\Company\Message\SendRegistrationEmailMessage': async_sync
             'App\Company\Message\SendPasswordChangedEmailMessage': async_sync

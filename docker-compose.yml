@@ -114,6 +114,22 @@ services:
             - ./site:/app
         command: php bin/console messenger:consume async_sync --time-limit=3600 --memory-limit=160M -vv
 
+    site-php-cli-worker-payment-intake:
+        profiles: [payment-intake]
+        build:
+            context: site/docker
+            dockerfile: development/php-cli/Dockerfile
+        working_dir: /app
+        restart: unless-stopped
+        environment:
+            <<: *tz-env
+        depends_on:
+            site-postgres:
+                condition: service_healthy
+        volumes:
+            - ./site:/app
+        command: php bin/console messenger:consume async_payment_intake --time-limit=3600 --memory-limit=256M -vv
+
     site-php-cli-worker-pipeline:
         build:
             context: site/docker

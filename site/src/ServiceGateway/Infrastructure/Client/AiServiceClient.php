@@ -77,6 +77,17 @@ final readonly class AiServiceClient implements AiServiceClientInterface
         return $body->acked;
     }
 
+    public function fetchTaskResults(string $companyId, string $taskId): AiResultsPage
+    {
+        \Webmozart\Assert\Assert::uuid($companyId);
+        \Webmozart\Assert\Assert::uuid($taskId);
+        $body = $this->request('GET', '/internal/tasks/'.$taskId.'/result', Uuid::uuid7()->toString(), [
+            'query' => ['company_id' => strtolower($companyId)],
+        ], 200);
+
+        return $this->parser->parseResultsPage($body);
+    }
+
     /**
      * @param array<string, mixed> $options
      */

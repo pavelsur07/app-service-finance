@@ -21,6 +21,10 @@ final readonly class CreateTelegramCashTransactionAction
 
     public function __invoke(CreateTelegramCashTransactionCommand $command): ?CreateTelegramCashTransactionActionResult
     {
+        if (null !== $command->botId && null !== $command->chatId && null !== $command->messageId
+            && $this->cashFacade->hasPaymentIntakeSource($command->botId, $command->chatId, $command->messageId)) {
+            return CreateTelegramCashTransactionActionResult::skippedKnownPaymentIntakeSource();
+        }
         $amount = $this->parseAmountFromText($command->text);
         if (null === $amount) {
             return null;

@@ -92,6 +92,12 @@ final readonly class CashFacade
         return $this->paymentIntake->getBySource($botId, $chatId, $messageId, $actorUserId);
     }
 
+    /** Global source identity metadata only; does not expose any draft or company information. */
+    public function hasPaymentIntakeSource(string $botId, string $chatId, string $messageId): bool
+    {
+        return $this->paymentIntake->hasSource($botId, $chatId, $messageId);
+    }
+
     public function amendPaymentIntakeDraft(\App\Cash\Application\DTO\PaymentIntake\AmendPaymentIntakeDraftCommand $command): \App\Cash\Application\DTO\PaymentIntake\PaymentIntakeDraftView
     {
         return $this->paymentIntake->amend($command);

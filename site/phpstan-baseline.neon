@@ -12806,7 +12806,7 @@ parameters:
 		-
 			message: '#^flush\(\) в App\\Telegram\\Controller\\TelegramWebhookController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
 			identifier: vashfindir.flushOutsideBoundary
-			count: 6
+			count: 4
 			path: src/Telegram/Controller/TelegramWebhookController.php
 
 		-

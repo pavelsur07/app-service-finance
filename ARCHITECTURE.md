@@ -485,7 +485,9 @@
   своей транзакции. `taskIdFor(companyId, taskType, idempotencyKey): string` —
   тот же `task_id` без постановки: потребитель записывает его в своей транзакции
   до `requestTask`. `isEnabledForCompany(companyId): bool`.
-- `SubmitAiTaskMessage` → `async_sync`. `SubmitAiTaskHandler` — `POST /internal/tasks`
+- `SubmitAiTaskMessage` → `async_sync` по умолчанию; `parse_payment_message`
+  получает TransportNamesStamp `async_payment_intake` (3 повтора с задержкой
+  2 секунды). `SubmitAiTaskHandler` — `POST /internal/tasks`
   с `Idempotency-Key`: сервис недоступен → исключение без Recoverable-маркера
   (повторы по `max_retries` транспорта, затем `failed`; Recoverable обходит
   лимит), выключено для компании → сообщение снимается с WARNING, отказ
@@ -3916,6 +3918,74 @@ buildQueryBuilder(
 
 ## Telegram → Cash: контракт интеграции
 
+### PaymentIntake: текстовые черновики
+
+Для компаний с доступом к новой ИИ-задаче текст обрабатывается как черновик
+Cash PaymentIntake. Python `parse_payment_message` выполняется внутри существующего
+ai-service; payload/output — `services/_contracts/ai-parse-payment-message/v1`.
+Конверт `ai-task/v1` не изменён. Модель возвращает предложения с доказательными
+фрагментами; деньги записывает только Symfony после подтверждения факта оплаты.
+Дополнительный rollout-переключатель `TELEGRAM_PAYMENT_INTAKE_ENABLED` по
+умолчанию `0` (только test env `1`). Его включение до live-eval приёмки не
+является частью обычного доступа компании к ИИ. Если новый сценарий выбран,
+его недоступность не включает автоматически legacy запись первой цифры.
+
+`CashFacade` предоставляет request/get/amend/confirm/cancel сценарии черновика
+через DTO `Application/DTO/PaymentIntake`. Компания и пользователь приходят из
+авторизованной привязки; runtime-уточнения сохраняют финансовую неоднозначность.
+Cash владеет транзакциями; глобальный ключ Telegram `(bot, chat, message)`
+закрепляет первоначальную компанию, stable ID строк и revision защищают
+повторы и конкурирующие изменения. Confirm сохраняет весь выбранный пакет
+в одной транзакции; ключи строк дают повтору прежние transaction IDs.
+
+`CashFacade::hasPaymentIntakeSource(botId, chatId, messageId): bool` возвращает
+только глобальный признак владения исходным сообщением или обработанным reply,
+без данных компании. Этот DBAL guard работает и после удаления Telegram binding/
+session и закрывает legacy fallback. `AmendPaymentIntakeDraftCommand` принимает
+необязательный `replyIdempotencyKey`: Cash атомарно сохраняет amendment и
+`PaymentIntakeReplyReceipt` (UUIDv7, глобально уникальный SHA256 reply key).
+Повтор reply не изменяет другую выбранную строку/черновик. Receipt связан FK
+с Cash draft с ON DELETE CASCADE; исходный sourceRevision при reply не меняется.
+
+Telegram-привязка нового сценария содержит actual actorUserId приложения,
+перенесённый из ссылки авторизованного инициатора; старые null-привязки требуют
+перепривязки. Владелец компании не подставляется вместо отсутствующего actor.
+Права на финансы проверяются повторно при чтении/изменении/подтверждении.
+
+Быстрый pull результата: `AiTaskResultFacadeInterface::refreshTask(companyId,
+taskId): bool` → company-scoped GET `/internal/tasks/{taskId}/result` → обычный
+`results_page`. Несовпадение company/task или нарушение контракта отклоняется
+до consumer. `ImportAiResultsAction::importResult` использует существующую
+транзакцию consumer + ai_usage, затем ack. HTTP вне DB-транзакции.
+Consumer PaymentIntake только меняет текущую revision/attempt; повтор/старый
+результат не переписывает ручной выбор. Обычный периодический импорт сохраняется.
+
+`RefreshPaymentIntakeMessage` идёт через `async_payment_intake` (Doctrine,
+существующая таблица Messenger, queue_name=payment_intake, auto_setup=false,
+retry 2 секунды). `AiTaskFacade::requestTask` только для parse_payment_message
+ставит TransportNamesStamp этого транспорта; остальные типы сохраняют routing.
+Webhook не ждёт модель и не спит. Production worker нового транспорта требует
+именованного одобрения и запуска до включения пилота; код не меняет prod workers.
+Состояние доставки
+Telegram хранится отдельно от факта сохранения операций. Недоставка ответа
+не запускает сохранение повторно. Каждая новая необходимость доставки меняет
+delivery_request_token; после HTTP worker перечитывает session под блокировкой
+и проверяет token, generation, sequence и текущую revision/status черновика.
+Отправка старой карточки не сбрасывает более новый запрос доставки.
+Pending dispatch/event intent долговечен;
+recovery повторяет исходный task key/payload, не создаёт новый платёж.
+Интерактивный `CashFacade::recoverPaymentIntakeDraft(companyId, actorUserId,
+draftId): int` проверяет владельца и восстанавливает только этот черновик.
+Полный обход компании выполняют только доверенные recovery commands с keyset
+pagination и изоляцией ошибок. Не получивший результата queued-запрос может
+быть повторно поставлен через 60 секунд по last_enqueued_at с прежним ключом;
+бюджет проверяется при новых попытках, но не отменяет уже допущенную работу.
+
+Legacy-путь ниже остаётся отдельным контрактом для прежнего сценария; outage
+нового сценария не должен молча переводить запрос в парсер первой цифры.
+
+### Legacy: одна операция из сообщения
+
 Telegram создаёт ДДС-транзакции только через цепочку:
 
 `TelegramWebhookController` → `CreateTelegramCashTransactionAction` → `CashFacade::createTransaction()`.
@@ -5374,7 +5444,8 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 
 | Транспорт | Воркер (`messenger:consume`) | Что идёт |
 |---|---|---|
-| `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad, постановка задач ai-service (`SubmitAiTaskMessage`), проверка платежей ЮKassa (`ApplyYooKassaPaymentMessage`) |
+| `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad, задачи ai-service кроме parse_payment_message (`SubmitAiTaskMessage`), проверка платежей ЮKassa (`ApplyYooKassaPaymentMessage`) |
+| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake` (profile payment-intake); production worker требует отдельного одобрения | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Worker `messenger:consume async_payment_intake` обязан работать до включения TELEGRAM_PAYMENT_INTAKE_ENABLED |
 | `async_pipeline` | `async_pipeline` | Локальная DB-обработка: Process*-сообщения Marketplace, Ads raw, нормализация inventory, auto-rules, ImportProducts |
 | `async_wb_finance` | `async_wb_finance` | `SyncWbFinancialReportDayMessage` (retry до 20 раз) |
 | `async_ads` | `async_ads` | Ozon Performance polling (`LoadOzonAdStatisticsRangeMessage`, `FetchOzonAdStatisticsMessage`, `RequestOzonAdBatchMessage`) |
