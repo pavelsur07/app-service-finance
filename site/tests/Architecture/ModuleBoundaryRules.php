@@ -36,6 +36,7 @@ final class ModuleBoundaryRules
         'Marketplace',
         'MarketplaceAds',
         'MarketplaceAnalytics',
+        'MarketplaceOperations',
         'Settlement',
     ];
 
@@ -347,6 +348,36 @@ final class ModuleBoundaryRules
             ->because(
                 'SourceFacts хранит записи источника как есть: разбор — в переводчике канала, '
                 .'компанию по подключению определяет фасад ServiceGateway.',
+            );
+    }
+
+    /**
+     * `MarketplaceOperations` — канон нового контура (`docs/tasks/marketplace-profit-pipeline/DATA.md`
+     * §4–§6, §9): ниже канона от канала остаётся только строка `channel`. Модуль не знает
+     * переводчиков каналов, легаси маркетплейсов, приём фактов и учёт — их знание сделало бы
+     * канон ещё одним `Marketplace`. Запись мимо фасада закрывает список MODULES_WITH_FACADE.
+     * На момент добавления ссылок нет — гейт зелёный с первого дня.
+     */
+    public function test_marketplace_operations_knows_no_channels(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplaceOperations'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceWb'),
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\SourceFacts'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->because(
+                'канон одинаков для всех каналов: правила Ozon и WB — в переводчиках, '
+                .'статьи ОПиУ — в проекции, исходные записи — в SourceFacts.',
             );
     }
 
