@@ -8,6 +8,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceEconomics\Application\Action\RefreshEconomicsDayAction;
 use App\MarketplaceEconomics\Command\EconomicsHealthCheckCommand;
 use App\MarketplaceEconomics\Command\RefreshEconomicsCommand;
+use App\MarketplaceEconomics\Infrastructure\Query\EconomicsStore;
 use App\MarketplaceOperations\Application\DTO\DayOperations;
 use App\MarketplaceOperations\Application\DTO\OperationInput;
 use App\MarketplaceOperations\Enum\OperationKind;
@@ -17,7 +18,9 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -106,6 +109,17 @@ final class RefreshEconomicsCommandTest extends IntegrationTestCase
         self::assertSame(Command::FAILURE, $this->health());
     }
 
+    public function testGateCatchesUnallocatedAboveThreshold(): void
+    {
+        $this->canon('2026-11-09', 1);
+        $this->canon('2026-11-10', 0);
+        $this->refresh();
+
+        // 10.11 без выручки — хранение 50 ₽ некуда разнести: 50 из 50 + 150 + 50 затрат
+        self::assertSame(5000, (int) $this->connection->fetchOne("SELECT unallocated_minor FROM me_day WHERE company_id = ? AND operation_date = '2026-11-10'", [$this->companyId]) * -1);
+        self::assertSame(Command::FAILURE, $this->health());
+    }
+
     private function canon(string $date, int $sales): void
     {
         $money = static fn (int $minor): Money => Money::fromMinor($minor, 'RUB');
@@ -129,7 +143,14 @@ final class RefreshEconomicsCommandTest extends IntegrationTestCase
 
     private function health(): int
     {
-        return (new CommandTester(self::getContainer()->get(EconomicsHealthCheckCommand::class)))->execute([]);
+        $c = self::getContainer();
+
+        return (new CommandTester(new EconomicsHealthCheckCommand(
+            $c->get(EconomicsStore::class),
+            new MockClock('2026-11-11 09:30:00'),
+            $c->get(MarketplaceOperationsFacadeInterface::class),
+            new NullLogger(),
+        )))->execute([]);
     }
 
     private function rows(): int

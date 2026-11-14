@@ -103,6 +103,32 @@ final readonly class EconomicsStore
     }
 
     /**
+     * По компаниям за окно: Σ |нераспределённого дня| и Σ затрат витрины (без себестоимости и справочных).
+     *
+     * @companyScopeExempt без `$companyId` — системный гейт по всем компаниям
+     *
+     * @return list<array{company_id: string, unallocated_minor: int, costs_minor: int}>
+     */
+    public function unallocatedTotals(\DateTimeImmutable $from, \DateTimeImmutable $to, ?string $companyId = null): array
+    {
+        $params = ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')];
+        $company = '';
+        if (null !== $companyId) {
+            $company = ' AND d.company_id = :company';
+            $params['company'] = $companyId;
+        }
+
+        return array_map(static fn (array $r): array => ['company_id' => (string) $r['company_id'], 'unallocated_minor' => (int) $r['unallocated_minor'], 'costs_minor' => (int) $r['costs_minor']], $this->connection->fetchAllAssociative(
+            "SELECT d.company_id::text AS company_id, SUM(ABS(d.unallocated_minor))::bigint AS unallocated_minor,
+                    COALESCE((SELECT SUM(-l.amount_minor) FROM me_day_line l WHERE l.company_id = d.company_id AND l.operation_date BETWEEN :from AND :to
+                              AND l.amount_minor < 0 AND l.level NOT IN ('cost_price', 'info')), 0)::bigint AS costs_minor
+             FROM me_day d WHERE d.operation_date BETWEEN :from AND :to".$company.'
+             GROUP BY d.company_id ORDER BY d.company_id',
+            $params,
+        ));
+    }
+
+    /**
      * Компании с витриной за период — кандидаты на недельный отчёт.
      *
      * @companyScopeExempt рассылка обходит все компании (cron)
