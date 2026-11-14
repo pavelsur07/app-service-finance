@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any
 
 import structlog
-from psycopg import Connection
+from psycopg import Connection, InterfaceError, OperationalError
 
 from ai_service.evals.payment_intake_nightly import EvalOutcome, NightlyEvaluator, utcnow
 from ai_service.store.evals import EvalStore
@@ -41,6 +41,9 @@ class EvalWorker:
         started = time.monotonic()
         try:
             outcome = self.evaluator.run(claim)
+        except (OperationalError, InterfaceError):
+            # A broken connection cannot finalize; let the supervisor reopen it.
+            raise
         except Exception as error:  # noqa: BLE001 — no payload or exception text enters logs/report.
             log.error(
                 "eval_execution_error",
@@ -86,6 +89,9 @@ class EvalWorker:
         while not self._stop.is_set():
             try:
                 worked = self.run_once()
+            except (OperationalError, InterfaceError):
+                # Match the business worker: exit instead of spinning on a dead connection.
+                raise
             except Exception as error:  # noqa: BLE001 — keep daemon alive; expired runs are not replayed.
                 log.error("eval_worker_error", service="ai-service", stage="poll", error_type=type(error).__name__)
                 worked = False

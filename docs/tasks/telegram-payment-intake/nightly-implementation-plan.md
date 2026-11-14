@@ -116,7 +116,7 @@ freshness/quality/provider/budget states distinct, existingGlitchTipaggregatedal
 
 - Symfony ServiceGateway: typed client/parser/DTO, technicalrun journal/readmodel,
   short request/pull/health commands. New Symfony additive migration if needed.
-- Schedule proposal03:00MSK and bounded statuspull through existing supercronic;
+- Schedule03:25MSK (после существующих ingestion/WB) and bounded statuspull through existing supercronic;
   existing transport/handler only if needed (shortPOST fits commandtimeout).
   Keep technicalscope independent of companyAI grants/absence of companies.
 - docker-compose dev/prod: separate eval-worker sameimage; env daily30/month900,

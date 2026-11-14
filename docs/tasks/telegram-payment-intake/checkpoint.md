@@ -1,3 +1,33 @@
+# Текущий checkpoint — PaymentIntake
+
+**Дата:** 14 ноября 2026. **Этап:** 7 закрыт, переход к этапу 8.
+**Ветка:** docs/telegram-payment-intake-examples.
+**Draft PR:** https://github.com/pavelsur07/app-service-finance/pull/2985 (master).
+**База этапа 7:** fcd5659469e441d20d87cb77666b6d859aefc8e8.
+
+Этап 6: общий source boundary и runtime эталоны завершены. Этап 7: технический
+API, очередь, отдельный eval-worker, общий бюджет 30 ₽/ночь и 900 ₽/месяц готовы.
+Итоговые module gates после внешних исправлений: Ruff/format 114, mypy 63 PASS;
+554 Python tests PASS/1 skip, evals 9 PASS/1 skip. Tooling target PASS.
+Внешнее ревью этапа 7: Claude medium, один раунд B0/I1/M4; I1 и два локальных
+MINOR исправлены и проверены RED→GREEN, один вопрос immutable deployment
+обоснован, disabled restart перенесён в compose этапа 8. Итог fixed without
+re-run, открытых BLOCKER/IMPORTANT нет. Подробности stages/stage-7.md.
+
+Следующее действие: выполнить этап 8 по stages/stage-8-spec.md. Baseline client
+8 tests/32 assertions и health 6 tests/13 assertions PASS. Сначала client/parser
+и техническая витрина с тестами, затем cron/worker wiring и health; полные PHP
+handoff gates запускать однократно после интеграции. Root AGENTS.md/CLAUDE.md и
+посторонние файлы владельца не трогать. Merge/deploy не разрешены.
+
+Ночные живые запуски ещё не включены; локальные проверки не вызывают моделей.
+Четыре прежних live passes завершены, старое root-SSH исключение закрыто;
+пятый разовый benchmark не разрешён. Бизнес-пилот Telegram выключен.
+
+---
+
+## История работы (состояния и разрешения ниже архивные)
+
 # Checkpoint — Telegram Payment Intake
 
 **Phase:** Stage5 / first live run completed, safe diagnostics and scorer correction.

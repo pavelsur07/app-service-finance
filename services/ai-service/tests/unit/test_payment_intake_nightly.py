@@ -102,3 +102,57 @@ def test_zero_cases_is_incomplete_without_touching_db(monkeypatch: pytest.Monkey
     assert outcome.status == "incomplete"
     assert outcome.error_code == "empty_dataset"
     assert outcome.report["network_calls"] == 0
+
+
+@pytest.mark.parametrize("phase", ["claim", "evaluate", "finish"])
+@pytest.mark.parametrize("error_name", ["OperationalError", "InterfaceError"])
+def test_broken_database_exits_daemon_for_supervisor_restart(
+    phase: str, error_name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import psycopg
+
+    from ai_service.evals import worker as worker_module
+    from ai_service.evals.payment_intake_nightly import EvalOutcome
+    from ai_service.evals.worker import EvalWorker
+
+    database_error = getattr(psycopg, error_name)
+
+    def fail() -> None:
+        raise database_error("database connection lost")
+
+    class Store:
+        claims = 0
+
+        def claim(self, *_args: Any, **_kwargs: Any) -> Any:
+            self.claims += 1
+            if self.claims > 1:
+                worker.stop()
+                return None
+            if phase == "claim":
+                fail()
+            return claim()
+
+        def finish(self, *_args: Any, **_kwargs: Any) -> bool:
+            if phase == "finish":
+                fail()
+            return True
+
+    class Evaluator:
+        def run(self, _claim: Any) -> EvalOutcome:
+            if phase == "evaluate":
+                fail()
+            return EvalOutcome("incomplete", {"complete": False})
+
+    worker = EvalWorker(object(), Store(), Evaluator(), lease_seconds=900, poll_seconds=0)
+    monkeypatch.setattr(worker_module.signal, "signal", lambda *_args: None)
+    # Prevent a buggy swallowed exception from looping forever during the RED run.
+    monkeypatch.setattr(worker._stop, "wait", lambda _timeout: worker.stop())
+    with pytest.raises(database_error):
+        worker.run_forever()
+
+
+def test_malformed_price_yaml_uses_sanitized_configuration_error(tmp_path: Path) -> None:
+    path = tmp_path / "prices.yaml"
+    path.write_text("one/first: [unterminated secret content")
+    with pytest.raises(ValueError, match=r"^invalid_eval_prices$"):
+        load_prices(path)

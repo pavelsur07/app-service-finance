@@ -39,7 +39,10 @@ def _hash(value: Any) -> str:
 def load_prices(path: Path) -> Prices:
     """BaseLoader keeps YAML decimal lexemes exact, including unquoted prices."""
     # BaseLoader constructs strings/collections only; unlike Loader it has no object constructors.
-    raw = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)  # noqa: S506
+    try:
+        raw = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)  # noqa: S506
+    except yaml.YAMLError:
+        raise ValueError("invalid_eval_prices") from None
     if not isinstance(raw, dict):
         raise ValueError("invalid_eval_prices")
     prices: Prices = {}
