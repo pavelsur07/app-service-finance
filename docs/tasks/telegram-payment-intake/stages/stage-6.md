@@ -4,7 +4,7 @@ Risk HIGH-LOCAL. stage_base_commit:950ad65ccaa30d430b0b3a2f3f0826f13efd3cd7.
 Definition of Done до кода: generic source boundary сохраняет Telegram identity/
 reply/company/actor pin; runtime pack работает без checkout; новые данные проходят
 human review и offline validation до любого model call. ТЗ nightly-implementation-plan.md.
-Статус: код/локальная приёмка готовы, обязательный external review выполняется.
+Статус: Stage6закрыт,локальныегейтыиобязательныйexternalreviewGREEN.
 
 ## Изменения и проверки
 
@@ -39,7 +39,8 @@ M1guidepath/order исправлен. Эти counts разных точек не
 
 ## External review
 
-PENDING. HIGH-LOCALStage6diff>500строк. Прогон в чистомdetachedreviewworktree,
+Одинраунд Claude medium: точныймаркер REVIEW_GREEN, B0/I0.
+HIGH-LOCALStage6combinedPHP/Pythondiff>500строк. Прогон в чистомdetachedreviewworktree,
 чтобыunrelatedowneruntrackedsite/bin/capture-wbнепопалврецензирование.
 Обычныйscriptполучаетsite-diff; Pythoncode/testdiff передаётсяконтекстом,
 без raw anonymizedcorpus/productiondata. Secrets/envvaluesнепередаются.
