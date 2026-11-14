@@ -3941,6 +3941,31 @@ null; суммы/валюты/новые положительные факты �
 маскируются подготовкой. Вопросы не обрезаются, overflowоставляет исходный отказ.
 Подготовка добавляет в trace только boolean `output_prepared`/`output_prepare_failed`; исходный ответ
 не мутирует. Остальные задачи с `prepare_output=None` проходят прежний путь.
+Техническая проверка качества использует отдельный контракт
+`services/_contracts/ai-eval-run/v1`: POST `/internal/eval-runs`, GET
+`/internal/eval-runs/latest?suite=payment_intake` и GET по run_id. Existing
+Bearer auth; запрос не принимает company/payload/models/prices/limits/paths.
+Daily identity — одна suite/date с canonical idempotency key; конфликт
+содержимого или configuration_fingerprint возвращает409. Флаги и лимиты —
+`AI_SERVICE_EVAL_ENABLED` (default0), `AI_SERVICE_EVAL_DAILY_LIMIT_RUB` (30max),
+`AI_SERVICE_EVAL_MONTHLY_LIMIT_RUB` (900max). Периоды Europe/Moscow.
+
+`python -m ai_service eval-worker` отдельно выполняет technical jobs из
+ai_eval_run. Business ai_task/result/trace и потребители Cash не участвуют.
+До каждого HTTP atomic reserve в ai_eval_call и месячном/дневном budget;
+известная usage заменяет резерв точной Decimal-оценкой, неизвестная сохраняет
+полный резерв. Отдельные модели реального маршрута и все datasets делят лимиты.
+164calls/job и82/model, lease/attempt fencing, terminal result immutable;
+истёкший job становится incomplete и не повторяет ранее оплаченные cases.
+
+Runtime fixtures/manifest находятся в AI_SERVICE_EVALS_DIR/parse_payment_message/
+runtime, exporter/check/validator — ai_service.evals.payment_intake_assets.
+Canonical source41/semantic12 и human-reviewed additions hash-pinned; pending
+не регистрируется, expected fields не передаются модели. Обычный runtime/wheel
+не читает docs или исходники контрактов checkout. Набор с неизвестной суммой
+может хранить amountnull с вопросом и проверяемым anchor. Auto gold/model/prompt
+updates и auto-disable не реализованы. Ночной scheduler ещё не подключён.
+
 Дополнительный rollout-переключатель `TELEGRAM_PAYMENT_INTAKE_ENABLED` по
 умолчанию `0` (только test env `1`). Его включение до live-eval приёмки не
 является частью обычного доступа компании к ИИ. Если новый сценарий выбран,
@@ -5770,6 +5795,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Дата | Область | Решение | Причина |
 |---|---|---|---|
+| 2026-11-14 | ai-service / technical eval | Ночная проверка имеет отдельные ai_eval_run/ai_eval_budget/ai_eval_call и eval-worker того же image; ai-task/company usage не используются. Резерв до HTTP, settlement известной usage, неизвестный резерв сохраняется; caps30/day900/month MSK,164/job82/model. API вычисляет общий с worker fingerprint; terminal report immutable, lease expiry не повторяет оплаченные cases. | Согласованный владельцем технический контроль качества и расходов, без платёжных сумм/ПДн в state; бизнесочередь не блокируется. |
 | 2026-11-14 | ai-service / PaymentIntake | Необязательный `TaskSpec.prepare_output(input, output, CheckContext)` после parse и до неизменных checks; результат повторно валидируется outputschema. PaymentIntake переводит неподтверждённые optionalполя в null/unknown+вопрос и явно исключает справочные итоги; критические ошибки денег/ID/privacy остаются отказом. Остальные задачи defaultNone. | Нельзя терять проверяемые кандидаты из-за неподтверждённого paid или принимать reference total как новый платёж; окончательный финансовый факт подтверждает человек вSymfony. |
 | 2026-03-28 | Infrastructure | Redis: БД0=сессии, `/messages`=Messenger, `prefix=symfony-locks`=Lock | Изоляция назначений, один инстанс |
 | 2026-03-28 | Infrastructure | Messenger worker: `--time-limit=3600`, `restart: always` | Утечки памяти при долгих воркерах |

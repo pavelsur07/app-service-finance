@@ -1,6 +1,6 @@
 """Точка входа: `python -m ai_service <команда>` (только wiring).
 
-Команды: api, worker, migrate, cleanup-traces, evals-import, evals-compare, gateway-check, llm-ping.
+Команды: api, worker, eval-worker, migrate, cleanup-traces, evals-import, evals-compare, gateway-check, llm-ping.
 """
 
 import argparse
@@ -20,7 +20,9 @@ from ai_service.config import Settings
 from ai_service.core.pipeline import Pipeline
 from ai_service.evals import compare
 from ai_service.evals.anonymize import anonymize_history
+from ai_service.evals.payment_intake_nightly import EvalLimits, NightlyEvaluator, configuration_fingerprint, load_prices
 from ai_service.evals.sets import HISTORY_DIR, load_sets, write_set
+from ai_service.evals.worker import EvalWorker
 from ai_service.llm.adapters import build_adapters
 from ai_service.llm.connectivity import CheckLine, gateway_check, llm_ping
 from ai_service.llm.gateway import LlmGateway
@@ -32,6 +34,7 @@ from ai_service.llm.routes import (
     parse_routing,
     worst_case_seconds,
 )
+from ai_service.store.evals import EvalStore
 from ai_service.store.migrate import migrate
 from ai_service.store.tasks import TaskStore
 from ai_service.tasks.categorize_transactions import task as categorize
@@ -50,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     evals = Path(os.environ.get("AI_SERVICE_EVALS_DIR") or _ROOT / "evals") / compare.TASK
     parser = argparse.ArgumentParser(prog="ai_service")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("api", "worker", "migrate", "cleanup-traces"):
+    for name in ("api", "worker", "eval-worker", "migrate", "cleanup-traces"):
         commands.add_parser(name)
     importer = commands.add_parser("evals-import", help="обезличить выгрузку app:cash:ai-eval-export в набор")
     importer.add_argument("export", type=Path)
@@ -109,8 +112,36 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "api":
         pool: ConnectionPool[Any] = ConnectionPool(dsn, min_size=1, max_size=5, open=False, kwargs={"autocommit": True})
-        app = create_app(pool, settings.api_token.get_secret_value(), registry.task_types())
+        app = create_app(
+            pool,
+            settings.api_token.get_secret_value(),
+            registry.task_types(),
+            eval_enabled=settings.eval_enabled,
+            eval_fingerprint=(
+                lambda: configuration_fingerprint(routing, load_prices(settings.routes_file.with_name("prices.yaml")))
+            )
+            if settings.eval_enabled
+            else None,
+        )
         uvicorn.run(app, host=settings.http_host, port=settings.http_port, log_config=None, access_log=False)
+        return 0
+
+    if args.command == "eval-worker":
+        if not settings.eval_enabled:
+            print("nightly eval disabled", file=sys.stderr)  # noqa: T201
+            return 0
+        limits = EvalLimits(day_limit=settings.eval_daily_limit_rub, month_limit=settings.eval_monthly_limit_rub)
+        with psycopg.connect(dsn, autocommit=True) as conn:
+            store = EvalStore()
+            evaluator = NightlyEvaluator(
+                conn,
+                store,
+                routing=routing,
+                adapters=build_adapters(routing, settings.llm_timeout_seconds),
+                prices=load_prices(settings.routes_file.with_name("prices.yaml")),
+                limits=limits,
+            )
+            EvalWorker(conn, store, evaluator, lease_seconds=limits.lease_seconds, poll_seconds=5).run_forever()
         return 0
 
     # Аренда короче худшего прогона — вторая копия worker'а перехватит задачу и заплатит за вызовы ещё раз.

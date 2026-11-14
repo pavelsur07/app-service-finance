@@ -12,7 +12,9 @@ APIсамвычисляетconfiguration_fingerprint по deployedcode/prompts/p
 без секретов; сохраняет его в job. Ответ202 run_id/status/duplicate/fingerprint.
 GET /internal/eval-runs/{uuid} и /internal/eval-runs/latest?suite=payment_intake
 отдают технический статус и metadata-only report. ExistingBearertoken.
-Одинаковыйsuite/day — одинjob; тотжеключсдругимсодержимым/fingerprint→409.
+Одинаковыйsuite/day — одинjob иодинcanonicalkey; новыйkeyдляужепринятой
+даты→409. Тотжеключсдругимсодержимым/fingerprint→409; точныйповторключа
+сновымrun_idвозвращаетпервоначальныйjob.
 Disabledflag→явныйdisabledresponse,ночнойhealthневыдаётdisabledзаPASS.
 
 ## Persistedstate

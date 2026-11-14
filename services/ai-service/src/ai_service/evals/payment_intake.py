@@ -56,13 +56,15 @@ def load_holdout(path: Path | None = None, review_path: Path | None = None) -> l
     return cases
 
 
-def manifest(cases: list[dict[str, Any]], dataset: Dataset = "source") -> dict[str, Any]:
+def manifest(
+    cases: list[dict[str, Any]], dataset: Dataset = "source", *, assets_root: Path | None = None
+) -> dict[str, Any]:
     families: dict[str, list[str]] = {}
     for case in cases:
         families.setdefault(case["family"], []).append(case["id"])
     from ai_service.evals.payment_intake_assets import load_pack
 
-    pack = load_pack()["manifest"]
+    pack = load_pack(assets_root)["manifest"]
     if dataset not in pack["datasets"]:
         raise ValueError("invalid_dataset")
     dataset_metadata = pack["datasets"][dataset]
@@ -96,6 +98,8 @@ class Limits:
     budget_rub: Decimal
     input_price: Decimal
     output_price: Decimal
+    settle_known_usage: bool = False
+    stop_on_provider_error: bool = False
 
     def __post_init__(self) -> None:
         if not 1 <= self.max_calls <= 82 or self.max_input_tokens < 1 or not 1 <= self.max_output_tokens <= 16000:
@@ -153,6 +157,8 @@ class BoundedAdapter:
             )
         except LlmError as exc:
             call["error"] = exc.code if re.fullmatch(r"[a-z0-9_]{1,64}", exc.code) else "provider_error"
+            if self.limits.stop_on_provider_error:
+                self.stop_reason = call["error"]
             raise
         finally:
             call["latency_ms"] = int((time.monotonic() - started) * 1000)
@@ -165,6 +171,10 @@ class BoundedAdapter:
             input_tokens=response.input_tokens,
             output_tokens=response.output_tokens,
         )
+        if self.limits.settle_known_usage and response.input_tokens > 0 and response.output_tokens > 0:
+            self.reserved += (
+                response.input_tokens * self.limits.input_price + response.output_tokens * self.limits.output_price
+            ) / Decimal(1000000) - self.limits.reservation
         if (
             response.input_tokens > self.limits.max_input_tokens
             or response.output_tokens > self.limits.max_output_tokens
@@ -318,11 +328,17 @@ def _diagnostics(outcome: PipelineOutcome | None) -> dict[str, Any]:
 
 
 def evaluate(
-    cases: list[dict[str, Any]], adapter: LlmAdapter, model: str, limits: Limits, *, dataset: Dataset = "source"
+    cases: list[dict[str, Any]],
+    adapter: LlmAdapter,
+    model: str,
+    limits: Limits,
+    *,
+    dataset: Dataset = "source",
+    assets_root: Path | None = None,
 ) -> dict[str, Any]:
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.:/-]{1,128}", model):
         raise ValueError("invalid_model_alias")
-    run_manifest = manifest(cases, dataset)
+    run_manifest = manifest(cases, dataset, assets_root=assets_root)
     ref = ModelRef.parse(model)
     routing = parse_routing(
         {"providers": {ref.provider: {"type": "stub"}}, "tasks": {TASK_TYPE: {"mode": "single", "models": [model]}}}, {}

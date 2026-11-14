@@ -1,10 +1,13 @@
 """HTTP API сервиса: стандартные endpoint'ы шлюза и API задач (service-gateway.md §2.3, ТЗ §4)."""
 
 import hmac
-from collections.abc import Iterator
+import re
+from collections.abc import Callable, Iterator
 from contextlib import asynccontextmanager
-from typing import Annotated, Any
+from datetime import UTC, datetime
+from typing import Annotated, Any, Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import structlog
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
@@ -15,6 +18,7 @@ from psycopg.errors import UniqueViolation
 from psycopg_pool import ConnectionPool
 
 from ai_service import SERVICE_NAME, __version__
+from ai_service.api.eval_models import EvalAccepted, EvalLatest, EvalRunRequest, EvalStatus
 from ai_service.api.models import (
     AckRequest,
     AckResponse,
@@ -25,6 +29,7 @@ from ai_service.api.models import (
     TaskStatus,
     Usage,
 )
+from ai_service.store.evals import EvalStore
 from ai_service.store.tasks import NewTask, TaskStore
 
 log = structlog.get_logger(__name__)
@@ -40,8 +45,18 @@ class ApiError(Exception):
         self.message = message
 
 
-def create_app(pool: ConnectionPool[Any], api_token: str, task_types: list[str]) -> FastAPI:
+def create_app(
+    pool: ConnectionPool[Any],
+    api_token: str,
+    task_types: list[str],
+    *,
+    eval_enabled: bool = False,
+    eval_fingerprint: Callable[[], str] | None = None,
+    eval_clock: Callable[[], datetime] | None = None,
+) -> FastAPI:
     store = TaskStore()
+    evals = EvalStore()
+    eval_now = eval_clock or (lambda: datetime.now(UTC))
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> Any:
@@ -80,6 +95,64 @@ def create_app(pool: ConnectionPool[Any], api_token: str, task_types: list[str])
 
     Conn = Annotated[Connection[Any], Depends(connection)]  # noqa: N806 — алиас типа зависимости
     internal = [Depends(authorized)]
+
+    def fingerprint() -> str:
+        if not eval_enabled:
+            raise ApiError(503, "eval_disabled", "Ночная проверка выключена")
+        try:
+            value = eval_fingerprint() if eval_fingerprint is not None else ""
+            if not re.fullmatch(r"[0-9a-f]{64}", value):
+                raise ValueError("invalid fingerprint")
+        except (OSError, ValueError, KeyError):
+            raise ApiError(503, "eval_configuration_unavailable", "Конфигурация проверки недоступна") from None
+        return value
+
+    @app.post("/internal/eval-runs", status_code=202, dependencies=internal)
+    def enqueue_eval(
+        body: EvalRunRequest, conn: Conn, idempotency_key: Annotated[str | None, Header()] = None
+    ) -> EvalAccepted:
+        current = fingerprint()
+        if idempotency_key != body.idempotency_key:
+            raise ApiError(422, "idempotency_key_mismatch", "Ключ повтора не совпадает")
+        now = eval_now()
+        if body.run_date != now.astimezone(ZoneInfo("Europe/Moscow")).date():
+            raise ApiError(422, "invalid_eval_date", "Проверка ставится только за текущую дату")
+        accepted = evals.enqueue(
+            conn,
+            run_id=body.run_id,
+            suite=body.suite,
+            run_date=body.run_date,
+            trace_id=body.trace_id,
+            idempotency_key=body.idempotency_key,
+            configuration_fingerprint=current,
+            now=now,
+        )
+        if accepted.conflict:
+            raise ApiError(409, "eval_idempotency_conflict", "Проверка за эту дату уже связана с другим запросом")
+        return EvalAccepted(
+            contract_version="v1",
+            run_id=accepted.run_id,
+            status=accepted.status,
+            duplicate=accepted.duplicate,
+            configuration_fingerprint=current,
+        )
+
+    @app.get("/internal/eval-runs/latest", dependencies=internal)
+    def latest_eval(conn: Conn, suite: Literal["payment_intake"] = "payment_intake") -> EvalLatest:
+        if not eval_enabled:
+            return EvalLatest(enabled=False, configuration_fingerprint=None, run=None)
+        current = fingerprint()
+        row = evals.latest(conn, suite)
+        return EvalLatest(enabled=True, configuration_fingerprint=current, run=None if row is None else _eval_view(row))
+
+    @app.get("/internal/eval-runs/{run_id}", dependencies=internal)
+    def eval_status(run_id: UUID, conn: Conn) -> EvalStatus:
+        if not eval_enabled:
+            raise ApiError(503, "eval_disabled", "Ночная проверка выключена")
+        row = evals.status(conn, run_id)
+        if row is None:
+            raise ApiError(404, "eval_run_not_found", "Проверка не найдена")
+        return _eval_view(row)
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -195,3 +268,8 @@ def _result(row: dict[str, Any]) -> TaskResult:
         error_code=row["error_code"],
         completed_at=row["completed_at"],
     )
+
+
+def _eval_view(row: dict[str, Any]) -> EvalStatus:
+    report = None if row["status"] in {"queued", "running"} else row["report"]
+    return EvalStatus.model_validate({"contract_version": "v1", **row, "report": report})

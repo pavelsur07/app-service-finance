@@ -1,5 +1,6 @@
 """Настройки из переменных окружения (pydantic-settings), без значений секретов в коде."""
 
+from decimal import Decimal
 from pathlib import Path
 
 from pydantic import Field, SecretStr
@@ -31,3 +32,8 @@ class Settings(BaseSettings):
     llm_gateway_url: str | None = None
     llm_timeout_seconds: float = 60.0
     llm_retries_per_model: int = 1
+
+    # Technical quality evaluation has its own owner-approved resource cap.
+    eval_enabled: bool = False
+    eval_daily_limit_rub: Decimal = Field(default=Decimal("30"), gt=0, le=30, allow_inf_nan=False)
+    eval_monthly_limit_rub: Decimal = Field(default=Decimal("900"), gt=0, le=900, allow_inf_nan=False)
