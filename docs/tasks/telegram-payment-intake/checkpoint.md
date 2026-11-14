@@ -1,3 +1,25 @@
+# Актуальный checkpoint — handoff
+
+Каноническая копия /tmp/vf-payment-intake-release-dc96632b (detached).
+Remote docs/telegram-payment-intake-examples, PR2985 base master.
+Код c3a38a5e57d15e78160fb6a81ff9afef8075942c: полный CI43589885600 SUCCESS.
+Stage8DONE, fresh internal B0/I3fixed -> REVIEW_GREEN; external Claude medium
+round1 REVIEW_GREEN,B0/I0/M4addressed. Source/gold/pack не менялись после проверки.
+Последний локальный PHPmodule380/2067,Pyth6031skip/eval91skip,style0/4240,
+focusedStanNoerrors. Локальные full137 не GREEN, все полные gates подтвердил CI.
+
+Дальше: commit/push итоговых документов, latest-head CI (код неизменен),
+обновить PR body через REST (gh pr edit ломается из-за projectCards), Ready,
+единственный запрос release: merge+триDoctrineмиграции+Python0002+nightflag/
+worker/cron+deploy. Bot pilot остаётся0 и отдельно не принят. Никакого merge,
+prod writes или paid benchmark до соответствующего согласования.
+
+Оригинальный checkout41174124f с owner AGENTS/CLAUDE и чужими untracked не трогать.
+Formal review artifacts: originalroot/site/var/payment-intake-review/final-external.
+Node active state: originalroot/site/var/payment-intake-review/nightly-stage-state.json.
+
+---
+
 # Release checkpoint — финальная приёмка
 
 Рабочая копия /tmp/vf-payment-intake-release-dc96632b (detached);
