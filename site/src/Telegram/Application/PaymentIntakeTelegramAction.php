@@ -269,7 +269,7 @@ final readonly class PaymentIntakeTelegramAction
                 $session->awaitEdit($itemId, $revision);
                 $this->em->flush();
 
-                return ['text' => 'Ответьте на карточку этой строки: «сумма 20000», «дата 2026-11-13», «оплачено», «проект Название», «статья Название» или «ЦФО Название». Для связанной пары: «проект Название; ЦФО Название».'];
+                return ['text' => 'Ответьте на карточку этой строки: «сумма 20000», «дата 2026-11-13», «направление приход», «направление расход», «валюта RUB», «оплачено», «проект Название», «статья Название» или «ЦФО Название». Для связанной пары: «проект Название; ЦФО Название».'];
             }
             if ('q' === $action[0]) {
                 $this->markDeliveryPending($session);
@@ -309,6 +309,10 @@ final readonly class PaymentIntakeTelegramAction
             $patch['amount'] = str_replace(',', '.', $match[1]);
         } elseif (preg_match('/^дата\s+(\d{4}-\d{2}-\d{2})$/iu', $text, $match)) {
             $patch['date'] = $match[1];
+        } elseif (preg_match('/^направление\s+(приход|расход)$/iu', $text, $match)) {
+            $patch['direction'] = 'приход' === mb_strtolower($match[1]) ? 'inflow' : 'outflow';
+        } elseif (preg_match('/^валюта\s+([a-z]{3})$/iu', $text, $match)) {
+            $patch['currency'] = strtoupper($match[1]);
         } elseif ('оплачено' === mb_strtolower($text)) {
             $patch['paid_confirmed'] = true;
             $patch['execution_status'] = 'paid';
@@ -324,7 +328,7 @@ final readonly class PaymentIntakeTelegramAction
         } elseif (preg_match('/^назначение\s+(.+)$/ius', $text, $match)) {
             $patch['description'] = $match[1];
         } else {
-            return ['text' => 'Назовите одно поле: сумма, дата, оплачено, проект Название, статья Название, ЦФО Название или назначение. Связанную пару можно изменить вместе: «проект Название; ЦФО Название». Изменения не применены.'];
+            return ['text' => 'Назовите одно поле: сумма, дата, направление приход/расход, валюта RUB, оплачено, проект Название, статья Название, ЦФО Название или назначение. Связанную пару можно изменить вместе: «проект Название; ЦФО Название». Изменения не применены.'];
         }
         $this->markDeliveryPending($session);
         $this->cash->amendPaymentIntakeDraft(new AmendPaymentIntakeDraftCommand($session->getCompanyId(), (string) $session->getBinding()->getActorUserId(), $session->getDraftId(), $revision, [$itemId => $patch], replyIdempotencyKey: TelegramPaymentIntakeSource::replyIdempotencyKey((string) $session->getBinding()->getBot()->getId(), $session->getChatId(), $replyMessageId)));

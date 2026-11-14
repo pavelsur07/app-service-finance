@@ -599,15 +599,19 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         self::assertCount(0, $this->aiTaskKeys);
     }
 
-    /** @param array<string, mixed> $expected */
+    /**
+     * @param array<string, mixed> $expected
+     * @param array<string, mixed> $initial
+     */
     #[DataProvider('manualFieldReplyProvider')]
-    public function testManualFieldReplyWorksWithoutAiGrantAndDoesNotRequestNewParse(string $reply, array $expected, bool $confirm): void
+    public function testManualFieldReplyWorksWithoutAiGrantAndDoesNotRequestNewParse(string $reply, array $expected, bool $confirm, array $initial): void
     {
         $client = $this->setupClient(true, true);
         $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
         $session = $this->em()->getRepository(\App\Telegram\Entity\PaymentIntakeSession::class)->findOneBy(['companyId' => self::COMPANY]);
         self::assertInstanceOf(\App\Telegram\Entity\PaymentIntakeSession::class, $session);
         $item = ['id' => Uuid::uuid7()->toString(), 'transaction_id' => Uuid::uuid7()->toString(), 'amount' => '100.00', 'currency' => 'RUB', 'date' => '2026-11-13', 'direction' => 'outflow', 'execution_status' => 'unknown', 'paid_confirmed' => false, 'category_id' => null, 'project_id' => null, 'cfo_id' => null, 'description' => 'Расход', 'questions' => ['Подтвердите факт оплаты.'], 'provenance' => []];
+        $item = array_replace($item, $initial);
         $session->markDelivered('1:needs_clarification', ['900']);
         $this->em()->flush();
         $this->em()->getConnection()->executeStatement("UPDATE cash_payment_intake_draft SET status = 'needs_clarification', items = CAST(? AS JSONB) WHERE company_id = ?", [json_encode([$item], \JSON_THROW_ON_ERROR), self::COMPANY]);
@@ -639,12 +643,15 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         }
     }
 
-    /** @return array<string, array{string, array<string, mixed>, bool}> */
+    /** @return array<string, array{string, array<string, mixed>, bool, array<string, mixed>}> */
     public static function manualFieldReplyProvider(): array
     {
         return [
-            'amount stays unpaid' => ['сумма 250', ['amount' => '250', 'execution_status' => 'unknown', 'paid_confirmed' => false], false],
-            'paid fact then explicit row acknowledgement' => ['оплачено', ['amount' => '100.00', 'execution_status' => 'paid', 'paid_confirmed' => true, 'questions' => ['Подтвердите факт оплаты.']], true],
+            'amount stays unpaid' => ['сумма 250', ['amount' => '250', 'execution_status' => 'unknown', 'paid_confirmed' => false], false, []],
+            'outflow clarified from unknown without AI' => ['направление расход', ['direction' => 'outflow', 'paid_confirmed' => false], true, ['direction' => null, 'execution_status' => 'paid']],
+            'inflow clarified from unknown without AI' => ['направление приход', ['direction' => 'inflow', 'paid_confirmed' => false], true, ['direction' => null, 'execution_status' => 'paid']],
+            'explicit currency correction without conversion or AI' => ['валюта rub', ['currency' => 'RUB', 'paid_confirmed' => false], true, ['currency' => 'USD', 'execution_status' => 'paid']],
+            'paid fact then explicit row acknowledgement' => ['оплачено', ['amount' => '100.00', 'execution_status' => 'paid', 'paid_confirmed' => true, 'questions' => ['Подтвердите факт оплаты.']], true, []],
         ];
     }
 

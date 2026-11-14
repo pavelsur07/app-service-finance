@@ -1,3 +1,38 @@
+# Актуальный handoff checkpoint
+
+Каноническая рабочая копия: /tmp/vf-payment-intake-handoff-41174124 (detached).
+Ветка на GitHub: docs/telegram-payment-intake-examples, DraftPR2985.
+Исходный checkout /home/deploy/projects/app-service-finance остаётся41174124f:
+owner AGENTS.md/CLAUDE.md и чужие файлы не трогать, не reset/stash/checkout.
+
+Master3cb72b37d интегрирован mergecommitab6c3ace5,5конфликтов разрешеныаддитивно.
+CI43585432214 SUCCESS наab6: все static/unit/integration/3functional/Python/style/
+API/emptyDB/SPA gates зелёные; prod migration/deploy skipped. Ранее локальные
+fullStan/fulltest и отдельноintegration завершались137приRAM/swap pressure,
+не GREEN. Точечные и CI проверки это не скрывают.
+
+Свежий full-task reviewer gpt-6-astra прочитал весь847KBdiff/17130строк:
+B0/I3 (unanchored direction; manual direction reply; partialConfirm losing rows).
+Все3исправлены, reviewerпроверилдельту и вернул INTERNAL REVIEW_GREEN.
+Не путать с ещё не проведённым formal external Claude review.
+
+Последние факты после исправлений: Python603PASS1skip,eval9PASS1skip,
+Ruff121/mypy68PASS; PHPmodule378tests2055assertPASS; focusedStan4filesNoerrors,
+CS4filesPASS. 7 целевых регрессий57assertPASS, исходныйRED4FAIL доказан.
+Sem-010 и runtime source41/semantic12/curated pack не менялись: явные будущие
+оплачу/заплачу/оплатить якорят только outflow/planned, не paid.
+Offline verifier short-1 теперь воздерживается от unsupported direction/category;
+исходное запрещённое предложение оставлено отдельным negative vectorN25.
+Никакой подгонки source/semantic gold или нового live benchmark.
+
+Дальше: commit/push9файловfix+checkpoint, CIновогоHEAD, formal external medium
+one round от3cb72b37d по полному cleaned diff в этой worktree. После green/fixes:
+закрыть stage8/handoff/runbook/PR description, commit/push docs, Ready PR,
+единственный release request с3Doctrineмиграциями+Python0002+nightlyflag/worker/
+scheduler. До согласования no merge/deploy/prod mutation. Telegrambusinessflag0.
+
+---
+
 # Текущий checkpoint — PaymentIntake
 
 **Дата:** 14 ноября 2026. **Этап:** 8 / интеграция client, витрины и runtime wiring.

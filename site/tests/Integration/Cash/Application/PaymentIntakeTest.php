@@ -236,6 +236,44 @@ final class PaymentIntakeTest extends IntegrationTestCase
         self::assertSame('100.00', $this->connection->fetchOne('SELECT amount FROM cash_transaction WHERE id=?', [$first->transactionIds[0]]));
     }
 
+    #[\PHPUnit\Framework\Attributes\DataProvider('remainderSelectionCases')]
+    public function testConfirmationRequiresExplicitDecisionForEveryRow(bool $excludeOther): void
+    {
+        $draft = $this->request();
+        $this->deliverResult($draft->taskId, count: 2);
+        $draft = $this->get($draft);
+        $patch = [$draft->items[0]['id'] => ['paid_confirmed' => true]];
+        if ($excludeOther) {
+            $patch[$draft->items[1]['id']] = ['excluded' => true];
+        }
+        $draft = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, $patch));
+        $command = new ConfirmPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$draft->items[0]['id']]);
+        if (!$excludeOther) {
+            try {
+                $this->action->confirm($command);
+                self::fail('Unselected rows must be explicitly excluded before closing the draft.');
+            } catch (\DomainException $error) {
+                self::assertStringContainsString('исключите', $error->getMessage());
+            }
+            self::assertSame(0, $this->ledgerCount());
+            self::assertNotSame('confirmed', $this->connection->fetchOne('SELECT status FROM cash_payment_intake_draft WHERE id = ? AND company_id = ?', [$draft->id, $this->companyId()]));
+
+            return;
+        }
+        $result = $this->action->confirm($command);
+        self::assertSame('confirmed', $this->get($draft)->status);
+        self::assertCount(1, $result->transactionIds);
+        self::assertSame($result->transactionIds, $this->action->confirm($command)->transactionIds);
+        self::assertSame(1, $this->ledgerCount());
+    }
+
+    /** @return iterable<string, array{bool}> */
+    public static function remainderSelectionCases(): iterable
+    {
+        yield 'unselected active row blocks every write' => [false];
+        yield 'explicitly excluded row permits idempotent confirmation' => [true];
+    }
+
     public function testResultReplayAndStaleAttemptCannotReplaceRows(): void
     {
         $draft = $this->ready();

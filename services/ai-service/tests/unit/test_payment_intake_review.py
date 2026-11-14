@@ -79,7 +79,7 @@ def test_supported_local_dates(source: str, wanted: str) -> None:
 
 @pytest.mark.parametrize("verb", ["Купила", "Потратила", "Внесла", "Скинул", "Закинула"])
 def test_supported_paid_verbs(verb: str) -> None:
-    assert not probe(verb + " бумагу 1500 руб.", "1500 руб.", "1500.00")
+    assert not probe(verb + " бумагу -1500 руб.", "1500 руб.", "1500.00")
 
 
 def test_mixed_tense_does_not_invalidate_paid_clause() -> None:
@@ -97,6 +97,75 @@ def test_neighbouring_sentence_does_not_lend_paid_or_date() -> None:
 
 def test_signed_amount_inside_clause_has_direction() -> None:
     assert "direction_contradiction" in probe("Перевела -5000 руб", "5000 руб", "5000.00", direction="inflow")
+
+
+@pytest.mark.parametrize("direction", ["inflow", "outflow"])
+def test_unsigned_verbless_payment_cannot_invent_direction(direction: str) -> None:
+    errors = probe(
+        "Такси 1700р",
+        "1700р",
+        "1700.00",
+        direction=direction,
+        execution_status="unknown",
+        questions=["Оплата уже совершена?"],
+    )
+    assert "direction_unanchored" in errors
+
+
+@pytest.mark.parametrize(
+    ("source", "direction"),
+    [
+        ("Такси +1700р", "inflow"),
+        ("Такси -1700р", "outflow"),
+        ("Получила 1700р", "inflow"),
+        ("Отдала 1700р", "outflow"),
+    ],
+)
+def test_explicit_direction_anchor_is_preserved(source: str, direction: str) -> None:
+    assert not probe(
+        source,
+        "1700р",
+        "1700.00",
+        direction=direction,
+        execution_status="unknown",
+        questions=["Оплата уже совершена?"],
+    )
+
+
+@pytest.mark.parametrize("verb", ["Оплачу", "Заплачу", "Оплатить"])
+@pytest.mark.parametrize("direction", ["outflow", "inflow"])
+def test_future_payment_verb_anchors_direction_independently_from_paid(verb: str, direction: str) -> None:
+    errors = probe(
+        verb + " 1700р",
+        "1700р",
+        "1700.00",
+        direction=direction,
+        execution_status="planned",
+        questions=["Подтвердите оплату после её совершения"],
+    )
+    if direction == "outflow":
+        assert not errors
+    else:
+        assert "direction_contradiction" in errors
+
+
+@pytest.mark.parametrize("verb", ["Оплачу", "Заплачу", "Оплатить"])
+def test_future_payment_direction_does_not_prove_paid(verb: str) -> None:
+    errors = probe(verb + " 1700р", "1700р", "1700.00", direction="outflow")
+    assert "paid_unanchored" in errors
+
+
+@pytest.mark.parametrize("word", ["Завтра", "Послезавтра", "Планирую"])
+def test_vague_future_context_does_not_anchor_direction(word: str) -> None:
+    errors = probe(
+        word + " такси 1700р",
+        "1700р",
+        "1700.00",
+        direction="outflow",
+        execution_status="planned",
+        questions=["Уточните платёж"],
+    )
+    assert "direction_unanchored" in errors
 
 
 @pytest.mark.parametrize("field", ["description", "item_question", "top_question"])
@@ -122,7 +191,9 @@ def test_mask_tokens_cannot_reach_visible_output(field: str) -> None:
     ],
 )
 def test_list_and_quantity_checks_are_not_hidden_by_short_scale(source: str, evidence: str, error: str) -> None:
-    errors = probe(source, evidence, evidence + ".00", execution_status="unknown", questions=["Уточните платёж"])
+    errors = probe(
+        source, evidence, evidence + ".00", direction=None, execution_status="unknown", questions=["Уточните платёж"]
+    )
     assert errors - {"ambiguous_occurrence"} == {error}
     assert "short_amount_scale" not in errors
 

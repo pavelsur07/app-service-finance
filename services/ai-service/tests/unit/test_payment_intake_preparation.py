@@ -101,6 +101,64 @@ def test_known_but_incompatible_category_becomes_unknown() -> None:
     assert row["questions"]
 
 
+@pytest.mark.parametrize("direction", ["inflow", "outflow"])
+def test_guessed_direction_becomes_question_without_changing_money(direction: str) -> None:
+    inp, out = proposal(
+        "Такси 1700р",
+        text_evidence="1700р",
+        amount_evidence="1700р",
+        amount="1700.00",
+        direction=direction,
+        execution_status="unknown",
+        questions=["Оплата уже совершена?"],
+    )
+    result = run(inp, out)
+    assert result.verdict is Verdict.NEEDS_REVIEW
+    assert result.output is not None
+    row = result.output["items"][0]
+    assert row["direction"] is None
+    for field in ("ref", "text_evidence", "amount_evidence", "amount", "currency", "execution_status"):
+        assert row[field] == out["items"][0][field]
+    assert row["questions"][0] == "Оплата уже совершена?"
+    assert any("приход" in question and "расход" in question for question in row["questions"])
+    assert result.trace["output_prepared"] is True
+
+
+def test_guessed_direction_also_clears_direction_dependent_category() -> None:
+    inp, out = proposal("Такси 53000 руб.", direction="outflow", category_id="rent-a")
+    result = run(inp, out)
+    assert result.verdict is Verdict.NEEDS_REVIEW
+    assert result.output is not None
+    row = result.output["items"][0]
+    assert row["amount"] == "53000.00"
+    assert row["direction"] is None
+    assert row["category_id"] is None
+    assert row["questions"]
+
+
+@pytest.mark.parametrize("verb", ["Оплачу", "Заплачу", "Оплатить"])
+def test_explicit_future_outflow_is_preserved_without_preparation(verb: str) -> None:
+    inp, out = proposal(
+        verb + " 53000 руб.",
+        direction="outflow",
+        execution_status="planned",
+        questions=["Подтвердите оплату после её совершения"],
+    )
+    result = run(inp, out)
+    assert result.verdict is Verdict.NEEDS_REVIEW
+    assert result.output == out
+    assert not result.trace.get("output_prepared", False)
+
+
+@pytest.mark.parametrize("change", [{"amount": "54000.00"}, {"category_id": "foreign-category"}])
+def test_unanchored_direction_does_not_hide_critical_money_or_id_error(change: dict[str, Any]) -> None:
+    inp, out = proposal("Такси 53000 руб.", **change)
+    result = run(inp, out)
+    assert result.verdict is Verdict.REJECTED
+    assert result.output is None
+    assert not result.trace.get("output_prepared", False)
+
+
 @pytest.mark.parametrize("total_amount", [None, "9700.00"])
 def test_reference_total_is_excluded_with_notice_current_payment_survives(total_amount: str | None) -> None:
     inp, out = proposal("Отдала 53000 руб., итого мы ей 9700 за месяц отдали", direction="outflow")

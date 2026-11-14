@@ -294,7 +294,7 @@ class PaymentIntakeDraft
 
     /**
      * @param array<string, array<string, mixed>> $patches
-     * @param list<string>|null $questions
+     * @param list<string>|null                   $questions
      */
     public function amend(int $expectedRevision, array $patches, ?string $text = null, ?string $sourceRevision = null, ?array $questions = null, bool $retry = false): bool
     {
@@ -385,6 +385,11 @@ class PaymentIntakeDraft
         $this->assertMutable($expectedRevision);
         if (!\in_array($this->status, ['ready', 'needs_clarification'], true) || [] !== $this->questions || [] === $itemIds || \count($itemIds) !== \count(array_unique($itemIds))) {
             throw new \DomainException('Сначала ответьте на вопросы и выберите платежи.');
+        }
+        foreach ($this->items as $item) {
+            if (!($item['excluded'] ?? false) && !\in_array($item['id'], $itemIds, true)) {
+                throw new \DomainException('Выберите все неисключённые платежи или явно исключите оставшиеся строки.');
+            }
         }
         $selected = [];
         foreach ($itemIds as $id) {
