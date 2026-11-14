@@ -18,7 +18,7 @@
 | Таблица | Строка | Ключ |
 |---|---|---|
 | `moz_source_type` | справочник кодов Ozon: `source_type`, название как в кабинете, `kind` (пусто — не решено), статус `confirmed` / `pending`, черновик ИИ (jsonb), кто и когда подтвердил, где и когда код встретился впервые | `source_type` |
-| `moz_day` | день кабинета, переведённый в канон: ревизия фактов, версия правил, число фактов, Σ компонентов, Σ записанного в канон, Σ в карантине, число компонентов без листинга, время перевода | `(company_id, connection_ref, operation_date)` |
+| `moz_day` | день кабинета, переведённый в канон: ревизия фактов, версия правил, число фактов, Σ `total_amount`, Σ компонентов, Σ записанного в канон, Σ в карантине, число компонентов без листинга, время перевода | `(company_id, connection_ref, operation_date)` |
 | `moz_quarantine` | компонент с кодом без решения: день, `source_type`, сумма, число строк, ссылки на факты | `(company_id, connection_ref, operation_date, source_type)` |
 
 Справочник общий для всех компаний: это коды Ozon, а не данные клиентов.
@@ -27,10 +27,10 @@
 
 | Компонент by-day | `source_type` | `kind` |
 |---|---|---|
-| `posting.products[].commission.seller_price` (резерв — `sale_amount`) | `ozon:field:seller_price` | `sale`, при отрицательной сумме — `return` |
+| `posting.products[].commission.sale_amount` | `ozon:field:sale_amount` | `sale`, при отрицательной сумме — `return` |
 | `…commission.bonus` | `ozon:field:bonus` | `spp` |
 | `…commission.coinvestment` | `ozon:field:coinvestment` | `coinvestment` |
-| `…commission.sale_commission` (резерв — `commission`) | `ozon:field:sale_commission` | `commission` |
+| `…commission.sale_commission` | `ozon:field:sale_commission` | `commission` |
 | `…delivery.services[]`, `item_fees.fees[].fees[]`, `non_item_fee`, `container_fees` (рекурсивно) | `ozon:service:{type_id}` | из справочника |
 
 - `type_id` — номер из справочника Ozon (`ingest_ozon_accrual_types`, 137 типов), один на всех.
@@ -38,6 +38,10 @@
   знаком, ничего не переворачиваем.
 - Выручка с СПП = `sale` − `spp` − `coinvestment` (см. исправление `DATA.md` §9.2 в этом PR).
 - Компонент с нулевой суммой не пишется — так же делает легаси.
+- Проверено на проде 14.11 (все факты Вумджой): `total_amount` начисления = `sale_amount` + `sale_commission` +
+  Σ услуг у всех 2293 отправлений; `sale_amount` = `sale_price` + `bonus` + `coinvestment` у всех 872 продаж.
+  `seller_price` — цена за штуку (расходится при количестве > 1), в канон не идёт. Контроль дня:
+  Σ компонентов = Σ `total_amount` начислений.
 
 ### 2.3. Начальное наполнение справочника
 
@@ -134,8 +138,8 @@ Ozon попадает в карантин и на экран администр�
 - [ ] Unit `AccrualByDayTranslator` на обезличенных фикстурах: POSTING (продажа, возврат),
       ITEM, NON_ITEM, CONTAINER (вложенный), нулевая сумма, нет `accrual_id`, неизвестный `type_id`.
       Σ компонентов = Σ денежных полей начисления.
-- [ ] Unit: по каждой продаже `sale` − `spp` − `coinvestment` = `sale_price` до копейки (фикстура
-      `accrual_by_day_cases.json`).
+- [ ] Unit: по каждой продаже `sale` − `spp` − `coinvestment` = `sale_price` до копейки; Σ компонентов
+      начисления = `total_amount` (фикстура `accrual_by_day_cases.json`).
 - [ ] Integration: повторный перевод дня → то же число строк в `mo_operation` и `moz_day`; новая
       ревизия фактов с изменённой / исчезнувшей / новой записью меняет канон дня.
 - [ ] Integration: неизвестный код → компонент в `moz_quarantine`, не в каноне;
@@ -153,7 +157,7 @@ Ozon попадает в карантин и на экран администр�
 
 **Прод, Вумджой (3f4d87cc), 01.09 – вчера**
 - [ ] У каждого дня с фактами есть `moz_day` с текущей ревизией. Для каждого дня
-      `Σ канона + Σ карантина = Σ компонентов` до копейки.
+      `Σ канона + Σ карантина = Σ компонентов = Σ total_amount` до копейки.
 - [ ] Сверка с эталоном этапа 1 по уровню каскада × день: выручка, МД1, общие, МД2 без рекламы
       по статистике. Окно 08.09 – 31.10 — со снимком, с 01.11 — со свежим прогоном
       `stage-1-baseline.sql`. Расхождение ≤ 1 ₽ на день и уровень или объяснено списком
