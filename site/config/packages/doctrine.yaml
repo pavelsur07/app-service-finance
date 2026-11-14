@@ -155,6 +155,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/MarketplaceOperations/Entity'
                 prefix: 'App\MarketplaceOperations\Entity'
                 alias: MarketplaceOperations
+            MarketplaceOzon:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/MarketplaceOzon/Entity'
+                prefix: 'App\MarketplaceOzon\Entity'
+                alias: MarketplaceOzon
             MarketplaceAds:
                 type: attribute
                 is_bundle: false
