@@ -14,12 +14,12 @@ use App\Shared\Domain\ValueObject\Money;
  * Сумма компонентов всегда равна `total_amount` начисления: то, что разбор не объяснил,
  * уходит компонентом `ozon:unexplained` — у него нет вида, поэтому он попадает в карантин,
  * а не теряется. Проверено на проде 14.11.2026: у POSTING `total_amount` = `sale_amount` +
- * `sale_commission` + Σ услуг; `bonus` и `coinvestment` — справочно, они уже внутри `sale_amount`.
+ * `commission` (нет — `sale_commission`) + Σ услуг; `bonus` и `coinvestment` — справочно, они уже внутри `sale_amount`.
  */
 final class AccrualByDayTranslator
 {
     /** Меняется вместе с правилами разбора: дни с другой версией переводятся заново. */
-    public const RULES_VERSION = 'ozon-by-day-2';
+    public const RULES_VERSION = 'ozon-by-day-3';
 
     public const UNEXPLAINED = 'ozon:unexplained';
 
@@ -85,7 +85,10 @@ final class AccrualByDayTranslator
             if (null !== $sale && !$sale->isZero()) {
                 $components[] = new AccrualComponent('ozon:field:sale_amount', $sale, $sourceKey, $sku, $quantity, $sale->isNegative() ? OperationKind::RETURN : OperationKind::SALE);
             }
-            foreach (['bonus' => OperationKind::SPP, 'coinvestment' => OperationKind::COINVESTMENT, 'sale_commission' => OperationKind::COMMISSION] as $field => $kind) {
+            // Комиссия — поле `commission` (полная); `sale_commission` — только если его нет: у части
+            // начислений `commission` больше на разницу цены (прод 14.11, 10 из 215 тыс.), как в легаси.
+            $commissionField = null !== $this->money($commission['commission'] ?? null) ? 'commission' : 'sale_commission';
+            foreach (['bonus' => OperationKind::SPP, 'coinvestment' => OperationKind::COINVESTMENT, $commissionField => OperationKind::COMMISSION] as $field => $kind) {
                 $amount = $this->money($commission[$field] ?? null);
                 if (null !== $amount && !$amount->isZero()) {
                     $components[] = new AccrualComponent('ozon:field:'.$field, $amount, $sourceKey, $sku, null, $kind);

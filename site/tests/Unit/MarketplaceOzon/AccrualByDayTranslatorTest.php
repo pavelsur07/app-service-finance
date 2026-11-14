@@ -63,13 +63,39 @@ final class AccrualByDayTranslatorTest extends TestCase
             ['ozon:field:sale_amount', 299900, 'sale', '700', 2],
             ['ozon:field:bonus', 181874, 'spp', '700', null],
             ['ozon:field:coinvestment', 1169, 'coinvestment', '700', null],
-            ['ozon:field:sale_commission', -137954, 'commission', '700', null],
+            ['ozon:field:commission', -137954, 'commission', '700', null],
             ['ozon:service:32', -11800, null, '700', null],
         ], $this->rows($sale));
 
         $return = $this->translator->translate('k', $this->posting('-2647', '-1154.8', '-14.77', '1217.62', [], 1));
         self::assertSame(OperationKind::RETURN, $return[0]->kind);
         self::assertSame(-264700, $return[0]->amount->amountMinor());
+    }
+
+    /**
+     * Регрессия (прод 14.11, начисление 62486669594): `commission` −78,60 при `sale_commission` −38,60 —
+     * разница 40 = sale_price − seller_price уходила в `ozon:unexplained`.
+     */
+    public function testFullCommissionFieldExplainsTotal(): void
+    {
+        $m = static fn (string $a): array => ['amount' => $a, 'currency' => 'RUB'];
+        $components = $this->translator->translate('k', [
+            'accrued_category' => 'POSTING',
+            'total_amount' => $m('108.05'),
+            'posting' => ['products' => [[
+                'sku' => 700,
+                'quantity' => 1,
+                'commission' => ['sale_amount' => $m('233'), 'sale_price' => $m('233'), 'seller_price' => $m('193'), 'bonus' => $m('0'), 'coinvestment' => $m('0'), 'sale_commission' => $m('-38.6'), 'commission' => $m('-78.6')],
+                'delivery' => ['services' => [['type_id' => 32, 'accrued' => $m('-21.35')], ['type_id' => 98, 'accrued' => $m('-25')]]],
+            ]]],
+        ]);
+
+        self::assertSame([
+            ['ozon:field:sale_amount', 23300, 'sale', '700', 1],
+            ['ozon:field:commission', -7860, 'commission', '700', null],
+            ['ozon:service:32', -2135, null, '700', null],
+            ['ozon:service:98', -2500, null, '700', null],
+        ], $this->rows($components), 'без ozon:unexplained');
     }
 
     public function testItemAndNonItemFees(): void
