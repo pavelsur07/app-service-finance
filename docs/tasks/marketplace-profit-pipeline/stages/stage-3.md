@@ -62,7 +62,7 @@
       слои; `SchemaInSyncWithMigrationsTest`, `DbResetTest` зелёные.
 - [x] `site-cs-check`, unit (4670) и integration модуля — зелёные; PHPStan level 8 по изменённым
       файлам — без ошибок (полный прогон локально не помещается в память — в CI).
-- [ ] Миграция применена на проде, `mo_operation` и `mo_dirty_window` существуют и пусты.
+- [x] Миграция применена на проде, `mo_operation` и `mo_dirty_window` существуют и пусты; код выкачен 14.11.2026 (деплой 43551538412).
 
 ## Ход работ
 
