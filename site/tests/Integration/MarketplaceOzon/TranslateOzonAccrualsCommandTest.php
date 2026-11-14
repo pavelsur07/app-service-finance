@@ -19,6 +19,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 final class TranslateOzonAccrualsCommandTest extends IntegrationTestCase
 {
     private const RESOURCE = 'ozon.finance.accrual-by-day';
+    private const ADS = 'ozon.ads.statistics';
     private const DAY = '2026-11-10';
     private const CABINET = 'cabinet-1';
 
@@ -107,17 +108,52 @@ final class TranslateOzonAccrualsCommandTest extends IntegrationTestCase
         self::assertSame(0, $this->day()['unresolved_listing_count']);
     }
 
+    public function testCpcIsSplitBySkuSpendOfAdsStatisticsAndRetranslatedOnNewRevision(): void
+    {
+        $this->facts(1, [$this->fee(5, 41, '-100.00')]);
+        $this->facts(1, [['campaign_id' => '1', 'sku' => '700', 'Расход, ₽, с НДС' => '30,00'], ['campaign_id' => '2', 'sku' => '999', 'Расход, ₽, с НДС' => '10,00']], self::ADS);
+
+        self::assertStringContainsString('1 due, 1 translated (2 operations)', $this->translate());
+        $cpc = fn (): array => $this->connection->fetchAllAssociative(
+            "SELECT listing_id, amount_minor, allocation_key FROM mo_operation WHERE company_id = ? AND kind = 'ads_cpc' ORDER BY listing_id NULLS LAST",
+            [$this->companyId],
+        );
+        // SKU 999 без листинга — его доля остаётся без SKU; Σ дня не меняется
+        self::assertEquals([
+            ['listing_id' => $this->listingId, 'amount_minor' => -7500, 'allocation_key' => 'ads_statistics_share'],
+            ['listing_id' => null, 'amount_minor' => -2500, 'allocation_key' => null],
+        ], $cpc());
+        self::assertSame(-10000, $this->day()['canon_minor']);
+        self::assertStringContainsString('0 due', $this->translate());
+
+        // новая ревизия статистики — день переводится заново
+        $this->facts(2, [['campaign_id' => '1', 'sku' => '700', 'Расход, ₽, с НДС' => '1 000,00']], self::ADS);
+        self::assertStringContainsString('1 due, 1 translated (1 operations)', $this->translate());
+        self::assertEquals([['listing_id' => $this->listingId, 'amount_minor' => -10000, 'allocation_key' => 'ads_statistics_share']], $cpc());
+    }
+
+    public function testCpcWithoutAdsStatisticsStaysOnCabinet(): void
+    {
+        $this->facts(1, [$this->fee(5, 41, '-100.00')]);
+        $this->translate();
+
+        self::assertSame([[null, -10000]], array_map(
+            static fn (array $r): array => [$r['listing_id'], (int) $r['amount_minor']],
+            $this->connection->fetchAllAssociative("SELECT listing_id, amount_minor FROM mo_operation WHERE company_id = ? AND kind = 'ads_cpc'", [$this->companyId]),
+        ));
+    }
+
     /**
      * @param list<array<string, mixed>> $accruals
      */
-    private function facts(int $revision, array $accruals): void
+    private function facts(int $revision, array $accruals, string $resource = self::RESOURCE): void
     {
-        $period = ['company' => $this->companyId, 'connection' => self::CABINET, 'resource' => self::RESOURCE, 'period' => self::DAY];
-        foreach ($accruals as $accrual) {
+        $period = ['company' => $this->companyId, 'connection' => self::CABINET, 'resource' => $resource, 'period' => self::DAY];
+        foreach ($accruals as $i => $accrual) {
             $this->connection->executeStatement(
                 'INSERT INTO sf_fact (id, company_id, connection_ref, resource_type, period_key, source_key, payload_hash, payload, first_revision, last_seen_revision, created_at)
                  VALUES (gen_random_uuid(), :company, :connection, :resource, :period, :key, md5(:payload), CAST(:payload AS jsonb), :revision, :revision, now())',
-                $period + ['key' => 'ozon:accrual-by-day:'.$accrual['accrual_id'], 'payload' => json_encode($accrual, \JSON_THROW_ON_ERROR), 'revision' => $revision],
+                $period + ['key' => isset($accrual['accrual_id']) ? 'ozon:accrual-by-day:'.$accrual['accrual_id'] : 'ozon:ads-statistics:'.$i.':r'.$revision, 'payload' => json_encode($accrual, \JSON_THROW_ON_ERROR), 'revision' => $revision],
             );
         }
         $this->connection->executeStatement(
