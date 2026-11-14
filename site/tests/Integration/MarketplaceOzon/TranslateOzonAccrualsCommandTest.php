@@ -132,6 +132,32 @@ final class TranslateOzonAccrualsCommandTest extends IntegrationTestCase
         self::assertEquals([['listing_id' => $this->listingId, 'amount_minor' => -10000, 'allocation_key' => 'ads_statistics_share']], $cpc());
     }
 
+    public function testPayPerOrderIsSplitBySoldQuantityOfTheDay(): void
+    {
+        // 3 продажи SKU 700 (листинг) и 1 продажа SKU 999 (без листинга): 3/4 — на листинг, 1/4 — без SKU
+        $this->facts(1, [$this->sale(1, '700'), $this->sale(2, '700'), $this->sale(3, '700'), $this->sale(4, '999'), $this->fee(5, 54, '-100.00')]);
+        $this->translate();
+
+        self::assertEquals([
+            ['listing_id' => $this->listingId, 'amount_minor' => -7500, 'allocation_key' => 'sales_qty_share'],
+            ['listing_id' => null, 'amount_minor' => -2500, 'allocation_key' => null],
+        ], $this->connection->fetchAllAssociative(
+            "SELECT listing_id, amount_minor, allocation_key FROM mo_operation WHERE company_id = ? AND kind = 'ads_pay_per_order' ORDER BY listing_id NULLS LAST",
+            [$this->companyId],
+        ));
+    }
+
+    public function testPayPerOrderWithoutSalesStaysOnCabinet(): void
+    {
+        $this->facts(1, [$this->fee(5, 54, '-100.00')]);
+        $this->translate();
+
+        self::assertSame([[null, -10000]], array_map(
+            static fn (array $r): array => [$r['listing_id'], (int) $r['amount_minor']],
+            $this->connection->fetchAllAssociative("SELECT listing_id, amount_minor FROM mo_operation WHERE company_id = ? AND kind = 'ads_pay_per_order'", [$this->companyId]),
+        ));
+    }
+
     public function testCpcWithoutAdsStatisticsStaysOnCabinet(): void
     {
         $this->facts(1, [$this->fee(5, 41, '-100.00')]);

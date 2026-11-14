@@ -13,6 +13,8 @@ final class AdsStatisticsShares
 {
     public const RESOURCE = 'ozon.ads.statistics';
     public const ALLOCATION_KEY = 'ads_statistics_share';
+    /** Оплата за заказ — по проданным штукам SKU за день. */
+    public const SALES_ALLOCATION_KEY = 'sales_qty_share';
 
     private const SPEND_COLUMNS = ['расход, ₽, с ндс', 'расход, ₽', 'расход', 'spend', 'cost'];
 
