@@ -36,6 +36,12 @@
         <h1 class="wz-title">Экономика SKU</h1>
         <a class="btn btn-sm btn-secondary" href="{{ path('marketplace_analytics_unit_extended_index') }}">Открыть прежний отчёт</a>
     </div>
+    <div class="tabs-row">
+        <nav class="tabs" aria-label="Отчёт">
+            <a class="tab is-active" aria-current="page" href="{{ path('marketplace_economics_sku', params) }}">По SKU</a>
+            <a class="tab" href="{{ path('marketplace_economics_dynamics', params|merge({sort: null, dir: null, page: null, limit: null})) }}">Динамика</a>
+        </nav>
+    </div>
 
     <form method="get" class="wz-row wz-filters">
         <div class="form-field">

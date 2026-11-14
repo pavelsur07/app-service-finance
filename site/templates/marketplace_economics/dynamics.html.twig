@@ -1,0 +1,161 @@
+{% extends '_layout/app.html.twig' %}
+{% set app_nav_active = 'marketplace_economics' %}
+{% set app_breadcrumb = 'Динамика' %}
+{% block title %}Динамика экономики{% endblock %}
+
+{% macro money(minor) %}{{ minor|vf_minor(2)|vf_amount(2) }}{% endmacro %}
+{% macro pct(value) %}{{ value is null ? '—' : value|vf_number(1) ~ ' %' }}{% endmacro %}
+
+{% block content %}
+    {% import _self as ui %}
+    {% set params = app.request.query.all %}
+    {% set steps = {day: 'По дням', week: 'По неделям', month: 'По месяцам'} %}
+    {% set profit = allocated ? 'full' : 'md2' %}
+    {% set profit_label = allocated ? 'Прибыль полная' : 'МД2' %}
+
+    <div class="wz-head">
+        <h1 class="wz-title">Экономика маркетплейсов</h1>
+        <a class="btn btn-sm btn-secondary" href="{{ path('marketplace_analytics_unit_extended_index') }}">Открыть прежний отчёт</a>
+    </div>
+    <div class="tabs-row">
+        <nav class="tabs" aria-label="Отчёт">
+            <a class="tab" href="{{ path('marketplace_economics_sku', params|merge({step: null, page: null})) }}">По SKU</a>
+            <a class="tab is-active" aria-current="page" href="{{ path('marketplace_economics_dynamics', params) }}">Динамика</a>
+        </nav>
+    </div>
+
+    <form method="get" class="wz-row wz-filters">
+        <div class="form-field">
+            <label class="form-label" for="md-from">С даты</label>
+            <input class="input" id="md-from" type="date" name="from" required value="{{ from }}">
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="md-to">По дату</label>
+            <input class="input" id="md-to" type="date" name="to" required value="{{ to }}">
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="md-step">Шаг</label>
+            <select class="select" id="md-step" name="step">
+                {% for value, label in steps %}
+                    <option value="{{ value }}" {{ value == step ? 'selected' }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% if report and report.connections|length > 1 %}
+            <div class="form-field">
+                <label class="form-label" for="md-connection">Кабинет</label>
+                <select class="select" id="md-connection" name="connection">
+                    <option value="">Все кабинеты</option>
+                    {% for ref in report.connections %}
+                        <option value="{{ ref }}" {{ ref == connection ? 'selected' }}>{{ ref }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% endif %}
+        {% if allTags is not empty %}
+            <div class="form-field">
+                <label class="form-label" for="md-tags">Теги</label>
+                <select class="select" id="md-tags" name="tags[]" multiple size="1">
+                    {% for tag in allTags %}
+                        <option value="{{ tag.id }}" {{ tag.id in tagIds ? 'selected' }}>{{ tag.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% endif %}
+        <div class="form-field">
+            <label class="form-label" for="md-q">Поиск</label>
+            <input class="input" id="md-q" type="search" name="q" value="{{ search }}" placeholder="SKU, артикул, название">
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="md-alloc">Общие затраты</label>
+            <select class="select" id="md-alloc" name="alloc">
+                <option value="1" {{ allocated ? 'selected' }}>С разнесением</option>
+                <option value="0" {{ not allocated ? 'selected' }}>Без разнесения</option>
+            </select>
+        </div>
+        <div class="wz-row-actions">
+            <button class="btn btn-md btn-primary">Показать</button>
+            {% if report and report.hasData %}
+                <a class="btn btn-md btn-secondary" href="{{ path('marketplace_economics_dynamics', params|merge({format: 'xlsx'})) }}">Скачать xlsx</a>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if error %}
+        <div class="wz-row">
+            <div class="alert alert--danger" role="alert"><div class="a-body"><p class="a-text">{{ error }}</p></div></div>
+        </div>
+    {% elseif not report.hasData %}
+        <div class="wz-row">
+            <div class="alert alert--info" role="status"><div class="a-body"><p class="a-text">Кабинеты компании ещё не переведены на новый контур данных. Пока пользуйтесь <a href="{{ path('marketplace_analytics_unit_extended_index') }}">прежним отчётом</a>.</p></div></div>
+        </div>
+    {% else %}
+        {# График: выручка и прибыль по шагам, масштаб — по наибольшему модулю #}
+        {% set max = 1 %}
+        {% for s in report.steps %}
+            {% set max = max(max, s.metrics.revenue, attribute(s.metrics, profit) < 0 ? -attribute(s.metrics, profit) : attribute(s.metrics, profit)) %}
+        {% endfor %}
+        {% set count = report.steps|length %}
+        {% set width = 100 / count %}
+        <section class="card wz-row" aria-label="График: выручка и {{ profit_label }}">
+            <svg viewBox="0 0 100 60" preserveAspectRatio="none" width="100%" height="220" role="img" aria-label="Выручка и {{ profit_label }} по шагам">
+                <line x1="0" y1="40" x2="100" y2="40" stroke="var(--vf-border)" stroke-width="0.2" vector-effect="non-scaling-stroke"/>
+                {% for s in report.steps %}
+                    {% set value = attribute(s.metrics, profit) %}
+                    {% set x = (loop.index0 * width) %}
+                    {% set h_rev = s.metrics.revenue * 38 / max %}
+                    {% set h_profit = (value < 0 ? -value : value) * 38 / max %}
+                    <rect x="{{ x + width * 0.1 }}" y="{{ 40 - h_rev }}" width="{{ width * 0.4 }}" height="{{ h_rev }}" fill="var(--vf-primary)" opacity="0.3">
+                        <title>{{ s.from|date('d.m.Y') }}: выручка {{ ui.money(s.metrics.revenue) }} ₽</title>
+                    </rect>
+                    <rect x="{{ x + width * 0.5 }}" y="{{ value < 0 ? 40 : 40 - h_profit }}" width="{{ width * 0.4 }}" height="{{ h_profit }}" fill="{{ value < 0 ? 'var(--tblr-danger)' : 'var(--tblr-success)' }}">
+                        <title>{{ s.from|date('d.m.Y') }}: {{ profit_label }} {{ ui.money(value) }} ₽</title>
+                    </rect>
+                {% endfor %}
+            </svg>
+            <p class="t-sub">Светлые столбцы — выручка, цветные — {{ profit_label }} (красные — убыток). Реклама за последние 2 дня — предварительно.</p>
+        </section>
+
+        <section class="card report-scroll">
+            <table class="t-table">
+                <thead>
+                    <tr>
+                        <th>Период</th>
+                        <th class="t-cell--right">Продано, шт.</th>
+                        <th class="t-cell--right">Выручка, ₽</th>
+                        <th class="t-cell--right">МД1, ₽</th>
+                        <th class="t-cell--right">Реклама, ₽</th>
+                        <th class="t-cell--right">ДРР, %</th>
+                        <th class="t-cell--right">МД2, ₽</th>
+                        {% if allocated %}<th class="t-cell--right">Прибыль полная, ₽</th>{% endif %}
+                        <th class="t-cell--right">Маржа, %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in report.steps|merge([{from: null, to: null, metrics: report.total}]) %}
+                        {% set m = s.metrics %}
+                        <tr{{ s.from is null ? ' class="t-row--totals"' }}>
+                            <td{{ s.from is null ? ' class="t-totals-label"' }}>
+                                {%- if s.from is null -%}
+                                    {{ tagIds or search ? 'Итого по выбранным' : 'Итого' }}
+                                {%- elseif s.from == s.to -%}
+                                    {{ s.from|date('d.m.Y') }}
+                                {%- else -%}
+                                    {{ s.from|date('d.m') }} – {{ s.to|date('d.m.Y') }}
+                                {%- endif -%}
+                            </td>
+                            <td class="t-cell--right">{{ m.salesQty|vf_number }}</td>
+                            <td class="t-cell--right">{{ ui.money(m.revenue) }}</td>
+                            <td class="t-cell--right">{{ ui.money(m.md1) }}</td>
+                            <td class="t-cell--right">{{ ui.money(m.ads) }}</td>
+                            <td class="t-cell--right">{{ ui.pct(m.drr) }}</td>
+                            <td class="t-cell--right">{{ ui.money(m.md2) }}</td>
+                            {% if allocated %}<td class="t-cell--right">{{ ui.money(m.full) }}</td>{% endif %}
+                            <td class="t-cell--right">{{ ui.pct(m.percentOfRevenue(attribute(m, profit))) }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    {% endif %}
+{% endblock %}
