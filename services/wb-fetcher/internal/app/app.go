@@ -19,6 +19,7 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/config"
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/connections"
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/executor"
+	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/facts"
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/planner"
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/quota"
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/wb"
@@ -29,8 +30,11 @@ func Migrate(ctx context.Context, dsn string) error {
 	return store.Migrate(ctx, dsn, store.CoreMigrations(), "migrations")
 }
 
-// NewTasks — очередь ядра: одна задача кабинета одновременно, без отдельных слотов.
-func NewTasks(pool *store.Pool) *store.Tasks { return store.NewTasks(pool, store.Options{}) }
+// NewTasks — очередь ядра: одна задача кабинета одновременно, без отдельных слотов;
+// ревизии ресурсов facts.Resources публикуются фактами.
+func NewTasks(pool *store.Pool) *store.Tasks {
+	return store.NewTasks(pool, store.Options{PublishResources: facts.Resources})
+}
 
 // Limits — отчёт finance-api: не чаще запроса в interval на кабинет (лимит WB —
 // 1 в минуту на продавца); после 429 темп падает вплоть до вчетверо, серия
@@ -50,6 +54,7 @@ type Ingestion struct {
 	Cabinets *connections.Cache
 	Tasks    *store.Tasks
 	Raw      *rawstore.Store
+	RawRead  *rawstore.Reader
 	Location *time.Location
 	wg       sync.WaitGroup
 }
@@ -109,7 +114,14 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 		Owner:        fmt.Sprintf("%s:%d", hostname, os.Getpid()),
 	}, tasks, cabinets, exec, logger, now, nil)
 
-	ing := &Ingestion{Cabinets: cabinets, Tasks: tasks, Raw: raw, Location: loc}
+	// Дни, загруженные до публикации фактов, — в outbox; повтор при каждом старте безвреден.
+	backfilled, err := tasks.EnqueueLoadedFactBatches(ctx, now())
+	if err != nil {
+		return nil, err
+	}
+	logger.Info("fact batches enqueued for loaded revisions", slog.String("stage", "start"), slog.Int64("batches", backfilled))
+
+	ing := &Ingestion{Cabinets: cabinets, Tasks: tasks, Raw: raw, RawRead: rawstore.NewReader(s3Client, cfg.S3Bucket), Location: loc}
 	for _, run := range []func(context.Context){
 		func(c context.Context) { cabinets.Run(c, cfg.ConnectionsPollInterval) },
 		scheduler.Run,

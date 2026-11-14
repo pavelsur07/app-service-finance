@@ -57,6 +57,29 @@ func enqueueFactBatch(ctx context.Context, tx pgx.Tx, key TaskKey, revision int,
 	return nil
 }
 
+// EnqueueLoadedFactBatches ставит в outbox текущие ревизии публикуемых ресурсов,
+// загруженные до включения публикации, — Symfony получит историю без повторной
+// загрузки из источника. Идемпотентно (batch_id стабилен), поэтому вызывается
+// при каждом старте сервиса; сервису без своих миграций это заменяет backfill.
+func (t *Tasks) EnqueueLoadedFactBatches(ctx context.Context, now time.Time) (int64, error) {
+	if len(t.opts.PublishResources) == 0 {
+		return 0, nil
+	}
+	tag, err := t.pool.Exec(ctx, `
+		INSERT INTO outbox_batch (batch_id, envelope_hash, payload, created_at)
+		SELECT connection_ref || ':' || resource_type || ':' || period_key || ':r' || revision, content_hash,
+		       jsonb_build_object('connection_ref', connection_ref, 'resource_type', resource_type,
+		                          'period_key', period_key, 'revision', revision, 'pages', content_pages), $2
+		FROM fetch_task
+		WHERE resource_type = ANY($1) AND revision > 0 AND content_hash IS NOT NULL AND content_pages <> ''
+		ORDER BY period_key, connection_ref
+		ON CONFLICT (batch_id) DO NOTHING`, t.opts.PublishResources, now)
+	if err != nil {
+		return 0, fmt.Errorf("store: enqueue loaded fact batches: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
 // NewFactBatches — неподтверждённые пачки ресурса после курсора (createdAt,
 // batchID), по порядку постановки. Нулевой курсор — с начала.
 func (t *Tasks) NewFactBatches(ctx context.Context, resourceType string, afterCreatedAt time.Time, afterBatchID string, limit int) ([]FactBatch, error) {
