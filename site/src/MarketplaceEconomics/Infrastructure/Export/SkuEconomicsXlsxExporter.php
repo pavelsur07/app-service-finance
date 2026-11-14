@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceEconomics\Infrastructure\Export;
 
+use App\MarketplaceEconomics\Application\DTO\EconomicsDynamicsReport;
 use App\MarketplaceEconomics\Application\DTO\SkuEconomicsReport;
 use App\MarketplaceEconomics\Domain\SkuMetrics;
 use OpenSpout\Common\Entity\Cell;
@@ -36,6 +37,30 @@ final readonly class SkuEconomicsXlsxExporter
 
         $response = new BinaryFileResponse($path);
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, sprintf('economics-sku-%s-%s.xlsx', $report->from->format('Ymd'), $report->to->format('Ymd')));
+        $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $response->deleteFileAfterSend();
+
+        return $response;
+    }
+
+    public function dynamicsResponse(EconomicsDynamicsReport $report, bool $allocated): BinaryFileResponse
+    {
+        $path = (string) tempnam(sys_get_temp_dir(), 'me-dyn-');
+        $writer = new Writer();
+        $writer->openToFile($path);
+        try {
+            $writer->addRow(new Row([Cell::fromValue(sprintf('Динамика · %s – %s', $report->from->format('d.m.Y'), $report->to->format('d.m.Y')))]));
+            $writer->addRow(new Row(array_map(static fn (string $h): Cell => Cell::fromValue($h), ['С', 'По', ...\array_slice(self::header($allocated), 2)])));
+            foreach ($report->steps as $step) {
+                $writer->addRow($this->row([$step['from']->format('d.m.Y'), $step['to']->format('d.m.Y')], $step['metrics'], $allocated));
+            }
+            $writer->addRow($this->row(['Итого', ''], $report->total, $allocated));
+        } finally {
+            $writer->close();
+        }
+
+        $response = new BinaryFileResponse($path);
+        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, sprintf('economics-dynamics-%s-%s.xlsx', $report->from->format('Ymd'), $report->to->format('Ymd')));
         $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         $response->deleteFileAfterSend();
 

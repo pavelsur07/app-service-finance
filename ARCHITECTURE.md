@@ -673,6 +673,11 @@
   без», Pagerfanta ≤ 200. `SkuEconomicsReportBuilder` — свод `me_day_line` за период и прошлый период той же
   длины (`SkuEconomicsQuery`), уровни — `SkuMetrics`. Без фильтра итог = кабинет (SKU + нераспределённое);
   с тегами или поиском — Σ строк. Нет витрины — пустое состояние со ссылкой на легаси-экран.
+- Отчёт R2 «Динамика» — `GET /marketplace/economics/dynamics` (`EconomicsDynamicsController`, вкладка рядом с
+  R1, те же фильтры + шаг день / неделя / месяц, `?format=xlsx`): `EconomicsDynamicsReportBuilder` —
+  `SkuEconomicsQuery::byStep` (`date_trunc`, неделя с понедельника), все шаги периода (пустые — нули, края
+  обрезаны периодом), график — встроенный SVG. Набор SKU при тегах или поиске берётся из R1 за тот же
+  период, поэтому итог R2 = итог R1.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -5540,6 +5545,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.179 | 2026-11-14 | MarketplaceEconomics: отчёт R2 «Динамика» `/marketplace/economics/dynamics` (+ xlsx), вкладки R1/R2; легаси не меняется (этап 6.4 `marketplace-profit-pipeline`) |
 | 2.178 | 2026-11-14 | MarketplaceOzon: CPC разносится по SKU из статистики Performance (`ozon.ads.statistics`, ozon-fetcher публикует фактами, `source-fact-envelope` v1.1.0), `moz_day.ads_revision` (`Version20261114180000`); день переводится заново при новой статистике (этап 6.1–6.2 `marketplace-profit-pipeline`) |
 | 2.177 | 2026-11-14 | MarketplaceEconomics: реклама разносится по долям статистики своего вида (клики / оплата за заказ), `RULES_VERSION` `economics-2`; refresh сам пересчитывает дни прежней версии правил; итог сверки 5.3 — `stages/stage-5.md` |
 | 2.176 | 2026-11-14 | MarketplaceEconomics: отчёт R1 «Экономика SKU» `/marketplace/economics` (+ xlsx) на новом слое, пункты меню в обоих интерфейсах; легаси `unit-extended` не меняется (этап 5.2 `marketplace-profit-pipeline`) |
