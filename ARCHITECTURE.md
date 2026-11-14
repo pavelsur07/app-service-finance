@@ -3958,6 +3958,26 @@ ai_eval_run. Business ai_task/result/trace и потребители Cash не �
 164calls/job и82/model, lease/attempt fencing, terminal result immutable;
 истёкший job становится incomplete и не повторяет ранее оплаченные cases.
 
+Symfony ServiceGateway получает результаты через AiServiceClient и строгий
+AiEvalV1Parser. Глобальные технические сущности AiQualityMonitor/AiQualityRun
+(`ai_quality_monitor`, `ai_quality_run`) не содержат company/finance данных.
+AiQualityAction сохраняет UUID/trace до POST и ключ payment_intake:YYYY-MM-DD;
+повторы используют исходные значения, canonical remote ID возвращается сервисом.
+Pull revision фиксируется до HTTP: старый ответ или ошибка не могут заменить
+новое наблюдение конфигурации. Дневная запись также защищена remote_updated_at.
+Проекция отчёта содержит status/coverage, fingerprint и до 100 safe failure
+entries на модель (case IDs, metric names, counts); raw input/output не копируется.
+
+Команды `app:ai-service:quality:request` и `:pull` идут каждые пять минут;
+постановка начинается с 03:25 МСК. `:health-check` — ежечасно в :45, до 04:00
+оценивает вчерашнюю дату, затем сегодняшнюю; свежесть pull — 20 минут.
+Старый fingerprint, неполный/отсутствующий отчёт и pending не считаются PASSED.
+Инциденты дедуплицируются в БД, ERROR — в существующий GlitchTip; budget skip —
+WARNING, восстановление — INFO. Флаги проверяются независимо от AI grants компаний.
+Отдельный eval-worker использует тот же image/env, restart:on-failure и grace960s;
+disabled exit0 не образует restart loop. Код и prices обновляются только
+перезапуском API и worker одного immutable image, hot patch не поддерживается.
+
 Runtime fixtures/manifest находятся в AI_SERVICE_EVALS_DIR/parse_payment_message/
 runtime, exporter/check/validator — ai_service.evals.payment_intake_assets.
 Canonical source41/semantic12 и human-reviewed additions hash-pinned; pending

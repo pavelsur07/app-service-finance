@@ -1,9 +1,9 @@
 # Текущий checkpoint — PaymentIntake
 
-**Дата:** 14 ноября 2026. **Этап:** 7 закрыт, переход к этапу 8.
+**Дата:** 14 ноября 2026. **Этап:** 8 / интеграция client, витрины и runtime wiring.
 **Ветка:** docs/telegram-payment-intake-examples.
 **Draft PR:** https://github.com/pavelsur07/app-service-finance/pull/2985 (master).
-**База этапа 7:** fcd5659469e441d20d87cb77666b6d859aefc8e8.
+**База этапа 8:** 38981c1ae5c756c28627a079e16914fc07d82bf9.
 
 Этап 6: общий source boundary и runtime эталоны завершены. Этап 7: технический
 API, очередь, отдельный eval-worker, общий бюджет 30 ₽/ночь и 900 ₽/месяц готовы.
@@ -14,11 +14,33 @@ MINOR исправлены и проверены RED→GREEN, один вопр�
 обоснован, disabled restart перенесён в compose этапа 8. Итог fixed without
 re-run, открытых BLOCKER/IMPORTANT нет. Подробности stages/stage-7.md.
 
-Следующее действие: выполнить этап 8 по stages/stage-8-spec.md. Baseline client
-8 tests/32 assertions и health 6 tests/13 assertions PASS. Сначала client/parser
-и техническая витрина с тестами, затем cron/worker wiring и health; полные PHP
-handoff gates запускать однократно после интеграции. Root AGENTS.md/CLAUDE.md и
-посторонние файлы владельца не трогать. Merge/deploy не разрешены.
+Этап 8: client/parser и безопасная проекция готовы; 127 client tests/618
+assertions, затем reviewed dataset regression 48/263 PASS. Исправлен внутренний
+IMPORTANT: ключ reviewed:version ранее отвергался PHP parser. Дополняется
+проекция safe failures (case IDs/названия метрик/счётчики), без сырых данных.
+Витрина из двух технических таблиц, durable request, pull и health готовы;
+22 integration tests/71 assertions PASS после фикса гонки старого fingerprint.
+Первичная регистрация трёх disabled commands также проверена. Миграция локально
+up/down/up прошла, ORM dump не имеет drift ai_quality (только старый fixture
+test_money_holder). Wiring agent сообщил42 Python config/CLI PASS, Compose и
+shell PASS; родители ещё интегрируют и проверяют полный diff.
+
+Stage8 module integration завершена: ServiceGateway+schema254/1140PASS,
+Python571PASS/1skip,eval9PASS/1skip,Ruff115/mypy63PASS. Safe diagnostics и
+budget WARNING готовы. Стиль full0/4168PASS. Canonical fullStan прерван на1540/
+4132 из-за host RAM/swap pressure; own container остановлен/удалён, exit137,
+это не GREEN. Tool runtime временно заменялся, fresh exec восстановился.
+Точечный PHPStan8root+client files Noerrors. Baseline не менялся.
+make site-test-unit site-test сейчас RUNNING, лог
+/tmp/payment-intake-handoff-tests-current.log, session37469 (может потеряться
+после runtime replacement — прежде повторов читать лог/состояние).
+
+Следующее действие: дождаться полного PHP test run, не запускать второй.
+Stage8 code checkpoint commit/push; попробовать per-command gh credential helper
+для CI (gh API user=pavelsur07, обычные pushes не создают workflow runs).
+Затем ограниченный ресурсами fullStan/проверка CI, свежий independent whole-task
+review, formal external review. Пока gates/review pending, не называть этап8DONE.
+Owner AGENTS/CLAUDE и прочие чужие файлы исключены. Production не разрешён.
 
 Ночные живые запуски ещё не включены; локальные проверки не вызывают моделей.
 Четыре прежних live passes завершены, старое root-SSH исключение закрыто;

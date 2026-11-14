@@ -137,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
                 conn,
                 store,
                 routing=routing,
-                adapters=build_adapters(routing, settings.llm_timeout_seconds),
+                adapters=build_adapters(routing, min(settings.llm_timeout_seconds, 60)),
                 prices=load_prices(settings.routes_file.with_name("prices.yaml")),
                 limits=limits,
             )

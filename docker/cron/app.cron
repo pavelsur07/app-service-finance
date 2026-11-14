@@ -373,6 +373,12 @@
 # Гейт «тишины» ИИ (docs/workflow/health-gates.md): компания без запуска > 3 ч или половина результатов failed — ERROR и exit 1.
 50 * * * * cd /app && php bin/console app:ai-service:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Ночная проверка качества: только короткие HTTP-постановка/pull и локальная витрина.
+# AI_SERVICE_EVAL_ENABLED=false — exit 0. Request сам проверяет окно после 03:25 МСК.
+*/5 * * * * cd /app && php bin/console app:ai-service:quality:request --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+*/5 * * * * cd /app && php bin/console app:ai-service:quality:pull --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+45 * * * * cd /app && php bin/console app:ai-service:quality:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Dead man's switch: пинг heartbeat-монитора GlitchTip. Молчание → монитор сам заводит issue.
 # Отдельно от почтовой пробы: ловит смерть supercronic/контейнера, т.е. немоту ВСЕХ кронов.
 # Пустой GLITCHTIP_SCHEDULER_HEARTBEAT_URL = выключено. wget, а не curl: busybox есть в alpine всегда.

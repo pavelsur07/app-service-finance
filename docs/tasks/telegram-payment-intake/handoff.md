@@ -1,8 +1,9 @@
-# Telegram payment intake — реализация и результаты проверок
+# PaymentIntake — реализация и результаты проверок
 
 Branch `docs/telegram-payment-intake-examples`; [Draft PR #2985](https://github.com/pavelsur07/app-service-finance/pull/2985), base `master`.
 Task base `8a1f51cac4dacac4d49dd6b5cf72e0940d26a895`.
-Проверенный runtime source `99cf27cde6b1d0fa7213b008d11506466d70a091`, prompt v5.
+Версия последних ручных live benchmarks: `99cf27cde6b1d0fa7213b008d11506466d70a091`, prompt v5.
+Расширение nightly/source прошло module checks; итоговые handoff gates и ревью выполняются.
 
 ## Результат
 
