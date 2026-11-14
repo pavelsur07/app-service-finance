@@ -6,13 +6,18 @@ namespace App\Tests\Integration\MarketplaceOzon;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Enum\MarketplaceType;
+use App\MarketplaceOperations\Facade\MarketplaceOperationsFacadeInterface;
 use App\MarketplaceOzon\Command\OzonTranslationHealthCheckCommand;
 use App\MarketplaceOzon\Command\TranslateOzonAccrualsCommand;
+use App\MarketplaceOzon\Infrastructure\Query\OzonTranslationStore;
+use App\SourceFacts\Facade\SourceFactsFacadeInterface;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -59,6 +64,18 @@ final class TranslateOzonAccrualsCommandTest extends IntegrationTestCase
         self::assertSame(13, $this->rows('mo_operation'));
     }
 
+    public function testHealthCheckCatchesLostCanonRowsAndLaggingCabinet(): void
+    {
+        $this->facts(1, [$this->sale(1, '700'), $this->fee(3, 46, '-50.00')]);
+        $this->translate();
+        self::assertSame(Command::SUCCESS, $this->healthCheck(), 'канон = перевод, день вчерашний');
+
+        self::assertSame(Command::FAILURE, $this->healthCheck('2026-11-13 09:20:00'), 'последний день кабинета — позавчера');
+
+        $this->connection->executeStatement("DELETE FROM mo_operation WHERE company_id = ? AND source_type = 'ozon:service:46'", [$this->companyId]);
+        self::assertSame(Command::FAILURE, $this->healthCheck(), 'строка канона потеряна');
+    }
+
     public function testNewRevisionReplacesDay(): void
     {
         $this->facts(1, [$this->sale(1, '700'), $this->fee(3, 46, '-50.00')]);
@@ -84,7 +101,7 @@ final class TranslateOzonAccrualsCommandTest extends IntegrationTestCase
         self::assertSame([-8000, -5000, -3000], [$this->day()['total_minor'], $this->day()['canon_minor'], $this->day()['quarantine_minor']]);
         self::assertSame(['pending', 'Кросс-докинг'], array_values((array) $this->connection->fetchAssociative("SELECT status, name FROM moz_source_type WHERE source_type = 'ozon:service:12'")));
 
-        $this->connection->executeStatement("UPDATE moz_quarantine SET quarantined_at = quarantined_at - interval '2 days' WHERE company_id = ?", [$this->companyId]);
+        $this->connection->executeStatement("UPDATE moz_quarantine SET quarantined_at = '2026-11-09 09:00:00' WHERE company_id = ?", [$this->companyId]);
         self::assertSame(Command::FAILURE, $this->healthCheck());
 
         $this->connection->executeStatement("UPDATE moz_source_type SET kind = 'logistics_to', status = 'confirmed' WHERE source_type = 'ozon:service:12'");
@@ -229,9 +246,17 @@ final class TranslateOzonAccrualsCommandTest extends IntegrationTestCase
         return $tester->getDisplay();
     }
 
-    private function healthCheck(): int
+    private function healthCheck(string $now = '2026-11-11 09:20:00'): int
     {
-        return (new CommandTester(self::getContainer()->get(OzonTranslationHealthCheckCommand::class)))->execute([]);
+        $c = self::getContainer();
+
+        return (new CommandTester(new OzonTranslationHealthCheckCommand(
+            $c->get(SourceFactsFacadeInterface::class),
+            $c->get(OzonTranslationStore::class),
+            $c->get(MarketplaceOperationsFacadeInterface::class),
+            new MockClock($now),
+            new NullLogger(),
+        )))->execute([]);
     }
 
     /**

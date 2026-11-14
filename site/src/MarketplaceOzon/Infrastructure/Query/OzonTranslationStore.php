@@ -141,6 +141,26 @@ final readonly class OzonTranslationStore
     }
 
     /**
+     * Σ, отправленная в канон, по переведённым дням окна — сверка «перевод = канон».
+     *
+     * @companyScopeExempt без `$companyId` — системный гейт по всем компаниям
+     *
+     * @return array<string, int> dayKey → canon_minor
+     */
+    public function canonTotals(\DateTimeImmutable $from, \DateTimeImmutable $to, ?string $companyId = null): array
+    {
+        $totals = [];
+        foreach ($this->connection->fetchAllAssociative(
+            'SELECT company_id, connection_ref, operation_date, canon_minor FROM moz_day WHERE operation_date BETWEEN :from AND :to'.(null === $companyId ? '' : ' AND company_id = :company'),
+            ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')] + (null === $companyId ? [] : ['company' => $companyId]),
+        ) as $row) {
+            $totals[self::dayKey((string) $row['company_id'], (string) $row['connection_ref'], (string) $row['operation_date'])] = (int) $row['canon_minor'];
+        }
+
+        return $totals;
+    }
+
+    /**
      * Дни, в карантине которых есть код с уже принятым решением, — их надо перевести заново.
      *
      * @companyScopeExempt переводчик обходит все компании (cron)

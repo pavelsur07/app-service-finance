@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceOperations\Facade;
 
+use App\MarketplaceOperations\Application\DTO\CanonDaySum;
 use App\MarketplaceOperations\Application\DTO\DayOperations;
 use App\MarketplaceOperations\Application\DTO\DayWindow;
 use App\MarketplaceOperations\Application\DTO\OperationRecord;
@@ -37,6 +38,16 @@ interface MarketplaceOperationsFacadeInterface
      * @return list<DayWindow>
      */
     public function days(\DateTimeImmutable $from, \DateTimeImmutable $to): array;
+
+    /**
+     * Σ канона по (компания, кабинет, день) канала без справочных видов — сверка с переводчиком (гейт)
+     * и экран качества данных (с `$companyId`). Только чтение.
+     *
+     * @companyScopeExempt без `$companyId` — системный гейт по всем компаниям
+     *
+     * @return list<CanonDaySum>
+     */
+    public function daySums(string $channel, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $companyId = null): array;
 
     /**
      * Забрать день для пересчёта витрины: блокировка дня (та же, что у `replaceDay`), операции и

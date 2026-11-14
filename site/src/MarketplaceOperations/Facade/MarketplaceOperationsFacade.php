@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\MarketplaceOperations\Facade;
 
+use App\MarketplaceOperations\Application\DTO\CanonDaySum;
 use App\MarketplaceOperations\Application\DTO\DayOperations;
 use App\MarketplaceOperations\Application\DTO\DayWindow;
 use App\MarketplaceOperations\Application\DTO\OperationRecord;
+use App\MarketplaceOperations\Enum\CascadeLevel;
 use App\MarketplaceOperations\Enum\OperationKind;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Clock\ClockInterface;
@@ -105,6 +108,26 @@ final readonly class MarketplaceOperationsFacade implements MarketplaceOperation
             'SELECT DISTINCT company_id, channel, connection_ref, operation_date FROM mo_operation
              WHERE operation_date BETWEEN :from AND :to ORDER BY operation_date, company_id, channel, connection_ref',
             ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')],
+        ));
+    }
+
+    public function daySums(string $channel, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $companyId = null): array
+    {
+        $info = array_values(array_map(static fn (OperationKind $k): string => $k->value, array_filter(OperationKind::cases(), static fn (OperationKind $k): bool => CascadeLevel::INFO === $k->level())));
+        $params = ['channel' => $channel, 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d'), 'info' => $info];
+        $types = ['info' => ArrayParameterType::STRING];
+        $company = '';
+        if (null !== $companyId) {
+            $company = ' AND company_id = :company';
+            $params['company'] = $companyId;
+        }
+
+        return array_map(static fn (array $r): CanonDaySum => new CanonDaySum((string) $r['company_id'], (string) $r['connection_ref'], (string) $r['operation_date'], (int) $r['amount']), $this->connection->fetchAllAssociative(
+            'SELECT company_id, connection_ref, operation_date, COALESCE(SUM(amount_minor) FILTER (WHERE kind NOT IN (:info)), 0) AS amount FROM mo_operation
+             WHERE channel = :channel AND operation_date BETWEEN :from AND :to'.$company.'
+             GROUP BY company_id, connection_ref, operation_date ORDER BY operation_date, company_id, connection_ref',
+            $params,
+            $types,
         ));
     }
 
