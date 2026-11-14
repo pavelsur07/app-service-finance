@@ -35,7 +35,7 @@
 
 ## Откат
 
-Флаг0 + обычный deploy останавливает profiled worker и recovery script. Согласованный scope сохраняется, чтобы сообщения компании при отключённом флаге не переходили в legacy. Уже сохранённые финансовые операции не удаляются. На более широкую группу scope не расширять без owner scope decision. Возврат GPT fallback — отдельное изменение после проверки его качества.
+Флаг0 + обычный deploy останавливает profiled worker и recovery script. Pilot worker использует restart: unless-stopped, чтобы ручная остановка сохранялась после перезапуска Docker ([документация Docker](https://docs.docker.com/engine/containers/start-containers-automatically/)). Согласованный scope сохраняется, чтобы сообщения компании при отключённом флаге не переходили в legacy. Уже сохранённые финансовые операции не удаляются. На более широкую группу scope не расширять без owner scope decision. Возврат GPT fallback — отдельное изменение после проверки его качества.
 
 ## Известные ограничения
 
