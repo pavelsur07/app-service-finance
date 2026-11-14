@@ -105,7 +105,8 @@ runner self-review B0/I1; external B1/I15 по пяти раундам, open B0/
 Task commits до final Stage5: dbfc6d5ff, 1b326aa9a, 0264aed23, 5fff92c58,
 0984d7b62; final code commit доступен в голове той же ветки/PR.
 
-Current runtime source: `bd490a8fbd3ddd1d511046bae7c337e0fb958b34` (promptv3).
+Последний измеренный runtime source: `bd490a8fbd3ddd1d511046bae7c337e0fb958b34` (promptv3).
+Текущая локальная версияv4: см. следующую секцию, пока без live-оценки.
 Source4160b4e08CI43557018107 SUCCESS:fullPHP/Python/empty-DB gates; production
 schema/migrations/deploySKIPPED. V3localgates green; exact-headCI is recorded
 separately. Manual none43500484323 was not counted as validation.
@@ -129,3 +130,17 @@ Fresh independent full-run acceptance review:B0/I0securitydefects,M1staledocs
 fixed. Stage5qualitygapsremain; no final pilot acceptance/Ready/merge request.
 Earlier focused eval/scorer/privacy/v2/v3reviewsB0/I0/M0. Documentation-only
 continuation did not repeat externalreview; previous fixed-without-rerun stands.
+
+## Локальная доработка после полного v3
+
+Справочный итог проверяется и для amountnull; поиск привязан к своей фразе,
+чтобы не мешать текущему платежу из следующей строки. Promptv4явно сопоставляет
+локальный плюс с inflow, отдельно от факта оплаты, и запрещает строки итогов
+с неизвестной суммой. Schema/core/PHPне менялись, v1–v3сохранены.
+
+Baseline10PASS; три исходные регрессии RED→GREEN; независимый I1о границах
+фразы закрыт после6RED→GREEN. Итог15адресныхPASS,318PythonPASS/1skip,
+eval9PASS/1skip,ruff93/mypy55PASS. ReviewerB0/I1found→B0/I0/M0open.
+Текущаяmanifest41/0/currentv4; результат живойv3не является оценкойv4.
+Следующий bounded run той же41пачки в остатке общей кампании, без новых данных.
+Stage5/pilotне закрыты; productionflag0/worker/миграции/deployбез изменений.

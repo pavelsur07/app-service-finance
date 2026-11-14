@@ -3,7 +3,7 @@
 `cases.jsonl`: 24 synthetic verifier replies and explicit expected check outcomes.
 These are adversarial fixtures, not model-produced results. Tests report pass/N
 by dimension and exercise structured Pipeline separately. No live calls or model
-accuracy claim. Model/prompt: fixture replies / current version from TaskSpec (v3).
+accuracy claim. Model/prompt: fixture replies / current version from TaskSpec (v4).
 
 `corpus-review.jsonl`: review of all 41 source records; partial monetary facts,
 questions and exclusions only. `tg-016`–`tg-040` stay in event-list family,
@@ -24,3 +24,7 @@ amount; precision remains unmeasured. Total50items,3unknownamounts,39unknown
 directions. Analytics/date/question quality have no complete gold. Stage5/pilot
 acceptance remainpending; see docs/tasks/telegram-payment-intake/live-eval-result-2026-11-14.md.
 Stub/fixture green proves deterministic integration/checks only.
+
+Current local v4 adds a clause-local reference-total guard for unknown amounts
+and explicit direction wording. v1–v3/schema unchanged. v3numbers above remain
+historical v3measurements; current v4 has not yet been measured live.

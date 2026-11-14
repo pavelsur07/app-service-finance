@@ -123,8 +123,10 @@ def _occurrence_errors(inp: PaymentInput, item: PaymentItem, start: int, end: in
             errors.add("quantity_amount")
         if re.search(r"(?:^|\n)\s*$", before) and re.match(r"\.\s", after):
             errors.add("list_index_amount")
-        if re.search(r"итого\s+(?:\S+\s+){0,3}$", before, re.IGNORECASE):
-            errors.add("context_total_amount")
+    if re.search(r"итого\s+(?:\S+\s+){0,3}$", inp.text[left:start], re.IGNORECASE) or re.match(
+        r"\s*итого\b", inp.text[start:end], re.IGNORECASE
+    ):
+        errors.add("context_total_amount")
     explicit_currency = _currency(evidence or "", after)
     if (
         item.amount is not None

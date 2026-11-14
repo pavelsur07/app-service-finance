@@ -3925,8 +3925,10 @@ Cash PaymentIntake. Python `parse_payment_message` выполняется вну
 ai-service; payload/output — `services/_contracts/ai-parse-payment-message/v1`.
 Конверт `ai-task/v1` не изменён. Модель возвращает предложения с доказательными
 фрагментами; деньги записывает только Symfony после подтверждения факта оплаты.
-Промпт `parse_payment_message/v3` включает JSON Schema, автоматически полученную
-из PaymentOutput; v1 сохранён. Версия и хеш полного system prompt входят в eval.
+Промпт `parse_payment_message/v4` включает JSON Schema, автоматически полученную
+из PaymentOutput; v1–v3 сохранены. Версия и хеш полного system prompt входят в eval.
+Справочный итог отклоняется также у кандидата с неизвестной суммой; сам факт
+наличия вопроса не превращает такой итог в платёж.
 Дополнительный rollout-переключатель `TELEGRAM_PAYMENT_INTAKE_ENABLED` по
 умолчанию `0` (только test env `1`). Его включение до live-eval приёмки не
 является частью обычного доступа компании к ИИ. Если новый сценарий выбран,

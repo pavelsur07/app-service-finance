@@ -10,7 +10,7 @@ from ai_service.tasks.parse_payment_message.checks import verify
 from ai_service.tasks.parse_payment_message.schemas import PaymentInput, PaymentOutput
 
 TASK_TYPE = "parse_payment_message"
-PROMPT_VERSION = "v3"
+PROMPT_VERSION = "v4"
 
 
 def build_user(inp: PaymentInput) -> str:

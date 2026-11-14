@@ -212,3 +212,65 @@ def test_conflicting_sign_unknown_also_requires_question() -> None:
     source = "Получил от клиента - 79000 руб"
     assert "direction_question" in probe(source, "79000 руб", "79000.00", direction=None)
     assert not probe(source, "79000 руб", "79000.00", direction=None, questions=["Это приход или расход?"])
+
+
+@pytest.mark.parametrize(
+    ("quote", "amount_evidence"),
+    [("9700", "9700"), ("9700", None), ("итого мы ей 9700", None)],
+)
+def test_context_total_cannot_be_unknown_amount_candidate(quote: str, amount_evidence: str | None) -> None:
+    errors = probe(
+        "Отдала 4300 руб., итого мы ей 9700 за октябрь отдали наличкой",
+        quote,
+        None,
+        amount_evidence=amount_evidence,
+        direction=None,
+        execution_status="unknown",
+        questions=["Уточните сумму платежа"],
+    )
+    assert "context_total_amount" in errors
+
+
+@pytest.mark.parametrize("amount", [None, "4300.00"])
+def test_current_payment_survives_reference_total(amount: str | None) -> None:
+    assert not probe(
+        "Отдала 4300 руб., итого мы ей 9700 за октябрь отдали наличкой",
+        "4300 руб.",
+        amount,
+        execution_status="unknown",
+        questions=["Подтвердите текущий платёж"],
+    )
+
+
+def test_clean_occurrence_survives_same_number_in_reference_total() -> None:
+    assert not probe(
+        "Отдала 9700 руб., итого 9700 руб.",
+        "9700 руб.",
+        "9700.00",
+        execution_status="unknown",
+        questions=["Подтвердите текущий платёж"],
+    )
+
+
+@pytest.mark.parametrize("source", ["плюс 53000", "+ 53000", "Партнёрский платёж\n+ 53000\nОтдал наличными"])
+def test_explicit_local_plus_allows_inflow_without_assuming_paid(source: str) -> None:
+    assert not probe(
+        source,
+        "53000",
+        "53000.00",
+        direction="inflow",
+        execution_status="unknown",
+        questions=["Оплата уже совершена?"],
+    )
+
+
+@pytest.mark.parametrize("separator", ["\n", ", ", "; "])
+@pytest.mark.parametrize("amount", [None, "4300.00"])
+def test_reference_total_in_previous_clause_cannot_hide_current_payment(separator: str, amount: str | None) -> None:
+    assert not probe(
+        "Итого 9700 руб." + separator + "Отдала 4300 руб.",
+        "4300 руб.",
+        amount,
+        execution_status="unknown",
+        questions=["Подтвердите текущий платёж"],
+    )

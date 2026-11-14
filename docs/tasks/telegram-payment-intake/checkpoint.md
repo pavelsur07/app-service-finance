@@ -331,3 +331,40 @@ beingcompleted; finalreport states executiondone, Stage5qualitystillopen, no
 pilot/merge/deployclaimed. Localimplementation remains pre-authorized by original
 ownerbrief; the fixed-v3externalrepeat scope is not automatically broadened to a
 newprompt/dataset/access. Preserve raw-output privacy and all historicalreceipts.
+
+Nextuserasked'что дальше'; explained sequence and continued authorizedlocalwork.
+NewStage5workitemspec stage-5-context-total-spec.md beforecode. Confirmed codegap:
+context_total guard sits inside amountnonnull block. This can admit an unknown
+amount totalcandidate, independent of whether that caused actualtg008(extra raw
+notretained). PlanregressionRED→GREEN, minimalguardfix, immutablepromptv4 explicit
+localplus→inflow/totalsnotcandidates, no publiccontract/core/consumerchange.
+No new livecall or prodaction in thislocalwork; oldv3receipt remains historical.
+Baseline narrow totals/direction command started; wait before addingtests.
+
+Localtotalguardbaseline10PASS beforecode. NewregressionsRED3fail/6pass: unknown
+contexttotalcandidate accepted with numericamount_evidence, nullamount_evidence,
+or quote starting'итого'. Minimalfixmovesexistingtotalguardoutsideamountnonnull
+and checks quote-start'итого'. GREEN9/9, preservescurrentpaymentandclean repeated
+number. Syntheticexplicitplusdirectionallowed controlsPASS; originalraw008cause
+stillunknown and notclaimedfixedlive. Immutablepromptv4 adds explicitinflow/
+outflowmapping and totalsnotunknowncandidates;v1-v3untouched, schema/core/PHPnone.
+Needformat→lint→fullPython/evals→manifest→focusedreview; paidcallsremain122/163.
+
+FocusedreviewB0/I1: movedtotalprefixstillglobalbefore,regexcrossesnewline/clause.
+Reviewer counterexample total-first9700 then current4300 amountnull falselyrejected.
+Needfixexistingprefixclause-local usingalreadycomputedleft, keepquote-start guard.
+FullPythonfirstpass312PASS/1skip,eval9PASS/1skip beforethisnewcounterexample;
+notfinalproofuntilI1regressionred/greenandupdatedsuite. New6cases (newline/comma/
+semicolon xnull/knownamount) willproveboundaryfailure first. No modelcalls.
+
+I1clauseboundary6RED→GREEN; all15targetedPASS. Final318testsPASS/1skip,eval9PASS/
+1skip,ruff93/mypy55PASS. FreshreviewI1closed,B0/I0/M0open. v1-v3/schema unchanged,
+manifestv4/41/0. Localv4report/README/handoffupdated withoutlivequalityclaim.
+Ruling on next validation: original owner authorized autonomous fixes and up to
+82additionaltestcalls/samekey/300estimate;41ofthatallowance remain. Use remaining
+41on unchanged41text/provider/key/accessscope to verify necessaryv4fix. Frozenv3
+helper/bundle remainimmutable and are NOT reused/rerun. Newv4bundle/helper guarded
+atcampaign122/max163/remaining41; no reset/increase of cap, no newdataset/settings.
+No permission asked again for the same unexhausted boundedtestcampaign. Record
+newsource/image/receipts and never equate v3numbers withv4. Next commit/pushv4,
+bundle67files/offlinepreflight→singlefull41max41→postcheck→actualanalysis/docs.
