@@ -12,11 +12,12 @@ use Symfony\Component\Clock\ClockInterface;
 
 /**
  * Черновик ИИ для каждого нового кода без решения (`DATA.md` §9.4): ставит задачу
- * `marketplace_source_type_draft` от компании, у которой код встретился впервые.
+ * `marketplace_source_type_draft` от компании, у которой код встретился впервые, а если у неё ИИ
+ * выключен — от другой компании с этим кодом в карантине, у которой ИИ включён (её бюджет и учёт).
  *
  * Номер задачи пишется в `ai_draft` до постановки (ключ повтора — сам код), поэтому ответ
  * найдёт свою строку. Сервис недоступен — запрос снимается и повторится следующим прогоном;
- * ИИ выключен у компании — черновика не будет, экран работает без него. Вызывать вне транзакции.
+ * ИИ выключен у всех таких компаний — черновика не будет, экран работает без него. Вызывать вне транзакции.
  */
 final readonly class RequestOzonSourceTypeDraftsAction
 {
@@ -48,11 +49,19 @@ final readonly class RequestOzonSourceTypeDraftsAction
 
         $requested = 0;
         foreach ($pending as $row) {
-            $taskId = $this->ai->taskIdFor($row['company_id'], self::TASK_TYPE, $row['source_type']);
+            $enabled = array_flip($this->ai->enabledCompanyIds($row['company_ids']));
+            $companyId = $row['company_ids'][0];
+            foreach ($row['company_ids'] as $candidate) {
+                if (isset($enabled[strtolower($candidate)])) {
+                    $companyId = $candidate;
+                    break;
+                }
+            }
+            $taskId = $this->ai->taskIdFor($companyId, self::TASK_TYPE, $row['source_type']);
             $now = $this->clock->now()->format(\DATE_ATOM);
             $this->store->saveDraft($row['source_type'], ['task_id' => $taskId, 'status' => 'requested', 'requested_at' => $now]);
             try {
-                $accepted = $this->ai->requestTask($row['company_id'], self::TASK_TYPE, [
+                $accepted = $this->ai->requestTask($companyId, self::TASK_TYPE, [
                     'channel' => 'ozon',
                     'source_type' => $row['source_type'],
                     'name' => $row['name'],

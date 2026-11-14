@@ -56,6 +56,20 @@ final class OzonSourceTypeDecisionTest extends IntegrationTestCase
         self::assertSame(['needs_review', 'logistics_to', 'логистика до склада'], [$draft['status'] ?? null, $draft['kind'] ?? null, $draft['reason'] ?? null]);
     }
 
+    public function testDraftGoesToAnotherQuarantinedCompanyWhenFirstHasNoAi(): void
+    {
+        $other = Uuid::uuid7()->toString();
+        $this->connection->executeStatement(
+            "INSERT INTO moz_quarantine (company_id, connection_ref, operation_date, source_type, amount_minor, currency, row_count, source_refs, quarantined_at)
+             VALUES (?, 'cabinet-2', '2026-11-11', 'ozon:service:12', -1000, 'RUB', 1, '[]', now())",
+            [$other],
+        );
+        $this->ai->enabledOnly = [$other];
+
+        self::assertSame(1, $this->request());
+        self::assertSame($other, $this->ai->requests[0]['companyId']);
+    }
+
     public function testServiceFailureIsRetriedAndDisabledAiLeavesNoDraft(): void
     {
         $this->ai->fail = true;
@@ -108,6 +122,8 @@ final class FakeAiTasks implements AiTaskFacadeInterface
 {
     public bool $enabled = true;
     public bool $fail = false;
+    /** @var list<string>|null компании с ИИ; null — все */
+    public ?array $enabledOnly = null;
     /** @var list<array{taskId: string, companyId: string, taskType: string, payload: array<string, mixed>, key: string}> */
     public array $requests = [];
 
@@ -137,7 +153,7 @@ final class FakeAiTasks implements AiTaskFacadeInterface
 
     public function enabledCompanyIds(array $companyIds): array
     {
-        return $companyIds;
+        return null === $this->enabledOnly ? $companyIds : array_values(array_intersect($companyIds, $this->enabledOnly));
     }
 
     public function connectedCompanyIds(): array
