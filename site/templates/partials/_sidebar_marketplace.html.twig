@@ -19,6 +19,9 @@
             <a class="dropdown-item {{ mp_unit_active ? 'active' : '' }}" href="{{ path('marketplace_analytics_unit_extended_index') }}">
                 <span>Unit-экономика</span>
             </a>
+            <a class="dropdown-item" href="{{ path('marketplace_economics_sku') }}">
+                <span>Экономика SKU (новая)</span>
+            </a>
             {% set mp_ads_active = current_route starts with 'marketplace_ads_' %}
             <a class="dropdown-item {{ mp_ads_active ? 'active' : '' }}" href="{{ path('marketplace_ads_efficiency_index') }}">
                 <span>Реклама</span>

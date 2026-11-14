@@ -22,6 +22,10 @@
                 <div class="sb-group-title">Справочники</div>
                 <a class="sb-item {{ balance_structure_active ? 'is-active' : '' }}" href="{{ path('balance_structure_index') }}"><span class="lbl">Статьи баланса</span></a>
             {% endif %}
+            {% if is_granted('module.marketplace.read') %}
+                <div class="sb-group-title">Маркетплейсы</div>
+                <a class="sb-item {{ app_nav_active|default('') == 'marketplace_economics' ? 'is-active' : '' }}" href="{{ path('marketplace_economics_sku') }}"><span class="lbl">Экономика SKU</span></a>
+            {% endif %}
             {% if activeCompany|default(null) and app.user and activeCompany.user.id == app.user.id %}
                 <div class="sb-group-title">Настройки</div>
                 <a class="sb-item {{ app_nav_active|default('') == 'api' ? 'is-active' : '' }}" href="{{ path('settings_api_index') }}"><span class="lbl">API</span></a>
