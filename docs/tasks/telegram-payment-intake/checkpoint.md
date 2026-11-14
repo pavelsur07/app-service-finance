@@ -1,8 +1,9 @@
 # Checkpoint — Telegram Payment Intake
 
-**Phase:** Stage5 / local integration accepted, live eval pending.
-**Status:** local checks/review complete; final branch CI is verified through PR
-checks before the owner handoff. Next business step requires named live approval.
+**Phase:** Stage5 / approved live eval, missing app-host execution entrypoint.
+**Status:** owner approved DeepSeek bounded trial and reuse of existing gateway
+key on14November. No second key is needed. Dev-host gateway403 and no allowed
+Python eval wrapper block actual execution; all remaining local preflight is done.
 **Task base:** `8a1f51cac4dacac4d49dd6b5cf72e0940d26a895`.
 
 Branch: `docs/telegram-payment-intake-examples`.
@@ -85,23 +86,38 @@ B0/I12 plus runner selfB0/I1; external B1/I15 across five rounds.
 
 ## Exact next action on resume
 
-1. Read handoff.md, live-eval.md, this checkpoint; verify git status/PR head and
-   current CI. Final code7031b5299 is committed/pushed in same Draft PR, never merged.
-2. Without explicit named live approval do NOT run --execute. Owner must approve
-   proposed deepseek/deepseek-flash via existing gateway,41 anonymized cases,
-   max82calls, input guard65536/output16000, timeout60s, budget estimate300RUB.
-   Check current tariff and provision separate local PAYMENT_INTAKE_EVAL_TOKEN
-   before execution; never copy/use production AI_GATEWAY_TOKEN or print secrets.
-3. Once approved, run bounded eval, review partial-gold metrics and limitations,
-   measure real latency/cost; no fabricated total accuracy/analytics from partial
-   labels. Stage5/pilot remains pending until agreed acceptance is actually met.
-4. Pilot flag default0; global flag+existing AI grants define reach. Narrow
-   independent company pilot needs a task-specific gate first. Production worker,
-   scheduler/recovery commands, migrations/deploy each need applicable named
-   approvals; worker command/dev profile and migration request are reviewable in
-   runbook. Do NOT merge/deploy/activate on generic implementation authorization.
+1. Read live-eval-preflight-2026-11-14.md and verify git status. Runtime source
+   remains7b5e7b950 (CI43500760767 SUCCESS); this continuation changes docs only.
+2. Approval ALREADY GIVEN: DeepSeek41 anonymized cases, max82 calls, timeout60s,
+   estimate300RUB; owner explicitly chose existing gateway key, no second key.
+   Do NOT ask to approve the same trial or to create another credential again.
+3. Need authorized app-host execution entrypoint. Current dev process, checked
+   local env and containers have no gateway token; gateway GET models returns403.
+   Allowed vf-prod-codex/codex-console provides only Symfony allowlist, no Python
+   eval. codex-docker-ps confirms healthy production ai-service; it does not grant
+   Docker exec/run. Never bypass a missing wrapper with arbitrary SSH/sudo/Docker.
+4. Source bundle without secrets is ready in ignored site/var/payment-intake-review/
+   approved-live-eval-source.zip, SHA256
+   87123e508601131a881cf0a3291808aa0ae8591215285dca38b99fe46230a1b2.
+   Isolated temporary source-tree import/default CLI passed41cases/0network calls.
+   Full file checksum/preflight JSON is beside archive. Fixed command and scope
+   for a narrow server entrypoint are in the new preflight document.
+5. Once that entrypoint exists, inherit the existing key inside the server-side
+   process only, run same bounded trial, capture metadata JSON locally and review
+   actual partial-gold metrics/errors/latency. No unapproved additional runs.
+   Peak tariff checked: input$0.30/output$1.20 per1M; CBR82.1516 gives upward-rounded
+   24.65/98.59RUB prices and261.82RUB reservation ceiling82calls. Sources in doc.
+6. Pilot flag0; company gate/production worker/scheduler/migrations/deploy remain
+   separate approvals. Named trial approval does not enable pilot or deploy.
 
 No live Telegram/model API, production processing, production worker/config,
 production migration or deploy performed. Two additive migrations need release
 manual dispatch; down drops new drafts/session/receipt metadata and is not an
 automatic production rollback. Disabling flag preserves saved money and guards.
+
+## Continuation review / checks14November
+
+No application/config/service contract changes. Documentation-only self-review:
+B0/I0; external review not required (FastPath). Checks: deterministic64-file
+source archive/digest, exact41-case offline import/network_calls0, Decimal budget
+261.82<300, doc links and git diff check. Provider generation calls for this trial0.

@@ -102,3 +102,13 @@ Automatic PR CI did not start for that push. Manual workflow43500484323 with
 production_action=none skipped every path gate; its SUCCESS is explicitly not
 accepted as a test/static result. A documentation checkpoint push retriggers
 normal PR validation; actual current-head receipt belongs in PR/final response.
+
+## Owner approval14November and execution preflight
+
+The owner approved the bounded DeepSeek trial and explicitly authorized reuse of
+the existing gateway key. No new credential is requested. Current tariff/FX and
+source bundle are verified in [preflight](live-eval-preflight-2026-11-14.md).
+Dev host gets gateway403 and has no token; the available production wrappers
+contain no Python eval entrypoint. Actual trial remains unexecuted, calls0; next
+required operator action is a narrow app-host execution entrypoint or operator
+execution of the prepared bounded command. No permission broadening performed.

@@ -129,3 +129,14 @@ Review metrics (наблюдения раундов, не число уника�
 internal B0/I12 по трём исходным сессиям (4+5+3), runner self-review B0/I1;
 external B1/I15 по пяти раундам Stage2/3/4/4-rerun/handoff. Открытых B/I нет.
 Часть внешнего I6 Stage2 отклонена по git evidence, valid fixture часть исправлена.
+
+## Continuation14November — existing-key approval
+
+Owner approved the live trial and reuse of existing key, superseding the original
+second-test-key prerequisite for this run. Tariff/CBR verified, conservative
+reservation261.82RUB<300.64-file source bundle checksum and offline import/default
+41case/network_calls0 passed. Live calls0: dev gateway403; available production
+console wrapper only runs Symfony allowlist and has no Python eval entrypoint.
+[Preflight](../live-eval-preflight-2026-11-14.md) defines the exact command, bundle
+and in-place key use. Stage5 remains pending actual execution/measurement; no
+application/config change, no grant/network/worker/deploy mutation.

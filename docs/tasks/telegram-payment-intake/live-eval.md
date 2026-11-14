@@ -1,4 +1,4 @@
-# Reviewable live-eval action (not executed)
+# Live-eval action — approved, execution access pending
 
 The runner is `python -m ai_service.evals.payment_intake`. It uses the existing
 TaskSpec, gateway, masking and Pipeline; it does not boot Symfony, open a database,
@@ -22,32 +22,31 @@ Stub output proves wiring and limits, not recognition quality.
 
 A live run requires a separately named approval covering provider/model, gateway,
 41 anonymized cases, at most 82 calls, declared input/output maxima, timeout and
-budget estimate. Neither model nor budget is selected by the current implementation.
-The token must be a separately provisioned **local test credential** in
-`PAYMENT_INTAKE_EVAL_TOKEN`; the runner never uses `AI_GATEWAY_TOKEN` or service
-Settings. Pass the variable by name, without exposing its value in command/chat.
-Availability or permissions of such a token have not been assumed or checked.
+budget estimate. The owner has now approved the proposed DeepSeek model and bounded300RUB trial.
+The runner reads `PAYMENT_INTAKE_EVAL_TOKEN`, not service Settings. On14November
+the owner explicitly approved this trial and reusing the existing gateway key;
+a second credential is not required. An authorized app-host entrypoint may alias
+existing AI_GATEWAY_TOKEN to that variable only in process memory. Do not print
+or copy the key into the dev machine. [Current preflight](live-eval-preflight-2026-11-14.md)
+records the actual access blocker and the fixed source bundle.
 
-One concrete option for the owner's approval is `deepseek/deepseek-flash` through
-the existing gateway, 82 calls maximum, 65536 declared input tokens and 16000
-output tokens per call, 60-second timeout, budget estimate 300 RUB. At the archived
-rates in config/prices.yaml (24.17/96.67 RUB per million input/output tokens), the
-configured reservation ceiling for 82 calls is 256.72 RUB. These are recorded
-31 October rates, **not a newly verified quote**; the owner must approve rates
-or supply corrected values. Current tariff verification and test-credential
-provisioning remain prerequisites after approval; neither has been performed. The alternative existing `openai/gpt-4.1-mini` route
+Approved: `deepseek/deepseek-flash` through the existing gateway, 82 calls maximum,
+65536 declared input guard and 16000 output tokens per call, 60-second timeout,
+budget estimate300RUB. Current peak tariff and CBR rate were verified14November;
+reserve rates are24.65/98.59RUB per1M and the82-call reservation estimate261.82RUB.
+Execution is blocked by the missing app-host eval entrypoint. The old31October
+configured rates24.17/96.67 are retained only as historical proposal data.
+The alternative existing `openai/gpt-4.1-mini` route
 requires its own explicit choice and price/budget approval.
 
-Only after that named approval and test-token provisioning:
+Once an authorized app-host execution entrypoint is available:
 
 ```bash
-docker compose --profile services run --rm -e PAYMENT_INTAKE_EVAL_TOKEN \
-  services-ai-service-dev python -m ai_service.evals.payment_intake \
+python -m ai_service.evals.payment_intake \
   --execute --routes config/routes.yaml --model deepseek/deepseek-flash \
   --gateway-url https://ai.vashfindir.ru \
   --max-calls 82 --max-input-tokens 65536 --max-output-tokens 16000 \
-  --timeout 60 --budget-rub 300 --input-price 24.17 --output-price 96.67 \
-  --output /repo/site/var/payment-intake-live-eval.json
+  --timeout 60 --budget-rub 300 --input-price 24.65 --output-price 98.59
 ```
 
 No fallback provider or gateway retry runs. The selected DeepSeek route uses
