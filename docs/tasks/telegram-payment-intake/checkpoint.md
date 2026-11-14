@@ -31,13 +31,20 @@ budget WARNING готовы. Стиль full0/4168PASS. Canonical fullStan пр�
 4132 из-за host RAM/swap pressure; own container остановлен/удалён, exit137,
 это не GREEN. Tool runtime временно заменялся, fresh exec восстановился.
 Точечный PHPStan8root+client files Noerrors. Baseline не менялся.
-make site-test-unit site-test сейчас RUNNING, лог
+make site-test-unit4773tests/26504assertionsPASS; monolithic make site-test
+прервалсяexit137после~5580/9058безtestFAIL. Не называтьGREEN. Идётэквивалентный
+serialраздельныйintegration/functionalсPHPmemory_limit512M, sessionrootintegration. Лог
 /tmp/payment-intake-handoff-tests-current.log, session37469 (может потеряться
 после runtime replacement — прежде повторов читать лог/состояние).
 
-Следующее действие: дождаться полного PHP test run, не запускать второй.
-Stage8 code checkpoint commit/push; попробовать per-command gh credential helper
-для CI (gh API user=pavelsur07, обычные pushes не создают workflow runs).
+Следующее действие: дождаться bounded integration, затем отдельный functional;
+unit4773ужеPASS, новыйunitне нужен. Затем fullStan с однимworker768M через
+ignored phpstan-single.neon (включаеттотжеконфиг,безbaseline/rulechanges).
+Stage8codecheckpointc9b318c48pushed. ПричинаотсутствияCI подтверждена:
+PR OPEN/Draft, mergeStateStatus DIRTY. Merge-tree нашёл5конфликтов сmaster
+3cb72b37d(ARCHITECTURE,routesdev/prod,stubadapter,registry). Следующее действие —
+изолированныйcleanworktree, совместитьобатаскабезпотерь, сохранитьownerrootdirty
+AGENTS/CLAUDE. Rootcheckoutнеобновлятьчерезreset/stash/checkout.
 Затем ограниченный ресурсами fullStan/проверка CI, свежий independent whole-task
 review, formal external review. Пока gates/review pending, не называть этап8DONE.
 Owner AGENTS/CLAUDE и прочие чужие файлы исключены. Production не разрешён.
