@@ -562,7 +562,10 @@
   пусто — выключено. Пачки компаний вне списка остаются в очереди сервиса.
 - Гейт `app:source-facts:health-check` (cron 09:10 МСК): пачки в карантине или поток
   (кабинет × ресурс) без применённых пачек дольше 36 ч — `error`, exit 1.
-- Фасада чтения нет: появится вместе с первым потребителем (переводчик `MarketplaceOzon`).
+- `SourceFactsFacadeInterface` (только чтение, для переводчиков каналов): `periods(resourceType)` —
+  периоды всех компаний с текущей ревизией; `activeFacts(companyId, connectionRef, resourceType,
+  periodKey)` — действующие записи периода (`SourceFactRecord`: `source_key`, `payload`). Модуль в
+  `MODULES_WITH_FACADE`: внутренние слои закрыты.
 
 ### MarketplaceOperations: канон операций маркетплейсов
 
@@ -588,6 +591,34 @@
   `\LogicException`. Блокировка одна на вызов; переводчик, который заменяет несколько дней в одной
   транзакции, берёт их по возрастанию даты.
 - Фасада чтения нет: появится с витриной экономики (этап 5).
+
+### MarketplaceOzon: переводчик Ozon
+
+Третий модуль нового контура (`docs/tasks/marketplace-profit-pipeline/DATA.md` §4, §9; этап 4).
+
+**Устав.** Причина изменений — Ozon (форма начислений, справочник типов). Модуль переводит
+начисления by-day из `SourceFacts` в канон. В модуле не должно быть: правил WB, статей ОПиУ,
+экономики и отчётов, обращений к API Ozon, зависимости от легаси (`Ingestion`, `MarketplaceAds`,
+внутренности `Marketplace`). Зависимости — только фасады `SourceFacts`, `MarketplaceOperations`,
+`Marketplace` (листинги) (гейт `ModuleBoundaryRules::test_marketplace_ozon_uses_only_facades`).
+
+| Таблица | Что | Ключ |
+|---|---|---|
+| `moz_source_type` | решение по коду Ozon: `kind` или `pending` (ждёт администратора), название, где встретился впервые, черновик ИИ | `source_type` |
+| `moz_day` | переведённый день: ревизия фактов, версия правил, `total_minor` (Σ `total_amount`) = `canon_minor` + `quarantine_minor`, операции без листинга | `(company_id, connection_ref, operation_date)` |
+| `moz_quarantine` | компоненты с кодом без решения: сумма, число строк, до 20 ссылок на факты | `(company_id, connection_ref, operation_date, source_type)` |
+
+- Коды: `ozon:field:{sale_amount|bonus|coinvestment|sale_commission}` (вид задаёт переводчик:
+  `sale`/`return` по знаку, `spp`, `coinvestment`, `commission`), `ozon:service:{type_id}` (вид —
+  `moz_source_type`, иначе `OzonAccrualTypeSeed`), `ozon:unexplained` — остаток, который разбор не
+  объяснил (всегда карантин). `bonus` и `coinvestment` — справочно, в итог дня не входят.
+- `app:marketplace-ozon:translate` (cron `*/15`, со сдвигом 5 мин после приёма фактов; `--relink` раз
+  в сутки) — точка входа и владелец транзакций: день — одна транзакция, `TranslateOzonDayAction` →
+  `replaceDay` (блокировка дня — внутри) + карантин + `moz_day`. День переводится, если ревизия
+  фактов выросла, сменилась `RULES_VERSION`, по коду его карантина принято решение или (`--relink`)
+  есть операции без листинга. Сбой дня не останавливает остальные; один `error` на прогон.
+- Гейт `app:marketplace-ozon:health-check` (cron 09:20 МСК): код без решения в карантине дольше 24 ч
+  или день с фактами не переведён — `error`, exit 1.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -5351,6 +5382,9 @@ config/
 | **Инфраструктура** | | |
 | `app:source-facts:pull` | `*/15 * * * *` | Забор пачек фактов из ozon-fetcher (`source-fact-envelope` v1) в `sf_*`, ack после commit; выключено без `SOURCE_FACTS_COMPANIES`; недоступен — WARNING; нарушение контракта списка — ERROR |
 | `app:source-facts:health-check` | `10 9 * * *` | Гейт приёма фактов: карантин или поток без применённых пачек > 36 ч — ERROR, exit 1 |
+| `app:marketplace-ozon:translate` | `5-59/15 * * * *` | Перевод начислений Ozon by-day из `sf_fact` в канон `mo_operation`; день — транзакция; сбой дня — ERROR в конце прогона |
+| `app:marketplace-ozon:translate --relink` | `57 6 * * *` | То же + повторный перевод дней с операциями без листинга (листинг появился после перевода) |
+| `app:marketplace-ozon:health-check` | `20 9 * * *` | Гейт переводчика Ozon: код без решения в карантине > 24 ч или непереведённый день — ERROR, exit 1 |
 | `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
 | `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (`AI_SERVICE_ENABLED`, адрес, токен) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
 | `app:cash:ai-categorize --all-enabled` | `25 * * * *` | Компании allowlist ai-service с операциями за 90 дней: автоприменение по флагу компании, затем постановка ИИ-подсказок статей ДДС; сбой компании — ERROR, остальные идут дальше |
@@ -5449,6 +5483,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.172 | 2026-11-14 | MarketplaceOzon: новый модуль — переводчик начислений Ozon by-day в канон (`moz_source_type`, `moz_day`, `moz_quarantine`, `Version20261114035239`), `app:marketplace-ozon:translate` (`*/15`, `--relink` 06:57) и гейт `app:marketplace-ozon:health-check` (09:20); SourceFacts: фасад чтения `SourceFactsFacadeInterface`, модуль в `MODULES_WITH_FACADE`; PHPat — переводчик знает только фасады (задача `marketplace-profit-pipeline`, этап 4) |
 | 2.171 | 2026-11-13 | MarketplaceOperations: новый модуль — канон операций маркетплейсов (`mo_operation`, `mo_dirty_window`, `Version20261113175117`), `MarketplaceOperationsFacadeInterface::replaceDay`, enum `OperationKind` / `CascadeLevel`; PHPat — канон не знает каналов (задача `marketplace-profit-pipeline`, этап 3) |
 | 2.170 | 2026-11-13 | SourceFacts: новый модуль — приём фактов из сервисов (`sf_batch`, `sf_period`, `sf_fact`, `Version20261113130402`), `app:source-facts:pull` (cron `*/15`) и гейт `app:source-facts:health-check` (09:10); ServiceGateway: `SourceFactsGatewayFacadeInterface`, клиент `source-fact-envelope` v1; ozon-fetcher публикует `ozon.finance.accrual-by-day`; PHPat — `SourceFacts` не знает каналов и учёта (задача `marketplace-profit-pipeline`, этап 2) |
 | 2.169 | 2026-11-13 | `Ingestion`, `Marketplace` (кроме листингов) и `MarketplaceAds` объявлены легаси — ADR 2026-11-13 |

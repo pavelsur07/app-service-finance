@@ -38,6 +38,7 @@ final class ModuleBoundaryRules
         'MarketplaceAnalytics',
         'MarketplaceOperations',
         'Settlement',
+        'SourceFacts',
     ];
 
     /**
@@ -378,6 +379,35 @@ final class ModuleBoundaryRules
             ->because(
                 'канон одинаков для всех каналов: правила Ozon и WB — в переводчиках, '
                 .'статьи ОПиУ — в проекции, исходные записи — в SourceFacts.',
+            );
+    }
+
+    /**
+     * `MarketplaceOzon` — переводчик Ozon нового контура (`DATA.md` §4, §6): факты читает через фасад
+     * `SourceFacts`, пишет только через фасад канона, листинги — через фасад `Marketplace`. Легаси
+     * маркетплейсов (`Ingestion`, `MarketplaceAds`, внутренности `Marketplace`), WB и учёт ему
+     * недоступны: иначе переводчик снова срастается со старым разбором.
+     */
+    public function test_marketplace_ozon_uses_only_facades(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplaceOzon'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceWb'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\Inventory'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->excluding(Selector::inNamespace('App\Marketplace\Facade'))
+            ->because(
+                'переводчик Ozon знает только фасады: факты — SourceFacts, канон — MarketplaceOperations, '
+                .'листинги — Marketplace\\Facade; разбор легаси и учёт ему не нужны.',
             );
     }
 
