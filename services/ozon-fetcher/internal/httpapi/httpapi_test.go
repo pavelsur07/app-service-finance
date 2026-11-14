@@ -169,8 +169,8 @@ func TestSnapshotPublishesOnlySupplies(t *testing.T) {
 	assert.Equal(t, "invalid_request", body["error"].(map[string]any)["code"])
 }
 
-func TestFactsPublishOnlyAccrualByDay(t *testing.T) {
-	assert.Equal(t, []string{executor.ResourceAccrualByDay}, facts.Resources, "имя ресурса в пакете facts — то же, что у загрузчика")
+func TestFactsPublishOnlyListedResources(t *testing.T) {
+	assert.Equal(t, []string{executor.ResourceAccrualByDay, executor.ResourceAdsStatistics}, facts.Resources, "имена ресурсов в пакете facts — те же, что у загрузчика")
 
 	d := deps(t)
 	var asked []string

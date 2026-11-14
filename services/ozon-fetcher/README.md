@@ -124,8 +124,8 @@ gzip исходных байтов, `If-None-Match: *`, sha256 несжатых 
 
 | Метод | Назначение |
 |---|---|
-| `GET /internal/source-facts?resource_type=…&after=…&limit=…` | Неподтверждённые пачки фактов ресурса (метаданные), контракт `services/_contracts/source-fact-envelope/v1`. Пачка — загруженная ревизия дня кабинета. Белый список — `facts.Resources` (сейчас `ozon.finance.accrual-by-day`), вне него — 422 |
-| `GET /internal/source-facts/page?batch_id=…&page=N` | Записи страницы пачки: начисления Ozon целиком (`payload`) с ключом `ozon:accrual-by-day:{accrual_id}`. Нет пачки или страницы — 404; страница потеряна, повреждена или не режется — 502 + ERROR |
+| `GET /internal/source-facts?resource_type=…&after=…&limit=…` | Неподтверждённые пачки фактов ресурса (метаданные), контракт `services/_contracts/source-fact-envelope/v1`. Пачка — загруженная ревизия дня кабинета. Белый список — `facts.Resources` (сейчас `ozon.finance.accrual-by-day`, `ozon.ads.statistics`), вне него — 422 |
+| `GET /internal/source-facts/page?batch_id=…&page=N` | Записи страницы пачки: начисления Ozon целиком (`payload`) с ключом `ozon:accrual-by-day:{accrual_id}`; статистика рекламы — строка CSV (кампания × SKU) с ключом `ozon:ads-statistics:{campaign_id}:{sku}`. Нет пачки или страницы — 404; страница потеряна, повреждена или не режется — 502 + ERROR |
 | `POST /internal/source-facts/ack` | `{batch_ids}` → пачки в `acked`, списком больше не выдаются; повтор — не ошибка |
 | `POST /internal/fetch-requests` | Загрузка по запросу (отложено): `{request_id, connection_ref, resource_type, period_from, period_to}` → 202 после записи; повтор сливается в активный запрос |
 | `GET /internal/fetch-status` | Состояние загрузки по кабинетам и ресурсам: пропуски, последняя успешная загрузка, текущий лимит, 429, пауза (этап 12) |

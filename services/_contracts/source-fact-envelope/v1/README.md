@@ -3,7 +3,7 @@
 Канал «сервис загрузки → Symfony» для данных, которые сервис загружает
 периодами (начисления дня, отчёт недели). Schema: [schema.json](schema.json),
 примеры — [examples/](examples/), история решений — [CHANGELOG.md](CHANGELOG.md).
-Статус: **действует** с 2026-11-13, ресурс `ozon.finance.accrual-by-day`.
+Статус: **действует** с 2026-11-13, ресурсы `ozon.finance.accrual-by-day`, `ozon.ads.statistics` (с 2026-11-14).
 
 Снимки «на сейчас» (остатки, поставки) идут другим контрактом —
 `service-snapshot` v1 (pull без подтверждения).
@@ -75,6 +75,7 @@ Symfony подтверждает пачку **после** commit примене
 | resource_type | `source_key` | `period_key` |
 |---|---|---|
 | `ozon.finance.accrual-by-day` | `ozon:accrual-by-day:{accrual_id}`; у записи без пригодного `accrual_id` (`^[A-Za-z0-9_.-]{1,128}$`) — `ozon:accrual-by-day:fallback-{sha256(payload)[:16]}` | `YYYY-MM-DD`, день начисления |
+| `ozon.ads.statistics` | `ozon:ads-statistics:{campaign_id}:{sku}`; повтор пары в отчёте дня — `…:{n}` по порядку строк; небезопасная часть (`^[A-Za-z0-9_.-]{1,64}$`) — `x{sha256(payload)[:16]}`. `payload` — строка CSV отчёта Performance: колонки по заголовку, значения строками как в CSV (`"1152,19"`), плюс `campaign_id` и `sku` | `YYYY-MM-DD`, день статистики |
 
 Ключи остальных ресурсов фиксируются здесь до реализации их публикации.
 

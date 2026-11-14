@@ -1,5 +1,12 @@
 # source-fact-envelope — CHANGELOG
 
+## v1.1.0 (2026-11-14) — новый ресурс, форма не менялась
+
+- `ozon.ads.statistics` (ozon-fetcher): дневной отчёт статистики Performance,
+  запись — строка «кампания × SKU» как в CSV. Расход по SKU для канона
+  (задача `marketplace-profit-pipeline`, этап 6). Хвост `ozon.ads.statistics.tail`
+  не публикуется.
+
 ## v1.0.0 (2026-11-13) — утверждён, действует
 
 Решение Владельца 13.11.2026 (задача `docs/tasks/marketplace-profit-pipeline`,
