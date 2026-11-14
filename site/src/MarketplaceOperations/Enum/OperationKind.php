@@ -51,6 +51,8 @@ enum OperationKind: string
     case SERVICE_CORRECTION = 'service_correction';
     /** Компенсация маркетплейса за утерянный или повреждённый товар — прочий доход (+). */
     case COMPENSATION = 'compensation';
+    /** Прочие удержания маркетплейса без своего вида (пожертвования, разовые удержания). */
+    case MP_OTHER_DEDUCTIONS = 'mp_other_deductions';
 
     public function level(): CascadeLevel
     {
@@ -59,7 +61,7 @@ enum OperationKind: string
             self::SPP, self::COINVESTMENT => CascadeLevel::INFO,
             self::ADS_CPC, self::ADS_PAY_PER_ORDER, self::PROMO_STARS => CascadeLevel::MD2,
             self::PACKAGING_WAREHOUSE, self::PROMO_PREMIUM, self::PROMO_SELLER_BONUS, self::PROMO_REVIEWS,
-            self::PROMO_CHAT_POINTS, self::SUBSCRIPTION, self::FINE, self::SERVICE_CORRECTION, self::COMPENSATION => CascadeLevel::OVERHEAD,
+            self::PROMO_CHAT_POINTS, self::SUBSCRIPTION, self::FINE, self::SERVICE_CORRECTION, self::COMPENSATION, self::MP_OTHER_DEDUCTIONS => CascadeLevel::OVERHEAD,
             default => CascadeLevel::MD1,
         };
     }
@@ -98,6 +100,7 @@ enum OperationKind: string
             self::FINE => 'Штрафы',
             self::SERVICE_CORRECTION => 'Корректировка услуг',
             self::COMPENSATION => 'Компенсации',
+            self::MP_OTHER_DEDUCTIONS => 'Прочие удержания МП',
         };
     }
 }

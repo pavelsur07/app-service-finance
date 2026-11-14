@@ -5547,6 +5547,8 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.184 | 2026-11-14 | MarketplaceOperations: вид `mp_other_deductions` «Прочие удержания МП» (уровень «общие») — код Ozon 7 и разовые удержания без своего вида |
+| 2.183 | 2026-11-14 | MarketplaceOzon: комиссия — поле `commission` (нет — `sale_commission`), как в легаси; `ozon:unexplained` (10 начислений) обнуляется, `RULES_VERSION` `ozon-by-day-3` |
 | 2.182 | 2026-11-14 | MarketplaceOzon: оплата за заказ (тип 54) без SKU делится по проданным штукам SKU за день (`sales_qty_share`), `RULES_VERSION` `ozon-by-day-2` (этап 6.1b упрощённо) |
 | 2.181 | 2026-11-14 | MarketplaceEconomics: подписи R1/R2/xlsx по терминам проекта — СМ1 / СМ2 / СМ3 (шаблон ОПиУ `pl_templates/marketplace.json`), «Выручка − себестоимость», «Склад и прочие МП»; расчёт не менялся |
 | 2.180 | 2026-11-14 | MarketplaceOperations: вид `compensation` (компенсации маркетплейса, уровень «общие», +) — коды Ozon 10 и 25 можно подтвердить на экране кодов |
