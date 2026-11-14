@@ -17,20 +17,21 @@
     {% set columns = [
         {key: 'revenue', label: 'Выручка', sort: 'revenue'},
         {key: 'costPrice', label: 'Себестоимость'},
-        {key: 'gross', label: 'Валовая', sort: 'gross'},
+        {key: 'gross', label: 'Выручка − себестоимость', sort: 'gross'},
         {key: 'commission', label: 'Комиссия'},
         {key: 'logisticsTo', label: 'Логистика туда'},
         {key: 'logisticsBack', label: 'Логистика обратно'},
         {key: 'acquiring', label: 'Эквайринг'},
-        {key: 'otherMd1', label: 'Прочие МД1'},
-        {key: 'md1', label: 'МД1', sort: 'md1'},
+        {key: 'otherMd1', label: 'Прочие СМ1'},
+        {key: 'md1', label: 'СМ1', sort: 'md1'},
         {key: 'ads', label: 'Реклама', sort: 'ads'},
-        {key: 'md2', label: 'МД2', sort: 'md2'},
+        {key: 'md2', label: 'СМ2', sort: 'md2'},
     ] %}
     {% if allocated %}
-        {% set columns = columns|merge([{key: 'overhead', label: 'Общие затраты'}, {key: 'full', label: 'Прибыль полная', sort: 'full'}]) %}
+        {% set columns = columns|merge([{key: 'overhead', label: 'Склад и прочие МП'}, {key: 'full', label: 'СМ3', sort: 'full'}]) %}
     {% endif %}
     {% set profit = allocated ? 'full' : 'md2' %}
+    {% set profit_label = allocated ? 'СМ3' : 'СМ2' %}
 
     <div class="wz-head">
         <h1 class="wz-title">Экономика SKU</h1>
@@ -78,7 +79,7 @@
             <input class="input" id="me-q" type="search" name="q" value="{{ search }}" placeholder="SKU, артикул, название">
         </div>
         <div class="form-field">
-            <label class="form-label" for="me-alloc">Общие затраты</label>
+            <label class="form-label" for="me-alloc">Склад и прочие МП</label>
             <select class="select" id="me-alloc" name="alloc">
                 <option value="1" {{ allocated ? 'selected' }}>С разнесением</option>
                 <option value="0" {{ not allocated ? 'selected' }}>Без разнесения</option>
@@ -128,7 +129,7 @@
                                 {% endif %}
                             </th>
                         {% endfor %}
-                        <th class="t-cell--right">Маржа, %</th>
+                        <th class="t-cell--right">Маржинальность {{ profit_label }}, %</th>
                         <th class="t-cell--right">ДРР, %</th>
                         <th class="t-cell--right">СПП, ₽</th>
                     </tr>
