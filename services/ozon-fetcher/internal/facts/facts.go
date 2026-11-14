@@ -22,7 +22,7 @@ const ResourceAccrualByDay = "ozon.finance.accrual-by-day"
 
 // Resources — ресурсы, чьи ревизии публикуются фактами. Новый ресурс — правкой
 // списка, разбором в Split и CHANGELOG контракта.
-var Resources = []string{ResourceAccrualByDay}
+var Resources = []string{ResourceAccrualByDay, ResourceAdsStatistics}
 
 const accrualKeyPrefix = "ozon:accrual-by-day:"
 
@@ -31,6 +31,9 @@ var accrualID = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,128}$`)
 
 // Split режет страницу ресурса на записи с ключом source_key.
 func Split(resourceType string, page []byte) ([]fkhttp.FactRecord, error) {
+	if resourceType == ResourceAdsStatistics {
+		return splitAdsStatistics(page)
+	}
 	if resourceType != ResourceAccrualByDay {
 		return nil, fmt.Errorf("facts: resource %q is not published", resourceType)
 	}

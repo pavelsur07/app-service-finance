@@ -7,6 +7,7 @@ namespace App\MarketplaceOzon\Command;
 use App\MarketplaceOzon\Application\Action\RequestOzonSourceTypeDraftsAction;
 use App\MarketplaceOzon\Application\Action\TranslateOzonDayAction;
 use App\MarketplaceOzon\Domain\AccrualByDayTranslator;
+use App\MarketplaceOzon\Domain\AdsStatisticsShares;
 use App\MarketplaceOzon\Infrastructure\Query\OzonTranslationStore;
 use App\SourceFacts\Facade\SourceFactsFacadeInterface;
 use Doctrine\DBAL\Connection;
@@ -63,25 +64,31 @@ final class TranslateOzonAccrualsCommand extends Command
             $relink = (bool) $input->getOption('relink');
             $limit = max(1, (int) $input->getOption('limit'));
 
+            $ads = [];
+            foreach ($this->sourceFacts->periods(AdsStatisticsShares::RESOURCE) as $adsPeriod) {
+                $ads[OzonTranslationStore::dayKey($adsPeriod->companyId, $adsPeriod->connectionRef, $adsPeriod->periodKey)] = $adsPeriod->revision;
+            }
+
             $due = [];
             foreach ($this->sourceFacts->periods(TranslateOzonDayAction::RESOURCE) as $period) {
                 $key = OzonTranslationStore::dayKey($period->companyId, $period->connectionRef, $period->periodKey);
                 $state = $states[$key] ?? null;
                 if (null === $state
                     || $state['revision'] !== $period->revision
+                    || $state['ads'] !== ($ads[$key] ?? 0)
                     || AccrualByDayTranslator::RULES_VERSION !== $state['rules']
                     || isset($decided[$key])
                     || ($relink && $state['unresolved'] > 0)) {
-                    $due[] = $period;
+                    $due[] = [$period, $ads[$key] ?? 0];
                 }
             }
 
             $this->logger->info('Ozon accrual translation started.', ['due' => \count($due), 'limit' => $limit]);
             $done = $operations = 0;
             $failed = [];
-            foreach (\array_slice($due, 0, $limit) as $period) {
+            foreach (\array_slice($due, 0, $limit) as [$period, $adsRevision]) {
                 try {
-                    $result = $this->connection->transactional(fn (): array => ($this->translate)($period));
+                    $result = $this->connection->transactional(fn (): array => ($this->translate)($period, $adsRevision));
                     ++$done;
                     $operations += $result['operations'];
                 } catch (\Throwable $e) {

@@ -70,7 +70,7 @@ final readonly class OzonTranslationStore
 
     /**
      * @param array<string, array{amountMinor: int, currency: string, rows: int, refs: list<string>}> $quarantine source_type => итог
-     * @param array{revision: int, facts: int, totalMinor: int, canonMinor: int, quarantineMinor: int, currency: string, unresolved: int} $day
+     * @param array{revision: int, adsRevision: int, facts: int, totalMinor: int, canonMinor: int, quarantineMinor: int, currency: string, unresolved: int} $day
      */
     public function saveDay(string $companyId, string $connectionRef, string $date, string $rulesVersion, array $day, array $quarantine): void
     {
@@ -95,14 +95,15 @@ final readonly class OzonTranslationStore
         }
 
         $this->connection->executeStatement(
-            'INSERT INTO moz_day (company_id, connection_ref, operation_date, facts_revision, rules_version, fact_count, total_minor, canon_minor, quarantine_minor, currency, unresolved_listing_count, translated_at)
-             VALUES (:company, :connection, :date, :revision, :rules, :facts, :total, :canon, :quarantine, :currency, :unresolved, :now)
+            'INSERT INTO moz_day (company_id, connection_ref, operation_date, facts_revision, ads_revision, rules_version, fact_count, total_minor, canon_minor, quarantine_minor, currency, unresolved_listing_count, translated_at)
+             VALUES (:company, :connection, :date, :revision, :ads, :rules, :facts, :total, :canon, :quarantine, :currency, :unresolved, :now)
              ON CONFLICT (company_id, connection_ref, operation_date) DO UPDATE SET
-                facts_revision = EXCLUDED.facts_revision, rules_version = EXCLUDED.rules_version, fact_count = EXCLUDED.fact_count,
+                facts_revision = EXCLUDED.facts_revision, ads_revision = EXCLUDED.ads_revision, rules_version = EXCLUDED.rules_version, fact_count = EXCLUDED.fact_count,
                 total_minor = EXCLUDED.total_minor, canon_minor = EXCLUDED.canon_minor, quarantine_minor = EXCLUDED.quarantine_minor,
                 currency = EXCLUDED.currency, unresolved_listing_count = EXCLUDED.unresolved_listing_count, translated_at = EXCLUDED.translated_at',
             $key + [
                 'revision' => $day['revision'],
+                'ads' => $day['adsRevision'],
                 'rules' => $rulesVersion,
                 'facts' => $day['facts'],
                 'total' => $day['totalMinor'],
@@ -120,16 +121,17 @@ final readonly class OzonTranslationStore
      *
      * @companyScopeExempt переводчик сравнивает периоды всех компаний (cron)
      *
-     * @return array<string, array{revision: int, rules: string, unresolved: int}>
+     * @return array<string, array{revision: int, ads: int, rules: string, unresolved: int}>
      */
     public function dayStates(): array
     {
         $states = [];
         foreach ($this->connection->fetchAllAssociative(
-            'SELECT company_id, connection_ref, operation_date, facts_revision, rules_version, unresolved_listing_count FROM moz_day',
+            'SELECT company_id, connection_ref, operation_date, facts_revision, ads_revision, rules_version, unresolved_listing_count FROM moz_day',
         ) as $row) {
             $states[self::dayKey((string) $row['company_id'], (string) $row['connection_ref'], (string) $row['operation_date'])] = [
                 'revision' => (int) $row['facts_revision'],
+                'ads' => (int) $row['ads_revision'],
                 'rules' => (string) $row['rules_version'],
                 'unresolved' => (int) $row['unresolved_listing_count'],
             ];

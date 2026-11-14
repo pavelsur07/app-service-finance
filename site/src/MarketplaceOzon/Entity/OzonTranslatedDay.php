@@ -29,6 +29,10 @@ class OzonTranslatedDay
     #[ORM\Column(type: 'integer')]
     private int $factsRevision;
 
+    /** Ревизия статистики рекламы дня (`ozon.ads.statistics`), по которой разнесён CPC; 0 — не было. */
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    private int $adsRevision = 0;
+
     #[ORM\Column(type: 'string', length: 32)]
     private string $rulesVersion;
 

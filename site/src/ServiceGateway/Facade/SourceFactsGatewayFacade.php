@@ -15,7 +15,7 @@ final readonly class SourceFactsGatewayFacade implements SourceFactsGatewayFacad
 {
     /** Ресурсы, которые сервисы публикуют фактами (белые списки сервисов — `facts.Resources`). */
     private const RESOURCES = [
-        'ozon-fetcher' => ['ozon.finance.accrual-by-day'],
+        'ozon-fetcher' => ['ozon.finance.accrual-by-day', 'ozon.ads.statistics'],
     ];
 
     public function __construct(

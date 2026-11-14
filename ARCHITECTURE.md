@@ -611,7 +611,7 @@
 | Таблица | Что | Ключ |
 |---|---|---|
 | `moz_source_type` | решение по коду Ozon: `kind` или `pending` (ждёт администратора), название, где встретился впервые, черновик ИИ | `source_type` |
-| `moz_day` | переведённый день: ревизия фактов, версия правил, `total_minor` (Σ `total_amount`) = `canon_minor` + `quarantine_minor`, операции без листинга | `(company_id, connection_ref, operation_date)` |
+| `moz_day` | переведённый день: ревизия фактов, ревизия статистики рекламы (`ads_revision`, 0 — не было), версия правил, `total_minor` (Σ `total_amount`) = `canon_minor` + `quarantine_minor`, операции без листинга | `(company_id, connection_ref, operation_date)` |
 | `moz_quarantine` | компоненты с кодом без решения: сумма, число строк, до 20 ссылок на факты | `(company_id, connection_ref, operation_date, source_type)` |
 
 - Коды: `ozon:field:{sale_amount|bonus|coinvestment|sale_commission}` (вид задаёт переводчик:
@@ -621,8 +621,12 @@
 - `app:marketplace-ozon:translate` (cron `*/15`, со сдвигом 5 мин после приёма фактов; `--relink` раз
   в сутки) — точка входа и владелец транзакций: день — одна транзакция, `TranslateOzonDayAction` →
   `replaceDay` (блокировка дня — внутри) + карантин + `moz_day`. День переводится, если ревизия
-  фактов выросла, сменилась `RULES_VERSION`, по коду его карантина принято решение или (`--relink`)
-  есть операции без листинга. Сбой дня не останавливает остальные; один `error` на прогон.
+  фактов или статистики рекламы того же дня выросла, сменилась `RULES_VERSION`, по коду его карантина
+  принято решение или (`--relink`) есть операции без листинга.
+- CPC кабинета (`ads_cpc` без SKU, by-day тип 41) разносится по листингам пропорционально расходу SKU
+  из фактов `ozon.ads.statistics` того же дня (`AdsStatisticsShares`, наибольший остаток, Σ дня не
+  меняется, `allocation_key = ads_statistics_share`). SKU без листинга и день без статистики — доля
+  остаётся без SKU. Дата статистики = дата начисления CPC (сверка Вумджой, 14.11). Сбой дня не останавливает остальные; один `error` на прогон.
 - Гейт `app:marketplace-ozon:health-check` (cron 09:20 МСК): код без решения в карантине дольше 24 ч
   или день с фактами не переведён — `error`, exit 1.
 - Новый код без вида: в конце прогона перевода `RequestOzonSourceTypeDraftsAction` ставит задачу ИИ
@@ -5535,6 +5539,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.178 | 2026-11-14 | MarketplaceOzon: CPC разносится по SKU из статистики Performance (`ozon.ads.statistics`, ozon-fetcher публикует фактами, `source-fact-envelope` v1.1.0), `moz_day.ads_revision` (`Version20261114180000`); день переводится заново при новой статистике (этап 6.1–6.2 `marketplace-profit-pipeline`) |
 | 2.176 | 2026-11-14 | MarketplaceEconomics: отчёт R1 «Экономика SKU» `/marketplace/economics` (+ xlsx) на новом слое, пункты меню в обоих интерфейсах; легаси `unit-extended` не меняется (этап 5.2 `marketplace-profit-pipeline`) |
 | 2.175 | 2026-11-14 | MarketplaceEconomics: новый модуль — витрина экономики SKU (`me_day_line`, `me_day`, `Version20261114120000`), `app:marketplace-economics:refresh` (`*/15`, `--recent=45` 07:15) и гейт `app:marketplace-economics:health-check` (09:30); MarketplaceOperations: чтение `dirtyDays` / `days` / `takeDay`; PHPat — витрина знает только фасады (задача `marketplace-profit-pipeline`, этап 5.1) |
 | 2.174 | 2026-11-14 | ServiceGateway: `AiTaskFacadeInterface::PLATFORM_COMPANY_ID` — задачи по общим данным без подключения компании к ИИ; черновик кода Ozon ставится от платформы (этап 4.3 `marketplace-profit-pipeline`) |
