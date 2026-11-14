@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from ai_service.core.prompt import Prompt
-from ai_service.verification.checks import Check
+from ai_service.verification.checks import Check, CheckContext
 
 
 class Risk(StrEnum):
@@ -31,6 +31,7 @@ class TaskSpec[In: BaseModel, Out: BaseModel]:
     # Ключи payload, которые маскирование не трогает: идентификаторы, суммы, даты, валюта.
     mask_skip_keys: frozenset[str] = field(default_factory=frozenset)
     max_tokens: int = 1024
+    prepare_output: Callable[[In, Out, CheckContext], Out] | None = None
 
 
 class TaskRegistry:

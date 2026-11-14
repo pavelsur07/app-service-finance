@@ -223,3 +223,20 @@ def test_finalize_failure_closes_task_as_failed(
     assert worker(conn).run_once() is True
     [item] = client.get("/internal/tasks", params={"status": "done"}).json()["items"]
     assert (item["status"], item["error_code"]) == ("failed", "internal_error")
+
+
+def test_targeted_result_scoped_pending_ready_acked(client: TestClient, conn: psycopg.Connection[Any]) -> None:
+    body = task_body()
+    post(client, body)
+    url = f"/internal/tasks/{body['task_id']}/result"
+    params = {"company_id": COMPANY}
+    assert client.get(url, params=params).json() == {"items": [], "next_cursor": None}
+    assert worker(conn).run_once()
+    ready = client.get(url, params=params)
+    assert ready.status_code == 200
+    validate("results_page", ready.json())
+    assert ready.json()["items"][0]["task_id"] == body["task_id"]
+    assert client.get(url, params={"company_id": str(uuid.uuid4())}).json()["items"] == []
+    assert client.get(url, params=params, headers={"Authorization": "Bearer wrong"}).status_code == 401
+    client.post("/internal/tasks/ack", json={"task_ids": [body["task_id"]]})
+    assert client.get(url, params=params).json()["items"] == []

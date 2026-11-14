@@ -54,6 +54,31 @@ final class TelegramStartCompanyDeletionTest extends WebTestCaseBase
         self::assertSame([ClientBinding::STATUS_ACTIVE], $this->em()->getConnection()->fetchFirstColumn('SELECT status FROM client_bindings WHERE company_id = ?', [self::COMPANY_ID]));
     }
 
+    public function testLegacyLinkCannotEraseAlreadyRecordedApplicationActor(): void
+    {
+        $client = static::createClient();
+        $token = $this->seedCompanyWithLink();
+        $link = $this->em()->getRepository(BotLink::class)->findOneBy(['token' => $token]);
+        self::assertInstanceOf(BotLink::class, $link);
+        self::assertNull($link->getActorUserId());
+        $link->setExpiresAt(new \DateTimeImmutable('+30 minutes'));
+        $actor = UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail('tg-current-actor@example.test')->build();
+        $telegramUser = new \App\Telegram\Entity\TelegramUser(Uuid::uuid7()->toString(), '70003');
+        $binding = new ClientBinding(Uuid::uuid7()->toString(), $link->getCompany(), $link->getBot(), $telegramUser);
+        $binding->setActorUserId((string) $actor->getId());
+        foreach ([$actor, $telegramUser, $binding] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+        $sent = [];
+        $this->captureTelegramCalls($client, $sent);
+        $this->postStart($client, $token, '70003');
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('Привязка выполнена', implode("\n", $sent));
+        self::assertSame($actor->getId(), $this->em()->getConnection()->fetchOne('SELECT actor_user_id FROM client_bindings WHERE id = ?', [$binding->getId()]));
+        self::assertNotNull($this->em()->getConnection()->fetchOne('SELECT used_at FROM bot_links WHERE token = ?', [$token]));
+    }
+
     private function seedCompanyWithLink(): string
     {
         $em = $this->em();

@@ -26,7 +26,7 @@ final class BalanceAccessSerializationTest extends IntegrationTestCase
         try {
             $first->executeStatement('SET search_path TO '.$schema);
             $second->executeStatement('SET search_path TO '.$schema);
-            $first->executeStatement('CREATE TABLE companies (id uuid PRIMARY KEY,user_id uuid NOT NULL)');
+            $first->executeStatement('CREATE TABLE companies (id uuid PRIMARY KEY,user_id uuid NOT NULL,deletion_requested_at timestamp DEFAULT NULL)');
             $first->executeStatement('CREATE TABLE company_role (id uuid PRIMARY KEY,company_id uuid,permissions json NOT NULL)');
             $first->executeStatement('CREATE TABLE company_members (company_id uuid,user_id uuid,role text,role_id uuid,status text)');
             $first->insert('companies', ['id' => $company, 'user_id' => $owner]);
@@ -59,6 +59,8 @@ final class BalanceAccessSerializationTest extends IntegrationTestCase
             $second->commit();
             self::assertFalse($repository->financialAccess($company, $member)['read']);
             self::assertTrue($repository->financialAccess($company, $owner)['owner']);
+            $first->update('companies', ['deletion_requested_at' => '2026-11-13 12:00:00'], ['id' => $company]);
+            self::assertFalse($repository->financialAccess($company, $owner)['write']);
         } finally {
             if ($first->isTransactionActive()) {
                 $first->rollBack();

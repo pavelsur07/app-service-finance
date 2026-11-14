@@ -15,6 +15,7 @@ use Webmozart\Assert\Assert;
     name: 'uniq_client_binding_company_bot_user',
     columns: ['company_id', 'bot_id', 'telegram_user_id']
 )]
+#[ORM\UniqueConstraint(name: 'uniq_selected_client_binding', columns: ['bot_id', 'telegram_user_id'], options: ['where' => '(selected = true)'])]
 class ClientBinding
 {
     public const STATUS_ACTIVE = 'active';
@@ -53,6 +54,15 @@ class ClientBinding
     #[ORM\Column(type: 'string', length: 16)]
     private string $status = self::STATUS_ACTIVE;
 
+    #[ORM\Column(type: 'guid', nullable: true)]
+    private ?string $actorUserId = null;
+
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $selected = false;
+
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $paymentIntakeSelected = false;
+
     // Дата создания записи
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -73,6 +83,39 @@ class ClientBinding
         $this->createdAt = $now;
         $this->updatedAt = $now;
         $this->status = self::STATUS_ACTIVE;
+    }
+
+    public function getActorUserId(): ?string
+    {
+        return $this->actorUserId;
+    }
+
+    public function setActorUserId(?string $actorUserId): void
+    {
+        if (null !== $actorUserId) {
+            Assert::uuid($actorUserId);
+        }
+        $this->actorUserId = $actorUserId;
+    }
+
+    public function isPaymentIntakeSelected(): bool
+    {
+        return $this->paymentIntakeSelected;
+    }
+
+    public function selectPaymentIntake(): void
+    {
+        $this->paymentIntakeSelected = true;
+    }
+
+    public function isSelected(): bool
+    {
+        return $this->selected;
+    }
+
+    public function select(bool $selected): void
+    {
+        $this->selected = $selected;
     }
 
     // Возвращает идентификатор привязки

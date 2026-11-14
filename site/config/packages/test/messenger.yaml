@@ -1,6 +1,7 @@
 framework:
     messenger:
         transports:
+            async_payment_intake: 'in-memory://'
             async_sync: 'in-memory://'
             async_pipeline: 'in-memory://'
             ingest_fetch: 'in-memory://'

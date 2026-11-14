@@ -22,6 +22,22 @@ final class AiServiceClientTest extends TestCase
 
     private TestHandler $logs;
 
+    public function testFetchesOnlyRequestedCompanyTask(): void
+    {
+        $seen = '';
+        $http = new MockHttpClient(static function (string $method, string $url) use (&$seen): MockResponse {
+            $seen = $url;
+
+            return new MockResponse('{"items":[],"next_cursor":null}', ['http_code' => 200]);
+        });
+        $companyId = '0192f0a0-0000-7000-8000-000000000002';
+        $taskId = '0192f0a0-0000-7000-8000-000000000001';
+
+        self::assertSame([], $this->client($http)->fetchTaskResults($companyId, $taskId)->items);
+        self::assertStringContainsString('/internal/tasks/'.$taskId.'/result?', $seen);
+        self::assertStringContainsString('company_id='.$companyId, $seen);
+    }
+
     protected function setUp(): void
     {
         $this->logs = new TestHandler();
