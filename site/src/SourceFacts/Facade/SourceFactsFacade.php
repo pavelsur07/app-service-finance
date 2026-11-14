@@ -19,12 +19,12 @@ final readonly class SourceFactsFacade implements SourceFactsFacadeInterface
     /**
      * @companyScopeExempt переводчик обходит периоды всех компаний (cron)
      */
-    public function periods(string $resourceType): array
+    public function periods(string $resourceType, ?string $companyId = null): array
     {
         $rows = $this->connection->fetchAllAssociative(
             'SELECT company_id, connection_ref, period_key, current_revision FROM sf_period
-             WHERE resource_type = :resource ORDER BY company_id, connection_ref, period_key',
-            ['resource' => $resourceType],
+             WHERE resource_type = :resource'.(null === $companyId ? '' : ' AND company_id = :company').' ORDER BY company_id, connection_ref, period_key',
+            ['resource' => $resourceType] + (null === $companyId ? [] : ['company' => $companyId]),
         );
 
         return array_map(

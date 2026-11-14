@@ -13,11 +13,13 @@ use App\SourceFacts\Application\DTO\SourcePeriod;
 interface SourceFactsFacadeInterface
 {
     /**
-     * Все периоды ресурса по всем компаниям с текущей ревизией.
+     * Периоды ресурса с текущей ревизией: все компании (переводчик, гейт) или одна (экран качества).
+     *
+     * @companyScopeExempt без `$companyId` — переводчик и гейт обходят все компании (cron)
      *
      * @return list<SourcePeriod>
      */
-    public function periods(string $resourceType): array;
+    public function periods(string $resourceType, ?string $companyId = null): array;
 
     /**
      * Действующие записи текущей ревизии периода, по `source_key`.

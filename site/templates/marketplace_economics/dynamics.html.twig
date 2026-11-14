@@ -21,6 +21,7 @@
         <nav class="tabs" aria-label="Отчёт">
             <a class="tab" href="{{ path('marketplace_economics_sku', params|merge({step: null, page: null})) }}">По SKU</a>
             <a class="tab is-active" aria-current="page" href="{{ path('marketplace_economics_dynamics', params) }}">Динамика</a>
+            <a class="tab" href="{{ path('marketplace_economics_quality') }}">Качество данных</a>
         </nav>
     </div>
 

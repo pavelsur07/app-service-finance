@@ -1,0 +1,103 @@
+{% extends '_layout/app.html.twig' %}
+{% set app_nav_active = 'marketplace_economics' %}
+{% set app_breadcrumb = 'Качество данных' %}
+{% block title %}Качество данных маркетплейсов{% endblock %}
+
+{% macro money(minor) %}{{ minor|vf_minor(2)|vf_amount(2) }}{% endmacro %}
+{% macro day(value) %}{{ value is null ? '—' : value|date('d.m.Y') }}{% endmacro %}
+
+{% block content %}
+    {% import _self as ui %}
+    {% set links = {
+        untranslated: 'Факты не переведены',
+        quarantine: 'Коды без решения (карантин)',
+        translation_canon: 'Перевод ≠ канон',
+        canon_mart: 'Канон ≠ витрина',
+    } %}
+
+    <div class="wz-head">
+        <h1 class="wz-title">Экономика маркетплейсов</h1>
+    </div>
+    <div class="tabs-row">
+        <nav class="tabs" aria-label="Отчёт">
+            <a class="tab" href="{{ path('marketplace_economics_sku') }}">По SKU</a>
+            <a class="tab" href="{{ path('marketplace_economics_dynamics') }}">Динамика</a>
+            <a class="tab is-active" aria-current="page" href="{{ path('marketplace_economics_quality') }}">Качество данных</a>
+        </nav>
+    </div>
+
+    <p class="t-sub">
+        {{ report.from|date('d.m.Y') }} – {{ report.to|date('d.m.Y') }}. Данные проходят цепочку: факты маркетплейса → перевод в операции → канон →
+        витрина отчётов. В каждом звене суммы должны совпадать до копейки; дни с расхождением перечислены ниже.
+    </p>
+
+    {% if report.cabinets is empty %}
+        <section class="card">
+            <p>Кабинетов в новом контуре нет: данные маркетплейсов этой компании пока считает прежний отчёт.</p>
+        </section>
+    {% else %}
+        <section class="card report-scroll">
+            <table class="t-table">
+                <thead>
+                    <tr>
+                        <th>Кабинет</th>
+                        <th>Последний день фактов</th>
+                        <th>Последний переведённый</th>
+                        <th>Последний в витрине</th>
+                        <th class="t-cell--right">Дней не переведено</th>
+                        <th class="t-cell--right">Факты, ₽</th>
+                        <th class="t-cell--right">Карантин, ₽</th>
+                        <th class="t-cell--right">Канон, ₽</th>
+                        <th class="t-cell--right">Витрина, ₽</th>
+                        <th class="t-cell--right">Нераспределено, %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in report.cabinets %}
+                        <tr>
+                            <td>{{ c.channel|upper }} · {{ c.connectionRef }}</td>
+                            <td>{{ ui.day(c.lastFactDay) }}</td>
+                            <td>{{ ui.day(c.lastTranslatedDay) }}</td>
+                            <td>{{ ui.day(c.lastMartDay) }}</td>
+                            <td class="t-cell--right">{{ c.untranslatedDays|vf_number }}</td>
+                            <td class="t-cell--right">{{ ui.money(c.factsMinor) }}</td>
+                            <td class="t-cell--right">{{ ui.money(c.quarantineMinor) }}</td>
+                            <td class="t-cell--right">{{ ui.money(c.canonMinor) }}</td>
+                            <td class="t-cell--right">{{ ui.money(c.martMinor) }}</td>
+                            <td class="t-cell--right">{{ c.unallocatedPercent is null ? '—' : c.unallocatedPercent|vf_number(2) ~ ' %' }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p class="t-sub">Факты = канон + карантин. Канон и витрина — без справочных строк (СПП, соинвестирование) и себестоимости.</p>
+        </section>
+
+        <section class="card report-scroll">
+            <h2 class="card-title">Дни с расхождениями</h2>
+            {% if report.problems is empty %}
+                <p>Расхождений нет.</p>
+            {% else %}
+                <table class="t-table">
+                    <thead>
+                        <tr>
+                            <th>День</th>
+                            <th>Кабинет</th>
+                            <th>Звено</th>
+                            <th class="t-cell--right">Расхождение, ₽</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in report.problems %}
+                            <tr>
+                                <td>{{ p.date|date('d.m.Y') }}</td>
+                                <td>{{ p.connectionRef }}</td>
+                                <td>{{ links[p.link] }}</td>
+                                <td class="t-cell--right">{{ p.diffMinor is null ? '—' : ui.money(p.diffMinor) }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </section>
+    {% endif %}
+{% endblock %}

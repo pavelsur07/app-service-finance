@@ -567,8 +567,8 @@
   пусто — выключено. Пачки компаний вне списка остаются в очереди сервиса.
 - Гейт `app:source-facts:health-check` (cron 09:10 МСК): пачки в карантине или поток
   (кабинет × ресурс) без применённых пачек дольше 36 ч — `error`, exit 1.
-- `SourceFactsFacadeInterface` (только чтение, для переводчиков каналов): `periods(resourceType)` —
-  периоды всех компаний с текущей ревизией; `activeFacts(companyId, connectionRef, resourceType,
+- `SourceFactsFacadeInterface` (только чтение, для переводчиков каналов): `periods(resourceType,
+  ?companyId)` — периоды с текущей ревизией, всех компаний (переводчик, гейт) или одной (экран R10); `activeFacts(companyId, connectionRef, resourceType,
   periodKey)` — действующие записи периода (`SourceFactRecord`: `source_key`, `payload`). Модуль в
   `MODULES_WITH_FACADE`: внутренние слои закрыты.
 
@@ -599,6 +599,9 @@
   (`@companyScopeExempt`, cron); `takeDay(DayWindow): list<OperationRecord>` — та же блокировка дня, что у
   `replaceDay`, операции и снятие отметки `mo_dirty_window`. **Коммитит вызывающий** (команда витрины);
   без транзакции — `\LogicException`; откат вызывающего возвращает отметку.
+- Сверки: `daySums(channel, from, to, ?companyId): list<CanonDaySum>` — Σ канона по (компания, кабинет,
+  день) без видов уровня «справочно»; без компании — гейт переводчика (`@companyScopeExempt`), с компанией —
+  экран R10. Только чтение.
 
 ### MarketplaceOzon: переводчик Ozon
 
@@ -631,8 +634,11 @@
   остаётся без SKU. Дата статистики = дата начисления CPC (сверка Вумджой, 14.11).
 - Оплата за заказ (`ads_pay_per_order` без SKU, тип 54) — по проданным штукам SKU того же дня
   (`sales_qty_share`); нет продаж — без SKU. Сбой дня не останавливает остальные; один `error` на прогон.
-- Гейт `app:marketplace-ozon:health-check` (cron 09:20 МСК): код без решения в карантине дольше 24 ч
-  или день с фактами не переведён — `error`, exit 1.
+- Гейт `app:marketplace-ozon:health-check` (cron 09:20 МСК): код без решения в карантине дольше 24 ч;
+  день с фактами не переведён; за 45 дней Σ канона дня ≠ `moz_day.canon_minor` (сумма расхождения в
+  рублях); последний день фактов кабинета старше D−2 — `error`, exit 1.
+- `MarketplaceOzonFacadeInterface::dayStates(companyId, from, to): list<OzonDayState>` — переведённые дни
+  (ревизия, актуальность правил, `total` / `canon` / `quarantine`) для экрана R10. Только чтение.
 - Новый код без вида: в конце прогона перевода `RequestOzonSourceTypeDraftsAction` ставит задачу ИИ
   `marketplace_source_type_draft` (ai-task v1.3) от `PLATFORM_COMPANY_ID`: данные общие, подключение
   компаний к ИИ не учитывается; номер задачи — в `ai_draft` до постановки, ключ повтора — сам код;
@@ -683,6 +689,9 @@
   `SkuEconomicsQuery::byStep` (`date_trunc`, неделя с понедельника), все шаги периода (пустые — нули, края
   обрезаны периодом), график — встроенный SVG. Набор SKU при тегах или поиске берётся из R1 за тот же
   период, поэтому итог R2 = итог R1.
+- Гейт витрины дополнительно: за 7 дней Σ |нераспределённого| > 1 % затрат компании — `error`.
+- `MarketplaceEconomicsFacadeInterface::daySums(companyId, from, to): list<EconomicsDaySum>` — Σ строк
+  витрины дня (без себестоимости и справочных), нераспределённое и затраты для экрана R10. Только чтение.
 - Отчёт R3 «Неделя» — `app:marketplace-economics:weekly-report` (cron `0 9 * * 1` МСК; `--week`, `--company`,
   `--dry-run`): за прошлую неделю R1 (`SkuEconomicsReportBuilder`, с разнесением) → сводка
   `WeeklyEconomicsSummary` (итог против прошлой недели, топ-5 роста и падения СМ2, SKU в минусе, ДРР > 20 %)
@@ -691,6 +700,20 @@
   (UUID через запятую, `*` — все, пусто — выключено). Журнал `me_weekly_report` (ключ
   `(company_id, week_start, delivery)`): отметка `INSERT … ON CONFLICT DO NOTHING` до отправки, сбой или
   0 получателей — отметка снимается; повтор прогона дошлёт только неотправленное. Транзакций нет.
+
+### MarketplaceQuality: экран R10 «Качество данных»
+
+Пятый модуль нового контура (`docs/tasks/marketplace-profit-pipeline/stages/stage-7.md` §7.3).
+
+**Устав.** Причина изменений — сводка качества данных по звеньям «факты → перевод → канон → витрина».
+Таблиц и записи нет. Зависимости — только фасады и DTO контрактов `SourceFacts`, `MarketplaceOzon`,
+`MarketplaceOperations`, `MarketplaceEconomics` (PHPat `test_marketplace_quality_reads_facades_only`).
+
+- `GET /marketplace/economics/quality` (`DataQualityController`, вкладка рядом с R1/R2, активная компания,
+  `ROLE_COMPANY_USER`, модуль `MARKETPLACE`): окно 45 дней до вчера. `DataQualityReportBuilder` — по кабинету
+  последние дни фактов / перевода / витрины, дней не переведено, Σ фактов (по переводчику: `SourceFacts`
+  payload не читает), карантина, канона, витрины и доля нераспределённого; список дней с расхождением по
+  звеньям (не переведён, карантин, перевод ≠ канон, канон ≠ витрина). Гейты — в модулях звеньев.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -5624,9 +5647,9 @@ config/
 | `app:marketplace-ozon:translate --relink` | `57 6 * * *` | То же + повторный перевод дней с операциями без листинга (листинг появился после перевода) |
 | `app:marketplace-economics:refresh` | `10-59/15 * * * *` | Пересчёт витрины экономики SKU по дням, заменённым в каноне; день — транзакция; сбой дня — ERROR в конце прогона |
 | `app:marketplace-economics:refresh --recent=45` | `15 7 * * *` | То же + все дни с операциями за 45 суток (себестоимость и реклама легаси меняются без отметки в каноне) |
-| `app:marketplace-economics:health-check` | `30 9 * * *` | Гейт витрины: Σ витрины дня ≠ Σ канона или заменённый день не пересчитан > 60 мин — ERROR, exit 1 |
+| `app:marketplace-economics:health-check` | `30 9 * * *` | Гейт витрины: Σ витрины дня ≠ Σ канона, заменённый день не пересчитан > 60 мин или нераспределённое за 7 дней > 1 % затрат — ERROR, exit 1 |
 | `app:marketplace-economics:weekly-report` | `0 9 * * 1` | Отчёт R3 «Неделя»: сводка и xlsx за прошлую неделю владельцу (почта) и в Telegram; `ECONOMICS_WEEKLY_REPORT_COMPANIES`; сбой компании — ERROR, exit 1 |
-| `app:marketplace-ozon:health-check` | `20 9 * * *` | Гейт переводчика Ozon: код без решения в карантине > 24 ч или непереведённый день — ERROR, exit 1 |
+| `app:marketplace-ozon:health-check` | `20 9 * * *` | Гейт переводчика Ozon: код без решения в карантине > 24 ч, непереведённый день, канон ≠ перевод за 45 дней или кабинет отстал больше D−2 — ERROR, exit 1 |
 | `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
 | `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (`AI_SERVICE_ENABLED`, адрес, токен) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
 | `bash bin/recover-payment-intake.sh` | `*/5 * * * *` | Только включённый Telegram pilot scope: независимые Cash и Telegram recovery, strict UUID CSV, никакого Confirm; ошибочный список не запускает команды |
@@ -5727,6 +5750,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.187 | 2026-11-14 | Сверки нового контура (этап 7): гейт Ozon — перевод = канон за 45 дней и отставание кабинета; гейт витрины — доля нераспределённого > 1 %; новый модуль `MarketplaceQuality` — экран R10 `/marketplace/economics/quality`; фасады чтения `MarketplaceOzonFacadeInterface::dayStates`, `MarketplaceEconomicsFacadeInterface::daySums`, `MarketplaceOperationsFacadeInterface::daySums`, `SourceFactsFacadeInterface::periods(…, ?companyId)` |
 | 2.186 | 2026-11-14 | Telegram PaymentIntake: company pilot allowlist, guards ввода/доставки/отзыва, профилированный worker и независимый scoped recovery; parse route single DeepSeek; финансовые правила и общие AI grants без изменений |
 | 2.185 | 2026-11-14 | MarketplaceEconomics: отчёт R3 «Неделя» — `app:marketplace-economics:weekly-report` (понедельник 09:00), журнал `me_weekly_report` (`Version20261114230000`), `ECONOMICS_WEEKLY_REPORT_COMPANIES`; Telegram: фасад `TelegramFacadeInterface::sendDocumentToCompany` (этап 6.5) |
 | 2.184 | 2026-11-14 | MarketplaceOperations: вид `mp_other_deductions` «Прочие удержания МП» (уровень «общие») — код Ozon 7 и разовые удержания без своего вида |
