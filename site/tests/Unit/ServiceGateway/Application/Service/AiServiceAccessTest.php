@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\ServiceGateway\Application\Service;
 
 use App\ServiceGateway\Application\Service\AiServiceAccess;
+use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 
@@ -40,6 +41,15 @@ final class AiServiceAccessTest extends TestCase
         self::assertTrue($access->isEnabledForCompany(strtoupper(self::COMPANY)));
         self::assertFalse($access->isEnabledForCompany(self::OTHER));
         self::assertSame([self::COMPANY], $access->enabledCompanyIds([self::OTHER, self::COMPANY]));
+    }
+
+    public function testPlatformNeedsOnlyTheServiceSwitch(): void
+    {
+        $platform = AiTaskFacadeInterface::PLATFORM_COMPANY_ID;
+
+        self::assertTrue($this->access([])->isEnabledForCompany($platform), 'платформа не подключается администратором');
+        self::assertSame([self::COMPANY, $platform], $this->access([self::COMPANY])->enabledCompanyIds([$platform, self::COMPANY]));
+        self::assertFalse((new AiServiceAccess(false, 'http://ai', 'token', $this->createStub(Connection::class)))->isEnabledForCompany($platform));
     }
 
     /** @param list<string> $granted */

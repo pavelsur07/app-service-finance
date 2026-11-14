@@ -384,7 +384,8 @@ final class ModuleBoundaryRules
 
     /**
      * `MarketplaceOzon` — переводчик Ozon нового контура (`DATA.md` §4, §6): факты читает через фасад
-     * `SourceFacts`, пишет только через фасад канона, листинги — через фасад `Marketplace`. Легаси
+     * `SourceFacts`, пишет только через фасад канона, листинги — через фасад `Marketplace`, ИИ — через
+     * фасад `ServiceGateway`. Легаси
      * маркетплейсов (`Ingestion`, `MarketplaceAds`, внутренности `Marketplace`), WB и учёт ему
      * недоступны: иначе переводчик снова срастается со старым разбором.
      */

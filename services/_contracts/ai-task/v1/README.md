@@ -11,6 +11,7 @@
 | `ack_request` / `ack_response` | `POST /internal/tasks/ack` |
 | `echo_payload` / `echo_output` | диагностическая задача `echo` |
 | `categorize_payload` / `categorize_output` | `categorize_transactions`: статьи компании + до 50 операций → статья или `null` на операцию |
+| `source_type_draft_payload` / `source_type_draft_output` | `marketplace_source_type_draft`: новый код маркетплейса + виды операций + решённые коды → вид или новый вид, название, пояснение |
 
 Правила:
 

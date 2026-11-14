@@ -1,0 +1,7 @@
+{
+    "kind": "logistics_to",
+    "new_kind": null,
+    "title": "Кросс-докинг",
+    "reason": "Доставка товара на склад Ozon через кросс-докинг — логистика.",
+    "confidence": 0.7
+}

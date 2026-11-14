@@ -95,8 +95,8 @@ ozon-fetcher (`/internal/fetch-status`). Граница: поток, не при
 
 Тринадцатый пример — `app:marketplace-ozon:health-check` (09:20 МСК): переводчик Ozon (`MarketplaceOzon`). Красное (`error`, exit 1) —
 код Ozon без решения (`moz_source_type.kind IS NULL`) лежит в карантине `moz_quarantine` дольше 24 ч, либо день с фактами не переведён
-на текущей ревизии или версии правил. Починка: карантин — администратор выбирает вид кода (экран — этап 4.3; до него —
-`UPDATE moz_source_type SET kind = …, status = 'confirmed'` по решению Владельца), следующий прогон переводит дни сам;
+на текущей ревизии или версии правил. Починка: карантин — администратор выбирает вид кода на `/admin/marketplace/ozon-source-types` (черновик ИИ — там же),
+следующий прогон переводит дни сам;
 `ozon:unexplained` — разбор не объяснил часть `total_amount`, нужна правка переводчика и `RULES_VERSION`. Непереведённые дни —
 смотреть `error` прогона `app:marketplace-ozon:translate` (там компания и день).
 

@@ -1,5 +1,12 @@
 # ai-task — CHANGELOG
 
+## v1.3.0 (2026-11-14)
+
+Добавлены `source_type_draft_payload` / `source_type_draft_output` — задача
+`marketplace_source_type_draft` (черновик решения по новому коду маркетплейса для
+администратора платформы, этап 4.3 `marketplace-profit-pipeline`). Конверты не
+менялись: изменение аддитивное.
+
 ## v1.2.0 (2026-11-08)
 
 `categorize_payload.categories[].description` — необязательное описание статьи

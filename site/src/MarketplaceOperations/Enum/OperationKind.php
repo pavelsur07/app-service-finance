@@ -61,4 +61,40 @@ enum OperationKind: string
             default => CascadeLevel::MD1,
         };
     }
+
+    /** Название вида для экранов и черновика ИИ. */
+    public function label(): string
+    {
+        return match ($this) {
+            self::SALE => 'Продажа',
+            self::RETURN => 'Возврат',
+            self::SPP => 'Скидка за счёт маркетплейса (СПП)',
+            self::COINVESTMENT => 'Соинвестирование',
+            self::COMMISSION => 'Комиссия за продажу',
+            self::COMMISSION_BRAND => 'Брендовая комиссия',
+            self::LOGISTICS_TO => 'Логистика до покупателя',
+            self::LOGISTICS_TO_LAST_MILE => 'Последняя миля',
+            self::LOGISTICS_TO_DROPOFF => 'Обработка отправления (drop-off)',
+            self::LOGISTICS_TO_HANDOVER => 'Доставка до места передачи',
+            self::LOGISTICS_BACK => 'Обратная логистика',
+            self::LOGISTICS_BACK_PVZ => 'Обработка возвратов в ПВЗ',
+            self::ACQUIRING => 'Эквайринг',
+            self::PACKAGING_LABOR => 'Упаковка партнёрами',
+            self::PACKAGING_MATERIALS => 'Упаковочные материалы',
+            self::STORAGE => 'Хранение',
+            self::STOCK_REMOVAL => 'Вывоз остатков',
+            self::DISPOSAL => 'Утилизация',
+            self::ADS_CPC => 'Реклама: оплата за клик',
+            self::ADS_PAY_PER_ORDER => 'Реклама: оплата за заказ',
+            self::PROMO_STARS => 'Звёздные товары',
+            self::PACKAGING_WAREHOUSE => 'Доп. упаковка на складе',
+            self::PROMO_PREMIUM => 'Подписка Premium',
+            self::PROMO_SELLER_BONUS => 'Бонусы продавца',
+            self::PROMO_REVIEWS => 'Отзывы за баллы',
+            self::PROMO_CHAT_POINTS => 'Баллы за чат',
+            self::SUBSCRIPTION => 'Подписки и аналитика',
+            self::FINE => 'Штрафы',
+            self::SERVICE_CORRECTION => 'Корректировка услуг',
+        };
+    }
 }
