@@ -450,6 +450,41 @@ final class ModuleBoundaryRules
             );
     }
 
+    /**
+     * `MarketplaceQuality` — экран R10 (`stages/stage-7.md` §7.3): сводит звенья нового контура и только
+     * читает их фасады. Внутренности модулей контура и легаси ему недоступны.
+     */
+    public function test_marketplace_quality_reads_facades_only(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplaceQuality'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\SourceFacts'),
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceOperations'),
+                Selector::inNamespace('App\MarketplaceEconomics'),
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->excluding(
+                Selector::inNamespace('App\SourceFacts\Facade'),
+                Selector::inNamespace('App\SourceFacts\Application\DTO'),
+                Selector::inNamespace('App\MarketplaceOzon\Facade'),
+                Selector::inNamespace('App\MarketplaceOzon\Application\DTO'),
+                Selector::inNamespace('App\MarketplaceOperations\Facade'),
+                Selector::inNamespace('App\MarketplaceOperations\Application\DTO'),
+                Selector::inNamespace('App\MarketplaceEconomics\Facade'),
+                Selector::inNamespace('App\MarketplaceEconomics\Application\DTO'),
+            )
+            ->because('экран качества только сводит звенья контура: каждое читается через свой фасад.');
+    }
+
     public function test_legacy_zone_stays_empty(): Rule
     {
         $legacy = [];

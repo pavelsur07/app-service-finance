@@ -173,6 +173,12 @@ marketplace_economics_controllers:
         namespace: App\MarketplaceEconomics\Controller
     type: attribute
 
+marketplace_quality_controllers:
+    resource:
+        path: ../src/MarketplaceQuality/Controller/
+        namespace: App\MarketplaceQuality\Controller
+    type: attribute
+
 api_management_controllers:
     resource:
         path: ../src/Api/Controller/
