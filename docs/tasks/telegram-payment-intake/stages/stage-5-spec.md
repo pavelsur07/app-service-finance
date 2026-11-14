@@ -38,8 +38,10 @@ Base commit реализации: 8a1f51cac4dacac4d49dd6b5cf72e0940d26a895.
  независимый holdout не заявляется.
 - [x] Разрешённый полный live eval v3 выполнен на41сообщении/41вызове;
  49/49размеченных кандидатов и47/47известных сумм; actual results сохранены.
-- [ ] Критические ожидания качества выполнены: направлениеtg027inflow и
- исключение справочного итогаtg008пока не подтверждены; explicit direction5/7.
+- [x] Критические ожидания на development-наборе выполнены в проходах2–4:
+ tg027inflow, tg008одна строка платежа без справочного итога; direction7/7.
+ Synthetic explicit analytics/date tuples13/13 в каждом из трёх проходов.
+ Это не независимая production accuracy; см. актуальный отчёт четырёх проходов.
 - [ ] Независимыйholdout, полныйgoldаналитики/дат/precision/качества вопросов и
  живой Telegram end-to-end acceptance не подменены текущим standalone-run.
 - [x] Review-метрики, изменения контрактов/схемы, риски и release request в handoff.

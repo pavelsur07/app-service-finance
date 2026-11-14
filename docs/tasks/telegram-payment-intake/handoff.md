@@ -1,155 +1,108 @@
-# Telegram payment intake — локальная реализация
+# Telegram payment intake — реализация и результаты проверок
 
-**Branch:** `docs/telegram-payment-intake-examples` ·
-**PR:** https://github.com/pavelsur07/app-service-finance/pull/2985 · **Draft**.
-Task base: `8a1f51cac4dacac4d49dd6b5cf72e0940d26a895`.
+Branch `docs/telegram-payment-intake-examples`; [Draft PR #2985](https://github.com/pavelsur07/app-service-finance/pull/2985), base `master`.
+Task base `8a1f51cac4dacac4d49dd6b5cf72e0940d26a895`.
+Проверенный runtime source `99cf27cde6b1d0fa7213b008d11506466d70a091`, prompt v5.
 
-## Результат по этапам
+## Результат
+
+Свободный текст Telegram, сокращения и несколько платежей превращаются в
+проверяемые черновики. Модель предлагает статьи ДДС, проекты и ЦФО из переданных
+справочников; Symfony проверяет права и сохраняет деньги только после явного
+подтверждения. Фото исключены v1. Неизвестное не становится финансовым фактом.
 
 | Этап | Результат | Приёмка |
 |---|---|---|
-| 1 | Контракт v1, 41 обезличенный текст, partial gold и контексты компаний | [ТЗ](stages/stage-1-spec.md), [отчёт](stages/stage-1.md) |
-| 2 | Задача Python внутри ai-service, структурированный вывод, Decimal/evidence checks | [ТЗ](stages/stage-2-spec.md), [отчёт](stages/stage-2.md) |
-| 3 | Cash drafts, правки, atomic/idempotent Confirm, recovery и бюджеты | [ТЗ](stages/stage-3-spec.md), [отчёт](stages/stage-3.md) |
-| 4 | Telegram actor/source binding, карточки, уточнения, durable polling/delivery | [ТЗ](stages/stage-4-spec.md), [отчёт](stages/stage-4.md) |
-| 5 | Локальные проверки, живые v3/v4 и подготовка ответа | [ТЗ](stages/stage-5-spec.md), [отчёт](stages/stage-5.md); полный live run выполнен; quality acceptance pending |
+| 1 | Контракт, 41 обезличенный текст и partial annotations | [ТЗ](stages/stage-1-spec.md), [отчёт](stages/stage-1.md) |
+| 2 | Python TaskSpec, Decimal/source-evidence/privacy checks | [ТЗ](stages/stage-2-spec.md), [отчёт](stages/stage-2.md) |
+| 3 | Durable Cash drafts, ручные правки, atomic/idempotent Confirm и recovery | [ТЗ](stages/stage-3-spec.md), [отчёт](stages/stage-3.md) |
+| 4 | Telegram actor/company/source binding, карточки, уточнения и delivery recovery | [ТЗ](stages/stage-4-spec.md), [отчёт](stages/stage-4.md) |
+| 5 | Интеграция, output preparation, четыре живых прохода; полная pilot acceptance открыта | [ТЗ](stages/stage-5-spec.md), [отчёт](stages/stage-5.md) |
 
-## Что изменено
+## Текущее поведение и файлы
 
-- `services/_contracts/ai-parse-payment-message/v1/`,
-  `services/ai-service/src/ai_service/tasks/parse_payment_message/`:
-  извлечение кандидатов и проверка literal evidence без float. Модель предлагает
-  аналитику из переданных справочников; не пишет деньги и не выдумывает ID.
-- `site/src/Cash/{Application,Entity,Repository}/PaymentIntake/`, `CashFacade`:
-  долговечный черновик, stable item/transaction IDs, revision/attempt,
-  текущие права/аналитика/период, atomic Confirm, source/reply replay guards.
-- `site/src/Telegram/`: actual app actor в привязке, выбор компании,
-  ответы и corrections, source edits, очередь карточек, безопасное восстановление.
-- `site/src/ServiceGateway/`: targeted company/task pull через существующие
-  consumer/ai_usage transaction и ack после commit; dedicated intake transport.
-- `ARCHITECTURE.md`, dev Compose/profile и config описывают текущие контракты.
-  User deletion/access и synthetic fixtures согласованы с новыми metadata.
+- `services/ai-service/src/ai_service/tasks/parse_payment_message/`: immutable
+  prompt v5, structured output, строгий verifier и безопасная preparation.
+  Неподтверждённые дата/направление/paid → null/unknown и вопросы; доказанный
+  справочный итог исключается с уведомлением. Ошибки денег/валют/evidence,
+  чужие ID, forbidden pairs и независимые коллизии остаются отказом.
+- `core/task.py`, `core/pipeline.py`: optional prepare_output только для этой
+  задачи; затем повторные outputschema и полный verify. Остальные tasks defaultNone.
+- `reference_local_date` вычисляется общей с verifier функцией во внутреннем
+  model data block. Public PaymentInput не расширяется; дата по умолчанию
+  платежу не присваивается. Prompt сохраняет независимость аналитических полей.
+- `src/ai_service/evals/payment_intake*.py`, `evals/parse_payment_message/`:
+  source и synthetic dataset, раздельные метрики, exact source occurrence
+  alignment, wrong-intent guard, версия и hashes runtime. Model не видит gold.
+- `site/src/Cash/`, `site/src/Telegram/`, `site/src/ServiceGateway/`:
+  текущие финансовые/авторизационные проверки, durable draft/revision/attempt,
+  stable IDs, explicit Confirm, targeted pull и ack после commit.
+- `site/tests/Fixtures/Cash/payment-intake-prepared.json`: общая synthetic fixture
+  Python → Cash; отдельный Telegram manual-paid/ack/Confirm test.
 
-## Схема и контракты
+## Живая проверка
 
-`ai-task/v1` не меняется; новая самостоятельная `ai-parse-payment-message/v1`.
-Новый внутренний GET `/internal/tasks/{taskId}/result?company_id=...` использует
-существующий authenticated results_page, неизвестный/pending/чужой/acked → empty.
-Новых публичных API или frontend нет.
+Владелец разрешил до четырёх проходов тем же ключом, с прежним ограниченным
+root-SSH исключением и общим estimated300RUB. Выполнено4/4, новых вызовов не осталось
+по количеству проходов, даже при неиспользованном call headroom.
 
-- `Version20261113120001`: nullable actual actor в links/bindings, выбор компании,
-  таблица Telegram session. Final up/down/up: PASS23 SQL, старая строка сохранена.
-- `Version20261113171344`: Cash draft и reply receipt, global unique source/reply,
-  company/draft indexes и receipt FK CASCADE. Старые денежные записи не меняются.
-- Doctrine mapping/schema: только существующий fixture test_money_holder вне
-  миграций; Cash/Telegram расхождений нет. Down удаляет новые черновики и metadata,
-  поэтому для production rollback выключается flag, таблицы сохраняются.
+| Проходы | Source | Synthetic | Результат |
+|---|---|---|---|
+| 1, v4 + preparer | 49/49 кандидатов, 47/47 сумм, 7/7 направлений | 9/13 exact rows | Обнаружены CFO/pair/date ошибки |
+| 2–4, v5 + preparer + derived date | На каждом49/49,47/47,7/7 | На каждом13/13 exact rows | Нет misses по измеряемым метрикам |
+
+На каждом из проходов2–4: category13/13, project12/12, CFO12/12, date13/13,
+null abstention9/9, pair abstention1/1, required-question presence9/9.
+В forbidden-pair примере project/CFO оцениваются как допустимые tuples без
+навязывания приоритета; индивидуальные denominators его не включают.
+212 новых calls; вся кампания 375 calls / 32.74599378 RUB usage estimate, не invoice.
+Fresh before/after всех четырёх совпали; собственных eval containers0.
+[Полный отчёт с hashes/latency/ограничениями](live-eval-four-passes-2026-11-14.md).
+
+41 исходное сообщение и12 synthetic cases использованы при настройке.
+Независимый holdout, реальная analytics/date accuracy, source precision,
+качество вопросов, живой Telegram E2E и queue/SLA этим не доказаны.
+Исторический полный v4 до preparer:46/49,44/47,6/7,3rejected — сохранён
+в [истории](live-eval-result-2026-11-14.md), не подменяется новым результатом.
 
 ## Проверки и review
 
-- `make site-test`: **8942 tests / 50254 assertions PASS**, 11:32.694,
-  до последних четырёх PHP regression tests handoff review.
-- Full canonical CS/strict types: **0/4153**; оба новых entity builders и
-  unit helper также проверены focused PHPStan.
-- Python current: lint/format92files/mypy55 GREEN; **303 passed / 1 skipped**;
-  offline eval9 passed / 1 skipped; targeted verifier/runner64 passed.
-- Local full PHPStan: incomplete worker / host OOM (не green). CI0984d7b62
-  full static и остальные PHP gates PASS; baseline не расширялся.
-- Late fixes: Cash TRANSFER2 tests/5 assertions, Telegram2/16, focused Stan/CS
-  PASS; Python sign/runner regression RED→GREEN. Итоговый CI текущей головы PR
-  указывается в PR description и финальном сообщении после проверки.
+- Текущий Python source: `make ai-service-lint` — Ruff/format98, mypy57 PASS;
+  `make ai-service-test` —406PASS/1skip; `make ai-service-evals` —9PASS/1skip.
+  Skip: site не смонтирован для одного cross-service test / нет eval keys.
+- Cash/Telegram:66tests/434assertionsPASS; focused PHPStan/canonicalCS/strict
+  двух изменённых тестов PASS. PHP-файлы с того запуска не менялись.
+  Повторный Confirm даёт одну операцию и не вызывает новый AI parse.
+- Четыре timezone tests provenRED→GREEN; source/semantic scorer и critical
+  preparation regressions ранее provenRED→GREEN. Полные Python gates
+  выполнены после последнего изменения runtime, для неизменных повторов не дублировались.
+- Исторический полный PHP suite8942tests/50254assertionsPASS; CI4160b4e08
+  full PHP/Python/empty-DB PASS. Это не CI текущей головы. Local full PHPStan
+  ранее ограничен OOM; baseline не расширялся. Полные handoff gates для
+  финального выпуска ещё требуются, не повторяются на каждом work item.
+- Focused internal review runtime99cf27cde6 и bounded four-pass controller:
+  B0/I0/M0. Reviewer read-only, тяжёлые тесты не повторял.
+  Итоговый review отчёта записывается в checkpoint/PR.
+- Исторический external review:5rounds,B1/I15observations; подтверждённые
+  исправлены, последний handoff результат fixed without re-run, не новый
+  REVIEW_GREEN. На work items external не запускался; Stage5/handoff
+  обязательное review не отменено.
 
-Stage2 external1: B0/I6 (5 подтверждены; ошибочное missing-tracked-files
-отклонено по git, valid unused-context subfinding исправлен). Stage3 external1:
-B0/I3, все исправлены. Stage4 external1: B1/I4, все исправлены; обязательный
-external2: B0/I1, queue docs/local worker исправлены, safe MINOR тоже.
-Результаты без повторного маркера честно записаны fixed without re-run.
-Последний fresh internal B0/I3, все три независимо проверены закрытыми;
-open B0/I0/M0. Разные раунды могут описывать один дефект и не суммируются как
-уникальные находки. Финальный external handoff: один раунд B0/I1/M3; подтверждённые исправления
-проверены targeted tests и fresh targeted internal review, open B0/I0. Повтор не обязателен после IMPORTANT/MINOR,
-результат **fixed without re-run**, не REVIEW_GREEN.
+## Выпуск и оставшаяся приёмка
 
-## Ограничения и следующий разрешённый шаг
+`ai-task/v1` не меняется; отдельный `ai-parse-payment-message/v1`.
+Две additive migrations: Version20261113120001 (Telegram actor/session) и
+Version20261113171344 (Cash draft/receipt). Local up/down/up и schema checks
+описаны в Stage reports; старые денежные записи не преобразуются.
+Down удаляет новые metadata, поэтому production rollback — выключение flag
+с сохранением таблиц, а не автоматическое удаление данных.
 
-Флаг `TELEGRAM_PAYMENT_INTAKE_ENABLED=0` по умолчанию. Фото/OCR исключены v1.
-Неизвестные масштаб, группировка, источник средств и факт оплаты остаются
-вопросами. Последний полный живой v4: 38 needs_review / 3 rejected,
-46/49 размеченных кандидатов, 44/47 известных сумм, 6/7 направлений.
-Отказы tg006/tg011: paid_unanchored; tg008: context_total_amount.
-Исторический v3 (49/49, 47/47, 5/7) не является результатом текущего алгоритма.
-
-После v4 добавлена подготовка результата перед неизменным verifier: только
-понижение неподтверждённых optional fields в null/unknown с вопросами и
-исключение доказанного справочного итога с уведомлением. Чужие ID, неверная
-сумма/валюта/evidence, недопустимые пары и коллизии по-прежнему отклоняются.
-Текущий live-результат отсутствует: кампания 163/163, остаток 0;
-известная оценка использования 11.92739911 рубля, не invoice.
-
-Свежие локальные проверки этой итерации: Python 402 passed / 1 skipped;
-оффлайн eval 9 passed / 1 skipped; Ruff/format 97 files, mypy 57 files.
-Cash/Telegram 66 tests / 434 assertions PASS; PHPStan, canonical CS и strict
-для двух изменённых тестов PASS. Общая синтетическая fixture проверена в Python
-и Cash; ручное подтверждение и повторный Confirm создают одну операцию без
-дополнительного AI-запроса. Production PHP-код в этой итерации не менялся.
-Полный PHP suite и CI старых commits выше не выдаются за проверки новой головы.
-
-Добавлены 12 синтетических случаев с явными ожидаемыми статьями ДДС, проектами,
-ЦФО и датами. Отдельные метрики не подменяют реальный gold, независимый holdout,
-качество вопросов или живую Telegram end-to-end приёмку. Оба dataset-режима
-по умолчанию работают без сети и без модели. Ни Stage 5, ни пилот не закрыты.
-Production processing, миграции и активация флага задачей не выполнялись.
-Для узкого пилота по-прежнему требуется отдельный company gate; существующие
-AI grants не заменяются молча. Второй ключ не требуется.
-[Runbook](runbook.md) содержит recovery, очередь, условия включения и откат.
-
-После успешного live eval для выпуска нужны отдельный production worker нового
-транспорта, согласованная группа пилота, production migrations и deploy.
-Миграционный запрос по docs/workflow/release.md: «run the migration and deploy
-#2985». На текущем этапе merge/deploy не запрашивается; PR остаётся Draft.
-
-Review metrics: independent internal B0/I12 по трём исходным сессиям (4+5+3),
-runner self-review B0/I1; external B1/I15 по пяти раундам, open B0/I0.
-Суммы — наблюдения review, возможны повторы, не число уникальных дефектов.
-Task commits до final Stage5: dbfc6d5ff, 1b326aa9a, 0264aed23, 5fff92c58,
-0984d7b62; final code commit доступен в голове той же ветки/PR.
-
-Последний измеренный runtime source: `bd490a8fbd3ddd1d511046bae7c337e0fb958b34` (promptv3).
-Текущая локальная версияv4: см. следующую секцию, пока без live-оценки.
-Source4160b4e08CI43557018107 SUCCESS:fullPHP/Python/empty-DB gates; production
-schema/migrations/deploySKIPPED. V3localgates green; exact-headCI is recorded
-separately. Manual none43500484323 was not counted as validation.
-
-## Live execution14November
-
-The owner approved the bounded trial, existing key and a named one-off root-SSH
-exception for isolated evaluation. No persistent wrapper/access/settings changes.
-First41cases/45calls, targeteddiagnostic14,v212,v3split5+5,fullv341:122/163total.
-[Full measurements and caveats](live-eval-result-2026-11-14.md) retain all versions,
-actual source hashes, safe diagnostics and the scorer correction.
-
-Final full-run operational postcheck PASS:own evalcontainers0,APIhealthy,
-workerrunning; fresh before/afterfull metadata совпадают точно. До этого
-исторические comparison с initial campaign receipt возвращалиFALSE из-за
-независимыхmasterdeploy43555954635/43557409568 (start/imagechanged). Все receipt
-сохранены; новаяbaselineне переписывает прежние расхождения. No repair/restart/
-deploybyeval. Sourcebundlefixed; imagefullrun9d621cd8b680… recorded in live report.
-
-Fresh independent full-run acceptance review:B0/I0securitydefects,M1staledocs
-fixed. Stage5qualitygapsremain; no final pilot acceptance/Ready/merge request.
-Earlier focused eval/scorer/privacy/v2/v3reviewsB0/I0/M0. Documentation-only
-continuation did not repeat externalreview; previous fixed-without-rerun stands.
-
-## Локальная доработка после полного v3
-
-Справочный итог проверяется и для amountnull; поиск привязан к своей фразе,
-чтобы не мешать текущему платежу из следующей строки. Promptv4явно сопоставляет
-локальный плюс с inflow, отдельно от факта оплаты, и запрещает строки итогов
-с неизвестной суммой. Schema/core/PHPне менялись, v1–v3сохранены.
-
-Baseline10PASS; три исходные регрессии RED→GREEN; независимый I1о границах
-фразы закрыт после6RED→GREEN. Итог15адресныхPASS,318PythonPASS/1skip,
-eval9PASS/1skip,ruff93/mypy55PASS. ReviewerB0/I1found→B0/I0/M0open.
-Текущаяmanifest41/0/currentv4; результат живойv3не является оценкойv4.
-Следующий bounded run той же41пачки в остатке общей кампании, без новых данных.
-Stage5/pilotне закрыты; productionflag0/worker/миграции/deployбез изменений.
+Production migrations, worker/флаг и deploy этой задачей не выполнялись.
+`TELEGRAM_PAYMENT_INTAKE_ENABLED=0`. Нужны согласованный охват пилота,
+worker нового транспорта и отдельный migration dispatch по
+`docs/workflow/release.md`; [runbook](runbook.md).
+Flag глобальный плюс существующие AI grants; intake company allowlist пока нет.
+Для узкого пилота сначала требуется company gate, не изменение общих grants.
+Живой Telegram E2E и независимая проверка реальных аналитик остаются открытыми.
+Stage5 целиком не закрыт; PR остаётся Draft. Merge/deploy не запрашивается в этом
+checkpoint. Все четыре разрешённых прохода закончены, пятый не запускается.

@@ -2,8 +2,9 @@
 
 **Risk:** HIGH-LOCAL. **Base:** `8a1f51cac4dacac4d49dd6b5cf72e0940d26a895`.
 ТЗ: [stage-5-spec.md](stage-5-spec.md). Статус: локальная интеграционная приёмка завершена;
-Stage5 целиком не закрыт: полный live eval v3 выполнен, но приёмка качества
-и готовность пилота ещё не подтверждены; актуальные результаты в конце отчёта.
+Stage5 целиком не закрыт: подготовленные source/synthetic наборы проверены
+четырьмя дополнительными проходами, но независимая quality и pilot acceptance
+не подтверждены; актуальные результаты в конце отчёта.
 
 ## Что проверено
 
@@ -183,3 +184,25 @@ focused PHPStan, canonical CS и strict для двух тестов PASS.
 Это work items открытого Stage; full PHP gates и обязательный external review
 не повторялись на каждом work item. Новая live-оценка и финальный handoff
 остаются впереди. Сценарий выключен, новых production действий не выполнялось.
+
+
+## Четыре дополнительных прохода: текущий результат
+
+После первого прохода исправлены independent analytics и контекст локальной даты.
+На последних трёх проходах одной версии99cf27cde6/promptv5 все измеренные
+метрики совпали: source49/49candidates47/47amounts7/7directions, synthetic13/13exact
+rows,category13/13,project12/12,CFO12/12,date13/13,expectednull9/9,pair1/1,Q9/9.
+Ни одного rejected/providererror в этих трёх проходах. Первый проход сохранил
+ошибки synthetic4/5/7/9 и не выдаётся за результат v5.
+
+Fresh before/after каждого прохода совпали, своих контейнеров0. Никаких
+production migrations, изменений приложения/worker/флага/deploy. Четыре прохода
+из разрешённых четырёх завершены; unusedcallheadroom не разрешает пятый.
+Текущие локальные gates406PythonPASS/1skip,eval9PASS/1skip,ruff98/mypy57PASS;
+PHP66tests434assertions и focusedStan/CS/strict остаются последними релевантными
+для неизменных PHP-файлов. Исторические полные gates выше не объявляются
+проверкой текущей головы. Stage5 всё ещё открыт по независимому gold/holdout,
+живому TelegramE2E и pilot/release acceptance.
+
+[Полный актуальный отчёт](../live-eval-four-passes-2026-11-14.md),
+[ТЗ refinement](stage-5-semantic-refinement-spec.md).

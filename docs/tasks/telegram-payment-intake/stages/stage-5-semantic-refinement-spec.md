@@ -43,7 +43,7 @@ null/вопрос. Это не подстановка даты платежа п
 - [x] Prompt v5 immutable, v1–v4 неизменны, source manifest/hash обновлены.
 - [x] Targeted tests, format/lint/fullPython/evals, focused independent review.
 - [x] Commit/push/DraftPR; новый immutable bundle/offline preflight.
-- [ ] Проход2 с fresh receipts и общим estimated300RUB; не заявлять его результат
+- [x] Проход2 с fresh receipts и общим estimated300RUB; не заявлять его результат
   до фактического завершения. Проходы3/4 — на оставшиеся дефекты/проверку стабильности.
 
 ## Локальный результат перед проходом 2
@@ -55,3 +55,14 @@ null/вопрос. Это не подстановка даты платежа п
 mypy57 PASS. Финальный независимый focused review: B0/I0/M0. Verifier/preparation
 и публичная схема не ослаблены; v4 сохранён дословно как префикс v5.
 Живой результат v5 пока отсутствует; raw исходного v4 не восстанавливается.
+
+## Живой проход 2
+
+Source99cf27cde6, promptv5, bundle71files SHA
+15c72eb45fc1041347d04e1c98b3648c0b1b04c22ac9a6f4550a91084f467614.
+53calls:source49/49candidates47/47amounts7/7directions; synthetic13/13exactrows,
+category13/13,project12/12,CFO12/12,date13/13,null9/9,pair1/1,Q9/9.
+53needs_review,0reject/providererrors. Freshbefore/afterPASS,owncontainers0.
+Usageestimate5.33702479RUB; campaign269calls/22.07007099RUB.
+Проходы3/4 завершены на той же версии, каждый повторил все метрики прохода2.
+Fresh receipts всех проходов PASS; итог в отчёте четырёх проходов. Голд не менялся, прочие ограничения исходной приёмки сохраняются.
