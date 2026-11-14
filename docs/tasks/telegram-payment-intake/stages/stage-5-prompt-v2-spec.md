@@ -18,8 +18,8 @@ Acceptance:
 - [x] Generated schema equals actual PaymentOutput schema; direction enums visible.
 - [x] Current prompt id v2, original v1 file unchanged, HIGH/manual policy retained.
 - [x] Tests/lint/evals pass; manifest hashes rendered prompt, not only template.
-- [ ] Same10-case targeted run uses≤20 additional calls, campaign59+20≤82.
-- [ ] No claim of full-corpus/independent improvement from selected hard subset.
+- [x] Same10-case targeted run uses≤20 additional calls, campaign59+20≤82.
+- [x] No claim of full-corpus/independent improvement from selected hard subset.
 
 Additional safe diagnostics revalidate only the already obtained response in
 memory to record schema error types and trusted field paths; unknown field names
@@ -29,3 +29,7 @@ for this revalidation. Targeted47tests PASS; complete gates recorded after finis
 Fresh independent review of schema rendering B0/I0/M0; privacy-delta review follows.
 
 Final local gates:303testsPASS/1skip; eval9PASS/1skip; ruff91files and mypy55PASS. New task+helper regression47PASS. No PHP/contract/verifier/core changes.
+
+Actual run:10cases/12calls, campaign71/82. Mentions6/19,amounts5/18,direction6/7;
+not accepted as an aggregate improvement. Safe codes/paths identified remaining
+context/string-null errors. Privacy reviewB0/I0/M0. See subsequent v3spec/results.

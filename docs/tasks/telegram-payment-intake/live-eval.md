@@ -1,10 +1,11 @@
-# Live-eval action — first approved execution completed
+# Live-eval action — bounded trial completed, full v3 acceptance pending
 
 The runner is `python -m ai_service.evals.payment_intake`. It uses the existing
 TaskSpec, gateway, masking and Pipeline; it does not boot Symfony, open a database,
 write payments or read production credentials. Its default is an offline manifest
 of all 41 anonymized source cases, grouped by existing families. All families stay
-in holdout; no source example is injected into the prompt.
+in the corpus; after prompt tuning it is a development/regression set, not an
+unseen holdout. No source example is injected into the prompt.
 
 ```bash
 docker compose --profile services run --rm services-ai-service-dev \
@@ -86,3 +87,9 @@ Live model quality and pilot readiness remain pending until the approved run and
 its separately agreed acceptance criteria have been reviewed.
 
 Current14November execution/result and scorer correction: [live report](live-eval-result-2026-11-14.md). Earlier access-block notes describe the pre-approval state.
+
+Latest:81/82calls used; v3same10cases19/19candidates,18/18knownamounts,
+5/7directions,10needs_review/0rejected. Full41case v3 has NOT run. The prepared
+[bounded full-repeat request](live-eval-v3-full-request.md) needs call-cap and
+one-off isolated root-eval exception extension; it does not request a second key
+or any deploy/worker/migration change.

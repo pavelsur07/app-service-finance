@@ -12,7 +12,7 @@ Task base: `8a1f51cac4dacac4d49dd6b5cf72e0940d26a895`.
 | 2 | Задача Python внутри ai-service, структурированный вывод, Decimal/evidence checks | [ТЗ](stages/stage-2-spec.md), [отчёт](stages/stage-2.md) |
 | 3 | Cash drafts, правки, atomic/idempotent Confirm, recovery и бюджеты | [ТЗ](stages/stage-3-spec.md), [отчёт](stages/stage-3.md) |
 | 4 | Telegram actor/source binding, карточки, уточнения, durable polling/delivery | [ТЗ](stages/stage-4-spec.md), [отчёт](stages/stage-4.md) |
-| 5 | Локальная общая проверка и подготовка живого eval | [ТЗ](stages/stage-5-spec.md), [отчёт](stages/stage-5.md); живой eval pending |
+| 5 | Локальная общая проверка и живой eval, prompt v3 | [ТЗ](stages/stage-5-spec.md), [отчёт](stages/stage-5.md); полная live-приёмка v3 pending |
 
 ## Что изменено
 
@@ -51,7 +51,7 @@ Task base: `8a1f51cac4dacac4d49dd6b5cf72e0940d26a895`.
   до последних четырёх PHP regression tests handoff review.
 - Full canonical CS/strict types: **0/4153**; оба новых entity builders и
   unit helper также проверены focused PHPStan.
-- Python current: lint/format/mypy55 GREEN; **295 passed / 1 skipped**;
+- Python current: lint/format92files/mypy55 GREEN; **303 passed / 1 skipped**;
   offline eval9 passed / 1 skipped; targeted verifier/runner64 passed.
 - Local full PHPStan: incomplete worker / host OOM (не green). CI0984d7b62
   full static и остальные PHP gates PASS; baseline не расширялся.
@@ -74,16 +74,21 @@ open B0/I0/M0. Разные раунды могут описывать один 
 
 Флаг `TELEGRAM_PAYMENT_INTAKE_ENABLED=0` по умолчанию. Фото/OCR исключены v1.
 Short amounts/группировка/личные средства/неизвестный факт остаются вопросами;
-точность модели, latency p95 и стоимость ещё не подтверждены живым eval.
-Никаких live API или production изменений/processing не выполнялось.
+полная точность модели не установлена. Первый live41case-run и диагностика
+выполнены; v3на10cases:19/19candidates,18/18known amounts,5/7direction,
+10needs_review/0rejected. Это tuned development subset, не полная приёмка.
+Cumulative81/82calls; usage estimate4.81949560RUB, не invoice. Production
+processing/миграции/feature flag этой задачей не выполнялись.
 Flag глобальный + существующие AI grants; отдельного intake allowlist нет.
 Для более узкого независимого пилота сначала нужен company gate, а не молчаливое
 изменение общих AI grants. Доля черновиков с provenance=user измерима, полная
 история частоты событий редактирования не сохраняется; см. observability runbook.
 
-Следующий шаг — отдельно разрешённый ограниченный live eval на обезличенных
-41 сообщениях с выбранными provider/model/лимитами и локальным test token.
-Stage5 нельзя полностью закрыть/объявить пилот готовым до этого измерения.
+Следующий шаг — [полный повтор41сообщения на v3](live-eval-v3-full-request.md)
+после расширения согласованного call cap82→163, с тем же ключом и isolated
+app-host execution. Второй ключ не требуется. Пока остаётся1call, полный run
+не помещается. Stage5/pilot не принимается до полного измерения и end-to-end
+проверки; partial gold не даёт точности аналитики/дат/precision.
 [Runbook](runbook.md) содержит recovery, очередь, условия включения и откат.
 
 После успешного live eval для выпуска нужны отдельный production worker нового
@@ -97,20 +102,25 @@ runner self-review B0/I1; external B1/I15 по пяти раундам, open B0/
 Task commits до final Stage5: dbfc6d5ff, 1b326aa9a, 0264aed23, 5fff92c58,
 0984d7b62; final code commit доступен в голове той же ветки/PR.
 
-Final runtime code: `7031b52992cbf7fadc6cbb27a516c987c5dcd73c`.
-Automatic PR CI did not start for that push. Manual workflow43500484323 with
-production_action=none skipped every path gate; its SUCCESS is explicitly not
-accepted as a test/static result. A documentation checkpoint push retriggers
-normal PR validation; actual current-head receipt belongs in PR/final response.
+Current runtime source: `bd490a8fbd3ddd1d511046bae7c337e0fb958b34` (promptv3).
+Source4160b4e08CI43557018107 SUCCESS:fullPHP/Python/empty-DB gates; production
+schema/migrations/deploySKIPPED. V3localgates green; exact-headCI is recorded
+separately. Manual none43500484323 was not counted as validation.
 
-## Owner approval14November and execution preflight
+## Live execution14November
 
-The owner approved the bounded DeepSeek trial and explicitly authorized reuse of
-the existing gateway key. No new credential is requested. Current tariff/FX and
-source bundle are verified in [preflight](live-eval-preflight-2026-11-14.md).
-Dev host gets gateway403 and has no token; the available production wrappers
-contain no Python eval entrypoint. Actual trial remains unexecuted, calls0; next
-required operator action is a narrow app-host execution entrypoint or operator
-execution of the prepared bounded command. No permission broadening performed.
+The owner approved the bounded trial, existing key and a named one-off root-SSH
+exception for isolated evaluation. No persistent wrapper/access/settings changes.
+First41cases/45calls, targeteddiagnostic14,v212,v3split5+5:81/82total.
+[Full measurements and caveats](live-eval-result-2026-11-14.md) retain all versions,
+actual source hashes, safe diagnostics and the scorer correction.
 
-Current14November execution/result and scorer correction: [live report](live-eval-result-2026-11-14.md). Earlier access-block notes describe the pre-approval state.
+Final operational postcheck:own evalcontainers0,APIhealthy/workerrunning,
+image/user/network/restart unchanged. Exact initial-state comparison FAILED
+because both started_at changed at04:30UTC, coincident with independent master
+workflow_dispatch43555954635deploy. Do not claim all fields unchanged. No repair,
+restart or deploy was performed by our eval harness; see the receipt/report.
+
+Fresh focused review of each eval/scorer/privacy/prompt deltaB0/I0/M0. These are
+Work-item reviews, not a completed Stage5 or final handoff acceptance. PR remains
+Draft. No additional paid run beyond the approved cap and no merge request yet.

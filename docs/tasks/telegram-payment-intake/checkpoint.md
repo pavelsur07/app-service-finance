@@ -230,3 +230,46 @@ Offline manifest41cases/0calls/currentv3; initial absolute output path failed
 FileNotFoundError, corrected relative path passed (no calls). Ready to commit
 local delta then bundle66files and run five declared IDs max10 with guard71.
 Schema/verifier/v1/v2 unchanged byte-for-byte; quality still requires live proof.
+
+V3first5 completed5calls,14/14mentions and amounts,5needs_review/0rejected;
+sourcebd490a8fb,bundle202aad82c69189c11dcff036e4f38c07c2a461ba97b049ed3320c6cc6e3d96dd.
+Campaign76/82,6remaining. Next validateother5originaldiagnosticIDs001/004/005/027/041
+samebundle max6, guard76. Separate controls report/helper, no overwritten first
+artifacts. Afterwards postcheck existing containers, reportactualresults, update
+PR/checkpoint/handoff. Full41v3 acceptance still absent and pilotOFF.
+
+2026-11-14 CURRENT: v3control5 completed5calls, totalcampaign81/82,1remaining,
+noactive_run. Combined10development cases19/19mentions,18/18literal amounts,
+5/7direction,1/1scale abstention,4/4marked-question presence.10needs_review,
+0rejected, no failed schema/check codes. Known usageestimateallruns4.81949560RUB,
+not invoice. Summary live-eval-2026-11-14-v3-summary.json; currentruntimebd490a8fb.
+Stage5/pilot NOT accepted: full41v3/end-to-end/fullanalyticalgold still pending.
+
+Post-eval metadata:owncontainers0,APIhealthy/workerrunning; image/user/network/
+restartsame. Exact unchanged check FAILED due started_at04:30UTC for both,
+coinciding with independent master manualdeploy43555954635(04:25:54–04:30:36).
+No production repair/restart; preserve actualreceipt after-final.json. State
+change attributed only as inference from dates/jobs, not a proven causal trace.
+
+Next required paid action does NOT fit remaining1call. Prepared but NOT executed:
+live-eval-v3-full-request.md, ignoredexecute-proposed-prompt-v3-full-eval.py and
+proposed-prompt-v3-full-eval-plan.json. Same66filebundleSHA202aad82c69189c11dcff036e4f38c07c2a461ba97b049ed3320c6cc6e3d96dd,
+sourcebd490a8fb; all41case/max82newcalls,campaigncap82→163,still300RUBestimate,
+existingkey/isolatedrootSSH exception needs NAMED EXTENSION approval. Default
+plan-only verifiedSSH0/model0. Do not run --execute-approved-extended-trial until
+owner approves this scope. After approval continue pipeline within this trial:
+executeonce→results→safecontainerspostcheck→acceptanceanalysis→docs/PR.
+Do not repeat if unknownoutput;guard reserves full82after uncertain failure.
+No merge/deploy/worker/migration/flag authorization by trial approval.
+
+Currentlocalchecks303PASS/1skip,eval9PASS/1skip,ruff92/mypy55PASS; freshpromptv3
+reviewB0/I0/M0. Exact4160CI43557018107SUCCESS,proddeploySKIPPED. Sourcebd490CI
+not yet observed; no false exact-headgreen. Remaining authorized work in this
+session: finish docs self-review/checks/commit/push/update singleDraftPR, then
+report status and request only the concrete trial-limit extension above.
+
+Docs/result/self-review complete: links/counts/hashes/ledger guard PASS; no new
+B/I/M. New full-run helper plan-only output confirms0SSH/0calls; global cap still82,
+used81. Continuation docs commit/push/PR update authorized; final report asks only
+named extension per live-eval-v3-full-request.md. No further local code changes
+needed before that live acceptance run; preserve existing owner-untracked files.

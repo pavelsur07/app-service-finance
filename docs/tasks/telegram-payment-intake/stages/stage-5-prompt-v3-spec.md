@@ -26,10 +26,10 @@ Acceptance checklist:
 - [x] New immutable v3 selected; v1/v2 byte-identical to their committed versions.
 - [x] Existing Python lint/tests/evals pass, output schema and verifier unchanged.
 - [x] Offline manifest updated with current rendered prompt/source hashes.
-- [ ] Same-provider run on009/011/016/022 and026(control), at most10calls, campaign
+- [x] Same-provider run on009/011/016/022 and026(control), at most10calls, campaign
       total<=81/82. Never repeat after an uncertain outcome.
-- [ ] Record every case's safe verdict/check code/count and campaign balance.
-- [ ] Do not infer full-corpus quality, precision or generalization from tuning.
+- [x] Record every case's safe verdict/check code/count and campaign balance.
+- [x] Do not infer full-corpus quality, precision or generalization from tuning.
 - [ ] Final read-only metadata confirms existing API/worker unchanged and no own
       disposable eval container remains.
 
@@ -44,3 +44,19 @@ Independent focused review B0/I0/M0. The first offline manifest command used an
 incorrect container path and returned runner_error/FileNotFoundError (no network);
 corrected relative path succeeded with41cases/0calls. Verifier/schema/older
 prompts byte-compared against HEAD and unchanged. No PHP changes or gate rerun.
+
+The declared five-case run completed5calls:14/14verified mentions and14/14literal
+amounts,5needs_review/0rejected, no failed schema/check codes. No direction inferred
+for ambiguous cases. Campaign76used/6remaining. To use the already approved
+remaining allowance, validate the other five IDs from the original diagnostic10:
+001/004/005/027/041, same exact v3 bundle/source, max6calls with guard76+6<=82.
+This adds no corpus/provider/key/scope. Combined development10 still cannot serve
+as a full-corpus or unseen acceptance claim.
+
+Controls completed5calls; cumulative81/82,1remaining. Combined10cases:19/19
+candidates,18/18amounts,5/7direction,10needs_review/0rejected. Current prompt
+quality beyond this tuned subset is unmeasured. Evalcontainer0; existing API
+healthy/worker running, image/user/network/restart unchanged but started_at differs
+from initial receipt, coincident with independent master deploy43555954635.
+Therefore the exact-unchanged checkbox remains open, with the actual discrepancy
+and inference recorded in live-eval-result; no production repair is authorized.
