@@ -1,8 +1,9 @@
 import json
+from dataclasses import replace
 
 import pytest
 
-from ai_service.core.pipeline import Pipeline
+from ai_service.core.pipeline import SCHEMA_CHECK, Pipeline
 from ai_service.core.prompt import Prompt, data_block, extract_data_block
 from ai_service.core.task import Risk, TaskRegistry, TaskSpec
 from ai_service.llm.adapters.stub import StubAdapter
@@ -11,7 +12,7 @@ from ai_service.llm.routes import parse_routing
 from ai_service.llm.types import LlmRequest, LlmResponse, LlmUnavailableError
 from ai_service.tasks.echo import task as echo
 from ai_service.tasks.echo.schemas import EchoInput, EchoOutput
-from ai_service.verification.checks import CheckResult, Severity, Verdict, decide
+from ai_service.verification.checks import CheckContext, CheckResult, Severity, Verdict, decide
 
 COMPANY = "0192f0a0-0000-7000-8000-0000000000c1"
 
@@ -150,3 +151,32 @@ def test_masked_input_breaking_task_schema_fails_without_llm_call() -> None:
     outcome = Pipeline(TaskRegistry([echo.build()]), gateway("stub/fail")).run("echo", COMPANY, {"text": text})
     assert (outcome.verdict, outcome.error_code) == (Verdict.FAILED, "masking_invalid")
     assert "a@b.ru" not in json.dumps(outcome.trace, ensure_ascii=False)
+
+
+def test_task_output_preparation_runs_before_checks_with_real_context() -> None:
+    def prepare(inp: EchoInput, out: EchoOutput, ctx: CheckContext) -> EchoOutput:
+        assert ctx.company_id == COMPANY
+        assert ctx.task_type == "echo"
+        return out.model_copy(update={"text": inp.text})
+
+    adapter = SequenceAdapter(['{"text":"другое"}'])
+    spec = replace(echo.build(), prepare_output=prepare)
+    outcome = Pipeline(TaskRegistry([spec]), gateway("stub/x", {"stub": adapter})).run("echo", COMPANY, {"text": "a"})
+    assert outcome.verdict is Verdict.ACCEPTED
+    assert outcome.output == {"text": "a"}
+    assert outcome.trace["output_prepared"] is True
+    assert len(outcome.trace["responses"]) == 1
+
+
+def test_prepared_output_is_revalidated_without_another_generation() -> None:
+    def prepare(inp: EchoInput, out: EchoOutput, ctx: CheckContext) -> EchoOutput:
+        return out.model_copy(update={"text": None})
+
+    adapter = SequenceAdapter(['{"text":"a"}'])
+    spec = replace(echo.build(), prepare_output=prepare)
+    outcome = Pipeline(TaskRegistry([spec]), gateway("stub/x", {"stub": adapter})).run("echo", COMPANY, {"text": "a"})
+    assert outcome.verdict is Verdict.REJECTED
+    assert outcome.output is None
+    assert any(c.name == SCHEMA_CHECK and not c.passed for c in outcome.checks)
+    assert outcome.trace["output_prepare_failed"] is True
+    assert len(outcome.trace["responses"]) == 1

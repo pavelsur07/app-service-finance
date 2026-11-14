@@ -1,7 +1,7 @@
-"""Общий pipeline задачи: prepare → generate → parse → verify → decide → finalize (ТЗ §5).
+"""Общий pipeline задачи: prepare → generate → parse → prepare_output → verify → decide → finalize (ТЗ §5).
 
 Ни одна задача не обходит проверки: шаги заданы здесь, задача поставляет только
-схемы, промпт и свои проверки. Запись результата и трассы — у worker'а.
+схемы, промпт, необязательную подготовку вывода и свои проверки. Запись результата и трассы — у worker'а.
 """
 
 import time
@@ -107,6 +107,21 @@ class Pipeline:
         usage_in = sum(c.input_tokens for c in calls)
         usage_out = sum(c.output_tokens for c in calls)
 
+        context = CheckContext(company_id=company_id, task_type=spec.task_type)
+        prepare_output = spec.prepare_output
+        if output is not None and prepare_output is not None:
+            original = output.model_dump(mode="json")
+            try:
+                prepared = prepare_output(masked_input, output, context)
+                output = spec.output_model.model_validate(prepared.model_dump(mode="json", warnings=False))
+            except ValidationError as error:
+                parse_error = f"prepared output: {error.error_count()} validation error(s)"
+                trace["output_prepare_failed"] = True
+                output = None
+                log.warning("prepared_output_invalid", task_type=spec.task_type, errors=error.error_count())
+            else:
+                trace["output_prepared"] = output.model_dump(mode="json") != original
+
         if output is None:
             checks = [CheckResult(SCHEMA_CHECK, False, Severity.BLOCK, parse_error)]
             trace.update(checks=[c.as_dict() for c in checks], verdict=Verdict.REJECTED.value)
@@ -121,7 +136,6 @@ class Pipeline:
             )
 
         # verify + decide
-        context = CheckContext(company_id=company_id, task_type=spec.task_type)
         checks = [CheckResult(SCHEMA_CHECK, True, Severity.BLOCK)]
         checks += [check(masked_input, output, context) for check in spec.checks]
         confidence: float | None = spec.confidence(masked_input, output)

@@ -191,6 +191,20 @@ class TaskStore:
                 (after, limit),
             ).fetchall()
 
+    def result_for_task(self, conn: Connection[Any], company_id: UUID, task_id: UUID) -> dict[str, Any] | None:
+        """Unacked result restricted to the owning company; pending/unknown/acked are indistinguishable."""
+        with conn.cursor(row_factory=dict_row) as cur:
+            return cur.execute(
+                """
+                SELECT r.seq, t.id AS task_id, t.task_type, t.company_id, r.status, r.output, r.checks,
+                       r.confidence, t.trace_id, r.models, r.prompt_version, r.input_tokens, r.output_tokens,
+                       r.error_code, r.completed_at
+                FROM ai_result r JOIN ai_task t ON t.id = r.task_id
+                WHERE r.acked_at IS NULL AND t.company_id = %s AND t.id = %s
+                """,
+                (company_id, task_id),
+            ).fetchone()
+
     def ack(self, conn: Connection[Any], task_ids: list[UUID]) -> int:
         """Подтверждение приёма: output обнуляется (retention), повторный ack ничего не меняет."""
         with conn.transaction():

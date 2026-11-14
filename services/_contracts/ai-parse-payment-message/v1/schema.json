@@ -1,0 +1,366 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vashfindir.ru/contracts/ai-parse-payment-message/v1/schema.json",
+  "$defs": {
+    "Named": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "Category": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "direction": {
+          "enum": [
+            "inflow",
+            "outflow",
+            "any"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "direction"
+      ]
+    },
+    "AllowedPair": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "cfo_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "project_id",
+        "cfo_id"
+      ]
+    },
+    "DraftItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "description": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 1024
+        }
+      },
+      "required": [
+        "ref",
+        "description"
+      ]
+    },
+    "Item": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "text_evidence": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16000
+        },
+        "amount_evidence": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^\\d{1,16}\\.\\d{2}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "date": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "direction": {
+          "enum": [
+            "inflow",
+            "outflow",
+            null
+          ]
+        },
+        "execution_status": {
+          "enum": [
+            "paid",
+            "planned",
+            "unknown"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 1024
+        },
+        "category_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "project_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cfo_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "maxItems": 50
+        }
+      },
+      "required": [
+        "ref",
+        "text_evidence",
+        "amount_evidence",
+        "amount",
+        "currency",
+        "date",
+        "direction",
+        "execution_status",
+        "description",
+        "category_id",
+        "project_id",
+        "cfo_id",
+        "questions"
+      ]
+    },
+    "Payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16000
+        },
+        "reference_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Category"
+          },
+          "maxItems": 1000
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Named"
+          },
+          "maxItems": 1000
+        },
+        "cfos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Named"
+          },
+          "maxItems": 1000
+        },
+        "allowed_pairs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AllowedPair"
+          },
+          "maxItems": 10000
+        },
+        "draft_items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DraftItem"
+          },
+          "maxItems": 50
+        }
+      },
+      "required": [
+        "text",
+        "reference_at",
+        "timezone",
+        "currency",
+        "categories",
+        "projects",
+        "cfos",
+        "allowed_pairs",
+        "draft_items"
+      ]
+    },
+    "Output": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "intent": {
+          "enum": [
+            "payments",
+            "correction",
+            "no_payment"
+          ]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Item"
+          },
+          "maxItems": 50
+        },
+        "target_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "maxItems": 50
+        }
+      },
+      "required": [
+        "intent",
+        "items",
+        "target_ref",
+        "questions"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Payload"
+    },
+    {
+      "$ref": "#/$defs/Output"
+    }
+  ]
+}

@@ -488,7 +488,9 @@
 - `AiTaskFacadeInterface::PLATFORM_COMPANY_ID` — компания платформы для задач по общим данным
   (справочник кодов маркетплейсов): включена вместе с сервисом, без строки в `ai_company_access`;
   расход в `ai_usage` под этим id входит только в общий лимит, бюджет клиентов не трогает.
-- `SubmitAiTaskMessage` → `async_sync`. `SubmitAiTaskHandler` — `POST /internal/tasks`
+- `SubmitAiTaskMessage` → `async_sync` по умолчанию; `parse_payment_message`
+  получает TransportNamesStamp `async_payment_intake` (3 повтора с задержкой
+  2 секунды). `SubmitAiTaskHandler` — `POST /internal/tasks`
   с `Idempotency-Key`: сервис недоступен → исключение без Recoverable-маркера
   (повторы по `max_retries` транспорта, затем `failed`; Recoverable обходит
   лимит), выключено для компании → сообщение снимается с WARNING, отказ
@@ -4052,6 +4054,145 @@ buildQueryBuilder(
 
 ## Telegram → Cash: контракт интеграции
 
+### PaymentIntake: текстовые черновики
+
+Для компаний с существующим доступом к ai-service текст обрабатывается как черновик
+Cash PaymentIntake. Python `parse_payment_message` выполняется внутри существующего
+ai-service; payload/output — `services/_contracts/ai-parse-payment-message/v1`.
+Конверт `ai-task/v1` не изменён. Модель возвращает предложения с доказательными
+фрагментами; деньги записывает только Symfony после подтверждения факта оплаты.
+Промпт `parse_payment_message/v5` включает JSON Schema, автоматически полученную
+из PaymentOutput; v1–v4 сохранены. Внутренний model data block дополнен
+`reference_local_date`, вычисленной общей с verifier функцией из reference_at
+и timezone; публичный PaymentInput не расширяется. Эта дата задаёт основу
+относительных выражений, но не является датой платежа по умолчанию. Версия и хеш полного system prompt входят в eval.
+Проверка справочного итога действует и при неизвестной сумме. После schema parse
+необязательный `TaskSpec.prepare_output` готовит безопасное предложение; только
+PaymentIntake подключает такую подготовку. Неподтверждённые дата/направление/paid
+становятся null/unknown с явными вопросами, несовместимая разрешённая статья —
+null; суммы/валюты/новые положительные факты не подставляются. Справочный итог
+исключается с явным сообщением; чистая привязка того же числа к настоящему
+платежу сохраняется. Затем снова outputschema и полный verifier. ЧужиеID,
+неверные суммы/currency/доказательства, duplicate refs и forbiddenpair не
+маскируются подготовкой. Вопросы не обрезаются, overflowоставляет исходный отказ.
+Подготовка добавляет в trace только boolean `output_prepared`/`output_prepare_failed`; исходный ответ
+не мутирует. Остальные задачи с `prepare_output=None` проходят прежний путь.
+Техническая проверка качества использует отдельный контракт
+`services/_contracts/ai-eval-run/v1`: POST `/internal/eval-runs`, GET
+`/internal/eval-runs/latest?suite=payment_intake` и GET по run_id. Existing
+Bearer auth; запрос не принимает company/payload/models/prices/limits/paths.
+Daily identity — одна suite/date с canonical idempotency key; конфликт
+содержимого или configuration_fingerprint возвращает409. Флаги и лимиты —
+`AI_SERVICE_EVAL_ENABLED` (default0), `AI_SERVICE_EVAL_DAILY_LIMIT_RUB` (30max),
+`AI_SERVICE_EVAL_MONTHLY_LIMIT_RUB` (900max). Периоды Europe/Moscow.
+
+`python -m ai_service eval-worker` отдельно выполняет technical jobs из
+ai_eval_run. Business ai_task/result/trace и потребители Cash не участвуют.
+До каждого HTTP atomic reserve в ai_eval_call и месячном/дневном budget;
+известная usage заменяет резерв точной Decimal-оценкой, неизвестная сохраняет
+полный резерв. Отдельные модели реального маршрута и все datasets делят лимиты.
+164calls/job и82/model, lease/attempt fencing, terminal result immutable;
+истёкший job становится incomplete и не повторяет ранее оплаченные cases.
+
+Symfony ServiceGateway получает результаты через AiServiceClient и строгий
+AiEvalV1Parser. Глобальные технические сущности AiQualityMonitor/AiQualityRun
+(`ai_quality_monitor`, `ai_quality_run`) не содержат company/finance данных.
+AiQualityAction сохраняет UUID/trace до POST и ключ payment_intake:YYYY-MM-DD;
+повторы используют исходные значения, canonical remote ID возвращается сервисом.
+Pull revision фиксируется до HTTP: старый ответ или ошибка не могут заменить
+новое наблюдение конфигурации. Дневная запись также защищена remote_updated_at.
+Проекция отчёта содержит status/coverage, fingerprint и до 100 safe failure
+entries на модель (case IDs, metric names, counts); raw input/output не копируется.
+
+Команды `app:ai-service:quality:request` и `:pull` идут каждые пять минут;
+постановка начинается с 03:25 МСК. `:health-check` — ежечасно в :45, до 04:00
+оценивает вчерашнюю дату, затем сегодняшнюю; свежесть pull — 20 минут.
+Старый fingerprint, неполный/отсутствующий отчёт и pending не считаются PASSED.
+Инциденты дедуплицируются в БД, ERROR — в существующий GlitchTip; budget skip —
+WARNING, восстановление — INFO. Флаги проверяются независимо от AI grants компаний.
+Отдельный eval-worker использует тот же image/env, restart:on-failure и grace960s;
+disabled exit0 не образует restart loop. Код и prices обновляются только
+перезапуском API и worker одного immutable image, hot patch не поддерживается.
+
+Runtime fixtures/manifest находятся в AI_SERVICE_EVALS_DIR/parse_payment_message/
+runtime, exporter/check/validator — ai_service.evals.payment_intake_assets.
+Canonical source41/semantic12 и human-reviewed additions hash-pinned; pending
+не регистрируется, expected fields не передаются модели. Обычный runtime/wheel
+не читает docs или исходники контрактов checkout. Набор с неизвестной суммой
+может хранить amountnull с вопросом и проверяемым anchor. Auto gold/model/prompt
+updates и auto-disable не реализованы. Ночной scheduler ещё не подключён.
+
+Дополнительный rollout-переключатель `TELEGRAM_PAYMENT_INTAKE_ENABLED` по
+умолчанию `0` (только test env `1`). Его включение до live-eval приёмки не
+является частью обычного доступа компании к ИИ. Если новый сценарий выбран,
+его недоступность не включает автоматически legacy запись первой цифры.
+Переключатель глобальный; отдельного company allowlist для intake нет, охват
+при включении задают существующие AI grants. Более узкий независимый пилот
+требует отдельного company gate до включения, без изменения общих grants молча.
+
+`CashFacade` предоставляет request/get/amend/confirm/cancel сценарии черновика
+через DTO `Application/DTO/PaymentIntake`. Компания и пользователь приходят из
+авторизованной привязки; runtime-уточнения сохраняют финансовую неоднозначность.
+Cash владеет транзакциями; общий opaque `sourceKey` закрепляет первоначальную
+компанию и actor независимо от канала. `RequestPaymentIntakeCommand` принимает
+companyId, actorUserId, moneyAccountId, sourceKey, text, receivedAt, sourceRevision
+и timezone. Ключ непустой, до255байт, без управляющих символов; namespace задаёт
+серверный адаптер. TelegramPaymentIntakeSource сохраняет прежние bot/chat/message
+identity bytes, другие каналы используют собственный namespace. Stable ID строк и revision защищают
+повторы и конкурирующие изменения. Confirm сохраняет весь выбранный пакет
+в одной транзакции; ключи строк дают повтору прежние transaction IDs.
+
+`CashFacade::findPaymentIntakeDraftBySource(sourceKey, actorUserId)` возвращает
+авторизованный PaymentIntakeDraftView или null.
+`CashFacade::hasPaymentIntakeSource(sourceKey, ?replyIdempotencyKey=null): bool` возвращает
+только глобальный признак владения исходным сообщением или обработанным reply,
+без данных компании. Reply key передаётся адаптером явно; Telegram сохраняет
+строку `telegram:bot:chat:message` до SHA256. Этот DBAL guard работает и после удаления Telegram binding/
+session и закрывает legacy fallback. `AmendPaymentIntakeDraftCommand` принимает
+необязательный `replyIdempotencyKey`: Cash атомарно сохраняет amendment и
+`PaymentIntakeReplyReceipt` (UUIDv7, глобально уникальный SHA256 reply key).
+Повтор reply не изменяет другую выбранную строку/черновик. Receipt связан FK
+с Cash draft с ON DELETE CASCADE; исходный sourceRevision при reply не меняется.
+
+Telegram-привязка нового сценария содержит actual actorUserId приложения,
+перенесённый из ссылки авторизованного инициатора; старые null-привязки требуют
+перепривязки. Владелец компании не подставляется вместо отсутствующего actor.
+Права на финансы проверяются повторно при чтении/изменении/подтверждении.
+
+Быстрый pull результата: `AiTaskResultFacadeInterface::refreshTask(companyId,
+taskId): bool` → company-scoped GET `/internal/tasks/{taskId}/result` → обычный
+`results_page`. Несовпадение company/task или нарушение контракта отклоняется
+до consumer. `ImportAiResultsAction::importResult` использует существующую
+транзакцию consumer + ai_usage, затем ack. HTTP вне DB-транзакции.
+Consumer PaymentIntake только меняет текущую revision/attempt; повтор/старый
+результат не переписывает ручной выбор. Обычный периодический импорт сохраняется.
+
+`RefreshPaymentIntakeMessage` идёт через `async_payment_intake` (Doctrine,
+существующая таблица Messenger, queue_name=payment_intake, auto_setup=false,
+retry 2 секунды). `AiTaskFacade::requestTask` только для parse_payment_message
+ставит TransportNamesStamp этого транспорта; остальные типы сохраняют routing.
+Webhook не ждёт модель и не спит. Production worker нового транспорта требует
+именованного одобрения и запуска до включения пилота; код не меняет prod workers.
+Состояние доставки
+Telegram хранится отдельно от факта сохранения операций. Недоставка ответа
+не запускает сохранение повторно. Каждая новая необходимость доставки меняет
+delivery_request_token; после HTTP worker перечитывает session под блокировкой
+и проверяет token, generation, sequence и текущую revision/status черновика.
+Отправка старой карточки не сбрасывает более новый запрос доставки.
+Pending dispatch/event intent долговечен;
+recovery повторяет исходный task key/payload, не создаёт новый платёж.
+Интерактивный `CashFacade::recoverPaymentIntakeDraft(companyId, actorUserId,
+draftId): int` проверяет владельца и восстанавливает только этот черновик.
+Полный обход компании выполняют только доверенные recovery commands с keyset
+pagination и изоляцией ошибок. Не получивший результата queued-запрос может
+быть повторно поставлен через 60 секунд по last_enqueued_at с прежним ключом;
+бюджет проверяется при новых попытках, но не отменяет уже допущенную работу.
+
+Legacy-путь ниже остаётся отдельным контрактом для прежнего сценария; outage
+нового сценария не должен молча переводить запрос в парсер первой цифры.
+
+### Legacy: одна операция из сообщения
+
 Telegram создаёт ДДС-транзакции только через цепочку:
 
 `TelegramWebhookController` → `CreateTelegramCashTransactionAction` → `CashFacade::createTransaction()`.
@@ -5517,7 +5658,8 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 
 | Транспорт | Воркер (`messenger:consume`) | Что идёт |
 |---|---|---|
-| `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad, постановка задач ai-service (`SubmitAiTaskMessage`), проверка платежей ЮKassa (`ApplyYooKassaPaymentMessage`) |
+| `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad, задачи ai-service кроме parse_payment_message (`SubmitAiTaskMessage`), проверка платежей ЮKassa (`ApplyYooKassaPaymentMessage`) |
+| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake` (profile payment-intake); production worker требует отдельного одобрения | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Worker `messenger:consume async_payment_intake` обязан работать до включения TELEGRAM_PAYMENT_INTAKE_ENABLED; перед пилотом также согласовать company-scoped расписание `app:cash:recover-payment-intake` и `app:telegram:recover-payment-intake` (processing commands) |
 | `async_pipeline` | `async_pipeline` | Локальная DB-обработка: Process*-сообщения Marketplace, Ads raw, нормализация inventory, auto-rules, ImportProducts |
 | `async_wb_finance` | `async_wb_finance` | `SyncWbFinancialReportDayMessage` (retry до 20 раз) |
 | `async_ads` | `async_ads` | Ozon Performance polling (`LoadOzonAdStatisticsRangeMessage`, `FetchOzonAdStatisticsMessage`, `RequestOzonAdBatchMessage`) |
@@ -5831,6 +5973,8 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Дата | Область | Решение | Причина |
 |---|---|---|---|
+| 2026-11-14 | ai-service / technical eval | Ночная проверка имеет отдельные ai_eval_run/ai_eval_budget/ai_eval_call и eval-worker того же image; ai-task/company usage не используются. Резерв до HTTP, settlement известной usage, неизвестный резерв сохраняется; caps30/day900/month MSK,164/job82/model. API вычисляет общий с worker fingerprint; terminal report immutable, lease expiry не повторяет оплаченные cases. | Согласованный владельцем технический контроль качества и расходов, без платёжных сумм/ПДн в state; бизнесочередь не блокируется. |
+| 2026-11-14 | ai-service / PaymentIntake | Необязательный `TaskSpec.prepare_output(input, output, CheckContext)` после parse и до неизменных checks; результат повторно валидируется outputschema. PaymentIntake переводит неподтверждённые optionalполя в null/unknown+вопрос и явно исключает справочные итоги; критические ошибки денег/ID/privacy остаются отказом. Остальные задачи defaultNone. | Нельзя терять проверяемые кандидаты из-за неподтверждённого paid или принимать reference total как новый платёж; окончательный финансовый факт подтверждает человек вSymfony. |
 | 2026-03-28 | Infrastructure | Redis: БД0=сессии, `/messages`=Messenger, `prefix=symfony-locks`=Lock | Изоляция назначений, один инстанс |
 | 2026-03-28 | Infrastructure | Messenger worker: `--time-limit=3600`, `restart: always` | Утечки памяти при долгих воркерах |
 | 2026-04-23 | MarketplaceAds | Ozon batch: один POST на один `RequestOzonAdBatchMessage` | Ozon лимит «1 активная выгрузка на аккаунт», FIFO Redis сериализует |

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\ServiceGateway\Infrastructure\Client;
 
+use App\ServiceGateway\Application\DTO\AiEvalAccepted;
+use App\ServiceGateway\Application\DTO\AiEvalLatest;
+use App\ServiceGateway\Application\DTO\AiEvalRun;
 use App\ServiceGateway\Application\DTO\AiResultsPage;
 use App\ServiceGateway\Application\DTO\AiTaskAccepted;
 use App\ServiceGateway\Exception\AiTaskRejectedException;
@@ -35,6 +38,7 @@ final readonly class AiServiceClient implements AiServiceClientInterface
         private ?string $baseUrl,
         #[Autowire('%env(default::AI_SERVICE_API_TOKEN)%')]
         private ?string $token,
+        private AiEvalV1Parser $evalParser = new AiEvalV1Parser(),
     ) {
     }
 
@@ -77,10 +81,57 @@ final readonly class AiServiceClient implements AiServiceClientInterface
         return $body->acked;
     }
 
+    public function fetchTaskResults(string $companyId, string $taskId): AiResultsPage
+    {
+        \Webmozart\Assert\Assert::uuid($companyId);
+        \Webmozart\Assert\Assert::uuid($taskId);
+        $body = $this->request('GET', '/internal/tasks/'.$taskId.'/result', Uuid::uuid7()->toString(), [
+            'query' => ['company_id' => strtolower($companyId)],
+        ], 200);
+
+        return $this->parser->parseResultsPage($body);
+    }
+
+    public function submitEvalRun(string $runId, string $runDate, string $traceId, string $key): AiEvalAccepted
+    {
+        \Webmozart\Assert\Assert::uuid($runId);
+        \Webmozart\Assert\Assert::uuid($traceId);
+        $body = $this->request('POST', '/internal/eval-runs', $traceId, [
+            'json' => [
+                'contract_version' => 'v1',
+                'run_id' => $runId,
+                'suite' => 'payment_intake',
+                'run_date' => $runDate,
+                'trace_id' => $traceId,
+                'idempotency_key' => $key,
+            ],
+            'headers' => ['Idempotency-Key' => $key],
+        ], 202, AiEvalV1Parser::CONTRACT);
+
+        return $this->evalParser->parseAccepted($body);
+    }
+
+    public function fetchEvalRun(string $runId): AiEvalRun
+    {
+        \Webmozart\Assert\Assert::uuid($runId);
+        $body = $this->request('GET', '/internal/eval-runs/'.$runId, Uuid::uuid7()->toString(), [], 200, AiEvalV1Parser::CONTRACT);
+
+        return $this->evalParser->parseRun($body);
+    }
+
+    public function fetchLatestEvalRun(): AiEvalLatest
+    {
+        $body = $this->request('GET', '/internal/eval-runs/latest', Uuid::uuid7()->toString(), [
+            'query' => ['suite' => 'payment_intake'],
+        ], 200, AiEvalV1Parser::CONTRACT);
+
+        return $this->evalParser->parseLatest($body);
+    }
+
     /**
      * @param array<string, mixed> $options
      */
-    private function request(string $method, string $path, string $traceId, array $options, int $expectedStatus): mixed
+    private function request(string $method, string $path, string $traceId, array $options, int $expectedStatus, string $contract = AiTaskV1Parser::CONTRACT): mixed
     {
         if ('' === (string) $this->baseUrl || '' === (string) $this->token) {
             throw ServiceUnavailableException::notConfigured(self::SERVICE);
@@ -125,7 +176,7 @@ final readonly class AiServiceClient implements AiServiceClientInterface
         try {
             return json_decode($content, false, 64, \JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
-            throw ContractViolationException::at(AiTaskV1Parser::CONTRACT, '$', 'response is not JSON');
+            throw ContractViolationException::at($contract, '$', 'response is not JSON');
         }
     }
 

@@ -76,3 +76,28 @@ def test_evals_compare_reads_sets_from_evals_dir_env(tmp_path: Path, monkeypatch
     assert entry.main(args) == 2  # пустой каталог — наборов нет
     monkeypatch.setenv("AI_SERVICE_EVALS_DIR", str(dev_routes.parents[1] / "evals"))
     assert entry.main(args) == 0
+
+
+@pytest.mark.parametrize("command", ["eval-worker", "worker"])
+@pytest.mark.parametrize("timeout", [30, 120])
+def test_nightly_caps_adapter_timeout_without_changing_business_worker(
+    command: str, timeout: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from contextlib import nullcontext
+    from unittest.mock import Mock
+
+    dev_routes = Path(entry.__file__).resolve().parents[2] / "config" / "routes.dev.yaml"
+    monkeypatch.setenv("AI_SERVICE_ROUTES_FILE", str(dev_routes))
+    monkeypatch.setenv("AI_SERVICE_DB_DSN", "postgresql://nobody@127.0.0.1:1/none")
+    monkeypatch.setenv("AI_SERVICE_API_TOKEN", "a" * 32)
+    monkeypatch.setenv("AI_SERVICE_EVAL_ENABLED", "true")
+    monkeypatch.setenv("AI_SERVICE_LLM_TIMEOUT_SECONDS", str(timeout))
+    monkeypatch.delenv("AI_SERVICE_LLM_GATEWAY_URL", raising=False)
+    monkeypatch.setattr(entry.psycopg, "connect", lambda *_args, **_kwargs: nullcontext(object()))
+    adapters = Mock(return_value={})
+    monkeypatch.setattr(entry, "build_adapters", adapters)
+    monkeypatch.setattr(entry, "NightlyEvaluator", Mock())
+    monkeypatch.setattr(entry, "EvalWorker", Mock())
+    monkeypatch.setattr(entry, "Worker", Mock())
+    assert entry.main([command]) == 0
+    assert adapters.call_args.args[1] == (min(timeout, 60) if command == "eval-worker" else timeout)

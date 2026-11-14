@@ -6,6 +6,7 @@
 parameters:
     env(SPA_ACCOUNT_HOST): 'account.vashfindir.ru'
     env(SPA_ADMIN_HOST): 'admin.vashfindir.ru'
+    env(TELEGRAM_PAYMENT_INTAKE_ENABLED): '0'
     # Стартовые шаблоны онбординга по профилю бизнеса (App\Company\Enum\BusinessProfile).
     # Новый профиль — свой файл; без него запись указывает на маркетплейсный явно. Единый
     # словарь кодов во всех шаблонах держит TemplateRegistryTest.
@@ -98,6 +99,7 @@ services:
             string $telegramWebhookUrl: '%telegram.webhook_url%'
             # Секрет вебхука Telegram: проверяем заголовок X-Telegram-Bot-Api-Secret-Token (пусто = проверка выключена)
             string $telegramWebhookSecret: '%telegram.webhook_secret%'
+            bool $telegramPaymentIntakeEnabled: '%env(bool:TELEGRAM_PAYMENT_INTAKE_ENABLED)%'
             # Базовый URL Telegram Bot API (в проде — через шлюз tg-gateway)
             string $telegramApiBaseUrl: '%telegram.api_base_url%'
 

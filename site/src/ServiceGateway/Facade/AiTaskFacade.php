@@ -15,6 +15,7 @@ use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 use Webmozart\Assert\Assert;
 
 final readonly class AiTaskFacade implements AiTaskFacadeInterface
@@ -66,7 +67,7 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
             traceId: Uuid::uuid7()->toString(),
             createdAt: $this->clock->now()->format(\DATE_RFC3339),
             payload: $payload,
-        ));
+        ), 'parse_payment_message' === $taskType ? [new TransportNamesStamp(['async_payment_intake'])] : []);
         $this->logger->info('AI task requested.', ['companyId' => $companyId, 'taskType' => $taskType, 'taskId' => $taskId]);
 
         return $taskId;

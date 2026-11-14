@@ -15,3 +15,8 @@ tasks:
   marketplace_source_type_draft:
     mode: single
     models: [stub/source-type-draft]
+
+  # Review-only intake; production model selection/live evaluation is pending.
+  parse_payment_message:
+    mode: single
+    models: [stub/payment-intake]

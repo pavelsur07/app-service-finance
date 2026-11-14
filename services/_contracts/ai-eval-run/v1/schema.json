@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vashfindir.ru/contracts/ai-eval-run/v1/schema.json",
+  "$defs": {
+    "EvalAccepted": {
+      "properties": {
+        "contract_version": {
+          "const": "v1",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "passed",
+            "failed",
+            "unavailable",
+            "incomplete",
+            "skipped_budget"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "duplicate": {
+          "title": "Duplicate",
+          "type": "boolean"
+        },
+        "configuration_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Configuration Fingerprint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract_version",
+        "run_id",
+        "status",
+        "duplicate",
+        "configuration_fingerprint"
+      ],
+      "title": "EvalAccepted",
+      "type": "object"
+    },
+    "EvalLatest": {
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "configuration_fingerprint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Configuration Fingerprint"
+        },
+        "run": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvalStatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "enabled",
+        "configuration_fingerprint",
+        "run"
+      ],
+      "title": "EvalLatest",
+      "type": "object"
+    },
+    "EvalRunRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {
+          "const": "v1",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "suite": {
+          "const": "payment_intake",
+          "title": "Suite",
+          "type": "string"
+        },
+        "run_date": {
+          "format": "date",
+          "title": "Run Date",
+          "type": "string"
+        },
+        "trace_id": {
+          "format": "uuid",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Idempotency Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract_version",
+        "run_id",
+        "suite",
+        "run_date",
+        "trace_id",
+        "idempotency_key"
+      ],
+      "title": "EvalRunRequest",
+      "type": "object"
+    },
+    "EvalStatus": {
+      "properties": {
+        "contract_version": {
+          "const": "v1",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "suite": {
+          "const": "payment_intake",
+          "title": "Suite",
+          "type": "string"
+        },
+        "run_date": {
+          "format": "date",
+          "title": "Run Date",
+          "type": "string"
+        },
+        "trace_id": {
+          "format": "uuid",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "passed",
+            "failed",
+            "unavailable",
+            "incomplete",
+            "skipped_budget"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "attempt": {
+          "minimum": 0,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "configuration_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Configuration Fingerprint",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Completed At"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error Code"
+        },
+        "report": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Report"
+        }
+      },
+      "required": [
+        "contract_version",
+        "run_id",
+        "suite",
+        "run_date",
+        "trace_id",
+        "status",
+        "attempt",
+        "configuration_fingerprint",
+        "created_at",
+        "updated_at",
+        "completed_at",
+        "error_code",
+        "report"
+      ],
+      "title": "EvalStatus",
+      "type": "object"
+    }
+  },
+  "title": "ai-eval-run/v1"
+}

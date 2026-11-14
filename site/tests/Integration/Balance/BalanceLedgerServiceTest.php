@@ -262,7 +262,7 @@ final class BalanceLedgerServiceTest extends IntegrationTestCase
                     $first->insert($table, $row);
                 }
             }
-            $first->executeStatement('CREATE TABLE companies (id uuid PRIMARY KEY, user_id uuid NOT NULL)');
+            $first->executeStatement('CREATE TABLE companies (id uuid PRIMARY KEY, user_id uuid NOT NULL, deletion_requested_at timestamp DEFAULT NULL)');
             $first->insert('companies', ['id' => $this->companyId, 'user_id' => $this->actorId]);
             $ledger = new BalanceLedgerService($second, $this->accessOnConnection($second));
             $id = $ledger->saveDraft($this->companyId, $this->actorId, 'concurrent', 'opening', '2025-01-01', 'Старт', $this->lineInput(['money' => '100', 'equity' => '100']));

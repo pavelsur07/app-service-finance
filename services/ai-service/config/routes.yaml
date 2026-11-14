@@ -47,3 +47,8 @@ tasks:
   marketplace_source_type_draft:
     mode: fallback
     models: [deepseek/deepseek-flash, openai/gpt-4.1-mini]
+
+  # Review-only intake; pilot remains disabled until approved live evaluation.
+  parse_payment_message:
+    mode: fallback
+    models: [deepseek/deepseek-flash, openai/gpt-4.1-mini]

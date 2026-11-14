@@ -1,0 +1,59 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Cash\Repository\PaymentIntake;
+
+use App\Cash\Entity\PaymentIntake\PaymentIntakeDraft;
+use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\LockMode;
+use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\Query;
+use Doctrine\Persistence\ManagerRegistry;
+
+/** @extends ServiceEntityRepository<PaymentIntakeDraft> */
+final class PaymentIntakeDraftRepository extends ServiceEntityRepository
+{
+    public function __construct(ManagerRegistry $registry)
+    {
+        parent::__construct($registry, PaymentIntakeDraft::class);
+    }
+
+    public function getForCompany(string $companyId, string $id, bool $lock = false): ?PaymentIntakeDraft
+    {
+        $query = $this->createQueryBuilder('d')->where('d.companyId = :company')->andWhere('d.id = :id')->setParameter('company', $companyId)->setParameter('id', $id)->getQuery()->setHint(Query::HINT_REFRESH, true);
+        if ($lock) {
+            $query->setLockMode(LockMode::PESSIMISTIC_WRITE);
+        }
+
+        return $query->getOneOrNullResult();
+    }
+
+    public function getByTask(string $companyId, string $taskId): ?PaymentIntakeDraft
+    {
+        return $this->createQueryBuilder('d')->where('d.companyId = :company')->andWhere('d.taskId = :task')->setParameter('company', $companyId)->setParameter('task', $taskId)->getQuery()->setHint(Query::HINT_REFRESH, true)->setLockMode(LockMode::PESSIMISTIC_WRITE)->getOneOrNullResult();
+    }
+
+    /** @companyScopeExempt Global Telegram source binding; caller authorizes exact actor and bound company before exposing data. */
+    public function getBySource(string $sourceKey): ?PaymentIntakeDraft
+    {
+        return $this->createQueryBuilder('d')->where('d.sourceKey = :source')->setParameter('source', $sourceKey)->getQuery()->setHint(Query::HINT_REFRESH, true)->getOneOrNullResult();
+    }
+
+    /** @companyScopeExempt Existence-only global source guard; returns no draft identity, content or tenant data. */
+    public function hasSource(string $sourceKey): bool
+    {
+        return (int) $this->getEntityManager()->getConnection()->fetchOne('SELECT count(*) FROM cash_payment_intake_draft WHERE source_key = :source', ['source' => $sourceKey]) > 0;
+    }
+
+    /** @return list<PaymentIntakeDraft> */
+    public function getRecoverable(string $companyId, \DateTimeImmutable $now, int $limit = 100, ?string $afterId = null): array
+    {
+        $query = $this->createQueryBuilder('d')->where('d.companyId = :company')->andWhere("d.dispatchPending = true OR d.cashEventPending = true OR (d.status = 'queued' AND (d.lastEnqueuedAt IS NULL OR d.lastEnqueuedAt <= :retryBefore))")->setParameter('retryBefore', $now->modify('-60 seconds'), Types::DATETIMETZ_IMMUTABLE)->setParameter('company', $companyId)->orderBy('d.id', \SortDirection::Ascending)->setMaxResults($limit);
+        if (null !== $afterId) {
+            $query->andWhere('d.id > :afterId')->setParameter('afterId', $afterId);
+        }
+
+        return $query->getQuery()->setHint(Query::HINT_REFRESH, true)->getResult();
+    }
+}

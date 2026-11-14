@@ -32,7 +32,9 @@ site/bin/external-review.sh <base_commit> [--effort medium] [--context facts.md]
 Скрипт сам: выбирает ревьюера (из Claude Code — Codex, иначе — Claude), собирает
 дифф от базы до рабочего дерева только по `site/src`, `site/tests`,
 `site/config`, `site/migrations`, `site/templates`, `site/assets`, `site/bin`,
-`site/tools` без lock-файлов, фикстур и снапшотов, подставляет стандартный промпт, запускает
+`site/tools`, а также `services/ai-service/{src,tests,migrations,config,docker}`
+и `services/_contracts/ai-*/**/schema.json`. Данные `services/ai-service/evals`
+не передаются; lock-файлы, фикстуры и снапшоты исключены. Скрипт подставляет стандартный промпт, запускает
 ревьюера под `timeout 900` и пишет `prompt.txt`, `diff.patch`, `review.txt` в
 `site/var/external-review/<base8>/`. Код возврата 0 — `REVIEW_GREEN`, 1 —
 находки, 3 — ревьюер не завершился. Повторный запуск на неизменённом диффе

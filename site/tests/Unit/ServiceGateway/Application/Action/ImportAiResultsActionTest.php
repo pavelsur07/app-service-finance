@@ -25,6 +25,45 @@ final class ImportAiResultsActionTest extends TestCase
     private int $resets = 0;
     /** @var list<array<string, mixed>> параметры INSERT INTO ai_usage */
     private array $usage = [];
+    private bool $transactionFinished = false;
+    private bool $commitFails = false;
+
+    public function testSingleResultCommitsBeforeAcknowledging(): void
+    {
+        $client = new ImportPagesClient([]);
+        $consumer = new ImportRecordingConsumer('echo');
+        $action = $this->action($client, [$consumer], new TestHandler());
+        $client->beforeAck = function (): void {
+            self::assertTrue($this->transactionFinished, 'Ack must follow the transaction commit.');
+        };
+
+        self::assertTrue($action->importResult(self::aiResult('t1', 'echo')));
+        self::assertSame(['t1'], $consumer->taskIds);
+        self::assertSame([['t1']], $client->acks);
+        self::assertCount(1, $this->usage);
+    }
+
+    public function testSingleResultIsNotAcknowledgedAfterConsumerFailure(): void
+    {
+        $client = new ImportPagesClient([]);
+        $consumer = new ImportRecordingConsumer('echo', failTaskIds: ['t1']);
+        $logs = new TestHandler();
+
+        self::assertFalse($this->action($client, [$consumer], $logs)->importResult(self::aiResult('t1', 'echo')));
+        self::assertSame([], $client->acks);
+        self::assertSame([], $this->usage);
+        self::assertTrue($logs->hasErrorThatContains('AI single result consumer failed'));
+    }
+
+    public function testSingleResultIsNotAcknowledgedWhenCommitFails(): void
+    {
+        $this->commitFails = true;
+        $client = new ImportPagesClient([]);
+
+        self::assertFalse($this->action($client, [new ImportRecordingConsumer('echo')], new TestHandler())->importResult(self::aiResult('t1', 'echo')));
+        self::assertFalse($this->transactionFinished);
+        self::assertSame([], $client->acks);
+    }
 
     public function testHandsResultsToConsumersAndAcksOnlyHandledPerPage(): void
     {
@@ -182,7 +221,13 @@ final class ImportAiResultsActionTest extends TestCase
         $em->method('getConnection')->willReturn($db);
         $em->method('wrapInTransaction')->willReturnCallback(function (callable $func) use (&$open): mixed {
             try {
-                return $func();
+                $result = $func();
+                if ($this->commitFails) {
+                    throw new \RuntimeException('commit failed');
+                }
+                $this->transactionFinished = true;
+
+                return $result;
             } catch (\Throwable $e) {
                 $open = !$this->emClosedAfterFailure;
                 throw $e;
@@ -227,6 +272,8 @@ final class ImportAiResultsActionTest extends TestCase
 
 final class ImportPagesClient implements AiServiceClientInterface
 {
+    /** @var (\Closure(): void)|null */
+    public ?\Closure $beforeAck = null;
     /** @var list<list<string>> */
     public array $acks = [];
     /** @var list<string|null> */
@@ -253,6 +300,7 @@ final class ImportPagesClient implements AiServiceClientInterface
 
     public function ack(array $taskIds): int
     {
+        ($this->beforeAck ?? static function (): void {})();
         $this->acks[] = $taskIds;
 
         return \count($taskIds);
