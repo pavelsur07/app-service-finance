@@ -388,6 +388,8 @@
 # нарушение контракта — ERROR и exit 1. Подсказки статей ДДС — все подключённые в админке компании (запуск пишется в ai_run),
 # сначала автоприменение по флагу компании; сбой компании — ERROR и exit 1, остальные идут дальше.
 */5 * * * * cd /app && php bin/console app:ai-service:import-results --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+# Telegram pilot: strict company scope, Cash and delivery recover independently; never Confirm.
+*/5 * * * * cd /app && bash bin/recover-payment-intake.sh >> /proc/1/fd/1 2>> /proc/1/fd/2
 25 * * * * cd /app && php bin/console app:cash:ai-categorize --all-enabled --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 # Гейт «тишины» ИИ (docs/workflow/health-gates.md): компания без запуска > 3 ч или половина результатов failed — ERROR и exit 1.
 50 * * * * cd /app && php bin/console app:ai-service:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2

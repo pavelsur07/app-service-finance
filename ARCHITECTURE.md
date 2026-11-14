@@ -4120,15 +4120,23 @@ Canonical source41/semantic12 и human-reviewed additions hash-pinned; pending
 не регистрируется, expected fields не передаются модели. Обычный runtime/wheel
 не читает docs или исходники контрактов checkout. Набор с неизвестной суммой
 может хранить amountnull с вопросом и проверяемым anchor. Auto gold/model/prompt
-updates и auto-disable не реализованы. Ночной scheduler ещё не подключён.
+updates и auto-disable не реализованы. Расписание — `docker/cron/app.cron`,
+ночной контур включается отдельно `AI_SERVICE_EVAL_ENABLED`.
 
 Дополнительный rollout-переключатель `TELEGRAM_PAYMENT_INTAKE_ENABLED` по
 умолчанию `0` (только test env `1`). Его включение до live-eval приёмки не
 является частью обычного доступа компании к ИИ. Если новый сценарий выбран,
 его недоступность не включает автоматически legacy запись первой цифры.
-Переключатель глобальный; отдельного company allowlist для intake нет, охват
-при включении задают существующие AI grants. Более узкий независимый пилот
-требует отдельного company gate до включения, без изменения общих grants молча.
+Telegram дополнительно ограничен `TELEGRAM_PAYMENT_INTAKE_COMPANIES` (UUID CSV,
+по умолчанию пусто, wildcard и неверный элемент закрывают весь список).
+`Telegram/Application/PaymentIntakeAccess::isPilotCompany(companyId)` проверяет
+membership независимо от глобального флага; `isAllowed(companyId)` требует оба.
+Guard применяется до восстановления source/session, callback, публикации polling,
+Refresh handler и company recovery. Для участника при выключенном флаге, sticky
+binding и известных source/reply запрещён legacy fallback; никогда не выбранный
+nonpilot сохраняет прежний сценарий. Общие AI grants и Cash source-neutral core
+не меняются. Уже принятая AI задача может завершиться после выключения Telegram;
+допуск не означает автоматическое подтверждение и запись денег.
 
 `CashFacade` предоставляет request/get/amend/confirm/cancel сценарии черновика
 через DTO `Application/DTO/PaymentIntake`. Компания и пользователь приходят из
@@ -4171,8 +4179,17 @@ Consumer PaymentIntake только меняет текущую revision/attempt
 существующая таблица Messenger, queue_name=payment_intake, auto_setup=false,
 retry 2 секунды). `AiTaskFacade::requestTask` только для parse_payment_message
 ставит TransportNamesStamp этого транспорта; остальные типы сохраняют routing.
-Webhook не ждёт модель и не спит. Production worker нового транспорта требует
-именованного одобрения и запуска до включения пилота; код не меняет prod workers.
+Webhook не ждёт модель и не спит. Production worker
+`site-messenger-worker-payment-intake` имеет profile `payment-intake`, получает
+тот же scope/флаг и запускается деплоем явно только при флаге1 и непустом scope.
+Выключение останавливает worker; общий final up не включает профиль.
+`bin/recover-payment-intake.sh` каждые5мин после полной проверки UUID CSV
+независимо запускает Cash recovery и Telegram recovery с `--skip-cash-recovery`;
+без опции Telegram команда сохраняет внутренний Cash recovery. Ошибки не
+прерывают остальные команды/компании, общий exit ненулевой.
+Маршрут `parse_payment_message` — single `deepseek/deepseek-flash`; маршруты
+категоризации и source-type draft сохраняют свои fallback. Ночной fingerprint
+меняется с конфигом, завершённый run текущей даты не переигрывается.
 Состояние доставки
 Telegram хранится отдельно от факта сохранения операций. Недоставка ответа
 не запускает сохранение повторно. Каждая новая необходимость доставки меняет
@@ -5612,6 +5629,7 @@ config/
 | `app:marketplace-ozon:health-check` | `20 9 * * *` | Гейт переводчика Ozon: код без решения в карантине > 24 ч или непереведённый день — ERROR, exit 1 |
 | `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
 | `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (`AI_SERVICE_ENABLED`, адрес, токен) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
+| `bash bin/recover-payment-intake.sh` | `*/5 * * * *` | Только включённый Telegram pilot scope: независимые Cash и Telegram recovery, strict UUID CSV, никакого Confirm; ошибочный список не запускает команды |
 | `app:cash:ai-categorize --all-enabled` | `25 * * * *` | Компании allowlist ai-service с операциями за 90 дней: автоприменение по флагу компании, затем постановка ИИ-подсказок статей ДДС; сбой компании — ERROR, остальные идут дальше |
 | `app:storage:healthcheck` | `*/5 * * * *` | Синтетическая проверка объектного хранилища (write→read→delete); сбой → `error` → GlitchTip |
 | `app:billing:expiry-reminders` | `0 10 * * *` | Напоминания владельцам об окончании оплаты (7/3/1/0 дней, пробный — 3/0) → `async_sync`; отправленные пропускает, дубль отсекает handler (`billing_expiry_reminders`); сбой постановки — exit 1 + один `error`, повторный запуск безопасен |
@@ -5659,7 +5677,7 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 | Транспорт | Воркер (`messenger:consume`) | Что идёт |
 |---|---|---|
 | `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad, задачи ai-service кроме parse_payment_message (`SubmitAiTaskMessage`), проверка платежей ЮKassa (`ApplyYooKassaPaymentMessage`) |
-| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake` (profile payment-intake); production worker требует отдельного одобрения | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Worker `messenger:consume async_payment_intake` обязан работать до включения TELEGRAM_PAYMENT_INTAKE_ENABLED; перед пилотом также согласовать company-scoped расписание `app:cash:recover-payment-intake` и `app:telegram:recover-payment-intake` (processing commands) |
+| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake`; prod: `site-messenger-worker-payment-intake` (profile payment-intake, conditional start/stop) | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Worker `messenger:consume async_payment_intake` обязан работать до включения TELEGRAM_PAYMENT_INTAKE_ENABLED; перед пилотом также согласовать company-scoped расписание `app:cash:recover-payment-intake` и `app:telegram:recover-payment-intake` (processing commands) |
 | `async_pipeline` | `async_pipeline` | Локальная DB-обработка: Process*-сообщения Marketplace, Ads raw, нормализация inventory, auto-rules, ImportProducts |
 | `async_wb_finance` | `async_wb_finance` | `SyncWbFinancialReportDayMessage` (retry до 20 раз) |
 | `async_ads` | `async_ads` | Ozon Performance polling (`LoadOzonAdStatisticsRangeMessage`, `FetchOzonAdStatisticsMessage`, `RequestOzonAdBatchMessage`) |
@@ -5709,6 +5727,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.186 | 2026-11-14 | Telegram PaymentIntake: company pilot allowlist, guards ввода/доставки/отзыва, профилированный worker и независимый scoped recovery; parse route single DeepSeek; финансовые правила и общие AI grants без изменений |
 | 2.185 | 2026-11-14 | MarketplaceEconomics: отчёт R3 «Неделя» — `app:marketplace-economics:weekly-report` (понедельник 09:00), журнал `me_weekly_report` (`Version20261114230000`), `ECONOMICS_WEEKLY_REPORT_COMPANIES`; Telegram: фасад `TelegramFacadeInterface::sendDocumentToCompany` (этап 6.5) |
 | 2.184 | 2026-11-14 | MarketplaceOperations: вид `mp_other_deductions` «Прочие удержания МП» (уровень «общие») — код Ozon 7 и разовые удержания без своего вида |
 | 2.183 | 2026-11-14 | MarketplaceOzon: комиссия — поле `commission` (нет — `sale_commission`), как в легаси; `ozon:unexplained` (10 начислений) обнуляется, `RULES_VERSION` `ozon-by-day-3` |
