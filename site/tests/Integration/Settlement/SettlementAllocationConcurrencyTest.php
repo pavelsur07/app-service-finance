@@ -35,7 +35,7 @@ final class SettlementAllocationConcurrencyTest extends IntegrationTestCase
             foreach ($migration->getSql() as $query) {
                 $db->executeStatement($query->getStatement());
             }
-            $db->executeStatement('CREATE TABLE companies (id UUID PRIMARY KEY, user_id UUID NOT NULL, finance_lock_before DATE)');
+            $db->executeStatement('CREATE TABLE companies (id UUID PRIMARY KEY, user_id UUID NOT NULL, finance_lock_before DATE, deletion_requested_at TIMESTAMP DEFAULT NULL)');
             $db->insert('companies', ['id' => $company, 'user_id' => $actor]);
             $db->insert('settlement_books', ['id' => Uuid::uuid7()->toString(), 'company_id' => $company, 'start_date' => '2026-11-01', 'initialized' => 1, 'version' => 1, 'next_event_sequence' => 3]);
             $items = [];

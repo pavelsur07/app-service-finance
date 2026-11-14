@@ -61,8 +61,12 @@ x-php-env: &php-env
     # Выключено, пока не заданы AI_SERVICE_ENABLED=true и токен; компании подключает администратор
     # (/admin/users, таблица ai_company_access). Задачи ставит воркер async_sync, результаты забирает cron (scheduler).
     AI_SERVICE_ENABLED: ${AI_SERVICE_ENABLED:-false}
+    AI_SERVICE_EVAL_ENABLED: ${AI_SERVICE_EVAL_ENABLED:-false}
     AI_SERVICE_BASE_URL: http://ai-service:8080
     AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
+    # Company-scoped Telegram pilot; disabled until both flag and scope are configured.
+    TELEGRAM_PAYMENT_INTAKE_ENABLED: ${TELEGRAM_PAYMENT_INTAKE_ENABLED:-0}
+    TELEGRAM_PAYMENT_INTAKE_COMPANIES: ${TELEGRAM_PAYMENT_INTAKE_COMPANIES:-}
     # Публичный URL вебхука Telegram — точка приёма апдейтов (шлюз tg-gateway)
     TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-https://tg.vashfindir.ru/telegram/webhook}
     # Секрет вебхука: задать случайным значением в host-env и переустановить webhook (пусто = проверка выключена)
@@ -475,6 +479,37 @@ services:
                 reservations:
                     memory: 64M
 
+    site-messenger-worker-payment-intake:
+        image: ghcr.io/pavelsur07/site-php-cli:${IMAGE_TAG:-latest}
+        container_name: site-messenger-worker-payment-intake
+        profiles: [payment-intake]
+        restart: unless-stopped
+        logging: *default-logging
+        command: php bin/console messenger:consume async_payment_intake -vv --time-limit=3600 --memory-limit=160M --no-interaction
+        environment:
+            <<: *php-env
+        networks:
+            - default
+        depends_on:
+            site-postgres:
+                condition: service_healthy
+            site-redis:
+                condition: service_healthy
+        volumes:
+            - ${ALFA_SECRETS_DIR:-./alfa-secrets}:/app/var/secrets/alfa:ro
+            - site_storage:/app/var/storage
+            - site_company_storage:/app/var/storage/companies
+            - site_var_log:/app/var/log
+        stop_grace_period: 60s
+        healthcheck:
+            disable: true
+        deploy:
+            resources:
+                limits:
+                    memory: 256M
+                reservations:
+                    memory: 64M
+
     site-postgres:
         image: postgres:15-alpine
         container_name: symfony-postgres
@@ -581,8 +616,11 @@ services:
             WB_FETCHER_API_TOKEN: ${WB_FETCHER_API_TOKEN:-}
             # ai-service: cron импорта результатов и подсказок статей (как в x-php-env).
             AI_SERVICE_ENABLED: ${AI_SERVICE_ENABLED:-false}
+            AI_SERVICE_EVAL_ENABLED: ${AI_SERVICE_EVAL_ENABLED:-false}
             AI_SERVICE_BASE_URL: http://ai-service:8080
             AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
+            TELEGRAM_PAYMENT_INTAKE_ENABLED: ${TELEGRAM_PAYMENT_INTAKE_ENABLED:-0}
+            TELEGRAM_PAYMENT_INTAKE_COMPANIES: ${TELEGRAM_PAYMENT_INTAKE_COMPANIES:-}
             # Billing: cron сверки онлайн-оплат app:billing:yookassa-sync (как в x-php-env).
             # Пусто = онлайн-оплата выключена, команда выходит сразу.
             YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-}
@@ -755,6 +793,9 @@ services:
             TZ: Europe/Moscow
             AI_SERVICE_DB_DSN: postgresql://svc_ai_service:${AI_SERVICE_DB_PASSWORD:-}@site-postgres:5432/ai_service
             AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
+            AI_SERVICE_EVAL_ENABLED: ${AI_SERVICE_EVAL_ENABLED:-false}
+            AI_SERVICE_EVAL_DAILY_LIMIT_RUB: "30"
+            AI_SERVICE_EVAL_MONTHLY_LIMIT_RUB: "900"
             # Провайдеры ИИ — только через шлюз (docs/tasks/ai/gateway/): ключи провайдеров живут на
             # шлюзе, здесь — токен шлюза. URL — литерал: пустая переменная не выключит проверку,
             # что base_url провайдеров в config/routes.yaml ведут на шлюз.
@@ -793,6 +834,31 @@ services:
         # Задача с захваченной арендой после остановки вернётся в очередь по истечении аренды.
         stop_grace_period: 60s
         # У воркера нет HTTP: проверка образа (GET /health) к нему неприменима.
+        healthcheck:
+            disable: true
+        deploy:
+            resources:
+                limits:
+                    memory: 256M
+                reservations:
+                    memory: 64M
+
+    # Отдельный bounded nightly run; без HTTP и ingress. Выход disabled=0 не перезапускается.
+    ai-service-eval-worker:
+        image: ghcr.io/pavelsur07/ai-service:${IMAGE_TAG:-latest}
+        container_name: ai-service-eval-worker
+        profiles: ["ai-service"]
+        command: ["eval-worker"]
+        restart: on-failure
+        logging: *default-logging
+        environment: *ai-service-env
+        networks:
+            - default
+        depends_on:
+            site-postgres:
+                condition: service_healthy
+        # Лимит run — 900s плюс bounded adapter call до 60s.
+        stop_grace_period: 960s
         healthcheck:
             disable: true
         deploy:

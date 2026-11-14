@@ -1,0 +1,49 @@
+{
+  "source_text": "-100 руб.\nОплатил аренду",
+  "raw_output": {
+    "intent": "payments",
+    "target_ref": null,
+    "questions": [],
+    "items": [
+      {
+        "ref": "p0",
+        "text_evidence": "100 руб.",
+        "amount_evidence": "100 руб.",
+        "amount": "100.00",
+        "currency": "RUB",
+        "date": null,
+        "direction": "outflow",
+        "execution_status": "paid",
+        "description": "Аренда",
+        "category_id": null,
+        "project_id": null,
+        "cfo_id": null,
+        "questions": []
+      }
+    ]
+  },
+  "prepared_output": {
+    "intent": "payments",
+    "target_ref": null,
+    "questions": [],
+    "items": [
+      {
+        "ref": "p0",
+        "text_evidence": "100 руб.",
+        "amount_evidence": "100 руб.",
+        "amount": "100.00",
+        "currency": "RUB",
+        "date": null,
+        "direction": "outflow",
+        "execution_status": "unknown",
+        "description": "Аренда",
+        "category_id": null,
+        "project_id": null,
+        "cfo_id": null,
+        "questions": [
+          "Подтвердите факт оплаты этого платежа."
+        ]
+      }
+    ]
+  }
+}

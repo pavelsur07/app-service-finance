@@ -47,3 +47,8 @@ tasks:
   marketplace_source_type_draft:
     mode: fallback
     models: [deepseek/deepseek-flash, openai/gpt-4.1-mini]
+
+  # Company-scoped Telegram pilot: DeepSeek only, without GPT fallback.
+  parse_payment_message:
+    mode: single
+    models: [deepseek/deepseek-flash]

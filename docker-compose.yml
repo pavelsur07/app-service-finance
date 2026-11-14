@@ -114,6 +114,22 @@ services:
             - ./site:/app
         command: php bin/console messenger:consume async_sync --time-limit=3600 --memory-limit=160M -vv
 
+    site-php-cli-worker-payment-intake:
+        profiles: [payment-intake]
+        build:
+            context: site/docker
+            dockerfile: development/php-cli/Dockerfile
+        working_dir: /app
+        restart: unless-stopped
+        environment:
+            <<: *tz-env
+        depends_on:
+            site-postgres:
+                condition: service_healthy
+        volumes:
+            - ./site:/app
+        command: php bin/console messenger:consume async_payment_intake --time-limit=3600 --memory-limit=256M -vv
+
     site-php-cli-worker-pipeline:
         build:
             context: site/docker
@@ -286,6 +302,9 @@ services:
             AI_SERVICE_DB_DSN: "postgresql://svc_ai_service:ai_service_dev@services-postgres:5432/ai_service"
             AI_SERVICE_API_TOKEN: "dev-only-ai-service-token"
             AI_SERVICE_ROUTES_FILE: "/app/config/routes.dev.yaml"
+            AI_SERVICE_EVAL_ENABLED: ${AI_SERVICE_EVAL_ENABLED:-false}
+            AI_SERVICE_EVAL_DAILY_LIMIT_RUB: "30"
+            AI_SERVICE_EVAL_MONTHLY_LIMIT_RUB: "900"
         command: ["api"]
         ports:
             - "8181:8080"   # dev-only проброс API
@@ -308,6 +327,30 @@ services:
         depends_on:
             services-postgres:
                 condition: service_healthy
+        profiles:
+            - services
+
+    services-ai-service-eval-worker:
+        build:
+            context: services/ai-service
+            dockerfile: docker/Dockerfile
+            target: runtime
+        restart: on-failure
+        environment: *ai-service-env
+        command: ["eval-worker"]
+        healthcheck:
+            disable: true
+        depends_on:
+            services-postgres:
+                condition: service_healthy
+        # Даём bounded run завершиться; неизвестный расход остаётся зарезервированным.
+        stop_grace_period: 960s
+        deploy:
+            resources:
+                limits:
+                    memory: 256M
+                reservations:
+                    memory: 64M
         profiles:
             - services
 

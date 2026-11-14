@@ -28,7 +28,9 @@
 #
 # В дифф попадают только site/src, site/tests, site/config, site/migrations,
 # site/templates, site/assets, site/bin, site/tools — то, что меняет поведение
-# приложения или оснастки. Документация, lock-файлы, фикстуры и снапшоты
+# приложения или оснастки; также code/tests/migrations/config/docker AI-сервиса
+# и схемы ai-* контрактов. Данные services/ai-service/evals не включаются.
+# Документация, lock-файлы, фикстуры и снапшоты
 # ревьюеру не показываются. Сравнение идёт с рабочим деревом, поэтому
 # незакоммиченные и новые файлы тоже входят, включая посторонние untracked-файлы
 # в тех же путях: находки по ним отклоняются как out-of-scope.
@@ -85,7 +87,10 @@ base_full=$(git rev-parse "$base")
 [ -n "$out_dir" ] || out_dir="site/var/external-review/${base_full:0:8}"
 mkdir -p "$out_dir"
 
-paths=(site/src site/tests site/config site/migrations site/templates site/assets site/bin site/tools)
+paths=(site/src site/tests site/config site/migrations site/templates site/assets site/bin site/tools
+    services/ai-service/src services/ai-service/tests services/ai-service/migrations
+    services/ai-service/config services/ai-service/docker
+    ':(glob)services/_contracts/ai-*/**/schema.json')
 excludes=(':(exclude)**/*.lock' ':(exclude)**/__snapshots__/**' ':(exclude)**/Fixtures/**' ':(exclude)**/fixtures/**')
 
 diff_file="$out_dir/diff.patch"

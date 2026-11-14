@@ -26,7 +26,7 @@ class CompanyRepository extends ServiceEntityRepository
         if ($lock && !$this->connection->isTransactionActive()) {
             throw new \LogicException('Company permission locks require a transaction.');
         }
-        $company = $this->connection->fetchAssociative('SELECT user_id FROM companies WHERE id=?'.($lock ? ' FOR SHARE' : ''), [$companyId]);
+        $company = $this->connection->fetchAssociative('SELECT user_id FROM companies WHERE id=? AND deletion_requested_at IS NULL'.($lock ? ' FOR SHARE' : ''), [$companyId]);
         $none = ['owner' => false, 'read' => false, 'write' => false];
         if (false === $company) {
             return $none;

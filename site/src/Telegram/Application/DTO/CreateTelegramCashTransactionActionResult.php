@@ -11,12 +11,18 @@ final readonly class CreateTelegramCashTransactionActionResult
         public string $amount,
         public string $directionLabel,
         public bool $skippedMissingMessageIdentity,
+        public bool $skippedPaymentIntakeSource = false,
     ) {
     }
 
     public static function created(bool $duplicate, string $amount, string $directionLabel): self
     {
         return new self($duplicate, $amount, $directionLabel, false);
+    }
+
+    public static function skippedKnownPaymentIntakeSource(): self
+    {
+        return new self(false, '0.00', '', false, true);
     }
 
     public static function skippedDueToMissingMessageIdentity(): self

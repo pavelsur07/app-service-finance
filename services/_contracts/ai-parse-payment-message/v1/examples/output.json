@@ -1,0 +1,22 @@
+{
+  "intent": "payments",
+  "items": [
+    {
+      "ref": "item-1",
+      "text_evidence": "Вчера отдала 20 тысяч за аренду",
+      "amount_evidence": "20 тысяч",
+      "amount": "20000.00",
+      "currency": "RUB",
+      "date": "2026-11-12",
+      "direction": "outflow",
+      "execution_status": "paid",
+      "description": "Аренда",
+      "category_id": "rent-a",
+      "project_id": null,
+      "cfo_id": null,
+      "questions": []
+    }
+  ],
+  "target_ref": null,
+  "questions": []
+}

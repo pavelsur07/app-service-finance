@@ -1,0 +1,119 @@
+{
+  "contract_id": "https://vashfindir.ru/contracts/ai-parse-payment-message/v1/schema.json",
+  "datasets": {
+    "semantic": {
+      "N": 12,
+      "corpus_file": "semantic12.jsonl",
+      "families": {
+        "ambiguous_date": [
+          "sem-012"
+        ],
+        "category_direction": [
+          "sem-008"
+        ],
+        "company_a": [
+          "sem-001"
+        ],
+        "company_b": [
+          "sem-002"
+        ],
+        "duplicate_category": [
+          "sem-003"
+        ],
+        "duplicate_cfo": [
+          "sem-005"
+        ],
+        "duplicate_project": [
+          "sem-004"
+        ],
+        "forbidden_pair": [
+          "sem-007"
+        ],
+        "missing_directories": [
+          "sem-006"
+        ],
+        "multiple_payments": [
+          "sem-011"
+        ],
+        "timezone_today": [
+          "sem-009"
+        ],
+        "unsupported_date": [
+          "sem-010"
+        ]
+      },
+      "gold": "synthetic_explicit_choices",
+      "review_file": null
+    },
+    "source": {
+      "N": 41,
+      "corpus_file": "source-corpus.jsonl",
+      "families": {
+        "event-list": [
+          "tg-016",
+          "tg-017",
+          "tg-018",
+          "tg-019",
+          "tg-020",
+          "tg-021",
+          "tg-022",
+          "tg-023",
+          "tg-024",
+          "tg-025",
+          "tg-026",
+          "tg-027",
+          "tg-028",
+          "tg-029",
+          "tg-030",
+          "tg-031",
+          "tg-032",
+          "tg-033",
+          "tg-034",
+          "tg-035",
+          "tg-036",
+          "tg-037",
+          "tg-038",
+          "tg-039",
+          "tg-040"
+        ],
+        "misc": [
+          "tg-001",
+          "tg-002",
+          "tg-003",
+          "tg-005",
+          "tg-006",
+          "tg-009",
+          "tg-010",
+          "tg-011",
+          "tg-012",
+          "tg-013",
+          "tg-014",
+          "tg-015",
+          "tg-041"
+        ],
+        "salary": [
+          "tg-004",
+          "tg-007",
+          "tg-008"
+        ]
+      },
+      "gold": "partial_annotations",
+      "review_file": "source-review.jsonl"
+    }
+  },
+  "files": {
+    "reviewed-index.json": "ee46d554fdcaa89dd8400847eba3b90a1a81c5eba41028ae3012e621bcab6eb2",
+    "schema.json": "904fbed170cdc02f503a66d72dd7cb0cbe20be32cdbda8605b47d9b791034d8a",
+    "semantic12.jsonl": "2029d31fb3b2a036e899b72b1c1bb6d9fa05e5bcac8b6e52ab55826a7eafb561",
+    "source-corpus.jsonl": "8e630000b77b64a932417322d2f65a2bac3a2316c3691a9ab2be13dfdb5723bf",
+    "source-review.jsonl": "7356ac909c142191c0fe70353c57ed44cbf20eb1a55b0ca4aec57d9f484dd9b4",
+    "source41.jsonl": "f917dcb62ab2d442f9854cdd4bb6bdb17dd426625e36629480a49ff3f2f2c6fd"
+  },
+  "format_version": 1,
+  "provenance": {
+    "review": "services/ai-service/evals/parse_payment_message/corpus-review.jsonl",
+    "schema": "services/_contracts/ai-parse-payment-message/v1/schema.json",
+    "semantic": "services/ai-service/evals/parse_payment_message/semantic-cases.jsonl",
+    "source": "docs/tasks/telegram-payment-intake/examples/messages.jsonl"
+  }
+}

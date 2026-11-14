@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Telegram\Controller\Integration;
 
+use App\Company\Entity\User;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
 use App\Telegram\Entity\BotLink;
@@ -86,6 +87,11 @@ class TelegramIntegrationController extends AbstractController
 
         $expiresAt = new \DateTimeImmutable('+60 minutes');
 
+        $actor = $this->getUser();
+        if (!$actor instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
         $botLink = new BotLink(
             Uuid::uuid4()->toString(),
             $company,
@@ -93,6 +99,7 @@ class TelegramIntegrationController extends AbstractController
             $token,
             self::SCOPE_FINANCE,
             $expiresAt,
+            $actor->getId(),
         );
 
         $this->entityManager->persist($botLink);
