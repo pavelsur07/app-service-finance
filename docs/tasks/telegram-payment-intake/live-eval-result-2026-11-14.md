@@ -120,3 +120,68 @@ commit7f115df9c9208f4e13796c9952c5a9e27276ec82:deploy04:25:54–04:30:36UTC SUCC
 Stage5/pilot остаются НЕ ПРИНЯТЫ. Нужны полный повтор41cases на v3, полный gold
 для аналитики/дат и end-to-end acceptance перед пилотом. Deploy/миграции/worker/
 feature flag этой задачей не выполнялись и не включались.
+
+## Разрешённый полный повтор v3 — фактический результат
+
+Владелец ответил «разрешаю» на подготовленное расширение до82дополнительных
+вызовов, общий оценочный лимит300RUB, существующий ключ и то же исключение
+root-SSH для одноразового контейнера. Запуск выполнен один раз исходным helper
+с ранее зафиксированным SHA; bundle/source/prompt не менялись.
+
+| Проверка | Результат полного v3 |
+|---|---:|
+| Сообщения / вызовы |41 / 41|
+| Размеченные проверенные кандидаты |49/49|
+| Размеченные точные суммы с известным масштабом |47/47|
+| Размеченные направления |5/7; дваnull|
+| Отказ угадывать неоднозначный масштаб |2/2|
+| Intent исправления |1/1|
+| Наличие вопросов в размеченных случаях |19/19|
+| Schema/verifier rejected / ошибки провайдера |0 / 0|
+| Вердикт HIGH risk |41needs_review|
+| Задержка Python pipeline median / p95 / max |1569 / 1922 / 4477ms|
+
+Модель выдала40payments и1correction intent; всего50строк:3без суммы,
+39без направления. Наличие needs_review определяется HIGH risk и не означает,
+что каждый ответ полностью корректен. Уtg008две строки при одном размеченном
+платеже; одна строка без суммы. Исходный текст также содержит справочный итог,
+который не должен стать отдельным платежом. Raw output не сохранялся, поэтому
+его evidence и точное назначение второй строки восстановить нельзя. Критерий
+«итог не отдельный платёж» не доказан; precision остаётсяnull, а не100%.
+
+Уtg011/tg027 directionnull. Это безопасный пропуск с ручным уточнением, однако
+обязательное ожиданиеtg027→inflow не выполнено. 5/7 не достигает предложенного
+в плане порога95% для однозначных направлений; порог не меняется молча.
+49/49 и47/47 относятся только к размеченным ограничениям. Аналитика, даты,
+precision и качество вопросов не получили полногоgold; настроенный корпус не
+стал независимымholdout. Живой Telegram→уточнение→Confirm/backlog/end-to-end
+latency этим изолированным Python-run не проверялись.
+
+Sourcebd490a8fbd3ddd1d511046bae7c337e0fb958b34, bundle66filesSHA
+202aad82c69189c11dcff036e4f38c07c2a461ba97b049ed3320c6cc6e3d96dd.
+Full reportSHA2365afad1b9a1ea36cf1dd484e7a62bba646119a637722639fc484861e4b77bc;
+report и metadata-only summary лежат в ignored review dir под именами
+live-eval-2026-11-14-v3-full.json и live-eval-2026-11-14-v3-full-summary.json.
+Tokens109620input/7282output; run known-usage estimate3.42006538RUB,
+консервативный резерв130.9089984RUB. Campaign122/163calls,41remaining;
+all-runs known-usage estimate8.23956098RUB, не подтверждённое списание/invoice.
+Новых автоматических запусков и изменений runtime-кода в этом продолжении нет.
+
+Свежий precheck сравнивался со старым04:30receipt и вернулFALSE: внешний master
+run43557409568,commitba3cc0d33a3a2f1d79c64afea21789c683293169 заменил image/start
+в04:47UTC. Fresh before-v3-full receipt сохранён до запуска; APIhealthy иworker
+running. Использован текущий runtimeimage
+sha256:9d621cd8b6809b6d97362231fd0399261bbb904179e458e513ee6f66fc36bc47,
+но source внутри контейнера — тот же проверенный immutable bundle. Локальный
+bootstrap41/0 и remote bootstrap перед live прошли.
+
+**Полный run postcheck PASS:** fresh before/after metadata API/worker совпали
+точно (включаяimage/start/restart/health/user/network); evalcontainers0.
+Оба receipt сохранены как root-eval-containers-{before,after}-v3-full.json.
+Старое расхождение с исходным кампании baseline не переписано и не скрыто.
+
+Независимый read-only acceptance review:B0/I0 новых подтверждённых дефектов
+безопасности; M1устаревшие документы — исправлены этим отчётом и обновлением
+Stage5/handoff/spec. Приёмочные пробелы выше остаются открытыми. Внешний review
+не повторялся для documentation-only продолжения; прошлый handoff результат
+fixed without re-run остаётся в истории. **Stage5/pilot НЕ ЗАКРЫТЫ.**

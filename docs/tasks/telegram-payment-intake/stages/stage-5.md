@@ -2,7 +2,8 @@
 
 **Risk:** HIGH-LOCAL. **Base:** `8a1f51cac4dacac4d49dd6b5cf72e0940d26a895`.
 ТЗ: [stage-5-spec.md](stage-5-spec.md). Статус: локальная интеграционная приёмка завершена;
-Stage 5 целиком не закрыт до отдельно разрешённого live eval.
+Stage5 целиком не закрыт: полный live eval v3 выполнен, но приёмка качества
+и готовность пилота ещё не подтверждены; актуальные результаты в конце отчёта.
 
 ## Что проверено
 
@@ -62,7 +63,8 @@ make run --rm; результат общего compose exec с другой ко
 siblings не делятся между prompt и holdout; source cases в prompt отсутствуют.
 Offline verifier green не доказывает recall/точность живой модели.
 
-Live eval, p95 задержки и стоимость живой обработки остаются PENDING.
+На момент первоначальной локальной приёмки live eval, p95 и стоимость были PENDING.
+Последующее полное измерение v3 и его ограничения записаны ниже.
 Порог 95% из плана является предложением для согласованного измерения, а не
 уже достигнутым результатом. Production pilot, worker, scheduler и processing
 не включались. Флаг по умолчанию 0.
@@ -117,7 +119,7 @@ Stage1–4 закрыты; final source frozen, task-owned files идут в т�
 Локальные proof logs находятся в /tmp/payment-intake-{test-serial,cs-final-complete,
 strict-final-complete}.log, external artifact — site/var/payment-intake-review/.
 
-Stage5 полностью остаётся **PENDING LIVE EVAL**: test credential, provider/model/
+Историческое состояние перед одобрением: Stage5 **PENDING LIVE EVAL**; test credential, provider/model/
 лимиты и актуальный тариф требуют явно названного разрешения. Подготовлены
 [live-eval.md](../live-eval.md), offline manifest и отдельные ТЗ/чек-лист/отчёт
 подготовки. До измерений нет заявления об общей точности, p95 или готовности
@@ -130,7 +132,7 @@ internal B0/I12 по трём исходным сессиям (4+5+3), runner se
 external B1/I15 по пяти раундам Stage2/3/4/4-rerun/handoff. Открытых B/I нет.
 Часть внешнего I6 Stage2 отклонена по git evidence, valid fixture часть исправлена.
 
-## Continuation14November — existing-key approval
+## Исторический preflight14November — до разрешённого live-запуска
 
 Owner approved the live trial and reuse of existing key, superseding the original
 second-test-key prerequisite for this run. Tariff/CBR verified, conservative
@@ -140,3 +142,26 @@ console wrapper only runs Symfony allowlist and has no Python eval entrypoint.
 [Preflight](../live-eval-preflight-2026-11-14.md) defines the exact command, bundle
 and in-place key use. Stage5 remains pending actual execution/measurement; no
 application/config change, no grant/network/worker/deploy mutation.
+
+## Разрешённый полный live v3 —14November
+
+Выполнен после ownerapproval, тем же ключом и immutable sourcebd490a8fb:
+41сообщение/41вызов,49/49размеченных кандидатов,47/47известных сумм,2/2scale
+abstention,1/1correction intent,19/19marked-question presence;5/7directions.
+Все41needs_review(HIGH policy),0schema/verifierrejections,0providererrors.
+Python pipeline median1569ms,p951922ms,max4477ms; это не Telegramend-to-end.
+Campaign122/163,knownusageestimate8.23956098RUB,неinvoice. Full-runfresh
+API/worker before/after metadataPASS,owncontainers0; старые несовпаденияbaseline
+из-за независимыхmasterdeploy сохранены в[отчёте](../live-eval-result-2026-11-14.md).
+
+Не закрыто:tg011/tg027directionnull (tg027→inflow ожидание§10 не выполнено);
+tg008twoitems vsoneannotatedcandidate, одинamountnull — исключение итога не
+доказано без raw output. Всего50items,3amountnull,39directionnull. Precision/
+аналитика/даты/qualityquestions остаютсяnull; tuneddevelopmentcorpus не unseen
+holdout. Живой Telegram→clarify→Confirm, backlog и end-to-end latency отдельно
+не выполнены. Нельзя объявлять Stage5/pilotaccepted по денежному recall100%.
+
+Fresh independent acceptance review:B0/I0securitydefects,M1staledocsfixed;
+доказательные пробелы выше открыты. Documentation-onlycontinuation не требует
+нового externalreview; прежние reviewmetrics/fixed-without-rerun не меняются.
+Новых processing/migrations/worker/flag/deploy не выполнялось; PR остаётсяDraft.

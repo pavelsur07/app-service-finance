@@ -30,8 +30,9 @@ Acceptance checklist:
       total<=81/82. Never repeat after an uncertain outcome.
 - [x] Record every case's safe verdict/check code/count and campaign balance.
 - [x] Do not infer full-corpus quality, precision or generalization from tuning.
-- [ ] Final read-only metadata confirms existing API/worker unchanged and no own
-      disposable eval container remains.
+- [x] Full-run fresh before/after metadata confirms API/worker unchanged and no
+      own disposable eval container remains. Earlier campaign-wide timestamp
+      mismatch remains documented separately.
 
 Model prompt prose is validated by the actual live consumer, not a test that
 searches for copied instructions. Existing automated schema/pipeline tests
@@ -53,10 +54,16 @@ remaining allowance, validate the other five IDs from the original diagnostic10:
 This adds no corpus/provider/key/scope. Combined development10 still cannot serve
 as a full-corpus or unseen acceptance claim.
 
-Controls completed5calls; cumulative81/82,1remaining. Combined10cases:19/19
-candidates,18/18amounts,5/7direction,10needs_review/0rejected. Current prompt
-quality beyond this tuned subset is unmeasured. Evalcontainer0; existing API
+Historical controls checkpoint before full run:5calls; cumulative81/82,1remaining. Combined10cases:19/19
+candidates,18/18amounts,5/7direction,10needs_review/0rejected. At that checkpoint, quality beyond the tuned subset had not yet been measured. Evalcontainer0; existing API
 healthy/worker running, image/user/network/restart unchanged but started_at differs
 from initial receipt, coincident with independent master deploy43555954635.
-Therefore the exact-unchanged checkbox remains open, with the actual discrepancy
+At that checkpoint the campaign-wide exact-unchanged checkbox was open, with the actual discrepancy
 and inference recorded in live-eval-result; no production repair is authorized.
+
+Owner-approved fullrepeat:41cases/41calls,49/49annotated candidates,47/47known
+amounts,5/7directions. Two explicit directions stillnull;tg008twoitems vsonegold,
+so full Stage5/pilotacceptance remains pending. Campaign122/163,41remaining.
+No prompt/verifier/runtime code changed for this run. Fullactualreport referenced
+in ../live-eval-result-2026-11-14.md; freshfullpostcheckPASS; initialcampaign
+exact-unchanged failure is retained historically, not relabelled green.

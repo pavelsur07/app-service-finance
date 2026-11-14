@@ -12,7 +12,7 @@ Task base: `8a1f51cac4dacac4d49dd6b5cf72e0940d26a895`.
 | 2 | Задача Python внутри ai-service, структурированный вывод, Decimal/evidence checks | [ТЗ](stages/stage-2-spec.md), [отчёт](stages/stage-2.md) |
 | 3 | Cash drafts, правки, atomic/idempotent Confirm, recovery и бюджеты | [ТЗ](stages/stage-3-spec.md), [отчёт](stages/stage-3.md) |
 | 4 | Telegram actor/source binding, карточки, уточнения, durable polling/delivery | [ТЗ](stages/stage-4-spec.md), [отчёт](stages/stage-4.md) |
-| 5 | Локальная общая проверка и живой eval, prompt v3 | [ТЗ](stages/stage-5-spec.md), [отчёт](stages/stage-5.md); полная live-приёмка v3 pending |
+| 5 | Локальная общая проверка и живой eval, prompt v3 | [ТЗ](stages/stage-5-spec.md), [отчёт](stages/stage-5.md); полный live run выполнен; quality acceptance pending |
 
 ## Что изменено
 
@@ -74,21 +74,24 @@ open B0/I0/M0. Разные раунды могут описывать один 
 
 Флаг `TELEGRAM_PAYMENT_INTAKE_ENABLED=0` по умолчанию. Фото/OCR исключены v1.
 Short amounts/группировка/личные средства/неизвестный факт остаются вопросами;
-полная точность модели не установлена. Первый live41case-run и диагностика
-выполнены; v3на10cases:19/19candidates,18/18known amounts,5/7direction,
-10needs_review/0rejected. Это tuned development subset, не полная приёмка.
-Cumulative81/82calls; usage estimate4.81949560RUB, не invoice. Production
-processing/миграции/feature flag этой задачей не выполнялись.
+полная точность модели не установлена. Fullv3на41cases:49/49annotated
+candidates,47/47known amounts,5/7direction,41needs_review/0rejected.
+Два направленияnull;tg008twoitems vsoneannotatedcandidate (одинamountnull),
+исключение справочного итога не доказано. Всего50items/3amountnull/39directionnull.
+Это development corpus, не независимая generalization/precision/analytics/date
+оценка. Campaign122/163calls,knownusageestimate8.23956098RUB,неinvoice.
+Productionprocessing/миграции/featureflagэтойзадачей не выполнялись.
 Flag глобальный + существующие AI grants; отдельного intake allowlist нет.
 Для более узкого независимого пилота сначала нужен company gate, а не молчаливое
 изменение общих AI grants. Доля черновиков с provenance=user измерима, полная
 история частоты событий редактирования не сохраняется; см. observability runbook.
 
-Следующий шаг — [полный повтор41сообщения на v3](live-eval-v3-full-request.md)
-после расширения согласованного call cap82→163, с тем же ключом и isolated
-app-host execution. Второй ключ не требуется. Пока остаётся1call, полный run
-не помещается. Stage5/pilot не принимается до полного измерения и end-to-end
-проверки; partial gold не даёт точности аналитики/дат/precision.
+Подготовленный [полный повтор41сообщения наv3](live-eval-v3-full-request.md)
+разрешён и выполнен. Открыты ожиданиеtg027inflow, исключение справочного итога,
+независимыйgold/holdout и живой Telegram end-to-end acceptance. Stage5/pilot
+неприняты;95%по однозначным направлениям не заявляется и не подменяется
+денежнымrecall100%. Второйключ не нужен. Нового modelrun после этого полного
+прогона не было.
 [Runbook](runbook.md) содержит recovery, очередь, условия включения и откат.
 
 После успешного live eval для выпуска нужны отдельный production worker нового
@@ -111,16 +114,18 @@ separately. Manual none43500484323 was not counted as validation.
 
 The owner approved the bounded trial, existing key and a named one-off root-SSH
 exception for isolated evaluation. No persistent wrapper/access/settings changes.
-First41cases/45calls, targeteddiagnostic14,v212,v3split5+5:81/82total.
+First41cases/45calls, targeteddiagnostic14,v212,v3split5+5,fullv341:122/163total.
 [Full measurements and caveats](live-eval-result-2026-11-14.md) retain all versions,
 actual source hashes, safe diagnostics and the scorer correction.
 
-Final operational postcheck:own evalcontainers0,APIhealthy/workerrunning,
-image/user/network/restart unchanged. Exact initial-state comparison FAILED
-because both started_at changed at04:30UTC, coincident with independent master
-workflow_dispatch43555954635deploy. Do not claim all fields unchanged. No repair,
-restart or deploy was performed by our eval harness; see the receipt/report.
+Final full-run operational postcheck PASS:own evalcontainers0,APIhealthy,
+workerrunning; fresh before/afterfull metadata совпадают точно. До этого
+исторические comparison с initial campaign receipt возвращалиFALSE из-за
+независимыхmasterdeploy43555954635/43557409568 (start/imagechanged). Все receipt
+сохранены; новаяbaselineне переписывает прежние расхождения. No repair/restart/
+deploybyeval. Sourcebundlefixed; imagefullrun9d621cd8b680… recorded in live report.
 
-Fresh focused review of each eval/scorer/privacy/prompt deltaB0/I0/M0. These are
-Work-item reviews, not a completed Stage5 or final handoff acceptance. PR remains
-Draft. No additional paid run beyond the approved cap and no merge request yet.
+Fresh independent full-run acceptance review:B0/I0securitydefects,M1staledocs
+fixed. Stage5qualitygapsremain; no final pilot acceptance/Ready/merge request.
+Earlier focused eval/scorer/privacy/v2/v3reviewsB0/I0/M0. Documentation-only
+continuation did not repeat externalreview; previous fixed-without-rerun stands.

@@ -1,6 +1,7 @@
 # Полная live-проверка v3 — подготовленный следующий запуск
 
-Статус: НЕ ЗАПУЩЕН; требуется расширение ранее согласованных82вызовов.
+Статус: РАЗРЕШЁН И ВЫПОЛНЕН 14 ноября. Ниже сохранён исходный объём запроса.
+Факт:41case/41call, campaign122/163; повтор helper заблокирован исходным guard.
 Израсходовано81,остался1; новый41case-run допускает до82generations с учётом
 schema retry. Текущий результат10development cases:19/19кандидатов,18/18точных
 сумм с известным масштабом,5/7направлений,10needs_review/0rejected. Полная
@@ -42,3 +43,13 @@ approval не считается согласием. No merge/deploy/pilot reque
 
 Готовый ответ: «Разрешаю полный v3 eval: ещё до82вызовов, общий лимит300рублей,
 тем же ключом, с тем же исключением для одноразового root-SSH eval».
+
+## Фактическое выполнение
+
+Owner «разрешаю» получено в ответ на этот подготовленный объём. Один полный
+run исходным immutable helper:41case/41call,49/49annotated candidates,
+47/47known-scale amounts,5/7directions,41needs_review/0rejected. Общая кампания
+122/163,41remaining,usage estimate8.23956098RUB. Before/afterfullmetadataPASS,
+evalcontainers0. Stage5/pilotpending из-за пропусков направлений, дополнительной
+строкиtg008и неполногоqualitygold/end-to-end evidence. См.[полныйотчёт](live-eval-result-2026-11-14.md).
+Этот документ не является разрешением на merge/deploy/pilot/production processing.

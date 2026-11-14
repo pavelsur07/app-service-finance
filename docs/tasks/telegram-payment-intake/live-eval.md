@@ -1,4 +1,4 @@
-# Live-eval action — bounded trial completed, full v3 acceptance pending
+# Live-eval action — full v3 run completed, quality acceptance pending
 
 The runner is `python -m ai_service.evals.payment_intake`. It uses the existing
 TaskSpec, gateway, masking and Pipeline; it does not boot Symfony, open a database,
@@ -88,8 +88,15 @@ its separately agreed acceptance criteria have been reviewed.
 
 Current14November execution/result and scorer correction: [live report](live-eval-result-2026-11-14.md). Earlier access-block notes describe the pre-approval state.
 
-Latest:81/82calls used; v3same10cases19/19candidates,18/18knownamounts,
-5/7directions,10needs_review/0rejected. Full41case v3 has NOT run. The prepared
-[bounded full-repeat request](live-eval-v3-full-request.md) needs call-cap and
-one-off isolated root-eval exception extension; it does not request a second key
-or any deploy/worker/migration change.
+Latest approved extension completed once:fullv341cases/41calls,49/49annotated
+candidates,47/47knownamounts,5/7directions,41needs_review/0rejected. Campaign
+122/163used,41remaining; usageestimate8.23956098RUB,notinvoice. The
+[full-repeat request](live-eval-v3-full-request.md) records approval/execution.
+No new dataset/key/provider or automatic further run. Sourcebundle unchanged.
+Freshfullrunbefore/aftermetadataPASS,owncontainers0.
+
+Quality/pilotremainpending:tg011/tg027unknown direction;tg008additionalitem,
+exclusion of context total not proven; partialgold cannot establishprecision,
+analytics/date/questionquality. No liveTelegramend-to-end proof. Fullresults and
+scope are in [the report](live-eval-result-2026-11-14.md). No merge/deploy/pilot
+approval was obtained or exercised by the trial.

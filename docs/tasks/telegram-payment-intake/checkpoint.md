@@ -273,3 +273,61 @@ B/I/M. New full-run helper plan-only output confirms0SSH/0calls; global cap stil
 used81. Continuation docs commit/push/PR update authorized; final report asks only
 named extension per live-eval-v3-full-request.md. No further local code changes
 needed before that live acceptance run; preserve existing owner-untracked files.
+
+2026-11-14 OWNER APPROVED extension in chat ('разрешаю') in response to the
+prepared82additionalcalls/total300RUB/existingkey/isolatedrootSSH proposal.
+Authorization now covers the single full41case v3 run, not merge/deploy or config.
+Fresh bundle/harness hashes and priorusage+maxreservation<300 preflightPASS.
+Next: fresh metadata before receipt→execute approved helper ONCE→fullreport→
+postcheck→acceptance analysis and docs/PR. Keep old receipts immutable.
+
+Pre-full currentreadinessPASS and localbundleoffline41/0PASS. Comparing fresh
+before receipt against old04:30receipt returnedFALSE because external master
+deploy43557409568(ba3cc0d33a3a2f1d79c64afea21789c683293169) changedimage/start
+at04:47:27/38UTC; APIhealthy/workerrunning/noevalcontainers. This fresh receipt
+root-eval-containers-before-v3-full.json is full-runbaseline. Runtimeimage now
+sha256:9d621cd8b6809b6d97362231fd0399261bbb904179e458e513ee6f66fc36bc47;
+fixed66fileapprovedbundle remains authoritative source, bootstrap validates it.
+Approved full41run started ONCE via originalpreparedhashhelper; do not invoke
+again. Active session returned to tool; report/status files track completion.
+
+FULLV3 APPROVED RUN COMPLETED:41cases/41calls,all41needs_review,49/49annotated
+candidates,47/47known-scaleamounts,5/7explicitdirections,2/2scaleabstention,
+1/1correction,19/19marked-question presence. No schema/check/providererrors.
+Sourcebd490a8fb,unchangedapprovedbundle202aad82…;fullreportSHA2365afad1b9a1ea36cf1dd484e7a62bba646119a637722639fc484861e4b77bc.
+Actual50items,3amountnull,39directionnull. tg011/027directionnull;tg008twoitems
+vsoneannotatedcandidate (extraamountnull), exactevidence unknown as rawnotretained.
+No100%precision/overall/analytics/dateclaim; corpusnowdevelopment. Pipeline
+median1569ms,p951922ms,max4477ms,notTelegramend-to-end. Campaign122/163used,
+41remaining,noactive. Knownusageallruns8.23956098RUB,notinvoice.
+
+FullrunpostcheckPASS:root-eval-containers-before-v3-full.json vsafter-v3-full
+exactcontainersmetadataequal,owncontainers0. EarlierprecheckFALSEagainstold04:30
+receipt explained by independentmasterdeploy04:47; retainedhistorically.
+NewreadonlyreviewacceptanceB0/I0securitydefects,M1staledocsfixed. Stage5/pilot
+stillPENDING due directiontg027criticalcase,possibleextraitem008,partialgold/
+unseenholdout/liveTelegramE2E. No threshold silentlyreduced. No runtimechange
+or secondtrial/newprompt/automaticcall afterapprovedfullrun. NoReady/merge/
+productionprocessing/migrations/worker/flag. Currentcontinuationdocs only.
+
+Remaining current-session work:verify metadata/report/docslinks and independent
+M1closure→commit/push→updateDraftPR→reportactualfullresultandopenacceptancegaps.
+Keep originalowneruntrackedfiles untouched. New implementation/paidvalidation
+must explicitly preserve scope of this single approved frozen-v3fullrepeat;
+do not rerun immutablehelper (originalledgerguard81 preventsrepeat).
+
+DocumentationreviewM1followupfound residualindependent/holdout/pendingexecution
+wording; corrected README/stage5spec and explicitly labelled old preflight/
+controls checkpoints as history. All assertions report/codebounds/30links/full
+postcheckPASS. gitdiff--check global emitted2trailing-space warnings from concurrent
+ownerCLAUDE.md edits (not task-owned); leave CLAUDE untouched, check task-owned
+paths separately. No overlappingownerchanges in task files. No runtimechange.
+
+Independent docfollowupconfirmedM1CLOSED,B0/I0/M0remaining. Task-pathdiffcheckPASS;
+report/campaign/hashes/privacy-fields/30doclinks/freshcontainerpostcheckPASS.
+Currentturnis approvedfixed-v3evaluation plusdocs only; no runtimeedits or repeat
+Python/PHPgates (previousruntimechecks unchanged). Commit/push/updateDraftPR are
+beingcompleted; finalreport states executiondone, Stage5qualitystillopen, no
+pilot/merge/deployclaimed. Localimplementation remains pre-authorized by original
+ownerbrief; the fixed-v3externalrepeat scope is not automatically broadened to a
+newprompt/dataset/access. Preserve raw-output privacy and all historicalreceipts.
