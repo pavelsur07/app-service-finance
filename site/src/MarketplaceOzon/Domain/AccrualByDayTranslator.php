@@ -19,7 +19,7 @@ use App\Shared\Domain\ValueObject\Money;
 final class AccrualByDayTranslator
 {
     /** Меняется вместе с правилами разбора: дни с другой версией переводятся заново. */
-    public const RULES_VERSION = 'ozon-by-day-1';
+    public const RULES_VERSION = 'ozon-by-day-2';
 
     public const UNEXPLAINED = 'ozon:unexplained';
 

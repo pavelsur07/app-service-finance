@@ -626,7 +626,9 @@
 - CPC кабинета (`ads_cpc` без SKU, by-day тип 41) разносится по листингам пропорционально расходу SKU
   из фактов `ozon.ads.statistics` того же дня (`AdsStatisticsShares`, наибольший остаток, Σ дня не
   меняется, `allocation_key = ads_statistics_share`). SKU без листинга и день без статистики — доля
-  остаётся без SKU. Дата статистики = дата начисления CPC (сверка Вумджой, 14.11). Сбой дня не останавливает остальные; один `error` на прогон.
+  остаётся без SKU. Дата статистики = дата начисления CPC (сверка Вумджой, 14.11).
+- Оплата за заказ (`ads_pay_per_order` без SKU, тип 54) — по проданным штукам SKU того же дня
+  (`sales_qty_share`); нет продаж — без SKU. Сбой дня не останавливает остальные; один `error` на прогон.
 - Гейт `app:marketplace-ozon:health-check` (cron 09:20 МСК): код без решения в карантине дольше 24 ч
   или день с фактами не переведён — `error`, exit 1.
 - Новый код без вида: в конце прогона перевода `RequestOzonSourceTypeDraftsAction` ставит задачу ИИ
@@ -5545,6 +5547,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.182 | 2026-11-14 | MarketplaceOzon: оплата за заказ (тип 54) без SKU делится по проданным штукам SKU за день (`sales_qty_share`), `RULES_VERSION` `ozon-by-day-2` (этап 6.1b упрощённо) |
 | 2.181 | 2026-11-14 | MarketplaceEconomics: подписи R1/R2/xlsx по терминам проекта — СМ1 / СМ2 / СМ3 (шаблон ОПиУ `pl_templates/marketplace.json`), «Выручка − себестоимость», «Склад и прочие МП»; расчёт не менялся |
 | 2.180 | 2026-11-14 | MarketplaceOperations: вид `compensation` (компенсации маркетплейса, уровень «общие», +) — коды Ozon 10 и 25 можно подтвердить на экране кодов |
 | 2.179 | 2026-11-14 | MarketplaceEconomics: отчёт R2 «Динамика» `/marketplace/economics/dynamics` (+ xlsx), вкладки R1/R2; легаси не меняется (этап 6.4 `marketplace-profit-pipeline`) |

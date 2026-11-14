@@ -87,6 +87,20 @@ final readonly class TranslateOzonDayAction
             $key = $listings[(string) $sku] ?? '';
             $adsWeights[$key] = ($adsWeights[$key] ?? 0) + $minor;
         }
+        // Оплата за заказ (тип 54: ALL_SKU_PROMO и SEARCH_PROMO) — по проданным штукам SKU за день.
+        // ponytail: ALL_SKU_PROMO — по продажам всех SKU, а не только товаров кампании, SEARCH_PROMO — не на
+        // заказанный SKU; точнее — отчёт заказов и список товаров кампании из ozon-fetcher (этап 6.1b).
+        $salesWeights = [];
+        foreach ($components as $component) {
+            if (OperationKind::SALE === $component->kind && null !== $component->sku && ($component->quantity ?? 0) > 0) {
+                $key = $listings[$component->sku] ?? '';
+                $salesWeights[$key] = ($salesWeights[$key] ?? 0) + (int) $component->quantity;
+            }
+        }
+        $allocation = [
+            OperationKind::ADS_CPC->value => [$adsWeights, AdsStatisticsShares::ALLOCATION_KEY],
+            OperationKind::ADS_PAY_PER_ORDER->value => [$salesWeights, AdsStatisticsShares::SALES_ALLOCATION_KEY],
+        ];
 
         $operations = [];
         $quarantine = [];
@@ -107,10 +121,11 @@ final readonly class TranslateOzonDayAction
             if (null !== $component->sku && null === $listingId) {
                 ++$unresolved;
             }
-            if (OperationKind::ADS_CPC === $kind && null === $component->sku && [] !== $adsWeights) {
-                foreach (AdsStatisticsShares::split($component->amount->amountMinor(), $adsWeights) as $key => $minor) {
+            [$weights, $allocationKey] = $allocation[$kind->value] ?? [[], null];
+            if (null === $component->sku && [] !== $weights) {
+                foreach (AdsStatisticsShares::split($component->amount->amountMinor(), $weights) as $key => $minor) {
                     $operations[] = new OperationInput($kind, $component->sourceType, Money::fromMinor($minor, $component->amount->currency()), [$component->sourceKey],
-                        '' === $key ? null : $key, null, '' === $key ? null : AdsStatisticsShares::ALLOCATION_KEY);
+                        '' === $key ? null : $key, null, '' === $key ? null : $allocationKey);
                 }
             } else {
                 $operations[] = new OperationInput($kind, $component->sourceType, $component->amount, [$component->sourceKey], $listingId, $component->quantity);
