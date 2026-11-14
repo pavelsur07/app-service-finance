@@ -30,7 +30,7 @@
 | `posting.products[].commission.sale_amount` | `ozon:field:sale_amount` | `sale`, при отрицательной сумме — `return` |
 | `…commission.bonus` | `ozon:field:bonus` | `spp` |
 | `…commission.coinvestment` | `ozon:field:coinvestment` | `coinvestment` |
-| `…commission.sale_commission` | `ozon:field:sale_commission` | `commission` |
+| `…commission.commission` (нет — `sale_commission`) | `ozon:field:commission` (`ozon:field:sale_commission`) | `commission` |
 | `…delivery.services[]`, `item_fees.fees[].fees[]`, `non_item_fee`, `container_fees` (рекурсивно) | `ozon:service:{type_id}` | из справочника |
 
 - `type_id` — номер из справочника Ozon (`ingest_ozon_accrual_types`, 137 типов), один на всех.
