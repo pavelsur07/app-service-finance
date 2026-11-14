@@ -11,7 +11,7 @@
     {% set params = app.request.query.all %}
     {% set steps = {day: 'По дням', week: 'По неделям', month: 'По месяцам'} %}
     {% set profit = allocated ? 'full' : 'md2' %}
-    {% set profit_label = allocated ? 'Прибыль полная' : 'МД2' %}
+    {% set profit_label = allocated ? 'СМ3' : 'СМ2' %}
 
     <div class="wz-head">
         <h1 class="wz-title">Экономика маркетплейсов</h1>
@@ -67,7 +67,7 @@
             <input class="input" id="md-q" type="search" name="q" value="{{ search }}" placeholder="SKU, артикул, название">
         </div>
         <div class="form-field">
-            <label class="form-label" for="md-alloc">Общие затраты</label>
+            <label class="form-label" for="md-alloc">Склад и прочие МП</label>
             <select class="select" id="md-alloc" name="alloc">
                 <option value="1" {{ allocated ? 'selected' }}>С разнесением</option>
                 <option value="0" {{ not allocated ? 'selected' }}>Без разнесения</option>
@@ -123,12 +123,12 @@
                         <th>Период</th>
                         <th class="t-cell--right">Продано, шт.</th>
                         <th class="t-cell--right">Выручка, ₽</th>
-                        <th class="t-cell--right">МД1, ₽</th>
+                        <th class="t-cell--right">СМ1, ₽</th>
                         <th class="t-cell--right">Реклама, ₽</th>
                         <th class="t-cell--right">ДРР, %</th>
-                        <th class="t-cell--right">МД2, ₽</th>
-                        {% if allocated %}<th class="t-cell--right">Прибыль полная, ₽</th>{% endif %}
-                        <th class="t-cell--right">Маржа, %</th>
+                        <th class="t-cell--right">СМ2, ₽</th>
+                        {% if allocated %}<th class="t-cell--right">СМ3, ₽</th>{% endif %}
+                        <th class="t-cell--right">Маржинальность {{ profit_label }}, %</th>
                     </tr>
                 </thead>
                 <tbody>

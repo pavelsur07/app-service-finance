@@ -5545,6 +5545,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.181 | 2026-11-14 | MarketplaceEconomics: подписи R1/R2/xlsx по терминам проекта — СМ1 / СМ2 / СМ3 (шаблон ОПиУ `pl_templates/marketplace.json`), «Выручка − себестоимость», «Склад и прочие МП»; расчёт не менялся |
 | 2.180 | 2026-11-14 | MarketplaceOperations: вид `compensation` (компенсации маркетплейса, уровень «общие», +) — коды Ozon 10 и 25 можно подтвердить на экране кодов |
 | 2.179 | 2026-11-14 | MarketplaceEconomics: отчёт R2 «Динамика» `/marketplace/economics/dynamics` (+ xlsx), вкладки R1/R2; легаси не меняется (этап 6.4 `marketplace-profit-pipeline`) |
 | 2.178 | 2026-11-14 | MarketplaceOzon: CPC разносится по SKU из статистики Performance (`ozon.ads.statistics`, ozon-fetcher публикует фактами, `source-fact-envelope` v1.1.0), `moz_day.ads_revision` (`Version20261114180000`); день переводится заново при новой статистике (этап 6.1–6.2 `marketplace-profit-pipeline`) |

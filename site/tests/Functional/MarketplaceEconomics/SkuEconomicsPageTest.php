@@ -29,7 +29,7 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         $this->line('2026-11-10', $listingId, 'overhead_share', 'overhead', -5000);
         $this->line('2026-11-10', null, 'subscription', 'overhead', -8000);
         $this->line('2026-11-10', null, 'overhead_share', 'overhead', 5000);
-        // прошлый период (01.11–09.11 для 10.11–18.11): МД2 SKU = 1 000 ₽
+        // прошлый период (01.11–09.11 для 10.11–18.11): СМ2 SKU = 1 000 ₽
         $this->line('2026-11-05', $listingId, 'sale', 'revenue', 100000, 1);
         $this->day('2026-11-10');
 
@@ -40,7 +40,7 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         $row = $crawler->filter('tbody tr')->first()->text();
         self::assertStringContainsString('SKU-991', $row);
-        // МД1 = 3000 − 900 − 450 = 1650; МД2 = 1500; полная = 1450
+        // СМ1 = 3000 − 900 − 450 = 1650; СМ2 = 1500; СМ3 = 1450
         self::assertMatchesRegularExpression('/1\s650,00/u', $row);
         self::assertMatchesRegularExpression('/1\s450,00/u', $row);
         $totals = $crawler->filter('tr.t-row--totals');
@@ -49,7 +49,7 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         self::assertMatchesRegularExpression('/1\s420,00/u', $totals->last()->text());
 
         $client->request('GET', self::URL, ['from' => '2026-11-10', 'to' => '2026-11-18', 'alloc' => '0']);
-        self::assertStringNotContainsString('Прибыль полная', (string) $client->getResponse()->getContent());
+        self::assertStringNotContainsString('СМ3', (string) $client->getResponse()->getContent());
 
         $client->request('GET', self::URL, ['from' => '2026-11-10', 'to' => '2026-11-18', 'format' => 'xlsx']);
         self::assertResponseIsSuccessful();
