@@ -68,6 +68,30 @@ def test_deploy_waits_only_for_services_with_healthcheck() -> None:
     assert [line for line, bad in waited if bad] == []
 
 
+def test_payment_intake_runtime_defaults_off_and_worker_is_isolated() -> None:
+    compose = yaml.safe_load((REPO / "docker-compose.prod.yml").read_text(encoding="utf-8"))
+    services = compose["services"]
+    for env in [compose["x-php-env"], services["scheduler"]["environment"]]:
+        assert env["TELEGRAM_PAYMENT_INTAKE_ENABLED"] == "${TELEGRAM_PAYMENT_INTAKE_ENABLED:-0}"
+        assert env["TELEGRAM_PAYMENT_INTAKE_COMPANIES"] == "${TELEGRAM_PAYMENT_INTAKE_COMPANIES:-}"
+    worker = services["site-messenger-worker-payment-intake"]
+    assert worker["profiles"] == ["payment-intake"]
+    assert worker["restart"] == "unless-stopped"
+    assert worker["image"] == services["site-php-cli"]["image"]
+    assert worker["environment"] == compose["x-php-env"]
+    assert worker["logging"] == services["site-messenger-worker-sync"]["logging"]
+    assert worker["networks"] == ["default"]
+    assert worker["volumes"] == services["site-messenger-worker-sync"]["volumes"]
+    command = worker["command"].split()
+    assert command[:4] == ["php", "bin/console", "messenger:consume", "async_payment_intake"]
+    assert all(part.startswith("-") for part in command[4:])
+    assert "--memory-limit=160M" in command
+    assert worker["healthcheck"] == {"disable": True}
+    assert worker["deploy"]["resources"]["limits"]["memory"] == "256M"
+    assert not worker.get("ports")
+    assert not worker.get("labels")
+
+
 def test_every_prod_route_model_has_price() -> None:
     prices = yaml.safe_load((ROUTES_FILE.with_name("prices.yaml")).read_text(encoding="utf-8"))
     routing = load_routing(ROUTES_FILE, env={})

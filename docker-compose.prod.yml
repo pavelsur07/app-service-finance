@@ -64,6 +64,9 @@ x-php-env: &php-env
     AI_SERVICE_EVAL_ENABLED: ${AI_SERVICE_EVAL_ENABLED:-false}
     AI_SERVICE_BASE_URL: http://ai-service:8080
     AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
+    # Company-scoped Telegram pilot; disabled until both flag and scope are configured.
+    TELEGRAM_PAYMENT_INTAKE_ENABLED: ${TELEGRAM_PAYMENT_INTAKE_ENABLED:-0}
+    TELEGRAM_PAYMENT_INTAKE_COMPANIES: ${TELEGRAM_PAYMENT_INTAKE_COMPANIES:-}
     # Публичный URL вебхука Telegram — точка приёма апдейтов (шлюз tg-gateway)
     TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-https://tg.vashfindir.ru/telegram/webhook}
     # Секрет вебхука: задать случайным значением в host-env и переустановить webhook (пусто = проверка выключена)
@@ -476,6 +479,37 @@ services:
                 reservations:
                     memory: 64M
 
+    site-messenger-worker-payment-intake:
+        image: ghcr.io/pavelsur07/site-php-cli:${IMAGE_TAG:-latest}
+        container_name: site-messenger-worker-payment-intake
+        profiles: [payment-intake]
+        restart: unless-stopped
+        logging: *default-logging
+        command: php bin/console messenger:consume async_payment_intake -vv --time-limit=3600 --memory-limit=160M --no-interaction
+        environment:
+            <<: *php-env
+        networks:
+            - default
+        depends_on:
+            site-postgres:
+                condition: service_healthy
+            site-redis:
+                condition: service_healthy
+        volumes:
+            - ${ALFA_SECRETS_DIR:-./alfa-secrets}:/app/var/secrets/alfa:ro
+            - site_storage:/app/var/storage
+            - site_company_storage:/app/var/storage/companies
+            - site_var_log:/app/var/log
+        stop_grace_period: 60s
+        healthcheck:
+            disable: true
+        deploy:
+            resources:
+                limits:
+                    memory: 256M
+                reservations:
+                    memory: 64M
+
     site-postgres:
         image: postgres:15-alpine
         container_name: symfony-postgres
@@ -585,6 +619,8 @@ services:
             AI_SERVICE_EVAL_ENABLED: ${AI_SERVICE_EVAL_ENABLED:-false}
             AI_SERVICE_BASE_URL: http://ai-service:8080
             AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
+            TELEGRAM_PAYMENT_INTAKE_ENABLED: ${TELEGRAM_PAYMENT_INTAKE_ENABLED:-0}
+            TELEGRAM_PAYMENT_INTAKE_COMPANIES: ${TELEGRAM_PAYMENT_INTAKE_COMPANIES:-}
             # Billing: cron сверки онлайн-оплат app:billing:yookassa-sync (как в x-php-env).
             # Пусто = онлайн-оплата выключена, команда выходит сразу.
             YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-}

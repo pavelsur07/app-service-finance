@@ -29,6 +29,165 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
     private ?\Closure $duringDelivery = null;
     /** @var list<string> */
     private array $aiTaskKeys = [];
+    private ?string $previousScopeEnv = null;
+    private ?string $previousScopeServer = null;
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+        if (null === $this->previousScopeEnv) {
+            unset($_ENV['TELEGRAM_PAYMENT_INTAKE_COMPANIES']);
+        } else {
+            $_ENV['TELEGRAM_PAYMENT_INTAKE_COMPANIES'] = $this->previousScopeEnv;
+        }
+        if (null === $this->previousScopeServer) {
+            unset($_SERVER['TELEGRAM_PAYMENT_INTAKE_COMPANIES']);
+        } else {
+            $_SERVER['TELEGRAM_PAYMENT_INTAKE_COMPANIES'] = $this->previousScopeServer;
+        }
+    }
+
+    public function testPilotGlobalOffNeverSelectedBindingCannotUseLegacy(): void
+    {
+        $client = $this->setupClient(true, true, false);
+        $this->post($client, ['message' => $this->message('+1500 доход')]);
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction WHERE company_id = ?', [self::COMPANY]));
+        self::assertStringContainsString('не включён', $this->lastText());
+        self::assertCount(0, $this->aiTaskKeys);
+    }
+
+    #[DataProvider('unselectedBindingsProvider')]
+    public function testUnselectedBindingsCannotHidePilotOrStickyBinding(bool $sticky, string $scope): void
+    {
+        $client = $this->setupClient(true, true, false, $scope);
+        $binding = $this->em()->getRepository(ClientBinding::class)->findOneBy(['company' => self::COMPANY]);
+        self::assertInstanceOf(ClientBinding::class, $binding);
+        if ($sticky) {
+            $binding->selectPaymentIntake();
+        }
+        $owner = $binding->getCompany()->getUser();
+        self::assertInstanceOf(\App\Company\Entity\User::class, $owner);
+        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-abcd0000ee02')->withOwner($owner)->build();
+        $other = new ClientBinding(Uuid::uuid7()->toString(), $company, $binding->getBot(), $binding->getTelegramUser());
+        $this->em()->persist($company);
+        $this->em()->persist($other);
+        $this->em()->flush();
+        $action = $client->getContainer()->get(\App\Telegram\Application\PaymentIntakeTelegramAction::class);
+        self::assertNotNull($action->message($binding->getBot(), $this->message('+1500 доход'), '+1500 доход'));
+        self::assertCount(0, $this->aiTaskKeys);
+    }
+
+    /** @return array<string, array{bool, string}> */
+    public static function unselectedBindingsProvider(): array
+    {
+        return ['pilot' => [false, self::COMPANY], 'revoked sticky' => [true, '']];
+    }
+
+    public function testNonpilotNeverSelectedBindingKeepsLegacy(): void
+    {
+        $client = $this->setupClient(true, true, true, '11111111-1111-1111-1111-abcd0000ee02');
+        $this->post($client, ['message' => $this->message('+1500 доход')]);
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction WHERE company_id = ?', [self::COMPANY]));
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_payment_intake_draft WHERE company_id = ?', [self::COMPANY]));
+        self::assertCount(0, $this->aiTaskKeys);
+    }
+
+    #[DataProvider('revokedAccessProvider')]
+    public function testRevokedSourceRecoveryDoesNotPersistSessionOrFallThrough(bool $enabled, string $scope): void
+    {
+        $client = $this->setupClient(true, true);
+        $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
+        $this->em()->getConnection()->executeStatement('DELETE FROM telegram_payment_intake_session WHERE company_id = ?', [self::COMPANY]);
+        $this->em()->clear();
+        $container = $client->getContainer();
+        $access = new \App\Telegram\Application\PaymentIntakeAccess($enabled, $scope);
+        $action = new \App\Telegram\Application\PaymentIntakeTelegramAction($this->em(), $container->get(\App\Cash\Facade\CashFacade::class), $container->get(\App\Company\Facade\CompanyFacade::class), $container->get(\App\Company\Facade\FinancialResponsibilityCenterFacade::class), $container->get(AiTaskFacadeInterface::class), $container->get(\App\Telegram\Application\QueuePaymentIntakePollAction::class), $access);
+        $bot = $this->em()->getRepository(TelegramBot::class)->findOneBy(['isActive' => true]);
+        self::assertInstanceOf(TelegramBot::class, $bot);
+        self::assertNotNull($action->message($bot, $this->message('+1500 доход'), '+1500 доход'));
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM telegram_payment_intake_session WHERE company_id = ?', [self::COMPANY]));
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction WHERE company_id = ?', [self::COMPANY]));
+        self::assertCount(1, $this->aiTaskKeys);
+    }
+
+    #[DataProvider('revokedAccessProvider')]
+    public function testRevokedCallbackPollPublicationAndRecoveryLeaveStateUntouched(bool $enabled, string $scope): void
+    {
+        $client = $this->setupClient(true, true);
+        $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
+        $container = $client->getContainer();
+        $session = $this->em()->getRepository(\App\Telegram\Entity\PaymentIntakeSession::class)->findOneBy(['companyId' => self::COMPANY]);
+        self::assertInstanceOf(\App\Telegram\Entity\PaymentIntakeSession::class, $session);
+        $transport = $container->get('messenger.transport.async_payment_intake');
+        self::assertInstanceOf(\Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport::class, $transport);
+        $poll = $transport->getSent()[0]->getMessage();
+        self::assertInstanceOf(\App\Telegram\Message\RefreshPaymentIntakeMessage::class, $poll);
+        $session->markDelivered('1:queued', ['900']);
+        $session->preparePoll(0, 1, 0);
+        $this->em()->flush();
+        $this->em()->getConnection()->executeStatement('UPDATE cash_payment_intake_draft SET dispatch_pending = true WHERE company_id = ?', [self::COMPANY]);
+        $sessionSql = 'SELECT source_revision, delivered_state, delivery_pending, delivery_request_token, delivery_cursor, sending_state, reply_message_ids, editing_item_id, editing_revision, last_sequence, pending_poll, poll_generation, poll_until, lease_until FROM telegram_payment_intake_session WHERE id = ?';
+        $draftSql = 'SELECT revision, status, attempt, task_revision, task_id, source_revision, items, questions, payload, transaction_ids, confirmed_item_ids, confirmed_revision, error_code, dispatch_pending, cash_event_pending, last_enqueued_at FROM cash_payment_intake_draft WHERE company_id = ?';
+        $beforeSession = $this->em()->getConnection()->fetchAssociative($sessionSql, [$session->getId()]);
+        $beforeDraft = $this->em()->getConnection()->fetchAssociative($draftSql, [self::COMPANY]);
+        $beforeSent = count($this->sent);
+        $beforeQueued = count($transport->getSent());
+        $access = new \App\Telegram\Application\PaymentIntakeAccess($enabled, $scope);
+        $polls = new \App\Telegram\Application\QueuePaymentIntakePollAction($this->em(), $container->get('messenger.default_bus'), $access);
+        $cash = $container->get(\App\Cash\Facade\CashFacade::class);
+        $companies = $container->get(\App\Company\Facade\CompanyFacade::class);
+        $centers = $container->get(\App\Company\Facade\FinancialResponsibilityCenterFacade::class);
+        $action = new \App\Telegram\Application\PaymentIntakeTelegramAction($this->em(), $cash, $companies, $centers, $container->get(AiTaskFacadeInterface::class), $polls, $access);
+        $bot = $session->getBinding()->getBot();
+        $callback = ['data' => 'pi:'.\App\Telegram\Application\PaymentIntakePresenter::encodeId($session->getId()).':1:cancel', 'from' => ['id' => 70090], 'message' => ['chat' => ['id' => 70090]]];
+        foreach (['confirm', 'cancel', 'refresh', 'retry'] as $callbackAction) {
+            $callback['data'] = 'pi:'.\App\Telegram\Application\PaymentIntakePresenter::encodeId($session->getId()).':1:'.$callbackAction;
+            self::assertStringContainsString('не включён', $action->callback($bot, $callback)['text']);
+        }
+        self::assertNotNull($action->message($bot, $this->message('+1500 доход'), '+1500 доход', true));
+        self::assertNotNull($action->message($bot, array_replace($this->message('+1500 доход'), ['message_id' => 56, 'reply_to_message' => ['message_id' => 900]]), '+1500 доход'));
+        self::assertNotNull($action->message($bot, array_replace($this->message('+1500 доход'), ['message_id' => 57]), '+1500 доход'));
+        $results = $this->createMock(\App\ServiceGateway\Facade\AiTaskResultFacadeInterface::class);
+        $results->expects(self::never())->method('refreshTask');
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects(self::never())->method('info')->with('Telegram intake refresh started', self::anything());
+        $handler = new \App\Telegram\MessageHandler\RefreshPaymentIntakeMessageHandler($this->em(), $cash, $companies, $centers, $results, $container->get(\App\Telegram\Application\PaymentIntakePresenter::class), $container->get('http_client'), $polls, $logger, $access);
+        $handler($poll);
+        self::assertFalse($polls($session));
+        $command = new \App\Telegram\Command\RecoverPaymentIntakeDeliveryCommand($this->em(), $cash, $companies, $polls, $container->get('monolog.logger.telegram'), $access);
+        $tester = new \Symfony\Component\Console\Tester\CommandTester($command);
+        self::assertSame(0, $tester->execute(['company-id' => self::COMPANY]));
+        self::assertCount($beforeSent, $this->sent);
+        self::assertCount($beforeQueued, $transport->getSent());
+        self::assertSame($beforeSession, $this->em()->getConnection()->fetchAssociative($sessionSql, [$session->getId()]));
+        self::assertSame($beforeDraft, $this->em()->getConnection()->fetchAssociative($draftSql, [self::COMPANY]));
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction WHERE company_id = ?', [self::COMPANY]));
+    }
+
+    /** @return array<string, array{bool, string}> */
+    public static function revokedAccessProvider(): array
+    {
+        return ['company revoked' => [true, ''], 'global disabled' => [false, self::COMPANY], 'malformed list' => [true, self::COMPANY.',invalid']];
+    }
+
+    public function testRecoveryCanSkipCashWhilePublishingTelegramIntent(): void
+    {
+        $client = $this->setupClient(true, true);
+        $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
+        $session = $this->em()->getRepository(\App\Telegram\Entity\PaymentIntakeSession::class)->findOneBy(['companyId' => self::COMPANY]);
+        self::assertInstanceOf(\App\Telegram\Entity\PaymentIntakeSession::class, $session);
+        $session->finishPolling();
+        $session->schedulePolling();
+        $this->em()->flush();
+        $this->em()->getConnection()->executeStatement('UPDATE cash_payment_intake_draft SET dispatch_pending = true WHERE company_id = ?', [self::COMPANY]);
+        $transport = $client->getContainer()->get('messenger.transport.async_payment_intake');
+        self::assertInstanceOf(\Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport::class, $transport);
+        $before = count($transport->getSent());
+        $tester = new \Symfony\Component\Console\Tester\CommandTester($client->getContainer()->get(\App\Telegram\Command\RecoverPaymentIntakeDeliveryCommand::class));
+        self::assertSame(0, $tester->execute(['company-id' => self::COMPANY, '--skip-cash-recovery' => true]));
+        self::assertTrue($this->em()->getConnection()->fetchOne('SELECT dispatch_pending FROM cash_payment_intake_draft WHERE company_id = ?', [self::COMPANY]));
+        self::assertCount($before + 1, $transport->getSent());
+    }
 
     public function testConfiguredCompanyWithDisabledServiceCannotFallBackToLegacy(): void
     {
@@ -144,7 +303,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         $this->em()->getConnection()->executeStatement('DELETE FROM client_bindings WHERE company_id = ?', [self::COMPANY]);
         $this->em()->clear();
         $container = $client->getContainer();
-        $disabledAction = new \App\Telegram\Application\PaymentIntakeTelegramAction($this->em(), $container->get(\App\Cash\Facade\CashFacade::class), $container->get(\App\Company\Facade\CompanyFacade::class), $container->get(\App\Company\Facade\FinancialResponsibilityCenterFacade::class), $container->get(AiTaskFacadeInterface::class), $container->get(\App\Telegram\Application\QueuePaymentIntakePollAction::class), false);
+        $disabledAction = new \App\Telegram\Application\PaymentIntakeTelegramAction($this->em(), $container->get(\App\Cash\Facade\CashFacade::class), $container->get(\App\Company\Facade\CompanyFacade::class), $container->get(\App\Company\Facade\FinancialResponsibilityCenterFacade::class), $container->get(AiTaskFacadeInterface::class), $container->get(\App\Telegram\Application\QueuePaymentIntakePollAction::class), new \App\Telegram\Application\PaymentIntakeAccess(false, self::COMPANY));
         $replay = $disabledAction->message($binding->getBot(), $this->message('+1500 доход'), '+1500 доход');
         self::assertIsArray($replay, 'Known Cash intake source must never fall through to legacy after its binding/session was removed.');
     }
@@ -300,7 +459,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         $queued[] = $poll;
         self::assertInstanceOf(\App\Telegram\Message\RefreshPaymentIntakeMessage::class, $poll);
         $container = $client->getContainer();
-        $handler = new \App\Telegram\MessageHandler\RefreshPaymentIntakeMessageHandler($this->em(), $container->get(\App\Cash\Facade\CashFacade::class), $container->get(\App\Company\Facade\CompanyFacade::class), $container->get(\App\Company\Facade\FinancialResponsibilityCenterFacade::class), $results, $container->get(\App\Telegram\Application\PaymentIntakePresenter::class), $container->get('http_client'), new \App\Telegram\Application\QueuePaymentIntakePollAction($this->em(), $bus), $container->get('monolog.logger.telegram'));
+        $handler = new \App\Telegram\MessageHandler\RefreshPaymentIntakeMessageHandler($this->em(), $container->get(\App\Cash\Facade\CashFacade::class), $container->get(\App\Company\Facade\CompanyFacade::class), $container->get(\App\Company\Facade\FinancialResponsibilityCenterFacade::class), $results, $container->get(\App\Telegram\Application\PaymentIntakePresenter::class), $container->get('http_client'), new \App\Telegram\Application\QueuePaymentIntakePollAction($this->em(), $bus, new \App\Telegram\Application\PaymentIntakeAccess(true, self::COMPANY)), $container->get('monolog.logger.telegram'), new \App\Telegram\Application\PaymentIntakeAccess(true, self::COMPANY));
         try {
             $handler($poll);
             self::fail('Successor enqueue must fail once.');
@@ -393,7 +552,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
 
             return new \Symfony\Component\Messenger\Envelope($message, $stamps);
         });
-        $polls = new \App\Telegram\Application\QueuePaymentIntakePollAction($this->em(), $bus);
+        $polls = new \App\Telegram\Application\QueuePaymentIntakePollAction($this->em(), $bus, new \App\Telegram\Application\PaymentIntakeAccess(true, self::COMPANY));
         try {
             $polls($session);
             self::fail('Initial publication must fail once.');
@@ -402,7 +561,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         }
         self::assertNotNull($session->pendingPoll());
         $container = $client->getContainer();
-        $command = new \App\Telegram\Command\RecoverPaymentIntakeDeliveryCommand($this->em(), $container->get(\App\Cash\Facade\CashFacade::class), $container->get(\App\Company\Facade\CompanyFacade::class), $polls, $container->get('monolog.logger.telegram'));
+        $command = new \App\Telegram\Command\RecoverPaymentIntakeDeliveryCommand($this->em(), $container->get(\App\Cash\Facade\CashFacade::class), $container->get(\App\Company\Facade\CompanyFacade::class), $polls, $container->get('monolog.logger.telegram'), new \App\Telegram\Application\PaymentIntakeAccess(true, self::COMPANY));
         $tester = new \Symfony\Component\Console\Tester\CommandTester($command);
         self::assertSame(0, $tester->execute(['company-id' => self::COMPANY]));
         self::assertCount(1, $queued);
@@ -415,7 +574,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
 
     public function testDisabledRolloutPreservesLegacyForAiGrantedNeverSelectedBinding(): void
     {
-        $client = $this->setupClient(true, true, false);
+        $client = $this->setupClient(true, true, false, '');
         $this->post($client, ['message' => $this->message('+1500 доход')]);
         self::assertResponseIsSuccessful();
         self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction WHERE company_id = ?', [self::COMPANY]));
@@ -739,8 +898,11 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         return (string) ($this->sent[count($this->sent) - 1]['text'] ?? '');
     }
 
-    private function setupClient(bool $actorBound, bool $enabled = false, bool $intakeEnabled = true): KernelBrowser
+    private function setupClient(bool $actorBound, bool $enabled = false, bool $intakeEnabled = true, string $scope = self::COMPANY): KernelBrowser
     {
+        $this->previousScopeEnv = $_ENV['TELEGRAM_PAYMENT_INTAKE_COMPANIES'] ?? null;
+        $this->previousScopeServer = $_SERVER['TELEGRAM_PAYMENT_INTAKE_COMPANIES'] ?? null;
+        $_ENV['TELEGRAM_PAYMENT_INTAKE_COMPANIES'] = $_SERVER['TELEGRAM_PAYMENT_INTAKE_COMPANIES'] = $scope;
         $client = static::createClient();
         $client->disableReboot();
         $owner = UserBuilder::aUser()->withId('22222222-2222-2222-2222-abcd0000ee01')->withEmail('tg-intake@example.test')->build();
@@ -775,7 +937,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         $client->getContainer()->set(AiTaskFacadeInterface::class, $ai);
         if (!$intakeEnabled) {
             $container = $client->getContainer();
-            $container->set(\App\Telegram\Application\PaymentIntakeTelegramAction::class, new \App\Telegram\Application\PaymentIntakeTelegramAction($this->em(), $container->get(\App\Cash\Facade\CashFacade::class), $container->get(\App\Company\Facade\CompanyFacade::class), $container->get(\App\Company\Facade\FinancialResponsibilityCenterFacade::class), $ai, $container->get(\App\Telegram\Application\QueuePaymentIntakePollAction::class), false));
+            $container->set(\App\Telegram\Application\PaymentIntakeTelegramAction::class, new \App\Telegram\Application\PaymentIntakeTelegramAction($this->em(), $container->get(\App\Cash\Facade\CashFacade::class), $container->get(\App\Company\Facade\CompanyFacade::class), $container->get(\App\Company\Facade\FinancialResponsibilityCenterFacade::class), $ai, $container->get(\App\Telegram\Application\QueuePaymentIntakePollAction::class), new \App\Telegram\Application\PaymentIntakeAccess(false, $scope)));
         }
         $client->getContainer()->set('http_client', new MockHttpClient(function (string $method, string $url, array $options): MockResponse {
             if ($this->failNextDelivery) {

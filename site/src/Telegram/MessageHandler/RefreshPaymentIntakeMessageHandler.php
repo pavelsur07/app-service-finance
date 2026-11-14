@@ -9,6 +9,7 @@ use App\Cash\Facade\CashFacade;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\ServiceGateway\Facade\AiTaskResultFacadeInterface;
+use App\Telegram\Application\PaymentIntakeAccess;
 use App\Telegram\Application\PaymentIntakePresenter;
 use App\Telegram\Application\QueuePaymentIntakePollAction;
 use App\Telegram\Entity\ClientBinding;
@@ -25,12 +26,15 @@ final readonly class RefreshPaymentIntakeMessageHandler
 {
     private const MAX_ATTEMPTS = 15;
 
-    public function __construct(private EntityManagerInterface $em, private CashFacade $cash, private CompanyFacade $companies, private FinancialResponsibilityCenterFacade $centers, private AiTaskResultFacadeInterface $results, private PaymentIntakePresenter $presenter, private HttpClientInterface $http, private QueuePaymentIntakePollAction $polls, private LoggerInterface $telegramLogger, private string $telegramApiBaseUrl = 'https://api.telegram.org')
+    public function __construct(private EntityManagerInterface $em, private CashFacade $cash, private CompanyFacade $companies, private FinancialResponsibilityCenterFacade $centers, private AiTaskResultFacadeInterface $results, private PaymentIntakePresenter $presenter, private HttpClientInterface $http, private QueuePaymentIntakePollAction $polls, private LoggerInterface $telegramLogger, private PaymentIntakeAccess $access, private string $telegramApiBaseUrl = 'https://api.telegram.org')
     {
     }
 
     public function __invoke(RefreshPaymentIntakeMessage $message): void
     {
+        if (!$this->access->isAllowed($message->companyId)) {
+            return;
+        }
         $this->telegramLogger->info('Telegram intake refresh started', ['companyId' => $message->companyId, 'sessionId' => $message->sessionId, 'attempt' => $message->attempt]);
         $session = $this->em->getRepository(PaymentIntakeSession::class)->findOneBy(['id' => $message->sessionId, 'companyId' => $message->companyId]);
         if (!$session instanceof PaymentIntakeSession || !$session->pollingMatches($message->generation)) {
