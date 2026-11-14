@@ -78,7 +78,18 @@
 
 ## 3. Что выполнено
 
-_заполняется по ходу_
+14.11, ветка `docs/stage7-plan`, без миграций:
+
+- 7.1 — `MarketplaceOperationsFacadeInterface::daySums`, гейт Ozon: перевод = канон за 45 дней (сумма
+  расхождения) и отставание кабинета больше D−2; тесты — зелёный, потерянная строка канона, отставший кабинет.
+- 7.2 — гейт витрины: нераспределённое за 7 дней > 1 % затрат; тест — день без выручки → красный.
+- 7.3 — модуль `MarketplaceQuality`, экран R10 `/marketplace/economics/quality` (вкладка «Качество
+  данных»); фасады `MarketplaceOzonFacadeInterface`, `MarketplaceEconomicsFacadeInterface`, фильтр компании
+  в `SourceFactsFacadeInterface::periods`; unit-тест сборщика (все звенья), функциональный — чужие
+  расхождения не видны, аноним — на вход; PHPat — только фасады.
+- 7.4 — `ARCHITECTURE.md`, `health-gates.md`.
+- Гейты локально: PHPStan по изменённым модулям и `tests/Architecture` — 0 ошибок; CS, twigcs, `lint:twig`
+  чисто; тесты модулей контура — 60 зелёных.
 
 ## 4. Чек-лист приёмки
 
