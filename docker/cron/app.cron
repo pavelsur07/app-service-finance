@@ -378,6 +378,10 @@
 10-59/15 * * * * cd /app && php bin/console app:marketplace-economics:refresh --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 15 7 * * * cd /app && php bin/console app:marketplace-economics:refresh --recent=45 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 30 9 * * * cd /app && php bin/console app:marketplace-economics:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+# Отчёт R3 «Неделя» по понедельникам 09:00 МСК — после ночного пересчёта витрины: сводка и xlsx за прошлую неделю
+# владельцу на почту и в Telegram. Включение — ECONOMICS_WEEKLY_REPORT_COMPANIES; журнал me_weekly_report не даёт
+# второй отправки, сбой канала снимает отметку — ручной повтор дошлёт. Сбой компании — ERROR, exit 1.
+0 9 * * 1 cd /app && php bin/console app:marketplace-economics:weekly-report --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
 # ai-service (docs/maintenance/ai-service-prod.md). Выключено (AI_SERVICE_ENABLED, адрес, токен) —
 # обе команды выходят с 0, ничего не делая. Импорт результатов: сервис недоступен — WARNING и exit 0,

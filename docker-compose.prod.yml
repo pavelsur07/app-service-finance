@@ -574,6 +574,9 @@ services:
             # Приём фактов из сервисов (cron app:source-facts:pull, модуль SourceFacts): UUID компаний
             # через запятую, * — все, пусто — выключено. GitHub variable SOURCE_FACTS_COMPANIES + деплой.
             SOURCE_FACTS_COMPANIES: ${SOURCE_FACTS_COMPANIES:-}
+            # Недельный отчёт экономики SKU (cron app:marketplace-economics:weekly-report): UUID через запятую,
+            # * — все, пусто — выключено. GitHub variable ECONOMICS_WEEKLY_REPORT_COMPANIES + деплой.
+            ECONOMICS_WEEKLY_REPORT_COMPANIES: ${ECONOMICS_WEEKLY_REPORT_COMPANIES:-}
             # Витрина покрытия wb-fetcher (вкладка Wildberries), токен «Symfony → сервис».
             WB_FETCHER_BASE_URL: http://wb-fetcher:8080
             WB_FETCHER_API_TOKEN: ${WB_FETCHER_API_TOKEN:-}

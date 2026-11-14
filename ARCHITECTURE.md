@@ -657,6 +657,7 @@
 | Таблица | Что | Ключ |
 |---|---|---|
 | `me_day_line` | строка витрины: `listing_id` (пусто — без SKU), `measure` (вид канона или `cost_price` / `ads_allocated` / `storage_share` / `overhead_share`), `level` (`revenue` / `cost_price` / `md1` / `md2` / `overhead` / `info`), `amount_minor`, `quantity`, `allocation_key` | `id`; индекс `(company_id, operation_date)` |
+| `me_weekly_report` | отметка отправки недельного отчёта: `delivery` (`email` / `telegram`), `sent_at` | `(company_id, week_start, delivery)` |
 | `me_day` | пересчитанный день: `canon_minor` (Σ канона без справочных), `unallocated_minor`, `cost_price_minor`, листингов без себестоимости, версия правил | `(company_id, channel, connection_ref, operation_date)` |
 
 - Расчёт дня — `DayEconomicsCalculator` (чистая функция): себестоимость = (продано − возвращено) × цена на
@@ -682,6 +683,14 @@
   `SkuEconomicsQuery::byStep` (`date_trunc`, неделя с понедельника), все шаги периода (пустые — нули, края
   обрезаны периодом), график — встроенный SVG. Набор SKU при тегах или поиске берётся из R1 за тот же
   период, поэтому итог R2 = итог R1.
+- Отчёт R3 «Неделя» — `app:marketplace-economics:weekly-report` (cron `0 9 * * 1` МСК; `--week`, `--company`,
+  `--dry-run`): за прошлую неделю R1 (`SkuEconomicsReportBuilder`, с разнесением) → сводка
+  `WeeklyEconomicsSummary` (итог против прошлой недели, топ-5 роста и падения СМ2, SKU в минусе, ДРР > 20 %)
+  и xlsx R1 владельцу компании на почту (`NotificationRouter`, синхронно) и привязанным пользователям в
+  Telegram (`TelegramFacadeInterface::sendDocumentToCompany`). Включение — `ECONOMICS_WEEKLY_REPORT_COMPANIES`
+  (UUID через запятую, `*` — все, пусто — выключено). Журнал `me_weekly_report` (ключ
+  `(company_id, week_start, delivery)`): отметка `INSERT … ON CONFLICT DO NOTHING` до отправки, сбой или
+  0 получателей — отметка снимается; повтор прогона дошлёт только неотправленное. Транзакций нет.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -4033,6 +4042,16 @@ buildQueryBuilder(
 
 ---
 
+## Telegram: фасад для других модулей
+
+`App\Telegram\Facade\TelegramFacadeInterface` (реализация `TelegramFacade`):
+
+- `sendDocumentToCompany(companyId, path, fileName, caption): array{sent, failed}` — файл (multipart
+  `sendDocument`, подпись ≤ 1024 символов) каждому пользователю с активной привязкой
+  `client_bindings` к компании у активного бота. Нет бота или привязок — `0/0`. HTTP вызывается вне
+  транзакций, данных не пишет; сбой одного получателя — `warning` и `failed`, остальным отправляется.
+  Потребитель — недельный отчёт `MarketplaceEconomics`.
+
 ## Telegram → Cash: контракт интеграции
 
 ### PaymentIntake: текстовые черновики
@@ -5589,6 +5608,7 @@ config/
 | `app:marketplace-economics:refresh` | `10-59/15 * * * *` | Пересчёт витрины экономики SKU по дням, заменённым в каноне; день — транзакция; сбой дня — ERROR в конце прогона |
 | `app:marketplace-economics:refresh --recent=45` | `15 7 * * *` | То же + все дни с операциями за 45 суток (себестоимость и реклама легаси меняются без отметки в каноне) |
 | `app:marketplace-economics:health-check` | `30 9 * * *` | Гейт витрины: Σ витрины дня ≠ Σ канона или заменённый день не пересчитан > 60 мин — ERROR, exit 1 |
+| `app:marketplace-economics:weekly-report` | `0 9 * * 1` | Отчёт R3 «Неделя»: сводка и xlsx за прошлую неделю владельцу (почта) и в Telegram; `ECONOMICS_WEEKLY_REPORT_COMPANIES`; сбой компании — ERROR, exit 1 |
 | `app:marketplace-ozon:health-check` | `20 9 * * *` | Гейт переводчика Ozon: код без решения в карантине > 24 ч или непереведённый день — ERROR, exit 1 |
 | `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
 | `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (`AI_SERVICE_ENABLED`, адрес, токен) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
@@ -5689,6 +5709,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.185 | 2026-11-14 | MarketplaceEconomics: отчёт R3 «Неделя» — `app:marketplace-economics:weekly-report` (понедельник 09:00), журнал `me_weekly_report` (`Version20261114230000`), `ECONOMICS_WEEKLY_REPORT_COMPANIES`; Telegram: фасад `TelegramFacadeInterface::sendDocumentToCompany` (этап 6.5) |
 | 2.184 | 2026-11-14 | MarketplaceOperations: вид `mp_other_deductions` «Прочие удержания МП» (уровень «общие») — код Ozon 7 и разовые удержания без своего вида |
 | 2.183 | 2026-11-14 | MarketplaceOzon: комиссия — поле `commission` (нет — `sale_commission`), как в легаси; `ozon:unexplained` (10 начислений) обнуляется, `RULES_VERSION` `ozon-by-day-3` |
 | 2.182 | 2026-11-14 | MarketplaceOzon: оплата за заказ (тип 54) без SKU делится по проданным штукам SKU за день (`sales_qty_share`), `RULES_VERSION` `ozon-by-day-2` (этап 6.1b упрощённо) |
