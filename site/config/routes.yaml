@@ -167,6 +167,12 @@ marketplace_ozon_admin_controllers:
         namespace: App\MarketplaceOzon\Controller\Admin
     type: attribute
 
+marketplace_economics_controllers:
+    resource:
+        path: ../src/MarketplaceEconomics/Controller/
+        namespace: App\MarketplaceEconomics\Controller
+    type: attribute
+
 api_management_controllers:
     resource:
         path: ../src/Api/Controller/

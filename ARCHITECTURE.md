@@ -662,6 +662,12 @@
   под `pg_advisory_xact_lock` `me:…`. Порядок блокировок — день канона раньше дня витрины.
 - Гейт `app:marketplace-economics:health-check` (cron 09:30 МСК): Σ витрины дня ≠ Σ канона или заменённый
   день не пересчитан дольше 60 мин — `error`, exit 1.
+- Отчёт R1 «Экономика SKU» — `GET /marketplace/economics` (`SkuEconomicsController`, новый слой
+  `_layout/app.html.twig`, серверный Twig; `?format=xlsx` — та же выборка файлом; доступ
+  `MARKETPLACE_READ`): период ≤ 366 дней (иначе 422), кабинет, теги, поиск, сортировка, «с разнесением /
+  без», Pagerfanta ≤ 200. `SkuEconomicsReportBuilder` — свод `me_day_line` за период и прошлый период той же
+  длины (`SkuEconomicsQuery`), уровни — `SkuMetrics`. Без фильтра итог = кабинет (SKU + нераспределённое);
+  с тегами или поиском — Σ строк. Нет витрины — пустое состояние со ссылкой на легаси-экран.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -5529,6 +5535,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.176 | 2026-11-14 | MarketplaceEconomics: отчёт R1 «Экономика SKU» `/marketplace/economics` (+ xlsx) на новом слое, пункты меню в обоих интерфейсах; легаси `unit-extended` не меняется (этап 5.2 `marketplace-profit-pipeline`) |
 | 2.175 | 2026-11-14 | MarketplaceEconomics: новый модуль — витрина экономики SKU (`me_day_line`, `me_day`, `Version20261114120000`), `app:marketplace-economics:refresh` (`*/15`, `--recent=45` 07:15) и гейт `app:marketplace-economics:health-check` (09:30); MarketplaceOperations: чтение `dirtyDays` / `days` / `takeDay`; PHPat — витрина знает только фасады (задача `marketplace-profit-pipeline`, этап 5.1) |
 | 2.174 | 2026-11-14 | ServiceGateway: `AiTaskFacadeInterface::PLATFORM_COMPANY_ID` — задачи по общим данным без подключения компании к ИИ; черновик кода Ozon ставится от платформы (этап 4.3 `marketplace-profit-pipeline`) |
 | 2.173 | 2026-11-14 | MarketplaceOzon: черновик ИИ для нового кода (`marketplace_source_type_draft`, ai-task v1.3, `RequestOzonSourceTypeDraftsAction`, `OzonSourceTypeDraftConsumer`) и экран администратора `/admin/marketplace/ozon-source-types`; `OperationKind::label()` (этап 4.3 `marketplace-profit-pipeline`) |

@@ -61,6 +61,7 @@ final class ModuleAccessMap
         'App\\Marketplace\\' => Module::MARKETPLACE,
         'App\\MarketplaceAds\\' => Module::MARKETPLACE,
         'App\\MarketplaceAnalytics\\' => Module::MARKETPLACE,
+        'App\\MarketplaceEconomics\\' => Module::MARKETPLACE,
         'App\\Inventory\\' => Module::MARKETPLACE,
         'App\\Ingestion\\' => Module::MARKETPLACE,
         'App\\MoySklad\\' => Module::MARKETPLACE,
