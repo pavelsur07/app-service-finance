@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\MarketplaceEconomics;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\MarketplaceEconomics\Application\Action\RefreshEconomicsDayAction;
 use App\MarketplaceEconomics\Command\EconomicsHealthCheckCommand;
 use App\MarketplaceEconomics\Command\RefreshEconomicsCommand;
 use App\MarketplaceOperations\Application\DTO\DayOperations;
@@ -84,6 +85,16 @@ final class RefreshEconomicsCommandTest extends IntegrationTestCase
         $this->canon('2026-11-10', 1);
         self::assertStringContainsString('1 days, 1 refreshed', $this->refresh());
         self::assertSame(-35000, (int) $this->connection->fetchOne('SELECT cost_price_minor FROM me_day WHERE company_id = ?', [$this->companyId]));
+    }
+
+    public function testDaysOfPreviousRulesVersionAreRefreshed(): void
+    {
+        $this->canon('2026-11-10', 1);
+        $this->refresh();
+        $this->connection->executeStatement("UPDATE me_day SET rules_version = 'economics-0' WHERE company_id = ?", [$this->companyId]);
+
+        self::assertStringContainsString('1 days, 1 refreshed', $this->refresh());
+        self::assertSame(RefreshEconomicsDayAction::RULES_VERSION, $this->connection->fetchOne('SELECT rules_version FROM me_day WHERE company_id = ?', [$this->companyId]));
     }
 
     public function testGateCatchesUnbalancedDay(): void

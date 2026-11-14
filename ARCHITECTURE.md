@@ -656,12 +656,13 @@
 | `me_day` | пересчитанный день: `canon_minor` (Σ канона без справочных), `unallocated_minor`, `cost_price_minor`, листингов без себестоимости, версия правил | `(company_id, channel, connection_ref, operation_date)` |
 
 - Расчёт дня — `DayEconomicsCalculator` (чистая функция): себестоимость = (продано − возвращено) × цена на
-  дату (D5); реклама без SKU из канона — по долям рекламы SKU легаси (`legacy_ads_share`); хранение без
+  дату (D5); реклама без SKU из канона — каждый вид по долям SKU в статистике легаси своего вида (клики —
+  `legacy_clicks_share`, оплата за заказ — `legacy_order_share`; нет статистики — без SKU); хранение без
   SKU — по остатку на дату (`stock_share`), без остатков — к общим; общие и прямые без SKU — по выручке
   SKU за день (`revenue_share`, D3). Разнесение — пара строк (доля на SKU и обратная без SKU), поэтому
   Σ строк без `cost_price`/`info` = `canon_minor`, строки без SKU — нераспределённое.
 - `app:marketplace-economics:refresh` (cron `*/15` со сдвигом 5 мин после перевода; `--recent=45` ночью;
-  `--from/--to` вручную) — точка входа и владелец транзакций: день — одна транзакция,
+  `--from/--to` вручную; дни с прежней `RULES_VERSION` пересчитываются сами) — точка входа и владелец транзакций: день — одна транзакция,
   `RefreshEconomicsDayAction` → `takeDay` (блокировка дня канона, снятие отметки) → замена дня витрины
   под `pg_advisory_xact_lock` `me:…`. Порядок блокировок — день канона раньше дня витрины.
 - Гейт `app:marketplace-economics:health-check` (cron 09:30 МСК): Σ витрины дня ≠ Σ канона или заменённый
@@ -5540,6 +5541,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 | Версия | Дата | Что изменилось |
 |---|---|---|
 | 2.178 | 2026-11-14 | MarketplaceOzon: CPC разносится по SKU из статистики Performance (`ozon.ads.statistics`, ozon-fetcher публикует фактами, `source-fact-envelope` v1.1.0), `moz_day.ads_revision` (`Version20261114180000`); день переводится заново при новой статистике (этап 6.1–6.2 `marketplace-profit-pipeline`) |
+| 2.177 | 2026-11-14 | MarketplaceEconomics: реклама разносится по долям статистики своего вида (клики / оплата за заказ), `RULES_VERSION` `economics-2`; refresh сам пересчитывает дни прежней версии правил; итог сверки 5.3 — `stages/stage-5.md` |
 | 2.176 | 2026-11-14 | MarketplaceEconomics: отчёт R1 «Экономика SKU» `/marketplace/economics` (+ xlsx) на новом слое, пункты меню в обоих интерфейсах; легаси `unit-extended` не меняется (этап 5.2 `marketplace-profit-pipeline`) |
 | 2.175 | 2026-11-14 | MarketplaceEconomics: новый модуль — витрина экономики SKU (`me_day_line`, `me_day`, `Version20261114120000`), `app:marketplace-economics:refresh` (`*/15`, `--recent=45` 07:15) и гейт `app:marketplace-economics:health-check` (09:30); MarketplaceOperations: чтение `dirtyDays` / `days` / `takeDay`; PHPat — витрина знает только фасады (задача `marketplace-profit-pipeline`, этап 5.1) |
 | 2.174 | 2026-11-14 | ServiceGateway: `AiTaskFacadeInterface::PLATFORM_COMPANY_ID` — задачи по общим данным без подключения компании к ИИ; черновик кода Ozon ставится от платформы (этап 4.3 `marketplace-profit-pipeline`) |
