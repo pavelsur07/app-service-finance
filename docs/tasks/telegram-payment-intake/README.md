@@ -49,7 +49,7 @@ services/ai-service/src/ai_service/tasks/parse_payment_message/
   schemas.py                     типизированный вход и результат
   task.py                        подключение к существующему pipeline
   checks.py                      проверка результата и исходных фрагментов
-  prompts/v1.md, v2.md           версии инструкции; v2 включает schema из модели
+  prompts/v1.md, v2.md, v3.md    версии инструкции; schema генерируется из модели
 
 services/_contracts/ai-parse-payment-message/v1/
                                  контракт payload/output

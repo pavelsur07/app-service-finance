@@ -53,8 +53,8 @@
     },
     "corpus_sha256": "8e630000b77b64a932417322d2f65a2bac3a2316c3691a9ab2be13dfdb5723bf",
     "review_sha256": "7356ac909c142191c0fe70353c57ed44cbf20eb1a55b0ca4aec57d9f484dd9b4",
-    "prompt": "parse_payment_message/v2",
-    "prompt_sha256": "c206f849251e930968ea7f3d0da77a351ba6b5f56750c0b8505918939d763f55",
+    "prompt": "parse_payment_message/v3",
+    "prompt_sha256": "ce694e692cf25d25c47807ce353d6ababf9d96735037dfac9ff87d096987ac1b",
     "runner_sha256": "11c5f1882329f0d999a3221956c45f8113c9957c4c71e2c5d62048f4013e22b9",
     "gold": "partial_annotations",
     "schema_sha256": "904fbed170cdc02f503a66d72dd7cb0cbe20be32cdbda8605b47d9b791034d8a"

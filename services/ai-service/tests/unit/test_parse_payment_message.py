@@ -280,5 +280,5 @@ def test_payment_prompt_supplies_authoritative_output_schema_to_model() -> None:
         "inflow",
         "outflow",
     ]
-    assert spec.prompt.version == "v2"
+    assert spec.prompt.version == "v3"
     assert spec.risk.value == "high"

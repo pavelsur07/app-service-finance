@@ -205,3 +205,28 @@ Manifest currentv2rendered prompt; no model calls since diagnostic59campaign tot
 Next: commitv2+schema diagnostics, distinct65-file bundle, same10IDs max20calls
 with ledger guard59+20<=82, old archives/reports immutable. Reviewer privacy-delta
 followup pending, priorv2reviewB0/I0/M0. Default NoPayment/date/paid policy unchanged.
+
+2026-11-14 latest: promptv2 committed/pushed4160b4e08; targeted10cases completed
+12calls. Campaign ledger71/82 used,11remaining, no active paid process.
+V2 subset mentions6/19,amount5/18,direction6/7; NOT accepted: long-list016 now
+direction_contradiction,009date_unanchored,011paid_unanchored,022description
+string_type(null). Schema recovered001/026/027/041. Comparisons are development
+subset constraints only; no full-corpus or independent quality estimate.
+
+Source investigation confirms009 adjective(today) outside supported date tokens,
+011 paid verb on another line,016 plus between money expressions/list symbols,
+022 two bare monetary expressions. V2 global 'unknown=null' conflicts with
+nonnullable description schema. Next work item: specification for conservative
+promptv3 with field-specific unknown handling and strict occurrence-local rules;
+do not change verifier/contract/consumer. Live v2 is observed RED evidence for
+model behavior; do not replace live validation with tests grepping prose.
+Final authorized targeted run may use at most10calls on original009/011/016/022
+and026(control), ledger guard71+10<=82, same provider/key/root exception. Any
+additional full-corpus live run needs a new budget approval. Pilot remains OFF.
+
+Promptv3 conservative field instructions implemented; automated gates303PASS/
+1skip,eval9PASS/1skip,ruff92/mypy55PASS. Independent targeted reviewerB0/I0/M0.
+Offline manifest41cases/0calls/currentv3; initial absolute output path failed
+FileNotFoundError, corrected relative path passed (no calls). Ready to commit
+local delta then bundle66files and run five declared IDs max10 with guard71.
+Schema/verifier/v1/v2 unchanged byte-for-byte; quality still requires live proof.
