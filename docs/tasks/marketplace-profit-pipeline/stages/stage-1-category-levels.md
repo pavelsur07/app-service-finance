@@ -51,3 +51,37 @@
 
 Категории, которых у кабинета за период не было (остальные коды `OzonCostCategory`), получают
 уровень на этапе 4 при переносе справочника: правило то же, спорные — списком на утверждение.
+
+## WB: поле / операция строки → вид → уровень (этап 8.0, 14.11.2026)
+
+Эталон легаси WB: 3 кабинета, 16.09 – 13.11.2026, Σ затрат по категориям (`~/vf-measurements/.../2026-11-14-stage8/baseline-wb`).
+`source_type` — по W4 (`stages/stage-8.md`). Строки с ❓ — предложение, решение администратора на экране кодов
+WB (как у Ozon); новые виды канона — только по этому решению.
+
+| `source_type` | Легаси-категория | Σ легаси, ₽ | Вид канона | Уровень |
+|---|---|---:|---|---|
+| `wb:field:sale` (`retailPriceWithDisc × quantity`, «Продажа») | продажа | — | `sale` | выручка |
+| `wb:field:return` (то же, «Возврат») | возврат | — | `return` | выручка |
+| `wb:calc:spp` (выручка − `retailAmount`) | — (легаси не хранит) | — | `spp` | справочно |
+| `wb:calc:commission` (выручка − `forPay` − `acquiringFee`) | `commission` | 1 993 268,79 | `commission` | СМ1 |
+| `wb:field:acquiringFee` | `acquiring` | 120 065,37 | `acquiring` | СМ1 |
+| `wb:field:deliveryService` (доставка) + коррекция логистики | `logistics_delivery`, `logistics_correction` | 351 811,35 | `logistics_to` | СМ1 |
+| `wb:field:deliveryService` (возврат) | `logistics_return` | 111 642,56 | `logistics_back` | СМ1 |
+| `wb:field:rebillLogisticCost` | `warehouse_logistics` | 35 660,27 | ❓ `logistics_to` | СМ1 |
+| `wb:field:ppvzReward` | `pvz_processing` | 9 555,07 | ❓ `logistics_to_last_mile` | СМ1 |
+| `wb:field:paidAcceptance` | `product_processing` | 13 510,00 | ❓ новый вид `acceptance` «Приёмка и обработка товара» | СМ1 (как хранение) |
+| `wb:field:paidStorage` | `storage` | 826,53 | `storage` | СМ1 |
+| `wb:field:penalty` | `penalty` | 9 904,44 | `fine` | СМ3 |
+| `wb:deduction:Оказание услуг «WB Продвижение»` | `wb_okazanie_uslug_wb_prodvizhenie` (под статистикой рекламы) | 520 729,00 | ❓ новый вид `ads_settlement` «Списание рекламы (справочно)» — W6 | справочно |
+| `wb:deduction:Предоставление услуг по подписке «Джем»` | `wb_predostavlenie_uslug_po_podpiske_dzhem` | 45 980,00 | `subscription` | СМ3 |
+| `wb:deduction:Утилизация товара…` | `wb_warehouse_disposal` | 88,00 | `disposal` | СМ1 |
+| `wb:field:cashbackDiscount` | `wb_loyalty_discount_compensation` | 5 901,58 | `compensation` | СМ3 |
+| `wb:field:cashbackCommissionChange` | `wb_loyalty_program_fee` | 182,39 | ❓ `promo_seller_bonus` | СМ3 |
+| `wb:field:cashbackAmount` | `wb_review_points_withheld` | 2 050,00 | `promo_reviews` | СМ3 |
+| `wb:field:additionalPayment` | (Ingestion: доплата) | — | `compensation` | СМ3 |
+| `wb:deduction:<другая причина>` | `wb_<slug>` создаётся сам | — | карантин → черновик ИИ → администратор | — |
+
+Реклама WB в каноне — из `wb.ads.daily` (расход `updSum` по дням, вид `ads_cpc`, СМ2, разнесение по
+`fullstats`), а не из удержания «WB Продвижение»: удержание приходит нерегулярно (19 строк за 2 месяца)
+и уже оплаченными суммами. Чтобы не считать рекламу дважды и сохранить `total = canon + quarantine`,
+удержание идёт в справочный вид (W6).

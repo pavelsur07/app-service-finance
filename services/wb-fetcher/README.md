@@ -41,6 +41,12 @@ Dev-БД `wb_fetcher` и роль `svc_wb_fetcher` создаёт init
 `connection_limit`, `resource_stop` (описание — README ozon-fetcher «Схема
 БД»). У кабинета не больше одной `running`-задачи.
 
+**Факты** (`source-fact-envelope` v1): новая ревизия дня `wb.finance.sales-report.daily`
+ставит пачку в `outbox_batch` (ядро, транзакция `FinishTask`); дни, загруженные до
+включения публикации, ставятся при старте (`EnqueueLoadedFactBatches`, идемпотентно —
+своих миграций у сервиса нет). Выдача — `/internal/source-facts*` (Bearer
+`SERVICE_API_TOKEN`), разбиение страницы — `internal/facts`.
+
 **Raw в S3:** `wb/{connection_ref}/{resource_type}/{period_key}/{fetched_at}_{attempt}_p{NNN}_{sha8}.json.gz`
 — ответ WB как есть (204 и `[]` — `[]`), gzip, `If-None-Match: *`.
 

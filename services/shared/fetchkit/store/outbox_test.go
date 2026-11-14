@@ -108,3 +108,28 @@ func TestFactBatchesPageByCursorAndAckIsIdempotent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, left, 2)
 }
+
+func TestEnqueueLoadedFactBatchesBackfillsCurrentRevisionsOnce(t *testing.T) {
+	ctx := context.Background()
+	// История загружена, пока ресурс не публиковался.
+	plain := testTasksWith(t, Options{})
+	_, err := plain.pool.Exec(ctx, `TRUNCATE outbox_batch`)
+	require.NoError(t, err)
+	load(t, plain, spec("ref-b", factResource, "2026-10-20", 5), "p1", "rev1", t0)
+	load(t, plain, spec("ref-b", factResource, "2026-10-21", 5), "p2", "rev2", t0)
+	load(t, plain, spec("ref-b", "ozon.orders.fbo", "2026-10-21", 5), "p3", "rev3", t0)
+
+	tasks := NewTasks(plain.pool, Options{PublishResources: []string{factResource}})
+	n, err := tasks.EnqueueLoadedFactBatches(ctx, t0.Add(time.Hour))
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), n, "только публикуемый ресурс")
+	n, err = tasks.EnqueueLoadedFactBatches(ctx, t0.Add(2*time.Hour))
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), n, "повтор ничего не ставит")
+
+	batches, err := tasks.NewFactBatches(ctx, factResource, time.Time{}, "", 10)
+	require.NoError(t, err)
+	require.Len(t, batches, 2)
+	assert.Equal(t, "ref-b:ozon.finance.accrual-by-day:2026-10-20:r1", batches[0].BatchID)
+	assert.Equal(t, []string{hash("p1")}, batches[0].PageHashes)
+}

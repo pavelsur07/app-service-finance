@@ -19,6 +19,7 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/store"
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/app"
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/config"
+	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/facts"
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/httpapi"
 )
 
@@ -100,6 +101,9 @@ func run(setFlush func(func())) error {
 		deps.Status = ingestion.Tasks.Status
 		deps.Expected = func() fkhttp.Expectation { return httpapi.Expectation(ingestion.Cabinets.List()) }
 		deps.Coverage = ingestion.Tasks.Coverage
+		deps.Facts = &fkhttp.FactsDeps{Resources: facts.Resources, Split: facts.Split,
+			NewBatches: ingestion.Tasks.NewFactBatches, Batch: ingestion.Tasks.FactBatch,
+			BatchPage: ingestion.Tasks.FactBatchPage, Ack: ingestion.Tasks.AckFactBatches, ReadRawObject: ingestion.RawRead.Get}
 		deps.Location = ingestion.Location
 	}
 
