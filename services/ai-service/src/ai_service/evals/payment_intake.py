@@ -9,12 +9,13 @@ import time
 from dataclasses import dataclass, replace
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import ValidationError
 
 from ai_service.core.pipeline import SCHEMA_CHECK, Pipeline, PipelineOutcome, _strip_fences
+from ai_service.evals import payment_intake_semantics as semantics
 from ai_service.evals.compare import EVAL_COMPANY
 from ai_service.llm.adapters import build_adapters
 from ai_service.llm.gateway import LlmGateway
@@ -24,6 +25,8 @@ from ai_service.tasks.parse_payment_message.checks import normalize_money
 from ai_service.tasks.parse_payment_message.schemas import PaymentItem, PaymentOutput
 from ai_service.tasks.parse_payment_message.task import TASK_TYPE, build
 from ai_service.tasks.registry import build_registry
+
+Dataset = Literal["source", "semantic"]
 
 ROOT = Path(__file__).resolve().parents[3]
 CORPUS = ROOT.parents[1] / "docs/tasks/telegram-payment-intake/examples/messages.jsonl"
@@ -48,20 +51,28 @@ def load_holdout() -> list[dict[str, Any]]:
     return cases
 
 
-def manifest(cases: list[dict[str, Any]]) -> dict[str, Any]:
+def manifest(cases: list[dict[str, Any]], dataset: Dataset = "source") -> dict[str, Any]:
     families: dict[str, list[str]] = {}
     for case in cases:
         families.setdefault(case["family"], []).append(case["id"])
     spec = build()
+    package = Path(__file__).resolve().parents[1]
+    task = package / "tasks/parse_payment_message"
     return {
         "N": len(cases),
         "families": families,
-        "corpus_sha256": digest(CORPUS.read_text()),
-        "review_sha256": digest(REVIEW.read_text()),
+        "dataset": dataset,
+        "corpus_sha256": digest((CORPUS if dataset == "source" else semantics.SEMANTIC_CORPUS).read_text()),
+        "review_sha256": digest(REVIEW.read_text()) if dataset == "source" else None,
         "prompt": spec.prompt.id,
         "prompt_sha256": digest(spec.prompt.text),
         "runner_sha256": digest(Path(__file__).read_text()),
-        "gold": "partial_annotations",
+        "pipeline_sha256": digest((package / "core/pipeline.py").read_text()),
+        "task_spec_sha256": digest((task / "task.py").read_text()),
+        "verification_sha256": digest((task / "checks.py").read_text()),
+        "preparation_sha256": digest((task / "preparation.py").read_text()),
+        "semantic_scorer_sha256": digest(Path(semantics.__file__).read_text()) if dataset == "semantic" else None,
+        "gold": "partial_annotations" if dataset == "source" else "synthetic_explicit_choices",
         "schema_sha256": digest((ROOT.parent / "_contracts/ai-parse-payment-message/v1/schema.json").read_text()),
     }
 
@@ -151,7 +162,9 @@ class BoundedAdapter:
         return response
 
 
-def _payload(case: dict[str, Any]) -> dict[str, Any]:
+def _payload(case: dict[str, Any], dataset: Dataset = "source") -> dict[str, Any]:
+    if dataset == "semantic":
+        return dict(case["payload"])
     context = case["context"]
     return {
         "text": case["text"],
@@ -166,7 +179,11 @@ def _payload(case: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _score(cases: list[dict[str, Any]], answers: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def _score(
+    cases: list[dict[str, Any]], answers: dict[str, dict[str, Any]], dataset: Dataset = "source"
+) -> dict[str, Any]:
+    if dataset == "semantic":
+        return semantics.score(cases, answers)
     scores = {
         name: {"numerator": 0, "denominator": 0}
         for name in (
@@ -176,12 +193,18 @@ def _score(cases: list[dict[str, Any]], answers: dict[str, dict[str, Any]]) -> d
             "scale_abstention",
             "correction_intent_agreement",
             "marked_question_presence",
+            "payment_intent_agreement",
         )
     }
     for case in cases:
         gold, answer = case["annotations"], answers.get(case["id"], {})
         items = answer.get("items", [])
         questions = bool(answer.get("questions") or any(item["questions"] for item in items))
+        if any(mention["role"] == "candidate_amount" for mention in gold["money_mentions"]):
+            scores["payment_intent_agreement"]["denominator"] += 1
+            scores["payment_intent_agreement"]["numerator"] += int(answer.get("intent") == "payments")
+        if answer.get("intent") != "payments":
+            items = []
         if gold.get("clarification_topics"):
             scores["marked_question_presence"]["denominator"] += 1
             scores["marked_question_presence"]["numerator"] += int(questions)
@@ -277,11 +300,15 @@ def _diagnostics(outcome: PipelineOutcome | None) -> dict[str, Any]:
         "direction_null_count": sum(item["direction"] is None for item in items) if items is not None else None,
         "failed_checks": failed,
         "schema_errors": schema_errors,
+        "output_prepared": outcome is not None and outcome.trace.get("output_prepared") is True,
+        "output_prepare_failed": outcome is not None and outcome.trace.get("output_prepare_failed") is True,
         "error_code": outcome.error_code if outcome is not None else "provider_unavailable",
     }
 
 
-def evaluate(cases: list[dict[str, Any]], adapter: LlmAdapter, model: str, limits: Limits) -> dict[str, Any]:
+def evaluate(
+    cases: list[dict[str, Any]], adapter: LlmAdapter, model: str, limits: Limits, *, dataset: Dataset = "source"
+) -> dict[str, Any]:
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.:/-]{1,128}", model):
         raise ValueError("invalid_model_alias")
     ref = ModelRef.parse(model)
@@ -297,7 +324,7 @@ def evaluate(cases: list[dict[str, Any]], adapter: LlmAdapter, model: str, limit
         started = time.monotonic()
         outcome: PipelineOutcome | None = None
         try:
-            completed = pipeline.run(TASK_TYPE, EVAL_COMPANY, _payload(case))
+            completed = pipeline.run(TASK_TYPE, EVAL_COMPANY, _payload(case, dataset))
         except LlmUnavailableError:
             verdict, output = "failed", None
         else:
@@ -312,20 +339,20 @@ def evaluate(cases: list[dict[str, Any]], adapter: LlmAdapter, model: str, limit
                 "verdict": verdict,
                 "latency_ms": int((time.monotonic() - started) * 1000),
                 "diagnostics": _diagnostics(outcome),
-                "metrics": _score([case], answers),
+                "metrics": _score([case], answers, dataset),
             }
         )
     input_tokens = sum(c["input_tokens"] for c in bounded.calls)
     output_tokens = sum(c["output_tokens"] for c in bounded.calls)
     return {
         "mode": "executed",
-        "manifest": manifest(cases),
+        "manifest": manifest(cases, dataset),
         "network_calls": len(bounded.calls),
         "complete": len(rows) == len(cases) and bounded.stop_reason is None,
         "stop_reason": bounded.stop_reason,
         "cases": rows,
         "calls": bounded.calls,
-        "metrics": _score(cases, answers),
+        "metrics": _score(cases, answers, dataset),
         "reserved_cost_rub_estimate": str(bounded.reserved),
         "known_usage_cost_rub_estimate": str(
             (input_tokens * limits.input_price + output_tokens * limits.output_price) / Decimal(1000000)
@@ -350,6 +377,7 @@ def evaluate(cases: list[dict[str, Any]], adapter: LlmAdapter, model: str, limit
 def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--dataset", choices=("source", "semantic"), default="source")
     parser.add_argument("--case-id", action="append")
     parser.add_argument("--routes", type=Path)
     parser.add_argument("--model")
@@ -363,7 +391,8 @@ def _main(argv: list[str] | None = None) -> int:
     parser.add_argument("--timeout", type=float, default=30)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
-    cases = load_holdout()
+    dataset: Dataset = args.dataset
+    cases = load_holdout() if dataset == "source" else semantics.load_cases()
     if args.case_id is not None:
         by_id = {case["id"]: case for case in cases}
         if len(set(args.case_id)) != len(args.case_id) or any(case_id not in by_id for case_id in args.case_id):
@@ -373,7 +402,7 @@ def _main(argv: list[str] | None = None) -> int:
     if not args.execute:
         report = {
             "mode": "offline_manifest",
-            "manifest": manifest(cases),
+            "manifest": manifest(cases, dataset),
             "network_calls": 0,
             "live_approval": "pending_provider_model_budget",
             "metrics": None,
@@ -423,7 +452,9 @@ def _main(argv: list[str] | None = None) -> int:
                 },
             )
             assert_via_gateway(routing, args.gateway_url)
-            report = evaluate(cases, build_adapters(routing, args.timeout)[ref.provider], args.model, limits)
+            report = evaluate(
+                cases, build_adapters(routing, args.timeout)[ref.provider], args.model, limits, dataset=dataset
+            )
             report["route_sha256"] = digest(
                 json.dumps(
                     {

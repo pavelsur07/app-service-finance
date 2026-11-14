@@ -12,7 +12,7 @@ Task base: `8a1f51cac4dacac4d49dd6b5cf72e0940d26a895`.
 | 2 | Задача Python внутри ai-service, структурированный вывод, Decimal/evidence checks | [ТЗ](stages/stage-2-spec.md), [отчёт](stages/stage-2.md) |
 | 3 | Cash drafts, правки, atomic/idempotent Confirm, recovery и бюджеты | [ТЗ](stages/stage-3-spec.md), [отчёт](stages/stage-3.md) |
 | 4 | Telegram actor/source binding, карточки, уточнения, durable polling/delivery | [ТЗ](stages/stage-4-spec.md), [отчёт](stages/stage-4.md) |
-| 5 | Локальная общая проверка и живой eval, prompt v3 | [ТЗ](stages/stage-5-spec.md), [отчёт](stages/stage-5.md); полный live run выполнен; quality acceptance pending |
+| 5 | Локальные проверки, живые v3/v4 и подготовка ответа | [ТЗ](stages/stage-5-spec.md), [отчёт](stages/stage-5.md); полный live run выполнен; quality acceptance pending |
 
 ## Что изменено
 
@@ -73,25 +73,34 @@ open B0/I0/M0. Разные раунды могут описывать один 
 ## Ограничения и следующий разрешённый шаг
 
 Флаг `TELEGRAM_PAYMENT_INTAKE_ENABLED=0` по умолчанию. Фото/OCR исключены v1.
-Short amounts/группировка/личные средства/неизвестный факт остаются вопросами;
-полная точность модели не установлена. Fullv3на41cases:49/49annotated
-candidates,47/47known amounts,5/7direction,41needs_review/0rejected.
-Два направленияnull;tg008twoitems vsoneannotatedcandidate (одинamountnull),
-исключение справочного итога не доказано. Всего50items/3amountnull/39directionnull.
-Это development corpus, не независимая generalization/precision/analytics/date
-оценка. Campaign122/163calls,knownusageestimate8.23956098RUB,неinvoice.
-Productionprocessing/миграции/featureflagэтойзадачей не выполнялись.
-Flag глобальный + существующие AI grants; отдельного intake allowlist нет.
-Для более узкого независимого пилота сначала нужен company gate, а не молчаливое
-изменение общих AI grants. Доля черновиков с provenance=user измерима, полная
-история частоты событий редактирования не сохраняется; см. observability runbook.
+Неизвестные масштаб, группировка, источник средств и факт оплаты остаются
+вопросами. Последний полный живой v4: 38 needs_review / 3 rejected,
+46/49 размеченных кандидатов, 44/47 известных сумм, 6/7 направлений.
+Отказы tg006/tg011: paid_unanchored; tg008: context_total_amount.
+Исторический v3 (49/49, 47/47, 5/7) не является результатом текущего алгоритма.
 
-Подготовленный [полный повтор41сообщения наv3](live-eval-v3-full-request.md)
-разрешён и выполнен. Открыты ожиданиеtg027inflow, исключение справочного итога,
-независимыйgold/holdout и живой Telegram end-to-end acceptance. Stage5/pilot
-неприняты;95%по однозначным направлениям не заявляется и не подменяется
-денежнымrecall100%. Второйключ не нужен. Нового modelrun после этого полного
-прогона не было.
+После v4 добавлена подготовка результата перед неизменным verifier: только
+понижение неподтверждённых optional fields в null/unknown с вопросами и
+исключение доказанного справочного итога с уведомлением. Чужие ID, неверная
+сумма/валюта/evidence, недопустимые пары и коллизии по-прежнему отклоняются.
+Текущий live-результат отсутствует: кампания 163/163, остаток 0;
+известная оценка использования 11.92739911 рубля, не invoice.
+
+Свежие локальные проверки этой итерации: Python 402 passed / 1 skipped;
+оффлайн eval 9 passed / 1 skipped; Ruff/format 97 files, mypy 57 files.
+Cash/Telegram 66 tests / 434 assertions PASS; PHPStan, canonical CS и strict
+для двух изменённых тестов PASS. Общая синтетическая fixture проверена в Python
+и Cash; ручное подтверждение и повторный Confirm создают одну операцию без
+дополнительного AI-запроса. Production PHP-код в этой итерации не менялся.
+Полный PHP suite и CI старых commits выше не выдаются за проверки новой головы.
+
+Добавлены 12 синтетических случаев с явными ожидаемыми статьями ДДС, проектами,
+ЦФО и датами. Отдельные метрики не подменяют реальный gold, независимый holdout,
+качество вопросов или живую Telegram end-to-end приёмку. Оба dataset-режима
+по умолчанию работают без сети и без модели. Ни Stage 5, ни пилот не закрыты.
+Production processing, миграции и активация флага задачей не выполнялись.
+Для узкого пилота по-прежнему требуется отдельный company gate; существующие
+AI grants не заменяются молча. Второй ключ не требуется.
 [Runbook](runbook.md) содержит recovery, очередь, условия включения и откат.
 
 После успешного live eval для выпуска нужны отдельный production worker нового

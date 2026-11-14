@@ -114,6 +114,8 @@ def test_partial_short_amount_gold_is_not_financial_amount_oracle(amount_evidenc
         "direction_null_count": 0,
         "failed_checks": {},
         "schema_errors": [],
+        "output_prepared": False,
+        "output_prepare_failed": False,
         "error_code": None,
     }
     assert metrics["verified_candidate_recall"] == {"numerator": 1, "denominator": 1}
@@ -217,3 +219,120 @@ def test_schema_diagnostics_show_types_and_redact_unknown_field_names() -> None:
     assert {"path": "items.[].extra_field", "type": "extra_forbidden"} in diagnostic["schema_errors"]
     assert "private-field" not in json.dumps(diagnostic)
     assert "private-value" not in json.dumps(diagnostic)
+
+
+@pytest.mark.parametrize("flag", [True, "private-flag-value"])
+def test_preparation_diagnostics_expose_only_trusted_booleans(flag: object) -> None:
+    from ai_service.core.pipeline import PipelineOutcome
+    from ai_service.verification.checks import Verdict
+
+    outcome = PipelineOutcome(
+        verdict=Verdict.NEEDS_REVIEW,
+        trace={"output_prepared": flag, "output_prepare_failed": True, "private": "private-response"},
+    )
+    diagnostic = runner._diagnostics(outcome)
+    assert diagnostic["output_prepared"] is (flag is True)
+    assert diagnostic["output_prepare_failed"] is True
+    assert "private" not in json.dumps(diagnostic)
+
+
+def test_semantic_default_is_metadata_only_and_uses_its_own_source_hash(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from ai_service.evals import payment_intake_semantics as semantics
+
+    def forbidden(*args: Any, **kwargs: Any) -> None:
+        pytest.fail("semantic dry-run constructed an adapter")
+
+    monkeypatch.setattr(runner, "build_adapters", forbidden)
+    monkeypatch.setenv("PAYMENT_INTAKE_EVAL_TOKEN", "private-test-credential")
+    assert runner.main(["--dataset", "semantic"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["network_calls"] == 0
+    assert report["metrics"] is None
+    assert report["manifest"]["N"] == 12
+    assert report["manifest"]["dataset"] == "semantic"
+    assert report["manifest"]["gold"] == "synthetic_explicit_choices"
+    assert report["manifest"]["corpus_sha256"] == runner.digest(semantics.SEMANTIC_CORPUS.read_text())
+    assert report["manifest"]["review_sha256"] is None
+    assert "private-test-credential" not in json.dumps(report)
+    assert "expected_items" not in json.dumps(report)
+
+
+def test_semantic_subset_rejects_source_ids_before_adapter_construction(capsys: pytest.CaptureFixture[str]) -> None:
+    assert runner.main(["--dataset", "semantic", "--execute", "--case-id", "tg-004"]) == 2
+    assert json.loads(capsys.readouterr().out) == {"error": "invalid_case_selection"}
+
+
+def test_semantic_execution_reuses_pipeline_without_leaking_gold_to_model() -> None:
+    from ai_service.core.prompt import extract_data_block
+    from ai_service.evals import payment_intake_semantics as semantics
+    from ai_service.tasks.parse_payment_message.schemas import PaymentInput
+    from tests.unit.test_payment_intake_semantics import answer
+
+    case = semantics.load_cases()[0]
+    reply = answer(case)
+
+    class Reply:
+        def complete(self, model: str, request: LlmRequest) -> LlmResponse:
+            data = json.loads(extract_data_block(request.user))
+            assert set(data) == set(PaymentInput.model_fields)
+            assert data["text"] == case["payload"]["text"]
+            assert "expected_items" not in data
+            assert "literal_anchor" not in data
+            return LlmResponse(json.dumps(reply), "stub/semantic", 3, 4, 1)
+
+    report = runner.evaluate([case], Reply(), "stub/semantic", limits(max_calls=1), dataset="semantic")
+    assert report["network_calls"] == 1
+    assert report["complete"]
+    assert report["manifest"]["dataset"] == "semantic"
+    assert report["manifest"]["N"] == 1
+    assert report["metrics"]["verified_candidate_recall"] == {"numerator": 1, "denominator": 1}
+    assert report["metrics"]["category_id_agreement"] == {"numerator": 1, "denominator": 1}
+    assert report["metrics"]["overall_accuracy"] is None
+
+
+def test_manifest_fingerprints_preparation_and_final_verification_sources() -> None:
+    from pathlib import Path
+
+    from ai_service.core import pipeline
+    from ai_service.tasks.parse_payment_message import checks, preparation, task
+
+    manifest = runner.manifest(runner.load_holdout())
+    for name, module in {
+        "pipeline_sha256": pipeline,
+        "task_spec_sha256": task,
+        "verification_sha256": checks,
+        "preparation_sha256": preparation,
+    }.items():
+        assert module.__file__ is not None
+        assert manifest[name] == runner.digest(Path(module.__file__).read_text())
+    assert manifest["semantic_scorer_sha256"] is None
+
+
+def test_source_scorer_does_not_count_correction_rows_as_new_payments() -> None:
+    from ai_service.tasks.parse_payment_message.checks import verify
+    from ai_service.tasks.parse_payment_message.schemas import PaymentInput, PaymentOutput
+    from ai_service.verification.checks import CheckContext
+    from tests.unit.test_payment_intake_preparation import proposal
+
+    inp, answer = proposal("Получила 53000 руб.")
+    answer["intent"] = "correction"
+    answer["questions"] = ["Какую строку исправить?"]
+    assert verify(
+        PaymentInput.model_validate(inp),
+        PaymentOutput.model_validate(answer),
+        CheckContext("synthetic", "parse_payment_message"),
+    ).passed
+    case = {
+        "id": "source-intent-test",
+        "annotations": {
+            "clarification_topics": [],
+            "explicit_direction": "inflow",
+            "money_mentions": [{"role": "candidate_amount", "surface": "53000 руб.", "literal_amount": "53000.00"}],
+        },
+    }
+    metrics = runner._score([case], {case["id"]: answer})
+    assert metrics["verified_candidate_recall"] == {"numerator": 0, "denominator": 1}
+    assert metrics["literal_amount_agreement"] == {"numerator": 0, "denominator": 1}
+    assert metrics["payment_intent_agreement"] == {"numerator": 0, "denominator": 1}

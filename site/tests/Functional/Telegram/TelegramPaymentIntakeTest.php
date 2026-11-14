@@ -12,6 +12,7 @@ use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -598,13 +599,15 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         self::assertCount(0, $this->aiTaskKeys);
     }
 
-    public function testManualFieldReplyWorksWithoutAiGrantAndDoesNotRequestNewParse(): void
+    /** @param array<string, mixed> $expected */
+    #[DataProvider('manualFieldReplyProvider')]
+    public function testManualFieldReplyWorksWithoutAiGrantAndDoesNotRequestNewParse(string $reply, array $expected, bool $confirm): void
     {
         $client = $this->setupClient(true, true);
         $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
         $session = $this->em()->getRepository(\App\Telegram\Entity\PaymentIntakeSession::class)->findOneBy(['companyId' => self::COMPANY]);
         self::assertInstanceOf(\App\Telegram\Entity\PaymentIntakeSession::class, $session);
-        $item = ['id' => Uuid::uuid7()->toString(), 'transaction_id' => Uuid::uuid7()->toString(), 'amount' => '100.00', 'currency' => 'RUB', 'date' => '2026-11-13', 'direction' => 'outflow', 'execution_status' => 'paid', 'paid_confirmed' => false, 'category_id' => null, 'project_id' => null, 'cfo_id' => null, 'description' => 'Расход', 'questions' => [], 'provenance' => []];
+        $item = ['id' => Uuid::uuid7()->toString(), 'transaction_id' => Uuid::uuid7()->toString(), 'amount' => '100.00', 'currency' => 'RUB', 'date' => '2026-11-13', 'direction' => 'outflow', 'execution_status' => 'unknown', 'paid_confirmed' => false, 'category_id' => null, 'project_id' => null, 'cfo_id' => null, 'description' => 'Расход', 'questions' => ['Подтвердите факт оплаты.'], 'provenance' => []];
         $session->markDelivered('1:needs_clarification', ['900']);
         $this->em()->flush();
         $this->em()->getConnection()->executeStatement("UPDATE cash_payment_intake_draft SET status = 'needs_clarification', items = CAST(? AS JSONB) WHERE company_id = ?", [json_encode([$item], \JSON_THROW_ON_ERROR), self::COMPANY]);
@@ -612,13 +615,37 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         $before = count($this->aiTaskKeys);
         $callback = ['id' => 'manual-offline', 'from' => ['id' => 70090], 'message' => ['chat' => ['id' => 70090]], 'data' => 'pi:'.\App\Telegram\Application\PaymentIntakePresenter::encodeId($session->getId()).':1:e'.\App\Telegram\Application\PaymentIntakePresenter::encodeId($item['id'])];
         $this->post($client, ['callback_query' => $callback]);
-        $this->post($client, ['message' => array_replace($this->message('сумма 250'), ['message_id' => 56, 'reply_to_message' => ['message_id' => 900]])]);
+        $this->post($client, ['message' => array_replace($this->message($reply), ['message_id' => 56, 'reply_to_message' => ['message_id' => 900]])]);
         $draft = $client->getContainer()->get(\App\Cash\Facade\CashFacade::class)->getPaymentIntakeDraft(self::COMPANY, '22222222-2222-2222-2222-abcd0000ee01', $session->getDraftId());
-        self::assertSame('250', $draft->items[0]['amount']);
+        foreach ($expected as $field => $value) {
+            self::assertSame($value, $draft->items[0][$field]);
+        }
         self::assertSame(2, $draft->revision);
         self::assertCount($before, $this->aiTaskKeys);
         self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_payment_intake_draft WHERE company_id = ?', [self::COMPANY]));
         self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction WHERE company_id = ?', [self::COMPANY]));
+        if ($confirm) {
+            $callback['id'] = 'manual-paid-row-ack';
+            $prefix = 'pi:'.\App\Telegram\Application\PaymentIntakePresenter::encodeId($session->getId()).':';
+            $callback['data'] = $prefix.'2:q'.\App\Telegram\Application\PaymentIntakePresenter::encodeId($item['id']);
+            $this->post($client, ['callback_query' => $callback]);
+            $callback['id'] = 'manual-paid-confirm';
+            $callback['data'] = $prefix.'3:confirm';
+            $this->post($client, ['callback_query' => $callback]);
+            self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction WHERE company_id = ?', [self::COMPANY]));
+            $this->post($client, ['callback_query' => $callback]);
+            self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction WHERE company_id = ?', [self::COMPANY]));
+            self::assertCount($before, $this->aiTaskKeys);
+        }
+    }
+
+    /** @return array<string, array{string, array<string, mixed>, bool}> */
+    public static function manualFieldReplyProvider(): array
+    {
+        return [
+            'amount stays unpaid' => ['сумма 250', ['amount' => '250', 'execution_status' => 'unknown', 'paid_confirmed' => false], false],
+            'paid fact then explicit row acknowledgement' => ['оплачено', ['amount' => '100.00', 'execution_status' => 'paid', 'paid_confirmed' => true, 'questions' => ['Подтвердите факт оплаты.']], true],
+        ];
     }
 
     public function testSourceRecoveryContinuesPastWrongActorBindingBeforeOwnedBinding(): void

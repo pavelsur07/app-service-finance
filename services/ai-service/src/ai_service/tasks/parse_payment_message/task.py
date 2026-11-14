@@ -7,6 +7,7 @@ from pathlib import Path
 from ai_service.core.prompt import Prompt, data_block
 from ai_service.core.task import Risk, TaskSpec
 from ai_service.tasks.parse_payment_message.checks import verify
+from ai_service.tasks.parse_payment_message.preparation import prepare_output
 from ai_service.tasks.parse_payment_message.schemas import PaymentInput, PaymentOutput
 
 TASK_TYPE = "parse_payment_message"
@@ -38,4 +39,5 @@ def build() -> TaskSpec[PaymentInput, PaymentOutput]:
             {"id", "ref", "project_id", "cfo_id", "direction", "currency", "reference_at", "timezone"}
         ),
         max_tokens=16000,
+        prepare_output=prepare_output,
     )

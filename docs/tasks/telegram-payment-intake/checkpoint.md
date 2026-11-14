@@ -368,3 +368,104 @@ atcampaign122/max163/remaining41; no reset/increase of cap, no newdataset/settin
 No permission asked again for the same unexhausted boundedtestcampaign. Record
 newsource/image/receipts and never equate v3numbers withv4. Next commit/pushv4,
 bundle67files/offlinepreflight→singlefull41max41→postcheck→actualanalysis/docs.
+
+V4codecommitted/pushed739fe2c2e7c1dd2f8991bf4f27aaa330a46457df. Runtimebundle67
+filesSHA232f70d124d58fca13b26b42c2892a91b9fa7f5a2647270f7a898e8e60591037;
+harnessSHAc922892f7d021b0eb3f5d7d62507394acddbb857d178379cbd03791dce8be7d3.
+Localbootstrap41/0PASS;freshAPIhealthy/workerrunning/evalcontainers0. Before-v4
+receipt differs from after-v3 onlystarted_at05:14UTC; no ownrestartcommand.
+Freshbefore-v4 is new baseline. Paidv4fullrunstartedONCE max41 guard122/max163,
+no call-cap/budget/data/provider/key/resource increase. Waitactiveprocess,never
+rerunhelper afteruncertainresult. Separate report/live-eval-2026-11-14-v4-full.json
+and before/after-v4 receipts; no oldreportoverwritten. Verifyactualmodelquality
+before claiming direction/extra-candidatefixed. Next fullpostcheck→analysis→docs/PR.
+
+V4fullcompleted41calls,total163/163,0remaining;runreportv4-full.json.38needs_review/
+3rejected:006paid_unanchored,008context_total_amount,011paid_unanchored.46/49
+candidates44/47amounts6/7directions,2/2scale,1/1correction,17/19questions. Plus027
+nowcorrect; no claimwholev4accepted. Allknownusage11.92739911RUB;freshv4container
+postcheckPASS,owncontainers0. No further paidcalls authorized within exhaustedcap.
+
+Useraskedstatus; reportedactualregression honestly. Architecturaldecisionbefore
+moreprompttuning:task-specificsafe outputpreparation afterparse/beforeunchanged
+verify, optionalTaskSpec callbackdefaultNone, core revalidatespreparedschema.
+Spec stage-5-output-preparation-spec.md written beforecode; no inventedfacts,
+unsupportedoptionalfields→null/unknown+question, contexttotalproposalexcluded
+transparently, criticalfinancial/ID/privacyerrorsstayrejected. Thisimplements
+original'неясноеуточнять'policy deterministicly; no modelsource/rawsavedretrofit.
+Corebaseline tests started; nextREDtests/corehook/taskpreparer thenreview/gates.
+Semanticgold design exploration returned12synthetic explicit-choicefixtures and
+minimalexistingrunnerdatasetmode; notimplemented/modeltested yet, nofinancial
+businessgoldinvented. No newdata/providercalls/rootoperations inlocalwork.
+
+Outputpreparecorebaseline18PASS. InitialRED:11fail/25pass (missinghook+unprepared
+semanticerrors); expandedtaskRED14fail/11pass. Genericoptionalhook+revalidation
+and puretaskpreparer implemented; first45targetedPASS. DesignreviewM1 clarified
+knownamounttotalauxiliaryambiguity; coveredknown/nulltotals+independentcollision.
+Selfreviewfoundnewtotalnoticecouldsuppressanotherrow'sexecutionquestion; RED1
+thenperrowprobeusesoriginalglobalquestions (notnewnotices). SafeevalflagsRED2→
+implementedboolean-onlyflags. Combinedrun2fail/61pass dueexpecteddiagdictnotyet
+includingnewfalseflags; assertionsupdated, numeric/scorerbehaviorunchanged.
+CurrentcriticalID/money/currency/duplicate/pairguardspreserved and tested;
+no modelcalls(cap163/163), no productionchanges. Nextformat/lint/fulltests and
+focusedreview; semanticgoldimplagentownsthreefiles, nooverlapmainrunner.
+
+Semanticimplagent completed12fixtures/helper/scorer. ReviewI2/I3: validnumeric
+quote narrowerthan gold rejected; duplicateproject/CFO goldnotreallyambiguous
+becauseallowedpairsuniquelyselectedone. BothRED6→GREEN40;pairsfixed bothchoices
+eligible. FurtherwhitespaceenvelopeI1rootcause:gold/modelmonetaryspansneednot
+same. Materiallydifferentalignment now onlynormalizedevidence+literalquote+
+absolutefirstnumericposition; whitespace/sign/widerunit/differentoccurrence
+regressionsRED4→GREEN45. IndependentreviewconfirmedB0/I0/M0. No realmodelquality
+claim; fullsemanticgoldsyntheticonly. RootselfI1: wrongcorrection/no_paymentintent
+couldscoreasnewpayments. RED2→addedpayment_intent_agreement and prohibitsmatching
+nonpaymentrows; othermetrics/sourcepartialunchanged. Freshnarrowcheckrunning.
+
+SemanticCLI testsRED3→GREEN3: defaultsemanticmanifest12/0, correctsourcehash,
+noadapterevencredentialpresent, sourceIDrejectedbeforeadapter, modelgets only
+PaymentInput.payload, notgold. No duplicatedroutes/budget/LLMcore. Core/prep/
+safediagscombined63PASS afterdiagdict2expectedfalsefieldsupdated.
+
+Crosslanguage sharedsyntheticfixture site/tests/Fixtures/Cash/payment-intake-
+prepared.json: Pythonrawpaid(onanotherline)→preparedunknown+question fieldschecked;
+Pythonprepsuite27PASS. CashconsumerNEEDS_REVIEWfixture→manualrowack→Confirmtwice
+1operation,noadditionalAI:1test9assertPASS. Telegrammanualpaidpath baseline1/6;
+expanded2casesinitialfailwasincorrecttestexpectation (textpaiddoesnotackallQs),
+correctedtoexistingpresentercontract textpaid→explicitfullrowack→Confirmtwice,
+2tests20assertPASS. No PHPproductioncodechange, questionsnotblindlycleared.
+No new model/prod calls since163/163; currentworklocal. Nextformat/lint/full
+Python/evals+targetedPHPmodule/staticstyle→reviewclosure→docs/commit/push/PR.
+
+
+2026-11-14 — текущая локальная итерация после v4:
+- Source и semantic scorers: wrong-intent rows не засчитываются как новые
+  payments, оба RED→GREEN; добавлен payment_intent_agreement.
+- Manifest hashes pipeline/task/verifier/preparation/semantic scorer проверены.
+- Full Python: 402 PASS/1skip; eval 9PASS/1skip; Ruff/format97/mypy57 PASS.
+- Cash/Telegram66tests434assertPASS, focused PHPStan/CS/strict2filesPASS.
+  Shared JSON fixture и ручной paid→ack→Confirmtwice дают одну операцию.
+- Финальные source/code deltas отправлены независимому reviewer; ожидать ответ.
+- Ledger по-прежнему163/163,0remaining,noactive. Ни SSH/prod, ни модели в этой
+  локальной итерации не вызывались. Текущий live-quality неизвестен.
+- Immutable runtime bundle70files SHA
+  02efd5e0695705a5ce4f011570661d489cc4f070a653506ddb6e3541a6e22b41
+  подготовлен до commit; offline preflight/harness/новое разрешение впереди.
+- Next: закрыть focused review, подготовить ограниченный новый trial без запуска,
+  обновить docs/commit/push/DraftPR; только затем запросить named extension.
+  CLAUDE.md и остальные чужие изменения не трогать/не коммитить.
+
+Финальный focused review кода и отдельно prepared helper/scope завершены:
+B0/I0/M0 в обоих проверенных объёмах. Рецензент read-only, tests не повторял.
+Bundle current-runtime equality70filesPASS; source41/semantic12 offline
+bootstrapPASS,0model/0SSH; helpers defaultplanonly, ledger163/163неизменен.
+Итог этой итерации доставляется в ту же DraftPR2985, base master;
+commit только task-owned files, CLAUDE.md и прочие ownerchanges исключены.
+
+ТОЧНОЕ СЛЕДУЮЩЕЕ ДЕЙСТВИЕ ПОСЛЕ DELIVERY: ожидать именованного разрешения
+из live-eval-prepared-output-request.md. До ответа не повышать ledger cap,
+не запускать live-флаг и SSH helpers. При одобрении: сверить source commit и
+bundle/harness hashes с prepared-output-eval-plan.json; fresh before metadata
+→ один bounded run → fresh after metadata → анализ отдельных source/semantic
+метрик и docs. Новая cap245 включает все ретесты в тех же наборах; старые
+артефакты immutable. Unknown active run запрещает повтор до reconciliation.
+Stage5/pilot/merge/deploy по-прежнему не приняты и не запрошены.

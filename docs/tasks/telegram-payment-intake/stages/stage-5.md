@@ -165,3 +165,21 @@ Fresh independent acceptance review:B0/I0securitydefects,M1staledocsfixed;
 доказательные пробелы выше открыты. Documentation-onlycontinuation не требует
 нового externalreview; прежние reviewmetrics/fixed-without-rerun не меняются.
 Новых processing/migrations/worker/flag/deploy не выполнялось; PR остаётсяDraft.
+
+
+## Текущее продолжение после полного v4
+
+Полный v4: 38 needs_review / 3 rejected, кандидаты 46/49, суммы 44/47,
+направления 6/7. Кампания исчерпана: 163/163. Исторические v3-результаты выше
+не заменяют текущую проверку. См. [фактический отчёт](../live-eval-result-2026-11-14.md).
+
+Внутри открытого Stage реализована подготовка ответа, сохраняющая строгий
+денежный verifier, и отдельный синтетический набор аналитики/дат.
+ТЗ и чек-листы: [подготовка](stage-5-output-preparation-spec.md),
+[семантическая проверка](stage-5-semantic-eval-spec.md).
+Свежие локальные gates: Python 402 PASS / 1 skip, eval 9 PASS / 1 skip,
+Ruff/format 97 / mypy 57 PASS; Cash/Telegram 66 tests / 434 assertions PASS;
+focused PHPStan, canonical CS и strict для двух тестов PASS.
+Это work items открытого Stage; full PHP gates и обязательный external review
+не повторялись на каждом work item. Новая live-оценка и финальный handoff
+остаются впереди. Сценарий выключен, новых production действий не выполнялось.

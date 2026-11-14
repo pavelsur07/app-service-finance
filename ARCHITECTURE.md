@@ -3927,8 +3927,17 @@ ai-service; payload/output — `services/_contracts/ai-parse-payment-message/v1`
 фрагментами; деньги записывает только Symfony после подтверждения факта оплаты.
 Промпт `parse_payment_message/v4` включает JSON Schema, автоматически полученную
 из PaymentOutput; v1–v3 сохранены. Версия и хеш полного system prompt входят в eval.
-Справочный итог отклоняется также у кандидата с неизвестной суммой; сам факт
-наличия вопроса не превращает такой итог в платёж.
+Проверка справочного итога действует и при неизвестной сумме. После schema parse
+необязательный `TaskSpec.prepare_output` готовит безопасное предложение; только
+PaymentIntake подключает такую подготовку. Неподтверждённые дата/направление/paid
+становятся null/unknown с явными вопросами, несовместимая разрешённая статья —
+null; суммы/валюты/новые положительные факты не подставляются. Справочный итог
+исключается с явным сообщением; чистая привязка того же числа к настоящему
+платежу сохраняется. Затем снова outputschema и полный verifier. ЧужиеID,
+неверные суммы/currency/доказательства, duplicate refs и forbiddenpair не
+маскируются подготовкой. Вопросы не обрезаются, overflowоставляет исходный отказ.
+Подготовка добавляет в trace только boolean `output_prepared`/`output_prepare_failed`; исходный ответ
+не мутирует. Остальные задачи с `prepare_output=None` проходят прежний путь.
 Дополнительный rollout-переключатель `TELEGRAM_PAYMENT_INTAKE_ENABLED` по
 умолчанию `0` (только test env `1`). Его включение до live-eval приёмки не
 является частью обычного доступа компании к ИИ. Если новый сценарий выбран,
@@ -5751,6 +5760,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Дата | Область | Решение | Причина |
 |---|---|---|---|
+| 2026-11-14 | ai-service / PaymentIntake | Необязательный `TaskSpec.prepare_output(input, output, CheckContext)` после parse и до неизменных checks; результат повторно валидируется outputschema. PaymentIntake переводит неподтверждённые optionalполя в null/unknown+вопрос и явно исключает справочные итоги; критические ошибки денег/ID/privacy остаются отказом. Остальные задачи defaultNone. | Нельзя терять проверяемые кандидаты из-за неподтверждённого paid или принимать reference total как новый платёж; окончательный финансовый факт подтверждает человек вSymfony. |
 | 2026-03-28 | Infrastructure | Redis: БД0=сессии, `/messages`=Messenger, `prefix=symfony-locks`=Lock | Изоляция назначений, один инстанс |
 | 2026-03-28 | Infrastructure | Messenger worker: `--time-limit=3600`, `restart: always` | Утечки памяти при долгих воркерах |
 | 2026-04-23 | MarketplaceAds | Ozon batch: один POST на один `RequestOzonAdBatchMessage` | Ozon лимит «1 активная выгрузка на аккаунт», FIFO Redis сериализует |

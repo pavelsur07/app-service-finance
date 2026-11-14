@@ -247,6 +247,30 @@ final class PaymentIntakeTest extends IntegrationTestCase
         $this->action->confirm(new ConfirmPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, 2, [$draft->items[0]['id']]));
     }
 
+    public function testPreparedUnknownExecutionCanBeExplicitlyConfirmedWithoutAnotherAiRequest(): void
+    {
+        $contents = file_get_contents(__DIR__.'/../../../Fixtures/Cash/payment-intake-prepared.json');
+        self::assertNotFalse($contents);
+        /** @var array{source_text: string, prepared_output: array<string, mixed>} $fixture */
+        $fixture = json_decode($contents, true, 512, \JSON_THROW_ON_ERROR);
+        $draft = $this->request(text: $fixture['source_text']);
+        $this->deliverResult($draft->taskId, AiResultStatus::NEEDS_REVIEW, output: $fixture['prepared_output']);
+        $draft = $this->get($draft);
+        $itemId = $draft->items[0]['id'];
+        self::assertSame('100.00', $draft->items[0]['amount']);
+        self::assertSame('unknown', $draft->items[0]['execution_status']);
+        self::assertFalse($draft->items[0]['paid_confirmed']);
+        self::assertNotEmpty($draft->items[0]['questions']);
+        self::assertSame(0, $this->ledgerCount());
+        $draft = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$itemId => ['paid_confirmed' => true, 'execution_status' => 'paid', 'questions' => []]]));
+        $command = new ConfirmPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$itemId]);
+        $first = $this->action->confirm($command);
+        $second = $this->action->confirm($command);
+        self::assertSame($first->transactionIds, $second->transactionIds);
+        self::assertSame(1, $this->ledgerCount());
+        self::assertCount(1, $this->requests);
+    }
+
     public function testNullableAmountEvidencePreservesClarificationCandidate(): void
     {
         $draft = $this->request();
@@ -667,9 +691,9 @@ final class PaymentIntakeTest extends IntegrationTestCase
         $this->action = new PaymentIntakeAction($this->em, $c->get(PaymentIntakeDraftRepository::class), $c->get(CompanyFacade::class), $c->get(FinancialResponsibilityCenterFacade::class), $c->get(CashTransactionService::class), $c->get(CashTransactionResponsibilityCenterResolver::class), $c->get(CashCategorizationQuery::class), $this->ai, $c->get(AddCashTransactionAction::class), $events ?? $c->get('event_dispatcher'), new \Psr\Log\NullLogger(), $c->get(\App\Cash\Infrastructure\Query\PaymentIntakeDuplicateQuery::class), $this->clock, $c->get(\App\Cash\Repository\PaymentIntake\PaymentIntakeReplyReceiptRepository::class), $c->get(\App\Cash\Application\Service\AiCategorization\CashCategorizationPayloadMapper::class));
     }
 
-    private function request(string $messageId = '3'): PaymentIntakeDraftView
+    private function request(string $messageId = '3', string $text = 'оплатил 100'): PaymentIntakeDraftView
     {
-        return $this->action->request(new RequestPaymentIntakeCommand($this->companyId(), $this->actorId(), (string) $this->account->getId(), '1', '2', $messageId, 'оплатил 100', new \DateTimeImmutable('2026-11-13T00:30:00+03:00')));
+        return $this->action->request(new RequestPaymentIntakeCommand($this->companyId(), $this->actorId(), (string) $this->account->getId(), '1', '2', $messageId, $text, new \DateTimeImmutable('2026-11-13T00:30:00+03:00')));
     }
 
     private function ready(): PaymentIntakeDraftView

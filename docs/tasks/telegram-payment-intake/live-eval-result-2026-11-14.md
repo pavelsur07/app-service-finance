@@ -185,3 +185,34 @@ bootstrap41/0 и remote bootstrap перед live прошли.
 Stage5/handoff/spec. Приёмочные пробелы выше остаются открытыми. Внешний review
 не повторялся для documentation-only продолжения; прошлый handoff результат
 fixed without re-run остаётся в истории. **Stage5/pilot НЕ ЗАКРЫТЫ.**
+
+
+## Полный v4: регрессия и следующий локальный алгоритм
+
+Source `739fe2c2e7c1dd2f8991bf4f27aaa330a46457df`, immutable bundle
+`232f70d124d58fca13b26b42c2892a91b9fa7f5a2647270f7a898e8e60591037`.
+41 вызов на тех же 41 случаях: 38 needs_review, 3 rejected;
+46/49 кандидатов, 44/47 известных сумм, 6/7 направлений, 2/2 scale abstention,
+1/1 correction intent, 17/19 marked-question presence. Tg027 теперь inflow.
+Tg006 и tg011 отклонены по paid_unanchored, tg008 — context_total_amount.
+Это регрессия recall относительно v3; порог приёмки не снижается.
+Metadata-only report: `site/var/payment-intake-review/live-eval-2026-11-14-v4-full.json`.
+
+Оценка этого run 3.68783813 рубля, всей кампании 11.92739911 рубля.
+Общий лимит 163/163, остаток 0; новых платных вызовов после этого не было.
+Fresh before-v4 / after-v4 metadata совпали, собственных eval containers 0.
+Изменение started_at между историческими v3 и v4 receipt сохранено отдельно;
+совпадение с исходным baseline всей кампании не заявляется.
+
+Следующая локальная итерация сохраняет prompt v4 и денежный verifier, но
+готовит проверяемый черновик: неподтверждённые paid/date/direction → unknown/null
+с вопросом; несовместимая статья → null с вопросом; доказанный справочный итог
+исключается с уведомлением. Critical money/currency/ID/privacy/pair errors
+не ремонтируются. Полный verify после подготовки обязателен.
+
+Локально: Python 402 passed / 1 skipped, eval 9 passed / 1 skipped,
+Ruff/format 97 files, mypy 57 files PASS; Cash/Telegram 66 tests / 434 assertions
+PASS. Это ещё не результат живой модели. Новые 12 synthetic analytics/date
+cases имеют отдельный scorer и offline mode, не являются production holdout.
+Следующий ограниченный живой прогон требует расширения исчерпанного лимита;
+Stage 5, production Telegram E2E и pilot остаются открытыми.
