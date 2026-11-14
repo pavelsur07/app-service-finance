@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceOzon\Command;
 
+use App\MarketplaceOzon\Application\Action\RequestOzonSourceTypeDraftsAction;
 use App\MarketplaceOzon\Application\Action\TranslateOzonDayAction;
 use App\MarketplaceOzon\Domain\AccrualByDayTranslator;
 use App\MarketplaceOzon\Infrastructure\Query\OzonTranslationStore;
@@ -23,6 +24,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * День переводится, если у фактов новая ревизия, сменилась версия правил или по коду из его
  * карантина принято решение; с `--relink` — ещё и дни с SKU без листинга (раз в сутки).
  * Каждый день — своя транзакция; сбой дня не останавливает остальные, в конце один `error`.
+ * В конце прогона — черновики ИИ для новых кодов без решения (`RequestOzonSourceTypeDraftsAction`).
  */
 #[AsCommand(name: 'app:marketplace-ozon:translate', description: 'Translates Ozon by-day accrual facts into canonical marketplace operations')]
 final class TranslateOzonAccrualsCommand extends Command
@@ -33,6 +35,7 @@ final class TranslateOzonAccrualsCommand extends Command
         private readonly SourceFactsFacadeInterface $sourceFacts,
         private readonly OzonTranslationStore $store,
         private readonly TranslateOzonDayAction $translate,
+        private readonly RequestOzonSourceTypeDraftsAction $requestDrafts,
         private readonly Connection $connection,
         private readonly LoggerInterface $logger,
     ) {
@@ -89,7 +92,9 @@ final class TranslateOzonAccrualsCommand extends Command
             if ([] !== $failed) {
                 $this->logger->error('Ozon accrual translation: days failed.', ['count' => \count($failed), 'days' => \array_slice($failed, 0, 10)]);
             }
-            $this->logger->info('Ozon accrual translation finished.', ['translated' => $done, 'operations' => $operations, 'failed' => \count($failed), 'left' => max(0, \count($due) - $limit)]);
+            // После всех commit: новые коды без решения получают черновик ИИ (HTTP — вне транзакций).
+            $drafts = ($this->requestDrafts)();
+            $this->logger->info('Ozon accrual translation finished.', ['translated' => $done, 'operations' => $operations, 'failed' => \count($failed), 'left' => max(0, \count($due) - $limit), 'draftsRequested' => $drafts]);
             $output->writeln(sprintf('marketplace-ozon translate: %d due, %d translated (%d operations), %d failed', \count($due), $done, $operations, \count($failed)));
 
             return [] === $failed ? self::SUCCESS : self::FAILURE;

@@ -12,3 +12,6 @@ tasks:
   categorize_transactions:
     mode: single
     models: [stub/categorize]
+  marketplace_source_type_draft:
+    mode: single
+    models: [stub/source-type-draft]

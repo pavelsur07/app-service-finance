@@ -1,7 +1,9 @@
 # ai-service
 
 Python-сервис ИИ-задач для Symfony (`docs/tasks/ai/`). Статус: ядро (этап 1),
-задачи `echo` и `categorize_transactions` (этап 2, подсказки статей ДДС). Прод —
+задачи `echo`, `categorize_transactions` (этап 2, подсказки статей ДДС) и
+`marketplace_source_type_draft` (черновик решения по новому коду маркетплейса,
+`docs/tasks/marketplace-profit-pipeline` этап 4.3; риск high — всегда на проверку человеку). Прод —
 за флагом `AI_SERVICE_ENABLED` (выключен), включение — `docs/maintenance/ai-service-prod.md`.
 
 ## Запуск (dev)

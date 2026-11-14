@@ -1,0 +1,77 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}Admin · Коды Ozon на решение{% endblock %}
+
+{% block body %}
+  <div class="wz-head">
+    <div>
+      <h1 class="wz-title">Коды Ozon на решение</h1>
+      <div class="wz-subtitle">Новый контур маркетплейсов: код без вида лежит в карантине и не попадает в экономику SKU. Решение действует для всех компаний.</div>
+    </div>
+  </div>
+
+  <div class="card" data-moz-pending>
+    {% if pending is empty %}
+      <p class="u-text-faint">Все коды решены.</p>
+    {% else %}
+      <div class="t-wrap">
+        <table class="t">
+          <thead>
+            <tr>
+              <th>Код / название Ozon</th>
+              <th class="t-cell--right">В карантине</th>
+              <th>Черновик ИИ</th>
+              <th>Решение</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in pending %}
+              {% set draft = item.ai_draft %}
+              <tr data-source-type="{{ item.source_type }}">
+                <td><code>{{ item.source_type }}</code><br>{{ item.name }}<br><span class="u-text-faint">с {{ item.first_seen_at|date('d.m.Y H:i') }}</span></td>
+                <td class="t-cell--right u-tnum">
+                  {{ item.amount_minor|vf_minor|vf_amount }}<br>
+                  <span class="u-text-faint">{{ item.days }} дн. · {{ item.companies }} комп.</span>
+                </td>
+                <td>
+                  {% if draft is null %}
+                    <span class="u-text-faint">ещё не запрошен</span>
+                  {% elseif draft.status == 'requested' %}
+                    <span class="status status--pending"><span class="dot"></span>запрошен</span>
+                  {% elseif draft.status == 'unavailable' %}
+                    <span class="u-text-faint">ИИ выключен у компании</span>
+                  {% elseif draft.error is defined %}
+                    <span class="status status--warning"><span class="dot"></span>ошибка: {{ draft.error }}</span>
+                  {% else %}
+                    {% if draft.kind %}<strong>{{ draft.kind }}</strong>{% endif %}
+                    {% if draft.new_kind %}<strong>нужен новый вид:</strong> {{ draft.new_kind.title }} (<code>{{ draft.new_kind.code }}</code>, {{ draft.new_kind.level }}){% endif %}
+                    {% if draft.confidence is not null %}<span class="u-text-faint"> · {{ (draft.confidence * 100)|round }}%</span>{% endif %}
+                    <br>{{ draft.reason }}
+                  {% endif %}
+                </td>
+                <td>
+                  {% if item.source_type == 'ozon:unexplained' %}
+                    <span class="u-text-faint">Разбор не объяснил часть итога начисления — нужна правка переводчика, не решение.</span>
+                  {% else %}
+                    <form action="{{ path('admin_marketplace_ozon_source_types_confirm') }}" method="POST">
+                      <input type="hidden" name="_token" value="{{ csrf_token('moz_confirm_' ~ item.source_type) }}">
+                      <input type="hidden" name="source_type" value="{{ item.source_type }}">
+                      <input class="input" name="name" value="{{ draft.title ?? item.name }}" aria-label="Название" maxlength="255" required>
+                      <select class="select" name="kind" aria-label="Вид операции" required>
+                        <option value="">— вид —</option>
+                        {% for kind in kinds %}
+                          <option value="{{ kind.value }}" {% if draft.kind is defined and draft.kind == kind.value %}selected{% endif %}>{{ kind.label }} ({{ kind.level.value }})</option>
+                        {% endfor %}
+                      </select>
+                      <button type="submit" class="btn btn-sm btn-primary">Подтвердить</button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
