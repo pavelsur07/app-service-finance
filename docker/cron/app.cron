@@ -364,6 +364,21 @@
 */15 * * * * cd /app && php bin/console app:source-facts:pull --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 10 9 * * * cd /app && php bin/console app:source-facts:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Переводчик Ozon (модуль MarketplaceOzon): начисления by-day из sf_fact → канон mo_operation, через 5 минут
+# после забора фактов. Раз в сутки (--relink) — ещё и дни с операциями без листинга. Сбой дня — ERROR в конце
+# прогона, exit 1. Гейт 09:20 МСК: код без решения в карантине > 24 ч или непереведённый день — ERROR и exit 1.
+5-59/15 * * * * cd /app && php bin/console app:marketplace-ozon:translate --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+57 6 * * * cd /app && php bin/console app:marketplace-ozon:translate --relink --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+20 9 * * * cd /app && php bin/console app:marketplace-ozon:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Витрина экономики SKU (модуль MarketplaceEconomics): дни, заменённые в каноне, — через 5 минут после перевода.
+# Ночью (--recent=45, после --relink переводчика) — все дни за 45 суток: себестоимость и реклама легаси меняются
+# без отметки в каноне. Сбой дня — ERROR в конце прогона, exit 1. Гейт 09:30 МСК: Σ витрины дня ≠ Σ канона или
+# заменённый день не пересчитан > 60 мин — ERROR и exit 1.
+10-59/15 * * * * cd /app && php bin/console app:marketplace-economics:refresh --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+15 7 * * * cd /app && php bin/console app:marketplace-economics:refresh --recent=45 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+30 9 * * * cd /app && php bin/console app:marketplace-economics:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # ai-service (docs/maintenance/ai-service-prod.md). Выключено (AI_SERVICE_ENABLED, адрес, токен) —
 # обе команды выходят с 0, ничего не делая. Импорт результатов: сервис недоступен — WARNING и exit 0,
 # нарушение контракта — ERROR и exit 1. Подсказки статей ДДС — все подключённые в админке компании (запуск пишется в ai_run),

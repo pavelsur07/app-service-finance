@@ -149,6 +149,24 @@ doctrine:
                 dir: '%kernel.project_dir%/src/SourceFacts/Entity'
                 prefix: 'App\SourceFacts\Entity'
                 alias: SourceFacts
+            MarketplaceOperations:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/MarketplaceOperations/Entity'
+                prefix: 'App\MarketplaceOperations\Entity'
+                alias: MarketplaceOperations
+            MarketplaceEconomics:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/MarketplaceEconomics/Entity'
+                prefix: 'App\MarketplaceEconomics\Entity'
+                alias: MarketplaceEconomics
+            MarketplaceOzon:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/MarketplaceOzon/Entity'
+                prefix: 'App\MarketplaceOzon\Entity'
+                alias: MarketplaceOzon
             MarketplaceAds:
                 type: attribute
                 is_bundle: false

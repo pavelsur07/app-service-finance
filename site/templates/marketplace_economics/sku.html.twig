@@ -1,0 +1,181 @@
+{% extends '_layout/app.html.twig' %}
+{% set app_nav_active = 'marketplace_economics' %}
+{% set app_breadcrumb = 'Экономика SKU' %}
+{% block title %}Экономика SKU{% endblock %}
+
+{% macro money(minor) %}{{ minor|vf_minor(2)|vf_amount(2) }}{% endmacro %}
+{% macro pct(value) %}{{ value is null ? '—' : value|vf_number(1) ~ ' %' }}{% endmacro %}
+{% macro delta(current, previous) %}
+    {%- if previous != 0 -%}
+        <p class="t-sub">{{ (current - previous)|vf_minor(2)|vf_amount(2, null, true) }}{% if previous > 0 %} · {{ ((current - previous) * 100 / previous)|vf_number(1) }} %{% endif %}</p>
+    {%- endif -%}
+{% endmacro %}
+
+{% block content %}
+    {% import _self as ui %}
+    {% set params = app.request.query.all %}
+    {% set columns = [
+        {key: 'revenue', label: 'Выручка', sort: 'revenue'},
+        {key: 'costPrice', label: 'Себестоимость'},
+        {key: 'gross', label: 'Выручка − себестоимость', sort: 'gross'},
+        {key: 'commission', label: 'Комиссия'},
+        {key: 'logisticsTo', label: 'Логистика туда'},
+        {key: 'logisticsBack', label: 'Логистика обратно'},
+        {key: 'acquiring', label: 'Эквайринг'},
+        {key: 'otherMd1', label: 'Прочие СМ1'},
+        {key: 'md1', label: 'СМ1', sort: 'md1'},
+        {key: 'ads', label: 'Реклама', sort: 'ads'},
+        {key: 'md2', label: 'СМ2', sort: 'md2'},
+    ] %}
+    {% if allocated %}
+        {% set columns = columns|merge([{key: 'overhead', label: 'Склад и прочие МП'}, {key: 'full', label: 'СМ3', sort: 'full'}]) %}
+    {% endif %}
+    {% set profit = allocated ? 'full' : 'md2' %}
+    {% set profit_label = allocated ? 'СМ3' : 'СМ2' %}
+
+    <div class="wz-head">
+        <h1 class="wz-title">Экономика SKU</h1>
+        <a class="btn btn-sm btn-secondary" href="{{ path('marketplace_analytics_unit_extended_index') }}">Открыть прежний отчёт</a>
+    </div>
+    <div class="tabs-row">
+        <nav class="tabs" aria-label="Отчёт">
+            <a class="tab is-active" aria-current="page" href="{{ path('marketplace_economics_sku', params) }}">По SKU</a>
+            <a class="tab" href="{{ path('marketplace_economics_dynamics', params|merge({sort: null, dir: null, page: null, limit: null})) }}">Динамика</a>
+        </nav>
+    </div>
+
+    <form method="get" class="wz-row wz-filters">
+        <div class="form-field">
+            <label class="form-label" for="me-from">С даты</label>
+            <input class="input" id="me-from" type="date" name="from" required value="{{ from }}">
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="me-to">По дату</label>
+            <input class="input" id="me-to" type="date" name="to" required value="{{ to }}">
+        </div>
+        {% if report and report.connections|length > 1 %}
+            <div class="form-field">
+                <label class="form-label" for="me-connection">Кабинет</label>
+                <select class="select" id="me-connection" name="connection">
+                    <option value="">Все кабинеты</option>
+                    {% for ref in report.connections %}
+                        <option value="{{ ref }}" {{ ref == connection ? 'selected' }}>{{ ref }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% endif %}
+        {% if allTags is not empty %}
+            <div class="form-field">
+                <label class="form-label" for="me-tags">Теги</label>
+                <select class="select" id="me-tags" name="tags[]" multiple size="1">
+                    {% for tag in allTags %}
+                        <option value="{{ tag.id }}" {{ tag.id in tagIds ? 'selected' }}>{{ tag.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% endif %}
+        <div class="form-field">
+            <label class="form-label" for="me-q">Поиск</label>
+            <input class="input" id="me-q" type="search" name="q" value="{{ search }}" placeholder="SKU, артикул, название">
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="me-alloc">Склад и прочие МП</label>
+            <select class="select" id="me-alloc" name="alloc">
+                <option value="1" {{ allocated ? 'selected' }}>С разнесением</option>
+                <option value="0" {{ not allocated ? 'selected' }}>Без разнесения</option>
+            </select>
+        </div>
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="dir" value="{{ desc ? 'desc' : 'asc' }}">
+        <div class="wz-row-actions">
+            <button class="btn btn-md btn-primary">Показать</button>
+            {% if report and report.hasData %}
+                <a class="btn btn-md btn-secondary" href="{{ path('marketplace_economics_sku', params|merge({format: 'xlsx', page: null})) }}">Скачать xlsx</a>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if error %}
+        <div class="wz-row">
+            <div class="alert alert--danger" role="alert"><div class="a-body"><p class="a-text">{{ error }}</p></div></div>
+        </div>
+    {% elseif not report.hasData %}
+        <div class="wz-row">
+            <div class="alert alert--info" role="status"><div class="a-body"><p class="a-text">Кабинеты компании ещё не переведены на новый контур данных. Пока пользуйтесь <a href="{{ path('marketplace_analytics_unit_extended_index') }}">прежним отчётом</a>.</p></div></div>
+        </div>
+    {% else %}
+        <div class="wz-row">
+            <p class="t-sub">
+                Сравнение с {{ report.previousFrom|date('d.m.Y') }} – {{ report.previousTo|date('d.m.Y') }}.
+                Дней в витрине: {{ report.days|vf_number }}.
+                {% if report.daysWithoutCostPrice > 0 %}Дней с продажами без себестоимости: {{ report.daysWithoutCostPrice|vf_number }} — себестоимость там 0.{% endif %}
+                Реклама по SKU — по долям прежнего отчёта рекламы; за последние 2 дня — предварительно.
+            </p>
+        </div>
+        <section class="card report-scroll">
+            <table class="t-table">
+                <thead>
+                    <tr>
+                        <th>SKU</th>
+                        <th class="t-cell--right">
+                            <a href="{{ path('marketplace_economics_sku', params|merge({sort: 'sales', dir: sort == 'sales' and desc ? 'asc' : 'desc', page: null})) }}">Продано, шт.</a>
+                        </th>
+                        {% for column in columns %}
+                            <th class="t-cell--right">
+                                {% if column.sort is defined %}
+                                    <a href="{{ path('marketplace_economics_sku', params|merge({sort: column.sort, dir: sort == column.sort and desc ? 'asc' : 'desc', page: null})) }}">{{ column.label }}, ₽</a>
+                                {% else %}
+                                    {{ column.label }}, ₽
+                                {% endif %}
+                            </th>
+                        {% endfor %}
+                        <th class="t-cell--right">Маржинальность {{ profit_label }}, %</th>
+                        <th class="t-cell--right">ДРР, %</th>
+                        <th class="t-cell--right">СПП, ₽</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in pager.currentPageResults %}
+                        {% set m = row.current %}
+                        <tr>
+                            <td>
+                                {{ row.sku }}
+                                <p class="t-sub">{{ row.title ?? row.supplierSku ?? '' }}</p>
+                            </td>
+                            <td class="t-cell--right">{{ m.salesQty|vf_number }}{% if m.returnsQty %}<p class="t-sub">возвр. {{ m.returnsQty|vf_number }}</p>{% endif %}</td>
+                            {% for column in columns %}
+                                <td class="t-cell--right">
+                                    {{ ui.money(attribute(m, column.key)) }}
+                                    {% if column.key == profit %}{{ ui.delta(attribute(m, column.key), attribute(row.previous, column.key)) }}{% endif %}
+                                </td>
+                            {% endfor %}
+                            <td class="t-cell--right">{{ ui.pct(m.percentOfRevenue(attribute(m, profit))) }}</td>
+                            <td class="t-cell--right">{{ ui.pct(m.drr) }}</td>
+                            <td class="t-cell--right">{{ ui.money(m.spp) }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td class="t-empty" colspan="{{ columns|length + 5 }}">Нет продаж и затрат по SKU за период.</td>
+                        </tr>
+                    {% endfor %}
+                    {% for label, m in report.unallocated is not null ? {'Нераспределено': report.unallocated, 'Итого': report.total} : {'Итого по выбранным': report.total} %}
+                        <tr class="t-row--totals">
+                            <td class="t-totals-label">{{ label }}</td>
+                            <td class="t-cell--right">{{ m.salesQty|vf_number }}</td>
+                            {% for column in columns %}
+                                <td class="t-cell--right">
+                                    {{ ui.money(attribute(m, column.key)) }}
+                                    {% if label starts with 'Итого' and column.key == profit %}{{ ui.delta(attribute(m, column.key), attribute(report.previousTotal, column.key)) }}{% endif %}
+                                </td>
+                            {% endfor %}
+                            <td class="t-cell--right">{{ ui.pct(m.percentOfRevenue(attribute(m, profit))) }}</td>
+                            <td class="t-cell--right">{{ ui.pct(m.drr) }}</td>
+                            <td class="t-cell--right">{{ ui.money(m.spp) }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% include 'app/_ui/_pagination.html.twig' with {pager: pager} only %}
+    {% endif %}
+{% endblock %}

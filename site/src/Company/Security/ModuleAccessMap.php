@@ -61,6 +61,7 @@ final class ModuleAccessMap
         'App\\Marketplace\\' => Module::MARKETPLACE,
         'App\\MarketplaceAds\\' => Module::MARKETPLACE,
         'App\\MarketplaceAnalytics\\' => Module::MARKETPLACE,
+        'App\\MarketplaceEconomics\\' => Module::MARKETPLACE,
         'App\\Inventory\\' => Module::MARKETPLACE,
         'App\\Ingestion\\' => Module::MARKETPLACE,
         'App\\MoySklad\\' => Module::MARKETPLACE,
@@ -116,6 +117,7 @@ final class ModuleAccessMap
         'App\\Marketplace\\Controller\\Admin\\', // маппинг-админка под ROLE_ADMIN, без контекста компании
         'App\\Billing\\Controller\\Admin\\',     // /admin/billing/*, ROLE_ADMIN, тариф любого кабинета
         'App\\ServiceGateway\\Controller\\Admin\\', // /admin/services/*, ROLE_ADMIN, сводки сервисов без компаний
+        'App\\MarketplaceOzon\\Controller\\Admin\\', // /admin/marketplace/ozon-source-types, ROLE_ADMIN, справочник кодов платформы
         'App\\MarketplaceAds\\Controller\\Api\\Admin\\', // ROLE_SUPER_ADMIN на классе; mark-failed — свой MARKETPLACE_WRITE
     ];
 

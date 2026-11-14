@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\ServiceGateway\Application\Service;
 
+use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -11,7 +12,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 /**
  * Переключатель ai-service и доступ компаний (ТЗ §4). Выключено, пока не заданы
  * `AI_SERVICE_ENABLED=true`, адрес и токен. Компанию подключает администратор
- * (`ai_company_access`, `/admin/users`); общий откат — переключателем.
+ * (`ai_company_access`, `/admin/users`); общий откат — переключателем. Компания платформы
+ * ({@see AiTaskFacadeInterface::PLATFORM_COMPANY_ID}) включена вместе с сервисом.
  */
 final readonly class AiServiceAccess
 {
@@ -43,7 +45,16 @@ final readonly class AiServiceAccess
      */
     public function enabledCompanyIds(array $companyIds): array
     {
-        return $this->isEnabled() ? $this->grantedCompanyIds($companyIds) : [];
+        if (!$this->isEnabled()) {
+            return [];
+        }
+        $enabled = $this->grantedCompanyIds($companyIds);
+        // Платформа не подключается администратором: ей достаточно общего выключателя.
+        if (\in_array(AiTaskFacadeInterface::PLATFORM_COMPANY_ID, array_map('strtolower', $companyIds), true)) {
+            $enabled[] = AiTaskFacadeInterface::PLATFORM_COMPANY_ID;
+        }
+
+        return $enabled;
     }
 
     /**

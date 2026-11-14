@@ -93,6 +93,19 @@ cron не запускается, сервис отвечает ошибками
 ozon-fetcher (`/internal/fetch-status`). Граница: поток, не пришедший ни разу, гейт не видит — это покрытие сервиса.
 `SOURCE_FACTS_COMPANIES` пуст — exit 0.
 
+Тринадцатый пример — `app:marketplace-ozon:health-check` (09:20 МСК): переводчик Ozon (`MarketplaceOzon`). Красное (`error`, exit 1) —
+код Ozon без решения (`moz_source_type.kind IS NULL`) лежит в карантине `moz_quarantine` дольше 24 ч, либо день с фактами не переведён
+на текущей ревизии или версии правил. Починка: карантин — администратор выбирает вид кода на `/admin/marketplace/ozon-source-types` (черновик ИИ — там же),
+следующий прогон переводит дни сам;
+`ozon:unexplained` — разбор не объяснил часть `total_amount`, нужна правка переводчика и `RULES_VERSION`. Непереведённые дни —
+смотреть `error` прогона `app:marketplace-ozon:translate` (там компания и день).
+
+Четырнадцатый пример — `app:marketplace-economics:health-check` (09:30 МСК): витрина экономики SKU (`MarketplaceEconomics`). Красное
+(`error`, exit 1) — Σ строк `me_day_line` дня без себестоимости и справочных ≠ `me_day.canon_minor` (разнесение потеряло или
+добавило копейки — дефект расчёта), либо день канона заменён больше 60 мин назад и не пересчитан (`mo_dirty_window`). Починка:
+расхождение — правка `DayEconomicsCalculator`, затем `app:marketplace-economics:refresh --from … --to …`; отставание — смотреть
+`error` прогона `app:marketplace-economics:refresh` (там компания и день).
+
 Хронически красный гейт — отдельный дефект: либо сделать его достижимо зелёным,
 либо удалить. Оставлять красным нельзя.
 
