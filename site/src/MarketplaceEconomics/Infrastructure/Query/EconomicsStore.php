@@ -65,6 +65,21 @@ final readonly class EconomicsStore
     }
 
     /**
+     * Дни, посчитанные по другой версии правил витрины, — пересчитать после смены правил.
+     *
+     * @companyScopeExempt пересчёт обходит все компании (cron)
+     *
+     * @return list<DayWindow>
+     */
+    public function staleDays(string $rulesVersion, int $limit): array
+    {
+        return array_map(static fn (array $r): DayWindow => new DayWindow((string) $r['company_id'], (string) $r['channel'], (string) $r['connection_ref'], (string) $r['operation_date']), $this->connection->fetchAllAssociative(
+            'SELECT company_id, channel, connection_ref, operation_date FROM me_day WHERE rules_version <> :rules ORDER BY operation_date LIMIT :limit',
+            ['rules' => $rulesVersion, 'limit' => max(1, $limit)],
+        ));
+    }
+
+    /**
      * Для гейта: дни, где Σ строк витрины (без себестоимости и справочных) ≠ Σ канона дня.
      *
      * @companyScopeExempt системный гейт по всем компаниям
