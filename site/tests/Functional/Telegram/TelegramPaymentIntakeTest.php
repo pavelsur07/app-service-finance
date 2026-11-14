@@ -487,7 +487,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         $owner = $binding->getCompany()->getUser();
         self::assertInstanceOf(\App\Company\Entity\User::class, $owner);
         $cash = $client->getContainer()->get(\App\Cash\Facade\CashFacade::class);
-        $cash->requestPaymentIntake(new \App\Cash\Application\DTO\PaymentIntake\RequestPaymentIntakeCommand(self::COMPANY, (string) $owner->getId(), (string) $binding->getMoneyAccount()?->getId(), (string) $bot->getId(), '70090', '55', 'Оплатил 1500', new \DateTimeImmutable('2026-11-13')));
+        $cash->requestPaymentIntake(new \App\Cash\Application\DTO\PaymentIntake\RequestPaymentIntakeCommand(self::COMPANY, (string) $owner->getId(), (string) $binding->getMoneyAccount()?->getId(), (string) $bot->getId().'/70090/55', 'Оплатил 1500', new \DateTimeImmutable('2026-11-13')));
         $secondId = '11111111-1111-1111-1111-abcd0000ee02';
         $company = CompanyBuilder::aCompany()->withId($secondId)->withOwner($owner)->build();
         $account = MoneyAccountBuilder::aMoneyAccount()->withId('33333333-3333-3333-3333-abcd0000ee02')->forCompany($company)->build();

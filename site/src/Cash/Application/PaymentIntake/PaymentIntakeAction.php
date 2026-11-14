@@ -58,7 +58,8 @@ final readonly class PaymentIntakeAction
 
     public function request(RequestPaymentIntakeCommand $command): PaymentIntakeDraftView
     {
-        $source = self::sourceKey($command->botId, $command->chatId, $command->messageId);
+        $source = $command->sourceKey;
+        self::validateSourceKey($source);
         $draft = $this->em->wrapInTransaction(function () use ($command, $source): PaymentIntakeDraft {
             $this->authorize($command->companyId, $command->actorUserId, true);
             // Global source identity is serialized independently of the selected company.
@@ -97,9 +98,10 @@ final readonly class PaymentIntakeAction
         return $this->view($draft);
     }
 
-    public function getBySource(string $botId, string $chatId, string $messageId, string $actorUserId): ?PaymentIntakeDraftView
+    public function getBySource(string $sourceKey, string $actorUserId): ?PaymentIntakeDraftView
     {
-        $draft = $this->drafts->getBySource(self::sourceKey($botId, $chatId, $messageId));
+        self::validateSourceKey($sourceKey);
+        $draft = $this->drafts->getBySource($sourceKey);
         if (null === $draft) {
             return null;
         }
@@ -112,16 +114,16 @@ final readonly class PaymentIntakeAction
     }
 
     /** Identity metadata only: safe even when the former actor binding no longer exists. */
-    public function hasSource(string $botId, string $chatId, string $messageId): bool
+    public function hasSource(string $sourceKey, ?string $replyIdempotencyKey = null): bool
     {
         try {
-            $sourceKey = self::sourceKey($botId, $chatId, $messageId);
+            self::validateSourceKey($sourceKey);
         } catch (\DomainException) {
             return false;
         }
 
         return $this->drafts->hasSource($sourceKey)
-            || $this->replyReceipts->hasReceipt(hash('sha256', 'telegram:'.$botId.':'.$chatId.':'.$messageId));
+            || (null !== $replyIdempotencyKey && $this->replyReceipts->hasReceipt(hash('sha256', $replyIdempotencyKey)));
     }
 
     public function amend(AmendPaymentIntakeDraftCommand $command): PaymentIntakeDraftView
@@ -477,17 +479,10 @@ final readonly class PaymentIntakeAction
         return new PaymentIntakeDraftView($draft->getId(), $draft->getCompanyId(), $draft->getActorUserId(), $draft->getMoneyAccountId(), $draft->getRevision(), $draft->getStatus(), $draft->getTaskId(), $items, $draft->getQuestions(), $draft->getErrorCode());
     }
 
-    private static function sourceKey(string $botId, string $chatId, string $messageId): string
+    private static function validateSourceKey(string $sourceKey): void
     {
-        if (!Uuid::isValid($botId) && 1 !== preg_match('/^[0-9]{1,30}$/D', $botId)) {
-            throw new \DomainException('Некорректный бот Telegram.');
+        if ('' === $sourceKey || \strlen($sourceKey) > 255 || 0 !== preg_match('/\p{Cc}/u', $sourceKey)) {
+            throw new \DomainException('Некорректный источник платёжного сообщения.');
         }
-        foreach ([$chatId, $messageId] as $part) {
-            if (1 !== preg_match('/^-?[0-9]{1,30}$/D', $part)) {
-                throw new \DomainException('Некорректный источник Telegram.');
-            }
-        }
-
-        return $botId.'/'.$chatId.'/'.$messageId;
     }
 }

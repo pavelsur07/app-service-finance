@@ -35,7 +35,7 @@ def _canonical(case: dict[str, Any], golds: list[dict[str, Any]]) -> PaymentOutp
     )
 
 
-def _validate_case(case: dict[str, Any]) -> None:
+def _validate_case(case: dict[str, Any], *, allow_unknown_amount: bool = False) -> None:
     if set(case) != {"id", "family", "payload", "expected_items", "questions_required"}:
         raise ValueError
     if not isinstance(case["family"], str) or not re.fullmatch(r"[a-z][a-z_]{0,63}", case["family"]):
@@ -56,18 +56,17 @@ def _validate_case(case: dict[str, Any]) -> None:
         ):
             raise ValueError
         anchor, amount = gold["literal_anchor"], gold["amount"]
-        if (
-            not isinstance(anchor, str)
-            or not anchor
-            or inp.text.count(anchor) != 1
-            or not isinstance(amount, str)
-            or not re.fullmatch(r"[0-9]{1,16}\.[0-9]{2}", amount)
-            or normalize_money(anchor) != amount
-            or amount == "0.00"
-            or amount in amounts
-        ):
+        if not isinstance(anchor, str) or not anchor or inp.text.count(anchor) != 1:
             raise ValueError
-        amounts.add(amount)
+        normalized = normalize_money(anchor)
+        if normalized is None or normalized in amounts:
+            raise ValueError
+        if amount is None:
+            if not allow_unknown_amount or not case["questions_required"]:
+                raise ValueError
+        elif not isinstance(amount, str) or not re.fullmatch(r"[0-9]{1,16}\.[0-9]{2}", amount) or normalized != amount:
+            raise ValueError
+        amounts.add(normalized)
         if PAIR_VARIANTS in gold:
             variants = gold[PAIR_VARIANTS]
             if not isinstance(variants, list) or len(variants) != 3:
@@ -100,8 +99,13 @@ def _validate_case(case: dict[str, Any]) -> None:
         raise ValueError
 
 
-def load_cases(path: Path = SEMANTIC_CORPUS) -> list[dict[str, Any]]:
+def load_cases(path: Path | None = None) -> list[dict[str, Any]]:
     """Reject incomplete or unverifiable gold with one sanitized error before adapter construction."""
+    if path is None:
+        from ai_service.evals.payment_intake_assets import load_pack
+
+        cases_from_pack: list[dict[str, Any]] = load_pack()["datasets"]["semantic"]
+        return cases_from_pack
     try:
         cases = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
         if len(cases) != 12 or any(not isinstance(case, dict) for case in cases):

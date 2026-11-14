@@ -3952,14 +3952,21 @@ null; суммы/валюты/новые положительные факты �
 `CashFacade` предоставляет request/get/amend/confirm/cancel сценарии черновика
 через DTO `Application/DTO/PaymentIntake`. Компания и пользователь приходят из
 авторизованной привязки; runtime-уточнения сохраняют финансовую неоднозначность.
-Cash владеет транзакциями; глобальный ключ Telegram `(bot, chat, message)`
-закрепляет первоначальную компанию, stable ID строк и revision защищают
+Cash владеет транзакциями; общий opaque `sourceKey` закрепляет первоначальную
+компанию и actor независимо от канала. `RequestPaymentIntakeCommand` принимает
+companyId, actorUserId, moneyAccountId, sourceKey, text, receivedAt, sourceRevision
+и timezone. Ключ непустой, до255байт, без управляющих символов; namespace задаёт
+серверный адаптер. TelegramPaymentIntakeSource сохраняет прежние bot/chat/message
+identity bytes, другие каналы используют собственный namespace. Stable ID строк и revision защищают
 повторы и конкурирующие изменения. Confirm сохраняет весь выбранный пакет
 в одной транзакции; ключи строк дают повтору прежние transaction IDs.
 
-`CashFacade::hasPaymentIntakeSource(botId, chatId, messageId): bool` возвращает
+`CashFacade::findPaymentIntakeDraftBySource(sourceKey, actorUserId)` возвращает
+авторизованный PaymentIntakeDraftView или null.
+`CashFacade::hasPaymentIntakeSource(sourceKey, ?replyIdempotencyKey=null): bool` возвращает
 только глобальный признак владения исходным сообщением или обработанным reply,
-без данных компании. Этот DBAL guard работает и после удаления Telegram binding/
+без данных компании. Reply key передаётся адаптером явно; Telegram сохраняет
+строку `telegram:bot:chat:message` до SHA256. Этот DBAL guard работает и после удаления Telegram binding/
 session и закрывает legacy fallback. `AmendPaymentIntakeDraftCommand` принимает
 необязательный `replyIdempotencyKey`: Cash атомарно сохраняет amendment и
 `PaymentIntakeReplyReceipt` (UUIDv7, глобально уникальный SHA256 reply key).

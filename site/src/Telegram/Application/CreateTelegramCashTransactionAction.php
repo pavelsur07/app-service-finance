@@ -10,6 +10,7 @@ use App\Cash\Facade\CashFacade;
 use App\Telegram\Application\DTO\CreateTelegramCashTransactionActionResult;
 use App\Telegram\Application\DTO\CreateTelegramCashTransactionCommand;
 use App\Telegram\Domain\Service\TelegramCashTransactionExternalIdGenerator;
+use App\Telegram\Domain\Service\TelegramPaymentIntakeSource;
 
 final readonly class CreateTelegramCashTransactionAction
 {
@@ -21,9 +22,15 @@ final readonly class CreateTelegramCashTransactionAction
 
     public function __invoke(CreateTelegramCashTransactionCommand $command): ?CreateTelegramCashTransactionActionResult
     {
-        if (null !== $command->botId && null !== $command->chatId && null !== $command->messageId
-            && $this->cashFacade->hasPaymentIntakeSource($command->botId, $command->chatId, $command->messageId)) {
-            return CreateTelegramCashTransactionActionResult::skippedKnownPaymentIntakeSource();
+        if (null !== $command->botId && null !== $command->chatId && null !== $command->messageId) {
+            try {
+                $sourceKey = TelegramPaymentIntakeSource::sourceKey($command->botId, $command->chatId, $command->messageId);
+            } catch (\DomainException) {
+                $sourceKey = null;
+            }
+            if (null !== $sourceKey && $this->cashFacade->hasPaymentIntakeSource($sourceKey, TelegramPaymentIntakeSource::replyIdempotencyKey($command->botId, $command->chatId, $command->messageId))) {
+                return CreateTelegramCashTransactionActionResult::skippedKnownPaymentIntakeSource();
+            }
         }
         $amount = $this->parseAmountFromText($command->text);
         if (null === $amount) {

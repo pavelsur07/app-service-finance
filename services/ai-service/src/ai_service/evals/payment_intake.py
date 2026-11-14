@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass, replace
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import yaml
 from pydantic import ValidationError
@@ -26,7 +26,7 @@ from ai_service.tasks.parse_payment_message.schemas import PaymentItem, PaymentO
 from ai_service.tasks.parse_payment_message.task import TASK_TYPE, build
 from ai_service.tasks.registry import build_registry
 
-Dataset = Literal["source", "semantic"]
+Dataset = str
 
 ROOT = Path(__file__).resolve().parents[3]
 CORPUS = ROOT.parents[1] / "docs/tasks/telegram-payment-intake/examples/messages.jsonl"
@@ -37,9 +37,14 @@ def digest(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def load_holdout() -> list[dict[str, Any]]:
-    cases: list[dict[str, Any]] = [json.loads(line) for line in CORPUS.read_text().splitlines() if line]
-    families = {c["id"]: c["family"] for c in map(json.loads, REVIEW.read_text().splitlines())}
+def load_holdout(path: Path | None = None, review_path: Path | None = None) -> list[dict[str, Any]]:
+    if path is None:
+        from ai_service.evals.payment_intake_assets import load_pack
+
+        cases_from_pack: list[dict[str, Any]] = load_pack()["datasets"]["source"]
+        return cases_from_pack
+    cases: list[dict[str, Any]] = [json.loads(line) for line in path.read_text().splitlines() if line]
+    families = {c["id"]: c["family"] for c in map(json.loads, (review_path or REVIEW).read_text().splitlines())}
     if len(cases) != 41 or len({c["id"] for c in cases}) != 41 or set(families) != {c["id"] for c in cases}:
         raise ValueError("invalid_holdout")
     for case in cases:
@@ -55,6 +60,12 @@ def manifest(cases: list[dict[str, Any]], dataset: Dataset = "source") -> dict[s
     families: dict[str, list[str]] = {}
     for case in cases:
         families.setdefault(case["family"], []).append(case["id"])
+    from ai_service.evals.payment_intake_assets import load_pack
+
+    pack = load_pack()["manifest"]
+    if dataset not in pack["datasets"]:
+        raise ValueError("invalid_dataset")
+    dataset_metadata = pack["datasets"][dataset]
     spec = build()
     package = Path(__file__).resolve().parents[1]
     task = package / "tasks/parse_payment_message"
@@ -62,8 +73,8 @@ def manifest(cases: list[dict[str, Any]], dataset: Dataset = "source") -> dict[s
         "N": len(cases),
         "families": families,
         "dataset": dataset,
-        "corpus_sha256": digest((CORPUS if dataset == "source" else semantics.SEMANTIC_CORPUS).read_text()),
-        "review_sha256": digest(REVIEW.read_text()) if dataset == "source" else None,
+        "corpus_sha256": pack["files"][dataset_metadata["corpus_file"]],
+        "review_sha256": pack["files"][dataset_metadata["review_file"]] if dataset_metadata["review_file"] else None,
         "prompt": spec.prompt.id,
         "prompt_sha256": digest(spec.prompt.text),
         "runner_sha256": digest(Path(__file__).read_text()),
@@ -71,9 +82,9 @@ def manifest(cases: list[dict[str, Any]], dataset: Dataset = "source") -> dict[s
         "task_spec_sha256": digest((task / "task.py").read_text()),
         "verification_sha256": digest((task / "checks.py").read_text()),
         "preparation_sha256": digest((task / "preparation.py").read_text()),
-        "semantic_scorer_sha256": digest(Path(semantics.__file__).read_text()) if dataset == "semantic" else None,
-        "gold": "partial_annotations" if dataset == "source" else "synthetic_explicit_choices",
-        "schema_sha256": digest((ROOT.parent / "_contracts/ai-parse-payment-message/v1/schema.json").read_text()),
+        "semantic_scorer_sha256": digest(Path(semantics.__file__).read_text()) if dataset != "source" else None,
+        "gold": dataset_metadata["gold"],
+        "schema_sha256": pack["files"]["schema.json"],
     }
 
 
@@ -163,7 +174,7 @@ class BoundedAdapter:
 
 
 def _payload(case: dict[str, Any], dataset: Dataset = "source") -> dict[str, Any]:
-    if dataset == "semantic":
+    if dataset != "source":
         return dict(case["payload"])
     context = case["context"]
     return {
@@ -182,7 +193,7 @@ def _payload(case: dict[str, Any], dataset: Dataset = "source") -> dict[str, Any
 def _score(
     cases: list[dict[str, Any]], answers: dict[str, dict[str, Any]], dataset: Dataset = "source"
 ) -> dict[str, Any]:
-    if dataset == "semantic":
+    if dataset != "source":
         return semantics.score(cases, answers)
     scores = {
         name: {"numerator": 0, "denominator": 0}
@@ -311,6 +322,7 @@ def evaluate(
 ) -> dict[str, Any]:
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.:/-]{1,128}", model):
         raise ValueError("invalid_model_alias")
+    run_manifest = manifest(cases, dataset)
     ref = ModelRef.parse(model)
     routing = parse_routing(
         {"providers": {ref.provider: {"type": "stub"}}, "tasks": {TASK_TYPE: {"mode": "single", "models": [model]}}}, {}
@@ -346,7 +358,7 @@ def evaluate(
     output_tokens = sum(c["output_tokens"] for c in bounded.calls)
     return {
         "mode": "executed",
-        "manifest": manifest(cases, dataset),
+        "manifest": run_manifest,
         "network_calls": len(bounded.calls),
         "complete": len(rows) == len(cases) and bounded.stop_reason is None,
         "stop_reason": bounded.stop_reason,
@@ -377,7 +389,7 @@ def evaluate(
 def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--execute", action="store_true")
-    parser.add_argument("--dataset", choices=("source", "semantic"), default="source")
+    parser.add_argument("--dataset", default="source")
     parser.add_argument("--case-id", action="append")
     parser.add_argument("--routes", type=Path)
     parser.add_argument("--model")
@@ -392,7 +404,16 @@ def _main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     dataset: Dataset = args.dataset
-    cases = load_holdout() if dataset == "source" else semantics.load_cases()
+    if dataset in ("source", "semantic"):
+        cases = load_holdout() if dataset == "source" else semantics.load_cases()
+    else:
+        from ai_service.evals.payment_intake_assets import load_pack
+
+        datasets = load_pack()["datasets"]
+        if dataset not in datasets:
+            print(json.dumps({"error": "invalid_dataset"}))  # noqa: T201
+            return 2
+        cases = datasets[dataset]
     if args.case_id is not None:
         by_id = {case["id"]: case for case in cases}
         if len(set(args.case_id)) != len(args.case_id) or any(case_id not in by_id for case_id in args.case_id):

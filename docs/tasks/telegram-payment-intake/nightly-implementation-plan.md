@@ -20,7 +20,7 @@ Generic technical-job API нет; business ai-task с фиктивной ком�
 Baseline: Python89PASS, Cash/Telegram66tests434assertionsPASS на неизменном99cf27cde6.
 Полные handoff gates не повторять после каждого work item.
 
-Стоимость — Decimal/numeric, периодыEurope/Moscow, day30/month900, max82calls/job.
+Стоимость — Decimal/numeric, периодыEurope/Moscow, day30/month900, max82calls/model и max164calls/job для текущих2route models.
 Резерв до внешнего запроса; settlement после известной usage; неизвестный расход
 не освобождается по lease timeout. Никаких бизнесопераций из eval. No newframework,
 новых ключей, auto prompt/gold/model changes или auto-disable v1.
@@ -84,7 +84,7 @@ metadata-only result and honest terminal status. Tests before implementation.
 - store/evals.py: enqueue/hash/unique(suite,run_date), claim SKIPLOCKED/lease/
   attemptfencing, finalreport immutable. Stale previous-day run expires withoutcalls.
 - MonththenDay locks in one transaction; beforecall check spent+reserved+new<=limit,
-  max82 durablecalls/run. Idempotent settlement. Leaseexpiry retains unknown cost;
+  max164 durablecalls/run. Idempotent settlement. Leaseexpiry retains unknown cost;
   incomplete run never automatically restarts previouslypaid cases.
 - RED integration: duplicate/conflictingenqueue, concurrentclaim/reserve, month
   boundaryMSK, day30/month900, unknown/cancelledsettlement, fenceafterlease,
@@ -94,7 +94,9 @@ metadata-only result and honest terminal status. Tests before implementation.
 
 - evals/payment_intake_nightly.py + evals/worker.py, command eval-worker in __main__.
   Dedicatedprocess same existingimage; businessworker unchanged/unblocked.
-- Existing evaluate/Pipeline/scorer; source41/semantic12+approvedcurated pack.
+- Existing evaluate/Pipeline/scorer; source41/semantic12+approvedcurated pack
+  по каждой настроенной модели задачи (primary+fallback), раздельные метрики;
+  единый day/month/call cap, не164накаждую модель. Currentroute2models.
   BoundedAdapter opt-in reserve/settle known usage keeps legacy conservative default.
   Durable adapter enforces bothdatasets/day/month together and heartbeat/fencing.
 - Run includes deployedcode/prompt/schema/asset/scorer hashes, safe perfield counts,

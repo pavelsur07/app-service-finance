@@ -12,6 +12,7 @@ use App\Cash\Facade\CashFacade;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
+use App\Telegram\Domain\Service\TelegramPaymentIntakeSource;
 use App\Telegram\Entity\ClientBinding;
 use App\Telegram\Entity\PaymentIntakeSession;
 use App\Telegram\Entity\TelegramBot;
@@ -35,7 +36,11 @@ final readonly class PaymentIntakeTelegramAction
         $chatId = (string) ($message['chat']['id'] ?? '');
         $messageId = (string) ($message['message_id'] ?? '');
         // Existence-only routing metadata is safe before actor lookup; no draft content is read.
-        $knownSource = $this->cash->hasPaymentIntakeSource((string) $bot->getId(), $chatId, $messageId);
+        try {
+            $knownSource = $this->cash->hasPaymentIntakeSource(TelegramPaymentIntakeSource::sourceKey((string) $bot->getId(), $chatId, $messageId), TelegramPaymentIntakeSource::replyIdempotencyKey((string) $bot->getId(), $chatId, $messageId));
+        } catch (\DomainException) {
+            $knownSource = false;
+        }
         $user = $this->em->getRepository(TelegramUser::class)->findOneBy(['tgUserId' => (string) ($message['from']['id'] ?? '')]);
         if (!$user instanceof TelegramUser) {
             return $knownSource ? ['text' => 'Сообщение уже принято в разбор платежей. Повтор не создаёт операцию.'] : null;
@@ -63,7 +68,7 @@ final readonly class PaymentIntakeTelegramAction
                     continue;
                 }
                 try {
-                    $sourceDraft = $this->cash->findPaymentIntakeDraftBySource((string) $bot->getId(), $chatId, $messageId, $candidateActor);
+                    $sourceDraft = $this->cash->findPaymentIntakeDraftBySource(TelegramPaymentIntakeSource::sourceKey((string) $bot->getId(), $chatId, $messageId), $candidateActor);
                 } catch (\DomainException) {
                     $knownSource = true;
                     // Another binding can represent a different or revoked app actor.
@@ -180,7 +185,7 @@ final readonly class PaymentIntakeTelegramAction
             if (!$this->ai->isEnabledForCompany($companyId)) {
                 return ['text' => 'ИИ-разбор сейчас недоступен. Платежи не созданы. Попробуйте позже.'];
             }
-            $draft = $this->cash->requestPaymentIntake(new RequestPaymentIntakeCommand($companyId, $actor, (string) $account->getId(), (string) $bot->getId(), $chatId, $messageId, $text, new \DateTimeImmutable('@'.(int) ($message['date'] ?? time()))));
+            $draft = $this->cash->requestPaymentIntake(new RequestPaymentIntakeCommand($companyId, $actor, (string) $account->getId(), TelegramPaymentIntakeSource::sourceKey((string) $bot->getId(), $chatId, $messageId), $text, new \DateTimeImmutable('@'.(int) ($message['date'] ?? time()))));
             $session = new PaymentIntakeSession($binding, $chatId, $messageId, $draft->id);
             $this->em->persist($session);
             $this->em->flush();
@@ -322,7 +327,7 @@ final readonly class PaymentIntakeTelegramAction
             return ['text' => 'Назовите одно поле: сумма, дата, оплачено, проект Название, статья Название, ЦФО Название или назначение. Связанную пару можно изменить вместе: «проект Название; ЦФО Название». Изменения не применены.'];
         }
         $this->markDeliveryPending($session);
-        $this->cash->amendPaymentIntakeDraft(new AmendPaymentIntakeDraftCommand($session->getCompanyId(), (string) $session->getBinding()->getActorUserId(), $session->getDraftId(), $revision, [$itemId => $patch], replyIdempotencyKey: 'telegram:'.$session->getBinding()->getBot()->getId().':'.$session->getChatId().':'.$replyMessageId));
+        $this->cash->amendPaymentIntakeDraft(new AmendPaymentIntakeDraftCommand($session->getCompanyId(), (string) $session->getBinding()->getActorUserId(), $session->getDraftId(), $revision, [$itemId => $patch], replyIdempotencyKey: TelegramPaymentIntakeSource::replyIdempotencyKey((string) $session->getBinding()->getBot()->getId(), $session->getChatId(), $replyMessageId)));
         $session->clearEdit();
         $session->requireDelivery();
         $this->em->flush();

@@ -88,6 +88,111 @@ final class PaymentIntakeTest extends IntegrationTestCase
         $this->buildAction();
     }
 
+    public function testOpaqueSourceRequestsAndReplaysWithoutTelegramIdentity(): void
+    {
+        $command = $this->sourceCommand('web:payment-form/receipt-42');
+        $first = $this->action->request($command);
+        $replayed = $this->action->request($command);
+        self::assertSame($first->id, $replayed->id);
+        self::assertSame($first->id, $this->action->getBySource('web:payment-form/receipt-42', $this->actorId())?->id);
+        self::assertTrue($this->action->hasSource('web:payment-form/receipt-42'));
+        self::assertCount(1, $this->recordedRequests());
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM cash_payment_intake_draft WHERE company_id=?', [$this->companyId()]));
+        self::assertSame('web:payment-form/receipt-42', $this->connection->fetchOne('SELECT source_key FROM cash_payment_intake_draft WHERE id=?', [$first->id]));
+        self::assertSame(0, $this->ledgerCount());
+    }
+
+    public function testDifferentSourceNamespacesDoNotCollide(): void
+    {
+        $web = $this->action->request($this->sourceCommand('web:receipt-42'));
+        $email = $this->action->request($this->sourceCommand('email:receipt-42'));
+        self::assertNotSame($web->id, $email->id);
+        self::assertSame($email->id, $this->action->getBySource('email:receipt-42', $this->actorId())?->id);
+        self::assertSame(2, (int) $this->connection->fetchOne('SELECT count(*) FROM cash_payment_intake_draft WHERE company_id=?', [$this->companyId()]));
+        self::assertSame(0, $this->ledgerCount());
+    }
+
+    public function testOpaqueSourceCannotBeReboundToAnotherCompany(): void
+    {
+        $this->action->request($this->sourceCommand('email:receipt-42'));
+        $other = CompanyBuilder::aCompany()->withId(Uuid::uuid7()->toString())->withOwner($this->user)->withName('Other')->build();
+        $this->em->persist($other);
+        $this->em->flush();
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Сообщение уже связано с другой компанией или пользователем.');
+        $this->action->request($this->sourceCommand('email:receipt-42', companyId: (string) $other->getId()));
+    }
+
+    public function testOpaqueSourceCannotBeReboundToAnotherAuthorizedActor(): void
+    {
+        $this->action->request($this->sourceCommand('web:receipt-42'));
+        $other = UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail('source-other@example.com')->build();
+        $this->em->persist($other);
+        $this->em->persist(new \App\Company\Entity\CompanyMember(Uuid::uuid7()->toString(), $this->company, $other, \App\Company\Entity\CompanyMember::ROLE_OWNER));
+        $this->em->flush();
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Сообщение уже связано с другой компанией или пользователем.');
+        $this->action->request($this->sourceCommand('web:receipt-42', actorId: (string) $other->getId()));
+    }
+
+    public function testOpaqueSourceLookupCannotExposeAnotherActorsDraft(): void
+    {
+        $this->action->request($this->sourceCommand('web:receipt-42'));
+        $other = UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail('source-lookup@example.com')->build();
+        $this->em->persist($other);
+        $this->em->persist(new \App\Company\Entity\CompanyMember(Uuid::uuid7()->toString(), $this->company, $other, \App\Company\Entity\CompanyMember::ROLE_OWNER));
+        $this->em->flush();
+        $this->expectException(\DomainException::class);
+        $this->action->getBySource('web:receipt-42', (string) $other->getId());
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('malformedSourceKeys')]
+    public function testMalformedOpaqueSourceIsRejectedBeforeAnyDraftOrTask(string $sourceKey): void
+    {
+        try {
+            $this->action->request($this->sourceCommand($sourceKey));
+            self::fail('Malformed source identity must be rejected.');
+        } catch (\DomainException) {
+            self::assertFalse($this->action->hasSource($sourceKey));
+            self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM cash_payment_intake_draft WHERE company_id=?', [$this->companyId()]));
+            self::assertCount(0, $this->recordedRequests());
+        }
+        $this->expectException(\DomainException::class);
+        $this->action->getBySource($sourceKey, $this->actorId());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function malformedSourceKeys(): iterable
+    {
+        yield 'empty' => [''];
+        yield 'too long' => [str_repeat('a', 256)];
+        yield 'null byte' => ["email:receipt\0id"];
+        yield 'line break' => ["web:receipt\nid"];
+        yield 'delete control' => ["web:receipt\x7fid"];
+        yield 'unicode control' => ["email:receipt\u{0085}id"];
+    }
+
+    public function testOpaqueReplyReceiptClosesSourceGuardOnlyWithExplicitReplyIdentity(): void
+    {
+        $draft = $this->action->request($this->sourceCommand('email:receipt-42'));
+        $this->deliverResult($draft->taskId);
+        $draft = $this->get($draft);
+        $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$draft->items[0]['id'] => ['amount' => '200.00']], replyIdempotencyKey: 'email:reply-43'));
+        self::assertFalse($this->action->hasSource('email:reply-43'));
+        self::assertTrue($this->action->hasSource('email:reply-43', 'email:reply-43'));
+        self::assertFalse($this->action->hasSource('email:reply-43', 'email:reply-44'));
+        self::assertTrue($this->action->hasSource('email:receipt-42', 'email:reply-44'));
+        self::assertSame(hash('sha256', 'email:reply-43'), $this->connection->fetchOne('SELECT reply_key FROM cash_payment_intake_reply_receipt WHERE draft_id=?', [$draft->id]));
+    }
+
+    public function testOpaqueSourceAcceptsTheMaximumLengthWithoutNormalization(): void
+    {
+        $key = 'web:'.str_repeat('A', 251);
+        $draft = $this->action->request($this->sourceCommand($key));
+        self::assertSame($draft->id, $this->action->getBySource($key, $this->actorId())?->id);
+        self::assertNull($this->action->getBySource(strtolower($key), $this->actorId()));
+    }
+
     public function testTransferLeafCategoryUsesTheExistingAnyDirectionPayloadContract(): void
     {
         $this->category->setOperationType(\App\Cash\Enum\PaymentPlan\PaymentPlanType::TRANSFER);
@@ -161,7 +266,7 @@ final class PaymentIntakeTest extends IntegrationTestCase
         $this->em->persist($other);
         $this->em->flush();
         $this->expectException(\DomainException::class);
-        $this->action->request(new RequestPaymentIntakeCommand((string) $other->getId(), $this->actorId(), (string) $this->account->getId(), '1', '2', '3', 'оплатил 100', new \DateTimeImmutable()));
+        $this->action->request(new RequestPaymentIntakeCommand((string) $other->getId(), $this->actorId(), (string) $this->account->getId(), '1/2/3', 'оплатил 100', new \DateTimeImmutable()));
     }
 
     public function testBrokerFailureRecoveryUsesSameDurableTaskAndOriginalDate(): void
@@ -396,7 +501,7 @@ final class PaymentIntakeTest extends IntegrationTestCase
                 $this->request((string) (1000 + $i));
                 self::fail('Broker must reject initial delivery.');
             } catch (\RuntimeException) {
-                $draft = $this->action->getBySource('1', '2', (string) (1000 + $i), $this->actorId());
+                $draft = $this->action->getBySource('1/2/'.(1000 + $i), $this->actorId());
                 self::assertNotNull($draft);
                 if ($i < 100) {
                     $this->failingDraftIds[] = $draft->id;
@@ -420,7 +525,7 @@ final class PaymentIntakeTest extends IntegrationTestCase
                 $this->request($messageId);
                 self::fail('Initial broker enqueue must fail.');
             } catch (\RuntimeException) {
-                $draft = $this->action->getBySource('1', '2', $messageId, $this->actorId());
+                $draft = $this->action->getBySource('1/2/'.$messageId, $this->actorId());
                 self::assertNotNull($draft);
                 $drafts[] = $draft;
             }
@@ -570,12 +675,12 @@ final class PaymentIntakeTest extends IntegrationTestCase
         $filters = $this->em->getFilters();
         $filters->enable('company')->setParameter('companyId', Uuid::uuid7()->toString());
         try {
-            self::assertTrue($this->action->hasSource('1', '2', '3'));
+            self::assertTrue($this->action->hasSource('1/2/3'));
         } finally {
             $filters->disable('company');
         }
-        self::assertFalse($this->action->hasSource('1', '2', '9999'));
-        self::assertFalse($this->action->hasSource('legacy-bot-label', '2', '3'));
+        self::assertFalse($this->action->hasSource('1/2/9999'));
+        self::assertFalse($this->action->hasSource('legacy-bot-label/2/3'));
     }
 
     public function testReplyReplayCannotMoveFromTheOriginalRowToANewEditSelection(): void
@@ -587,7 +692,7 @@ final class PaymentIntakeTest extends IntegrationTestCase
         $second = $draft->items[1]['id'];
         $key = 'telegram:1:2:56';
         $changed = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, 1, [$first => ['amount' => '200.00']], replyIdempotencyKey: $key));
-        self::assertTrue($this->action->hasSource('1', '2', '56'), 'A processed correction reply also belongs to intake and must never enter legacy creation.');
+        self::assertTrue($this->action->hasSource('1/2/56', 'telegram:1:2:56'), 'A processed correction reply also belongs to intake and must never enter legacy creation.');
         try {
             $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $changed->revision, [$second => ['amount' => '200.00']], replyIdempotencyKey: $key));
             self::fail('The same Telegram reply must never amend another row.');
@@ -634,7 +739,7 @@ final class PaymentIntakeTest extends IntegrationTestCase
         $this->em->persist(new \App\Company\Entity\CompanyMember(Uuid::uuid7()->toString(), $this->company, $other, \App\Company\Entity\CompanyMember::ROLE_OWNER));
         $this->em->flush();
         $actorId = (string) $other->getId();
-        $draft = $this->action->request(new RequestPaymentIntakeCommand($this->companyId(), $actorId, (string) $this->account->getId(), '1', '2', '4001', 'оплатил 100', new \DateTimeImmutable('2026-11-13T00:30:00+03:00')));
+        $draft = $this->action->request(new RequestPaymentIntakeCommand($this->companyId(), $actorId, (string) $this->account->getId(), '1/2/4001', 'оплатил 100', new \DateTimeImmutable('2026-11-13T00:30:00+03:00')));
         $this->deliverResult($draft->taskId);
         $draft = $this->action->get($this->companyId(), $actorId, $draft->id);
         try {
@@ -693,7 +798,12 @@ final class PaymentIntakeTest extends IntegrationTestCase
 
     private function request(string $messageId = '3', string $text = 'оплатил 100'): PaymentIntakeDraftView
     {
-        return $this->action->request(new RequestPaymentIntakeCommand($this->companyId(), $this->actorId(), (string) $this->account->getId(), '1', '2', $messageId, $text, new \DateTimeImmutable('2026-11-13T00:30:00+03:00')));
+        return $this->action->request(new RequestPaymentIntakeCommand($this->companyId(), $this->actorId(), (string) $this->account->getId(), '1/2/'.$messageId, $text, new \DateTimeImmutable('2026-11-13T00:30:00+03:00')));
+    }
+
+    private function sourceCommand(string $sourceKey, ?string $companyId = null, ?string $actorId = null): RequestPaymentIntakeCommand
+    {
+        return new RequestPaymentIntakeCommand(companyId: $companyId ?? $this->companyId(), actorUserId: $actorId ?? $this->actorId(), moneyAccountId: (string) $this->account->getId(), sourceKey: $sourceKey, text: 'оплатил 100', receivedAt: new \DateTimeImmutable('2026-11-13T00:30:00+03:00'));
     }
 
     private function ready(): PaymentIntakeDraftView
