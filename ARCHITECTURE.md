@@ -593,7 +593,10 @@
   `mo_dirty_window`. **Коммитит вызывающий** (Action / Handler переводчика); без активной транзакции —
   `\LogicException`. Блокировка одна на вызов; переводчик, который заменяет несколько дней в одной
   транзакции, берёт их по возрастанию даты.
-- Фасада чтения нет: появится с витриной экономики (этап 5).
+- Чтение для витрины: `dirtyDays(limit, ?markedBefore)` и `days(from, to)` — списки `DayWindow`
+  (`@companyScopeExempt`, cron); `takeDay(DayWindow): list<OperationRecord>` — та же блокировка дня, что у
+  `replaceDay`, операции и снятие отметки `mo_dirty_window`. **Коммитит вызывающий** (команда витрины);
+  без транзакции — `\LogicException`; откат вызывающего возвращает отметку.
 
 ### MarketplaceOzon: переводчик Ozon
 
@@ -630,6 +633,35 @@
 - Решение — администратор платформы на `/admin/marketplace/ozon-source-types` (`ROLE_ADMIN`, вне карты
   модулей компании): вид из `OperationKind`, название; `ConfirmOzonSourceTypeAction` — один `UPDATE` только
   для кода без решения. Дни карантина с этим кодом переводит следующий прогон.
+
+### MarketplaceEconomics: витрина экономики SKU
+
+Четвёртый модуль нового контура (`docs/tasks/marketplace-profit-pipeline/DATA.md` §4; этап 5).
+
+**Устав.** Причина изменений — показатели и отчёты экономики SKU. Модуль строит витрину кабинет × день ×
+листинг × показатель из канона и считает уровни каскада. В модуле не должно быть: правил каналов
+(переводчики), исходных фактов, статей ОПиУ, обращений к провайдерам, правок легаси. Зависимости —
+только фасады `MarketplaceOperations` (канон), `Marketplace` (себестоимость на дату), `MarketplaceAds`
+(доли рекламы SKU — временно, до этапа 6), `Inventory` (остатки) (гейт
+`ModuleBoundaryRules::test_marketplace_economics_reads_canon_only`). Легаси-экран
+`/marketplace-analytics/unit-extended` работает параллельно и от модуля не зависит.
+
+| Таблица | Что | Ключ |
+|---|---|---|
+| `me_day_line` | строка витрины: `listing_id` (пусто — без SKU), `measure` (вид канона или `cost_price` / `ads_allocated` / `storage_share` / `overhead_share`), `level` (`revenue` / `cost_price` / `md1` / `md2` / `overhead` / `info`), `amount_minor`, `quantity`, `allocation_key` | `id`; индекс `(company_id, operation_date)` |
+| `me_day` | пересчитанный день: `canon_minor` (Σ канона без справочных), `unallocated_minor`, `cost_price_minor`, листингов без себестоимости, версия правил | `(company_id, channel, connection_ref, operation_date)` |
+
+- Расчёт дня — `DayEconomicsCalculator` (чистая функция): себестоимость = (продано − возвращено) × цена на
+  дату (D5); реклама без SKU из канона — по долям рекламы SKU легаси (`legacy_ads_share`); хранение без
+  SKU — по остатку на дату (`stock_share`), без остатков — к общим; общие и прямые без SKU — по выручке
+  SKU за день (`revenue_share`, D3). Разнесение — пара строк (доля на SKU и обратная без SKU), поэтому
+  Σ строк без `cost_price`/`info` = `canon_minor`, строки без SKU — нераспределённое.
+- `app:marketplace-economics:refresh` (cron `*/15` со сдвигом 5 мин после перевода; `--recent=45` ночью;
+  `--from/--to` вручную) — точка входа и владелец транзакций: день — одна транзакция,
+  `RefreshEconomicsDayAction` → `takeDay` (блокировка дня канона, снятие отметки) → замена дня витрины
+  под `pg_advisory_xact_lock` `me:…`. Порядок блокировок — день канона раньше дня витрины.
+- Гейт `app:marketplace-economics:health-check` (cron 09:30 МСК): Σ витрины дня ≠ Σ канона или заменённый
+  день не пересчитан дольше 60 мин — `error`, exit 1.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -5395,6 +5427,9 @@ config/
 | `app:source-facts:health-check` | `10 9 * * *` | Гейт приёма фактов: карантин или поток без применённых пачек > 36 ч — ERROR, exit 1 |
 | `app:marketplace-ozon:translate` | `5-59/15 * * * *` | Перевод начислений Ozon by-day из `sf_fact` в канон `mo_operation`; день — транзакция; сбой дня — ERROR в конце прогона |
 | `app:marketplace-ozon:translate --relink` | `57 6 * * *` | То же + повторный перевод дней с операциями без листинга (листинг появился после перевода) |
+| `app:marketplace-economics:refresh` | `10-59/15 * * * *` | Пересчёт витрины экономики SKU по дням, заменённым в каноне; день — транзакция; сбой дня — ERROR в конце прогона |
+| `app:marketplace-economics:refresh --recent=45` | `15 7 * * *` | То же + все дни с операциями за 45 суток (себестоимость и реклама легаси меняются без отметки в каноне) |
+| `app:marketplace-economics:health-check` | `30 9 * * *` | Гейт витрины: Σ витрины дня ≠ Σ канона или заменённый день не пересчитан > 60 мин — ERROR, exit 1 |
 | `app:marketplace-ozon:health-check` | `20 9 * * *` | Гейт переводчика Ozon: код без решения в карантине > 24 ч или непереведённый день — ERROR, exit 1 |
 | `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
 | `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (`AI_SERVICE_ENABLED`, адрес, токен) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
@@ -5494,6 +5529,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.175 | 2026-11-14 | MarketplaceEconomics: новый модуль — витрина экономики SKU (`me_day_line`, `me_day`, `Version20261114120000`), `app:marketplace-economics:refresh` (`*/15`, `--recent=45` 07:15) и гейт `app:marketplace-economics:health-check` (09:30); MarketplaceOperations: чтение `dirtyDays` / `days` / `takeDay`; PHPat — витрина знает только фасады (задача `marketplace-profit-pipeline`, этап 5.1) |
 | 2.174 | 2026-11-14 | ServiceGateway: `AiTaskFacadeInterface::PLATFORM_COMPANY_ID` — задачи по общим данным без подключения компании к ИИ; черновик кода Ozon ставится от платформы (этап 4.3 `marketplace-profit-pipeline`) |
 | 2.173 | 2026-11-14 | MarketplaceOzon: черновик ИИ для нового кода (`marketplace_source_type_draft`, ai-task v1.3, `RequestOzonSourceTypeDraftsAction`, `OzonSourceTypeDraftConsumer`) и экран администратора `/admin/marketplace/ozon-source-types`; `OperationKind::label()` (этап 4.3 `marketplace-profit-pipeline`) |
 | 2.172 | 2026-11-14 | MarketplaceOzon: новый модуль — переводчик начислений Ozon by-day в канон (`moz_source_type`, `moz_day`, `moz_quarantine`, `Version20261114035239`), `app:marketplace-ozon:translate` (`*/15`, `--relink` 06:57) и гейт `app:marketplace-ozon:health-check` (09:20); SourceFacts: фасад чтения `SourceFactsFacadeInterface`, модуль в `MODULES_WITH_FACADE`; PHPat — переводчик знает только фасады (задача `marketplace-profit-pipeline`, этап 4) |

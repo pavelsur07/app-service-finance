@@ -367,6 +367,7 @@ final class ModuleBoundaryRules
             ->dependOn()
             ->classes(
                 Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceEconomics'),
                 Selector::inNamespace('App\MarketplaceWb'),
                 Selector::inNamespace('App\Marketplace'),
                 Selector::inNamespace('App\MarketplaceAds'),
@@ -409,6 +410,42 @@ final class ModuleBoundaryRules
             ->because(
                 'переводчик Ozon знает только фасады: факты — SourceFacts, канон — MarketplaceOperations, '
                 .'листинги — Marketplace\\Facade; разбор легаси и учёт ему не нужны.',
+            );
+    }
+
+    /**
+     * `MarketplaceEconomics` — витрина экономики SKU (`DATA.md` §4, §6): канон читает через фасад
+     * `MarketplaceOperations`, себестоимость и листинги — через фасад `Marketplace`, рекламу (временно,
+     * до этапа 6) — через фасад `MarketplaceAds`, остатки — через фасад `Inventory`. Правила каналов
+     * (переводчики), исходные факты и учёт ей недоступны: экономика считается только из канона.
+     */
+    public function test_marketplace_economics_reads_canon_only(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplaceEconomics'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceWb'),
+                Selector::inNamespace('App\SourceFacts'),
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\Inventory'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->excluding(
+                Selector::inNamespace('App\Marketplace\Facade'),
+                Selector::inNamespace('App\MarketplaceAds\Facade'),
+                Selector::inNamespace('App\Inventory\Facade'),
+                Selector::inNamespace('App\Inventory\Application\DTO'),
+            )
+            ->because(
+                'экономика считается из канона: операции — MarketplaceOperations, себестоимость — Marketplace\\Facade, '
+                .'реклама — MarketplaceAds\\Facade (до этапа 6), остатки — Inventory\\Facade; переводчики и факты ей не нужны.',
             );
     }
 

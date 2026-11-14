@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\MarketplaceOperations;
 
 use App\MarketplaceOperations\Application\DTO\DayOperations;
+use App\MarketplaceOperations\Application\DTO\DayWindow;
 use App\MarketplaceOperations\Application\DTO\OperationInput;
 use App\MarketplaceOperations\Enum\OperationKind;
 use App\MarketplaceOperations\Facade\MarketplaceOperationsFacade;
@@ -105,6 +106,35 @@ final class ReplaceDayTest extends IntegrationTestCase
         }
 
         self::assertSame(1, $this->replace($this->day('2026-11-12', [$this->sale('1.00')])));
+    }
+
+    public function testTakeDayReadsOperationsAndClearsMarkInCallerTransaction(): void
+    {
+        $this->replace($this->day('2026-11-12', [$this->sale('500.00'), $this->op(OperationKind::STORAGE, 'ozon:service:46', '-7.00')]));
+        $this->replace($this->day('2026-11-11', [$this->sale('1.00')]));
+        $window = new DayWindow($this->companyId, 'ozon', 'cabinet-1', '2026-11-12');
+
+        $mine = fn (array $days): array => array_values(array_map(static fn (DayWindow $d): string => $d->date, array_filter($days, fn (DayWindow $d): bool => $d->companyId === $this->companyId)));
+        self::assertSame(['2026-11-11', '2026-11-12'], $mine($this->facade->days(new \DateTimeImmutable('2026-11-01'), new \DateTimeImmutable('2026-11-30'))));
+        self::assertCount(2, $mine($this->facade->dirtyDays(100)));
+        self::assertSame([], $mine($this->facade->dirtyDays(100, new \DateTimeImmutable('2026-11-13 09:00:00'))), 'отмечены в 10:00');
+
+        // откат вызывающего возвращает отметку
+        $this->connection->beginTransaction();
+        self::assertCount(2, $this->facade->takeDay($window));
+        $this->connection->rollBack();
+        self::assertCount(2, $mine($this->facade->dirtyDays(100)));
+
+        $ops = $this->connection->transactional(fn (): array => $this->facade->takeDay($window));
+        self::assertSame([[OperationKind::SALE, 50000], [OperationKind::STORAGE, -700]], array_map(static fn ($o): array => [$o->kind, $o->amountMinor], $ops));
+        self::assertSame(['2026-11-11'], $mine($this->facade->dirtyDays(100)));
+    }
+
+    public function testTakeDayOutsideTransactionIsRejected(): void
+    {
+        $this->expectException(\LogicException::class);
+
+        $this->facade->takeDay(new DayWindow($this->companyId, 'ozon', 'cabinet-1', '2026-11-12'));
     }
 
     /**

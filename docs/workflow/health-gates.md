@@ -100,6 +100,12 @@ ozon-fetcher (`/internal/fetch-status`). Граница: поток, не при
 `ozon:unexplained` — разбор не объяснил часть `total_amount`, нужна правка переводчика и `RULES_VERSION`. Непереведённые дни —
 смотреть `error` прогона `app:marketplace-ozon:translate` (там компания и день).
 
+Четырнадцатый пример — `app:marketplace-economics:health-check` (09:30 МСК): витрина экономики SKU (`MarketplaceEconomics`). Красное
+(`error`, exit 1) — Σ строк `me_day_line` дня без себестоимости и справочных ≠ `me_day.canon_minor` (разнесение потеряло или
+добавило копейки — дефект расчёта), либо день канона заменён больше 60 мин назад и не пересчитан (`mo_dirty_window`). Починка:
+расхождение — правка `DayEconomicsCalculator`, затем `app:marketplace-economics:refresh --from … --to …`; отставание — смотреть
+`error` прогона `app:marketplace-economics:refresh` (там компания и день).
+
 Хронически красный гейт — отдельный дефект: либо сделать его достижимо зелёным,
 либо удалить. Оставлять красным нельзя.
 
