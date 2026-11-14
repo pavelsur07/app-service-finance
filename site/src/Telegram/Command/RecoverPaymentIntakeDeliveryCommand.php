@@ -6,6 +6,7 @@ namespace App\Telegram\Command;
 
 use App\Cash\Facade\CashFacade;
 use App\Company\Facade\CompanyFacade;
+use App\Telegram\Application\PaymentIntakeAccess;
 use App\Telegram\Application\QueuePaymentIntakePollAction;
 use App\Telegram\Entity\ClientBinding;
 use App\Telegram\Entity\PaymentIntakeSession;
@@ -16,12 +17,13 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 #[AsCommand(name: 'app:telegram:recover-payment-intake', description: 'Recover pending Telegram draft notifications for one company; never confirms payments')]
 final class RecoverPaymentIntakeDeliveryCommand extends Command
 {
-    public function __construct(private readonly EntityManagerInterface $em, private readonly CashFacade $cash, private readonly CompanyFacade $companies, private readonly QueuePaymentIntakePollAction $polls, private readonly LoggerInterface $telegramLogger)
+    public function __construct(private readonly EntityManagerInterface $em, private readonly CashFacade $cash, private readonly CompanyFacade $companies, private readonly QueuePaymentIntakePollAction $polls, private readonly LoggerInterface $telegramLogger, private readonly PaymentIntakeAccess $access)
     {
         parent::__construct();
     }
@@ -29,6 +31,7 @@ final class RecoverPaymentIntakeDeliveryCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('company-id', InputArgument::REQUIRED);
+        $this->addOption('skip-cash-recovery', null, InputOption::VALUE_NONE, 'Recover Telegram delivery only; Cash recovery is run separately.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -39,8 +42,15 @@ final class RecoverPaymentIntakeDeliveryCommand extends Command
 
             return Command::INVALID;
         }
+        if (!$this->access->isAllowed($companyId)) {
+            $output->writeln('Telegram payment intake is disabled for this company. Queued notifications: 0');
+
+            return Command::SUCCESS;
+        }
         // Trusted console entry: recover Cash intents even before a Telegram session exists.
-        $this->cash->recoverPaymentIntake($companyId);
+        if (!$input->getOption('skip-cash-recovery')) {
+            $this->cash->recoverPaymentIntake($companyId);
+        }
         $queued = 0;
         $afterId = null;
         do {
