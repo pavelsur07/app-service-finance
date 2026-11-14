@@ -75,7 +75,8 @@ def test_limit_covers_second_schema_attempt_without_extra_request() -> None:
     assert len(report["calls"]) == 1
 
 
-def test_partial_short_amount_gold_is_not_financial_amount_oracle() -> None:
+@pytest.mark.parametrize("amount_evidence", ["120", None])
+def test_partial_short_amount_gold_is_not_financial_amount_oracle(amount_evidence: str | None) -> None:
     case = next(c for c in runner.load_holdout() if c["id"] == "tg-004")
     reply = {
         "intent": "payments",
@@ -83,7 +84,7 @@ def test_partial_short_amount_gold_is_not_financial_amount_oracle() -> None:
             {
                 "ref": "one",
                 "text_evidence": "120",
-                "amount_evidence": "120",
+                "amount_evidence": amount_evidence,
                 "amount": None,
                 "currency": None,
                 "date": None,
@@ -106,6 +107,14 @@ def test_partial_short_amount_gold_is_not_financial_amount_oracle() -> None:
 
     report = runner.evaluate([case], Reply(), "stub/requested", limits())
     metrics = report["metrics"]
+    assert report["cases"][0]["diagnostics"] == {
+        "intent": "payments",
+        "item_count": 1,
+        "amount_null_count": 1,
+        "direction_null_count": 0,
+        "failed_checks": {},
+        "error_code": None,
+    }
     assert metrics["verified_candidate_recall"] == {"numerator": 1, "denominator": 1}
     assert metrics["literal_amount_agreement"]["denominator"] == 0
     assert metrics["scale_abstention"] == {"numerator": 1, "denominator": 1}
@@ -141,3 +150,45 @@ def test_usage_over_declared_maximum_stops_schema_retry_before_call() -> None:
     report = runner.evaluate(runner.load_holdout()[:1], UsageExceeded(), "stub/invalid", limits())
     assert report["network_calls"] == 1
     assert report["stop_reason"] == "provider_usage_exceeded_declared_maxima"
+
+
+def test_rejected_reply_reports_safe_reason_without_response_text() -> None:
+    report = runner.evaluate(runner.load_holdout()[:1], StubAdapter(), "stub/invalid", limits())
+    case = report["cases"][0]
+    assert case["verdict"] == "rejected"
+    assert case["diagnostics"]["failed_checks"] == {"output_schema": ["schema_validation_failed"]}
+    assert case["diagnostics"]["intent"] is None
+    assert case["diagnostics"]["item_count"] is None
+    assert case["metrics"]["verified_candidate_recall"] == {"numerator": 0, "denominator": 1}
+    assert "trace" not in case
+    assert "responses" not in case
+
+
+def test_offline_subset_has_only_requested_known_id(capsys: pytest.CaptureFixture[str]) -> None:
+    assert runner.main(["--case-id", "tg-004"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["manifest"]["N"] == 1
+    assert report["manifest"]["families"] == {"salary": ["tg-004"]}
+    assert report["network_calls"] == 0
+
+
+@pytest.mark.parametrize("ids", [["tg-999"], ["tg-004", "tg-004"]])
+def test_invalid_subset_rejected_before_execution(ids: list[str], capsys: pytest.CaptureFixture[str]) -> None:
+    args = [value for case_id in ids for value in ["--case-id", case_id]]
+    assert runner.main(args) == 2
+    assert json.loads(capsys.readouterr().out)["error"] == "invalid_case_selection"
+
+
+def test_diagnostics_drop_unknown_check_text_and_names() -> None:
+    from ai_service.core.pipeline import PipelineOutcome
+    from ai_service.verification.checks import CheckResult, Severity, Verdict
+
+    outcome = PipelineOutcome(
+        verdict=Verdict.REJECTED,
+        checks=[CheckResult("sensitive-name", False, Severity.BLOCK, "token=private-response")],
+        trace={"responses": [{"text": "private-response"}]},
+    )
+    diagnostic = runner._diagnostics(outcome)
+    assert diagnostic["failed_checks"] == {"other": ["check_failed"]}
+    assert "private-response" not in json.dumps(diagnostic)
+    assert "sensitive-name" not in json.dumps(diagnostic)

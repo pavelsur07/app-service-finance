@@ -1,4 +1,4 @@
-# Live-eval action — approved, execution access pending
+# Live-eval action — first approved execution completed
 
 The runner is `python -m ai_service.evals.payment_intake`. It uses the existing
 TaskSpec, gateway, masking and Pipeline; it does not boot Symfony, open a database,
@@ -34,7 +34,8 @@ Approved: `deepseek/deepseek-flash` through the existing gateway, 82 calls maxim
 65536 declared input guard and 16000 output tokens per call, 60-second timeout,
 budget estimate300RUB. Current peak tariff and CBR rate were verified14November;
 reserve rates are24.65/98.59RUB per1M and the82-call reservation estimate261.82RUB.
-Execution is blocked by the missing app-host eval entrypoint. The old31October
+The owner subsequently authorized a one-off root-SSH isolated execution;
+first run completed41cases/45calls. See [results](live-eval-result-2026-11-14.md). The old31October
 configured rates24.17/96.67 are retained only as historical proposal data.
 The alternative existing `openai/gpt-4.1-mini` route
 requires its own explicit choice and price/budget approval.
@@ -83,3 +84,5 @@ LlmResponse model field and response bytes, and states this provenance limitatio
 model weights. Missing usage on provider failures can make known-usage cost partial.
 Live model quality and pilot readiness remain pending until the approved run and
 its separately agreed acceptance criteria have been reviewed.
+
+Current14November execution/result and scorer correction: [live report](live-eval-result-2026-11-14.md). Earlier access-block notes describe the pre-approval state.

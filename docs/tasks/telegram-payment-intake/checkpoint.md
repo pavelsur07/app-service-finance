@@ -1,9 +1,10 @@
 # Checkpoint — Telegram Payment Intake
 
-**Phase:** Stage5 / approved live eval, missing app-host execution entrypoint.
-**Status:** owner approved DeepSeek bounded trial and reuse of existing gateway
-key on14November. No second key is needed. Dev-host gateway403 and no allowed
-Python eval wrapper block actual execution; all remaining local preflight is done.
+**Phase:** Stage5 / first live run completed, safe diagnostics and scorer correction.
+**Status:** owner also approved a one-off root-SSH isolated evaluation. First
+run41cases/45calls completed and cleaned up; credentials stayed on app-host.
+Scorer false-negative bug fixed RED→GREEN; safe diagnostics prepared, next focused
+subset uses≤18 of remaining37 campaign calls. No pilot acceptance or deploy.
 **Task base:** `8a1f51cac4dacac4d49dd6b5cf72e0940d26a895`.
 
 Branch: `docs/telegram-payment-intake-examples`.
@@ -121,3 +122,55 @@ No application/config/service contract changes. Documentation-only self-review:
 B0/I0; external review not required (FastPath). Checks: deterministic64-file
 source archive/digest, exact41-case offline import/network_calls0, Decimal budget
 261.82<300, doc links and git diff check. Provider generation calls for this trial0.
+
+## Root execution exception approved
+
+Owner replied «Разрешаю» to the exact proposal: one live-eval through root-SSH,
+in a separate disposable container with the existing gateway key, leaving
+application/settings/existing containers unchanged. This expressly overrides
+the wrappers-only access restriction solely for this bounded execution. No
+new key, permanent wrapper, access-role/network/worker/config change or deploy
+is authorized. Prepared source digest and82-call/300RUB bounds remain unchanged.
+Root read-only inspect verified healthy ai-service, non-root image userapp,
+existing gateway key present, one existing Docker network; no secret was printed.
+Next: launch one isolated serial eval from verified bundle, persist metadata-only
+result, compare existing container identities/start/restart state afterwards.
+
+## Actual live run and current diagnostics work
+
+Approved root isolated execution COMPLETED:41cases,45calls,provider errors0,
+64k input/6k output tokens; conservative known-usage cost estimate2.15255083RUB,
+reserved143.680608RUB. Report site/var/payment-intake-review/live-eval-2026-11-14.json
+and summary JSON; own container removed, existing API/worker image/start/restarts/
+health unchanged (before/after receipts saved). First report needs_review36,
+rejected5(tg009,011,026,027,041), initial metric26/49 mentions and24/47amounts,
+direction1/7, scale abstention2/2. Median1455ms,p953319ms,max4508ms. NOT pilot-ready.
+
+Current work: Stage5 diagnostics spec written before code; eval-only metadata
+per-case intent/counts/check codes/per-case metrics and --case-id selection. New
+regressions RED4+privacy2 then GREEN13. No task/verifier/prompt changes. Lint
+initially requires ruff format of one test; mypy not yet reached.
+
+Identified potential metric bug: valid candidate can have amount_evidence=null
+and amount=null but numeric text_evidence+scale question. Existing score wrongly
+counts that as no mention. Parametrized test RED command running91955, log
+/tmp/payment-intake-null-evidence-score-red.log. Confirm failure, then narrowly
+allow normalized numeric text_evidence as fallback anchor (not arbitrary quotes),
+rerun targeted tests/lint/full Python/evals. Baseline raw report stays immutable.
+
+Cumulative call ledger site/var/payment-intake-review/live-eval-call-ledger.json:
+used45/max82, remaining37, no additional paid run yet. Next focused diagnostic
+subset at most18calls within remaining budget/same41IDs/provider/key and same
+nonpersistent root evaluation exception; never exceed campaign82 or300RUB estimate.
+Current ignored execute-approved-root-eval.py/hashes refer FIRST bundle; do NOT
+reuse unchanged. Need distinct diagnostic bundle/harness hashes and command
+subset, CLI max18, save distinct report; preserve first immutable archive/report.
+Read actual metadata first before any prompt/parser fix; do not guess root cause.
+Update provenance: first-run source7b5e7b950, diagnostic code currently uncommitted;
+regenerate offline manifest after final formatting, commit/push same PR whenchecked.
+
+Latest local proof: diagnostic14targetedPASS;301testsPASS/1skip, eval9PASS/1skip;
+ruff+format+mypy55PASS after optional-outcome flow fix. Fresh targeted reviewer
+B0/I0/M0. Manifest regenerated after final source changes before commit. Next:
+commit/push diagnostic/scorer change, build distinct bundle, check call ledger45
+then focused max18cases invocation; never overwrite initial receipts.

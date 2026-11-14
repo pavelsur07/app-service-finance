@@ -55,7 +55,7 @@
     "review_sha256": "7356ac909c142191c0fe70353c57ed44cbf20eb1a55b0ca4aec57d9f484dd9b4",
     "prompt": "parse_payment_message/v1",
     "prompt_sha256": "0553ee321857d40bded13bb682f478cfc8b42e2526a1c7dbcf008037bcc1eeed",
-    "runner_sha256": "cbb2f1856bc1b87f2ca159c72869f7d1d97425edf8a3f769b4422cac7acbfb58",
+    "runner_sha256": "adce4fc1338b114dc4cc384e7f0d3bd3b815d0dc08ad5543a9fce0549562ec30",
     "gold": "partial_annotations",
     "schema_sha256": "904fbed170cdc02f503a66d72dd7cb0cbe20be32cdbda8605b47d9b791034d8a"
   },

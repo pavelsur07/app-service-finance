@@ -112,3 +112,5 @@ Dev host gets gateway403 and has no token; the available production wrappers
 contain no Python eval entrypoint. Actual trial remains unexecuted, calls0; next
 required operator action is a narrow app-host execution entrypoint or operator
 execution of the prepared bounded command. No permission broadening performed.
+
+Current14November execution/result and scorer correction: [live report](live-eval-result-2026-11-14.md). Earlier access-block notes describe the pre-approval state.

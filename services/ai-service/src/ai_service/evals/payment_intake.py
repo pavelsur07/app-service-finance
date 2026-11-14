@@ -13,7 +13,7 @@ from typing import Any
 
 import yaml
 
-from ai_service.core.pipeline import Pipeline
+from ai_service.core.pipeline import SCHEMA_CHECK, Pipeline, PipelineOutcome
 from ai_service.evals.compare import EVAL_COMPANY
 from ai_service.llm.adapters import build_adapters
 from ai_service.llm.gateway import LlmGateway
@@ -196,9 +196,11 @@ def _score(cases: list[dict[str, Any]], answers: dict[str, dict[str, Any]]) -> d
                     n
                     for n, item in enumerate(items)
                     if n not in used
-                    and item["amount_evidence"]
-                    and normalize_money(item["amount_evidence"]) == expected
-                    and (mention["surface"] in item["text_evidence"] or item["amount_evidence"] in mention["surface"])
+                    and normalize_money(item["amount_evidence"] or item["text_evidence"]) == expected
+                    and (
+                        mention["surface"] in item["text_evidence"]
+                        or (item["amount_evidence"] or item["text_evidence"]) in mention["surface"]
+                    )
                 ),
                 None,
             )
@@ -228,6 +230,34 @@ def _score(cases: list[dict[str, Any]], answers: dict[str, dict[str, Any]]) -> d
     }
 
 
+def _diagnostics(outcome: PipelineOutcome | None) -> dict[str, Any]:
+    failed: dict[str, list[str]] = {}
+    if outcome is not None:
+        for check in outcome.checks:
+            if check.passed:
+                continue
+            if check.name == SCHEMA_CHECK:
+                failed[SCHEMA_CHECK] = ["schema_validation_failed"]
+            elif check.name == "payment_evidence_and_context":
+                # This task's verifier emits static comma-separated machine codes, never model text.
+                codes = check.details.split(",")
+                failed[check.name] = (
+                    codes if all(re.fullmatch(r"[a-z][a-z0-9_]{0,63}", c) for c in codes) else ["check_failed"]
+                )
+            else:
+                failed["other"] = ["check_failed"]
+    output = outcome.output if outcome is not None else None
+    items = output["items"] if output is not None else None
+    return {
+        "intent": output["intent"] if output is not None else None,
+        "item_count": len(items) if items is not None else None,
+        "amount_null_count": sum(item["amount"] is None for item in items) if items is not None else None,
+        "direction_null_count": sum(item["direction"] is None for item in items) if items is not None else None,
+        "failed_checks": failed,
+        "error_code": outcome.error_code if outcome is not None else "provider_unavailable",
+    }
+
+
 def evaluate(cases: list[dict[str, Any]], adapter: LlmAdapter, model: str, limits: Limits) -> dict[str, Any]:
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.:/-]{1,128}", model):
         raise ValueError("invalid_model_alias")
@@ -242,12 +272,14 @@ def evaluate(cases: list[dict[str, Any]], adapter: LlmAdapter, model: str, limit
         if bounded.stop_reason:
             break
         started = time.monotonic()
+        outcome: PipelineOutcome | None = None
         try:
-            outcome = pipeline.run(TASK_TYPE, EVAL_COMPANY, _payload(case))
+            completed = pipeline.run(TASK_TYPE, EVAL_COMPANY, _payload(case))
         except LlmUnavailableError:
             verdict, output = "failed", None
         else:
-            verdict, output = outcome.verdict.value, outcome.output
+            outcome = completed
+            verdict, output = completed.verdict.value, completed.output
         if output is not None:
             answers[case["id"]] = output
         rows.append(
@@ -256,6 +288,8 @@ def evaluate(cases: list[dict[str, Any]], adapter: LlmAdapter, model: str, limit
                 "family": case["family"],
                 "verdict": verdict,
                 "latency_ms": int((time.monotonic() - started) * 1000),
+                "diagnostics": _diagnostics(outcome),
+                "metrics": _score([case], answers),
             }
         )
     input_tokens = sum(c["input_tokens"] for c in bounded.calls)
@@ -293,6 +327,7 @@ def evaluate(cases: list[dict[str, Any]], adapter: LlmAdapter, model: str, limit
 def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--case-id", action="append")
     parser.add_argument("--routes", type=Path)
     parser.add_argument("--model")
     parser.add_argument("--gateway-url")
@@ -306,6 +341,12 @@ def _main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     cases = load_holdout()
+    if args.case_id is not None:
+        by_id = {case["id"]: case for case in cases}
+        if len(set(args.case_id)) != len(args.case_id) or any(case_id not in by_id for case_id in args.case_id):
+            print(json.dumps({"error": "invalid_case_selection"}))  # noqa: T201
+            return 2
+        cases = [by_id[case_id] for case_id in args.case_id]
     if not args.execute:
         report = {
             "mode": "offline_manifest",
