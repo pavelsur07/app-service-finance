@@ -184,14 +184,12 @@ final readonly class OzonTranslationStore
      *
      * @companyScopeExempt справочник кодов общий для платформы
      *
-     * @return list<array{source_type: string, name: string, company_ids: list<string>, debit: bool}>
+     * @return list<array{source_type: string, name: string, company_id: string, debit: bool}>
      */
     public function pendingWithoutDraft(): array
     {
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT t.source_type, t.name,
-                    (SELECT string_agg(DISTINCT q.company_id::text, \',\') FROM moz_quarantine q WHERE q.source_type = t.source_type) AS companies,
-                    t.first_seen_company_id AS company_id,
+            'SELECT t.source_type, t.name, t.first_seen_company_id AS company_id,
                     COALESCE((SELECT sum(q.amount_minor) FROM moz_quarantine q WHERE q.source_type = t.source_type), 0) < 0 AS debit
              FROM moz_source_type t
              WHERE t.kind IS NULL AND t.ai_draft IS NULL AND t.first_seen_company_id IS NOT NULL AND t.source_type <> :unexplained
@@ -202,8 +200,7 @@ final readonly class OzonTranslationStore
         return array_map(static fn (array $r): array => [
             'source_type' => (string) $r['source_type'],
             'name' => (string) $r['name'],
-            // первая — где код встретился впервые, дальше — остальные компании с ним в карантине
-            'company_ids' => array_values(array_unique(array_merge([(string) $r['company_id']], array_filter(explode(',', (string) $r['companies']))))),
+            'company_id' => (string) $r['company_id'],
             'debit' => (bool) $r['debit'],
         ], $rows);
     }

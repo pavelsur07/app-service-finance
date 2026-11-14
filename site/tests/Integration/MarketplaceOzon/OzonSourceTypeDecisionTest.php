@@ -46,7 +46,7 @@ final class OzonSourceTypeDecisionTest extends IntegrationTestCase
         self::assertSame(0, $this->request(), 'черновик уже запрошен');
 
         $sent = $this->ai->requests[0];
-        self::assertSame([RequestOzonSourceTypeDraftsAction::TASK_TYPE, 'ozon:service:12', $this->companyId], [$sent['taskType'], $sent['key'], $sent['companyId']]);
+        self::assertSame([RequestOzonSourceTypeDraftsAction::TASK_TYPE, 'ozon:service:12', AiTaskFacadeInterface::PLATFORM_COMPANY_ID], [$sent['taskType'], $sent['key'], $sent['companyId']]);
         self::assertSame(['ozon', 'ozon:service:12', 'Кросс-докинг', 'debit'], [$sent['payload']['channel'], $sent['payload']['source_type'], $sent['payload']['name'], $sent['payload']['sign']]);
         self::assertContains(['source_type' => 'ozon:service:32', 'name' => 'Логистика', 'kind' => 'logistics_to'], $sent['payload']['examples']);
 
@@ -56,21 +56,7 @@ final class OzonSourceTypeDecisionTest extends IntegrationTestCase
         self::assertSame(['needs_review', 'logistics_to', 'логистика до склада'], [$draft['status'] ?? null, $draft['kind'] ?? null, $draft['reason'] ?? null]);
     }
 
-    public function testDraftGoesToAnotherQuarantinedCompanyWhenFirstHasNoAi(): void
-    {
-        $other = Uuid::uuid7()->toString();
-        $this->connection->executeStatement(
-            "INSERT INTO moz_quarantine (company_id, connection_ref, operation_date, source_type, amount_minor, currency, row_count, source_refs, quarantined_at)
-             VALUES (?, 'cabinet-2', '2026-11-11', 'ozon:service:12', -1000, 'RUB', 1, '[]', now())",
-            [$other],
-        );
-        $this->ai->enabledOnly = [$other];
-
-        self::assertSame(1, $this->request());
-        self::assertSame($other, $this->ai->requests[0]['companyId']);
-    }
-
-    public function testServiceFailureIsRetriedAndDisabledAiLeavesNoDraft(): void
+    public function testServiceFailureOrSwitchedOffServiceIsRetried(): void
     {
         $this->ai->fail = true;
         self::assertSame(0, $this->request());
@@ -79,7 +65,10 @@ final class OzonSourceTypeDecisionTest extends IntegrationTestCase
         $this->ai->fail = false;
         $this->ai->enabled = false;
         self::assertSame(0, $this->request());
-        self::assertSame('unavailable', $this->store->pendingForReview()[0]['ai_draft']['status'] ?? null);
+        self::assertNull($this->store->pendingForReview()[0]['ai_draft']);
+
+        $this->ai->enabled = true;
+        self::assertSame(1, $this->request(), 'после включения сервиса черновик запрашивается');
     }
 
     public function testConfirmDecidesOnceAndRejectsUnknownKind(): void
@@ -122,8 +111,6 @@ final class FakeAiTasks implements AiTaskFacadeInterface
 {
     public bool $enabled = true;
     public bool $fail = false;
-    /** @var list<string>|null компании с ИИ; null — все */
-    public ?array $enabledOnly = null;
     /** @var list<array{taskId: string, companyId: string, taskType: string, payload: array<string, mixed>, key: string}> */
     public array $requests = [];
 
@@ -153,7 +140,7 @@ final class FakeAiTasks implements AiTaskFacadeInterface
 
     public function enabledCompanyIds(array $companyIds): array
     {
-        return null === $this->enabledOnly ? $companyIds : array_values(array_intersect($companyIds, $this->enabledOnly));
+        return $companyIds;
     }
 
     public function connectedCompanyIds(): array

@@ -485,6 +485,9 @@
   своей транзакции. `taskIdFor(companyId, taskType, idempotencyKey): string` —
   тот же `task_id` без постановки: потребитель записывает его в своей транзакции
   до `requestTask`. `isEnabledForCompany(companyId): bool`.
+- `AiTaskFacadeInterface::PLATFORM_COMPANY_ID` — компания платформы для задач по общим данным
+  (справочник кодов маркетплейсов): включена вместе с сервисом, без строки в `ai_company_access`;
+  расход в `ai_usage` под этим id входит только в общий лимит, бюджет клиентов не трогает.
 - `SubmitAiTaskMessage` → `async_sync`. `SubmitAiTaskHandler` — `POST /internal/tasks`
   с `Idempotency-Key`: сервис недоступен → исключение без Recoverable-маркера
   (повторы по `max_retries` транспорта, затем `failed`; Recoverable обходит
@@ -620,10 +623,9 @@
 - Гейт `app:marketplace-ozon:health-check` (cron 09:20 МСК): код без решения в карантине дольше 24 ч
   или день с фактами не переведён — `error`, exit 1.
 - Новый код без вида: в конце прогона перевода `RequestOzonSourceTypeDraftsAction` ставит задачу ИИ
-  `marketplace_source_type_draft` (ai-task v1.3) от компании, где код встретился впервые (ИИ у неё выключен — от
-  другой компании с этим кодом в карантине, у которой включён); номер задачи —
-  в `ai_draft` до постановки, ключ повтора — сам код; сервис недоступен — запрос снимается и повторяется
-  следующим прогоном; ИИ у компании выключен — `ai_draft.status = unavailable`. Ответ принимает
+  `marketplace_source_type_draft` (ai-task v1.3) от `PLATFORM_COMPANY_ID`: данные общие, подключение
+  компаний к ИИ не учитывается; номер задачи — в `ai_draft` до постановки, ключ повтора — сам код;
+  сервис выключен или недоступен — запрос не ставится и повторяется следующим прогоном. Ответ принимает
   `OzonSourceTypeDraftConsumer` (внутри транзакции импорта ServiceGateway).
 - Решение — администратор платформы на `/admin/marketplace/ozon-source-types` (`ROLE_ADMIN`, вне карты
   модулей компании): вид из `OperationKind`, название; `ConfirmOzonSourceTypeAction` — один `UPDATE` только
@@ -5492,6 +5494,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.174 | 2026-11-14 | ServiceGateway: `AiTaskFacadeInterface::PLATFORM_COMPANY_ID` — задачи по общим данным без подключения компании к ИИ; черновик кода Ozon ставится от платформы (этап 4.3 `marketplace-profit-pipeline`) |
 | 2.173 | 2026-11-14 | MarketplaceOzon: черновик ИИ для нового кода (`marketplace_source_type_draft`, ai-task v1.3, `RequestOzonSourceTypeDraftsAction`, `OzonSourceTypeDraftConsumer`) и экран администратора `/admin/marketplace/ozon-source-types`; `OperationKind::label()` (этап 4.3 `marketplace-profit-pipeline`) |
 | 2.172 | 2026-11-14 | MarketplaceOzon: новый модуль — переводчик начислений Ozon by-day в канон (`moz_source_type`, `moz_day`, `moz_quarantine`, `Version20261114035239`), `app:marketplace-ozon:translate` (`*/15`, `--relink` 06:57) и гейт `app:marketplace-ozon:health-check` (09:20); SourceFacts: фасад чтения `SourceFactsFacadeInterface`, модуль в `MODULES_WITH_FACADE`; PHPat — переводчик знает только фасады (задача `marketplace-profit-pipeline`, этап 4) |
 | 2.171 | 2026-11-13 | MarketplaceOperations: новый модуль — канон операций маркетплейсов (`mo_operation`, `mo_dirty_window`, `Version20261113175117`), `MarketplaceOperationsFacadeInterface::replaceDay`, enum `OperationKind` / `CascadeLevel`; PHPat — канон не знает каналов (задача `marketplace-profit-pipeline`, этап 3) |

@@ -12,12 +12,12 @@ use Symfony\Component\Clock\ClockInterface;
 
 /**
  * Черновик ИИ для каждого нового кода без решения (`DATA.md` §9.4): ставит задачу
- * `marketplace_source_type_draft` от компании, у которой код встретился впервые, а если у неё ИИ
- * выключен — от другой компании с этим кодом в карантине, у которой ИИ включён (её бюджет и учёт).
+ * `marketplace_source_type_draft` от компании платформы: справочник кодов общий, утечки данных
+ * клиента нет, поэтому подключение компаний к ИИ не учитывается — нужен только общий выключатель.
  *
  * Номер задачи пишется в `ai_draft` до постановки (ключ повтора — сам код), поэтому ответ
- * найдёт свою строку. Сервис недоступен — запрос снимается и повторится следующим прогоном;
- * ИИ выключен у всех таких компаний — черновика не будет, экран работает без него. Вызывать вне транзакции.
+ * найдёт свою строку. Сервис выключен или недоступен — запрос не ставится и повторится следующим
+ * прогоном; экран работает и без черновика. Вызывать вне транзакции.
  */
 final readonly class RequestOzonSourceTypeDraftsAction
 {
@@ -37,7 +37,7 @@ final readonly class RequestOzonSourceTypeDraftsAction
     public function __invoke(): int
     {
         $pending = $this->store->pendingWithoutDraft();
-        if ([] === $pending) {
+        if ([] === $pending || !$this->ai->isServiceEnabled()) {
             return 0;
         }
 
@@ -49,19 +49,11 @@ final readonly class RequestOzonSourceTypeDraftsAction
 
         $requested = 0;
         foreach ($pending as $row) {
-            $enabled = array_flip($this->ai->enabledCompanyIds($row['company_ids']));
-            $companyId = $row['company_ids'][0];
-            foreach ($row['company_ids'] as $candidate) {
-                if (isset($enabled[strtolower($candidate)])) {
-                    $companyId = $candidate;
-                    break;
-                }
-            }
-            $taskId = $this->ai->taskIdFor($companyId, self::TASK_TYPE, $row['source_type']);
+            $taskId = $this->ai->taskIdFor(AiTaskFacadeInterface::PLATFORM_COMPANY_ID, self::TASK_TYPE, $row['source_type']);
             $now = $this->clock->now()->format(\DATE_ATOM);
             $this->store->saveDraft($row['source_type'], ['task_id' => $taskId, 'status' => 'requested', 'requested_at' => $now]);
             try {
-                $accepted = $this->ai->requestTask($companyId, self::TASK_TYPE, [
+                $accepted = $this->ai->requestTask(AiTaskFacadeInterface::PLATFORM_COMPANY_ID, self::TASK_TYPE, [
                     'channel' => 'ozon',
                     'source_type' => $row['source_type'],
                     'name' => $row['name'],
@@ -75,7 +67,8 @@ final readonly class RequestOzonSourceTypeDraftsAction
                 continue;
             }
             if (null === $accepted) {
-                $this->store->saveDraft($row['source_type'], ['status' => 'unavailable', 'requested_at' => $now]);
+                // сервис выключили между проверкой и постановкой — повторим следующим прогоном
+                $this->store->saveDraft($row['source_type'], null);
                 continue;
             }
             ++$requested;
