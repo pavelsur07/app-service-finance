@@ -113,6 +113,7 @@ def test_partial_short_amount_gold_is_not_financial_amount_oracle(amount_evidenc
         "amount_null_count": 1,
         "direction_null_count": 0,
         "failed_checks": {},
+        "schema_errors": [],
         "error_code": None,
     }
     assert metrics["verified_candidate_recall"] == {"numerator": 1, "denominator": 1}
@@ -192,3 +193,27 @@ def test_diagnostics_drop_unknown_check_text_and_names() -> None:
     assert diagnostic["failed_checks"] == {"other": ["check_failed"]}
     assert "private-response" not in json.dumps(diagnostic)
     assert "sensitive-name" not in json.dumps(diagnostic)
+
+
+def test_schema_diagnostics_show_types_and_redact_unknown_field_names() -> None:
+    from ai_service.core.pipeline import SCHEMA_CHECK, PipelineOutcome
+    from ai_service.verification.checks import CheckResult, Severity, Verdict
+
+    response = json.dumps(
+        {
+            "intent": "payments",
+            "items": [{"direction": "income", "private-field": "private-value"}],
+            "questions": [],
+            "target_ref": None,
+        }
+    )
+    outcome = PipelineOutcome(
+        verdict=Verdict.REJECTED,
+        checks=[CheckResult(SCHEMA_CHECK, False, Severity.BLOCK, "invalid output")],
+        trace={"responses": [{"text": response}]},
+    )
+    diagnostic = runner._diagnostics(outcome)
+    assert {"path": "items.[].direction", "type": "literal_error"} in diagnostic["schema_errors"]
+    assert {"path": "items.[].extra_field", "type": "extra_forbidden"} in diagnostic["schema_errors"]
+    assert "private-field" not in json.dumps(diagnostic)
+    assert "private-value" not in json.dumps(diagnostic)

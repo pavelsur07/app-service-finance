@@ -8,6 +8,7 @@ import pytest
 
 from ai_service.tasks.parse_payment_message.checks import verify
 from ai_service.tasks.parse_payment_message.schemas import PaymentInput, PaymentOutput
+from ai_service.tasks.parse_payment_message.task import build
 from ai_service.verification.checks import CheckContext
 
 pytestmark = pytest.mark.evals
@@ -38,7 +39,7 @@ def test_offline_verifier_dimensions() -> None:
         json.dumps(
             {
                 "model": "fixture-only",
-                "prompt": "parse_payment_message/v1",
+                "prompt": build().prompt.id,
                 "N": len(CASES),
                 "scores": scores,
                 "errors": errors,

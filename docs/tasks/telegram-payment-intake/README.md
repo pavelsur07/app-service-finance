@@ -38,6 +38,7 @@ site/src/Telegram/
 site/src/Cash/
   Application/PaymentIntake/      запрос разбора, уточнение, подтверждение
   Application/DTO/PaymentIntake/  команды и представление черновика
+  Application/Service/PaymentIntake/ проверка и применение результата модели
   Entity/PaymentIntake/           черновик с JSON-строками и reply receipt
   Repository/PaymentIntake/       company-scoped загрузка и existence-only metadata
   Facade/CashFacade.php           вход для Telegram и будущих каналов
@@ -48,7 +49,7 @@ services/ai-service/src/ai_service/tasks/parse_payment_message/
   schemas.py                     типизированный вход и результат
   task.py                        подключение к существующему pipeline
   checks.py                      проверка результата и исходных фрагментов
-  prompts/v1.md                  версия инструкции распознавания
+  prompts/v1.md, v2.md           версии инструкции; v2 включает schema из модели
 
 services/_contracts/ai-parse-payment-message/v1/
                                  контракт payload/output

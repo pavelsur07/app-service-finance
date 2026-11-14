@@ -174,3 +174,34 @@ ruff+format+mypy55PASS after optional-outcome flow fix. Fresh targeted reviewer
 B0/I0/M0. Manifest regenerated after final source changes before commit. Next:
 commit/push diagnostic/scorer change, build distinct bundle, check call ledger45
 then focused max18cases invocation; never overwrite initial receipts.
+
+Focused diagnostics completed10cases/14calls; totalcampaign59,remaining23.
+Report live-eval-2026-11-14-diagnostics.json; source1aa0f7baf; no task/prompt changes.
+Safe codes prove: tg001/026/041 schema errors, tg009 date_unanchored, tg011
+paid_unanchored (ambiguous_occurrence is secondary to those rejected occurrences);
+tg022 and027 incorrectly return no_payment; long-list016 extracts9/9amounts.
+Known direction cases005/004 abstain with directionnull. Diagnosticaggregate11/19
+mentions; this is selected hard subset, not full-corpus accuracy.
+
+Root cause contract gap verified from source: core Pipeline sends only prompt
+text, not PaymentOutput JSON schema; v1 system prompt does NOT name direction
+allowed enum inflow/outflow (example directionnull). Date/reference and missing
+paid-fact can also make model drop an otherwise recognized monetary candidate.
+Next: new immutable promptv2 with generated authoritative PaymentOutput schema
+and explicit field independence/draft-intent/date/paid conservative guidance;
+keep all verifier checks and published task contract unchanged. Need RED schema
+contract prompt tests first, then task build defaultv2. Consumer has no prompt
+version strict gate (verify actual source), output schema remainsv1. Budget
+remaining23 can cover one selected regression run max20 on same10cases, no
+additional data/provider, cumulative≤79/82. Do NOT do another full41-case run.
+
+Promptv2 implementation ready: v1file unchanged, v2template identical; TaskSpec
+build derives PaymentOutput JSONschema and appends to trusted system instruction.
+This is the only LLM-input variable changed. New enum/schema/version test proved
+RED→GREEN. Metadata now also provides sanitized Pydantic schema error paths/types
+without input/context/message/rawresponse or unknown keys (test RED→GREEN).
+Finalgates303testsPASS/1skip,eval9PASS/1skip,ruff/mypy55PASS,47targetedPASS.
+Manifest currentv2rendered prompt; no model calls since diagnostic59campaign total.
+Next: commitv2+schema diagnostics, distinct65-file bundle, same10IDs max20calls
+with ledger guard59+20<=82, old archives/reports immutable. Reviewer privacy-delta
+followup pending, priorv2reviewB0/I0/M0. Default NoPayment/date/paid policy unchanged.

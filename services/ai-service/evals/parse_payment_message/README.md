@@ -3,7 +3,7 @@
 `cases.jsonl`: 24 synthetic verifier replies and explicit expected check outcomes.
 These are adversarial fixtures, not model-produced results. Tests report pass/N
 by dimension and exercise structured Pipeline separately. No live calls or model
-accuracy claim. Model/prompt: fixture replies / parse_payment_message/v1.
+accuracy claim. Model/prompt: fixture replies / current version from TaskSpec (v2).
 
 `corpus-review.jsonl`: review of all 41 source records; partial monetary facts,
 questions and exclusions only. `tg-016`–`tg-040` stay in event-list family,

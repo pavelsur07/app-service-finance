@@ -267,3 +267,18 @@ def test_untrusted_instructions_or_truncated_response_never_produce_draft(attack
     assert result.verdict.value == "rejected"
     assert result.output is None
     assert len(result.trace["responses"]) == (1 if attack == "foreign_id" else 2)
+
+
+def test_payment_prompt_supplies_authoritative_output_schema_to_model() -> None:
+    spec = build_registry().get("parse_payment_message")
+    assert spec is not None
+    marker = "\n\nOUTPUT_JSON_SCHEMA\n"
+    assert marker in spec.prompt.text
+    schema = json.loads(spec.prompt.text.split(marker, 1)[1])
+    assert schema == PaymentOutput.model_json_schema()
+    assert schema["$defs"]["PaymentItem"]["properties"]["direction"]["anyOf"][0]["enum"] == [
+        "inflow",
+        "outflow",
+    ]
+    assert spec.prompt.version == "v2"
+    assert spec.risk.value == "high"

@@ -12,14 +12,16 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import ValidationError
 
-from ai_service.core.pipeline import SCHEMA_CHECK, Pipeline, PipelineOutcome
+from ai_service.core.pipeline import SCHEMA_CHECK, Pipeline, PipelineOutcome, _strip_fences
 from ai_service.evals.compare import EVAL_COMPANY
 from ai_service.llm.adapters import build_adapters
 from ai_service.llm.gateway import LlmGateway
 from ai_service.llm.routes import assert_via_gateway, parse_routing
 from ai_service.llm.types import LlmAdapter, LlmError, LlmRequest, LlmResponse, LlmUnavailableError, ModelRef
 from ai_service.tasks.parse_payment_message.checks import normalize_money
+from ai_service.tasks.parse_payment_message.schemas import PaymentItem, PaymentOutput
 from ai_service.tasks.parse_payment_message.task import TASK_TYPE, build
 from ai_service.tasks.registry import build_registry
 
@@ -232,12 +234,32 @@ def _score(cases: list[dict[str, Any]], answers: dict[str, dict[str, Any]]) -> d
 
 def _diagnostics(outcome: PipelineOutcome | None) -> dict[str, Any]:
     failed: dict[str, list[str]] = {}
+    schema_errors: list[dict[str, str]] = []
     if outcome is not None:
         for check in outcome.checks:
             if check.passed:
                 continue
             if check.name == SCHEMA_CHECK:
                 failed[SCHEMA_CHECK] = ["schema_validation_failed"]
+                responses = outcome.trace.get("responses", [])
+                text = responses[-1].get("text") if responses and isinstance(responses[-1], dict) else None
+                if isinstance(text, str):
+                    try:
+                        PaymentOutput.model_validate_json(_strip_fences(text))
+                    except ValidationError as error:
+                        fields = PaymentOutput.model_fields.keys() | PaymentItem.model_fields.keys()
+                        for detail in error.errors(include_input=False, include_context=False, include_url=False):
+                            parts = [
+                                "[]" if isinstance(part, int) else part if part in fields else "extra_field"
+                                for part in detail["loc"]
+                            ]
+                            kind = detail["type"]
+                            schema_errors.append(
+                                {
+                                    "path": ".".join(parts),
+                                    "type": kind if re.fullmatch(r"[a-z_]{1,64}", kind) else "validation_error",
+                                }
+                            )
             elif check.name == "payment_evidence_and_context":
                 # This task's verifier emits static comma-separated machine codes, never model text.
                 codes = check.details.split(",")
@@ -254,6 +276,7 @@ def _diagnostics(outcome: PipelineOutcome | None) -> dict[str, Any]:
         "amount_null_count": sum(item["amount"] is None for item in items) if items is not None else None,
         "direction_null_count": sum(item["direction"] is None for item in items) if items is not None else None,
         "failed_checks": failed,
+        "schema_errors": schema_errors,
         "error_code": outcome.error_code if outcome is not None else "provider_unavailable",
     }
 
