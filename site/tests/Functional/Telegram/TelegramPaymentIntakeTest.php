@@ -166,6 +166,31 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction WHERE company_id = ?', [self::COMPANY]));
     }
 
+    public function testExplicitRefreshRestartsLostPollBeforeItsDeadlineWithoutNewAiRequest(): void
+    {
+        $client = $this->setupClient(true, true);
+        $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
+        $session = $this->em()->getRepository(\App\Telegram\Entity\PaymentIntakeSession::class)->findOneBy(['companyId' => self::COMPANY]);
+        self::assertInstanceOf(\App\Telegram\Entity\PaymentIntakeSession::class, $session);
+        $oldGeneration = $session->getPollGeneration();
+        self::assertNotNull($oldGeneration);
+        self::assertNull($session->pendingPoll(), 'The published intent is no longer in the database even if its queue message is lost.');
+        $this->aiGranted = false;
+        $before = \count($this->aiTaskKeys);
+        $this->post($client, ['callback_query' => [
+            'id' => 'refresh-lost-poll', 'from' => ['id' => 70090], 'message' => ['chat' => ['id' => 70090]],
+            'data' => 'pi:'.\App\Telegram\Application\PaymentIntakePresenter::encodeId($session->getId()).':1:refresh',
+        ]]);
+        $fresh = $this->em()->getRepository(\App\Telegram\Entity\PaymentIntakeSession::class)->findOneBy(['companyId' => self::COMPANY]);
+        self::assertInstanceOf(\App\Telegram\Entity\PaymentIntakeSession::class, $fresh);
+        self::assertNotNull($fresh->getPollGeneration());
+        self::assertNotSame($oldGeneration, $fresh->getPollGeneration());
+        self::assertCount($before, $this->aiTaskKeys);
+        $transport = $client->getContainer()->get('messenger.transport.async_payment_intake');
+        self::assertInstanceOf(\Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport::class, $transport);
+        self::assertCount(1, $transport->getSent());
+    }
+
     public function testConfirmedMoneySurvivesTelegramTimeoutAndNotificationRetry(): void
     {
         $client = $this->setupClient(true, true);

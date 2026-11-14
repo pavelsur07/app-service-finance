@@ -5659,7 +5659,7 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 | Транспорт | Воркер (`messenger:consume`) | Что идёт |
 |---|---|---|
 | `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad, задачи ai-service кроме parse_payment_message (`SubmitAiTaskMessage`), проверка платежей ЮKassa (`ApplyYooKassaPaymentMessage`) |
-| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake` (profile payment-intake); production worker требует отдельного одобрения | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Worker `messenger:consume async_payment_intake` обязан работать до включения TELEGRAM_PAYMENT_INTAKE_ENABLED |
+| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake` (profile payment-intake); production worker требует отдельного одобрения | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Worker `messenger:consume async_payment_intake` обязан работать до включения TELEGRAM_PAYMENT_INTAKE_ENABLED; перед пилотом также согласовать company-scoped расписание `app:cash:recover-payment-intake` и `app:telegram:recover-payment-intake` (processing commands) |
 | `async_pipeline` | `async_pipeline` | Локальная DB-обработка: Process*-сообщения Marketplace, Ads raw, нормализация inventory, auto-rules, ImportProducts |
 | `async_wb_finance` | `async_wb_finance` | `SyncWbFinancialReportDayMessage` (retry до 20 раз) |
 | `async_ads` | `async_ads` | Ozon Performance polling (`LoadOzonAdStatisticsRangeMessage`, `FetchOzonAdStatisticsMessage`, `RequestOzonAdBatchMessage`) |

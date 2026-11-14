@@ -1,3 +1,35 @@
+# Release checkpoint — финальная приёмка
+
+Рабочая копия /tmp/vf-payment-intake-release-dc96632b (detached);
+remote ветка docs/telegram-payment-intake-examples, PR2985 Draft/master.
+Оригинальный checkout41174124f и owner AGENTS/CLAUDE не трогать.
+Masterd12987ad совместилиmerge337269f72, обе nightly/weekly config сохранены.
+CI43588394992: единственный failedgatePHPDoc alignment. Причина: focused CS
+был ошибочно запущен с.distconfig вместо active.php. Исправлено; canonical
+composer cs:check иcs:strict-types теперь0/4240PASS. Другие результаты CI
+проверять по точномуSHA, не объявлять failedrunGREEN.
+
+Полный independent internal review B0/I3fixed -> INTERNALREVIEW_GREEN.
+FormalClaude medium round1 прочитал16426lines, markerREVIEW_GREEN, B0/I0/M4.
+Артефакты final-external в ignored root/site/var/payment-intake-review.
+MINORs закрыты: neutral ledger sourcepayment_intake; правильный caller-owned
+transactiondoc; pilotprecondition businessworker+обеcompany-scopedrecoverycron
+документирован; explicitRefreshперезапускаетpollgenerationбезновогоAIparse.
+RED2FAIL→GREEN2tests12assert. НовыхB/I послеselfreviewнет.
+
+Последний PHPmodule380tests2067assertPASS (Gateway/Cash/Telegram/schema),
+focusedStan6filesNoerrors. Fullstyleactiveconfig0/4240PASS. Pythonпосле3I:
+603PASS1skip,eval9PASS1skip,Ruff121/mypy68PASS. Goldsource41/semantic12/reviewed
+packнеизменены. БолеераннийfullCI43585432214SUCCESSatab6—исторический.
+
+Дальше: pushMINORfix+этазапись, дождатьсяCIточногоновогокода; закрытьStage8/
+handoff/PRdescription,docscommit/push,latestCI,Ready,singlecombinedreleaseask
+(3Doctrine+Python0002+nightlyflag/worker/cron+merge/deploy). Не спрашивать о
+рутинныхcommit/push/review. Businessbotpilotпока0иотдельнонепринят.
+No prod mutations/new paid benchmarks; четыре старых прохода закрыты.
+
+---
+
 # Актуальный handoff checkpoint
 
 Каноническая рабочая копия: /tmp/vf-payment-intake-handoff-41174124 (detached).

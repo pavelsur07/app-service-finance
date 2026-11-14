@@ -211,7 +211,7 @@ final readonly class PaymentIntakeAction
                 $dto->projectDirectionId = $item['project_id'];
                 $dto->responsibilityCenterId = $item['cfo_id'];
                 $dto->idempotencyKey = $item['transaction_id'];
-                $dto->importSource = 'telegram_payment_intake';
+                $dto->importSource = 'payment_intake';
                 $dto->externalId = $draft->getId().'/'.$item['id'];
                 $dto->rawData = ['draft_id' => $draft->getId(), 'item_id' => $item['id'], 'revision' => $draft->getRevision(), 'provenance' => $item['provenance']];
                 $tx = $this->addTransaction->createInCurrentTransaction($dto);

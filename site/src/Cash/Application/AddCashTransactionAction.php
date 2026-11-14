@@ -37,13 +37,7 @@ final class AddCashTransactionAction
     ) {
     }
 
-    /**
-     * Создание транзакции ДДС.
-     * Важно: сперва пишем транзакцию (flush), затем — пересчитываем факты, чтобы расчёт шёл по актуальным данным;
-     * всё это — одна транзакция БД, событие для кэша — после commit.
-     *
-     * @throws ORMException
-     */
+    /** Создание внутри транзакции вызывающего; он же отправляет событие кэша после commit. */
     public function createInCurrentTransaction(CashTransactionDTO $dto): CashTransaction
     {
         if (!$this->entityManager->getConnection()->isTransactionActive()) {
@@ -56,6 +50,13 @@ final class AddCashTransactionAction
         return $this->create($dto, true);
     }
 
+    /**
+     * Создание транзакции ДДС.
+     * Важно: сперва пишем транзакцию (flush), затем — пересчитываем факты, чтобы расчёт шёл по актуальным данным;
+     * всё это — одна транзакция БД, событие для кэша — после commit.
+     *
+     * @throws ORMException
+     */
     public function __invoke(CashTransactionDTO $dto): CashTransaction
     {
         return $this->create($dto, false);

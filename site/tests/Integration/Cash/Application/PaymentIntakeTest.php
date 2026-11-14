@@ -274,6 +274,18 @@ final class PaymentIntakeTest extends IntegrationTestCase
         yield 'explicitly excluded row permits idempotent confirmation' => [true];
     }
 
+    public function testGenericSourceConfirmationUsesNeutralLedgerNamespace(): void
+    {
+        $draft = $this->action->request($this->sourceCommand('web/form/payment-1'));
+        $this->deliverResult($draft->taskId);
+        $draft = $this->approve($this->get($draft));
+        $command = new ConfirmPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$draft->items[0]['id']]);
+        $result = $this->action->confirm($command);
+        self::assertSame('payment_intake', $this->connection->fetchOne('SELECT import_source FROM cash_transaction WHERE id = ? AND company_id = ?', [$result->transactionIds[0], $this->companyId()]));
+        self::assertSame($result->transactionIds, $this->action->confirm($command)->transactionIds);
+        self::assertSame(1, $this->ledgerCount());
+    }
+
     public function testResultReplayAndStaleAttemptCannotReplaceRows(): void
     {
         $draft = $this->ready();

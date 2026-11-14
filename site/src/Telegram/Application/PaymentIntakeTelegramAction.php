@@ -232,6 +232,7 @@ final readonly class PaymentIntakeTelegramAction
             return ['text' => 'Карточка устарела. Нажмите «Обновить» в актуальной версии.'];
         }
         if ('refresh' === $action) {
+            $session->finishPolling();
             $session->requireDelivery();
         } elseif ('cancel' === $action) {
             $this->markDeliveryPending($session);

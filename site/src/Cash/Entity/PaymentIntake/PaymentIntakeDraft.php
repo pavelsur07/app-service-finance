@@ -294,7 +294,7 @@ class PaymentIntakeDraft
 
     /**
      * @param array<string, array<string, mixed>> $patches
-     * @param list<string>|null                   $questions
+     * @param list<string>|null $questions
      */
     public function amend(int $expectedRevision, array $patches, ?string $text = null, ?string $sourceRevision = null, ?array $questions = null, bool $retry = false): bool
     {
