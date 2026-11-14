@@ -18,6 +18,18 @@ final readonly class SkuEconomicsXlsxExporter
 {
     public function response(SkuEconomicsReport $report, bool $allocated): BinaryFileResponse
     {
+        $path = $this->writeFile($report, $allocated);
+        $response = new BinaryFileResponse($path);
+        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, sprintf('economics-sku-%s-%s.xlsx', $report->from->format('Ymd'), $report->to->format('Ymd')));
+        $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $response->deleteFileAfterSend();
+
+        return $response;
+    }
+
+    /** Временный xlsx-файл отчёта; удаляет вызывающий. */
+    public function writeFile(SkuEconomicsReport $report, bool $allocated): string
+    {
         $path = (string) tempnam(sys_get_temp_dir(), 'me-sku-');
         $writer = new Writer();
         $writer->openToFile($path);
@@ -35,12 +47,7 @@ final readonly class SkuEconomicsXlsxExporter
             $writer->close();
         }
 
-        $response = new BinaryFileResponse($path);
-        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, sprintf('economics-sku-%s-%s.xlsx', $report->from->format('Ymd'), $report->to->format('Ymd')));
-        $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        $response->deleteFileAfterSend();
-
-        return $response;
+        return $path;
     }
 
     public function dynamicsResponse(EconomicsDynamicsReport $report, bool $allocated): BinaryFileResponse

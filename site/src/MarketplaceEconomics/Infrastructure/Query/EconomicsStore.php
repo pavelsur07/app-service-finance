@@ -101,4 +101,41 @@ final readonly class EconomicsStore
 
         return $rows;
     }
+
+    /**
+     * Компании с витриной за период — кандидаты на недельный отчёт.
+     *
+     * @companyScopeExempt рассылка обходит все компании (cron)
+     *
+     * @return list<string>
+     */
+    public function companiesWithDays(\DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        return array_map('strval', $this->connection->fetchFirstColumn(
+            'SELECT DISTINCT company_id::text FROM me_day WHERE operation_date BETWEEN :from AND :to ORDER BY 1',
+            ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')],
+        ));
+    }
+
+    /**
+     * Застолбить отправку недельного отчёта: true — отметки не было и она записана (отправлять),
+     * false — уже отправлен. Один INSERT … ON CONFLICT DO NOTHING вне транзакции.
+     */
+    public function claimWeeklyReport(string $companyId, \DateTimeImmutable $weekStart, string $delivery): bool
+    {
+        return 1 === $this->connection->executeStatement(
+            'INSERT INTO me_weekly_report (company_id, week_start, delivery, sent_at) VALUES (:company, :week, :delivery, :now)
+             ON CONFLICT (company_id, week_start, delivery) DO NOTHING',
+            ['company' => $companyId, 'week' => $weekStart->format('Y-m-d'), 'delivery' => $delivery, 'now' => $this->clock->now()->format('Y-m-d H:i:s')],
+        );
+    }
+
+    /** Снять отметку, если отчёт не ушёл: следующий прогон отправит его. */
+    public function releaseWeeklyReport(string $companyId, \DateTimeImmutable $weekStart, string $delivery): void
+    {
+        $this->connection->executeStatement(
+            'DELETE FROM me_weekly_report WHERE company_id = :company AND week_start = :week AND delivery = :delivery',
+            ['company' => $companyId, 'week' => $weekStart->format('Y-m-d'), 'delivery' => $delivery],
+        );
+    }
 }
