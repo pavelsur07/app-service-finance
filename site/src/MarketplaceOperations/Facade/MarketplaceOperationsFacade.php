@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\MarketplaceOperations\Facade;
 
 use App\MarketplaceOperations\Application\DTO\DayOperations;
+use App\MarketplaceOperations\Application\DTO\DayWindow;
+use App\MarketplaceOperations\Application\DTO\OperationRecord;
+use App\MarketplaceOperations\Enum\OperationKind;
 use Doctrine\DBAL\Connection;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Clock\ClockInterface;
@@ -36,10 +39,7 @@ final readonly class MarketplaceOperationsFacade implements MarketplaceOperation
         $window = ['company' => $day->companyId, 'channel' => $day->channel, 'connection' => $day->connectionRef, 'date' => $date];
         $now = $this->clock->now()->format('Y-m-d H:i:s');
 
-        $this->connection->executeStatement(
-            'SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))',
-            ['key' => 'mo:'.implode(':', $window)],
-        );
+        $this->lockDay('mo:'.implode(':', $window));
         $this->connection->executeStatement(
             'DELETE FROM mo_operation WHERE company_id = :company AND channel = :channel AND connection_ref = :connection AND operation_date = :date',
             $window,
@@ -83,5 +83,77 @@ final readonly class MarketplaceOperationsFacade implements MarketplaceOperation
         );
 
         return \count($day->operations);
+    }
+
+    public function dirtyDays(int $limit, ?\DateTimeImmutable $markedBefore = null): array
+    {
+        $params = ['limit' => max(1, $limit)];
+        if (null !== $markedBefore) {
+            $params['before'] = $markedBefore->format('Y-m-d H:i:s');
+        }
+
+        return $this->windows($this->connection->fetchAllAssociative(
+            'SELECT company_id, channel, connection_ref, operation_date FROM mo_dirty_window'
+            .(null === $markedBefore ? '' : ' WHERE marked_at < :before').' ORDER BY marked_at, operation_date LIMIT :limit',
+            $params,
+        ));
+    }
+
+    public function days(\DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        return $this->windows($this->connection->fetchAllAssociative(
+            'SELECT DISTINCT company_id, channel, connection_ref, operation_date FROM mo_operation
+             WHERE operation_date BETWEEN :from AND :to ORDER BY operation_date, company_id, channel, connection_ref',
+            ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')],
+        ));
+    }
+
+    public function takeDay(DayWindow $day): array
+    {
+        if (!$this->connection->isTransactionActive()) {
+            throw new \LogicException('MarketplaceOperations: takeDay вызывается внутри транзакции вызывающего');
+        }
+
+        $window = ['company' => $day->companyId, 'channel' => $day->channel, 'connection' => $day->connectionRef, 'date' => $day->date];
+        $this->lockDay('mo:'.implode(':', $window));
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT listing_id, kind, source_type, amount_minor, currency, quantity FROM mo_operation
+             WHERE company_id = :company AND channel = :channel AND connection_ref = :connection AND operation_date = :date
+             ORDER BY id',
+            $window,
+        );
+        $this->connection->executeStatement(
+            'DELETE FROM mo_dirty_window WHERE company_id = :company AND channel = :channel AND connection_ref = :connection AND operation_date = :date',
+            $window,
+        );
+
+        return array_map(static fn (array $r): OperationRecord => new OperationRecord(
+            null === $r['listing_id'] ? null : (string) $r['listing_id'],
+            OperationKind::from((string) $r['kind']),
+            (string) $r['source_type'],
+            (int) $r['amount_minor'],
+            (string) $r['currency'],
+            null === $r['quantity'] ? null : (int) $r['quantity'],
+        ), $rows);
+    }
+
+    private function lockDay(string $key): void
+    {
+        $this->connection->executeStatement('SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))', ['key' => $key]);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return list<DayWindow>
+     */
+    private function windows(array $rows): array
+    {
+        return array_map(static fn (array $r): DayWindow => new DayWindow(
+            (string) $r['company_id'],
+            (string) $r['channel'],
+            (string) $r['connection_ref'],
+            (string) $r['operation_date'],
+        ), $rows);
     }
 }
