@@ -3925,8 +3925,11 @@ Cash PaymentIntake. Python `parse_payment_message` выполняется вну
 ai-service; payload/output — `services/_contracts/ai-parse-payment-message/v1`.
 Конверт `ai-task/v1` не изменён. Модель возвращает предложения с доказательными
 фрагментами; деньги записывает только Symfony после подтверждения факта оплаты.
-Промпт `parse_payment_message/v4` включает JSON Schema, автоматически полученную
-из PaymentOutput; v1–v3 сохранены. Версия и хеш полного system prompt входят в eval.
+Промпт `parse_payment_message/v5` включает JSON Schema, автоматически полученную
+из PaymentOutput; v1–v4 сохранены. Внутренний model data block дополнен
+`reference_local_date`, вычисленной общей с verifier функцией из reference_at
+и timezone; публичный PaymentInput не расширяется. Эта дата задаёт основу
+относительных выражений, но не является датой платежа по умолчанию. Версия и хеш полного system prompt входят в eval.
 Проверка справочного итога действует и при неизвестной сумме. После schema parse
 необязательный `TaskSpec.prepare_output` готовит безопасное предложение; только
 PaymentIntake подключает такую подготовку. Неподтверждённые дата/направление/paid

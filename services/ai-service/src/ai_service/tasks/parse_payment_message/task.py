@@ -6,16 +6,17 @@ from pathlib import Path
 
 from ai_service.core.prompt import Prompt, data_block
 from ai_service.core.task import Risk, TaskSpec
-from ai_service.tasks.parse_payment_message.checks import verify
+from ai_service.tasks.parse_payment_message.checks import reference_date, verify
 from ai_service.tasks.parse_payment_message.preparation import prepare_output
 from ai_service.tasks.parse_payment_message.schemas import PaymentInput, PaymentOutput
 
 TASK_TYPE = "parse_payment_message"
-PROMPT_VERSION = "v4"
+PROMPT_VERSION = "v5"
 
 
 def build_user(inp: PaymentInput) -> str:
-    return data_block(json.dumps(inp.model_dump(mode="json"), ensure_ascii=False))
+    data = inp.model_dump(mode="json") | {"reference_local_date": reference_date(inp).isoformat()}
+    return data_block(json.dumps(data, ensure_ascii=False))
 
 
 def build() -> TaskSpec[PaymentInput, PaymentOutput]:

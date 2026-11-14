@@ -280,5 +280,29 @@ def test_payment_prompt_supplies_authoritative_output_schema_to_model() -> None:
         "inflow",
         "outflow",
     ]
-    assert spec.prompt.version == "v4"
+    assert spec.prompt.version == "v5"
     assert spec.risk.value == "high"
+
+
+@pytest.mark.parametrize(
+    ("reference", "zone", "expected"),
+    [
+        ("2026-11-14T23:30:00+00:00", "Asia/Tokyo", "2026-11-15"),
+        ("2026-11-14T00:30:00+00:00", "America/Los_Angeles", "2026-11-13"),
+        ("2026-12-31T23:30:00+00:00", "Europe/Moscow", "2027-01-01"),
+        ("2028-03-01T00:30:00+03:00", "UTC", "2028-02-29"),
+    ],
+)
+def test_model_context_uses_reference_local_date_without_changing_public_input(
+    reference: str, zone: str, expected: str
+) -> None:
+    from ai_service.core.prompt import extract_data_block
+    from ai_service.tasks.parse_payment_message.task import build_user
+
+    inp = PaymentInput.model_validate(payload() | {"reference_at": reference, "timezone": zone})
+    original = inp.model_dump(mode="json")
+    data = json.loads(extract_data_block(build_user(inp)))
+    assert data.get("reference_local_date") == expected
+    assert {key: value for key, value in data.items() if key != "reference_local_date"} == original
+    assert inp.model_dump(mode="json") == original
+    assert "reference_local_date" not in PaymentInput.model_fields

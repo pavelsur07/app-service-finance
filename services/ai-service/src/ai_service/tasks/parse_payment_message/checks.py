@@ -71,6 +71,10 @@ def _clause(text: str, start: int, end: int) -> tuple[str, int]:
     return text[left:right], left
 
 
+def reference_date(inp: PaymentInput) -> date:
+    return inp.reference_at.astimezone(ZoneInfo(inp.timezone)).date()
+
+
 def _dates(clause: str, reference: date, money_start: int, money_end: int) -> set[date]:
     found = set()
     relative = {"позавчера": -2, "вчера": -1, "сегодня": 0, "завтра": 1, "послезавтра": 2}
@@ -166,7 +170,7 @@ def _occurrence_errors(inp: PaymentInput, item: PaymentItem, start: int, end: in
         and item.direction != expected_direction
     ):
         errors.add("direction_contradiction")
-    reference = inp.reference_at.astimezone(ZoneInfo(inp.timezone)).date()
+    reference = reference_date(inp)
     anchored_dates = _dates(clause, reference, start - left, end - left)
     if len(anchored_dates) > 1:
         if item.date is not None:

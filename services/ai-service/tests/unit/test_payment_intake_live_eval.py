@@ -276,7 +276,7 @@ def test_semantic_execution_reuses_pipeline_without_leaking_gold_to_model() -> N
     class Reply:
         def complete(self, model: str, request: LlmRequest) -> LlmResponse:
             data = json.loads(extract_data_block(request.user))
-            assert set(data) == set(PaymentInput.model_fields)
+            assert set(data) == {*PaymentInput.model_fields, "reference_local_date"}
             assert data["text"] == case["payload"]["text"]
             assert "expected_items" not in data
             assert "literal_anchor" not in data
