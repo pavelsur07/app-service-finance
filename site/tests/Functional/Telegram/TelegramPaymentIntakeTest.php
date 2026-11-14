@@ -149,7 +149,9 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         self::assertNotNull($action->message($bot, array_replace($this->message('+1500 доход'), ['message_id' => 57]), '+1500 доход'));
         $results = $this->createMock(\App\ServiceGateway\Facade\AiTaskResultFacadeInterface::class);
         $results->expects(self::never())->method('refreshTask');
-        $handler = new \App\Telegram\MessageHandler\RefreshPaymentIntakeMessageHandler($this->em(), $cash, $companies, $centers, $results, $container->get(\App\Telegram\Application\PaymentIntakePresenter::class), $container->get('http_client'), $polls, $container->get('monolog.logger.telegram'), $access);
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects(self::never())->method('info')->with('Telegram intake refresh started', self::anything());
+        $handler = new \App\Telegram\MessageHandler\RefreshPaymentIntakeMessageHandler($this->em(), $cash, $companies, $centers, $results, $container->get(\App\Telegram\Application\PaymentIntakePresenter::class), $container->get('http_client'), $polls, $logger, $access);
         $handler($poll);
         self::assertFalse($polls($session));
         $command = new \App\Telegram\Command\RecoverPaymentIntakeDeliveryCommand($this->em(), $cash, $companies, $polls, $container->get('monolog.logger.telegram'), $access);

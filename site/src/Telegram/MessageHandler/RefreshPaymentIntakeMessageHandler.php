@@ -32,10 +32,10 @@ final readonly class RefreshPaymentIntakeMessageHandler
 
     public function __invoke(RefreshPaymentIntakeMessage $message): void
     {
-        $this->telegramLogger->info('Telegram intake refresh started', ['companyId' => $message->companyId, 'sessionId' => $message->sessionId, 'attempt' => $message->attempt]);
         if (!$this->access->isAllowed($message->companyId)) {
             return;
         }
+        $this->telegramLogger->info('Telegram intake refresh started', ['companyId' => $message->companyId, 'sessionId' => $message->sessionId, 'attempt' => $message->attempt]);
         $session = $this->em->getRepository(PaymentIntakeSession::class)->findOneBy(['id' => $message->sessionId, 'companyId' => $message->companyId]);
         if (!$session instanceof PaymentIntakeSession || !$session->pollingMatches($message->generation)) {
             return;

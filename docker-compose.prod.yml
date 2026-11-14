@@ -483,7 +483,7 @@ services:
         image: ghcr.io/pavelsur07/site-php-cli:${IMAGE_TAG:-latest}
         container_name: site-messenger-worker-payment-intake
         profiles: [payment-intake]
-        restart: always
+        restart: unless-stopped
         logging: *default-logging
         command: php bin/console messenger:consume async_payment_intake -vv --time-limit=3600 --memory-limit=160M --no-interaction
         environment:

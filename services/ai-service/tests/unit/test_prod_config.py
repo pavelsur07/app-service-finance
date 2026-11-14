@@ -76,6 +76,7 @@ def test_payment_intake_runtime_defaults_off_and_worker_is_isolated() -> None:
         assert env["TELEGRAM_PAYMENT_INTAKE_COMPANIES"] == "${TELEGRAM_PAYMENT_INTAKE_COMPANIES:-}"
     worker = services["site-messenger-worker-payment-intake"]
     assert worker["profiles"] == ["payment-intake"]
+    assert worker["restart"] == "unless-stopped"
     assert worker["image"] == services["site-php-cli"]["image"]
     assert worker["environment"] == compose["x-php-env"]
     assert worker["logging"] == services["site-messenger-worker-sync"]["logging"]
