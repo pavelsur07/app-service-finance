@@ -13,7 +13,8 @@ use App\MarketplaceOperations\Enum\OperationKind;
  *
  * - строки канона — по листингу × виду, уровень из `OperationKind::level()`;
  * - себестоимость (D5) — (продано − возвращено) × цена на дату;
- * - реклама без SKU (итог канона) — по долям рекламы SKU из легаси, ключ `legacy_ads_share`;
+ * - реклама без SKU (итог канона) — каждый вид по долям SKU в статистике легаси своего вида
+ *   (клики — `legacy_clicks_share`, оплата за заказ — `legacy_order_share`); нет статистики — без SKU;
  * - хранение без SKU — по остатку на дату (`stock_share`), нет остатков — вместе с общими;
  * - общие и прямые без SKU — по выручке SKU за день (`revenue_share`, D3).
  *
@@ -27,14 +28,17 @@ final class DayEconomicsCalculator
     public const STORAGE_SHARE = 'storage_share';
     public const OVERHEAD_SHARE = 'overhead_share';
 
-    public const KEY_ADS = 'legacy_ads_share';
+    public const KEY_ADS = [
+        'ads_cpc' => 'legacy_clicks_share',
+        'ads_pay_per_order' => 'legacy_order_share',
+    ];
     public const KEY_STOCK = 'stock_share';
     public const KEY_REVENUE = 'revenue_share';
 
     /**
      * @param list<OperationRecord> $operations
      * @param array<string, string> $costPrices listingId => цена за штуку, десятичная строка
-     * @param array<string, string> $adSpend listingId => реклама SKU из легаси (только доли)
+     * @param array<string, array<string, string>> $adSpend вид канона (`ads_cpc`, `ads_pay_per_order`) => listingId => реклама SKU в статистике легаси (только доли)
      * @param array<string, float> $stock listingId => остаток, шт
      */
     public function calculate(array $operations, array $costPrices, array $adSpend, array $stock): DayEconomics
@@ -44,7 +48,8 @@ final class DayEconomicsCalculator
         $groups = [];
         $revenue = [];
         $soldQty = [];
-        $canon = $adsPool = $storagePool = $overheadPool = 0;
+        $canon = $storagePool = $overheadPool = 0;
+        $adsPools = [];
 
         foreach ($operations as $op) {
             // ponytail: витрина в рублях — у кабинетов РФ другой валюты нет; чужая валюта роняет день, а не считает неверно
@@ -72,7 +77,7 @@ final class DayEconomicsCalculator
                 continue;
             }
             match (true) {
-                CascadeLevel::MD2 === $level => $adsPool += $op->amountMinor,
+                CascadeLevel::MD2 === $level => $adsPools[$op->kind->value] = ($adsPools[$op->kind->value] ?? 0) + $op->amountMinor,
                 OperationKind::STORAGE === $op->kind => $storagePool += $op->amountMinor,
                 CascadeLevel::MD1 === $level, CascadeLevel::OVERHEAD === $level => $overheadPool += $op->amountMinor,
                 // выручка без листинга (SKU не нашёлся) и справочные остаются без SKU
@@ -107,9 +112,16 @@ final class DayEconomicsCalculator
             $storagePool = 0;
         }
 
+        ksort($adsPools);
+        foreach ($adsPools as $kind => $pool) {
+            $key = self::KEY_ADS[$kind] ?? null;
+            if (null !== $key) {
+                $weights = array_filter($adSpend[$kind] ?? [], static fn (string $v): bool => 1 === bccomp($v, '0', 2));
+                array_push($lines, ...$this->allocate($pool, $weights, self::ADS_ALLOCATED, EconomicsLevel::MD2, $key));
+            }
+        }
         array_push(
             $lines,
-            ...$this->allocate($adsPool, array_filter($adSpend, static fn (string $v): bool => 1 === bccomp($v, '0', 2)), self::ADS_ALLOCATED, EconomicsLevel::MD2, self::KEY_ADS),
             ...$this->allocate($storagePool, array_map(static fn (float $q): string => (string) $q, $stockWeights), self::STORAGE_SHARE, EconomicsLevel::OVERHEAD, self::KEY_STOCK),
             ...$this->allocate($overheadPool, array_map('strval', array_filter($revenue, static fn (int $r): bool => $r > 0)), self::OVERHEAD_SHARE, EconomicsLevel::OVERHEAD, self::KEY_REVENUE),
         );

@@ -439,6 +439,7 @@ final class ModuleBoundaryRules
             )
             ->excluding(
                 Selector::inNamespace('App\Marketplace\Facade'),
+                Selector::inNamespace('App\Marketplace\Enum'),
                 Selector::inNamespace('App\MarketplaceAds\Facade'),
                 Selector::inNamespace('App\Inventory\Facade'),
                 Selector::inNamespace('App\Inventory\Application\DTO'),

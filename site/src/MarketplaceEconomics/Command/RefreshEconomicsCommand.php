@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceEconomics\Command;
 
 use App\MarketplaceEconomics\Application\Action\RefreshEconomicsDayAction;
+use App\MarketplaceEconomics\Infrastructure\Query\EconomicsStore;
 use App\MarketplaceOperations\Facade\MarketplaceOperationsFacadeInterface;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
@@ -17,7 +18,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Пересчёт витрины экономики SKU (cron каждые 15 минут после перевода): дни, заменённые в каноне.
+ * Пересчёт витрины экономики SKU (cron каждые 15 минут после перевода): дни, заменённые в каноне, и дни,
+ * посчитанные по прежней версии правил (`RefreshEconomicsDayAction::RULES_VERSION`).
  * `--recent=N` — ещё и все дни с операциями за последние N дней (ночью: себестоимость и реклама
  * легаси меняются без отметки в каноне); `--from/--to` — ручное окно. Каждый день — своя транзакция;
  * сбой дня не останавливает остальные, в конце один `error`.
@@ -30,6 +32,7 @@ final class RefreshEconomicsCommand extends Command
     public function __construct(
         private readonly MarketplaceOperationsFacadeInterface $operations,
         private readonly RefreshEconomicsDayAction $refresh,
+        private readonly EconomicsStore $store,
         private readonly Connection $connection,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
@@ -56,7 +59,8 @@ final class RefreshEconomicsCommand extends Command
 
         try {
             $days = [];
-            foreach ($this->operations->dirtyDays(max(1, (int) $input->getOption('limit'))) as $day) {
+            $limit = max(1, (int) $input->getOption('limit'));
+            foreach ([...$this->operations->dirtyDays($limit), ...$this->store->staleDays(RefreshEconomicsDayAction::RULES_VERSION, $limit)] as $day) {
                 $days[$day->key()] = $day;
             }
             $today = $this->clock->now()->setTime(0, 0);

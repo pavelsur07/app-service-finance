@@ -39,16 +39,18 @@ final class DayEconomicsCalculatorTest extends TestCase
         $this->assertBalanced($day);
     }
 
-    public function testAdsByLegacySharesStorageByStockAndRounding(): void
+    public function testAdsByLegacySharesOfOwnKindStorageByStockAndRounding(): void
     {
         $day = $this->calc([
             $this->op(self::A, K::SALE, 100000, 1),
             $this->op(null, K::ADS_CPC, -1000),
+            $this->op(null, K::ADS_PAY_PER_ORDER, -500),
             $this->op(null, K::STORAGE, -100),
-        ], [], [self::A => '1.00', self::B => '2.00', 'gone' => '0'], [self::A => 1.0, self::B => 2.0]);
+        ], [], ['ads_cpc' => [self::A => '1.00', self::B => '2.00', 'gone' => '0'], 'ads_pay_per_order' => [self::B => '5.00']], [self::A => 1.0, self::B => 2.0]);
 
-        // 1000 по 1 : 2 → 333 / 667 (наибольший остаток), 100 по остатку 1 : 2 → 33 / 67
-        self::assertSame([-333, -667], [$this->sum($day, self::A, EconomicsLevel::MD2), $this->sum($day, self::B, EconomicsLevel::MD2)]);
+        // клики 1000 по 1 : 2 → 333 / 667 (наибольший остаток); оплата за заказ 500 — только B; хранение 100 по остатку 1 : 2 → 33 / 67
+        self::assertSame([-333, -1167], [$this->sum($day, self::A, EconomicsLevel::MD2), $this->sum($day, self::B, EconomicsLevel::MD2)]);
+        self::assertSame('legacy_order_share', $this->lineByKey($day, self::B, 'legacy_order_share')?->allocationKey);
         self::assertSame([-33, -67], [$this->sum($day, self::A, EconomicsLevel::OVERHEAD), $this->sum($day, self::B, EconomicsLevel::OVERHEAD)]);
         self::assertSame(Calc::KEY_STOCK, $this->line($day, self::B, Calc::STORAGE_SHARE)?->allocationKey);
         self::assertSame(0, $day->unallocatedMinor);
@@ -57,13 +59,13 @@ final class DayEconomicsCalculatorTest extends TestCase
 
     public function testWithoutWeightsEverythingStaysUnallocated(): void
     {
-        // нет выручки, нет остатков, нет рекламы SKU в легаси: хранение уходит к общим, а им некуда
+        // нет выручки, нет остатков, нет статистики оплаты за заказ в легаси: хранение уходит к общим, а им некуда
         $day = $this->calc([
             $this->op(self::A, K::RETURN, -5000, 1),
             $this->op(null, K::STORAGE, -700),
             $this->op(null, K::ADS_PAY_PER_ORDER, -300),
             $this->op(null, K::SALE, 2000, 1),
-        ]);
+        ], [], ['ads_cpc' => [self::A => '9.00']]);
 
         self::assertSame(-700 - 300 + 2000, $day->unallocatedMinor);
         self::assertNull($this->line($day, self::A, Calc::OVERHEAD_SHARE));
@@ -92,7 +94,7 @@ final class DayEconomicsCalculatorTest extends TestCase
     /**
      * @param list<OperationRecord> $ops
      * @param array<string, string> $prices
-     * @param array<string, string> $ads
+     * @param array<string, array<string, string>> $ads
      * @param array<string, float> $stock
      */
     private function calc(array $ops, array $prices = [], array $ads = [], array $stock = []): DayEconomics
@@ -137,6 +139,17 @@ final class DayEconomicsCalculatorTest extends TestCase
         }
 
         return $sum;
+    }
+
+    private function lineByKey(DayEconomics $day, string $listing, string $key): ?\App\MarketplaceEconomics\Domain\EconomicsLine
+    {
+        foreach ($day->lines as $line) {
+            if ($line->listingId === $listing && $line->allocationKey === $key) {
+                return $line;
+            }
+        }
+
+        return null;
     }
 
     private function line(DayEconomics $day, string $listing, string $measure): ?\App\MarketplaceEconomics\Domain\EconomicsLine

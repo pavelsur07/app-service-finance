@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceEconomics\Application\Action;
 
 use App\Inventory\Facade\InventoryFacade;
+use App\Marketplace\Enum\AdSpendKind;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceEconomics\Domain\DayEconomics;
@@ -21,8 +22,8 @@ use App\MarketplaceOperations\Facade\MarketplaceOperationsFacadeInterface;
  */
 final readonly class RefreshEconomicsDayAction
 {
-    /** Меняется при смене правил расчёта витрины; дни пересчитывает `--from` (ночной `--recent` — последние). */
-    public const RULES_VERSION = 'economics-1';
+    /** Меняется при смене правил расчёта витрины — команда пересчитает все дни с прежней версией сама. */
+    public const RULES_VERSION = 'economics-2';
 
     public function __construct(
         private MarketplaceOperationsFacadeInterface $operations,
@@ -39,15 +40,17 @@ final readonly class RefreshEconomicsDayAction
         $operations = $this->operations->takeDay($day);
         $date = new \DateTimeImmutable($day->date);
 
-        $sold = $needAds = $needStock = false;
-        $listingIds = [];
+        $sold = $needStock = false;
+        $listingIds = $adKinds = [];
         foreach ($operations as $op) {
             if (null !== $op->listingId && CascadeLevel::REVENUE === $op->kind->level()) {
                 $listingIds[$op->listingId] = true;
                 $sold = true;
             }
             if (null === $op->listingId) {
-                $needAds = $needAds || CascadeLevel::MD2 === $op->kind->level();
+                if (CascadeLevel::MD2 === $op->kind->level()) {
+                    $adKinds[$op->kind->value] = true;
+                }
                 $needStock = $needStock || OperationKind::STORAGE === $op->kind;
             }
         }
@@ -56,7 +59,12 @@ final readonly class RefreshEconomicsDayAction
         $costPrices = $sold ? $this->marketplace->getCostPricesForListingsOnDate($day->companyId, array_keys($listingIds), $date) : [];
         // ponytail: доли рекламы — по всем листингам компании в канале; у компании с несколькими кабинетами
         // одного канала доли смешаются — сузить по кабинету листинга, когда такие компании включат
-        $adSpend = $needAds ? $this->ads->getAdSpendByListingForPeriod($day->companyId, $date, $date, $day->channel) : [];
+        $adSpend = [];
+        foreach ([OperationKind::ADS_CPC->value => AdSpendKind::CLICKS, OperationKind::ADS_PAY_PER_ORDER->value => AdSpendKind::PAY_PER_ORDER] as $kind => $spendKind) {
+            if (isset($adKinds[$kind])) {
+                $adSpend[$kind] = $this->ads->getAdSpendByListingForPeriod($day->companyId, $date, $date, $day->channel, $spendKind);
+            }
+        }
         $stock = $needStock ? $this->inventory->getStockQtyByListingOnReportDate($day->companyId, $date, $day->channel)->qtyByListingId : [];
 
         $economics = $this->calculator->calculate($operations, $costPrices, $adSpend, $stock);
