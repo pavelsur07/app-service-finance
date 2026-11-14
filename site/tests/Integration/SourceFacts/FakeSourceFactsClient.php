@@ -29,14 +29,20 @@ final class FakeSourceFactsClient implements SourceFactsClientInterface
     public array $failPage = [];
     public int $pageRequests = 0;
 
+    public function __construct(
+        private readonly string $service = 'ozon-fetcher',
+        private readonly string $resource = self::RESOURCE,
+    ) {
+    }
+
     /**
      * @param list<list<array{string, array<string, mixed>}>> $pages страницы записей [source_key, payload]
      */
     public function enqueue(string $connectionRef, string $period, int $revision, array $pages): string
     {
-        $batchId = sprintf('%s:%s:%s:r%d', $connectionRef, self::RESOURCE, $period, $revision);
+        $batchId = sprintf('%s:%s:%s:r%d', $connectionRef, $this->resource, $period, $revision);
         $this->queue[$batchId] = [
-            'batch' => new SourceFactBatch('ozon-fetcher', $batchId, $connectionRef, null, self::RESOURCE, $period, $revision, str_repeat('a', 64), \count($pages)),
+            'batch' => new SourceFactBatch($this->service, $batchId, $connectionRef, null, $this->resource, $period, $revision, str_repeat('a', 64), \count($pages)),
             'pages' => $pages,
         ];
 
@@ -47,7 +53,7 @@ final class FakeSourceFactsClient implements SourceFactsClientInterface
 
     public function service(): string
     {
-        return 'ozon-fetcher';
+        return $this->service;
     }
 
     public function isEnabled(): bool

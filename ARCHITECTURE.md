@@ -525,12 +525,14 @@
 ### ServiceGateway: канал фактов
 
 Контракт — `services/_contracts/source-fact-envelope/v1` (pull + ack). Клиент —
-`SourceFactsHttpClient` (сейчас один сервис: ozon-fetcher, `OZON_FETCHER_BASE_URL`/`_API_TOKEN`).
+`SourceFactsHttpClient`, по экземпляру на сервис с тегом `app.source_facts_client`
+(`services.yaml`): ozon-fetcher (`OZON_FETCHER_BASE_URL`/`_API_TOKEN`), wb-fetcher
+(`WB_FETCHER_BASE_URL`/`_API_TOKEN`). Клиент без базового URL в `sources()` не попадает.
 
-- `SourceFactsGatewayFacadeInterface`: `sources()` (сервис → публикуемые ресурсы; сейчас
-  `ozon.finance.accrual-by-day`), `batches()`, `page()`, `ack()`. Данных не меняет и не коммитит.
+- `SourceFactsGatewayFacadeInterface`: `sources()` (сервис → публикуемые ресурсы:
+  `ozon.finance.accrual-by-day`, `wb.finance.sales-report.daily`), `batches()`, `page()`, `ack()`. Данных не меняет и не коммитит.
 - Компанию пачки определяет фасад по `connection_ref` из активных подключений
-  (`MarketplaceFacade::getActiveOzonSellerConnections()`); подключения нет — `companyId = null`.
+  (`getActiveOzonSellerConnections()` ∪ `getActiveWbSellerConnections()`); подключения нет — `companyId = null`.
 - Страница отдаётся телом ответа как есть (`SourceFactPage::body`), проверенным по контракту:
   числа источника не проходят через `float` PHP. 404 и 502 страницы — `ContractViolationException`
   (повтор бесполезен), остальные не-200 и транспорт — `ServiceUnavailableException`.
@@ -5750,6 +5752,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.188 | 2026-11-14 | Канал фактов WB (этап 8.1–8.2): wb-fetcher публикует `wb.finance.sales-report.daily` (запись = строка отчёта, ключ `wb:sales-report.daily:{rrdId}`, backfill загруженных дней при старте); `SourceFactsGatewayFacade` — клиенты по тегу `app.source_facts_client`, кабинеты Ozon ∪ WB |
 | 2.187 | 2026-11-14 | Сверки нового контура (этап 7): гейт Ozon — перевод = канон за 45 дней и отставание кабинета; гейт витрины — доля нераспределённого > 1 %; новый модуль `MarketplaceQuality` — экран R10 `/marketplace/economics/quality`; фасады чтения `MarketplaceOzonFacadeInterface::dayStates`, `MarketplaceEconomicsFacadeInterface::daySums`, `MarketplaceOperationsFacadeInterface::daySums`, `SourceFactsFacadeInterface::periods(…, ?companyId)` |
 | 2.186 | 2026-11-14 | Telegram PaymentIntake: company pilot allowlist, guards ввода/доставки/отзыва, профилированный worker и независимый scoped recovery; parse route single DeepSeek; финансовые правила и общие AI grants без изменений |
 | 2.185 | 2026-11-14 | MarketplaceEconomics: отчёт R3 «Неделя» — `app:marketplace-economics:weekly-report` (понедельник 09:00), журнал `me_weekly_report` (`Version20261114230000`), `ECONOMICS_WEEKLY_REPORT_COMPANIES`; Telegram: фасад `TelegramFacadeInterface::sendDocumentToCompany` (этап 6.5) |

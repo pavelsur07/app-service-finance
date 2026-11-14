@@ -54,6 +54,26 @@ final class PullSourceFactsActionTest extends IntegrationTestCase
         $this->connectionRef = $connection->getId();
     }
 
+    public function testAcceptsWbFactsForWbCabinet(): void
+    {
+        $company = $this->em->find(\App\Company\Entity\Company::class, $this->companyId);
+        self::assertNotNull($company);
+        $wbConnection = new MarketplaceConnection(Uuid::uuid7()->toString(), $company, MarketplaceType::WILDBERRIES);
+        $wbConnection->setApiKey('wb-key');
+        $this->em->persist($wbConnection);
+        $this->em->flush();
+        $wb = new FakeSourceFactsClient('wb-fetcher', 'wb.finance.sales-report.daily');
+        $wb->enqueue($wbConnection->getId(), self::DAY, 1, [[['wb:sales-report.daily:101', ['rrdId' => 101]]], []]);
+
+        ($this->action(PullSourceFactsAction::ALL_COMPANIES, [$wb]))();
+
+        self::assertCount(1, $wb->acked, 'кабинет WB сопоставлен с компанией, пачка принята');
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM sf_fact WHERE company_id = ? AND resource_type = 'wb.finance.sales-report.daily'",
+            [$this->companyId],
+        ));
+    }
+
     public function testAppliesBatchAndRepeatedDeliveryChangesNothing(): void
     {
         $batchId = $this->service->enqueue($this->connectionRef, self::DAY, 1, [
@@ -203,13 +223,14 @@ final class PullSourceFactsActionTest extends IntegrationTestCase
         self::assertSame(Command::SUCCESS, $disabled->execute([]));
     }
 
-    private function action(string $companies = PullSourceFactsAction::ALL_COMPANIES): PullSourceFactsAction
+    /** @param list<FakeSourceFactsClient> $extra */
+    private function action(string $companies = PullSourceFactsAction::ALL_COMPANIES, array $extra = []): PullSourceFactsAction
     {
         /** @var MarketplaceFacade $marketplace */
         $marketplace = self::getContainer()->get(MarketplaceFacade::class);
 
         return new PullSourceFactsAction(
-            new SourceFactsGatewayFacade($this->service, $marketplace),
+            new SourceFactsGatewayFacade([$this->service, ...$extra], $marketplace),
             $this->store(),
             $this->connection,
             new Logger('test', [$this->logs]),
