@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** Stage 3 / Work item 3.1
-**Status:** implementing
+**Phase:** Stage 3 / handoff / stopped
+**Status:** stopped
 **Stage base commit:** `f230a0670`
 
 ### Completed
@@ -29,6 +29,16 @@
   vendor/phpstan/extension-installer/src/GeneratedConfig.php. При пропуске
   install с уже установленными locked deps suite запущен; в старой DB отсутствуют
   seed tariffs. Для контрольного полного прогона создана app_customer_ui_legacy_test.
+- Диагностика на отдельной app_customer_ui_diag_test: первое integration test
+  падает на записи var/storage/cash-file-imports (root-owned directory vs UID 1000).
+  Не меняя прав, исправлен пользователь локального test runner: user 0.
+  Запущен background full suite; предыдущий non-root изолированный прогон
+  остановлен после доказательства причины. Старый make-run завершился 143
+  без итоговой сводки; зелёным не считается.
+- CI source 6f380a39e: все три functional shards, integration, unit, PHPStan,
+  style и real-auth SPA job — pass; все CI checks pass/skipped.
+- Итоговый полный прогон: 9271 tests / 52215 assertions, 07:45.022, exit 0.
+  Runtime helper и лог в ignored site/var/customer-ui-smoke/.
 
 ### Review status
 - internal: Stage 1 — 0/0; Stage 2 — IMPORTANT 1 fixed; финальное независимое
@@ -38,9 +48,12 @@
   REVIEW_GREEN не получен, PR должен оставаться Draft.
 
 ### Exact next action
-- Дождаться full suite на isolated DB и завершения первого прогона; записать
-  точные результаты, commit/push review fixes, обновить Draft PR #3021.
-  External review блокирован окружением; не ставить Ready/merge.
+- Требуется установленный и авторизованный Claude Code в окружении.
+- Затем агент выполняет сам:
+  `site/bin/external-review.sh 0658c9fc6a3c4c3519f6e254d6669200b6a38753 --effort medium --context docs/tasks/customer-ui-legacy/review-context.md`.
+- После review/fix cycle обновить handoff, поставить PR #3021 Ready и пройти
+  owner decision для merge/deploy по AGENTS.md. Сейчас Draft, merge/deploy не выполнялись.
+- Source review fixes: 6f380a39e; полный audit и все runnable checks завершены.
 
 ### Files to inspect first on resume
 - site/src/Shared/Service/UiModeResolver.php

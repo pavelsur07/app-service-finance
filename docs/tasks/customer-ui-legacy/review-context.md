@@ -18,4 +18,19 @@ Auth уже отдельный legacy auth-слой, бюджет и Unit уже
 7 tests / 69 assertions. Frontend lint/build/unit 152 tests — OK. Chromium:
 9 отрендеренных Symfony test HTML fixtures × desktop/mobile; copy/presets/Tab/
 secret clearing — OK. Это UI smoke; реальные HTTP-сценарии покрыты functional tests.
-Полные гейты запускаются отдельно; результаты будут в handoff.
+CI дополнительно выявил устаревшее ожидание app-workzone для billing banner и
+ожидание Vite script tags в functional job, где frontend build не выполняется.
+Тесты актуализированы, built scripts доказаны browser smoke. Delta проверен
+независимым reviewer, открытых B/I нет. Эти два случая — validation fixes,
+не дополнительные находки внешнего review.
+
+Полные PHPStan, fixer, strict-types, unit и Twig gates прошли. Backend CI
+на source commit `6f380a39e`: unit, три functional shards и integration — pass.
+Локальный make site-test сначала остановился на правах записи Composer в
+vendor; прогон с preinstalled deps показал отсутствие seed tariffs в старой
+test DB и отсутствие write-доступа UID 1000 к var/storage (owner root).
+Диагностика на отдельной fresh test DB доказала storage permission failure
+в первом CashFileImportHandlerFlowTest. Контрольный полный прогон выполняется
+в отдельной fresh DB под user 0 внутри локального test runner:
+OK, 9271 tests / 52215 assertions, 07:45.022, exit 0. chmod/chown,
+production/config/dependencies не менялись. Результаты — в handoff.
