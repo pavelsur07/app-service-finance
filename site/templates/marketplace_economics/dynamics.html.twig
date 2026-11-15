@@ -1,6 +1,15 @@
 {% extends 'base.html.twig' %}
 {% block title %}Динамика экономики{% endblock %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    {{ vite_entry_link_tags('marketplace_economics') }}
+{% endblock %}
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('marketplace_economics') }}
+{% endblock %}
+
 {% macro money(minor) %}{{ minor|vf_minor(2)|vf_amount(2) }}{% endmacro %}
 {% macro pct(value) %}{{ value is null ? '—' : value|vf_number(1) ~ ' %' }}{% endmacro %}
 
@@ -119,26 +128,27 @@
             <p class="text-secondary small mb-0">Светлые столбцы — выручка, цветные — {{ profit_label }} (красные — убыток). Реклама за последние 2 дня — предварительно.</p>
         </section>
 
-        <section class="card report-scroll">
-            <table class="t-table">
+        <section class="card mb-3 me-table-card" data-economics-table>
+            <div class="me-table-scroll" data-economics-scroll tabindex="0" role="region" aria-label="Динамика экономики">
+            <table class="table table-vcenter card-table me-table">
                 <thead>
                     <tr>
                         <th>Период</th>
-                        <th class="t-cell--right">Продано, шт.</th>
-                        <th class="t-cell--right">Выручка, ₽</th>
-                        <th class="t-cell--right">СМ1, ₽</th>
-                        <th class="t-cell--right">Реклама, ₽</th>
-                        <th class="t-cell--right">ДРР, %</th>
-                        <th class="t-cell--right">СМ2, ₽</th>
-                        {% if allocated %}<th class="t-cell--right">СМ3, ₽</th>{% endif %}
-                        <th class="t-cell--right">Маржинальность {{ profit_label }}, %</th>
+                        <th class="text-end">Продано, шт.</th>
+                        <th class="text-end">Выручка, ₽</th>
+                        <th class="text-end">СМ1, ₽</th>
+                        <th class="text-end">Реклама, ₽</th>
+                        <th class="text-end">ДРР, %</th>
+                        <th class="text-end">СМ2, ₽</th>
+                        {% if allocated %}<th class="text-end">СМ3, ₽</th>{% endif %}
+                        <th class="text-end">Маржинальность {{ profit_label }}, %</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for s in report.steps|merge([{from: null, to: null, metrics: report.total}]) %}
                         {% set m = s.metrics %}
-                        <tr{{ s.from is null ? ' class="t-row--totals"' }}>
-                            <td{{ s.from is null ? ' class="t-totals-label"' }}>
+                        <tr{{ s.from is null ? ' class="me-totals"' }}>
+                            <td{{ s.from is null ? ' class="fw-semibold"' }}>
                                 {%- if s.from is null -%}
                                     {{ tagIds or search ? 'Итого по выбранным' : 'Итого' }}
                                 {%- elseif s.from == s.to -%}
@@ -147,18 +157,19 @@
                                     {{ s.from|date('d.m') }} – {{ s.to|date('d.m.Y') }}
                                 {%- endif -%}
                             </td>
-                            <td class="t-cell--right">{{ m.salesQty|vf_number }}</td>
-                            <td class="t-cell--right">{{ ui.money(m.revenue) }}</td>
-                            <td class="t-cell--right">{{ ui.money(m.md1) }}</td>
-                            <td class="t-cell--right">{{ ui.money(m.ads) }}</td>
-                            <td class="t-cell--right">{{ ui.pct(m.drr) }}</td>
-                            <td class="t-cell--right">{{ ui.money(m.md2) }}</td>
-                            {% if allocated %}<td class="t-cell--right">{{ ui.money(m.full) }}</td>{% endif %}
-                            <td class="t-cell--right">{{ ui.pct(m.percentOfRevenue(attribute(m, profit))) }}</td>
+                            <td class="text-end">{{ m.salesQty|vf_number }}</td>
+                            <td class="text-end">{{ ui.money(m.revenue) }}</td>
+                            <td class="text-end">{{ ui.money(m.md1) }}</td>
+                            <td class="text-end">{{ ui.money(m.ads) }}</td>
+                            <td class="text-end">{{ ui.pct(m.drr) }}</td>
+                            <td class="text-end">{{ ui.money(m.md2) }}</td>
+                            {% if allocated %}<td class="text-end">{{ ui.money(m.full) }}</td>{% endif %}
+                            <td class="text-end">{{ ui.pct(m.percentOfRevenue(attribute(m, profit))) }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
         </section>
     {% endif %}
 {% endblock %}

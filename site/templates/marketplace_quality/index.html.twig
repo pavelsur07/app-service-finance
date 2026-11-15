@@ -1,6 +1,15 @@
 {% extends 'base.html.twig' %}
 {% block title %}Качество данных маркетплейсов{% endblock %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    {{ vite_entry_link_tags('marketplace_economics') }}
+{% endblock %}
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('marketplace_economics') }}
+{% endblock %}
+
 {% macro money(minor) %}{{ minor|vf_minor(2)|vf_amount(2) }}{% endmacro %}
 {% macro day(value) %}{{ value is null ? '—' : value|date('d.m.Y') }}{% endmacro %}
 
@@ -39,20 +48,21 @@
             <p class="mb-0">Кабинетов в новом контуре нет: данные маркетплейсов этой компании пока считает прежний отчёт.</p>
         </section>
     {% else %}
-        <section class="card report-scroll">
-            <table class="t-table">
+        <section class="card mb-3 me-table-card" data-economics-table>
+            <div class="me-table-scroll" data-economics-scroll tabindex="0" role="region" aria-label="Качество данных">
+            <table class="table table-vcenter card-table me-table">
                 <thead>
                     <tr>
                         <th>Кабинет</th>
                         <th>Последний день фактов</th>
                         <th>Последний переведённый</th>
                         <th>Последний в витрине</th>
-                        <th class="t-cell--right">Дней не переведено</th>
-                        <th class="t-cell--right">Факты, ₽</th>
-                        <th class="t-cell--right">Карантин, ₽</th>
-                        <th class="t-cell--right">Канон, ₽</th>
-                        <th class="t-cell--right">Витрина, ₽</th>
-                        <th class="t-cell--right">Нераспределено, %</th>
+                        <th class="text-end">Дней не переведено</th>
+                        <th class="text-end">Факты, ₽</th>
+                        <th class="text-end">Карантин, ₽</th>
+                        <th class="text-end">Канон, ₽</th>
+                        <th class="text-end">Витрина, ₽</th>
+                        <th class="text-end">Нераспределено, %</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -62,31 +72,33 @@
                             <td>{{ ui.day(c.lastFactDay) }}</td>
                             <td>{{ ui.day(c.lastTranslatedDay) }}</td>
                             <td>{{ ui.day(c.lastMartDay) }}</td>
-                            <td class="t-cell--right">{{ c.untranslatedDays|vf_number }}</td>
-                            <td class="t-cell--right">{{ ui.money(c.factsMinor) }}</td>
-                            <td class="t-cell--right">{{ ui.money(c.quarantineMinor) }}</td>
-                            <td class="t-cell--right">{{ ui.money(c.canonMinor) }}</td>
-                            <td class="t-cell--right">{{ ui.money(c.martMinor) }}</td>
-                            <td class="t-cell--right">{{ c.unallocatedPercent is null ? '—' : c.unallocatedPercent|vf_number(2) ~ ' %' }}</td>
+                            <td class="text-end">{{ c.untranslatedDays|vf_number }}</td>
+                            <td class="text-end">{{ ui.money(c.factsMinor) }}</td>
+                            <td class="text-end">{{ ui.money(c.quarantineMinor) }}</td>
+                            <td class="text-end">{{ ui.money(c.canonMinor) }}</td>
+                            <td class="text-end">{{ ui.money(c.martMinor) }}</td>
+                            <td class="text-end">{{ c.unallocatedPercent is null ? '—' : c.unallocatedPercent|vf_number(2) ~ ' %' }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>
             </table>
-            <p class="text-secondary small mb-0">Факты = канон + карантин. Канон и витрина — без справочных строк (СПП, соинвестирование) и себестоимости.</p>
+            </div>
+            <p class="card-body text-secondary small mb-0">Факты = канон + карантин. Канон и витрина — без справочных строк (СПП, соинвестирование) и себестоимости.</p>
         </section>
 
-        <section class="card report-scroll">
-            <h2 class="card-title">Дни с расхождениями</h2>
+        <section class="card mb-3 me-table-card" data-economics-table>
+            <div class="card-header"><h2 class="card-title">Дни с расхождениями</h2></div>
             {% if report.problems is empty %}
-                <p>Расхождений нет.</p>
+                <div class="card-body">Расхождений нет.</div>
             {% else %}
-                <table class="t-table">
+                <div class="me-table-scroll" data-economics-scroll tabindex="0" role="region" aria-label="Качество данных">
+                <table class="table table-vcenter card-table me-table">
                     <thead>
                         <tr>
                             <th>День</th>
                             <th>Кабинет</th>
                             <th>Звено</th>
-                            <th class="t-cell--right">Расхождение, ₽</th>
+                            <th class="text-end">Расхождение, ₽</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -95,11 +107,12 @@
                                 <td>{{ p.date|date('d.m.Y') }}</td>
                                 <td>{{ p.connectionRef }}</td>
                                 <td>{{ links[p.link] }}</td>
-                                <td class="t-cell--right">{{ p.diffMinor is null ? '—' : ui.money(p.diffMinor) }}</td>
+                                <td class="text-end">{{ p.diffMinor is null ? '—' : ui.money(p.diffMinor) }}</td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+                </div>
             {% endif %}
         </section>
     {% endif %}

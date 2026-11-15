@@ -40,6 +40,8 @@ final class DataQualityPageTest extends WebTestCaseBase
         self::assertSelectorTextContains('nav[aria-label="Отчёт"] .nav-link.active[aria-current="page"]', 'Качество данных');
         self::assertSame('/marketplace/economics', $crawler->filter('nav[aria-label="Отчёт"] a')->first()->attr('href'));
         self::assertSame('/marketplace/economics/dynamics', $crawler->filter('nav[aria-label="Отчёт"] a')->eq(1)->attr('href'));
+        self::assertSelectorCount(2, '[data-economics-table] .table.table-vcenter.card-table');
+        self::assertSelectorExists('script[src*="marketplace_economics"]');
         $cabinet = $crawler->filter('tbody')->first()->filter('tr')->each(static fn ($r): string => $r->text());
         self::assertCount(1, $cabinet);
         self::assertStringContainsString('OZON · cab-'.substr(self::COMPANY_ID, -3), $cabinet[0]);
@@ -56,6 +58,24 @@ final class DataQualityPageTest extends WebTestCaseBase
         $client->request('GET', self::URL);
 
         self::assertResponseRedirects();
+    }
+
+    public function testEmptyAndReconciledStates(): void
+    {
+        $client = static::createClient();
+        $owner = $this->seed();
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
+        $client->request('GET', self::URL);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('section.card', 'Кабинетов в новом контуре нет');
+
+        $yesterday = (new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow')))->modify('-1 day')->format('Y-m-d');
+        $this->day(self::COMPANY_ID, $yesterday, 100000);
+        $client->request('GET', self::URL);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('section.card:last-child', 'Расхождений нет.');
+        self::assertSelectorCount(1, '[data-economics-table] table');
     }
 
     private function seed(): User

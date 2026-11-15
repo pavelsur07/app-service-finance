@@ -1,6 +1,15 @@
 {% extends 'base.html.twig' %}
 {% block title %}Экономика SKU{% endblock %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    {{ vite_entry_link_tags('marketplace_economics') }}
+{% endblock %}
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('marketplace_economics') }}
+{% endblock %}
+
 {% macro money(minor) %}{{ minor|vf_minor(2)|vf_amount(2) }}{% endmacro %}
 {% macro pct(value) %}{{ value is null ? '—' : value|vf_number(1) ~ ' %' }}{% endmacro %}
 {% macro delta(current, previous) %}
@@ -115,16 +124,17 @@
                 Реклама по SKU — по долям прежнего отчёта рекламы; за последние 2 дня — предварительно.
             </p>
         </div>
-        <section class="card report-scroll">
-            <table class="t-table">
+        <section class="card mb-3 me-table-card" data-economics-table>
+            <div class="me-table-scroll" data-economics-scroll tabindex="0" role="region" aria-label="Экономика SKU">
+            <table class="table table-vcenter card-table me-table">
                 <thead>
                     <tr>
                         <th>SKU</th>
-                        <th class="t-cell--right">
+                        <th class="text-end">
                             <a href="{{ path('marketplace_economics_sku', params|merge({sort: 'sales', dir: sort == 'sales' and desc ? 'asc' : 'desc', page: null})) }}">Продано, шт.</a>
                         </th>
                         {% for column in columns %}
-                            <th class="t-cell--right">
+                            <th class="text-end">
                                 {% if column.sort is defined %}
                                     <a href="{{ path('marketplace_economics_sku', params|merge({sort: column.sort, dir: sort == column.sort and desc ? 'asc' : 'desc', page: null})) }}">{{ column.label }}, ₽</a>
                                 {% else %}
@@ -132,9 +142,9 @@
                                 {% endif %}
                             </th>
                         {% endfor %}
-                        <th class="t-cell--right">Маржинальность {{ profit_label }}, %</th>
-                        <th class="t-cell--right">ДРР, %</th>
-                        <th class="t-cell--right">СПП, ₽</th>
+                        <th class="text-end">Маржинальность {{ profit_label }}, %</th>
+                        <th class="text-end">ДРР, %</th>
+                        <th class="text-end">СПП, ₽</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -145,39 +155,40 @@
                                 {{ row.sku }}
                                 <p class="text-secondary small mb-0">{{ row.title ?? row.supplierSku ?? '' }}</p>
                             </td>
-                            <td class="t-cell--right">{{ m.salesQty|vf_number }}{% if m.returnsQty %}<p class="text-secondary small mb-0">возвр. {{ m.returnsQty|vf_number }}</p>{% endif %}</td>
+                            <td class="text-end">{{ m.salesQty|vf_number }}{% if m.returnsQty %}<p class="text-secondary small mb-0">возвр. {{ m.returnsQty|vf_number }}</p>{% endif %}</td>
                             {% for column in columns %}
-                                <td class="t-cell--right">
+                                <td class="text-end">
                                     {{ ui.money(attribute(m, column.key)) }}
                                     {% if column.key == profit %}{{ ui.delta(attribute(m, column.key), attribute(row.previous, column.key)) }}{% endif %}
                                 </td>
                             {% endfor %}
-                            <td class="t-cell--right">{{ ui.pct(m.percentOfRevenue(attribute(m, profit))) }}</td>
-                            <td class="t-cell--right">{{ ui.pct(m.drr) }}</td>
-                            <td class="t-cell--right">{{ ui.money(m.spp) }}</td>
+                            <td class="text-end">{{ ui.pct(m.percentOfRevenue(attribute(m, profit))) }}</td>
+                            <td class="text-end">{{ ui.pct(m.drr) }}</td>
+                            <td class="text-end">{{ ui.money(m.spp) }}</td>
                         </tr>
                     {% else %}
                         <tr>
-                            <td class="t-empty" colspan="{{ columns|length + 5 }}">Нет продаж и затрат по SKU за период.</td>
+                            <td class="text-center text-secondary py-5" colspan="{{ columns|length + 5 }}">Нет продаж и затрат по SKU за период.</td>
                         </tr>
                     {% endfor %}
                     {% for label, m in report.unallocated is not null ? {'Нераспределено': report.unallocated, 'Итого': report.total} : {'Итого по выбранным': report.total} %}
-                        <tr class="t-row--totals">
-                            <td class="t-totals-label">{{ label }}</td>
-                            <td class="t-cell--right">{{ m.salesQty|vf_number }}</td>
+                        <tr class="me-totals">
+                            <td class="fw-semibold">{{ label }}</td>
+                            <td class="text-end">{{ m.salesQty|vf_number }}</td>
                             {% for column in columns %}
-                                <td class="t-cell--right">
+                                <td class="text-end">
                                     {{ ui.money(attribute(m, column.key)) }}
                                     {% if label starts with 'Итого' and column.key == profit %}{{ ui.delta(attribute(m, column.key), attribute(report.previousTotal, column.key)) }}{% endif %}
                                 </td>
                             {% endfor %}
-                            <td class="t-cell--right">{{ ui.pct(m.percentOfRevenue(attribute(m, profit))) }}</td>
-                            <td class="t-cell--right">{{ ui.pct(m.drr) }}</td>
-                            <td class="t-cell--right">{{ ui.money(m.spp) }}</td>
+                            <td class="text-end">{{ ui.pct(m.percentOfRevenue(attribute(m, profit))) }}</td>
+                            <td class="text-end">{{ ui.pct(m.drr) }}</td>
+                            <td class="text-end">{{ ui.money(m.spp) }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
         </section>
         <div class="card card-body mt-3">
             {% include 'partials/_pagination.html.twig' with {pager: pager} only %}

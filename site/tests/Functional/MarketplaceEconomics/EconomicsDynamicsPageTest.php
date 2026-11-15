@@ -29,6 +29,10 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
         $this->line('2026-11-16', $listingId, 'sale', 'revenue', 50000, 1);
         $this->line('2026-11-16', null, 'subscription', 'overhead', -8000);
         $this->day('2026-11-10');
+        static::getContainer()->get(Connection::class)->insert('me_day_line', [
+            'id' => Uuid::uuid7()->toString(), 'company_id' => Uuid::uuid7()->toString(), 'channel' => 'ozon', 'connection_ref' => 'foreign-cabinet',
+            'operation_date' => '2026-11-10', 'measure' => 'sale', 'level' => 'revenue', 'amount_minor' => 99999999, 'quantity' => 999,
+        ]);
 
         $client->loginUser($owner);
         $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
@@ -36,6 +40,9 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
 
         $crawler = $client->request('GET', self::URL, $period + ['step' => 'week']);
         self::assertResponseIsSuccessful();
+        self::assertSelectorExists('[data-economics-table] .table.table-vcenter.card-table');
+        self::assertSelectorExists('section.card.card-body svg[role="img"]');
+        self::assertSelectorExists('script[src*="marketplace_economics"]');
         $rows = $crawler->filter('tbody tr')->each(static fn ($r): string => $r->text());
         self::assertCount(3, $rows, 'две недели + итог');
         // неделя обрезана началом периода: 09.11 не входит
@@ -51,6 +58,13 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
         self::assertCount(9, $rows, '8 дней, пустые — нулями, + итог');
         self::assertStringStartsWith('Итого по выбранным', $rows[8]);
         self::assertMatchesRegularExpression('/2\s200,00/u', $rows[8], 'с поиском — только SKU, без подписки');
+
+        $crawler = $client->request('GET', self::URL, $period + ['step' => 'month', 'alloc' => '0']);
+        self::assertResponseIsSuccessful();
+        self::assertCount(2, $crawler->filter('tbody tr'));
+        self::assertStringStartsWith('10.11 – 17.11.2026', $crawler->filter('tbody tr')->first()->text());
+        self::assertSelectorNotExists('th:contains("СМ3")');
+        self::assertMatchesRegularExpression('/2\s200,00/u', $crawler->filter('tbody tr')->last()->text());
 
         $client->request('GET', self::URL, $period + ['format' => 'xlsx']);
         self::assertResponseIsSuccessful();
@@ -74,13 +88,16 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
         [$owner] = $this->seed();
         $client->loginUser($owner);
         $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
-        $params = ['from' => '2026-11-10', 'to' => '2026-11-18', 'q' => 'SKU-992', 'alloc' => '0', 'step' => 'month', 'page' => '1'];
+        $this->day('2026-11-10');
+        $this->day('2026-11-11', 'cabinet-2');
+        $params = ['connection' => 'cabinet-2', 'from' => '2026-11-10', 'to' => '2026-11-18', 'q' => 'SKU-992', 'alloc' => '0', 'step' => 'month', 'page' => '1'];
         $crawler = $client->request('GET', self::URL, $params);
 
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('html[data-ui-mode="legacy"]');
         self::assertSelectorTextContains('nav[aria-label="Отчёт"] .nav-link.active[aria-current="page"]', 'Динамика');
         self::assertSelectorExists('select.form-select[name="step"] option[value="month"][selected]');
+        self::assertSelectorExists('select[name="connection"] option[value="cabinet-2"][selected]');
         self::assertSelectorExists('select[name="alloc"] option[value="0"][selected]');
         self::assertSelectorExists('input[name="q"][value="SKU-992"]');
         self::assertSelectorExists('input[name="to"][value="2026-11-18"]');
@@ -113,10 +130,10 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
         ]);
     }
 
-    private function day(string $date): void
+    private function day(string $date, string $connection = 'cabinet-1'): void
     {
         static::getContainer()->get(Connection::class)->insert('me_day', [
-            'company_id' => self::COMPANY_ID, 'channel' => 'ozon', 'connection_ref' => 'cabinet-1', 'operation_date' => $date, 'rules_version' => 'economics-2',
+            'company_id' => self::COMPANY_ID, 'channel' => 'ozon', 'connection_ref' => $connection, 'operation_date' => $date, 'rules_version' => 'economics-2',
             'canon_minor' => 0, 'unallocated_minor' => 0, 'cost_price_minor' => 0, 'without_cost_price' => 0, 'line_count' => 0, 'currency' => 'RUB', 'refreshed_at' => '2026-11-14 10:00:00',
         ]);
     }
