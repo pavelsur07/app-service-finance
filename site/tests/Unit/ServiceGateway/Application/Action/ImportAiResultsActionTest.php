@@ -43,6 +43,18 @@ final class ImportAiResultsActionTest extends TestCase
         self::assertCount(1, $this->usage);
     }
 
+    public function testEveryConsumerOfTaskTypeGetsTheResult(): void
+    {
+        // переводчики Ozon и WB принимают один task_type: каждый берёт только свои задачи
+        $client = new ImportPagesClient([]);
+        $ozon = new ImportRecordingConsumer('draft');
+        $wb = new ImportRecordingConsumer('draft');
+
+        self::assertTrue($this->action($client, [$ozon, $wb], new TestHandler())->importResult(self::aiResult('t1', 'draft')));
+        self::assertSame([['t1'], ['t1']], [$ozon->taskIds, $wb->taskIds]);
+        self::assertCount(1, $this->usage, 'расход записан один раз');
+    }
+
     public function testSingleResultIsNotAcknowledgedAfterConsumerFailure(): void
     {
         $client = new ImportPagesClient([]);

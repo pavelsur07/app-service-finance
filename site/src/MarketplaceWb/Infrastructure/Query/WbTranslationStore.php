@@ -201,7 +201,7 @@ final readonly class WbTranslationStore
     }
 
     /**
-     * Для экрана администратора: коды без решения с суммой и охватом карантина (черновика ИИ пока нет — 8.3b).
+     * Для экрана администратора: коды без решения с суммой и охватом карантина и черновиком ИИ.
      *
      * @companyScopeExempt справочник кодов общий для платформы
      *
@@ -233,6 +233,76 @@ final readonly class WbTranslationStore
                 'amount_minor' => (int) $r['amount_minor'],
             ];
         }, $rows);
+    }
+
+    /**
+     * Коды без решения и без черновика ИИ — на запрос черновика. `debit` — знак суммы в карантине.
+     *
+     * @companyScopeExempt справочник кодов общий для платформы
+     *
+     * @return list<array{source_type: string, name: string, debit: bool}>
+     */
+    public function pendingWithoutDraft(): array
+    {
+        return array_map(static fn (array $r): array => [
+            'source_type' => (string) $r['source_type'],
+            'name' => (string) $r['name'],
+            'debit' => (bool) $r['debit'],
+        ], $this->connection->fetchAllAssociative(
+            'SELECT t.source_type, t.name,
+                    COALESCE((SELECT sum(q.amount_minor) FROM mwb_quarantine q WHERE q.source_type = t.source_type), 0) < 0 AS debit
+             FROM mwb_source_type t
+             WHERE t.kind IS NULL AND t.ai_draft IS NULL
+             ORDER BY t.first_seen_at',
+        ));
+    }
+
+    /**
+     * Черновик ИИ: состояние запроса или ответ. `null` — запросить снова в следующий прогон.
+     *
+     * @param array<string, mixed>|null $draft
+     */
+    public function saveDraft(string $sourceType, ?array $draft): void
+    {
+        $this->connection->executeStatement(
+            'UPDATE mwb_source_type SET ai_draft = :draft WHERE source_type = :type AND kind IS NULL',
+            ['type' => $sourceType, 'draft' => null === $draft ? null : json_encode($draft, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE)],
+        );
+    }
+
+    /**
+     * @companyScopeExempt справочник кодов общий для платформы
+     */
+    public function sourceTypeByDraftTask(string $taskId): ?string
+    {
+        $type = $this->connection->fetchOne(
+            "SELECT source_type FROM mwb_source_type WHERE kind IS NULL AND ai_draft->>'task_id' = :task",
+            ['task' => $taskId],
+        );
+
+        return false === $type ? null : (string) $type;
+    }
+
+    /**
+     * Решённые коды для примеров ИИ: решения администратора поверх справочника по умолчанию.
+     *
+     * @companyScopeExempt справочник кодов общий для платформы
+     *
+     * @return array<string, array{name: string, kind: OperationKind}>
+     */
+    public function decidedSourceTypes(): array
+    {
+        $decided = [];
+        foreach (WbSourceTypeSeed::TYPES as $sourceType => [$name, $kind]) {
+            if (null !== $kind) {
+                $decided[$sourceType] = ['name' => $name, 'kind' => $kind];
+            }
+        }
+        foreach ($this->connection->fetchAllAssociative('SELECT source_type, name, kind FROM mwb_source_type WHERE kind IS NOT NULL') as $row) {
+            $decided[(string) $row['source_type']] = ['name' => (string) $row['name'], 'kind' => OperationKind::from((string) $row['kind'])];
+        }
+
+        return $decided;
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceWb\Command;
 
+use App\MarketplaceWb\Application\Action\RequestWbSourceTypeDraftsAction;
 use App\MarketplaceWb\Application\Action\TranslateWbDayAction;
 use App\MarketplaceWb\Domain\AdsDayTranslator;
 use App\MarketplaceWb\Domain\SalesReportTranslator;
@@ -34,6 +35,7 @@ final class TranslateWbSalesReportCommand extends Command
         private readonly SourceFactsFacadeInterface $sourceFacts,
         private readonly WbTranslationStore $store,
         private readonly TranslateWbDayAction $translate,
+        private readonly RequestWbSourceTypeDraftsAction $requestDrafts,
         private readonly Connection $connection,
         private readonly LoggerInterface $logger,
     ) {
@@ -96,7 +98,9 @@ final class TranslateWbSalesReportCommand extends Command
             if ([] !== $failed) {
                 $this->logger->error('WB sales report translation: days failed.', ['count' => \count($failed), 'days' => \array_slice($failed, 0, 10)]);
             }
-            $this->logger->info('WB sales report translation finished.', ['translated' => $done, 'operations' => $operations, 'failed' => \count($failed), 'left' => max(0, \count($due) - $limit)]);
+            // После всех commit: новые коды без решения получают черновик ИИ (HTTP — вне транзакций).
+            $drafts = ($this->requestDrafts)();
+            $this->logger->info('WB sales report translation finished.', ['translated' => $done, 'operations' => $operations, 'failed' => \count($failed), 'left' => max(0, \count($due) - $limit), 'draftsRequested' => $drafts]);
             $output->writeln(sprintf('marketplace-wb translate: %d due, %d translated (%d operations), %d failed', \count($due), $done, $operations, \count($failed)));
 
             return [] === $failed ? self::SUCCESS : self::FAILURE;

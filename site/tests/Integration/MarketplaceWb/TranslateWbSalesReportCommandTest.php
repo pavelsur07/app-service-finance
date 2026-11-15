@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceOperations\Facade\MarketplaceOperationsFacadeInterface;
+use App\MarketplaceWb\Application\Action\RequestWbSourceTypeDraftsAction;
 use App\MarketplaceWb\Application\Action\TranslateWbDayAction;
 use App\MarketplaceWb\Command\TranslateWbSalesReportCommand;
 use App\MarketplaceWb\Command\WbTranslationHealthCheckCommand;
@@ -153,6 +154,7 @@ final class TranslateWbSalesReportCommandTest extends IntegrationTestCase
             $c->get(SourceFactsFacadeInterface::class),
             $c->get(WbTranslationStore::class),
             $c->get(TranslateWbDayAction::class),
+            $c->get(RequestWbSourceTypeDraftsAction::class),
             $c->get(Connection::class),
             new NullLogger(),
         ));
