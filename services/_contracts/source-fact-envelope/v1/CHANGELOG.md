@@ -1,5 +1,10 @@
 # source-fact-envelope — CHANGELOG
 
+## v1.3.0 (2026-11-15) — новый ресурс, форма не менялась
+
+- `wb.ads.daily` (wb-fetcher): реклама WB за день, запись — кампания (списания `upd` и её
+  строка `fullstats`), ключ — `advertId` (задача `marketplace-profit-pipeline`, этап 8.4).
+
 ## v1.2.0 (2026-11-14) — новый ресурс, форма не менялась
 
 - `wb.finance.sales-report.daily` (wb-fetcher): дневной отчёт о продажах WB,

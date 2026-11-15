@@ -215,3 +215,19 @@ func keys(m map[string]store.TaskSpec) []string {
 	}
 	return out
 }
+
+func TestAdsCabinetLoadsHistoryOnceAndRefreshesLastWeek(t *testing.T) {
+	cab := connections.Cabinet{Ref: "wb-1", ResourceTypes: []string{executor.ResourceAds}}
+
+	plan := Build(at("2026-11-15 03:00"), []connections.Cabinet{cab}, DefaultConfig(msk))
+
+	require.Len(t, plan.Ensure, AdsHistoryDays)
+	assert.Equal(t, executor.ResourceAds, plan.Ensure[0].ResourceType)
+	assert.Equal(t, "2026-11-14", plan.Ensure[0].PeriodKey)
+	assert.Equal(t, PriorityYesterday, plan.Ensure[0].Priority)
+	assert.Equal(t, at("2026-11-15 04:00"), plan.Ensure[0].RunAt, "вчера — после публикации")
+	assert.Equal(t, "2026-10-01", plan.Ensure[AdsHistoryDays-1].PeriodKey)
+	require.Len(t, plan.Refreshes, 1)
+	assert.Equal(t, KindAdsTail, plan.Refreshes[0].Kind)
+	assert.Len(t, plan.Refreshes[0].Specs, AdsRefreshDays+1, "вчера и неделя до него")
+}

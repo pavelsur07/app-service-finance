@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
@@ -25,15 +26,25 @@ import (
 	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/wb"
 )
 
-// Migrate — история миграций wb-fetcher = миграции ядра fetchkit/store.
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
+
+// SeparateSlotPrefix — реклама идёт своим слотом кабинета (индекс миграции 00002).
+const SeparateSlotPrefix = "wb.ads."
+
+// Migrate — миграция ядра fetchkit/store (00001), затем свои миграции сервиса (00002…):
+// у goose одна таблица версий, каталог сервиса начинается после ядра.
 func Migrate(ctx context.Context, dsn string) error {
-	return store.Migrate(ctx, dsn, store.CoreMigrations(), "migrations")
+	if err := store.Migrate(ctx, dsn, store.CoreMigrations(), "migrations"); err != nil {
+		return err
+	}
+	return store.Migrate(ctx, dsn, migrationsFS, "migrations")
 }
 
-// NewTasks — очередь ядра: одна задача кабинета одновременно, без отдельных слотов;
+// NewTasks — очередь ядра: одна задача отчёта и одна задача рекламы кабинета одновременно;
 // ревизии ресурсов facts.Resources публикуются фактами.
 func NewTasks(pool *store.Pool) *store.Tasks {
-	return store.NewTasks(pool, store.Options{PublishResources: facts.Resources})
+	return store.NewTasks(pool, store.Options{SeparateSlotPrefix: SeparateSlotPrefix, PublishResources: facts.Resources})
 }
 
 // Limits — отчёт finance-api: не чаще запроса в interval на кабинет (лимит WB —
@@ -42,8 +53,17 @@ func NewTasks(pool *store.Pool) *store.Tasks {
 func Limits(interval time.Duration) ratelimit.Config {
 	ceiling := 1 / interval.Seconds()
 	limit := ratelimit.EndpointLimit{Start: ceiling, Floor: ceiling / 4, Ceiling: ceiling, DefaultPause: wb.DefaultRateLimitPause}
+	// Продвижение: токен общий с легаси-синком рекламы Symfony — темп заведомо ниже лимитов WB.
+	every := func(d time.Duration) ratelimit.EndpointLimit {
+		c := 1 / d.Seconds()
+		return ratelimit.EndpointLimit{Start: c, Floor: c / 4, Ceiling: c, DefaultPause: wb.DefaultRateLimitPause}
+	}
 	return ratelimit.Config{
-		Endpoints: map[string]ratelimit.EndpointLimit{wb.EndpointSalesReport: limit},
+		Endpoints: map[string]ratelimit.EndpointLimit{
+			wb.EndpointSalesReport:  limit,
+			wb.EndpointAdsExpenses:  every(10 * time.Second),
+			wb.EndpointAdsFullStats: every(20 * time.Second),
+		},
 		Fallback:  limit,
 		GrowAfter: 5, IncreaseStep: ceiling,
 	}
@@ -99,7 +119,8 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 	raw := rawstore.New(s3Client, cfg.S3Bucket, cfg.MaxParallelConnections*2)
 	execCfg := executor.DefaultConfig()
 	execCfg.Location = loc
-	exec := executor.New(execCfg, tasks, raw, report, cabinets, logger, now, jitter)
+	ads := wb.NewAds(cfg.WBAdvertBaseURL, &http.Client{Timeout: wb.DefaultTimeout}, now).WithLimiter(limits)
+	exec := executor.New(execCfg, tasks, raw, report, cabinets, logger, now, jitter).WithAds(ads)
 
 	plannerCfg := planner.DefaultConfig(loc)
 	plannerCfg.TailDays = cfg.DailyTailDays

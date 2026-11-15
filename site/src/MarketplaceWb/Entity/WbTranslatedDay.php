@@ -29,6 +29,10 @@ class WbTranslatedDay
     #[ORM\Column(type: 'integer')]
     private int $factsRevision;
 
+    /** Ревизия рекламы дня (`wb.ads.daily`), с которой день переведён; 0 — без рекламы. */
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    private int $adsRevision = 0;
+
     #[ORM\Column(type: 'string', length: 32)]
     private string $rulesVersion;
 

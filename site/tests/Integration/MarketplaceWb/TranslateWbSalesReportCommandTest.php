@@ -11,6 +11,7 @@ use App\MarketplaceOperations\Facade\MarketplaceOperationsFacadeInterface;
 use App\MarketplaceWb\Application\Action\TranslateWbDayAction;
 use App\MarketplaceWb\Command\TranslateWbSalesReportCommand;
 use App\MarketplaceWb\Command\WbTranslationHealthCheckCommand;
+use App\MarketplaceWb\Domain\AdsDayTranslator;
 use App\MarketplaceWb\Infrastructure\Query\WbTranslationStore;
 use App\SourceFacts\Facade\SourceFactsFacadeInterface;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -31,6 +32,7 @@ final class TranslateWbSalesReportCommandTest extends IntegrationTestCase
 
     private string $companyId;
     private string $listingId;
+    private string $otherListingId;
 
     protected function setUp(): void
     {
@@ -42,7 +44,8 @@ final class TranslateWbSalesReportCommandTest extends IntegrationTestCase
         $this->em->persist($owner);
         $this->em->persist($company);
         $this->em->persist($this->listing($company, $this->listingId, '42'));
-        $this->em->persist($this->listing($company, Uuid::uuid7()->toString(), '44'));
+        $this->otherListingId = Uuid::uuid7()->toString();
+        $this->em->persist($this->listing($company, $this->otherListingId, '44'));
         $this->em->flush();
     }
 
@@ -81,6 +84,23 @@ final class TranslateWbSalesReportCommandTest extends IntegrationTestCase
         self::assertSame(Command::FAILURE, $this->healthCheck(), 'строка канона потеряна');
     }
 
+    public function testAdsSpendIsAllocatedToListingsAndNewAdsRevisionRetranslatesDay(): void
+    {
+        $this->facts(1, [$this->sale(1, '42')]);
+        self::assertStringContainsString('1 due, 1 translated', $this->translate());
+
+        $this->facts(1, [['advertId' => '7', 'expenses' => [['advertId' => 7, 'updSum' => 30]], 'statistics' => ['advertId' => 7, 'days' => [['apps' => [['nms' => [['nmId' => 555, 'sum' => 3], ['nmId' => 999, 'sum' => 1]]]]]]]]], AdsDayTranslator::RESOURCE);
+        self::assertStringContainsString('1 due, 1 translated', $this->translate(), 'новая ревизия рекламы — день заново');
+
+        $ads = $this->connection->fetchAllAssociative("SELECT listing_id, amount_minor, allocation_key FROM mo_operation WHERE company_id = ? AND kind = 'ads_cpc' ORDER BY amount_minor", [$this->companyId]);
+        // у nmId 555 два листинга (размеры 42, 44) — первый по id; nmId 999 без листинга
+        $first = min($this->listingId, $this->otherListingId);
+        self::assertEquals([['listing_id' => $first, 'amount_minor' => -2250, 'allocation_key' => 'ads_statistics_share'], ['listing_id' => null, 'amount_minor' => -750, 'allocation_key' => null]], $ads);
+        self::assertSame([1, 1, 72000, 72000, 0, 1], $this->day(), 'итог дня = forPay 750 − реклама 30');
+
+        self::assertStringContainsString('0 due', $this->translate());
+    }
+
     public function testDisabledCompanyIsNotTranslated(): void
     {
         $this->facts(1, [$this->sale(1, '42')]);
@@ -117,14 +137,14 @@ final class TranslateWbSalesReportCommandTest extends IntegrationTestCase
     /**
      * @param list<array<string, mixed>> $rows
      */
-    private function facts(int $revision, array $rows): void
+    private function facts(int $revision, array $rows, string $resource = TranslateWbDayAction::RESOURCE): void
     {
-        $period = ['company' => $this->companyId, 'connection' => self::CABINET, 'resource' => TranslateWbDayAction::RESOURCE, 'period' => self::DAY];
+        $period = ['company' => $this->companyId, 'connection' => self::CABINET, 'resource' => $resource, 'period' => self::DAY];
         foreach ($rows as $row) {
             $this->connection->executeStatement(
                 'INSERT INTO sf_fact (id, company_id, connection_ref, resource_type, period_key, source_key, payload_hash, payload, first_revision, last_seen_revision, created_at)
                  VALUES (gen_random_uuid(), :company, :connection, :resource, :period, :key, md5(:payload), CAST(:payload AS jsonb), :revision, :revision, now())',
-                $period + ['key' => 'wb:sales-report.daily:'.$row['rrdId'], 'payload' => json_encode($row, \JSON_THROW_ON_ERROR), 'revision' => $revision],
+                $period + ['key' => isset($row['advertId']) ? 'wb:ads.daily:'.$row['advertId'] : 'wb:sales-report.daily:'.$row['rrdId'], 'payload' => json_encode($row, \JSON_THROW_ON_ERROR), 'revision' => $revision],
             );
         }
         $this->connection->executeStatement(

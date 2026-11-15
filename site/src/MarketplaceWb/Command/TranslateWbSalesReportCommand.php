@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceWb\Command;
 
 use App\MarketplaceWb\Application\Action\TranslateWbDayAction;
+use App\MarketplaceWb\Domain\AdsDayTranslator;
 use App\MarketplaceWb\Domain\SalesReportTranslator;
 use App\MarketplaceWb\Infrastructure\Query\WbTranslationStore;
 use App\SourceFacts\Facade\SourceFactsFacadeInterface;
@@ -21,7 +22,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 /**
  * Перевод дневного отчёта WB в канон (cron каждые 15 минут, после `app:source-facts:pull`).
  *
- * День переводится, если у фактов новая ревизия, сменилась версия правил или по коду из его
+ * День переводится, если у фактов отчёта или рекламы новая ревизия, сменилась версия правил или по коду из его
  * карантина принято решение; с `--relink` — ещё и дни с SKU без листинга (раз в сутки).
  * Каждый день — своя транзакция; сбой дня не останавливает остальные, в конце один `error`.
  * Включение — `MARKETPLACE_WB_COMPANIES` (UUID через запятую, * — все, пусто — выключено).
@@ -76,6 +77,11 @@ final class TranslateWbSalesReportCommand extends Command
             $limit = max(1, (int) $input->getOption('limit'));
             $all = \in_array(self::ALL, $this->allowed, true);
 
+            $ads = [];
+            foreach ($this->sourceFacts->periods(AdsDayTranslator::RESOURCE) as $adsPeriod) {
+                $ads[WbTranslationStore::dayKey($adsPeriod->companyId, $adsPeriod->connectionRef, $adsPeriod->periodKey)] = $adsPeriod->revision;
+            }
+
             $due = [];
             foreach ($this->sourceFacts->periods(TranslateWbDayAction::RESOURCE) as $period) {
                 if (!$all && !\in_array($period->companyId, $this->allowed, true)) {
@@ -85,19 +91,20 @@ final class TranslateWbSalesReportCommand extends Command
                 $state = $states[$key] ?? null;
                 if (null === $state
                     || $state['revision'] !== $period->revision
+                    || $state['ads'] !== ($ads[$key] ?? 0)
                     || SalesReportTranslator::RULES_VERSION !== $state['rules']
                     || isset($decided[$key])
                     || ($relink && $state['unresolved'] > 0)) {
-                    $due[] = $period;
+                    $due[] = [$period, $ads[$key] ?? 0];
                 }
             }
 
             $this->logger->info('WB sales report translation started.', ['due' => \count($due), 'limit' => $limit]);
             $done = $operations = 0;
             $failed = [];
-            foreach (\array_slice($due, 0, $limit) as $period) {
+            foreach (\array_slice($due, 0, $limit) as [$period, $adsRevision]) {
                 try {
-                    $result = $this->connection->transactional(fn (): array => ($this->translate)($period));
+                    $result = $this->connection->transactional(fn (): array => ($this->translate)($period, $adsRevision));
                     ++$done;
                     $operations += $result['operations'];
                 } catch (\Throwable $e) {

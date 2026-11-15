@@ -8,7 +8,8 @@ API WB — [`docs/wb-api.md`](docs/wb-api.md).
 
 Статус: этап 3 — дневной и недельный детальный отчёт о реализации
 (`wb.finance.sales-report.daily`, `wb.finance.sales-report.weekly`); недельный —
-эталон сверки с дневными. Покрытие — админка, «Покрытие Сервис GO» → Wildberries. Прод —
+эталон сверки с дневными; реклама — расход кампаний за день (`wb.ads.daily`, этап 8.4
+задачи `marketplace-profit-pipeline`). Покрытие — админка, «Покрытие Сервис GO» → Wildberries. Прод —
 [`docs/maintenance/wb-fetcher-prod.md`](../../docs/maintenance/wb-fetcher-prod.md) (постоянный запуск). Загрузка WB в Symfony продолжает работать.
 
 ## Ресурсы
@@ -17,6 +18,8 @@ API WB — [`docs/wb-api.md`](docs/wb-api.md).
 |---|---|---|
 | `wb.finance.sales-report.daily` | `YYYY-MM-DD` (МСК) | вчера — с 04:00 МСК; 14 дней перед ним — сразу; вчера и хвост перечитываются раз в сутки (WB дописывает строки задним числом). У кабинета с недельным ресурсом окно продлевается до понедельника самой старой перечитываемой недели |
 | `wb.finance.sales-report.weekly` | `YYYY-Www` (ISO-неделя МСК) | прошлая неделя — с 04:00 МСК понедельника; две перед ней — сразу; три недели перечитываются раз в сутки. Пустой ответ до ср 00:00 МСК после недели — `not_ready` (повтор через час) |
+
+| `wb.ads.daily` | `YYYY-MM-DD` (МСК) | API продвижения тем же токеном: `/adv/v1/upd` за день, затем `/adv/v3/fullstats` по его кампаниям порциями по 50; страница — `{"schema":"wb-ads-daily-v1","expenses":[…],"statistics":[…]}`. 45 дней истории один раз (вчера — с 04:00 МСК), 8 последних дней перечитываются раз в сутки. Отдельный слот: идёт параллельно отчёту; отказ токена (401/403) ставит на паузу только задачу рекламы, кабинет не останавливает |
 
 Выдаётся кабинету, если Symfony включил ресурс (`wb_fetcher.finance_companies`).
 
@@ -35,15 +38,16 @@ Dev-БД `wb_fetcher` и роль `svc_wb_fetcher` создаёт init
 
 ## Схема БД
 
-Миграции — миграции ядра (`fetchkit/store`, `00001_core.sql`), таблицы —
+Миграции — ядро (`fetchkit/store`, `00001_core.sql`), затем свои (`internal/app/migrations`,
+`00002` — у кабинета по одной `running`-задаче на семейство API: отчёт и `wb.ads.*`). Таблицы —
 `fetch_task`, `fetch_attempt`, `raw_object`, `connection_state`,
 `connection_limit`, `resource_stop` (описание — README ozon-fetcher «Схема
-БД»). У кабинета не больше одной `running`-задачи.
+БД»).
 
 **Факты** (`source-fact-envelope` v1): новая ревизия дня `wb.finance.sales-report.daily`
-ставит пачку в `outbox_batch` (ядро, транзакция `FinishTask`); дни, загруженные до
-включения публикации, ставятся при старте (`EnqueueLoadedFactBatches`, идемпотентно —
-своих миграций у сервиса нет). Выдача — `/internal/source-facts*` (Bearer
+(запись — строка отчёта, ключ `rrdId`) или `wb.ads.daily` (запись — кампания:
+`{"advertId","expenses","statistics"}`, ключ `advertId`) ставит пачку в `outbox_batch` (ядро, транзакция `FinishTask`); дни, загруженные до
+включения публикации, ставятся при старте (`EnqueueLoadedFactBatches`, идемпотентно). Выдача — `/internal/source-facts*` (Bearer
 `SERVICE_API_TOKEN`), разбиение страницы — `internal/facts`.
 
 **Raw в S3:** `wb/{connection_ref}/{resource_type}/{period_key}/{fetched_at}_{attempt}_p{NNN}_{sha8}.json.gz`

@@ -132,7 +132,7 @@ final class MarketplaceConnectionsControllerTest extends WebTestCaseBase
         self::assertNull($cabinet['credentials']['performance']);
         // `wb_fetcher.finance_companies: ['*']` — оба ресурса каждому кабинету; кабинеты
         // ограничивает allowlist сервиса (docs/maintenance/wb-fetcher-prod.md).
-        self::assertSame(['wb.finance.sales-report.daily', 'wb.finance.sales-report.weekly'], $cabinet['resource_types']);
+        self::assertSame(['wb.finance.sales-report.daily', 'wb.finance.sales-report.weekly', 'wb.ads.daily'], $cabinet['resource_types']);
 
         foreach ($logs->getRecords() as $record) {
             self::assertStringNotContainsString('wb-token-never-logged', $record->message.json_encode($record->context, \JSON_PARTIAL_OUTPUT_ON_ERROR));

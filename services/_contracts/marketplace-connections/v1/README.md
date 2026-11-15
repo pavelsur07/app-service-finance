@@ -21,7 +21,7 @@
   `connection:<id>`), сервис ведёт лимитер по ней. `seller.api_key` — токен.
 - Токен, который не расшифровался или пуст, — кабинет не выдаётся.
 - `resource_types`: `wb.finance.sales-report.daily`,
-  `wb.finance.sales-report.weekly` — компаниям из `wb_fetcher.finance_companies`
+  `wb.finance.sales-report.weekly`, `wb.ads.daily` — компаниям из `wb_fetcher.finance_companies`
   (`['*']` — всем, `[]` — никому); остальным — `[]`.
 
 ## Реализация в Symfony

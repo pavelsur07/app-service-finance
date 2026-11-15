@@ -44,3 +44,28 @@ func TestSplitRejectsUnknownResourceAndBadPage(t *testing.T) {
 	_, err = Split(ResourceDaily, []byte(`[1]`))
 	require.Error(t, err)
 }
+
+func TestSplitAdsDayGroupsByCampaign(t *testing.T) {
+	page := []byte(`{"schema":"wb-ads-daily-v1",
+		"expenses":[{"advertId":10,"updSum":5},{"advertId":"9","updSum":1},{"advertId":10,"updSum":2}],
+		"statistics":[{"advertId":10,"days":[{"apps":[{"nms":[{"nmId":1,"sum":3}]}]}]}]}`)
+
+	records, err := Split(ResourceAds, page)
+	require.NoError(t, err)
+
+	require.Len(t, records, 2)
+	assert.Equal(t, "wb:ads.daily:9", records[0].SourceKey)
+	assert.JSONEq(t, `{"advertId":"9","expenses":[{"advertId":"9","updSum":1}],"statistics":null}`, string(records[0].Payload))
+	assert.Equal(t, "wb:ads.daily:10", records[1].SourceKey)
+	assert.JSONEq(t, `{"advertId":"10","expenses":[{"advertId":10,"updSum":5},{"advertId":10,"updSum":2}],
+		"statistics":{"advertId":10,"days":[{"apps":[{"nms":[{"nmId":1,"sum":3}]}]}]}}`, string(records[1].Payload))
+}
+
+func TestSplitAdsRejectsOtherSchema(t *testing.T) {
+	_, err := Split(ResourceAds, []byte(`{"schema":"v0","expenses":[],"statistics":[]}`))
+	require.Error(t, err)
+
+	records, err := Split(ResourceAds, []byte(`{"schema":"wb-ads-daily-v1","expenses":[],"statistics":[]}`))
+	require.NoError(t, err)
+	assert.Empty(t, records, "день без рекламы — ноль записей")
+}
