@@ -246,15 +246,16 @@
 <span class="cb-tag">:focus-visible · .is-focus</span>
 <span class="cb-when">Один стиль на весь продукт. <code class="code-inline">.is-focus</code> — только для документации: показывает состояние без нажатия Tab.</span>
 </div>
-<span class="demo-label">Кнопки, ссылки, табы, chip — outline 2px · offset 2px · --focus-ring-color</span>
+<span class="demo-label">Кнопки, табы, chip — outline 2px · offset 2px · --focus-ring-color</span>
 <div class="demo">
 <button class="btn btn-md btn-primary is-focus" type="button">Primary</button>
 <button class="btn btn-md btn-secondary is-focus" type="button">Secondary</button>
 <button class="btn btn-md btn-ghost is-focus" type="button">Ghost</button>
-<a class="link is-focus" href="#focus">Ссылка</a>
 <button class="chip chip--filter is-focus" type="button">Chip</button>
 <div class="tabs"><button class="tab is-active" type="button">Все</button><button class="tab is-focus" type="button">Поступления</button></div>
 </div>
+<span class="demo-label">Ссылка в тексте — то же кольцо, переносится вместе со строкой</span>
+<div class="demo"><p class="link-text">Подробности — в <a class="link is-focus" href="#focus">справке по разметке операций</a>.</p></div>
 <span class="demo-label">Поля — граница primary + мягкое кольцо (своё правило, outline не используется)</span>
 <div class="demo">
 <input aria-label="Пример поля в фокусе" class="input is-focus" style="max-width:260px" value="Тинькофф Бизнес"/>
@@ -264,10 +265,10 @@
 <div class="demo">
 <button class="btn btn-md btn-primary" type="button">Сохранить</button>
 <button class="btn btn-md btn-secondary" type="button">Отмена</button>
-<a class="link" href="#focus">Подробнее</a>
 <button class="chip chip--filter" type="button">Фильтр</button>
 <input aria-label="Живое поле" class="input" placeholder="Поле ввода" style="max-width:220px"/>
 </div>
+<div class="demo"><p class="link-text">Ссылка в тексте тоже получает фокус: <a class="link" href="#focus">правила разметки операций</a>.</p></div>
 <div class="cb-note" style="margin-top:var(--s-3);">Правила: никогда не писать <code class="code-inline">outline: none</code> без замены · кольцо контрастирует с фоном ≥3:1 (поэтому сплошной navy, а не полупрозрачное свечение, как было в v3.1 у <code class="code-inline">.is-focus</code>) · offset 2px, чтобы кольцо не сливалось с заливкой кнопки · фокус не красный и не оранжевый — эти цвета заняты ошибками.</div>
 </div>
 <h3 class="sub-h" id="grid">Grid</h3>

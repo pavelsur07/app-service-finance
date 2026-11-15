@@ -68,7 +68,7 @@ API (пропсы, варианты, состояния, клавиатура) �
 | Компонент | Лист | Минимальный API |
 |---|---|---|
 | Button | DS-Controls | `variant: primary \| secondary \| ghost \| danger`, `size: sm \| md \| lg`, `icon`, `iconOnly` (= `.btn-icon`, обязателен `aria-label`), `loading`, `disabled` |
-| Link | DS-Controls | текстовая ссылка (`.link`) |
+| Link | DS-Controls | `variant: inline \| standalone \| muted`, `external` (иконка ↗, `rel="noopener"`, подпись для скринридера); только навигация — действие на месте всегда Button (Decision 47) |
 | FormField | DS-Controls | `label`, `required`, `helper`, `error`, связывает `id`/`aria-describedby` |
 | Input, Textarea | DS-Controls | состояния default / hover / focus / error / disabled |
 | InputGroup («Поле с дополнением») | DS-Controls | `prefix`, `suffix`, `icon`, `action` (`clearable`, показать пароль) |

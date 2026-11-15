@@ -350,6 +350,14 @@
             <div class="decision-why">Разработка ведётся на Tailwind, Tabler-пагинация теряет смысл. Компонент кита уже построен на токенах и поддерживает тёмную тему.</div>
           </div>
         </div>
+        <div class="decision-item">
+          <div class="decision-num">47</div>
+          <div class="decision-body">
+            <div class="decision-title">Ссылки: три вида и граница со кнопкой</div>
+            <div class="decision-value">.link (в тексте, подчёркнута) · .link--standalone (вне текста, подчёркивание по hover) · .link--muted (служебная)</div>
+            <div class="decision-why">В v3.3 ссылка была одним жирным подчёркнутым стилем и в ките стояла в ряду кнопок — выглядела чужеродно. Ссылка — навигация, кнопка — действие; ссылка не ставится в ряд кнопок как равная. Вес ссылки в тексте наследуется, подчёркивание обязательно (цвет не единственный признак).</div>
+          </div>
+        </div>
         <details class="dec-archive">
           <summary>Архив решений — исполнены или заменены · 6</summary>
 <div class="decision-item">
@@ -415,6 +423,7 @@
           <li>🔗 Табы в пикерах — канонические <code class="code-inline">.tabs</code> вместо <code class="code-inline">.picker-tab</code>.</li>
           <li>🗂 App Shell и Page scaffold перенесены в Patterns. EntityPicker и TreePicker — по одному примеру + таблица отличий.</li>
           <li>🗂 Decisions 3, 19, 24, 29, 30, 40 — в архив; 23 и 28 обновлены. Changelog: на виду три последние версии.</li>
+          <li>➕ Компонент <b>Link</b>: <code class="code-inline">.link</code> / <code class="code-inline">.link--standalone</code> / <code class="code-inline">.link--muted</code>, правило «ссылка — навигация, кнопка — действие» (Decision 47). В Focus ссылка показана внутри текста, а не в ряду кнопок.</li>
           <li>📄 Удалена дублирующая страница <code class="code-inline">uploads/ui-kit-v2.6.html</code>; v2.6 оставлена как архив.</li>
         </ul>
       </div>

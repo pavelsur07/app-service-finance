@@ -18,7 +18,7 @@
 <body>
 <main class="main">
 <h1 class="page-h1">DS-Controls</h1>
-<p class="page-sub">Button (+ .btn-icon), Form field, Input, Поле с дополнением, Textarea, Select, Checkbox, Radio, Toggle, Tags, EntityPicker, TreePicker.</p>
+<p class="page-sub">Button (+ .btn-icon), Link, Form field, Input, Поле с дополнением, Textarea, Select, Checkbox, Radio, Toggle, Tags, EntityPicker, TreePicker.</p>
 <div class="page-meta">ДС «Ваш Финдир» v3.4 · 15.11.2026 · все листы: <a href="../README.md">README</a></div>
 <h3 class="sub-h cat-h">Действия</h3>
 <div class="cb" id="button">
@@ -60,6 +60,34 @@
             Экспорт
           </button>
 </div>
+</div><div class="cb" id="link">
+<div class="cb-head">
+<span class="cb-name">Link</span>
+<span class="cb-tag">.link · .link--standalone · .link--muted</span>
+<span class="cb-when">Ссылка ведёт на другую страницу или раздел. Действие на месте (сохранить, открыть модалку, удалить) — всегда кнопка. Ссылка не стоит в ряду кнопок как равная им.</span>
+</div>
+<span class="demo-label">Inline · .link — внутри текста; подчёркнута всегда (цвет не единственный признак, WCAG 1.4.1), вес наследует текст</span>
+<div class="demo demo--column" style="align-items:flex-start;">
+<p class="link-text">Выписка загружена 14 ноября. Нераспознанные операции — в разделе <a class="link" href="#link">«Требуют разметки»</a>, правила автоматической разметки настраиваются в <a class="link" href="#link">авто-правилах</a>.</p>
+</div>
+<span class="demo-label">Standalone · .link--standalone — вне текста: в шапке карточки, под таблицей; подчёркивание по hover, стрелка — переход</span>
+<div class="demo">
+<a class="link link--standalone" href="#link">Все листинги <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+<a class="link link--standalone" href="#link">Подробнее об отчёте</a>
+<a class="link link--standalone" href="#link" target="_blank" rel="noopener">Личный кабинет Ozon <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg><span class="u-sr-only">(откроется в новой вкладке)</span></a>
+</div>
+<span class="demo-label">Muted · .link--muted — футер, служебные ссылки, подписи</span>
+<div class="demo">
+<a class="link link--muted" href="#link">База знаний</a>
+<a class="link link--muted" href="#link">Поддержка</a>
+<a class="link link--muted" href="#link">Конфиденциальность</a>
+</div>
+<span class="demo-label">Ссылка или кнопка</span>
+<div class="demo demo--column" style="align-items:flex-start; gap:var(--s-2);">
+<div style="display:flex; align-items:center; gap:var(--s-3);"><button class="btn btn-md btn-secondary" type="button">Отмена</button><button class="btn btn-md btn-primary" type="button">Сохранить</button><span class="status status--success"><span class="dot"></span>Верно</span></div>
+<div style="display:flex; align-items:center; gap:var(--s-3);"><button class="btn btn-md btn-secondary" type="button">Отмена</button><a class="link" href="#link">Сохранить</a><span class="status status--danger"><span class="dot"></span>Неверно — действие оформлено ссылкой</span></div>
+</div>
+<div class="cb-note" style="margin-top:var(--s-3);">Цвет — <code class="code-inline">--color-primary</code> (navy), посещённые ссылки не перекрашиваются. Внешняя ссылка — иконка ↗, <code class="code-inline">rel="noopener"</code> и подпись для скринридера. Фокус — общее кольцо, у inline-ссылки переносится вместе со строкой (<code class="code-inline">box-decoration-break: clone</code>).</div>
 </div><h3 class="sub-h cat-h">Поля и формы</h3>
 <h3 class="sub-h" id="form-field">Form field</h3>
 <div class="section-sub">Вертикальная обёртка: подпись сверху, поле снизу, промежуток 5px.</div>

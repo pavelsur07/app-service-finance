@@ -2703,11 +2703,32 @@ mark, .hl { background: var(--highlight-bg); color: var(--highlight-text); borde
 .theme-switch-group button:hover { color: var(--text-strong); }
 .theme-switch-group button[aria-pressed="true"] { background: var(--bg-card); color: var(--text-strong); box-shadow: var(--shadow-sm); }
 
-/* Текстовая ссылка (в v3.2 и раньше отдельного стиля не было — браузерный синий) */
-.link { color: var(--color-primary); font-weight: var(--fw-semibold); text-decoration: underline; text-decoration-thickness: 1px;
-  text-underline-offset: 3px; text-decoration-color: var(--color-primary-border); border-radius: var(--r-xs);
-  transition: color var(--dur-fast), text-decoration-color var(--dur-fast); }
+.u-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+/* Link — навигация (ведёт на страницу/раздел). Действие на месте — кнопка, не ссылка. Decision 47 */
+.link {
+  color: var(--color-primary); font-weight: inherit;
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px;
+  text-decoration-color: var(--color-primary-border);
+  border-radius: var(--r-xs);
+  transition: color var(--dur-fast), text-decoration-color var(--dur-fast);
+}
+.link:visited { color: var(--color-primary); }
 .link:hover { color: var(--color-primary-hover); text-decoration-color: currentColor; }
+.link:focus-visible, .link.is-focus { outline-offset: 1px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+/* Самостоятельная ссылка: «Все листинги →», «Подробнее» — вне текста, без подчёркивания до hover */
+.link--standalone {
+  display: inline-flex; align-items: center; gap: var(--s-1);
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); line-height: var(--lh-snug);
+  text-decoration: none;
+}
+.link--standalone:hover { text-decoration: underline; }
+.link--standalone svg { width: 14px; height: 14px; flex-shrink: 0; transition: transform var(--dur-fast) var(--ease-standard); }
+.link--standalone:hover svg { transform: translateX(2px); }
+/* Служебная ссылка: футер, подписи, мета */
+.link--muted { color: var(--text-tertiary); text-decoration: none; }
+.link--muted:visited { color: var(--text-tertiary); }
+.link--muted:hover { color: var(--text-strong); text-decoration: underline; }
+.link-text { font-size: var(--fs-md); color: var(--text-secondary); line-height: var(--lh-base); max-width: 60ch; margin: 0; }
 
 /* v3.4 — свёрнутые архивы */
 .dec-archive, .cl-archive { margin-top: var(--s-4); border: 1px dashed var(--border); border-radius: var(--r-lg); padding: var(--s-3) var(--s-4); background: var(--bg-subtle); }
