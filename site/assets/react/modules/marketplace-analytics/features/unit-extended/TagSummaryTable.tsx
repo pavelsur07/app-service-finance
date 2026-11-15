@@ -1,11 +1,27 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import type { TagSummaryRow } from './unitExtended.types';
+import { sortTagSummary } from './tagSummarySort';
+import type { TagSummarySortDirection, TagSummarySortField } from './tagSummarySort';
 import { formatMoney } from '@/react/shared/format/number';
 
 interface TagSummaryTableProps {
     rows: TagSummaryRow[];
     isLoading: boolean;
 }
+
+const HEADERS: { field: TagSummarySortField; label: string; tooltip?: string }[] = [
+    { field: 'name', label: 'Тег' },
+    { field: 'listingsCount', label: 'Листингов' },
+    { field: 'revenue', label: 'Выручка' },
+    { field: 'quantity', label: 'Кол-во' },
+    { field: 'averageCheckRub', label: 'Сред. чек', tooltip: 'Средний чек: (выручка − возвраты) / (продано − возвращено, шт.)' },
+    { field: 'costPriceTotal', label: 'Себест.' },
+    { field: 'stockCapitalRub', label: 'Капитал.', tooltip: 'Остаток на МП FBO/FBS/RFBS (капитализация остатка)' },
+    { field: 'adSpend', label: 'Реклама' },
+    { field: 'totalCosts', label: 'Итого затрат' },
+    { field: 'profit', label: 'Прибыль' },
+    { field: 'marginPercent', label: 'Маржа %' },
+];
 
 function formatPercent(value: number | null): string {
     return value === null ? '—' : `${value.toFixed(1)}%`;
@@ -19,6 +35,22 @@ function marginColor(value: number | null): string {
 }
 
 const TagSummaryTable: React.FC<TagSummaryTableProps> = ({ rows, isLoading }) => {
+    const [sortField, setSortField] = useState<TagSummarySortField>('revenue');
+    const [sortDirection, setSortDirection] = useState<TagSummarySortDirection>('desc');
+    const sortedRows = useMemo(
+        () => sortTagSummary(rows, sortField, sortDirection),
+        [rows, sortField, sortDirection],
+    );
+
+    const handleSort = (field: TagSummarySortField) => {
+        if (field === sortField) {
+            setSortDirection((previous) => previous === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('desc');
+        }
+    };
+
     if (isLoading && rows.length === 0) {
         return (
             <div className="card-body text-center text-muted py-4">
@@ -45,31 +77,26 @@ const TagSummaryTable: React.FC<TagSummaryTableProps> = ({ rows, isLoading }) =>
                 <table className="table card-table table-vcenter">
                     <thead>
                         <tr>
-                            <th>Тег</th>
-                            <th className="text-end">Листингов</th>
-                            <th className="text-end">Выручка</th>
-                            <th className="text-end">Кол-во</th>
-                            <th
-                                className="text-end"
-                                title="Средний чек: (выручка − возвраты) / (продано − возвращено, шт.)"
-                            >
-                                Сред. чек
-                            </th>
-                            <th className="text-end">Себест.</th>
-                            <th
-                                className="text-end"
-                                title="Остаток на МП FBO/FBS/RFBS (капитализация остатка)"
-                            >
-                                Капитал.
-                            </th>
-                            <th className="text-end">Реклама</th>
-                            <th className="text-end">Итого затрат</th>
-                            <th className="text-end">Прибыль</th>
-                            <th className="text-end">Маржа %</th>
+                            {HEADERS.map((header) => (
+                                <th
+                                    key={header.field}
+                                    className={`cursor-pointer${header.field === 'name' ? '' : ' text-end'}`}
+                                    title={header.tooltip}
+                                    aria-sort={sortField === header.field
+                                        ? (sortDirection === 'asc' ? 'ascending' : 'descending')
+                                        : 'none'}
+                                    onClick={() => handleSort(header.field)}
+                                >
+                                    {header.label}
+                                    {sortField === header.field && (
+                                        <i className={`ti ti-chevron-${sortDirection === 'asc' ? 'up' : 'down'} ms-1`} />
+                                    )}
+                                </th>
+                            ))}
                         </tr>
                     </thead>
                     <tbody>
-                        {rows.map((row) => (
+                        {sortedRows.map((row) => (
                             <tr key={row.tagId ?? '__untagged__'}>
                                 <td>
                                     {row.tagId === null
