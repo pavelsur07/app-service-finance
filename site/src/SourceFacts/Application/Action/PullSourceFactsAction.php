@@ -41,7 +41,7 @@ final readonly class PullSourceFactsAction
 
     /**
      * @throws ServiceUnavailableException
-     * @throws ContractViolationException  нарушен контракт списка пачек или ack — прогон остановлен
+     * @throws ContractViolationException нарушен контракт списка пачек или ack — прогон остановлен
      */
     public function __invoke(): PullSourceFactsResult
     {

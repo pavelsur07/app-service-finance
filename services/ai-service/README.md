@@ -4,7 +4,7 @@ Python-сервис ИИ-задач для Symfony (`docs/tasks/ai/`). Стат�
 задачи `echo`, `categorize_transactions` (этап 2, подсказки статей ДДС) и
 `marketplace_source_type_draft` (черновик решения по новому коду маркетплейса,
 `docs/tasks/marketplace-profit-pipeline` этап 4.3; риск high — всегда на проверку человеку). Прод —
-за флагом `AI_SERVICE_ENABLED` (выключен), включение — `docs/maintenance/ai-service-prod.md`.
+постоянно в production; доступ компаний — админка. См. `docs/maintenance/ai-service-prod.md`.
 
 ## Запуск (dev)
 
@@ -16,7 +16,7 @@ make ai-service-up          # API на :8181 (dev-проброс) и worker
 make ai-service-lint ai-service-test ai-service-evals
 ```
 
-Symfony (dev): `AI_SERVICE_ENABLED=true`, `AI_SERVICE_BASE_URL=http://services-ai-service:8080`,
+Symfony (dev): `AI_SERVICE_BASE_URL=http://services-ai-service:8080`,
 `AI_SERVICE_API_TOKEN=dev-only-ai-service-token`, компания подключена в `/admin/users` (отметка «ИИ»), затем
 
 ```bash

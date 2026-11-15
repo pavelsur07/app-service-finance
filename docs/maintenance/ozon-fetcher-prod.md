@@ -1,8 +1,8 @@
 # ozon-fetcher на проде — включение
 
-План — `docs/tasks/ozon-fetcher-ingestion/stages/stage-14.md`. Пока
-`OZON_FETCHER_ENABLED` не равен `true`, деплой сервис не запускает и его БД
-не трогает; `/internal/*` Symfony закрыт, пока не задан `INTERNAL_AUTH_TOKEN`.
+Сервис запускается каждым штатным deployment после проверки обязательных секретов,
+bootstrap БД/роли и миграций. `/internal/*` Symfony закрыт без `INTERNAL_AUTH_TOKEN`.
+SourceFacts принимает все действительные подключения, ack — после commit.
 
 ## Что сделать один раз
 
@@ -25,7 +25,6 @@
    | Имя | Значение |
    |---|---|
    | `OZON_FETCHER_CONNECTION_ALLOWLIST` | `90b72323-784a-4268-88aa-10778c3da78b` (ООО «Вумджой», seller); пусто — все кабинеты |
-   | `OZON_FETCHER_ENABLED` | `true` |
 
 3. **Деплой** (обычный merge в master или `production_action=deploy`). Шаг
    деплоя сам создаёт роль `svc_ozon_fetcher` и БД `ozon_fetcher`
@@ -39,8 +38,7 @@
   — кабинет «Вумджой», задачи идут в `done`, пауз нет.
 - Прод-синк Symfony: `app:marketplace:perf-report` — повторы `SyncOzonAccrualByDayMessage` не выросли.
 - Очередь фактов (с миграции `00008`): `docker exec ozon-fetcher sh -c 'wget -qO- --header "Authorization: Bearer $SERVICE_API_TOKEN" "http://127.0.0.1:8080/internal/source-facts?resource_type=ozon.finance.accrual-by-day&limit=1"'`
-  — 200 и пачка в `batches`. Пока Symfony факты не забирает (модуль `SourceFacts` не включён), очередь
-  только растёт: строка на ревизию дня кабинета, данных источника в ней нет — это штатно.
+  — 200 и неподтверждённые пачки в `batches`; штатный SourceFacts pull применяет их и подтверждает после commit.
 
 ## Витрина покрытия и страница «Покрытие Сервис GO»
 
@@ -58,8 +56,8 @@
 
 ## Откат
 
-`OZON_FETCHER_ENABLED=false` и деплой — контейнер останавливается. Загрузка
-Symfony от сервиса не зависит. Быстро без деплоя: `docker stop ozon-fetcher`.
+Symfony от сервиса не зависит. Остановка контейнера требует отдельного production-разрешения.
+Для отката к старому коду сначала восстановить сохранённые rollout Variables.
 
 - Покрытие: то же с `/internal/coverage` (контракт `services/_contracts/service-coverage/v1`).
 

@@ -36,6 +36,7 @@ final class RecoverPaymentIntakeAllCompaniesTest extends IntegrationTestCase
     private array $queued = [];
     private ?string $cashFailure = null;
     private ?string $deliveryFailure = null;
+    private ?string $eventFailure = null;
     private bool $recovering = false;
     private AiTaskFacadeInterface $ai;
     private CashFacade $cash;
@@ -48,9 +49,6 @@ final class RecoverPaymentIntakeAllCompaniesTest extends IntegrationTestCase
         $ai->method('isEnabledForCompany')->willReturnCallback(function (string $companyId): bool {
             if ($this->recovering) {
                 $this->cashChecks[] = $companyId;
-                if ($companyId === $this->cashFailure) {
-                    throw new \RuntimeException('Simulated Cash authorization channel failure');
-                }
             }
 
             return in_array($companyId, $this->grants, true);
@@ -58,9 +56,21 @@ final class RecoverPaymentIntakeAllCompaniesTest extends IntegrationTestCase
         $ai->method('connectedCompanyIds')->willReturnCallback(fn (): array => $this->grants);
         $taskId = static fn (string $company, string $type, string $key): string => Uuid::uuid5(Uuid::NAMESPACE_URL, $company.'/'.$type.'/'.$key)->toString();
         $ai->method('taskIdFor')->willReturnCallback($taskId);
-        $ai->method('requestTask')->willReturnCallback(static fn (string $company, string $type, array $payload, string $key): string => $taskId($company, $type, $key));
+        $ai->method('requestTask')->willReturnCallback(function (string $company, string $type, array $payload, string $key) use ($taskId): string {
+            if ($this->recovering && $company === $this->cashFailure) {
+                throw new \RuntimeException('Simulated AI dispatch failure');
+            }
+
+            return $taskId($company, $type, $key);
+        });
         self::getContainer()->set(AiTaskFacadeInterface::class, $ai);
         $this->ai = $ai;
+        $dispatcher = self::getContainer()->get('event_dispatcher');
+        $dispatcher->addListener(\App\Cash\Domain\Event\CashTransactionsChanged::class, function (\App\Cash\Domain\Event\CashTransactionsChanged $event): void {
+            if ($event->companyId === $this->eventFailure) {
+                throw new \RuntimeException('Simulated committed event delivery failure');
+            }
+        });
         $this->cash = self::getContainer()->get(CashFacade::class);
     }
 
@@ -105,6 +115,25 @@ final class RecoverPaymentIntakeAllCompaniesTest extends IntegrationTestCase
         self::assertContains($a, $this->queued);
         self::assertContains($b, $this->queued);
         self::assertFalse($this->pendingCash($b));
+    }
+
+    public function testCommittedEventFailureReturnsFailureAndContinuesOtherCompanies(): void
+    {
+        [$a, $b, $c] = $this->fixtures();
+        $this->grants = [$a, $b];
+        $this->connection->executeStatement("UPDATE cash_payment_intake_draft SET status = 'confirmed', dispatch_pending = false, cash_event_pending = true WHERE company_id = ?", [$c]);
+        $this->connection->executeStatement('DELETE FROM telegram_payment_intake_session WHERE company_id = ?', [$c]);
+        $this->eventFailure = $c;
+        $this->em->clear();
+        $tester = $this->tester();
+
+        self::assertSame(1, $tester->execute(['--all' => true]));
+        self::assertTrue($this->connection->fetchOne('SELECT cash_event_pending FROM cash_payment_intake_draft WHERE company_id = ?', [$c]));
+        self::assertContains($a, $this->queued);
+        self::assertContains($b, $this->queued);
+        $this->eventFailure = null;
+        self::assertSame(0, $tester->execute(['--all' => true]));
+        self::assertFalse($this->connection->fetchOne('SELECT cash_event_pending FROM cash_payment_intake_draft WHERE company_id = ?', [$c]));
     }
 
     public function testBrokerFailureDoesNotBlockNextCompanyAndIsRecoverable(): void
@@ -169,6 +198,7 @@ final class RecoverPaymentIntakeAllCompaniesTest extends IntegrationTestCase
         $this->recovering = true;
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(function (object $message): Envelope {
+            self::assertInstanceOf(\App\Telegram\Message\RefreshPaymentIntakeMessage::class, $message);
             if ($message->companyId === $this->deliveryFailure) {
                 throw new \RuntimeException('Broker unavailable');
             }

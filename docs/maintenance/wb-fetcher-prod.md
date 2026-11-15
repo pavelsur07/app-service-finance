@@ -2,8 +2,8 @@
 
 План — `docs/tasks/wb-fetcher-finance/stages/stage-5.md`. Сервис грузит детальный отчёт
 о реализации WB (день и неделя) в raw S3 (`vashfindir-services-raw`, префикс `wb/`).
-Загрузку WB в Symfony он не заменяет и от неё не зависит. Пока `WB_FETCHER_ENABLED` не
-равен `true`, деплой сервис не запускает и его БД не трогает.
+Загрузку WB в Symfony он не заменяет. Сервис запускается каждым deployment после
+проверки секретов, bootstrap БД/роли и миграций.
 
 ## Что сделать один раз
 
@@ -24,7 +24,6 @@
    | Имя | Значение |
    |---|---|
    | `WB_FETCHER_CONNECTION_ALLOWLIST` | не задана с 03.11.2026 — все кабинеты WB; принимает `company_id` или id подключения через запятую (эталон при включении — «Вумджой ООО», `19621cff-b028-45d9-9193-11f47ad9a8b2`) |
-   | `WB_FETCHER_ENABLED` | `true` |
 
 3. **Деплой** (merge в master или `production_action=deploy`). Шаг `[4b2/5]` создаёт
    роль `svc_wb_fetcher` и БД `wb_fetcher` (`docker/wb-fetcher/db-bootstrap.sql`),
@@ -58,13 +57,13 @@
 ## Все кабинеты
 
 С 03.11.2026 сервис на всех кабинетах: `WB_FETCHER_CONNECTION_ALLOWLIST` удалена (решение Владельца,
-без трёх ночей на эталоне), `WB_FETCHER_ENABLED=true`. Сузить обратно — задать allowlist и задеплоить
+без трёх ночей на эталоне). Сузить обратно — задать allowlist и задеплоить
 (`production_action=deploy`).
 
 ## Откат
 
-`WB_FETCHER_ENABLED` ≠ `true` и деплой — контейнер останавливается, БД и raw остаются.
-Быстро без деплоя: `docker stop wb-fetcher`. Загрузка WB в Symfony не затронута; вкладка
+Остановка контейнера требует отдельного production-разрешения; БД и raw сохраняются.
+Для отката к старому коду сначала восстановить сохранённые rollout Variables. Вкладка
 Wildberries показывает прежние данные и «устарело» через 30 минут.
 
 ## Ротация токенов

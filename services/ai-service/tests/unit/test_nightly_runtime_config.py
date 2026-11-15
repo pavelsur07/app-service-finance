@@ -13,7 +13,7 @@ WORKFLOW = REPO / ".github/workflows/deploy.yml"
 
 @pytest.mark.parametrize(
     ("filename", "prefix", "profile"),
-    [("docker-compose.yml", "services-", "services"), ("docker-compose.prod.yml", "", "ai-service")],
+    [("docker-compose.yml", "services-", "services"), ("docker-compose.prod.yml", "", "ai-service-eval")],
 )
 def test_nightly_worker_shares_runtime_and_has_bounded_shutdown(filename: str, prefix: str, profile: str) -> None:
     services = yaml.safe_load((REPO / filename).read_text(encoding="utf-8"))["services"]
@@ -42,7 +42,6 @@ def test_symfony_and_scheduler_share_default_off_nightly_flag() -> None:
     compose = yaml.safe_load((REPO / "docker-compose.prod.yml").read_text(encoding="utf-8"))
     for env in [compose["x-php-env"], compose["services"]["scheduler"]["environment"]]:
         assert env["AI_SERVICE_EVAL_ENABLED"] == "${AI_SERVICE_EVAL_ENABLED:-false}"
-        assert env["AI_SERVICE_ENABLED"] == "${AI_SERVICE_ENABLED:-false}"
 
 
 @pytest.mark.parametrize(
@@ -72,42 +71,14 @@ def test_deploy_exports_and_validates_nonsecret_nightly_flag() -> None:
         assert result.returncode == (0 if value in ("", "true", "false") else 1)
 
 
-@pytest.mark.parametrize("service_enabled", ["true", "false"])
-@pytest.mark.parametrize("eval_enabled", ["true", "false", ""])
-def test_deploy_starts_nightly_only_after_migrations_when_both_flags_enabled(
-    service_enabled: str, eval_enabled: str
-) -> None:
-    deploy = WORKFLOW.read_text(encoding="utf-8")
-    start = deploy.index('if [ "$AI_SERVICE_ENABLED" = "true" ]; then')
-    end = deploy.index('echo "🐳 Обновляем account/admin SPA"', start)
-    script = 'docker() { echo "DOCKER $*"; }\n' + deploy[start:end]
-    result = subprocess.run(  # noqa: S603 — trusted repository block, docker replaced with a local echo function.
-        ["/bin/bash", "-eu", "-c", script],
-        cwd=REPO,
-        env={
-            "AI_SERVICE_ENABLED": service_enabled,
-            "AI_SERVICE_EVAL_ENABLED": eval_enabled,
-            "AI_SERVICE_DB_PASSWORD": "fake-test-password",
-            "AI_SERVICE_API_TOKEN": "a" * 32,
-            "AI_GATEWAY_TOKEN": "b" * 32,
-        },
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr
-    commands = [line for line in result.stdout.splitlines() if line.startswith("DOCKER ")]
-    nightly_start = [line for line in commands if " up " in line and "ai-service-eval-worker" in line]
-    nightly_pull = [line for line in commands if " pull " in line and "ai-service-eval-worker" in line]
-    nightly_stop = [line for line in commands if " stop " in line and "ai-service-eval-worker" in line]
-    if service_enabled == eval_enabled == "true":
-        assert len(nightly_start) == len(nightly_pull) == 1
-        assert nightly_stop == []
-        assert "--wait" not in nightly_start[0]
-        migration = next(line for line in commands if "ai-service migrate" in line)
-        gateway = next(line for line in commands if "ai-service gateway-check" in line)
-        assert commands.index(nightly_pull[0]) < commands.index(migration) < commands.index(gateway)
-        assert commands.index(gateway) < commands.index(nightly_start[0])
-    else:
-        assert nightly_start == nightly_pull == []
-        assert len(nightly_stop) == 1
+def test_business_services_are_default_and_nightly_is_separate() -> None:
+    services = yaml.safe_load((REPO / "docker-compose.prod.yml").read_text(encoding="utf-8"))["services"]
+    for name in [
+        "ozon-fetcher",
+        "wb-fetcher",
+        "ai-service",
+        "ai-service-worker",
+        "site-messenger-worker-payment-intake",
+    ]:
+        assert not services[name].get("profiles"), name
+    assert services["ai-service-eval-worker"]["profiles"] == ["ai-service-eval"]

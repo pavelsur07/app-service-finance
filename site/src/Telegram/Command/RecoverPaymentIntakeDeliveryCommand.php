@@ -53,9 +53,9 @@ final class RecoverPaymentIntakeDeliveryCommand extends Command
             // Recheck the grant immediately before Cash recovery; delivery needs no AI grant.
             try {
                 if (!$input->getOption('skip-cash-recovery')) {
-                    $this->cash->recoverPaymentIntakeEvents($id);
+                    $this->cash->recoverPaymentIntakeEvents($id, failOnError: true);
                     if ($this->ai->isEnabledForCompany($id)) {
-                        $this->cash->recoverPaymentIntake($id);
+                        $this->cash->recoverPaymentIntake($id, failOnError: true);
                     }
                 }
             } catch (\Throwable $exception) {
@@ -88,7 +88,7 @@ final class RecoverPaymentIntakeDeliveryCommand extends Command
         // Technical enumeration returns IDs only; every subsequent read is company-scoped.
         $pending = $this->em->getConnection()->fetchFirstColumn('SELECT DISTINCT company_id FROM telegram_payment_intake_session WHERE '.self::CANDIDATES);
         $ids = array_values(array_unique([...$this->ai->connectedCompanyIds(), ...$this->cash->pendingPaymentIntakeEventCompanyIds(), ...array_map('strval', $pending)]));
-        sort($ids, SORT_STRING);
+        sort($ids, \SORT_STRING);
 
         return $ids;
     }

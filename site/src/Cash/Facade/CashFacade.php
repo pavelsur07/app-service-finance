@@ -126,14 +126,14 @@ final readonly class CashFacade
     }
 
     /** Action commits event acknowledgement; does not request AI or create payments. */
-    public function recoverPaymentIntakeEvents(string $companyId): int
+    public function recoverPaymentIntakeEvents(string $companyId, bool $failOnError = false): int
     {
-        return $this->paymentIntake->recoverEvents($companyId);
+        return $this->paymentIntake->recoverEvents($companyId, $failOnError);
     }
 
-    public function recoverPaymentIntake(string $companyId): int
+    public function recoverPaymentIntake(string $companyId, bool $failOnError = false): int
     {
-        return $this->paymentIntake->recover($companyId);
+        return $this->paymentIntake->recover($companyId, $failOnError);
     }
 
     public function getSettlementSourceForUpdate(string $companyId, string $transactionId): \App\Cash\Application\DTO\CashSettlementSource
@@ -282,7 +282,7 @@ final readonly class CashFacade
      * транзакции вызывающего (`wrapInTransaction()`): коммитит он, вместе со своим курсором.
      *
      * @throws StatementImportOutsideTransactionException транзакция не открыта
-     * @throws StatementImportTargetNotFoundException     счёт не принадлежит компании
+     * @throws StatementImportTargetNotFoundException счёт не принадлежит компании
      */
     public function importBankStatementDay(
         string $companyId,

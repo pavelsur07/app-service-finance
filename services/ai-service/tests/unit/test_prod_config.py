@@ -68,14 +68,11 @@ def test_deploy_waits_only_for_services_with_healthcheck() -> None:
     assert [line for line, bad in waited if bad] == []
 
 
-def test_payment_intake_runtime_defaults_off_and_worker_is_isolated() -> None:
+def test_payment_intake_worker_is_always_enabled_and_isolated() -> None:
     compose = yaml.safe_load((REPO / "docker-compose.prod.yml").read_text(encoding="utf-8"))
     services = compose["services"]
-    for env in [compose["x-php-env"], services["scheduler"]["environment"]]:
-        assert env["TELEGRAM_PAYMENT_INTAKE_ENABLED"] == "${TELEGRAM_PAYMENT_INTAKE_ENABLED:-0}"
-        assert env["TELEGRAM_PAYMENT_INTAKE_COMPANIES"] == "${TELEGRAM_PAYMENT_INTAKE_COMPANIES:-}"
     worker = services["site-messenger-worker-payment-intake"]
-    assert worker["profiles"] == ["payment-intake"]
+    assert not worker.get("profiles")
     assert worker["restart"] == "unless-stopped"
     assert worker["image"] == services["site-php-cli"]["image"]
     assert worker["environment"] == compose["x-php-env"]

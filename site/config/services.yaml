@@ -6,8 +6,6 @@
 parameters:
     env(SPA_ACCOUNT_HOST): 'account.vashfindir.ru'
     env(SPA_ADMIN_HOST): 'admin.vashfindir.ru'
-    env(TELEGRAM_PAYMENT_INTAKE_ENABLED): '0'
-    env(TELEGRAM_PAYMENT_INTAKE_COMPANIES): ''
     # Стартовые шаблоны онбординга по профилю бизнеса (App\Company\Enum\BusinessProfile).
     # Новый профиль — свой файл; без него запись указывает на маркетплейсный явно. Единый
     # словарь кодов во всех шаблонах держит TemplateRegistryTest.
@@ -649,7 +647,6 @@ services:
 
     # Каналы фактов сервисов (source-fact-envelope v1) для модуля SourceFacts — по клиенту на
     # сервис (тег app.source_facts_client); пустые адрес или токен — источник выключен.
-    # Приём включает SOURCE_FACTS_COMPANIES.
     app.service_gateway.source_facts_client.ozon_fetcher:
         class: App\ServiceGateway\Infrastructure\Client\SourceFactsHttpClient
         autowire: true

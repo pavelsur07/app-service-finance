@@ -63,7 +63,9 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         $binding = $this->em()->getRepository(ClientBinding::class)->findOneBy(['company' => self::COMPANY]);
         self::assertInstanceOf(ClientBinding::class, $binding);
         $binding->selectPaymentIntake();
-        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-abcd0000ee02')->withOwner($binding->getCompany()->getUser())->build();
+        $owner = $binding->getCompany()->getUser();
+        self::assertInstanceOf(\App\Company\Entity\User::class, $owner);
+        $company = CompanyBuilder::aCompany()->withId('11111111-1111-1111-1111-abcd0000ee02')->withOwner($owner)->build();
         $other = new ClientBinding(Uuid::uuid7()->toString(), $company, $binding->getBot(), $binding->getTelegramUser());
         $this->em()->persist($company);
         $this->em()->persist($other);
@@ -111,6 +113,26 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         self::assertStringContainsString('Queued notifications: 1', $tester->getDisplay());
         self::assertCount(1, $this->aiTaskKeys);
         self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction'));
+    }
+
+    public function testGrantRevocationKeepsAmbiguousDispatchAvailableForExistingResult(): void
+    {
+        $client = $this->setupClient(true, true);
+        $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
+        $this->em()->getConnection()->executeStatement('UPDATE cash_payment_intake_draft SET dispatch_pending = true WHERE company_id = ?', [self::COMPANY]);
+        $this->aiGranted = false;
+        $results = $this->createStub(\App\ServiceGateway\Facade\AiTaskResultFacadeInterface::class);
+        $results->method('refreshTask')->willReturn(false);
+        $client->getContainer()->set(\App\ServiceGateway\Facade\AiTaskResultFacadeInterface::class, $results);
+        $transport = $client->getContainer()->get('messenger.transport.async_payment_intake');
+        self::assertInstanceOf(\Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport::class, $transport);
+        $poll = $transport->getSent()[0]->getMessage();
+        self::assertInstanceOf(\App\Telegram\Message\RefreshPaymentIntakeMessage::class, $poll);
+        $client->getContainer()->get(\App\Telegram\MessageHandler\RefreshPaymentIntakeMessageHandler::class)($poll);
+
+        self::assertSame('queued', $this->em()->getConnection()->fetchOne('SELECT status FROM cash_payment_intake_draft WHERE company_id = ?', [self::COMPANY]));
+        self::assertTrue($this->em()->getConnection()->fetchOne('SELECT dispatch_pending FROM cash_payment_intake_draft WHERE company_id = ?', [self::COMPANY]));
+        self::assertCount(1, $this->aiTaskKeys);
     }
 
     public function testRecoveryCanSkipCashWhilePublishingTelegramIntent(): void
@@ -588,7 +610,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
 
     public function testKnownIntakeSourceCannotReachLegacyWithOnlyActorlessBindingRemaining(): void
     {
-        $client = $this->setupClient(true, true, false);
+        $client = $this->setupClient(true, true);
         $binding = $this->em()->getRepository(ClientBinding::class)->findOneBy(['company' => self::COMPANY]);
         self::assertInstanceOf(ClientBinding::class, $binding);
         $bot = $binding->getBot();
@@ -850,7 +872,10 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         $ai->method('isEnabledForCompany')->willReturnCallback(fn (): bool => $enabled && $this->aiGranted);
         $taskIdFor = static fn (string $companyId, string $type, string $key): string => Uuid::uuid5(Uuid::NAMESPACE_URL, $companyId.'/'.$type.'/'.$key)->toString();
         $ai->method('taskIdFor')->willReturnCallback($taskIdFor);
-        $ai->method('requestTask')->willReturnCallback(function (string $companyId, string $type, array $payload, string $key) use ($taskIdFor): string {
+        $ai->method('requestTask')->willReturnCallback(function (string $companyId, string $type, array $payload, string $key) use ($taskIdFor): ?string {
+            if (!$this->aiGranted) {
+                return null;
+            }
             $this->aiTaskKeys[] = $key;
 
             return $taskIdFor($companyId, $type, $key);

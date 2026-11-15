@@ -30,7 +30,7 @@
         <div class="form-hint">Подключение</div>
         {% if overview.connected %}
           <span class="status status--{{ overview.serviceEnabled ? 'success' : 'warning' }}"><span class="dot"></span>ИИ вкл</span>
-          <div class="form-hint">с {{ overview.enabledAt|date('d.m.Y H:i') }}{% if not overview.serviceEnabled %} · сервис выключен (AI_SERVICE_ENABLED){% endif %}</div>
+          <div class="form-hint">с {{ overview.enabledAt|date('d.m.Y H:i') }}{% if not overview.serviceEnabled %} · сервис не настроен (URL или токен){% endif %}</div>
         {% else %}
           <span class="status status--neutral"><span class="dot"></span>ИИ выкл</span>
         {% endif %}
