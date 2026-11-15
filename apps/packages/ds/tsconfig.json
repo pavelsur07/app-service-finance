@@ -1,0 +1,13 @@
+{
+  "extends": "../../account/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node"],
+    "typeRoots": ["../../account/node_modules/@types"],
+    "paths": {
+      "vitest": ["../../account/node_modules/vitest"]
+    },
+    "resolveJsonModule": true
+  },
+  "include": ["src"]
+}

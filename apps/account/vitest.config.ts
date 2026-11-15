@@ -9,5 +9,16 @@ export default defineConfig({
       msw: fileURLToPath(import.meta.resolve('msw')),
     },
   },
-  test: { environment: 'node', include: ['src/**/*.test.ts'] },
+  server: {
+    fs: {
+      allow: [
+        fileURLToPath(new URL('.', import.meta.url)),
+        fileURLToPath(new URL('../packages/ds', import.meta.url)),
+      ],
+    },
+  },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts', '../packages/ds/src/**/*.test.ts'],
+  },
 });
