@@ -121,13 +121,11 @@ final class UiModeControllerTest extends WebTestCaseBase
         $client->loginUser($user);
         $client->getCookieJar()->set(new BrowserCookie('ui_theme', 'vf'));
 
-        $crawler = $client->request('GET', '/company/');
+        $client->request('GET', '/company/');
 
         self::assertResponseIsSuccessful();
-        self::assertSame(
-            'Старый',
-            trim($crawler->filter('.ui-mode-switch button[aria-pressed="true"]')->text()),
-        );
+        self::assertSelectorExists('html[data-ui-mode="legacy"]');
+        self::assertSelectorNotExists('.ui-mode-switch');
     }
 
     public function testRetiredUserModeRequestSetsLegacyCookie(): void

@@ -23,7 +23,7 @@ Reviewer focus: CSRF, redirect, cookie flags, financial filter preservation.
 ## Stage 2: frontend — Tabler для API и завершение переключения
 
 Risk: MEDIUM.
-stage_base_commit: записать перед началом.
+stage_base_commit: `fe29a8f8d`.
 Definition of Done:
 - Все экраны API, включая результат и ошибки, наследуют legacy-shell.
 - Формы, таблицы, права, пагинация и пустые состояния используют Tabler.

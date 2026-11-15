@@ -28,6 +28,7 @@ final class HomeUiModeTest extends WebTestCaseBase
         self::assertSelectorNotExists('#react-dashboard-started');
         self::assertStringContainsString('@tabler/core@1.2.0', (string) $client->getResponse()->getContent());
         self::assertSelectorNotExists('[data-dashboard-mode="app"]');
+        self::assertSelectorNotExists('.ui-mode-switch');
         self::assertSelectorCount(4, '[data-dashboard-kpi-comparison]');
         self::assertSelectorExists(
             '#finance-balance-dynamics-root[data-endpoint="/api/finance/dashboard/balance-dynamics"][data-currency="RUB"]',
