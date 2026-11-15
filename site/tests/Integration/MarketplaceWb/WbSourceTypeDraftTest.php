@@ -74,6 +74,17 @@ final class WbSourceTypeDraftTest extends IntegrationTestCase
         self::assertSame(1, $this->request());
     }
 
+    public function testRequestWithoutAnswerForAnHourIsRepeated(): void
+    {
+        self::assertSame(1, $this->request());
+        $this->store = new WbTranslationStore($this->connection, new MockClock('2026-11-15 10:30:00'));
+        self::assertSame(0, $this->request(), 'полчаса — ждём ответ');
+
+        $this->store = new WbTranslationStore($this->connection, new MockClock('2026-11-15 11:01:00'));
+        self::assertSame(1, $this->request(), 'постановка упала окончательно — запрос повторяется с тем же ключом');
+        self::assertSame($this->requests[0]['key'], $this->requests[1]['key']);
+    }
+
     private function request(): int
     {
         $ai = $this->createStub(AiTaskFacadeInterface::class);
