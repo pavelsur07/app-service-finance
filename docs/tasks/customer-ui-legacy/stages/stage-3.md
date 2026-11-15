@@ -1,4 +1,4 @@
-### Stage 3: handoff — external review blocked
+### Stage 3: handoff — DONE
 
 **Risk:** LOW. **Stage base:** `f230a0670`. **Work items:** 3.1, 3.2.
 
@@ -31,13 +31,21 @@ delta review confirmed fix and later validation fixes. Stage 2 self-review
 had IMPORTANT 1 fixed (scope labels). Aggregate review metrics: B0/I2 fixed;
 open B0/I0. No additional external reviewer was delegated.
 
-**External review:** 1 command attempt, 0 completed rounds. Command:
-`site/bin/external-review.sh 0658c9fc6a3c4c3519f6e254d6669200b6a38753 --effort medium --context docs/tasks/customer-ui-legacy/review-context.md`
-— exit 2, `ревьюер 'claude' не установлен`. Standard binary paths were checked;
-no existing local Claude authorization was available. There is no corrected
-retry without provisioning the missing tool/auth; identical failed command
-was not repeated. REVIEW_GREEN was not claimed.
+**External review:** по явному поручению владельца вместо недоступного Claude
+запущен Codex в отдельной ephemeral read-only сессии. Первый Codex запуск не
+завершил проверку из-за `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.
+Исправленный повтор сохранил sandbox read-only: полный diff и 52 исходника/правила
+переданы через stdin, без вызова сломанного shell. Ограничение: проверка по
+переданному dossier, без самостоятельных команд и запуска тестов ревьюером.
 
-**Status:** Stage not closed; PR #3021 stays Draft until mandatory external
-review is completed. No Ready/merge/deploy. Remaining environment blocker
-falls under AGENTS.md §3.4 item 5.
+Команда исправленного запуска:
+`site/bin/external-review.sh 0658c9fc6a3c4c3519f6e254d6669200b6a38753 --reviewer codex --effort medium --context /tmp/customer-ui-codex-review-context.md --out site/var/external-review/0658c9fc-codex-stdin`
+
+Результат: exit 0, точный маркер **REVIEW_GREEN**, diff 1187 строк.
+Сессия `01a1e076-ec7d-7741-9f9f-560653ce0ea7`, sandbox read-only, effort medium.
+Отчёт: `site/var/external-review/0658c9fc-codex-stdin/review.txt`.
+Завершённых раундов: 1; Codex запусков: 2 (один исправленный повтор);
+отдельно прежний Claude preflight не запустился. External B0/I0, открытых нет.
+
+**Status:** Stage завершён. PR #3021 переводится в Ready; merge/deploy ожидают
+единственного owner decision. Блокировки внешнего review больше нет.

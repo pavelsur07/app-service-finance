@@ -1,5 +1,9 @@
 # Контекст внешнего review
 
+Владелец явно поручил провести review Codex в отдельной сессии вместо
+недоступного Claude Code. Это исключение только для текущей задачи;
+ревьюер работает read-only, без истории сессии реализации.
+
 Scope: только пользовательский UI site/. Admin и apps исключены.
 Дашборд использует имеющийся legacy template; API markup переведён на Tabler;
 старые UI-cookie и POST app приводятся к legacy, URL/CSRF/redirect guards сохранены.

@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** Stage 3 / handoff / stopped
-**Status:** stopped
+**Phase:** handoff / owner decision
+**Status:** done
 **Stage base commit:** `f230a0670`
 
 ### Completed
@@ -46,16 +46,19 @@
 ### Review status
 - internal: Stage 1 — 0/0; Stage 2 — IMPORTANT 1 fixed; финальное независимое
   review — IMPORTANT 1 fixed. Суммарно BLOCKER 0 / IMPORTANT 2 fixed, открытых нет.
-- external: BLOCKED — external-review.sh exit 2: reviewer claude not installed.
-  Проверены стандартные пути; локальной Claude авторизации также нет.
-  REVIEW_GREEN не получен, PR должен оставаться Draft.
+- external: REVIEW_GREEN, exit 0. По явному поручению владельца reviewer Codex
+  в отдельной ephemeral read-only сессии; один завершённый раунд, B0/I0.
+  Первый Codex запуск не завершил проверку из-за bwrap; исправленный повтор
+  проверил полный diff + dossier 52 файлов через stdin без shell.
+  Report: site/var/external-review/0658c9fc-codex-stdin/review.txt;
+  session 01a1e076-ec7d-7741-9f9f-560653ce0ea7. Ранее Claude preflight не запустился.
 
 ### Exact next action
-- Требуется установленный и авторизованный Claude Code в окружении.
-- Затем агент выполняет сам:
-  `site/bin/external-review.sh 0658c9fc6a3c4c3519f6e254d6669200b6a38753 --effort medium --context docs/tasks/customer-ui-legacy/review-context.md`.
-- После review/fix cycle обновить handoff, поставить PR #3021 Ready и пройти
-  owner decision для merge/deploy по AGENTS.md. Сейчас Draft, merge/deploy не выполнялись.
+- Все проверки и review завершены; PR #3021 переводится в Ready.
+- Ожидать owner decision: "merge and deploy #3021". После него выполнить
+  весь release pipeline по AGENTS.md, без дополнительных вопросов по этапам.
+- Merge/deploy не выполнялись. Политика reviewer изменена только для этой задачи
+  явным поручением владельца; глобальные инструкции не менялись.
 - Source review fixes: 6f380a39e; полный audit и все runnable checks завершены.
 
 ### Files to inspect first on resume

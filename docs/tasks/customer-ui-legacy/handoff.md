@@ -1,7 +1,7 @@
-# customer-ui-legacy — реализация готова, внешнее review заблокировано
+# customer-ui-legacy — handoff
 
 **Branch:** `fix/customer-ui-legacy`.
-**PR:** https://github.com/pavelsur07/app-service-finance/pull/3021 — Draft,
+**PR:** https://github.com/pavelsur07/app-service-finance/pull/3021 — Ready,
 base `master` проверена. **Последний source commit:** `6f380a39e`.
 Все CI checks этого source commit — pass/skipped, включая SPA real-auth isolation.
 
@@ -11,8 +11,8 @@ base `master` проверена. **Последний source commit:** `6f380a3
   больше не включают новый интерфейс. CSRF/redirect/cookie flags сохранены.
 - Stage 2 — шесть API-маршрутов, результат создания и ошибки на Tabler;
   сохранены permissions presets, копирование/очистка секрета, paging и IDOR guards.
-- Stage 3 — аудит, независимое внутреннее review и CI завершены; внешнее
-  review не запустилось. Stage не закрыт, Ready не выставлялся.
+- Stage 3 — аудит, независимое внутреннее review, CI и отдельное Codex review
+  завершены. REVIEW_GREEN; открытых BLOCKER/IMPORTANT нет.
 - UI admin и apps не менялись; общие assets и app/_ui pagination/tabs для
   админки сохранены. Auth, бюджет и Unit уже legacy, остались без правок.
 
@@ -59,11 +59,17 @@ base `master` проверена. **Последний source commit:** `6f380a3
   независимое IMPORTANT 1 fixed (retired flash-shell test). Fixes и поздние
   CI validation assertions проверены reviewer повторно; открытых B/I нет.
 - Метрики review: internal BLOCKER 0 / IMPORTANT 2 found and fixed;
-  external 0 completed rounds, 1 blocked command attempt, no findings available.
-- Команда:
-  `site/bin/external-review.sh 0658c9fc6a3c4c3519f6e254d6669200b6a38753 --effort medium --context docs/tasks/customer-ui-legacy/review-context.md`.
-- Результат: exit 2, `ревьюер 'claude' не установлен`. Проверены стандартные
-  binary paths; локальной авторизации Claude нет. REVIEW_GREEN не получен.
+  external BLOCKER 0 / IMPORTANT 0, 1 завершённый раунд.
+- Владелец явно поручил Codex в отдельной сессии вместо недоступного Claude.
+  Первый Codex запуск был ограничен bwrap; исправленный повтор получил полный
+  diff + dossier 52 файлов/правил через stdin. Sandbox оставлен read-only,
+  ревьюер не запускал команды/тесты и не менял файлы. Ограничение: контекст и
+  reference-scan предоставлены через stdin вместо самостоятельного чтения.
+- Исправленная команда:
+  `site/bin/external-review.sh 0658c9fc6a3c4c3519f6e254d6669200b6a38753 --reviewer codex --effort medium --context /tmp/customer-ui-codex-review-context.md --out site/var/external-review/0658c9fc-codex-stdin`.
+- Результат: exit 0, **REVIEW_GREEN**; сессия
+  `01a1e076-ec7d-7741-9f9f-560653ce0ea7`; отчёт
+  `site/var/external-review/0658c9fc-codex-stdin/review.txt`.
 
 ## Ограничения и продолжение
 
@@ -72,7 +78,10 @@ base `master` проверена. **Последний source commit:** `6f380a3
 Права локальных каталогов не расширялись; для проверки использован user 0
 в disposable test runner с изолированной test DB.
 
-По AGENTS.md §7.2 для Large обязательно внешнее review; §3.4 item 5 требует
-зафиксировать блокировку инструментом. Нужен установленный и авторизованный
-Claude Code в окружении. После предоставления инструмента агент сам выполняет
-review/fix cycle, актуализирует handoff и ставит PR Ready. Merge/deploy не выполнялись.
+Обязательное review выполнено Codex по явному исключению владельца для текущей
+задачи. Merge/deploy не выполнялись; ожидается owner decision для PR #3021.
+
+## Owner decision
+
+Ready: PR #3021 "fix: единый legacy UI для пользовательских страниц site" — merge into master with automatic production deploy?
+Reply: "merge and deploy #3021"
