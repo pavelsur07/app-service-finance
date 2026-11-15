@@ -167,6 +167,12 @@ marketplace_ozon_admin_controllers:
         namespace: App\MarketplaceOzon\Controller\Admin
     type: attribute
 
+marketplace_wb_admin_controllers:
+    resource:
+        path: ../src/MarketplaceWb/Controller/Admin/
+        namespace: App\MarketplaceWb\Controller\Admin
+    type: attribute
+
 marketplace_economics_controllers:
     resource:
         path: ../src/MarketplaceEconomics/Controller/

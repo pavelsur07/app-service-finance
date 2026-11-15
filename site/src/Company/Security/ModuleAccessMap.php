@@ -119,6 +119,7 @@ final class ModuleAccessMap
         'App\\Billing\\Controller\\Admin\\',     // /admin/billing/*, ROLE_ADMIN, тариф любого кабинета
         'App\\ServiceGateway\\Controller\\Admin\\', // /admin/services/*, ROLE_ADMIN, сводки сервисов без компаний
         'App\\MarketplaceOzon\\Controller\\Admin\\', // /admin/marketplace/ozon-source-types, ROLE_ADMIN, справочник кодов платформы
+        'App\\MarketplaceWb\\Controller\\Admin\\', // /admin/marketplace/wb-source-types, ROLE_ADMIN, справочник кодов платформы
         'App\\MarketplaceAds\\Controller\\Api\\Admin\\', // ROLE_SUPER_ADMIN на классе; mark-failed — свой MARKETPLACE_WRITE
     ];
 

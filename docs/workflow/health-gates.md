@@ -105,6 +105,11 @@ read-only сверка `moz_day` с `mo_operation`). Отставание каб
 ozon-fetcher и `app:source-facts:pull`; отключённый кабинет — решение по случаю. Экран R10
 `/marketplace/economics/quality` показывает те же звенья по дням для компании.
 
+Тот же гейт для WB — `app:marketplace-wb:health-check` (09:25 МСК, модуль `MarketplaceWb`, таблицы `mwb_*`): только компании из
+`MARKETPLACE_WB_COMPANIES` (пусто — exit 0). Карантин решает администратор на `/admin/marketplace/wb-source-types` (черновика ИИ
+пока нет); `wb:payout:*` — выплата без выручки, вид выбирают по названию операции; непереведённые дни — `error` прогона
+`app:marketplace-wb:translate`; отставание — покрытие wb-fetcher.
+
 Четырнадцатый пример — `app:marketplace-economics:health-check` (09:30 МСК): витрина экономики SKU (`MarketplaceEconomics`). Красное
 (`error`, exit 1) — Σ строк `me_day_line` дня без себестоимости и справочных ≠ `me_day.canon_minor` (разнесение потеряло или
 добавило копейки — дефект расчёта), либо день канона заменён больше 60 мин назад и не пересчитан (`mo_dirty_window`). Починка:
