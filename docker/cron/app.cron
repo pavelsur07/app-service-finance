@@ -371,8 +371,8 @@
 57 6 * * * cd /app && php bin/console app:marketplace-ozon:translate --relink --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 20 9 * * * cd /app && php bin/console app:marketplace-ozon:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
-# Переводчик WB (модуль MarketplaceWb): дневной отчёт о продажах из sf_fact → канон mo_operation. Включение —
-# MARKETPLACE_WB_COMPANIES (пусто — exit 0). Гейт 09:25 МСК — как у Ozon, только по включённым компаниям.
+# Переводчик WB (модуль MarketplaceWb): дневной отчёт о продажах и реклама из sf_fact →
+# канон mo_operation, все кабинеты. Гейт 09:25 МСК — как у Ozon.
 7-59/15 * * * * cd /app && php bin/console app:marketplace-wb:translate --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 58 6 * * * cd /app && php bin/console app:marketplace-wb:translate --relink --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 25 9 * * * cd /app && php bin/console app:marketplace-wb:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
