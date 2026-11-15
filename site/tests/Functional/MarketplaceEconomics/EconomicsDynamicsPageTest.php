@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\MarketplaceEconomics;
 
+use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -29,6 +30,10 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
         $this->line('2026-11-16', $listingId, 'sale', 'revenue', 50000, 1);
         $this->line('2026-11-16', null, 'subscription', 'overhead', -8000);
         $this->day('2026-11-10');
+        static::getContainer()->get(Connection::class)->insert('me_day_line', [
+            'id' => Uuid::uuid7()->toString(), 'company_id' => Uuid::uuid7()->toString(), 'channel' => 'ozon', 'connection_ref' => 'foreign-cabinet',
+            'operation_date' => '2026-11-10', 'measure' => 'sale', 'level' => 'revenue', 'amount_minor' => 99999999, 'quantity' => 999,
+        ]);
 
         $client->loginUser($owner);
         $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
@@ -36,6 +41,8 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
 
         $crawler = $client->request('GET', self::URL, $period + ['step' => 'week']);
         self::assertResponseIsSuccessful();
+        self::assertSelectorExists('[data-economics-table] .table.table-vcenter.card-table');
+        self::assertSelectorExists('section.card.card-body svg[role="img"]');
         $rows = $crawler->filter('tbody tr')->each(static fn ($r): string => $r->text());
         self::assertCount(3, $rows, 'две недели + итог');
         // неделя обрезана началом периода: 09.11 не входит
@@ -52,9 +59,57 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
         self::assertStringStartsWith('Итого по выбранным', $rows[8]);
         self::assertMatchesRegularExpression('/2\s200,00/u', $rows[8], 'с поиском — только SKU, без подписки');
 
+        $crawler = $client->request('GET', self::URL, $period + ['step' => 'month', 'alloc' => '0']);
+        self::assertResponseIsSuccessful();
+        self::assertCount(2, $crawler->filter('tbody tr'));
+        self::assertStringStartsWith('10.11 – 17.11.2026', $crawler->filter('tbody tr')->first()->text());
+        self::assertSelectorNotExists('th:contains("СМ3")');
+        self::assertMatchesRegularExpression('/2\s200,00/u', $crawler->filter('tbody tr')->last()->text());
+
         $client->request('GET', self::URL, $period + ['format' => 'xlsx']);
         self::assertResponseIsSuccessful();
         self::assertStringContainsString('spreadsheetml', (string) $client->getResponse()->headers->get('Content-Type'));
+    }
+
+    public function testChannelFilterNarrowsSkuAndDynamicsAlike(): void
+    {
+        $client = static::createClient();
+        [$owner, $ozonId] = $this->seed();
+        $company = $this->em()->find(Company::class, self::COMPANY_ID);
+        self::assertNotNull($company);
+        $wb = MarketplaceListingBuilder::aListing()->forCompany($company)->withMarketplace(MarketplaceType::WILDBERRIES)->withMarketplaceSku('NM-992')->withName('Платье')->build();
+        $this->em()->persist($wb);
+        $this->em()->flush();
+        $wbId = (string) $wb->getId();
+        $this->line('2026-11-10', $ozonId, 'sale', 'revenue', 100000, 1);
+        $this->line('2026-11-10', $wbId, 'sale', 'revenue', 300000, 3, 'wildberries', 'wb-cabinet');
+        $this->line('2026-11-11', null, 'subscription', 'overhead', -5000, null, 'wildberries', 'wb-cabinet');
+        $this->day('2026-11-10');
+        $this->day('2026-11-10', 'wb-cabinet', 'wildberries');
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
+        $period = ['from' => '2026-11-10', 'to' => '2026-11-11'];
+
+        $crawler = $client->request('GET', '/marketplace/economics', $period);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('select[name="channel"] option[value="wildberries"]');
+        self::assertCount(1, $crawler->filter('tbody tr:contains("NM-992") [data-channel="wildberries"]'), 'метка канала у SKU');
+
+        $crawler = $client->request('GET', '/marketplace/economics', $period + ['channel' => 'wildberries']);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('select[name="channel"] option[value="wildberries"][selected]');
+        $rows = $crawler->filter('tbody tr')->each(static fn ($r): string => $r->text());
+        self::assertSame([], array_values(array_filter($rows, static fn (string $r): bool => str_contains($r, 'SKU-992'))), 'Ozon отфильтрован');
+        $skuTotal = $crawler->filter('tbody tr:contains("Итого")')->last()->text();
+        // WB: 3000 выручки − 50 подписки = 2950 полная
+        self::assertMatchesRegularExpression('/2\s950,00/u', $skuTotal);
+
+        $crawler = $client->request('GET', self::URL, $period + ['channel' => 'wildberries', 'step' => 'week']);
+        self::assertResponseIsSuccessful();
+        self::assertMatchesRegularExpression('/2\s950,00/u', $crawler->filter('tbody tr')->last()->text(), 'итог R2 = R1 канала');
+
+        $client->request('GET', self::URL, $period + ['channel' => 'avito']);
+        self::assertResponseStatusCodeSame(422);
     }
 
     public function testRejectsBadDate(): void
@@ -66,6 +121,31 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
 
         $client->request('GET', self::URL, ['from' => '10.11.2026', 'to' => '2026-11-17']);
         self::assertResponseStatusCodeSame(422);
+    }
+
+    public function testLegacyShellPreservesStepAndReturnLink(): void
+    {
+        $client = static::createClient();
+        [$owner] = $this->seed();
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
+        $this->day('2026-11-10');
+        $this->day('2026-11-11', 'cabinet-2');
+        $params = ['connection' => 'cabinet-2', 'from' => '2026-11-10', 'to' => '2026-11-18', 'q' => 'SKU-992', 'alloc' => '0', 'step' => 'month', 'page' => '1'];
+        $crawler = $client->request('GET', self::URL, $params);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('html[data-ui-mode="legacy"]');
+        self::assertSelectorTextContains('nav[aria-label="Отчёт"] .nav-link.active[aria-current="page"]', 'Динамика');
+        self::assertSelectorExists('select.form-select[name="step"] option[value="month"][selected]');
+        self::assertSelectorExists('select[name="connection"] option[value="cabinet-2"][selected]');
+        self::assertSelectorExists('select[name="alloc"] option[value="0"][selected]');
+        self::assertSelectorExists('input[name="q"][value="SKU-992"]');
+        self::assertSelectorExists('input[name="to"][value="2026-11-18"]');
+        $href = $crawler->filter('nav[aria-label="Отчёт"] a')->first()->attr('href');
+        parse_str((string) parse_url((string) $href, \PHP_URL_QUERY), $query);
+        self::assertSame(array_diff_key($params, array_flip(['step', 'page'])), $query);
+        self::assertSame('/marketplace/economics/quality', $crawler->filter('nav[aria-label="Отчёт"] a')->last()->attr('href'));
     }
 
     /** @return array{0: User, 1: string} */
@@ -83,18 +163,18 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
         return [$owner, (string) $listing->getId()];
     }
 
-    private function line(string $date, ?string $listingId, string $measure, string $level, int $amount, ?int $qty = null): void
+    private function line(string $date, ?string $listingId, string $measure, string $level, int $amount, ?int $qty = null, string $channel = 'ozon', string $connection = 'cabinet-1'): void
     {
         static::getContainer()->get(Connection::class)->insert('me_day_line', [
-            'id' => Uuid::uuid7()->toString(), 'company_id' => self::COMPANY_ID, 'channel' => 'ozon', 'connection_ref' => 'cabinet-1',
+            'id' => Uuid::uuid7()->toString(), 'company_id' => self::COMPANY_ID, 'channel' => $channel, 'connection_ref' => $connection,
             'operation_date' => $date, 'listing_id' => $listingId, 'measure' => $measure, 'level' => $level, 'amount_minor' => $amount, 'quantity' => $qty,
         ]);
     }
 
-    private function day(string $date): void
+    private function day(string $date, string $connection = 'cabinet-1', string $channel = 'ozon'): void
     {
         static::getContainer()->get(Connection::class)->insert('me_day', [
-            'company_id' => self::COMPANY_ID, 'channel' => 'ozon', 'connection_ref' => 'cabinet-1', 'operation_date' => $date, 'rules_version' => 'economics-2',
+            'company_id' => self::COMPANY_ID, 'channel' => $channel, 'connection_ref' => $connection, 'operation_date' => $date, 'rules_version' => 'economics-2',
             'canon_minor' => 0, 'unallocated_minor' => 0, 'cost_price_minor' => 0, 'without_cost_price' => 0, 'line_count' => 0, 'currency' => 'RUB', 'refreshed_at' => '2026-11-14 10:00:00',
         ]);
     }

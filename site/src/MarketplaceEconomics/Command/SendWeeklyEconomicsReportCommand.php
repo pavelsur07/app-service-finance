@@ -126,7 +126,13 @@ final class SendWeeklyEconomicsReportCommand extends Command
         if (!$report->hasData()) {
             return false;
         }
-        $summary = WeeklyEconomicsSummary::fromReport($report);
+        $byChannel = [];
+        if (\count($report->channels) > 1) {
+            foreach ($report->channels as $channel) {
+                $byChannel[$channel] = $this->reports->build($companyId, new SkuEconomicsFilter($from, $to, channel: $channel))->total;
+            }
+        }
+        $summary = WeeklyEconomicsSummary::fromReport($report, byChannel: $byChannel);
         $text = trim($this->twig->render('notifications/email/economics_weekly_report.txt.twig', ['summary' => $summary]));
         if ($dryRun) {
             $output->writeln(sprintf("== %s (%s)\n%s\n", $company->getName(), $companyId, $text));

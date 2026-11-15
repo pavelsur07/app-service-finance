@@ -1,0 +1,35 @@
+{% extends 'moy_sklad/layout.html.twig' %}
+
+{% block title %}МойСклад — История связей{% endblock %}
+{% block integration_title %}История связей{% endblock %}
+
+{% block integration_content %}
+    <div class="card" data-mapping-history>
+        <div class="card-body">
+            <h2 class="card-title text-break">{{ source ? source.title ?? source.sku : state.listingSnapshot.title|default('Листинг недоступен') }}</h2>
+            <p class="text-secondary">{{ connection.name }} · Данные позиции сохранены на момент изменения связи.</p>
+            <a class="btn" href="{{ path('moysklad_listing_mapping_edit', routeParams) }}">К связи листинга</a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+                <thead><tr><th>Версия</th><th>Дата</th><th>Действие</th><th>Позиция</th><th>Артикул</th></tr></thead>
+                <tbody>
+                    {% for revision in history.items %}
+                        <tr>
+                            <td>{{ revision.revision|vf_number }}</td>
+                            <td>{{ revision.createdAt|date('d.m.Y H:i:s') }}</td>
+                            <td>{{ revision.operation.label }}</td>
+                            <td class="text-break">{{ revision.targetSnapshot.name|default('Связь снята') }}</td>
+                            <td>{{ revision.targetSnapshot.article|default('—') }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="text-secondary text-center py-4">История назначений пока пуста.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer">
+            {% include 'partials/_pagination.html.twig' with {page: history.page, total: history.totalItems, perPage: history.perPage, route: 'moysklad_listing_mapping_history', params: routeParams} only %}
+        </div>
+    </div>
+{% endblock %}

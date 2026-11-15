@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceEconomics\Infrastructure\Export;
 
 use App\MarketplaceEconomics\Application\DTO\EconomicsDynamicsReport;
+use App\MarketplaceEconomics\Application\DTO\SkuEconomicsFilter;
 use App\MarketplaceEconomics\Application\DTO\SkuEconomicsReport;
 use App\MarketplaceEconomics\Domain\SkuMetrics;
 use OpenSpout\Common\Entity\Cell;
@@ -37,12 +38,12 @@ final readonly class SkuEconomicsXlsxExporter
             $writer->addRow(new Row([Cell::fromValue(sprintf('Экономика SKU · %s – %s', $report->from->format('d.m.Y'), $report->to->format('d.m.Y')))]));
             $writer->addRow(new Row(array_map(static fn (string $h): Cell => Cell::fromValue($h), self::header($allocated))));
             foreach ($report->rows as $row) {
-                $writer->addRow($this->row([$row->sku, (string) $row->title], $row->current, $allocated));
+                $writer->addRow($this->row([$row->sku, (string) $row->title, SkuEconomicsFilter::CHANNELS[(string) $row->channel] ?? ''], $row->current, $allocated));
             }
             if (null !== $report->unallocated) {
-                $writer->addRow($this->row(['Нераспределено', ''], $report->unallocated, $allocated));
+                $writer->addRow($this->row(['Нераспределено', '', ''], $report->unallocated, $allocated));
             }
-            $writer->addRow($this->row(['Итого', ''], $report->total, $allocated));
+            $writer->addRow($this->row(['Итого', '', ''], $report->total, $allocated));
         } finally {
             $writer->close();
         }
@@ -57,7 +58,7 @@ final readonly class SkuEconomicsXlsxExporter
         $writer->openToFile($path);
         try {
             $writer->addRow(new Row([Cell::fromValue(sprintf('Динамика · %s – %s', $report->from->format('d.m.Y'), $report->to->format('d.m.Y')))]));
-            $writer->addRow(new Row(array_map(static fn (string $h): Cell => Cell::fromValue($h), ['С', 'По', ...\array_slice(self::header($allocated), 2)])));
+            $writer->addRow(new Row(array_map(static fn (string $h): Cell => Cell::fromValue($h), ['С', 'По', ...\array_slice(self::header($allocated), 3)])));
             foreach ($report->steps as $step) {
                 $writer->addRow($this->row([$step['from']->format('d.m.Y'), $step['to']->format('d.m.Y')], $step['metrics'], $allocated));
             }
@@ -77,16 +78,16 @@ final readonly class SkuEconomicsXlsxExporter
     /** @return list<string> */
     private static function header(bool $allocated): array
     {
-        $columns = ['SKU', 'Название', 'Продано, шт.', 'Возвраты, шт.', 'Выручка', 'Себестоимость', 'Выручка − себестоимость', 'Комиссия', 'Логистика туда', 'Логистика обратно', 'Эквайринг', 'Прочие СМ1', 'СМ1', 'Реклама', 'СМ2'];
+        $columns = ['SKU', 'Название', 'Канал', 'Продано, шт.', 'Возвраты, шт.', 'Выручка', 'Себестоимость', 'Выручка − себестоимость', 'Комиссия', 'Логистика туда', 'Логистика обратно', 'Эквайринг', 'Прочие СМ1', 'СМ1', 'Реклама', 'СМ2'];
 
         return $allocated ? [...$columns, 'Склад и прочие МП', 'СМ3', 'СПП (справочно)'] : [...$columns, 'СПП (справочно)'];
     }
 
-    /** @param array{0: string, 1: string} $label */
+    /** @param list<string> $label первые колонки строки */
     private function row(array $label, SkuMetrics $m, bool $allocated): Row
     {
         $rub = static fn (int $minor): float => $minor / 100;
-        $values = [$label[0], $label[1], $m->salesQty, $m->returnsQty, $rub($m->revenue), $rub($m->costPrice), $rub($m->gross()), $rub($m->commission),
+        $values = [...$label, $m->salesQty, $m->returnsQty, $rub($m->revenue), $rub($m->costPrice), $rub($m->gross()), $rub($m->commission),
             $rub($m->logisticsTo), $rub($m->logisticsBack), $rub($m->acquiring), $rub($m->otherMd1), $rub($m->md1()), $rub($m->ads), $rub($m->md2())];
         $values = $allocated ? [...$values, $rub($m->overhead), $rub($m->full()), $rub($m->spp)] : [...$values, $rub($m->spp)];
 

@@ -49,6 +49,7 @@ final class EconomicsDynamicsController extends AbstractController
             'to' => $to,
             'step' => \in_array($step, EconomicsDynamicsReport::STEPS, true) ? $step : 'week',
             'connection' => (string) $query->get('connection', ''),
+            'channel' => (string) $query->get('channel', ''),
             'tagIds' => array_values(array_filter(array_map('strval', $query->all('tags')))),
             'search' => trim((string) $query->get('q', '')),
             'allocated' => '0' !== $query->get('alloc'),
@@ -60,7 +61,7 @@ final class EconomicsDynamicsController extends AbstractController
         try {
             $filter = new SkuEconomicsFilter(
                 $this->date($from), $this->date($to), '' === $view['connection'] ? null : $view['connection'],
-                $view['tagIds'], $view['search'],
+                $view['tagIds'], $view['search'], channel: '' === $view['channel'] ? null : $view['channel'],
             );
             $report = $this->reports->build($companyId, $filter, $view['step']);
             if ('xlsx' === $query->get('format')) {

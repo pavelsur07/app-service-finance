@@ -30,7 +30,7 @@ final readonly class EconomicsDynamicsReportBuilder
         $listingIds = $filter->filtersListings()
             ? array_map(static fn (SkuEconomicsRow $row): string => $row->listingId, $this->skuReports->build($companyId, $filter)->rows)
             : null;
-        $byStep = $this->query->byStep($companyId, $filter->from, $filter->to, $step, $filter->connectionRef, $listingIds);
+        $byStep = $this->query->byStep($companyId, $filter->from, $filter->to, $step, $filter->connectionRef, $listingIds, $filter->channel);
 
         $steps = [];
         $total = new SkuMetrics();
@@ -46,7 +46,8 @@ final readonly class EconomicsDynamicsReportBuilder
             $steps[] = ['from' => max($cursor, $filter->from), 'to' => min($end, $filter->to), 'metrics' => $metrics];
         }
 
-        return new EconomicsDynamicsReport($filter->from, $filter->to, $step, $steps, $total,
-            $this->query->coverage($companyId, $filter->from, $filter->to)['connections']);
+        $coverage = $this->query->coverage($companyId, $filter->from, $filter->to);
+
+        return new EconomicsDynamicsReport($filter->from, $filter->to, $step, $steps, $total, $coverage['connections'], $coverage['channels']);
     }
 }

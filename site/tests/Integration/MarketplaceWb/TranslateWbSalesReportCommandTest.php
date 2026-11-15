@@ -101,15 +101,6 @@ final class TranslateWbSalesReportCommandTest extends IntegrationTestCase
         self::assertStringContainsString('0 due', $this->translate());
     }
 
-    public function testDisabledCompanyIsNotTranslated(): void
-    {
-        $this->facts(1, [$this->sale(1, '42')]);
-
-        self::assertStringContainsString('выключено', $this->translate(''));
-        self::assertStringContainsString('0 due', $this->translate(Uuid::uuid7()->toString()));
-        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM mwb_day WHERE company_id = ?', [$this->companyId]));
-    }
-
     private function listing(Company $company, string $id, string $size): MarketplaceListing
     {
         return MarketplaceListingBuilder::aListing()->withId($id)->forCompany($company)->withMarketplace(MarketplaceType::WILDBERRIES)->withMarketplaceSku('555')->build()->setSize($size);
@@ -155,7 +146,7 @@ final class TranslateWbSalesReportCommandTest extends IntegrationTestCase
         );
     }
 
-    private function translate(?string $companies = null): string
+    private function translate(): string
     {
         $c = self::getContainer();
         $tester = new CommandTester(new TranslateWbSalesReportCommand(
@@ -164,7 +155,6 @@ final class TranslateWbSalesReportCommandTest extends IntegrationTestCase
             $c->get(TranslateWbDayAction::class),
             $c->get(Connection::class),
             new NullLogger(),
-            $companies ?? $this->companyId,
         ));
         $tester->execute([]);
 
@@ -181,7 +171,6 @@ final class TranslateWbSalesReportCommandTest extends IntegrationTestCase
             $c->get(MarketplaceOperationsFacadeInterface::class),
             new MockClock('2026-11-11 09:25:00'),
             new NullLogger(),
-            $this->companyId,
         )))->execute([]);
     }
 

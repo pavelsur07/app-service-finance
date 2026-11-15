@@ -490,6 +490,7 @@ final class ModuleBoundaryRules
             ->classes(
                 Selector::inNamespace('App\SourceFacts'),
                 Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceWb'),
                 Selector::inNamespace('App\MarketplaceOperations'),
                 Selector::inNamespace('App\MarketplaceEconomics'),
                 Selector::inNamespace('App\Marketplace'),
@@ -504,6 +505,8 @@ final class ModuleBoundaryRules
                 Selector::inNamespace('App\SourceFacts\Application\DTO'),
                 Selector::inNamespace('App\MarketplaceOzon\Facade'),
                 Selector::inNamespace('App\MarketplaceOzon\Application\DTO'),
+                Selector::inNamespace('App\MarketplaceWb\Facade'),
+                Selector::inNamespace('App\MarketplaceWb\Application\DTO'),
                 Selector::inNamespace('App\MarketplaceOperations\Facade'),
                 Selector::inNamespace('App\MarketplaceOperations\Application\DTO'),
                 Selector::inNamespace('App\MarketplaceEconomics\Facade'),

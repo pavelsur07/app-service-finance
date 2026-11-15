@@ -8,10 +8,19 @@
             <div class="row g-2 align-items-center">
                 <div class="col">
                     <div class="page-pretitle">МойСклад</div>
-                    <h1 class="page-title">Интеграция</h1>
+                    <h1 class="page-title">{% block integration_title %}Интеграция{% endblock %}</h1>
                 </div>
                 {% block page_actions %}{% endblock %}
             </div>
+        </div>
+        {% set mappingId = mappingConnectionId|default(connection.id|default(null)) %}
+        {% set mappingProvider = mappingMarketplace|default(null) %}
+        <div class="mb-3" data-moysklad-tabs>
+            {% include 'partials/_tabs.html.twig' with {tabs: [
+                {label: 'Подключения', href: path('moysklad_connections_index'), active: mappingProvider is null},
+                {label: 'Маппинг Ozon', href: mappingId ? path('moysklad_listing_mappings', {connectionId: mappingId, marketplace: 'ozon'}) : path('moysklad_mapping_entry', {marketplace: 'ozon'}), active: mappingProvider == 'ozon'},
+                {label: 'Маппинг Wildberries', href: mappingId ? path('moysklad_listing_mappings', {connectionId: mappingId, marketplace: 'wildberries'}) : path('moysklad_mapping_entry', {marketplace: 'wildberries'}), active: mappingProvider == 'wildberries'},
+            ]} only %}
         </div>
         {% block integration_content %}{% endblock %}
     </div>
