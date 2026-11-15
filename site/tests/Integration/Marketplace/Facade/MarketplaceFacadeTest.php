@@ -14,6 +14,7 @@ use App\Marketplace\Facade\MarketplaceFacade;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class MarketplaceFacadeTest extends IntegrationTestCase
 {
@@ -387,6 +388,81 @@ final class MarketplaceFacadeTest extends IntegrationTestCase
             MarketplaceType::WILDBERRIES->value,
             [],
         ));
+    }
+
+    public function testExternalMappingPageKeepsWbSizesInactiveAndCatalogMappedListings(): void
+    {
+        $company = $this->seedCompany(self::COMPANY_A_ID, 'mapping-page@example.test');
+        $product = $this->seedProduct($company, '33333333-3333-4333-8333-000000000901', 'CATALOG', 'Internal product');
+        $small = $this->seedListing($company, $product, '55555555-5555-4555-8555-000000000901', '12345', 'S', MarketplaceType::WILDBERRIES, '101');
+        $medium = $this->seedListing($company, null, '55555555-5555-4555-8555-000000000902', '12345', 'M', MarketplaceType::WILDBERRIES, '102');
+        $medium->setIsActive(false);
+        $this->em->flush();
+        $this->connection->executeStatement('UPDATE marketplace_listings SET created_at = :at WHERE company_id = :company', ['at' => '2026-11-15 00:00:00', 'company' => self::COMPANY_A_ID]);
+
+        $first = $this->facade->paginateListingsForExternalMapping(self::COMPANY_A_ID, 'wildberries', null, 1, 1);
+        $second = $this->facade->paginateListingsForExternalMapping(self::COMPANY_A_ID, 'wildberries', null, 2, 1);
+        self::assertSame(2, $first->totalItems);
+        self::assertSame(1, $first->perPage);
+        self::assertSame(1, $first->page);
+        self::assertSame([$medium->getId()], array_column($first->items, 'id'));
+        self::assertSame([$small->getId()], array_column($second->items, 'id'));
+        self::assertSame('M', $first->items[0]->size);
+        self::assertSame('102', $first->items[0]->marketplaceVariantId);
+        self::assertFalse($first->items[0]->isActive);
+        self::assertTrue($second->items[0]->isActive);
+        self::assertSame($product->getId(), $small->getProduct()?->getId());
+    }
+
+    public function testExternalMappingPageScopesProviderCompanyAndLiteralSearch(): void
+    {
+        $company = $this->seedCompany(self::COMPANY_A_ID, 'mapping-search@example.test');
+        $foreign = $this->seedCompany(self::COMPANY_B_ID, 'mapping-foreign@example.test', '22222222-2222-4222-8222-000000000902');
+        $wanted = $this->seedListing($company, null, '55555555-5555-4555-8555-000000000911', '001%_', 'UNKNOWN');
+        $wanted->setSupplierSku('АРТ-001%_');
+        $this->seedListing($company, null, '55555555-5555-4555-8555-000000000912', '001AB', 'UNKNOWN');
+        $this->seedListing($company, null, '55555555-5555-4555-8555-000000000913', '001%_', 'S', MarketplaceType::WILDBERRIES);
+        $this->seedListing($foreign, null, '55555555-5555-4555-8555-000000000914', '001%_', 'UNKNOWN');
+        $this->em->flush();
+
+        $page = $this->facade->paginateListingsForExternalMapping(self::COMPANY_A_ID, 'ozon', 'арт-001%_');
+        self::assertSame(1, $page->totalItems);
+        self::assertSame([$wanted->getId()], array_column($page->items, 'id'));
+        $batch = $this->facade->getListingsMetaByIds(self::COMPANY_A_ID, [$wanted->getId(), '55555555-5555-4555-8555-000000000914']);
+        self::assertSame([$wanted->getId()], array_keys($batch));
+        self::assertEquals($batch[$wanted->getId()], $page->items[0]);
+        self::assertNull($page->items[0]->size);
+        self::assertNull($page->items[0]->marketplaceVariantId);
+    }
+
+    public function testExternalMappingPagePastEndRetainsTotal(): void
+    {
+        $company = $this->seedCompany(self::COMPANY_A_ID, 'mapping-empty@example.test');
+        $this->seedListing($company, null, '55555555-5555-4555-8555-000000000921', 'SKU', 'UNKNOWN');
+        $this->em->flush();
+
+        $page = $this->facade->paginateListingsForExternalMapping(self::COMPANY_A_ID, null, null, 99, 25);
+        self::assertSame([], $page->items);
+        self::assertSame(1, $page->totalItems);
+        self::assertSame(99, $page->page);
+        self::assertSame(0, $this->facade->paginateListingsForExternalMapping(self::COMPANY_B_ID, null, null)->totalItems);
+    }
+
+    #[DataProvider('invalidExternalMappingFilters')]
+    public function testExternalMappingPageRejectsInvalidFilters(?string $marketplace, ?string $search, int $page, int $perPage): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->facade->paginateListingsForExternalMapping(self::COMPANY_A_ID, $marketplace, $search, $page, $perPage);
+    }
+
+    /** @return iterable<string, array{?string, ?string, int, int}> */
+    public static function invalidExternalMappingFilters(): iterable
+    {
+        yield 'unknown provider' => ['wb', null, 1, 25];
+        yield 'page zero' => [null, null, 0, 25];
+        yield 'zero size' => [null, null, 1, 0];
+        yield 'oversized page' => [null, null, 1, 101];
+        yield 'long query' => [null, str_repeat('я', 101), 1, 25];
     }
 
     private function seedCompany(

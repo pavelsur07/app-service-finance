@@ -3197,6 +3197,11 @@ wbCostCategoryGroups(): array
 
 ### `MarketplaceFacade` (`src/Marketplace/Facade/MarketplaceFacade.php`)
 ```php
+// Постраничный read-контракт для внешнего маппинга (без фильтра по Catalog product).
+// Включает неактивные листинги; page >= 1, perPage 1..100, search до 100 символов.
+// Страница за концом: пустые items при сохранённом totalItems.
+paginateListingsForExternalMapping(string $companyId, ?string $marketplace, ?string $search, int $page = 1, int $perPage = 25): ListingMetaPageDTO
+
 // Состояние аутентификации подключения. Точка входа для модуля Ingestion:
 // обработчик синхронизации узнаёт про 401/403 первым, но сущности чужого
 // модуля не трогает. Возвращают true, когда состояние ТОЛЬКО ЧТО
@@ -5785,6 +5790,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.192 | 2026-11-15 | Marketplace: постраничный DTO-контракт внешнего маппинга; ListingMetaDTO содержит isActive/marketplaceVariantId с общей нормализацией size через ListingMetaQuery |
 | 2.191 | 2026-11-15 | MarketplaceWb: переключатель `MARKETPLACE_WB_COMPANIES` снят — переводчик и гейт работают по всем кабинетам WB (решение Владельца 15.11) |
 | 2.190 | 2026-11-15 | MarketplaceWb: реклама WB из фактов `wb.ads.daily` (wb-fetcher, upd + fullstats) — `ads_cpc` по SKU, `mwb_day.ads_revision` (`Version20261115120000`); `wb.ads.daily` в снимке кабинетов WB и в белом списке фактов шлюза (этап 8.4) |
 | 2.189 | 2026-11-15 | MarketplaceWb: новый модуль — переводчик дневного отчёта WB в канон (`mwb_source_type`, `mwb_day`, `mwb_quarantine`, `Version20261115090000`), `app:marketplace-wb:translate` (`MARKETPLACE_WB_COMPANIES`) и гейт 09:25, экран `/admin/marketplace/wb-source-types`; `OperationKind::ADS_SETTLEMENT` (справочно); `findListingsByMarketplaceSkus` отдаёт `size` (этап 8.3) |
