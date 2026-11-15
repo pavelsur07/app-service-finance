@@ -1,6 +1,4 @@
-{% extends '_layout/app.html.twig' %}
-{% set app_nav_active = 'marketplace_economics' %}
-{% set app_breadcrumb = 'Качество данных' %}
+{% extends 'base.html.twig' %}
 {% block title %}Качество данных маркетплейсов{% endblock %}
 
 {% macro money(minor) %}{{ minor|vf_minor(2)|vf_amount(2) }}{% endmacro %}
@@ -15,25 +13,30 @@
         canon_mart: 'Канон ≠ витрина',
     } %}
 
-    <div class="wz-head">
-        <h1 class="wz-title">Экономика маркетплейсов</h1>
+    <div class="vf-page-head">
+        <div class="vf-page-head__title"><h1>Экономика маркетплейсов</h1></div>
     </div>
-    <div class="tabs-row">
-        <nav class="tabs" aria-label="Отчёт">
-            <a class="tab" href="{{ path('marketplace_economics_sku') }}">По SKU</a>
-            <a class="tab" href="{{ path('marketplace_economics_dynamics') }}">Динамика</a>
-            <a class="tab is-active" aria-current="page" href="{{ path('marketplace_economics_quality') }}">Качество данных</a>
-        </nav>
+    <div class="card mb-3">
+        <div class="card-header">
+            <nav aria-label="Отчёт">
+                {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
+                    {label: 'По SKU', href: path('marketplace_economics_sku'), active: false},
+                    {label: 'Динамика', href: path('marketplace_economics_dynamics'), active: false},
+                    {label: 'Качество данных', href: path('marketplace_economics_quality'), active: true},
+                ]} only %}
+            </nav>
+        </div>
     </div>
 
-    <p class="t-sub">
+
+    <p class="text-secondary small mb-0">
         {{ report.from|date('d.m.Y') }} – {{ report.to|date('d.m.Y') }}. Данные проходят цепочку: факты маркетплейса → перевод в операции → канон →
         витрина отчётов. В каждом звене суммы должны совпадать до копейки; дни с расхождением перечислены ниже.
     </p>
 
     {% if report.cabinets is empty %}
-        <section class="card">
-            <p>Кабинетов в новом контуре нет: данные маркетплейсов этой компании пока считает прежний отчёт.</p>
+        <section class="card card-body">
+            <p class="mb-0">Кабинетов в новом контуре нет: данные маркетплейсов этой компании пока считает прежний отчёт.</p>
         </section>
     {% else %}
         <section class="card report-scroll">
@@ -69,7 +72,7 @@
                     {% endfor %}
                 </tbody>
             </table>
-            <p class="t-sub">Факты = канон + карантин. Канон и витрина — без справочных строк (СПП, соинвестирование) и себестоимости.</p>
+            <p class="text-secondary small mb-0">Факты = канон + карантин. Канон и витрина — без справочных строк (СПП, соинвестирование) и себестоимости.</p>
         </section>
 
         <section class="card report-scroll">

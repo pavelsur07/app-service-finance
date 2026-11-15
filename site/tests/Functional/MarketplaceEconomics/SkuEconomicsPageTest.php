@@ -9,6 +9,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
+use App\Tests\Builders\Marketplace\MarketplaceListingTagBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Doctrine\DBAL\Connection;
 use Ramsey\Uuid\Uuid;
@@ -70,6 +71,33 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         $client->request('GET', self::URL, ['from' => '2026-11-01', 'to' => '2026-11-10']);
         self::assertResponseIsSuccessful();
         self::assertStringContainsString('ещё не переведены на новый контур', (string) $client->getResponse()->getContent());
+    }
+
+    public function testLegacyShellPreservesFiltersAndTabQuery(): void
+    {
+        $client = static::createClient();
+        [$owner] = $this->seed();
+        $tag = MarketplaceListingTagBuilder::aTag()->forCompanyId(self::COMPANY_ID)->build();
+        $this->em()->persist($tag);
+        $this->em()->flush();
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
+        $params = ['from' => '2026-11-10', 'to' => '2026-11-18', 'q' => 'SKU-991', 'tags' => [$tag->getId()], 'alloc' => '0', 'sort' => 'revenue', 'dir' => 'asc', 'limit' => '1'];
+        $crawler = $client->request('GET', self::URL, $params);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('html[data-ui-mode="legacy"]');
+        self::assertSelectorTextContains('.vf-page-head h1', 'Экономика SKU');
+        self::assertSelectorTextContains('nav[aria-label="Отчёт"] .nav-link.active[aria-current="page"]', 'По SKU');
+        self::assertSelectorExists('form[method="get"] .form-control[name="from"][value="2026-11-10"]');
+        self::assertSelectorExists('input[name="q"][value="SKU-991"]');
+        self::assertSelectorExists('select[name="alloc"] option[value="0"][selected]');
+        self::assertSelectorExists('select[name="tags[]"] option[selected]');
+        self::assertSelectorExists('button.btn-primary');
+        $href = $crawler->filter('nav[aria-label="Отчёт"] a')->eq(1)->attr('href');
+        parse_str((string) parse_url((string) $href, \PHP_URL_QUERY), $query);
+        self::assertSame(array_diff_key($params, array_flip(['sort', 'dir', 'limit'])), $query);
+        self::assertSame('/marketplace/economics/quality', $crawler->filter('nav[aria-label="Отчёт"] a')->last()->attr('href'));
     }
 
     /** @return array{0: User, 1: string} */

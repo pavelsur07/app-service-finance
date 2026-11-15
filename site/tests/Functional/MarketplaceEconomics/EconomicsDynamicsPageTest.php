@@ -68,6 +68,28 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(422);
     }
 
+    public function testLegacyShellPreservesStepAndReturnLink(): void
+    {
+        $client = static::createClient();
+        [$owner] = $this->seed();
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
+        $params = ['from' => '2026-11-10', 'to' => '2026-11-18', 'q' => 'SKU-992', 'alloc' => '0', 'step' => 'month', 'page' => '1'];
+        $crawler = $client->request('GET', self::URL, $params);
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('html[data-ui-mode="legacy"]');
+        self::assertSelectorTextContains('nav[aria-label="Отчёт"] .nav-link.active[aria-current="page"]', 'Динамика');
+        self::assertSelectorExists('select.form-select[name="step"] option[value="month"][selected]');
+        self::assertSelectorExists('select[name="alloc"] option[value="0"][selected]');
+        self::assertSelectorExists('input[name="q"][value="SKU-992"]');
+        self::assertSelectorExists('input[name="to"][value="2026-11-18"]');
+        $href = $crawler->filter('nav[aria-label="Отчёт"] a')->first()->attr('href');
+        parse_str((string) parse_url((string) $href, \PHP_URL_QUERY), $query);
+        self::assertSame(array_diff_key($params, array_flip(['step', 'page'])), $query);
+        self::assertSame('/marketplace/economics/quality', $crawler->filter('nav[aria-label="Отчёт"] a')->last()->attr('href'));
+    }
+
     /** @return array{0: User, 1: string} */
     private function seed(): array
     {

@@ -36,6 +36,10 @@ final class DataQualityPageTest extends WebTestCaseBase
         $crawler = $client->request('GET', self::URL);
 
         self::assertResponseIsSuccessful();
+        self::assertSelectorExists('html[data-ui-mode="legacy"]');
+        self::assertSelectorTextContains('nav[aria-label="Отчёт"] .nav-link.active[aria-current="page"]', 'Качество данных');
+        self::assertSame('/marketplace/economics', $crawler->filter('nav[aria-label="Отчёт"] a')->first()->attr('href'));
+        self::assertSame('/marketplace/economics/dynamics', $crawler->filter('nav[aria-label="Отчёт"] a')->eq(1)->attr('href'));
         $cabinet = $crawler->filter('tbody')->first()->filter('tr')->each(static fn ($r): string => $r->text());
         self::assertCount(1, $cabinet);
         self::assertStringContainsString('OZON · cab-'.substr(self::COMPANY_ID, -3), $cabinet[0]);
