@@ -59,7 +59,7 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         ],
     ];
 
-    public function testCashflowActivityFilterInBothUiModes(): void
+    public function testCashflowActivityFilterWithCurrentAndRetiredModeCookies(): void
     {
         $client = static::createClient();
         $user = UserBuilder::aUser()->withEmail('home-cashflow-activity@example.test')->build();
@@ -116,25 +116,25 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
 
                 self::assertResponseIsSuccessful();
                 $this->assertActivityState($crawler, $activity);
-                $this->assertKpis($crawler, self::EXPECTED_BY_ACTIVITY[$activity], $uiMode);
-                $this->assertKpiComparisons($crawler, $uiMode, $activity);
-                $this->assertReconciliationLinks($crawler, $uiMode, $activity);
+                $this->assertKpis($crawler, self::EXPECTED_BY_ACTIVITY[$activity], UiModeResolver::LEGACY);
+                $this->assertKpiComparisons($crawler, UiModeResolver::LEGACY, $activity);
+                $this->assertReconciliationLinks($crawler, UiModeResolver::LEGACY, $activity);
             }
 
             $defaultCrawler = $client->request('GET', '/finance?currency=RUB');
             self::assertResponseIsSuccessful();
             $this->assertActivityState($defaultCrawler, 'all');
-            $this->assertKpis($defaultCrawler, self::EXPECTED_BY_ACTIVITY['all'], $uiMode);
-            $this->assertTabsComposition($defaultCrawler, $uiMode);
+            $this->assertKpis($defaultCrawler, self::EXPECTED_BY_ACTIVITY['all'], UiModeResolver::LEGACY);
+            $this->assertTabsComposition($defaultCrawler, UiModeResolver::LEGACY);
 
             $invalidCrawler = $client->request('GET', '/finance?currency=RUB&activity=unknown');
             self::assertResponseIsSuccessful();
             $this->assertActivityState($invalidCrawler, 'all');
-            $this->assertKpis($invalidCrawler, self::EXPECTED_BY_ACTIVITY['all'], $uiMode);
+            $this->assertKpis($invalidCrawler, self::EXPECTED_BY_ACTIVITY['all'], UiModeResolver::LEGACY);
         }
     }
 
-    public function testLegacyDashboardUsesSelectedPeriodWhileAppKeepsThirtyDays(): void
+    public function testSelectedPeriodIsPreservedWithRetiredAppCookie(): void
     {
         $client = static::createClient();
         $user = UserBuilder::aUser()->withEmail('home-cashflow-period@example.test')->build();
@@ -219,8 +219,9 @@ final class HomeCashflowActivityTest extends WebTestCaseBase
         $client->getCookieJar()->set(new Cookie(UiModeResolver::COOKIE_NAME, UiModeResolver::APP));
         $app = $client->request('GET', '/finance?currency=RUB&activity=operating&period=7');
         self::assertResponseIsSuccessful();
-        $this->assertPeriodState($app, 30, '255RUB', '768RUB', UiModeResolver::APP);
-        $this->assertActivityState($app, 'operating');
+        $this->assertPeriodState($app, 7, '3RUB', '12RUB');
+        $this->assertLegacyFilterControls($app, 7, 'operating');
+        $this->assertActivityState($app, 'operating', 7);
     }
 
     private function persistTransaction(

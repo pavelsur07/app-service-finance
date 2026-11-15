@@ -10,7 +10,6 @@ use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\BrowserKit\Cookie;
-use Symfony\Component\HttpFoundation\Response;
 
 final class HomeUiModeTest extends WebTestCaseBase
 {
@@ -35,7 +34,7 @@ final class HomeUiModeTest extends WebTestCaseBase
         );
     }
 
-    public function testUserCookieRendersAppDashboardWithoutTablerAssets(): void
+    public function testRetiredUserCookieRendersLegacyDashboard(): void
     {
         $client = static::createClient();
         $this->loginWithCompany($client, false);
@@ -44,21 +43,14 @@ final class HomeUiModeTest extends WebTestCaseBase
         $client->request('GET', self::DASHBOARD_URL);
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('html[data-ui-mode="app"]');
-        self::assertSelectorExists('.app-customer [data-dashboard-mode="app"]');
-        self::assertSelectorTextContains('.app-header .crumb-current', 'Финансовый обзор');
-        self::assertSelectorTextContains('.app-header .app-company', 'Тестовая компания');
-        self::assertSelectorExists('.app-company[title="Тестовая компания"]');
-        self::assertSelectorTextContains('.app-company .sr-only', 'Активная компания:');
-        self::assertSelectorExists('.app-sidebar .sb-item[aria-current="page"]');
-        self::assertSelectorTextContains('.app-dashboard', 'Остаток на сегодня');
-        self::assertSelectorTextContains('.ui-mode-switch button[aria-pressed="true"]', 'Новый');
-        self::assertStringNotContainsString('@tabler/core', (string) $client->getResponse()->getContent());
+        self::assertSelectorExists('html[data-ui-mode="legacy"]');
+        self::assertSelectorNotExists('[data-dashboard-mode="app"]');
+        self::assertStringContainsString('@tabler/core@1.2.0', (string) $client->getResponse()->getContent());
         self::assertSelectorNotExists('#react-dashboard-started');
-        self::assertSelectorNotExists('#finance-balance-dynamics-root');
+        self::assertSelectorExists('#finance-balance-dynamics-root');
     }
 
-    public function testAdminCookieStillRendersAppDashboard(): void
+    public function testAdminVisitingCustomerDashboardAlsoUsesLegacy(): void
     {
         $client = static::createClient();
         $this->loginWithCompany($client, true);
@@ -67,27 +59,19 @@ final class HomeUiModeTest extends WebTestCaseBase
         $client->request('GET', self::DASHBOARD_URL);
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('html[data-ui-mode="app"]');
-        self::assertSelectorExists('[data-dashboard-mode="app"]');
+        self::assertSelectorExists('html[data-ui-mode="legacy"]');
+        self::assertSelectorNotExists('[data-dashboard-mode="app"]');
     }
 
-    public function testSwitchChangesDashboardModeWithoutChangingUrl(): void
+    public function testRetiredThemeCookieCannotEnableAppDashboard(): void
     {
         $client = static::createClient();
         $this->loginWithCompany($client, false);
-        $crawler = $client->request('GET', self::DASHBOARD_URL);
-        $client->setServerParameter('HTTP_REFERER', 'http://localhost'.self::DASHBOARD_URL);
+        $client->getCookieJar()->set(new Cookie('ui_theme', 'vf'));
 
-        $client->submit($crawler->selectButton('Новый')->form());
+        $client->request('GET', self::DASHBOARD_URL);
 
-        self::assertResponseRedirects(self::DASHBOARD_URL, Response::HTTP_SEE_OTHER);
-        $crawler = $client->followRedirect();
-        self::assertSelectorExists('html[data-ui-mode="app"]');
-
-        $client->submit($crawler->selectButton('Старый')->form());
-
-        self::assertResponseRedirects(self::DASHBOARD_URL, Response::HTTP_SEE_OTHER);
-        $client->followRedirect();
+        self::assertResponseIsSuccessful();
         self::assertSelectorExists('html[data-ui-mode="legacy"]');
     }
 

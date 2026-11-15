@@ -36,7 +36,7 @@ final class UiModeController extends AbstractController
             Response::HTTP_SEE_OTHER,
         );
         $response->headers->setCookie(
-            Cookie::create(UiModeResolver::COOKIE_NAME, $mode)
+            Cookie::create(UiModeResolver::COOKIE_NAME, UiModeResolver::LEGACY)
                 ->withExpires(time() + 365 * 24 * 60 * 60)
                 ->withPath('/')
                 ->withSecure($request->isSecure())
