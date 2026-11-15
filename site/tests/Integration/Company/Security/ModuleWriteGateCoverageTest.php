@@ -151,6 +151,7 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
         'admin_billing_company_cancel_next' => ['firewall', 'App\Billing\Controller\Admin\CancelScheduledTariffController::__invoke'],
         'admin_ingestion_external_categories_confirm_ozon_type' => ['firewall', 'App\Admin\Controller\IngestionExternalCategoriesController::confirmOzonType'],
         'admin_marketplace_ozon_source_types_confirm' => ['firewall', 'App\MarketplaceOzon\Controller\Admin\ConfirmOzonSourceTypeController::__invoke'],
+        'admin_marketplace_wb_source_types_confirm' => ['firewall', 'App\MarketplaceWb\Controller\Admin\ConfirmWbSourceTypeController::__invoke'],
         'admin_ingestion_external_categories_discover' => ['firewall', 'App\Admin\Controller\IngestionExternalCategoriesController::discover'],
         'admin_ingestion_external_categories_import_ozon_details' => ['firewall', 'App\Admin\Controller\IngestionExternalCategoriesController::importOzonDetails'],
         'admin_ingestion_external_categories_refresh_ozon_metadata' => ['firewall', 'App\Admin\Controller\IngestionExternalCategoriesController::refreshOzonMetadata'],
