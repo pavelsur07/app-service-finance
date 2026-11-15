@@ -40,7 +40,7 @@ keyboard, responsive tables, no shared kit/admin regressions.
 ## Stage 3: handoff
 
 Risk: LOW.
-stage_base_commit: записать перед началом.
+stage_base_commit: `f230a0670`.
 Definition of Done:
 - Итоговый аудит не находит активных пользовательских наследников app-shell.
 - Пройдены полные гейты; внутреннее ревью в свежей сессии и внешнее Claude review.

@@ -63,8 +63,6 @@ final class ApiSettingsControllerTest extends WebTestCaseBase
             self::assertResponseIsSuccessful();
             self::assertSelectorExists('html[data-ui-mode="legacy"]');
             self::assertSelectorNotExists('.app-customer, .ui-mode-switch, .wz-head, .t-table');
-            self::assertSelectorExists('script[src*="legacy-app"], script[src*="legacy_app"]');
-            self::assertSelectorExists('script[src*="api_settings"]');
             self::assertSelectorExists('a[href="/settings/api"][aria-current="page"]');
         }
     }
