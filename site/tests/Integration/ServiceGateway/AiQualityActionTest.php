@@ -335,7 +335,7 @@ final class AiQualityActionTest extends IntegrationTestCase
         return new AiQualityAction(
             $this->connection,
             new AiServiceClient($http, new AiTaskV1Parser(), new Logger('http'), 'http://ai-service:8080', 'test-token'),
-            new AiServiceAccess(true, 'http://ai-service:8080', 'test-token', $this->connection),
+            new AiServiceAccess('http://ai-service:8080', 'test-token', $this->connection),
             $this->clock,
             new Logger('quality', [$this->logs]),
             $enabled,

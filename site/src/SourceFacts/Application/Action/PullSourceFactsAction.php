@@ -12,7 +12,6 @@ use App\SourceFacts\Application\DTO\PullSourceFactsResult;
 use App\SourceFacts\Infrastructure\Query\SourceFactStore;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Забор фактов из сервисов (pull + ack, `source-fact-envelope` v1). Пачка — ревизия периода кабинета.
@@ -31,34 +30,18 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 final readonly class PullSourceFactsAction
 {
     public const PAGE_SIZE = 100;
-    public const ALL_COMPANIES = '*';
-
-    /** @var list<string> */
-    private array $companies;
 
     public function __construct(
         private SourceFactsGatewayFacadeInterface $gateway,
         private SourceFactStore $store,
         private Connection $connection,
         private LoggerInterface $logger,
-        #[Autowire('%env(default::SOURCE_FACTS_COMPANIES)%')]
-        ?string $companies = null,
     ) {
-        $this->companies = array_values(array_filter(array_map(
-            static fn (string $id): string => strtolower(trim($id)),
-            explode(',', (string) $companies),
-        )));
-    }
-
-    /** Список компаний пуст — приём выключен. */
-    public function isEnabled(): bool
-    {
-        return [] !== $this->companies;
     }
 
     /**
      * @throws ServiceUnavailableException
-     * @throws ContractViolationException нарушен контракт списка пачек или ack — прогон остановлен
+     * @throws ContractViolationException  нарушен контракт списка пачек или ack — прогон остановлен
      */
     public function __invoke(): PullSourceFactsResult
     {
@@ -123,10 +106,6 @@ final readonly class PullSourceFactsAction
         if (null === $batch->companyId) {
             return $this->quarantine($batch, 'unknown_connection', null);
         }
-        if (!\in_array(self::ALL_COMPANIES, $this->companies, true) && !\in_array($batch->companyId, $this->companies, true)) {
-            return ['skipped', 0, null];
-        }
-
         $current = $this->store->currentRevision($batch);
         if ($batch->revision > $current) {
             // Фаза 1: загрузка страниц.

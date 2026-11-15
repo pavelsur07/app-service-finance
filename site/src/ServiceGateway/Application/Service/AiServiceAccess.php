@@ -10,16 +10,13 @@ use Doctrine\DBAL\Connection;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Переключатель ai-service и доступ компаний (ТЗ §4). Выключено, пока не заданы
- * `AI_SERVICE_ENABLED=true`, адрес и токен. Компанию подключает администратор
- * (`ai_company_access`, `/admin/users`); общий откат — переключателем. Компания платформы
+ * Настройка ai-service и доступ компаний (ТЗ §4). Выключено без адреса или токена. Компанию подключает администратор
+ * (`ai_company_access`, `/admin/users`). Компания платформы
  * ({@see AiTaskFacadeInterface::PLATFORM_COMPANY_ID}) включена вместе с сервисом.
  */
 final readonly class AiServiceAccess
 {
     public function __construct(
-        #[Autowire('%env(bool:AI_SERVICE_ENABLED)%')]
-        private bool $enabled,
         #[Autowire('%env(default::AI_SERVICE_BASE_URL)%')]
         private ?string $baseUrl,
         #[Autowire('%env(default::AI_SERVICE_API_TOKEN)%')]
@@ -30,7 +27,7 @@ final readonly class AiServiceAccess
 
     public function isEnabled(): bool
     {
-        return $this->enabled && '' !== (string) $this->baseUrl && '' !== (string) $this->token;
+        return '' !== (string) $this->baseUrl && '' !== (string) $this->token;
     }
 
     public function isEnabledForCompany(string $companyId): bool
@@ -49,7 +46,7 @@ final readonly class AiServiceAccess
             return [];
         }
         $enabled = $this->grantedCompanyIds($companyIds);
-        // Платформа не подключается администратором: ей достаточно общего выключателя.
+        // Платформа не подключается администратором: ей достаточно настройки сервиса.
         if (\in_array(AiTaskFacadeInterface::PLATFORM_COMPANY_ID, array_map('strtolower', $companyIds), true)) {
             $enabled[] = AiTaskFacadeInterface::PLATFORM_COMPANY_ID;
         }
@@ -71,7 +68,7 @@ final readonly class AiServiceAccess
     }
 
     /**
-     * Подключена ли компания администратором — без учёта общего выключателя (для админки).
+     * Подключена ли компания администратором — без учёта настройки сервиса (для админки).
      *
      * @param list<string> $companyIds
      *
