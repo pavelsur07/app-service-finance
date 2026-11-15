@@ -66,7 +66,7 @@ grant bindings и audience проверены. Исправлен реальны
 по существующим контрактам и источникам, не запуском отчётов. Все эти проверки
 явно входят в Phase 0/будущую приёмку; тесты и deploy не заявляются выполненными.
 
-## Итог проверки документов
+## Итог проверки документов после раунда 2
 
 Внутренняя сверка по коду: BLOCKER 0 / IMPORTANT 1, исправлен. Durable заявки
 и worker перенесены в проектируемый Mcp module, который владеет OAuth grants;
@@ -76,3 +76,29 @@ ServiceGateway от Mcp для проверки отзыва и цикл меж�
 решения до реализации; документация не означает согласия с рекомендациями.
 Проверены локальные ссылки, code fences, Stage 1–5 и tests-first Work items;
 `git diff --cached --check` — без ошибок. Изменены только эти три Markdown-файла.
+
+## Раунд 3 — повторный запрос владельца
+
+Проверен точный опубликованный commit `123e18134921dc17e20d15521cd331399f0bfc65`
+PR #3011. Claude CLI 2.1.323, effort medium, safe-mode, только Read/Glob/Grep;
+предыдущий review.md не передавался до формирования выводов.
+Процесс exit 0, итоговый маркер **REVIEW_FINDINGS**:
+**BLOCKER 1 / IMPORTANT 3 / MINOR 3**. [Полный отчёт](review-round-3.md).
+
+| Находка | Проверка и поправка плана после ревью |
+|---|---|
+| B1: SPA-хосты не пропускают MCP/OAuth/Twig | Подтверждено compose routers, frontend nginx и SpaHttpSubscriber. Оба MCP/AS/consent/approval перенесены в плане на существующий legacy app.vashfindir.ru; изоляция по path/firewall/context/audience. SPA boundary не меняется. Reauth-stamp связан с admin context и userId, а не просто cookie |
+| I1: statement_timeout не ограничивает весь отчёт | Подтверждены per-period/per-category запросы. Добавлены global report concurrency, monotonic execution budget с checkpoints внутри расчёта, SQL timeout по остатку времени и нагрузочная приёмка Stage 1/3 |
+| I2: один expiresAt неоднозначен после approve | approvalExpiresAt=preparedAt+5min, отдельно executeBy=approvedAt+5min; queued expiry и Busy-requeue имеют явные тесты и события |
+| I3: не задан durable audit/actor в worker | Shared AuditLog требует companyId и не подходит global ops. Запроектирован append-only AdminOperationEvent в транзакции со сменой состояния; worker явно передаёт initiatedBy/approvedBy/connection и system executor. Добавлены approvedAt/reauthAt/startedAt/finishedAt |
+| M1: list/get tasks раньше Entity | Перенесены в Stage 4 после AdminOperation |
+| M2: dispatcher создаёт неограниченные записи | Добавлены IP/client quotas, предел активных OAuth transactions, TTL и очистка |
+| M3: не описаны потомки проекта | В schema/description и parity cases закреплены descendants и отличие всех корней от полного набора UI choices |
+
+Внутренне проверены поправки по исходникам и согласованность документов;
+код приложения и production не менялись, runtime-тесты не запускались.
+Повторного независимого ревью исправленного B1 нет: бюджет трёх раундов
+AGENTS.md §7.2 исчерпан, четвёртый раунд автоматически не запускался.
+**REVIEW_GREEN не получен; результат внешнего ревью не объявляется зелёным.**
+PR возвращается в Draft. Решения D1–D6 и Phase 0 проверки по-прежнему открыты
+до зависимой реализации; документ не является разрешением на разработку/деплой.

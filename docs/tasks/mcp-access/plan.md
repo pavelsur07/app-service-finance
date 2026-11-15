@@ -50,6 +50,10 @@
   тарифе не заменять предположением. Остальную подготовку продолжать независимо.
 - [ ] Проверить 2–3 существующих образца: Api stateless auth, CompanyFacade
   financialAccess, Report builders и ServiceCoverageRefreshCommand.
+- [ ] Проверить ingress и SPA boundary по docker-compose.prod.yml,
+  docker/frontend/nginx.conf и SpaHttpSubscriber. Выбран существующий legacy
+  host app.vashfindir.ru для обоих MCP, AS и Twig consent/approval; SPA-хосты
+  не меняются. Проверить прохождение discovery в backend nginx на local/test.
 - [ ] Выбрать совместимые released версии `symfony/mcp-bundle` + `mcp/sdk`;
   если bundle не даёт изолировать два каталога и JSON-response transport,
   использовать SDK с тонким Symfony controller, сохраняя протокол в SDK.
@@ -85,21 +89,22 @@
 
 | Назначение | Host/path | Firewall / доступ |
 |---|---|---|
-| Пользовательский MCP | account host `/mcp` | отдельный stateless bearer, user audience |
-| Административный MCP | admin host `/mcp/admin` | отдельный stateless bearer, admin audience |
-| Resource metadata | `.well-known` для каждого resource | public, без сведений о подключениях |
-| AS metadata | account host `.well-known/oauth-authorization-server` | один canonical issuer; public; PKCE S256 |
-| OAuth authorize entry | account host `/oauth/authorize` | публичный stateless dispatcher, без login/consent и выдачи code |
-| OAuth token / revocation | account host `/oauth/token`, `/oauth/revoke` | stateless protocol firewall; без form_login redirect |
-| User login/consent | account host `/integrations/mcp/authorize` | существующий main context/form_login + consent POST с CSRF |
-| Admin login/consent | admin host `/admin/oauth/authorize` | существующий admin context/form_login + ROLE_ADMIN; POST с CSRF |
-| Подключения пользователя | account host `/integrations/mcp` | сессионный доступ к своим разрешённым grants |
-| Admin подключения/операции | admin host `/admin/mcp/*` | admin session, отдельные checks read/execute |
+| Пользовательский MCP | legacy app host `/mcp` | отдельный stateless bearer, user audience |
+| Административный MCP | legacy app host `/mcp/admin` | отдельный stateless bearer, admin audience |
+| Resource metadata | legacy app host `.well-known` для каждого resource | public, без сведений о подключениях |
+| AS metadata | legacy app host `.well-known/oauth-authorization-server` | один canonical issuer; public; PKCE S256 |
+| OAuth authorize entry | legacy app host `/oauth/authorize` | публичный stateless dispatcher, без login/consent и выдачи code |
+| OAuth token / revocation | legacy app host `/oauth/token`, `/oauth/revoke` | stateless protocol firewall; без form_login redirect |
+| User login/consent | legacy app host `/integrations/mcp/authorize` | существующий main context/form_login + consent POST с CSRF |
+| Admin login/consent | legacy app host `/admin/oauth/authorize` | существующий admin context/form_login + ROLE_ADMIN; POST с CSRF |
+| Подключения пользователя | legacy app host `/integrations/mcp` | main session, доступ к своим разрешённым grants |
+| Admin подключения/операции | legacy app host `/admin/mcp/*` | admin session, отдельные checks read/execute |
 
-Host'ы брать из канонической конфигурации существующих account/admin realms,
-не из неконтролируемого Host/X-Forwarded-Host. Resource audience — полный
+Legacy app host — `app.vashfindir.ru`, canonical origin задаётся сервером,
+не берётся из неконтролируемого Host/X-Forwarded-Host. Resource audience — полный
 канонический HTTPS URL endpoint. Один access token имеет ровно одну аудиторию.
-Admin matcher и оба MCP firewall стоят перед main; точные path boundaries,
+Точный admin MCP matcher стоит перед user MCP matcher, оба — перед main;
+user matcher не захватывает `/mcp/admin`. Точные path boundaries,
 trailing slash, encoded aliases и неправильный host закрываются, не падают
 в сессионный маршрут. Metadata соответствует RFC9728 для resource path;
 проверить discovery реальными выбранными клиентами.
@@ -125,6 +130,13 @@ session contexts не смешивать с ними. Каждый route при�
 Grant, auth code и refresh family привязаны к client+realm+resource;
 публичный клиент не может запросить admin resource. RS проверяет issuer,
 audience и эти связи по серверному grant, а не только строку scope.
+Main/admin на app-хосте имеют общую host-only session-cookie, но разные
+security context keys. Reauth-stamp связан с admin context, текущим userId
+и моментом входа; наличие main login/stamp не подтверждает admin-операцию.
+На account.vashfindir.ru/admin.vashfindir.ru MCP/OAuth/Twig paths остаются
+404 по существующему SPA boundary; новые Traefik/nginx исключения не нужны.
+Тесты проверяют один canonical host и раздельные context/audience/path;
+разделение по разным хостам не является обещанным security boundary.
 
 Resource server: 401 + WWW-Authenticate/resource_metadata для отсутствующего,
 истёкшего или неверного токена; недостаточные OAuth scopes — корректный 403
@@ -160,6 +172,7 @@ SDK/AS проверяет подпись JWT, issuer, audience/resource, expiry,
 | Authorization code | одноразовый, 60 секунд | одноразовый, 60 секунд |
 | Reauthentication для изменяющей admin-операции | — | не старше 5 минут |
 | Подтверждение заявки | — | 5 минут, одна версия и одна операция |
+| Начало исполнения после одобрения | — | executeBy = approvedAt + 5 минут |
 
 Обязательны PKCE S256, точный redirect URI, client/resource binding,
 server-side OAuth consent и state handling со стороны клиента. Refresh tokens
@@ -188,16 +201,27 @@ Tool metadata/annotations описывают поведение, но не сл�
 | Фильтры отчёта | до 20 project IDs и 20 ЦФО; принадлежность каждого ID проверяется |
 | Ответ | максимум 1 MiB; превышение — явная ошибка с предложением сузить период/разрез |
 | Общий rate limit | 60/min/connection и 60/min/user; failed auth 20/min/IP |
-| Дорогие отчёты | 10/min/company, не более 2 параллельно на компанию |
+| Дорогие отчёты | 10/min/company, не более 2 на компанию и 2 суммарно по приложению до измерения FPM capacity |
+| Анонимный OAuth dispatcher | 20/min/IP, 60/min/client, до 5 активных transaction/IP; TTL 10 минут, очистка просроченных записей |
 | Admin prepare | 5/min/operator; один активный refresh на сервис |
-| Report request budget | 10 секунд; валидировать не только HTTP, но и DB statement timeout |
+| Report request budget | общий wall-clock deadline 10 секунд через checkpoints расчёта и ограничение каждого SQL остатком времени |
 | Внутренний GET coverage | connect <=2s, total <=10s, без бесконечных повторов |
 | Transport | request/response JSON; без долгоживущего server GET SSE stream |
 
 Числа — предложенные лимиты, не измеренная производительность. До общего
 выпуска подтвердить нагрузкой на обезличенных локальных данных. Ограничения
 применяются до дорогой работы; concurrency lease освобождается при ошибке и
-протухает при crash. Не обрезать финансовый отчёт молча. На первом выпуске
+протухает при crash. Глобальная quota реализуется тем же Redis limiter/lock,
+не отдельной инфраструктурой; отказ не занимает FPM дорогим расчётом.
+statement_timeout сам по себе ограничивает один SQL, а не весь отчёт.
+Передавать доверенный monotonic deadline из report adapter через необязательный
+execution budget в PlReportGridBuilder/PlReportCalculator/FactsProvider и
+ДДС builder; проверять до/после периодов, обхода статей и DB-вызовов.
+Каждому SQL задавать timeout не больше остатка budget и восстанавливать
+параметры соединения после запроса. При исчерпании — целиком timeout error,
+без частичных итогов; формулы, порядок суммирования и UI default не менять.
+Лимит колонок ОПиУ окончательно выбрать по измерениям Stage 1/3, не объявлять
+31 колонку доказанно безопасной. Не обрезать финансовый отчёт молча. На первом выпуске
 не добавлять новый report cache; при появлении ключ обязательно включает
 company/права/фильтры и формат. Существующие кеши builders проверить на scope.
 
@@ -217,10 +241,12 @@ company/права/фильтры и формат. Существующие ке
 | `site/src/Mcp/Tool/{Account,Admin}/*` (новые) | Тонкие SDK handlers с разделённой регистрацией |
 | `site/src/Report/Facade/{ReportFacadeInterface,ReportFacade}.php`, `Application/DTO/*` (новые) | Полные read-контракты ДДС/ОПиУ без сессии, общий расчёт |
 | `site/src/Finance/Facade/FinanceFacade.php` (изменение) | Узкий read-метод готового ОПиУ через существующий builder |
+| `site/src/Finance/{Report,Facts}/*`, `site/src/Report/Cashflow/CashflowReportBuilder.php` (точечные изменения) | Необязательный execution budget/checkpoints без изменения финансовой семантики |
 | `site/src/Cash/Facade/CashFacade.php` (изменение) | Пагинированная безопасная проекция счетов; не возвращать остатки по умолчанию |
 | `site/src/ServiceGateway/Facade/{ServiceOperationsFacadeInterface,ServiceOperationsFacade}.php` (новые) | Общий доступ к витрине и единственному поддержанному типу операций |
 | `site/src/ServiceGateway/Application/Service/CoverageRefreshCoordinator.php` (новый) | Одна общая блокировка и вызов существующего refresh Action для cron и Facade |
 | `site/src/Mcp/Entity/AdminOperation.php`, `Repository/AdminOperationRepository.php` (новые) | Durable состояния, attempts/lease/idempotency административных заявок |
+| `site/src/Mcp/Entity/AdminOperationEvent.php`, `Repository/AdminOperationEventRepository.php` (новые) | Append-only durable audit переходов без фиктивной company ID |
 | `site/src/Mcp/Application/Action/{PrepareCoverageRefreshAction,PrepareTaskRetryAction,ApproveAdminOperationAction}.php`, `Command/ProcessAdminOperationsCommand.php` (новые) | prepare/approve/claim/execute; без Request/Security в worker |
 | `site/src/ServiceGateway/Command/ServiceCoverageRefreshCommand.php` (изменение) | Общая с новым worker per-service блокировка без изменения cron-семантики |
 | `site/src/Company/Facade/CompanyFacade.php`, `Application/DTO/*` (изменение/новый DTO) | Бессессионное чтение реальных platform roles по userId |
@@ -265,6 +291,8 @@ Company global role lookup — явно документированное ident
   Отсутствующий фильтр = null, пустой список = invalid filter; после проверки
   всех ID полный набор доступных UI choices = null, частичный — явный набор.
   null включает нераспределённые факты, как UI; чужие ID не отбрасывать молча.
+  Выбранные проекты включают потомков; все корни не равны полному набору
+  UI choices и не превращаются в null. Добавить этот случай в parity tests.
   Дедупликация/порядок ID не меняют семантику; from>to — явная ошибка схемы.
   FinanceFacade добавляет `readProfitLoss(string $companyId, ProfitLossReadRequest $request): ProfitLossReportData`
   с DTO в Finance/Application/DTO; адаптер вызывает PlReportGridBuilder внутри
@@ -285,6 +313,10 @@ Company global role lookup — явно документированное ident
   о liveness. Неверный service/месяц — domain error до запроса к сервису.
 - [ ] **1.5:** обновить ARCHITECTURE.md; модульные проверки, полное внутреннее
   ревью Stage diff, исправления, Stage Report и commit/push в task Draft PR.
+  До закрытия Stage измерить query count/wall-clock на обезличенных больших
+  деревьях и периодах; тест budget exhaustion внутри периода/статьи должен
+  прерывать расчёт и возвращать timeout без данных. Зафиксировать безопасный
+  лимит колонок и global concurrency либо уменьшить допустимый запрос.
 
 **Проверки:** Report/Cash/Finance focused tests, архитектурные границы и
 ServiceCoverageMonthQueryTest. **Reviewer focus:** финансовый паритет,
@@ -327,7 +359,7 @@ AS vs resource server ошибки, отказ при невозможности
 ## Stage 3 — пользовательские tools и административная диагностика
 
 **Risk:** HIGH-LOCAL. **stage_base_commit:** записать перед 3.1.
-**DoD:** все чтения из TASK.md имеют схемы, policy и ограниченные ответы;
+**DoD:** четыре user tools и admin status/coverage имеют схемы, policy и ограниченные ответы;
 проверенный клиент получает совпадающие с UI отчёты, ops не раскрывает payload.
 
 - [ ] **3.1, tests first:** `McpToolPolicyCoverageTest`, `McpReportToolsTest`,
@@ -336,13 +368,14 @@ AS vs resource server ошибки, отказ при невозможности
 - [ ] **3.2:** зарегистрировать четыре пользовательских tools; компания из
   McpUserPrincipal, данные через Stage 1 Facade. Нельзя использовать
   ReportApiKey, `/api/public/reports/*` или browser active_company_id.
-- [ ] **3.3:** диагностические tools admin; get_service_status/coverage через
-  ServiceOperationsFacade. List/get tasks пока читают только operations,
-  определённые в Stage 4 и созданные через MCP; cron-попытки не изобретать
-  задним числом. Тесты задают явные fixtures этого контракта.
-  Не заявлять готовность всего admin-каталога до интеграции Stage 4.
+- [ ] **3.3:** диагностические tools admin get_service_status/coverage через
+  ServiceOperationsFacade. List/get tasks реализуются в Stage 4 после
+  появления AdminOperation; не создавать fixtures несуществующей Entity.
 - [ ] **3.4:** ограничения §2, SDK error mapping, Origin/Content-Type, no-store,
   ограниченный JSON response. Тестировать очистку quota lease после исключения.
+  Глобальная конкуренция разных компаний также ограничена; нагрузочный
+  тест подтверждает deadline и отсутствие насыщения общего с UI FPM-пула
+  до закрытия Stage, а не только при handoff.
 - [ ] **3.5:** проверить реальные выбранные клиенты на local/test с фиктивными
   компаниями; это compatibility acceptance, а не production company pilot.
   Данные на внешнюю LLM не отправлять без отдельной авторизации таких вызовов.
@@ -362,13 +395,22 @@ AS vs resource server ошибки, отказ при невозможности
   `McpAdminApprovalTest`, `ServiceCoverageLockTest`: подмена параметров/actor,
   approve чужим соединением, просроченное подтверждение, двойной POST,
   loss of role перед worker, crash после commit, cron vs worker race.
+  Добавить границы approvalExpiresAt/executeBy, approve за 30 секунд до
+  исходного срока и Busy-requeue после executeBy; проверить явного actor в CLI.
 - [ ] **4.2:** Mcp/AdminOperation и миграция: id, kind, service, immutable arguments,
-  actor/connection, parentOperationId, version, status, expiresAt, timestamps,
+  initiatedBy/connection, approvedBy, approvedAt, reauthAt, startedAt, finishedAt,
+  approvalExpiresAt, executeBy, parentOperationId, version, status, timestamps,
   idempotency hash, leaseUntil, attempt/error code. Уникальность по
   connection+kind+idempotency key; индекс status/leaseUntil/createdAt;
   partial unique на service для status IN (queued,running), prepared не
   занимает слот. Для global admin не создавать
   фиктивную company ID. Business/company repositories не теряют scope.
+  AdminOperationEvent хранит operationId, sequence, transition, initiatedBy,
+  approvedBy, executorKind/userId, connectionId, occurredAt, безопасный code
+  и hash параметров; unique(operationId,sequence). Вставка события и CAS
+  версии/статуса — одна транзакция; старые события не обновляются.
+  Shared AuditLog требует non-null companyId и не подходит для глобальной
+  операции: не добавлять фиктивную компанию и не менять его общий контракт.
 - [ ] **4.3:** Actions внутри Mcp имеют `__invoke`:
   `PrepareCoverageRefreshAction(AdminOperationActor $actor, string $service, string $reason, string $idempotencyKey): AdminOperationView`,
   `PrepareTaskRetryAction(AdminOperationActor $actor, string $taskId, int $expectedVersion, string $reason, string $idempotencyKey): AdminOperationView`,
@@ -380,10 +422,17 @@ AS vs resource server ошибки, отказ при невозможности
   approval context — только из admin session, с connection/reauth proof.
   Prepare и approve Actions владеют транзакциями: параметры/аудит/состояние
   сохраняются атомарно, ключи не генерируются заново при retry.
+  List/get tasks читают только MCP-created AdminOperation и события с
+  разрешённой проекцией, не cron history и не payload.
 - [ ] **4.4:** конечный lifecycle:
   `prepared -> queued -> running -> succeeded|failed_retryable|failed_permanent`;
   до running возможны `expired|cancelled`. Approve переводит prepared в queued
-  в той же транзакции, что аудит. Одна операция — одна попытка; succeeded,
+  в той же транзакции, что событие AdminOperationEvent. Prepared имеет
+  approvalExpiresAt=preparedAt+5min; approve отдельно фиксирует
+  executeBy=approvedAt+5min. До claim и после Busy-requeue executeBy
+  проверяется заново; истёкшая queued -> expired с событием, без исполнения.
+  Начатая вовремя операция ограничена своим lease/budget, а не новым
+  отсчётом срока подтверждения. Одна операция — одна попытка; succeeded,
   failed_retryable и failed_permanent терминальные. Автоматических retry и
   backoff нет. Истёкший running lease переводится в failed_retryable после
   проверки отсутствия живого исполнителя под общей service-блокировкой.
@@ -400,7 +449,7 @@ AS vs resource server ошибки, отказ при невозможности
   HTTP/DB budget; при потере lock/lease финализация запрещена и пишется ошибка.
   При занятом service lock coordinator бросает CoverageRefreshBusyException:
   worker возвращает заявку в queued, очищает lease и не расходует попытку;
-  expiry проверяется до следующего claim. Не держать DB row transaction в HTTP.
+  executeBy проверяется до следующего claim. Не держать DB row transaction в HTTP.
   ServiceOperationsFacade добавляет
   `refreshCoverage(string $service): RefreshServiceCoverageResult` и вызывает
   существующий RefreshServiceCoverageAction через coordinator; cron
@@ -411,6 +460,10 @@ AS vs resource server ошибки, отказ при невозможности
   permanent; неизвестные виды запрещены. Admission и mutation audit обязателен,
   ошибка сохранения approval audit откатывает queued transition. Метрики и
   denial events без сырого error текста/аргументов. Stage checks/review/report/commit.
+  Worker берёт initiatedBy/approvedBy/connection из строки заявки и передаёт
+  их в аудит явно, executorKind=system; не пытается получить User из
+  AuditContextProvider в CLI. Расширение провайдера в Stage 2 относится
+  только к HTTP MCP; performer не подменяет инициатора или подтверждающего.
 
 **Проверки:** Mcp integration concurrency + ServiceGateway shared lock test + Mcp admin functional set,
 не вызывать настоящие services/provider API. **Reviewer focus:** lease/crash,
@@ -454,7 +507,8 @@ durable enqueue, shared cron lock, approval state и потеря роли/conne
 Пользователь сам явно подключается; никто не получает токен автоматически.
 Никакого второго owner gate «включить MCP после merge» в обычный релиз не добавлять.
 Нет нового публичного доступа к services/ или нового домена; использовать
-существующие ingress account/admin hosts, проверить их маршрутизацию.
+существующий ingress legacy app-host. SPA host routing и его запреты не
+менять; необходимость иного ingress — отдельный scope и named approval.
 
 ## Команды проверок будущей реализации
 
