@@ -1,22 +1,22 @@
 {% extends 'balance/layout.html.twig' %}
 {% import 'balance/_macros.html.twig' as ui %}
 {% block balance_content %}
-    <div class="wz-head">
-        <h1 class="wz-title">Сравнение двух дат</h1>
-    </div>{{ ui.period(from, to) }}
+    <div class="vf-page-head">
+        <h1 class="page-title d-block">Сравнение двух дат</h1>
+    </div>{{ ui.period(from, to, true) }}
     {% if not comparison.before.initialized or not comparison.after.initialized %}
-        <div class="wz-row">
-            <div class="alert alert--info" role="status"><div class="a-body"><p class="a-text">На одной из выбранных дат учет еще не начат.</p></div></div>
+        <div class="d-flex flex-wrap gap-3 mb-4">
+            <div class="alert alert-info" role="status"><div><p class="mb-0">На одной из выбранных дат учет еще не начат.</p></div></div>
         </div>
     {% endif %}
-    <section class="card report-scroll">
-        <table class="t-table">
+    <section class="card vf-card mb-4"><div class="card-body">
+        <div class="table-responsive"><table class="table table-vcenter vf-table">
             <thead>
                 <tr>
                     <th>Счет / статья</th>
-                    <th class="t-cell--right">{{ ui.col(ui.date(from), currency) }}</th>
-                    <th class="t-cell--right">{{ ui.col(ui.date(to), currency) }}</th>
-                    <th class="t-cell--right">{{ ui.col('Изменение', currency) }}</th>
+                    <th class="text-end text-nowrap">{{ ui.col(ui.date(from), currency) }}</th>
+                    <th class="text-end text-nowrap">{{ ui.col(ui.date(to), currency) }}</th>
+                    <th class="text-end text-nowrap">{{ ui.col('Изменение', currency) }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -24,18 +24,18 @@
                     <tr>
                         <td>
                             <a href="{{ path('balance_account_card', {id: row.id, from: from, to: to}) }}">{{ row.name }}</a>
-                            <p class="t-sub">{{ row.article_name }}</p>
+                            <p class="text-secondary small mb-0">{{ row.article_name }}</p>
                         </td>
                         {% for key in ['before', 'closing', 'change'] %}
-                            <td class="t-cell--right">{{ ui.amount(attribute(row, key), currency) }}</td>
+                            <td class="text-end text-nowrap">{{ ui.amount(attribute(row, key), currency) }}</td>
                         {% endfor %}
                     </tr>
                 {% else %}
                     <tr>
-                        <td class="t-empty" colspan="4">Нет учетных счетов.</td>
+                        <td class="text-center text-secondary py-5" colspan="4">Нет учетных счетов.</td>
                     </tr>
                 {% endfor %}
             </tbody>
-        </table>
-    </section>
+        </table></div>
+    </div></section>
 {% endblock %}

@@ -9,8 +9,8 @@
 
 | Shell | Кто наследует | Стили |
 |---|---|---|
-| `_layout/legacy.html.twig` (через `base.html.twig`) | легаси-страницы на Tabler, 153 файла | Tabler CDN + `design-tokens.css` + `vf-custom-classes.css` + `legacy-app.css` |
-| `_layout/app.html.twig` | новый слой: Баланс, Взаиморасчёты, API, Бюджет | кит `assets/styles/kit/` через `app.css` |
+| `_layout/legacy.html.twig` (через `base.html.twig`) | легаси-страницы на Tabler, включая Баланс через `balance/layout` | Tabler CDN + `design-tokens.css` + `vf-custom-classes.css` + `legacy-app.css` |
+| `_layout/app.html.twig` | новый слой: Взаиморасчёты, API, Бюджет | кит `assets/styles/kit/` через `app.css` |
 | `admin/base.html.twig` | админка | кит + `admin_shell` |
 
 Новая страница в существующем модуле наследует layout модуля

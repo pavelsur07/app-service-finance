@@ -1,16 +1,16 @@
 {% extends 'balance/layout.html.twig' %}
 {% import 'balance/_macros.html.twig' as ui %}
-{% form_theme form 'balance/_form_theme.html.twig' %}
+{% form_theme form 'bootstrap_5_layout.html.twig' %}
 {% block balance_content %}
-    <div class="wz-head">
-        <h1 class="wz-title">Права учета баланса</h1>
+    <div class="vf-page-head">
+        <h1 class="page-title d-block">Права учета баланса</h1>
     </div>
-    <section class="card">
+    <section class="card vf-card mb-4"><div class="card-body">
         <p>Права Balance действуют вместе с финансовым доступом к компании. Владелец управляет настройками. Снятие всех флажков отзывает дополнительные права.</p>{{ form_start(form) }}{{ form_widget(form) }}
-        <button class="btn btn-md btn-primary">Сохранить права</button>{{ form_end(form) }}
-    </section>
-    <section class="card report-scroll">
-        <table class="t-table">
+        <button class="btn btn-primary">Сохранить права</button>{{ form_end(form) }}
+    </div></section>
+    <section class="card vf-card mb-4"><div class="card-body">
+        <div class="table-responsive"><table class="table table-vcenter vf-table">
             <thead>
                 <tr>
                     <th>Участник</th>
@@ -37,11 +37,11 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td class="t-empty" colspan="5">Дополнительные права не назначены.</td>
+                        <td class="text-center text-secondary py-5" colspan="5">Дополнительные права не назначены.</td>
                     </tr>
                 {% endfor %}
             </tbody>
-        </table>
-        {{ ui.pager(pager) }}
-    </section>
+        </table></div>
+        {{ ui.pager(pager, app.request.attributes.get('_route'), app.request.query.all) }}
+    </div></section>
 {% endblock %}

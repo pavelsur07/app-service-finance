@@ -1,0 +1,11 @@
+/* Local layout only: controls, cards, tables and money use Tabler and legacy DS. */
+.vf-balance { min-width: 0; }
+.vf-balance .vf-page-head h1 { min-width: 0; overflow-wrap: anywhere; }
+.vf-balance .balance-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: var(--vf-space-4); }
+.vf-balance .balance-kpis > .card { min-width: 0; }
+.vf-balance [data-balance-value] { overflow-wrap: anywhere; }
+.vf-balance .balance-tree[data-level="1"] { font-weight: var(--vf-weight-semibold); }
+.vf-balance .balance-tree[data-level="2"] { padding-inline-start: var(--vf-space-6); }
+.vf-balance .balance-tree[data-level="3"] { padding-inline-start: var(--vf-space-7); }
+.vf-balance .balance-tree[data-level="4"] { padding-inline-start: var(--vf-space-8); }
+.vf-balance .table-responsive { max-width: 100%; overflow-x: auto; }
