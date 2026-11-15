@@ -21,7 +21,7 @@ Twig/Tabler, PHPUnit. Новых зависимостей, Messenger/cron и Rea
 
 ## Global Constraints
 
-- Это план, реализация не начата. Текущая поставка — только эти документы.
+- Владелец разрешил автономную реализацию четырёх Stage. Выпуск отдельно на handoff.
 - Реализация Large, HIGH-LOCAL: четыре Stage, backend отдельно от frontend.
 - Компания и actor определяются сервером. Межмодульные данные — только Facade.
 - Ozon/Wildberries отдельно, в выбранном подключении. Internal Catalog,
@@ -245,7 +245,7 @@ Files: новые Policy/Decision/Candidate/Page DTO, DecisionStatus, три Que
 tests/Integration/MoySklad/AutomaticMappingCandidatesQueryTest.php,
 AutomaticMappingPreviewQueryTest.php, MappingCharacteristicsQueryTest.php.
 
-- [ ] **1.1 RED:** тесты точного article, регистра/001 vs1, variant own article,
+- [x] **1.1 RED:** тесты точного article, регистра/001 vs1, variant own article,
   parent article+size, TAB/CR краёв и неприравнивания NBSP, дубликатов (включая архивный), неархивного ребёнка
   архивного parent, parent с variants_count0 но реальными children,
   двух цветов размераM, неизвестного размера, «0», отсутствующей и
@@ -253,13 +253,13 @@ AutomaticMappingPreviewQueryTest.php, MappingCharacteristicsQueryTest.php.
   двух правил с одним target и двух разных targets, inactive/current/clear.
   Assert READY только при доказанно единственной доступной leaf-цели;
   ambiguous/unresolved cases имеют target=null. Запустить: ожидается RED.
-- [ ] **1.2 RED:** integration fixtures foreign company/connection, одинаковый
+- [x] **1.2 RED:** integration fixtures foreign company/connection, одинаковый
   externalId двух подключений, 51 candidates (нужный размер у 51-го),
   100 articles и101 rejected, numeric article keys, pagination characteristics,
   query count1 vs25. Ожидается RED на отсутствующих Query/контрактах.
-- [ ] **1.3 GREEN:** минимальные pure policy и set-based Query; no SELECT *,
+- [x] **1.3 GREEN:** минимальные pure policy и set-based Query; no SELECT *,
   no raw чужих таблиц, no per-listing SQL loop. Переиспользовать Facade/state.
-- [ ] **1.4 VERIFY/REVIEW:** narrow tests → module set, focused PHPStan/CS,
+- [x] **1.4 VERIFY/REVIEW:** narrow tests → module set, focused PHPStan/CS,
   EXPLAIN на50k fixture targets; self-review scope/tenant/ambiguity. Обновить
   ARCHITECTURE/checkpoint/StageReport. Commit/push Draft PR, продолжить Stage2.
 

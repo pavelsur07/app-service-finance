@@ -5800,6 +5800,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.198 | 2026-11-15 | MoySklad: pure policy автомаппинга, bounded candidates/preview/характеристики; общий CatalogTargetDTO::fromRow |
 | 2.197 | 2026-11-15 | MarketplaceWb: черновики ИИ для кодов WB (этап 8.3b) — `RequestWbSourceTypeDraftsAction`, `WbSourceTypeDraftConsumer`, колонка черновика на экране кодов; ServiceGateway: результат ИИ получают все потребители его task_type |
 | 2.196 | 2026-11-15 | Отчёты нового контура по двум каналам (этап 8.5): фильтр канала в R1/R2, метка канала у SKU и в xlsx, строки каналов в R3; R10 сверяет WB со своим каналом — фасад `MarketplaceWbFacadeInterface::dayStates` |
 | 2.195 | 2026-11-15 | MoySklad: отдельные legacy-вкладки Ozon/Wildberries, выбор подключения, локальный поиск, ручное назначение/снятие связи и история; READ/WRITE, CSRF, CAS и bounded-пагинация |
@@ -6114,6 +6115,18 @@ Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/defa
 `ApiScopeCatalog`: explicit resources/actions/presets, all disconnected. `ApiScopePolicy::effectiveScopes(selected,enabled,connected)` даёт только известное пересечение. ApiKey хранит JSON selectedScopes/enabledResources с пустыми defaults. `SaveApiKeyPermissionsAction(companyId,userId,keyId,selectedScopes,enabledResources,expectedVersion): ApiKey` проверяет владельца и optimistic version под scoped row lock;409 требует перечитать, unknown scope/enable disconnected422, no-op без аудита. Отдельная миграция20260913090200; подключение модуля не включает ресурс старого ключа. Principal несёт preparedScopes/effectiveScopes, ApiAccessSubscriber требует известный effective scope либо auth.check; тестовые endpoints толькоenv=test.
 
 ## MoySklad: подключение и проверка доступа
+
+Автомаппинг v1 использует `AutomaticListingMappingPolicy`: точный собственный
+article либо parent.article + размер по явно выбранному ID характеристики.
+Нормализуется только краевой ASCII whitespace, регистр/нули/NBSP сохраняются.
+`AutomaticMappingCandidatesQuery` одним scoped SQL получает максимум50 целей
+на артикул (до100 артикулов); truncation и неразрешимые размеры запрещают READY.
+Архивные дубли участвуют в неоднозначности, parent с детьми не является leaf.
+`AutomaticMappingPreviewQuery` обрабатывает только текущие25 листингов через
+MarketplaceFacade; существующие ревизии, включая clear, не предлагаются.
+`MappingCharacteristicsQuery` выдаёт по20 непрозрачных ID из локального JSONB.
+Никакой записи и внешнего HTTP в этих Query нет.
+
 
 Legacy UI маппинга размещён в `templates/moy_sklad/mappings/` под общим
 `moy_sklad/layout.html.twig`: отдельные вкладки Ozon и Wildberries используют

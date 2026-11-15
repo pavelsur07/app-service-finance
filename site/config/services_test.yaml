@@ -1,4 +1,10 @@
 services:
+    App\MoySklad\Infrastructure\Query\AutomaticMappingCandidatesQuery:
+        public: true
+    App\MoySklad\Infrastructure\Query\MappingCharacteristicsQuery:
+        public: true
+    App\MoySklad\Infrastructure\Query\AutomaticMappingPreviewQuery:
+        public: true
     App\MoySklad\Application\Action\ChangeListingMappingAction:
         public: true
     App\MoySklad\Infrastructure\Query\MoySkladCatalogTargetsQuery:
