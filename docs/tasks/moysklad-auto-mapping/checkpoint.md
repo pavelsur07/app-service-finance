@@ -1,7 +1,7 @@
 # Current checkpoint
 
 **Phase:** Stage 4 / Work item 4.1
-**Status:** Stage3 complete; Stage4 RED4 recorded
+**Status:** Stage4 code complete; handoff gates/browser in progress
 **Task base / Stage 1 base:** `0658c9fc6a3c4c3519f6e254d6669200b6a38753`
 **Branch:** feat/moysklad-auto-mapping
 **PR:** #3023 https://github.com/pavelsur07/app-service-finance/pull/3023
@@ -53,3 +53,5 @@ Stage2 module449/1868 PASS, no open B/I.
 Stage3 base30a98e5a7. Targeted45/194, concurrency7/66, module469/1988, focused CS/Stan PASS. Mutation locks RED2/RED1 expected; restored. Stage4 prep only in ignored scratch while review pending.
 
 Stage3 external1 round IMPORTANT3+MINOR1 fixed without re-run; regression25/138; finalmodule474/2006; focused CS/Stan PASS. No openB/I. Stage4 scratch RED4 missing UI.
+
+Stage4 RED4→GREEN8/68; focused CS/Stan46 PHP files PASS. Legacy controllers/forms/Twig, RBAC/CSRF/tampered selection/characteristic scope/partial apply+fresh EM retry/cache-after-commit503 tested. Full gates running once. Browser test fixture cookie wiring corrected for MockFileSessionStorageFactory (ignores HTTP cookies by design).

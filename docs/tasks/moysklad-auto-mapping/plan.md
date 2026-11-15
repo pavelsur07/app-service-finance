@@ -340,12 +340,12 @@ POST `/automatic/preview` (READ+CSRF), GET `/automatic/{previewId}` (READ),
 POST `/automatic/{previewId}/apply` (READ+WRITE+CSRF). Requirement UUID для
 connectionId/previewId; marketplace только ozon|wildberries.
 
-- [ ] **4.1 RED:** выбор правил/характеристики, source page25/q<=100,
+- [x] **4.1 RED:** выбор правил/характеристики, source page25/q<=100,
   обе вкладки и одинаковый nmId с разными размерами, READY checkboxes,
   disabled reasons, foreign/bad IDs/other provider404, invalid CSRF403,
   malformed arrays/limits422, source/CAS conflicts в summary, истёкшая сессия,
   повтор POST и replay после последующего manual clear. Нет WRITE -> нельзя apply.
-- [ ] **4.2 GREEN:** кнопка «Найти соответствия на этой странице», явный выбор
+- [x] **4.2 GREEN:** кнопка «Найти соответствия на этой странице», явный выбор
   характеристики размера по id (bounded list20 с поиском), таблица с причиной,
   правилами и текущей целью, READY по умолчанию выбраны, остальные disabled.
   Селектор/поиск характеристики на index использует char_q/char_page и

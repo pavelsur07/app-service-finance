@@ -6146,8 +6146,20 @@ caller transaction, возвращает свежий DBAL DTO, не Entity из
 Audit listing_snapshot.autoMapping хранит origin/preview/rule/fingerprint/
 characteristic/matchedRules. Replay проверяет полный payload и guard прежде
 новой валидации каталога, поэтому не восстанавливает последующий manual clear.
+При занятом catalog lock SyncCatalogAction выдаёт существующую категорию
+`temporary`: Handler планирует штатный retry, вместо потери запуска. Auto
+source/target lock wait ограничен LOCAL lock_timeout2s. Manual snapshot не
+наследует autoMapping прежней ревизии при отсутствующем source.
 Технический сбой останавливает остаток; ACCEPTED включает прежний request,
 CONFLICT/FAILED/NOT_PROCESSED отдельны; закрытый EM не переиспользуется.
+Legacy index содержит bounded поиск/выбор характеристики и POST preview
+(READ+CSRF), Show GET привязан к полному scope, Apply POST требует READ+WRITE
+и CSRF. Показанный контекст характеристики включён в CSRF id/form action;
+свой ID вне ChoiceType422, неизвестный/чужой404. Клиент передаёт только
+selectedIds из25 READY; target/rule/requestId берутся из Redis envelope.
+POST сохраняет отдельный server attemptId →303 GET со свежим EM/current
+states; ACCEPTED не выдаётся за число новых ревизий или актуальную связь.
+Cache failure после commit возвращает честный503 без ORM-render.
 
 
 Legacy UI маппинга размещён в `templates/moy_sklad/mappings/` под общим

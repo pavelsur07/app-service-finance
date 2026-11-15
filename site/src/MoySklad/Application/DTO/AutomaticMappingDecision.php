@@ -22,4 +22,12 @@ final readonly class AutomaticMappingDecision
         Assert::true((AutomaticMappingDecisionStatus::READY === $status) === (null !== $target));
         $this->reason = $status->label();
     }
+
+    /** @return list<string> */
+    public function getRuleLabels(): array
+    {
+        return array_map(static fn (string $rule): string => match ($rule) {
+            'direct_article' => 'Артикул позиции', 'parent_article_size' => 'Артикул родителя и размер', default => $rule,
+        }, $this->matchedRules);
+    }
 }

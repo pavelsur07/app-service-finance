@@ -1,0 +1,68 @@
+{% extends 'moy_sklad/layout.html.twig' %}
+
+{% block title %}МойСклад — Автомаппинг {{ providerName }}{% endblock %}
+{% block integration_title %}Автомаппинг {{ providerName }}{% endblock %}
+
+{% block integration_content %}
+    {% set backParams = {connectionId: mappingConnectionId, marketplace: mappingMarketplace} %}
+    {% if preview is null %}
+        <div class="alert alert-warning">Предпросмотр истёк или недоступен. Сформируйте новый. Если применяли связи, проверьте их текущее состояние и историю.</div>
+        <a class="btn" href="{{ path('moysklad_listing_mappings', backParams) }}">Вернуться к листингам</a>
+    {% else %}
+        {% set backParams = backParams|merge({q: preview.q, page: preview.page, sizeCharacteristicId: preview.sizeCharacteristicId ?? ''}) %}
+        <section data-automatic-mapping-preview="{{ preview.id }}">
+            <p class="text-secondary text-break">{{ connection.name }} · На этой странице: {{ preview.counts.total_shown }}. Однозначных соответствий: {{ preview.counts.ready }}. Предпросмотр действует 15 минут.</p>
+            <p>Проверьте позиции перед применением. Существующие и снятые связи не заменяются. Изменившиеся данные будут отклонены.</p>
+            {% if result %}
+                <div class="alert {{ result.conflicts or result.failed or result.notProcessed ? 'alert-warning' : 'alert-success' }}" data-automatic-result role="status">
+                    Принято запросов: {{ result.accepted }}. Конфликтов: {{ result.conflicts }}. Ошибок: {{ result.failed }}. Не обработано: {{ result.notProcessed }}.
+                    <div>Принятый запрос мог быть сохранён ранее. Текущее состояние связей показано отдельно.</div>
+                    <ul class="mb-0">
+                        {% for row in result.items %}<li class="text-break">{{ listingLabels[row.listingId] }}: {{ row.status.label }}{% if row.reason %} — {{ row.reason }}{% endif %}</li>{% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+            {% if applyForm %}{{ form_start(applyForm, {attr: {'data-automatic-apply': ''}}) }}{% endif %}
+            <div class="card mb-3">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead><tr><th>Выбор</th><th>Листинг {{ providerName }}</th><th>Артикул / размер</th><th>Предложенная позиция</th><th>Основание</th><th>Текущее состояние</th></tr></thead>
+                        <tbody>
+                            {% for item in preview.items %}
+                                <tr data-automatic-listing-id="{{ item.listingId }}">
+                                    <td>
+                                        {% if applyForm and item.decision.status.value == 'ready' %}
+                                            {% for checkbox in applyForm.selectedIds %}
+                                                {% if checkbox.vars.value == item.listingId %}{{ form_widget(checkbox, {attr: {'aria-label': 'Сопоставить ' ~ item.source.sku}}) }}{% endif %}
+                                            {% endfor %}
+                                        {% else %}
+                                            <input type="checkbox" class="form-check-input" disabled aria-label="Недоступно для {{ item.source.sku }}">
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-break">{{ item.source.title ?? item.source.sku }}<div class="text-secondary">{{ item.source.sku }}</div></td>
+                                    <td class="text-break">{{ item.source.supplierSku ?? '—' }}<div class="text-secondary">{{ item.source.size ?? '—' }}</div></td>
+                                    <td class="text-break">
+                                        {% if item.decision.target %}
+                                            {{ item.decision.target.name }}<div class="text-secondary">{{ item.decision.target.typeLabel }} · {{ item.decision.target.article ?? '—' }}</div>
+                                            {% for characteristic in item.decision.target.characteristics %}<div class="text-secondary">{{ characteristic.name }}: {{ characteristic.value }}</div>{% endfor %}
+                                        {% else %}—{% endif %}
+                                    </td>
+                                    <td class="text-break">{{ item.decision.reason }}{% for rule in item.decision.ruleLabels %}<div class="text-secondary">{{ rule }}</div>{% endfor %}</td>
+                                    <td class="text-break" data-current-state>
+                                        {% set state = states[item.listingId] %}
+                                        {{ state.statusLabel }}
+                                        {% if state.target %}<div class="text-secondary">{{ state.target.name }}</div>{% endif %}
+                                        {% if state.status == 'needs_review' %}<div class="text-secondary">{{ state.reasonLabel }}</div>{% endif %}
+                                        {% if state.revision > 0 %}<a href="{{ path('moysklad_listing_mapping_history', {connectionId: mappingConnectionId, marketplace: mappingMarketplace, listingId: item.listingId}) }}">История</a>{% endif %}
+                                    </td>
+                                </tr>
+                            {% else %}<tr><td colspan="6" class="text-secondary text-center py-4">На этой странице листингов нет.</td></tr>{% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% if applyForm %}<button class="btn btn-primary mb-3" type="submit">Применить выбранные соответствия</button>{{ form_end(applyForm) }}{% endif %}
+            <a class="btn mb-3" href="{{ path('moysklad_listing_mappings', backParams) }}">Вернуться к листингам</a>
+        </section>
+    {% endif %}
+{% endblock %}
