@@ -309,26 +309,26 @@ MoySkladSchemaExtension, `ARCHITECTURE.md` только при появлени�
 
 ## Stage 1: DTO-контракт чтения листингов без привязки к ERP
 
-**Risk:** MEDIUM. **stage_base_commit:** записать перед 1.1.
+**Risk:** MEDIUM. **stage_base_commit:** `e0b5ac0d276ccb58d38c069722a2fad90358edda`.
 **Definition of Done:** внешний модуль может получить страницу всех листингов
 и batch-метаданные с размером/variantId/activity, не получая Entity;
 существующие consumers и каталог Marketplace работают как раньше.
 
-- [ ] **1.1 RED:** в `site/tests/Integration/Marketplace/Facade/MarketplaceFacadeTest.php`
+- [x] **1.1 RED:** в `site/tests/Integration/Marketplace/Facade/MarketplaceFacadeTest.php`
   добавить tests: twoWbSizesRemainDistinct, includesInactiveListings,
   isolatesCompanyAndBatchIds, stablePaginationWithEqualCreatedAt,
   filtersMarketplaceAndLiteralSearchCharacters, rejectsInvalidPagination.
   Данные: один nm_id, размеры S/M, два listingId; два tenant с одинаковым SKU;
   поиск «001%_» — буквальный, ведущие нули не теряются.
   Выполнить точечный PHPUnit, подтвердить FAIL нового поведения.
-- [ ] **1.2 GREEN:** добавить ListingMetaPageDTO, расширить ListingMetaDTO/Query,
+- [x] **1.2 GREEN:** добавить ListingMetaPageDTO, расширить ListingMetaDTO/Query,
   реализовать новый метод существующего MarketplaceFacade через существующий
   MarketplaceListingsQuery с внутренним ListingsFilter(mapped: null).
   Из pager брать ID, batch-читать DTO через ListingMetaQuery и сохранять порядок.
   Перехватить out-of-range только в новом API Facade. Не экспортировать
   внутренний фильтр или QueryBuilder. Запустить тесты 1.1, включая одинаковое
   представление size UNKNOWN в batch/page и пустую страницу за концом.
-- [ ] **1.3 REVIEW:** проверить всех new ListingMetaDTO, targeted PHPStan/CS,
+- [x] **1.3 REVIEW:** проверить всех new ListingMetaDTO, targeted PHPStan/CS,
   добавить контракт в ARCHITECTURE.md. Review полного Stage diff, Stage Report,
   commit/push/Draft PR; продолжить Stage 2.
 
@@ -338,11 +338,11 @@ MoySkladSchemaExtension, `ARCHITECTURE.md` только при появлени�
 
 ## Stage 2: хранение ревизий и tenant-инварианты
 
-**Risk:** HIGH-LOCAL — миграция. **stage_base_commit:** записать перед 2.1.
+**Risk:** HIGH-LOCAL — миграция. **stage_base_commit:** `bd3b59bf4`.
 **Definition of Done:** схема хранит set/clear, историю и requestId, запрещает
 смешение компаний и подключений; нет backfill и изменений чужих таблиц.
 
-- [ ] **2.1 RED:** создать
+- [x] **2.1 RED:** создать
   `site/tests/Unit/MoySklad/Entity/MoySkladListingMappingRevisionTest.php` и
   `site/tests/Integration/MoySklad/ListingMappingStorageTest.php`;
   builders — `site/tests/Builders/MoySklad/MoySkladListingMappingRevisionBuilder.php`.
@@ -356,12 +356,12 @@ MoySkladSchemaExtension, `ARCHITECTURE.md` только при появлени�
   целой записи при constraint violation. Проверки CHECK/FK выполнить также
   прямой DBAL-вставкой, чтобы тест не ограничивался PHP-конструктором.
   Запустить новые тесты и зафиксировать RED.
-- [ ] **2.2 GREEN:** Entity/Enum, repository latest/acceptedRequest/append,
+- [x] **2.2 GREEN:** Entity/Enum, repository latest/acceptedRequest/append,
   builder, одна миграция и SchemaExtension. Получить GREEN 2.1.
   На пустой test БД проверить migration up/down/up; rollback с данными
   должен безопасно отказываться. Проверить Doctrine schema diff без
   генерации второй миграции с удалением составных ограничений.
-- [ ] **2.3 REVIEW:** module unit+integration, focused gates, ARCHITECTURE.md,
+- [x] **2.3 REVIEW:** module unit+integration, focused gates, ARCHITECTURE.md,
   Stage Report. Внешнее ревью Stage — только если HIGH-LOCAL diff >500 строк
   согласно AGENTS.md; commit/push/обновить тот же Draft PR, продолжить Stage 3.
 
@@ -371,11 +371,11 @@ MoySkladSchemaExtension, `ARCHITECTURE.md` только при появлени�
 ## Stage 3: назначение, снятие, конкуренция, read model
 
 **Risk:** HIGH-LOCAL — tenant validation и конкуренция.
-**stage_base_commit:** записать перед 3.1.
+**stage_base_commit:** `fb218990a`.
 **Definition of Done:** Action реализует раздел 1.3; чтение и подсказки bounded,
 каталог не изменяется, архивирование не стирает ревизии.
 
-- [ ] **3.1 RED:** создать
+- [x] **3.1 RED:** создать
   `site/tests/Integration/MoySklad/ChangeListingMappingActionTest.php`.
   Сценарии: set product/variant, replace, clear, clear выключенного подключения,
   many-to-one, два подключения, неактивный листинг, отсутствующий/чужой листинг,
@@ -400,7 +400,7 @@ MoySkladSchemaExtension, `ARCHITECTURE.md` только при появлени�
   set той же цели и clear revision=0 — без новых ревизий; stale CAS не обойти no-op.
   SQL-снимком до/после доказать, что MarketplaceListing.product, costPrice,
   остатки и сам каталог не изменились. Запустить, подтвердить RED.
-- [ ] **3.2 RED:** создать
+- [x] **3.2 RED:** создать
   `site/tests/Integration/MoySklad/ListingMappingsQueryTest.php` и
   `site/tests/Integration/MoySklad/CatalogTargetsQueryTest.php`.
   current latest/clear, архивная цель «Требует проверки», 0/100/101 ID,
@@ -412,14 +412,14 @@ MoySkladSchemaExtension, `ARCHITECTURE.md` только при появлени�
   exact article/дубли/размеры/«001» против «1»/регистр/пробелы/пустой артикул,
   q[]=, q короче 2, literal %/_/обратный слеш, page за концом.
   Статус product, у которого позже появились варианты, требует проверки.
-- [ ] **3.3 GREEN:** реализовать Command/DTO/Exception, Action и Queries из
+- [x] **3.3 GREEN:** реализовать Command/DTO/Exception, Action и Queries из
   раздела 2. Scoped locks читать свежими DBAL-запросами; не использовать
   устаревшие ORM-объекты как результат повторной проверки.
   На успешном set создавать снимки из свежих данных. Queries не делают
   flush/commit и не обращаются к таблицам Marketplace; листинги — через Facade.
   Статусы импорта брать из существующих cursor/run, без дополнительного журнала.
   Запустить тесты 3.1–3.2, модульные наборы и focused gates.
-- [ ] **3.4 REVIEW:** отдельно проверить lock order против SyncCatalogAction,
+- [x] **3.4 REVIEW:** отдельно проверить lock order против SyncCatalogAction,
   no-op/replay после rollback, безопасные reason: not_found, catalog_not_ready,
   target_unavailable, stale_mapping, idempotency_conflict.
   Обновить ARCHITECTURE.md/Stage Report, выполнить положенное Stage review,
@@ -432,7 +432,7 @@ MoySkladSchemaExtension, `ARCHITECTURE.md` только при появлени�
 
 ## Stage 4: UI в существующем модуле МойСклад
 
-**Risk:** MEDIUM. **stage_base_commit:** записать перед 4.1.
+**Risk:** MEDIUM. **stage_base_commit:** `17a0bc3bf`.
 **Definition of Done:** пользователь выбирает листинг/цель, понимает размер и
 подключение, подтверждает замену/снятие, видит историю и ошибки.
 
@@ -530,7 +530,7 @@ stale/reused request — 409 с предложением обновить сос
 dropdown/picker: всё работает без JS и без загрузки всего справочника.
 Если позже потребуется autocomplete, переиспользовать picker_core.js, не копировать.
 
-- [ ] **4.1 RED:** создать
+- [x] **4.1 RED:** создать
   `site/tests/Functional/MoySklad/ListingMappingsControllerTest.php`.
   До шаблонов проверить 200/root selector, 25-row pagination, correct selected
   connection, foreign listing/target/history 404, READ/WRITE/CSRF, unknown UUID,
@@ -550,7 +550,7 @@ dropdown/picker: всё работает без JS и без загрузки в
   history/clear по своей сохранённой связи без живого листинга доступны,
   при чужом marketplace — 404. Пагинация edit/history сохраняет route params.
   Отдельно regression: существующий Catalog mapping и его экран неизменны.
-- [ ] **4.2 GREEN:** тонкие Controllers/Form, четыре шаблона, входной Controller
+- [x] **4.2 GREEN:** тонкие Controllers/Form, четыре шаблона, входной Controller
   и вкладки через existing partial в layout. Выбор/clear/CSRF реализовать
   строго по контракту HTML-формы выше; POST заново проверяет UUID и допустимость.
   Отправлять параметры поиска/страницы как скаляры для восстановления контекста
@@ -558,12 +558,12 @@ dropdown/picker: всё работает без JS и без загрузки в
   requestId сохранять при ошибках; после 303 новая форма получает новый UUID.
   Формы с новым поиском сохраняют expectedRevision исходного редактирования,
   чтобы пользователь не подтвердил незаметно изменённую другим человеком связь.
-- [ ] **4.3 VERIFY:** функциональный набор, Twig gates, focused CS/PHPStan.
+- [x] **4.3 VERIFY:** функциональный набор, Twig gates, focused CS/PHPStan.
   Smoke: loading обычной навигации, пусто, ошибка поиска, нет прав, 409,
   две вкладки, клавиатура/radio, длинные имена, ширина 375px и desktop.
   Использовать DS и существующие pagination/flash/confirm partials;
   не добавлять inline JS/CSS. Данные только с Twig escaping.
-- [ ] **4.4 HANDOFF:** финальные gates один раз, полный diff review, внешнее
+- [x] **4.4 HANDOFF:** финальные gates один раз, полный diff review, внешнее
   ревью Claude CLI и fix cycle; Stage Report/handoff. Один Ready PR.
   Реализация несёт миграцию: до решения владельца не merge/deploy/dispatch.
 
@@ -617,23 +617,24 @@ make site-cs-twig
 
 ## 4. Чек-лист приёмки и выпуска
 
-- [ ] Все пункты приёмки TASK.md покрыты перечисленными тестами/smoke.
-- [ ] Маппинг только в MoySklad, Marketplace API только read, нет Catalog side effects.
-- [ ] Две вкладки в легаси-шаблоне и стилях модуля; marketplace проверяется
+- [x] Все пункты приёмки TASK.md покрыты перечисленными тестами/smoke.
+- [x] Маппинг только в MoySklad, Marketplace API только read, нет Catalog side effects.
+- [x] Две вкладки в легаси-шаблоне и стилях модуля; marketplace проверяется
   сервером для GET/POST/истории, SPA/React/new-shell не затронуты.
-- [ ] Явный выбор variant; родитель с вариантами недопустим, дубль article не автоприменяется.
-- [ ] Успешны tenant/CSRF/permissions, гонки создания/замены и replay тесты.
-- [ ] Все чтения bounded, count queries не растёт с количеством строк страницы.
-- [ ] История переживает смену кода, архивацию и clear; snapshots не меняются.
-- [ ] Миграция up/down/up и schema-diff без потери FK/CHECK/индексов.
-- [ ] Нет открытых BLOCKER/IMPORTANT, external review документирован.
-- [ ] ARCHITECTURE.md описывает фактические Entity/Enum/Facade и lock order.
-- [ ] Для реализации созданы checkpoint.md, stages/stage-N.md и handoff.md.
-- [ ] В handoff назвать новую миграцию и запросить одной фразой merge,
+- [x] Явный выбор variant; родитель с вариантами недопустим, дубль article не автоприменяется.
+- [x] Успешны tenant/CSRF/permissions, гонки создания/замены и replay тесты.
+- [x] Все чтения bounded, count queries не растёт с количеством строк страницы.
+- [x] История переживает смену кода, архивацию и clear; snapshots не меняются.
+- [x] Миграция up/down/up и schema-diff без потери FK/CHECK/индексов.
+- [x] Нет открытых BLOCKER/IMPORTANT, external review документирован.
+- [x] ARCHITECTURE.md описывает фактические Entity/Enum/Facade и lock order.
+- [x] Для реализации созданы checkpoint.md, stages/stage-N.md и handoff.md.
+- [x] В handoff назвать новую миграцию и запросить одной фразой merge,
   production migration dispatch и deploy по docs/workflow/release.md.
 - [ ] После одобрения выполнить pipeline и read-only post-deploy acceptance:
   страница доступна, схема актуальна, старые связи Catalog не изменились.
   Создание пробных production-связей в приёмку не входит.
 
-Текущий документационный PR миграции не содержит и не разрешает выполнение
-этого плана. Сначала владелец получает проверенный план; разработка — отдельный запрос.
+План принят в документационном PR #3015. После его слияния владелец поручил
+автономную реализацию. Продвижение — checkpoint.md; историческое ревью плана
+в review.md не заменяет ревью реализации.

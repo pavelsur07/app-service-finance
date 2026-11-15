@@ -1,0 +1,29 @@
+{% extends 'moy_sklad/layout.html.twig' %}
+
+{% block integration_title %}Выберите подключение МойСклад{% endblock %}
+
+{% block integration_content %}
+    {% if pager.nbResults == 0 %}
+        <div class="card" data-moysklad-empty-connections>
+            <div class="card-body empty">
+                <h2 class="empty-title">Подключения пока не созданы</h2>
+                <p class="text-secondary">Добавьте подключение МойСклад и загрузите товары и модификации.</p>
+                {% if is_granted('module.marketplace.write') %}<a class="btn btn-primary" href="{{ path('moysklad_connections_create') }}">Добавить подключение</a>{% endif %}
+            </div>
+        </div>
+    {% else %}
+        <div class="card" data-moysklad-connection-picker>
+            <div class="list-group list-group-flush">
+                {% for item in pager.currentPageResults %}
+                    <a class="list-group-item list-group-item-action d-flex justify-content-between gap-3" href="{{ path('moysklad_listing_mappings', {connectionId: item.id, marketplace: mappingMarketplace}) }}">
+                        <span class="text-break">{{ item.name }}</span>
+                        {% if not item.isActive %}<span class="badge bg-secondary-lt">Отключено</span>{% endif %}
+                    </a>
+                {% endfor %}
+            </div>
+            <div class="card-footer">
+                {% include 'partials/_pagination.html.twig' with {pager: pager, route: 'moysklad_mapping_entry', params: {marketplace: mappingMarketplace}} only %}
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

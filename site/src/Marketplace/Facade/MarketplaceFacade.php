@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Facade;
 
+use App\Marketplace\Application\DTO\ListingsFilter;
 use App\Marketplace\Application\RecordConnectionAuthResultAction;
 use App\Marketplace\DTO\ActiveListingDTO;
 use App\Marketplace\DTO\AdvertisingCostDTO;
 use App\Marketplace\DTO\CostData;
+use App\Marketplace\DTO\ListingMetaPageDTO;
 use App\Marketplace\DTO\OrderDTO;
 use App\Marketplace\DTO\ReturnData;
 use App\Marketplace\DTO\SaleData;
@@ -20,6 +22,7 @@ use App\Marketplace\Infrastructure\Query\ListingMetaQuery;
 use App\Marketplace\Infrastructure\Query\ListingReturnAggregateQuery;
 use App\Marketplace\Infrastructure\Query\ListingSalesAggregateQuery;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
+use App\Marketplace\Infrastructure\Query\MarketplaceListingsQuery;
 use App\Marketplace\Inventory\CostPriceResolverInterface;
 use App\Marketplace\Inventory\Infrastructure\Query\CostPriceByListingsOnDateQuery;
 use App\Marketplace\Ozon\Infrastructure\Query\ActiveOzonConnectionsQuery;
@@ -54,6 +57,7 @@ final readonly class MarketplaceFacade
         private RecordConnectionAuthResultAction $recordConnectionAuthResultAction,
         private BrokenConnectionsQuery $brokenConnectionsQuery,
         private CostPriceByListingsOnDateQuery $costPriceByListingsOnDateQuery,
+        private MarketplaceListingsQuery $listingsQuery,
     ) {
     }
 
@@ -687,6 +691,42 @@ final readonly class MarketplaceFacade
         array $listingIds,
     ): array {
         return $this->listingMetaQuery->findByIds($companyId, $listingIds);
+    }
+
+    public function paginateListingsForExternalMapping(
+        string $companyId,
+        ?string $marketplace,
+        ?string $search,
+        int $page = 1,
+        int $perPage = 25,
+    ): ListingMetaPageDTO {
+        Assert::uuid($companyId);
+        Assert::greaterThanEq($page, 1);
+        Assert::range($perPage, 1, 100);
+        $type = null === $marketplace ? null : MarketplaceType::tryFrom($marketplace);
+        Assert::true(null === $marketplace || null !== $type, 'Unknown marketplace.');
+        $search = null === $search ? null : trim($search);
+        $search = '' === $search ? null : $search;
+        Assert::lessThanEq(mb_strlen($search ?? ''), 100);
+        $pager = $this->listingsQuery->paginate($companyId, new ListingsFilter(marketplace: $type, search: $search), 1, $perPage);
+        $total = $pager->getNbResults();
+        if ($page > max(1, $pager->getNbPages())) {
+            return new ListingMetaPageDTO([], $page, $perPage, $total);
+        }
+        $pager->setCurrentPage($page);
+        $ids = [];
+        foreach ($pager->getCurrentPageResults() as $listing) {
+            $ids[] = $listing->getId();
+        }
+        $metadata = $this->listingMetaQuery->findByIds($companyId, $ids);
+        $items = [];
+        foreach ($ids as $id) {
+            if (isset($metadata[$id])) {
+                $items[] = $metadata[$id];
+            }
+        }
+
+        return new ListingMetaPageDTO($items, $page, $perPage, $total);
     }
 
     /**

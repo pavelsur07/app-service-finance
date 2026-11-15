@@ -14,6 +14,8 @@ final readonly class ListingMetaDTO
         public ?string $supplierSku = null,
         /** Размер (WB ts_name); null, когда размера нет (`UNKNOWN` в БД). */
         public ?string $size = null,
+        public bool $isActive = true,
+        public ?string $marketplaceVariantId = null,
     ) {
     }
 }

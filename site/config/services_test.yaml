@@ -1,4 +1,10 @@
 services:
+    App\MoySklad\Application\Action\ChangeListingMappingAction:
+        public: true
+    App\MoySklad\Infrastructure\Query\MoySkladCatalogTargetsQuery:
+        public: true
+    App\MoySklad\Infrastructure\Query\MoySkladListingMappingsQuery:
+        public: true
     _defaults:
         autowire: true
         autoconfigure: true

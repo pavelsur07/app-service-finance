@@ -34,7 +34,9 @@ final readonly class ListingMetaQuery
                 l.marketplace_sku AS listing_sku,
                 l.marketplace     AS listing_marketplace,
                 l.supplier_sku    AS supplier_sku,
-                l.size            AS listing_size
+                l.size            AS listing_size,
+                l.is_active,
+                l.marketplace_variant_id
             FROM marketplace_listings l
             WHERE l.id IN (:ids)
               AND l.company_id = :companyId
@@ -55,6 +57,8 @@ final readonly class ListingMetaQuery
                 marketplace: $row['listing_marketplace'],
                 supplierSku: null !== $row['supplier_sku'] ? (string) $row['supplier_sku'] : null,
                 size: in_array($row['listing_size'], [null, '', 'UNKNOWN'], true) ? null : (string) $row['listing_size'],
+                isActive: (bool) $row['is_active'],
+                marketplaceVariantId: $row['marketplace_variant_id'],
             );
         }
 

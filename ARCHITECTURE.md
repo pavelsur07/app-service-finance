@@ -3197,6 +3197,11 @@ wbCostCategoryGroups(): array
 
 ### `MarketplaceFacade` (`src/Marketplace/Facade/MarketplaceFacade.php`)
 ```php
+// Постраничный read-контракт для внешнего маппинга (без фильтра по Catalog product).
+// Включает неактивные листинги; page >= 1, perPage 1..100, search до 100 символов.
+// Страница за концом: пустые items при сохранённом totalItems.
+paginateListingsForExternalMapping(string $companyId, ?string $marketplace, ?string $search, int $page = 1, int $perPage = 25): ListingMetaPageDTO
+
 // Состояние аутентификации подключения. Точка входа для модуля Ingestion:
 // обработчик синхронизации узнаёт про 401/403 первым, но сущности чужого
 // модуля не трогает. Возвращают true, когда состояние ТОЛЬКО ЧТО
@@ -5785,6 +5790,10 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.195 | 2026-11-15 | MoySklad: отдельные legacy-вкладки Ozon/Wildberries, выбор подключения, локальный поиск, ручное назначение/снятие связи и история; READ/WRITE, CSRF, CAS и bounded-пагинация |
+| 2.194 | 2026-11-15 | MoySklad: CAS/idempotent Action назначения и снятия связи, блокировки против гонок/импорта вариантов, bounded current/history и локальные подсказки |
+| 2.193 | 2026-11-15 | MoySklad: tenant-scoped ревизии связей листингов с product/variant, set/clear, requestId и snapshots; Catalog/Finance не меняются |
+| 2.192 | 2026-11-15 | Marketplace: постраничный DTO-контракт внешнего маппинга; ListingMetaDTO содержит isActive/marketplaceVariantId с общей нормализацией size через ListingMetaQuery |
 | 2.191 | 2026-11-15 | MarketplaceWb: переключатель `MARKETPLACE_WB_COMPANIES` снят — переводчик и гейт работают по всем кабинетам WB (решение Владельца 15.11) |
 | 2.190 | 2026-11-15 | MarketplaceWb: реклама WB из фактов `wb.ads.daily` (wb-fetcher, upd + fullstats) — `ads_cpc` по SKU, `mwb_day.ads_revision` (`Version20261115120000`); `wb.ads.daily` в снимке кабинетов WB и в белом списке фактов шлюза (этап 8.4) |
 | 2.189 | 2026-11-15 | MarketplaceWb: новый модуль — переводчик дневного отчёта WB в канон (`mwb_source_type`, `mwb_day`, `mwb_quarantine`, `Version20261115090000`), `app:marketplace-wb:translate` (`MARKETPLACE_WB_COMPANIES`) и гейт 09:25, экран `/admin/marketplace/wb-source-types`; `OperationKind::ADS_SETTLEMENT` (справочно); `findListingsByMarketplaceSkus` отдаёт `size` (этап 8.3) |
@@ -6093,6 +6102,57 @@ Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/defa
 `ApiScopeCatalog`: explicit resources/actions/presets, all disconnected. `ApiScopePolicy::effectiveScopes(selected,enabled,connected)` даёт только известное пересечение. ApiKey хранит JSON selectedScopes/enabledResources с пустыми defaults. `SaveApiKeyPermissionsAction(companyId,userId,keyId,selectedScopes,enabledResources,expectedVersion): ApiKey` проверяет владельца и optimistic version под scoped row lock;409 требует перечитать, unknown scope/enable disconnected422, no-op без аудита. Отдельная миграция20260913090200; подключение модуля не включает ресурс старого ключа. Principal несёт preparedScopes/effectiveScopes, ApiAccessSubscriber требует известный effective scope либо auth.check; тестовые endpoints толькоenv=test.
 
 ## MoySklad: подключение и проверка доступа
+
+Legacy UI маппинга размещён в `templates/moy_sklad/mappings/` под общим
+`moy_sklad/layout.html.twig`: отдельные вкладки Ozon и Wildberries используют
+Tabler и существующие partials вкладок, пагинации и подтверждения. Нового
+React/Vite entry нет. `/moy-sklad/mappings/{ozon|wildberries}` показывает
+пустое состояние, перенаправляет в единственное подключение либо предлагает
+выбор подключения с пагинацией по 20. Внутри подключения
+`/moy-sklad/connections/{connectionId}/mappings/{marketplace}` выводит 25
+листингов, локальный поиск до 100 символов и batched текущие связи.
+`/{listingId}/edit` обслуживает GET/POST назначения и снятия, а
+`/{listingId}/history` — историю по 20 ревизий. Вкладки сохраняют подключение.
+
+Чтение требует `MARKETPLACE_READ`, изменение — `MARKETPLACE_WRITE`, активная
+компания определяется сервером. POST сначала проверяет ручной CSRF, затем
+`MoySkladListingMappingType` с явным набором ChoiceType: подсказки, текущая
+страница поиска и сохранённая позиция. Чужая/неизвестная позиция возвращает
+404, своя вне показанных вариантов — 422; CAS-конфликт — 409, успех — 303.
+Поиск и переходы страниц сохраняют expectedRevision/requestId формы. Снятие
+связи имеет отдельную форму без target и noscript fallback; удалённый листинг
+доступен по сохранённому snapshot для истории и снятия связи.
+
+Хранение внешнего маппинга — `MoySkladListingMappingRevision`, отдельная от
+Catalog история в `moysklad_listing_mapping_revisions`. Ключ связи:
+companyId/connectionId/listingId, порядок — revision, операции set/clear.
+SET содержит ровно один внешний UUID product/variant своего подключения;
+CLEAR — без цели. Составные FK, unique revision/requestId и CHECK защищают
+tenant и форму записи. Ревизия хранит expectedRevision, actorUserId, время UTC
+и серверные снимки листинга/цели. Repository только append/tenant lookup,
+без flush; текущая связь — последняя revision, не изменяемая строка.
+Миграция Version20261115153000 создаёт пустую таблицу; down отказывает,
+если история не пуста.
+
+`ChangeListingMappingAction(ChangeListingMappingCommand): ListingMappingState`
+владеет wrapInTransaction и append ревизии. UUID/CAS/requestId проверяются до
+записи, accepted request возвращает прежнюю ревизию. Порядок блокировок:
+connection FOR SHARE → advisory xact mapping key → product FOR UPDATE либо
+variant parent FOR SHARE → variant FOR SHARE. Сильный lock product исключает
+одновременный INSERT дочерней модификации до commit. No-op не пишет ревизию;
+stale CAS и reuse requestId с другим payload дают доменный конфликт.
+Новая цель требует активного привязанного подключения и completed курсоров
+product/variant; временный HTTP-check failure не отменяет локальный каталог.
+CLEAR доступен при выключенном подключении и отсутствующем исходном листинге,
+но только по своей существующей истории.
+
+`MoySkladCatalogTargetsQuery` читает локальные product/variant и родителей:
+поиск/подсказки 20 строк, точный trim(article) без смены регистра и ведущих нулей,
+никакого автоматического назначения. `findMany` использует UUID IN по типам,
+а не поиск по строковой конкатенации UUID. `MoySkladListingMappingsQuery`
+возвращает current batch до 100 IDs и history по 20; metadata листингов читает
+через MarketplaceFacade. Архив/появление вариантов/потеря листинга меняют
+вычисленный статус на needs_review, а не историю или Catalog mapping.
 
 Legacy Twig/Tabler UI: `/moy-sklad/connections`, права `MARKETPLACE_READ/WRITE`.
 `MoySkladConnection` сохраняет неизменяемый `companyId`, nullable глобально уникальный
