@@ -512,7 +512,9 @@
   по каждому виду — один агрегированный ERROR за прогон.
 - Потребитель — `AiTaskResultConsumerInterface` (тег
   `app.service_gateway.ai_task_result_consumer`): `supports(taskType)`,
-  `consume(AiTaskResult)`; только `persist()`, транзакцией владеет импорт.
+  `consume(AiTaskResult)`; только `persist()`, транзакцией владеет импорт. Потребителей одного task_type
+  может быть несколько (`marketplace_source_type_draft` — переводчики Ozon и WB): вызываются все в одной
+  транзакции, каждый игнорирует чужие задачи; расход записывается один раз.
   Вход `AiTaskResult` — DTO (`status` — `AiResultStatus`: `accepted`,
   `needs_review`, `rejected`, `failed`; `checks` — `list<AiCheck>`; `output` —
   массив по контракту задачи). Сейчас — `EchoAiTaskResultConsumer` (только лог)
@@ -662,7 +664,7 @@
 
 | Таблица | Что | Ключ |
 |---|---|---|
-| `mwb_source_type` | решение по коду WB: `kind` или `pending`, название, где встретился впервые (`ai_draft` — под 8.3b) | `source_type` |
+| `mwb_source_type` | решение по коду WB: `kind` или `pending`, название, где встретился впервые (`ai_draft` — черновик ИИ) | `source_type` |
 | `mwb_day` | переведённый день: ревизия фактов отчёта и рекламы (`ads_revision`, 0 — без рекламы), версия правил, `total_minor` (Σ компонентов без справочных) = `canon_minor` + `quarantine_minor`, операции без листинга | `(company_id, connection_ref, operation_date)` |
 | `mwb_quarantine` | компоненты с кодом без решения: сумма, число строк, до 20 ссылок на факты | `(company_id, connection_ref, operation_date, source_type)` |
 
@@ -682,7 +684,10 @@
 - Гейт `app:marketplace-wb:health-check` (cron 09:25 МСК): то же, что у Ozon (карантин > 24 ч, непереведённый
   день, канон ≠ перевод за 45 дней, кабинет старше D−2), по всем кабинетам.
 - Решение — `/admin/marketplace/wb-source-types` (`ROLE_ADMIN`), `ConfirmWbSourceTypeAction` — один `UPDATE`
-  только для кода без решения. Черновика ИИ пока нет (8.3b).
+  только для кода без решения. Черновик ИИ — `RequestWbSourceTypeDraftsAction` в конце прогона перевода
+  (задача `marketplace_source_type_draft`, канал `wb`, от компании платформы, ключ повтора — код; как у Ozon),
+  ответ — `WbSourceTypeDraftConsumer` → `mwb_source_type.ai_draft`; экран показывает черновик и выбирает его
+  вид заранее (вид из `WbSourceTypeSeed::SUGGESTED` важнее).
 - `MarketplaceWbFacadeInterface::dayStates(companyId, from, to): list<WbDayState>` — переведённые дни
   (ревизия фактов отчёта, актуальность правил, `total` / `canon` / `quarantine`) для экрана R10. Только чтение.
 
@@ -5795,6 +5800,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.197 | 2026-11-15 | MarketplaceWb: черновики ИИ для кодов WB (этап 8.3b) — `RequestWbSourceTypeDraftsAction`, `WbSourceTypeDraftConsumer`, колонка черновика на экране кодов; ServiceGateway: результат ИИ получают все потребители его task_type |
 | 2.196 | 2026-11-15 | Отчёты нового контура по двум каналам (этап 8.5): фильтр канала в R1/R2, метка канала у SKU и в xlsx, строки каналов в R3; R10 сверяет WB со своим каналом — фасад `MarketplaceWbFacadeInterface::dayStates` |
 | 2.195 | 2026-11-15 | MoySklad: отдельные legacy-вкладки Ozon/Wildberries, выбор подключения, локальный поиск, ручное назначение/снятие связи и история; READ/WRITE, CSRF, CAS и bounded-пагинация |
 | 2.194 | 2026-11-15 | MoySklad: CAS/idempotent Action назначения и снятия связи, блокировки против гонок/импорта вариантов, bounded current/history и локальные подсказки |
