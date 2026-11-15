@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceWb\Controller\Admin;
 
 use App\MarketplaceOperations\Enum\OperationKind;
+use App\MarketplaceWb\Domain\WbSourceTypeSeed;
 use App\MarketplaceWb\Infrastructure\Query\WbTranslationStore;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
@@ -28,6 +29,7 @@ final class WbSourceTypesController extends AbstractController
         return $this->render('admin/marketplace_wb/source_types.html.twig', [
             'pending' => $this->store->pendingForReview(),
             'kinds' => OperationKind::cases(),
+            'suggested' => WbSourceTypeSeed::SUGGESTED,
         ]);
     }
 }

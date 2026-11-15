@@ -29,6 +29,9 @@ final class WbSourceTypesPageTest extends WebTestCaseBase
         $client->loginUser($admin, 'admin');
         $crawler = $client->request('GET', self::URL);
         self::assertResponseIsSuccessful();
+        $row = $crawler->filter('[data-source-type="wb:field:paidAcceptance"]');
+        self::assertSame('storage', $row->filter('select[name="kind"] option[selected]')->attr('value'), 'предложенный вид выбран заранее');
+        self::assertStringContainsString('Предложено: Хранение', $row->text());
         $form = $crawler->filter('[data-source-type="wb:field:paidAcceptance"] form')->form(['kind' => 'storage']);
 
         $client->submit($form);
