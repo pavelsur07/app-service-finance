@@ -17,7 +17,9 @@ use App\Shared\Domain\ValueObject\Money;
 final class SalesReportTranslator
 {
     /** Меняется вместе с правилами: дни с другой версией переводятся заново. */
-    public const RULES_VERSION = 'wb-sales-report-1';
+    public const RULES_VERSION = 'wb-sales-report-2';
+    /** В строке отчёта нет `techSize`. */
+    public const UNKNOWN_SIZE = 'UNKNOWN';
 
     private const PVZ_OPERATION = 'возмещение за выдачу и возврат товаров на пвз';
 
@@ -44,7 +46,7 @@ final class SalesReportTranslator
     {
         $currency = \is_string($row['currency'] ?? null) && 3 === \strlen($row['currency']) ? $row['currency'] : 'RUB';
         $nmId = \is_int($row['nmId'] ?? null) && $row['nmId'] > 0 ? (string) $row['nmId'] : null;
-        $size = \is_string($row['techSize'] ?? null) && '' !== trim($row['techSize']) ? trim($row['techSize']) : 'UNKNOWN';
+        $size = \is_string($row['techSize'] ?? null) && '' !== trim($row['techSize']) ? trim($row['techSize']) : self::UNKNOWN_SIZE;
         $operation = mb_strtolower(trim(\is_string($row['sellerOperName'] ?? null) ? $row['sellerOperName'] : ''));
         $add = function (array &$out, string $type, Money $amount, ?OperationKind $kind, ?int $quantity = null) use ($sourceKey, $nmId, $size): void {
             if (!$amount->isZero()) {
