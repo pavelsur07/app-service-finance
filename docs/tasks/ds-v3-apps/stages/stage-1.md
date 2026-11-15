@@ -3,6 +3,8 @@
 **Статус:** реализация и локальная приёмка завершены; Stage не закрыт:
 обязательный внешний Claude review недоступен. PR остаётся Draft.
 **Risk:** MEDIUM.
+**PR:** [#3027](https://github.com/pavelsur07/app-service-finance/pull/3027) — Draft, base master.
+**Implementation commit:** `c5233de52`.
 **Stage base commit:** `cd19c36b043746e6502ba2cdebb9b09616127b81`.
 **Work items:** 1.1, 1.2, 1.3 (review blocked).
 

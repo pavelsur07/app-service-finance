@@ -4,6 +4,8 @@
 **Status:** stopped — external reviewer unavailable (AGENTS.md §3.4 item 5)
 **Stage base commit:** cd19c36b043746e6502ba2cdebb9b09616127b81
 **Branch:** feat/ds-v3-stage-1
+**PR:** [#3027](https://github.com/pavelsur07/app-service-finance/pull/3027) — Draft, base master проверена.
+**Implementation commit:** c5233de52
 
 ### Completed
 
@@ -13,6 +15,7 @@
   361 CSS/TS токен, exports и 8 тестов RED→GREEN.
 - 1.3: проверки apps включают пакет; все локальные gates и независимое internal
   review пройдены; stage-1.md/handoff.md описывают внешнюю блокировку.
+- Stage 1 commit c5233de52 опубликован; создан отдельный Draft PR #3027 в master.
 - site/, runtime apps, Docker/CI не менялись. Stage 2–5 ещё не начаты.
 
 ### Checks and baseline
@@ -37,7 +40,6 @@
 
 ### Exact next action
 
-- Зафиксировать/опубликовать подготовленный Stage 1 в отдельном Draft PR в master.
 - После восстановления Claude Code провести реальное read-only review полного
   apps diff; штатный wrapper исключает apps и не должен дать ложный empty green.
 - Исправить findings, Ready, один запрос merge+deploy Stage 1. После доставки —

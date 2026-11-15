@@ -1,6 +1,8 @@
 # ds-v3-apps — частичная передача, Stage 1
 
-**Branch:** `feat/ds-v3-stage-1`.
+**Branch:** `feat/ds-v3-stage-1` · **PR:** [#3027](https://github.com/pavelsur07/app-service-finance/pull/3027) (base master).
+**Implementation commit:** `c5233de52`.
+**CI:** запущен; окончательный результат не заявляется.
 **Статус:** Draft, не готов к merge. Внешний Claude reviewer недоступен.
 
 Phase 0 завершена: [plan.md](plan.md).
