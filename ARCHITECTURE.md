@@ -6134,6 +6134,20 @@ Redis failure503, чужой/истёкший preview одинаково отс�
 company/actor/connection/provider; sessionId/hash не возвращаются в UI.
 UUIDv7 preview/requestId генерируются сервером; Guard фиксирует версию
 `article_size_v1`, fingerprint и выбранный opaque characteristic ID.
+`ApplyAutomaticListingMappingsAction` вызывает существующий writer отдельно
+для каждой строки без внешней транзакции/flush. Guarded order: connection
+FOR SHARE → mapping advisory → accepted replay → catalog try-lock → source
+FOR SHARE через MarketplaceFacade → recompute policy/candidates → target lock
+→ append/flush/commit. Общий `MoySkladCatalogLock` использует прежний session
+ключ `moysklad-catalog`/connectionId в SyncCatalogAction и writer; освобождение
+во внешнем finally после wrapInTransaction, занятость409 без закрытия EM.
+Facade `lockListingMetaForExternalMapping(companyId, listingId)` требует
+caller transaction, возвращает свежий DBAL DTO, не Entity из identity map.
+Audit listing_snapshot.autoMapping хранит origin/preview/rule/fingerprint/
+characteristic/matchedRules. Replay проверяет полный payload и guard прежде
+новой валидации каталога, поэтому не восстанавливает последующий manual clear.
+Технический сбой останавливает остаток; ACCEPTED включает прежний request,
+CONFLICT/FAILED/NOT_PROCESSED отдельны; закрытый EM не переиспользуется.
 
 
 Legacy UI маппинга размещён в `templates/moy_sklad/mappings/` под общим

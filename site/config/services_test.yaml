@@ -1,4 +1,10 @@
 services:
+    App\MoySklad\Application\Action\ApplyAutomaticListingMappingsAction:
+        public: true
+    App\MoySklad\Infrastructure\Lock\MoySkladCatalogLock:
+        public: true
+    App\MoySklad\Domain\AutomaticListingMappingPolicy:
+        public: true
     App\MoySklad\Infrastructure\Cache\AutomaticMappingPreviewStorage:
         public: true
     App\MoySklad\Infrastructure\Query\AutomaticMappingCandidatesQuery:

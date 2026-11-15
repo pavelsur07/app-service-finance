@@ -1,7 +1,7 @@
 # Current checkpoint
 
-**Phase:** Stage 3 / Work item 3.1
-**Status:** Stage2 complete; Stage3 tests next
+**Phase:** Stage 4 / Work item 4.1
+**Status:** Stage3 complete; Stage4 RED4 recorded
 **Task base / Stage 1 base:** `0658c9fc6a3c4c3519f6e254d6669200b6a38753`
 **Branch:** feat/moysklad-auto-mapping
 **PR:** #3023 https://github.com/pavelsur07/app-service-finance/pull/3023
@@ -28,7 +28,7 @@
 - Stage Report, commit/push Draft PR, continue Stage 2 automatically.
 
 ## Exact next action
-- Stage3 RED for guarded writer/batch/locking; reuse single writer.
+- Materialize Stage4 legacy controllers/forms/templates after RED4, then functional/security/browser tests and handoff.
 
 ## Resume
 - This checkpoint, TASK.md/plan.md, .superpowers/sdd/plan/progress.md; verify git status/log.
@@ -49,3 +49,7 @@ Stage1 final module442/1827, focused gates PASS; Claude1round IMPORTANT1 fixed w
 Stage2 targeted7/41 PASS including real Redis parallel workers. Focused PHPStan/CS PASS. Internal B/I0/0. Stage2 base03bd475df.
 
 Stage2 module449/1868 PASS, no open B/I.
+
+Stage3 base30a98e5a7. Targeted45/194, concurrency7/66, module469/1988, focused CS/Stan PASS. Mutation locks RED2/RED1 expected; restored. Stage4 prep only in ignored scratch while review pending.
+
+Stage3 external1 round IMPORTANT3+MINOR1 fixed without re-run; regression25/138; finalmodule474/2006; focused CS/Stan PASS. No openB/I. Stage4 scratch RED4 missing UI.

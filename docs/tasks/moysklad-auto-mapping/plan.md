@@ -301,7 +301,7 @@ tests/Integration/MoySklad/ApplyAutomaticListingMappingsActionTest.php,
 AutomaticMappingConcurrencyTest.php; расширение mapping-worker.php,
 ChangeListingMappingActionTest.php, SyncCatalogActionTest.php и MarketplaceFacadeTest.php.
 
-- [ ] **3.1 RED:** single/batch25, explicit size rule, no replaces/clear restore,
+- [x] **3.1 RED:** single/batch25, explicit size rule, no replaces/clear restore,
   source changed/archived/foreign, target moved/duplicate appeared, disabled
   connection, provider mismatch, invalid selection26 and duplicateIDs,
   expired/foreign envelope, id не из READY набора, подмена цели из POST,
@@ -310,17 +310,17 @@ ChangeListingMappingActionTest.php, SyncCatalogActionTest.php и MarketplaceFaca
   Отдельно EM remains open on domain reject; EM closed -> остаток NOT_PROCESSED.
   Cache outage после успешной строки не скрывает commit; независимые attempt
   имеют свои результаты. Потеря preview посреди запроса не откатывает принятые строки.
-- [ ] **3.2 RED:** независимые PG-процессы: реальный auto Action vs SyncCatalog
+- [x] **3.2 RED:** независимые PG-процессы: реальный auto Action vs SyncCatalog
   writer c общим catalog lock в обоих порядках; duplicate INSERT другой цели,
   parent/target archive, source article/size change, manual SET/CLEAR и два
   одинаковых POST. Проверить actual lock wait/try-lock refusal и число ревизий.
   Mutation без catalog guard должна давать RED на duplicate race; без source
   lock — RED на source race. Не подменять тест Action тестом одного Query.
-- [ ] **3.3 GREEN:** извлечь общий существующий catalog lock, Facade source
+- [x] **3.3 GREEN:** извлечь общий существующий catalog lock, Facade source
   lock с документированной caller transaction; optional guard в Command и
   защищённый путь в том же writer. Batch без внешней транзакции и дублирования
   append. Snapshot audit и полная проверка idempotency guard.
-- [ ] **3.4 VERIFY/REVIEW:** module + старые sync/manual tests, focused gates,
+- [x] **3.4 VERIFY/REVIEW:** module + старые sync/manual tests, focused gates,
   full Stage diff review (lock order/phantoms/EM/retry). Внешний Claude review,
   если HIGH-LOCAL diff>500 строк; иначе только handoff. Исправить confirmed
   B/I, reports, commit/push и автоматически перейти Stage4.

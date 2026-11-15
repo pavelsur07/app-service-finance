@@ -693,6 +693,12 @@ final readonly class MarketplaceFacade
         return $this->listingMetaQuery->findByIds($companyId, $listingIds);
     }
 
+    /** Holds FOR SHARE until the calling Action commits. Returns fresh DBAL metadata. */
+    public function lockListingMetaForExternalMapping(string $companyId, string $listingId): ?\App\Marketplace\DTO\ListingMetaDTO
+    {
+        return $this->listingMetaQuery->lockForExternalMapping($companyId, $listingId);
+    }
+
     public function paginateListingsForExternalMapping(
         string $companyId,
         ?string $marketplace,

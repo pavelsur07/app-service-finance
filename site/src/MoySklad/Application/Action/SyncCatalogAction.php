@@ -13,6 +13,7 @@ use App\MoySklad\Entity\MoySkladVariant;
 use App\MoySklad\Enum\ConnectionCheckStatus;
 use App\MoySklad\Exception\CatalogSyncException;
 use App\MoySklad\Infrastructure\Api\MoySkladClient;
+use App\MoySklad\Infrastructure\Lock\MoySkladCatalogLock;
 use App\MoySklad\Infrastructure\Repository\MoySkladConnectionWriteRepository;
 use App\MoySklad\Infrastructure\Repository\MoySkladProductRepository;
 use App\MoySklad\Infrastructure\Repository\MoySkladSyncCursorRepository;
@@ -38,6 +39,7 @@ final readonly class SyncCatalogAction
         private CatalogPageParser $parser,
         private ConnectionTokenCodec $codec,
         private LoggerInterface $logger,
+        private MoySkladCatalogLock $catalogLock,
     ) {
     }
 
@@ -48,11 +50,8 @@ final readonly class SyncCatalogAction
             return false;
         }
 
-        $db = $this->em->getConnection();
-        $lockParams = ['namespace' => 'moysklad-catalog', 'key' => $connectionId];
-        $locked = $db->fetchOne('SELECT pg_try_advisory_lock(hashtext(:namespace), hashtext(:key))', $lockParams);
-        if (!in_array($locked, [true, 1, '1', 't'], true)) {
-            return false;
+        if (!$this->catalogLock->tryAcquire($connectionId)) {
+            throw new CatalogSyncException('temporary');
         }
 
         try {
@@ -66,11 +65,7 @@ final readonly class SyncCatalogAction
 
             return true;
         } finally {
-            try {
-                $db->fetchOne('SELECT pg_advisory_unlock(hashtext(:namespace), hashtext(:key))', $lockParams);
-            } catch (\Throwable) {
-                // A lost database session has already released its session lock.
-            }
+            $this->catalogLock->release($connectionId);
         }
     }
 
