@@ -28,8 +28,8 @@
 - make site-test остановился в composer install на permission denied в
   vendor/phpstan/extension-installer/src/GeneratedConfig.php. При пропуске
   install с уже установленными locked deps suite запущен; в старой DB отсутствуют
-  seed tariffs. Для контрольного полного прогона создана app_customer_ui_legacy_test.
-- Диагностика на отдельной app_customer_ui_diag_test: первое integration test
+  seed tariffs. Для контрольного полного прогона создана app_customer_ui_legacy.
+- Диагностика на отдельной app_customer_ui_diag: первое integration test
   падает на записи var/storage/cash-file-imports (root-owned directory vs UID 1000).
   Не меняя прав, исправлен пользователь локального test runner: user 0.
   Запущен background full suite; предыдущий non-root изолированный прогон
@@ -39,6 +39,9 @@
   style и real-auth SPA job — pass; все CI checks pass/skipped.
 - Итоговый полный прогон: 9271 tests / 52215 assertions, 07:45.022, exit 0.
   Runtime helper и лог в ignored site/var/customer-ui-smoke/.
+- После проверок task-owned DB app_customer_ui_legacy/app_customer_ui_diag и
+  disposable containers vf-customer-legacy-php/node/browser удалены. Исходные
+  test DB и PostgreSQL/Redis services не удалялись.
 
 ### Review status
 - internal: Stage 1 — 0/0; Stage 2 — IMPORTANT 1 fixed; финальное независимое
