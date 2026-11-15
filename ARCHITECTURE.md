@@ -6126,6 +6126,14 @@ article либо parent.article + размер по явно выбранном�
 MarketplaceFacade; существующие ревизии, включая clear, не предлагаются.
 `MappingCharacteristicsQuery` выдаёт по20 непрозрачных ID из локального JSONB.
 Никакой записи и внешнего HTTP в этих Query нет.
+`AutomaticMappingPreviewStorage` хранит scalar-array envelope в отдельном
+Redis pool `cache.moysklad_automatic_mapping`: TTL900, максимум3 preview на
+SHA256(sessionId), максимум3 immutable attempt results на preview. READ/WRITE
+индекса сериализуется существующим LockFactory, acquire(false); busy409,
+Redis failure503, чужой/истёкший preview одинаково отсутствует. Scope включает
+company/actor/connection/provider; sessionId/hash не возвращаются в UI.
+UUIDv7 preview/requestId генерируются сервером; Guard фиксирует версию
+`article_size_v1`, fingerprint и выбранный opaque characteristic ID.
 
 
 Legacy UI маппинга размещён в `templates/moy_sklad/mappings/` под общим

@@ -1,10 +1,10 @@
 # Current checkpoint
 
-**Phase:** Stage 2 / Work item 2.1
-**Status:** Stage1 complete; Stage2 RED
+**Phase:** Stage 3 / Work item 3.1
+**Status:** Stage2 complete; Stage3 tests next
 **Task base / Stage 1 base:** `0658c9fc6a3c4c3519f6e254d6669200b6a38753`
 **Branch:** feat/moysklad-auto-mapping
-**PR:** pending
+**PR:** #3023 https://github.com/pavelsur07/app-service-finance/pull/3023
 **Workspace:** /home/deploy/.codex/worktrees/0d8f/app-service-finance
 
 ## Completed
@@ -28,7 +28,7 @@
 - Stage Report, commit/push Draft PR, continue Stage 2 automatically.
 
 ## Exact next action
-- Implement Stage2 immutable Redis preview after RED4 (missing Storage/Guard), then concurrency tests.
+- Stage3 RED for guarded writer/batch/locking; reuse single writer.
 
 ## Resume
 - This checkpoint, TASK.md/plan.md, .superpowers/sdd/plan/progress.md; verify git status/log.
@@ -45,3 +45,7 @@
 - Internal review: BLOCKER0, IMPORTANT1 fixed (Cyrillic characteristic search). External review running.
 
 Stage1 final module442/1827, focused gates PASS; Claude1round IMPORTANT1 fixed without re-run, MINOR1 fixed, openB/I0/0. See stages/stage-1.md.
+
+Stage2 targeted7/41 PASS including real Redis parallel workers. Focused PHPStan/CS PASS. Internal B/I0/0. Stage2 base03bd475df.
+
+Stage2 module449/1868 PASS, no open B/I.

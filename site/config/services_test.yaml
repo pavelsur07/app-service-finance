@@ -1,4 +1,6 @@
 services:
+    App\MoySklad\Infrastructure\Cache\AutomaticMappingPreviewStorage:
+        public: true
     App\MoySklad\Infrastructure\Query\AutomaticMappingCandidatesQuery:
         public: true
     App\MoySklad\Infrastructure\Query\MappingCharacteristicsQuery:

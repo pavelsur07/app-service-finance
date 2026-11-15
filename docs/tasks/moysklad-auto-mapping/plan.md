@@ -273,7 +273,7 @@ site/config/packages/cache.yaml и site/config/services_test.yaml; tests/Unit/Mo
 и tests/Integration/MoySklad/AutomaticMappingPreviewStorageConcurrencyTest.php;
 worker tests/Fixtures/MoySklad/automatic-preview-worker.php (только local/test).
 
-- [ ] **2.1 RED:** MockClock/ArrayAdapter/Lock test store: TTL15m, максимум3, вытеснение oldest,
+- [x] **2.1 RED:** MockClock/ArrayAdapter/Lock test store: TTL15m, максимум3, вытеснение oldest,
   roundtrip scalar serialization, stable requestIds на retry, два preview
   независимы, foreign session/actor/company/connection/provider ->null, expiry ->null.
   Два реальных параллельных put: оба успешны либо один явно409; повтор
@@ -281,13 +281,13 @@ worker tests/Fixtures/MoySklad/automatic-preview-worker.php (только local/
   записи, активны не более3. Same id/different payload ->409.
   Два attempt не теряют/не смешивают results, limit3, cache outage до apply.
   Невалидные поля Guard отклоняются DTO. Ожидается RED на новом storage.
-- [ ] **2.2 GREEN:** storage + envelope, UUIDv7 per preview/per row, source hash
+- [x] **2.2 GREEN:** storage + envelope, UUIDv7 per preview/per row, source hash
   из Policy. Версия `article_size_v1`. Выделенный Redis pool, существующий
   LockFactory: mutex session-key только на короткое перечитывание/изменение
   индексов, без matcher/SQL/HTTP внутри. Не ждать mutex бесконечно: acquire(false),
   при занятости409, при недоступном Redis503. Не класть Entity, токены МС и
   полный marketplaceData в cache; pruning/TTL без фоновых задач.
-- [ ] **2.3 VERIFY/REVIEW:** unit/module и focused gates; self-review размера
+- [x] **2.3 VERIFY/REVIEW:** unit/module и focused gates; self-review размера
   cache payload/ownership/TTL/конкурентных обновлений, reports и commit/push. Продолжить Stage3.
 
 ## Stage 3: guarded writer и частичное массовое применение
