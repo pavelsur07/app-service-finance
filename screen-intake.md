@@ -45,7 +45,7 @@
 | Что | Где |
 |---|---|
 | Макет страницы | `screens/<name>.html` (обязательно) |
-| Эталон визуала (DS «Ваш Финдир» v3.4) | `docs/design-system/sheets/DS-*.html` (+ `ds-kit.css`) |
+| Эталон визуала (DS «Ваш Финдир») | `docs/design-system/sheets/*.dc.html` |
 | CSS кита (реализация нового слоя) | `assets/styles/kit/components/*.css`, `assets/styles/kit/patterns/*.css` |
 | Токены | `assets/styles/kit/tokens/*.css` (новый слой), `assets/styles/design-tokens.css` (легаси) |
 | Решения дизайна | `docs/plan/ds-legacy-tabler-audit.md` §7, §7a |

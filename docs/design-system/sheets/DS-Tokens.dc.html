@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Основы: цвета, типографика, отступы</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+*{box-sizing:border-box}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:16px;color:#525b78}
+.sw{width:152px;display:flex;flex-direction:column;gap:8px}
+.sw>div:first-child{height:56px;border-radius:6px;border:1px solid rgba(11,16,32,.1)}
+.sw b{font-size:13px;font-weight:600;display:block}
+.sec{display:flex;flex-direction:column;gap:20px}
+.sec h2{margin:0;font-size:18px;line-height:24px;font-weight:600}
+.sec p{margin:0;color:#525b78}
+.grp{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#525b78}
+</style>
+</helmet>
+
+<div style="width:1240px;height:2600px;padding:56px 64px;display:flex;flex-direction:column;gap:56px;background:#fff;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:20px;color:#0b1020">
+
+  <header style="display:flex;flex-direction:column;gap:8px;padding-bottom:32px;border-bottom:1px solid #dde1ec">
+    <div class="grp">Ваш Финдир · Design System · v0.1</div>
+    <h1 style="margin:0;font-size:32px;line-height:40px;font-weight:600">Основы</h1>
+    <p style="margin:0;color:#525b78;max-width:720px">Токены на базе Tabler с палитрой Navy и Red: цвета, типографика, отступы, радиусы, тени и иконки. Все компоненты ниже собираются только из этих значений.</p>
+  </header>
+
+  <!-- COLORS -->
+  <section class="sec">
+    <div><h2>Два бренд-цвета, цвет действия и нейтральная шкала из синего</h2><p>У каждой роли свой цвет. Navy 900 — структура и текст. Blue 600 — всё, на что можно нажать. Red 600 — бренд и опасное: логотип, ошибки, необратимые действия. Так главная кнопка не сливается с текстом и меню, а красный всегда читается как «осторожно».</p></div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px">
+      <div style="height:220px;border-radius:16px;background:#0b1020;color:#fff;padding:28px;display:flex;flex-direction:column;justify-content:space-between">
+        <div style="font-size:20px;line-height:28px;font-weight:700">Navy 900 · Основной</div>
+        <div class="mono" style="color:#fff;display:flex;flex-direction:column;gap:4px"><span>#0b1020 · --color-navy-900</span><span style="color:#dfe3ef">Текст, заголовки, тёмное меню, шапки, подвалы</span></div>
+      </div>
+      <div style="height:220px;border-radius:16px;background:#b00020;color:#fff;padding:28px;display:flex;flex-direction:column;justify-content:space-between">
+        <div style="font-size:20px;line-height:28px;font-weight:700">Red 600 · Бренд и опасное</div>
+        <div class="mono" style="color:#fff;display:flex;flex-direction:column;gap:4px"><span>#b00020 · --color-red-600</span><span>Логотип, маркетинг, ошибки, опасные действия. Белый текст — 7.2:1</span></div>
+      </div>
+    </div>
+
+    <div class="grp">Цвет действия</div>
+    <div style="display:flex;flex-wrap:wrap;gap:20px">
+      <div class="sw"><div style="background:#1d4ed8"></div><div><b>Blue 600 · Действие</b><span class="mono">--color-action-600 · #1d4ed8<br>белый текст — 6.7:1</span></div></div>
+      <div class="sw"><div style="background:#1a40b0"></div><div><b>Blue 700</b><span class="mono">--color-action-700 · #1a40b0<br>hover, нажатие</span></div></div>
+      <div class="sw"><div style="background:#e8effd"></div><div><b>Blue 50</b><span class="mono">--color-action-50 · #e8effd<br>выбранное, активный сегмент</span></div></div>
+      <div class="sw"><div style="background:#8f0019"></div><div><b>Red 700</b><span class="mono">--color-red-700 · #8f0019<br>hover опасной кнопки</span></div></div>
+    </div>
+
+    <div class="grp">Роли цвета</div>
+    <div style="display:flex;flex-direction:column;border:1px solid #dde1ec;border-radius:4px">
+      <div style="display:grid;grid-template-columns:44px 200px 1fr;align-items:center;gap:20px;padding:14px 20px"><div style="width:28px;height:28px;border-radius:6px;background:#0b1020"></div><b style="font-weight:600">Структура и текст</b><span style="color:#525b78">Navy: текст, заголовки, меню, шапки, подвалы, границы и фоны из нейтральной шкалы</span></div>
+      <div style="display:grid;grid-template-columns:44px 200px 1fr;align-items:center;gap:20px;padding:14px 20px;border-top:1px solid #dde1ec"><div style="width:28px;height:28px;border-radius:6px;background:#1d4ed8"></div><b style="font-weight:600">Действие</b><span style="color:#525b78">Blue: главная кнопка (одна на экран), ссылки, активные вкладки и сегменты, чекбоксы, переключатели, фокус, выбранные строки</span></div>
+      <div style="display:grid;grid-template-columns:44px 200px 1fr;align-items:center;gap:20px;padding:14px 20px;border-top:1px solid #dde1ec"><div style="width:28px;height:28px;border-radius:6px;background:#b00020"></div><b style="font-weight:600">Бренд и опасное</b><span style="color:#525b78">Red: логотип, маркетинг, ошибки и необратимые действия — всегда с иконкой или текстом действия</span></div>
+      <div style="display:grid;grid-template-columns:44px 200px 1fr;align-items:center;gap:20px;padding:14px 20px;border-top:1px solid #dde1ec"><div style="width:28px;height:28px;border-radius:6px;background:linear-gradient(90deg,#2fb344 50%,#f76707 50%)"></div><b style="font-weight:600">Статусы</b><span style="color:#525b78">Зелёный и жёлтый: состояния записей. Всегда вместе с текстом бейджа</span></div>
+    </div>
+
+    <div class="grp">Нейтральная шкала (Navy)</div>
+    <div style="display:flex;flex-wrap:wrap;gap:20px">
+      <div class="sw"><div style="background:#0b1020"></div><div><b>Navy 900</b><span class="mono">#0b1020<br>основной текст</span></div></div>
+      <div class="sw"><div style="background:#2b3350"></div><div><b>Navy 700</b><span class="mono">#2b3350<br>вторичный тёмный</span></div></div>
+      <div class="sw"><div style="background:#525b78"></div><div><b>Navy 600</b><span class="mono">#525b78<br>приглушённый текст</span></div></div>
+      <div class="sw"><div style="background:#6a738f"></div><div><b>Navy 500</b><span class="mono">#6a738f<br>плейсхолдер</span></div></div>
+      <div class="sw"><div style="background:#c3c8d6"></div><div><b>Navy 300</b><span class="mono">#c3c8d6<br>граница полей</span></div></div>
+      <div class="sw"><div style="background:#dde1ec"></div><div><b>Navy 200</b><span class="mono">#dde1ec<br>разделители, карточки</span></div></div>
+      <div class="sw"><div style="background:#e8ecf7"></div><div><b>Navy 100</b><span class="mono">#e8ecf7<br>чипы, выбранная строка</span></div></div>
+      <div class="sw"><div style="background:#f4f6fb"></div><div><b>Navy 50</b><span class="mono">#f4f6fb<br>шапка таблицы, hover</span></div></div>
+      <div class="sw"><div style="background:#f7f8fc"></div><div><b>Page</b><span class="mono">--bg · #f7f8fc<br>фон страницы</span></div></div>
+      <div class="sw"><div style="background:#ffffff"></div><div><b>Surface</b><span class="mono">--surface · #ffffff<br>карточки, поля</span></div></div>
+    </div>
+
+    <div class="grp">Семантические</div>
+    <p style="margin-top:-8px">Красный разрешён в интерфейсе только для ошибок, необратимых действий и логотипа. Главная кнопка, ссылки, вкладки, чекбоксы и выбранные состояния — Navy. Опасное действие всегда с подтверждением и текстом («Удалить», «В архив»), ошибка — с иконкой и текстом.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:20px">
+      <div class="sw"><div style="background:#2fb344"></div><div><b>Success</b><span class="mono">--success · #2fb344</span></div></div>
+      <div class="sw"><div style="background:#1d7a30"></div><div><b>Success text</b><span class="mono">--ok-text · #1d7a30</span></div></div>
+      <div class="sw"><div style="background:#e4f5e7"></div><div><b>Success lite</b><span class="mono">--ok-bg · #e4f5e7</span></div></div>
+      <div class="sw"><div style="background:#f76707"></div><div><b>Warning</b><span class="mono">--warning · #f76707</span></div></div>
+      <div class="sw"><div style="background:#9a4a00"></div><div><b>Warning text</b><span class="mono">--warn-text · #9a4a00</span></div></div>
+      <div class="sw"><div style="background:#fff4e5"></div><div><b>Warning lite</b><span class="mono">--warn-bg · #fff4e5</span></div></div>
+      <div class="sw"><div style="background:#f5d3a8"></div><div><b>Warning border</b><span class="mono">--warn-border · #f5d3a8</span></div></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:20px">
+      <div class="sw"><div style="background:#b00020"></div><div><b>Danger</b><span class="mono">--danger · #b00020</span></div></div>
+      <div class="sw"><div style="background:#9a001b"></div><div><b>Danger text</b><span class="mono">--danger-text · #9a001b</span></div></div>
+      <div class="sw"><div style="background:#fdecee"></div><div><b>Danger lite</b><span class="mono">--danger-bg · #fdecee</span></div></div>
+      <div class="sw"><div style="background:#f0c2c9"></div><div><b>Danger border</b><span class="mono">--danger-border · #f0c2c9</span></div></div>
+      <div class="sw"><div style="background:#164f94"></div><div><b>Info text</b><span class="mono">--info-text · #164f94</span></div></div>
+      <div class="sw"><div style="background:#e3eefb"></div><div><b>Info lite</b><span class="mono">--info-bg · #e3eefb</span></div></div>
+    </div>
+
+    <div class="grp">Категориальные (бейджи, аватары)</div>
+    <div style="display:flex;flex-wrap:wrap;gap:20px">
+      <div class="sw"><div style="background:#e3eefb;display:flex;align-items:center;justify-content:center;color:#164f94;font-weight:600">Аа</div><div><b>Blue</b><span class="mono">#164f94 / #e3eefb</span></div></div>
+      <div class="sw"><div style="background:#e0f2fb;display:flex;align-items:center;justify-content:center;color:#0b5d85;font-weight:600">Аа</div><div><b>Azure</b><span class="mono">#0b5d85 / #e0f2fb</span></div></div>
+      <div class="sw"><div style="background:#dff5ef;display:flex;align-items:center;justify-content:center;color:#0a6650;font-weight:600">Аа</div><div><b>Teal</b><span class="mono">#0a6650 / #dff5ef</span></div></div>
+      <div class="sw"><div style="background:#f4e9f8;display:flex;align-items:center;justify-content:center;color:#7a2a93;font-weight:600">Аа</div><div><b>Purple</b><span class="mono">#7a2a93 / #f4e9f8</span></div></div>
+    </div>
+  </section>
+
+  <!-- TYPOGRAPHY -->
+  <section class="sec">
+    <div><h2>Типографика</h2><p>Шрифт Inter (как в Tabler), запасной — системный. Суммы и ИНН всегда с табличными цифрами: <span class="mono" style="font-size:13px">font-variant-numeric: tabular-nums</span>.</p></div>
+    <div style="display:flex;flex-direction:column;border:1px solid #dde1ec;border-radius:4px">
+      <div style="display:grid;grid-template-columns:180px 1fr 220px;align-items:center;gap:24px;padding:16px 20px">
+        <div><b style="font-weight:600">H1</b><div class="mono">24 / 32 · 600</div></div>
+        <div style="font-size:24px;line-height:32px;font-weight:600">Контрагенты</div>
+        <div style="color:#525b78">Заголовок страницы</div>
+      </div>
+      <div style="display:grid;grid-template-columns:180px 1fr 220px;align-items:center;gap:24px;padding:16px 20px;border-top:1px solid #dde1ec">
+        <div><b style="font-weight:600">H2</b><div class="mono">18 / 24 · 600</div></div>
+        <div style="font-size:18px;line-height:24px;font-weight:600">Банковские счета</div>
+        <div style="color:#525b78">Панели, модальные окна</div>
+      </div>
+      <div style="display:grid;grid-template-columns:180px 1fr 220px;align-items:center;gap:24px;padding:16px 20px;border-top:1px solid #dde1ec">
+        <div><b style="font-weight:600">H3</b><div class="mono">16 / 24 · 600</div></div>
+        <div style="font-size:16px;line-height:24px;font-weight:600">Юридические лица</div>
+        <div style="color:#525b78">Заголовки карточек и групп</div>
+      </div>
+      <div style="display:grid;grid-template-columns:180px 1fr 220px;align-items:center;gap:24px;padding:16px 20px;border-top:1px solid #dde1ec">
+        <div><b style="font-weight:600">Body</b><div class="mono">14 / 20 · 400</div></div>
+        <div style="font-size:14px;line-height:20px">Организации, ИП и физические лица, с которыми вы ведёте расчёты</div>
+        <div style="color:#525b78">Основной текст, ячейки таблиц</div>
+      </div>
+      <div style="display:grid;grid-template-columns:180px 1fr 220px;align-items:center;gap:24px;padding:16px 20px;border-top:1px solid #dde1ec">
+        <div><b style="font-weight:600">Body strong</b><div class="mono">14 / 20 · 500</div></div>
+        <div style="font-size:14px;line-height:20px;font-weight:500">Агрба Анна Сергеевна</div>
+        <div style="color:#525b78">Названия в строках, кнопки, подписи</div>
+      </div>
+      <div style="display:grid;grid-template-columns:180px 1fr 220px;align-items:center;gap:24px;padding:16px 20px;border-top:1px solid #dde1ec">
+        <div><b style="font-weight:600">Small</b><div class="mono">13 / 20 · 400</div></div>
+        <div style="font-size:13px;line-height:20px;color:#525b78">Название, КПП, ОГРН и адрес подставятся из ЕГРЮЛ</div>
+        <div style="color:#525b78">Подсказки под полями, футеры</div>
+      </div>
+      <div style="display:grid;grid-template-columns:180px 1fr 220px;align-items:center;gap:24px;padding:16px 20px;border-top:1px solid #dde1ec">
+        <div><b style="font-weight:600">Caption</b><div class="mono">12 / 16 · 500–600</div></div>
+        <div style="font-size:12px;line-height:16px;font-weight:600">Активен</div>
+        <div style="color:#525b78">Бейджи, служебные подписи</div>
+      </div>
+      <div style="display:grid;grid-template-columns:180px 1fr 220px;align-items:center;gap:24px;padding:16px 20px;border-top:1px solid #dde1ec">
+        <div><b style="font-weight:600">Overline</b><div class="mono">11 / 16 · 700 · +5%</div></div>
+        <div style="font-size:11px;line-height:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#525b78">Наименование</div>
+        <div style="color:#525b78">Заголовки столбцов таблиц</div>
+      </div>
+      <div style="display:grid;grid-template-columns:180px 1fr 220px;align-items:center;gap:24px;padding:16px 20px;border-top:1px solid #dde1ec">
+        <div><b style="font-weight:600">Numeric</b><div class="mono">14 / 20 · tabular</div></div>
+        <div style="font-size:14px;line-height:20px;font-variant-numeric:tabular-nums;font-weight:500">12 480,00 ₽ &nbsp; 7728168971</div>
+        <div style="color:#525b78">Суммы, ИНН, р/с — выравнивание по разряду</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SPACING / RADIUS / SHADOW -->
+  <section class="sec">
+    <div><h2>Отступы, радиусы, тени</h2><p>Шаг сетки — 4 px. Для разметки страниц используются только значения из шкалы.</p></div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:40px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="grp">Отступы</div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:4px;height:16px;background:#0b1020"></div><span class="mono">4 · --s-1 · иконка и текст</span></div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:8px;height:16px;background:#0b1020"></div><span class="mono">8 · --s-2 · между кнопками</span></div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:12px;height:16px;background:#0b1020"></div><span class="mono">12 · --s-3 · аватар и текст</span></div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:16px;height:16px;background:#0b1020"></div><span class="mono">16 · --s-4 · поля карточки</span></div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:24px;height:16px;background:#0b1020"></div><span class="mono">24 · --s-5 · между секциями</span></div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:32px;height:16px;background:#0b1020"></div><span class="mono">32 · --s-6 · поля страницы</span></div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:48px;height:16px;background:#0b1020"></div><span class="mono">48 · --s-7 · крупные блоки</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="grp">Радиусы</div>
+        <div style="display:flex;align-items:center;gap:16px"><div style="width:56px;height:40px;border:2px solid #0b1020;border-radius:4px"></div><span class="mono">4 · --r-sm · кнопки, поля, карточки</span></div>
+        <div style="display:flex;align-items:center;gap:16px"><div style="width:56px;height:40px;border:2px solid #0b1020;border-radius:6px"></div><span class="mono">6 · --r-md · аватар организации</span></div>
+        <div style="display:flex;align-items:center;gap:16px"><div style="width:56px;height:40px;border:2px solid #0b1020;border-radius:8px"></div><span class="mono">8 · --r-lg · модальные окна</span></div>
+        <div style="display:flex;align-items:center;gap:16px"><div style="width:56px;height:40px;border:2px solid #0b1020;border-radius:20px"></div><span class="mono">full · счётчики, аватар ИП</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="grp">Тени</div>
+        <div style="display:flex;align-items:center;gap:16px"><div style="width:56px;height:40px;background:#fff;border:1px solid #dde1ec;border-radius:4px;box-shadow:0 1px 2px rgba(11,16,32,.04)"></div><span class="mono">sm · карточки</span></div>
+        <div style="display:flex;align-items:center;gap:16px"><div style="width:56px;height:40px;background:#fff;border-radius:4px;box-shadow:0 4px 12px rgba(11,16,32,.12)"></div><span class="mono">md · выпадающие меню</span></div>
+        <div style="display:flex;align-items:center;gap:16px"><div style="width:56px;height:40px;background:#fff;border-radius:4px;box-shadow:0 12px 32px rgba(11,16,32,.18)"></div><span class="mono">lg · модальные окна, панели</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ICONS -->
+  <section class="sec">
+    <div><h2>Иконки</h2><p>Линейные, штрих 1.8 px, скругленные концы. Размеры 16 (в кнопках и строках), 18 (меню), 20 и 24 (пустые состояния). Иконка без текста всегда с <span class="mono" style="font-size:13px">aria-label</span>.</p></div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px">
+      <div style="width:104px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0;border:1px solid #dde1ec;border-radius:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1020" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="mono">search</span></div>
+      <div style="width:104px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0;border:1px solid #dde1ec;border-radius:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1020" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="mono">plus</span></div>
+      <div style="width:104px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0;border:1px solid #dde1ec;border-radius:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1020" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 9l5-5 5 5M12 4v12"/></svg><span class="mono">upload</span></div>
+      <div style="width:104px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0;border:1px solid #dde1ec;border-radius:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1020" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 11l5 5 5-5M12 4v12"/></svg><span class="mono">download</span></div>
+      <div style="width:104px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0;border:1px solid #dde1ec;border-radius:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1020" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16v4zM13.5 6.5l4 4"/></svg><span class="mono">edit</span></div>
+      <div style="width:104px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0;border:1px solid #dde1ec;border-radius:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="#0b1020" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg><span class="mono">more</span></div>
+      <div style="width:104px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0;border:1px solid #dde1ec;border-radius:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1020" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg><span class="mono">chevron</span></div>
+      <div style="width:104px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0;border:1px solid #dde1ec;border-radius:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1020" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9L2.4 17.5A2 2 0 004.1 20.5h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg><span class="mono">alert</span></div>
+      <div style="width:104px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0;border:1px solid #dde1ec;border-radius:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1020" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="mono">close</span></div>
+      <div style="width:104px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0;border:1px solid #dde1ec;border-radius:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1020" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg><span class="mono">check</span></div>
+      <div style="width:104px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0;border:1px solid #dde1ec;border-radius:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1020" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18v4H3zM5 9v10h14V9M10 13h4"/></svg><span class="mono">archive</span></div>
+      <div style="width:104px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 0;border:1px solid #dde1ec;border-radius:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1020" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg><span class="mono">trash</span></div>
+    </div>
+  </section>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1240,"height":2600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

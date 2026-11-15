@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Деньги и числа</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+*{box-sizing:border-box}
+input{font-family:inherit;font-size:14px;color:#0b1020}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:16px;color:#525b78}
+.sec{display:flex;flex-direction:column;gap:20px}
+.sec h2{margin:0;font-size:18px;line-height:24px;font-weight:600}
+.sec p{margin:0;color:#525b78}
+.grp{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#525b78}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.dim{color:#525b78;font-weight:400}
+.rule{display:grid;grid-template-columns:200px minmax(0,1fr) 260px;gap:24px;align-items:center;padding:14px 20px;border-top:1px solid #dde1ec}
+.rule:first-child{border-top:0}
+.rule b{font-weight:600}
+.rule .ex{text-align:right}
+.field{width:100%;height:36px;padding:0 12px;border:1px solid #c3c8d6;border-radius:4px;background:#fff}
+</style>
+</helmet>
+
+<div style="width:1240px;height:2380px;padding:56px 64px;display:flex;flex-direction:column;gap:56px;background:#fff;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:20px;color:#0b1020">
+
+  <header style="display:flex;flex-direction:column;gap:8px;padding-bottom:32px;border-bottom:1px solid #dde1ec">
+    <div class="grp">Ваш Финдир · Design System · v0.1</div>
+    <h1 style="margin:0;font-size:32px;line-height:40px;font-weight:600">Деньги и числа</h1>
+    <p style="margin:0;color:#525b78;max-width:760px">Правила записи денежных сумм. Цель — чтобы в списках цифры читались сразу: короче запись, ровные разряды, нет повторяющейся валюты и лишнего цвета.</p>
+  </header>
+
+  <!-- BEFORE / AFTER -->
+  <section class="sec">
+    <div><h2>Было и стало</h2><p>Валюта вынесена в заголовок колонки, копейки приглушены, знак и цвет остались. Сумма занимает меньше места, а целая часть выделяется.</p></div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px">
+      <div style="border:1px solid #dde1ec;border-radius:4px">
+        <div style="display:flex;justify-content:space-between;padding:10px 20px;background:#f4f6fb;border-bottom:1px solid #dde1ec"><span class="grp">Было</span><span class="grp">Сумма</span></div>
+        <div style="display:flex;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #dde1ec"><span style="color:#525b78">04.10.2026</span><span class="num" style="font-weight:600;color:#1d7a30">+91&nbsp;079,35&nbsp;RUB</span></div>
+        <div style="display:flex;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #dde1ec"><span style="color:#525b78">04.10.2026</span><span class="num" style="font-weight:600;color:#9a001b">−11,90&nbsp;RUB</span></div>
+        <div style="display:flex;justify-content:space-between;padding:14px 20px"><span style="color:#525b78">04.10.2026</span><span class="num" style="font-weight:600;color:#1d7a30">+2&nbsp;500,00&nbsp;RUB</span></div>
+      </div>
+      <div style="border:1px solid #1d4ed8;border-radius:4px">
+        <div style="display:flex;justify-content:space-between;padding:10px 20px;background:#e8effd;border-bottom:1px solid #dde1ec"><span class="grp" style="color:#1d4ed8">Стало</span><span class="grp">Сумма, ₽</span></div>
+        <div style="display:flex;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #dde1ec"><span style="color:#525b78">04.10.2026</span><span class="num" style="font-weight:600;color:#1d7a30">+91&nbsp;079<span class="dim">,35</span></span></div>
+        <div style="display:flex;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #dde1ec"><span style="color:#525b78">04.10.2026</span><span class="num" style="font-weight:600">−11<span class="dim">,90</span></span></div>
+        <div style="display:flex;justify-content:space-between;padding:14px 20px"><span style="color:#525b78">04.10.2026</span><span class="num" style="font-weight:600;color:#1d7a30">+2&nbsp;500<span class="dim">,00</span></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RULES -->
+  <section class="sec">
+    <div><h2>Правила</h2></div>
+    <div style="border:1px solid #dde1ec;border-radius:4px">
+      <div class="rule"><b>Разряды и копейки</b><span style="color:#525b78">Неразрывный пробел между тысячами, запятая перед копейками. Копейки в таблицах и формах всегда два знака: «,00» не скрываем, а приглушаем.</span><span class="ex num" style="font-weight:600">1&nbsp;250&nbsp;000<span class="dim">,50</span></span></div>
+      <div class="rule"><b>Знак</b><span style="color:#525b78">Настоящий минус «−» (U+2212), не дефис. Плюс — только у приходов в списке операций. В остатках и итогах знак только у отрицательных значений.</span><span class="ex num" style="font-weight:600"><span style="color:#1d7a30">+91&nbsp;079<span class="dim">,35</span></span> &nbsp; −11<span class="dim">,90</span></span></div>
+      <div class="rule"><b>Валюта в таблице</b><span style="color:#525b78">Если в таблице одна валюта, в строках её не повторяем: она указана в заголовке колонки «Сумма, ₽». Символ ₽ вместо кода RUB: он короче и привычнее.</span><span class="ex" style="color:#525b78">Заголовок: <b style="color:#0b1020;font-weight:600">Сумма, ₽</b></span></div>
+      <div class="rule"><b>Несколько валют</b><span style="color:#525b78">Символ ставится после числа, приглушённым цветом. Для валют без привычного символа — трёхбуквенный код. Строки с рублями остаются без символа, пока колонка в рублях.</span><span class="ex num" style="font-weight:600">1&nbsp;250<span class="dim">,00 $</span> &nbsp; 5&nbsp;000<span class="dim">,00 CNY</span></span></div>
+      <div class="rule"><b>Выравнивание</b><span style="color:#525b78">По правому краю, табличные цифры, одинаковое число знаков после запятой. Тогда рубли, тысячи и копейки стоят друг под другом.</span><span class="ex num" style="font-weight:600;line-height:24px">91&nbsp;079<span class="dim">,35</span><br>2&nbsp;500<span class="dim">,00</span><br>11<span class="dim">,90</span></span></div>
+      <div class="rule"><b>Цвет</b><span style="color:#525b78">Приход — зелёный, расход — основной цвет текста, ноль — приглушённый. Красный не используем: он зарезервирован под ошибки. Смысл всегда дублирует знак.</span><span class="ex num" style="font-weight:600"><span style="color:#1d7a30">+2&nbsp;500<span class="dim">,00</span></span> &nbsp; −11<span class="dim">,90</span> &nbsp; <span class="dim">0,00</span></span></div>
+      <div class="rule"><b>Сокращения</b><span style="color:#525b78">Только в плитках KPI и на графиках: «тыс.», «млн». В таблицах, формах и документах сумму не сокращаем. У сокращённого значения при наведении видна полная сумма.</span><span class="ex num" style="font-weight:600">196,1 тыс. ₽ &nbsp; 1,2 млн ₽</span></div>
+      <div class="rule"><b>Итоги</b><span style="color:#525b78">В итогах и подвалах таблиц символ валюты всегда указан. Итоговая сумма крупнее и жирнее строк.</span><span class="ex num" style="font-weight:700;font-size:16px">+196&nbsp;114<span class="dim">,44</span>&nbsp;₽</span></div>
+      <div class="rule"><b>Поле ввода</b><span style="color:#525b78">Валюта — суффикс внутри поля, не часть текста. Принимает запятую и точку, расставляет разряды при вводе, понимает вставку вида «91 079,35 ₽».</span><span class="ex"><span style="position:relative;display:block"><input class="field num" type="text" aria-label="Пример поля суммы" value="12 480,00" style="text-align:right;padding-right:36px;font-weight:500"><span aria-hidden="true" style="position:absolute;right:12px;top:8px;color:#525b78">₽</span></span></span></div>
+      <div class="rule"><b>Экспорт</b><span style="color:#525b78">В XLS и CSV суммы идут числами без пробелов и символа, а формат ячейки задаёт столбец. Так их можно складывать и фильтровать.</span><span class="ex num" style="font-weight:600">91079.35</span></div>
+    </div>
+  </section>
+
+  <!-- FX -->
+  <section class="sec">
+    <div><h2>Валютные операции</h2><p>Основная сумма — всегда рубли: то, что фактически списал банк. Валюта операции и курс идут второй строкой серым. Курс фиксируется в момент операции и потом не пересчитывается.</p></div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:32px;align-items:start">
+      <div style="border:1px solid #dde1ec;border-radius:4px">
+        <div style="display:grid;grid-template-columns:150px 1fr 170px;gap:16px;padding:10px 20px;background:#f4f6fb;border-bottom:1px solid #dde1ec"><span class="grp">Дата / счёт</span><span class="grp">Статья</span><span class="grp" style="text-align:right">Сумма, ₽</span></div>
+        <div style="display:grid;grid-template-columns:150px 1fr 170px;gap:16px;padding:14px 20px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:2px"><span class="num" style="font-weight:500">05.10.2026</span><span style="font-size:12px;color:#525b78">Корп. карта</span></div>
+          <div style="font-weight:500">Сервисы и подписки</div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px"><span class="num" style="font-weight:600">−11&nbsp;902<span class="dim">,40</span></span><span class="num" style="font-size:12px;color:#525b78">−120,00&nbsp;€ · 99,19&nbsp;₽/€</span></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;color:#525b78">
+        <div><b style="color:#0b1020;font-weight:600">Рубли — факт списания.</b> Берутся из выписки банка, поэтому остаток в системе сходится с банком.</div>
+        <div><b style="color:#0b1020;font-weight:600">Курс — производное.</b> Сумма списания ÷ сумма в валюте, с двумя знаками. Показывается справочно, при наведении — «Фактическое списание банка».</div>
+        <div><b style="color:#0b1020;font-weight:600">Фиксация.</b> Курс записывается в момент операции. Курсы позже не обновляются, итоги за прошлые периоды не меняются.</div>
+        <div><b style="color:#0b1020;font-weight:600">Фильтр по валюте.</b> Если выбрана одна валюта, основная колонка становится «Сумма, €», а рубли идут вторым значением. Итоги пересчитываются в выбранную валюту.</div>
+        <div><b style="color:#0b1020;font-weight:600">Итоги.</b> По умолчанию в рублях по фактическим списаниям, рядом «в том числе в валюте: −120,00 €».</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DONT -->
+  <section class="sec">
+    <div><h2>Не делать</h2></div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px">
+      <div style="border:1px solid #dde1ec;border-radius:4px;padding:16px 20px;display:flex;flex-direction:column;gap:8px"><b style="font-weight:600">Дефис вместо минуса</b><span class="num" style="color:#525b78">-11,90 вместо −11,90</span><span style="color:#525b78;font-size:13px">Дефис не выровняется с плюсом и ломает сортировку при вставке.</span></div>
+      <div style="border:1px solid #dde1ec;border-radius:4px;padding:16px 20px;display:flex;flex-direction:column;gap:8px"><b style="font-weight:600">Скобки для расходов</b><span class="num" style="color:#525b78">(11,90)</span><span style="color:#525b78;font-size:13px">Бухгалтерский формат — только в отчётах по запросу, не в рабочих списках.</span></div>
+      <div style="border:1px solid #dde1ec;border-radius:4px;padding:16px 20px;display:flex;flex-direction:column;gap:8px"><b style="font-weight:600">Красный для расходов</b><span class="num" style="color:#525b78">обычный расход — не красный</span><span style="color:#525b78;font-size:13px">Красный всегда читается как ошибка. Расход — обычный цвет со знаком.</span></div>
+      <div style="border:1px solid #dde1ec;border-radius:4px;padding:16px 20px;display:flex;flex-direction:column;gap:8px"><b style="font-weight:600">Сокращения в таблицах</b><span class="num" style="color:#525b78">91 тыс. ₽ вместо 91 079,35</span><span style="color:#525b78;font-size:13px">Теряется точность, суммы нельзя сверить с выпиской.</span></div>
+      <div style="border:1px solid #dde1ec;border-radius:4px;padding:16px 20px;display:flex;flex-direction:column;gap:8px"><b style="font-weight:600">Обычный пробел в сумме</b><span class="num" style="color:#525b78">91 079,35 может перенестись</span><span style="color:#525b78;font-size:13px">Между тысячами и перед символом только неразрывный пробел.</span></div>
+      <div style="border:1px solid #dde1ec;border-radius:4px;padding:16px 20px;display:flex;flex-direction:column;gap:8px"><b style="font-weight:600">Разное число знаков</b><span class="num" style="color:#525b78">2 500 и 11,9 в одной колонке</span><span style="color:#525b78;font-size:13px">Разряды перестают совпадать, и цифры сложно сравнивать.</span></div>
+    </div>
+  </section>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1240,"height":2380}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

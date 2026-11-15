@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Таблица и фильтры</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+*{box-sizing:border-box}
+button,input,select{font-family:inherit;font-size:14px;color:#0b1020}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:16px;color:#525b78}
+.sec{display:flex;flex-direction:column;gap:20px}
+.sec h2{margin:0;font-size:18px;line-height:24px;font-weight:600}
+.sec p{margin:0;color:#525b78}
+.grp{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#525b78}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 14px;border-radius:4px;border:1px solid #c3c8d6;background:#fff;cursor:pointer;font-weight:500;white-space:nowrap;line-height:20px}
+.btn.sm{height:30px;padding:0 10px;font-size:13px}
+.field{height:36px;padding:0 12px;border:1px solid #c3c8d6;border-radius:4px;background:#fff}
+.tr{display:grid;grid-template-columns:48px minmax(240px,1fr) 140px 150px 100px 100px 80px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px 0 10px;border-radius:14px;background:#e8effd;color:#1d4ed8;font-size:13px;font-weight:500}
+.chip button{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:0;border-radius:50%;background:transparent;color:#0b1020;cursor:pointer}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:4px;background:transparent;color:#525b78;cursor:pointer}
+.link{background:none;border:0;padding:0;color:#1d4ed8;cursor:pointer;font-weight:500;font-size:13px}
+.link:hover{text-decoration:underline}
+.num{position:absolute;top:-10px;left:-10px;width:22px;height:22px;border-radius:50%;background:#0b1020;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+button:focus-visible{outline:2px solid #1d4ed8;outline-offset:2px}
+</style>
+</helmet>
+
+<div style="width:1240px;height:1500px;padding:56px 64px;display:flex;flex-direction:column;gap:56px;background:#fff;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:20px;color:#0b1020">
+
+  <header style="display:flex;flex-direction:column;gap:8px;padding-bottom:32px;border-bottom:1px solid #dde1ec">
+    <div class="grp">Ваш Финдир · Design System · v0.1</div>
+    <h1 style="margin:0;font-size:32px;line-height:40px;font-weight:600">Таблица и фильтры</h1>
+    <p style="margin:0;color:#525b78;max-width:720px">Главный паттерн продукта: большинство экранов — это список записей. Один и тот же каркас используется для контрагентов, операций, счетов и документов.</p>
+  </header>
+
+  <!-- ANATOMY -->
+  <section class="sec">
+    <div><h2>Анатомия списка</h2><p>Порядок сверху вниз неизменен: заголовок и действия, сегменты, фильтры, массовые действия, таблица, подвал.</p></div>
+
+    <div style="position:relative;border:1px solid #dde1ec;border-radius:4px;box-shadow:0 1px 2px rgba(11,16,32,.04)">
+      <!-- 1 Segments -->
+      <div style="position:relative;display:flex;gap:4px;padding:0 16px;border-bottom:1px solid #dde1ec" role="tablist" aria-label="Сегменты">
+        <span class="num" aria-hidden="true" style="left:-11px">1</span>
+        <button role="tab" aria-selected="true" type="button" style="display:inline-flex;align-items:center;gap:8px;padding:14px 12px 12px;margin-bottom:-1px;background:none;border:0;border-bottom:2px solid #1d4ed8;color:#1d4ed8;font-weight:500;cursor:pointer">Все<span style="padding:0 7px;border-radius:10px;background:#e8effd;color:#1d4ed8;font-size:12px;font-weight:600;line-height:20px">13</span></button>
+        <button role="tab" aria-selected="false" type="button" style="display:inline-flex;align-items:center;gap:8px;padding:14px 12px 12px;margin-bottom:-1px;background:none;border:0;border-bottom:2px solid transparent;color:#525b78;font-weight:500;cursor:pointer">Юридические лица<span style="padding:0 7px;border-radius:10px;background:#e8ecf7;color:#525b78;font-size:12px;font-weight:600;line-height:20px">6</span></button>
+        <button role="tab" aria-selected="false" type="button" style="display:inline-flex;align-items:center;gap:8px;padding:14px 12px 12px;margin-bottom:-1px;background:none;border:0;border-bottom:2px solid transparent;color:#525b78;font-weight:500;cursor:pointer">ИП<span style="padding:0 7px;border-radius:10px;background:#e8ecf7;color:#525b78;font-size:12px;font-weight:600;line-height:20px">7</span></button>
+      </div>
+
+      <!-- 2 Filters -->
+      <div style="position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px">
+        <span class="num" aria-hidden="true" style="left:-11px">2</span>
+        <div style="position:relative;flex:1 1 260px;max-width:360px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#525b78" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="position:absolute;left:12px;top:10px"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input class="field" type="search" aria-label="Поиск" placeholder="Название или ИНН" style="width:100%;padding-left:36px">
+        </div>
+        <select class="field" aria-label="Категория"><option>Категория: все</option></select>
+        <select class="field" aria-label="Статус"><option>Статус: активные</option></select>
+        <span class="chip">Категория: Банк<button type="button" aria-label="Убрать фильтр «Категория: Банк»"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>
+        <button class="link" type="button">Сбросить всё</button>
+        <div style="flex:1 1 0"></div>
+        <div role="group" aria-label="Группировка" style="display:flex;border:1px solid #c3c8d6;border-radius:4px;overflow:hidden">
+          <button type="button" aria-pressed="true" style="height:34px;padding:0 12px;border:0;background:#e8effd;color:#1d4ed8;font-weight:600;cursor:pointer">Тип</button>
+          <button type="button" aria-pressed="false" style="height:34px;padding:0 12px;border:0;border-left:1px solid #c3c8d6;background:#fff;font-weight:500;cursor:pointer">Категория</button>
+          <button type="button" aria-pressed="false" style="height:34px;padding:0 12px;border:0;border-left:1px solid #c3c8d6;background:#fff;font-weight:500;cursor:pointer">Без групп</button>
+        </div>
+      </div>
+
+      <!-- 3 Bulk bar -->
+      <div role="toolbar" aria-label="Действия с выбранными" style="position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 16px;background:#e8effd;border-top:1px solid #dde1ec;border-bottom:1px solid #dde1ec;min-height:56px">
+        <span class="num" aria-hidden="true" style="left:-11px">3</span>
+        <div style="font-weight:600;color:#1d4ed8">Выбрано: 2</div>
+        <button class="btn sm" type="button">Назначить категорию</button>
+        <button class="btn sm" type="button">Объединить дубли</button>
+        <button class="btn sm" type="button" style="color:#9a001b">В архив</button>
+        <div style="flex:1 1 0"></div>
+        <button class="link" type="button">Снять выбор</button>
+      </div>
+
+      <!-- 4 Table -->
+      <div role="table" aria-label="Пример таблицы" style="position:relative">
+        <span class="num" aria-hidden="true" style="left:-11px;top:8px;z-index:1">4</span>
+        <div role="row" class="tr" style="background:#f4f6fb;padding:10px 0;font-size:11px;font-weight:700;letter-spacing:.05em;color:#525b78;text-transform:uppercase">
+          <div role="columnheader" style="padding-left:16px"><span aria-hidden="true" style="width:16px;height:16px;border-radius:2px;background:#1d4ed8;display:inline-flex;align-items:center;justify-content:center"><span style="width:8px;height:2px;background:#fff"></span></span></div>
+          <div role="columnheader" style="display:flex;align-items:center;gap:4px">Наименование<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0b1020" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
+          <div role="columnheader">ИНН</div>
+          <div role="columnheader">Категория</div>
+          <div role="columnheader">Тип</div>
+          <div role="columnheader">Статус</div>
+          <div role="columnheader"></div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 16px;background:#f4f6fb;border-top:1px solid #dde1ec">
+          <button type="button" class="icon-btn" aria-label="Свернуть группу" style="width:28px;height:28px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          <div style="font-weight:600">Юридические лица</div>
+          <div style="padding:0 8px;border-radius:10px;background:#e8ecf7;color:#525b78;font-size:12px;font-weight:600;line-height:20px">6</div>
+        </div>
+
+        <!-- selected + flagged -->
+        <div role="row" class="tr" style="padding:14px 0;border-top:1px solid #dde1ec;background:#e8effd">
+          <div role="cell" style="padding-left:16px"><input type="checkbox" checked aria-label="Выбрать" style="width:16px;height:16px;accent-color:#1d4ed8;margin:0"></div>
+          <div role="cell" style="display:flex;align-items:center;gap:12px;min-width:0;padding-right:16px">
+            <div aria-hidden="true" style="flex:none;width:36px;height:36px;border-radius:6px;background:#e3eefb;color:#164f94;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">АБ</div>
+            <div style="min-width:0;display:flex;flex-direction:column;gap:2px">
+              <div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">АО "АЛЬФА-БАНК" Р/С 30233810714000000919</div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9a4a00"><span>Предложено: <b style="font-weight:600">АО «АЛЬФА-БАНК»</b></span><button class="link" type="button" style="font-size:12px">Применить</button></div>
+            </div>
+          </div>
+          <div role="cell" style="font-variant-numeric:tabular-nums">7728168971</div>
+          <div role="cell"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:#e3eefb;color:#164f94">Банк</span></div>
+          <div role="cell">Юр. лицо</div>
+          <div role="cell"><span style="display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:4px;background:#e4f5e7;color:#1d7a30;font-size:12px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#1d7a30"></span>Активен</span></div>
+          <div role="cell" style="display:flex;justify-content:flex-end;padding-right:12px"><button class="icon-btn" type="button" aria-label="Ещё"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg></button></div>
+        </div>
+        <!-- hover -->
+        <div role="row" class="tr" style="padding:14px 0;border-top:1px solid #dde1ec;background:#f4f6fb">
+          <div role="cell" style="padding-left:16px"><input type="checkbox" aria-label="Выбрать" style="width:16px;height:16px;accent-color:#1d4ed8;margin:0"></div>
+          <div role="cell" style="display:flex;align-items:center;gap:12px;min-width:0;padding-right:16px">
+            <div aria-hidden="true" style="flex:none;width:36px;height:36px;border-radius:6px;background:#e3eefb;color:#164f94;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">БЛ</div>
+            <div style="font-weight:500">АО "БАЛТИЙСКИЙ ЛИЗИНГ"</div>
+          </div>
+          <div role="cell" style="font-variant-numeric:tabular-nums">7812022787</div>
+          <div role="cell"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:#e0f2fb;color:#0b5d85">Лизинг</span></div>
+          <div role="cell">Юр. лицо</div>
+          <div role="cell"><span style="display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:4px;background:#e4f5e7;color:#1d7a30;font-size:12px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#1d7a30"></span>Активен</span></div>
+          <div role="cell" style="display:flex;gap:2px;justify-content:flex-end;padding-right:12px"><button class="icon-btn" type="button" aria-label="Редактировать"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16v4zM13.5 6.5l4 4"/></svg></button><button class="icon-btn" type="button" aria-label="Ещё"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg></button></div>
+        </div>
+        <!-- default compact -->
+        <div role="row" class="tr" style="padding:8px 0;border-top:1px solid #dde1ec">
+          <div role="cell" style="padding-left:16px"><input type="checkbox" aria-label="Выбрать" style="width:16px;height:16px;accent-color:#1d4ed8;margin:0"></div>
+          <div role="cell" style="display:flex;align-items:center;gap:12px;min-width:0;padding-right:16px">
+            <div aria-hidden="true" style="flex:none;width:36px;height:36px;border-radius:6px;background:#e3eefb;color:#164f94;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">ДО</div>
+            <div style="font-weight:500">АО "ДОНТАРА"</div>
+          </div>
+          <div role="cell" style="font-variant-numeric:tabular-nums">6165032044</div>
+          <div role="cell" style="color:#525b78;font-size:13px">Не задана</div>
+          <div role="cell">Юр. лицо</div>
+          <div role="cell"><span style="display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:4px;background:#e4f5e7;color:#1d7a30;font-size:12px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#1d7a30"></span>Активен</span></div>
+          <div role="cell"></div>
+        </div>
+      </div>
+
+      <!-- 5 Footer -->
+      <div style="position:relative;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-top:1px solid #dde1ec;color:#525b78;font-size:13px">
+        <span class="num" aria-hidden="true" style="left:-11px">5</span>
+        <div>Показано 13 из 13</div>
+        <div style="display:flex;align-items:center;gap:12px"><span>На странице</span><select class="field" aria-label="На странице" style="height:30px;padding:0 8px;font-size:13px"><option>50</option></select></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RULES -->
+  <section class="sec">
+    <div><h2>Правила паттерна</h2></div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 48px">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-weight:600">1 · Сегменты</div>
+        <div style="color:#525b78">Взаимоисключающие срезы списка со счётчиками. «Архив» — тоже сегмент, а не чекбокс. Счётчик «Требуют внимания» жёлтый, пока он больше нуля.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-weight:600">2 · Фильтры</div>
+        <div style="color:#525b78">Поиск слева, фильтры рядом, группировка справа. Применённые фильтры показываются чипами с крестиком и общей кнопкой «Сбросить всё». Кнопки «Применить» нет — список обновляется сразу.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-weight:600">3 · Массовые действия</div>
+        <div style="color:#525b78">Панель заменяет строку фильтров, как только выбрана хотя бы одна запись, и показывает число выбранных. В заголовке таблицы чекбокс частичного выбора. Опасное действие — последним и красным.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-weight:600">4 · Таблица</div>
+        <div style="color:#525b78">Заголовок группы можно свернуть. Наименование слева с аватаром, числа и ИНН с табличными цифрами, статус бейджем. Действия строки — карандаш и «⋯», видны при наведении и по фокусу. Плотность: 14 px (обычная) и 8 px (компактная) по вертикали.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-weight:600">5 · Подвал</div>
+        <div style="color:#525b78">Сколько показано из скольких и размер страницы. Если записей больше 50 — пагинация справа.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-weight:600">Состояния</div>
+        <div style="color:#525b78">Hover — фон #f4f6fb. Выбрана — фон #e8effd. Строка с проблемой — предупреждение и готовое исправление под названием, а не отдельный экран. Пустой и ошибочный список — как на листе «Статусы и обратная связь».</div>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1240,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
