@@ -1,7 +1,7 @@
 ## Current checkpoint
 
-**Phase:** Stage 1 / Work item 1.1
-**Status:** implementing
+**Phase:** handoff — owner merge/deploy decision pending
+**Status:** done (implementation)
 **Stage base commit:** 0e14475c9
 
 ### Completed
@@ -124,3 +124,31 @@
 - Running full analysis with --debug --memory-limit=1536M, avoiding parallel job transport.
 - Full local tests 9147 /51337 assertions PASS; final CS/strict/unit PASS on latest code.
 - Commit/push Draft for standard CI full PHPStan on its own runner; Ready remains pending.
+
+### CI verification
+- CI full PHPStan success for code commit 87b4dd615:
+  https://github.com/pavelsur07/app-service-finance/actions/runs/43679594480/job/132707202964
+- CI Python/CS/unit/API types/SPA checks green; full local 9147 tests green.
+- CI functional shard 2/3 failed one untouched wall-clock-sensitive test:
+  WbFinanceSalesReportsQuotaControllerTest::testRemote429SetsSharedCooldown,
+  expected cooldown_seconds=120, actual119 (test elapsed second).
+- No quota/rate-limit code changed. Retry failed job on a fresh runner to verify timing hypothesis.
+- Rerun initially refused with HTTP403 while original workflow was still running.
+  Original run has now completed; corrected retry of the single failed functional job requested.
+  All other required source gates including full PHPStan passed in CI.
+
+### Handoff preparation
+- Full PHPStan CI PASS; in-process local retry also ended exit137 (OOM), no running local analyzer remains.
+- Final source code 87b4dd615; 9147 PHP tests /51337 assertions PASS, CS/strict/unit PASS.
+- External REVIEW_GREEN, internal findings fixed, one Cash-channel MINOR deferred.
+- CI failed WB timing test rerun accepted; attempt2 in progress, no source changes.
+- Next: observe rerun result; finalize reports, commit docs, Ready PR, single release question.
+
+### Final handoff
+- CI WB timing-flake retry PASS without source changes. All source gates green.
+- Source commit: 87b4dd615; final commit only records verification in task reports.
+- Internal: BLOCKER0/IMPORTANT2 fixed; external: BLOCKER0/IMPORTANT1 fixed,
+  2 points ×1 round, handoff REVIEW_GREEN; Cash per-draft retry MINOR deferred.
+- Branch feat/retire-feature-flags, PR3006 base master; Ready at handoff.
+- Production and six GitHub Variables unchanged; one named merge/deploy + post-acceptance
+  variable-removal decision pending. Rollback requires restoring saved variables first.

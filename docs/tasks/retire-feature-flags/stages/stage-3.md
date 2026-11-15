@@ -1,4 +1,4 @@
-### Stage 3: постоянный deployment — checking
+### Stage 3: постоянный deployment — DONE
 
 Risk: HIGH-EXTERNAL (изменения CI/CD и production-конфигурации прямо предусмотрены запросом реализации).
 Stage base: `ed99b3518`. Production и GitHub Variables не изменены.
@@ -19,12 +19,12 @@ Stage base: `ed99b3518`. Production и GitHub Variables не изменены.
 - PHP full CS/strict PASS (0/4272); unit 4804 tests /26738 assertions PASS.
 - Final focused PHPStan PASS; Telegram/PaymentIntake 184 tests /1304 assertions PASS.
 - Full PHP tests: 9147 tests /51337 assertions PASS (unit + integration +3 CI functional shards).
-- Full PHPStan: local worker killed by OOM (Docker OOMKilled=true); in-process retry + CI pending.
+- Full PHPStan: CI PASS; local worker OOM (Docker OOMKilled=true).
 - Final external: round 1 REVIEW_GREEN; BLOCKER 0 / IMPORTANT 0 / MINOR 5.
   4 локальные группы MINOR исправлены. FOLLOW-UP: fail-fast внутри Cash-канала
   одного кабинета откладывает последующие намерения этого кабинета до cron;
   Telegram и другие кабинеты продолжаются. Перестройка per-draft retry вне цели.
 - Ранее: Composer CS timeout 300s (повтор с timeout=0 PASS); monolithic full tests
-  exit137 при 6771/9145 (повтор bounded); PHPStan worker timeout (повтор sequential).
+  exit137 при 6771/9145 (повтор bounded); PHPStan worker OOM; повтор --debug также OOM, полный CI PHPStan PASS.
 - Internal: fresh independent BLOCKER 0 / IMPORTANT 1 fixed + author final IMPORTANT 1 fixed; external Stage 2 IMPORTANT 1 fixed.
-  Открытых BLOCKER/IMPORTANT нет. Handoff после оставшихся проверок.
+  Открытых BLOCKER/IMPORTANT нет. Handoff: подтверждённые проверки и review завершены; CI WB timing-flake retry PASS без правок исходников.

@@ -1,4 +1,4 @@
-# retire-feature-flags — handoff (проверки завершаются)
+# retire-feature-flags — handoff
 
 Branch: `feat/retire-feature-flags` · PR: https://github.com/pavelsur07/app-service-finance/pull/3006
 Base: `0e14475c9`. Миграций БД и новых зависимостей нет.
@@ -24,7 +24,7 @@ DI/env templates, active architecture/runbooks и admin text copy.
   pre-existing moved Symfony action path), 10 evals deselected, 2 sentry_sdk warnings.
 - Full CS + strict: PASS 0/4272; full unit: 4804 tests /26738 assertions PASS.
 - Final focused PHPStan PASS; Telegram/PaymentIntake: 184 tests /1304 assertions PASS.
-- Full PHP tests: 9147 tests /51337 assertions PASS; full PHPStan: local worker OOM; in-process retry + CI pending.
+- Full PHP tests: 9147 tests /51337 assertions PASS; full PHPStan: CI PASS ([job](https://github.com/pavelsur07/app-service-finance/actions/runs/43679594480/job/132707202964)); local parallel/single-worker и debug проверки killed by OOM (137), заменены успешным полным анализом CI.
 - Internal: fresh independent BLOCKER 0 / IMPORTANT 1 fixed + author final IMPORTANT 1 fixed (Cash error reporting и сохранение queued результата после отзыва grant, RED→GREEN).
 - После внешнего REVIEW_GREEN добавлен точечный grant guard для crash-window;
   регрессия RED→GREEN, Telegram/PaymentIntake и полный PHP набор PASS.
@@ -40,7 +40,7 @@ DI/env templates, active architecture/runbooks и admin text copy.
   перестройка retry не входит в цель удаления rollout-настроек.
 - Монолитный full PHP запуск был killed (137) при 6771/9145 без assertion failure;
   полный набор повторён последовательными suite/штатными CI shards.
-  PHPStan parallel worker timeout: повтор в последовательном режиме; CS 300s
+  PHPStan локально: OOM параллельного и одиночного worker; CI PASS; CS 300s
   timeout — локальным COMPOSER_PROCESS_TIMEOUT=0. Эти адаптации не меняют CI.
 - Ruling: текущий запрос реализации покрывает предусмотренные CI/Compose/cron изменения.
   Ruling: event-only Cash recovery нужен для завершённых Confirm после отзыва grant;
@@ -59,3 +59,13 @@ AI_SERVICE_EVAL_ENABLED, ECONOMICS_WEEKLY_REPORT_COMPANIES, прочие Variabl
 затем удалить только разрешённые имена и проверить сохранность остальных.
 Платных тестов, ручных production recovery/consume/backfill нет.
 Для отката старого кода после удаления сперва восстановить сохранённые Variables.
+
+CI source run: [43679594480](https://github.com/pavelsur07/app-service-finance/actions/runs/43679594480).
+На первом запуске один существующий WB cooldown тест получил 119 вместо120 секунд;
+повтор только этого задания на новом runner — PASS, quota/rate-limit код не менялся.
+
+Все source gates для `87b4dd615` зелёные. Последующий коммит меняет только отчёты;
+его стандартные CI-проверки запускаются автоматически. PR переводится Ready на handoff.
+
+Ready: PR #3006 "refactor: retire service and payment intake rollout flags" — merge into master with automatic production deploy?
+Дополнительно: после успешного deploy/приёмки удалить ровно шесть имён выше.
