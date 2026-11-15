@@ -17,7 +17,6 @@ use Symfony\Component\Console\Command\LockableTrait;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Перевод дневного отчёта WB в канон (cron каждые 15 минут, после `app:source-facts:pull`).
@@ -25,17 +24,11 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * День переводится, если у фактов отчёта или рекламы новая ревизия, сменилась версия правил или по коду из его
  * карантина принято решение; с `--relink` — ещё и дни с SKU без листинга (раз в сутки).
  * Каждый день — своя транзакция; сбой дня не останавливает остальные, в конце один `error`.
- * Включение — `MARKETPLACE_WB_COMPANIES` (UUID через запятую, * — все, пусто — выключено).
  */
 #[AsCommand(name: 'app:marketplace-wb:translate', description: 'Translates WB daily sales report facts into canonical marketplace operations')]
 final class TranslateWbSalesReportCommand extends Command
 {
     use LockableTrait;
-
-    public const ALL = '*';
-
-    /** @var list<string> */
-    private readonly array $allowed;
 
     public function __construct(
         private readonly SourceFactsFacadeInterface $sourceFacts,
@@ -43,11 +36,8 @@ final class TranslateWbSalesReportCommand extends Command
         private readonly TranslateWbDayAction $translate,
         private readonly Connection $connection,
         private readonly LoggerInterface $logger,
-        #[Autowire('%env(default::MARKETPLACE_WB_COMPANIES)%')]
-        ?string $allowed = null,
     ) {
         parent::__construct();
-        $this->allowed = array_values(array_filter(array_map(static fn (string $id): string => strtolower(trim($id)), explode(',', (string) $allowed))));
     }
 
     protected function configure(): void
@@ -59,11 +49,6 @@ final class TranslateWbSalesReportCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        if ([] === $this->allowed) {
-            $output->writeln('marketplace-wb translate: выключено (MARKETPLACE_WB_COMPANIES пуст)');
-
-            return self::SUCCESS;
-        }
         if (!$this->lock()) {
             $output->writeln('marketplace-wb translate: another run is in progress, skipping');
 
@@ -75,7 +60,6 @@ final class TranslateWbSalesReportCommand extends Command
             $decided = $this->store->daysWithDecidedQuarantine();
             $relink = (bool) $input->getOption('relink');
             $limit = max(1, (int) $input->getOption('limit'));
-            $all = \in_array(self::ALL, $this->allowed, true);
 
             $ads = [];
             foreach ($this->sourceFacts->periods(AdsDayTranslator::RESOURCE) as $adsPeriod) {
@@ -84,9 +68,6 @@ final class TranslateWbSalesReportCommand extends Command
 
             $due = [];
             foreach ($this->sourceFacts->periods(TranslateWbDayAction::RESOURCE) as $period) {
-                if (!$all && !\in_array($period->companyId, $this->allowed, true)) {
-                    continue;
-                }
                 $key = WbTranslationStore::dayKey($period->companyId, $period->connectionRef, $period->periodKey);
                 $state = $states[$key] ?? null;
                 if (null === $state

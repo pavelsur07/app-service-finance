@@ -105,8 +105,8 @@ read-only сверка `moz_day` с `mo_operation`). Отставание каб
 ozon-fetcher и `app:source-facts:pull`; отключённый кабинет — решение по случаю. Экран R10
 `/marketplace/economics/quality` показывает те же звенья по дням для компании.
 
-Тот же гейт для WB — `app:marketplace-wb:health-check` (09:25 МСК, модуль `MarketplaceWb`, таблицы `mwb_*`): только компании из
-`MARKETPLACE_WB_COMPANIES` (пусто — exit 0). Карантин решает администратор на `/admin/marketplace/wb-source-types` (черновика ИИ
+Тот же гейт для WB — `app:marketplace-wb:health-check` (09:25 МСК, модуль `MarketplaceWb`, таблицы `mwb_*`): все кабинеты WB.
+Карантин решает администратор на `/admin/marketplace/wb-source-types` (черновика ИИ
 пока нет); `wb:payout:*` — выплата без выручки, вид выбирают по названию операции; непереведённые дни — `error` прогона
 `app:marketplace-wb:translate`; отставание — покрытие wb-fetcher.
 

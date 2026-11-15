@@ -603,8 +603,6 @@ services:
             # Недельный отчёт экономики SKU (cron app:marketplace-economics:weekly-report): UUID через запятую,
             # * — все, пусто — выключено. GitHub variable ECONOMICS_WEEKLY_REPORT_COMPANIES + деплой.
             ECONOMICS_WEEKLY_REPORT_COMPANIES: ${ECONOMICS_WEEKLY_REPORT_COMPANIES:-}
-            # Переводчик WB (MarketplaceWb): UUID через запятую, * — все, пусто — выключен. GitHub variable + деплой.
-            MARKETPLACE_WB_COMPANIES: ${MARKETPLACE_WB_COMPANIES:-}
             # Витрина покрытия wb-fetcher (вкладка Wildberries), токен «Symfony → сервис».
             WB_FETCHER_BASE_URL: http://wb-fetcher:8080
             WB_FETCHER_API_TOKEN: ${WB_FETCHER_API_TOKEN:-}

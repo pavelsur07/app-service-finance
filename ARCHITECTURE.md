@@ -677,10 +677,10 @@
   несколькими листингами — первый по id. Код `wb:ads:campaign`. Удержание «WB Продвижение» в отчёте — справочное
   (`ads_settlement`), иначе реклама дважды. Новая ревизия рекламы дня — день переводится заново.
 - `app:marketplace-wb:translate` (cron `7-59/15`, `--relink` 06:58) — точка входа и владелец транзакций:
-  день — одна транзакция, `TranslateWbDayAction` → `replaceDay` + карантин + `mwb_day`. Включение —
-  `MARKETPLACE_WB_COMPANIES` (UUID через запятую, `*` — все, пусто — выключено).
+  день — одна транзакция, `TranslateWbDayAction` → `replaceDay` + карантин + `mwb_day`. Все кабинеты WB
+  с фактами, без переключателя.
 - Гейт `app:marketplace-wb:health-check` (cron 09:25 МСК): то же, что у Ozon (карантин > 24 ч, непереведённый
-  день, канон ≠ перевод за 45 дней, кабинет старше D−2), только по включённым компаниям.
+  день, канон ≠ перевод за 45 дней, кабинет старше D−2), по всем кабинетам.
 - Решение — `/admin/marketplace/wb-source-types` (`ROLE_ADMIN`), `ConfirmWbSourceTypeAction` — один `UPDATE`
   только для кода без решения. Черновика ИИ пока нет (8.3b).
 
@@ -5682,7 +5682,7 @@ config/
 | `app:marketplace-economics:refresh --recent=45` | `15 7 * * *` | То же + все дни с операциями за 45 суток (себестоимость и реклама легаси меняются без отметки в каноне) |
 | `app:marketplace-economics:health-check` | `30 9 * * *` | Гейт витрины: Σ витрины дня ≠ Σ канона, заменённый день не пересчитан > 60 мин или нераспределённое за 7 дней > 1 % затрат — ERROR, exit 1 |
 | `app:marketplace-economics:weekly-report` | `0 9 * * 1` | Отчёт R3 «Неделя»: сводка и xlsx за прошлую неделю владельцу (почта) и в Telegram; `ECONOMICS_WEEKLY_REPORT_COMPANIES`; сбой компании — ERROR, exit 1 |
-| `app:marketplace-wb:translate` | `7-59/15 * * * *` | Перевод дневного отчёта WB из `sf_fact` в канон (`MARKETPLACE_WB_COMPANIES`, пусто — выключено); `--relink` — `58 6 * * *` |
+| `app:marketplace-wb:translate` | `7-59/15 * * * *` | Перевод дневного отчёта WB из `sf_fact` в канон (все кабинеты); `--relink` — `58 6 * * *` |
 | `app:marketplace-wb:health-check` | `25 9 * * *` | Гейт переводчика WB — как у Ozon, только по включённым компаниям |
 | `app:marketplace-ozon:health-check` | `20 9 * * *` | Гейт переводчика Ozon: код без решения в карантине > 24 ч, непереведённый день, канон ≠ перевод за 45 дней или кабинет отстал больше D−2 — ERROR, exit 1 |
 | `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
@@ -5785,6 +5785,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.191 | 2026-11-15 | MarketplaceWb: переключатель `MARKETPLACE_WB_COMPANIES` снят — переводчик и гейт работают по всем кабинетам WB (решение Владельца 15.11) |
 | 2.190 | 2026-11-15 | MarketplaceWb: реклама WB из фактов `wb.ads.daily` (wb-fetcher, upd + fullstats) — `ads_cpc` по SKU, `mwb_day.ads_revision` (`Version20261115120000`); `wb.ads.daily` в снимке кабинетов WB и в белом списке фактов шлюза (этап 8.4) |
 | 2.189 | 2026-11-15 | MarketplaceWb: новый модуль — переводчик дневного отчёта WB в канон (`mwb_source_type`, `mwb_day`, `mwb_quarantine`, `Version20261115090000`), `app:marketplace-wb:translate` (`MARKETPLACE_WB_COMPANIES`) и гейт 09:25, экран `/admin/marketplace/wb-source-types`; `OperationKind::ADS_SETTLEMENT` (справочно); `findListingsByMarketplaceSkus` отдаёт `size` (этап 8.3) |
 | 2.188 | 2026-11-14 | Канал фактов WB (этап 8.1–8.2): wb-fetcher публикует `wb.finance.sales-report.daily` (запись = строка отчёта, ключ `wb:sales-report.daily:{rrdId}`, backfill загруженных дней при старте); `SourceFactsGatewayFacade` — клиенты по тегу `app.source_facts_client`, кабинеты Ozon ∪ WB |

@@ -15,7 +15,6 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Гейт переводчика WB (cron раз в сутки, docs/workflow/health-gates.md). Только чтение.
@@ -25,8 +24,6 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * - error: Σ канона дня (без справочных) ≠ Σ, отправленной переводчиком (`mwb_day.canon_minor`), за
  *   последние WINDOW_DAYS — строки канона потеряны или чужие;
  * - error: последний день фактов кабинета старше LAG_DAYS — сервис застрял на хвосте.
- *
- * Смотрит только компании из `MARKETPLACE_WB_COMPANIES` (пусто — гейт молчит, exit 0).
  *
  * exit 1 — штатный результат гейта.
  */
@@ -45,28 +42,12 @@ final class WbTranslationHealthCheckCommand extends Command
         private readonly MarketplaceOperationsFacadeInterface $operations,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
-        #[Autowire('%env(default::MARKETPLACE_WB_COMPANIES)%')]
-        ?string $allowed = null,
     ) {
         parent::__construct();
-        $this->allowed = array_values(array_filter(array_map(static fn (string $id): string => strtolower(trim($id)), explode(',', (string) $allowed))));
-    }
-
-    /** @var list<string> */
-    private readonly array $allowed;
-
-    private function enabled(string $companyId): bool
-    {
-        return \in_array(TranslateWbSalesReportCommand::ALL, $this->allowed, true) || \in_array($companyId, $this->allowed, true);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        if ([] === $this->allowed) {
-            $output->writeln('marketplace-wb health: выключено (MARKETPLACE_WB_COMPANIES пуст)');
-
-            return self::SUCCESS;
-        }
         $pending = $this->store->stalePending($this->clock->now()->modify(sprintf('-%d hours', self::PENDING_HOURS)));
         if ([] !== $pending) {
             $this->logger->error('WB translation health: source types wait for a decision.', [
@@ -80,9 +61,6 @@ final class WbTranslationHealthCheckCommand extends Command
         /** @var array<string, string> $lastDay кабинет → последний день фактов */
         $lastDay = [];
         foreach ($this->sourceFacts->periods(TranslateWbDayAction::RESOURCE) as $period) {
-            if (!$this->enabled($period->companyId)) {
-                continue;
-            }
             $cabinet = $period->companyId.'|'.$period->connectionRef;
             $lastDay[$cabinet] = max($lastDay[$cabinet] ?? '', $period->periodKey);
             $state = $states[WbTranslationStore::dayKey($period->companyId, $period->connectionRef, $period->periodKey)] ?? null;
@@ -120,9 +98,6 @@ final class WbTranslationHealthCheckCommand extends Command
     {
         $diff = array_map(static fn (int $minor): int => -$minor, $this->store->canonTotals($from, $to));
         foreach ($this->operations->daySums(TranslateWbDayAction::CHANNEL, $from, $to) as $sum) {
-            if (!$this->enabled($sum->companyId)) {
-                continue;
-            }
             $key = WbTranslationStore::dayKey($sum->companyId, $sum->connectionRef, $sum->date);
             $diff[$key] = ($diff[$key] ?? 0) + $sum->amountMinor;
         }
