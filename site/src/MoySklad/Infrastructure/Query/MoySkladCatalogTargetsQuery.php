@@ -88,7 +88,7 @@ final readonly class MoySkladCatalogTargetsQuery
             Assert::keyExists($ids, $parts[0]);
             $ids[$parts[0]][] = Uuid::fromString($parts[1])->toString();
         }
-        $rows = $this->db->fetchAllAssociative('SELECT * FROM ('.self::TARGETS.") targets WHERE (type = 'product' AND external_id IN (:products)) OR (type = 'variant' AND external_id IN (:variants))",
+        $rows = $this->db->fetchAllAssociative('SELECT type, external_id, parent_external_id, name, code, article, characteristics, archived, parent_archived, variants_count, has_variants FROM ('.self::TARGETS.") targets WHERE (type = 'product' AND external_id IN (:products)) OR (type = 'variant' AND external_id IN (:variants))",
             ['company' => $companyId, 'connection' => $connectionId, 'products' => $ids['product'], 'variants' => $ids['variant']],
             ['products' => ArrayParameterType::STRING, 'variants' => ArrayParameterType::STRING]);
         $result = [];
@@ -131,7 +131,7 @@ final readonly class MoySkladCatalogTargetsQuery
         if ($page > max(1, (int) ceil($total / 20))) {
             return new CatalogTargetPage([], $page, $total);
         }
-        $rows = $this->db->fetchAllAssociative('SELECT *'.$sql.' ORDER BY name, type, external_id LIMIT 20 OFFSET '.(($page - 1) * 20), $params);
+        $rows = $this->db->fetchAllAssociative('SELECT type, external_id, parent_external_id, name, code, article, characteristics, archived, parent_archived, variants_count, has_variants'.$sql.' ORDER BY name, type, external_id LIMIT 20 OFFSET '.(($page - 1) * 20), $params);
 
         return new CatalogTargetPage(array_map($this->target(...), $rows), $page, $total);
     }

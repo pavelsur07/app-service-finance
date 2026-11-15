@@ -435,6 +435,24 @@ final class MarketplaceFacadeTest extends IntegrationTestCase
         self::assertNull($page->items[0]->marketplaceVariantId);
     }
 
+    public function testExternalMappingBlankSearchDoesNotAddLikePredicates(): void
+    {
+        $company = $this->seedCompany(self::COMPANY_A_ID, 'mapping-blank-search@example.test');
+        $this->seedListing($company, null, '55555555-5555-4555-8555-000000000921', 'SKU', 'UNKNOWN');
+        $this->em->flush();
+        $holder = self::getContainer()->get('doctrine.debug_data_holder');
+        $holder->reset();
+        $page = $this->facade->paginateListingsForExternalMapping(self::COMPANY_A_ID, 'ozon', '   ');
+        self::assertSame(1, $page->totalItems);
+        /** @var array<string,list<array{sql:string}>> $debug */
+        $debug = $holder->getData();
+        $queries = array_filter($debug['default'] ?? [], static fn (array $query): bool => str_contains($query['sql'], 'marketplace_listings'));
+        self::assertNotEmpty($queries);
+        foreach ($queries as $query) {
+            self::assertStringNotContainsString(' LIKE ', strtoupper($query['sql']));
+        }
+    }
+
     public function testExternalMappingPagePastEndRetainsTotal(): void
     {
         $company = $this->seedCompany(self::COMPANY_A_ID, 'mapping-empty@example.test');

@@ -31,4 +31,15 @@ final readonly class ListingMappingState
             'mapped' => 'Сопоставлен', 'needs_review' => 'Требует проверки', default => 'Не сопоставлен',
         };
     }
+
+    public function getReasonLabel(): string
+    {
+        return match ($this->reason) {
+            'listing_unavailable' => 'Листинг недоступен',
+            'archived' => 'Позиция в архиве',
+            'parent_archived' => 'Товар модификации в архиве',
+            'requires_variant' => 'Выберите конкретную модификацию',
+            default => 'Проверьте связь с номенклатурой',
+        };
+    }
 }

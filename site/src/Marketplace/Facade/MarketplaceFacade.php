@@ -706,6 +706,7 @@ final readonly class MarketplaceFacade
         $type = null === $marketplace ? null : MarketplaceType::tryFrom($marketplace);
         Assert::true(null === $marketplace || null !== $type, 'Unknown marketplace.');
         $search = null === $search ? null : trim($search);
+        $search = '' === $search ? null : $search;
         Assert::lessThanEq(mb_strlen($search ?? ''), 100);
         $pager = $this->listingsQuery->paginate($companyId, new ListingsFilter(marketplace: $type, search: $search), 1, $perPage);
         $total = $pager->getNbResults();

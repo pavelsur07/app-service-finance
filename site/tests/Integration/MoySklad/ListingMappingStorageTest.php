@@ -76,6 +76,19 @@ final class ListingMappingStorageTest extends IntegrationTestCase
         }
     }
 
+    public function testMigrationDownRechecksHistoryWhenQueuedSqlActuallyExecutes(): void
+    {
+        $this->catalog();
+        require_once \dirname(__DIR__, 3).'/migrations/Version20261115153000.php';
+        $migration = new Version20261115153000($this->connection, new NullLogger());
+        $migration->down(new Schema());
+        $this->connection->insert('moysklad_listing_mapping_revisions', $this->row());
+        $this->expectException(DriverException::class);
+        foreach ($migration->getSql() as $query) {
+            $this->connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+        }
+    }
+
     /** @param array<string, mixed> $changes */
     #[DataProvider('invalidRows')]
     public function testDatabaseEnforcesRevisionAndTenantConstraints(array $changes, string $sqlState): void

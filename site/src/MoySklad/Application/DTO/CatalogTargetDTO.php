@@ -19,6 +19,11 @@ final readonly class CatalogTargetDTO
         return $this->type.':'.$this->externalId;
     }
 
+    public function getTypeLabel(): string
+    {
+        return 'variant' === $this->type ? 'Модификация' : 'Товар';
+    }
+
     /** @return array<string, mixed> */
     public function toSnapshot(): array
     {

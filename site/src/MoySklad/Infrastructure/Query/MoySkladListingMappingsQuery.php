@@ -33,7 +33,7 @@ final readonly class MoySkladListingMappingsQuery
         }
         $listingIds = array_values(array_unique(array_map(static fn (string $id): string => Uuid::fromString($id)->toString(), $listingIds)));
         $rows = $this->db->fetchAllAssociative(
-            'SELECT DISTINCT ON (listing_id) * FROM moysklad_listing_mapping_revisions WHERE company_id=:company AND connection_id=:connection AND listing_id IN (:ids) ORDER BY listing_id, revision DESC',
+            'SELECT DISTINCT ON (listing_id) id, listing_id, revision, operation, actor_user_id, created_at, listing_snapshot, target_snapshot, product_external_id, variant_external_id FROM moysklad_listing_mapping_revisions WHERE company_id=:company AND connection_id=:connection AND listing_id IN (:ids) ORDER BY listing_id, revision DESC',
             ['company' => $companyId, 'connection' => $connectionId, 'ids' => $listingIds], ['ids' => ArrayParameterType::STRING],
         );
         $references = [];
@@ -67,7 +67,7 @@ final readonly class MoySkladListingMappingsQuery
         if ($page > max(1, (int) ceil($total / 20))) {
             return new MappingHistoryPage([], $page, $total);
         }
-        $rows = $this->db->fetchAllAssociative('SELECT *'.$sql.' ORDER BY revision DESC LIMIT 20 OFFSET '.(($page - 1) * 20), $params);
+        $rows = $this->db->fetchAllAssociative('SELECT id, listing_id, revision, operation, actor_user_id, created_at, listing_snapshot, target_snapshot, product_external_id, variant_external_id'.$sql.' ORDER BY revision DESC LIMIT 20 OFFSET '.(($page - 1) * 20), $params);
 
         return new MappingHistoryPage(array_map($this->revision(...), $rows), $page, $total);
     }

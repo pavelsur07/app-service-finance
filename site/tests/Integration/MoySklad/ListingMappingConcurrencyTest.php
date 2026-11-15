@@ -120,10 +120,132 @@ final class ListingMappingConcurrencyTest extends PostgresResetTestCase
         return $process;
     }
 
+    #[DataProvider('catalogActionOrders')]
+    public function testActualAssignmentAndCatalogImportSerializeInBothOrders(string $kind, bool $importFirst): void
+    {
+        $data = $this->mappingCatalog($this->em);
+        $variant = null;
+        if ('archive' === $kind) {
+            $variant = \App\Tests\Builders\MoySklad\MoySkladVariantBuilder::aVariant()->forProduct($data['product'])->build();
+            $this->em->persist($variant);
+            $this->em->flush();
+        }
+        $application = 'mapping-action-'.Uuid::uuid7()->toString();
+        $input = ['company' => $data['connection']->getCompanyId(), 'connection' => $data['connection']->getId(),
+            'listing' => $data['listing']->getId(), 'product' => $data['product']->getExternalId(),
+            'request' => Uuid::uuid7()->toString(), 'application' => $application,
+            'targetType' => null === $variant ? 'product' : 'variant', 'target' => $variant?->getExternalId() ?? $data['product']->getExternalId()];
+        $processes = [];
+        $this->connection->beginTransaction();
+        try {
+            if ($importFirst) {
+                if ('archive' === $kind) {
+                    $this->connection->executeStatement('UPDATE moysklad_products SET archived=TRUE WHERE company_id=? AND connection_id=?', [$input['company'], $input['connection']]);
+                } else {
+                    $this->em->persist(\App\Tests\Builders\MoySklad\MoySkladVariantBuilder::aVariant()->forProduct($data['product'])->build());
+                    $this->em->flush();
+                }
+                $processes[] = $this->startWorker($input);
+                $this->assertWaiting($application, 1);
+            } else {
+                $this->connection->fetchOne('SELECT pg_advisory_xact_lock(hashtext(?),hashtext(?))', ['mapping-test-pause', $application]);
+                $processes[] = $this->startWorker($input + ['mode' => 'set_paused']);
+                $this->assertWaiting($application, 1);
+                $processes[] = $this->startWorker(array_replace($input, ['mode' => $kind, 'application' => $application.'-import']));
+                $this->assertWaiting($application.'-import', 1);
+            }
+            $this->connection->commit();
+            foreach ($processes as $process) {
+                self::assertSame(0, $process->wait(), $process->getErrorOutput());
+            }
+            self::assertStringContainsString($importFirst ? 'rejected:target_unavailable' : 'success:1', $processes[0]->getOutput());
+            self::assertSame($importFirst ? 0 : 1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM moysklad_listing_mapping_revisions'));
+            if (!$importFirst) {
+                $state = self::getContainer()->get(MoySkladListingMappingsQuery::class)->currentForListings($input['company'], $input['connection'], [$input['listing']])[$input['listing']];
+                self::assertSame('needs_review', $state->status);
+            }
+        } finally {
+            if ($this->connection->isTransactionActive()) {
+                $this->connection->rollBack();
+            }
+            foreach ($processes as $process) {
+                if ($process->isRunning()) {
+                    $process->stop(0);
+                }
+            }
+        }
+    }
+
+    /** @return iterable<string,array{string,bool}> */
+    public static function catalogActionOrders(): iterable
+    {
+        foreach (['variant', 'archive'] as $kind) {
+            yield $kind.' import first' => [$kind, true];
+            yield $kind.' assignment first' => [$kind, false];
+        }
+    }
+
+    public function testMigrationDownWaitsForConcurrentFirstRevisionAndPreservesIt(): void
+    {
+        $data = $this->mappingCatalog($this->em);
+        $application = 'mapping-down-'.Uuid::uuid7()->toString();
+        $process = null;
+        $this->connection->beginTransaction();
+        try {
+            $this->em->persist(\App\Tests\Builders\MoySklad\MoySkladListingMappingRevisionBuilder::aRevision()->build());
+            $this->em->flush();
+            $process = $this->startWorker(['company' => $data['connection']->getCompanyId(), 'connection' => $data['connection']->getId(),
+                'listing' => $data['listing']->getId(), 'product' => $data['product']->getExternalId(), 'request' => Uuid::uuid7()->toString(), 'application' => $application, 'mode' => 'down']);
+            $this->assertWaiting($application, 1);
+            $this->connection->commit();
+            self::assertSame(0, $process->wait(), $process->getErrorOutput());
+            self::assertStringContainsString('rejected:history_not_empty', $process->getOutput());
+            self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM moysklad_listing_mapping_revisions'));
+        } finally {
+            if ($this->connection->isTransactionActive()) {
+                $this->connection->rollBack();
+            }
+            if (null !== $process && $process->isRunning()) {
+                $process->stop(0);
+            }
+        }
+    }
+
+    public function testMigrationDownLockBlocksNewAssignmentUntilRollbackDecision(): void
+    {
+        $data = $this->mappingCatalog($this->em);
+        $application = 'mapping-down-first-'.Uuid::uuid7()->toString();
+        $process = null;
+        $this->connection->beginTransaction();
+        try {
+            require_once \dirname(__DIR__, 3).'/migrations/Version20261115153000.php';
+            $migration = new \DoctrineMigrations\Version20261115153000($this->connection, new \Psr\Log\NullLogger());
+            $migration->down(new \Doctrine\DBAL\Schema\Schema());
+            foreach ($migration->getSql() as $query) {
+                $this->connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+            }
+            $process = $this->startWorker(['company' => $data['connection']->getCompanyId(), 'connection' => $data['connection']->getId(),
+                'listing' => $data['listing']->getId(), 'product' => $data['product']->getExternalId(), 'request' => Uuid::uuid7()->toString(), 'application' => $application]);
+            $this->assertWaiting($application, 1);
+            $this->connection->rollBack();
+            self::assertSame(0, $process->wait(), $process->getErrorOutput());
+            self::assertStringContainsString('success:1', $process->getOutput());
+            self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM moysklad_listing_mapping_revisions'));
+        } finally {
+            if ($this->connection->isTransactionActive()) {
+                $this->connection->rollBack();
+            }
+            if (null !== $process && $process->isRunning()) {
+                $process->stop(0);
+            }
+        }
+    }
+
     private function assertWaiting(string $application, int $expected): void
     {
         $deadline = microtime(true) + 5;
         do {
+            $this->connection->fetchOne('SELECT pg_stat_clear_snapshot()');
             $waiting = (int) $this->connection->fetchOne("SELECT COUNT(*) FROM pg_stat_activity WHERE application_name=? AND wait_event_type='Lock'", [$application]);
             if ($expected === $waiting) {
                 break;

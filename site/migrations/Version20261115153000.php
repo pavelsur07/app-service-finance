@@ -48,6 +48,14 @@ final class Version20261115153000 extends AbstractMigration
     public function down(Schema $schema): void
     {
         $this->abortIf((bool) $this->connection->fetchOne('SELECT EXISTS (SELECT 1 FROM moysklad_listing_mapping_revisions)'), 'Mapping history is not empty; use a forward migration.');
-        $this->addSql('DROP TABLE moysklad_listing_mapping_revisions');
+        $this->addSql(<<<'SQL'
+            DO $$ BEGIN
+                LOCK TABLE moysklad_listing_mapping_revisions IN ACCESS EXCLUSIVE MODE;
+                IF EXISTS (SELECT 1 FROM moysklad_listing_mapping_revisions) THEN
+                    RAISE EXCEPTION 'Mapping history is not empty; use a forward migration.';
+                END IF;
+                DROP TABLE moysklad_listing_mapping_revisions;
+            END $$
+            SQL);
     }
 }
