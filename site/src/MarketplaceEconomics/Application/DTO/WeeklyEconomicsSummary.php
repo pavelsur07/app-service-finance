@@ -15,9 +15,10 @@ final readonly class WeeklyEconomicsSummary
     public const HIGH_DRR = 20.0;
 
     /**
-     * @param list<array{sku: string, title: ?string, value: int, delta: int}> $growth
-     * @param list<array{sku: string, title: ?string, value: int, delta: int}> $fall
-     * @param list<array{sku: string, title: ?string, value: int, delta: int}> $worst
+     * @param list<array{sku: string, title: ?string, channel: ?string, value: int, delta: int}> $growth
+     * @param list<array{sku: string, title: ?string, channel: ?string, value: int, delta: int}> $fall
+     * @param list<array{sku: string, title: ?string, channel: ?string, value: int, delta: int}> $worst
+     * @param array<string, SkuMetrics> $byChannel итог каждого канала (R1 с фильтром канала); пусто при одном канале
      */
     public function __construct(
         public SkuEconomicsReport $report,
@@ -29,12 +30,14 @@ final readonly class WeeklyEconomicsSummary
         public int $losses,
         public array $worst,
         public int $highDrr,
+        public array $byChannel = [],
     ) {
     }
 
-    public static function fromReport(SkuEconomicsReport $report, int $top = 5): self
+    /** @param array<string, SkuMetrics> $byChannel */
+    public static function fromReport(SkuEconomicsReport $report, int $top = 5, array $byChannel = []): self
     {
-        $item = static fn (SkuEconomicsRow $r): array => ['sku' => $r->sku, 'title' => $r->title, 'value' => $r->current->md2(), 'delta' => $r->current->md2() - $r->previous->md2()];
+        $item = static fn (SkuEconomicsRow $r): array => ['sku' => $r->sku, 'title' => $r->title, 'channel' => $r->channel, 'value' => $r->current->md2(), 'delta' => $r->current->md2() - $r->previous->md2()];
         $rows = array_map($item, $report->rows);
 
         usort($rows, static fn (array $a, array $b): int => $b['delta'] <=> $a['delta'] ?: strcmp($a['sku'], $b['sku']));
@@ -47,6 +50,6 @@ final readonly class WeeklyEconomicsSummary
         $highDrr = \count(array_filter($report->rows, static fn (SkuEconomicsRow $r): bool => ($r->current->drr() ?? 0.0) > self::HIGH_DRR));
 
         return new self($report, $report->total, $report->previousTotal, $report->total->md2() - $report->previousTotal->md2(),
-            $growth, $fall, \count($losses), \array_slice($losses, 0, $top), $highDrr);
+            $growth, $fall, \count($losses), \array_slice($losses, 0, $top), $highDrr, $byChannel);
     }
 }

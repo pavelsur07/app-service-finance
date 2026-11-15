@@ -12,6 +12,7 @@ final readonly class SkuEconomicsReport
     /**
      * @param list<SkuEconomicsRow> $rows отфильтрованы и отсортированы, без пагинации
      * @param list<string> $connections кабинеты с витриной
+     * @param list<string> $channels каналы с витриной
      */
     public function __construct(
         public \DateTimeImmutable $from,
@@ -26,6 +27,7 @@ final readonly class SkuEconomicsReport
         public array $connections,
         public int $days,
         public int $daysWithoutCostPrice,
+        public array $channels = [],
     ) {
     }
 

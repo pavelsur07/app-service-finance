@@ -112,6 +112,23 @@ final class WeeklyEconomicsReportCommandTest extends IntegrationTestCase
         self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM me_weekly_report'));
     }
 
+    public function testTwoChannelsGetChannelTotalsAndSkuLabels(): void
+    {
+        $company = $this->em->find(\App\Company\Entity\Company::class, $this->companyId);
+        self::assertNotNull($company);
+        $wb = MarketplaceListingBuilder::aListing()->forCompany($company)->withMarketplace(MarketplaceType::WILDBERRIES)->withMarketplaceSku('NM-7')->withName('Платье')->build();
+        $this->em->persist($wb);
+        $this->em->flush();
+        $this->line($this->companyId, '2026-11-11', (string) $wb->getId(), 'sale', 'revenue', 120000, 1, 'wildberries');
+
+        $text = $this->runWeekly($this->companyId, ['--dry-run' => true]);
+
+        self::assertStringContainsString('Выручка: 4', $text, 'итог — оба канала: 3000 + 1200');
+        self::assertMatchesRegularExpression('/Ozon: выручка 3\s000/u', $text);
+        self::assertMatchesRegularExpression('/WB: выручка 1\s200/u', $text);
+        self::assertStringContainsString('WB NM-7', $text, 'SKU с меткой канала');
+    }
+
     /** @param array<string, mixed> $options */
     private function runWeekly(string $allowed, array $options): string
     {
@@ -178,16 +195,17 @@ final class WeeklyEconomicsReportCommandTest extends IntegrationTestCase
         return true;
     }
 
-    private function line(string $companyId, string $date, string $listingId, string $measure, string $level, int $amount, int $qty = 0): void
+    private function line(string $companyId, string $date, string $listingId, string $measure, string $level, int $amount, int $qty = 0, string $channel = 'ozon'): void
     {
+        $connection = 'ozon' === $channel ? 'cabinet-1' : 'cabinet-wb';
         $this->connection->insert('me_day_line', [
-            'id' => Uuid::uuid7()->toString(), 'company_id' => $companyId, 'channel' => 'ozon', 'connection_ref' => 'cabinet-1',
+            'id' => Uuid::uuid7()->toString(), 'company_id' => $companyId, 'channel' => $channel, 'connection_ref' => $connection,
             'operation_date' => $date, 'listing_id' => $listingId, 'measure' => $measure, 'level' => $level, 'amount_minor' => $amount, 'quantity' => $qty,
         ]);
         $this->connection->executeStatement(
             "INSERT INTO me_day (company_id, channel, connection_ref, operation_date, rules_version, canon_minor, unallocated_minor, cost_price_minor, without_cost_price, line_count, currency, refreshed_at)
-             VALUES (?, 'ozon', 'cabinet-1', ?, 'economics-2', 0, 0, 0, 0, 0, 'RUB', '2026-11-14 10:00:00') ON CONFLICT DO NOTHING",
-            [$companyId, $date],
+             VALUES (?, ?, ?, ?, 'economics-2', 0, 0, 0, 0, 0, 'RUB', '2026-11-14 10:00:00') ON CONFLICT DO NOTHING",
+            [$companyId, $channel, $connection, $date],
         );
     }
 }

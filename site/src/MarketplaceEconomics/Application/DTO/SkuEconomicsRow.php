@@ -15,6 +15,8 @@ final readonly class SkuEconomicsRow
         public ?string $supplierSku,
         public SkuMetrics $current,
         public SkuMetrics $previous,
+        /** Канал листинга (`ozon`, `wildberries`); null — листинг не найден. */
+        public ?string $channel = null,
     ) {
     }
 }

@@ -31,8 +31,8 @@ final readonly class SkuEconomicsReportBuilder
         $previousTo = $filter->from->modify('-1 day');
         $previousFrom = $previousTo->modify(sprintf('-%d days', $days - 1));
 
-        $current = $this->query->byListing($companyId, $filter->from, $filter->to, $filter->connectionRef);
-        $previous = $this->query->byListing($companyId, $previousFrom, $previousTo, $filter->connectionRef);
+        $current = $this->query->byListing($companyId, $filter->from, $filter->to, $filter->connectionRef, $filter->channel);
+        $previous = $this->query->byListing($companyId, $previousFrom, $previousTo, $filter->connectionRef, $filter->channel);
         $unallocated = $current[''] ?? new SkuMetrics();
         $previousUnallocated = $previous[''] ?? new SkuMetrics();
         unset($current[''], $previous['']);
@@ -52,7 +52,7 @@ final readonly class SkuEconomicsReportBuilder
             if ('' !== $needle && !str_contains(mb_strtolower(implode(' ', [$item?->sku, $item?->title, $item?->supplierSku])), $needle)) {
                 continue;
             }
-            $rows[] = new SkuEconomicsRow($listingId, $item->sku ?? '—', $item?->title, $item?->supplierSku, $metrics, $previous[$listingId] ?? new SkuMetrics());
+            $rows[] = new SkuEconomicsRow($listingId, $item->sku ?? '—', $item?->title, $item?->supplierSku, $metrics, $previous[$listingId] ?? new SkuMetrics(), $item?->marketplace);
         }
 
         $value = static fn (SkuMetrics $m): int => match ($filter->sort) {
@@ -86,7 +86,7 @@ final readonly class SkuEconomicsReportBuilder
         return new SkuEconomicsReport(
             $filter->from, $filter->to, $previousFrom, $previousTo, $rows,
             $filter->filtersListings() ? null : $unallocated,
-            $total, $previousTotal, $coverage['connections'], $coverage['days'], $coverage['daysWithoutCostPrice'],
+            $total, $previousTotal, $coverage['connections'], $coverage['days'], $coverage['daysWithoutCostPrice'], $coverage['channels'],
         );
     }
 }

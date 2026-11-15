@@ -34,6 +34,19 @@ final class WeeklyEconomicsSummaryTest extends TestCase
         self::assertSame(-100_00, $summary->md2Delta);
     }
 
+    public function testChannelOfSkuAndChannelTotals(): void
+    {
+        $row = new SkuEconomicsRow('L1', '123', 'Платье', null, self::metrics(100_00, 50_00, 0), self::metrics(0, 0, 0), 'wildberries');
+        $report = new SkuEconomicsReport(new \DateTimeImmutable('2026-11-02'), new \DateTimeImmutable('2026-11-08'), new \DateTimeImmutable('2026-10-26'), new \DateTimeImmutable('2026-11-01'),
+            [$row], new SkuMetrics(), $row->current, new SkuMetrics(), ['c1', 'c2'], 7, 0, ['ozon', 'wildberries']);
+        $byChannel = ['ozon' => new SkuMetrics(), 'wildberries' => $row->current];
+
+        $summary = WeeklyEconomicsSummary::fromReport($report, 5, $byChannel);
+
+        self::assertSame('wildberries', $summary->growth[0]['channel']);
+        self::assertSame($byChannel, $summary->byChannel);
+    }
+
     public function testEmptyWeek(): void
     {
         $report = new SkuEconomicsReport(new \DateTimeImmutable('2026-11-02'), new \DateTimeImmutable('2026-11-08'), new \DateTimeImmutable('2026-10-26'), new \DateTimeImmutable('2026-11-01'),

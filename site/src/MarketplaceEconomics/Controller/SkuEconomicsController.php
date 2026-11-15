@@ -47,6 +47,7 @@ final class SkuEconomicsController extends AbstractController
             'from' => $from,
             'to' => $to,
             'connection' => (string) $query->get('connection', ''),
+            'channel' => (string) $query->get('channel', ''),
             'tagIds' => array_values(array_filter(array_map('strval', $query->all('tags')))),
             'search' => trim((string) $query->get('q', '')),
             'sort' => \in_array($query->get('sort'), SkuEconomicsFilter::SORTS, true) ? (string) $query->get('sort') : 'md2',
@@ -65,7 +66,7 @@ final class SkuEconomicsController extends AbstractController
             }
             $filter = new SkuEconomicsFilter(
                 $this->date($from), $this->date($to), '' === $view['connection'] ? null : $view['connection'],
-                $view['tagIds'], $view['search'], $view['sort'], $view['desc'],
+                $view['tagIds'], $view['search'], $view['sort'], $view['desc'], '' === $view['channel'] ? null : $view['channel'],
             );
             $report = $this->reports->build($companyId, $filter);
             if ('xlsx' === $query->get('format')) {

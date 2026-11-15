@@ -52,6 +52,17 @@
                     {% endfor %}
                 </select>
             </div>
+            {% if report and report.channels|length > 1 %}
+                <div class="col-12 col-sm-6 col-lg-auto">
+                    <label class="form-label" for="md-channel">Канал</label>
+                    <select class="form-select" id="md-channel" name="channel">
+                        <option value="">Все каналы</option>
+                        {% for value in report.channels %}
+                            <option value="{{ value }}" {{ value == channel ? 'selected' }}>{{ constant('App\\MarketplaceEconomics\\Application\\DTO\\SkuEconomicsFilter::CHANNELS')[value] ?? value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
             {% if report and report.connections|length > 1 %}
                 <div class="col-12 col-sm-6 col-lg-auto">
                     <label class="form-label" for="md-connection">Кабинет</label>
