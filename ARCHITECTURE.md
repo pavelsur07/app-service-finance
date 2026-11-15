@@ -672,11 +672,14 @@
   задаёт переводчик или `WbSourceTypeSeed`; `wb:deduction:{причина}` (без номера документа и месяца) и
   `wb:payout:{операция}` — справочник или решение администратора. Знаки — как в источнике; итог строки без
   справочных = `±forPay` + поля затрат. Справочно (`CascadeLevel::INFO`): `spp`, `ads_settlement`.
-- Листинг — `nmId` + `techSize` (`findListingsByMarketplaceSkus` отдаёт `size`); размера нет, а листинг у
-  `nmId` один — он; иначе операция без SKU (`unresolved`).
+- Листинг — `nmId` + `techSize` (`findListingsByMarketplaceSkus` отдаёт `size`; размеры сравниваются без
+  регистра и кириллических двойников латиницы); у `nmId` один листинг — он. Размера в строке нет (возмещение
+  логистики, реклама по nmId) — сумма остаётся на артикуле: по его размерам пропорционально проданным за день
+  штукам, без продаж — поровну (ключ `wb_size_sales_share`, у рекламы — `ads_statistics_share`). Известный
+  размер без листинга — операция без SKU (`unresolved`).
 - Реклама — `AdsDayTranslator`: кампания дня → `ads_cpc` = −Σ `expenses[].updSum`, по nmId пропорционально
   Σ `statistics…nms[].sum` (наибольший остаток, ключ `ads_statistics_share`), нет весов — без SKU; nmId с
-  несколькими листингами — первый по id. Код `wb:ads:campaign`. Удержание «WB Продвижение» в отчёте — справочное
+  несколькими листингами — по размерам, как строка без размера. Код `wb:ads:campaign`. Удержание «WB Продвижение» в отчёте — справочное
   (`ads_settlement`), иначе реклама дважды. Новая ревизия рекламы дня — день переводится заново.
 - `app:marketplace-wb:translate` (cron `7-59/15`, `--relink` 06:58) — точка входа и владелец транзакций:
   день — одна транзакция, `TranslateWbDayAction` → `replaceDay` + карантин + `mwb_day`. Все кабинеты WB
@@ -5800,7 +5803,9 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.198 | 2026-11-15 | MoySklad: pure policy автомаппинга, bounded candidates/preview/характеристики; общий CatalogTargetDTO::fromRow |
+| 2.200 | 2026-11-15 | MoySklad: pure policy автомаппинга, bounded candidates/preview/характеристики; общий CatalogTargetDTO::fromRow |
+| 2.199 | 2026-11-15 | MarketplaceWb: строка с артикулом без размера (возмещение логистики, реклама) остаётся на артикуле — по размерам по продажам дня (`wb_size_sales_share`), а не без SKU по всему кабинету; размеры без учёта кириллических двойников; `RULES_VERSION` `wb-sales-report-2` — все дни переводятся заново |
+| 2.198 | 2026-11-15 | ServiceGateway: ключ повтора задачи ИИ вне печатного ASCII или длиннее 200 символов уходит в сервис хешем `sha256:…` (заголовок `Idempotency-Key` искажал кириллицу — 422), `task_id` — от исходного ключа; MarketplaceOzon/MarketplaceWb: запрос черновика без ответа дольше часа повторяется |
 | 2.197 | 2026-11-15 | MarketplaceWb: черновики ИИ для кодов WB (этап 8.3b) — `RequestWbSourceTypeDraftsAction`, `WbSourceTypeDraftConsumer`, колонка черновика на экране кодов; ServiceGateway: результат ИИ получают все потребители его task_type |
 | 2.196 | 2026-11-15 | Отчёты нового контура по двум каналам (этап 8.5): фильтр канала в R1/R2, метка канала у SKU и в xlsx, строки каналов в R3; R10 сверяет WB со своим каналом — фасад `MarketplaceWbFacadeInterface::dayStates` |
 | 2.195 | 2026-11-15 | MoySklad: отдельные legacy-вкладки Ozon/Wildberries, выбор подключения, локальный поиск, ручное назначение/снятие связи и история; READ/WRITE, CSRF, CAS и bounded-пагинация |

@@ -8,7 +8,6 @@ use App\Cash\Enum\FiatCurrency;
 use App\Finance\Application\Service\FinanceDashboardKpiProvider;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\Shared\Service\ActiveCompanyService;
-use App\Shared\Service\UiModeResolver;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -39,7 +38,6 @@ class HomeController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly FinanceDashboardKpiProvider $kpiProvider,
         private readonly MarketplaceFacade $marketplaceFacade,
-        private readonly UiModeResolver $uiModeResolver,
     ) {
     }
 
@@ -58,11 +56,8 @@ class HomeController extends AbstractController
 
         $company = $this->activeCompanyService->getActiveCompany();
         $today = (new \DateTimeImmutable('today'))->setTime(0, 0);
-        $uiMode = $this->uiModeResolver->current();
         $cashflowActivity = $this->resolveCashflowActivity($request);
-        $dashboardPeriodDays = UiModeResolver::LEGACY === $uiMode
-            ? $this->resolveDashboardPeriodDays($request)
-            : self::DEFAULT_DASHBOARD_PERIOD_DAYS;
+        $dashboardPeriodDays = $this->resolveDashboardPeriodDays($request);
         $dashboardKpis = $this->kpiProvider->build(
             $company,
             $cashCurrency,
@@ -81,11 +76,7 @@ class HomeController extends AbstractController
             'currency' => $cashCurrency->value,
         ];
 
-        $template = UiModeResolver::APP === $uiMode
-            ? 'app/home/index.html.twig'
-            : 'home/index.html.twig';
-
-        $templateParameters = [
+        return $this->render('home/index.html.twig', [
             'activeCompany' => $company,
             'cashCurrency' => $cashCurrency,
             'cashCurrencies' => FiatCurrency::cases(),
@@ -95,13 +86,9 @@ class HomeController extends AbstractController
             'kpiComparisons' => $dashboardKpis['comparisons'],
             'kpiPeriodLabels' => $kpiPeriodLabels,
             'cashflowReconciliationQuery' => $cashflowReconciliationQuery,
-        ];
-        if (UiModeResolver::LEGACY === $uiMode) {
-            $templateParameters['dashboardPeriodDays'] = $dashboardPeriodDays;
-            $templateParameters['dashboardPeriods'] = self::DASHBOARD_PERIODS;
-        }
-
-        return $this->render($template, $templateParameters);
+            'dashboardPeriodDays' => $dashboardPeriodDays,
+            'dashboardPeriods' => self::DASHBOARD_PERIODS,
+        ]);
     }
 
     #[Route('/dashboard', name: 'app_dashboard_index', methods: ['GET'])]

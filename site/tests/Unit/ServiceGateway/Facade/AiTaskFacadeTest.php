@@ -54,6 +54,23 @@ final class AiTaskFacadeTest extends TestCase
         self::assertSame([], $this->stamps[0]);
     }
 
+    public function testNonAsciiOrLongKeyIsSentAsHashButTaskIdComesFromOriginalKey(): void
+    {
+        // ключ уходит и в заголовок Idempotency-Key: кириллица там искажается, сервис отвечает 422
+        $facade = $this->facade('*');
+        $key = 'wb:payout:добровольная компенсация при возврате';
+        $taskId = $facade->requestTask(self::COMPANY, 'echo', ['text' => 'a'], $key);
+        $facade->requestTask(self::COMPANY, 'echo', ['text' => 'a'], str_repeat('k', 201));
+
+        $message = $this->dispatched[0];
+        self::assertInstanceOf(SubmitAiTaskMessage::class, $message);
+        self::assertSame('sha256:'.hash('sha256', $key), $message->idempotencyKey);
+        self::assertSame($facade->taskIdFor(self::COMPANY, 'echo', $key), $taskId, 'ответ найдёт строку по номеру от исходного ключа');
+        $long = $this->dispatched[1];
+        self::assertInstanceOf(SubmitAiTaskMessage::class, $long);
+        self::assertSame('sha256:'.hash('sha256', str_repeat('k', 201)), $long->idempotencyKey);
+    }
+
     public function testSameKeyGivesSameTaskIdAndOtherKeyOrCompanyAnother(): void
     {
         $facade = $this->facade('*');

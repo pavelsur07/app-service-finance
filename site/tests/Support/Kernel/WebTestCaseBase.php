@@ -55,7 +55,7 @@ abstract class WebTestCaseBase extends WebTestCase
         return $client->request('POST', (string) $trigger->attr('data-confirm-action'), ['_token' => (string) $trigger->attr('data-confirm-token')] + $fields);
     }
 
-    protected function csrfToken(KernelBrowser $client, string $tokenId): string
+    protected function csrfToken(KernelBrowser $client, string $tokenId, string $uri = '/'): string
     {
         $session = $client->getContainer()->get('session.factory')->createSession();
         $cookie = $client->getCookieJar()->get($session->getName());
@@ -63,7 +63,7 @@ abstract class WebTestCaseBase extends WebTestCase
             $session->setId($cookie->getValue());
         }
 
-        $request = Request::create('/');
+        $request = Request::create($uri);
         $request->setSession($session);
         $requestStack = $client->getContainer()->get('request_stack');
         $requestStack->push($request);

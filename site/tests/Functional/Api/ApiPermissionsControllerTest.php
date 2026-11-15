@@ -53,7 +53,7 @@ final class ApiPermissionsControllerTest extends WebTestCaseBase
         self::assertSelectorCount(16, 'input[data-api-scope]');
         self::assertSelectorCount(0, 'input[data-api-scope]:checked');
         self::assertSelectorCount(10, 'input[data-api-resource-enable][disabled]');
-        self::assertSelectorTextContains('.alert--warning', 'Права подготовлены. Доступ появится после подключения раздела и вашего включения');
+        self::assertSelectorTextContains('.alert-warning', 'Права подготовлены. Доступ появится после подключения раздела и вашего включения');
         self::assertSelectorNotExists('input[value="accounts.create"]');
         $presets = $this->client->getCrawler()->filter('[data-api-preset]')->each(static fn ($node): array => json_decode((string) $node->attr('data-api-preset'), true, flags: \JSON_THROW_ON_ERROR));
         self::assertSame(array_values(ApiScopeCatalog::presets()), $presets);
@@ -67,7 +67,7 @@ final class ApiPermissionsControllerTest extends WebTestCaseBase
         $this->client->request('POST', $this->url(), $data);
         self::assertResponseRedirects($this->url(), 303);
         $this->client->followRedirect();
-        self::assertSelectorTextContains('.alert--success', 'Права сохранены.');
+        self::assertSelectorTextContains('.toast.text-bg-success', 'Права сохранены.');
         self::assertSelectorCount(2, 'input[data-api-scope]:checked');
         $key = $this->reloadKey();
         self::assertSame(['accounts.read', 'cash_transactions.create'], $key->getSelectedScopes());
@@ -105,7 +105,7 @@ final class ApiPermissionsControllerTest extends WebTestCaseBase
             $data['api_key_permissions'] = array_replace($data['api_key_permissions'], $invalid);
             $this->client->request('POST', $this->url(), $data);
             self::assertResponseStatusCodeSame(422);
-            self::assertSelectorExists('.field-helper.error');
+            self::assertSelectorExists('.invalid-feedback, .alert-danger');
         }
         self::assertSame([], $this->reloadKey()->getSelectedScopes());
         self::assertSame([], $this->reloadKey()->getEnabledResources());
@@ -119,7 +119,7 @@ final class ApiPermissionsControllerTest extends WebTestCaseBase
         $this->client->request('POST', $this->url(), $data);
         self::assertResponseStatusCodeSame(409);
         self::assertSelectorExists('a[href="'.$this->url().'"]');
-        self::assertSelectorTextContains('.alert--danger', 'Настройки ключа изменились');
+        self::assertSelectorTextContains('.alert-danger', 'Настройки ключа изменились');
         self::assertSame('["projects.read"]', $this->em()->getConnection()->fetchOne('SELECT selected_scopes FROM api_keys WHERE id = ?', [$this->key->getId()]));
         $this->client->clickLink('Перечитать права');
         self::assertResponseIsSuccessful();

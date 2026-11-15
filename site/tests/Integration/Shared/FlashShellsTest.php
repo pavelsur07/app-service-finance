@@ -12,7 +12,7 @@ use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
 use Twig\Environment;
 
 /**
- * Stage 3 (twig-ui-systematization): три shell'а рендерят flash одним маппингом label → variant,
+ * Пользовательский legacy-shell и админка рендерят flash одним маппингом label → variant,
  * служебные ключи flash (invite_token) shell не трогает.
  */
 final class FlashShellsTest extends KernelTestCase
@@ -32,7 +32,6 @@ final class FlashShellsTest extends KernelTestCase
     private const SHELLS = [
         'partials/_flash.html.twig' => 'toast text-bg-%s',
         'admin/_toasts.html.twig' => 'toast toast--%s',
-        'app/_ui/_flash.html.twig' => 'alert alert--%s',
     ];
 
     public function testEveryShellMapsLabelsToTheSameVariant(): void
