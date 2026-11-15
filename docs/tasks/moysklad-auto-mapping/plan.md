@@ -353,10 +353,10 @@ connectionId/previewId; marketplace только ozon|wildberries.
   Apply только selectedIds; POST303 → summary/current states. Частичную ошибку
   не выдавать за полное успешное сохранение. Нет общей кнопки на весь каталог.
   Tabler/существующие формы, flash, pagination; no new CSS/JS/React.
-- [ ] **4.3 VERIFY:** functional/module, Twig gates. Browser desktop1440/
+- [x] **4.3 VERIFY:** functional/module, Twig gates. Browser desktop1440/
   mobile375, keyboard/checkbox, длинные названия, empty/error/no permission,
   no-JS формы, конфликт и частичное применение. Нет document overflow.
-- [ ] **4.4 HANDOFF:** full gates один раз, fresh-session internal whole-diff
+- [x] **4.4 HANDOFF:** full gates один раз, fresh-session internal whole-diff
   review, Claude external review по task base и fix cycle. ARCHITECTURE,
   reports/checkpoint/handoff; Ready PR и один запрос merge+deploy. В текущем
   scope миграции нет; если scope изменён — release.md и именованное approval.
@@ -396,26 +396,26 @@ round после IMPORTANT/MINOR, если исправления подтвер
 
 ## 6. Чек-лист приёмки
 
-- [ ] Exact article и parent article+explicit size rule работают для обоих MP.
-- [ ] Case/ведущие нули не изменены; штрихкод/code/name не подменяют ключ.
-- [ ] Неоднозначные, truncated, unknown характеристики не дают READY.
-- [ ] Parent с модификациями никогда не назначается; архивные дубли не спрятаны.
-- [ ] Current mapped/needs_review/clear не перезаписываются; inactive пропускается.
-- [ ] Company/actor/connection/provider, READ/WRITE и CSRF проверяются сервером.
-- [ ] Параллельные preview/attempt не теряют и не смешивают результаты; Redis
+- [x] Exact article и parent article+explicit size rule работают для обоих MP.
+- [x] Case/ведущие нули не изменены; штрихкод/code/name не подменяют ключ.
+- [x] Неоднозначные, truncated, unknown характеристики не дают READY.
+- [x] Parent с модификациями никогда не назначается; архивные дубли не спрятаны.
+- [x] Current mapped/needs_review/clear не перезаписываются; inactive пропускается.
+- [x] Company/actor/connection/provider, READ/WRITE и CSRF проверяются сервером.
+- [x] Параллельные preview/attempt не теряют и не смешивают результаты; Redis
   outage до записи не пишет ревизии, после commit не выдаётся за rollback.
-- [ ] Клиент не может выбрать target, изменить rule/guard/requestId или выйти
+- [x] Клиент не может выбрать target, изменить rule/guard/requestId или выйти
   за пределы 25 READY listingId своего preview.
-- [ ] Истёкший/вытесненный preview не применяется; retry действительного не дублирует.
-- [ ] После preview изменились source/target/кандидаты/связь — конфликт без retarget.
-- [ ] Синхронизация каталога и изменение источника защищены реальными locks.
-- [ ] Catalog lock держится до commit; replay не зависит от текущего catalog lock.
-- [ ] Partial apply/EM close показаны честно; retry не восстанавливает manual clear.
-- [ ] Snapshot хранит origin/rule/guard; старые manual snapshots совместимы.
-- [ ] SQL выдача bounded; число запросов preview не растёт с размером страницы.
-- [ ] Legacy UI/no-JS, mobile/keyboard, loading/empty/error/role states пройдены.
-- [ ] Нет side effects в Catalog/Finance/Inventory/FIFO или внешних API.
-- [ ] Gates/reviews/reports выполнены, open B/I=0/0; Ready PR создан.
+- [x] Истёкший/вытесненный preview не применяется; retry действительного не дублирует.
+- [x] После preview изменились source/target/кандидаты/связь — конфликт без retarget.
+- [x] Синхронизация каталога и изменение источника защищены реальными locks.
+- [x] Catalog lock держится до commit; replay не зависит от текущего catalog lock.
+- [x] Partial apply/EM close показаны честно; retry не восстанавливает manual clear.
+- [x] Snapshot хранит origin/rule/guard; старые manual snapshots совместимы.
+- [x] SQL выдача bounded; число запросов preview не растёт с размером страницы.
+- [x] Legacy UI/no-JS, mobile/keyboard, loading/empty/error/role states пройдены.
+- [x] Нет side effects в Catalog/Finance/Inventory/FIFO или внешних API.
+- [x] Gates/reviews/reports выполнены, open B/I=0/0; Ready PR создан.
 
 ## 7. Дальнейшие расширения
 
@@ -423,3 +423,9 @@ round после IMPORTANT/MINOR, если исправления подтвер
 явные словари размеров/цветов, постоянная конфигурация правил, обработка
 всего каталога с cursor/job/status и отдельным batch ledger. Их schema/API/
 очереди/финансовые контракты не добавлять по ходу этой реализации.
+
+## Implementation rulings / финальные уточнения
+- Dedicated Redis pool использует AutomaticMappingRedisAdapter (наследник штатного RedisAdapter, текущий native phpredis provider), чтобы transport false/error не становились cache miss и не теряли immutable index. Тот же marshaller/write protocol, без зависимостей.
+- Импорт имеет дополнительный session import-intent lock moysklad-catalog-sync: duplicate sync skip сохранён, collision auto→existing temporary retry. Auto shared catalog key не изменён.
+- Preview READ+CSRF классифицирован exact existing authenticated-self ROUTE_POLICY только для private cache. Apply WRITE проверен valid-CSRF mutation.
+- Полный suite/Stan исключения и green narrow rechecks описаны в handoff; baseline не расширялся. Browser states и fresh/final external reviews завершены.

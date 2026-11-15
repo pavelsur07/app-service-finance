@@ -12,6 +12,7 @@
         {% set backParams = backParams|merge({q: preview.q, page: preview.page, sizeCharacteristicId: preview.sizeCharacteristicId ?? ''}) %}
         <section data-automatic-mapping-preview="{{ preview.id }}">
             <p class="text-secondary text-break">{{ connection.name }} · На этой странице: {{ preview.counts.total_shown }}. Однозначных соответствий: {{ preview.counts.ready }}. Предпросмотр действует 15 минут.</p>
+            <p class="text-secondary text-break" data-size-characteristic>Характеристика размера: {{ preview.sizeCharacteristicId ?? 'Не выбрана' }}.</p>
             <p>Проверьте позиции перед применением. Существующие и снятые связи не заменяются. Изменившиеся данные будут отклонены.</p>
             {% if result %}
                 <div class="alert {{ result.conflicts or result.failed or result.notProcessed ? 'alert-warning' : 'alert-success' }}" data-automatic-result role="status">

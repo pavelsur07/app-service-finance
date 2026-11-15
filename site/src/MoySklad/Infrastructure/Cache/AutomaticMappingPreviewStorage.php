@@ -8,6 +8,8 @@ use App\MoySklad\Application\DTO\AutomaticMappingApplyResult;
 use App\MoySklad\Application\DTO\AutomaticMappingPreview;
 use App\MoySklad\Exception\ListingMappingException;
 use Psr\Cache\CacheItemPoolInterface;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\NullLogger;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Lock\LockFactory;
@@ -153,6 +155,9 @@ final readonly class AutomaticMappingPreviewStorage
             Assert::minLength($sessionId, 1);
             $hash = hash('sha256', $sessionId);
             $lock = $this->locks->createLock('moysklad-automatic-mapping:'.$hash, 30);
+            if ($lock instanceof LoggerAwareInterface) {
+                $lock->setLogger(new NullLogger());
+            }
             if (!$lock->acquire(false)) {
                 throw new ListingMappingException('preview_busy', 'Предпросмотр занят другим запросом. Повторите действие.');
             }

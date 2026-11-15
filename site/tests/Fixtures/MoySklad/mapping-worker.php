@@ -58,7 +58,25 @@ try {
             new App\MoySklad\Infrastructure\Api\MoySkladClient($http, 'https://example.test/api/remap/1.2'),
             new App\MoySklad\Application\CatalogPageParser(), $container->get(App\MoySklad\Infrastructure\Security\ConnectionTokenCodec::class), new Psr\Log\NullLogger(),
             $container->get(App\MoySklad\Infrastructure\Lock\MoySkladCatalogLock::class));
-        echo ($sync($data['company'], $data['connection']) ? 'success:imported' : 'success:skipped')."\n";
+        if ('sync_duplicate_handler' === $data['mode']) {
+            $bus = new class implements Symfony\Component\Messenger\MessageBusInterface {
+                public int $calls = 0;
+
+                public function dispatch(object $message, array $stamps = []): Symfony\Component\Messenger\Envelope
+                {
+                    ++$this->calls;
+
+                    return new Symfony\Component\Messenger\Envelope($message, $stamps);
+                }
+            };
+            $records = new Monolog\Handler\TestHandler();
+            $logger = new Monolog\Logger('sync-duplicate-test', [$records]);
+            (new App\MoySklad\MessageHandler\SyncCatalogHandler($sync, $bus, $logger))(
+                new App\MoySklad\Message\SyncCatalogMessage($data['company'], $data['connection'], 3));
+            echo 'success:handler:'.$bus->calls.':'.(int) $records->hasErrorRecords()."\n";
+        } else {
+            echo ($sync($data['company'], $data['connection']) ? 'success:imported' : 'success:skipped')."\n";
+        }
     } elseif ('source' === ($data['mode'] ?? '')) {
         $db->executeStatement("UPDATE marketplace_listings SET supplier_sku='CHANGED' WHERE company_id=? AND id=?", [$data['company'], $data['listing']]);
         echo "success:source\n";
@@ -81,7 +99,10 @@ try {
 
                 public function now(): DateTimeImmutable
                 {
+                    $previous = $this->db->fetchOne("SELECT current_setting('lock_timeout')");
+                    $this->db->fetchOne("SELECT set_config('lock_timeout','0',true)");
                     $this->db->fetchOne('SELECT pg_advisory_xact_lock(hashtext(?),hashtext(?))', ['mapping-test-pause', $this->application]);
+                    $this->db->fetchOne("SELECT set_config('lock_timeout',?,true)", [$previous]);
 
                     return new DateTimeImmutable();
                 }

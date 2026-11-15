@@ -78,7 +78,12 @@ final readonly class AutomaticListingMappingPolicy
                     $unverifiable = true;
                     continue;
                 }
-                if (self::normalizeKey($values[0]['value']) !== $size) {
+                $targetSize = self::normalizeKey($values[0]['value']);
+                if (null === $targetSize) {
+                    $unverifiable = true;
+                    continue;
+                }
+                if ($targetSize !== $size) {
                     $sizeMismatch = true;
                     continue;
                 }

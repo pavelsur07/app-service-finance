@@ -79,6 +79,11 @@ final class AutomaticListingMappingPolicyTest extends TestCase
         yield 'same target is counted once' => [['rows' => [[], ['index' => 1]], 'status' => 'ready']];
         yield 'wrong size is rejected' => [['size' => 'M', 'characteristic' => 'size', 'rows' => [array_replace($variant, ['characteristics' => $l])], 'status' => 'size_mismatch']];
         yield 'proven wrong size does not create ambiguity' => [['size' => 'M', 'characteristic' => 'size', 'rows' => [array_replace($variant, ['characteristics' => $l]), $variant], 'status' => 'ready', 'target' => 2]];
+        foreach (['' => 'empty', " \t\n" => 'ASCII blank'] as $value => $label) {
+            $unknown = array_replace($variant, ['characteristics' => [['id' => 'size', 'name' => 'Размер', 'value' => $value]]]);
+            yield $label.' target size is unresolved' => [['size' => 'M', 'characteristic' => 'size', 'rows' => [$unknown], 'status' => 'size_unverifiable']];
+            yield $label.' target size cannot hide competing variant' => [['size' => 'M', 'characteristic' => 'size', 'rows' => [$variant, $unknown], 'status' => 'size_unverifiable']];
+        }
         yield 'missing characteristic is unresolved' => [['size' => 'M', 'characteristic' => 'size', 'rows' => [array_replace($variant, ['characteristics' => []])], 'status' => 'size_unverifiable']];
         yield 'unknown size cannot hide another candidate' => [['size' => 'M', 'characteristic' => 'size', 'rows' => [$variant, array_replace($variant, ['characteristics' => []])], 'status' => 'size_unverifiable']];
         yield 'repeated characteristic even with equal values is unresolved' => [['size' => 'M', 'characteristic' => 'size', 'rows' => [array_replace($variant, ['characteristics' => [...$m, ...$m]])], 'status' => 'size_unverifiable']];

@@ -126,6 +126,8 @@ final class AutomaticListingMappingsControllerTest extends WebTestCaseBase
         self::assertSelectorExists('option[value="char-00"][selected]');
         $client->submit($client->getCrawler()->filter('form[data-automatic-preview]')->form());
         self::assertResponseStatusCodeSame(303);
+        $client->followRedirect();
+        self::assertSelectorTextContains('[data-size-characteristic]', 'char-00');
         foreach ([['char_q' => ['bad']], ['char_page' => 0]] as $bad) {
             $client->request('GET', $url, $bad);
             self::assertResponseStatusCodeSame(422);
@@ -151,7 +153,11 @@ final class AutomaticListingMappingsControllerTest extends WebTestCaseBase
         $client->followRedirect();
         self::assertResponseIsSuccessful();
         self::assertSelectorNotExists('form[data-automatic-apply]');
-        $client->request('POST', $location.'/apply', ['_token' => 'bad', 'selectedIds' => [$data['listing']->getId()]]);
+        $previewId = basename((string) $location);
+        $token = bin2hex(random_bytes(32));
+        $tokenId = \App\MoySklad\Form\ApplyAutomaticMappingsType::csrfId($previewId);
+        $this->setClientSessionValue($client, \Symfony\Component\Security\Csrf\TokenStorage\SessionTokenStorage::SESSION_NAMESPACE.'/'.$tokenId, $token);
+        $client->request('POST', $location.'/apply', ['_token' => $token, 'selectedIds' => [$data['listing']->getId()]]);
         self::assertResponseStatusCodeSame(403);
     }
 

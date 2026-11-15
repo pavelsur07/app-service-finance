@@ -50,11 +50,15 @@ final readonly class SyncCatalogAction
             return false;
         }
 
-        if (!$this->catalogLock->tryAcquire($connectionId)) {
-            throw new CatalogSyncException('temporary');
+        if (!$this->catalogLock->tryAcquireSync($connectionId)) {
+            return false; // An actual import already owns this connection; keep duplicate-sync skip.
         }
-
+        $catalogLocked = false;
         try {
+            $catalogLocked = $this->catalogLock->tryAcquire($connectionId);
+            if (!$catalogLocked) {
+                throw new CatalogSyncException('temporary');
+            }
             $this->em->refresh($connection);
             if (!$connection->isActive() || ConnectionCheckStatus::CONNECTED !== $connection->getCheckStatus() || null === $connection->getAccountId()) {
                 return false;
@@ -65,7 +69,10 @@ final readonly class SyncCatalogAction
 
             return true;
         } finally {
-            $this->catalogLock->release($connectionId);
+            if ($catalogLocked) {
+                $this->catalogLock->release($connectionId);
+            }
+            $this->catalogLock->releaseSync($connectionId);
         }
     }
 

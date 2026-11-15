@@ -5803,7 +5803,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.200 | 2026-11-15 | MoySklad: pure policy автомаппинга, bounded candidates/preview/характеристики; общий CatalogTargetDTO::fromRow |
+| 2.200 | 2026-11-15 | MoySklad: автомаппинг25 листингов Ozon/WB в legacy UI, exact article/explicit size, immutable Redis preview, guarded per-row apply, CAS/replay и audit |
 | 2.199 | 2026-11-15 | MarketplaceWb: строка с артикулом без размера (возмещение логистики, реклама) остаётся на артикуле — по размерам по продажам дня (`wb_size_sales_share`), а не без SKU по всему кабинету; размеры без учёта кириллических двойников; `RULES_VERSION` `wb-sales-report-2` — все дни переводятся заново |
 | 2.198 | 2026-11-15 | ServiceGateway: ключ повтора задачи ИИ вне печатного ASCII или длиннее 200 символов уходит в сервис хешем `sha256:…` (заголовок `Idempotency-Key` искажал кириллицу — 422), `task_id` — от исходного ключа; MarketplaceOzon/MarketplaceWb: запрос черновика без ответа дольше часа повторяется |
 | 2.197 | 2026-11-15 | MarketplaceWb: черновики ИИ для кодов WB (этап 8.3b) — `RequestWbSourceTypeDraftsAction`, `WbSourceTypeDraftConsumer`, колонка черновика на экране кодов; ServiceGateway: результат ИИ получают все потребители его task_type |
@@ -6135,7 +6135,11 @@ MarketplaceFacade; существующие ревизии, включая clear
 Redis pool `cache.moysklad_automatic_mapping`: TTL900, максимум3 preview на
 SHA256(sessionId), максимум3 immutable attempt results на preview. READ/WRITE
 индекса сериализуется существующим LockFactory, acquire(false); busy409,
-Redis failure503, чужой/истёкший preview одинаково отсутствует. Scope включает
+Redis failure503, чужой/истёкший preview одинаково отсутствует.
+Dedicated `AutomaticMappingRedisAdapter` сохраняет штатный marshaller/write
+protocol, но mget false/error/incomplete не превращает в miss. Pool и private
+Lock получают NullLogger, чтобы session hash не попал в framework diagnostics;
+глобальный LockFactory/logger не меняется. Scope включает
 company/actor/connection/provider; sessionId/hash не возвращаются в UI.
 UUIDv7 preview/requestId генерируются сервером; Guard фиксирует версию
 `article_size_v1`, fingerprint и выбранный opaque characteristic ID.
@@ -6151,8 +6155,11 @@ caller transaction, возвращает свежий DBAL DTO, не Entity из
 Audit listing_snapshot.autoMapping хранит origin/preview/rule/fingerprint/
 characteristic/matchedRules. Replay проверяет полный payload и guard прежде
 новой валидации каталога, поэтому не восстанавливает последующий manual clear.
-При занятом catalog lock SyncCatalogAction выдаёт существующую категорию
-`temporary`: Handler планирует штатный retry, вместо потери запуска. Auto
+SyncCatalogAction сначала берёт отдельный session import-intent lock
+`moysklad-catalog-sync`/connectionId: другой настоящий import→skip без retry.
+Затем shared catalog lock; его занятость auto writer→существующий `temporary`
+и штатный Handler retry. Оба lock освобождаются finally; duplicate-sync
+контракт и текст UI сохранены. Auto
 source/target lock wait ограничен LOCAL lock_timeout2s. Manual snapshot не
 наследует autoMapping прежней ревизии при отсутствующем source.
 Технический сбой останавливает остаток; ACCEPTED включает прежний request,

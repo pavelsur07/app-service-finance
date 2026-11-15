@@ -48,6 +48,47 @@ final class AutomaticMappingPreviewStorageConcurrencyTest extends KernelTestCase
         }
     }
 
+    public function testTransientRedisReadFailureCannotOverwriteAcknowledgedIndex(): void
+    {
+        $redis = new class extends \Redis {
+            public bool $failRead = false;
+
+            /** @param list<string> $keys
+             * @return array<string|false>|false
+             */
+            public function mget(array $keys): array|false
+            {
+                return $this->failRead ? false : parent::mget($keys);
+            }
+        };
+        $redis->connect('site-redis');
+        $clock = new \Symfony\Component\Clock\MockClock();
+        $storage = new AutomaticMappingPreviewStorage(new \App\MoySklad\Infrastructure\Cache\AutomaticMappingRedisAdapter($redis, 'automatic-test-'.Uuid::uuid7()->toString()),
+            new \Symfony\Component\Lock\LockFactory(new \Symfony\Component\Lock\Store\InMemoryStore()), $clock);
+        $company = Uuid::uuid7()->toString();
+        $actor = Uuid::uuid7()->toString();
+        $connection = Uuid::uuid7()->toString();
+        $first = new AutomaticMappingPreview(Uuid::uuid7()->toString(), $company, $actor, $connection, 'ozon', time(), time() + 900, AutomaticMappingGuard::RULE_VERSION, '', 1, null, [], []);
+        $second = new AutomaticMappingPreview(Uuid::uuid7()->toString(), $company, $actor, $connection, 'ozon', time(), time() + 900, AutomaticMappingGuard::RULE_VERSION, '', 1, null, [], []);
+        try {
+            $storage->put('private-session', $first);
+            $redis->failRead = true;
+            try {
+                $storage->put('private-session', $second);
+                self::fail('Broken index read must not overwrite the old index.');
+            } catch (\App\MoySklad\Exception\ListingMappingException $error) {
+                self::assertSame(503, $error->getStatusCode());
+            }
+            $redis->failRead = false;
+            self::assertEquals($first, $storage->get('private-session', $first->id, $company, $actor, $connection, 'ozon'));
+            $storage->put('private-session', $second);
+            self::assertEquals($first, $storage->get('private-session', $first->id, $company, $actor, $connection, 'ozon'));
+            self::assertEquals($second, $storage->get('private-session', $second->id, $company, $actor, $connection, 'ozon'));
+        } finally {
+            $redis->close();
+        }
+    }
+
     /** @param list<array<string,mixed>> $inputs */
     private function race(array $inputs): void
     {

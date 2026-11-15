@@ -11,14 +11,18 @@ use Webmozart\Assert\Assert;
 
 final readonly class MappingCharacteristicsQuery
 {
-    private const GROUPED = <<<'SQL'
-        SELECT item->>'id' COLLATE "C" AS id,
-            MIN(COALESCE(NULLIF(item->>'name',''), item->>'id') COLLATE "C") AS name
+    private const CHARACTERISTICS = <<<'SQL'
         FROM moysklad_variants v CROSS JOIN LATERAL jsonb_array_elements(v.characteristics) item
         WHERE v.company_id=:company AND v.connection_id=:connection
             AND item->>'id' IS NOT NULL AND item->>'id'<>''
-        GROUP BY item->>'id' COLLATE "C"
         SQL;
+
+    private const SELECT_CHARACTERISTIC = <<<'SQL'
+        SELECT item->>'id' COLLATE "C" AS id,
+            MIN(COALESCE(NULLIF(item->>'name',''), item->>'id') COLLATE "C") AS name
+        SQL;
+
+    private const GROUPED = self::SELECT_CHARACTERISTIC.' '.self::CHARACTERISTICS.' GROUP BY item->>\'id\' COLLATE "C"';
 
     public function __construct(private Connection $db)
     {
@@ -50,7 +54,7 @@ final readonly class MappingCharacteristicsQuery
     {
         Assert::maxLength($characteristicId, 255);
         /** @var array{id:string,name:string}|false $row */
-        $row = $this->db->fetchAssociative('SELECT id, name FROM ('.self::GROUPED.') grouped WHERE id=:id',
+        $row = $this->db->fetchAssociative(self::SELECT_CHARACTERISTIC.' '.self::CHARACTERISTICS.' AND item->>\'id\' COLLATE "C"=:id COLLATE "C" GROUP BY item->>\'id\' COLLATE "C" LIMIT 1',
             ['company' => Uuid::fromString($companyId)->toString(), 'connection' => Uuid::fromString($connectionId)->toString(), 'id' => $characteristicId]);
 
         return false === $row ? null : $row;

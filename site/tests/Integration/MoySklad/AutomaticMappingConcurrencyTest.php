@@ -100,6 +100,26 @@ final class AutomaticMappingConcurrencyTest extends PostgresResetTestCase
         }
     }
 
+    public function testAnotherRunningImportSkipsDuplicateWithoutRetryOrErrorLog(): void
+    {
+        $input = $this->input();
+        $processes = [];
+        $this->connection->beginTransaction();
+        try {
+            $this->pause($input['application']);
+            $processes[] = $this->worker($input + ['mode' => 'sync_duplicate_paused']);
+            $this->assertWaiting($input['application']);
+            $processes[] = $this->worker(array_replace($input, ['mode' => 'sync_duplicate_handler', 'application' => $input['application'].'-duplicate']));
+            self::assertSame(0, $processes[1]->wait(), $processes[1]->getErrorOutput());
+            self::assertStringContainsString('success:handler:0:0', $processes[1]->getOutput());
+            $this->connection->commit();
+            self::assertSame(0, $processes[0]->wait(), $processes[0]->getErrorOutput());
+            self::assertStringContainsString('success:imported', $processes[0]->getOutput());
+        } finally {
+            $this->finish($processes);
+        }
+    }
+
     public function testFacadeLockRequiresTransaction(): void
     {
         $input = $this->input();

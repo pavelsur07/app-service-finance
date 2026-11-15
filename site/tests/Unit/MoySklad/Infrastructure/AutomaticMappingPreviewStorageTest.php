@@ -131,6 +131,40 @@ final class AutomaticMappingPreviewStorageTest extends TestCase
         }
     }
 
+    public function testRealRedisAdapterReadFailureCannotBecomeCacheMiss(): void
+    {
+        foreach ([false, [], ['unexpected' => 'not-a-list'], new \RedisException('Test connection failure')] as $failure) {
+            $redis = $this->createMock(\Redis::class);
+            if ($failure instanceof \Throwable) {
+                $redis->method('mget')->willThrowException($failure);
+            } else {
+                $redis->method('mget')->willReturn($failure);
+            }
+            $adapter = new \App\MoySklad\Infrastructure\Cache\AutomaticMappingRedisAdapter($redis);
+            $store = new AutomaticMappingPreviewStorage($adapter, new LockFactory(new InMemoryStore()), new MockClock());
+            try {
+                $this->get($store, $this->preview(new MockClock()));
+                self::fail('Redis read failure was interpreted as missing preview.');
+            } catch (ListingMappingException $error) {
+                self::assertSame(503, $error->getStatusCode());
+            }
+        }
+    }
+
+    public function testSessionIdentityDoesNotLeakThroughFrameworkLockLogger(): void
+    {
+        $handler = new \Monolog\Handler\TestHandler();
+        $locks = new LockFactory(new InMemoryStore());
+        $locks->setLogger(new \Monolog\Logger('private-preview', [$handler]));
+        $clock = new MockClock();
+        $store = new AutomaticMappingPreviewStorage(new ArrayAdapter(), $locks, $clock);
+        $store->put('private-test-session', $this->preview($clock));
+        $formatter = new \Monolog\Formatter\LineFormatter('%message% %context%');
+        $messages = implode("\n", array_map($formatter->format(...), $handler->getRecords()));
+        self::assertStringNotContainsString('private-test-session', $messages);
+        self::assertStringNotContainsString(hash('sha256', 'private-test-session'), $messages);
+    }
+
     private function preview(MockClock $clock): AutomaticMappingPreview
     {
         $source = new ListingMetaDTO(Uuid::uuid7()->toString(), 'Листинг', 'SKU', 'ozon', '001');

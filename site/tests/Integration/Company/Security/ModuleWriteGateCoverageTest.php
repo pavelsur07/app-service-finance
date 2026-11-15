@@ -61,6 +61,9 @@ final class ModuleWriteGateCoverageTest extends KernelTestCase
      * @var array<string, array{0: string, 1: string}>
      */
     private const ROUTE_POLICY = [
+        // READ + CSRF: only the actor/session private preview cache changes; no domain write.
+        // Apply has its own MARKETPLACE_WRITE gate. Covered by AutomaticListingMappingsControllerTest.
+        'moysklad_automatic_mapping_preview' => ['authenticated-self', 'App\MoySklad\Controller\PreviewAutomaticMappingsController::__invoke'],
         // SPA session-only mutations: Symfony token + Origin/CSRF; company selection
         // additionally checks owner/active membership. Covered by SpaAuthenticationTest
         // and SelectActiveCompanyTest; never grants a module write permission.
