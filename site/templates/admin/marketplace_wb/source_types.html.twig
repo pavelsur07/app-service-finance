@@ -32,6 +32,8 @@
                   <span class="u-text-faint">{{ item.days }} дн. · {{ item.companies }} комп.</span>
                 </td>
                 <td>
+                  {% set proposal = suggested[item.source_type] ?? null %}
+                  {% if proposal %}<div class="u-text-faint">Предложено: {{ proposal.label }}</div>{% endif %}
                   <form action="{{ path('admin_marketplace_wb_source_types_confirm') }}" method="POST">
                     <input type="hidden" name="_token" value="{{ csrf_token('mwb_confirm_' ~ item.source_type) }}">
                     <input type="hidden" name="source_type" value="{{ item.source_type }}">
@@ -39,7 +41,7 @@
                     <select class="select" name="kind" aria-label="Вид операции" required>
                       <option value="">— вид —</option>
                       {% for kind in kinds %}
-                        <option value="{{ kind.value }}">{{ kind.label }} ({{ kind.level.value }})</option>
+                        <option value="{{ kind.value }}" {% if proposal and proposal.value == kind.value %}selected{% endif %}>{{ kind.label }} ({{ kind.level.value }})</option>
                       {% endfor %}
                     </select>
                     <button type="submit" class="btn btn-sm btn-primary">Подтвердить</button>
