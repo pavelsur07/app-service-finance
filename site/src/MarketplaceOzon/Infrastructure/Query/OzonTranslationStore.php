@@ -214,9 +214,9 @@ final readonly class OzonTranslationStore
             'SELECT t.source_type, t.name, t.first_seen_company_id AS company_id,
                     COALESCE((SELECT sum(q.amount_minor) FROM moz_quarantine q WHERE q.source_type = t.source_type), 0) < 0 AS debit
              FROM moz_source_type t
-             WHERE t.kind IS NULL AND t.ai_draft IS NULL AND t.first_seen_company_id IS NOT NULL AND t.source_type <> :unexplained
+             WHERE t.kind IS NULL AND (t.ai_draft IS NULL OR (t.ai_draft->>\'status\' = \'requested\' AND (t.ai_draft->>\'requested_at\')::timestamptz < :stale)) AND t.first_seen_company_id IS NOT NULL AND t.source_type <> :unexplained
              ORDER BY t.first_seen_at',
-            ['unexplained' => AccrualByDayTranslator::UNEXPLAINED],
+            ['unexplained' => AccrualByDayTranslator::UNEXPLAINED, 'stale' => $this->staleDraftBefore()],
         );
 
         return array_map(static fn (array $r): array => [
@@ -349,5 +349,11 @@ final readonly class OzonTranslationStore
     private function now(): string
     {
         return $this->clock->now()->format('Y-m-d H:i:s');
+    }
+
+    /** Запрос черновика без ответа дольше часа (постановка упала окончательно) — запросить снова: сервис сольёт дубль по ключу. */
+    private function staleDraftBefore(): string
+    {
+        return $this->clock->now()->modify('-1 hour')->format(\DATE_ATOM);
     }
 }

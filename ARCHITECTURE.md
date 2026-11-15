@@ -5800,6 +5800,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.198 | 2026-11-15 | ServiceGateway: ключ повтора задачи ИИ вне печатного ASCII или длиннее 200 символов уходит в сервис хешем `sha256:…` (заголовок `Idempotency-Key` искажал кириллицу — 422), `task_id` — от исходного ключа; MarketplaceOzon/MarketplaceWb: запрос черновика без ответа дольше часа повторяется |
 | 2.197 | 2026-11-15 | MarketplaceWb: черновики ИИ для кодов WB (этап 8.3b) — `RequestWbSourceTypeDraftsAction`, `WbSourceTypeDraftConsumer`, колонка черновика на экране кодов; ServiceGateway: результат ИИ получают все потребители его task_type |
 | 2.196 | 2026-11-15 | Отчёты нового контура по двум каналам (этап 8.5): фильтр канала в R1/R2, метка канала у SKU и в xlsx, строки каналов в R3; R10 сверяет WB со своим каналом — фасад `MarketplaceWbFacadeInterface::dayStates` |
 | 2.195 | 2026-11-15 | MoySklad: отдельные legacy-вкладки Ozon/Wildberries, выбор подключения, локальный поиск, ручное назначение/снятие связи и история; READ/WRITE, CSRF, CAS и bounded-пагинация |
