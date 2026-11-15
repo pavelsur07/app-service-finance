@@ -7,6 +7,7 @@ namespace App\MarketplaceWb\Application\Action;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceOperations\Application\DTO\DayOperations;
 use App\MarketplaceOperations\Application\DTO\OperationInput;
+use App\MarketplaceOperations\Enum\OperationKind;
 use App\MarketplaceOperations\Facade\MarketplaceOperationsFacadeInterface;
 use App\MarketplaceWb\Domain\AdsDayTranslator;
 use App\MarketplaceWb\Domain\SalesReportTranslator;
@@ -25,6 +26,8 @@ final readonly class TranslateWbDayAction
     public const RESOURCE = 'wb.finance.sales-report.daily';
     /** Канал канона = `MarketplaceType::WILDBERRIES->value`. */
     public const CHANNEL = 'wildberries';
+    /** Строка с артикулом без размера разнесена по размерам артикула (продажи дня, без продаж — поровну). */
+    public const SIZE_ALLOCATION_KEY = 'wb_size_sales_share';
 
     public function __construct(
         private SourceFactsFacadeInterface $sourceFacts,
@@ -74,6 +77,18 @@ final readonly class TranslateWbDayAction
         $kinds = $this->store->resolveKinds($undecided, $period->companyId, $date);
         $listings = $this->listings($period->companyId, $components);
 
+        // проданные штуки размеров за день — веса для строк без размера (логистика, реклама по nmId)
+        $soldQty = [];
+        foreach ($components as $component) {
+            if (OperationKind::SALE === ($component->kind ?? $kinds[$component->sourceType] ?? null) && null !== $component->nmId) {
+                $own = self::allocate($listings[$component->nmId] ?? [], $component->size, 1, []);
+                if (1 === \count($own)) {
+                    $listingId = (string) array_key_first($own);
+                    $soldQty[$listingId] = ($soldQty[$listingId] ?? 0) + abs($component->quantity ?? 0);
+                }
+            }
+        }
+
         $operations = [];
         $quarantine = [];
         $unresolved = 0;
@@ -89,12 +104,21 @@ final readonly class TranslateWbDayAction
                 continue;
             }
 
-            $listingId = null === $component->nmId ? null : self::listingFor($listings[$component->nmId] ?? [], $component->size);
-            if (null !== $component->nmId && null === $listingId) {
+            $parts = null === $component->nmId ? [] : self::allocate($listings[$component->nmId] ?? [], $component->size, $component->amount->amountMinor(), $soldQty);
+            if (null !== $component->nmId && [] === $parts) {
                 ++$unresolved;
             }
-            $allocationKey = null !== $listingId && AdsDayTranslator::SOURCE_TYPE === $component->sourceType ? AdsDayTranslator::ALLOCATION_KEY : null;
-            $operations[] = new OperationInput($kind, $component->sourceType, $component->amount, [$component->sourceKey], $listingId, $component->quantity, $allocationKey);
+            $isAds = AdsDayTranslator::SOURCE_TYPE === $component->sourceType;
+            if ([] === $parts) {
+                $operations[] = new OperationInput($kind, $component->sourceType, $component->amount, [$component->sourceKey], null, $component->quantity, null);
+            } elseif (1 === \count($parts)) {
+                $operations[] = new OperationInput($kind, $component->sourceType, $component->amount, [$component->sourceKey], (string) array_key_first($parts), $component->quantity, $isAds ? AdsDayTranslator::ALLOCATION_KEY : null);
+            } else {
+                foreach ($parts as $listingId => $minor) {
+                    $operations[] = new OperationInput($kind, $component->sourceType, Money::fromMinor($minor, $component->amount->currency()), [$component->sourceKey], (string) $listingId, null,
+                        $isAds ? AdsDayTranslator::ALLOCATION_KEY : self::SIZE_ALLOCATION_KEY);
+                }
+            }
             if (!SalesReportTranslator::isInformational($component)) {
                 $canon = $canon->add($component->amount);
             }
@@ -124,27 +148,56 @@ final readonly class TranslateWbDayAction
     }
 
     /**
-     * Листинг по размеру; размера нет, а у `nmId` один листинг — он; иначе без SKU.
-     * `$size = null` (реклама — по nmId без размера) — первый листинг по id.
+     * Куда ставится сумма строки с артикулом: размер известен — на листинг этого размера (размеры сравниваются
+     * без регистра и кириллических двойников латиницы); у артикула один листинг — на него; размер неизвестен
+     * (`null` у рекламы, `UNKNOWN` у отчёта) — по размерам артикула пропорционально проданным за день штукам,
+     * без продаж — поровну. Известный размер без листинга — `[]` (без SKU: листинга не хватает).
      *
-     * @param list<array{id: string, size: string}> $found
+     * @param list<array{id: string, size: string}> $found листинги артикула
+     * @param array<string, int> $soldQty listingId → продано за день
+     *
+     * @return array<string, int> listingId → сумма, Σ = $amountMinor; `[]` — без SKU
      */
-    public static function listingFor(array $found, ?string $size): ?string
+    public static function allocate(array $found, ?string $size, int $amountMinor, array $soldQty): array
     {
-        if (null === $size) {
-            // ponytail: реклама nmId с несколькими размерами — на первый листинг; по размерам — по продажам дня, если понадобится
-            $ids = array_column($found, 'id');
-            sort($ids, \SORT_STRING);
-
-            return $ids[0] ?? null;
+        if ([] === $found) {
+            return [];
         }
-        foreach ($found as $listing) {
-            if ($listing['size'] === $size) {
-                return $listing['id'];
+        if (!self::sizeUnknown($size)) {
+            foreach ($found as $listing) {
+                if (self::normalizeSize($listing['size']) === self::normalizeSize((string) $size)) {
+                    return [$listing['id'] => $amountMinor];
+                }
             }
+
+            return 1 === \count($found) ? [$found[0]['id'] => $amountMinor] : [];
+        }
+        if (1 === \count($found)) {
+            return [$found[0]['id'] => $amountMinor];
+        }
+        $weights = [];
+        foreach ($found as $listing) {
+            $weights[$listing['id']] = $soldQty[$listing['id']] ?? 0;
+        }
+        if (0 === array_sum($weights)) {
+            $weights = array_map(static fn (): int => 1, $weights);
+        }
+        $parts = [];
+        foreach (AdsDayTranslator::split($amountMinor, $weights) as $listingId => $minor) {
+            $parts[(string) $listingId] = $minor;
         }
 
-        return 1 === \count($found) ? $found[0]['id'] : null;
+        return $parts;
+    }
+
+    private static function sizeUnknown(?string $size): bool
+    {
+        return null === $size || SalesReportTranslator::UNKNOWN_SIZE === $size;
+    }
+
+    private static function normalizeSize(string $size): string
+    {
+        return strtr(mb_strtoupper(trim($size)), ['А' => 'A', 'В' => 'B', 'Е' => 'E', 'К' => 'K', 'М' => 'M', 'Н' => 'H', 'О' => 'O', 'Р' => 'P', 'С' => 'C', 'Т' => 'T', 'Х' => 'X']);
     }
 
     /**

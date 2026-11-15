@@ -94,12 +94,31 @@ final class TranslateWbSalesReportCommandTest extends IntegrationTestCase
         self::assertStringContainsString('1 due, 1 translated', $this->translate(), 'новая ревизия рекламы — день заново');
 
         $ads = $this->connection->fetchAllAssociative("SELECT listing_id, amount_minor, allocation_key FROM mo_operation WHERE company_id = ? AND kind = 'ads_cpc' ORDER BY amount_minor", [$this->companyId]);
-        // у nmId 555 два листинга (размеры 42, 44) — первый по id; nmId 999 без листинга
-        $first = min($this->listingId, $this->otherListingId);
-        self::assertEquals([['listing_id' => $first, 'amount_minor' => -2250, 'allocation_key' => 'ads_statistics_share'], ['listing_id' => null, 'amount_minor' => -750, 'allocation_key' => null]], $ads);
+        // у nmId 555 два листинга (размеры 42, 44): реклама без размера — по продажам дня, продан только 42; nmId 999 без листинга
+        self::assertEquals([['listing_id' => $this->listingId, 'amount_minor' => -2250, 'allocation_key' => 'ads_statistics_share'], ['listing_id' => null, 'amount_minor' => -750, 'allocation_key' => null]], $ads);
         self::assertSame([1, 1, 72000, 72000, 0, 1], $this->day(), 'итог дня = forPay 750 − реклама 30');
 
         self::assertStringContainsString('0 due', $this->translate());
+    }
+
+    public function testRowWithArticleButWithoutSizeStaysOnArticleSplitBySalesOfSizes(): void
+    {
+        $this->connection->executeStatement(
+            "INSERT INTO mwb_source_type (source_type, name, kind, status, first_seen_at) VALUES ('wb:field:rebillLogisticCost', 'Возмещение логистики', 'logistics_to', 'confirmed', now())",
+        );
+        // продано: размер 42 — 1 шт., 44 — 2 шт.; возмещение логистики артикула 555 без размера — 30 ₽
+        $this->facts(1, [$this->sale(1, '42'), $this->sale(2, '44'), $this->sale(3, '44'), ['nmId' => 555] + $this->cost(4, ['sellerOperName' => 'Возмещение издержек по перевозке', 'rebillLogisticCost' => '30'])]);
+        $this->translate();
+
+        $rows = $this->connection->fetchAllAssociative(
+            "SELECT listing_id, amount_minor, allocation_key FROM mo_operation WHERE company_id = ? AND source_type = 'wb:field:rebillLogisticCost' ORDER BY amount_minor DESC",
+            [$this->companyId],
+        );
+        self::assertEquals([
+            ['listing_id' => $this->listingId, 'amount_minor' => -1000, 'allocation_key' => 'wb_size_sales_share'],
+            ['listing_id' => $this->otherListingId, 'amount_minor' => -2000, 'allocation_key' => 'wb_size_sales_share'],
+        ], $rows, 'расход остаётся на артикуле, на другие товары не попадает');
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT unresolved_listing_count FROM mwb_day WHERE company_id = ?', [$this->companyId]));
     }
 
     private function listing(Company $company, string $id, string $size): MarketplaceListing
