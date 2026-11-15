@@ -1,0 +1,82 @@
+/* Только R1/R2/R10. Внешний вид таблиц — как unit-extended, токены легаси. */
+.me-table-card {
+    min-width: 0;
+}
+.me-table-scroll {
+    overflow-x: auto;
+    width: 100%;
+}
+.me-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
+    margin: 0;
+}
+.me-table th,
+.me-table td {
+    white-space: nowrap;
+}
+.me-table th:first-child,
+.me-table td:first-child {
+    position: sticky;
+    left: 0;
+    min-width: 140px;
+    max-width: 240px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    background: var(--tblr-bg-surface);
+    border-right: 1px solid var(--vf-border);
+    z-index: 1;
+}
+.me-table thead th:first-child {
+    background: var(--vf-navy-50);
+    z-index: 3;
+}
+.me-table tbody tr:hover td {
+    background: var(--tblr-bg-surface-secondary);
+}
+.me-table .me-totals td {
+    background: var(--tblr-bg-surface-secondary);
+    border-top: 1px solid var(--vf-border-strong);
+    font-size: var(--vf-size-md);
+    font-weight: var(--vf-weight-semibold);
+}
+.me-fixed-header {
+    position: fixed;
+    top: 0;
+    overflow: hidden;
+    z-index: 1030;
+    background: var(--tblr-bg-surface);
+    border-bottom: 1px solid var(--vf-border-strong);
+}
+.me-fixed-header .me-table {
+    table-layout: fixed;
+    min-width: 0;
+}
+.me-floating-scroll {
+    position: fixed;
+    bottom: 0;
+    height: 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    z-index: 1030;
+    background: var(--tblr-bg-surface);
+    border-top: 1px solid var(--vf-border);
+}
+.me-floating-scroll > div {
+    height: 1px;
+}
+.me-fixed-header[hidden],
+.me-floating-scroll[hidden] {
+    display: none;
+}
+@media print {
+    .me-fixed-header,
+    .me-floating-scroll {
+        display: none;
+    }
+    .me-table-scroll {
+        overflow: visible;
+    }
+}
