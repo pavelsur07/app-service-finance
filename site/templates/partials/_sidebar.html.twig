@@ -18,7 +18,7 @@
             <img src="{{ asset('brand/logo-full.svg') }}" width="145" height="32" alt="" />
         </a>
     </h1>
-    <div class="collapse navbar-collapse d-flex flex-column vf-sidebar" id="sidebar-menu">
+    <div class="collapse navbar-collapse {{ current_route starts with 'balance_' ? 'd-lg-flex' : 'd-flex' }} flex-column vf-sidebar" id="sidebar-menu">
         <div class="vf-sidebar-body">
         <ul class="navbar-nav">
             <!-- Dashboard -->
@@ -170,7 +170,8 @@
             <!-- Баланс -->
             {% if is_granted('module.finance.read') %}
             {# «Статьи баланса» живут в «Справочниках» (balance_structure_*), здесь их нет — не дублируем. #}
-            {% set balance_active = current_route starts with 'balance_' and not (current_route starts with 'balance_structure_') %}
+            {% set balance_articles_active = (balanceSection|default(null) == 'balance_structure_index') or current_route starts with 'balance_structure_' or current_route == 'balance_article_card' %}
+            {% set balance_active = current_route starts with 'balance_' and not balance_articles_active %}
             <li class="nav-item dropdown {{ balance_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ balance_active ? 'show active' : '' }}" href="#navbar-balance" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ balance_active ? 'true' : 'false' }}">
                     <span class="nav-link-icon"><i class="ti ti-scale"></i></span>
@@ -178,11 +179,11 @@
                 </a>
                 <div class="dropdown-menu {{ balance_active ? 'show' : '' }}" id="navbar-balance">
                     <a class="dropdown-item {{ current_route == 'balance_index' ? 'active' : '' }}" href="{{ path('balance_index') }}">Баланс</a>
-                    <a class="dropdown-item {{ current_route starts with 'balance_account' ? 'active' : '' }}" href="{{ path('balance_accounts') }}">Счета</a>
-                    <a class="dropdown-item {{ current_route in ['balance_journal', 'balance_document', 'balance_document_new'] ? 'active' : '' }}" href="{{ path('balance_journal') }}">Документы</a>
+                    <a class="dropdown-item {{ (balanceSection|default(null) == 'balance_accounts' or current_route starts with 'balance_account') ? 'active' : '' }}" href="{{ path('balance_accounts') }}">Счета</a>
+                    <a class="dropdown-item {{ (balanceSection|default(null) == 'balance_journal' or current_route == 'balance_journal' or current_route starts with 'balance_document') ? 'active' : '' }}" href="{{ path('balance_journal') }}">Документы</a>
                     <a class="dropdown-item {{ current_route == 'balance_statement' ? 'active' : '' }}" href="{{ path('balance_statement') }}">Движения</a>
                     <a class="dropdown-item {{ current_route == 'balance_compare' ? 'active' : '' }}" href="{{ path('balance_compare') }}">Сравнение</a>
-                    <a class="dropdown-item {{ current_route == 'balance_periods' ? 'active' : '' }}" href="{{ path('balance_periods') }}">Периоды</a>
+                    <a class="dropdown-item {{ (balanceSection|default(null) == 'balance_periods' or current_route == 'balance_periods') ? 'active' : '' }}" href="{{ path('balance_periods') }}">Периоды</a>
                 </div>
             </li>
             {% endif %}
@@ -193,18 +194,20 @@
                хотя бы один из модулей, а пункты внутри гейтим по своему модулю. #}
             {% if is_granted('module.finance.read') or is_granted('module.catalog.read') %}
             {% set responsibility_centers_active = current_route starts with 'financial_responsibility_center_' %}
-            <li class="nav-item dropdown {{ responsibility_centers_active ? 'show' : '' }}">
-                <a class="nav-link dropdown-toggle {{ responsibility_centers_active ? 'show active' : '' }}" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ responsibility_centers_active ? 'true' : 'false' }}">
+            {% set balance_articles_active = balance_articles_active|default(false) %}
+            {% set directories_active = responsibility_centers_active or balance_articles_active %}
+            <li class="nav-item dropdown {{ directories_active ? 'show' : '' }}">
+                <a class="nav-link dropdown-toggle {{ directories_active ? 'show active' : '' }}" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ directories_active ? 'true' : 'false' }}">
                     <span class="nav-link-icon"><i class="ti ti-books"></i></span>
                     <span class="nav-link-title"> Справочники </span>
                 </a>
-                <div class="dropdown-menu {{ responsibility_centers_active ? 'show' : '' }}">
+                <div class="dropdown-menu {{ directories_active ? 'show' : '' }}">
                     <div class="dropdown-menu-columns">
                         <div class="dropdown-menu-column">
                             {% if is_granted('module.finance.read') %}
                             <a class="dropdown-item" href="{{ path('cashflow_category_index') }}">Категории ДДС</a>
                             <a class="dropdown-item" href="{{ path('pl_category_index') }}">Категории ОПиУ</a>
-                            <a class="dropdown-item" href="{{ path('balance_structure_index') }}">Статьи баланса</a>
+                            <a class="dropdown-item {{ balance_articles_active ? 'active' : '' }}" href="{{ path('balance_structure_index') }}">Статьи баланса</a>
                             <a class="dropdown-item" href="{{ path('money_account_index') }}">Счета и кассы</a>
                             <a class="dropdown-item" href="{{ path('counterparty_index') }}">Контрагенты</a>
                             <a class="dropdown-item" href="{{ path('project_direction_index') }}">Проекты</a>

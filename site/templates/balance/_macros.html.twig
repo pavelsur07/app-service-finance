@@ -11,28 +11,41 @@
 {# Учётные даты приходят строкой из БД (Y-m-d, время — МСК без зоны): зону не пересчитываем. #}
 {% macro date(value) %}{{ value ? value|date('d.m.Y', false) : '—' }}{% endmacro %}
 {% macro datetime(value) %}{{ value ? value|date('d.m.Y H:i', false) : '—' }}{% endmacro %}
-{% macro period(from, to) %}
-    <form method="get" class="wz-row wz-filters">
-        <div class="form-field">
-            <label class="form-label" for="balance-from">С даты</label>
-            <input class="input" id="balance-from" type="date" name="from" required value="{{ from }}">
-        </div>
-        <div class="form-field">
-            <label class="form-label" for="balance-to">По дату</label>
-            <input class="input" id="balance-to" type="date" name="to" required value="{{ to }}">
-        </div>
-        <div class="wz-row-actions">
-            <button class="btn btn-md btn-primary">Показать</button>
+{# comparison — две независимые даты, без пресетов диапазона. Параметры GET остаются from/to. #}
+{% macro period(from, to, comparison=false) %}
+    <form method="get" class="card vf-card mb-4">
+        <div class="card-body">
+            {% if not comparison %}
+                <div class="mb-3">
+                    {% include 'partials/_period_presets.html.twig' with {from: '#balance-from', to: '#balance-to'} only %}
+                </div>
+            {% endif %}
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-sm-auto">
+                    <label class="form-label" for="balance-from">{{ comparison ? 'Первая дата' : 'С даты' }}</label>
+                    <input class="form-control" id="balance-from" type="date" name="from" required value="{{ from }}">
+                </div>
+                <div class="col-12 col-sm-auto">
+                    <label class="form-label" for="balance-to">{{ comparison ? 'Вторая дата' : 'По дату' }}</label>
+                    <input class="form-control" id="balance-to" type="date" name="to" required value="{{ to }}">
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-primary">Показать</button>
+                </div>
+            </div>
         </div>
     </form>
 {% endmacro %}
-{% macro pager(pager) %}
-    {% include 'app/_ui/_pagination.html.twig' with {pager: pager} only %}
+{# route и params явные: легаси partial сам не добавляет идентификаторы из маршрута. #}
+{% macro pager(pager, route, params) %}
+    <div class="mt-3">
+        {% include 'partials/_pagination.html.twig' with {pager: pager, route: route, params: params} only %}
+    </div>
 {% endmacro %}
 {% macro line(line) %}
-    <fieldset class="card" data-balance-lines-target="row">
-        <legend>Строка операции</legend>
-        <div class="wz-row">{{ form_row(line.accountId) }}{{ form_row(line.direction) }}{{ form_row(line.amount) }}
+    <fieldset class="border rounded p-3 mb-3" data-balance-lines-target="row">
+        <legend class="float-none w-auto fs-5 px-2">Строка операции</legend>
+        <div class="row g-3">{{ form_row(line.accountId, {row_attr: {class: 'col-12 col-lg-6'}}) }}{{ form_row(line.direction, {row_attr: {class: 'col-12 col-sm-6 col-lg-3'}}) }}{{ form_row(line.amount, {row_attr: {class: 'col-12 col-sm-6 col-lg-3'}}) }}
         </div>
         <button class="btn btn-sm btn-danger" type="button" data-action="balance-lines#remove">Убрать строку</button>{{ form_rest(line) }}
     </fieldset>
@@ -41,12 +54,21 @@
     {% for item in items %}
         {% if item.isVisible %}
             <tr>
-                <td class="t-tree{{ item.level == 1 ? ' t-tree--root' : '' }}" style="--lvl: {{ item.level - 1 }}">
+                <td class="balance-tree" data-level="{{ item.level }}">
                     <a href="{{ path('balance_article_card', {id: item.id}) }}">{{ item.name }}</a>
                 </td>
-                <td class="t-cell--right">{{ _self.amount(item.amountMinor, currency) }}</td>
+                <td class="text-end text-nowrap">{{ _self.amount(item.amountMinor, currency) }}</td>
             </tr>
         {% endif %}
         {{ _self.tree(item.children, currency) }}
     {% endfor %}
+{% endmacro %}
+{# Один общий legacy-диалог; fields содержит только параметры исходного POST. #}
+{% macro confirm(action, token, label, body, fields={}, danger=true) %}
+    <button type="button" class="btn btn-sm {{ danger ? 'btn-danger' : 'btn-outline-secondary' }}"
+        data-bs-toggle="modal" data-bs-target="#balance-confirm"
+        data-confirm-action="{{ action }}" data-confirm-token="{{ token }}"
+        data-confirm-title="{{ label }}?" data-confirm-body="{{ body }}"
+        data-confirm-submit="{{ label }}" data-confirm-variant="{{ danger ? 'danger' : 'primary' }}"
+        data-confirm-fields="{{ fields|json_encode|e('html_attr') }}">{{ label }}</button>
 {% endmacro %}

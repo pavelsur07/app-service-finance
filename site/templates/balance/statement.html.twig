@@ -1,27 +1,27 @@
 {% extends 'balance/layout.html.twig' %}
 {% import 'balance/_macros.html.twig' as ui %}
 {% block balance_content %}
-    <div class="wz-head">
-        <h1 class="wz-title">Ведомость изменений</h1>
+    <div class="vf-page-head">
+        <h1 class="page-title d-block">Ведомость изменений</h1>
     </div>{{ ui.period(from, to) }}
     {% if not statement.accounting_started %}
-        <div class="wz-row">
-            <div class="alert alert--info" role="status"><div class="a-body"><p class="a-text">Учет не начат в выбранном периоде.</p></div></div>
+        <div class="d-flex flex-wrap gap-3 mb-4">
+            <div class="alert alert-info" role="status"><div><p class="mb-0">Учет не начат в выбранном периоде.</p></div></div>
         </div>
     {% elseif statement.effective_from != from %}
-        <div class="wz-row">
-            <div class="alert alert--info" role="status"><div class="a-body"><p class="a-text">Фактическое начало периода учета: {{ ui.date(statement.effective_from) }}. Начальные остатки показаны на эту дату.</p></div></div>
+        <div class="d-flex flex-wrap gap-3 mb-4">
+            <div class="alert alert-info" role="status"><div><p class="mb-0">Фактическое начало периода учета: {{ ui.date(statement.effective_from) }}. Начальные остатки показаны на эту дату.</p></div></div>
         </div>
     {% endif %}
-    <section class="card report-scroll">
-        <table class="t-table">
+    <section class="card vf-card mb-4"><div class="card-body">
+        <div class="table-responsive"><table class="table table-vcenter vf-table">
             <thead>
                 <tr>
                     <th>Счет / статья</th>
-                    <th class="t-cell--right">{{ ui.col('На начало', currency) }}</th>
-                    <th class="t-cell--right">{{ ui.col('Увеличение', currency) }}</th>
-                    <th class="t-cell--right">{{ ui.col('Уменьшение', currency) }}</th>
-                    <th class="t-cell--right">{{ ui.col('На конец', currency) }}</th>
+                    <th class="text-end text-nowrap">{{ ui.col('На начало', currency) }}</th>
+                    <th class="text-end text-nowrap">{{ ui.col('Увеличение', currency) }}</th>
+                    <th class="text-end text-nowrap">{{ ui.col('Уменьшение', currency) }}</th>
+                    <th class="text-end text-nowrap">{{ ui.col('На конец', currency) }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -29,20 +29,20 @@
                     <tr>
                         <td>
                             <a href="{{ path('balance_account_card', {id: row.id, from: from, to: to}) }}">{{ row.name }}</a>
-                            {% if row.is_archived %} <span class="status status--neutral">В архиве</span>{% endif %}
-                            <p class="t-sub">{{ row.article_name }}</p>
+                            {% if row.is_archived %} <span class="badge bg-secondary-lt">В архиве</span>{% endif %}
+                            <p class="text-secondary small mb-0">{{ row.article_name }}</p>
                         </td>
                         {% for key in ['opening', 'increase', 'decrease', 'closing'] %}
-                            <td class="t-cell--right">{{ ui.amount(attribute(row, key), currency) }}</td>
+                            <td class="text-end text-nowrap">{{ ui.amount(attribute(row, key), currency) }}</td>
                         {% endfor %}
                     </tr>
                 {% else %}
                     <tr>
-                        <td class="t-empty" colspan="5">Нет учетных счетов.</td>
+                        <td class="text-center text-secondary py-5" colspan="5">Нет учетных счетов.</td>
                     </tr>
                 {% endfor %}
             </tbody>
-        </table>
-        <p class="t-sub">Начальные остатки не включены в обороты периода.</p>
-    </section>
+        </table></div>
+        <p class="text-secondary small mb-0">Начальные остатки не включены в обороты периода.</p>
+    </div></section>
 {% endblock %}

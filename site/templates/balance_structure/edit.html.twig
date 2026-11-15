@@ -1,22 +1,19 @@
 {% extends 'balance/layout.html.twig' %}
-{% form_theme form 'balance/_form_theme.html.twig' %}
+{% import 'balance/_macros.html.twig' as ui %}
+{% form_theme form 'bootstrap_5_layout.html.twig' %}
 {% block balance_content %}
-    <div class="wz-head">
-        <h1 class="wz-title">{{ item ? 'Изменить статью' : 'Новая статья' }}
+    <div class="vf-page-head">
+        <h1 class="page-title d-block">{{ item ? 'Изменить статью' : 'Новая статья' }}
         </h1>
     </div>
-    <section class="card">{{ form_start(form) }}{{ form_widget(form) }}
-        <button class="btn btn-md btn-primary">Сохранить</button>
-        <a class="btn btn-md btn-secondary" href="{{ path('balance_structure_index') }}">Отмена</a>{{ form_end(form) }}
+    <section class="card vf-card mb-4"><div class="card-body">{{ form_start(form) }}{{ form_widget(form) }}
+        <button class="btn btn-primary">Сохранить</button>
+        <a class="btn btn-outline-secondary" href="{{ path('balance_structure_index') }}">Отмена</a>{{ form_end(form) }}
         {% if item %}
             <p>
                 <a href="{{ path('balance_audit', {type: 'article', id: item.id}) }}">История статьи</a>
             </p>
-            <form method="post" action="{{ path('balance_structure_delete', {id: item.id}) }}">
-                <input type="hidden" name="_token" value="{{ csrf_token('category_delete_' ~ item.id) }}">
-                <p>Удалить можно только пустую статью без истории и ссылок.</p>
-                <button class="btn btn-md btn-danger">Удалить неиспользованную статью</button>
-            </form>
+            {{ ui.confirm(path('balance_structure_delete', {id: item.id}), csrf_token('category_delete_' ~ item.id), 'Удалить неиспользованную статью', 'Удалить можно только пустую статью без истории и ссылок.', {}) }}
         {% endif %}
-    </section>
+    </div></section>
 {% endblock %}

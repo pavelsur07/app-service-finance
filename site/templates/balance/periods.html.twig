@@ -1,19 +1,19 @@
 {% extends 'balance/layout.html.twig' %}
 {% import 'balance/_macros.html.twig' as ui %}
-{% form_theme form 'balance/_form_theme.html.twig' %}
+{% form_theme form 'bootstrap_5_layout.html.twig' %}
 {% block balance_content %}
-    <div class="wz-head">
-        <h1 class="wz-title">Учетные периоды</h1>
+    <div class="vf-page-head">
+        <h1 class="page-title d-block">Учетные периоды</h1>
     </div>
-    <section class="card">
+    <section class="card vf-card mb-4"><div class="card-body">
         <p>Месяцы закрываются последовательно после их окончания. Черновики не входят в суммы. Переоткрыть можно только последний закрытый месяц.</p>
         {% if permissions.manage_periods or permissions.reopen_periods %}
             {{ form_start(form) }}{{ form_widget(form) }}
-            <button class="btn btn-md btn-primary">Применить</button>{{ form_end(form) }}
+            <button class="btn btn-primary">Применить</button>{{ form_end(form) }}
         {% endif %}
-    </section>
-    <section class="card report-scroll">
-        <table class="t-table">
+    </div></section>
+    <section class="card vf-card mb-4"><div class="card-body">
+        <div class="table-responsive"><table class="table table-vcenter vf-table">
             <thead>
                 <tr>
                     <th>Месяц</th>
@@ -29,18 +29,18 @@
                             <a href="{{ path('balance_audit', {type: 'period', id: item.id}) }}">{{ item.month|date('m.Y') }}</a>
                         </td>
                         <td>
-                            {% if item.is_closed %}<span class="status status--neutral">Закрыт</span>{% else %}<span class="status status--success">Открыт</span>{% endif %}
+                            {% if item.is_closed %}<span class="badge bg-secondary-lt">Закрыт</span>{% else %}<span class="badge bg-success-lt">Открыт</span>{% endif %}
                         </td>
                         <td>{{ item.reason }}</td>
                         <td>{{ ui.datetime(item.changed_at) }}</td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td class="t-empty" colspan="4">Закрытых периодов пока нет.</td>
+                        <td class="text-center text-secondary py-5" colspan="4">Закрытых периодов пока нет.</td>
                     </tr>
                 {% endfor %}
             </tbody>
-        </table>
-        {{ ui.pager(pager) }}
-    </section>
+        </table></div>
+        {{ ui.pager(pager, app.request.attributes.get('_route'), app.request.query.all) }}
+    </div></section>
 {% endblock %}
