@@ -441,10 +441,10 @@
 ### ServiceGateway: ai-service
 
 ТЗ — `docs/tasks/ai/TZ_AI_service_VashFinDir.md`; сервис — `services/ai-service`
-(Python, в прод не выведен); контракт — `services/_contracts/ai-task/v1`.
+(Python, постоянные API и business worker); контракт — `services/_contracts/ai-task/v1`.
 
-- Доступ — `AiServiceAccess`: `AI_SERVICE_ENABLED`, `AI_SERVICE_BASE_URL`,
-  `AI_SERVICE_API_TOKEN` (направление «Symfony → сервис») — общий выключатель; любое
+- Доступ — `AiServiceAccess`: `AI_SERVICE_BASE_URL`,
+  `AI_SERVICE_API_TOKEN` (направление «Symfony → сервис») — настройка подключения; любое
   пустое значение — выключено для всех. Компания получает ИИ, только если подключена
   администратором: строка в `ai_company_access` (unique `company_id`), переключатель «ИИ» у
   кабинета в `/admin/users` → `POST /admin/ai/companies/{companyId}/access` →
@@ -565,8 +565,8 @@
   или ответ страницы не по контракту — `quarantined`: пачка **не** подтверждается и приходит снова;
   `error` в журнал — один на прогон и только о новых пачках. Сервис недоступен — прогон прерван,
   WARNING, повтор по расписанию.
-- Включение — `SOURCE_FACTS_COMPANIES` (окружение scheduler): UUID компаний через запятую, `*` — все,
-  пусто — выключено. Пачки компаний вне списка остаются в очереди сервиса.
+- Приём охватывает все действительные подключения, без rollout-списка компаний.
+
 - Гейт `app:source-facts:health-check` (cron 09:10 МСК): пачки в карантине или поток
   (кабинет × ресурс) без применённых пачек дольше 36 ч — `error`, exit 1.
 - `SourceFactsFacadeInterface` (только чтение, для переводчиков каналов): `periods(resourceType,
@@ -4178,20 +4178,10 @@ Canonical source41/semantic12 и human-reviewed additions hash-pinned; pending
 updates и auto-disable не реализованы. Расписание — `docker/cron/app.cron`,
 ночной контур включается отдельно `AI_SERVICE_EVAL_ENABLED`.
 
-Дополнительный rollout-переключатель `TELEGRAM_PAYMENT_INTAKE_ENABLED` по
-умолчанию `0` (только test env `1`). Его включение до live-eval приёмки не
-является частью обычного доступа компании к ИИ. Если новый сценарий выбран,
-его недоступность не включает автоматически legacy запись первой цифры.
-Telegram дополнительно ограничен `TELEGRAM_PAYMENT_INTAKE_COMPANIES` (UUID CSV,
-по умолчанию пусто, wildcard и неверный элемент закрывают весь список).
-`Telegram/Application/PaymentIntakeAccess::isPilotCompany(companyId)` проверяет
-membership независимо от глобального флага; `isAllowed(companyId)` требует оба.
-Guard применяется до восстановления source/session, callback, публикации polling,
-Refresh handler и company recovery. Для участника при выключенном флаге, sticky
-binding и известных source/reply запрещён legacy fallback; никогда не выбранный
-nonpilot сохраняет прежний сценарий. Общие AI grants и Cash source-neutral core
-не меняются. Уже принятая AI задача может завершиться после выключения Telegram;
-допуск не означает автоматическое подтверждение и запись денег.
+Новый Telegram ИИ-разбор доступен по admin grant; ручные исправления, Confirm и доставка
+существующих черновиков не требуют ИИ-доступа при действующих финансовых правах.
+Recovery принимает UUID или `--all`: grants + незавершённые Telegram-доставки +
+недоставленные Cash-события Confirm; без grant восстанавливается только доставка.
 
 `CashFacade` предоставляет request/get/amend/confirm/cancel сценарии черновика
 через DTO `Application/DTO/PaymentIntake`. Компания и пользователь приходят из
@@ -4235,13 +4225,11 @@ Consumer PaymentIntake только меняет текущую revision/attempt
 retry 2 секунды). `AiTaskFacade::requestTask` только для parse_payment_message
 ставит TransportNamesStamp этого транспорта; остальные типы сохраняют routing.
 Webhook не ждёт модель и не спит. Production worker
-`site-messenger-worker-payment-intake` имеет profile `payment-intake`, получает
-тот же scope/флаг и запускается деплоем явно только при флаге1 и непустом scope.
-Выключение останавливает worker; общий final up не включает профиль.
-`bin/recover-payment-intake.sh` каждые5мин после полной проверки UUID CSV
-независимо запускает Cash recovery и Telegram recovery с `--skip-cash-recovery`;
-без опции Telegram команда сохраняет внутренний Cash recovery. Ошибки не
-прерывают остальные команды/компании, общий exit ненулевой.
+`site-messenger-worker-payment-intake` работает без профиля и стартует в шаге [4/5].
+Cron каждые 5 минут вызывает одну команду `app:telegram:recover-payment-intake --all`:
+Cash recovery только с grant, доставка прежних результатов и событий Confirm — без grant.
+Ошибки Cash и Telegram не прерывают остальные каналы/компании; общий exit ненулевой.
+Старый вызов с UUID и `--skip-cash-recovery` сохраняется для отдельных диагностик.
 Маршрут `parse_payment_message` — single `deepseek/deepseek-flash`; маршруты
 категоризации и source-type draft сохраняют свои fallback. Ночной fingerprint
 меняется с конфигом, завершённый run текущей даты не переигрывается.
@@ -4262,6 +4250,15 @@ pagination и изоляцией ошибок. Не получивший рез�
 
 Legacy-путь ниже остаётся отдельным контрактом для прежнего сценария; outage
 нового сценария не должен молча переводить запрос в парсер первой цифры.
+
+Восстановление событий Confirm: `CashFacade::pendingPaymentIntakeEventCompanyIds()`
+возвращает только технические IDs компаний с `cash_event_pending`.
+`recoverPaymentIntakeEvents(companyId): int` доставляет существующие
+`CashTransactionsChanged` порциями по 100 без ИИ-доступа и новых платежей;
+подтверждение доставки коммитит `PaymentIntakeAction`. Опциональный `failOnError=true`
+в обоих Cash recovery методах сообщает о сбое автоматической команде; интерактивный
+Confirm сохраняет доставку с повтором без исключения. Telegram recovery включает
+эти компании даже без grant/сессии, чтобы сбой после Confirm не терял инвалидацию.
 
 ### Legacy: одна операция из сообщения
 
@@ -5673,7 +5670,7 @@ config/
 | `app:ingestion:ozon-performance:daily-load --window=month-to-date` | `25 7 * * *` | Планирование Ozon Performance ingestion с начала месяца до вчерашнего дня; HTTP-загрузка выполняется `ingest_fetch` worker'ом |
 | `app:marketplace-ads:ozon-search-promo:sync` | `30 8 * * *` | Оплата за заказ Ozon из загруженных отчётов по заказам — в рекламную статистику по SKU, месяц вчерашнего дня |
 | **Инфраструктура** | | |
-| `app:source-facts:pull` | `*/15 * * * *` | Забор пачек фактов из ozon-fetcher (`source-fact-envelope` v1) в `sf_*`, ack после commit; выключено без `SOURCE_FACTS_COMPANIES`; недоступен — WARNING; нарушение контракта списка — ERROR |
+| `app:source-facts:pull` | `*/15 * * * *` | Забор пачек фактов из ozon-fetcher (`source-fact-envelope` v1) в `sf_*`, ack после commit; недоступен — WARNING; нарушение контракта списка — ERROR |
 | `app:source-facts:health-check` | `10 9 * * *` | Гейт приёма фактов: карантин или поток без применённых пачек > 36 ч — ERROR, exit 1 |
 | `app:marketplace-ozon:translate` | `5-59/15 * * * *` | Перевод начислений Ozon by-day из `sf_fact` в канон `mo_operation`; день — транзакция; сбой дня — ERROR в конце прогона |
 | `app:marketplace-ozon:translate --relink` | `57 6 * * *` | То же + повторный перевод дней с операциями без листинга (листинг появился после перевода) |
@@ -5685,8 +5682,8 @@ config/
 | `app:marketplace-wb:health-check` | `25 9 * * *` | Гейт переводчика WB — как у Ozon, только по включённым компаниям |
 | `app:marketplace-ozon:health-check` | `20 9 * * *` | Гейт переводчика Ozon: код без решения в карантине > 24 ч, непереведённый день, канон ≠ перевод за 45 дней или кабинет отстал больше D−2 — ERROR, exit 1 |
 | `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
-| `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (`AI_SERVICE_ENABLED`, адрес, токен) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
-| `bash bin/recover-payment-intake.sh` | `*/5 * * * *` | Только включённый Telegram pilot scope: независимые Cash и Telegram recovery, strict UUID CSV, никакого Confirm; ошибочный список не запускает команды |
+| `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (нет адреса или токена) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
+| `app:telegram:recover-payment-intake --all` | `*/5 * * * *` | Grants, pending Telegram delivery и события Confirm; каналы/компании независимы, сбой → exit 1; без grant только доставка, без Confirm |
 | `app:cash:ai-categorize --all-enabled` | `25 * * * *` | Компании allowlist ai-service с операциями за 90 дней: автоприменение по флагу компании, затем постановка ИИ-подсказок статей ДДС; сбой компании — ERROR, остальные идут дальше |
 | `app:storage:healthcheck` | `*/5 * * * *` | Синтетическая проверка объектного хранилища (write→read→delete); сбой → `error` → GlitchTip |
 | `app:billing:expiry-reminders` | `0 10 * * *` | Напоминания владельцам об окончании оплаты (7/3/1/0 дней, пробный — 3/0) → `async_sync`; отправленные пропускает, дубль отсекает handler (`billing_expiry_reminders`); сбой постановки — exit 1 + один `error`, повторный запуск безопасен |
@@ -5734,7 +5731,7 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 | Транспорт | Воркер (`messenger:consume`) | Что идёт |
 |---|---|---|
 | `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad, задачи ai-service кроме parse_payment_message (`SubmitAiTaskMessage`), проверка платежей ЮKassa (`ApplyYooKassaPaymentMessage`) |
-| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake`; prod: `site-messenger-worker-payment-intake` (profile payment-intake, conditional start/stop) | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Worker `messenger:consume async_payment_intake` обязан работать до включения TELEGRAM_PAYMENT_INTAKE_ENABLED; перед пилотом также согласовать company-scoped расписание `app:cash:recover-payment-intake` и `app:telegram:recover-payment-intake` (processing commands) |
+| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake`; prod: `site-messenger-worker-payment-intake` (постоянный запуск) | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Worker `messenger:consume async_payment_intake` работает постоянно; cron использует `app:telegram:recover-payment-intake --all` |
 | `async_pipeline` | `async_pipeline` | Локальная DB-обработка: Process*-сообщения Marketplace, Ads raw, нормализация inventory, auto-rules, ImportProducts |
 | `async_wb_finance` | `async_wb_finance` | `SyncWbFinancialReportDayMessage` (retry до 20 раз) |
 | `async_ads` | `async_ads` | Ozon Performance polling (`LoadOzonAdStatisticsRangeMessage`, `FetchOzonAdStatisticsMessage`, `RequestOzonAdBatchMessage`) |

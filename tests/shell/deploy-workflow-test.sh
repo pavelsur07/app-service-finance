@@ -70,24 +70,6 @@ if [[ -z $workers ]]; then
 fi
 for worker in $workers; do
     [[ $worker == site-messenger-worker-sync ]] && continue
-    if [[ $worker == site-messenger-worker-payment-intake ]]; then
-        # Только этот worker условный. Поведение веток проверяет stdlib runtime unittest
-        # (make test-deploy-workflow), остальные workers остаются обязательными в [4/5].
-        intake_guard=$(heredoc_commands | awk -F '\t' '
-            $2 == "if [ \"$TELEGRAM_PAYMENT_INTAKE_ENABLED\" = \"1\" ] && [ -n \"$TELEGRAM_PAYMENT_INTAKE_COMPANIES\" ]; then" { inside = 1 }
-            inside { print $2 }
-            inside && $2 == "fi" { inside = 0 }
-        ')
-        intake_up='docker compose -f docker-compose.prod.yml --profile payment-intake up -d --no-deps site-messenger-worker-payment-intake'
-        intake_stop='docker compose -f docker-compose.prod.yml --profile payment-intake stop site-messenger-worker-payment-intake'
-        if [[ $intake_guard != *"$intake_up"* || $intake_guard != *"$intake_stop"* ]]; then
-            fail "payment-intake worker требует guard flag=1 + непустой scope, explicit profile up/stop без --wait"
-        fi
-        if [[ " $step4_up " == *" $worker "* ]]; then
-            fail "payment-intake worker не должен стартовать безусловно в [4/5]"
-        fi
-        continue
-    fi
     if ! [[ " $step4_up " =~ [[:space:]]$worker[[:space:]] ]]; then
         fail "воркер $worker не обновляется шагом [4/5]: $step4_up"
     fi
@@ -98,4 +80,4 @@ if [[ $failures -gt 0 ]]; then
     exit 1
 fi
 
-printf 'OK: %d команд run/exec в ssh-heredoc, async_sync до FPM; обычные воркеры в [4/5], payment-intake под guard: %s\n' "$checked" "$(echo $workers)"
+printf 'OK: %d команд run/exec в ssh-heredoc, async_sync до FPM; все остальные воркеры в [4/5]: %s\n' "$checked" "$(echo $workers)"

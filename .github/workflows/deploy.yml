@@ -906,8 +906,6 @@ jobs:
                   AI_SERVICE_API_TOKEN: ${{ secrets.AI_SERVICE_API_TOKEN }}
                   AI_SERVICE_DB_PASSWORD: ${{ secrets.AI_SERVICE_DB_PASSWORD }}
                   AI_SERVICE_EVAL_ENABLED: ${{ vars.AI_SERVICE_EVAL_ENABLED }}
-                  TELEGRAM_PAYMENT_INTAKE_ENABLED: ${{ vars.TELEGRAM_PAYMENT_INTAKE_ENABLED }}
-                  TELEGRAM_PAYMENT_INTAKE_COMPANIES: ${{ vars.TELEGRAM_PAYMENT_INTAKE_COMPANIES }}
                   AI_GATEWAY_TOKEN: ${{ secrets.AI_GATEWAY_TOKEN }}
                   ALFA_TLS_CERT_PATH: ${{ secrets.ALFA_TLS_CERT_PATH }}
                   ALFA_TLS_KEY_PATH: ${{ secrets.ALFA_TLS_KEY_PATH }}
@@ -916,7 +914,6 @@ jobs:
                   ALFA_SANDBOX_CLIENT_SECRET: ${{ secrets.ALFA_SANDBOX_CLIENT_SECRET }}
                   ALFA_SANDBOX_ID_SIGNING_CERT_PATH: ${{ secrets.ALFA_SANDBOX_ID_SIGNING_CERT_PATH }}
                   BILLING_READ_ONLY_ENFORCED: ${{ vars.BILLING_READ_ONLY_ENFORCED }}
-                  SOURCE_FACTS_COMPANIES: ${{ vars.SOURCE_FACTS_COMPANIES }}
                   ECONOMICS_WEEKLY_REPORT_COMPANIES: ${{ vars.ECONOMICS_WEEKLY_REPORT_COMPANIES }}
                   MARKETPLACE_WB_COMPANIES: ${{ vars.MARKETPLACE_WB_COMPANIES }}
                   YOOKASSA_SHOP_ID: ${{ vars.YOOKASSA_SHOP_ID }}
@@ -965,28 +962,11 @@ jobs:
                       echo "❌ WB_FETCHER_CONNECTION_ALLOWLIST: разрешены A-Za-z0-9,_-"
                       exit 1 ;;
                   esac
-                  # Приём фактов (SourceFacts): UUID компаний через запятую или *.
-                  case "$SOURCE_FACTS_COMPANIES" in
-                    *[!A-Fa-f0-9,*-]*)
-                      echo "❌ SOURCE_FACTS_COMPANIES: UUID через запятую или *"
-                      exit 1 ;;
-                  esac
                   # Ночная проверка качества: не-секретный флаг, по умолчанию выключен.
                   case "$AI_SERVICE_EVAL_ENABLED" in
                     ''|true|false) ;;
                     *) echo "❌ AI_SERVICE_EVAL_ENABLED: true, false или пусто"; exit 1 ;;
                   esac
-                  # Telegram intake: весь UUID CSV проверяется на раннере до SSH-подстановки.
-                  case "$TELEGRAM_PAYMENT_INTAKE_ENABLED" in
-                    ''|0|1) ;;
-                    *) echo "❌ TELEGRAM_PAYMENT_INTAKE_ENABLED: 0, 1 или пусто"; exit 1 ;;
-                  esac
-                  uuid='[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}'
-                  intake_csv="^${uuid}(,${uuid})*$"
-                  if [[ -n "$TELEGRAM_PAYMENT_INTAKE_COMPANIES" && ! "$TELEGRAM_PAYMENT_INTAKE_COMPANIES" =~ $intake_csv ]]; then
-                    echo "❌ TELEGRAM_PAYMENT_INTAKE_COMPANIES: только canonical UUID CSV"
-                    exit 1
-                  fi
                   # Недельный отчёт экономики SKU: UUID компаний через запятую или *.
                   case "$ECONOMICS_WEEKLY_REPORT_COMPANIES" in
                     *[!A-Fa-f0-9,*-]*)
@@ -1051,7 +1031,7 @@ jobs:
                     # См. docs/maintenance/mailer-monitoring.md
                     export GLITCHTIP_SCHEDULER_HEARTBEAT_URL="${{ secrets.GLITCHTIP_SCHEDULER_HEARTBEAT_URL }}"
                     # Внутренний API /internal/* и сервис ozon-fetcher (docs/maintenance/ozon-fetcher-prod.md).
-                    # Секрет не заведён → пусто → /internal/* закрыт, сервис не включён.
+                    # Обязательные секреты проверяются до запуска сервисов; без токена /internal/* закрыт.
                     # Одинарные кавычки + алфавит A-Za-z0-9._~- (проверка ниже): значение не
                     # исполняется удалённым shell и безопасно в userinfo DSN без URL-кодирования.
                     export INTERNAL_AUTH_TOKEN='${{ secrets.INTERNAL_AUTH_TOKEN }}'
@@ -1064,21 +1044,13 @@ jobs:
                     # DSN GlitchTip сервиса (свой проект). Вне проверки алфавита ниже: содержит
                     # ://@ — но одинарные кавычки, а в DSN их не бывает.
                     export OZON_FETCHER_SENTRY_DSN='${{ secrets.OZON_FETCHER_SENTRY_DSN }}'
-                    OZON_FETCHER_ENABLED='${{ vars.OZON_FETCHER_ENABLED }}'
-                    # wb-fetcher (docs/maintenance/wb-fetcher-prod.md): S3 — ключи ozon-fetcher (тот же
-                    # бакет, префикс wb/). Без WB_FETCHER_ENABLED=true не стартует; scheduler видит
-                    # WB_FETCHER_API_TOKEN всегда (пусто — обновление витрины WB выключено).
+                    # wb-fetcher: S3 — ключи ozon-fetcher, тот же бакет, префикс wb/.
                     export WB_FETCHER_API_TOKEN='${{ secrets.WB_FETCHER_API_TOKEN }}'
                     export WB_FETCHER_DB_PASSWORD='${{ secrets.WB_FETCHER_DB_PASSWORD }}'
                     export WB_FETCHER_CONNECTION_ALLOWLIST='${{ vars.WB_FETCHER_CONNECTION_ALLOWLIST }}'
                     export WB_FETCHER_SENTRY_DSN='${{ secrets.WB_FETCHER_SENTRY_DSN }}'
-                    WB_FETCHER_ENABLED='${{ vars.WB_FETCHER_ENABLED }}'
-                    # ai-service (docs/maintenance/ai-service-prod.md): без AI_SERVICE_ENABLED=true сервис не
-                    # стартует, а Symfony видит его выключенным. Алфавит секретов проверен шагом выше.
-                    export AI_SERVICE_ENABLED='${{ vars.AI_SERVICE_ENABLED }}'
+                    # ai-service работает постоянно; отдельный nightly флаг остаётся выключенным по умолчанию.
                     export AI_SERVICE_EVAL_ENABLED='${{ vars.AI_SERVICE_EVAL_ENABLED }}'
-                    export TELEGRAM_PAYMENT_INTAKE_ENABLED='${{ vars.TELEGRAM_PAYMENT_INTAKE_ENABLED }}'
-                    export TELEGRAM_PAYMENT_INTAKE_COMPANIES='${{ vars.TELEGRAM_PAYMENT_INTAKE_COMPANIES }}'
                     export AI_SERVICE_API_TOKEN='${{ secrets.AI_SERVICE_API_TOKEN }}'
                     export AI_SERVICE_DB_PASSWORD='${{ secrets.AI_SERVICE_DB_PASSWORD }}'
                     # Провайдеры ИИ — через шлюз ai.vashfindir.ru: на app только его токен.
@@ -1098,8 +1070,6 @@ jobs:
                     # Billing (docs/tasks/billing/yookassa-setup.md): пусто → «только чтение» выключен,
                     # онлайн-оплата скрыта. Символы проверены шагом выше.
                     export BILLING_READ_ONLY_ENFORCED='${{ vars.BILLING_READ_ONLY_ENFORCED }}'
-                    # Приём фактов из сервисов (SourceFacts): пусто — выключен. Символы проверены шагом выше.
-                    export SOURCE_FACTS_COMPANIES='${{ vars.SOURCE_FACTS_COMPANIES }}'
                     # Недельный отчёт экономики SKU: пусто — выключен. Символы проверены шагом выше.
                     export ECONOMICS_WEEKLY_REPORT_COMPANIES='${{ vars.ECONOMICS_WEEKLY_REPORT_COMPANIES }}'
                     # Переводчик WB: пусто — выключен. Символы проверены шагом выше.
@@ -1146,92 +1116,63 @@ jobs:
                     echo "✅ land healthy"
 
                     echo "🐳 [4/5] Обновляем воркеры и CLI"
-                    docker compose -f docker-compose.prod.yml up -d --no-deps site-php-cli site-messenger-worker-pipeline site-messenger-worker-ads site-messenger-worker-wb-finance scheduler
+                    docker compose -f docker-compose.prod.yml up -d --no-deps site-php-cli site-messenger-worker-pipeline site-messenger-worker-ads site-messenger-worker-wb-finance site-messenger-worker-payment-intake scheduler
 
-                    # Telegram pilot: профиль только у явной команды, финальный up его не включает.
-                    # Код/DeepSeek route сначала выпускаются с флагом 0 (runbook пилота).
-                    if [ "$TELEGRAM_PAYMENT_INTAKE_ENABLED" = "1" ] && [ -n "$TELEGRAM_PAYMENT_INTAKE_COMPANIES" ]; then
-                      docker compose -f docker-compose.prod.yml --profile payment-intake up -d --no-deps site-messenger-worker-payment-intake
-                    else
-                      docker compose -f docker-compose.prod.yml --profile payment-intake stop site-messenger-worker-payment-intake
-                    fi
-
-                    # ozon-fetcher — за профилем: без OZON_FETCHER_ENABLED=true не стартует.
                     # Миграции его БД — до шага 5/5, иначе `up` поднял бы сервис раньше них.
-                    if [ "$OZON_FETCHER_ENABLED" = "true" ]; then
-                      export COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}ozon-fetcher"
-                      echo "🐳 [4b/5] ozon-fetcher: БД и роль, образ, миграции, запуск"
-                      if [ -z "$OZON_FETCHER_DB_PASSWORD" ] || [ -z "$INTERNAL_AUTH_TOKEN" ] || [ -z "$OZON_FETCHER_API_TOKEN" ]; then
-                        echo "❌ OZON_FETCHER_ENABLED=true, но не заведены секреты OZON_FETCHER_DB_PASSWORD / INTERNAL_AUTH_TOKEN / OZON_FETCHER_API_TOKEN"
-                        exit 1
-                      fi
-                      # Идемпотентно: роль, пароль из секрета, БД (docker/ozon-fetcher/db-bootstrap.sql).
-                      # Пароль — через окружение (-e без значения), не в аргументах процессов.
-                      docker compose -f docker-compose.prod.yml exec -T -e OZON_FETCHER_DB_PASSWORD site-postgres \
-                        psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/ozon-fetcher/db-bootstrap.sql
-                      docker compose -f docker-compose.prod.yml pull ozon-fetcher
-                      docker compose -f docker-compose.prod.yml run --rm --no-deps -T ozon-fetcher -migrate < /dev/null
-                      docker compose -f docker-compose.prod.yml up -d --no-deps --wait ozon-fetcher
-                      echo "✅ ozon-fetcher healthy"
-                    else
-                      echo "⏸ ozon-fetcher выключен (vars.OZON_FETCHER_ENABLED != true)"
-                      docker compose -f docker-compose.prod.yml --profile ozon-fetcher stop ozon-fetcher 2>/dev/null || true
+                    echo "🐳 [4b/5] ozon-fetcher: БД и роль, образ, миграции, запуск"
+                    if [ -z "$OZON_FETCHER_DB_PASSWORD" ] || [ -z "$INTERNAL_AUTH_TOKEN" ] || [ -z "$OZON_FETCHER_API_TOKEN" ]; then
+                      echo "❌ Не заведены секреты OZON_FETCHER_DB_PASSWORD / INTERNAL_AUTH_TOKEN / OZON_FETCHER_API_TOKEN"
+                      exit 1
                     fi
+                    # Идемпотентно: роль, пароль из секрета, БД (docker/ozon-fetcher/db-bootstrap.sql).
+                    # Пароль — через окружение (-e без значения), не в аргументах процессов.
+                    docker compose -f docker-compose.prod.yml exec -T -e OZON_FETCHER_DB_PASSWORD site-postgres \
+                      psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/ozon-fetcher/db-bootstrap.sql
+                    docker compose -f docker-compose.prod.yml pull ozon-fetcher
+                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T ozon-fetcher -migrate < /dev/null
+                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait ozon-fetcher
+                    echo "✅ ozon-fetcher healthy"
 
-                    # wb-fetcher — за профилем: без WB_FETCHER_ENABLED=true не стартует.
                     # Миграции его БД — до шага 5/5, иначе `up` поднял бы сервис раньше них.
-                    if [ "$WB_FETCHER_ENABLED" = "true" ]; then
-                      export COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}wb-fetcher"
-                      echo "🐳 [4b2/5] wb-fetcher: БД и роль, образ, миграции, запуск"
-                      if [ -z "$WB_FETCHER_DB_PASSWORD" ] || [ -z "$INTERNAL_AUTH_TOKEN" ] || [ -z "$WB_FETCHER_API_TOKEN" ] || [ -z "$OZON_FETCHER_S3_ACCESS_KEY_ID" ]; then
-                        echo "❌ WB_FETCHER_ENABLED=true, но не заведены секреты WB_FETCHER_DB_PASSWORD / INTERNAL_AUTH_TOKEN / WB_FETCHER_API_TOKEN / OZON_FETCHER_S3_ACCESS_KEY_ID"
-                        exit 1
-                      fi
-                      # Идемпотентно: роль, пароль из секрета, БД (docker/wb-fetcher/db-bootstrap.sql).
-                      docker compose -f docker-compose.prod.yml exec -T -e WB_FETCHER_DB_PASSWORD site-postgres \
-                        psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/wb-fetcher/db-bootstrap.sql
-                      docker compose -f docker-compose.prod.yml pull wb-fetcher
-                      docker compose -f docker-compose.prod.yml run --rm --no-deps -T wb-fetcher -migrate < /dev/null
-                      docker compose -f docker-compose.prod.yml up -d --no-deps --wait wb-fetcher
-                      echo "✅ wb-fetcher healthy"
-                    else
-                      echo "⏸ wb-fetcher выключен (vars.WB_FETCHER_ENABLED != true)"
-                      docker compose -f docker-compose.prod.yml --profile wb-fetcher stop wb-fetcher 2>/dev/null || true
+                    echo "🐳 [4b2/5] wb-fetcher: БД и роль, образ, миграции, запуск"
+                    if [ -z "$WB_FETCHER_DB_PASSWORD" ] || [ -z "$INTERNAL_AUTH_TOKEN" ] || [ -z "$WB_FETCHER_API_TOKEN" ] || [ -z "$OZON_FETCHER_S3_ACCESS_KEY_ID" ]; then
+                      echo "❌ Не заведены секреты WB_FETCHER_DB_PASSWORD / INTERNAL_AUTH_TOKEN / WB_FETCHER_API_TOKEN / OZON_FETCHER_S3_ACCESS_KEY_ID"
+                      exit 1
                     fi
+                    # Идемпотентно: роль, пароль из секрета, БД (docker/wb-fetcher/db-bootstrap.sql).
+                    docker compose -f docker-compose.prod.yml exec -T -e WB_FETCHER_DB_PASSWORD site-postgres \
+                      psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/wb-fetcher/db-bootstrap.sql
+                    docker compose -f docker-compose.prod.yml pull wb-fetcher
+                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T wb-fetcher -migrate < /dev/null
+                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait wb-fetcher
+                    echo "✅ wb-fetcher healthy"
 
-                    # ai-service — за профилем: без AI_SERVICE_ENABLED=true не стартует.
                     # Миграции его БД — до шага 5/5 (docs/maintenance/ai-service-prod.md).
-                    if [ "$AI_SERVICE_ENABLED" = "true" ]; then
-                      export COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}ai-service"
-                      echo "🐳 [4c/5] ai-service: БД и роль, образ, миграции, запуск API и воркера"
-                      if [ -z "$AI_SERVICE_DB_PASSWORD" ] || [ ${#AI_SERVICE_API_TOKEN} -lt 32 ] || [ ${#AI_GATEWAY_TOKEN} -lt 32 ]; then
-                        echo "❌ AI_SERVICE_ENABLED=true, но не заведён AI_SERVICE_DB_PASSWORD, AI_SERVICE_API_TOKEN или AI_GATEWAY_TOKEN (≥ 32 символов)"
-                        exit 1
-                      fi
-                      # Идемпотентно: роль, пароль из секрета, БД (docker/ai-service/db-bootstrap.sql).
-                      docker compose -f docker-compose.prod.yml exec -T -e AI_SERVICE_DB_PASSWORD site-postgres \
-                        psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/ai-service/db-bootstrap.sql
-                      docker compose -f docker-compose.prod.yml pull ai-service ai-service-worker
-                      if [ "$AI_SERVICE_EVAL_ENABLED" = "true" ]; then
-                        docker compose -f docker-compose.prod.yml pull ai-service-eval-worker
-                      else
-                        docker compose -f docker-compose.prod.yml --profile ai-service stop ai-service-eval-worker
-                      fi
-                      docker compose -f docker-compose.prod.yml run --rm --no-deps -T ai-service migrate < /dev/null
-                      # Проверки 2 и 4 (docs/tasks/ai/gateway/plan.md): /models через шлюз с токеном → 200,
-                      # без токена → 401; бесплатно. Провал — до запуска воркера.
-                      docker compose -f docker-compose.prod.yml run --rm --no-deps -T ai-service gateway-check < /dev/null
-                      # --wait — только API: у воркера healthcheck выключен, и `up --wait` на нём падает.
-                      docker compose -f docker-compose.prod.yml up -d --no-deps --wait ai-service
-                      docker compose -f docker-compose.prod.yml up -d --no-deps ai-service-worker
-                      if [ "$AI_SERVICE_EVAL_ENABLED" = "true" ]; then
-                        docker compose -f docker-compose.prod.yml up -d --no-deps ai-service-eval-worker
-                      fi
-                      echo "✅ ai-service healthy"
-                    else
-                      echo "⏸ ai-service выключен (vars.AI_SERVICE_ENABLED != true)"
-                      docker compose -f docker-compose.prod.yml --profile ai-service stop ai-service ai-service-worker ai-service-eval-worker 2>/dev/null || true
+                    echo "🐳 [4c/5] ai-service: БД и роль, образ, миграции, запуск API и воркера"
+                    if [ -z "$AI_SERVICE_DB_PASSWORD" ] || [ ${#AI_SERVICE_API_TOKEN} -lt 32 ] || [ ${#AI_GATEWAY_TOKEN} -lt 32 ]; then
+                      echo "❌ Не заведён AI_SERVICE_DB_PASSWORD, AI_SERVICE_API_TOKEN или AI_GATEWAY_TOKEN (≥ 32 символов)"
+                      exit 1
                     fi
+                    # Идемпотентно: роль, пароль из секрета, БД (docker/ai-service/db-bootstrap.sql).
+                    docker compose -f docker-compose.prod.yml exec -T -e AI_SERVICE_DB_PASSWORD site-postgres \
+                      psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/ai-service/db-bootstrap.sql
+                    docker compose -f docker-compose.prod.yml pull ai-service ai-service-worker
+                    if [ "$AI_SERVICE_EVAL_ENABLED" = "true" ]; then
+                      docker compose -f docker-compose.prod.yml --profile ai-service-eval pull ai-service-eval-worker
+                    else
+                      docker compose -f docker-compose.prod.yml --profile ai-service-eval stop ai-service-eval-worker
+                    fi
+                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T ai-service migrate < /dev/null
+                    # Проверки 2 и 4 (docs/tasks/ai/gateway/plan.md): /models через шлюз с токеном → 200,
+                    # без токена → 401; бесплатно. Провал — до запуска воркера.
+                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T ai-service gateway-check < /dev/null
+                    # --wait — только API: у воркера healthcheck выключен, и `up --wait` на нём падает.
+                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait ai-service
+                    docker compose -f docker-compose.prod.yml up -d --no-deps ai-service-worker
+                    if [ "$AI_SERVICE_EVAL_ENABLED" = "true" ]; then
+                      docker compose -f docker-compose.prod.yml --profile ai-service-eval up -d --no-deps ai-service-eval-worker
+                    fi
+                    echo "✅ ai-service healthy"
 
                     echo "🐳 Обновляем account/admin SPA"
                     docker compose -f docker-compose.prod.yml up -d --no-deps --wait account admin

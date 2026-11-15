@@ -95,7 +95,7 @@ final class AiServiceHealthCheckCommandTest extends IntegrationTestCase
         $usage = new AiUsageQuery($this->connection, $clock);
 
         return (new CommandTester(new AiServiceHealthCheckCommand(
-            new AiServiceAccess($enabled, 'http://ai', 'token', $this->connection),
+            new AiServiceAccess($enabled ? 'http://ai' : '', 'token', $this->connection),
             new AiRunJournal($this->connection, $clock),
             $usage,
             new AiBudget($this->connection, $usage, 5000.0),

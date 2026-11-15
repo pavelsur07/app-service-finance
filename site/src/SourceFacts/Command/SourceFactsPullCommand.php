@@ -16,7 +16,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Забор фактов из сервисов (cron каждые 15 минут).
- * Выключено (`SOURCE_FACTS_COMPANIES` пуст) → exit 0; сервис недоступен → WARNING, exit 0;
+ * Сервис недоступен → WARNING, exit 0;
  * нарушение контракта списка пачек → ERROR, exit 1.
  */
 #[AsCommand(name: 'app:source-facts:pull', description: 'Pulls source fact batches from fetcher services and acknowledges applied ones')]
@@ -33,11 +33,6 @@ final class SourceFactsPullCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        if (!$this->pull->isEnabled()) {
-            $output->writeln('source-facts: disabled');
-
-            return self::SUCCESS;
-        }
         if (!$this->lock()) {
             $output->writeln('source-facts: another pull is running, skipping');
 
