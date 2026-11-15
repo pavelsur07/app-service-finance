@@ -501,7 +501,7 @@ final readonly class MarketplaceFacade
      *
      * @param string[] $marketplaceSkus
      *
-     * @return array<string, list<array{id: string, parentSku: string}>> parentSku => listings
+     * @return array<string, list<array{id: string, parentSku: string, size: string}>> parentSku => listings (size — WB `techSize`, `UNKNOWN` без размера)
      */
     public function findListingsByMarketplaceSkus(
         string $companyId,
@@ -513,7 +513,7 @@ final readonly class MarketplaceFacade
         }
 
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT l.id, l.marketplace_sku AS parent_sku
+            'SELECT l.id, l.marketplace_sku AS parent_sku, l.size
              FROM marketplace_listings l
              WHERE l.company_id = :companyId
                AND l.marketplace = :marketplace
@@ -531,6 +531,7 @@ final readonly class MarketplaceFacade
             $result[$row['parent_sku']][] = [
                 'id' => $row['id'],
                 'parentSku' => $row['parent_sku'],
+                'size' => (string) $row['size'],
             ];
         }
 

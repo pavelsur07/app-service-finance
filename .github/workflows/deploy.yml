@@ -918,6 +918,7 @@ jobs:
                   BILLING_READ_ONLY_ENFORCED: ${{ vars.BILLING_READ_ONLY_ENFORCED }}
                   SOURCE_FACTS_COMPANIES: ${{ vars.SOURCE_FACTS_COMPANIES }}
                   ECONOMICS_WEEKLY_REPORT_COMPANIES: ${{ vars.ECONOMICS_WEEKLY_REPORT_COMPANIES }}
+                  MARKETPLACE_WB_COMPANIES: ${{ vars.MARKETPLACE_WB_COMPANIES }}
                   YOOKASSA_SHOP_ID: ${{ vars.YOOKASSA_SHOP_ID }}
                   YOOKASSA_SECRET_KEY: ${{ secrets.YOOKASSA_SECRET_KEY }}
                   YOOKASSA_RECEIPT_VAT_CODE: ${{ vars.YOOKASSA_RECEIPT_VAT_CODE }}
@@ -990,6 +991,11 @@ jobs:
                   case "$ECONOMICS_WEEKLY_REPORT_COMPANIES" in
                     *[!A-Fa-f0-9,*-]*)
                       echo "❌ ECONOMICS_WEEKLY_REPORT_COMPANIES: UUID через запятую или *"
+                      exit 1 ;;
+                  esac
+                  case "$MARKETPLACE_WB_COMPANIES" in
+                    *[!A-Fa-f0-9,*-]*)
+                      echo "❌ MARKETPLACE_WB_COMPANIES: UUID через запятую или *"
                       exit 1 ;;
                   esac
                   # Billing (docs/tasks/billing): флаг «только чтение» и магазин ЮKassa.
@@ -1096,6 +1102,8 @@ jobs:
                     export SOURCE_FACTS_COMPANIES='${{ vars.SOURCE_FACTS_COMPANIES }}'
                     # Недельный отчёт экономики SKU: пусто — выключен. Символы проверены шагом выше.
                     export ECONOMICS_WEEKLY_REPORT_COMPANIES='${{ vars.ECONOMICS_WEEKLY_REPORT_COMPANIES }}'
+                    # Переводчик WB: пусто — выключен. Символы проверены шагом выше.
+                    export MARKETPLACE_WB_COMPANIES='${{ vars.MARKETPLACE_WB_COMPANIES }}'
                     export YOOKASSA_SHOP_ID='${{ vars.YOOKASSA_SHOP_ID }}'
                     export YOOKASSA_SECRET_KEY='${{ secrets.YOOKASSA_SECRET_KEY }}'
                     export YOOKASSA_RECEIPT_VAT_CODE='${{ vars.YOOKASSA_RECEIPT_VAT_CODE }}'

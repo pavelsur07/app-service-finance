@@ -414,6 +414,33 @@ final class ModuleBoundaryRules
     }
 
     /**
+     * `MarketplaceWb` — переводчик WB нового контура (этап 8.3): как `MarketplaceOzon` — только фасады
+     * `SourceFacts`, канона и `Marketplace`; переводчик Ozon, легаси WB и учёт ему недоступны.
+     */
+    public function test_marketplace_wb_uses_only_facades(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplaceWb'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\Inventory'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->excluding(Selector::inNamespace('App\Marketplace\Facade'))
+            ->because(
+                'переводчик WB знает только фасады: факты — SourceFacts, канон — MarketplaceOperations, '
+                .'листинги — Marketplace\\Facade; переводчик Ozon и разбор легаси WB ему не нужны.',
+            );
+    }
+
+    /**
      * `MarketplaceEconomics` — витрина экономики SKU (`DATA.md` §4, §6): канон читает через фасад
      * `MarketplaceOperations`, себестоимость и листинги — через фасад `Marketplace`, рекламу (временно,
      * до этапа 6) — через фасад `MarketplaceAds`, остатки — через фасад `Inventory`. Правила каналов

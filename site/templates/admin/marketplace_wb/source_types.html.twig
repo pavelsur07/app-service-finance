@@ -1,0 +1,55 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}Admin · Коды WB на решение{% endblock %}
+
+{% block body %}
+  <div class="wz-head">
+    <div>
+      <h1 class="wz-title">Коды WB на решение</h1>
+      <div class="wz-subtitle">Новый контур маркетплейсов: код без вида лежит в карантине и не попадает в экономику SKU. Решение действует для всех компаний. Черновика ИИ для кодов WB пока нет.</div>
+    </div>
+  </div>
+
+  <div class="card" data-mwb-pending>
+    {% if pending is empty %}
+      <p class="u-text-faint">Все коды решены.</p>
+    {% else %}
+      <div class="t-wrap">
+        <table class="t">
+          <thead>
+            <tr>
+              <th>Код / название WB</th>
+              <th class="t-cell--right">В карантине</th>
+              <th>Решение</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in pending %}
+              <tr data-source-type="{{ item.source_type }}">
+                <td><code>{{ item.source_type }}</code><br>{{ item.name }}<br><span class="u-text-faint">с {{ item.first_seen_at|date('d.m.Y H:i') }}</span></td>
+                <td class="t-cell--right u-tnum">
+                  {{ item.amount_minor|vf_minor|vf_amount }}<br>
+                  <span class="u-text-faint">{{ item.days }} дн. · {{ item.companies }} комп.</span>
+                </td>
+                <td>
+                  <form action="{{ path('admin_marketplace_wb_source_types_confirm') }}" method="POST">
+                    <input type="hidden" name="_token" value="{{ csrf_token('mwb_confirm_' ~ item.source_type) }}">
+                    <input type="hidden" name="source_type" value="{{ item.source_type }}">
+                    <input class="input" name="name" value="{{ item.name }}" aria-label="Название" maxlength="255" required>
+                    <select class="select" name="kind" aria-label="Вид операции" required>
+                      <option value="">— вид —</option>
+                      {% for kind in kinds %}
+                        <option value="{{ kind.value }}">{{ kind.label }} ({{ kind.level.value }})</option>
+                      {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-primary">Подтвердить</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

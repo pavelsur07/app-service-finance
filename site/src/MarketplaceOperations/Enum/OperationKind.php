@@ -53,12 +53,14 @@ enum OperationKind: string
     case COMPENSATION = 'compensation';
     /** Прочие удержания маркетплейса без своего вида (пожертвования, разовые удержания). */
     case MP_OTHER_DEDUCTIONS = 'mp_other_deductions';
+    /** Удержание за рекламу в отчёте WB: расход рекламы в каноне — из её статистики (этап 8, W6). */
+    case ADS_SETTLEMENT = 'ads_settlement';
 
     public function level(): CascadeLevel
     {
         return match ($this) {
             self::SALE, self::RETURN => CascadeLevel::REVENUE,
-            self::SPP, self::COINVESTMENT => CascadeLevel::INFO,
+            self::SPP, self::COINVESTMENT, self::ADS_SETTLEMENT => CascadeLevel::INFO,
             self::ADS_CPC, self::ADS_PAY_PER_ORDER, self::PROMO_STARS => CascadeLevel::MD2,
             self::PACKAGING_WAREHOUSE, self::PROMO_PREMIUM, self::PROMO_SELLER_BONUS, self::PROMO_REVIEWS,
             self::PROMO_CHAT_POINTS, self::SUBSCRIPTION, self::FINE, self::SERVICE_CORRECTION, self::COMPENSATION, self::MP_OTHER_DEDUCTIONS => CascadeLevel::OVERHEAD,
@@ -101,6 +103,7 @@ enum OperationKind: string
             self::SERVICE_CORRECTION => 'Корректировка услуг',
             self::COMPENSATION => 'Компенсации',
             self::MP_OTHER_DEDUCTIONS => 'Прочие удержания МП',
+            self::ADS_SETTLEMENT => 'Оплата рекламы удержанием (справочно)',
         };
     }
 }
