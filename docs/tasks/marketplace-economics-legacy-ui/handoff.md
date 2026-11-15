@@ -1,7 +1,7 @@
-# marketplace-economics-legacy-ui — handoff (не завершён)
+# marketplace-economics-legacy-ui — handoff
 
 **Branch:** `fix/marketplace-economics-legacy-ui`
-**PR:** https://github.com/pavelsur07/app-service-finance/pull/3012 (Draft, base master)
+**PR:** https://github.com/pavelsur07/app-service-finance/pull/3012 (base master; статус Ready и текущий CI — в PR)
 
 ## Результат
 - Stage 1: три страницы переведены на base.html.twig и легаси-элементы по образцу ДДС.
@@ -16,7 +16,7 @@
 ## Проверки
 - Baseline: 6 tests / 34 assertions passed после подготовки отсутствовавшей локальной app_test.
 - Регрессии оболочки proven red: 3 failures; таблиц: 4 failures.
-- Финальные целевые PHPUnit: 10 tests / 95 assertions; frontend tests: 152 passed.
+- Финальные целевые PHPUnit: 10 tests / 92 assertions в обоих режимах (с Vite build и без него); frontend tests: 152 passed.
 - Frontend lint/build: passed. Предупреждение сборки об отсутствующем @symfony/ux-turbo было и до изменений.
 - `make site-cs-check`, `make site-cs-strict-types`: passed (4274 файла); итоговые правки тестов также прошли focused CS.
 - `make site-test-unit`: passed, 4807 tests / 26743 assertions.
@@ -29,9 +29,17 @@
 
 ## Ревью
 - Внутреннее: self-review и независимое ревью в свежей сессии; BLOCKER 0 / IMPORTANT 0. Дополнение двух тестов выбранным кабинетом и уточнение типа фикстуры также проверены независимо, новых находок нет.
-- Внешнее: 0 завершённых раундов. Команда `site/bin/external-review.sh 5aff7dbfd0f11f4c0d2181e04eda7743920018f9 --effort medium` завершилась на preflight (exit 2): `ревьюер 'claude' не установлен`. Поиск исполняемого файла в PATH и стандартных локальных каталогах кандидата не нашёл; каталога конфигурации Claude нет. Не заявляется REVIEW_GREEN.
+- Внешнее: по прямому указанию владельца Claude заменён на Codex CLI. Использован штатный скрипт с `--reviewer codex --effort medium --context /tmp/economics-ui-codex-review-context.md`.
+- Два запуска в двух новых `codex exec -s read-only --ephemeral` сессиях, без resume/fork и истории реализации. Первый не завершён из-за `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`; исправленный повтор получил весь diff, утверждённый план, правила, чек-листы и окружающие исходники через stdin, без инструментов чтения.
+- Повтор: exit 0, точный маркер `REVIEW_GREEN`; 1 завершённый раунд, BLOCKER 0 / IMPORTANT 0. Сессия `01a1de6f-1357-7e23-acd5-3b1a49e3bddf`; артефакты локально: `site/var/external-review/5aff7dbf-codex-retry/`. Vite config, не входящий в стандартный набор путей скрипта, передан полностью в context.
+- Метрики BLOCKER/IMPORTANT: internal 0/0; external 0/0.
+
+## Исправление CI после Stage 2
+- CI SHA 9b2be9a24: Functional 2/3 и 3/3 падали на трёх проверках `script[src*=marketplace_economics]`, зависящих от Vite build. PHP-шарды запускаются без frontend-сборки.
+- Воспроизведено локально без build: 10 tests, 3 failures. Удалены только эти три проверки имени JS-файла; UI и проверки таблиц/данных не менялись. Подключение assets проверяют Vite build и browser smoke.
+- После исправления: 10 tests / 92 assertions без build и 10/92 с build; focused CS passed. Коммит `d1754a155`.
+- Полный локальный PHPUnit 9155/51409 выше относится к версии до удаления этих трёх assertions; повтор полного прогона не требовался, финальные функциональные шарды запускает CI. Актуальное заключение CI отражается в PR.
 
 ## Ограничения и продолжение
-- Восстановить установленный и авторизованный Claude Code, выполнить обязательное read-only ревью штатным скриптом, исправить подтверждённые находки и завершить handoff.
-- После зелёного внешнего ревью обновить PR, пометить Ready и один раз запросить merge + deploy. Пока PR остаётся Draft; merge/deploy не разрешены и не выполнялись.
+- Внешнее ревью завершено по разрешённой владельцем замене на Codex CLI. После проверки финального CI — Ready и единственный запрос merge + deploy. Merge/deploy не разрешены и не выполнялись.
 - Сопутствующие проблемы общего sidebar и историческая запись layout в ARCHITECTURE.md перечислены в stage-2.md; оставлены без исправления согласно границам плана.
