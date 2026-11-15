@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DS-Tabs · ДС «Ваш Финдир» v3.4</title>
+<!--
+  Лист дизайн-системы «Ваш Финдир» v3.4 — Вкладки.
+  Источник: UI Kit v3.4 (канвас Claude Design, страница ui-kit-v3.0), сгенерировано 15.11.2026.
+  Обычный HTML: открывается в браузере. Значения — из ds-kit.css (токены в :root) и разметки.
+  Не править вручную: изменения вносятся в UI Kit и перегенерируются.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="ds-kit.css">
+</head>
+<body>
+<main class="main">
+<h1 class="page-h1">DS-Tabs</h1>
+<p class="page-sub">Tabs (segmented) — единственный вид вкладок, в т.ч. в пикерах.</p>
+<div class="page-meta">ДС «Ваш Финдир» v3.4 · 15.11.2026 · все листы: <a href="README.md">README</a></div>
+<div class="cb" id="tabs">
+<div class="cb-head">
+<span class="cb-name">Tabs (segmented)</span>
+<span class="cb-tag">.tabs · .tab</span>
+<span class="cb-when">Сегментер фильтра. Не используйте обычные tab-ленты — этот компонент канонический.</span>
+</div>
+<span class="demo-label">Default (count plain)</span>
+<div class="demo demo--center">
+<div class="tabs">
+<button class="tab is-active">Все <span class="count">248</span></button>
+<button class="tab">Поступления <span class="count">94</span></button>
+<button class="tab">Списания <span class="count">154</span></button>
+</div>
+</div>
+<span class="demo-label">Count с inner-dot (статусные счётчики · danger / warning / success)</span>
+<div class="demo demo--center">
+<div class="tabs">
+<button class="tab is-active">Очереди</button>
+<button class="tab">Сбои <span class="count count--dot count--danger">3</span></button>
+<button class="tab">Heartbeat <span class="count count--dot count--warning">1</span></button>
+<button class="tab">Здоровье <span class="count count--dot count--success">OK</span></button>
+</div>
+</div>
+<span class="demo-label">Tabs row + .tabs-meta справа (data-freshness)</span>
+<div class="demo" style="padding:var(--s-5); background:var(--bg-page);">
+<div class="tabs-row" style="width:100%;">
+<div class="tabs">
+<button class="tab is-active">Все</button>
+<button class="tab">Очереди</button>
+<button class="tab">Сбои <span class="count count--dot count--danger">3</span></button>
+</div>
+<div class="u-flex-1"></div>
+<span class="tabs-meta">
+<svg fill="none" height="13" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="13"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              Данные с момента старта окружения — <b>14 д 06:12</b>
+</span>
+</div>
+</div>
+</div>
+</main>
+</body>
+</html>

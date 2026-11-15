@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DS-Feedback · ДС «Ваш Финдир» v3.4</title>
+<!--
+  Лист дизайн-системы «Ваш Финдир» v3.4 — Обратная связь.
+  Источник: UI Kit v3.4 (канвас Claude Design, страница ui-kit-v3.0), сгенерировано 15.11.2026.
+  Обычный HTML: открывается в браузере. Значения — из ds-kit.css (токены в :root) и разметки.
+  Не править вручную: изменения вносятся в UI Kit и перегенерируются.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="ds-kit.css">
+</head>
+<body>
+<main class="main">
+<h1 class="page-h1">DS-Feedback</h1>
+<p class="page-sub">Toast, Inline Alert (+ сообщения форм), Empty state, Confirmation.</p>
+<div class="page-meta">ДС «Ваш Финдир» v3.4 · 15.11.2026 · все листы: <a href="README.md">README</a></div>
+<div class="cb" id="toast">
+<div class="cb-head">
+<span class="cb-name">Toast</span>
+<span class="cb-tag">.toast · .toast-stack</span>
+<span class="cb-when">Короткое уведомление о результате действия. Top-right, auto-dismiss 4s, закрывается крестиком.</span>
+</div>
+<span class="demo-label">4 семантики</span>
+<div class="demo demo--column">
+<div class="toast toast--success">
+<span class="t-ico"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24" width="12"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+<div class="t-body">
+<div class="t-title">Операция сохранена</div>
+<div class="t-desc">№ ДДС-1247 · +245 000 ₽</div>
+</div>
+<button class="t-action">Открыть</button>
+<button aria-label="Закрыть" class="t-close"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg></button>
+</div>
+<div class="toast toast--danger">
+<span class="t-ico"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6" viewbox="0 0 24 24" width="12"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg></span>
+<div class="t-body">
+<div class="t-title">Не удалось удалить контрагента</div>
+<div class="t-desc">У контрагента 12 связанных операций</div>
+</div>
+<button aria-label="Закрыть" class="t-close"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg></button>
+</div>
+<div class="toast toast--warning">
+<span class="t-ico"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><line x1="12" x2="12" y1="9" y2="13"></line><line x1="12" x2="12.01" y1="17" y2="17"></line><circle cx="12" cy="12" r="10"></circle></svg></span>
+<div class="t-body">
+<div class="t-title">Период закроется через 5 минут</div>
+<div class="t-desc">Сохраните черновики, чтобы не потерять изменения</div>
+</div>
+<button aria-label="Закрыть" class="t-close"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg></button>
+</div>
+<div class="toast toast--info">
+<span class="t-ico"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg></span>
+<div class="t-body">
+<div class="t-title">Импорт выписки запущен</div>
+<div class="t-desc">Обновим, когда закончим — это займёт минуту</div>
+</div>
+<button aria-label="Закрыть" class="t-close"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg></button>
+</div>
+</div>
+<span class="demo-label">Стек из 3 (top-right)</span>
+<div class="demo" style="min-height:300px; background:var(--bg-page); position:relative;">
+<div style="position:absolute; top:16px; right:16px; display:flex; flex-direction:column-reverse; gap:var(--s-2_5);">
+<div class="toast toast--info">
+<span class="t-ico"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg></span>
+<div class="t-body"><div class="t-title">Импорт выписки запущен</div></div>
+<button aria-label="Закрыть" class="t-close"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg></button>
+</div>
+<div class="toast toast--warning">
+<span class="t-ico"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><line x1="12" x2="12" y1="9" y2="13"></line><line x1="12" x2="12.01" y1="17" y2="17"></line><circle cx="12" cy="12" r="10"></circle></svg></span>
+<div class="t-body"><div class="t-title">Период закроется через 5 минут</div></div>
+<button aria-label="Закрыть" class="t-close"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg></button>
+</div>
+<div class="toast toast--success">
+<span class="t-ico"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24" width="12"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+<div class="t-body"><div class="t-title">Операция сохранена</div><div class="t-desc">№ ДДС-1247 · +245 000 ₽</div></div>
+<button class="t-action">Открыть</button>
+<button aria-label="Закрыть" class="t-close"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg></button>
+</div>
+</div>
+</div>
+</div><div class="cb" id="alert">
+<div class="cb-head">
+<span class="cb-name">Inline Alert / Banner</span>
+<span class="cb-tag">.alert</span>
+<span class="cb-when">Встроенное сообщение в layout. Не исчезает само. Для контекстной информации, не результата действия.</span>
+</div>
+<span class="demo-label">4 семантики</span>
+<div class="demo demo--column">
+<div class="alert alert--warning">
+<svg class="a-ico" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="16"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" x2="12" y1="9" y2="13"></line><line x1="12" x2="12.01" y1="17" y2="17"></line></svg>
+<div class="a-body">
+<div class="a-title">Синхронизация банка прервана</div>
+<div class="a-text">Токен Тинькофф Бизнес истёк 24 июня. Обновите подключение, чтобы продолжить авто-импорт операций.</div>
+</div>
+<button class="a-action">Обновить токен</button>
+</div>
+<div class="alert alert--info">
+<svg class="a-ico" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="16"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
+<div class="a-body">
+<div class="a-title">Период 1 кв. 2026 закрыт</div>
+<div class="a-text">Изменения в проведённых операциях недоступны. Можно создавать новые корректировки в открытом периоде.</div>
+</div>
+</div>
+<div class="alert alert--danger">
+<svg class="a-ico" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="16"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>
+<div class="a-body">
+<div class="a-title">Не удалось загрузить категории</div>
+<div class="a-text">Сервер не ответил за 10 сек. Проверьте подключение и попробуйте ещё раз.</div>
+</div>
+<button class="a-action">Повторить</button>
+</div>
+<div class="alert alert--success">
+<svg class="a-ico" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6" viewbox="0 0 24 24" width="16"><polyline points="20 6 9 17 4 12"></polyline></svg>
+<div class="a-body">
+<div class="a-title">Все операции категоризированы</div>
+<div class="a-text">Система присвоила статьи ДДС 152 импортированным операциям. <a class="a-link" href="#alert">Проверить результат</a></div>
+</div>
+<button aria-label="Скрыть" class="a-close"><svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg></button>
+</div>
+</div>
+<span class="demo-label" id="auth-msg">Сценарий: сообщение на уровне всей формы — .alert над полями (логин, регистрация, form-модалки)</span>
+
+<div class="demo demo--column">
+<div style="width:100%; max-width:380px; padding:var(--s-5); background:var(--bg-page); border-radius:var(--r-lg);">
+<div class="alert alert--danger" style="margin-bottom:var(--s-3_5);">
+<svg class="a-ico" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="16"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>
+<div class="a-body"><div class="a-text">Неверный e-mail или пароль</div></div>
+</div>
+<div class="form-field"><label class="form-label">E-mail</label><input class="input" value="anna@company.ru"/></div>
+<div class="form-field" style="margin-top:var(--s-2_5);"><label class="form-label">Пароль</label><input class="input" type="password" value="●●●●●●"/></div>
+</div>
+<div style="width:100%; max-width:380px; padding:var(--s-5); background:var(--bg-page); border-radius:var(--r-lg);">
+<div class="alert alert--success" style="margin-bottom:var(--s-3_5);">
+<svg class="a-ico" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6" viewbox="0 0 24 24" width="16"><polyline points="20 6 9 17 4 12"></polyline></svg>
+<div class="a-body"><div class="a-text">Код подтверждения отправлен на <b>anna@company.ru</b></div></div>
+</div>
+<div class="form-field"><label class="form-label">Код из письма</label><input class="input" placeholder="6 цифр" value=""/></div>
+</div>
+<div style="width:100%; max-width:380px; padding:var(--s-5); background:var(--bg-page); border-radius:var(--r-lg);">
+<div class="alert alert--info" style="margin-bottom:var(--s-3_5);">
+<svg class="a-ico" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="16"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
+<div class="a-body"><div class="a-text">Ссылка для входа отправлена. Проверьте почту — она действительна 15 минут.</div></div>
+</div>
+<div class="form-field"><label class="form-label">E-mail</label><input class="input" disabled="" style="background:var(--bg-page); color:var(--text-muted);" value="anna@company.ru"/></div>
+</div>
+</div>
+
+</div><div class="cb" id="empty">
+<div class="cb-head">
+<span class="cb-name">Empty state</span>
+<span class="cb-tag">.empty</span>
+<span class="cb-when">Когда у пользователя пусто — карточка с иконкой, заголовком (одна строка), пояснением и одним CTA.</span>
+</div>
+<div class="empty">
+<div class="empty-icon">
+<svg fill="none" height="22" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24" width="22"><path d="M3 3v18h18"></path><path d="M7 14l4-4 3 3 5-6"></path></svg>
+</div>
+<div class="empty-title">Правила автомаппинга ещё не созданы</div>
+<div class="empty-text">Создайте первое правило, чтобы система автоматически присваивала категории новым операциям из выписок.</div>
+<button class="btn btn-md btn-primary">Создать правило</button>
+</div>
+</div><div class="cb" id="confirm">
+<div class="cb-head">
+<span class="cb-name">Confirmation Dialog</span>
+<span class="cb-tag">.mdl.mdl--compact + .confirm-*</span>
+<span class="cb-when">Подтверждение действия. Для destructive/irreversible операций. На базе Modal compact (440).</span>
+</div>
+<span class="demo-label">Destructive (Удалить)</span>
+<div class="demo demo--hero" style="justify-content:center;">
+<div class="mdl mdl--compact">
+<div class="confirm-body">
+<div class="confirm-title">Удалить контрагента «ФНС России»?</div>
+<div class="confirm-text">Это действие нельзя отменить. У контрагента <b>8 связанных операций</b> — они останутся, но потеряют связь с контрагентом.</div>
+</div>
+<div class="confirm-foot">
+<button class="btn btn-md btn-secondary">Отмена</button>
+<button class="btn btn-md btn-danger-solid">Удалить</button>
+</div>
+</div>
+</div>
+<span class="demo-label">Warning (Прервать операцию)</span>
+<div class="demo demo--hero" style="justify-content:center;">
+<div class="mdl mdl--compact">
+<div class="confirm-body">
+<div class="confirm-title">Отменить операцию?</div>
+<div class="confirm-text">Операция «Оплата по счёту № 245» будет отменена. Действие можно откатить в течение 24 часов.</div>
+</div>
+<div class="confirm-foot">
+<button class="btn btn-md btn-secondary">Не отменять</button>
+<button class="btn btn-md btn-warning-solid">Отменить операцию</button>
+</div>
+</div>
+</div>
+<span class="demo-label">Neutral (Закрыть без сохранения)</span>
+<div class="demo demo--hero" style="justify-content:center;">
+<div class="mdl mdl--compact">
+<div class="confirm-body">
+<div class="confirm-title">Закрыть без сохранения?</div>
+<div class="confirm-text">Введённые данные будут потеряны. Чтобы сохранить, нажмите «Отмена» и нажмите «Сохранить» в форме.</div>
+</div>
+<div class="confirm-foot">
+<button class="btn btn-md btn-secondary">Отмена</button>
+<button class="btn btn-md btn-primary">Закрыть</button>
+</div>
+</div>
+</div>
+<span class="demo-label">С key-value grid · <code class="code-inline">.confirm-kv</code> (запуск фоновой команды)</span>
+<div class="demo demo--hero" style="justify-content:center;">
+<div class="mdl mdl--compact">
+<div class="confirm-body">
+<div class="confirm-title">Запустить операцию?</div>
+<div class="confirm-text">Запустить «<b>Пересчёт ОДДС</b>» для <b>ООО «Ромашка-Бэст»</b>? Фоновая команда будет отправлена в очередь.</div>
+<div class="confirm-kv">
+<div class="kv-key">Команда</div>
+<div class="kv-val kv-val--mono">app:recalc-oddc</div>
+<div class="kv-key">Очередь</div>
+<div class="kv-val kv-val--mono is-strong">reports</div>
+<div class="kv-key">Объём</div>
+<div class="kv-val">ООО «Ромашка-Бэст» · ИНН 7723812931</div>
+</div>
+</div>
+<div class="confirm-foot">
+<button class="btn btn-md btn-secondary">Отмена</button>
+<button class="btn btn-md btn-primary">
+<svg fill="none" height="13" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="13"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                Запустить
+              </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body>
+</html>

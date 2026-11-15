@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DS-Data · ДС «Ваш Финдир» v3.4</title>
+<!--
+  Лист дизайн-системы «Ваш Финдир» v3.4 — Отображение данных.
+  Источник: UI Kit v3.4 (канвас Claude Design, страница ui-kit-v3.0), сгенерировано 15.11.2026.
+  Обычный HTML: открывается в браузере. Значения — из ds-kit.css (токены в :root) и разметки.
+  Не править вручную: изменения вносятся в UI Kit и перегенерируются.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="ds-kit.css">
+</head>
+<body>
+<main class="main">
+<h1 class="page-h1">DS-Data</h1>
+<p class="page-sub">Badge/Chip, Marketplace badge, StatusPill, ABC-pill, Avatar, KPI, Card, Account card.</p>
+<div class="page-meta">ДС «Ваш Финдир» v3.4 · 15.11.2026 · все листы: <a href="README.md">README</a></div>
+<div class="cb" id="badge">
+<div class="cb-head">
+<span class="cb-name">Badge / Chip</span>
+<span class="cb-tag">.chip · .src · .bank-badge · .mp-badge</span>
+<span class="cb-when">Filter chip — выбор в фильтр-баре. Source badge — источник операции. Bank badge — бренд счёта.</span>
+</div>
+<span class="demo-label">Filter chips</span>
+<div class="demo">
+<button class="chip chip--filter is-active">Все <span class="chip__count">248</span></button>
+<button class="chip chip--filter">Поступления <span class="chip__count">94</span></button>
+<button class="chip chip--filter">Списания <span class="chip__count">154</span></button>
+</div>
+<span class="demo-label">Source badges (5 типов)</span>
+<div class="demo">
+<span class="src src--api"><svg fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9"></path><polyline points="21 3 21 9 15 9"></polyline></svg>API</span>
+<span class="src src--manual"><svg fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M2 2l7.5 7.5"></path></svg>Вручную</span>
+<span class="src src--bot"><svg fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24"><rect height="12" rx="3" width="18" x="3" y="8"></rect><circle cx="9" cy="14" r="1.2"></circle><circle cx="15" cy="14" r="1.2"></circle></svg>Бот</span>
+<span class="src src--xls"><svg fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M9 13l6 6M15 13l-6 6"></path></svg>XLS</span>
+<span class="src src--1c"><svg fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24"><rect height="18" rx="3" width="18" x="3" y="3"></rect><path d="M10 8l2-1v9"></path></svg>1С</span>
+</div>
+</div><div class="cb" id="marketplace">
+<div class="cb-head">
+<span class="cb-name">Marketplace badge</span>
+<span class="cb-tag">.mp-mark · .mp-badge · .mp-chip</span>
+<span class="cb-when">Бренд-метка маркетплейса. Аналог <code class="code-inline">.bank-mark</code> для интеграций с маркетплейсами — матрица покрытия, история загрузок, фильтры, inline-источник у операции.</span>
+</div>
+<span class="demo-label">Mark · 28px — единственный размер</span>
+<div class="demo demo--center">
+<div class="mp-mark mp-mark--md mp-mark--ozon">Oz</div>
+<div class="mp-mark mp-mark--md mp-mark--wb">WB</div>
+<div class="mp-mark mp-mark--md mp-mark--yamarket">ЯМ</div>
+<div class="mp-mark mp-mark--md mp-mark--megamarket">ММ</div>
+</div>
+<span class="demo-label">Inline chip (mark 16 + название) — для строк операций рядом с суммой</span>
+<div class="demo">
+<span class="mp-chip"><span class="mp-mark mp-mark--ozon">Oz</span>Озон</span>
+<span class="mp-chip"><span class="mp-mark mp-mark--wb">WB</span>Wildberries</span>
+<span class="mp-chip"><span class="mp-mark mp-mark--yamarket">ЯМ</span>Яндекс Маркет</span>
+<span class="mp-chip"><span class="mp-mark mp-mark--megamarket">ММ</span>Мегамаркет</span>
+</div>
+<span class="demo-label">Do / Don't</span>
+<div class="demo demo--column" style="gap:var(--s-1_5);">
+<div class="cb-note">Инициалы — 1–2 буквы (Oz, WB, ЯМ, ММ). Без эмодзи и без SVG-логотипов внутри mark.</div>
+<div class="cb-note">Новый маркетплейс — пара токенов <code class="code-inline">--mp-&lt;id&gt;</code> + <code class="code-inline">--mp-&lt;id&gt;-fg</code> в <code class="code-inline">:root</code>.</div>
+<div class="cb-note">Не подменяй фирменным цветом семантику ошибок/успеха — это роль <code class="code-inline">.status</code>.</div>
+<div class="cb-note">Не выводи mark без подписи в основном UI — только в плотных таблицах с контекстом в той же строке.</div>
+</div>
+</div><div class="cb" id="status">
+<div class="cb-head">
+<span class="cb-name">StatusPill</span>
+<span class="cb-tag">.status</span>
+<span class="cb-when">Канонический формат статуса: пилюля с точкой. Используется для операций, счетов, правил, документов.</span>
+</div>
+<span class="demo-label">Семантика</span>
+<div class="demo">
+<span class="status status--success"><span class="dot"></span>Проведено</span>
+<span class="status status--danger"><span class="dot"></span>Ошибка</span>
+<span class="status status--warning"><span class="dot"></span>На согласовании</span>
+<span class="status status--neutral"><span class="dot"></span>Черновик</span>
+<span class="status status--pending"><span class="dot"></span>В обработке</span>
+</div>
+<span class="demo-label">Sync статусы (счета)</span>
+<div class="demo">
+<span class="status status--success"><span class="dot"></span>Синхронизировано · 2 мин назад</span>
+<span class="status status--warning"><span class="dot"></span>Устарело · вчера, 18:42</span>
+<span class="status status--danger"><span class="dot"></span>Ошибка · 1 ч назад</span>
+<span class="status status--neutral"><span class="dot"></span>Ручной учёт</span>
+</div>
+</div><div class="cb" id="abc-pill">
+<div class="cb-head">
+<span class="cb-name">ABC × ABC pill</span>
+<span class="cb-tag">.abc-pill</span>
+<span class="cb-when">Двухбуквенный классификатор «ABC по выручке × ABC по прибыли». Свои токены --abc-* (Decision 20), не путать с status/feedback.</span>
+</div>
+<span class="demo-label">Variants</span>
+<div class="demo">
+<span class="abc-pill abc-pill--star" title="AA — Звезда">AA</span>
+<span class="abc-pill abc-pill--star" title="AB — Сильный">AB</span>
+<span class="abc-pill abc-pill--star" title="BA — Сильный">BA</span>
+<span class="abc-pill abc-pill--mid" title="BB — Стабильный середняк">BB</span>
+<span class="abc-pill abc-pill--attention" title="AC — Внимание">AC</span>
+<span class="abc-pill abc-pill--attention" title="CA — Внимание">CA</span>
+<span class="abc-pill abc-pill--weak" title="BC — Посредственный">BC</span>
+<span class="abc-pill abc-pill--weak" title="CB — Посредственный">CB</span>
+<span class="abc-pill abc-pill--tail" title="CC — Хвост">CC</span>
+</div>
+<span class="demo-label">Tokens</span>
+<div class="demo" style="flex-direction:column; align-items:flex-start; gap:var(--s-1_5);">
+<div style="font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--text-secondary);">--abc-star-bg → --success-bg · --abc-star-text → --success-text</div>
+<div style="font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--text-secondary);">--abc-attention-bg → --warning-bg · --abc-attention-text → --warning-text</div>
+<div style="font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--text-secondary);">--abc-mid-bg → --bg-subtle · --abc-mid-text → --text-strong</div>
+<div style="font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--text-secondary);">--abc-weak-bg → --bg-page · --abc-weak-text → --text-tertiary</div>
+<div style="font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--text-secondary);">--abc-tail-bg → --danger-bg · --abc-tail-text → --danger-text</div>
+</div>
+</div><div class="cb" id="avatar">
+<div class="cb-head">
+<span class="cb-name">Avatar / Initial</span>
+<span class="cb-tag">.avatar</span>
+<span class="cb-when">Круглый — пользователь, контрагент-физлицо. Квадрат — компания, банк, карта. Только три размера.</span>
+</div>
+<span class="demo-label">Sizes · circle</span>
+<div class="demo demo--center">
+<span class="avatar avatar--sm avatar--tint-2">АК</span>
+<span class="avatar avatar--md avatar--tint-2">АК</span>
+<span class="avatar avatar--lg avatar--tint-2">АК</span>
+</div>
+<span class="demo-label">Sizes · square (для банков/компаний)</span>
+<div class="demo demo--center">
+<span class="avatar avatar--sm avatar--square avatar--tint-1">ВФ</span>
+<span class="avatar avatar--md avatar--square avatar--tint-1">ВФ</span>
+<span class="avatar avatar--lg avatar--square avatar--tint-1">ВФ</span>
+</div>
+<span class="demo-label">Tint вариантов</span>
+<div class="demo demo--center">
+<span class="avatar avatar--md avatar--square avatar--tint-1">РБ</span>
+<span class="avatar avatar--md avatar--tint-2">АК</span>
+<span class="avatar avatar--md avatar--square avatar--tint-3">ПС</span>
+<span class="avatar avatar--md avatar--square avatar--tint-4">ИК</span>
+</div>
+</div><div class="cb" id="kpi">
+<div class="cb-head">
+<span class="cb-name">KPI card</span>
+<span class="cb-tag">.kpi</span>
+<span class="cb-when">Compact 22px — для ряда из 3–4 виджетов. Hero 28px — для одиночной главной метрики (тёмная карточка-акцент).</span>
+</div>
+<span class="demo-label">Compact (22px)</span>
+<div class="demo">
+<div class="kpi u-flex-1 u-min-w-200">
+<div class="kpi-label">Активных счетов</div>
+<div class="kpi-value">10 <span style="font-size:var(--fs-md); color:var(--text-disabled); font-weight:var(--fw-medium)">/ 11</span></div>
+<div class="kpi-meta">в 5 банках + 2 кассы</div>
+</div>
+<div class="kpi u-flex-1 u-min-w-200">
+<div class="kpi-label">Поступления</div>
+<div class="kpi-value money--strong">+3 820 450 ₽</div>
+<div class="kpi-meta"><span class="delta delta--up">+12,4%</span> к прошлому месяцу</div>
+</div>
+<div class="kpi u-flex-1 u-min-w-200">
+<div class="kpi-label">Списания</div>
+<div class="kpi-value money--strong">−2 968 720 ₽</div>
+<div class="kpi-meta"><span class="delta delta--down">+4,1%</span> к прошлому месяцу</div>
+</div>
+</div>
+<span class="demo-label">Hero (28px, тёмный)</span>
+<div class="demo">
+<div class="kpi kpi--dark u-flex-1">
+<div class="kpi-label"><svg fill="none" height="13" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="13"><rect height="13" rx="2" width="20" x="2" y="6"></rect><circle cx="12" cy="12.5" r="2.5"></circle></svg> Общий баланс</div>
+<div class="kpi-value kpi-value--hero">3 829 930 ₽</div>
+<div class="kpi-meta"><span class="delta delta--up">+12,4% за месяц</span> · в валюте: $8 450</div>
+</div>
+</div>
+<span class="demo-label">С StatusPill · <code class="code-inline">.kpi-head</code> + <code class="code-inline">.status</code></span>
+<div class="demo">
+<div class="kpi u-flex-1 u-min-w-220">
+<div class="kpi-head">
+<div class="kpi-label">Поступления</div>
+<span class="status status--success"><span class="dot"></span>Период закрыт</span>
+</div>
+<div class="kpi-value money--strong">+3 850 600 ₽</div>
+<div class="kpi-units"><b>500</b> ед.</div>
+<div class="kpi-meta"><span class="delta delta--up">+12,4%</span> к прошлому месяцу</div>
+</div>
+<div class="kpi u-flex-1 u-min-w-220">
+<div class="kpi-head">
+<div class="kpi-label">На согласовании</div>
+<span class="status status--pending"><span class="dot"></span>В ожидании</span>
+</div>
+<div class="kpi-value money--strong">218 400 ₽</div>
+<div class="kpi-units"><b>14</b> ед.</div>
+<div class="kpi-meta">ждут действия финдира</div>
+</div>
+<div class="kpi u-flex-1 u-min-w-220">
+<div class="kpi-head">
+<div class="kpi-label">Списания</div>
+<span class="status status--danger"><span class="dot"></span>Превышен лимит</span>
+</div>
+<div class="kpi-value money--strong">−2 968 720 ₽</div>
+<div class="kpi-units"><b>312</b> ед.</div>
+<div class="kpi-meta"><span class="delta delta--down">+4,1%</span> к прошлому месяцу</div>
+</div>
+<div class="kpi u-flex-1 u-min-w-220">
+<div class="kpi-head">
+<div class="kpi-label">Активные операции</div>
+<span class="status status--neutral"><span class="dot"></span>Черновик</span>
+</div>
+<div class="kpi-value money--strong">12 850 400 ₽</div>
+<div class="kpi-units"><b>248</b> ед.</div>
+<div class="kpi-meta">за период · все статусы</div>
+</div>
+</div>
+<span class="demo-label">Best practice</span>
+<div class="demo demo--column" style="gap:var(--s-1_5);">
+<div class="cb-note">Цвет в KPI — только у дельты (<code class="code-inline">.delta--up</code> / <code class="code-inline">.delta--down</code>). Значение всегда нейтральное, цветных акцентных полос нет (Decision 45).</div>
+<div class="cb-note"><code class="code-inline">.kpi-units</code> идёт сразу после <code class="code-inline">.kpi-value</code> — крупная сумма + количество операций, которые её сформировали. Число — <code class="code-inline">&lt;b&gt;</code> (strong), единица измерения приглушённая.</div>
+
+<div class="cb-note"><code class="code-inline">.kpi-head</code> — обёртка над <code class="code-inline">.kpi-label</code>, когда карточке нужен <code class="code-inline">.status</code>. Метка слева, пилюля справа, прижаты к верхнему краю карточки.</div>
+<div class="cb-note">Семантика акцентной полосы и пилюли должна совпадать (<code class="code-inline">--accent-success</code> + <code class="code-inline">.status--success</code>), либо пилюля — нейтральная (<code class="code-inline">.status--neutral</code>) когда нужен только тэг состояния, не направление.</div>
+<div class="cb-note">Не ставь больше одной пилюли в <code class="code-inline">.kpi-head</code> — для нескольких атрибутов используй обычный ряд статусов под значением.</div>
+</div>
+</div><div class="cb" id="card">
+<div class="cb-head">
+<span class="cb-name">Card</span>
+<span class="cb-tag">.card · .card-head · .card--flush</span>
+<span class="cb-when">Базовый блок. Един padding 16×20. Заголовок секции — .card-head (не инлайн). Для таблицы edge-to-edge — .card--flush (padding уходит на .card-head и содержимое).</span>
+</div>
+<span class="demo-label" id="card-head">Вариант A · .card-head в карточке с паддингом (форма/контент)</span>
+<div class="demo demo--column">
+<div class="card" style="width:100%">
+<div class="card-head">Контрагент и описание</div>
+<div style="font-size:var(--fs-md);">Стандартный блок секции в drawer'ах и на страницах. Заголовок 11px uppercase, отбивка s-3 (12px) до контента.</div>
+</div>
+</div>
+<span class="demo-label">Вариант B · .card--flush + .card-head над таблицей edge-to-edge</span>
+<div class="demo demo--column">
+<div class="card card--flush" style="width:100%">
+<div class="card-head">Операции за июнь <span class="card-head-aside">248 строк</span></div>
+<table class="t-table">
+<thead>
+<tr><th>Дата</th><th>Контрагент</th><th class="t-cell--right">Сумма</th></tr>
+</thead>
+<tbody>
+<tr><td>24.06</td><td>ООО «Ромашка-Бэст»</td><td class="t-cell--right">+245 000 ₽</td></tr>
+<tr><td>23.06</td><td>ИП Петров Л. А.</td><td class="t-cell--right">−156 200 ₽</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div><div class="cb" id="acc-card">
+<div class="cb-head">
+<span class="cb-name">Account card</span>
+<span class="cb-tag">.acc-card</span>
+<span class="cb-when">Карточка счёта/кассы в grid-сетке. Сумма 22px, без цвета (нейтральная).</span>
+</div>
+<div class="row-3col">
+<div class="acc-card">
+<div class="acc-top">
+<div class="bank-mark bank-mark--tinkoff">Т</div>
+<div style="flex:1; min-width:0; line-height:1.3">
+<div class="acc-name">Тинькофф Бизнес</div>
+<div class="acc-mask">•• 4521 5612</div>
+</div>
+<span class="acc-type">Расчётный</span>
+</div>
+<div>
+<div class="acc-balance">1 245 230 ₽</div>
+<div class="acc-sub">Основной счёт</div>
+</div>
+<div class="acc-foot">
+<span class="status status--success" style="font-size:var(--fs-xs)"><span class="dot"></span>2 мин</span>
+</div>
+</div>
+<div class="acc-card">
+<div class="acc-top">
+<div class="bank-mark bank-mark--alfa">А</div>
+<div style="flex:1; min-width:0; line-height:1.3">
+<div class="acc-name">Альфа-Банк</div>
+<div class="acc-mask">•• 0934 1278</div>
+</div>
+<span class="acc-type">Валютный</span>
+</div>
+<div>
+<div class="acc-balance">$8 450</div>
+<div class="acc-sub">≈ 759 660 ₽</div>
+</div>
+<div class="acc-foot">
+<span class="status status--success" style="font-size:var(--fs-xs)"><span class="dot"></span>8 мин</span>
+</div>
+</div>
+<div class="acc-card">
+<div class="acc-top">
+<div class="bank-mark bank-mark--sber">С</div>
+<div style="flex:1; min-width:0; line-height:1.3">
+<div class="acc-name">Сбер Бизнес</div>
+<div class="acc-mask">•• 2204</div>
+</div>
+<span class="acc-type">Карта</span>
+</div>
+<div>
+<div class="acc-balance">8 500 ₽</div>
+<div class="acc-sub">А. Соколов · лимит 80 000 ₽</div>
+</div>
+<div class="acc-foot">
+<span class="status status--danger" style="font-size:var(--fs-xs)"><span class="dot"></span>Ошибка</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body>
+</html>

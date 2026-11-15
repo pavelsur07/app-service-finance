@@ -1,0 +1,1118 @@
+<!doctype html>
+<html lang="ru" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App Layout · Ваш Финдир</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Ваш Финдир · design tokens v3.3 — источник: UI Kit. Подключать ДО Tailwind. */
+:root {
+  /* ================================================================
+     ТОКЕНЫ v3.0 — три слоя
+     1. PRIMITIVES  — палитра и сырые шкалы. Компоненты их НЕ используют.
+     2. SEMANTIC    — роли (text / bg / border / feedback / brand).
+                      Только этот слой переопределяется темой.
+     3. COMPONENT   — привязка роли к компоненту (button / input / card …).
+     Имена v2.6 сохранены: semantic-слой = прежние --text-*, --bg-*, …
+     Устаревшие имена — в блоке DEPRECATED ALIASES в конце, удаление в v4.
+     ================================================================ */
+
+  /* ============ 1. PRIMITIVES ============ */
+
+  /* Gray (холодный slate, шаги неравномерны — повторяют реальные значения v2.6) */
+  --gray-0:   #FFFFFF;
+  --gray-25:  #FAFAFB;
+  --gray-50:  #F8F8FA;
+  --gray-75:  #F5F5F7;
+  --gray-90:  #EFEFF2;
+  --gray-100: #F1F1F4;
+  --gray-150: #E3E4E8;
+  --gray-200: #D4D6DC;
+  --gray-300: #C4C7CE;
+  --gray-400: #9EA2AB;
+  --gray-450: #8A8E98;   /* ≥3:1 на белом и на --gray-75 — граница полей ввода */
+  --gray-500: #6A6E79;   /* 4.7:1 на --gray-75 — третичный текст */
+  --gray-600: #585D68;   /* «Вторичный текст» варианта A, 6.6:1 */
+  --gray-800: #23262F;
+  --gray-900: #0B1020;   /* «Текст» — синий из логотипа, 18.9:1 */
+
+  /* Blue (brand) */
+  --blue-25:  #F4F8FF;
+  --blue-50:  #EEF3FE;
+  --blue-100: #DBE6FF;
+  --blue-200: #C7D7FB;
+  --blue-400: #6E89C6;
+  --blue-600: #1A56DB;
+  --blue-700: #1E40AF;
+  --blue-800: #1A3E9C;
+
+  /* Green */
+  --green-50:  #ECFDF5;
+  --green-100: #D1FAE5;
+  --green-500: #10B981;
+  --green-700: #047857;
+
+  /* Red */
+  --red-50:  #FEF2F2;
+  --red-200: #FECACA;
+  --red-500: #EF4444;
+  --red-700: #B91C1C;
+  --red-800: #991B1B;
+
+  /* Amber */
+  --amber-50:  #FFFBEB;
+  --amber-200: #FDE68A;
+  --amber-400: #FBBF24;
+  --amber-500: #F59E0B;
+  --amber-800: #92400E;
+  --amber-900: #78350F;
+
+  /* Orange / Violet / Cyan / Sky */
+  --orange-50:  #FFF7ED;
+  --orange-100: #FFE4CC;
+  --orange-500: #F97316;
+  --orange-700: #C2410C;
+  --violet-50:  #F5F3FF;
+  --violet-100: #E9E5FF;
+  --violet-500: #8B5CF6;
+  --violet-700: #6D28D9;
+  --cyan-500:   #06B6D4;
+  --sky-500:    #0EA5E9;
+
+  /* Navy — синий из логотипа: интерактив, выбор, фокус */
+  --navy-25:  #F3F4F8;
+  --navy-50:  #EEF0F5;
+  --navy-100: #DEE2EB;
+  --navy-200: #C5CBD8;
+  --navy-400: #8E9BBB;
+  --navy-700: #1E2A44;   /* primary-кнопка: белый текст 14.3:1 */
+  --navy-800: #141B2E;
+  --navy-900: #0B1020;
+
+  /* Crimson — красный из логотипа: только CTA */
+  --crimson-50:  #FDECEE;
+  --crimson-100: #F9D2D7;
+  --crimson-600: #B00020;   /* белый текст 7.3:1 */
+  --crimson-700: #8C0019;   /* hover, 9.9:1 */
+  --crimson-800: #6E0014;
+
+  /* Green (рост) / Yellow (warning) / Orange-200 */
+  --green-brand-50:  #EAF6F0;
+  --green-brand-100: #CBEADB;
+  --green-brand-500: #16A06A;
+  --green-brand-700: #0E7A4F;   /* «Рост», 5.4:1 */
+  --yellow-50:  #FFF8E1;
+  --yellow-500: #F5B400;
+  --yellow-800: #8A5A00;
+  --yellow-900: #6B4500;
+  --orange-200: #FED7AA;
+  --orange-800: #9A3412;
+
+  /* Alpha (оверлеи, блики, тени) */
+  --alpha-white-10: rgba(255,255,255,0.10);
+  --alpha-white-15: rgba(255,255,255,0.15);
+  --alpha-white-40: rgba(255,255,255,0.40);
+  --alpha-white-55: rgba(255,255,255,0.55);
+  --alpha-white-70: rgba(255,255,255,0.70);
+  --alpha-white-80: rgba(255,255,255,0.80);
+  --alpha-ink-04:   rgba(15,23,42,0.04);
+  --alpha-ink-06:   rgba(15,23,42,0.06);
+  --alpha-ink-10:   rgba(15,23,42,0.10);
+  --alpha-ink-14:   rgba(15,23,42,0.14);
+  --alpha-ink-20:   rgba(15,23,42,0.20);
+  --alpha-blue-0:   rgba(26,86,219,0);
+  --alpha-blue-12:  rgba(26,86,219,0.12);
+  --alpha-blue-16:  rgba(26,86,219,0.16);
+  --alpha-blue-25:  rgba(26,86,219,0.25);
+  --alpha-navy-0:   rgba(30,42,68,0);
+  --alpha-navy-14:  rgba(30,42,68,0.14);
+  --alpha-navy-25:  rgba(30,42,68,0.25);
+  --alpha-crimson-25: rgba(176,0,32,0.25);
+  --alpha-orange-14:  rgba(194,65,12,0.14);
+  --alpha-orange-22:  rgba(194,65,12,0.22);
+
+  /* Type scale — 10 целых ступеней вместо 25 значений (в т.ч. дробных) v2.6 */
+  --fs-2xs: 10px;   /* только: инициалы в аватаре, mono-подписи токенов */
+  --fs-xs:  11px;   /* uppercase-заголовки таблиц, card-head, мета */
+  --fs-sm:  12px;   /* лейблы полей, chip, вторичный текст */
+  --fs-md:  13px;   /* BODY: строки таблиц, значения полей, кнопки */
+  --fs-lg:  14px;   /* sidebar main, subtotal, money 14 */
+  --fs-xl:  16px;   /* заголовок модалки и карточки, money 16 */
+  --fs-2xl: 18px;   /* заголовок drawer */
+  --fs-3xl: 22px;   /* KPI compact, заголовок раздела документации */
+  --fs-4xl: 28px;   /* KPI hero, заголовок страницы */
+  --fs-5xl: 32px;   /* display — только обложка документации */
+
+  --fw-regular:   400;
+  --fw-medium:    500;
+  --fw-semibold:  600;
+  --fw-bold:      700;
+  --fw-extrabold: 800;   /* только логотип и бренд-метки */
+
+  --lh-tight: 1.2;
+  --lh-snug:  1.35;
+  --lh-base:  1.5;
+
+  --ls-tight:  -0.02em;
+  --ls-normal: 0;
+  --ls-caps:   0.05em;
+
+  /* Spacing — база 4px + полушаги для плотного UI */
+  --s-0:   0;
+  --s-0_5: 2px;
+  --s-1:   4px;
+  --s-1_5: 6px;
+  --s-2:   8px;
+  --s-2_5: 10px;
+  --s-3:   12px;
+  --s-3_5: 14px;
+  --s-4:   16px;
+  --s-5:   20px;
+  --s-6:   24px;
+  --s-7:   32px;
+  --s-8:   40px;
+  --s-9:   48px;
+  --s-10:  64px;
+
+  /* Radius — шкала по ролям */
+  --r-xs: 2px;     /* прогресс-бары, мини-метки */
+  --r-sm: 4px;     /* chips, badges */
+  --r-md: 6px;     /* inputs, buttons, nav items */
+  --r-lg: 8px;     /* cards, sections, menus */
+  --r-xl: 12px;    /* modals */
+  --r-pill: 999px;
+  --r-circle: 50%;
+
+  /* Motion */
+  --dur-fast: 120ms;    /* hover, focus, цвет */
+  --dur-base: 160ms;    /* раскрытие, сдвиг */
+  --dur-slow: 240ms;    /* drawer, side modal */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit:     cubic-bezier(0.4, 0, 1, 1);
+
+  /* Z-index — именованные слои вместо магических чисел */
+  --z-raised:   1;
+  --z-sticky:   10;
+  --z-header:   30;
+  --z-dropdown: 50;
+  --z-overlay:  100;
+  --z-toast:    200;
+
+  /* ============ 2. SEMANTIC ============ */
+  /* (переопределяется в [data-theme="dark"]) */
+
+  /* Brand · вариант A «Фирменный красный»
+     primary = navy: ссылки, активные табы, чекбоксы, фокус, выбранные строки.
+     accent  = crimson: только бренд-моменты (логотип, промо, лендинг) — НЕ кнопки продукта.
+     Красный в финансах = «минус» / «опасность»,
+     поэтому снижение и ошибки — оранжевые (--danger-*), а не красные. */
+  --color-accent:        var(--crimson-600);
+  --color-accent-hover:  var(--crimson-700);
+  --color-accent-active: var(--crimson-800);
+  --color-accent-tint:   var(--crimson-50);
+  --color-primary:           var(--navy-700);
+  --color-primary-hover:     var(--navy-900);
+  --color-primary-active:    var(--navy-900);
+  --color-primary-tint:      var(--navy-50);
+  --color-primary-border:    var(--navy-200);
+  --color-primary-selection: var(--navy-100);
+
+  /* Text */
+  --text-strong:    var(--gray-900);
+  --text-secondary: var(--gray-600);
+  --text-tertiary:  var(--gray-500);   /* было #64748B — 4.4:1 на фоне страницы */
+  --text-muted:     var(--gray-500);   /* было #8B95A7 — 2.8:1, не проходило AA */
+  --text-disabled:  var(--gray-400);   /* disabled освобождён от требований контраста */
+  --text-faint:     var(--gray-300);   /* только декор: разделители «·», плейсхолдер-иконки */
+  --text-inverse:   var(--gray-0);
+  --neutral-tint-text: var(--gray-600);
+
+  /* Borders */
+  --border:        var(--gray-150);
+  --border-soft:   var(--gray-100);
+  --border-hover:  var(--gray-200);
+  --border-strong: var(--gray-450);    /* интерактивные границы, ≥3:1 */
+  --highlight-bg:   var(--amber-200);  /* совпадение в поиске */
+  --highlight-text: var(--text-strong);
+  --border-dark:   var(--gray-800);
+
+  /* Backgrounds */
+  --bg-page:         var(--gray-75);
+  --bg-card:         var(--gray-0);
+  --bg-subtle:       var(--gray-50);
+  --bg-subtle-hover: var(--gray-90);
+  --bg-row-hover:    var(--gray-25);
+  --bg-row-selected: var(--navy-25);
+  --bg-dark:         var(--gray-900);
+  --bg-hero-tint:    rgba(11, 18, 32, 0.05);
+  --report-head-meta: var(--navy-400);
+
+  /* Feedback */
+  --success-bg:     var(--green-brand-50);
+  --success-border: var(--green-brand-100);
+  --success-text:   var(--green-brand-700);
+  --success-dot:    var(--green-brand-500);
+
+  --danger-bg:         var(--orange-50);
+  --danger-border:     var(--orange-200);
+  --danger-text:       var(--orange-700);
+  --danger-text-hover: var(--orange-800);
+  --danger-dot:        var(--orange-500);
+
+  --warning-bg:         var(--yellow-50);
+  --warning-border:     var(--amber-200);
+  --warning-text:       var(--yellow-800);
+  --warning-text-hover: var(--yellow-900);
+  --warning-dot:        var(--yellow-500);
+
+  /* Info — отдельная роль (в v3.1 info-алерты брали --color-primary) */
+  --info-bg:     var(--blue-50);
+  --info-border: var(--blue-100);
+  --info-text:   var(--blue-700);
+  --info-dot:    var(--blue-600);
+
+  /* Sparkline */
+  --spark-fill-start: var(--alpha-navy-14);
+  --spark-fill-end:   var(--alpha-navy-0);
+
+  /* Focus / glow */
+  --focus-ring-color:    var(--color-primary);
+  --focus-ring-primary:  var(--alpha-navy-25);
+  --focus-ring-input:    var(--alpha-navy-14);
+  --focus-ring-danger:   var(--alpha-orange-14);
+  --shadow-primary-glow: rgba(11,16,32,0.18);
+  --shadow-danger-glow:  var(--alpha-orange-22);
+  --shadow-warning-glow: rgba(146, 64, 14, 0.22);
+
+  /* Categories */
+  --cat-revenue:   var(--green-500);
+  --cat-marketing: var(--amber-500);
+  --cat-services:  var(--cyan-500);
+  --cat-payroll:   var(--violet-500);
+  --cat-tax:       var(--red-500);
+  --cat-software:  var(--sky-500);
+
+  /* Banks — фирменные цвета, константы (не тематизируются) */
+  --bank-tinkoff: #FFDD2D;        --bank-tinkoff-fg: #0B1220;
+  --bank-sber:    #1A9F29;        --bank-sber-fg:    #FFFFFF;
+  --bank-alfa:    #EF3124;        --bank-alfa-fg:    #FFFFFF;
+  --bank-tochka:  #6132D6;        --bank-tochka-fg:  #FFFFFF;
+  --bank-mts:     #EF4444;        --bank-mts-fg:     #FFFFFF;
+  --bank-yookassa:#7B61FF;        --bank-yookassa-fg:#FFFFFF;
+
+  /* Marketplaces — фирменные цвета, константы */
+  --mp-ozon:       #005BFF;       --mp-ozon-fg:       #FFFFFF;
+  --mp-wb:         #CB11AB;       --mp-wb-fg:         #FFFFFF;
+  --mp-yamarket:   #FFCC00;       --mp-yamarket-fg:   #0B1220;
+  --mp-megamarket: #21A038;       --mp-megamarket-fg: #FFFFFF;
+
+  /* Source badges */
+  --src-api-bg:    var(--blue-50);    --src-api-text:    var(--blue-700);    --src-api-border:    var(--blue-100);
+  --src-manual-bg: var(--gray-75);    --src-manual-text: var(--gray-600);    --src-manual-border: var(--gray-150);
+  --src-bot-bg:    var(--violet-50);  --src-bot-text:    var(--violet-700);  --src-bot-border:    var(--violet-100);
+  --src-xls-bg:    var(--green-50);   --src-xls-text:    var(--green-700);   --src-xls-border:    var(--green-100);
+  --src-1c-bg:     var(--orange-50);  --src-1c-text:     var(--orange-700);  --src-1c-border:     var(--orange-100);
+
+  /* Typography roles (font shorthand: weight size/line-height family) */
+  --font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  --type-caps:      var(--fw-bold) var(--fs-xs)/var(--lh-snug) var(--font-family);
+  --type-label:     var(--fw-semibold) var(--fs-sm)/var(--lh-snug) var(--font-family);
+  --type-body:      var(--fw-regular) var(--fs-md)/var(--lh-base) var(--font-family);
+  --type-body-strong: var(--fw-semibold) var(--fs-md)/var(--lh-base) var(--font-family);
+  --type-title-sm:  var(--fw-bold) var(--fs-xl)/var(--lh-tight) var(--font-family);
+  --type-title:     var(--fw-bold) var(--fs-2xl)/var(--lh-tight) var(--font-family);
+  --type-kpi:       var(--fw-bold) var(--fs-3xl)/var(--lh-tight) var(--font-family);
+  --type-hero:      var(--fw-bold) var(--fs-4xl)/var(--lh-tight) var(--font-family);
+
+  /* Shadows */
+  --shadow-sm:         0 1px 2px var(--alpha-ink-06);
+  --shadow-card-hover: 0 4px 12px var(--alpha-ink-04);
+  --shadow-primary:    0 1px 0 var(--alpha-white-15) inset, 0 4px 10px var(--shadow-primary-glow);
+  --shadow-menu:       0 16px 36px var(--alpha-ink-14), 0 2px 8px var(--alpha-ink-06);
+  --shadow-modal:      0 24px 60px rgba(11,18,32,0.28), 0 4px 12px rgba(11,18,32,0.08);
+  --shadow-drawer:     -20px 0 60px rgba(11,18,32,0.22);
+  --shadow-inset-hl:   0 1px 0 var(--alpha-white-40) inset;
+  --ring-focus:        0 0 0 3px var(--input-focus-ring);
+  --ring-error:        0 0 0 3px var(--input-error-ring);
+
+  /* Grid & breakpoints (документация; в @media нужны литералы или @custom-media на сборке) */
+  --grid-columns: 12;
+  --grid-gutter: var(--s-5);
+  --bp-sm: 768px;
+  --bp-md: 960px;
+  --bp-lg: 1280px;
+  --bp-xl: 1440px;
+
+  /* ============ 3. COMPONENT ============ */
+
+  /* Layout */
+  --card-padding: var(--s-4) var(--s-5);
+  --modal-width-compact: 440px;
+  --modal-width-standard: 520px;
+  --modal-width-l: 640px;
+  --modal-width-xl: 800px;
+  --drawer-width: 680px;
+  --backdrop-opacity: 0.45;
+  --backdrop-blur: 6px;
+
+  --avatar-sm: 24px;
+  --avatar-md: 32px;
+  --avatar-lg: 40px;
+
+  --app-header-height: 60px;
+  --app-header-bg:     var(--bg-card);
+  --app-header-border: var(--border);
+  --app-sidebar-width: 264px;
+
+  --toggle-w: 42px;
+  --toggle-h: 24px;
+  --toggle-knob: 20px;
+  --control-h: 38px;
+  --control-h-sm: 32px;
+  --input-icon-slot: 36px;     /* место под иконку внутри поля: поиск, суффикс, глаз пароля, стрелка select */
+  --sb-indent: 28px;           /* отступ вложенного пункта sidebar = иконка 16 + gap 12 */
+  --app-header-gutter: 28px;   /* боковой отступ контента AppHeader */
+
+  /* ABC × ABC */
+  --abc-star-bg:        var(--success-bg);
+  --abc-star-text:      var(--success-text);
+  --abc-attention-bg:   var(--warning-bg);
+  --abc-attention-text: var(--warning-text);
+  --abc-mid-bg:         var(--bg-subtle);
+  --abc-mid-text:       var(--text-strong);
+  --abc-weak-bg:        var(--bg-page);
+  --abc-weak-text:      var(--text-tertiary);
+  --abc-tail-bg:        var(--danger-bg);
+  --abc-tail-text:      var(--danger-text);
+
+  /* Buttons */
+  --button-primary-bg:           var(--color-primary);   /* Decision 44: navy, не красный */
+  --button-primary-bg-hover:     var(--navy-800);
+  --button-primary-bg-active:    var(--navy-900);
+  --button-primary-text:         var(--text-inverse);
+  --button-secondary-bg:         var(--bg-card);
+  --button-secondary-bg-hover:   var(--bg-page);
+  --button-secondary-border:     var(--border);
+  --button-secondary-border-hover: var(--border-hover);
+  --button-secondary-text:       var(--text-strong);
+  --button-ghost-bg:             transparent;   /* v2.6: использовался, но не был объявлен */
+  --button-ghost-text:           var(--text-secondary);
+  --button-ghost-bg-hover:       var(--bg-page);
+
+  /* Inputs */
+  --input-bg:           var(--bg-card);
+  --input-border:       var(--border-strong);  /* Decision 33: ≥3:1 */
+  --input-border-disabled: var(--border);
+  --input-bg-disabled:  var(--bg-subtle);
+  --input-border-hover: var(--text-tertiary);
+  --toggle-off-bg:      var(--border-strong);   /* выключенный toggle тоже ≥3:1 */
+  --input-border-focus: var(--color-primary);
+  --input-border-error: var(--danger-dot);
+  --input-text:         var(--text-strong);
+  --input-placeholder:  var(--text-muted);
+  --input-focus-ring:   var(--focus-ring-input);
+  --input-error-ring:   var(--focus-ring-danger);
+
+  /* Cards */
+  --card-bg:     var(--bg-card);
+  --card-border: var(--border);
+  --card-shadow: var(--shadow-sm);
+
+  /* Form messages */
+  --form-error-text:    var(--danger-text);
+  --form-helper-text:   var(--text-muted);
+  --form-label-text:    var(--text-tertiary);
+  --form-required-mark: var(--danger-dot);
+
+  /* Status pills */
+  --status-success-bg:   var(--success-bg);
+  --status-success-text: var(--success-text);
+  --status-success-dot:  var(--success-dot);
+  --status-danger-bg:    var(--danger-bg);
+  --status-danger-text:  var(--danger-text);
+  --status-danger-dot:   var(--danger-dot);
+  --status-warning-bg:   var(--warning-bg);
+  --status-warning-text: var(--warning-text);
+  --status-warning-dot:  var(--warning-dot);
+  --status-neutral-bg:   var(--bg-page);
+  --status-neutral-text: var(--neutral-tint-text);
+  --status-neutral-dot:  var(--text-disabled);
+
+  /* ============ DEPRECATED ALIASES (v2.6 → v3.0, удаление в v4) ============ */
+  --font-9_5:  var(--fs-xs);
+  --font-10_5: var(--fs-xs);
+  --font-11:   var(--fs-xs);
+  --font-11_5: var(--fs-sm);
+  --font-12:   var(--fs-sm);
+  --font-12_5: var(--fs-md);
+  --font-13:   var(--fs-md);
+  --font-13_5: var(--fs-lg);
+  --font-14:   var(--fs-lg);
+  --r-1: var(--r-sm);
+  --r-2: var(--r-md);   /* было 5px */
+  --r-3: var(--r-md);
+  --r-4: var(--r-lg);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-accent: #FF6B7D;  --color-accent-hover: #FF8A99;  --color-accent-active: #E5485C;  --color-accent-tint: #3A1219;
+  --info-bg: #15264A;  --info-border: #24407A;  --info-text: #93B4FB;  --info-dot: #5B8DF8;
+  --focus-ring-input: rgba(169,184,218,0.25);  --focus-ring-primary: rgba(169,184,218,0.35);
+  --spark-fill-start: rgba(169,184,218,0.18);  --spark-fill-end: rgba(169,184,218,0);
+  --color-primary:           #A9B8DA;
+  --color-primary-hover:     #C5CFE6;
+  --color-primary-active:    #8E9BBB;
+  --color-primary-tint:      #1B2438;
+  --color-primary-border:    #2E3A57;
+  --color-primary-selection: #26314D;
+
+  --text-strong:    #E6EAF2;
+  --text-secondary: #B4BDCC;
+  --text-tertiary:  #8E9AAE;
+  --text-muted:     #8E9AAE;
+  --text-disabled:  #5B6678;
+  --text-faint:     #3A4558;
+  --text-inverse:   #FFFFFF;
+  --neutral-tint-text: #B4BDCC;
+
+  --border:        #243049;
+  --border-soft:   #1B2539;
+  --border-hover:  #33405A;
+  --border-strong: #5E6B86;
+  --highlight-bg:   rgba(251,191,36,0.28);
+  --highlight-text: #FDE68A;
+  --border-dark:   #33405A;
+
+  --bg-page:         #0B1220;
+  --bg-card:         #111A2B;
+  --bg-subtle:       #152036;
+  --bg-subtle-hover: #1B2840;
+  --bg-row-hover:    #17233A;
+  --bg-row-selected: #1A2A4A;
+  --bg-dark:         #050A14;
+  --bg-hero-tint:    rgba(255,255,255,0.04);
+  --report-head-meta: #A9B8DA;
+
+  --success-bg: #0E2A20;  --success-border: #14503A;  --success-text: #34D399;  --success-dot: #16A06A;
+  --danger-bg:  #2E1A0E;  --danger-border:  #5A3416;  --danger-text:  #FB923C;  --danger-dot:  #F97316;  --danger-text-hover: #FDBA74;
+  --warning-bg: #2A2410;  --warning-border: #574A16;  --warning-text: #FACC15;  --warning-dot: #F5B400;  --warning-text-hover: #FDE047;
+
+  --src-api-bg:    #15264A;  --src-api-text:    #93B4FB;  --src-api-border:    #24407A;
+  --src-manual-bg: #152036;  --src-manual-text: #B4BDCC;  --src-manual-border: #243049;
+  --src-bot-bg:    #221A3D;  --src-bot-text:    #A78BFA;  --src-bot-border:    #3A2C66;
+  --src-xls-bg:    #0E2A22;  --src-xls-text:    #34D399;  --src-xls-border:    #14503C;
+  --src-1c-bg:     #2E1C0E;  --src-1c-text:     #FB923C;  --src-1c-border:     #5A3416;
+
+  --button-primary-bg:        #DDE3F0;   /* светлая кнопка на тёмном: текст #0B1020 14:1 */
+  --button-primary-bg-hover:  #FFFFFF;
+  --button-primary-bg-active: #C5CFE6;
+  --button-primary-text:      #0B1020;
+  --shadow-primary-glow:      rgba(0,0,0,0.35);
+
+  --shadow-sm:         0 1px 2px rgba(0,0,0,0.4);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.35);
+  --shadow-menu:       0 16px 36px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4);
+  --shadow-modal:      0 24px 60px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-drawer:     -20px 0 60px rgba(0,0,0,0.55);
+}
+
+/* По умолчанию тема следует системе; явный выбор пользователя ([data-theme]) важнее. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  color-scheme: dark;
+  --color-accent: #FF6B7D;  --color-accent-hover: #FF8A99;  --color-accent-active: #E5485C;  --color-accent-tint: #3A1219;
+  --info-bg: #15264A;  --info-border: #24407A;  --info-text: #93B4FB;  --info-dot: #5B8DF8;
+  --focus-ring-input: rgba(169,184,218,0.25);  --focus-ring-primary: rgba(169,184,218,0.35);
+  --spark-fill-start: rgba(169,184,218,0.18);  --spark-fill-end: rgba(169,184,218,0);
+  --color-primary:           #A9B8DA;
+  --color-primary-hover:     #C5CFE6;
+  --color-primary-active:    #8E9BBB;
+  --color-primary-tint:      #1B2438;
+  --color-primary-border:    #2E3A57;
+  --color-primary-selection: #26314D;
+
+  --text-strong:    #E6EAF2;
+  --text-secondary: #B4BDCC;
+  --text-tertiary:  #8E9AAE;
+  --text-muted:     #8E9AAE;
+  --text-disabled:  #5B6678;
+  --text-faint:     #3A4558;
+  --text-inverse:   #FFFFFF;
+  --neutral-tint-text: #B4BDCC;
+
+  --border:        #243049;
+  --border-soft:   #1B2539;
+  --border-hover:  #33405A;
+  --border-strong: #5E6B86;
+  --highlight-bg:   rgba(251,191,36,0.28);
+  --highlight-text: #FDE68A;
+  --border-dark:   #33405A;
+
+  --bg-page:         #0B1220;
+  --bg-card:         #111A2B;
+  --bg-subtle:       #152036;
+  --bg-subtle-hover: #1B2840;
+  --bg-row-hover:    #17233A;
+  --bg-row-selected: #1A2A4A;
+  --bg-dark:         #050A14;
+  --bg-hero-tint:    rgba(255,255,255,0.04);
+  --report-head-meta: #A9B8DA;
+
+  --success-bg: #0E2A20;  --success-border: #14503A;  --success-text: #34D399;  --success-dot: #16A06A;
+  --danger-bg:  #2E1A0E;  --danger-border:  #5A3416;  --danger-text:  #FB923C;  --danger-dot:  #F97316;  --danger-text-hover: #FDBA74;
+  --warning-bg: #2A2410;  --warning-border: #574A16;  --warning-text: #FACC15;  --warning-dot: #F5B400;  --warning-text-hover: #FDE047;
+
+  --src-api-bg:    #15264A;  --src-api-text:    #93B4FB;  --src-api-border:    #24407A;
+  --src-manual-bg: #152036;  --src-manual-text: #B4BDCC;  --src-manual-border: #243049;
+  --src-bot-bg:    #221A3D;  --src-bot-text:    #A78BFA;  --src-bot-border:    #3A2C66;
+  --src-xls-bg:    #0E2A22;  --src-xls-text:    #34D399;  --src-xls-border:    #14503C;
+  --src-1c-bg:     #2E1C0E;  --src-1c-text:     #FB923C;  --src-1c-border:     #5A3416;
+
+  --button-primary-bg:        #DDE3F0;   /* светлая кнопка на тёмном: текст #0B1020 14:1 */
+  --button-primary-bg-hover:  #FFFFFF;
+  --button-primary-bg-active: #C5CFE6;
+  --button-primary-text:      #0B1020;
+  --shadow-primary-glow:      rgba(0,0,0,0.35);
+
+  --shadow-sm:         0 1px 2px rgba(0,0,0,0.4);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.35);
+  --shadow-menu:       0 16px 36px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4);
+  --shadow-modal:      0 24px 60px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-drawer:     -20px 0 60px rgba(0,0,0,0.55);
+  }
+}
+
+</style>
+<!-- Превью: Tailwind Play CDN с конфигом проекта. В продукте — сборка через tailwind.config.js -->
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+/**
+ * Ваш Финдир · Tailwind config (v3.3)
+ *
+ * Принцип: Tailwind не хранит цвета — он ссылается на CSS-переменные из tokens.css.
+ * Тема (светлая / тёмная / системная) переключается только переменными,
+ * поэтому классы вида `dark:bg-…` в компонентах не нужны.
+ *
+ * Отступы — стандартная шкала Tailwind (1 = 4px); она совпадает с сеткой кита:
+ *   --s-0_5=0.5  --s-1=1  --s-1_5=1.5  --s-2=2  --s-2_5=2.5  --s-3=3  --s-3_5=3.5
+ *   --s-4=4  --s-5=5  --s-6=6  --s-7(32px)=8  --s-8(40px)=10  --s-9(48px)=12  --s-10(64px)=16
+ */
+const v = (name) => `var(--${name})`;
+
+tailwind.config = {
+  darkMode: ['selector', '[data-theme="dark"]'],
+  theme: {
+    // Заменяем, а не расширяем: в проекте доступны только цвета системы.
+    colors: {
+      transparent: 'transparent',
+      current: 'currentColor',
+      white: '#FFFFFF',
+      surface: {
+        page: v('bg-page'),
+        card: v('bg-card'),
+        subtle: v('bg-subtle'),
+        'subtle-hover': v('bg-subtle-hover'),
+        'row-hover': v('bg-row-hover'),
+        'row-selected': v('bg-row-selected'),
+        dark: v('bg-dark'),
+      },
+      fg: {
+        strong: v('text-strong'),
+        secondary: v('text-secondary'),
+        tertiary: v('text-tertiary'),
+        muted: v('text-muted'),
+        disabled: v('text-disabled'),
+        faint: v('text-faint'),
+        inverse: v('text-inverse'),
+      },
+      line: {
+        DEFAULT: v('border'),
+        soft: v('border-soft'),
+        hover: v('border-hover'),
+        strong: v('border-strong'),
+      },
+      primary: {
+        DEFAULT: v('color-primary'),
+        hover: v('color-primary-hover'),
+        active: v('color-primary-active'),
+        tint: v('color-primary-tint'),
+        border: v('color-primary-border'),
+        selection: v('color-primary-selection'),
+      },
+      // Только бренд-моменты (логотип, промо). Не для кнопок — Decision 44.
+      accent: {
+        DEFAULT: v('color-accent'),
+        hover: v('color-accent-hover'),
+        tint: v('color-accent-tint'),
+      },
+      btn: {
+        primary: v('button-primary-bg'),
+        'primary-hover': v('button-primary-bg-hover'),
+        'primary-active': v('button-primary-bg-active'),
+        'primary-fg': v('button-primary-text'),
+      },
+      success: { bg: v('success-bg'), border: v('success-border'), text: v('success-text'), dot: v('success-dot') },
+      danger: { bg: v('danger-bg'), border: v('danger-border'), text: v('danger-text'), dot: v('danger-dot') },
+      warning: { bg: v('warning-bg'), border: v('warning-border'), text: v('warning-text'), dot: v('warning-dot') },
+      info: { bg: v('info-bg'), border: v('info-border'), text: v('info-text'), dot: v('info-dot') },
+    },
+    fontFamily: {
+      sans: ['Manrope', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+      mono: ['ui-monospace', 'SFMono-Regular', 'SF Mono', 'Menlo', 'monospace'],
+    },
+    // [размер, интерлиньяж] — 10 ступеней кита (Decision 34)
+    fontSize: {
+      '2xs': ['10px', '1.35'],
+      xs: ['11px', '1.35'],
+      sm: ['12px', '1.35'],
+      md: ['13px', '1.5'],   // body
+      lg: ['14px', '1.5'],
+      xl: ['16px', '1.2'],
+      '2xl': ['18px', '1.2'],
+      '3xl': ['22px', '1.2'],
+      '4xl': ['28px', '1.2'],
+      '5xl': ['32px', '1.2'],
+    },
+    borderRadius: {
+      none: '0',
+      xs: v('r-xs'),
+      sm: v('r-sm'),
+      md: v('r-md'),
+      lg: v('r-lg'),
+      xl: v('r-xl'),
+      full: v('r-pill'),
+    },
+    boxShadow: {
+      none: 'none',
+      sm: v('shadow-sm'),
+      'card-hover': v('shadow-card-hover'),
+      primary: v('shadow-primary'),
+      menu: v('shadow-menu'),
+      modal: v('shadow-modal'),
+      drawer: v('shadow-drawer'),
+      'ring-focus': v('ring-focus'),
+      'ring-error': v('ring-error'),
+    },
+    zIndex: {
+      auto: 'auto',
+      raised: v('z-raised'),
+      sticky: v('z-sticky'),
+      header: v('z-header'),
+      dropdown: v('z-dropdown'),
+      overlay: v('z-overlay'),
+      toast: v('z-toast'),
+    },
+    extend: {
+      spacing: {
+        sidebar: v('app-sidebar-width'),        // 264px
+        'sidebar-rail': '72px',                // свёрнутый сайдбар
+        header: v('app-header-height'),        // 60px
+        control: v('control-h'),               // 38px
+        'control-sm': v('control-h-sm'),       // 32px
+      },
+      letterSpacing: { tight: v('ls-tight'), caps: v('ls-caps') },
+      transitionDuration: { fast: '120ms', base: '160ms', slow: '240ms' },
+      transitionTimingFunction: { standard: v('ease-standard'), exit: v('ease-exit') },
+      outlineColor: { focus: v('focus-ring-color') },
+    },
+  },
+  plugins: [],
+};
+
+</script>
+<style type="text/tailwindcss">
+  @layer base {
+    :where(a, button, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+      outline: 2px solid var(--focus-ring-color);
+      outline-offset: 2px;
+    }
+    body { font-variant-numeric: tabular-nums; }
+  }
+  @layer components {
+    /* Пункт меню. Состояния — через aria-атрибуты, а не через классы is-* */
+    .nav-item {
+      @apply flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-lg font-medium text-fg-secondary
+             transition-colors duration-fast hover:bg-surface-page hover:text-fg-strong;
+    }
+    .nav-item[aria-current="page"] { @apply bg-primary-tint font-bold text-primary-hover; }
+    .nav-item[aria-current="page"] .nav-ico { @apply text-primary; }
+    .nav-ico { @apply h-[18px] w-[18px] shrink-0 text-fg-muted; }
+    .nav-badge { @apply rounded-sm bg-surface-page px-2 py-px text-xs font-bold text-fg-muted; }
+    .nav-sub-item {
+      @apply flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-md font-medium text-fg-secondary
+             transition-colors duration-fast hover:bg-surface-page hover:text-fg-strong;
+    }
+    .nav-sub-item[aria-current="page"] { @apply bg-primary-tint font-bold text-primary-hover; }
+    .nav-sub-item[aria-current="page"] .nav-dot { @apply bg-primary; }
+    .nav-dot { @apply h-[5px] w-[5px] shrink-0 rounded-full bg-fg-faint; }
+    .btn { @apply inline-flex h-9 items-center gap-2 rounded-md border px-3.5 text-md font-semibold transition-colors duration-fast; }
+    .btn-primary { @apply border-btn-primary bg-btn-primary text-btn-primary-fg shadow-primary hover:border-btn-primary-hover hover:bg-btn-primary-hover; }
+    .btn-secondary { @apply border-line bg-surface-card text-fg-strong hover:border-line-hover hover:bg-surface-page; }
+    /* Иконочная кнопка — квадрат высоты .btn (бывший .h-btn--icon, Decision 45). Идёт после .btn, чтобы перебить padding */
+    .btn-icon { @apply relative w-9 justify-center px-0 text-fg-secondary hover:text-fg-strong [&>svg]:shrink-0; }
+    .card { @apply rounded-lg border border-line bg-surface-card shadow-sm; }
+    .caps { @apply text-xs font-bold uppercase tracking-caps text-fg-tertiary; }
+  }
+  @layer utilities {
+    /* Место под полосу прокрутки резервируется всегда — контент не прыгает,
+       когда она появляется (раскрыли группу меню, сменили страницу). Полоса тонкая и спокойная. */
+    .scroll-stable {
+      scrollbar-gutter: stable;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-hover) transparent;
+    }
+    .scroll-stable::-webkit-scrollbar { width: 8px; height: 8px; }
+    .scroll-stable::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+    .scroll-stable::-webkit-scrollbar-thumb:hover { background-color: var(--border-strong); }
+    .scroll-stable::-webkit-scrollbar-track { background: transparent; }
+  }
+  /* Свёрнутый сайдбар: подписи остаются для скринридеров (sr-only), визуально — рейка иконок */
+  [data-sidebar="collapsed"] .when-expanded { @apply sr-only; }
+  [data-sidebar="collapsed"] .hide-collapsed { display: none !important; }
+  [data-sidebar="collapsed"] .nav-item { @apply justify-center px-0; }
+  [data-sidebar="collapsed"] .sidebar-scroll { scrollbar-gutter: auto; scrollbar-width: none; }
+  [data-sidebar="collapsed"] .sidebar-scroll::-webkit-scrollbar { display: none; }
+  [data-sidebar="collapsed"] .nav-group-title { @apply mx-3 my-2 h-px p-0 bg-line-soft; font-size: 0; }
+</style>
+</head>
+<body class="h-full overflow-hidden bg-surface-page font-sans text-md text-fg-strong antialiased">
+
+<a href="#main" class="sr-only z-toast rounded-md bg-surface-card px-3 py-2 font-semibold shadow-menu focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Перейти к содержимому</a>
+
+<div id="app" data-sidebar="expanded" class="flex h-full flex-col">
+
+  <!-- ============ HEADER ============ -->
+  <header class="z-header flex h-header shrink-0 border-b border-line bg-surface-card">
+    <div class="flex w-sidebar shrink-0 items-center gap-2.5 border-r border-line px-4 transition-[width] duration-slow ease-standard [[data-sidebar=collapsed]_&]:w-sidebar-rail [[data-sidebar=collapsed]_&]:justify-center [[data-sidebar=collapsed]_&]:px-0">
+      <a href="#" class="flex min-w-0 items-center gap-2.5 rounded-md" aria-label="Ваш Финдир — на главную">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-fg-strong text-md font-extrabold tracking-wide text-surface-card">ВФ</span>
+        <span class="when-expanded truncate text-lg font-bold tracking-tight">Ваш Финдир</span>
+      </a>
+      <button id="sidebar-toggle" type="button" aria-controls="sidebar" aria-expanded="true" title="Свернуть меню"
+              class="hide-collapsed ml-auto flex h-8 w-8 items-center justify-center rounded-md text-fg-tertiary transition-colors duration-fast hover:bg-surface-page hover:text-fg-strong">
+        <span class="sr-only">Свернуть меню</span>
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="m15 10-2 2 2 2"/></svg>
+      </button>
+    </div>
+
+    <div class="flex min-w-0 flex-1 items-center gap-3.5 px-7">
+      <nav aria-label="Хлебные крошки" class="min-w-0">
+        <ol class="flex items-center gap-1.5 text-lg">
+          <li><a href="#" class="font-medium text-fg-tertiary hover:text-primary">Главная</a></li>
+          <li aria-hidden="true" class="text-fg-faint"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg></li>
+          <li><a href="#" class="font-medium text-fg-tertiary hover:text-primary">Аналитика</a></li>
+          <li aria-hidden="true" class="text-fg-faint"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg></li>
+          <li><span aria-current="page" class="truncate font-bold text-fg-strong">Юнит-экономика по листингам</span></li>
+        </ol>
+      </nav>
+
+      <div class="ml-auto flex shrink-0 items-center gap-2">
+        <button type="button" class="btn btn-secondary">
+          <svg aria-hidden="true" class="text-fg-secondary" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+          01 — 27 июня 2026
+        </button>
+        <button type="button" class="btn btn-secondary btn-icon" aria-label="Поиск (Ctrl+K)" title="Поиск · Ctrl+K">
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+        <button type="button" class="btn btn-secondary btn-icon" aria-label="Уведомления: 2 новых" title="Уведомления">
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span aria-hidden="true" class="absolute -right-[3px] -top-[3px] h-2 w-2 rounded-full border-2 border-surface-card bg-danger-dot"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex min-h-0 flex-1">
+
+    <!-- ============ SIDEBAR ============ -->
+    <aside id="sidebar" aria-label="Боковая панель"
+           class="flex w-sidebar shrink-0 flex-col border-r border-line bg-surface-card transition-[width] duration-slow ease-standard [[data-sidebar=collapsed]_&]:w-sidebar-rail">
+
+      <!-- Компания -->
+      <div class="px-3 pb-1 pt-3 [[data-sidebar=collapsed]_&]:px-3">
+        <button type="button" title="ООО «Ромашка-Бэст» — сменить компанию"
+                class="flex w-full items-center gap-2.5 rounded-md border border-line bg-surface-subtle px-2.5 py-2 text-left transition-colors duration-fast hover:bg-surface-subtle-hover [[data-sidebar=collapsed]_&]:justify-center [[data-sidebar=collapsed]_&]:px-0">
+          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary-tint text-xs font-bold text-primary">РБ</span>
+          <span class="when-expanded min-w-0 flex-1">
+            <span class="block truncate text-md font-bold leading-tight">ООО «Ромашка-Бэст»</span>
+            <span class="mt-0.5 block font-mono text-xs text-fg-muted">ИНН 7723812931</span>
+          </span>
+          <svg aria-hidden="true" class="hide-collapsed shrink-0 text-fg-muted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg>
+        </button>
+      </div>
+
+      <!-- Меню -->
+      <nav aria-label="Основное меню" class="sidebar-scroll scroll-stable min-h-0 flex-1 overflow-y-auto pb-2 pl-2 pr-0.5 [[data-sidebar=collapsed]_&]:px-2">
+        <div class="nav-group-title caps px-2.5 pb-1 pt-3 text-fg-disabled">Главное</div>
+        <ul class="space-y-px">
+          <li><a href="#" class="nav-item" title="Дашборд">
+            <svg aria-hidden="true" class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+            <span class="when-expanded flex-1 truncate">Дашборд</span></a></li>
+          <li><a href="#" class="nav-item" title="Движение ДС · 248 новых">
+            <svg aria-hidden="true" class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4"/></svg>
+            <span class="when-expanded flex-1 truncate">Движение ДС</span><span class="nav-badge hide-collapsed">248</span></a></li>
+
+          <!-- Группа с вложенностью: раскрыта, т.к. внутри активная страница -->
+          <li>
+            <button type="button" class="nav-item group/item" aria-expanded="true" aria-controls="sub-analytics" data-nav-parent title="Аналитика">
+              <svg aria-hidden="true" class="nav-ico text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>
+              <span class="when-expanded flex-1 truncate text-fg-strong">Аналитика</span>
+              <svg aria-hidden="true" class="hide-collapsed shrink-0 -rotate-90 text-fg-muted transition-transform duration-base group-aria-expanded/item:rotate-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <ul id="sub-analytics" class="hide-collapsed mb-1 ml-7 mr-2 space-y-px border-l border-line-soft pl-3">
+              <li><a href="#" class="nav-sub-item" aria-current="page"><span aria-hidden="true" class="nav-dot"></span><span class="truncate">Юнит-экономика</span></a></li>
+              <li><a href="#" class="nav-sub-item"><span aria-hidden="true" class="nav-dot"></span><span class="truncate">ABC-анализ</span></a></li>
+              <li><a href="#" class="nav-sub-item"><span aria-hidden="true" class="nav-dot"></span><span class="truncate">Маржинальность SKU</span></a></li>
+            </ul>
+          </li>
+
+          <li>
+            <button type="button" class="nav-item group/item" aria-expanded="false" aria-controls="sub-reports" data-nav-parent title="Отчёты">
+              <svg aria-hidden="true" class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>
+              <span class="when-expanded flex-1 truncate">Отчёты</span>
+              <svg aria-hidden="true" class="hide-collapsed shrink-0 -rotate-90 text-fg-muted transition-transform duration-base group-aria-expanded/item:rotate-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <ul id="sub-reports" hidden class="hide-collapsed mb-1 ml-7 mr-2 space-y-px border-l border-line-soft pl-3">
+              <li><a href="#" class="nav-sub-item"><span aria-hidden="true" class="nav-dot"></span><span class="truncate">ОПиУ</span></a></li>
+              <li><a href="#" class="nav-sub-item"><span aria-hidden="true" class="nav-dot"></span><span class="truncate">Баланс</span></a></li>
+              <li><a href="#" class="nav-sub-item"><span aria-hidden="true" class="nav-dot"></span><span class="truncate">Денежный поток</span></a></li>
+            </ul>
+          </li>
+
+          <li><a href="#" class="nav-item" title="Закрытие месяца · 12 задач">
+            <svg aria-hidden="true" class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M9 15l2 2 4-4"/></svg>
+            <span class="when-expanded flex-1 truncate">Закрытие месяца</span><span class="nav-badge hide-collapsed bg-warning-bg text-warning-text">12</span></a></li>
+          <li><a href="#" class="nav-item" title="Счета и касса">
+            <svg aria-hidden="true" class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/><path d="M21 11h-5a2 2 0 0 0 0 4h5z"/></svg>
+            <span class="when-expanded flex-1 truncate">Счета и касса</span></a></li>
+          <li><a href="#" class="nav-item" title="Контрагенты · 42">
+            <svg aria-hidden="true" class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></svg>
+            <span class="when-expanded flex-1 truncate">Контрагенты</span><span class="nav-badge hide-collapsed">42</span></a></li>
+        </ul>
+
+        <div class="nav-group-title caps px-2.5 pb-1 pt-4 text-fg-disabled">Настройки учёта</div>
+        <ul class="space-y-px">
+          <li>
+            <button type="button" class="nav-item group/item" aria-expanded="false" aria-controls="sub-categories" data-nav-parent title="Категории ДДС">
+              <svg aria-hidden="true" class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2H2v10l9.3 9.3a2 2 0 0 0 2.8 0l7.2-7.2a2 2 0 0 0 0-2.8z"/><circle cx="7" cy="7" r="1.5"/></svg>
+              <span class="when-expanded flex-1 truncate">Категории ДДС</span>
+              <svg aria-hidden="true" class="hide-collapsed shrink-0 -rotate-90 text-fg-muted transition-transform duration-base group-aria-expanded/item:rotate-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <ul id="sub-categories" hidden class="hide-collapsed mb-1 ml-7 mr-2 space-y-px border-l border-line-soft pl-3">
+              <li><a href="#" class="nav-sub-item"><span aria-hidden="true" class="nav-dot"></span><span class="truncate">Доходы</span></a></li>
+              <li><a href="#" class="nav-sub-item"><span aria-hidden="true" class="nav-dot"></span><span class="truncate">Расходы</span></a></li>
+              <li><a href="#" class="nav-sub-item"><span aria-hidden="true" class="nav-dot"></span><span class="truncate">Технические</span></a></li>
+            </ul>
+          </li>
+          <li><a href="#" class="nav-item" title="Проекты · 7">
+            <svg aria-hidden="true" class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></svg>
+            <span class="when-expanded flex-1 truncate">Проекты</span><span class="nav-badge hide-collapsed">7</span></a></li>
+          <li><a href="#" class="nav-item" title="Авто-правила · 8">
+            <svg aria-hidden="true" class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>
+            <span class="when-expanded flex-1 truncate">Авто-правила</span><span class="nav-badge hide-collapsed">8</span></a></li>
+          <li><a href="#" class="nav-item" title="Импорт">
+            <svg aria-hidden="true" class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            <span class="when-expanded flex-1 truncate">Импорт</span></a></li>
+        </ul>
+
+        <div class="nav-group-title caps px-2.5 pb-1 pt-4 text-fg-disabled">Система</div>
+        <ul class="space-y-px">
+          <li><a href="#" class="nav-item" title="Воркеры · 3 с ошибкой">
+            <svg aria-hidden="true" class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
+            <span class="when-expanded flex-1 truncate">Воркеры</span><span class="nav-badge hide-collapsed bg-danger-bg text-danger-text">3</span></a></li>
+          <li><a href="#" class="nav-item" title="Пользователи и компании">
+            <svg aria-hidden="true" class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+            <span class="when-expanded flex-1 truncate">Пользователи и компании</span></a></li>
+          <li><a href="#" class="nav-item" title="Настройки">
+            <svg aria-hidden="true" class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span class="when-expanded flex-1 truncate">Настройки</span></a></li>
+        </ul>
+      </nav>
+
+      <!-- Развернуть (только в свёрнутом состоянии) -->
+      <div class="hidden px-3 pb-2 [[data-sidebar=collapsed]_&]:block">
+        <button id="sidebar-expand" type="button" aria-controls="sidebar" aria-expanded="false" title="Развернуть меню"
+                class="flex h-9 w-full items-center justify-center rounded-md text-fg-tertiary hover:bg-surface-page hover:text-fg-strong">
+          <span class="sr-only">Развернуть меню</span>
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="m13 10 2 2-2 2"/></svg>
+        </button>
+      </div>
+
+      <!-- Текущий пользователь + выход -->
+      <div class="flex items-center gap-2.5 border-t border-line-soft px-3 py-2.5 [[data-sidebar=collapsed]_&]:flex-col [[data-sidebar=collapsed]_&]:gap-1.5 [[data-sidebar=collapsed]_&]:px-0">
+        <a href="#" class="flex min-w-0 flex-1 items-center gap-2.5 rounded-md p-1 -m-1 hover:bg-surface-page [[data-sidebar=collapsed]_&]:flex-none" title="Анна Кузнецова — профиль">
+          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-tint text-xs font-bold text-primary">АК</span>
+          <span class="when-expanded min-w-0">
+            <span class="block truncate text-md font-semibold leading-tight">Анна Кузнецова</span>
+            <span class="mt-0.5 block truncate text-xs text-fg-muted">Главный бухгалтер</span>
+          </span>
+        </a>
+        <form action="#" method="post" class="shrink-0" onsubmit="event.preventDefault()">
+          <button type="submit" title="Выйти" class="flex h-8 w-8 items-center justify-center rounded-md text-fg-secondary transition-colors duration-fast hover:bg-surface-page hover:text-fg-strong">
+            <span class="sr-only">Выйти из аккаунта</span>
+            <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          </button>
+        </form>
+      </div>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main id="main" tabindex="-1" class="scroll-stable flex min-w-0 flex-1 flex-col overflow-y-auto focus:outline-none">
+      <div class="flex-1 px-8 py-6">
+
+        <div class="mb-5 flex items-start gap-4">
+          <div>
+            <h1 class="text-4xl font-bold tracking-tight">Юнит-экономика по листингам</h1>
+            <p class="mt-1 text-md text-fg-tertiary">Ozon и Wildberries · 312 листингов · июнь 2026</p>
+          </div>
+          <div class="ml-auto flex shrink-0 gap-2">
+            <button type="button" class="btn btn-secondary">
+              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Экспорт
+            </button>
+            <button type="button" class="btn btn-primary">Пересчитать</button>
+          </div>
+        </div>
+
+        <div class="mb-5 grid grid-cols-4 gap-4">
+          <div class="card px-5 py-4">
+            <div class="caps">Выручка</div>
+            <div class="mt-2 text-3xl font-bold tracking-tight">18 420 000 ₽</div>
+            <div class="mt-2 inline-flex rounded-sm bg-success-bg px-1.5 py-0.5 text-xs font-bold text-success-text">+12,4% к маю</div>
+          </div>
+          <div class="card px-5 py-4">
+            <div class="caps">Маржинальная прибыль</div>
+            <div class="mt-2 text-3xl font-bold tracking-tight">4 236 600 ₽</div>
+            <div class="mt-2 inline-flex rounded-sm bg-success-bg px-1.5 py-0.5 text-xs font-bold text-success-text">+8,1% к маю</div>
+          </div>
+          <div class="card px-5 py-4">
+            <div class="caps">Маржинальность</div>
+            <div class="mt-2 text-3xl font-bold tracking-tight">23,0%</div>
+            <div class="mt-2 inline-flex rounded-sm bg-danger-bg px-1.5 py-0.5 text-xs font-bold text-danger-text">−1,2 п.п. к маю</div>
+          </div>
+          <div class="card px-5 py-4">
+            <div class="caps">ДРР</div>
+            <div class="mt-2 text-3xl font-bold tracking-tight">7,8%</div>
+            <div class="mt-2 inline-flex rounded-sm bg-danger-bg px-1.5 py-0.5 text-xs font-bold text-danger-text">+0,6 п.п. к маю</div>
+          </div>
+        </div>
+
+        <section class="card" aria-labelledby="top-title">
+          <div class="flex items-center gap-3 border-b border-line-soft px-5 py-3.5">
+            <h2 id="top-title" class="text-xl font-bold">Листинги по марже</h2>
+            <span class="text-sm text-fg-tertiary">топ-6 из 312</span>
+            <a href="#" class="ml-auto text-md font-semibold text-primary underline decoration-primary-border underline-offset-[3px] hover:text-primary-hover">Все листинги</a>
+          </div>
+          <table class="w-full text-md">
+            <thead>
+              <tr class="bg-surface-subtle text-left">
+                <th scope="col" class="caps px-5 py-2.5">Листинг</th>
+                <th scope="col" class="caps px-3 py-2.5">МП</th>
+                <th scope="col" class="caps px-3 py-2.5 text-right">Выручка</th>
+                <th scope="col" class="caps px-3 py-2.5 text-right">Маржа</th>
+                <th scope="col" class="caps px-5 py-2.5 text-right">Маржа, %</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-line-soft">
+              <tr class="transition-colors duration-fast hover:bg-surface-row-hover">
+                <td class="px-5 py-3"><div class="font-semibold">Шары латексные 12″, 100 шт</div><div class="mt-0.5 font-mono text-xs text-fg-muted">SKU 481920</div></td>
+                <td class="px-3 py-3"><span class="inline-flex rounded-sm px-1.5 py-0.5 text-xs font-bold text-white" style="background:var(--mp-ozon)">Ozon</span></td>
+                <td class="px-3 py-3 text-right">2 184 000 ₽</td>
+                <td class="px-3 py-3 text-right font-semibold">812 400 ₽</td>
+                <td class="px-5 py-3 text-right">37,2%</td>
+              </tr>
+              <tr class="transition-colors duration-fast hover:bg-surface-row-hover">
+                <td class="px-5 py-3"><div class="font-semibold">Гирлянда буквенная «С днём рождения»</div><div class="mt-0.5 font-mono text-xs text-fg-muted">SKU 482057</div></td>
+                <td class="px-3 py-3"><span class="inline-flex rounded-sm px-1.5 py-0.5 text-xs font-bold text-white" style="background:var(--mp-wb)">WB</span></td>
+                <td class="px-3 py-3 text-right">1 642 500 ₽</td>
+                <td class="px-3 py-3 text-right font-semibold">541 900 ₽</td>
+                <td class="px-5 py-3 text-right">33,0%</td>
+              </tr>
+              <tr class="transition-colors duration-fast hover:bg-surface-row-hover">
+                <td class="px-5 py-3"><div class="font-semibold">Набор фольгированных шаров «Цифра»</div><div class="mt-0.5 font-mono text-xs text-fg-muted">SKU 482194</div></td>
+                <td class="px-3 py-3"><span class="inline-flex rounded-sm px-1.5 py-0.5 text-xs font-bold text-white" style="background:var(--mp-ozon)">Ozon</span></td>
+                <td class="px-3 py-3 text-right">1 318 200 ₽</td>
+                <td class="px-3 py-3 text-right font-semibold">389 100 ₽</td>
+                <td class="px-5 py-3 text-right">29,5%</td>
+              </tr>
+              <tr class="transition-colors duration-fast hover:bg-surface-row-hover">
+                <td class="px-5 py-3"><div class="font-semibold">Гелий баллон 1,4 л</div><div class="mt-0.5 font-mono text-xs text-fg-muted">SKU 482331</div></td>
+                <td class="px-3 py-3"><span class="inline-flex rounded-sm px-1.5 py-0.5 text-xs font-bold text-white" style="background:var(--mp-wb)">WB</span></td>
+                <td class="px-3 py-3 text-right">2 907 300 ₽</td>
+                <td class="px-3 py-3 text-right font-semibold">610 500 ₽</td>
+                <td class="px-5 py-3 text-right">21,0%</td>
+              </tr>
+              <tr class="transition-colors duration-fast hover:bg-surface-row-hover">
+                <td class="px-5 py-3"><div class="font-semibold">Шары с конфетти, 50 шт</div><div class="mt-0.5 font-mono text-xs text-fg-muted">SKU 482468</div></td>
+                <td class="px-3 py-3"><span class="inline-flex rounded-sm px-1.5 py-0.5 text-xs font-bold text-white" style="background:var(--mp-ozon)">Ozon</span></td>
+                <td class="px-3 py-3 text-right">984 600 ₽</td>
+                <td class="px-3 py-3 text-right font-semibold">186 900 ₽</td>
+                <td class="px-5 py-3 text-right">19,0%</td>
+              </tr>
+              <tr class="transition-colors duration-fast hover:bg-surface-row-hover">
+                <td class="px-5 py-3"><div class="font-semibold">Насос ручной для шаров</div><div class="mt-0.5 font-mono text-xs text-fg-muted">SKU 482605</div></td>
+                <td class="px-3 py-3"><span class="inline-flex rounded-sm px-1.5 py-0.5 text-xs font-bold text-white" style="background:var(--mp-wb)">WB</span></td>
+                <td class="px-3 py-3 text-right">412 800 ₽</td>
+                <td class="px-3 py-3 text-right font-semibold text-danger-text">−24 700 ₽</td>
+                <td class="px-5 py-3 text-right font-semibold text-danger-text">−6,0%</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
+
+      <!-- ============ FOOTER ============ -->
+      <footer class="flex shrink-0 items-center gap-4 border-t border-line bg-surface-card px-8 py-3 text-sm text-fg-tertiary">
+        <span>© 2026 Ваш Финдир · v3.4</span>
+        <span class="flex items-center gap-1.5">
+          <span aria-hidden="true" class="h-1.5 w-1.5 rounded-full bg-success-dot"></span>
+          Данные обновлены сегодня в 09:42 · Ozon, Wildberries, Т-Банк
+        </span>
+        <nav aria-label="Служебные ссылки" class="ml-auto flex items-center gap-4">
+          <a href="#" class="hover:text-fg-strong">База знаний</a>
+          <a href="#" class="hover:text-fg-strong">Поддержка</a>
+          <a href="#" class="hover:text-fg-strong">Конфиденциальность</a>
+        </nav>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  var app = document.getElementById('app');
+  var collapseBtn = document.getElementById('sidebar-toggle');
+  var expandBtn = document.getElementById('sidebar-expand');
+
+  function setSidebar(state) {
+    app.setAttribute('data-sidebar', state);
+    collapseBtn.setAttribute('aria-expanded', state === 'expanded' ? 'true' : 'false');
+    expandBtn.setAttribute('aria-expanded', state === 'expanded' ? 'true' : 'false');
+    try { localStorage.setItem('vf-sidebar', state); } catch (e) {}
+  }
+  var saved = null; try { saved = localStorage.getItem('vf-sidebar'); } catch (e) {}
+  if (saved === 'collapsed') setSidebar('collapsed');
+  collapseBtn.addEventListener('click', function () { setSidebar('collapsed'); expandBtn.focus(); });
+  expandBtn.addEventListener('click', function () { setSidebar('expanded'); collapseBtn.focus(); });
+
+  // Вложенные группы. В свёрнутом сайдбаре клик по группе сначала разворачивает меню.
+  document.querySelectorAll('[data-nav-parent]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var sub = document.getElementById(btn.getAttribute('aria-controls'));
+      if (app.getAttribute('data-sidebar') === 'collapsed') {
+        setSidebar('expanded'); btn.setAttribute('aria-expanded', 'true'); sub.hidden = false; return;
+      }
+      var open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+      sub.hidden = open;
+    });
+  });
+})();
+</script>
+</body>
+</html>

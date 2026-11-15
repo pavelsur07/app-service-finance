@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DS-Overlays · ДС «Ваш Финдир» v3.4</title>
+<!--
+  Лист дизайн-системы «Ваш Финдир» v3.4 — Оверлеи.
+  Источник: UI Kit v3.4 (канвас Claude Design, страница ui-kit-v3.0), сгенерировано 15.11.2026.
+  Обычный HTML: открывается в браузере. Значения — из ds-kit.css (токены в :root) и разметки.
+  Не править вручную: изменения вносятся в UI Kit и перегенерируются.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="ds-kit.css">
+</head>
+<body>
+<main class="main">
+<h1 class="page-h1">DS-Overlays</h1>
+<p class="page-sub">Modal S/M/L, Drawer 680. Других правых панелей нет.</p>
+<div class="page-meta">ДС «Ваш Финдир» v3.4 · 15.11.2026 · все листы: <a href="README.md">README</a></div>
+<div class="cb" id="modal">
+<div class="cb-head">
+<span class="cb-name">Modal</span>
+<span class="cb-tag">.mdl · S / M / L · 440 / 520 / 640</span>
+<span class="cb-when">S (.mdl--compact, 440) — выбор/подтверждение. M (.mdl или .mdl--m, 520) — пикер/форма до 8 полей. L (.mdl--l, 640) — для контента (компактная таблица, визард). Длинные формы и широкий контент — в drawer 680 (Decision 27). Правая панель в продукте одна — drawer. Любой размер не шире 100vw−s-8, .mdl-body скроллится при max-height 70vh.</span>
+</div>
+<div class="demo demo--hero" id="modal-sizes" style="padding:var(--s-6)">
+<div class="mdl mdl--compact">
+<div class="mdl-head">
+<div class="u-flex-1">
+<h3>Выбор компании</h3>
+<div class="sub">Переключение между организациями</div>
+</div>
+<button aria-label="Закрыть" class="btn btn-sm btn-ghost u-w-28 u-p-0"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24" width="14"><line x1="6" x2="18" y1="6" y2="18"></line><line x1="18" x2="6" y1="6" y2="18"></line></svg></button>
+</div>
+<div class="mdl-body picker" style="padding:0">
+<div class="picker-search" style="padding-top:0">
+<svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14"><circle cx="11" cy="11" r="7"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line></svg>
+<input placeholder="Найти компанию…"/>
+</div>
+<div class="picker-list" style="max-height:240px">
+<button class="picker-item is-selected">
+<span class="avatar avatar--md avatar--square avatar--tint-1">РБ</span>
+<div class="pi-body">
+<div class="pi-name">ООО «Ромашка-Бэст»</div>
+<div class="pi-meta"><span class="role-chip">Главбух</span> · ИНН <b>7723812931</b></div>
+</div>
+<div class="pi-right"><div class="check"><svg fill="none" height="10" stroke="currentColor" stroke-width="3" viewbox="0 0 24 24" width="10"><polyline points="20 6 9 17 4 12"></polyline></svg></div></div>
+</button>
+<button class="picker-item">
+<span class="avatar avatar--md avatar--square avatar--tint-3">ПЛ</span>
+<div class="pi-body">
+<div class="pi-name">ИП Петров Л. А.</div>
+<div class="pi-meta"><span class="role-chip">Финдир</span> · ИНН <b>772345678901</b></div>
+</div>
+<div class="pi-right"><div class="check"></div></div>
+</button>
+<button class="picker-item">
+<span class="avatar avatar--md avatar--square avatar--tint-4">ШК</span>
+<div class="pi-body">
+<div class="pi-name">ООО «ШарКомпани»</div>
+<div class="pi-meta"><span class="role-chip">Наблюдатель</span> · ИНН <b>5012094556</b></div>
+</div>
+<div class="pi-right"><div class="check"></div></div>
+</button>
+</div>
+</div>
+<div class="mdl-foot" style="display:flex;">
+<button class="btn btn-md btn-ghost add" style="color:var(--color-primary); margin-right:auto">+ Добавить компанию</button>
+<button class="btn btn-md btn-secondary">Отмена</button>
+<button class="btn btn-md btn-primary">Выбрать</button>
+</div>
+</div>
+<div class="mdl">
+<div class="mdl-head">
+<div class="u-flex-1">
+<h3>Выбор категории ДДС</h3>
+<div class="sub">Можно выбрать только конечную статью</div>
+</div>
+<button aria-label="Закрыть" class="btn btn-sm btn-ghost u-w-28 u-p-0"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24" width="14"><line x1="6" x2="18" y1="6" y2="18"></line><line x1="18" x2="6" y1="6" y2="18"></line></svg></button>
+</div>
+<div class="mdl-body picker" style="padding:0">
+<div class="picker-search" style="padding-top:0">
+<svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14"><circle cx="11" cy="11" r="7"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line></svg>
+<input placeholder="Найти статью…"/>
+</div>
+<div class="picker-list" style="max-height:260px">
+<button class="tree-node is-disabled">
+<span class="chev"><svg fill="none" height="10" stroke="currentColor" stroke-width="2.4" viewbox="0 0 24 24" width="10"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
+<span class="tn-name">Доходы</span>
+<span class="tn-amount" style="color:var(--success-text);">+5 670 000 ₽</span>
+</button>
+<div class="u-pl-4">
+<button class="tree-node is-disabled">
+<span class="chev"><svg fill="none" height="10" stroke="currentColor" stroke-width="2.4" viewbox="0 0 24 24" width="10"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
+<span class="tn-name">От клиентов</span>
+<span class="tn-amount" style="color:var(--success-text);">+4 820 450 ₽</span>
+</button>
+<div class="u-pl-4">
+<button class="tree-node is-selected">
+<span class="chev-spacer"></span>
+<span class="tn-dot" style="background:var(--cat-revenue);"></span>
+<span class="tn-name">Оплата за <mark>услу</mark>ги</span>
+<span class="tn-amount" style="color:var(--success-text);">+3 240 000 ₽</span>
+<span class="tn-check"><svg fill="none" height="10" stroke="currentColor" stroke-width="3" viewbox="0 0 24 24" width="10"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+</button>
+<button class="tree-node">
+<span class="chev-spacer"></span>
+<span class="tn-dot" style="background:var(--cat-revenue);"></span>
+<span class="tn-name">Оплата за товары</span>
+<span class="tn-amount" style="color:var(--success-text);">+1 580 450 ₽</span>
+<span class="tn-check"></span>
+</button>
+</div>
+</div>
+<button class="tree-node is-collapsed is-disabled">
+<span class="chev"><svg fill="none" height="10" stroke="currentColor" stroke-width="2.4" viewbox="0 0 24 24" width="10"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
+<span class="tn-name">Расходы</span>
+<span class="tn-amount" style="color:var(--danger-text);">−2 968 720 ₽</span>
+</button>
+</div>
+<div class="picker-breadcrumb">
+<span>Выбрано:</span>
+<b>Доходы</b><span class="sep">›</span>
+<b>От клиентов</b><span class="sep">›</span>
+<b style="color:var(--color-primary-hover);">Оплата за услуги</b>
+</div>
+</div>
+<div class="mdl-foot">
+<button class="btn btn-md btn-secondary">Отмена</button>
+<button class="btn btn-md btn-primary">Выбрать</button>
+</div>
+</div>
+</div>
+<span class="demo-label">L (640) · <code class="code-inline">.mdl--l</code> — компактная таблица / визард</span>
+<div class="demo demo--hero" style="padding:var(--s-6)">
+<div class="mdl mdl--l">
+<div class="mdl-head">
+<div class="u-flex-1">
+<h3>Сопоставление статей импорта</h3>
+<div class="sub">6 из 12 строк размечены автоматически</div>
+</div>
+<button aria-label="Закрыть" class="btn btn-sm btn-ghost u-w-28 u-p-0"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24" width="14"><line x1="6" x2="18" y1="6" y2="18"></line><line x1="18" x2="6" y1="6" y2="18"></line></svg></button>
+</div>
+<div class="mdl-body" style="padding:0">
+<table class="t-table">
+<thead><tr><th>Строка из файла</th><th>Статья ДДС</th><th class="t-cell--right">Сумма</th></tr></thead>
+<tbody>
+<tr><td>Оплата по счёту №1247</td><td>Оплата за услуги</td><td class="t-cell--right">+245 000 ₽</td></tr>
+<tr><td>Аренда офиса, июнь</td><td>Аренда</td><td class="t-cell--right">−156 200 ₽</td></tr>
+<tr><td>Зарплата, 1 половина</td><td>Зарплата</td><td class="t-cell--right">−420 000 ₽</td></tr>
+</tbody>
+</table>
+</div>
+<div class="mdl-foot">
+<button class="btn btn-md btn-secondary">Отмена</button>
+<button class="btn btn-md btn-primary">Применить сопоставление</button>
+</div>
+</div>
+</div>
+</div><div class="cb" id="drawer">
+<div class="cb-head">
+<span class="cb-name">Drawer header / footer</span>
+<span class="cb-tag">.dw · width 680</span>
+<span class="cb-when">Открывается справа. Body — белые секции на сером фоне. Footer — sticky, Удалить слева, Save справа.</span>
+</div>
+<div class="dw">
+<div class="dw-head">
+<div class="u-flex-1">
+<h3>Редактирование операции</h3>
+<div class="sub">№ ДДС-1247 · 24.06.2026 · Тинькофф Бизнес •• 4521 · <span class="src src--api" style="vertical-align:middle"><svg fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9"></path><polyline points="21 3 21 9 15 9"></polyline></svg>API</span></div>
+</div>
+<span class="status status--success"><span class="dot"></span>Проведено</span>
+<button aria-label="Закрыть" class="btn btn-sm btn-secondary u-w-32 u-p-0"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24" width="14"><line x1="6" x2="18" y1="6" y2="18"></line><line x1="18" x2="6" y1="6" y2="18"></line></svg></button>
+</div>
+<div class="dw-body" style="display:flex; flex-direction:column; gap:var(--s-3_5); padding:var(--s-5) var(--s-6);">
+<!-- Section: Сумма и направление -->
+<div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--s-4) var(--s-5);">
+<div style="font-size:var(--fs-xs); font-weight:var(--fw-bold); color:var(--text-tertiary); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:var(--s-3);">Сумма и направление</div>
+<div class="row-2col">
+<div class="form-field">
+<label class="form-label">Сумма <span class="req">*</span></label>
+<div class="input-wrap">
+<input class="input" style="text-align:right; font-weight:var(--fw-bold); padding-right:var(--s-7); font-variant-numeric:tabular-nums;" value="156 200"/>
+<span class="suffix">₽</span>
+</div>
+</div>
+<div class="form-field">
+<label class="form-label">Направление</label>
+<div style="display:flex; gap:var(--s-1_5);">
+<button class="chip chip--filter" style="flex:1; justify-content:center; padding:var(--s-2);"><span class="direction direction--in" style="font-weight:var(--fw-semibold);"><span class="ddot"></span>Поступление</span></button>
+<button class="chip chip--filter is-active" style="flex:1; justify-content:center; padding:var(--s-2);"><span class="direction direction--out" style="font-weight:var(--fw-semibold);"><span class="ddot"></span>Списание</span></button>
+</div>
+</div>
+</div>
+</div>
+<!-- Section: Контрагент и категория -->
+<div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--s-4) var(--s-5);">
+<div style="font-size:var(--fs-xs); font-weight:var(--fw-bold); color:var(--text-tertiary); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:var(--s-3);">Контрагент и категория</div>
+<div class="row-2col">
+<div class="form-field">
+<label class="form-label">Контрагент <span class="req">*</span></label>
+<button class="input" style="display:flex; align-items:center; gap:var(--s-2); cursor:pointer; text-align:left; padding:0 var(--s-2_5);">
+<span class="avatar avatar--sm avatar--square avatar--tint-1" style="width:22px; height:22px; font-size:var(--fs-2xs);">ФНС</span>
+<span class="u-flex-1">ФНС России</span>
+<svg fill="none" height="12" stroke="currentColor" stroke-width="2" style="color:var(--text-muted);" viewbox="0 0 24 24" width="12"><polyline points="6 9 12 15 18 9"></polyline></svg>
+</button>
+</div>
+<div class="form-field">
+<label class="form-label">Категория ДДС <span class="req">*</span></label>
+<button class="input" style="display:flex; align-items:center; gap:var(--s-2); cursor:pointer; text-align:left; padding:0 var(--s-2_5);">
+<span style="width:8px; height:8px; border-radius:var(--r-circle); background:var(--cat-tax);"></span>
+<span class="u-flex-1">Налоги и сборы</span>
+<svg fill="none" height="12" stroke="currentColor" stroke-width="2" style="color:var(--text-muted);" viewbox="0 0 24 24" width="12"><polyline points="6 9 12 15 18 9"></polyline></svg>
+</button>
+</div>
+<div class="form-field" style="grid-column:1/-1;">
+<label class="form-label">Назначение платежа</label>
+<input class="input" value="НДС за 2 кв. 2026, договор № 245"/>
+</div>
+<div class="form-field" style="grid-column:1/-1;">
+<label class="form-label">Теги</label>
+<div class="tags-input">
+<span class="tag-chip">2026-Q2 <button class="x">×</button></span>
+<span class="tag-chip">обязательный <button class="x">×</button></span>
+<input placeholder="Добавить тег…"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="dw-foot">
+<button class="btn btn-md btn-danger">Удалить операцию</button>
+<div class="u-flex-1"></div>
+<button class="btn btn-md btn-secondary">Отмена</button>
+<button class="btn btn-md btn-primary">Сохранить</button>
+</div>
+</div>
+<span class="demo-label">Заголовок секции в drawer · .drawer-section-label — uppercase 11px + опциональное описание</span>
+
+<div class="demo" style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--s-5) var(--s-5);">
+<div style="width:100%">
+<div style="font-size:var(--fs-xs); font-weight:var(--fw-bold); color:var(--text-tertiary); letter-spacing:0.05em; text-transform:uppercase;">Контрагент и описание</div>
+<div style="font-size:var(--fs-sm); color:var(--text-muted); margin-top:var(--s-1);">Опционально — короткая подсказка про назначение секции</div>
+</div>
+</div>
+
+</div>
+</main>
+</body>
+</html>

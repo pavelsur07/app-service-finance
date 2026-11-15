@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DS-Tokens · ДС «Ваш Финдир» v3.4</title>
+<!--
+  Лист дизайн-системы «Ваш Финдир» v3.4 — Токены и основы.
+  Источник: UI Kit v3.4 (канвас Claude Design, страница ui-kit-v3.0), сгенерировано 15.11.2026.
+  Обычный HTML: открывается в браузере. Значения — из ds-kit.css (токены в :root) и разметки.
+  Не править вручную: изменения вносятся в UI Kit и перегенерируются.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="ds-kit.css">
+</head>
+<body>
+<main class="main">
+<h1 class="page-h1">DS-Tokens</h1>
+<p class="page-sub">Архитектура токенов, палитра, цвета, типографика, отступы, скругления, тени, анимация, слои, фокус, сетка, брейкпоинты. Значения токенов — в ds-kit.css (:root).</p>
+<div class="page-meta">ДС «Ваш Финдир» v3.4 · 15.11.2026 · все листы: <a href="README.md">README</a></div>
+<h3 class="sub-h" id="token-architecture">Архитектура токенов</h3>
+<p class="section-sub">Три слоя. Компонент ссылается только на semantic или component-токен, никогда на примитив или hex. Тема переопределяет только semantic-слой — компоненты не меняются.</p>
+<div class="cb">
+<div class="layers">
+<div class="layer"><h5>1 · Primitives</h5><p>Палитра и сырые шкалы. Не используются в компонентах напрямую.</p><code>--gray-500</code><br/><code>--blue-600</code><br/><code>--fs-md</code> · <code>--s-3</code> · <code>--r-md</code></div>
+<div class="layer"><h5>2 · Semantic</h5><p>Роль цвета. Единственный слой, который меняет тема.</p><code>--text-tertiary</code> <span class="layer-arrow">→</span> <code>--gray-500</code><br/><code>--color-primary</code> <span class="layer-arrow">→</span> <code>--blue-600</code><br/><code>--danger-text</code> <span class="layer-arrow">→</span> <code>--red-700</code></div>
+<div class="layer"><h5>3 · Component</h5><p>Роль внутри компонента. Позволяет точечно менять компонент без побочных эффектов.</p><code>--input-border</code> <span class="layer-arrow">→</span> <code>--border-strong</code><br/><code>--button-primary-bg</code> <span class="layer-arrow">→</span> <code>--color-primary</code></div>
+</div>
+<div class="cb-note" style="margin-top:var(--s-3);">Имена v2.6 сохранены — semantic-слой = прежние <code class="code-inline">--text-*</code>, <code class="code-inline">--bg-*</code>, <code class="code-inline">--border*</code>, <code class="code-inline">--success-*</code>… Код продукта не ломается. Устаревшие <code class="code-inline">--font-9_5…--font-14</code> и <code class="code-inline">--r-1…--r-4</code> оставлены алиасами до v4.</div>
+</div>
+<h3 class="sub-h" id="primitives">Primitives · палитра</h3>
+<p class="section-sub">Справочно. В CSS компонентов примитивы запрещены (stylelint: <code class="code-inline">declaration-property-value-disallowed-list</code>).</p>
+<div class="cb">
+<div class="ramp"><div class="ramp-name">Gray</div><div class="ramp-chip" style="background:var(--gray-0)" title="--gray-0"><span style="color:var(--gray-900)">0</span></div><div class="ramp-chip" style="background:var(--gray-25)" title="--gray-25"><span style="color:var(--gray-900)">25</span></div><div class="ramp-chip" style="background:var(--gray-50)" title="--gray-50"><span style="color:var(--gray-900)">50</span></div><div class="ramp-chip" style="background:var(--gray-75)" title="--gray-75"><span style="color:var(--gray-900)">75</span></div><div class="ramp-chip" style="background:var(--gray-90)" title="--gray-90"><span style="color:var(--gray-900)">90</span></div><div class="ramp-chip" style="background:var(--gray-100)" title="--gray-100"><span style="color:var(--gray-900)">100</span></div><div class="ramp-chip" style="background:var(--gray-150)" title="--gray-150"><span style="color:var(--gray-900)">150</span></div><div class="ramp-chip" style="background:var(--gray-200)" title="--gray-200"><span style="color:var(--gray-900)">200</span></div><div class="ramp-chip" style="background:var(--gray-300)" title="--gray-300"><span style="color:var(--gray-900)">300</span></div><div class="ramp-chip" style="background:var(--gray-400)" title="--gray-400"><span style="color:var(--gray-900)">400</span></div><div class="ramp-chip" style="background:var(--gray-450)" title="--gray-450"><span style="color:var(--gray-0)">450</span></div><div class="ramp-chip" style="background:var(--gray-500)" title="--gray-500"><span style="color:var(--gray-0)">500</span></div><div class="ramp-chip" style="background:var(--gray-600)" title="--gray-600"><span style="color:var(--gray-0)">600</span></div><div class="ramp-chip" style="background:var(--gray-800)" title="--gray-800"><span style="color:var(--gray-0)">800</span></div><div class="ramp-chip" style="background:var(--gray-900)" title="--gray-900"><span style="color:var(--gray-0)">900</span></div></div>
+<div class="ramp"><div class="ramp-name">Navy</div><div class="ramp-chip" style="background:var(--navy-25)" title="--navy-25"><span style="color:var(--gray-900)">25</span></div><div class="ramp-chip" style="background:var(--navy-50)" title="--navy-50"><span style="color:var(--gray-900)">50</span></div><div class="ramp-chip" style="background:var(--navy-100)" title="--navy-100"><span style="color:var(--gray-900)">100</span></div><div class="ramp-chip" style="background:var(--navy-200)" title="--navy-200"><span style="color:var(--gray-900)">200</span></div><div class="ramp-chip" style="background:var(--navy-400)" title="--navy-400"><span style="color:var(--gray-900)">400</span></div><div class="ramp-chip" style="background:var(--navy-700)" title="--navy-700"><span style="color:var(--gray-0)">700</span></div><div class="ramp-chip" style="background:var(--navy-900)" title="--navy-900"><span style="color:var(--gray-0)">900</span></div></div>
+<div class="ramp"><div class="ramp-name">Crimson</div><div class="ramp-chip" style="background:var(--crimson-50)" title="--crimson-50"><span style="color:var(--gray-900)">50</span></div><div class="ramp-chip" style="background:var(--crimson-100)" title="--crimson-100"><span style="color:var(--gray-900)">100</span></div><div class="ramp-chip" style="background:var(--crimson-600)" title="--crimson-600"><span style="color:var(--gray-0)">600</span></div><div class="ramp-chip" style="background:var(--crimson-700)" title="--crimson-700"><span style="color:var(--gray-0)">700</span></div><div class="ramp-chip" style="background:var(--crimson-800)" title="--crimson-800"><span style="color:var(--gray-0)">800</span></div></div>
+<div class="ramp"><div class="ramp-name">Green</div><div class="ramp-chip" style="background:var(--green-brand-50)" title="--green-brand-50"><span style="color:var(--gray-900)">50</span></div><div class="ramp-chip" style="background:var(--green-brand-100)" title="--green-brand-100"><span style="color:var(--gray-900)">100</span></div><div class="ramp-chip" style="background:var(--green-brand-500)" title="--green-brand-500"><span style="color:var(--gray-0)">500</span></div><div class="ramp-chip" style="background:var(--green-brand-700)" title="--green-brand-700"><span style="color:var(--gray-0)">700</span></div></div>
+<div class="ramp"><div class="ramp-name">Orange</div><div class="ramp-chip" style="background:var(--orange-50)" title="--orange-50"><span style="color:var(--gray-900)">50</span></div><div class="ramp-chip" style="background:var(--orange-100)" title="--orange-100"><span style="color:var(--gray-900)">100</span></div><div class="ramp-chip" style="background:var(--orange-200)" title="--orange-200"><span style="color:var(--gray-900)">200</span></div><div class="ramp-chip" style="background:var(--orange-500)" title="--orange-500"><span style="color:var(--gray-0)">500</span></div><div class="ramp-chip" style="background:var(--orange-700)" title="--orange-700"><span style="color:var(--gray-0)">700</span></div><div class="ramp-chip" style="background:var(--orange-800)" title="--orange-800"><span style="color:var(--gray-0)">800</span></div></div>
+<div class="ramp"><div class="ramp-name">Yellow</div><div class="ramp-chip" style="background:var(--yellow-50)" title="--yellow-50"><span style="color:var(--gray-900)">50</span></div><div class="ramp-chip" style="background:var(--yellow-500)" title="--yellow-500"><span style="color:var(--gray-0)">500</span></div><div class="ramp-chip" style="background:var(--yellow-800)" title="--yellow-800"><span style="color:var(--gray-0)">800</span></div><div class="ramp-chip" style="background:var(--yellow-900)" title="--yellow-900"><span style="color:var(--gray-0)">900</span></div></div>
+<div class="ramp"><div class="ramp-name">Blue · info</div><div class="ramp-chip" style="background:var(--blue-50)" title="--blue-50"><span style="color:var(--gray-900)">50</span></div><div class="ramp-chip" style="background:var(--blue-100)" title="--blue-100"><span style="color:var(--gray-900)">100</span></div><div class="ramp-chip" style="background:var(--blue-600)" title="--blue-600"><span style="color:var(--gray-0)">600</span></div><div class="ramp-chip" style="background:var(--blue-700)" title="--blue-700"><span style="color:var(--gray-0)">700</span></div></div>
+</div>
+<h3 class="sub-h" id="colors">Цвета · semantic</h3>
+<h4 class="mini-h">Primary · navy</h4>
+<div class="grid-swatches">
+<div class="swatch"><div class="swatch-color" style="background:var(--color-primary)"></div><div class="swatch-info"><div class="swatch-name">Primary</div><div class="swatch-token">--color-primary</div><div class="swatch-hex">#1E2A44</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--color-primary-hover)"></div><div class="swatch-info"><div class="swatch-name">Primary hover</div><div class="swatch-token">--color-primary-hover</div><div class="swatch-hex">#0B1020</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--color-primary-tint)"></div><div class="swatch-info"><div class="swatch-name">Primary tint</div><div class="swatch-token">--color-primary-tint</div><div class="swatch-hex">#EEF0F5</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--color-primary-border)"></div><div class="swatch-info"><div class="swatch-name">Primary border</div><div class="swatch-token">--color-primary-border</div><div class="swatch-hex">#C5CBD8</div></div></div>
+</div>
+<h4 class="mini-h">Accent · бренд-моменты, не кнопки</h4>
+<div class="grid-swatches">
+<div class="swatch"><div class="swatch-color" style="background:var(--color-accent)"></div><div class="swatch-info"><div class="swatch-name">Accent</div><div class="swatch-token">--color-accent</div><div class="swatch-hex">#B00020</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--color-accent-hover)"></div><div class="swatch-info"><div class="swatch-name">Accent hover</div><div class="swatch-token">--color-accent-hover</div><div class="swatch-hex">#8C0019</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--color-accent-active)"></div><div class="swatch-info"><div class="swatch-name">Accent active</div><div class="swatch-token">--color-accent-active</div><div class="swatch-hex">#6E0014</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--color-accent-tint)"></div><div class="swatch-info"><div class="swatch-name">Accent tint</div><div class="swatch-token">--color-accent-tint</div><div class="swatch-hex">#FDECEE</div></div></div>
+</div>
+<h4 class="mini-h">Text</h4>
+<div class="grid-swatches">
+<div class="swatch"><div class="swatch-color" style="background:var(--text-strong)"></div><div class="swatch-info"><div class="swatch-name">Strong</div><div class="swatch-token">--text-strong</div><div class="swatch-hex">#0B1020</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--text-secondary)"></div><div class="swatch-info"><div class="swatch-name">Secondary</div><div class="swatch-token">--text-secondary</div><div class="swatch-hex">#585D68</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--text-tertiary)"></div><div class="swatch-info"><div class="swatch-name">Tertiary</div><div class="swatch-token">--text-tertiary</div><div class="swatch-hex">#6A6E79</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--text-muted)"></div><div class="swatch-info"><div class="swatch-name">Muted → = Tertiary</div><div class="swatch-token">--text-muted</div><div class="swatch-hex">#6A6E79</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--text-disabled)"></div><div class="swatch-info"><div class="swatch-name">Disabled</div><div class="swatch-token">--text-disabled</div><div class="swatch-hex">#9EA2AB</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--text-faint)"></div><div class="swatch-info"><div class="swatch-name">Faint</div><div class="swatch-token">--text-faint</div><div class="swatch-hex">#C4C7CE</div></div></div>
+</div>
+<h4 class="mini-h">Borders &amp; Backgrounds</h4>
+<div class="grid-swatches">
+<div class="swatch"><div class="swatch-color" style="background:var(--border)"></div><div class="swatch-info"><div class="swatch-name">Border</div><div class="swatch-token">--border</div><div class="swatch-hex">#E3E4E8</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--border-soft)"></div><div class="swatch-info"><div class="swatch-name">Border soft</div><div class="swatch-token">--border-soft</div><div class="swatch-hex">#F1F1F4</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--bg-card); border-top:1px dashed var(--border)"></div><div class="swatch-info"><div class="swatch-name">Card</div><div class="swatch-token">--bg-card</div><div class="swatch-hex">#FFFFFF</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--bg-page)"></div><div class="swatch-info"><div class="swatch-name">Page</div><div class="swatch-token">--bg-page</div><div class="swatch-hex">#F5F5F7</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--bg-subtle)"></div><div class="swatch-info"><div class="swatch-name">Subtle</div><div class="swatch-token">--bg-subtle</div><div class="swatch-hex">#F8F8FA</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--bg-row-hover)"></div><div class="swatch-info"><div class="swatch-name">Row hover</div><div class="swatch-token">--bg-row-hover</div><div class="swatch-hex">#FAFAFB</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--bg-row-selected)"></div><div class="swatch-info"><div class="swatch-name">Row selected</div><div class="swatch-token">--bg-row-selected</div><div class="swatch-hex">#F3F4F8</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--bg-dark)"></div><div class="swatch-info"><div class="swatch-name">Dark surface</div><div class="swatch-token">--bg-dark</div><div class="swatch-hex">#0B1020</div></div></div>
+</div>
+<h4 class="mini-h">Semantic — Success</h4>
+<div class="grid-swatches">
+<div class="swatch"><div class="swatch-color" style="background:var(--success-bg)"></div><div class="swatch-info"><div class="swatch-name">Success bg</div><div class="swatch-token">--success-bg</div><div class="swatch-hex">#EAF6F0</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--success-border)"></div><div class="swatch-info"><div class="swatch-name">Success border</div><div class="swatch-token">--success-border</div><div class="swatch-hex">#CBEADB</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--success-text)"></div><div class="swatch-info"><div class="swatch-name">Success text</div><div class="swatch-token">--success-text</div><div class="swatch-hex">#0E7A4F</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--success-dot)"></div><div class="swatch-info"><div class="swatch-name">Success dot</div><div class="swatch-token">--success-dot</div><div class="swatch-hex">#16A06A</div></div></div>
+</div>
+<h4 class="mini-h">Semantic — Danger</h4>
+<div class="grid-swatches">
+<div class="swatch"><div class="swatch-color" style="background:var(--danger-bg)"></div><div class="swatch-info"><div class="swatch-name">Danger / снижение bg</div><div class="swatch-token">--danger-bg</div><div class="swatch-hex">#FFF7ED</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--danger-border)"></div><div class="swatch-info"><div class="swatch-name">Danger border</div><div class="swatch-token">--danger-border</div><div class="swatch-hex">#FED7AA</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--danger-text)"></div><div class="swatch-info"><div class="swatch-name">Danger / снижение text</div><div class="swatch-token">--danger-text</div><div class="swatch-hex">#C2410C</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--danger-dot)"></div><div class="swatch-info"><div class="swatch-name">Danger dot</div><div class="swatch-token">--danger-dot</div><div class="swatch-hex">#F97316</div></div></div>
+</div>
+<h4 class="mini-h">Semantic — Warning</h4>
+<div class="grid-swatches">
+<div class="swatch"><div class="swatch-color" style="background:var(--warning-bg)"></div><div class="swatch-info"><div class="swatch-name">Warning bg</div><div class="swatch-token">--warning-bg</div><div class="swatch-hex">#FFF8E1</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--warning-border)"></div><div class="swatch-info"><div class="swatch-name">Warning border</div><div class="swatch-token">--warning-border</div><div class="swatch-hex">#FDE68A</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--warning-text)"></div><div class="swatch-info"><div class="swatch-name">Warning text</div><div class="swatch-token">--warning-text</div><div class="swatch-hex">#8A5A00</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--warning-dot)"></div><div class="swatch-info"><div class="swatch-name">Warning dot</div><div class="swatch-token">--warning-dot</div><div class="swatch-hex">#F5B400</div></div></div>
+<h4 class="mini-h">Info</h4>
+<div class="grid-swatches">
+<div class="swatch"><div class="swatch-color" style="background:var(--info-bg)"></div><div class="swatch-info"><div class="swatch-name">Info bg</div><div class="swatch-token">--info-bg</div><div class="swatch-hex">#EEF3FE</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--info-border)"></div><div class="swatch-info"><div class="swatch-name">Info border</div><div class="swatch-token">--info-border</div><div class="swatch-hex">#DBE6FF</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--info-text)"></div><div class="swatch-info"><div class="swatch-name">Info text</div><div class="swatch-token">--info-text</div><div class="swatch-hex">#1E40AF</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--info-dot)"></div><div class="swatch-info"><div class="swatch-name">Info dot</div><div class="swatch-token">--info-dot</div><div class="swatch-hex">#1A56DB</div></div></div>
+</div>
+</div>
+<h4 class="mini-h">Categories (8)</h4>
+<div class="grid-swatches">
+<div class="swatch"><div class="swatch-color" style="background:var(--cat-revenue)"></div><div class="swatch-info"><div class="swatch-name">Revenue</div><div class="swatch-token">--cat-revenue</div><div class="swatch-hex">#10B981</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--cat-marketing)"></div><div class="swatch-info"><div class="swatch-name">Marketing</div><div class="swatch-token">--cat-marketing</div><div class="swatch-hex">#F59E0B</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--cat-services)"></div><div class="swatch-info"><div class="swatch-name">Services</div><div class="swatch-token">--cat-services</div><div class="swatch-hex">#06B6D4</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--cat-payroll)"></div><div class="swatch-info"><div class="swatch-name">Payroll</div><div class="swatch-token">--cat-payroll</div><div class="swatch-hex">#8B5CF6</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--cat-tax)"></div><div class="swatch-info"><div class="swatch-name">Tax</div><div class="swatch-token">--cat-tax</div><div class="swatch-hex">#EF4444</div></div></div>
+<div class="swatch"><div class="swatch-color" style="background:var(--cat-software)"></div><div class="swatch-info"><div class="swatch-name">Software</div><div class="swatch-token">--cat-software</div><div class="swatch-hex">#0EA5E9</div></div></div>
+</div>
+<h4 class="mini-h">Bank brand colors</h4>
+<div class="demo">
+<div class="bank-badge"><div class="bank-mark bank-mark--tinkoff">Т</div><div><div class="bank-name">Тинькофф</div><div class="bank-token">--bank-tinkoff</div></div></div>
+<div class="bank-badge"><div class="bank-mark bank-mark--sber">С</div><div><div class="bank-name">Сбер</div><div class="bank-token">--bank-sber</div></div></div>
+<div class="bank-badge"><div class="bank-mark bank-mark--alfa">А</div><div><div class="bank-name">Альфа</div><div class="bank-token">--bank-alfa</div></div></div>
+<div class="bank-badge"><div class="bank-mark bank-mark--tochka">Т</div><div><div class="bank-name">Точка</div><div class="bank-token">--bank-tochka</div></div></div>
+<div class="bank-badge"><div class="bank-mark bank-mark--mts">М</div><div><div class="bank-name">МТС</div><div class="bank-token">--bank-mts</div></div></div>
+<div class="bank-badge"><div class="bank-mark bank-mark--yookassa">Ю</div><div><div class="bank-name">ЮKassa</div><div class="bank-token">--bank-yookassa</div></div></div>
+</div>
+<h4 class="mini-h">Marketplace brand colors</h4>
+<div class="demo">
+<div class="mp-badge"><div class="mp-mark mp-mark--lg mp-mark--ozon">Oz</div><div><div class="mp-name">Озон</div><div class="mp-token">--mp-ozon</div></div></div>
+<div class="mp-badge"><div class="mp-mark mp-mark--lg mp-mark--wb">WB</div><div><div class="mp-name">Wildberries</div><div class="mp-token">--mp-wb</div></div></div>
+<div class="mp-badge"><div class="mp-mark mp-mark--lg mp-mark--yamarket">ЯМ</div><div><div class="mp-name">Яндекс Маркет</div><div class="mp-token">--mp-yamarket</div></div></div>
+<div class="mp-badge"><div class="mp-mark mp-mark--lg mp-mark--megamarket">ММ</div><div><div class="mp-name">Мегамаркет</div><div class="mp-token">--mp-megamarket</div></div></div>
+</div>
+<!-- Typography -->
+<h3 class="sub-h" id="typography">Типографика</h3>
+<p class="section-sub">Manrope. 9 целых ступеней вместо 25 значений v2.6 (из них 6 дробных: 9.5, 10.5, 11.5, 12.5, 13.5 и пр.). Ролевые шорткаты <code class="code-inline">--type-*</code> задают сразу вес, размер, интерлиньяж и гарнитуру. Числа — всегда tabular-nums.</p>
+<div class="cb">
+<div class="type-row"><div class="type-meta"><b>10px</b> 700/500<br/><code class="code-inline">--fs-2xs</code></div><div style="font-size:var(--fs-2xs); font-weight:var(--fw-bold); font-family:var(--font-mono); color:var(--text-tertiary)">Инициалы в аватаре · mono-подписи токенов</div></div>
+<div class="type-row"><div class="type-meta"><b>11px</b> 700 · caps +0.05em<br/><code class="code-inline">--fs-xs</code></div><div style="font:var(--type-caps); text-transform:uppercase; letter-spacing:var(--ls-caps); color:var(--text-tertiary)">Заголовок таблицы · card-head · KPI meta</div></div>
+<div class="type-row"><div class="type-meta"><b>12px</b> 600<br/><code class="code-inline">--fs-sm</code></div><div style="font:var(--type-label); color:var(--text-secondary)">Лейбл поля · chip · вторичный текст</div></div>
+<div class="type-row"><div class="type-meta"><b>13px</b> 400 / 600<br/><code class="code-inline">--fs-md</code></div><div style="font:var(--type-body)">Body · строка таблицы · значение поля · кнопка</div></div>
+<div class="type-row"><div class="type-meta"><b>14px</b> 600/700<br/><code class="code-inline">--fs-lg</code></div><div style="font-size:var(--fs-lg); font-weight:var(--fw-bold)">Sidebar main · subtotal · money 14</div></div>
+<div class="type-row"><div class="type-meta"><b>16px</b> 700<br/><code class="code-inline">--fs-xl</code></div><div style="font:var(--type-title-sm); letter-spacing:var(--ls-tight)">Заголовок модалки и карточки · money 16</div></div>
+<div class="type-row"><div class="type-meta"><b>18px</b> 700 · −0.02em<br/><code class="code-inline">--fs-2xl</code></div><div style="font:var(--type-title); letter-spacing:var(--ls-tight)">Заголовок drawer</div></div>
+<div class="type-row"><div class="type-meta"><b>22px</b> 700 · −0.02em<br/><code class="code-inline">--fs-3xl</code></div><div style="font:var(--type-kpi); letter-spacing:var(--ls-tight); font-variant-numeric:tabular-nums">KPI compact</div></div>
+<div class="type-row"><div class="type-meta"><b>28px</b> 700 · −0.02em<br/><code class="code-inline">--fs-4xl</code></div><div style="font:var(--type-hero); letter-spacing:var(--ls-tight); font-variant-numeric:tabular-nums">KPI hero · заголовок страницы</div></div>
+<table class="tok-table" style="margin-top:var(--s-4)"><thead><tr><th>Роль</th><th>Токен</th><th>Состав</th></tr></thead><tbody>
+<tr><td>Caps-заголовок</td><td><code>--type-caps</code></td><td>700 · 11/1.35 + uppercase + <code>--ls-caps</code></td></tr>
+<tr><td>Лейбл</td><td><code>--type-label</code></td><td>600 · 12/1.35</td></tr>
+<tr><td>Body</td><td><code>--type-body</code> · <code>--type-body-strong</code></td><td>400 / 600 · 13/1.5</td></tr>
+<tr><td>Заголовок S / M</td><td><code>--type-title-sm</code> · <code>--type-title</code></td><td>700 · 16 / 18 · 1.2</td></tr>
+<tr><td>KPI / Hero</td><td><code>--type-kpi</code> · <code>--type-hero</code></td><td>700 · 22 / 28 · 1.2</td></tr>
+</tbody></table>
+<div class="cb-note" style="margin-top:var(--s-3);">Маппинг v2.6 → v3.0: 9.5 / 10.5 / 11 → 11 · 11.5 / 12 → 12 · 12.5 / 13 → 13 · 13.5 / 14 → 14 · 15 / 16 → 16 · 17 → 18 · 24 → 22. Шрифт 8px в бренд-глифе маркетплейса (16×16) оставлен как исключение.</div>
+</div>
+<!-- Spacing -->
+<h3 class="sub-h" id="spacing">Spacing</h3>
+<p class="section-sub">База 4px. Полушаги (<code class="code-inline">_5</code>) — для плотного табличного UI; в v2.6 они уже жили как сырые 2/6/10/14px в 74 местах. Значения 3, 5, 7, 9px сведены к ближайшему шагу.</p>
+<div class="cb">
+<div class="spacing-row"><div class="spacing-meta"><b>s-0_5</b> 2px · Хейрлайн-отступы: бейдж, иконка-текст</div><div class="spacing-bar" style="width:2px"></div></div>
+<div class="spacing-row"><div class="spacing-meta"><b>s-1</b> 4px</div><div class="spacing-bar" style="width:4px"></div></div>
+<div class="spacing-row"><div class="spacing-meta"><b>s-1_5</b> 6px · Внутри chip, menu-padding</div><div class="spacing-bar" style="width:6px"></div></div>
+<div class="spacing-row"><div class="spacing-meta"><b>s-2</b> 8px</div><div class="spacing-bar" style="width:8px"></div></div>
+<div class="spacing-row"><div class="spacing-meta"><b>s-2_5</b> 10px · Плотные кнопки, ячейки</div><div class="spacing-bar" style="width:10px"></div></div>
+<div class="spacing-row"><div class="spacing-meta"><b>s-3</b> 12px</div><div class="spacing-bar" style="width:12px"></div></div>
+<div class="spacing-row"><div class="spacing-meta"><b>s-3_5</b> 14px · Gap в шапке drawer</div><div class="spacing-bar" style="width:14px"></div></div>
+<div class="spacing-row"><div class="spacing-meta"><b>s-4</b> 16px</div><div class="spacing-bar" style="width:16px"></div></div>
+<div class="spacing-row"><div class="spacing-meta"><b>s-5</b> 20px · Gutter сетки</div><div class="spacing-bar" style="width:20px"></div></div>
+<div class="spacing-row"><div class="spacing-meta"><b>s-6</b> 24px</div><div class="spacing-bar" style="width:24px"></div></div>
+<div class="spacing-row"><div class="spacing-meta"><b>s-7</b> 32px</div><div class="spacing-bar" style="width:32px"></div></div>
+<div class="spacing-row"><div class="spacing-meta"><b>s-8</b> 40px</div><div class="spacing-bar" style="width:40px"></div></div>
+<div class="spacing-row"><div class="spacing-meta"><b>s-9</b> 48px · Отбивка разделов</div><div class="spacing-bar" style="width:48px"></div></div>
+<div class="spacing-row"><div class="spacing-meta"><b>s-10</b> 64px · Между секциями документа</div><div class="spacing-bar" style="width:64px"></div></div>
+</div>
+<!-- Radius -->
+<!-- Radius -->
+<h3 class="sub-h" id="radius">Radius</h3>
+<p class="section-sub">Шкала по ролям. <code class="code-inline">--r-2</code> (5px) убран: разница с 6px неразличима, лишняя ступень. Старые <code class="code-inline">--r-1…--r-4</code> — алиасы.</p>
+<div class="cb">
+<div class="radius-row">
+<div class="radius-item"><div class="radius-box" style="border-radius:var(--r-xs)"></div><div class="radius-meta"><b>r-xs</b> 2px<br/>progress, мини-метки</div></div>
+<div class="radius-item"><div class="radius-box" style="border-radius:var(--r-sm)"></div><div class="radius-meta"><b>r-sm</b> 4px<br/>chips, badges</div></div>
+<div class="radius-item"><div class="radius-box" style="border-radius:var(--r-md)"></div><div class="radius-meta"><b>r-md</b> 6px<br/>inputs, buttons, nav</div></div>
+<div class="radius-item"><div class="radius-box" style="border-radius:var(--r-lg)"></div><div class="radius-meta"><b>r-lg</b> 8px<br/>cards, menus</div></div>
+<div class="radius-item"><div class="radius-box" style="border-radius:var(--r-xl)"></div><div class="radius-meta"><b>r-xl</b> 12px<br/>modals</div></div>
+<div class="radius-item"><div class="radius-box" style="border-radius:var(--r-pill)"></div><div class="radius-meta"><b>r-pill</b> 999px<br/>status, toggle</div></div>
+<div class="radius-item"><div class="radius-box" style="border-radius:var(--r-circle); width:60px"></div><div class="radius-meta"><b>r-circle</b> 50%<br/>avatar, dots</div></div>
+</div>
+</div>
+<!-- Shadows -->
+<!-- Shadows -->
+<h3 class="sub-h" id="shadows">Shadows</h3>
+<div class="shadow-grid">
+<div class="shadow-item" style="box-shadow:var(--shadow-sm)">
+<div><div class="shadow-name">--shadow-sm</div><div class="shadow-token">0 1px 2px rgba(15,23,42,.06)</div></div>
+<div class="shadow-use">Активный tab, нажатый pill</div>
+</div>
+<div class="shadow-item" style="box-shadow:var(--shadow-card-hover)">
+<div><div class="shadow-name">--shadow-card-hover</div><div class="shadow-token">0 4px 12px rgba(15,23,42,.04)</div></div>
+<div class="shadow-use">Hover на карточке-row</div>
+</div>
+<div class="shadow-item" style="box-shadow:var(--shadow-primary); background:var(--color-primary); color:var(--text-inverse)">
+<div><div class="shadow-name">--shadow-primary</div><div class="shadow-token" style="color:var(--alpha-white-70)">0 4px 10px rgba(11,16,32,.18)</div></div>
+<div class="shadow-use" style="color:var(--alpha-white-80)">Primary CTA</div>
+</div>
+<div class="shadow-item" style="box-shadow:var(--shadow-menu)">
+<div><div class="shadow-name">--shadow-menu</div><div class="shadow-token">0 16px 36px + 0 2px 8px</div></div>
+<div class="shadow-use">Dropdown меню строки</div>
+</div>
+<div class="shadow-item" style="box-shadow:var(--shadow-modal)">
+<div><div class="shadow-name">--shadow-modal</div><div class="shadow-token">0 24px 60px + 0 4px 12px</div></div>
+<div class="shadow-use">Модалки (компании, контрагент)</div>
+</div>
+<div class="shadow-item" style="box-shadow:var(--shadow-drawer)">
+<div><div class="shadow-name">--shadow-drawer</div><div class="shadow-token">−20px 0 60px rgba(11,18,32,.22)</div></div>
+<div class="shadow-use">Slide-in drawer слева от тени</div>
+</div>
+</div>
+<h3 class="sub-h" id="motion">Motion</h3>
+<p class="section-sub">Три длительности и две кривые. Всё отключается через <code class="code-inline">prefers-reduced-motion</code>.</p>
+<div class="cb">
+<table class="tok-table"><thead><tr><th>Токен</th><th>Значение</th><th>Где</th></tr></thead><tbody>
+<tr><td><code>--dur-fast</code></td><td class="num">120ms</td><td>hover, focus, смена цвета</td></tr>
+<tr><td><code>--dur-base</code></td><td class="num">160ms</td><td>раскрытие меню, сдвиг, knob тоггла</td></tr>
+<tr><td><code>--dur-slow</code></td><td class="num">240ms</td><td>drawer, side modal</td></tr>
+<tr><td><code>--ease-standard</code></td><td>cubic-bezier(.2,0,0,1)</td><td>появление и движение</td></tr>
+<tr><td><code>--ease-exit</code></td><td>cubic-bezier(.4,0,1,1)</td><td>закрытие, уход с экрана</td></tr>
+</tbody></table>
+<div class="motion-demo" style="margin-top:var(--s-4)"><button class="md-fast" type="button">fast · hover</button><button class="md-base" type="button">base · lift</button><button class="md-slow" type="button">slow · slide</button></div>
+</div>
+<h3 class="sub-h" id="z-index">Z-index</h3>
+<p class="section-sub">Именованные слои вместо 8 магических чисел (1, 2, 3, 5, 9, 30, 50, 200). Локальные 1–3 внутри sticky-таблиц оставлены — они не выходят за контекст наложения.</p>
+<div class="cb">
+<table class="tok-table"><thead><tr><th>Токен</th><th>Значение</th><th>Слой</th></tr></thead><tbody>
+<tr><td><code>--z-raised</code></td><td class="num">1</td><td>sticky-колонка таблицы</td></tr>
+<tr><td><code>--z-sticky</code></td><td class="num">10</td><td>sticky-footer, итоги</td></tr>
+<tr><td><code>--z-header</code></td><td class="num">30</td><td>шапка модалки / AppHeader</td></tr>
+<tr><td><code>--z-dropdown</code></td><td class="num">50</td><td>select-popup, menu</td></tr>
+<tr><td><code>--z-overlay</code></td><td class="num">100</td><td>backdrop, drawer, modal</td></tr>
+<tr><td><code>--z-toast</code></td><td class="num">200</td><td>toast-stack</td></tr>
+</tbody></table>
+</div>
+<h3 class="sub-h" id="focus">Focus</h3>
+<p class="section-sub">Индикатор клавиатурного фокуса — показывает, на каком элементе сейчас находится пользователь, который работает с клавиатуры (Tab, Shift+Tab, Enter). Мышью он не появляется: правило висит на <code class="code-inline">:focus-visible</code>, браузер включает его только при навигации с клавиатуры. Нужен бухгалтерам и финдирам, которые вводят операции без мыши, и обязателен по WCAG 2.4.7.</p>
+<div class="cb">
+<div class="cb-head">
+<span class="cb-name">Focus ring</span>
+<span class="cb-tag">:focus-visible · .is-focus</span>
+<span class="cb-when">Один стиль на весь продукт. <code class="code-inline">.is-focus</code> — только для документации: показывает состояние без нажатия Tab.</span>
+</div>
+<span class="demo-label">Кнопки, ссылки, табы, chip — outline 2px · offset 2px · --focus-ring-color</span>
+<div class="demo">
+<button class="btn btn-md btn-primary is-focus" type="button">Primary</button>
+<button class="btn btn-md btn-secondary is-focus" type="button">Secondary</button>
+<button class="btn btn-md btn-ghost is-focus" type="button">Ghost</button>
+<a class="link is-focus" href="#focus">Ссылка</a>
+<button class="chip chip--filter is-focus" type="button">Chip</button>
+<div class="tabs"><button class="tab is-active" type="button">Все</button><button class="tab is-focus" type="button">Поступления</button></div>
+</div>
+<span class="demo-label">Поля — граница primary + мягкое кольцо (своё правило, outline не используется)</span>
+<div class="demo">
+<input aria-label="Пример поля в фокусе" class="input is-focus" style="max-width:260px" value="Тинькофф Бизнес"/>
+<select aria-label="Пример списка в фокусе" class="select is-focus" style="max-width:220px"><option>Все счета</option></select>
+</div>
+<span class="demo-label">Живая проверка — кликните сюда и нажимайте Tab</span>
+<div class="demo">
+<button class="btn btn-md btn-primary" type="button">Сохранить</button>
+<button class="btn btn-md btn-secondary" type="button">Отмена</button>
+<a class="link" href="#focus">Подробнее</a>
+<button class="chip chip--filter" type="button">Фильтр</button>
+<input aria-label="Живое поле" class="input" placeholder="Поле ввода" style="max-width:220px"/>
+</div>
+<div class="cb-note" style="margin-top:var(--s-3);">Правила: никогда не писать <code class="code-inline">outline: none</code> без замены · кольцо контрастирует с фоном ≥3:1 (поэтому сплошной navy, а не полупрозрачное свечение, как было в v3.1 у <code class="code-inline">.is-focus</code>) · offset 2px, чтобы кольцо не сливалось с заливкой кнопки · фокус не красный и не оранжевый — эти цвета заняты ошибками.</div>
+</div>
+<h3 class="sub-h" id="grid">Grid</h3>
+<p class="section-sub">12-колоночная сетка для рабочей зоны (<code class="code-inline">.app-workzone</code>). Gutter — <code class="code-inline">--grid-gutter</code> (= --s-5, 20px) на desktop. На узких экранах сетка сужается до 8 или 4 колонок (см. Breakpoints).</p>
+<div class="cb">
+<span class="demo-label">Desktop · 12 колонок · gutter --s-5</span>
+<div class="grid-12">
+<div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div>
+</div>
+<span class="demo-label">Tablet · 8 колонок · gutter --s-4</span>
+<div class="grid-8">
+<div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div>
+</div>
+<span class="demo-label">Mobile · 4 колонки · gutter --s-4</span>
+<div class="grid-4">
+<div>1</div><div>2</div><div>3</div><div>4</div>
+</div>
+<div class="cb-note" style="margin-top:var(--s-3);">Типовые span: KPI-ряд — по 3 колонки (4 карточки в ряд, 12/3). Две секции-карточки в <code class="code-inline">.wz-row</code> — по 6 колонок. Форма с боковой панелью — 8 + 4.</div>
+</div>
+<h3 class="sub-h" id="breakpoints">Breakpoints</h3>
+<p class="section-sub">Токены <code class="code-inline">--bp-sm</code> … <code class="code-inline">--bp-xl</code> — справочные: CSS-переменные не работают внутри <code class="code-inline">@media</code>. В коде — <code class="code-inline">@custom-media --md (min-width: 960px)</code> через PostCSS или SCSS-переменные с теми же значениями. Sidebar (264px) скрывается за drawer ниже md.</p>
+<div class="cb">
+<div class="bp-row"><div class="bp-meta"><b>&lt; 768</b> --bp-sm</div><div class="bp-desc">Mobile · 4 колонки · sidebar скрыт (drawer) · карточки в ряду стекуются в 1 колонку</div></div>
+<div class="bp-row"><div class="bp-meta"><b>768–959</b> --bp-sm…md</div><div class="bp-desc">Tablet portrait · 8 колонок · sidebar свёрнут в иконки</div></div>
+<div class="bp-row"><div class="bp-meta"><b>960–1279</b> --bp-md…lg</div><div class="bp-desc">Tablet landscape / малый ноутбук · 8 колонок · sidebar раскрыт (264px)</div></div>
+<div class="bp-row"><div class="bp-meta"><b>1280–1439</b> --bp-lg…xl</div><div class="bp-desc">Desktop · 12 колонок · базовый рабочий breakpoint продукта</div></div>
+<div class="bp-row"><div class="bp-meta"><b>≥ 1440</b> --bp-xl</div><div class="bp-desc">Wide desktop · 12 колонок · рабочая зона без max-width, KPI/report-ряды получают больше воздуха</div></div>
+</div>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DS-Controls · ДС «Ваш Финдир» v3.4</title>
+<!--
+  Лист дизайн-системы «Ваш Финдир» v3.4 — Кнопки, поля, выбор.
+  Источник: UI Kit v3.4 (канвас Claude Design, страница ui-kit-v3.0), сгенерировано 15.11.2026.
+  Обычный HTML: открывается в браузере. Значения — из ds-kit.css (токены в :root) и разметки.
+  Не править вручную: изменения вносятся в UI Kit и перегенерируются.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="ds-kit.css">
+</head>
+<body>
+<main class="main">
+<h1 class="page-h1">DS-Controls</h1>
+<p class="page-sub">Button (+ .btn-icon), Form field, Input, Поле с дополнением, Textarea, Select, Checkbox, Radio, Toggle, Tags, EntityPicker, TreePicker.</p>
+<div class="page-meta">ДС «Ваш Финдир» v3.4 · 15.11.2026 · все листы: <a href="README.md">README</a></div>
+<h3 class="sub-h cat-h">Действия</h3>
+<div class="cb" id="button">
+<div class="cb-head">
+<span class="cb-name">Button</span>
+<span class="cb-tag">.btn</span>
+<span class="cb-when">Действия. Primary — основное на странице/в drawer'е; Secondary — рядовое; Ghost — наименее важное; Danger — деструктивное.</span>
+</div>
+<span class="demo-label">Variants × Size</span>
+<div class="demo">
+<button class="btn btn-md btn-primary">Primary</button>
+<button class="btn btn-md btn-secondary">Secondary</button>
+<button class="btn btn-md btn-ghost">Ghost</button>
+<button class="btn btn-md btn-danger">Danger</button>
+</div>
+<span class="demo-label">Sizes (Primary)</span>
+<div class="demo">
+<button class="btn btn-sm btn-primary">Small 30</button>
+<button class="btn btn-md btn-primary">Medium 36</button>
+<button class="btn btn-lg btn-primary">Large 44</button>
+</div>
+<span class="demo-label">States (Medium · Primary)</span>
+<div class="demo">
+<button class="btn btn-md btn-primary">Default</button>
+<button class="btn btn-md btn-primary is-hover">Hover</button>
+<button class="btn btn-md btn-primary is-focus">Focus ring</button>
+<button class="btn btn-md btn-primary is-active">Active</button>
+<button class="btn btn-md btn-primary btn-disabled">Disabled</button>
+<button class="btn btn-md btn-primary btn-loading">Loading…</button>
+</div>
+<span class="demo-label">With icon</span>
+<div class="demo">
+<button class="btn btn-md btn-primary">
+<svg fill="none" height="14" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24" width="14"><line x1="12" x2="12" y1="5" y2="19"></line><line x1="5" x2="19" y1="12" y2="12"></line></svg>
+            Добавить операцию
+          </button>
+<button class="btn btn-md btn-secondary">
+<svg fill="none" height="14" stroke="currentColor" stroke-width="1.9" viewbox="0 0 24 24" width="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+            Экспорт
+          </button>
+</div>
+</div><h3 class="sub-h cat-h">Поля и формы</h3>
+<h3 class="sub-h" id="form-field">Form field</h3>
+<div class="section-sub">Вертикальная обёртка: подпись сверху, поле снизу, промежуток 5px.</div>
+<div class="cb">
+<div class="cb-head">
+<div class="cb-name">FormField</div>
+<div class="cb-tag">Layout</div>
+<div class="cb-when">Каждое поле формы: Login, Register, диалоги, фильтры</div>
+</div>
+<div class="cb-body">
+<div class="demo demo--column">
+<div class="form-field">
+<label class="form-label" for="ex-ff-1">E-mail</label>
+<input class="input" id="ex-ff-1" placeholder="you@example.com" type="email"/>
+</div>
+<div class="form-field">
+<label class="form-label" for="ex-ff-2">Пароль <span class="req">*</span></label>
+<div class="input-wrap">
+<input class="input input--action" id="ex-ff-2" type="password" value="qwerty12345"/>
+<button aria-label="Показать пароль" class="input-action" type="button">
+<svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="18"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div><div class="cb" id="input">
+<div class="cb-head">
+<span class="cb-name">Input</span>
+<span class="cb-tag">.input</span>
+<span class="cb-when">Текстовые поля форм. Высота 38px. Focus — синяя обводка с тенью.</span>
+</div>
+<div class="row-2col">
+<div class="form-field">
+<label class="form-label">Default</label>
+<input class="input" placeholder="Поиск контрагента…"/>
+</div>
+<div class="form-field">
+<label class="form-label">Focus</label>
+<input class="input is-focus" value="Тинькофф Бизнес"/>
+</div>
+<div class="form-field">
+<label class="form-label" for="demo-inn-err">Error <span class="req">*</span></label>
+<input aria-describedby="demo-inn-err-msg" aria-invalid="true" class="input input-error" id="demo-inn-err" value="abc"/>
+<span class="field-helper error" id="demo-inn-err-msg">ИНН должен содержать 10 или 12 цифр</span>
+</div>
+<div class="form-field">
+<label class="form-label">Disabled</label>
+<input class="input input-disabled" disabled="" value="Заблокировано"/>
+</div>
+<div class="form-field">
+<label class="form-label">С prefix</label>
+<div class="input-wrap">
+<span class="prefix">₽</span>
+<input class="input input--prefix" value="245 000"/>
+</div>
+</div>
+<div class="form-field">
+<label class="form-label">С suffix · helper</label>
+<div class="input-wrap">
+<input class="input input--suffix" value="1.99"/>
+<span class="suffix">%</span>
+</div>
+<span class="field-helper">Комиссия за платёжный сервис</span>
+</div>
+<div class="form-field" style="grid-column:1/-1">
+<label class="form-label">Textarea</label>
+<textarea class="input" placeholder="Комментарий, виден только команде…" rows="3"></textarea>
+</div>
+</div>
+<span class="demo-label">Native checkbox · <code class="code-inline">.checkbox</code></span>
+<div class="demo" style="gap:var(--s-6); flex-wrap:wrap;">
+<label class="checkbox-label"><input class="checkbox" type="checkbox"/><span>Не отмечен</span></label>
+<label class="checkbox-label"><input checked="" class="checkbox" type="checkbox"/><span>Отмечен</span></label>
+<label class="checkbox-label"><input class="checkbox" disabled="" type="checkbox"/><span>Заблокирован</span></label>
+<label class="checkbox-label"><input checked="" class="checkbox" disabled="" type="checkbox"/><span>Отмечен · disabled</span></label>
+</div>
+<span class="demo-label">Native select · <code class="code-inline">.select</code> / <code class="code-inline">.select--sm</code></span>
+<div class="form-grid" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:var(--s-3_5);">
+<div class="form-field">
+<label class="form-label">Default (38)</label>
+<select class="select">
+<option>Все транспорты</option>
+<option>banks_import</option>
+<option>marketplaces</option>
+<option>categorize</option>
+<option>reports</option>
+</select>
+</div>
+<div class="form-field">
+<label class="form-label">Sm (30) · фильтр в таблице</label>
+<select class="select select--sm">
+<option>Все периоды</option>
+<option>Сегодня</option>
+<option>Неделя</option>
+<option>Месяц</option>
+</select>
+</div>
+<div class="form-field">
+<label class="form-label">Disabled</label>
+<select class="select" disabled="">
+<option>Заблокировано</option>
+</select>
+</div>
+</div>
+</div><div class="cb" id="input-wrap">
+<div class="cb-head">
+<span class="cb-name">Поле с дополнением</span>
+<span class="cb-tag">.input-wrap · .prefix / .suffix · .input-icon · .input-action</span>
+<span class="cb-when">Один компонент для всех полей с чем-то внутри: текстовый префикс/суффикс (₽, %, .ru), иконка слева (поиск), кнопка справа (очистить, показать пароль). Раньше это были три набора классов: .input-wrap, .search-field, .password-field.</span>
+</div>
+<span class="demo-label">Префикс / суффикс · .prefix · .suffix</span>
+
+<div class="demo demo--column">
+<div class="form-field">
+<label class="form-label" for="ex-iw-1">Сумма</label>
+<div class="input-wrap">
+<span class="prefix">₽</span>
+<input class="input input--prefix" id="ex-iw-1" placeholder="0"/>
+</div>
+</div>
+<div class="form-field">
+<label class="form-label" for="ex-iw-2">Ставка</label>
+<div class="input-wrap">
+<input class="input input--suffix" id="ex-iw-2" value="12.5"/>
+<span class="suffix">%</span>
+</div>
+</div>
+<div class="form-field">
+<label class="form-label" for="ex-iw-3">Домен</label>
+<div class="input-wrap">
+<input class="input input--suffix" id="ex-iw-3" placeholder="mysite"/>
+<span class="suffix">.ru</span>
+</div>
+</div>
+</div>
+
+
+<span class="demo-label" id="search-input">Иконка слева + очистка · .input-icon · .input-action · .input-wrap--clearable</span>
+
+<div class="row-3col">
+<div class="form-field">
+<label class="form-label">Empty</label>
+<div class="input-wrap input-wrap--clearable">
+<svg class="input-icon" aria-hidden="true" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="16"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+<input class="input input--icon input--action" placeholder="Поиск по операциям…"/>
+<button aria-label="Очистить" class="input-action" type="button">
+<svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+</button>
+</div>
+</div>
+<div class="form-field">
+<label class="form-label">С введённым значением</label>
+<div class="input-wrap input-wrap--clearable has-value">
+<svg class="input-icon" aria-hidden="true" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="16"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+<input class="input input--icon input--action" value="Озон FBO"/>
+<button aria-label="Очистить" class="input-action" type="button">
+<svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+</button>
+</div>
+</div>
+<div class="form-field">
+<label class="form-label">Focused (имитация)</label>
+<div class="input-wrap input-wrap--clearable has-value">
+<svg class="input-icon" aria-hidden="true" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="16"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+<input class="input input--icon input--action is-focus" value="Озон FBO"/>
+<button aria-label="Очистить" class="input-action" type="button">
+<svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-width="2.4" viewbox="0 0 24 24" width="12"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+</button>
+</div>
+</div>
+</div>
+
+<span class="demo-label" id="password-input">Кнопка справа · пароль · .input-action</span>
+
+<div class="row-2col">
+<div class="form-field">
+<label class="form-label">Hidden (по умолчанию)</label>
+<div class="input-wrap">
+<input class="input input--action" type="password" value="qwerty12345"/>
+<button aria-label="Показать пароль" class="input-action" type="button">
+<svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="18"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+</button>
+</div>
+</div>
+<div class="form-field">
+<label class="form-label">Visible · показан</label>
+<div class="input-wrap">
+<input class="input input--action" type="text" value="qwerty12345"/>
+<button aria-label="Скрыть пароль" class="input-action" style="color: var(--text-secondary);" type="button">
+<svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="18"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-6.5 0-10-7-10-7a18.05 18.05 0 0 1 4.06-5.06"></path><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c6.5 0 10 7 10 7a18.05 18.05 0 0 1-2.16 3.19"></path><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M2 2l20 20"></path></svg>
+</button>
+</div>
+</div>
+</div>
+
+<div class="cb-note" style="margin-top:var(--s-3);">Модификаторы поля: <code class="code-inline">.input--prefix</code> · <code class="code-inline">.input--suffix</code> · <code class="code-inline">.input--icon</code> (место под иконку слева) · <code class="code-inline">.input--action</code> (место под кнопку справа). У <code class="code-inline">.input-wrap--clearable</code> кнопка видна только при <code class="code-inline">.has-value</code>. У кнопки-действия всегда <code class="code-inline">aria-label</code>.</div>
+</div><div class="cb" id="textarea">
+<div class="cb-head">
+<span class="cb-name">Textarea</span>
+<span class="cb-tag">.textarea</span>
+<span class="cb-when">Многострочный ввод. Min-height 80px, vertical resize. Состояния: default · focus · error · disabled.</span>
+</div>
+<div class="row-2col">
+<div class="form-field">
+<label class="form-label">Default</label>
+<textarea class="textarea" placeholder="Комментарий, виден только команде…"></textarea>
+</div>
+<div class="form-field">
+<label class="form-label">Focused (имитация)</label>
+<textarea class="textarea is-focus">Курсор активен</textarea>
+</div>
+<div class="form-field">
+<label class="form-label" for="demo-ta-err">Error <span class="req">*</span></label>
+<textarea aria-describedby="demo-ta-err-msg" aria-invalid="true" class="textarea is-error" id="demo-ta-err">Не пройдена валидация</textarea>
+<span class="field-helper error" id="demo-ta-err-msg">Минимум 10 символов</span>
+</div>
+<div class="form-field">
+<label class="form-label">Disabled</label>
+<textarea class="textarea" disabled="">Заблокировано</textarea>
+</div>
+</div>
+</div><div class="cb" id="select">
+<div class="cb-head">
+<span class="cb-name">Select</span>
+<span class="cb-tag">.select · .select--sm · .select-popup · .select-option · .select-optgroup-label</span>
+<span class="cb-when">Дропдаун. Закрытое состояние — нативное <code class="code-inline">&lt;select&gt;</code>. Открытое — кастомный <code class="code-inline">.select-popup</code> (для длинных списков, группировок, кастомных опций).</span>
+</div>
+<span class="demo-label">Триггер · закрытое состояние <code class="code-inline">.select</code> / <code class="code-inline">.select--sm</code></span>
+<div class="form-grid" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:var(--s-3_5);">
+<div class="form-field">
+<label class="form-label">Default (38) · кастомный триггер</label>
+<button class="select" style="text-align:left;" type="button">Все транспорты</button>
+<span class="field-helper">Список рендерится через <code class="code-inline">.select-popup</code> — см. ниже</span>
+</div>
+<div class="form-field">
+<label class="form-label">Sm (30) · нативный фильтр</label>
+<select class="select select--sm">
+<option>Все периоды</option>
+<option>Сегодня</option>
+<option>Неделя</option>
+<option>Месяц</option>
+</select>
+</div>
+<div class="form-field">
+<label class="form-label">Disabled</label>
+<select class="select" disabled="">
+<option>Заблокировано</option>
+</select>
+</div>
+</div>
+<div style="font-size:var(--fs-sm); color:var(--text-muted); margin: var(--s-1_5) 0 var(--s-0_5); max-width:680px; line-height:1.5;">
+<b style="color:var(--text-secondary);">Когда <code class="code-inline">&lt;select&gt;</code>, а когда <code class="code-inline">.select-popup</code>:</b>
+          нативный <code class="code-inline">&lt;select&gt;</code> рендерит выпадающий список средствами ОС/браузера — это нельзя стилизовать (цвет выбранной строки, шрифт, отступы зависят от системной темы). Поэтому для основного UI используем <code class="code-inline">.select-popup</code> с триггером-кнопкой <code class="code-inline">.select</code>. Нативный <code class="code-inline">&lt;select&gt;</code> оставляем только для коротких фильтров и read-only/disabled случаев, где визуал списка не критичен — <code class="code-inline">color-scheme: light</code> + <code class="code-inline">accent-color</code> на <code class="code-inline">.select</code> приведут его к светлой теме и primary-подсветке выбранной строки.
+        </div>
+<span class="demo-label">Открытое · <code class="code-inline">.select-popup</code> с группами и состояниями</span>
+<div class="demo" style="align-items:flex-start;">
+<div style="position:relative; width:280px;">
+<button class="select" style="text-align:left; border-color:var(--color-primary); box-shadow:0 0 0 3px var(--focus-ring-input);" type="button">Marketplace · Ozon FBO</button>
+<div class="select-popup" style="position:static; margin-top:var(--s-1_5); width:100%;">
+<div class="select-optgroup-label">Маркетплейсы</div>
+<button class="select-option" type="button"><span>Wildberries</span><svg class="select-check" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
+<button class="select-option is-selected" type="button"><span>Ozon FBO</span><svg class="select-check" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
+<button class="select-option" type="button"><span>Ozon FBS</span><svg class="select-check" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
+<button class="select-option" type="button"><span>Я.Маркет</span><svg class="select-check" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
+<div class="select-optgroup-label">Банки</div>
+<button class="select-option" type="button"><span>Тинькофф</span><svg class="select-check" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
+<button class="select-option is-disabled" type="button"><span>Сбер · недоступно</span><svg class="select-check" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
+<button class="select-option" type="button"><span>Альфа</span><svg class="select-check" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
+</div>
+</div>
+<div class="cb-note" style="max-width:340px;">
+            Визуальный язык — общий с <code class="code-inline">.menu</code> и <code class="code-inline">.picker-item</code>: card-фон, <code class="code-inline">--shadow-menu</code>, 7px-радиус, опции — кнопки с <code class="code-inline">--r-2</code> и hover на <code class="code-inline">--bg-page</code>. Выбранная — <code class="code-inline">--bg-row-selected</code> + чек в <code class="code-inline">--color-primary</code>.
+            <br/><br/>
+            Используй когда нужны группы (<code class="code-inline">.select-optgroup-label</code>), длинные списки со скроллом, кастомный контент в опции (иконка маркетплейса, аватар, бэйдж). Для простых — нативный <code class="code-inline">&lt;select&gt;</code>.
+          </div>
+</div>
+</div><div class="cb" id="checkbox">
+<div class="cb-head">
+<span class="cb-name">Checkbox</span>
+<span class="cb-tag">.checkbox · .checkbox-label</span>
+<span class="cb-when">Нативный чекбокс с <code class="code-inline">accent-color</code>. Парный <code class="code-inline">.checkbox-label</code> для подписи.</span>
+</div>
+<span class="demo-label">Состояния</span>
+<div class="demo" style="gap:var(--s-6); flex-wrap:wrap;">
+<label class="checkbox-label"><input class="checkbox" type="checkbox"/><span>Не отмечен</span></label>
+<label class="checkbox-label"><input checked="" class="checkbox" type="checkbox"/><span>Отмечен</span></label>
+<label class="checkbox-label"><input class="checkbox" disabled="" type="checkbox"/><span>Заблокирован</span></label>
+<label class="checkbox-label"><input checked="" class="checkbox" disabled="" type="checkbox"/><span>Отмечен · disabled</span></label>
+</div>
+</div><div class="cb" id="radio">
+<div class="cb-head">
+<span class="cb-name">Radio</span>
+<span class="cb-tag">.radio · .radio-label · .radio-group</span>
+<span class="cb-when">Группа взаимоисключающих опций. Колоночная и строчная компоновка через <code class="code-inline">.radio-group</code> / <code class="code-inline">.radio-group--inline</code>.</span>
+</div>
+<div class="row-2col">
+<div class="form-field">
+<label class="form-label">Группа (column)</label>
+<div class="radio-group">
+<label class="radio-label"><input class="radio" name="rg1" type="radio"/><span>День</span></label>
+<label class="radio-label"><input checked="" class="radio" name="rg1" type="radio"/><span>Неделя</span></label>
+<label class="radio-label"><input class="radio" name="rg1" type="radio"/><span>Месяц</span></label>
+<label class="radio-label"><input class="radio" disabled="" name="rg1" type="radio"/><span>Год · недоступно</span></label>
+</div>
+</div>
+<div class="form-field">
+<label class="form-label">Группа (inline)</label>
+<div class="radio-group radio-group--inline">
+<label class="radio-label"><input checked="" class="radio" name="rg2" type="radio"/><span>FBO</span></label>
+<label class="radio-label"><input class="radio" name="rg2" type="radio"/><span>FBS</span></label>
+<label class="radio-label"><input class="radio" name="rg2" type="radio"/><span>Свой склад</span></label>
+</div>
+</div>
+</div>
+</div><div class="cb" id="toggle">
+<div class="cb-head">
+<span class="cb-name">Toggle</span>
+<span class="cb-tag">.toggle</span>
+<span class="cb-when">Включение/выключение фичи. 42×24, knob 20.</span>
+</div>
+<div class="demo demo--center">
+<button aria-label="On" class="toggle is-on"></button>
+<span style="font-size:var(--fs-md)">On</span>
+<span style="width:24px"></span>
+<button aria-label="Off" class="toggle"></button>
+<span style="font-size:var(--fs-md)">Off</span>
+<span style="width:24px"></span>
+<button aria-label="Disabled" class="toggle is-on is-disabled"></button>
+<span style="font-size:var(--fs-md)">Disabled</span>
+</div>
+</div><div class="cb" id="tags">
+<div class="cb-head">
+<span class="cb-name">Tags input</span>
+<span class="cb-tag">.tags-input · .tag-chip</span>
+<span class="cb-when">Нейтральные теги (без радужности), ввод + autosuggest. Backspace фокусирует последний chip, повтор — удаляет.</span>
+</div>
+<span class="demo-label">Пустое поле</span>
+<div class="demo demo--column">
+<div class="form-field" style="width:100%; max-width:480px;">
+<label class="form-label">Теги</label>
+<div class="tags-input">
+<input placeholder="Добавьте тег…"/>
+</div>
+<div class="field-helper">Enter для добавления, Backspace — удалить последний</div>
+</div>
+</div>
+<span class="demo-label">С тегами</span>
+<div class="demo demo--column">
+<div class="form-field" style="width:100%; max-width:480px;">
+<label class="form-label">Теги</label>
+<div class="tags-input is-focus">
+<span class="tag-chip">2026-Q2<button class="x"><svg fill="none" height="10" stroke="currentColor" stroke-width="2.4" viewbox="0 0 24 24" width="10"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg></button></span>
+<span class="tag-chip">обязательный<button class="x"><svg fill="none" height="10" stroke="currentColor" stroke-width="2.4" viewbox="0 0 24 24" width="10"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg></button></span>
+<span class="tag-chip is-focused">налоги<button class="x"><svg fill="none" height="10" stroke="currentColor" stroke-width="2.4" viewbox="0 0 24 24" width="10"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg></button></span>
+<input value=""/>
+</div>
+<div class="field-helper">Последний chip в фокусе — повторный Backspace удалит</div>
+</div>
+</div>
+<span class="demo-label">С автосаджестом</span>
+<div class="demo demo--column" style="padding-bottom:160px;">
+<div class="form-field" style="width:100%; max-width:480px;">
+<label class="form-label">Теги</label>
+<div class="tags-input is-focus">
+<span class="tag-chip">2026-Q2<button class="x"><svg fill="none" height="10" stroke="currentColor" stroke-width="2.4" viewbox="0 0 24 24" width="10"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg></button></span>
+<input autofocus="" value="подо"/>
+<div class="suggest">
+<div class="suggest-item is-active">подо<b style="color:var(--color-primary)">тчётный</b><span class="hint">7 опер.</span></div>
+<div class="suggest-item">подо<b style="color:var(--color-primary)">ждёт</b><span class="hint">2 опер.</span></div>
+<div class="suggest-item">под<b style="color:var(--color-primary)">отчёт</b><span class="hint">5 опер.</span></div>
+<div class="suggest-create">+ Создать тег «подо»</div>
+</div>
+</div>
+<div class="field-helper">Поиск по вхождению + опция создать новый</div>
+</div>
+</div>
+</div><h3 class="sub-h cat-h">Выбор из справочника</h3>
+<div class="cb" id="entity-picker">
+<div class="cb-head">
+<span class="cb-name">EntityPicker</span>
+<span class="cb-tag">.mdl + .picker</span>
+<span class="cb-when">Универсальный плоский выбор из списка сущностей. Один компонент — три применения.</span>
+</div>
+<span class="demo-label">Инстанс 1 — Контрагент (ИНН + source в meta)</span>
+<div class="demo demo--hero" style="justify-content:center;">
+<div class="mdl">
+<div class="mdl-head">
+<div class="u-flex-1">
+<h3>Выбор контрагента</h3>
+<div class="sub">42 контрагента · поиск по названию и ИНН</div>
+</div>
+<button aria-label="Закрыть" class="btn btn-sm btn-ghost u-w-28 u-p-0"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24" width="14"><line x1="6" x2="18" y1="6" y2="18"></line><line x1="18" x2="6" y1="6" y2="18"></line></svg></button>
+</div>
+<div class="picker">
+<div class="picker-search">
+<svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14"><circle cx="11" cy="11" r="7"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line></svg>
+<input placeholder="Найти по названию или ИНН…"/>
+</div>
+<div class="picker-tabs"><div class="tabs">
+<button class="tab is-active">Недавние <span class="count">8</span></button>
+<button class="tab">Избранные <span class="count">3</span></button>
+<button class="tab">Все <span class="count">42</span></button>
+</div></div>
+<div class="picker-list">
+<button class="picker-item is-selected">
+<span class="avatar avatar--md avatar--square avatar--tint-1" style="font-size:var(--fs-2xs);">ТП</span>
+<div class="pi-body">
+<div class="pi-name">ООО «Технопарк»</div>
+<div class="pi-meta">ИНН <b>7704123456</b> · ООО · <span class="src src--api" style="padding:1px var(--s-1);">API</span></div>
+</div>
+<div class="pi-right">
+<span class="star is-on"><svg fill="currentColor" height="14" viewbox="0 0 24 24" width="14"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"></polygon></svg></span>
+</div>
+</button>
+<button class="picker-item">
+<span class="avatar avatar--md avatar--square avatar--tint-3" style="font-size:var(--fs-2xs);">ЯД</span>
+<div class="pi-body">
+<div class="pi-name">Яндекс.Директ</div>
+<div class="pi-meta">ИНН <b>7736207543</b> · ООО · <span class="src src--api" style="padding:1px var(--s-1);">API</span></div>
+</div>
+<div class="pi-right">
+<span class="star is-on"><svg fill="currentColor" height="14" viewbox="0 0 24 24" width="14"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"></polygon></svg></span>
+</div>
+</button>
+<button class="picker-item">
+<span class="avatar avatar--md avatar--square avatar--tint-1" style="font-size:var(--fs-2xs);">АС</span>
+<div class="pi-body">
+<div class="pi-name">ООО «Аренда-Сити»</div>
+<div class="pi-meta">ИНН <b>5012094556</b> · ООО · <span class="src src--xls" style="padding:1px var(--s-1);">XLS</span></div>
+</div>
+<div class="pi-right">
+<span class="star"><svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"></polygon></svg></span>
+</div>
+</button>
+<button class="picker-item">
+<span class="avatar avatar--md avatar--square avatar--tint-4" style="font-size:var(--fs-2xs);">ФНС</span>
+<div class="pi-body">
+<div class="pi-name">ФНС России</div>
+<div class="pi-meta">ИНН <b>7707329152</b> · Бюджетная организация</div>
+</div>
+<div class="pi-right">
+<span class="star"><svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"></polygon></svg></span>
+</div>
+</button>
+</div>
+</div>
+<div class="picker-foot">
+<button class="btn btn-md btn-ghost add" style="color:var(--color-primary); margin-right:auto">+ Добавить контрагента</button>
+<button class="btn btn-md btn-secondary">Отмена</button>
+<button class="btn btn-md btn-primary">Выбрать</button>
+</div>
+</div>
+</div>
+<div class="cb-note" style="margin-top:var(--s-3);"><b>Другие применения — та же разметка, меняется только строка.</b>
+<table class="tok-table" style="margin-top:var(--s-2)"><thead><tr><th>Сущность</th><th>Слева</th><th>Meta под названием</th><th>Особенности</th></tr></thead><tbody>
+<tr><td>Контрагент</td><td>аватар-квадрат с инициалами</td><td>ИНН · форма · source-бейдж</td><td>вкладки Недавние / Избранные / Все, звезда избранного</td></tr>
+<tr><td>Проект</td><td>цветная точка проекта</td><td>бюджет · потрачено, %</td><td>справа — мини-прогресс бюджета (цвет по порогам)</td></tr>
+<tr><td>Компания</td><td>аватар-квадрат</td><td>роль-бейдж · ИНН</td><td>radio справа; пустой список — компонент Empty state</td></tr>
+</tbody></table></div>
+</div><div class="cb" id="tree-picker">
+<div class="cb-head">
+<span class="cb-name">TreePicker</span>
+<span class="cb-tag">.mdl + .tree-node</span>
+<span class="cb-when">Иерархический выбор конечного узла. Разделы — дизаблены. При глубоком дереве — drawer 680.</span>
+</div>
+<span class="demo-label">Инстанс 1 — Категория ДДС (с агрегатами)</span>
+<div class="demo demo--hero" style="justify-content:center;">
+<div class="mdl">
+<div class="mdl-head">
+<div class="u-flex-1">
+<h3>Выбор категории ДДС</h3>
+<div class="sub">Серые разделы — для группировки; выбираются цветные конечные статьи</div>
+</div>
+<button aria-label="Закрыть" class="btn btn-sm btn-ghost u-w-28 u-p-0"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24" width="14"><line x1="6" x2="18" y1="6" y2="18"></line><line x1="18" x2="6" y1="6" y2="18"></line></svg></button>
+</div>
+<div class="picker">
+<div class="picker-search">
+<svg fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14"><circle cx="11" cy="11" r="7"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line></svg>
+<input placeholder="Найти статью…" value="услу"/>
+</div>
+<div class="picker-list" style="max-height:300px;">
+<button class="tree-node is-disabled">
+<span class="chev"><svg fill="none" height="10" stroke="currentColor" stroke-width="2.4" viewbox="0 0 24 24" width="10"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
+<span class="tn-name">Доходы</span>
+<span class="tn-amount" style="color:var(--success-text);">+5 670 000 ₽</span>
+</button>
+<div class="u-pl-4">
+<button class="tree-node is-disabled">
+<span class="chev"><svg fill="none" height="10" stroke="currentColor" stroke-width="2.4" viewbox="0 0 24 24" width="10"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
+<span class="tn-name">От клиентов</span>
+<span class="tn-amount" style="color:var(--success-text);">+4 820 450 ₽</span>
+</button>
+<div class="u-pl-4">
+<button class="tree-node is-selected">
+<span class="chev-spacer"></span>
+<span class="tn-dot" style="background:var(--cat-revenue);"></span>
+<span class="tn-name">Оплата за <mark>услу</mark>ги</span>
+<span class="tn-amount" style="color:var(--success-text);">+3 240 000 ₽</span>
+<span class="tn-check"><svg fill="none" height="10" stroke="currentColor" stroke-width="3" viewbox="0 0 24 24" width="10"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+</button>
+<button class="tree-node">
+<span class="chev-spacer"></span>
+<span class="tn-dot" style="background:var(--cat-revenue);"></span>
+<span class="tn-name">Оплата за товары</span>
+<span class="tn-amount" style="color:var(--success-text);">+1 580 450 ₽</span>
+<span class="tn-check"></span>
+</button>
+</div>
+<button class="tree-node is-collapsed is-disabled">
+<span class="chev"><svg fill="none" height="10" stroke="currentColor" stroke-width="2.4" viewbox="0 0 24 24" width="10"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
+<span class="tn-name">От партнёров</span>
+<span class="tn-amount" style="color:var(--success-text);">+849 550 ₽</span>
+</button>
+</div>
+<button class="tree-node is-collapsed is-disabled">
+<span class="chev"><svg fill="none" height="10" stroke="currentColor" stroke-width="2.4" viewbox="0 0 24 24" width="10"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
+<span class="tn-name">Расходы</span>
+<span class="tn-amount" style="color:var(--danger-text);">−2 968 720 ₽</span>
+</button>
+</div>
+<div class="picker-breadcrumb">
+<span>Выбрано:</span>
+<b>Доходы</b><span class="sep">›</span>
+<b>От клиентов</b><span class="sep">›</span>
+<b style="color:var(--color-primary-hover);">Оплата за услуги</b>
+</div>
+</div>
+<div class="mdl-foot">
+<button class="btn btn-md btn-secondary">Отмена</button>
+<button class="btn btn-md btn-primary">Выбрать</button>
+</div>
+</div>
+</div>
+<div class="cb-note" style="margin-top:var(--s-3);"><b>Статья ОПиУ</b> — та же разметка без колонки агрегатов; глубина до 4 уровней, выбрать можно только конечный узел.</div>
+</div>
+</main>
+</body>
+</html>

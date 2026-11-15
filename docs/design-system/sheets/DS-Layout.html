@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DS-Layout · ДС «Ваш Финдир» v3.4</title>
+<!--
+  Лист дизайн-системы «Ваш Финдир» v3.4 — Каркас и навигация.
+  Источник: UI Kit v3.4 (канвас Claude Design, страница ui-kit-v3.0), сгенерировано 15.11.2026.
+  Обычный HTML: открывается в браузере. Значения — из ds-kit.css (токены в :root) и разметки.
+  Не править вручную: изменения вносятся в UI Kit и перегенерируются.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="ds-kit.css">
+</head>
+<body>
+<main class="main">
+<h1 class="page-h1">DS-Layout</h1>
+<p class="page-sub">AppHeader (+ breadcrumbs), Sidebar, Dropdown menu, App Shell, Page scaffold. Реализация на Tailwind — ../screens/App-Layout.html.</p>
+<div class="page-meta">ДС «Ваш Финдир» v3.4 · 15.11.2026 · все листы: <a href="README.md">README</a></div>
+<h3 class="sub-h cat-h">Навигация</h3>
+<div class="cb" id="app-header">
+<div class="cb-head">
+<span class="cb-name">AppHeader</span>
+<span class="cb-tag">.app-header</span>
+<span class="cb-when">Глобальная шапка приложения на каждой странице. Высота 60px (--app-header-height). Слева — лого в колонке ширины сайдбара (264px); справа — breadcrumbs и слот действий. Сайдбар начинается ниже шапки, sticky от top:60px.</span>
+</div>
+<span class="demo-label">Default — breadcrumbs + period + bell</span>
+<div class="demo" style="padding:0; display:block; background:var(--bg-page);">
+<header class="app-header">
+<div class="app-header-brand">
+<div style="display:flex; align-items:center; gap:var(--s-2);">
+<div class="nav-logo" style="width:30px; height:30px;">ВФ</div>
+<span style="font-weight:var(--fw-extrabold); font-size:var(--fs-lg); letter-spacing:-0.01em;">Ваш Финдир</span>
+</div>
+</div>
+<div class="app-header-body">
+<nav class="crumbs">
+<a href="#">Главная</a>
+<span class="crumb-sep"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+<a href="#">Аналитика</a>
+<span class="crumb-sep"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+<span class="crumb-current">Юнит-экономика по листингам</span>
+</nav>
+<div class="u-flex-1"></div>
+<div class="app-header-actions">
+<button class="btn btn-md btn-secondary">
+<svg fill="none" height="13" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" viewbox="0 0 24 24" width="13"><rect height="18" rx="2" width="18" x="3" y="4"></rect><line x1="16" x2="16" y1="2" y2="6"></line><line x1="8" x2="8" y1="2" y2="6"></line><line x1="3" x2="21" y1="10" y2="10"></line></svg>
+                  01 — 27 июня 2026
+                </button>
+<button class="btn btn-md btn-secondary btn-icon" title="Уведомления">
+<svg fill="none" height="15" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" viewbox="0 0 24 24" width="15"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+<span class="dot"></span>
+</button>
+</div>
+</div>
+</header>
+</div>
+<span class="demo-label">Admin section — без селектора периода</span>
+<div class="demo" style="padding:0; display:block; background:var(--bg-page);">
+<header class="app-header">
+<div class="app-header-brand">
+<div style="display:flex; align-items:center; gap:var(--s-2);">
+<div class="nav-logo" style="width:30px; height:30px;">ВФ</div>
+<span style="font-weight:var(--fw-extrabold); font-size:var(--fs-lg); letter-spacing:-0.01em;">Ваш Финдир</span>
+</div>
+</div>
+<div class="app-header-body">
+<nav class="crumbs">
+<a href="#">Главная</a>
+<span class="crumb-sep"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+<a href="#">Система</a>
+<span class="crumb-sep"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+<span class="crumb-current">Пользователи и компании</span>
+</nav>
+<div class="u-flex-1"></div>
+<div class="app-header-actions">
+<button class="btn btn-md btn-secondary btn-icon" title="Уведомления">
+<svg fill="none" height="15" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" viewbox="0 0 24 24" width="15"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+<span class="dot"></span>
+</button>
+</div>
+</div>
+</header>
+</div>
+<span class="demo-label" id="crumbs">Breadcrumbs · .crumbs — только внутри AppHeader; последний элемент — текущая страница без ссылки (.crumb-current)</span>
+
+<div class="demo">
+<nav class="crumbs">
+<a href="#">Главная</a>
+<span class="crumb-sep"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+<a href="#">Деньги</a>
+<span class="crumb-sep"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+<span class="crumb-current">ДДС — операции</span>
+</nav>
+</div>
+
+</div><div class="cb" id="sidebar">
+<div class="cb-head">
+<span class="cb-name">Sidebar / Main Navigation</span>
+<span class="cb-tag">.sb · 264px</span>
+<span class="cb-when">Основная навигация продукта. Лого + workspace + группы пунктов + футер с юзером.</span>
+</div>
+<div class="demo" style="background:var(--bg-page); align-items:flex-start;">
+<div class="sb" style="min-height:680px;">
+<div class="sb-head">
+<div class="sb-logo">
+<div class="mark">ВФ</div>
+<div class="title">Ваш Финдир</div>
+</div>
+<button class="sb-ws">
+<span class="avatar avatar--sm avatar--square avatar--tint-1" style="width:28px; height:28px; font-size:var(--fs-2xs);">РБ</span>
+<div class="u-flex-1">
+<div class="ws-name">ООО «Ромашка-Бэст»</div>
+<div class="ws-meta">ИНН 7723812931</div>
+</div>
+<svg class="ws-chev" fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14"><polyline points="8 9 12 5 16 9"></polyline><polyline points="8 15 12 19 16 15"></polyline></svg>
+</button>
+</div>
+<div class="sb-nav">
+<div class="sb-group-title">Главное</div>
+<a class="sb-item" href="#sidebar">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><path d="M3 12L12 4l9 8"></path><path d="M5 10v10h14V10"></path></svg>
+<span class="lbl">Дашборд</span>
+</a>
+<a class="sb-item is-active" href="#sidebar">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><rect height="13" rx="2" width="18" x="3" y="6"></rect><path d="M3 10h18"></path><circle cx="16" cy="14.5" fill="currentColor" r="1.2"></circle></svg>
+<span class="lbl">Движение ДС</span>
+<span class="badge">248</span>
+</a>
+<a class="sb-item" href="#sidebar">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3"></path></svg>
+<span class="lbl">Воркеры</span>
+<span class="badge badge--danger">3</span>
+</a>
+<a class="sb-item" href="#sidebar">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><path d="M12 8v4l3 2"></path><circle cx="12" cy="12" r="9"></circle></svg>
+<span class="lbl">Закрытие месяца</span>
+<span class="badge badge--warning">12</span>
+</a>
+<a class="sb-item" href="#sidebar">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><path d="M3 3v18h18"></path><path d="M7 14l4-4 3 3 5-6"></path></svg>
+<span class="lbl">ОПиУ</span>
+</a>
+<a class="sb-item" href="#sidebar">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><rect height="12" rx="2" width="20" x="2" y="6"></rect><line x1="2" x2="22" y1="10" y2="10"></line></svg>
+<span class="lbl">Счета и касса</span>
+</a>
+<a class="sb-item" href="#sidebar">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><circle cx="9" cy="7" r="4"></circle><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path></svg>
+<span class="lbl">Контрагенты</span>
+<span class="badge">42</span>
+</a>
+<div class="sb-group-title">Настройки учета</div>
+<button class="sb-item" type="button">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><path d="M3 3h18v18H3z"></path><path d="M9 3v18M3 9h18"></path></svg>
+<span class="lbl">Категории ДДС</span>
+<svg class="chev" fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14"><polyline points="6 9 12 15 18 9"></polyline></svg>
+</button>
+<div class="sb-sub">
+<a class="sb-item" href="#sidebar"><span class="ico-dot"></span><span class="lbl">Доходы</span></a>
+<a class="sb-item is-active" href="#sidebar"><span class="ico-dot"></span><span class="lbl">Расходы</span></a>
+<a class="sb-item" href="#sidebar"><span class="ico-dot"></span><span class="lbl">Технические</span></a>
+</div>
+<a class="sb-item" href="#sidebar">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><path d="M3 7h6l2 3h10v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7z"></path></svg>
+<span class="lbl">Проекты</span>
+<span class="badge">7</span>
+</a>
+<a class="sb-item" href="#sidebar">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5"></path></svg>
+<span class="lbl">Авто-правила</span>
+<span class="badge">8</span>
+</a>
+<a class="sb-item" href="#sidebar">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+<span class="lbl">Импорт</span>
+</a>
+<div class="sb-group-title">Система</div>
+<a class="sb-item" href="#sidebar">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1"></path></svg>
+<span class="lbl">Настройки</span>
+</a>
+</div>
+<div class="sb-foot">
+<span class="avatar avatar--md avatar--tint-2">АК</span>
+<div class="u-flex-1">
+<div class="me-name">Анна Кузнецова</div>
+<div class="me-role">Главный бухгалтер</div>
+</div>
+<button class="settings" title="Настройки профиля">
+<svg fill="none" height="14" stroke="currentColor" stroke-width="1.9" viewbox="0 0 24 24" width="14"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5"></path></svg>
+</button>
+</div>
+</div>
+<div style="flex:1; padding:var(--s-5); font-size:var(--fs-sm); color:var(--text-tertiary); line-height:1.7; min-width:280px;">
+<h4 class="mini-h" style="margin-top:0;">Состояния пункта</h4>
+            · <b>default</b> — серый текст + приглушённая иконка<br/>
+            · <b>hover</b> — фон <code class="code-inline">--bg-page</code>, текст тёмнее<br/>
+            · <b>active</b> — фон <code class="code-inline">--color-primary-tint</code>, текст <code class="code-inline">--color-primary-hover</code>, иконка <code class="code-inline">--color-primary</code>, weight 700<br/>
+            · <b>counter-badge</b> — выравнивание по правой стороне, tabular-nums<br/>
+            · <b>collapsible group</b> — chev поворачивается на −90° при состоянии collapsed
+          </div>
+</div>
+</div><div class="cb" id="menu">
+<div class="cb-head">
+<span class="cb-name">Dropdown menu</span>
+<span class="cb-tag">.menu</span>
+<span class="cb-when">Меню действий на строке таблицы или у виджета. Разделители — для смены смысловой группы. В строке таблицы открывается по кнопке «⋯» в последней колонке и выравнивается по её правому краю.</span>
+</div>
+<div class="demo" style="background:transparent">
+<div class="menu">
+<button class="menu-item">
+<svg fill="none" stroke="currentColor" stroke-width="1.9" viewbox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              Редактировать <span class="shortcut">⌘E</span>
+</button>
+<button class="menu-item">
+<svg fill="none" stroke="currentColor" stroke-width="1.9" viewbox="0 0 24 24"><rect height="13" rx="2" width="13" x="9" y="9"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              Создать на основании
+            </button>
+<div class="menu-divider"></div>
+<button class="menu-item is-primary">
+<svg fill="none" stroke="currentColor" stroke-width="1.9" viewbox="0 0 24 24"><path d="M3 3v18h18"></path><path d="M7 14l4-4 3 3 5-6"></path></svg>
+              Создать ОПиУ
+            </button>
+<div class="menu-divider"></div>
+<button class="menu-item is-danger">
+<svg fill="none" stroke="currentColor" stroke-width="1.9" viewbox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"></path></svg>
+              Удалить
+            </button>
+</div>
+</div>
+</div><h3 class="sub-h cat-h">Каркас страницы</h3>
+<h3 class="sub-h" id="app-shell">App Shell</h3>
+<div class="section-sub">Каркас всех страниц приложения: header сверху, sidebar 264px слева, рабочая зона справа. Внутрь <code class="code-inline">.app-workzone</code> вкладывается контент страницы. Компонует существующие <code class="code-inline">.app-header</code> + <code class="code-inline">.sb</code>, ничего в них не меняя.</div>
+<div class="cb" id="app-shell-cb">
+<div class="cb-head">
+<span class="cb-name">AppShell</span>
+<span class="cb-tag">.app · .app-body · .app-sidebar · .app-workzone</span>
+<span class="cb-when">Внешняя обёртка страницы. .app (колонка) → .app-header + .app-body(.app-sidebar + .app-workzone). Sidebar sticky от top:60px, workzone — flex:1, padding s-6 / s-7.</span>
+</div>
+<div class="demo" style="padding:0; display:block; background:var(--bg-page);">
+<!-- Уменьшенное превью каркаса: min-height задан inline, чтобы не растягиваться на 100vh внутри storybook -->
+<div class="app" style="min-height:0; height:420px; overflow:hidden;">
+<header class="app-header">
+<div class="app-header-brand">
+<div style="display:flex; align-items:center; gap:var(--s-2);">
+<div class="nav-logo" style="width:30px; height:30px;">ВФ</div>
+<span style="font-weight:var(--fw-extrabold); font-size:var(--fs-lg); letter-spacing:-0.01em;">Ваш Финдир</span>
+</div>
+</div>
+<div class="app-header-body">
+<nav class="crumbs">
+<a href="#app-shell">Главная</a>
+<span class="crumb-sep"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+<span class="crumb-current">Дашборд</span>
+</nav>
+<div class="u-flex-1"></div>
+<div class="app-header-actions">
+<button class="btn btn-md btn-secondary btn-icon" title="Уведомления">
+<svg fill="none" height="15" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" viewbox="0 0 24 24" width="15"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+<span class="dot"></span>
+</button>
+</div>
+</div>
+</header>
+<div class="app-body">
+<aside class="app-sidebar">
+<div class="sb">
+<div class="sb-nav">
+<div class="sb-group-title">Главное</div>
+<a class="sb-item is-active" href="#app-shell">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><path d="M3 12L12 4l9 8"></path><path d="M5 10v10h14V10"></path></svg>
+<span class="lbl">Дашборд</span>
+</a>
+<a class="sb-item" href="#app-shell">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><rect height="13" rx="2" width="18" x="3" y="6"></rect><path d="M3 10h18"></path></svg>
+<span class="lbl">Движение ДС</span>
+<span class="badge">248</span>
+</a>
+<a class="sb-item" href="#app-shell">
+<svg class="ico" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24"><path d="M3 3v18h18"></path><path d="M7 14l4-4 3 3 5-6"></path></svg>
+<span class="lbl">ОПиУ</span>
+</a>
+</div>
+<div class="sb-foot">
+<span class="avatar avatar--md avatar--tint-2">АК</span>
+<div class="u-flex-1">
+<div class="me-name">Анна Кузнецова</div>
+<div class="me-role">Главный бухгалтер</div>
+</div>
+<button class="settings" title="Выйти" type="button">
+<svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" x2="9" y1="12" y2="12"></line></svg>
+</button>
+</div>
+</div>
+</aside>
+<main class="app-workzone">
+<div style="border:1px dashed var(--border-hover); border-radius:var(--r-lg); height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:var(--fs-md); font-family:var(--font-mono);">
+                  .app-workzone — контент страницы
+                </div>
+</main>
+</div>
+</div>
+</div>
+</div><h3 class="sub-h" id="page-scaffold">Page scaffold</h3>
+<div class="section-sub">Вертикальный ритм контента внутри <code class="code-inline">.app-workzone</code>: заголовок страницы → ряд KPI → ряды секций. Семейство <code class="code-inline">wz-*</code> (Decision 26). Заголовок 28px/700, отбивка s-5. Gap в ряду s-4, между рядами s-5. Карточки в ряду равные, переносятся на узком экране.</div>
+<div class="cb" id="page-layout-cb">
+<div class="cb-head">
+<span class="cb-name">Page scaffold</span>
+<span class="cb-tag">.wz-head · .wz-title · .wz-row</span>
+<span class="cb-when">Раскладка страницы: .wz-head (заголовок + слот действий) → .wz-row (ряд KPI) → .wz-row (две карточки-секции) → карточка с таблицей. Ряды переносятся при &lt; ~200px на карточку.</span>
+</div>
+<div class="demo" style="padding:var(--s-6); display:block; background:var(--bg-page);">
+<div class="wz-head">
+<h1 class="wz-title">Пользователи<span class="wz-sub">Управление доступом к рабочему пространству</span></h1>
+<div class="wz-head-actions">
+<button class="btn btn-md btn-primary">+ Добавить</button>
+</div>
+</div>
+<div class="wz-row">
+<div class="kpi"><div class="kpi-label">Всего пользователей</div><div class="kpi-value">18</div></div>
+<div class="kpi"><div class="kpi-label">Активных</div><div class="kpi-value">15</div></div>
+<div class="kpi"><div class="kpi-label">Приглашения</div><div class="kpi-value">2</div></div>
+<div class="kpi"><div class="kpi-label">Аутсорсеры</div><div class="kpi-value">3</div></div>
+</div>
+<div class="wz-row">
+<div class="card"><div class="card-head">Роли и права</div><div style="font-size:var(--fs-md); color:var(--text-secondary);">Секция-карточка слева. Ряд из двух равных колонок, переносится на узком экране.</div></div>
+<div class="card"><div class="card-head">Последняя активность</div><div style="font-size:var(--fs-md); color:var(--text-secondary);">Секция-карточка справа.</div></div>
+</div>
+<div class="wz-row">
+<div class="card card--flush" style="width:100%">
+<div class="card-head">Список пользователей <span class="card-head-aside">18 записей</span></div>
+<table class="t-table">
+<thead><tr><th>Имя</th><th>Роль</th><th class="t-cell--right">Статус</th></tr></thead>
+<tbody>
+<tr><td>Анна Кузнецова</td><td>Владелец</td><td class="t-cell--right"><span class="status status--success"><span class="dot"></span>Активен</span></td></tr>
+<tr><td>Пётр Лунёв</td><td>Администратор</td><td class="t-cell--right"><span class="status status--success"><span class="dot"></span>Активен</span></td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body>
+</html>
