@@ -10,6 +10,8 @@ final readonly class SkuEconomicsFilter
 {
     public const MAX_DAYS = 366;
     public const SORTS = ['revenue', 'gross', 'md1', 'md2', 'full', 'ads', 'sales'];
+    /** Каналы канона (`MarketplaceType::value`) и их подписи в отчётах. */
+    public const CHANNELS = ['ozon' => 'Ozon', 'wildberries' => 'WB'];
 
     /**
      * @param list<string> $tagIds
@@ -22,7 +24,11 @@ final readonly class SkuEconomicsFilter
         public string $search = '',
         public string $sort = 'md2',
         public bool $desc = true,
+        public ?string $channel = null,
     ) {
+        if (null !== $channel && !isset(self::CHANNELS[$channel])) {
+            throw new InvalidEconomicsPeriodException('Неизвестный канал.');
+        }
         if ($from > $to) {
             throw new InvalidEconomicsPeriodException('Начало периода позже конца.');
         }

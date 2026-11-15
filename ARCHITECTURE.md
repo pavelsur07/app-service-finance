@@ -683,6 +683,8 @@
   день, канон ≠ перевод за 45 дней, кабинет старше D−2), по всем кабинетам.
 - Решение — `/admin/marketplace/wb-source-types` (`ROLE_ADMIN`), `ConfirmWbSourceTypeAction` — один `UPDATE`
   только для кода без решения. Черновика ИИ пока нет (8.3b).
+- `MarketplaceWbFacadeInterface::dayStates(companyId, from, to): list<WbDayState>` — переведённые дни
+  (ревизия фактов отчёта, актуальность правил, `total` / `canon` / `quarantine`) для экрана R10. Только чтение.
 
 ### MarketplaceEconomics: витрина экономики SKU
 
@@ -716,7 +718,8 @@
   день не пересчитан дольше 60 мин — `error`, exit 1.
 - Отчёт R1 «Экономика SKU» — `GET /marketplace/economics` (`SkuEconomicsController`, новый слой
   `_layout/app.html.twig`, серверный Twig; `?format=xlsx` — та же выборка файлом; доступ
-  `MARKETPLACE_READ`): период ≤ 366 дней (иначе 422), кабинет, теги, поиск, сортировка, «с разнесением /
+  `MARKETPLACE_READ`): период ≤ 366 дней (иначе 422), канал (`?channel=ozon|wildberries`, фильтр виден при двух
+  каналах, метка канала у SKU и колонка «Канал» в xlsx), кабинет, теги, поиск, сортировка, «с разнесением /
   без», Pagerfanta ≤ 200. `SkuEconomicsReportBuilder` — свод `me_day_line` за период и прошлый период той же
   длины (`SkuEconomicsQuery`), уровни — `SkuMetrics`. Без фильтра итог = кабинет (SKU + нераспределённое);
   с тегами или поиском — Σ строк. Нет витрины — пустое состояние со ссылкой на легаси-экран.
@@ -730,7 +733,8 @@
   витрины дня (без себестоимости и справочных), нераспределённое и затраты для экрана R10. Только чтение.
 - Отчёт R3 «Неделя» — `app:marketplace-economics:weekly-report` (cron `0 9 * * 1` МСК; `--week`, `--company`,
   `--dry-run`): за прошлую неделю R1 (`SkuEconomicsReportBuilder`, с разнесением) → сводка
-  `WeeklyEconomicsSummary` (итог против прошлой недели, топ-5 роста и падения СМ2, SKU в минусе, ДРР > 20 %)
+  `WeeklyEconomicsSummary` (итог против прошлой недели, топ-5 роста и падения СМ2 — SKU с меткой канала, SKU в
+  минусе, ДРР > 20 %, при двух каналах — выручка и СМ2 каждого = R1 с фильтром канала)
   и xlsx R1 владельцу компании на почту (`NotificationRouter`, синхронно) и привязанным пользователям в
   Telegram (`TelegramFacadeInterface::sendDocumentToCompany`). Включение — `ECONOMICS_WEEKLY_REPORT_COMPANIES`
   (UUID через запятую, `*` — все, пусто — выключено). Журнал `me_weekly_report` (ключ
@@ -742,14 +746,15 @@
 Пятый модуль нового контура (`docs/tasks/marketplace-profit-pipeline/stages/stage-7.md` §7.3).
 
 **Устав.** Причина изменений — сводка качества данных по звеньям «факты → перевод → канон → витрина».
-Таблиц и записи нет. Зависимости — только фасады и DTO контрактов `SourceFacts`, `MarketplaceOzon`,
+Таблиц и записи нет. Зависимости — только фасады и DTO контрактов `SourceFacts`, `MarketplaceOzon`, `MarketplaceWb`,
 `MarketplaceOperations`, `MarketplaceEconomics` (PHPat `test_marketplace_quality_reads_facades_only`).
 
 - `GET /marketplace/economics/quality` (`DataQualityController`, вкладка рядом с R1/R2, активная компания,
   `ROLE_COMPANY_USER`, модуль `MARKETPLACE`): окно 45 дней до вчера. `DataQualityReportBuilder` — по кабинету
   последние дни фактов / перевода / витрины, дней не переведено, Σ фактов (по переводчику: `SourceFacts`
   payload не читает), карантина, канона, витрины и доля нераспределённого; список дней с расхождением по
-  звеньям (не переведён, карантин, перевод ≠ канон, канон ≠ витрина). Гейты — в модулях звеньев.
+  звеньям (не переведён, карантин, перевод ≠ канон, канон ≠ витрина). Каналы Ozon и WB — каждый со своим
+  переводчиком, ресурсом фактов (WB — отчёт о продажах) и каноном канала. Гейты — в модулях звеньев.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -5790,6 +5795,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.196 | 2026-11-15 | Отчёты нового контура по двум каналам (этап 8.5): фильтр канала в R1/R2, метка канала у SKU и в xlsx, строки каналов в R3; R10 сверяет WB со своим каналом — фасад `MarketplaceWbFacadeInterface::dayStates` |
 | 2.195 | 2026-11-15 | MoySklad: отдельные legacy-вкладки Ozon/Wildberries, выбор подключения, локальный поиск, ручное назначение/снятие связи и история; READ/WRITE, CSRF, CAS и bounded-пагинация |
 | 2.194 | 2026-11-15 | MoySklad: CAS/idempotent Action назначения и снятия связи, блокировки против гонок/импорта вариантов, bounded current/history и локальные подсказки |
 | 2.193 | 2026-11-15 | MoySklad: tenant-scoped ревизии связей листингов с product/variant, set/clear, requestId и snapshots; Catalog/Finance не меняются |

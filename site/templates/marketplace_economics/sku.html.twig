@@ -64,6 +64,17 @@
                 <label class="form-label" for="me-to">По дату</label>
                 <input class="form-control" id="me-to" type="date" name="to" required value="{{ to }}">
             </div>
+            {% if report and report.channels|length > 1 %}
+                <div class="col-12 col-sm-6 col-lg-auto">
+                    <label class="form-label" for="me-channel">Канал</label>
+                    <select class="form-select" id="me-channel" name="channel">
+                        <option value="">Все каналы</option>
+                        {% for value in report.channels %}
+                            <option value="{{ value }}" {{ value == channel ? 'selected' }}>{{ constant('App\\MarketplaceEconomics\\Application\\DTO\\SkuEconomicsFilter::CHANNELS')[value] ?? value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
             {% if report and report.connections|length > 1 %}
                 <div class="col-12 col-sm-6 col-lg-auto">
                     <label class="form-label" for="me-connection">Кабинет</label>
@@ -152,6 +163,7 @@
                         {% set m = row.current %}
                         <tr>
                             <td>
+                                {% if report.channels|length > 1 and row.channel %}<span class="badge bg-secondary-lt" data-channel="{{ row.channel }}">{{ constant('App\\MarketplaceEconomics\\Application\\DTO\\SkuEconomicsFilter::CHANNELS')[row.channel] ?? row.channel }}</span>{% endif %}
                                 {{ row.sku }}
                                 <p class="text-secondary small mb-0">{{ row.title ?? row.supplierSku ?? '' }}</p>
                             </td>

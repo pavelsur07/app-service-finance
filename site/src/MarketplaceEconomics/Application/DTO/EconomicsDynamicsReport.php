@@ -13,6 +13,7 @@ final readonly class EconomicsDynamicsReport
     /**
      * @param list<array{from: \DateTimeImmutable, to: \DateTimeImmutable, metrics: SkuMetrics}> $steps все шаги периода по порядку, без данных — нули; края обрезаны периодом
      * @param list<string> $connections кабинеты с витриной
+     * @param list<string> $channels каналы с витриной
      */
     public function __construct(
         public \DateTimeImmutable $from,
@@ -22,6 +23,7 @@ final readonly class EconomicsDynamicsReport
         /** Σ шагов: без фильтра — кабинет (с нераспределённым), с фильтром — выбранные SKU. */
         public SkuMetrics $total,
         public array $connections,
+        public array $channels = [],
     ) {
     }
 

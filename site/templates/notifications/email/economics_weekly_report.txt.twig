@@ -1,21 +1,23 @@
 {%- set rub = 'RUB' -%}
-{%- macro sku(item) %}{{ item.sku }}{% if item.title %} {{ item.title|slice(0, 40) }}{% endif %}{% endmacro -%}
+{%- set channels = constant('App\\MarketplaceEconomics\\Application\\DTO\\SkuEconomicsFilter::CHANNELS') -%}
+{%- macro sku(item, channels) %}{% if item.channel %}{{ channels[item.channel] ?? item.channel }} {% endif %}{{ item.sku }}{% if item.title %} {{ item.title|slice(0, 40) }}{% endif %}{% endmacro -%}
 {%- set s = summary -%}
 Неделя {{ s.report.from|date('d.m') }}–{{ s.report.to|date('d.m.Y') }}, маркетплейсы
 Выручка: {{ s.total.revenue|vf_minor|vf_money(0, rub) }} (было {{ s.previousTotal.revenue|vf_minor|vf_money(0, rub) }})
 СМ2: {{ s.total.md2|vf_minor|vf_money(0, rub) }} ({{ s.md2Delta >= 0 ? '+' : '' }}{{ s.md2Delta|vf_minor|vf_money(0, rub) }} к прошлой неделе)
 СМ3: {{ s.total.full|vf_minor|vf_money(0, rub) }}
 ДРР: {{ s.total.drr ?? '—' }} %
-{% if s.growth %}
+{% for channel, m in s.byChannel %}{{ channels[channel] ?? channel }}: выручка {{ m.revenue|vf_minor|vf_money(0, rub) }}, СМ2 {{ m.md2|vf_minor|vf_money(0, rub) }}
+{% endfor %}{% if s.growth %}
 Рост СМ2:
-{% for item in s.growth %}+{{ item.delta|vf_minor|vf_money(0, rub) }} · {{ _self.sku(item) }}
+{% for item in s.growth %}+{{ item.delta|vf_minor|vf_money(0, rub) }} · {{ _self.sku(item, channels) }}
 {% endfor %}{% endif %}
 {% if s.fall %}
 Падение СМ2:
-{% for item in s.fall %}{{ item.delta|vf_minor|vf_money(0, rub) }} · {{ _self.sku(item) }}
+{% for item in s.fall %}{{ item.delta|vf_minor|vf_money(0, rub) }} · {{ _self.sku(item, channels) }}
 {% endfor %}{% endif %}
 {% if s.losses %}
-В минусе по СМ2: {{ s.losses }} SKU, худший — {{ _self.sku(s.worst[0]) }} ({{ s.worst[0].value|vf_minor|vf_money(0, rub) }})
+В минусе по СМ2: {{ s.losses }} SKU, худший — {{ _self.sku(s.worst[0], channels) }} ({{ s.worst[0].value|vf_minor|vf_money(0, rub) }})
 {% endif %}
 {% if s.highDrr %}
 ДРР выше {{ constant('App\\MarketplaceEconomics\\Application\\DTO\\WeeklyEconomicsSummary::HIGH_DRR') }} %: {{ s.highDrr }} SKU
