@@ -371,7 +371,7 @@ MoySkladSchemaExtension, `ARCHITECTURE.md` только при появлени�
 ## Stage 3: назначение, снятие, конкуренция, read model
 
 **Risk:** HIGH-LOCAL — tenant validation и конкуренция.
-**stage_base_commit:** записать перед 3.1.
+**stage_base_commit:** `fb218990a`.
 **Definition of Done:** Action реализует раздел 1.3; чтение и подсказки bounded,
 каталог не изменяется, архивирование не стирает ревизии.
 

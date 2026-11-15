@@ -5790,6 +5790,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.194 | 2026-11-15 | MoySklad: CAS/idempotent Action назначения и снятия связи, блокировки против гонок/импорта вариантов, bounded current/history и локальные подсказки |
 | 2.193 | 2026-11-15 | MoySklad: tenant-scoped ревизии связей листингов с product/variant, set/clear, requestId и snapshots; Catalog/Finance не меняются |
 | 2.192 | 2026-11-15 | Marketplace: постраничный DTO-контракт внешнего маппинга; ListingMetaDTO содержит isActive/marketplaceVariantId с общей нормализацией size через ListingMetaQuery |
 | 2.191 | 2026-11-15 | MarketplaceWb: переключатель `MARKETPLACE_WB_COMPANIES` снят — переводчик и гейт работают по всем кабинетам WB (решение Владельца 15.11) |
@@ -6111,6 +6112,26 @@ tenant и форму записи. Ревизия хранит expectedRevision,
 без flush; текущая связь — последняя revision, не изменяемая строка.
 Миграция Version20261115153000 создаёт пустую таблицу; down отказывает,
 если история не пуста.
+
+`ChangeListingMappingAction(ChangeListingMappingCommand): ListingMappingState`
+владеет wrapInTransaction и append ревизии. UUID/CAS/requestId проверяются до
+записи, accepted request возвращает прежнюю ревизию. Порядок блокировок:
+connection FOR SHARE → advisory xact mapping key → product FOR UPDATE либо
+variant parent FOR SHARE → variant FOR SHARE. Сильный lock product исключает
+одновременный INSERT дочерней модификации до commit. No-op не пишет ревизию;
+stale CAS и reuse requestId с другим payload дают доменный конфликт.
+Новая цель требует активного привязанного подключения и completed курсоров
+product/variant; временный HTTP-check failure не отменяет локальный каталог.
+CLEAR доступен при выключенном подключении и отсутствующем исходном листинге,
+но только по своей существующей истории.
+
+`MoySkladCatalogTargetsQuery` читает локальные product/variant и родителей:
+поиск/подсказки 20 строк, точный trim(article) без смены регистра и ведущих нулей,
+никакого автоматического назначения. `findMany` использует UUID IN по типам,
+а не поиск по строковой конкатенации UUID. `MoySkladListingMappingsQuery`
+возвращает current batch до 100 IDs и history по 20; metadata листингов читает
+через MarketplaceFacade. Архив/появление вариантов/потеря листинга меняют
+вычисленный статус на needs_review, а не историю или Catalog mapping.
 
 Legacy Twig/Tabler UI: `/moy-sklad/connections`, права `MARKETPLACE_READ/WRITE`.
 `MoySkladConnection` сохраняет неизменяемый `companyId`, nullable глобально уникальный

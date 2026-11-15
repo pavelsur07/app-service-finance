@@ -1,11 +1,12 @@
 # Current checkpoint
 
-**Phase:** Stage 2 / Work item 2.1
-**Status:** reviewing
+**Phase:** Stage 3 / Work items 3.1–3.2
+**Status:** implementing
 **Task base / Stage 1 base:** `e0b5ac0d276ccb58d38c069722a2fad90358edda`
 **Branch:** `feat/moysklad-listing-mapping`
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/3016 (Draft, base master)
 **Stage 2 base:** `bd3b59bf4`
+**Stage 3 base:** `fb218990a`
 **Workspace:** `/home/deploy/.codex/worktrees/0d8f/app-service-finance`
 
 ## Completed
@@ -39,10 +40,29 @@
 - Implementation external: pending.
 - Stage 2 external Claude CLI: 1 round, REVIEW_GREEN; B/I 0/0,
   3 MINOR fixed and verified (see stages/stage-2.md).
+- Stage 3 RED: 13 Action/catalog cases and 3 read-model cases on absent services.
+- Stage 3 GREEN module: 302 tests / 1160 assertions; actual PostgreSQL
+  concurrency cases 4 tests / 30 assertions (two processes, observed lock waits).
+- Stage 3 first PHPStan: 17 typing issues; fixed nullable legacy Company ID
+  calls/test fixture and proven non-null current revision. Last focused run PASS.
+- Test-only public roots added in services_test.yaml so pre-UI services remain
+  reachable in integration/child-process tests; production service visibility unchanged.
+- Stage 3 external: Claude 1 round, B/I 0/1, 4 MINOR. Confirmed test coverage
+  IMPORTANT fixed with foreign company/listing/connection/product/variant,
+  same external UUID under two connections, missing-source set/clear, 100-ID
+  boundary, backslash/out-of-range and concurrent parent archive cases.
+- MINOR fixes: expected domain errors returned from transaction and thrown
+  outside (EM remains open), canonical batch keys, validated history IDs.
+  Three regression cases proven RED then GREEN (26 tests/81 assertions).
+- Archive race check PASS (real worker waits on parent's FOR SHARE); first
+  version of this new test used unavailable Product::getId, corrected to
+  tenant/external UUID lookup. Focused PHPStan PASS.
 - Plan review is historical, not evidence of implementation correctness.
 
 ## Exact next action
-- Commit/push Stage 2, then Stage 3 tests first. All Stage 2 gates passed.
+- Stage 2 committed/pushed fb218990a.
+- Stage 3 final module PASS: 316 tests / 1209 assertions.
+- Commit/push Stage 3 and continue Stage 4 tests first; Stage Report ready.
 
 ## Resume files
 - TASK.md, plan.md, this checkpoint; .superpowers/sdd/plan/progress.md.
