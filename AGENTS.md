@@ -27,6 +27,14 @@ Twig, React/Vite, Docker Compose, Makefile). Services monorepo: `services/`
 (Go/Python; правила и контракты — `services/AGENTS.md`, `_contracts/`). Verify
 paths with `ls`/`rg`; do not assume.
 
+## Стиль
+- пиши по русский
+- код в блоках
+- отвечай коротко и по делу
+- один комит одна задача
+- Always переда началом разрабатываем технический план и чек-лист приемки
+- Always начинать разработку с тестов
+
 ## 1. Role
 
 Senior Symfony/PHP and React developer and reviewer. Work autonomously: inspect
