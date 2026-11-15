@@ -119,6 +119,18 @@ final readonly class CashFacade
         return $this->paymentIntake->recoverDraft($companyId, $actorUserId, $draftId);
     }
 
+    /** @return list<string> Technical IDs only; caller must keep recovery company-scoped. */
+    public function pendingPaymentIntakeEventCompanyIds(): array
+    {
+        return $this->paymentIntake->pendingEventCompanyIds();
+    }
+
+    /** Action commits event acknowledgement; does not request AI or create payments. */
+    public function recoverPaymentIntakeEvents(string $companyId): int
+    {
+        return $this->paymentIntake->recoverEvents($companyId);
+    }
+
     public function recoverPaymentIntake(string $companyId): int
     {
         return $this->paymentIntake->recover($companyId);
@@ -270,7 +282,7 @@ final readonly class CashFacade
      * транзакции вызывающего (`wrapInTransaction()`): коммитит он, вместе со своим курсором.
      *
      * @throws StatementImportOutsideTransactionException транзакция не открыта
-     * @throws StatementImportTargetNotFoundException счёт не принадлежит компании
+     * @throws StatementImportTargetNotFoundException     счёт не принадлежит компании
      */
     public function importBankStatementDay(
         string $companyId,

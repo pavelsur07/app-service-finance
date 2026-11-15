@@ -22,7 +22,7 @@ use Doctrine\ORM\EntityManagerInterface;
 /** Telegram identity/context adapter. Cash alone validates and writes payments. */
 final readonly class PaymentIntakeTelegramAction
 {
-    public function __construct(private EntityManagerInterface $em, private CashFacade $cash, private CompanyFacade $companies, private FinancialResponsibilityCenterFacade $centers, private AiTaskFacadeInterface $ai, private QueuePaymentIntakePollAction $polls, private PaymentIntakeAccess $access)
+    public function __construct(private EntityManagerInterface $em, private CashFacade $cash, private CompanyFacade $companies, private FinancialResponsibilityCenterFacade $centers, private AiTaskFacadeInterface $ai, private QueuePaymentIntakePollAction $polls)
     {
     }
 
@@ -64,7 +64,7 @@ final readonly class PaymentIntakeTelegramAction
             // Recover a Cash-committed source after a crash before Telegram session creation.
             foreach ($bindings as $candidate) {
                 $candidateActor = $candidate->getActorUserId();
-                if (!$this->access->isAllowed((string) $candidate->getCompany()->getId()) || null === $candidateActor) {
+                if (null === $candidateActor) {
                     continue;
                 }
                 try {
@@ -96,20 +96,13 @@ final readonly class PaymentIntakeTelegramAction
                 }
             }
         }
-        if (null !== $binding && !$this->access->isAllowed((string) $binding->getCompany()->getId())) {
-            if (!$session instanceof PaymentIntakeSession && !$binding->isPaymentIntakeSelected() && !$this->access->isPilotCompany((string) $binding->getCompany()->getId())) {
-                return null;
-            }
-
-            return ['text' => 'Новый разбор платежей пока не включён. Платежи не созданы.'];
-        }
         if (null === $binding) {
             foreach ($bindings as $candidate) {
                 $candidateCompanyId = (string) $candidate->getCompany()->getId();
-                if (($this->access->isPilotCompany($candidateCompanyId) || $candidate->isPaymentIntakeSelected()) && !$this->access->isAllowed($candidateCompanyId)) {
+                if ($candidate->isPaymentIntakeSelected() && !$this->ai->isEnabledForCompany($candidateCompanyId)) {
                     return ['text' => 'Новый разбор платежей пока не включён. Платежи не созданы.'];
                 }
-                if ($this->access->isAllowed($candidateCompanyId) && [] !== $this->ai->grantedCompanyIds([(string) $candidate->getCompany()->getId()])) {
+                if ([] !== $this->ai->grantedCompanyIds([(string) $candidate->getCompany()->getId()])) {
                     return ['text' => 'Выберите компанию и кассу: /set_cash'];
                 }
             }
@@ -117,7 +110,7 @@ final readonly class PaymentIntakeTelegramAction
             return null;
         }
         $companyId = (string) $binding->getCompany()->getId();
-        // A configured company cannot fall through when the service/global switch is down.
+        // A configured company cannot fall through when the service is unavailable.
         if (!$session instanceof PaymentIntakeSession && !$binding->isPaymentIntakeSelected() && [] === $this->ai->grantedCompanyIds([$companyId])) {
             return null;
         }
@@ -221,9 +214,6 @@ final readonly class PaymentIntakeTelegramAction
         }
         $binding = $session->getBinding();
         $companyId = $session->getCompanyId();
-        if (!$this->access->isAllowed($companyId)) {
-            return ['text' => 'Новый разбор платежей пока не включён. Платежи не изменены.'];
-        }
         $actor = $binding->getActorUserId();
         if ((string) ($callback['from']['id'] ?? '') !== $binding->getTelegramUser()->getTgUserId() || ClientBinding::STATUS_ACTIVE !== $binding->getStatus() || null === $actor || !$this->companies->financialAccess($companyId, $actor)['write']) {
             return ['text' => 'Черновик недоступен или право записи отозвано.'];

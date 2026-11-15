@@ -235,6 +235,31 @@ final readonly class PaymentIntakeAction
     }
 
     /** Re-dispatch durable pending intent with the same attempt key; never creates a draft. */
+    /** @return list<string> */
+    public function pendingEventCompanyIds(): array
+    {
+        return $this->drafts->getPendingCashEventCompanyIds();
+    }
+
+    /** Deliver already committed financial changes without requesting AI or changing payments. */
+    public function recoverEvents(string $companyId): int
+    {
+        $count = 0;
+        $afterId = null;
+        do {
+            $batch = $this->drafts->getPendingCashEvents($companyId, $afterId);
+            foreach ($batch as $draft) {
+                $afterId = $draft->getId();
+                $this->deliverCashEvent($draft);
+                if (!$draft->isCashEventPending()) {
+                    ++$count;
+                }
+            }
+        } while (100 === \count($batch));
+
+        return $count;
+    }
+
     public function recover(string $companyId): int
     {
         $count = 0;
@@ -408,7 +433,7 @@ final readonly class PaymentIntakeAction
     }
 
     /**
-     * @param array<string, mixed> $item
+     * @param array<string, mixed>  $item
      * @param array<string, string> $eligible
      */
     private function validateReferences(PaymentIntakeDraft $draft, array $item, MoneyAccount $account, array $eligible): void

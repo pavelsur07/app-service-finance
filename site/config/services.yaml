@@ -100,8 +100,6 @@ services:
             string $telegramWebhookUrl: '%telegram.webhook_url%'
             # Секрет вебхука Telegram: проверяем заголовок X-Telegram-Bot-Api-Secret-Token (пусто = проверка выключена)
             string $telegramWebhookSecret: '%telegram.webhook_secret%'
-            bool $telegramPaymentIntakeEnabled: '%env(bool:TELEGRAM_PAYMENT_INTAKE_ENABLED)%'
-            string $telegramPaymentIntakeCompanies: '%env(string:TELEGRAM_PAYMENT_INTAKE_COMPANIES)%'
             # Базовый URL Telegram Bot API (в проде — через шлюз tg-gateway)
             string $telegramApiBaseUrl: '%telegram.api_base_url%'
 

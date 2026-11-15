@@ -4263,6 +4263,13 @@ pagination и изоляцией ошибок. Не получивший рез�
 Legacy-путь ниже остаётся отдельным контрактом для прежнего сценария; outage
 нового сценария не должен молча переводить запрос в парсер первой цифры.
 
+Восстановление событий Confirm: `CashFacade::pendingPaymentIntakeEventCompanyIds()`
+возвращает только технические IDs компаний с `cash_event_pending`.
+`recoverPaymentIntakeEvents(companyId): int` доставляет существующие
+`CashTransactionsChanged` порциями по 100 без ИИ-доступа и новых платежей;
+подтверждение доставки коммитит `PaymentIntakeAction`. Telegram recovery включает
+эти компании даже без grant/сессии, чтобы сбой после Confirm не терял инвалидацию.
+
 ### Legacy: одна операция из сообщения
 
 Telegram создаёт ДДС-транзакции только через цепочку:
