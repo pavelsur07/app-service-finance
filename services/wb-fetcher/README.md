@@ -10,8 +10,7 @@ API WB — [`docs/wb-api.md`](docs/wb-api.md).
 (`wb.finance.sales-report.daily`, `wb.finance.sales-report.weekly`); недельный —
 эталон сверки с дневными; реклама — расход кампаний за день (`wb.ads.daily`, этап 8.4
 задачи `marketplace-profit-pipeline`). Покрытие — админка, «Покрытие Сервис GO» → Wildberries. Прод —
-[`docs/maintenance/wb-fetcher-prod.md`](../../docs/maintenance/wb-fetcher-prod.md) (за переключателем
-`WB_FETCHER_ENABLED`). Загрузка WB в Symfony продолжает работать.
+[`docs/maintenance/wb-fetcher-prod.md`](../../docs/maintenance/wb-fetcher-prod.md) (постоянный запуск). Загрузка WB в Symfony продолжает работать.
 
 ## Ресурсы
 

@@ -46,6 +46,27 @@ final class PaymentIntakeDraftRepository extends ServiceEntityRepository
         return (int) $this->getEntityManager()->getConnection()->fetchOne('SELECT count(*) FROM cash_payment_intake_draft WHERE source_key = :source', ['source' => $sourceKey]) > 0;
     }
 
+    /**
+     * @return list<string>
+     *
+     * @companyScopeExempt Technical enumeration of pending event company IDs only; recovery is company-scoped.
+     */
+    public function getPendingCashEventCompanyIds(): array
+    {
+        return array_map('strval', $this->getEntityManager()->getConnection()->fetchFirstColumn('SELECT DISTINCT company_id FROM cash_payment_intake_draft WHERE cash_event_pending = true ORDER BY company_id'));
+    }
+
+    /** @return list<PaymentIntakeDraft> */
+    public function getPendingCashEvents(string $companyId, ?string $afterId = null): array
+    {
+        $query = $this->createQueryBuilder('d')->where('d.companyId = :company')->andWhere('d.cashEventPending = true')->setParameter('company', $companyId)->orderBy('d.id', \SortDirection::Ascending)->setMaxResults(100);
+        if (null !== $afterId) {
+            $query->andWhere('d.id > :after')->setParameter('after', $afterId);
+        }
+
+        return $query->getQuery()->setHint(Query::HINT_REFRESH, true)->getResult();
+    }
+
     /** @return list<PaymentIntakeDraft> */
     public function getRecoverable(string $companyId, \DateTimeImmutable $now, int $limit = 100, ?string $afterId = null): array
     {

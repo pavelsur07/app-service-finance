@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\SourceFacts\Command;
 
-use App\SourceFacts\Application\Action\PullSourceFactsAction;
 use App\SourceFacts\Infrastructure\Query\SourceFactStore;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
@@ -20,7 +19,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * - error: в поток (кабинет × ресурс), который уже приходил, ничего не применено дольше STALE_HOURS.
  *
  * Граница: поток, который не пришёл ни разу, гейт не видит — это покрытие сервиса
- * (`app:service-gateway:coverage:refresh`). Приём выключен — exit 0. exit 1 — штатный результат гейта.
+ * (`app:service-gateway:coverage:refresh`). exit 1 — штатный результат гейта.
  */
 #[AsCommand(name: 'app:source-facts:health-check', description: 'Source facts gate: quarantined batches, stale streams')]
 final class SourceFactsHealthCheckCommand extends Command
@@ -28,7 +27,6 @@ final class SourceFactsHealthCheckCommand extends Command
     public const STALE_HOURS = 36;
 
     public function __construct(
-        private readonly PullSourceFactsAction $pull,
         private readonly SourceFactStore $store,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
@@ -38,12 +36,6 @@ final class SourceFactsHealthCheckCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        if (!$this->pull->isEnabled()) {
-            $output->writeln('source-facts health: disabled');
-
-            return self::SUCCESS;
-        }
-
         $health = $this->store->health($this->clock->now()->modify(sprintf('-%d hours', self::STALE_HOURS)));
         if ($health['quarantined'] > 0) {
             $this->logger->error('Source facts health: batches are quarantined.', [

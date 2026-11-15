@@ -13,15 +13,12 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 /** Publishes a persisted polling intent; a crash before acknowledgement safely republishes it. */
 final readonly class QueuePaymentIntakePollAction
 {
-    public function __construct(private EntityManagerInterface $em, private MessageBusInterface $bus, private PaymentIntakeAccess $access)
+    public function __construct(private EntityManagerInterface $em, private MessageBusInterface $bus)
     {
     }
 
     public function __invoke(PaymentIntakeSession $session): bool
     {
-        if (!$this->access->isAllowed($session->getCompanyId())) {
-            return false;
-        }
         $this->em->refresh($session);
         $intent = $session->pendingPoll();
         $generation = $session->getPollGeneration();

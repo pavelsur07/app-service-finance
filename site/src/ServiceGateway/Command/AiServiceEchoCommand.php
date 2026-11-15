@@ -51,7 +51,7 @@ final class AiServiceEchoCommand extends Command
             idempotencyKey: Uuid::uuid7()->toString(),
         );
         if (null === $taskId) {
-            $output->writeln('ai-service: disabled for the company (AI_SERVICE_ENABLED, admin access, URL or token)');
+            $output->writeln('ai-service: disabled for the company (admin access, URL or token)');
 
             return self::SUCCESS;
         }

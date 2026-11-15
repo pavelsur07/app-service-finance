@@ -234,8 +234,33 @@ final readonly class PaymentIntakeAction
         });
     }
 
+    /** @return list<string> */
+    public function pendingEventCompanyIds(): array
+    {
+        return $this->drafts->getPendingCashEventCompanyIds();
+    }
+
+    /** Deliver already committed financial changes without requesting AI or changing payments. */
+    public function recoverEvents(string $companyId, bool $failOnError = false): int
+    {
+        $count = 0;
+        $afterId = null;
+        do {
+            $batch = $this->drafts->getPendingCashEvents($companyId, $afterId);
+            foreach ($batch as $draft) {
+                $afterId = $draft->getId();
+                $this->deliverCashEvent($draft, $failOnError);
+                if (!$draft->isCashEventPending()) {
+                    ++$count;
+                }
+            }
+        } while (100 === \count($batch));
+
+        return $count;
+    }
+
     /** Re-dispatch durable pending intent with the same attempt key; never creates a draft. */
-    public function recover(string $companyId): int
+    public function recover(string $companyId, bool $failOnError = false): int
     {
         $count = 0;
         $afterId = null;
@@ -243,7 +268,7 @@ final readonly class PaymentIntakeAction
             $batch = $this->drafts->getRecoverable($companyId, $this->clock->now(), 100, $afterId);
             foreach ($batch as $draft) {
                 $afterId = $draft->getId();
-                $count += $this->recoverOne($draft);
+                $count += $this->recoverOne($draft, $failOnError);
             }
         } while (100 === \count($batch));
 
@@ -258,23 +283,26 @@ final readonly class PaymentIntakeAction
         return $this->recoverOne($this->owned($companyId, $actorUserId, $draftId));
     }
 
-    private function recoverOne(PaymentIntakeDraft $draft): int
+    private function recoverOne(PaymentIntakeDraft $draft, bool $failOnError = false): int
     {
         $companyId = $draft->getCompanyId();
         $dispatchPending = $draft->isDispatchPending();
         $eventPending = $draft->isCashEventPending();
         $redispatched = false;
         try {
-            if ($dispatchPending) {
+            if ($dispatchPending && $this->ai->isEnabledForCompany($companyId)) {
                 $this->dispatch($draft);
             }
             if ($eventPending) {
-                $this->deliverCashEvent($draft);
+                $this->deliverCashEvent($draft, $failOnError);
             }
             if (!$dispatchPending && $draft->needsRedispatch($this->clock->now())) {
                 $redispatched = $this->redispatchQueued($draft);
             }
         } catch (\Throwable $exception) {
+            if ($failOnError) {
+                throw $exception;
+            }
             $this->logger->warning('Payment intake recovery remains pending.', ['companyId' => $companyId, 'draftId' => $draft->getId(), 'exceptionClass' => $exception::class]);
         }
         if (!$this->em->isOpen()) {
@@ -363,7 +391,7 @@ final readonly class PaymentIntakeAction
         return null !== $taskId;
     }
 
-    private function deliverCashEvent(PaymentIntakeDraft $draft): void
+    private function deliverCashEvent(PaymentIntakeDraft $draft, bool $failOnError = false): void
     {
         if (!$draft->isCashEventPending()) {
             return;
@@ -371,6 +399,9 @@ final readonly class PaymentIntakeAction
         try {
             $this->events->dispatch(new CashTransactionsChanged($draft->getCompanyId()));
         } catch (\Throwable $exception) {
+            if ($failOnError) {
+                throw $exception;
+            }
             $this->logger->warning('Payment intake cash event remains pending after confirmation.', ['companyId' => $draft->getCompanyId(), 'draftId' => $draft->getId(), 'exceptionClass' => $exception::class]);
 
             return;

@@ -358,7 +358,7 @@
 */10 * * * * cd /app && php bin/console app:service-gateway:coverage:refresh --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
 # Факты из сервисов (модуль SourceFacts, source-fact-envelope v1): забор пачек ozon-fetcher каждые 15 минут.
-# Выключено (SOURCE_FACTS_COMPANIES пуст) — exit 0. Сервис недоступен — WARNING и exit 0; нарушение контракта
+# Сервис недоступен — WARNING и exit 0; нарушение контракта
 # списка пачек — ERROR и exit 1. Гейт 09:10 МСК: пачки в карантине или поток без применённых пачек > 36 ч —
 # ERROR и exit 1 (docs/workflow/health-gates.md).
 */15 * * * * cd /app && php bin/console app:source-facts:pull --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
@@ -389,13 +389,13 @@
 # второй отправки, сбой канала снимает отметку — ручной повтор дошлёт. Сбой компании — ERROR, exit 1.
 0 9 * * 1 cd /app && php bin/console app:marketplace-economics:weekly-report --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
-# ai-service (docs/maintenance/ai-service-prod.md). Выключено (AI_SERVICE_ENABLED, адрес, токен) —
+# ai-service (docs/maintenance/ai-service-prod.md). Без адреса или токена —
 # обе команды выходят с 0, ничего не делая. Импорт результатов: сервис недоступен — WARNING и exit 0,
 # нарушение контракта — ERROR и exit 1. Подсказки статей ДДС — все подключённые в админке компании (запуск пишется в ai_run),
 # сначала автоприменение по флагу компании; сбой компании — ERROR и exit 1, остальные идут дальше.
 */5 * * * * cd /app && php bin/console app:ai-service:import-results --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
-# Telegram pilot: strict company scope, Cash and delivery recover independently; never Confirm.
-*/5 * * * * cd /app && bash bin/recover-payment-intake.sh >> /proc/1/fd/1 2>> /proc/1/fd/2
+# Recovery всех компаний: grants, незавершённые сессии и события Confirm; сбой → exit 1, без Confirm.
+*/5 * * * * cd /app && php bin/console app:telegram:recover-payment-intake --all --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 25 * * * * cd /app && php bin/console app:cash:ai-categorize --all-enabled --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 # Гейт «тишины» ИИ (docs/workflow/health-gates.md): компания без запуска > 3 ч или половина результатов failed — ERROR и exit 1.
 50 * * * * cd /app && php bin/console app:ai-service:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2

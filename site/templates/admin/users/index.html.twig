@@ -107,7 +107,7 @@
                         <button type="submit"
                                 class="status status--{{ aiOn ? (aiServiceEnabled ? 'success' : 'warning') : 'neutral' }} u-btn-reset"
                                 data-ai-badge="{{ cabinet.id }}"
-                                title="{{ aiOn and not aiServiceEnabled ? 'Подключён, но ИИ-сервис выключен (AI_SERVICE_ENABLED)' : 'ИИ-функции кабинета' }}"
+                                title="{{ aiOn and not aiServiceEnabled ? 'Подключён, но ИИ-сервис не настроен (URL или токен)' : 'ИИ-функции кабинета' }}"
                                 {% if aiOn %}
                                 data-admin-confirm="Кабинет «{{ cabinet.name }}» перестанет получать ИИ-подсказки. Уже показанные подсказки останутся."
                                 data-admin-confirm-title="Отключить ИИ?"

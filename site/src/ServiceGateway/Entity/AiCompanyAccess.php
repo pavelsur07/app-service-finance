@@ -11,7 +11,7 @@ use Webmozart\Assert\Assert;
 /**
  * Компания подключена к ИИ-функциям: есть строка — включено, нет — выключено.
  * Включает и выключает администратор (`/admin/users`, `SetAiCompanyAccessAction`), читает
- * `AiServiceAccess` — обе стороны через DBAL; общий выключатель — `AI_SERVICE_ENABLED`.
+ * `AiServiceAccess` — обе стороны через DBAL; техническая доступность — URL и токен.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'ai_company_access')]

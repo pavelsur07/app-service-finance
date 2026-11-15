@@ -120,7 +120,7 @@ final class SubmitAiTaskHandlerTest extends TestCase
             static fn (string $sql, array $params): array => '*' === $granted ? $params['ids'] : array_values(array_intersect($params['ids'], $granted)),
         );
 
-        return new AiServiceAccess(true, 'http://ai', 'token', $db);
+        return new AiServiceAccess('http://ai', 'token', $db);
     }
 }
 

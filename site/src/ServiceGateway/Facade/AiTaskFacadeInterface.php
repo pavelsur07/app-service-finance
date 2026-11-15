@@ -63,7 +63,7 @@ interface AiTaskFacadeInterface
      */
     public function connectedCompanyIds(): array;
 
-    /** Общий выключатель `AI_SERVICE_ENABLED` с адресом и токеном. */
+    /** Настроены адрес и токен сервиса. */
     public function isServiceEnabled(): bool;
 
     /**
