@@ -1,13 +1,12 @@
 {% extends 'api/settings/layout.html.twig' %}
-{% form_theme form 'api/settings/_form_theme.html.twig' %}
 {% block content %}
-<div class="wz-head"><h1 class="wz-title">Проверить API-ключ</h1></div>
-<div class="wz-row"><section class="card">
+{% include 'partials/_page_header.html.twig' with {title: 'Проверить API-ключ', container: false, class: 'mb-3'} only %}
+<section class="card"><div class="card-body">
     <p>Проверка для компании {{ activeCompany.name }} (ID {{ activeCompany.publicId }}). Вставленный ключ не сохраняется. Проверка не обращается к финансовым данным.</p>
-    {% if message %}{% set result_class = details ? 'alert alert--success' : 'alert alert--danger' %}<div class="{{ result_class }}" role="status"><div class="a-body"><p class="a-text">{{ message }}</p></div></div>{% endif %}
+    {% if message %}{% set result_class = details ? 'alert alert-success' : 'alert alert-danger' %}<div class="{{ result_class }}" role="status">{{ message }}</div>{% endif %}
     {% if details %}<p>Действует до {{ details.expires_at|date('d.m.Y H:i', 'UTC') }} UTC</p>{% endif %}
     {{ form_start(form, {attr: {autocomplete: 'off'}}) }}{{ form_errors(form) }}{{ form_rest(form) }}
-    <div class="wz-head-actions"><button class="btn btn-md btn-primary" type="submit">Проверить ключ</button><a class="btn btn-md btn-secondary" href="{{ path('settings_api_index') }}">К списку</a></div>
+    <div class="d-flex flex-wrap gap-2"><button class="btn btn-primary" type="submit">Проверить ключ</button><a class="btn btn-outline-secondary" href="{{ path('settings_api_index') }}">К списку</a></div>
     {{ form_end(form) }}
-</section></div>
+</div></section>
 {% endblock %}

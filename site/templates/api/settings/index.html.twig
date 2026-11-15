@@ -1,45 +1,51 @@
 {% extends 'api/settings/layout.html.twig' %}
 {% block content %}
-<div class="wz-head">
-    <h1 class="wz-title">API<span class="wz-sub">Ключи доступа для подключений вашей компании</span></h1>
-    <div class="wz-head-actions">
-        <a class="btn btn-md btn-secondary" href="{{ path('settings_api_check') }}">Проверить ключ</a>
-        <a class="btn btn-md btn-primary" href="{{ path('settings_api_create') }}">Создать ключ</a>
-    </div>
-</div>
-<div class="wz-row"><section class="card">
-    <h2 class="card-head">Подключение</h2>
+{% embed 'partials/_page_header.html.twig' with {title: 'API', container: false, class: 'mb-3'} %}
+    {% block subtitle %}<div class="text-secondary mt-1">Ключи доступа для подключений вашей компании</div>{% endblock %}
+    {% block actions %}
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-secondary" href="{{ path('settings_api_check') }}">Проверить ключ</a>
+            <a class="btn btn-primary" href="{{ path('settings_api_create') }}">Создать ключ</a>
+        </div>
+    {% endblock %}
+{% endembed %}
+<section class="card mb-3">
+    <div class="card-header"><h3 class="card-title">Подключение</h3></div>
+    <div class="card-body">
     <p>Публичный ID компании: <strong>{{ activeCompany.publicId }}</strong></p>
     <p>Передавайте ключ в Authorization: Bearer и ID компании в X-Company-Id. Ключ действует 90 суток.</p>
     <label class="form-label" for="api-curl">Пример проверки подключения</label>
-    <textarea id="api-curl" class="textarea" rows="4" readonly spellcheck="false">curl '{{ url('external_api_auth_check') }}' \
+    <textarea id="api-curl" class="form-control" rows="4" readonly spellcheck="false">curl '{{ url('external_api_auth_check') }}' \
   -H 'Authorization: Bearer YOUR_API_KEY' \
   -H 'X-Company-Id: {{ activeCompany.publicId }}'</textarea>
-    <p class="field-helper">Замените YOUR_API_KEY своим ключом. Предметные разделы API пока не подключены.</p>
-</section></div>
-<div class="wz-row"><section class="card card--flush">
-    <h2 class="card-head">API-ключи <span class="card-head-aside">{{ pager.nbResults }}</span></h2>
+    <p class="form-hint mt-2">Замените YOUR_API_KEY своим ключом. Предметные разделы API пока не подключены.</p>
+    </div>
+</section>
+<section class="card">
+    <div class="card-header"><h3 class="card-title">API-ключи <span class="text-secondary">{{ pager.nbResults|vf_number }}</span></h3></div>
     {% if pager.nbResults == 0 %}
-        {% embed 'partials/_empty.html.twig' with {title: 'API-ключей пока нет', hint: 'Создайте отдельный именованный ключ для каждого подключения.', variant: 'app'} %}
+        {% embed 'partials/_empty.html.twig' with {title: 'API-ключей пока нет', hint: 'Создайте отдельный именованный ключ для каждого подключения.'} %}
             {% block action %}
-                <a class="btn btn-md btn-primary" href="{{ path('settings_api_create') }}">Создать первый ключ</a>
+                <a class="btn btn-primary" href="{{ path('settings_api_create') }}">Создать первый ключ</a>
             {% endblock %}
         {% endembed %}
     {% else %}
-        <div class="report-scroll" role="region" aria-label="Список API-ключей" tabindex="0">
-        <table class="t-table">
-            <thead><tr><th scope="col">Название</th><th scope="col">Ключ</th><th scope="col">Действует до (UTC)</th><th scope="col">Последнее использование (UTC)</th><th scope="col">Статус</th><th scope="col" class="t-cell--right">Действия</th></tr></thead>
+        <div class="table-responsive" role="region" aria-label="Список API-ключей" tabindex="0">
+        <table class="table table-vcenter">
+            <thead><tr><th scope="col">Название</th><th scope="col">Ключ</th><th scope="col">Действует до (UTC)</th><th scope="col">Последнее использование (UTC)</th><th scope="col">Статус</th><th scope="col" class="text-end">Действия</th></tr></thead>
             <tbody>{% for key in pager %}
                 <tr>
                     <td>{{ key.name }}</td><td><code>vfd_{{ key.publicIdentifier|slice(0, 8) }}…</code></td>
                     <td>{{ key.expiresAt|date('d.m.Y H:i', 'UTC') }}</td>
                     <td>{{ key.lastUsedAt ? key.lastUsedAt|date('d.m.Y H:i', 'UTC') : 'Ещё не использовался' }}</td>
-                    <td>{# DS-Feedback: отозванный ключ — завершённое состояние, не ошибка: нейтральный бейдж. #}{% if key.revokedAt %}<span class="status status--neutral">Отозван</span>{% elseif key.expiresAt <= now %}<span class="status status--warning">Истёк</span>{% else %}<span class="status status--success">Действует</span>{% endif %}</td>
-                    <td><div class="t-actions"><a class="btn btn-sm btn-secondary" href="{{ path('settings_api_permissions', {id: key.id}) }}">Права</a> <a class="btn btn-sm btn-secondary" href="{{ path('settings_api_rename', {id: key.id}) }}">Переименовать</a> {% if not key.revokedAt %}<a class="btn btn-sm btn-danger" href="{{ path('settings_api_revoke', {id: key.id}) }}">Отозвать</a>{% endif %}</div></td>
+                    <td>{# Отозванный ключ — завершённое состояние, не ошибка. #}{% if key.revokedAt %}<span class="badge bg-secondary-lt">Отозван</span>{% elseif key.expiresAt <= now %}<span class="badge bg-warning-lt">Истёк</span>{% else %}<span class="badge bg-success-lt">Действует</span>{% endif %}</td>
+                    <td><div class="d-flex justify-content-end gap-2"><a class="btn btn-sm btn-outline-secondary" href="{{ path('settings_api_permissions', {id: key.id}) }}">Права</a> <a class="btn btn-sm btn-outline-secondary" href="{{ path('settings_api_rename', {id: key.id}) }}">Переименовать</a> {% if not key.revokedAt %}<a class="btn btn-sm btn-danger" href="{{ path('settings_api_revoke', {id: key.id}) }}">Отозвать</a>{% endif %}</div></td>
                 </tr>
             {% endfor %}</tbody>
         </table></div>
-        {% include 'app/_ui/_pagination.html.twig' with {pager: pager, route: 'settings_api_index', params: {limit: pager.maxPerPage}} only %}
+        <div class="card-footer">
+            {% include 'partials/_pagination.html.twig' with {pager: pager, route: 'settings_api_index', params: {limit: pager.maxPerPage}} only %}
+        </div>
     {% endif %}
-</section></div>
+</section>
 {% endblock %}

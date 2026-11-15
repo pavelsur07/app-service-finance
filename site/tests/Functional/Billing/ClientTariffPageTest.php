@@ -92,7 +92,7 @@ final class ClientTariffPageTest extends WebTestCaseBase
         self::assertSelectorNotExists('[data-billing-notice]');
     }
 
-    public function testTrialEndingShowsBannerInBothLayouts(): void
+    public function testTrialEndingShowsBannerOnCustomerPages(): void
     {
         $this->em()->persist(CompanySubscriptionBuilder::aSubscription()->withId(Uuid::uuid7()->toString())->forCompany($this->companyId())->onTariff($this->tariff(TariffCode::BASE))->trial('2027-02-28', '2027-03-13')->build());
         $this->em()->flush();
@@ -103,9 +103,10 @@ final class ClientTariffPageTest extends WebTestCaseBase
         self::assertSelectorTextContains('[data-billing-notice]', '13.03.2027');
         self::assertSelectorTextContains('[data-billing-current]', 'пробный период');
 
-        $this->client->request('GET', '/settings/api'); // страница на новом layout
+        $this->client->request('GET', '/settings/api');
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('.app-workzone [data-billing-notice="trial_ending"]');
+        self::assertSelectorExists('html[data-ui-mode="legacy"]');
+        self::assertSelectorCount(1, '.page-body [data-billing-notice="trial_ending"]');
     }
 
     public function testGraceShowsWarningWithReadOnlyDate(): void

@@ -12,6 +12,7 @@ use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Component\BrowserKit\Cookie;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Clock\MockClock;
 
@@ -30,6 +31,7 @@ final class ApiSettingsControllerTest extends WebTestCaseBase
         static::getContainer()->set(ClockInterface::class, $this->clock);
         $owner = UserBuilder::aUser()->withIndex(9860)->build();
         $this->company = CompanyBuilder::aCompany()->withIndex(9860)->withOwner($owner)->build();
+        $owner->addCompany($this->company);
         $this->em()->persist($owner);
         $this->em()->persist($this->company);
         $this->em()->flush();
@@ -41,12 +43,27 @@ final class ApiSettingsControllerTest extends WebTestCaseBase
     {
         $this->client->request('GET', '/settings/api');
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('h1', 'API');
+        self::assertSelectorTextContains('.page-title', 'API');
         self::assertSelectorTextContains('.empty-title', 'API-ключей пока нет');
         self::assertStringContainsString((string) $this->company->getPublicId(), (string) $this->client->getResponse()->getContent());
         foreach (['page=0', 'page=abc', 'page=2', 'limit=201', 'limit=0', 'limit=1.5', 'page[]=1'] as $query) {
             $this->client->request('GET', '/settings/api?'.$query);
             self::assertResponseStatusCodeSame(422);
+        }
+    }
+
+    public function testAllSettingsPagesUseLegacyShellWithRetiredCookie(): void
+    {
+        [$key] = $this->key();
+        $this->client->getCookieJar()->set(new Cookie('ui_mode', 'app'));
+
+        foreach (['', '/create', '/check', '/'.$key->getId().'/permissions', '/'.$key->getId().'/rename', '/'.$key->getId().'/revoke'] as $suffix) {
+            $this->client->request('GET', '/settings/api'.$suffix);
+
+            self::assertResponseIsSuccessful();
+            self::assertSelectorExists('html[data-ui-mode="legacy"]');
+            self::assertSelectorNotExists('.app-customer, .ui-mode-switch, .wz-head, .t-table');
+            self::assertSelectorExists('a[href="/settings/api"][aria-current="page"]');
         }
     }
 
@@ -58,6 +75,7 @@ final class ApiSettingsControllerTest extends WebTestCaseBase
         $values = $form->getPhpValues();
         $this->client->submit($form);
         self::assertResponseStatusCodeSame(201);
+        self::assertSelectorExists('html[data-ui-mode="legacy"]');
         self::assertTrue($this->client->getResponse()->headers->hasCacheControlDirective('no-store'));
         self::assertSame('no-referrer', $this->client->getResponse()->headers->get('Referrer-Policy'));
         $token = $this->client->getCrawler()->filter('[data-api-secret]')->attr('value');
@@ -66,6 +84,7 @@ final class ApiSettingsControllerTest extends WebTestCaseBase
         self::assertSame(1, $this->keyCount());
         $this->client->request('POST', '/settings/api/create', $values);
         self::assertResponseStatusCodeSame(422);
+        self::assertSelectorExists('html[data-ui-mode="legacy"]');
         self::assertSame(1, $this->keyCount());
         foreach (['/settings/api', '/settings/api/create'] as $url) {
             $this->client->request('GET', $url);
@@ -83,7 +102,7 @@ final class ApiSettingsControllerTest extends WebTestCaseBase
         $crawler = $this->client->request('GET', '/settings/api/create');
         $this->client->submit($crawler->selectButton('Создать ключ')->form(['api_key_name[name]' => '   ']));
         self::assertResponseStatusCodeSame(422);
-        self::assertSelectorExists('.field-helper.error');
+        self::assertSelectorExists('.invalid-feedback');
         self::assertSame(0, $this->keyCount());
     }
 
@@ -194,15 +213,15 @@ final class ApiSettingsControllerTest extends WebTestCaseBase
         $this->em()->getConnection()->executeStatement('UPDATE api_keys SET revoked_at = ? WHERE id = ?', ['2026-09-13 11:00:00', $revoked->getId()]);
         $this->client->request('GET', '/settings/api?limit=2');
         self::assertResponseIsSuccessful();
-        self::assertSelectorCount(2, '.t-table tbody tr');
+        self::assertSelectorCount(2, '.table tbody tr');
         self::assertSelectorExists('a[href="/settings/api?limit=2&page=2"][aria-label="Вперёд"]');
         $this->client->request('GET', '/settings/api?page=2&limit=2');
         self::assertResponseIsSuccessful();
-        self::assertSelectorCount(1, '.t-table tbody tr');
+        self::assertSelectorCount(1, '.table tbody tr');
         $this->client->request('GET', '/settings/api');
-        self::assertSelectorTextContains('.status--success', 'Действует');
-        self::assertSelectorTextContains('.status--warning', 'Истёк');
-        self::assertSelectorTextContains('.status--neutral', 'Отозван');
+        self::assertSelectorTextContains('.badge.bg-success-lt', 'Действует');
+        self::assertSelectorTextContains('.badge.bg-warning-lt', 'Истёк');
+        self::assertSelectorTextContains('.badge.bg-secondary-lt', 'Отозван');
         $html = (string) $this->client->getResponse()->getContent();
         self::assertStringNotContainsString($token, $html);
         self::assertStringNotContainsString($active->getPublicIdentifier(), $html);
