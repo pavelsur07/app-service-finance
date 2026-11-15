@@ -8,6 +8,7 @@ use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceOperations\Application\DTO\DayOperations;
 use App\MarketplaceOperations\Application\DTO\OperationInput;
 use App\MarketplaceOperations\Facade\MarketplaceOperationsFacadeInterface;
+use App\MarketplaceWb\Domain\AdsDayTranslator;
 use App\MarketplaceWb\Domain\SalesReportTranslator;
 use App\MarketplaceWb\Domain\WbComponent;
 use App\MarketplaceWb\Infrastructure\Query\WbTranslationStore;
@@ -35,9 +36,12 @@ final readonly class TranslateWbDayAction
     }
 
     /**
+     * `$adsRevision` — текущая ревизия рекламы того же дня (`wb.ads.daily`, 0 — нет): расход кампаний
+     * разносится по SKU пропорционально их статистике.
+     *
      * @return array{operations: int, quarantined: int, unresolved: int}
      */
-    public function __invoke(SourcePeriod $period): array
+    public function __invoke(SourcePeriod $period, int $adsRevision = 0): array
     {
         $date = $period->periodKey;
         $facts = $this->sourceFacts->activeFacts($period->companyId, $period->connectionRef, self::RESOURCE, $date);
@@ -50,6 +54,14 @@ final readonly class TranslateWbDayAction
             foreach ($this->translator->translate($fact->sourceKey, $fact->payload) as $component) {
                 $components[] = $component;
                 if (!SalesReportTranslator::isInformational($component)) {
+                    $total = $total->add($component->amount);
+                }
+            }
+        }
+        if (0 !== $adsRevision) {
+            foreach ($this->sourceFacts->activeFacts($period->companyId, $period->connectionRef, AdsDayTranslator::RESOURCE, $date) as $fact) {
+                foreach (AdsDayTranslator::translate($fact->sourceKey, $fact->payload) as $component) {
+                    $components[] = $component;
                     $total = $total->add($component->amount);
                 }
             }
@@ -77,11 +89,12 @@ final readonly class TranslateWbDayAction
                 continue;
             }
 
-            $listingId = null === $component->nmId ? null : self::listingFor($listings[$component->nmId] ?? [], (string) $component->size);
+            $listingId = null === $component->nmId ? null : self::listingFor($listings[$component->nmId] ?? [], $component->size);
             if (null !== $component->nmId && null === $listingId) {
                 ++$unresolved;
             }
-            $operations[] = new OperationInput($kind, $component->sourceType, $component->amount, [$component->sourceKey], $listingId, $component->quantity);
+            $allocationKey = null !== $listingId && AdsDayTranslator::SOURCE_TYPE === $component->sourceType ? AdsDayTranslator::ALLOCATION_KEY : null;
+            $operations[] = new OperationInput($kind, $component->sourceType, $component->amount, [$component->sourceKey], $listingId, $component->quantity, $allocationKey);
             if (!SalesReportTranslator::isInformational($component)) {
                 $canon = $canon->add($component->amount);
             }
@@ -98,6 +111,7 @@ final readonly class TranslateWbDayAction
 
         $this->store->saveDay($period->companyId, $period->connectionRef, $date, SalesReportTranslator::RULES_VERSION, [
             'revision' => $period->revision,
+            'adsRevision' => $adsRevision,
             'facts' => \count($facts),
             'totalMinor' => $total->amountMinor(),
             'canonMinor' => $canon->amountMinor(),
@@ -111,11 +125,19 @@ final readonly class TranslateWbDayAction
 
     /**
      * Листинг по размеру; размера нет, а у `nmId` один листинг — он; иначе без SKU.
+     * `$size = null` (реклама — по nmId без размера) — первый листинг по id.
      *
      * @param list<array{id: string, size: string}> $found
      */
-    public static function listingFor(array $found, string $size): ?string
+    public static function listingFor(array $found, ?string $size): ?string
     {
+        if (null === $size) {
+            // ponytail: реклама nmId с несколькими размерами — на первый листинг; по размерам — по продажам дня, если понадобится
+            $ids = array_column($found, 'id');
+            sort($ids, \SORT_STRING);
+
+            return $ids[0] ?? null;
+        }
         foreach ($found as $listing) {
             if ($listing['size'] === $size) {
                 return $listing['id'];

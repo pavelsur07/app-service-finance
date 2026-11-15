@@ -77,6 +77,7 @@ Symfony подтверждает пачку **после** commit примене
 | `ozon.finance.accrual-by-day` | `ozon:accrual-by-day:{accrual_id}`; у записи без пригодного `accrual_id` (`^[A-Za-z0-9_.-]{1,128}$`) — `ozon:accrual-by-day:fallback-{sha256(payload)[:16]}` | `YYYY-MM-DD`, день начисления |
 | `ozon.ads.statistics` | `ozon:ads-statistics:{campaign_id}:{sku}`; повтор пары в отчёте дня — `…:{n}` по порядку строк; небезопасная часть (`^[A-Za-z0-9_.-]{1,64}$`) — `x{sha256(payload)[:16]}`. `payload` — строка CSV отчёта Performance: колонки по заголовку, значения строками как в CSV (`"1152,19"`), плюс `campaign_id` и `sku` | `YYYY-MM-DD`, день статистики |
 | `wb.finance.sales-report.daily` | `wb:sales-report.daily:{rrdId}`; строка без числового `rrdId` — `wb:sales-report.daily:fallback-{sha256(payload)[:16]}`. `payload` — строка ответа finance-api `sales-reports/detailed` как есть (camelCase-поля); пустая последняя страница `[]` — 0 записей | `YYYY-MM-DD`, день отчёта (МСК) |
+| `wb.ads.daily` | `wb:ads.daily:{advertId}`. `payload` — кампания дня: `{"advertId": "…", "expenses": [строки /adv/v1/upd кампании как есть], "statistics": строка /adv/v3/fullstats кампании как есть или null}`; день без списаний — 0 записей | `YYYY-MM-DD`, день списания (МСК) |
 
 Ключи остальных ресурсов фиксируются здесь до реализации их публикации.
 

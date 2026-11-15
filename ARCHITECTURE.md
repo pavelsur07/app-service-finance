@@ -655,7 +655,7 @@
 Модуль нового контура (этап 8.3, `stages/stage-8.md`), устроен как `MarketplaceOzon`.
 
 **Устав.** Причина изменений — WB (поля детального отчёта, причины удержаний). Модуль переводит строки
-`wb.finance.sales-report.daily` из `SourceFacts` в канон (канал `wildberries`). В модуле не должно быть:
+`wb.finance.sales-report.daily` и кампании `wb.ads.daily` из `SourceFacts` в канон (канал `wildberries`). В модуле не должно быть:
 правил Ozon, статей ОПиУ, экономики, обращений к API WB, зависимости от легаси WB (`Marketplace/Wildberries`,
 `Ingestion`, `MarketplaceAds`). Зависимости — только фасады `SourceFacts`, `MarketplaceOperations`,
 `Marketplace` (листинги) (гейт `ModuleBoundaryRules::test_marketplace_wb_uses_only_facades`).
@@ -663,7 +663,7 @@
 | Таблица | Что | Ключ |
 |---|---|---|
 | `mwb_source_type` | решение по коду WB: `kind` или `pending`, название, где встретился впервые (`ai_draft` — под 8.3b) | `source_type` |
-| `mwb_day` | переведённый день: ревизия фактов, версия правил, `total_minor` (Σ компонентов без справочных) = `canon_minor` + `quarantine_minor`, операции без листинга | `(company_id, connection_ref, operation_date)` |
+| `mwb_day` | переведённый день: ревизия фактов отчёта и рекламы (`ads_revision`, 0 — без рекламы), версия правил, `total_minor` (Σ компонентов без справочных) = `canon_minor` + `quarantine_minor`, операции без листинга | `(company_id, connection_ref, operation_date)` |
 | `mwb_quarantine` | компоненты с кодом без решения: сумма, число строк, до 20 ссылок на факты | `(company_id, connection_ref, operation_date, source_type)` |
 
 - Правила строки — `SalesReportTranslator` (таблица в `stage-8.md`, 8.3): `wb:field:*` и `wb:calc:*` — вид
@@ -672,6 +672,10 @@
   справочных = `±forPay` + поля затрат. Справочно (`CascadeLevel::INFO`): `spp`, `ads_settlement`.
 - Листинг — `nmId` + `techSize` (`findListingsByMarketplaceSkus` отдаёт `size`); размера нет, а листинг у
   `nmId` один — он; иначе операция без SKU (`unresolved`).
+- Реклама — `AdsDayTranslator`: кампания дня → `ads_cpc` = −Σ `expenses[].updSum`, по nmId пропорционально
+  Σ `statistics…nms[].sum` (наибольший остаток, ключ `ads_statistics_share`), нет весов — без SKU; nmId с
+  несколькими листингами — первый по id. Код `wb:ads:campaign`. Удержание «WB Продвижение» в отчёте — справочное
+  (`ads_settlement`), иначе реклама дважды. Новая ревизия рекламы дня — день переводится заново.
 - `app:marketplace-wb:translate` (cron `7-59/15`, `--relink` 06:58) — точка входа и владелец транзакций:
   день — одна транзакция, `TranslateWbDayAction` → `replaceDay` + карантин + `mwb_day`. Включение —
   `MARKETPLACE_WB_COMPANIES` (UUID через запятую, `*` — все, пусто — выключено).
@@ -5784,6 +5788,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.190 | 2026-11-15 | MarketplaceWb: реклама WB из фактов `wb.ads.daily` (wb-fetcher, upd + fullstats) — `ads_cpc` по SKU, `mwb_day.ads_revision` (`Version20261115120000`); `wb.ads.daily` в снимке кабинетов WB и в белом списке фактов шлюза (этап 8.4) |
 | 2.189 | 2026-11-15 | MarketplaceWb: новый модуль — переводчик дневного отчёта WB в канон (`mwb_source_type`, `mwb_day`, `mwb_quarantine`, `Version20261115090000`), `app:marketplace-wb:translate` (`MARKETPLACE_WB_COMPANIES`) и гейт 09:25, экран `/admin/marketplace/wb-source-types`; `OperationKind::ADS_SETTLEMENT` (справочно); `findListingsByMarketplaceSkus` отдаёт `size` (этап 8.3) |
 | 2.188 | 2026-11-14 | Канал фактов WB (этап 8.1–8.2): wb-fetcher публикует `wb.finance.sales-report.daily` (запись = строка отчёта, ключ `wb:sales-report.daily:{rrdId}`, backfill загруженных дней при старте); `SourceFactsGatewayFacade` — клиенты по тегу `app.source_facts_client`, кабинеты Ozon ∪ WB |
 | 2.187 | 2026-11-14 | Сверки нового контура (этап 7): гейт Ozon — перевод = канон за 45 дней и отставание кабинета; гейт витрины — доля нераспределённого > 1 %; новый модуль `MarketplaceQuality` — экран R10 `/marketplace/economics/quality`; фасады чтения `MarketplaceOzonFacadeInterface::dayStates`, `MarketplaceEconomicsFacadeInterface::daySums`, `MarketplaceOperationsFacadeInterface::daySums`, `SourceFactsFacadeInterface::periods(…, ?companyId)` |

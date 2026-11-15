@@ -5,22 +5,30 @@
 package facts
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	fkhttp "github.com/pavelsur07/app-service-finance/services/shared/fetchkit/httpapi"
+	"github.com/pavelsur07/app-service-finance/services/wb-fetcher/internal/wb"
 )
 
 // ResourceDaily — дневной отчёт о продажах (executor.ResourceDaily; здесь —
 // чтобы app не тянул executor ради списка).
 const ResourceDaily = "wb.finance.sales-report.daily"
 
+// ResourceAds — реклама за день (executor.ResourceAds).
+const ResourceAds = "wb.ads.daily"
+
 // Resources — ресурсы, чьи ревизии публикуются фактами.
-var Resources = []string{ResourceDaily}
+var Resources = []string{ResourceDaily, ResourceAds}
+
+const adsKeyPrefix = "wb:ads.daily:"
 
 const dailyKeyPrefix = "wb:sales-report.daily:"
 
@@ -29,6 +37,9 @@ var rrdID = regexp.MustCompile(`^[0-9]{1,20}$`)
 // Split режет страницу (JSON-массив строк отчёта как есть) на записи; пустая
 // последняя страница `[]` — ноль записей.
 func Split(resourceType string, page []byte) ([]fkhttp.FactRecord, error) {
+	if resourceType == ResourceAds {
+		return splitAds(page)
+	}
 	if resourceType != ResourceDaily {
 		return nil, fmt.Errorf("facts: resource %q is not published", resourceType)
 	}
@@ -61,4 +72,56 @@ func rowKey(raw json.RawMessage) (string, error) {
 	}
 	sum := sha256.Sum256(raw)
 	return dailyKeyPrefix + "fallback-" + hex.EncodeToString(sum[:])[:16], nil
+}
+
+// splitAds — запись = кампания дня: её списания и её строка fullstats (null — статистики нет),
+// ключ wb:ads.daily:{advertId}; порядок — по номеру кампании.
+func splitAds(page []byte) ([]fkhttp.FactRecord, error) {
+	var day struct {
+		Schema     string            `json:"schema"`
+		Expenses   []json.RawMessage `json:"expenses"`
+		Statistics []json.RawMessage `json:"statistics"`
+	}
+	if err := json.Unmarshal(page, &day); err != nil || day.Schema != wb.AdsSchema {
+		return nil, fmt.Errorf("facts: ads page is not %s", wb.AdsSchema)
+	}
+	expenses := map[string][]json.RawMessage{}
+	var ids []string
+	for i, raw := range day.Expenses {
+		id, err := wb.AdvertID(raw)
+		if err != nil {
+			return nil, fmt.Errorf("facts: expenses[%d]: %w", i, err)
+		}
+		if _, ok := expenses[id]; !ok {
+			ids = append(ids, id)
+		}
+		expenses[id] = append(expenses[id], raw)
+	}
+	stats := map[string]json.RawMessage{}
+	for i, raw := range day.Statistics {
+		id, err := wb.AdvertID(raw)
+		if err != nil {
+			return nil, fmt.Errorf("facts: statistics[%d]: %w", i, err)
+		}
+		stats[id] = raw
+	}
+	slices.SortFunc(ids, func(a, b string) int {
+		if c := cmp.Compare(len(a), len(b)); c != 0 {
+			return c
+		}
+		return strings.Compare(a, b)
+	})
+	out := make([]fkhttp.FactRecord, 0, len(ids))
+	for _, id := range ids {
+		st := stats[id]
+		if st == nil {
+			st = json.RawMessage("null")
+		}
+		payload, err := json.Marshal(map[string]any{"advertId": id, "expenses": expenses[id], "statistics": st})
+		if err != nil {
+			return nil, fmt.Errorf("facts: encode campaign %s: %w", id, err)
+		}
+		out = append(out, fkhttp.FactRecord{SourceKey: adsKeyPrefix + id, Payload: payload})
+	}
+	return out, nil
 }

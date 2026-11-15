@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/apierr"
@@ -20,6 +21,17 @@ import (
 
 // ResourceDaily — детальный отчёт о реализации за день МСК (period_key YYYY-MM-DD).
 const ResourceDaily = "wb.finance.sales-report.daily"
+
+// ResourceAds — реклама за день МСК: списания кампаний и их статистика (одна страница).
+const ResourceAds = "wb.ads.daily"
+
+// IsAdsResource — ресурс семейства рекламы: свой слот кабинета, свой ключ доступа.
+func IsAdsResource(resource string) bool { return strings.HasPrefix(resource, "wb.ads.") }
+
+// AdsSource — день рекламы (wb.Ads).
+type AdsSource interface {
+	Day(ctx context.Context, ref, token, day string) (wb.AdsDay, error)
+}
 
 // DefaultMaxPages — предел страниц периода: 250 × 20 000 строк (5 млн) —
 // заведомо больше реального отчёта; превышение — зацикливание курсора, а не данные.
@@ -65,7 +77,14 @@ type Executor struct {
 	core   *fetch.Executor[connections.Cabinet]
 	cfg    Config
 	report Report
+	ads    AdsSource
 	now    func() time.Time
+}
+
+// WithAds — источник рекламы; без него задачи wb.ads.daily — неизвестный ресурс.
+func (e *Executor) WithAds(ads AdsSource) *Executor {
+	e.ads = ads
+	return e
 }
 
 func New(cfg Config, tasks fetch.TaskStore, raw fetch.RawStore, report Report, refresher fetch.Refresher, logger *slog.Logger,
@@ -91,6 +110,9 @@ func (e *Executor) Run(ctx context.Context, task store.Task, cabinet connections
 // Fetch — fetch.Adapter.
 func (e *Executor) Fetch(ctx context.Context, run *fetch.Run, cab connections.Cabinet) error {
 	resource := run.Task.ResourceType
+	if resource == ResourceAds && e.ads != nil {
+		return e.adsDay(ctx, run, cab)
+	}
 	if resource != ResourceDaily && resource != ResourceWeekly {
 		return fmt.Errorf("%w: %q", fetch.ErrUnknownResource, resource)
 	}
@@ -113,6 +135,32 @@ func (e *Executor) Fetch(ctx context.Context, run *fetch.Run, cab connections.Ca
 		return fmt.Errorf("%w: %q", fetch.ErrBadPeriod, run.Task.PeriodKey)
 	}
 	return e.pages(ctx, run, cab, wb.PeriodDaily, day.Format(time.DateOnly), day.Format(time.DateOnly), time.Time{})
+}
+
+// adsDay — день рекламы одной страницей: upd и fullstats его кампаний.
+func (e *Executor) adsDay(ctx context.Context, run *fetch.Run, cab connections.Cabinet) error {
+	if cab.Token == "" {
+		return fetch.ErrNoCredentials
+	}
+	if !cab.Supports(ResourceAds) {
+		return fetch.ErrResourceNotEnabled
+	}
+	if len(run.Hashes) > 0 {
+		return nil // страница сохранена прошлой попыткой, не записан только итог
+	}
+	day, err := time.Parse(time.DateOnly, run.Task.PeriodKey)
+	if err != nil {
+		return fmt.Errorf("%w: %q", fetch.ErrBadPeriod, run.Task.PeriodKey)
+	}
+	page, err := e.ads.Day(ctx, cab.Ref, cab.Token.Reveal(), day.Format(time.DateOnly))
+	if err != nil {
+		return err
+	}
+	if err := run.Store(ctx, fetch.Page{No: run.NextPage, Body: page.Body, ContentType: "application/json"}); err != nil {
+		return err
+	}
+	run.Log.Info("ads day read", slog.String("stage", "fetch"), slog.Int("campaigns", page.Campaigns))
+	return nil
 }
 
 // pages — с курсора задачи до страницы короче limit; каждая страница с
@@ -172,14 +220,27 @@ func (e *Executor) Classify(c *fetch.Classification) (store.Outcome, bool) {
 			label = "symfony_quota_unavailable"
 		}
 		return store.Outcome{Status: store.StatusPending, Label: label, ErrorClass: label, KeepCursor: true, NextRunAt: qe.Until}, true
+	case IsAdsResource(c.Task.ResourceType) && isAuth(c.Err):
+		// Токен без доступа к продвижению: пауза только этой задаче, финансы кабинета идут дальше.
+		pause := e.cfg.AuthRetryPause
+		if c.Task.LastErrorClass == string(apierr.ClassAuth) {
+			pause = e.cfg.AuthSuspend
+			c.Log.Error("wb promotion api rejected cabinet token again, ads task paused", slog.String("stage", "fetch"))
+		}
+		return store.Outcome{Status: store.StatusPending, Label: string(apierr.ClassAuth), ErrorClass: string(apierr.ClassAuth), NextRunAt: c.Now.Add(pause)}, true
 	case errors.Is(c.Err, errTooManyPages):
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "too_many_pages", ErrorClass: "too_many_pages", NextRunAt: c.Now}, true
 	}
 	return store.Outcome{}, false
 }
 
-// ResumesConnection — успех снимает паузу кабинета после 401.
-func (e *Executor) ResumesConnection(string) bool { return true }
+// ResumesConnection — успех отчёта снимает паузу кабинета после 401; реклама — другой доступ токена.
+func (e *Executor) ResumesConnection(resource string) bool { return !IsAdsResource(resource) }
+
+func isAuth(err error) bool {
+	var apiErr *apierr.APIError
+	return errors.As(err, &apiErr) && apiErr.Class == apierr.ClassAuth
+}
 
 // LogLevel — квота Symfony не отвечает — WARN (повтор сам, но долгий отказ
 // останавливает загрузку); остальное — уровни ядра.

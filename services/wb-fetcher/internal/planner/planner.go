@@ -38,6 +38,17 @@ const DefaultTailDays = 14
 // ещё не опубликовал (Symfony — 03:10), пустой ответ закрыл бы день до завтра.
 const DefaultDailyStart = 4 * time.Hour
 
+// KindAdsTail — суточное перечитывание рекламы за вчера и AdsRefreshDays: списания
+// WB проводит с задержкой.
+const KindAdsTail = "wb_ads_tail"
+
+// AdsHistoryDays — дней рекламы, загружаемых однократно (окно сверки и ночной перезагрузки
+// нового контура); AdsRefreshDays — из них перечитываются каждые сутки.
+const (
+	AdsHistoryDays = 45
+	AdsRefreshDays = 7
+)
+
 // Config — параметры окна.
 type Config struct {
 	Location   *time.Location // Europe/Moscow
@@ -82,6 +93,21 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) schedule.P
 				}
 				plan.Ensure = append(plan.Ensure, ensure)
 				tail.Specs = append(tail.Specs, store.TaskSpec{TaskKey: k, Priority: ensure.Priority, Refresh: true, RunAt: start})
+			}
+			plan.Refreshes = append(plan.Refreshes, tail)
+		}
+		if cab.Supports(executor.ResourceAds) {
+			tail := schedule.Refresh{Kind: KindAdsTail, RunDate: runDate, ConnectionRef: cab.Ref}
+			for i := 0; i < AdsHistoryDays; i++ {
+				k := key(cab.Ref, executor.ResourceAds, yesterday.AddDate(0, 0, -i).Format(time.DateOnly))
+				ensure := store.TaskSpec{TaskKey: k, Priority: PriorityTail, RunAt: now}
+				if i == 0 {
+					ensure.Priority, ensure.RunAt = PriorityYesterday, start
+				}
+				plan.Ensure = append(plan.Ensure, ensure)
+				if i <= AdsRefreshDays {
+					tail.Specs = append(tail.Specs, store.TaskSpec{TaskKey: k, Priority: ensure.Priority, Refresh: true, RunAt: start})
+				}
 			}
 			plan.Refreshes = append(plan.Refreshes, tail)
 		}

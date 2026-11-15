@@ -1,5 +1,10 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-11-15) — реклама WB
+
+- Новое значение `resource_types` у Wildberries: `wb.ads.daily` (API продвижения тем же токеном),
+  тем же компаниям, что отчёт (`wb_fetcher.finance_companies`). Схема не менялась.
+
 ## Правка (2026-11-02) — Wildberries
 
 - Endpoint отвечает на `provider=wildberries` (раньше 422): кабинет — seller-подключение WB,
