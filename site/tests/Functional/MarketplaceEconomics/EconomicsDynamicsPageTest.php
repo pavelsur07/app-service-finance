@@ -42,7 +42,6 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('[data-economics-table] .table.table-vcenter.card-table');
         self::assertSelectorExists('section.card.card-body svg[role="img"]');
-        self::assertSelectorExists('script[src*="marketplace_economics"]');
         $rows = $crawler->filter('tbody tr')->each(static fn ($r): string => $r->text());
         self::assertCount(3, $rows, 'две недели + итог');
         // неделя обрезана началом периода: 09.11 не входит

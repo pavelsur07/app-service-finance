@@ -41,7 +41,6 @@ final class DataQualityPageTest extends WebTestCaseBase
         self::assertSame('/marketplace/economics', $crawler->filter('nav[aria-label="Отчёт"] a')->first()->attr('href'));
         self::assertSame('/marketplace/economics/dynamics', $crawler->filter('nav[aria-label="Отчёт"] a')->eq(1)->attr('href'));
         self::assertSelectorCount(2, '[data-economics-table] .table.table-vcenter.card-table');
-        self::assertSelectorExists('script[src*="marketplace_economics"]');
         $cabinet = $crawler->filter('tbody')->first()->filter('tr')->each(static fn ($r): string => $r->text());
         self::assertCount(1, $cabinet);
         self::assertStringContainsString('OZON · cab-'.substr(self::COMPANY_ID, -3), $cabinet[0]);

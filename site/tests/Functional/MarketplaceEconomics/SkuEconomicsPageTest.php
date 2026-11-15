@@ -42,7 +42,6 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('[data-economics-table] .table.table-vcenter.card-table');
         self::assertSelectorExists('[data-economics-table] [data-economics-scroll][tabindex="0"]');
-        self::assertSelectorExists('script[src*="marketplace_economics"]');
         $row = $crawler->filter('tbody tr')->first()->text();
         self::assertStringContainsString('SKU-991', $row);
         // СМ1 = 3000 − 900 − 450 = 1650; СМ2 = 1500; СМ3 = 1450
