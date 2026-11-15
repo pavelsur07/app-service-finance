@@ -5790,6 +5790,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.193 | 2026-11-15 | MoySklad: tenant-scoped ревизии связей листингов с product/variant, set/clear, requestId и snapshots; Catalog/Finance не меняются |
 | 2.192 | 2026-11-15 | Marketplace: постраничный DTO-контракт внешнего маппинга; ListingMetaDTO содержит isActive/marketplaceVariantId с общей нормализацией size через ListingMetaQuery |
 | 2.191 | 2026-11-15 | MarketplaceWb: переключатель `MARKETPLACE_WB_COMPANIES` снят — переводчик и гейт работают по всем кабинетам WB (решение Владельца 15.11) |
 | 2.190 | 2026-11-15 | MarketplaceWb: реклама WB из фактов `wb.ads.daily` (wb-fetcher, upd + fullstats) — `ads_cpc` по SKU, `mwb_day.ads_revision` (`Version20261115120000`); `wb.ads.daily` в снимке кабинетов WB и в белом списке фактов шлюза (этап 8.4) |
@@ -6099,6 +6100,17 @@ Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/defa
 `ApiScopeCatalog`: explicit resources/actions/presets, all disconnected. `ApiScopePolicy::effectiveScopes(selected,enabled,connected)` даёт только известное пересечение. ApiKey хранит JSON selectedScopes/enabledResources с пустыми defaults. `SaveApiKeyPermissionsAction(companyId,userId,keyId,selectedScopes,enabledResources,expectedVersion): ApiKey` проверяет владельца и optimistic version под scoped row lock;409 требует перечитать, unknown scope/enable disconnected422, no-op без аудита. Отдельная миграция20260913090200; подключение модуля не включает ресурс старого ключа. Principal несёт preparedScopes/effectiveScopes, ApiAccessSubscriber требует известный effective scope либо auth.check; тестовые endpoints толькоenv=test.
 
 ## MoySklad: подключение и проверка доступа
+
+Хранение внешнего маппинга — `MoySkladListingMappingRevision`, отдельная от
+Catalog история в `moysklad_listing_mapping_revisions`. Ключ связи:
+companyId/connectionId/listingId, порядок — revision, операции set/clear.
+SET содержит ровно один внешний UUID product/variant своего подключения;
+CLEAR — без цели. Составные FK, unique revision/requestId и CHECK защищают
+tenant и форму записи. Ревизия хранит expectedRevision, actorUserId, время UTC
+и серверные снимки листинга/цели. Repository только append/tenant lookup,
+без flush; текущая связь — последняя revision, не изменяемая строка.
+Миграция Version20261115153000 создаёт пустую таблицу; down отказывает,
+если история не пуста.
 
 Legacy Twig/Tabler UI: `/moy-sklad/connections`, права `MARKETPLACE_READ/WRITE`.
 `MoySkladConnection` сохраняет неизменяемый `companyId`, nullable глобально уникальный

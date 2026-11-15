@@ -338,7 +338,7 @@ MoySkladSchemaExtension, `ARCHITECTURE.md` только при появлени�
 
 ## Stage 2: хранение ревизий и tenant-инварианты
 
-**Risk:** HIGH-LOCAL — миграция. **stage_base_commit:** записать перед 2.1.
+**Risk:** HIGH-LOCAL — миграция. **stage_base_commit:** `bd3b59bf4`.
 **Definition of Done:** схема хранит set/clear, историю и requestId, запрещает
 смешение компаний и подключений; нет backfill и изменений чужих таблиц.
 

@@ -22,6 +22,7 @@ parameters:
     # The public-ID migration is referenced by its regression test. Discover its
     # symbols without adding historical migrations to the analysis paths.
     scanFiles:
+        - migrations/Version20261115153000.php
         - migrations/Version20260913090000.php
         - migrations/Version20260914120000.php
         - migrations/Version20260926120000.php
