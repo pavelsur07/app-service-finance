@@ -1,4 +1,4 @@
-### Stage 4: legacy UI — проверка
+### Stage 4: legacy UI — DONE
 
 **Risk:** HIGH-LOCAL. **Stage base commit:** `8372aa8f9`. **Work items:** 4.1,4.2.
 

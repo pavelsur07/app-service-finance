@@ -50,9 +50,9 @@ Review focus: company isolation, CSRF, errors/empty/responsive, no implicit writ
 ## Stage 5: проверка и поставка
 Risk: HIGH-LOCAL. stage_base_commit: 31378ad4d.
 DoD / приёмка:
-- [ ] Полные гейты stan/cs/strict-types/unit/integration/functional/Twig.
-- [ ] Независимое внутреннее review полного diff и внешнее Claude CLI (fallback по правилам проекта).
-- [ ] Один PR base master; handoff с миграцией; Ready; merge/deploy только после отдельного согласования владельцем.
+- [x] Полные гейты stan/cs/strict-types/unit/integration/functional/Twig.
+- [x] Независимое внутреннее review полного diff и внешнее Claude CLI (fallback по правилам проекта).
+- [x] Один PR base master; handoff с миграцией; Ready; merge/deploy только после отдельного согласования владельцем.
 Work items: 5.1 gates/reviews/fixes; 5.2 handoff/PR ready.
 Review focus: все обязательные регрессии TASK.md; числа 35/45/26 — оценки, не обещание покрытия.
 
