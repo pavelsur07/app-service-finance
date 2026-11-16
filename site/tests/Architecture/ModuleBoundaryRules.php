@@ -515,6 +515,54 @@ final class ModuleBoundaryRules
             ->because('экран качества только сводит звенья контура: каждое читается через свой фасад.');
     }
 
+    /**
+     * `MarketplacePlProjection` — ОПиУ маркетплейсов из канона (`docs/tasks/marketplace-pl-projection`):
+     * статьи читает через фасад `Finance`, виды — из `MarketplaceOperations`. В ОПиУ не пишет.
+     */
+    public function test_marketplace_pl_projection_reads_facades_only(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplacePlProjection'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\SourceFacts'),
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceWb'),
+                Selector::inNamespace('App\MarketplaceEconomics'),
+                Selector::inNamespace('App\MarketplaceQuality'),
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->excluding(
+                Selector::inNamespace('App\Finance\Facade'),
+                Selector::inNamespace('App\Finance\DTO'),
+                Selector::inNamespace('App\Finance\Enum'),
+            )
+            ->because('проекция ОПиУ считается из канона и правил компании; статьи — только через фасад Finance.');
+    }
+
+    /** Канон, переводчики и экономика SKU о маппинге на ОПиУ не знают (`DATA.md` §9.3). */
+    public function test_pipeline_does_not_know_pl_projection(): Rule
+    {
+        return PHPat::rule()
+            ->classes(
+                Selector::inNamespace('App\SourceFacts'),
+                Selector::inNamespace('App\MarketplaceOperations'),
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceWb'),
+                Selector::inNamespace('App\MarketplaceEconomics'),
+            )
+            ->shouldNot()
+            ->dependOn()
+            ->classes(Selector::inNamespace('App\MarketplacePlProjection'))
+            ->because('маппинг на ОПиУ — забота только MarketplacePlProjection.');
+    }
+
     public function test_legacy_zone_stays_empty(): Rule
     {
         $legacy = [];

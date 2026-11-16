@@ -161,6 +161,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/MarketplaceEconomics/Entity'
                 prefix: 'App\MarketplaceEconomics\Entity'
                 alias: MarketplaceEconomics
+            MarketplacePlProjection:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/MarketplacePlProjection/Entity'
+                prefix: 'App\MarketplacePlProjection\Entity'
+                alias: MarketplacePlProjection
             MarketplaceOzon:
                 type: attribute
                 is_bundle: false
