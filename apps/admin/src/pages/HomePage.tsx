@@ -1,4 +1,4 @@
-import { EmptyState } from '@vashfindir/ui';
+import { EmptyState } from '@vashfindir/ds';
 
 export function HomePage() {
   return (

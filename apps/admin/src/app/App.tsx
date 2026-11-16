@@ -1,5 +1,6 @@
-import { BrowserRouter, Link, Route, Routes } from 'react-router';
-import { ErrorBoundary } from '@vashfindir/ui';
+import { NavigationLink } from '../shared/NavigationLink';
+import { BrowserRouter, Route, Routes } from 'react-router';
+import { ErrorBoundary, Card } from '@vashfindir/ds';
 import { HomePage } from '../pages/HomePage';
 import { AboutPage } from '../pages/AboutPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
@@ -13,16 +14,16 @@ export function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <div className={styles.root}>
-          <header className="card grid gap-3">
-            <p className="text-xl font-bold text-primary">Ваш Финдир · admin</p>
-            <nav className="wz-actions" aria-label="Основная навигация">
-              <Link className="ds-link" to="/">
-                Главная
-              </Link>
-              <Link className="ds-link" to="/about">
-                О приложении
-              </Link>
-            </nav>
+          <header>
+            <Card className="grid gap-3">
+              <p className="text-xl font-bold text-primary">
+                Ваш Финдир · admin
+              </p>
+              <nav className="wz-actions" aria-label="Основная навигация">
+                <NavigationLink href="/">Главная</NavigationLink>
+                <NavigationLink href="/about">О приложении</NavigationLink>
+              </nav>
+            </Card>
           </header>
           <main id="main">
             <Routes>

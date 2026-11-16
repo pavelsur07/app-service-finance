@@ -189,8 +189,7 @@
   }
 }
 
-/* Stage 2 bridge: current markup/wrappers, v3 values. React components arrive
-   in Stage 3; these classes remain the shared component styling surface. */
+/* DS v3.4 component surface shared by the React wrappers. */
 @layer components {
   .card {
     @apply rounded-lg border border-line bg-surface-card shadow-sm;
@@ -216,11 +215,12 @@
   .form-field {
     @apply flex flex-col gap-1;
   }
-  .form-field + .form-field {
+  .form-field + .form-field:not(:where(.grid > *, .flex > *)) {
     @apply mt-3;
   }
   .form-label {
     font: var(--ds-type-label);
+    line-height: 1.4;
     color: var(--ds-form-label-text);
   }
   .form-error {
@@ -252,7 +252,8 @@
   }
   .input[aria-invalid='true'],
   .select[aria-invalid='true'] {
-    border-color: var(--ds-input-border-error);
+    /* TODO(ds): source error-border (danger-dot) is 2.80:1; semantic text meets 3:1. */
+    border-color: var(--ds-danger-text);
     box-shadow: var(--ds-ring-error);
   }
   .input:disabled,
@@ -310,6 +311,7 @@
   }
   .btn-ghost:hover:not(:disabled) {
     background: var(--ds-button-ghost-bg-hover);
+    color: var(--ds-text-strong);
   }
   .btn-danger {
     @apply border-danger-border bg-surface-card text-danger-text;
@@ -337,23 +339,86 @@
   .empty-text > .wz-actions {
     @apply mt-4 justify-center;
   }
-  .alert {
-    @apply rounded-lg border p-5;
-  }
-  .alert--danger {
-    @apply border-danger-border bg-danger-bg text-danger-text;
-  }
-  .a-title {
-    font: var(--ds-type-title-sm);
-    @apply mb-2;
-  }
-  .a-text {
-    @apply mb-4;
-  }
   .ds-link {
-    @apply text-primary underline underline-offset-2;
+    @apply inline-flex items-center gap-1 rounded-xs text-primary underline decoration-primary-border decoration-1 underline-offset-3;
   }
   .ds-link:hover {
-    @apply text-primary-hover;
+    @apply text-primary-hover decoration-current;
+  }
+  .ds-link-standalone {
+    @apply text-md font-semibold no-underline hover:underline;
+  }
+  .ds-link-muted {
+    @apply text-fg-tertiary;
+  }
+  .ds-textarea {
+    height: auto;
+    min-height: 80px;
+    padding: 10px 12px;
+    resize: vertical;
+  }
+  .input:read-only {
+    background: var(--ds-bg-subtle);
+  }
+  .btn-icon {
+    aspect-ratio: 1;
+    padding: 0;
+  }
+  .ds-input-group {
+    @apply flex w-full items-center rounded-md border;
+    min-height: var(--ds-control-h);
+    border-color: var(--ds-input-border);
+    background: var(--ds-input-bg);
+  }
+  .ds-input-group:hover:not(:has(input:disabled)) {
+    border-color: var(--ds-input-border-hover);
+  }
+  .ds-input-group:has(input:focus-visible) {
+    border-color: var(--ds-input-border-focus);
+    box-shadow: var(--ds-ring-focus);
+    outline: 2px solid var(--ds-focus-ring-color);
+    outline-offset: 2px;
+  }
+  .ds-input-group:has(input[aria-invalid='true']) {
+    /* TODO(ds): source error-border (danger-dot) is 2.80:1; semantic text meets 3:1. */
+    border-color: var(--ds-danger-text);
+    box-shadow: var(--ds-ring-error);
+  }
+  .ds-input-group:has(input:disabled) {
+    background: var(--ds-input-bg-disabled);
+    border-color: var(--ds-input-border-disabled);
+  }
+  .ds-input-group:has(input:read-only:not(:disabled)) {
+    background: var(--ds-bg-subtle);
+  }
+  .ds-group-input {
+    flex: 1;
+    min-width: 0;
+    width: 0;
+    height: calc(var(--ds-control-h) - 2px);
+    border: 0;
+  }
+  .ds-group-input:focus-visible,
+  .ds-group-input[aria-invalid='true'] {
+    box-shadow: none;
+    outline: none;
+  }
+  .ds-group-input:disabled,
+  .ds-group-input:read-only {
+    background: transparent;
+  }
+  .ds-input-action {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: var(--ds-r-sm);
+  }
+  .peer:checked + .ds-toggle-track .ds-toggle-knob {
+    transform: translateX(18px);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .ds-toggle-knob {
+      transition: transform var(--ds-dur-fast);
+    }
   }
 }

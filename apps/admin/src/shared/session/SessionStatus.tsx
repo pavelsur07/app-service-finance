@@ -1,4 +1,4 @@
-import { Button, EmptyState } from '@vashfindir/ui';
+import { Button, EmptyState, Alert } from '@vashfindir/ds';
 import { useSession } from '../../app/SessionProvider';
 // TODO(ds): loading/error page sheets pending; compose existing DS patterns.
 export function SessionStatus() {
@@ -12,7 +12,7 @@ export function SessionStatus() {
           : 'Не удалось загрузить сессию'
       }
     >
-      <p role="alert">{state.error}</p>
+      <Alert tone="danger">{state.error}</Alert>
       <div className="wz-actions">
         <Button onClick={() => void store.refresh()}>Повторить</Button>
         <Button variant="secondary" onClick={() => void store.logout()}>

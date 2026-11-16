@@ -21,6 +21,10 @@
     "style-dictionary": "5.8.0"
   },
   "dependencies": {
-    "tailwindcss": "4.3.5"
+    "tailwindcss": "4.3.5",
+    "@tabler/icons-react": "3.52.0"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0"
   }
 }

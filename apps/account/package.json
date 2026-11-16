@@ -11,12 +11,12 @@
     "format": "prettier --write . ../../site/packages",
     "test": "vitest run",
     "build": "tsc --noEmit && vite build",
-    "test:e2e": "playwright test",
-    "prebuild": "node ../packages/ds/build/tokens.mjs --check"
+    "test:e2e": "playwright test && npm run test:components",
+    "prebuild": "node ../packages/ds/build/tokens.mjs --check",
+    "test:components": "vite build --config tests/components/vite.config.ts && playwright test --config tests/components/playwright.config.ts"
   },
   "dependencies": {
     "@vashfindir/api": "file:../../site/packages/api",
-    "@vashfindir/ui": "file:../../site/packages/ui",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router": "^8.3.0",

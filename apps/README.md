@@ -26,10 +26,10 @@ lock внутри соответствующего Node-контейнера. `f
 Prettier; форматирование: `docker compose -p vf-finance-frontend -f
  docker-compose.frontend.yml run --rm account npm run format` (аналогично admin).
 
-| Приложение | Dev | Preview | Сборка |
-|---|---|---|---|
-| account | http://127.0.0.1:5174 | http://127.0.0.1:4174 | `apps/account/dist/` |
-| admin | http://127.0.0.1:5175 | http://127.0.0.1:4175 | `apps/admin/dist/` |
+| Приложение | Dev                   | Preview               | Сборка               |
+| ---------- | --------------------- | --------------------- | -------------------- |
+| account    | http://127.0.0.1:5174 | http://127.0.0.1:4174 | `apps/account/dist/` |
+| admin      | http://127.0.0.1:5175 | http://127.0.0.1:4175 | `apps/admin/dist/`   |
 
 Порты опубликованы только на loopback. `strictPort` исключает незаметную смену
 порта. `/about` можно открыть напрямую и обновить в обоих режимах (SPA fallback).
@@ -57,7 +57,7 @@ Node: `24.18.1-bookworm-slim`, Playwright npm и браузерный образ
 
 App `prebuild` проверяет generated CSS/TS; source JSON не меняется вручную.
 OFL шрифта лежит в `apps/packages/ds/public/fonts/Manrope-OFL.txt` и попадает
-в dist обоих приложений. Новые React DS wrappers — следующие Stage.
+в dist обоих приложений. Базовые React-компоненты ДС уже подключены; следующие Stage — каркас и данные.
 
 ## Структура и общие пакеты
 
@@ -66,20 +66,18 @@ OFL шрифта лежит в `apps/packages/ds/public/fonts/Manrope-OFL.txt` �
 - `apps/*/src/shared/session/` — типы, адаптеры и жизненный цикл сессии; account picker.
 - `apps/*/src/app/SessionProvider.tsx` — React subscription и проверка на focus.
 - `apps/packages/ds/` — токены v3.4, Tailwind theme/preflight, локальный Manrope,
-  общий CSS и будущие React-компоненты.
-- `site/packages/ui/` — временно JS wrappers Button/EmptyState/ErrorBoundary;
-  их CSS в apps больше не подключается (замена wrappers — Stage 3).
+  общий CSS и базовые React-компоненты.
+- `site/packages/ui/` — только старый frontend; apps от пакета больше не зависят.
 - `site/packages/api/` — JSON-транспорт и общий MSW-контракт тестирования.
 
-Пакеты подключаются через `file:../../site/packages/...`. Они находятся внутри
+API подключён через `file:../../site/packages/api`, ДС — через `file:../packages/ds`. Они находятся внутри
 `site/`, поскольку production build context старого приложения ограничен этим
 каталогом. Это сохраняет его сборку без изменений production Docker/CI.
 Для apps каноническая реализация — `apps/packages/ds`: JSON v3.4, generated
 `--ds-*` токены, Tailwind v4 и Manrope. CSS-кит `site/assets/styles/kit/`
 остаётся только у site. App CSS entry добавляет собственный `@source`;
-вход ДС отключает автоматический поиск и добавляет свои компоненты. React/React DOM — peer dependencies UI с поддержкой
-18 и 19. Vite каждого приложения разрешает React из его собственных зависимостей.
-Старые импорты Button/cn/API сохранены реэкспортами и адаптером.
+вход ДС отключает автоматический поиск и добавляет свои компоненты. React19 — peer dependency ДС. Vite каждого приложения разрешает React из его собственных зависимостей.
+Старые импорты Button/cn/API у site сохранены реэкспортами и адаптером.
 
 Общий API отправляет JSON/FormData, cookies (`credentials: include`), явный
 CSRF через `csrfToken`, принимает `signal` и `keepalive`, нормализует ошибки в
@@ -108,7 +106,6 @@ Dev-контейнеры видят только `apps`, общие пакеты
 корневые служебные файлы, локальные секреты и `site/var` им недоступны.
 Тест необработанного запроса MSW использует встроенную стратегию `error`,
 проверяет отклонение запроса и отсутствие вызова сетевого fallback.
-
 
 ## Production: account.vashfindir.ru / admin.vashfindir.ru
 
@@ -172,7 +169,6 @@ Docker может скачать `account-nginx` и `admin-nginx` (public visibi
 существующий доступ к registry). Начальный общий `pull` в deploy проверяет
 доступ к обоим образам до обновления любых сервисов; отказ прерывает выкатку.
 Публичность packages или сохранённые credentials из исходников не проверяются.
-
 
 ## Реальный локальный вход и HTTP acceptance
 
@@ -240,3 +236,11 @@ Rollout: backend API → SPA. Rollback: revert через обычный pipelin
 После production deploy — только read-only acceptance HTTPS/about/health,
 anonymous csrf/session, wrong host/prefix и старый login; успешный вход и
 изменение компаний доказаны на test fixtures, production mutations не требуются.
+
+## Браузерные контракты базовых компонентов
+
+Account `test:e2e` после app smoke собирает отдельный fixture и запускает
+`test:components`: native keyboard, label/error/ref, password/clear, Toast
+4s/pause/unmount, focus/contrast и screenshot1440. Новые test dependencies не
+нужны; fixture использует установленный Playwright и Vite. Артефакты —
+`apps/account/test-results/`, app dist и production URLs не меняются.

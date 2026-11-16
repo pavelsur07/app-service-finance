@@ -1,14 +1,15 @@
-import { Link } from 'react-router';
+import { EmptyState } from '@vashfindir/ds';
+import { NavigationLink } from '../shared/NavigationLink';
 
 // TODO(ds): dedicated 404 sheet pending; reuse the DS empty state.
 export function NotFoundPage() {
   return (
-    <section className="empty">
-      <h1 className="empty-title">Не найдено</h1>
-      <p className="empty-text">Такой страницы нет.</p>
-      <Link className="ds-link" to="/">
-        На главную
-      </Link>
-    </section>
+    <EmptyState
+      title="Не найдено"
+      headingLevel={1}
+      action={<NavigationLink href="/">На главную</NavigationLink>}
+    >
+      Такой страницы нет.
+    </EmptyState>
   );
 }

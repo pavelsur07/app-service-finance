@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
-import { Button } from '@vashfindir/ui';
+import { Button, Card, FormField, Input, Alert } from '@vashfindir/ds';
 import { useSession } from '../app/SessionProvider';
 import { SessionStatus } from '../shared/session/SessionStatus';
 import { safeReturnPath } from '../shared/session/session';
@@ -21,15 +21,11 @@ export function LoginPage() {
   };
   // TODO(ds): v3 auth screen sheet pending; compose existing card/controls.
   return (
-    <section className="card mx-auto w-full max-w-(--ds-modal-width-compact)">
+    <Card className="mx-auto w-full max-w-(--ds-modal-width-compact)">
       <h1 className="wz-title">Вход — клиентский кабинет</h1>
       <form onSubmit={submit} aria-busy={state.busy}>
-        <div className="form-field">
-          <label className="form-label" htmlFor="email">
-            Email
-          </label>
-          <input
-            className="input"
+        <FormField id="email" label="Email" required>
+          <Input
             id="email"
             name="email"
             type="email"
@@ -40,13 +36,9 @@ export function LoginPage() {
             onChange={(event) => setEmail(event.target.value)}
             disabled={state.busy}
           />
-        </div>
-        <div className="form-field">
-          <label className="form-label" htmlFor="password">
-            Пароль
-          </label>
-          <input
-            className="input"
+        </FormField>
+        <FormField id="password" label="Пароль" required>
+          <Input
             id="password"
             name="password"
             type="password"
@@ -55,16 +47,16 @@ export function LoginPage() {
             maxLength={4096}
             disabled={state.busy}
           />
-        </div>
+        </FormField>
         {state.error && (
-          <p className="form-error" role="alert">
+          <Alert tone="danger" className="mt-3">
             {state.error}
-          </p>
+          </Alert>
         )}
-        <Button type="submit" loading={state.busy}>
+        <Button className="mt-4" type="submit" loading={state.busy}>
           Войти
         </Button>
       </form>
-    </section>
+    </Card>
   );
 }

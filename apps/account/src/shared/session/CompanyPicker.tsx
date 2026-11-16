@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@vashfindir/ui';
+import { Button, Card, FormField, Select, Alert } from '@vashfindir/ds';
 import { ApiError } from '@vashfindir/api';
 import { useSession } from '../../app/SessionProvider';
 import type { Companies } from './session';
@@ -43,13 +43,13 @@ export function CompanyPicker() {
   }, [store, page, retry, state.data]);
   const company = state.data?.active_company;
   return (
-    <section className="card grid gap-3" aria-label="Выбор компании">
+    <Card className="grid gap-3" aria-label="Выбор компании">
       <p>
         Текущая компания: <strong>{company?.name ?? 'Не выбрана'}</strong>
       </p>
       {error ? (
         <>
-          <p role="alert">{error}</p>
+          <Alert tone="danger">{error}</Alert>
           <Button onClick={() => setRetry((value) => value + 1)}>
             Повторить загрузку компаний
           </Button>
@@ -62,26 +62,24 @@ export function CompanyPicker() {
         </p>
       ) : (
         <>
-          <label className="form-label" htmlFor="company">
-            Компания
-          </label>
-          <select
-            className="select"
-            id="company"
-            value=""
-            onChange={(event) => {
-              if (event.target.value)
-                void store.selectCompany(event.target.value);
-            }}
-            disabled={state.busy}
-          >
-            <option value="">Выберите компанию</option>
-            {result.data.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
+          <FormField id="company" label="Компания">
+            <Select
+              id="company"
+              value=""
+              onChange={(event) => {
+                if (event.target.value)
+                  void store.selectCompany(event.target.value);
+              }}
+              disabled={state.busy}
+            >
+              <option value="">Выберите компанию</option>
+              {result.data.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
           <div className="wz-actions">
             <Button
               variant="secondary"
@@ -103,6 +101,6 @@ export function CompanyPicker() {
           </div>
         </>
       )}
-    </section>
+    </Card>
   );
 }
