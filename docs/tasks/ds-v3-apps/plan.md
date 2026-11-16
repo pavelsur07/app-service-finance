@@ -306,3 +306,39 @@ Stage4 verified: SSR10, apps92/88, fixture21, nginx44PASS6skips+fixture21,
 
 Stage4 integration based321bc79d: master PR3035/3036 merged; own apps unchanged,
 site/ own diff to origin/master empty. Final delivery state/checks in PR3037.
+
+
+## Stage 5 — уточнённый план и приёмка (2026-11-16)
+
+Stage4 delivered PR3037 /558586ee0, workflow43848374373SUCCESS; both
+healthy SHA, HTTPS23/23, public browser bothPASS. Stage5 base
+`03a34a2db176d0ecbb67ad904f28b8a7760c57c2`, branch feat/ds-v3-stage-5.
+Risk HIGH-LOCAL; отдельный PR, без site/dependencies/production config.
+
+- 5.1 baseline92/88; contracts SSR/formatter и browser scenarios сначала RED;
+  screenshots1440 existing apps before; canonical source из Git3882c5dd9.
+- 5.2 data: Table/SortHeader/TotalsRow/Pagination/Tabs/KpiCard, Chip/AbcPill/
+  MarketplaceMark/Avatar/TagsInput; controlled API, native attributes,
+  token-only appearance. Formatters Money/Number/Percent/Date без вычислений
+  бизнес-показателей; Unicode, rounding, invalid/nonfinite/large inputs tests.
+- 5.3 overlays: native dialog Modal S/M/L/Drawer680/ConfirmDialog; focus trap,
+  restore, Esc/top-layer/nesting, body scroll lock; DropdownMenu keyboard.
+- 5.4 pickers: local synthetic lists/trees, search/disabled/clear, leaf-only
+  selection, tree keyboard; composition with overlays, no new API or data.
+- 5.5 test-only comprehensive fixture (not production route), apps integration
+  only where an existing real consumer benefits; full module/frontend/backend
+  handoff gates, screenshots, fresh internal/external review, PR Ready.
+
+Чек-лист приёмки:
+- [ ] All §3.1 components exported; strict/native props/ref, no custom design
+  for missing §3.2 sheets. No fake business screens/actions.
+- [ ] Money NBSP/U2212/comma/₽, zero/negative/kopecks/large values; expenses
+  ordinary text, KPI only delta color; no financial calculations or API change.
+- [ ] Sort aria-sort on th; totals supplied by caller; pagination bounds and
+  empty state; Tabs roving focus/arrows/Home/End/disabled/panel association.
+- [ ] Modal/Drawer native top layer/inert background, focus trap/restore,
+  Esc only top layer, backdrop close, nested cleanup/scroll restoration.
+- [ ] Menu keyboard/disabled/destructive, pickers search/leaf-only/tree keyboard.
+- [ ] Both apps gates, package tests, preview/actual-nginx browser smoke,
+  1440 screenshots/contrast; scope gates and all acceptance blockers.
+- [ ] Fresh independent internal/external reviews, fixed B/I, Stage Report.
