@@ -191,7 +191,7 @@ Reviewer focus: composition и ref/id, label/error, loading/disabled, lifecycle.
 
 ## Stage 4 — общий каркас
 
-Risk: HIGH-LOCAL. Stage base commit: записать перед работой.
+Risk: HIGH-LOCAL. Stage base commit: `d99ede00de60e210d373feea8b80e371daa521e4`.
 DoD: AppShell/Header/Sidebar/PageHeader/footer, своё меню admin, 264/72,
 60px header, вложенность, persistence, skip link, scroll-stable, текущий logout.
 Work items: 4.1 поведенческие тесты; 4.2 компоненты/композиция apps; 4.3 review/PR.
@@ -264,3 +264,38 @@ Test-only fixture собирается отдельно и не попадает
 Stage3 завершён: native components/screens, fresh internal0/0(MINOR1fixed),
 external0/1 IMPORTANTfixed without re-run. Scope дополняет ToastStack (fixed
 viewport) и ErrorBoundary для полного удаления old UI. Отчёт stage-3.md.
+
+## Stage 4 — технический план и приёмка (2026-11-16)
+
+Stage3 PR3034 delivered d99ede00d; workflow43830874625 SUCCESS, оба apps
+healthy SHA, HTTPS23/23 и public browser acceptance PASS.
+
+Risk HIGH-LOCAL, branch feat/ds-v3-stage-4; base d99ede00d.
+- 4.1: baseline82/78 и preview, снимки1440 до; SSR и Chromium контракты RED.
+- 4.2: AppShell/AppHeader/Sidebar/PageHeader/AppFooter, useSidebarState;
+  semantic/component tokens, viewport-owned scroll, keyboard/focus.
+- 4.3: composition обоих apps: отдельные public/session layouts, реальные
+  ссылки/realm-specific menu, текущий logout; Home/About PageHeader.
+- 4.4: gates/preview/real HTTP/actual images, screenshot/scrollbar checks,
+  fresh internal + external review, Stage Report, отдельный PR.
+
+DoD: [ ] header60/aside264/72; [ ] вложенность aria-expanded/controls/current;
+[ ] rail labels sr-only + group click expands; [ ] focus collapse↔expand;
+[ ] separate persistence account/admin + storage failure; [ ] auto-rail<1280;
+[ ] first skip link/main focus; [ ] sidebar/main scroll-stable + visible
+scrollbar no jump; [ ] email/current logout from real session; [ ] public
+about/404 no API; [ ] no horizontal overflow in existing mobile smoke;
+[ ] package/apps tests/types/lint/build, preview/actual HTTP/CI/reviews.
+
+Source App-Layout is canonical for composition: brand padding16, content24×32,
+footer12×32. Header accepts period/search/notifications slots; apps do not
+render unavailable functions. Source has user-row + logout, not dropdown: generic
+DropdownMenu stays Stage5. No profile link/fictional user/role/company. Email is
+identity fallback; optional role only if supplied by real data. No new API.
+Group captions use existing text-tertiary to meet4.5:1 (source text-disabled
+is insufficient); outline2 maintained, icons16/18/20 stroke2.
+
+AppShell context coordinates controlled collapse/refs; app hook stores only UI
+preference per realm. Responsive rail does not overwrite the desktop preference.
+Public layout never mounts SessionProvider; session layout uses existing provider.
+No production Docker/CI config changes or dependencies required.

@@ -1,43 +1,36 @@
 ## Current checkpoint
 
-**Phase:** Stage 3 / handoff
-**Status:** implemented/reviewed, local gates green; implemented/reviewed; handoff PR3034, latest CI tracked in PR
-**Stage base commit:** 18fa0247850e17b7ade692b26c7403385b248a38
-**Branch:** feat/ds-v3-stage-3
-**PR:** https://github.com/pavelsur07/app-service-finance/pull/3034 (base master verified; Ready/checks — live PR state)
+**Phase:** Stage 4 / 4.3
+**Status:** implementing/integration checks
+**Stage base commit:** d99ede00de60e210d373feea8b80e371daa521e4
+**Branch:** feat/ds-v3-stage-4
+**PR:** ещё не создан
 
 ### Completed
-- Stage1 PR3027 delivered; fallback rule PR3028 в master.
-- Stage2 PR3030 delivered37264e03c, workflow43819052773SUCCESS;
-  apps healthy SHA, HTTPS23/23, browser Manrope/focusPASS.
-- Stage3 3.1–3.4: tests-first baseline,16components+ErrorBoundary+ToastStack,
-  current screens migration; oldUI dependency/consumers removed.
-- site/ не изменён; auth/API/session logic и generated tokens untouched.
+- Stages1/2/3 delivered: PR3027/3030/3034; fallback rule PR3028 in master.
+- Stage3 merge d99ede00d, deploy43830874625SUCCESS; both apps healthy SHA,
+  HTTPS23/23 + public browser native fields/navigationPASS.
+- Stage4 spec/reference read from Git3882c5dd9; plan/DoD in plan.md.
 
 ### Checks and baseline
-- Baseline48/44, newSSR RED→GREEN34, apps82/78, package47; full front gates PASS.
-- Preview26PASS/8skips+fixture11; nginx production30PASS/4skips+fixture11.
-  Final ToastStack fixture12PASS; SSR47, app82/78 и все front gates post-fix PASS.
-- PHPStan/CS/strict/unit4889PASS.15before+15after1440 +4fresh baseline.
-- Error-border contrast2.803→>=3 using semantic danger-text; TODO(ds).
-- TSconfig autonomous fixes actual admin Docker RED; subsequent both images GREEN.
+- Baseline front-test82/78 and preview PASS;15before1440 snapshots.
+- Shell SSR10RED→GREEN10, browser20PASS (12base+8layout), Typecheck/lint/build
+  both apps PASS after removing obsolete store binding in RequireSession.
+- Preview migrated apps36PASS/10skips +fixture20PASS.
+- Responsive focus restoration extra regression pending.
 
 ### Review status
-- Fresh internal B/I0/0, MINOR2fixed; final focus checks GREEN.
-- External separate Codex1round B/I0/1, IMPORTANTfixed with regression
-  RED→GREEN (ToastStack viewport); fixed without re-run, open0.
+- Fresh Stage4 internal0/0/0 GREEN; separate Codex external1round REVIEW_GREEN0/0.
+- Author regression checks: resize focus RED→GREEN; busy refresh/logout RED,
+  layout no longer disables logout on unrelated busy state, GREEN pending.
 
 ### Exact next action
-- Implementation ef01dc75d + action/metadata3e5ebd0ca pushed.
-- CI43827481866: fixture dependency install и test:e2e --config forwarding RED.
-  DS npm ci clean-room12PASS; test:e2e restored to playwright test, fixture via
-  posttest:e2e; actual --list --config lists2real auth tests +12fixturePASS.
-  Runtime components unchanged, latest runner fixes — final PR head.
-- Verify latest-head CI in PR3034; if Draft and checks green mark Ready.
-- Единственное решение Владельца: "merge and deploy #3034". При получении
-  выполнить merge→CI/deploy→readonly acceptance без повторных вопросов.
-- Stage4/5 separate PR, not started.
+- 4.1 baseline/contracts,4.2 components,4.3 app composition done.
+- Responsive focus fixed/21browserPASS,17paired screenshots1440.
+- Full backend gates4889PASS; actual nginx40PASS6skips+fixture21PASS.
+- Finish logout refresh regression, final gates/focused review/handoff PR.
+- No site/production config changes; separate PR per Stage.
 
 ### Files to inspect first on resume
-- stages/stage-3.md, reviews/codex-stage-3.md, apps/packages/ds/src/components
-- apps/account/tests/components, plan.md, apps/README.md
+- plan.md, apps/*/src/app, apps/packages/ds/src/components
+- apps/account/tests/components, apps/README.md
