@@ -64,7 +64,7 @@ Backups: `/var/backups/app-service-finance/<sha>/<run>-<attempt>/`, umask 077,
 До handoff:
 
 ```bash
-make test-release-pipeline test-deploy-workflow test-frontend-release
+make test-release-pipeline test-deploy-workflow test-frontend-release test-frontend-auth-routing
 RELEASE_TEST_POSTGRES_IMAGE=postgres:15-alpine make test-release-pipeline
 ```
 

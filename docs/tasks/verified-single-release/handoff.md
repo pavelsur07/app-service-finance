@@ -1,6 +1,6 @@
 # verified-single-release — сохранённое состояние
 
-Branch feat/verified-single-release; Draft PR base master (URL в GitHub/отчёте).
+Branch feat/verified-single-release; Draft PR https://github.com/pavelsur07/app-service-finance/pull/3042, base master.
 Код завершён, порядок выпуска удерживается до завершения part1 local acceptance.
 
 Файлы: .github/workflows/deploy.yml; site/bin/release-bundle.py;
@@ -13,12 +13,12 @@ Trusted manifest/SHA, все gates, 12 immutable image digests/20 services,
 backup→migration→schema→rolling→health; anti-downgrade и idempotent same-SHA retry.
 Инфраструктура фиксируется по установленным digest, не обновляется/не рестартует.
 
-Проверки: 12+8+8+1 real PG новых тестов и 6+6 существующих Python + shell GREEN;
+Проверки: 12+8+8+1 real PG новых тестов и 6+6+4 существующих Python + shell GREEN;
 actionlint/diff-check GREEN. Общие PHP источники неизменны: cs/strict и все три
 PHP-набора отдельно GREEN. Local full PHPStan blocked by доказанный host global
 OOM; три cold/warm/warm first task пока не получены. Экономия не заявляется.
 
-Review metrics: internal B0/I3 fixed; external B2/I4 fixed, 3 rounds,
+Review metrics: internal B0/I4 fixed; external B2/I4 fixed, 3 rounds,
 round3 REVIEW_GREEN; remaining minor fixed with targeted RED→GREEN.
 Fresh final internal B0/I0/M0. Reviewer root-file path limitation закрыта context.
 
