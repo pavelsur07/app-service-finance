@@ -50,9 +50,9 @@ test('company pagination, switching and revoked access on focus', async ({
     });
   });
   await page.goto('/');
-  await expect(page.getByText('Текущая компания:')).toContainText(
-    'Первая компания',
-  );
+  await expect(
+    page.getByRole('radio', { name: 'Первая компания' }),
+  ).toBeChecked();
   await page
     .getByRole('navigation', { name: 'Пагинация' })
     .getByRole('button', { name: 'Страница 2', exact: true })
@@ -60,10 +60,11 @@ test('company pagination, switching and revoked access on focus', async ({
   await expect(
     page.getByRole('navigation', { name: 'Пагинация' }),
   ).toContainText('2–2');
-  await page.getByLabel('Компания', { exact: true }).selectOption('two');
-  await expect(page.getByText('Текущая компания:')).toContainText(
-    'Вторая компания',
-  );
+  await page.getByRole('radio', { name: 'Вторая компания' }).check();
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await expect(
+    page.getByRole('radio', { name: 'Первая компания' }),
+  ).not.toBeChecked();
   await page
     .getByRole('navigation', { name: 'Пагинация' })
     .getByRole('button', { name: 'Страница 2', exact: true })
@@ -73,11 +74,66 @@ test('company pagination, switching and revoked access on focus', async ({
   ).toContainText('2–2');
   revoked = true;
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-  await expect(page.getByText('Текущая компания:')).toContainText('Не выбрана');
-  await expect(page.getByText('Текущая компания:')).not.toContainText(
-    'Вторая компания',
-  );
+  await expect(page.getByRole('radio')).toHaveCount(0);
   await expect(
     page.getByText('Нет доступных компаний.', { exact: false }),
   ).toBeVisible();
+});
+
+test('login with multiple companies requires Continue and preserves safe returnTo', async ({
+  page,
+}) => {
+  let authenticated = false;
+  let selected = { id: 'one', name: 'Первая компания' };
+  let selections = 0;
+  const session = () => ({
+    user: { id: 'u', email: 'person@company.ru' },
+    active_company: selected,
+    permissions: {},
+  });
+  await page.route('**/api/account/v1/**', (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/csrf'))
+      return route.fulfill({
+        json: {
+          tokens: { login: 'login-token', company_select: 'select-token' },
+        },
+      });
+    if (path.endsWith('/login')) {
+      authenticated = true;
+      return route.fulfill({ status: 204 });
+    }
+    if (!authenticated) return route.fulfill({ status: 401, json: {} });
+    if (path.endsWith('/companies'))
+      return route.fulfill({
+        json: {
+          data: [
+            { id: 'one', name: 'Первая компания' },
+            { id: 'two', name: 'Вторая компания' },
+          ],
+          meta: { total: 2, pages: 1, page: 1, per_page: 50 },
+        },
+      });
+    if (path.endsWith('/active-company')) {
+      selections++;
+      selected = { id: 'two', name: 'Вторая компания' };
+    }
+    return route.fulfill({ json: session() });
+  });
+  await page.goto('/login?returnTo=%2Fabout');
+  await page.getByLabel('Email', { exact: true }).fill('person@company.ru');
+  await page.getByLabel('Пароль', { exact: true }).fill('valid-password');
+  await page.getByRole('button', { name: 'Войти', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Выберите компанию' }),
+  ).toBeVisible();
+  await expect(page.locator('.ds-auth-card')).toHaveCSS(
+    'width',
+    test.info().project.name === 'mobile' ? '390px' : '520px',
+  );
+  await page.getByRole('radio', { name: 'Вторая компания' }).check();
+  expect(selections).toBe(0);
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await expect(page).toHaveURL(/\/about$/);
+  expect(selections).toBe(1);
 });

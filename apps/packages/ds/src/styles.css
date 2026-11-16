@@ -834,3 +834,63 @@
     transform: rotate(360deg);
   }
 }
+
+@layer components {
+  .ds-auth-companies {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 0 20px;
+    padding: 0;
+    border: 0;
+  }
+  .ds-auth-company {
+    display: flex;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-r-md);
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .ds-auth-company > input {
+    width: 18px;
+    height: 18px;
+  }
+  .ds-auth-company > span:last-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .ds-auth-company:hover {
+    background: var(--ds-bg-row-hover);
+  }
+  .ds-auth-company-selected {
+    background: var(--ds-bg-row-selected);
+    border-color: var(--ds-color-primary);
+  }
+  .ds-auth-company-search {
+    margin-bottom: 16px;
+  }
+  .ds-auth-company-search > p {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--ds-text-tertiary);
+  }
+  .ds-auth-continue {
+    margin-top: 20px;
+    width: 100%;
+  }
+  .ds-auth-logout {
+    margin: 16px 0 0;
+    text-align: center;
+    font-size: 13px;
+    color: var(--ds-text-tertiary);
+  }
+  .ds-auth-logout .btn {
+    height: auto;
+    padding: 0;
+    font-size: inherit;
+    text-decoration: underline;
+    color: var(--ds-color-primary);
+  }
+}

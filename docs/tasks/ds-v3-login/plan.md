@@ -44,7 +44,7 @@ error, clear/focus, logout false positives, доступность, отсутс
 
 ## Stage 2 — выбор компании
 
-Risk: MEDIUM; stage_base_commit: записать перед началом.
+Risk: MEDIUM; stage_base_commit: `62fbe9d82`.
 Definition of Done: card 520/radio/initials/Continue/logout, search≥8, pagination,
 после входа company choice не теряет returnTo, прежние 401/422/reconciliation работают.
 Work items: 2.1 tests RED; 2.2 CompanyPicker presentation + post-login UI; 2.3 checks.
