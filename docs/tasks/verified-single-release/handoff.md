@@ -28,10 +28,9 @@ approval; backup root должен уже быть доступен workflow use
 Backup retention/restore — отдельные задачи утверждённого плана. Upload и
 successful previous configs очищаются; failed configs сохраняются для диагностики.
 
-Ожидается: завершение двух warm acceptance runs первой задачи; разрешённый
-production acceptance SHA/digest/schema/health/timings. Merge/deploy не выполнялись.
-
-Owner decision at delivery:
-Ready: PR #3042 "ci: единый проверенный релиз без повторной сборки" — merge into master
-with automatic production deploy, after #3040?
-Reply: "merge and deploy #3042"
+Текущее состояние выпуска — checkpoint.md и stages/stage-3.md.
+Владелец одобрил merge+production обоих PR; оба слиты. Первый выпущен успешно.
+Первый master-run второго обнаружил hidden-artifact default в upload-artifact v4.
+Исправление четырёх флагов с RED→GREEN, fresh internal и external REVIEW_GREEN
+выпускается отдельным PR в рамках того же одобрения. До него production
+остаётся на успешно принятом15562ad3. Backup/restore/retention follow-ups прежние.

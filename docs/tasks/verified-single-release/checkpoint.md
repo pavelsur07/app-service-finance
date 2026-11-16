@@ -1,26 +1,22 @@
 # Current checkpoint
-Phase: handoff assembled. Status: verified; owner release decision pending.
-Branch feat/verified-single-release; PR #3042, base master. Source code241c3c655.
 
-Completed: implementation; 45 workflow-contract tests including real temporary
-PostgreSQL GREEN; actionlint/diff-check GREEN; source-code CI241c3c655 GREEN.
-Fresh final internal B0/I0/M0. Internal I4 fixed (malformed manifest, enabled
-nightly health, registry404 fallback, legacy auth-gate test parser). External
-B2/I4 fixed, 3 rounds, round3 REVIEW_GREEN; final stdin MINOR fixed RED→GREEN.
+2026-11-16: owner authorized Ready → merge → production for #3040 and #3042.
+#3040 merged 15562ad3e7e87127c2d012d1937599ef288144e1, production SUCCESS,
+19 running containers, no unhealthy/OOM, source migrations323/executed327/missing0.
+All three site-accept runs passed: 1499s cold, 667s warm1, 640s warm2; swap8GiB permanent.
 
-PHP application files unchanged between both task branches. First task's full
-cold site-accept passed after owner-approved persistent swap8GiB: all style,
-strict types, level8/baseline/paths/2GiB PHPStan and Unit/Integration/Functional
-GREEN in one sequential run. Two required warm runs of part1 are still running;
-see its ignored journal/site/var/accept-swap-runs.log and checkpoint, do not start
-a duplicate runner. Delivery order remains #3040 then #3042.
+#3042 merged 2e8d5217c2bf197fea2b3bd5a36741f3dab7474f. First master run
+43930147386 failed before production: upload-artifact v4 excludes hidden files
+by default, so .descriptor/*.json was not uploaded despite successful builds.
+Four uploads affected, including resolved bundle and manifest.
 
-Rulings: app+services push migration-free with exact source SQL inventory gates;
-installed infra RepoDigests pinned/rechecked; app-only --no-deps prevents restart;
-no new global mapping gate; preserve image prune336h. Backup retention/restore
-and failed-staging cleanup remain explicit follow-ups, no extra permission granted.
+Stage3 branch fix/release-hidden-artifacts based on current master13e657577.
+Regression RED4 → GREEN, four narrow include-hidden-files flags.
+Related release/worker/SSH/SPA/runtime contracts GREEN, real temporary PostgreSQL
+GREEN, actionlint/diff-check GREEN. Fresh internal B0/I0/M0; external one round
+REVIEW_GREEN B0/I0. No PHP application changes or migrations.
 
-Exact next: once part1 cold+warm+warm succeeds, mark both PR Ready, verify master
-base and checks, ask the owner for merge+deploy in delivery order. The owner's
-latest "Делай" approved persistent swap only; it is not merge/deploy permission.
-No production actions performed. Do not redo finished implementation/reviews.
+Next: commit/push single fix PR, Ready, merge under existing owner approval,
+wait automatic workflow to completion, verify production manifest digest/SHA,
+schema, health, unchanged infrastructure and timings. No manual production commands.
+Evidence/journal: ignored site/var/release/pipeline-journal.json.
