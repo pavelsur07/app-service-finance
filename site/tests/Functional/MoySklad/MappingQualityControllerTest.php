@@ -91,12 +91,15 @@ final class MappingQualityControllerTest extends WebTestCaseBase
         $client->request('GET', $url, ['diag_reason' => 'package_review', 'diag_manual' => '1']);
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('[data-diagnostic-listing-id]', 'Проверить комплектацию');
-        file_put_contents(self::getContainer()->getParameter('kernel.project_dir').'/var/mapping-quality-report.html', $client->getResponse()->getContent());
         self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM moysklad_listing_mapping_revisions'));
         $this->em()->getConnection()->executeStatement("UPDATE moysklad_mapping_diagnostic_runs SET status='running' WHERE id=?", [$latest->runId]);
         $client->request('GET', $url);
         self::assertSelectorExists('[data-diagnostic-running]');
         self::assertSelectorExists('[data-diagnostic-completed]');
+        $before = count($transport->getSent());
+        $client->submit($client->getCrawler()->filter('form[data-diagnostic-refresh]')->form());
+        self::assertResponseStatusCodeSame(303);
+        self::assertCount($before, $transport->getSent(), 'An active run must not enqueue another full scan.');
         $this->em()->getConnection()->executeStatement("UPDATE moysklad_mapping_diagnostic_runs SET status='failed', error_reason='diagnostic_failed' WHERE id=?", [$latest->runId]);
         $client->request('GET', $url);
         self::assertSelectorExists('[data-diagnostic-error]');
@@ -140,7 +143,6 @@ final class MappingQualityControllerTest extends WebTestCaseBase
         $client->request('GET', $url);
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('input[name="packageReviewConfirmed"]');
-        file_put_contents(self::getContainer()->getParameter('kernel.project_dir').'/var/mapping-quality-manual.html', $client->getResponse()->getContent());
         $form = $client->getCrawler()->filter('form[data-set-mapping-form]')->form();
         $payload = array_replace($form->getPhpValues(), ['target' => 'product:'.$d['product']->getExternalId()]);
         $client->request('POST', $url, $payload);

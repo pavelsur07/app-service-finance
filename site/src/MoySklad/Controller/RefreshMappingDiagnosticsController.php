@@ -6,6 +6,7 @@ namespace App\MoySklad\Controller;
 
 use App\Company\Security\ModuleAccess;
 use App\MoySklad\Infrastructure\Query\MappingCharacteristicsQuery;
+use App\MoySklad\Infrastructure\Query\MappingDiagnosticsQuery;
 use App\MoySklad\Infrastructure\Repository\MoySkladConnectionWriteRepository;
 use App\MoySklad\Message\DiagnoseMappingsMessage;
 use App\Shared\Service\ActiveCompanyService;
@@ -24,7 +25,7 @@ final class RefreshMappingDiagnosticsController extends AbstractController
 {
     #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     #[Route('/moy-sklad/connections/{connectionId}/mappings/{marketplace}/diagnostics', name: 'moysklad_mapping_diagnostics_refresh', requirements: ['connectionId' => Requirement::UUID, 'marketplace' => 'ozon|wildberries'], methods: ['POST'])]
-    public function __invoke(string $connectionId, string $marketplace, Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionWriteRepository $connections, MappingCharacteristicsQuery $characteristics, MessageBusInterface $bus): Response
+    public function __invoke(string $connectionId, string $marketplace, Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionWriteRepository $connections, MappingCharacteristicsQuery $characteristics, MappingDiagnosticsQuery $reports, MessageBusInterface $bus): Response
     {
         $connectionId = strtolower($connectionId);
         $companyId = (string) $activeCompany->getActiveCompany()->getId();
@@ -42,8 +43,12 @@ final class RefreshMappingDiagnosticsController extends AbstractController
         if (null !== $characteristic && null === $characteristics->find($companyId, $connectionId, $characteristic)) {
             throw $this->createNotFoundException();
         }
-        $bus->dispatch(new DiagnoseMappingsMessage($companyId, $connectionId, $marketplace, strtolower($id), $characteristic));
-        $this->addFlash('success', 'Проверка всего кабинета поставлена в очередь. Обновите страницу, чтобы увидеть прогресс.');
+        if ($reports->isRunning($companyId, $connectionId, $marketplace)) {
+            $this->addFlash('info', 'Проверка всего кабинета уже выполняется.');
+        } else {
+            $bus->dispatch(new DiagnoseMappingsMessage($companyId, $connectionId, $marketplace, strtolower($id), $characteristic));
+            $this->addFlash('success', 'Проверка всего кабинета поставлена в очередь. Обновите страницу, чтобы увидеть прогресс.');
+        }
 
         return $this->redirectToRoute('moysklad_listing_mappings', ['connectionId' => $connectionId, 'marketplace' => $marketplace, 'sizeCharacteristicId' => $characteristic ?? ''], 303);
     }

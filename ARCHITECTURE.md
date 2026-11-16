@@ -6539,12 +6539,18 @@ afterId, limit<=100)` — стабильный keyset, возвращает list
 ExternalMappingSourceVersion(fingerprint,total) по источникам и barcode sets.
 `MappingDiagnosticsQuery::inputVersion` объединяет этот fingerprint с каталогом,
 готовностью подключения, настройками, ревизиями и подтверждениями. Сверка идёт
-до/после каждого пакета и при чтении завершённого отчёта. Изменения во время
+при инициализации, перед публикацией завершённого отчёта и при его чтении.
+Между пакетами используется сохранённый total; версия правил проверяется всегда. Изменения во время
 расчёта → stale run, который не заменяет предыдущий completed. Незавершённый
 или failed run также не заменяет его. `page` выдаёт по25 сохранённых строк с
 фильтрами status/reason/manualReview; причины — MappingDiagnosticReason.
 `AutomaticMappingPreviewQuery::evaluate` — единый evaluator preview/diagnosis;
 SQL отчёта фильтрует сохранённые причины, не повторяет правила сопоставления.
+При completed сохраняются подробные строки только этого отчёта внутри scope;
+старые headers остаются для audit, потерявшие partial rows failed/running
+запуски становятся stale и не могут возобновить старый cursor. Stale run удаляет
+свои строки, не затрагивая последний completed. При уже running POST не ставит
+ещё один запуск; конфликт параметров существующего runId не ретраится.
 Предыдущая версия cached preview считается истёкшей, без ложной503 storage error.
 
 ### MoySklad: legacy UI качества сопоставления
@@ -6552,7 +6558,7 @@ SQL отчёта фильтрует сохранённые причины, не 
 Scoped POST moysklad_mapping_settings требует MARKETPLACE_READ+WRITE и CSRF;
 ChangeMappingSettingsAction меняет WB preset под connection FOR UPDATE,
 повтор без изменения значения сохраняет version. Scoped POST
-moysklad_mapping_diagnostics_refresh требует READ+CSRF и отправляет scalar
+moysklad_mapping_diagnostics_refresh требует READ+WRITE+CSRF и отправляет scalar
 DiagnoseMappingsMessage с UUID запроса. UI показывает время/прогресс, последний
 completed, stale/failed/empty и status/reason/manualReview filters по25 строк.
 Предпросмотр/apply также по25; отчёт не разрешает назначение.

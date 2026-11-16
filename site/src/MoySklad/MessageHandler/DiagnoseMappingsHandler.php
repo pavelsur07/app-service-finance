@@ -20,6 +20,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
 /** One delivery owns the scan; each <=100-row batch commits its cursor and results together. */
 #[AsMessageHandler]
@@ -43,6 +44,9 @@ final readonly class DiagnoseMappingsHandler
             while ($this->batch($message)) {
                 // No next-message dispatch window: retry of this delivery resumes the committed cursor.
             }
+        } catch (ListingMappingException $error) {
+            $this->logger->warning('Mapping diagnostic request conflicts with an existing run.', ['companyId' => $message->companyId, 'runId' => $message->runId, 'reason' => $error->reason]);
+            throw new UnrecoverableMessageHandlingException($error->getMessage(), 0, $error);
         } catch (\Throwable $error) {
             try {
                 $this->db->executeStatement("UPDATE moysklad_mapping_diagnostic_runs SET status='failed', error_reason='diagnostic_failed', finished_at=? WHERE company_id=? AND connection_id=? AND id=? AND status='running'", [$this->now(), $message->companyId, $message->connectionId, $message->runId]);
@@ -126,6 +130,16 @@ final readonly class DiagnoseMappingsHandler
             $this->db->executeStatement('UPDATE moysklad_mapping_diagnostic_runs SET after_listing_id=?, processed=processed+?, counts=?, status=?, finished_at=? WHERE company_id=? AND connection_id=? AND id=?',
                 [$after, count($sources), json_encode($counts, \JSON_THROW_ON_ERROR), $status, 'running' === $status ? null : $this->now(), $message->companyId, $message->connectionId, $message->runId]);
 
+            if ('stale' === $status) {
+                $this->db->executeStatement('DELETE FROM moysklad_mapping_diagnostic_rows WHERE company_id=? AND run_id=?', [$message->companyId, $message->runId]);
+            } elseif ('completed' === $status) {
+                // Keep audit headers; only the current completed report needs detailed rows.
+                $scope = [$message->companyId, $message->connectionId, $message->marketplace, $message->runId];
+                $this->db->executeStatement('DELETE FROM moysklad_mapping_diagnostic_rows r USING moysklad_mapping_diagnostic_runs d WHERE r.company_id=d.company_id AND r.run_id=d.id AND d.company_id=? AND d.connection_id=? AND d.marketplace=? AND d.id<>?', $scope);
+                // A retry must never resume a cursor whose partial rows were reclaimed.
+                $this->db->executeStatement("UPDATE moysklad_mapping_diagnostic_runs SET status='stale', finished_at=COALESCE(finished_at, ?) WHERE company_id=? AND connection_id=? AND marketplace=? AND id<>? AND status IN ('failed','running')", [$this->now(), ...$scope]);
+            }
+
             return 'running' === $status;
         });
     }
@@ -133,6 +147,7 @@ final readonly class DiagnoseMappingsHandler
     private function markStale(DiagnoseMappingsMessage $message): void
     {
         $this->db->executeStatement("UPDATE moysklad_mapping_diagnostic_runs SET status='stale', finished_at=? WHERE company_id=? AND connection_id=? AND id=?", [$this->now(), $message->companyId, $message->connectionId, $message->runId]);
+        $this->db->executeStatement('DELETE FROM moysklad_mapping_diagnostic_rows WHERE company_id=? AND run_id=?', [$message->companyId, $message->runId]);
     }
 
     /** @return array<string,int> */

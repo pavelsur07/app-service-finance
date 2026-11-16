@@ -52,6 +52,11 @@ final readonly class MappingDiagnosticsQuery
             $this->settings->get($companyId, $connectionId, $marketplace)->fingerprint(), AutomaticMappingGuard::RULE_VERSION, $sizeCharacteristicId], \JSON_THROW_ON_ERROR)), $source->total);
     }
 
+    public function isRunning(string $companyId, string $connectionId, string $marketplace): bool
+    {
+        return false !== $this->db->fetchOne("SELECT id FROM moysklad_mapping_diagnostic_runs WHERE company_id=? AND connection_id=? AND marketplace=? AND status='running' LIMIT 1", [$companyId, $connectionId, $marketplace]);
+    }
+
     public function page(string $companyId, string $connectionId, string $marketplace, int $page, ?string $status = null, ?string $reason = null, ?bool $manualReview = null): MappingDiagnosticPage
     {
         Assert::uuid($companyId);

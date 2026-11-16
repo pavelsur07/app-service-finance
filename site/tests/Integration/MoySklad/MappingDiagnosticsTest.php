@@ -104,6 +104,8 @@ final class MappingDiagnosticsTest extends PostgresResetTestCase
         self::assertSame(101, $done->totalItems);
         self::assertFalse($done->stale);
         self::assertSame(101, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM moysklad_mapping_diagnostic_rows WHERE run_id=?', [$next->runId]));
+        self::assertSame(101, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM moysklad_mapping_diagnostic_rows'), 'A successful report replaces old detailed rows, retaining headers.');
+        self::assertSame(2, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM moysklad_mapping_diagnostic_runs'));
     }
 
     public function testChangedInputDuringScanDoesNotReplaceCompletedReport(): void
@@ -132,8 +134,41 @@ final class MappingDiagnosticsTest extends PostgresResetTestCase
         $view = self::getContainer()->get(MappingDiagnosticsQuery::class)->page($message->companyId, $message->connectionId, 'ozon', 1);
         self::assertSame('stale', $view->latestRun?->status);
         self::assertSame(205, $view->latestRun->processed, 'Drift in a committed early batch prevents publication after the final batch.');
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM moysklad_mapping_diagnostic_rows WHERE run_id=?', [$view->latestRun->id]));
         self::assertSame($message->runId, $view->completedRun?->id);
         self::assertTrue($view->stale);
+    }
+
+    public function testSupersededFailedRunCannotResumeAfterItsRowsWereReclaimed(): void
+    {
+        $d = $this->mappingCatalog($this->em);
+        $message = new DiagnoseMappingsMessage($d['connection']->getCompanyId(), $d['connection']->getId(), 'ozon', Uuid::uuid7()->toString());
+        $handler = self::getContainer()->get(DiagnoseMappingsHandler::class);
+        $this->em->persist(MarketplaceListingBuilder::aListing()->forCompany($d['company'])->withIndex(2)->withMarketplace(MarketplaceType::WILDBERRIES)->withMarketplaceSku('WB-2')->withSupplierSku('001')->build());
+        $this->em->flush();
+        $other = new DiagnoseMappingsMessage($message->companyId, $message->connectionId, 'wildberries', Uuid::uuid7()->toString());
+        $handler($other);
+        $handler($message);
+        $this->connection->executeStatement("UPDATE moysklad_mapping_diagnostic_runs SET status='failed' WHERE id=?", [$message->runId]);
+        $replacement = new DiagnoseMappingsMessage($message->companyId, $message->connectionId, 'ozon', Uuid::uuid7()->toString());
+        $handler($replacement);
+        self::assertSame('stale', $this->connection->fetchOne('SELECT status FROM moysklad_mapping_diagnostic_runs WHERE id=?', [$message->runId]));
+        self::assertSame(2, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM moysklad_mapping_diagnostic_rows'));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM moysklad_mapping_diagnostic_rows WHERE run_id=?', [$other->runId]));
+        $handler($message);
+        $view = self::getContainer()->get(MappingDiagnosticsQuery::class)->page($message->companyId, $message->connectionId, 'ozon', 1);
+        self::assertSame($replacement->runId, $view->completedRun?->id);
+        self::assertSame(1, $view->totalItems);
+    }
+
+    public function testConflictingRunRequestIsNotRetriedAsTechnicalFailure(): void
+    {
+        $d = $this->mappingCatalog($this->em);
+        $message = new DiagnoseMappingsMessage($d['connection']->getCompanyId(), $d['connection']->getId(), 'ozon', Uuid::uuid7()->toString());
+        $handler = self::getContainer()->get(DiagnoseMappingsHandler::class);
+        $handler($message);
+        $this->expectException(\Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException::class);
+        $handler(new DiagnoseMappingsMessage($message->companyId, $message->connectionId, 'ozon', $message->runId, 'other-characteristic'));
     }
 
     public function testConfirmationInvalidatesReportAfterListingChangesMarketplace(): void
