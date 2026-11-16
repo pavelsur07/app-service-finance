@@ -13,11 +13,17 @@ export function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <div className={styles.root}>
-          <header className="card">
-            <p>Ваш Финдир · account</p>
+          <header className="card grid gap-3">
+            <p className="text-xl font-bold text-primary">
+              Ваш Финдир · account
+            </p>
             <nav className="wz-actions" aria-label="Основная навигация">
-              <Link to="/">Главная</Link>
-              <Link to="/about">О приложении</Link>
+              <Link className="ds-link" to="/">
+                Главная
+              </Link>
+              <Link className="ds-link" to="/about">
+                О приложении
+              </Link>
             </nav>
           </header>
           <main id="main">

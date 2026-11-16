@@ -1,0 +1,84 @@
+--- a/docker/frontend/Dockerfile
++++ b/docker/frontend/Dockerfile
+@@ -4,13 +4,15 @@
+ ARG APP
+ WORKDIR /workspace
+ RUN case "$APP" in account|admin) ;; *) echo 'APP must be account or admin' >&2; exit 2 ;; esac
++COPY apps/packages/ds/package.json apps/packages/ds/package-lock.json ./apps/packages/ds/
++RUN cd apps/packages/ds && npm ci --ignore-scripts --no-audit --no-fund
+ COPY apps/${APP}/package.json apps/${APP}/package-lock.json ./apps/${APP}/
+ COPY site/packages/api/package.json ./site/packages/api/
+ COPY site/packages/ui/package.json ./site/packages/ui/
+ RUN cd "apps/$APP" && npm ci --no-audit --no-fund
+ COPY apps/${APP}/ ./apps/${APP}/
++COPY apps/packages/ds/ ./apps/packages/ds/
+ COPY site/packages/ ./site/packages/
+-COPY site/assets/styles/kit/ ./site/assets/styles/kit/
+ RUN cd "apps/$APP" && npm run build
+
+ FROM nginx:1.27-alpine3.21
+--- a/docker/frontend/Dockerfile.dockerignore
++++ b/docker/frontend/Dockerfile.dockerignore
+@@ -5,13 +5,12 @@
+ !apps/account/**
+ !apps/admin/
+ !apps/admin/**
++!apps/packages/
++!apps/packages/ds/
++!apps/packages/ds/**
+ !site/
+ !site/packages/
+ !site/packages/**
+-!site/assets/
+-!site/assets/styles/
+-!site/assets/styles/kit/
+-!site/assets/styles/kit/**
+ !docker/
+ !docker/frontend/
+ !docker/frontend/**
+--- a/bin/frontend.sh
++++ b/bin/frontend.sh
+@@ -17,6 +17,9 @@
+ case "$action" in
+   dev) "${compose[@]}" up -d "${apps[@]}" ;;
+   install|typecheck|lint|test|build)
++    if [[ $action == install ]]; then
++      "${compose[@]}" run --rm --no-deps -w /workspace/apps/packages/ds "${apps[0]}" npm ci --ignore-scripts
++    fi
+     for app in "${apps[@]}"; do
+       if [[ $action == install ]]; then
+         "${compose[@]}" run --rm --no-deps "$app" npm ci
+--- a/.github/workflows/deploy.yml
++++ b/.github/workflows/deploy.yml
+@@ -77,6 +77,7 @@
+                       spa:
+                         - 'apps/account/**'
+                         - 'apps/admin/**'
++                        - 'apps/packages/ds/**'
+                         - 'site/packages/**'
+                         - 'site/assets/styles/kit/**'
+                         - 'docker/frontend/**'
+@@ -692,7 +693,12 @@
+               with:
+                   node-version: '24'
+                   cache: npm
+-                  cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
++                  cache-dependency-path: |
++                      apps/${{ matrix.app }}/package-lock.json
++                      apps/packages/ds/package-lock.json
++            - name: Install shared design system
++              working-directory: apps/packages/ds
++              run: npm ci --ignore-scripts
+             - run: npm ci
+             - run: npm run typecheck
+             - run: npm run lint
+--- a/tests/shell/frontend-release-test.py
++++ b/tests/shell/frontend-release-test.py
+@@ -71,6 +71,7 @@
+         self.assertIsNotNone(match, 'SPA path filter is required')
+         patterns = re.findall(r"^\s*- '([^']+)'", match[1], re.M)
+         for path in ['apps/account/src/main.tsx', 'apps/admin/package-lock.json',
++                     'apps/packages/ds/src/styles.css', 'apps/packages/ds/tokens/ds-v3.tokens.json',
+                      'site/packages/ui/src/Button.tsx', 'site/packages/api/src/index.ts',
+                      'site/assets/styles/kit/tokens/colors.css', 'docker/frontend/nginx.conf',
+                      'bin/frontend-production-test.sh', '.github/workflows/deploy.yml']:

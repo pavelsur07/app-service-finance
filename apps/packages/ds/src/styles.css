@@ -1,2 +1,359 @@
-/* Stage 1: token entry only. Tailwind and base styles arrive in Stage 2. */
+/* DS v3.4 light preset; reference: docs/design-system/v3/tailwind/app.css. */
 @import './tokens.css';
+@import 'tailwindcss' source(none);
+
+@source './components';
+@source not './components/**/*.test.ts';
+@source not './components/**/*.test.tsx';
+
+@theme inline {
+  --color-*: initial;
+  --color-white: var(--ds-text-inverse);
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-surface-page: var(--ds-bg-page);
+  --color-surface-card: var(--ds-bg-card);
+  --color-surface-subtle: var(--ds-bg-subtle);
+  --color-surface-subtle-hover: var(--ds-bg-subtle-hover);
+  --color-surface-row-hover: var(--ds-bg-row-hover);
+  --color-surface-row-selected: var(--ds-bg-row-selected);
+
+  --color-fg-strong: var(--ds-text-strong);
+  --color-fg-secondary: var(--ds-text-secondary);
+  --color-fg-tertiary: var(--ds-text-tertiary);
+  --color-fg-muted: var(--ds-text-muted);
+  --color-fg-disabled: var(--ds-text-disabled);
+  --color-fg-faint: var(--ds-text-faint);
+  --color-fg-inverse: var(--ds-text-inverse);
+
+  --color-line: var(--ds-border);
+  --color-line-soft: var(--ds-border-soft);
+  --color-line-hover: var(--ds-border-hover);
+  --color-line-strong: var(--ds-border-strong);
+
+  --color-primary: var(--ds-color-primary);
+  --color-primary-hover: var(--ds-color-primary-hover);
+  --color-primary-tint: var(--ds-color-primary-tint);
+  --color-primary-border: var(--ds-color-primary-border);
+  --color-primary-selection: var(--ds-color-primary-selection);
+  /* Только бренд-моменты (логотип, промо). Не для кнопок — Decision 44. */
+  --color-accent: var(--ds-color-accent);
+
+  --color-success-bg: var(--ds-success-bg);
+  --color-success-border: var(--ds-success-border);
+  --color-success-text: var(--ds-success-text);
+  --color-success-dot: var(--ds-success-dot);
+  --color-danger-bg: var(--ds-danger-bg);
+  --color-danger-border: var(--ds-danger-border);
+  --color-danger-text: var(--ds-danger-text);
+  --color-danger-dot: var(--ds-danger-dot);
+  --color-warning-bg: var(--ds-warning-bg);
+  --color-warning-border: var(--ds-warning-border);
+  --color-warning-text: var(--ds-warning-text);
+  --color-warning-dot: var(--ds-warning-dot);
+  --color-info-bg: var(--ds-info-bg);
+  --color-info-border: var(--ds-info-border);
+  --color-info-text: var(--ds-info-text);
+  --color-info-dot: var(--ds-info-dot);
+
+  --font-weight-*: initial;
+  --font-weight-normal: var(--ds-fw-regular);
+  --font-weight-medium: var(--ds-fw-medium);
+  --font-weight-semibold: var(--ds-fw-semibold);
+  --font-weight-bold: var(--ds-fw-bold);
+  --font-weight-extrabold: var(--ds-fw-extrabold);
+
+  --font-*: initial;
+  --font-sans: var(--ds-font-family);
+  --font-mono: var(--ds-font-mono);
+
+  --text-*: initial;
+  --text-2xs: var(--ds-fs-2xs);
+  --text-2xs--line-height: 1.35;
+  --text-xs: var(--ds-fs-xs);
+  --text-xs--line-height: 1.35;
+  --text-sm: var(--ds-fs-sm);
+  --text-sm--line-height: 1.35;
+  --text-md: var(--ds-fs-md);
+  --text-md--line-height: 1.5;
+  --text-lg: var(--ds-fs-lg);
+  --text-lg--line-height: 1.5;
+  --text-xl: var(--ds-fs-xl);
+  --text-xl--line-height: 1.2;
+  --text-2xl: var(--ds-fs-2xl);
+  --text-2xl--line-height: 1.2;
+  --text-3xl: var(--ds-fs-3xl);
+  --text-3xl--line-height: 1.2;
+  --text-4xl: var(--ds-fs-4xl);
+  --text-4xl--line-height: 1.2;
+
+  --radius-*: initial;
+  --radius-xs: var(--ds-r-xs);
+  --radius-sm: var(--ds-r-sm);
+  --radius-md: var(--ds-r-md);
+  --radius-lg: var(--ds-r-lg);
+  --radius-xl: var(--ds-r-xl);
+  --radius-full: var(--ds-r-pill);
+
+  --shadow-*: initial;
+  --shadow-sm: var(--ds-shadow-sm);
+  --shadow-card-hover: var(--ds-shadow-card-hover);
+  --shadow-primary: var(--ds-shadow-primary);
+  --shadow-menu: var(--ds-shadow-menu);
+  --shadow-modal: var(--ds-shadow-modal);
+  --shadow-drawer: var(--ds-shadow-drawer);
+
+  --tracking-tight: var(--ds-ls-tight);
+  --tracking-caps: var(--ds-ls-caps);
+
+  --ease-standard: var(--ds-ease-standard);
+  --ease-exit: var(--ds-ease-exit);
+
+  --spacing: 4px;
+  --spacing-sidebar: var(--ds-app-sidebar-width);
+  --spacing-sidebar-rail: 72px;
+  --spacing-header: var(--ds-app-header-height);
+  --spacing-control: var(--ds-control-h);
+  --spacing-control-sm: var(--ds-control-h-sm);
+}
+
+/* Брейкпоинты — литералы (в @theme для media нельзя var()); значения = --bp-* листа DS-Tokens.
+   Продукт — десктоп от 1280px; ниже сайдбар сворачивается в рейку. */
+@theme {
+  --breakpoint-*: initial;
+  --breakpoint-sm: 768px;
+  --breakpoint-md: 960px;
+  --breakpoint-lg: 1280px;
+  --breakpoint-xl: 1440px;
+}
+
+/* Слои наложения — именованные утилиты вместо магических чисел */
+@utility z-raised {
+  z-index: var(--ds-z-raised);
+}
+@utility z-sticky {
+  z-index: var(--ds-z-sticky);
+}
+@utility z-header {
+  z-index: var(--ds-z-header);
+}
+@utility z-dropdown {
+  z-index: var(--ds-z-dropdown);
+}
+@utility z-overlay {
+  z-index: var(--ds-z-overlay);
+}
+@utility z-toast {
+  z-index: var(--ds-z-toast);
+}
+
+/* Место под полосу прокрутки резервируется всегда — контент не прыгает (сайдбар, рабочая зона) */
+@utility scroll-stable {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ds-border-hover) transparent;
+}
+
+@font-face {
+  font-family: 'Manrope';
+  src: url('./fonts/Manrope-variable.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+@layer base {
+  /* rem не трогаем (spacing задан в px), кегль body — из токена */
+  body {
+    margin: 0;
+    font-family: var(--ds-font-family);
+    font-size: var(--ds-fs-md);
+    line-height: var(--ds-lh-base);
+    color: var(--ds-text-strong);
+    background: var(--ds-bg-page);
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+  :where(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    summary,
+    [tabindex]:not([tabindex='-1'])
+  ):focus-visible {
+    outline: 2px solid var(--ds-focus-ring-color);
+    outline-offset: 2px;
+  }
+}
+
+/* Stage 2 bridge: current markup/wrappers, v3 values. React components arrive
+   in Stage 3; these classes remain the shared component styling surface. */
+@layer components {
+  .card {
+    @apply rounded-lg border border-line bg-surface-card shadow-sm;
+    padding: var(--ds-card-padding);
+  }
+  .card > p + p,
+  .card > h1 + p {
+    @apply mt-3;
+  }
+  .card > form {
+    @apply mt-5;
+  }
+  .wz-title {
+    @apply text-4xl font-bold text-fg-strong;
+    letter-spacing: var(--ds-ls-tight);
+  }
+  .wz-head {
+    @apply flex flex-wrap items-center justify-between gap-3;
+  }
+  .wz-actions {
+    @apply flex flex-wrap items-center gap-2;
+  }
+  .form-field {
+    @apply flex flex-col gap-1;
+  }
+  .form-field + .form-field {
+    @apply mt-3;
+  }
+  .form-label {
+    font: var(--ds-type-label);
+    color: var(--ds-form-label-text);
+  }
+  .form-error {
+    color: var(--ds-form-error-text);
+  }
+  .form-error + .btn,
+  .form-field + .btn {
+    @apply mt-4;
+  }
+  .input,
+  .select {
+    @apply w-full rounded-md border px-3 text-md;
+    height: var(--ds-control-h);
+    border-color: var(--ds-input-border);
+    background: var(--ds-input-bg);
+    color: var(--ds-input-text);
+  }
+  .input::placeholder {
+    color: var(--ds-input-placeholder);
+  }
+  .input:hover:not(:disabled),
+  .select:hover:not(:disabled) {
+    border-color: var(--ds-input-border-hover);
+  }
+  .input:focus-visible,
+  .select:focus-visible {
+    border-color: var(--ds-input-border-focus);
+    box-shadow: var(--ds-ring-focus);
+  }
+  .input[aria-invalid='true'],
+  .select[aria-invalid='true'] {
+    border-color: var(--ds-input-border-error);
+    box-shadow: var(--ds-ring-error);
+  }
+  .input:disabled,
+  .select:disabled {
+    @apply cursor-not-allowed;
+    background: var(--ds-input-bg-disabled);
+    border-color: var(--ds-input-border-disabled);
+    color: var(--ds-text-disabled);
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-transparent text-md font-semibold;
+    cursor: pointer;
+    transition:
+      background-color var(--ds-dur-fast),
+      border-color var(--ds-dur-fast);
+  }
+  .btn-sm {
+    height: 30px;
+    @apply px-3;
+  }
+  .btn-md {
+    height: 36px;
+    @apply px-3.5;
+  }
+  .btn-lg {
+    height: 44px;
+    @apply px-5 text-lg;
+  }
+  .btn-primary {
+    background: var(--ds-button-primary-bg);
+    border-color: var(--ds-button-primary-bg);
+    color: var(--ds-button-primary-text);
+    box-shadow: var(--ds-shadow-primary);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--ds-button-primary-bg-hover);
+    border-color: var(--ds-button-primary-bg-hover);
+  }
+  .btn-primary:active:not(:disabled) {
+    background: var(--ds-button-primary-bg-active);
+    border-color: var(--ds-button-primary-bg-active);
+  }
+  .btn-secondary {
+    background: var(--ds-button-secondary-bg);
+    border-color: var(--ds-button-secondary-border);
+    color: var(--ds-button-secondary-text);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--ds-button-secondary-bg-hover);
+    border-color: var(--ds-button-secondary-border-hover);
+  }
+  .btn-ghost {
+    background: var(--ds-button-ghost-bg);
+    color: var(--ds-button-ghost-text);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--ds-button-ghost-bg-hover);
+  }
+  .btn-danger {
+    @apply border-danger-border bg-surface-card text-danger-text;
+  }
+  .btn-danger:hover:not(:disabled) {
+    @apply bg-danger-bg;
+  }
+  .btn:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+  /* TODO(ds): no dedicated loading sheet yet; keep the current busy label. */
+  .btn[aria-busy='true'] {
+    @apply cursor-wait;
+  }
+  .empty {
+    @apply rounded-lg border border-dashed border-line bg-surface-card px-6 py-12 text-center;
+  }
+  .empty-title {
+    @apply mb-1 text-lg font-bold text-fg-strong;
+  }
+  .empty-text {
+    @apply mx-auto mb-4 text-md text-fg-muted;
+    max-width: 40ch;
+  }
+  .empty-text > .wz-actions {
+    @apply mt-4 justify-center;
+  }
+  .alert {
+    @apply rounded-lg border p-5;
+  }
+  .alert--danger {
+    @apply border-danger-border bg-danger-bg text-danger-text;
+  }
+  .a-title {
+    font: var(--ds-type-title-sm);
+    @apply mb-2;
+  }
+  .a-text {
+    @apply mb-4;
+  }
+  .ds-link {
+    @apply text-primary underline underline-offset-2;
+  }
+  .ds-link:hover {
+    @apply text-primary-hover;
+  }
+}

@@ -19,5 +19,8 @@
   },
   "devDependencies": {
     "style-dictionary": "5.8.0"
+  },
+  "dependencies": {
+    "tailwindcss": "4.3.5"
   }
 }

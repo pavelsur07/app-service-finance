@@ -1,9 +1,20 @@
-# @vashfindir/ds — v3.4, Stage 1
+# @vashfindir/ds — v3.4, Stage 2
 
 Общая ДС для account/admin. Runtime exports: `.` (tokens и TokenName),
-`./tokens.css` (`:root` с `--ds-`), `./styles.css` (пока только tokens.css;
-Tailwind/preflight и подключение apps — Stage 2). Тёмная тема не включена.
-Токены не подключены к runtime приложений на Stage 1.
+`./tokens.css` (`:root` с `--ds-`), `./styles.css` (Tailwind v4 + preflight,
+тема ДС, Manrope, базовые стили текущих экранов). Тёмная тема не включена.
+
+App CSS entry импортирует `@vashfindir/ds/styles.css` и объявляет `@source './'`
+для собственного src; main.tsx подключает этот entry. Пакет отключает
+автопоиск Tailwind и добавляет только `./components`; соседний app, tests и
+legacy site не сканируются. Vite использует `@tailwindcss/vite`.
+
+Существующие Button/EmptyState/ErrorBoundary JS wrappers пока из старого UI
+(замена — Stage 3), но все их CSS теперь из этого пакета по v3.4. Псевдоклассы
+focus-visible/hover/disabled/error — поведение браузера, без class-моков.
+Manrope 200–800 подключён локально, кириллица/латиница; OFL доставляется через
+общий Vite publicDir по `/fonts/Manrope-OFL.txt`. Никаких runtime-запросов шрифта
+к внешним сервисам. `prebuild` apps проверяет актуальность generated токенов.
 
 ## Источник и обновление
 
@@ -50,8 +61,12 @@ make front-typecheck front-lint front-test front-build
 ```
 
 Оба приложения включают тесты/типы/линт пакета в существующие команды;
-новые production Docker/CI изменения на Stage 1 не требуются. Проверка генератора
-пока отдельная; включение её в production build — Stage 2.
+`npm run build` также вызывает check:generated. Дополнительные compile-тесты
+проверяют сброс default palette/type/radius/shadow/breakpoints и DS utilities.
+Production Docker/CI integration применена после named approval §3.3.
+`front-install` устанавливает пакет перед apps; Docker build копирует DS,
+CI учитывает DS paths/lock и устанавливает пакет отдельно. История согласованного
+patch — `docs/tasks/ds-v3-apps/proposals/`.
 
 Деньги: U+00A0, U+2212, запятая, ₽ суффиксом, расходы обычным цветом.
 Иконки: @tabler/icons-react, размеры 16/18/20, stroke 2 (реализация позднее).

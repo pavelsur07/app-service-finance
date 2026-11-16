@@ -71,6 +71,7 @@ class FrontendReleaseTest(unittest.TestCase):
         self.assertIsNotNone(match, 'SPA path filter is required')
         patterns = re.findall(r"^\s*- '([^']+)'", match[1], re.M)
         for path in ['apps/account/src/main.tsx', 'apps/admin/package-lock.json',
+                     'apps/packages/ds/src/styles.css', 'apps/packages/ds/tokens/ds-v3.tokens.json',
                      'site/packages/ui/src/Button.tsx', 'site/packages/api/src/index.ts',
                      'site/assets/styles/kit/tokens/colors.css', 'docker/frontend/nginx.conf',
                      'bin/frontend-production-test.sh', '.github/workflows/deploy.yml']:
