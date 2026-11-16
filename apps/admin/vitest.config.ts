@@ -4,6 +4,10 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   resolve: {
     alias: {
+      react: fileURLToPath(new URL('./node_modules/react', import.meta.url)),
+      'react-dom': fileURLToPath(
+        new URL('./node_modules/react-dom', import.meta.url),
+      ),
       vitest: fileURLToPath(import.meta.resolve('vitest')),
       'msw/node': fileURLToPath(import.meta.resolve('msw/node')),
       msw: fileURLToPath(import.meta.resolve('msw')),
@@ -19,6 +23,9 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts', '../packages/ds/src/**/*.test.ts'],
+    include: [
+      'src/**/*.test.{ts,tsx}',
+      '../packages/ds/src/**/*.test.{ts,tsx}',
+    ],
   },
 });

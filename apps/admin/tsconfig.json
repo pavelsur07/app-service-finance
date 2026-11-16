@@ -33,7 +33,6 @@
     "tests",
     "*.config.ts",
     "../../site/packages/api/src",
-    "../../site/packages/ui/src",
     "../../site/packages/api/testing",
     "../packages/ds/src"
   ]

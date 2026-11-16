@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from 'react-router';
-import { Button } from '@vashfindir/ui';
+import { Button, Card, Alert } from '@vashfindir/ds';
 import { useSession } from './SessionProvider';
 import { SessionStatus } from '../shared/session/SessionStatus';
 export function RequireSession() {
@@ -9,7 +9,7 @@ export function RequireSession() {
   if (!state.data) return <SessionStatus />;
   return (
     <>
-      <section className="card" aria-label="Текущая сессия">
+      <Card aria-label="Текущая сессия">
         <div className="wz-actions">
           <span>{state.data.user.email}</span>
           <Button variant="secondary" onClick={() => void store.logout()}>
@@ -17,11 +17,11 @@ export function RequireSession() {
           </Button>
         </div>
         {state.error && (
-          <p role="alert" className="form-error">
+          <Alert tone="danger" className="mt-3">
             {state.error}
-          </p>
+          </Alert>
         )}
-      </section>
+      </Card>
       <Outlet />
     </>
   );

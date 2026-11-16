@@ -159,7 +159,7 @@ Stage base commit: `fbfcc71c88984d560b4cf80e56310031cdd11eff`.
 - [x] Production patch применён после named approval 2026-11-16;
   actual release contracts и fresh admin install/typecheck/tests PASS.
 - [x] Реальный CI PR #3030 зелёный (43814469343, f82ec6d78); Stage 2
-  Ready/handoff. Merge+deploy #3030 ожидает решения Владельца.
+  Ready/handoff. Merge+deploy #3030 выполнен, acceptancePASS.
 
 Work items:
 - 2.1 — baseline, screenshots before, тесты темы/визуального контракта RED.
@@ -181,7 +181,7 @@ production build/smoke после одобрения. Reviewer focus: CSS isolat
 
 ## Stage 3 — базовые компоненты
 
-Risk: HIGH-LOCAL. Stage base commit: записать перед работой.
+Risk: HIGH-LOCAL. Stage base commit: `18fa02478` (master после PR3033).
 DoD: Button/Link/FormField/Input/InputGroup/Textarea/Select/Checkbox/Radio/Toggle,
 Badge/StatusPill/Card/EmptyState/Alert/Toast; apps используют их вместо старых
 Button/EmptyState; Vitest рендер/состояния/клавиатура/a11y; прежние auth/CSRF/401.
@@ -236,4 +236,31 @@ workflow43813732309 SUCCESS, build/deploy skipped для docs-only измене�
 Stage 2 handoff: approved patch f2df0325f, integration base87e6a7338,
 code head f82ec6d78; actual CI43814469343 SUCCESS. После independent review
 UI runtime/lock не менялись; actual config exact reviewed candidate.
-Stage2 закрыт, PR3030 Ready; production rollout Stage2 ещё не выполнялся.
+Stage2 доставлен: PR3030 merged37264e03c, workflow43819052773 SUCCESS; оба apps healthy на SHA, HTTPS23/23 и браузерная приёмка PASS.
+
+## Stage 3 — уточнённый технический план и приёмка (2026-11-16)
+
+- 3.1: baseline обоих apps; Vitest SSR-контракты компонентов RED, браузерные
+  поведенческие тесты в отдельном test-only fixture (без нового production route).
+- 3.2: базовые компоненты §5.3 на native HTML/React19, semantic/component
+  токенах; Tabler именованные imports16/18/20 stroke2; peer React.
+- 3.3: миграция Login/Home/About/404/session/company-picker, Link через
+  router adapter, локальная ErrorBoundary вместо последнего site/ui consumer.
+- 3.4: app/package gates, preview E2E, 1440 before/after, fresh internal review,
+  separate external review, Stage Report и отдельный PR.
+
+Чек-лист: [x] все16 базовых компонентов exported; [x] native props/ref,
+label/error/helper IDs; [x] disabled/loading/readonly; [x] external links
+secure + screenreader; [x] keyboard checkbox/radio/toggle/password/clear;
+[x] Toast4s с pause/cleanup; [x] site/ui consumers0; [x] auth/session tests
+без изменения правил; [x] contrast/focus; [x] gates/reviews green.
+
+SSR Vitest использует существующие ReactDOMServer и node environment; DOM
+поведение проверяется настоящим Chromium/Playwright (без новых test dependencies).
+Test-only fixture собирается отдельно и не попадает в dist приложений.
+Нативный Select — явное требование owner brief; custom select-popup листа
+не добавляется. Focus outline2px/offset2px сохраняется поверх shadow листа.
+
+Stage3 завершён: native components/screens, fresh internal0/0(MINOR1fixed),
+external0/1 IMPORTANTfixed without re-run. Scope дополняет ToastStack (fixed
+viewport) и ErrorBoundary для полного удаления old UI. Отчёт stage-3.md.
