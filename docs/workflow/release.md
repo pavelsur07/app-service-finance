@@ -1,46 +1,83 @@
-# Release: PR с миграцией
+# Production release
 
-> Когда читать: PR несёт Doctrine-миграцию — до запроса «merge and deploy»
-> на handoff. Триггер задан в `AGENTS.md` §3.2.
+Релиз разрешается владельцем по AGENTS.md §3.2. Локальная реализация и Draft PR
+не разрешают запуск production. PR с миграцией требует отдельного разрешения
+на миграцию вместе с выпуском.
 
-A merge into `master` deploys automatically after the required checks — but a
-PR carrying a migration does **not** deploy on the standard approval.
-Production migrations are a separate, manually dispatched action, and the
-push-triggered deploy refuses to run until production's schema is current:
-
-| Workflow job | Trigger |
-|---|---|
-| `migrations` | `workflow_dispatch` with `production_action: migrations` only |
-| `Verify production schema is ready` | every push to `master`; fails while any migration is pending |
-| `deploy` | only after that gate is green |
-
-So a merge with a pending migration lands the code and stops there, with the
-deploy job skipped — and the gate then blocks every later deploy too, not just
-that one.
-
-## Request template
-
-When the PR carries a migration, say so in the handoff request and ask for
-both actions at once:
-
-```text
-Ready: PR #<n> "<title>" — the PR adds migration <Version...>: <reversible? data touched? backup needed?>.
-Run the production migration and deploy?
-Reply: "run the migration and deploy #<n>"
-```
-
-An irreversible migration or a destructive data change is named explicitly in
-the request, with the backup or rollback plan. The owner decides with that fact
-in front of them.
-
-## Dispatch order
-
-After approval, dispatch in order and check the schema between the two:
+Ручные действия `deploy`, `migrations`, `release` доступны только на master.
+`release_sha` обязателен: полный 40-символьный SHA, равный SHA запуска workflow.
+Не подставлять «последний master» в середине запуска. Пример после разрешения:
 
 ```bash
-gh workflow run deploy.yml --ref master -f production_action=migrations
-gh workflow run deploy.yml --ref master -f production_action=deploy
+gh workflow run deploy.yml --ref master -f production_action=release -f release_sha=<full-SHA>
 ```
 
-Data migrations (measurements, merges, post-deploy reconciliation) —
-`docs/workflow/data-migrations.md`.
+`release`: проверенный комплект → полный логический backup всех non-template
+БД текущего PostgreSQL → Doctrine и сервисные миграции → проверка версий схем
+→ rolling deploy → здоровье → SHA/digest/длительности этапов.
+
+`migrations`: backup, миграции и проверка версий без deploy. `deploy` и обычный
+push: проверка версий, затем deploy, без самостоятельного запуска миграций.
+Проверяются Doctrine up-to-date и реестры Goose/Python против SQL-файлов того
+же SHA. Глобальный doctrine:schema:validate не добавлен: историческая схема
+может отличаться от ORM mapping и это не эквивалент pending migrations.
+
+Manifest содержит SHA, доверенные workflow/run/attempt, provenance сборок и
+12 digest (9 application + 3 уже установленных infrastructure images).
+Каждый образ привязан к descriptor успешной сборки; SPA — после browser smoke.
+Наличие Docker-тега само по себе не разрешает выпуск. Переиспользуются только
+артефакты доверенного deploy.yml на master после обязательных gates, включая
+PHPStan; наличие всех digest проверяется в реестре. Ошибка доступа не является
+cache miss. При отсутствии комплекта выполняются сборки и проверки.
+
+Один production job держит `production-release`, cancel-in-progress=false;
+удалённый flock дополнительно исключает перемешивание этапов. До изменения
+приложения проверяется Git ancestry установленного high-water SHA. Повтор того
+же SHA разрешён. High-water записывается до миграции, last-success — только
+после deploy/health. Частичный rerun сохраняет успешные build descriptors и
+имена upstream-артефактов; resolver учитывает последние результаты jobs до
+публикующего attempt. Конфигурация архивируется git archive ровно из SHA.
+
+Все запускаемые application-контейнеры используют digest Compose override.
+Для Traefik/PostgreSQL/Redis фиксируется фактически запущенный RepoDigest,
+а не текущий upstream tag; перед мутацией digest сверяется повторно.
+Обычный релиз не пересоздаёт infrastructure: app up всегда с --no-deps и
+явным списком. Drift инфраструктуры блокирует комплект; не обходить его
+автоматическим downgrade — нужен новый проверенный выпуск. Worker с
+отключённым healthcheck проверяется по running, включая enabled eval worker.
+
+Backups: `/var/backups/app-service-finance/<sha>/<run>-<attempt>/`, umask 077,
+каталоги 0700, файлы 0600. Workflow deploy user должен уже иметь право записи
+в корень; при отсутствии права — ошибка, без sudo/chmod расширения доступа.
+Проверяются pg_dump, непустой custom archive, полное чтение pg_restore в
+/dev/null и checksum. Это не проверка восстановления. Не включены globals
+ролей/конфигурация кластера; каждая БД имеет собственный consistent snapshot.
+При ошибке backup/migration/schema следующие этапы не исполняются. Автоотката
+и автоматического удаления backups нет; retention и восстановление остаются
+отдельными задачами утверждённого плана.
+
+Сохранена существующая очистка Docker images старше 336 часов. Upload tar
+удаляется после распаковки, предыдущая конфигурация — после успешного health.
+Неуспешные staging/config и backups сохраняются для диагностики; их ручная
+очистка/retention — follow-up, не расширять её на данные автоматически.
+
+До handoff:
+
+```bash
+make test-release-pipeline test-deploy-workflow test-frontend-release
+RELEASE_TEST_POSTGRES_IMAGE=postgres:15-alpine make test-release-pipeline
+```
+
+Вторая команда включает временную локальную PostgreSQL: реальный dump,
+полное чтение, checksum и подтверждение неизменности БД; внешние сервисы
+репетируются заглушками. Production не вызывается. После разрешённого
+выпуска сверить SHA, digest, версии схем, здоровье и длительности через
+read-only wrappers (docs/maintenance/prod-access.md).
+
+Запрос для PR с миграцией:
+
+```text
+Ready: PR #<n> "<title>" — добавляет миграцию <Version...>:
+<обратимость, затронутые данные>. Выполнить release с backup, миграцией и deploy?
+Reply: "run the migration and deploy #<n>"
+```

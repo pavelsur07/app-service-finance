@@ -15,12 +15,57 @@ on:
                     - none
                     - deploy
                     - migrations
+                    - release
+            release_sha:
+                description: Full master SHA, must equal the workflow run SHA
+                required: false
+                type: string
 
 jobs:
+    resolve-release:
+        name: Resolve verified release
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            actions: read
+            packages: read
+        outputs:
+            reuse: ${{ steps.resolve.outputs.reuse }}
+            artifact: ${{ steps.resolve.outputs.artifact }}
+        steps:
+            - uses: actions/checkout@v6
+            - uses: docker/login-action@v4
+              if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' }}
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+            - uses: docker/setup-buildx-action@v4
+            - name: Validate SHA and resolve trusted artifact
+              id: resolve
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  RELEASE_SHA: ${{ inputs.release_sha }}
+                  PRODUCTION_ACTION: ${{ inputs.production_action }}
+              run: |
+                  python3 site/bin/release-bundle.py resolve --directory .release
+                  echo "artifact=resolved-release-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+            - uses: actions/upload-artifact@v4
+              if: ${{ steps.resolve.outputs.reuse == 'true' }}
+              with:
+                  name: ${{ steps.resolve.outputs.artifact }}
+                  path: |
+                      .release/manifest.json
+                      .release/compose.digest.json
+                      .release/infrastructure.tsv
+                  if-no-files-found: error
+                  retention-days: 30
+
     # 0. ЧТО ИЗМЕНИЛОСЬ: один источник правды для path-фильтров.
     #    Остальные job'ы гейтятся по этим выходам, поэтому фронт-, бэк-
     #    и landing-правки больше не тянут весь пайплайн.
     changes:
+        needs: resolve-release
         name: 🔎 Detect changes
         runs-on: ubuntu-latest
         outputs:
@@ -39,7 +84,7 @@ jobs:
             - name: 🔎 Path filter
               uses: dorny/paths-filter@v4
               id: f
-              if: ${{ github.event_name != 'workflow_dispatch' }}
+              if: ${{ github.event_name != 'workflow_dispatch' && needs.resolve-release.outputs.reuse != 'true' }}
               with:
                   filters: |
                       backend:
@@ -49,6 +94,7 @@ jobs:
                         - 'site/templates/**'
                         - 'site/public/**'
                         - 'site/bin/**'
+                        - 'tests/shell/*release*'
                         - 'site/tests/**'
                         - 'site/composer.json'
                         - 'site/composer.lock'
@@ -120,6 +166,7 @@ jobs:
               id: matrix
               env:
                   PRODUCTION_ACTION: ${{ inputs.production_action }}
+                  REUSE_RELEASE: ${{ needs.resolve-release.outputs.reuse }}
               run: |
                   be='${{ steps.f.outputs.backend }}'
                   fe='${{ steps.f.outputs.frontend }}'
@@ -160,13 +207,17 @@ jobs:
                     # docs-only merge после кодового пропускает build-and-push по
                     # path-фильтру, и HEAD остаётся без образов — `migrations` падал на
                     # `manifest unknown`, хотя код был готов. Поэтому dispatch собирает сам.
-                    if [ "$PRODUCTION_ACTION" = 'deploy' ] || [ "$PRODUCTION_ACTION" = 'migrations' ]; then
+                    if [ "$PRODUCTION_ACTION" = 'deploy' ] || [ "$PRODUCTION_ACTION" = 'migrations' ] || [ "$PRODUCTION_ACTION" = 'release' ]; then
                       be=true
                       sp=true
                       la=true
                       sv=true
                       ai=true
                     fi
+                  fi
+
+                  if [ "${REUSE_RELEASE:-false}" = 'true' ]; then
+                    be=false; fe=false; sp=false; la=false; sa=false; sv=false; ai=false
                   fi
 
                   items=()
@@ -389,8 +440,8 @@ jobs:
                     site-php-cli composer cs:strict-types
 
     # СТАТИЧЕСКИЙ АНАЛИЗ ТИПИЗАЦИИ — PHPStan level 8.
-    #   Сознательно НЕ добавлен в needs у build-and-push: гейтит PR, но не блокирует
-    #   сборку и деплой. Поведение Production-пайплайна этим job'ом не меняется.
+    #   Сборки могут идти параллельно, но release-manifest требует success этого
+    #   job: без успешного анализа новый production-комплект не публикуется.
     #   Достижимо зелёный: унаследованные ошибки лежат в site/phpstan-baseline.neon,
     #   на PR проверяется только то, что изменил автор.
     stan:
@@ -706,7 +757,7 @@ jobs:
             - run: npm run build
             - name: Release contracts
               working-directory: .
-              run: make test-deploy-workflow test-frontend-release
+              run: make test-deploy-workflow test-frontend-release test-release-pipeline
 
     spa-auth-e2e:
         name: SPA real backend and HTTPS isolation
@@ -753,9 +804,10 @@ jobs:
             - name: Real Symfony acceptance through production nginx and trusted HTTPS
               run: make front-auth-e2e MODE=production
             - name: Routing and release contracts
-              run: make test-frontend-auth-routing test-frontend-release test-deploy-workflow
+              run: make test-frontend-auth-routing test-frontend-release test-deploy-workflow test-release-pipeline
 
     build-and-push:
+        name: Build image (${{ matrix.image }})
         needs: [ changes, unit-tests, cs-check, services-go, services-python, spa-checks ]
         # !cancelled() — чтобы job стартовал даже когда unit-tests/cs-check пропущены (frontend/landing-only).
         # != 'failure'  — но НЕ собираем, если бэкенд-тесты, проверка стиля или гейты сервиса упали.
@@ -782,6 +834,7 @@ jobs:
               uses: docker/setup-buildx-action@v4
 
             - name: 🛠 Build and Push ${{ matrix.service }}
+              id: build
               uses: docker/build-push-action@v7
               with:
                   context: ${{ matrix.context }}
@@ -816,88 +869,164 @@ jobs:
               run: bin/frontend-production-test.sh
 
             - name: Publish verified SPA image
+              id: publish-spa
               if: ${{ github.event_name != 'pull_request' && matrix.frontend_app != '' }}
               env:
                   IMAGE_SHA: ghcr.io/pavelsur07/${{ matrix.image }}:${{ github.sha }}
                   IMAGE_LATEST: ghcr.io/pavelsur07/${{ matrix.image }}:latest
               run: |
-                  docker push "$IMAGE_SHA"
+                  digest=$(docker push "$IMAGE_SHA" | tee /dev/stderr | sed -n 's/.*digest: \(sha256:[0-9a-f]*\).*/\1/p')
+                  [[ $digest =~ ^sha256:[0-9a-f]{64}$ ]]
+                  echo "digest=$digest" >> "$GITHUB_OUTPUT"
                   docker push "$IMAGE_LATEST"
 
-    # 2. ПРОВЕРКА СХЕМЫ — перед автоматическим или ручным deploy.
-    schema-ready:
-        name: 🔍 Verify production schema is ready
-        needs: [ build-and-push, migrations-empty-db, api-types-check, backend-tests, spa-auth-e2e ]
-        if: ${{ !cancelled() && github.ref == 'refs/heads/master' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.production_action == 'deploy')) && needs.build-and-push.result == 'success' && needs.migrations-empty-db.result == 'success' && needs.api-types-check.result == 'success' && needs['backend-tests'].result != 'failure' && needs['spa-auth-e2e'].result == 'success' }}
+            - name: Record immutable build descriptor
+              if: ${{ github.event_name != 'pull_request' }}
+              env:
+                  BUILD_DIGEST: ${{ steps.publish-spa.outputs.digest || steps.build.outputs.digest }}
+                  BUILD_IMAGE: ${{ matrix.image }}
+              run: |
+                  mkdir -p .descriptor
+                  python3 - <<'PYTHON'
+                  import json, os, pathlib, re
+                  digest = os.environ['BUILD_DIGEST']
+                  assert re.fullmatch(r'sha256:[0-9a-f]{64}', digest)
+                  descriptor = dict(sha=os.environ['GITHUB_SHA'], run_id=int(os.environ['GITHUB_RUN_ID']),
+                      run_attempt=int(os.environ['GITHUB_RUN_ATTEMPT']), image=os.environ['BUILD_IMAGE'], digest=digest)
+                  pathlib.Path('.descriptor', descriptor['image'] + '.json').write_text(json.dumps(descriptor))
+                  PYTHON
+            - uses: actions/upload-artifact@v4
+              if: ${{ github.event_name != 'pull_request' }}
+              with:
+                  name: descriptor-${{ matrix.image }}-${{ github.run_attempt }}
+                  path: .descriptor/*.json
+                  if-no-files-found: error
+
+    release-manifest:
+        name: Release manifest
+        needs: [resolve-release, changes, build-and-push, unit-tests, cs-check, stan, backend-tests, services-go, services-python, spa-checks, spa-auth-e2e, migrations-empty-db, api-types-check]
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' && needs.resolve-release.result == 'success' && (needs.resolve-release.outputs.reuse == 'true' || (needs.build-and-push.result == 'success' && needs.unit-tests.result == 'success' && needs.cs-check.result == 'success' && needs.stan.result == 'success' && needs.backend-tests.result == 'success' && needs.services-go.result == 'success' && needs.services-python.result == 'success' && needs.spa-checks.result == 'success' && needs.spa-auth-e2e.result == 'success' && needs.migrations-empty-db.result == 'success' && needs.api-types-check.result == 'success')) }}
+        outputs:
+            artifact: ${{ steps.bundle-name.outputs.artifact }}
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            actions: read
+            packages: read
+        steps:
+            - uses: actions/checkout@v6
+            - uses: actions/download-artifact@v4
+              if: ${{ needs.resolve-release.outputs.reuse == 'true' }}
+              with:
+                  name: ${{ needs.resolve-release.outputs.artifact }}
+                  path: .release
+            - uses: actions/download-artifact@v4
+              if: ${{ needs.resolve-release.outputs.reuse != 'true' }}
+              with:
+                  pattern: descriptor-*
+                  path: .release/descriptors
+                  merge-multiple: false
+            - uses: docker/login-action@v4
+              if: ${{ needs.resolve-release.outputs.reuse != 'true' }}
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+            - uses: docker/setup-buildx-action@v4
+              if: ${{ needs.resolve-release.outputs.reuse != 'true' }}
+            - name: Read installed infrastructure digests
+              if: ${{ needs.resolve-release.outputs.reuse != 'true' }}
+              uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555
+              with:
+                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+            - name: Pin the running infrastructure without upgrading it
+              if: ${{ needs.resolve-release.outputs.reuse != 'true' }}
+              env:
+                  SERVER_USER: ${{ secrets.SERVER_USER }}
+                  SERVER_HOST: ${{ secrets.SERVER_HOST }}
+              run: |
+                  ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_HOST" bash -s < docker/release/infrastructure-digests.sh > .release/infrastructure.tsv
+            - name: Publish verified manifest after all mandatory gates
+              if: ${{ needs.resolve-release.outputs.reuse != 'true' }}
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  NEEDS_JSON: ${{ toJSON(needs) }}
+                  RELEASE_SHA: ${{ inputs.release_sha }}
+                  PRODUCTION_ACTION: ${{ inputs.production_action }}
+              run: python3 site/bin/release-bundle.py publish --directory .release
+            - uses: actions/upload-artifact@v4
+              if: ${{ needs.resolve-release.outputs.reuse != 'true' }}
+              with:
+                  name: release-${{ github.sha }}-${{ github.run_attempt }}
+                  path: |
+                      .release/manifest.json
+                      .release/compose.digest.json
+                      .release/infrastructure.tsv
+                  retention-days: 90
+                  if-no-files-found: error
+            - id: bundle-name
+              run: echo "artifact=production-bundle-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ steps.bundle-name.outputs.artifact }}
+                  path: |
+                      .release/manifest.json
+                      .release/compose.digest.json
+                      .release/infrastructure.tsv
+                  if-no-files-found: error
+
+    production:
+        name: Production release
+        needs: release-manifest
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' && needs.release-manifest.result == 'success' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.production_action != 'none')) }}
         concurrency:
             group: production-release
             cancel-in-progress: false
         runs-on: ubuntu-latest
-        timeout-minutes: 10
+        timeout-minutes: 45
+        permissions:
+            contents: read
+            actions: read
         steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+            - uses: actions/download-artifact@v4
+              with:
+                  name: ${{ needs.release-manifest.outputs.artifact }}
+                  path: .release
             - name: 🔐 Setup SSH key
-              uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
+              uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555
               with:
                   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-            - name: 🔍 Verify production schema is ready
+            - name: Reject older releases before any production change
+              id: installed
+              env:
+                  RELEASE_SHA: ${{ inputs.release_sha }}
+                  PRODUCTION_ACTION: ${{ inputs.production_action }}
+                  SERVER_DIR: ${{ secrets.SERVER_DIR }}
+                  SERVER_USER: ${{ secrets.SERVER_USER }}
+                  SERVER_HOST: ${{ secrets.SERVER_HOST }}
               run: |
-                  ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-                    set -e
-                    cd ${{ secrets.SERVER_DIR }}/current
-
-                    export APP_ENV="${{ secrets.APP_ENV }}"
-                    export APP_SECRET="${{ secrets.APP_SECRET }}"
-                    export DATABASE_URL="${{ secrets.DATABASE_URL }}"
-                    export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
-                    export SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}"
-                    export SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
-                    export SENTRY_RELEASE="${{ github.sha }}"
-                    export IMAGE_TAG="${{ github.sha }}"
-                    export HEALTH_CHECK_TOKEN="${{ secrets.HEALTH_CHECK_TOKEN }}"
-                    export APP_OBJECT_STORAGE_S3_ACCESS_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_ACCESS_KEY }}"
-                    export APP_OBJECT_STORAGE_S3_SECRET_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_SECRET_KEY }}"
-                    export APP_ENCRYPTION_FALLBACK_KEY="${{ secrets.APP_ENCRYPTION_FALLBACK_KEY }}"
-                    export APP_ENCRYPTION_KEYS_JSON='${{ secrets.APP_ENCRYPTION_KEYS_JSON }}'
-                    export APP_ENCRYPTION_CURRENT_KEY_VERSION="${{ secrets.APP_ENCRYPTION_CURRENT_KEY_VERSION }}"
-
-                    docker compose -f docker-compose.prod.yml pull site-php-cli
-                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T site-php-cli bin/console doctrine:migrations:up-to-date --no-interaction < /dev/null
-                  EOF
-
-    # 3. ЭТАП ДЕПЛОЯ (rolling update — минимальный даунтайм).
-    #    Автоматически после push в master или вручную через production_action=deploy.
-    #    Всегда только после schema-ready.
-    deploy:
-        needs: schema-ready
-        if: ${{ !cancelled() && github.ref == 'refs/heads/master' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.production_action == 'deploy')) && needs.schema-ready.result == 'success' }}
-        concurrency:
-            group: production-release
-            cancel-in-progress: false
-        runs-on: ubuntu-latest
-        steps:
-            - name: 📦 Checkout repository
-              uses: actions/checkout@v6
-
-            - name: 🛠 Install zip
-              run: sudo apt-get install -y zip
-
-            - name: 🔐 Setup SSH key
-              uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
-              with:
-                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-            - name: 📦 Create deploy archive (Configs only)
+                  installed=$(ssh -o StrictHostKeyChecking=no "$SERVER_USER@$SERVER_HOST" bash -s -- "$SERVER_DIR" < docker/release/installed-sha.sh)
+                  python3 site/bin/release-bundle.py ancestry --directory .release --installed "$installed"
+                  echo "sha=$installed" >> "$GITHUB_OUTPUT"
+            - name: Archive configuration from the exact release SHA
               run: |
-                  zip -r app.zip docker-compose.prod.yml docker/
-
-            - name: 📤 Upload archive to server
+                  git archive --format=tar "$GITHUB_SHA" docker-compose.prod.yml docker/ \
+                    services/ozon-fetcher/internal/ozonstore/migrations/ \
+                    services/shared/fetchkit/store/migrations/ services/wb-fetcher/internal/app/migrations/ \
+                    services/ai-service/migrations/ > app.tar
+                  tar -rf app.tar -C .release manifest.json compose.digest.json infrastructure.tsv
+                  gzip app.tar
+            - name: Upload release-specific archive
+              env:
+                  SERVER_DIR: ${{ secrets.SERVER_DIR }}
+                  SERVER_USER: ${{ secrets.SERVER_USER }}
+                  SERVER_HOST: ${{ secrets.SERVER_HOST }}
               run: |
-                  scp -o StrictHostKeyChecking=no app.zip ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.SERVER_DIR }}
+                  scp -o StrictHostKeyChecking=no app.tar.gz "$SERVER_USER@$SERVER_HOST:$SERVER_DIR/release-$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
 
-            # Секреты сервисов подставляются ниже в текст удалённого скрипта ('…'): кавычка в
-            # значении выполнилась бы на сервере раньше проверки внутри скрипта. Здесь они —
-            # переменные окружения раннера (данные, не код), проверка до SSH.
             - name: 🔎 Check service secrets alphabet
               env:
                   INTERNAL_AUTH_TOKEN: ${{ secrets.INTERNAL_AUTH_TOKEN }}
@@ -993,24 +1122,26 @@ jobs:
                     *[!0-9]*) echo "❌ YOOKASSA_RECEIPT_VAT_CODE: только цифры"; exit 1 ;;
                   esac
 
-            - name: 🚀 Deploy application (rolling update)
+            - name: Backup, migrate, verify schema, deploy and check health under one lock
               run: |
-                  # Скрипт идёт удалённому bash через stdin. Каждый `docker compose run|exec`
-                  # внутри — с `< /dev/null` или своим файлом, иначе он выедает остаток
-                  # скрипта (с 17.10.2026 деплой молча обрывался после ozon-fetcher).
-                  # Гейт: tests/shell/deploy-workflow-test.sh.
                   ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-                    set -e
-                    cd ${{ secrets.SERVER_DIR }}
-
-                    echo "📦 Распаковка архива"
-                    rm -rf ./current
-                    mkdir -p ./current
-                    unzip -o app.zip -d ./current
-                    rm app.zip
-
-                    cd ./current
-
+                    set -euo pipefail
+                    umask 077
+                    export SERVER_DIR='${{ secrets.SERVER_DIR }}'
+                    export RELEASE_SHA='${{ github.sha }}'
+                    export RELEASE_RUN='${{ github.run_id }}-${{ github.run_attempt }}'
+                    export EXPECTED_INSTALLED_SHA='${{ steps.installed.outputs.sha }}'
+                    export PRODUCTION_ACTION='${{ inputs.production_action }}'
+                    if [[ '${{ github.event_name }}' == push ]]; then PRODUCTION_ACTION=deploy; fi
+                    release_dir="$SERVER_DIR/releases/$RELEASE_SHA-$RELEASE_RUN"
+                    mkdir -p "$SERVER_DIR/releases"
+                    mkdir "$release_dir"
+                    tar -xzf "$SERVER_DIR/release-$RELEASE_SHA-$RELEASE_RUN.tar.gz" -C "$release_dir"
+                    rm "$SERVER_DIR/release-$RELEASE_SHA-$RELEASE_RUN.tar.gz"
+                    cd "$release_dir"
+                    export COMPOSE_PROJECT_NAME
+                    COMPOSE_PROJECT_NAME=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' symfony-postgres)
+                    [[ $COMPOSE_PROJECT_NAME =~ ^[a-zA-Z0-9_-]+$ ]]
                     # Экспортируем переменные для docker compose
                     export APP_ENV="${{ secrets.APP_ENV }}"
                     export APP_SECRET="${{ secrets.APP_SECRET }}"
@@ -1065,7 +1196,7 @@ jobs:
                     export ALFA_SANDBOX_CLIENT_ID='${{ secrets.ALFA_SANDBOX_CLIENT_ID }}'
                     export ALFA_SANDBOX_CLIENT_SECRET='${{ secrets.ALFA_SANDBOX_CLIENT_SECRET }}'
                     export ALFA_SANDBOX_ID_SIGNING_CERT_PATH='${{ secrets.ALFA_SANDBOX_ID_SIGNING_CERT_PATH }}'
-                    export ALFA_SECRETS_DIR="$(cd .. && pwd)/shared/alfa"
+                    export ALFA_SECRETS_DIR="$SERVER_DIR/shared/alfa"
                     mkdir -p "$ALFA_SECRETS_DIR"
                     # Billing (docs/tasks/billing/yookassa-setup.md): пусто → «только чтение» выключен,
                     # онлайн-оплата скрыта. Символы проверены шагом выше.
@@ -1084,10 +1215,23 @@ jobs:
                       esac
                     done
 
-                    printf 'IMAGE_TAG=%s\n' "$IMAGE_TAG" > .env
 
+                    printf 'IMAGE_TAG=%s\n' "$IMAGE_TAG" > .env
+                    source docker/release/production.sh
+                    release_prepare
+                    if [[ $PRODUCTION_ACTION == migrations ]]; then
+                      release_finish
+                      exit 0
+                    fi
+                    release_phase deploy
+                    # Keep the previous configuration for diagnosis; data volumes stay untouched.
+                    if [[ -d "$SERVER_DIR/current" ]]; then
+                      mv "$SERVER_DIR/current" "$SERVER_DIR/previous-config-$RELEASE_RUN"
+                    fi
+                    mv "$release_dir" "$SERVER_DIR/current"
+                    cd "$SERVER_DIR/current"
                     echo "🚚 Скачивание свежих образов из GHCR"
-                    docker compose -f docker-compose.prod.yml pull land site site-php-fpm site-php-cli account admin
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json pull land site site-php-fpm site-php-cli account admin
 
                     # ───────────────────────────────────────────────
                     # ROLLING UPDATE: обновляем сервисы в правильном порядке
@@ -1098,23 +1242,23 @@ jobs:
                     # Новый async_sync совместим со старыми заданиями; до FPM старый consumer
                     # должен остановиться, а новый — пройти существующий healthcheck.
                     echo "🐳 [0/5] Обновляем async_sync до включения нового файлового импорта"
-                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait site-messenger-worker-sync
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --wait site-messenger-worker-sync
                     echo "✅ site-messenger-worker-sync healthy"
 
                     echo "🐳 [1/5] Обновляем PHP-FPM (бэкенд)"
-                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait site-php-fpm
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --wait site-php-fpm
                     echo "✅ site-php-fpm healthy"
 
                     echo "🐳 [2/5] Обновляем Nginx (фронтенд сайта)"
-                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait site
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --wait site
                     echo "✅ site-nginx healthy"
 
                     echo "🐳 [3/5] Обновляем Landing"
-                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait land
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --wait land
                     echo "✅ land healthy"
 
                     echo "🐳 [4/5] Обновляем воркеры и CLI"
-                    docker compose -f docker-compose.prod.yml up -d --no-deps site-php-cli site-messenger-worker-pipeline site-messenger-worker-ads site-messenger-worker-wb-finance site-messenger-worker-payment-intake scheduler
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps site-php-cli site-messenger-worker-pipeline site-messenger-worker-ads site-messenger-worker-wb-finance site-messenger-worker-payment-intake scheduler
 
                     # Миграции его БД — до шага 5/5, иначе `up` поднял бы сервис раньше них.
                     echo "🐳 [4b/5] ozon-fetcher: БД и роль, образ, миграции, запуск"
@@ -1124,11 +1268,8 @@ jobs:
                     fi
                     # Идемпотентно: роль, пароль из секрета, БД (docker/ozon-fetcher/db-bootstrap.sql).
                     # Пароль — через окружение (-e без значения), не в аргументах процессов.
-                    docker compose -f docker-compose.prod.yml exec -T -e OZON_FETCHER_DB_PASSWORD site-postgres \
-                      psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/ozon-fetcher/db-bootstrap.sql
-                    docker compose -f docker-compose.prod.yml pull ozon-fetcher
-                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T ozon-fetcher -migrate < /dev/null
-                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait ozon-fetcher
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json pull ozon-fetcher
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --wait ozon-fetcher
                     echo "✅ ozon-fetcher healthy"
 
                     # Миграции его БД — до шага 5/5, иначе `up` поднял бы сервис раньше них.
@@ -1138,11 +1279,8 @@ jobs:
                       exit 1
                     fi
                     # Идемпотентно: роль, пароль из секрета, БД (docker/wb-fetcher/db-bootstrap.sql).
-                    docker compose -f docker-compose.prod.yml exec -T -e WB_FETCHER_DB_PASSWORD site-postgres \
-                      psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/wb-fetcher/db-bootstrap.sql
-                    docker compose -f docker-compose.prod.yml pull wb-fetcher
-                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T wb-fetcher -migrate < /dev/null
-                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait wb-fetcher
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json pull wb-fetcher
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --wait wb-fetcher
                     echo "✅ wb-fetcher healthy"
 
                     # Миграции его БД — до шага 5/5 (docs/maintenance/ai-service-prod.md).
@@ -1152,87 +1290,54 @@ jobs:
                       exit 1
                     fi
                     # Идемпотентно: роль, пароль из секрета, БД (docker/ai-service/db-bootstrap.sql).
-                    docker compose -f docker-compose.prod.yml exec -T -e AI_SERVICE_DB_PASSWORD site-postgres \
-                      psql -U app -d app -v ON_ERROR_STOP=1 -q < docker/ai-service/db-bootstrap.sql
-                    docker compose -f docker-compose.prod.yml pull ai-service ai-service-worker
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json pull ai-service ai-service-worker
                     if [ "$AI_SERVICE_EVAL_ENABLED" = "true" ]; then
-                      docker compose -f docker-compose.prod.yml --profile ai-service-eval pull ai-service-eval-worker
+                      docker compose -f docker-compose.prod.yml -f compose.digest.json --profile ai-service-eval pull ai-service-eval-worker
                     else
-                      docker compose -f docker-compose.prod.yml --profile ai-service-eval stop ai-service-eval-worker
+                      docker compose -f docker-compose.prod.yml -f compose.digest.json --profile ai-service-eval stop ai-service-eval-worker
                     fi
-                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T ai-service migrate < /dev/null
                     # Проверки 2 и 4 (docs/tasks/ai/gateway/plan.md): /models через шлюз с токеном → 200,
                     # без токена → 401; бесплатно. Провал — до запуска воркера.
-                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T ai-service gateway-check < /dev/null
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json run --rm --no-deps -T ai-service gateway-check < /dev/null
                     # --wait — только API: у воркера healthcheck выключен, и `up --wait` на нём падает.
-                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait ai-service
-                    docker compose -f docker-compose.prod.yml up -d --no-deps ai-service-worker
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --wait ai-service
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps ai-service-worker
                     if [ "$AI_SERVICE_EVAL_ENABLED" = "true" ]; then
-                      docker compose -f docker-compose.prod.yml --profile ai-service-eval up -d --no-deps ai-service-eval-worker
+                      docker compose -f docker-compose.prod.yml -f compose.digest.json --profile ai-service-eval up -d --no-deps ai-service-eval-worker
                     fi
                     echo "✅ ai-service healthy"
 
                     echo "🐳 Обновляем account/admin SPA"
-                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait account admin
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --wait account admin
                     echo "✅ account/admin healthy"
 
                     echo "🐳 [5/5] Поднимаем остальные сервисы (если есть новые)"
-                    docker compose -f docker-compose.prod.yml up -d --remove-orphans
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --remove-orphans land site site-php-fpm site-php-cli account admin site-messenger-worker-sync site-messenger-worker-pipeline site-messenger-worker-ads site-messenger-worker-wb-finance site-messenger-worker-payment-intake scheduler ozon-fetcher wb-fetcher ai-service ai-service-worker
 
                     # Проба SMTP из env, который реально запечён в контейнер (письмо не шлём — только AUTH).
                     # Ловит протухший секрет сразу, а не через час кроном. Деплой не валим: мёртвая
                     # почта — не повод красить выкатку несвязанного кода, а logger->error внутри
                     # команды уже заводит issue в GlitchTip.
                     echo "📧 Проверяем SMTP-транспорт"
-                    docker compose -f docker-compose.prod.yml exec -T scheduler php bin/console app:mailer:healthcheck --no-interaction < /dev/null \
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json exec -T scheduler php bin/console app:mailer:healthcheck --no-interaction < /dev/null \
                       || echo "⚠️ SMTP не отвечает — проверь GitHub secret SITE_MAILER_DSN (см. docs/maintenance/mailer-monitoring.md)"
 
-                    echo "🧹 Очистка старых образов Docker"
+
+                    release_phase health
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --wait --wait-timeout 180 land site site-php-fpm site-messenger-worker-sync site-messenger-worker-pipeline site-messenger-worker-ads site-messenger-worker-wb-finance ozon-fetcher wb-fetcher ai-service account admin
+                    for container in ai-service-worker site-messenger-worker-payment-intake scheduler traefik; do
+                      [[ $(docker inspect --format '{{.State.Status}}' "$container" < /dev/null) == running ]]
+                    done
+                    if [[ $AI_SERVICE_EVAL_ENABLED == true ]]; then
+                      [[ $(docker inspect --format '{{.State.Status}}' ai-service-eval-worker < /dev/null) == running ]]
+                    fi
+                    for container in symfony-postgres site-redis; do
+                      [[ $(docker inspect --format '{{.State.Health.Status}}' "$container" < /dev/null) == healthy ]]
+                    done
+                    release_finish
+                    rm -rf -- "$SERVER_DIR/previous-config-$RELEASE_RUN"
                     docker image prune -af --filter "until=336h"
-                    echo "✅ Деплой завершён без даунтайма"
-                  EOF
-
-    # 4. ЭТАП МИГРАЦИЙ — отдельный ручной gate до deploy нового commit SHA.
-    migrations:
-        # build-and-push — предусловие: job тянет site-php-cli по SHA HEAD, и без
-        # собранного образа падал на `manifest unknown`.
-        needs: [ changes, build-and-push ]
-        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.build-and-push.result == 'success' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.production_action == 'migrations' }}
-        concurrency:
-            group: production-release
-            cancel-in-progress: false
-        runs-on: ubuntu-latest
-        steps:
-            - name: 🔐 Setup SSH key
-              uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
-              with:
-                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-            - name: 🧬 Run Doctrine migrations
-              run: |
-                  ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-                    set -e
-                    cd ${{ secrets.SERVER_DIR }}/current
-
-                    echo "🚧 Выполняем миграции"
-                    export APP_ENV="${{ secrets.APP_ENV }}"
-                    export APP_SECRET="${{ secrets.APP_SECRET }}"
-                    export DATABASE_URL="${{ secrets.DATABASE_URL }}"
-                    export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
-                    export SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}"
-                    export SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
-                    export SENTRY_RELEASE="${{ github.sha }}"
-                    export IMAGE_TAG="${{ github.sha }}"
-                    export HEALTH_CHECK_TOKEN="${{ secrets.HEALTH_CHECK_TOKEN }}"
-                    export APP_OBJECT_STORAGE_S3_ACCESS_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_ACCESS_KEY }}"
-                    export APP_OBJECT_STORAGE_S3_SECRET_KEY="${{ secrets.APP_OBJECT_STORAGE_S3_SECRET_KEY }}"
-                    export APP_ENCRYPTION_FALLBACK_KEY="${{ secrets.APP_ENCRYPTION_FALLBACK_KEY }}"
-                    export APP_ENCRYPTION_KEYS_JSON='${{ secrets.APP_ENCRYPTION_KEYS_JSON }}'
-                    export APP_ENCRYPTION_CURRENT_KEY_VERSION="${{ secrets.APP_ENCRYPTION_CURRENT_KEY_VERSION }}"
-
-                    docker compose -f docker-compose.prod.yml pull site-php-cli
-                    docker compose -f docker-compose.prod.yml run --rm --no-deps -T site-php-cli bin/console doctrine:migrations:migrate --no-interaction < /dev/null
-                    echo "✅ Миграции применены"
+                    echo 'Release completed; SHA, digest override and phase timings recorded.'
                   EOF
 
     # 5. ТЕСТЫ НА ПУСТОЙ БД — только при изменении бэкенда.

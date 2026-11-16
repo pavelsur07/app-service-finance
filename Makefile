@@ -69,7 +69,7 @@ site-stan-baseline: site-stan-prepare
 
 # ===== TESTS =====
 
-.PHONY: test-provision-vf-prod-deploy test-gt test-deploy-workflow
+.PHONY: test-provision-vf-prod-deploy test-gt test-deploy-workflow test-release-pipeline
 
 # Локальный security-тест owner-run provisioner; production не вызывается.
 test-provision-vf-prod-deploy:
@@ -82,6 +82,12 @@ test-gt:
 	bash tests/shell/gt-test.sh
 
 # Инварианты скрипта деплоя: stdin в ssh-heredoc и воркеры в шаге [4/5].
+test-release-pipeline:
+	python3 tests/shell/release-bundle-test.py
+	python3 tests/shell/production-release-test.py
+	python3 tests/shell/release-workflow-test.py
+	python3 tests/shell/release-postgres-test.py
+
 test-deploy-workflow:
 	bash tests/shell/deploy-workflow-test.sh
 	python3 -m unittest discover -s site/tools/tests
