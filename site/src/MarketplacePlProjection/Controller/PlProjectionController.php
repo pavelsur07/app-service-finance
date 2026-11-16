@@ -8,6 +8,7 @@ use App\Finance\Application\DTO\PlPreviewColumn;
 use App\Finance\Facade\FinanceFacade;
 use App\Marketplace\Facade\LegacyPlPreviewFacadeInterface;
 use App\MarketplacePlProjection\Application\Service\ProjectionBuilder;
+use App\MarketplacePlProjection\Application\Service\TreeCut;
 use App\MarketplacePlProjection\Enum\ProjectionStatus;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -19,7 +20,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
  * «ОПиУ из канона» рядом с текущим расчётом (`docs/tasks/marketplace-pl-projection`): дерево статей
- * компании, колонки — новый расчёт, текущий (предпросмотр легаси) и разница. Ничего не пишет.
+ * компании до СМ3 ({@see TreeCut}), колонки — новый расчёт, текущий (предпросмотр легаси) и разница.
+ * Ничего не пишет.
  */
 #[IsGranted('ROLE_COMPANY_USER')]
 final class PlProjectionController extends AbstractController
@@ -56,6 +58,7 @@ final class PlProjectionController extends AbstractController
             new PlPreviewColumn('new', $report->amountsByCategory()),
             new PlPreviewColumn('legacy', $this->legacy->amountsByCategory($companyId, $from, $to, $channel)),
         ]);
+        $cut = TreeCut::cut($tree->rows);
 
         return $this->render('marketplace_pl_projection/index.html.twig', [
             'from' => $from,
@@ -63,7 +66,11 @@ final class PlProjectionController extends AbstractController
             'channel' => $channel,
             'channels' => self::CHANNELS,
             'periodError' => $periodError,
-            'rows' => $tree->rows,
+            'rows' => $cut['rows'],
+            'below' => $cut['below'],
+            'boundaryFound' => $cut['found'],
+            'hasTree' => [] !== $tree->rows,
+            'hideEmpty' => $request->query->getBoolean('hide_empty'),
             'warnings' => $tree->warnings,
             'unplaced' => $tree->unplaced,
             'unmapped' => $report->linesOf(ProjectionStatus::UNMAPPED),
