@@ -1,0 +1,7 @@
+# Локальный прогон сохраняет level, baseline и paths основного конфига.
+includes:
+    - phpstan.dist.neon
+
+parameters:
+    parallel:
+        maximumNumberOfProcesses: 1
