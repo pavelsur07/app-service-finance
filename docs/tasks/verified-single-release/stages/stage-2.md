@@ -1,7 +1,7 @@
-# Stage 2: репетиция и handoff — сохранённое состояние
+# Stage 2: репетиция и handoff — DONE (implementation acceptance)
 
 Risk HIGH-LOCAL. Stage base: da7cef655 (исходный task diff).
-Implementation DONE; delivery blocked by общий local acceptance environment.
+Implementation/gates/reviews DONE; ordered handoff follows part1 acceptance.
 
 Временная PostgreSQL15: реальный pg_dump app+postgres, непустые custom archives,
 полное чтение pg_restore в /dev/null, checksum, unchanged row17, damaged archive
@@ -32,3 +32,9 @@ CI follow-up: missed legacy schema-ready parser in auth-routing test failed
 at final contracts step after dev/preview/HTTPS success. RED locally, updated
 to assert release-manifest dependency and mandatory spa-auth-e2e success,
 GREEN4. Internal IMPORTANT4 includes this CI-wiring fix; no open code findings.
+
+Update after explicit swap approval: total swap8GiB active/persistent and fstab
+verified. Full cold site-accept part1 passed, including PHPStan650.251s and all
+three PHP suites. Warm PHPStan passed9.159s, further warm suites still running.
+Source-code CI241c3c655 GREEN. Current update is documentation only; no new
+application/CI code or source-gate rerun is needed for these prose changes.
