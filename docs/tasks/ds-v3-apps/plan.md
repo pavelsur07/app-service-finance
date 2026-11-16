@@ -125,7 +125,8 @@ Definition of Done / чек-лист:
   и component токены и значения CSS-эталона, ссылки, полнота TS/CSS.
 - [x] Strict TS, lint/format/test/build пакета; гейты обоих apps и preview E2E.
 - [x] site/ и runtime apps не изменены; независимый internal review.
-- [ ] External review — blocked: executable claude отсутствует; детали в stage-1.md.
+- [x] Отдельный Codex review по решению Владельца 2026-11-16 — REVIEW_GREEN;
+  BLOCKER/IMPORTANT 0/0, детали в reviews/codex-stage-1.md.
 Work items: 1.1 тестовый контракт и пакет; 1.2 генератор; 1.3 checks/reviews/PR.
 Checks: package test/typecheck/lint/build/check:generated; make front-typecheck
 front-lint front-test front-build; make front-e2e MODE=preview.
@@ -183,6 +184,9 @@ review в свежем контексте; external Claude read-only на handof
 AGENTS.md. Скрипт site/bin/external-review.sh не включает apps в paths и
 штатно создаёт site/var: использовать --out вне site и передать полный diff
 в --context; пустой штатный diff НЕ считать состоявшимся ревью.
-На машине пока не найден исполняемый claude: если после проверки окружения
-ревью недоступно, закончить проверки/commit/push/Draft PR, записать точный
-блокер и оставить Draft. Не заменять обязательное Claude-ревью другим Codex.
+Claude не установлен. По прямому поручению Владельца 2026-11-16 для handoff
+Stage 1 выполнено ревью в отдельной ephemeral/read-only сессии Codex:
+REVIEW_GREEN. Вторая сессия получила полный diff и эталон через stdin,
+поскольку bwrap не позволяет read-only shell; ограничение и результат
+записаны в reviews/codex-stage-1.md. Это согласованная замена reviewer
+для данного handoff, а не изменение общих правил репозитория.

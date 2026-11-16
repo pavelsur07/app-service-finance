@@ -2,8 +2,9 @@
 
 **Branch:** `feat/ds-v3-stage-1` · **PR:** [#3027](https://github.com/pavelsur07/app-service-finance/pull/3027) (base master).
 **Implementation commit:** `c5233de52`.
-**CI:** запущен; окончательный результат не заявляется.
-**Статус:** Draft, не готов к merge. Внешний Claude reviewer недоступен.
+**CI:** [reviewed head ccb24c23d](https://github.com/pavelsur07/app-service-finance/actions/runs/43751112986) — SUCCESS: оба SPA checks, real backend/HTTPS
+isolation, production images account/admin.
+**Статус:** Ready, ожидается решение merge+deploy Stage 1.
 
 Phase 0 завершена: [plan.md](plan.md).
 Stage 1 реализован и локально проверен: [stages/stage-1.md](stages/stage-1.md).
@@ -19,13 +20,17 @@ build/check:generated/typecheck PASS. 15 пар снимков 1440 и арте�
 apps побайтно совпали с baseline. Изменений production нет.
 
 Независимый internal review: полный diff + focused dependency review,
-BLOCKER/IMPORTANT 0/0. External: 0 раундов, failed preflight exit 2 —
-`ревьюер 'claude' не установлен`. Не является зелёным review.
+BLOCKER/IMPORTANT 0/0. По прямому решению Владельца 2026-11-16 Claude заменён
+отдельной Codex-сессией: REVIEW_GREEN, BLOCKER/IMPORTANT 0/0. Две сессии
+(один corrected retry после bwrap); финальная проверка — stdin-анализ
+полного diff, исходных CSS/JSON, задания и правил, без выполнения команд.
+[Дословный результат](reviews/codex-stage-1.md). Исправлений кода нет.
 
-Для продолжения нужен доступный и авторизованный Claude Code executable.
-Владелец не должен сам проводить review. После восстановления окружения агент
-выполнит его, затем переведёт PR в Ready и запросит merge+deploy.
-Сейчас решение merge+deploy не запрашивается.
+Решение Владельца:
+
+Ready: PR #3027 "feat(ds): Stage 1 — пакет и токены ДС v3.4 для apps" —
+merge into master with automatic production deploy?
+Reply: "merge and deploy #3027"
 
 Риски: source docs пока в PR #3022; транзитивные builder dependencies имеют
 4 moderate + 2 low audit findings (HIGH/CRITICAL 0). Stage 2 отдельно требует

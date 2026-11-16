@@ -1,12 +1,12 @@
 # Stage 1 — пакет и токены
 
-**Статус:** реализация и локальная приёмка завершены; Stage не закрыт:
-обязательный внешний Claude review недоступен. PR остаётся Draft.
+**Статус:** DONE — Stage 1 готов к merge+deploy; решение Владельца ожидается.
+Отдельный Codex review выполнен вместо Claude по прямому поручению Владельца.
 **Risk:** MEDIUM.
-**PR:** [#3027](https://github.com/pavelsur07/app-service-finance/pull/3027) — Draft, base master.
+**PR:** [#3027](https://github.com/pavelsur07/app-service-finance/pull/3027) — Ready, base master.
 **Implementation commit:** `c5233de52`.
 **Stage base commit:** `cd19c36b043746e6502ba2cdebb9b09616127b81`.
-**Work items:** 1.1, 1.2, 1.3 (review blocked).
+**Work items:** 1.1, 1.2, 1.3 — завершены.
 
 ## Что сделано
 
@@ -40,8 +40,8 @@
 - [x] Strict typecheck/lint/test/build обоих apps и проверки пакета.
 - [x] Preview E2E, снимки 1440, неизменность runtime артефактов.
 - [x] Независимое internal review.
-- [ ] Обязательное внешнее Claude review: отсутствует executable.
-- [ ] Ready/merge/deploy: заблокировано до внешнего review и решения Владельца.
+- [x] Независимое ревью отдельной сессией Codex по решению Владельца: REVIEW_GREEN.
+- [x] Ready/handoff; merge/deploy ожидают единственного решения Владельца.
 
 ## Проверки
 
@@ -99,26 +99,26 @@ BLOCKER/IMPORTANT/MINOR: 0/0/0. Дополнительно независимы�
 admin typecheck/lint без монтирования account и admin Vitest 39/39.
 FOLLOW-UP: включение генерации/проверки в production build — Stage 2.
 
-## External review — BLOCKED
+## Независимое ревью отдельной сессией Codex — REVIEW_GREEN
 
-Preflight (review rounds: 0, reviewer не запустился):
+2026-11-16 Владелец прямо поручил отдельный Codex review вместо отсутствующего
+Claude. Исключение касается этого handoff, правила workflow не переписаны.
+[Отчёт с дословным результатом и scope](../reviews/codex-stage-1.md).
 
-```sh
-site/bin/external-review.sh cd19c36b043746e6502ba2cdebb9b09616127b81 \
-  --effort medium --out /tmp/vf-ds-v3-review/external \
-  --context /tmp/vf-ds-v3-review/context.patch
-```
+Две отдельные ephemeral/read-only сессии (одна исправленная повторная попытка):
+первая не смогла прочитать repo из-за bwrap, поэтому её marker не принят;
+вторая получила полный diff, правила, исходные CSS/JSON и задание через stdin
+без использования инструментов. Exit 0, точная строка REVIEW_GREEN.
+BLOCKER/IMPORTANT 0/0; код менять не требуется. Ограничение: статический
+анализ переданных материалов, без собственных запусков тестов или доступа
+к repo. Предыдущий Claude preflight exit 2 не учитывается как раунд ревью.
 
-Exit 2: `ревьюер 'claude' не установлен`.
-Проверены PATH и стандартные install locations, исполняемый файл не найден.
-Повтор без установки reviewer не исправит причину; REVIEW_GREEN не заявляется.
-Штатный script не включает apps: даже после появления claude нужно передать
-полный apps diff в read-only review напрямую или адаптировать wrapper вне site;
-пустой штатный diff возвращает формальный green и не является проверкой.
-`site/` ради исправления wrapper менять нельзя.
+CI reviewed head ccb24c23d: SPA checks account/admin, real backend + HTTPS
+isolation и production images account/admin — SUCCESS. PHP/service jobs
+штатно skipped. Merge и deploy не выполнялись.
 
-Review metrics: internal BLOCKER 0 / IMPORTANT 0; external не состоялся,
-BLOCKER/IMPORTANT не оценивались, rounds 0 (один failed preflight).
+Review metrics: internal BLOCKER 0 / IMPORTANT 0; отдельный Codex review
+BLOCKER 0 / IMPORTANT 0, 2 сессии (1 corrected retry), REVIEW_GREEN.
 
 ## Риски, отклонения, следующее действие
 
@@ -129,6 +129,5 @@ BLOCKER/IMPORTANT не оценивались, rounds 0 (один failed preflig
 - Stage 2 требует отдельного §3.3 одобрения production Docker/CI changes.
   Выявлен CI spa filter без apps/packages/** — включить вместе с интеграцией
   нового пакета; в этом Stage CI срабатывает через изменённые файлы обоих apps.
-- Продолжение: восстановить доступ к Claude Code, провести реальное read-only
-  review полного diff, исправить находки; затем Ready и единственный запрос
-  merge+deploy для Stage 1. Stage 2–5 не начинались, merge/deploy не выполнялись.
+- Продолжение: решение merge+deploy для PR #3027, затем полный pipeline и
+  Stage 2 в отдельном PR. Stage 2–5 не начинались; merge/deploy не выполнялись.
