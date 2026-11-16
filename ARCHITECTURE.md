@@ -603,7 +603,7 @@
   (`@companyScopeExempt`, cron); `takeDay(DayWindow): list<OperationRecord>` — та же блокировка дня, что у
   `replaceDay`, операции и снятие отметки `mo_dirty_window`. **Коммитит вызывающий** (команда витрины);
   без транзакции — `\LogicException`; откат вызывающего возвращает отметку.
-- Проекция ОПиУ: `plSums(companyId, from, to, ?channel): list<CanonPlSum>` — Σ по (канал, кабинет, день, вид, код источника), все виды; `companyIds()` — компании с операциями (cron). Только чтение.
+- Проекция ОПиУ: `plSums(companyId, from, to, ?channel): list<CanonPlSum>` — Σ по (канал, кабинет, день, вид, код источника), все виды; начисления и списания ключа — отдельными строками; `companyIds()` — компании с операциями (cron). Только чтение.
 - Сверки: `daySums(channel, from, to, ?companyId): list<CanonDaySum>` — Σ канона по (компания, кабинет,
   день) без видов уровня «справочно»; без компании — гейт переводчика (`@companyScopeExempt`), с компанией —
   экран R10. Только чтение.
@@ -738,6 +738,7 @@
   обрезаны периодом), график — встроенный SVG. Набор SKU при тегах или поиске берётся из R1 за тот же
   период, поэтому итог R2 = итог R1.
 - Гейт витрины дополнительно: за 7 дней Σ |нераспределённого| > 1 % затрат компании — `error`.
+- `MarketplaceEconomicsFacadeInterface::costPrice(companyId, from, to, ?channel): EconomicsCostPrice` — себестоимость проданного за период (Σ `me_day.cost_price_minor`, ≤ 0) и число дней с проданным без цены; потребитель — проекция ОПиУ.
 - `MarketplaceEconomicsFacadeInterface::daySums(companyId, from, to): list<EconomicsDaySum>` — Σ строк
   витрины дня (без себестоимости и справочных), нераспределённое и затраты для экрана R10. Только чтение.
 - Отчёт R3 «Неделя» — `app:marketplace-economics:weekly-report` (cron `0 9 * * 1` МСК; `--week`, `--company`,
@@ -801,10 +802,19 @@
   `ProjectionStatus` (`mapped` / `excluded` — правило без статьи / `unmapped` — правила нет) × статья;
   Σ канона = Σ трёх статусов. `ProjectionReport::amountsByCategory()` — рубли в знаке строки документа
   `marketplace_pl`, вход `FinanceFacade::calculatePlPreview()`.
+- Расчётные строки (`ProjectionReport::$derivedByCategory`, в тождество канона не входят), статья — по коду
+  листа в дереве компании: «Продажи с СПП» `REV_SPP_SALES` = продажи − СПП и соинвестирование продаж,
+  «Возвраты с СПП» `REV_SPP_RETURNS` — то же по возвратам (`ProjectionBuilder::revenueWithSpp()`); себестоимость
+  `COGS_PRODUCT_REV` = `MarketplaceEconomicsFacadeInterface::costPrice()` — проданное за вычетом возвратов одной
+  суммой, «Себестоимость возвратов» отдельно не выделяется. Нет статьи с кодом или у части проданного нет
+  цены — предупреждение на экране.
 - Экран — `GET /marketplace/economics/pl` (`marketplace_pl_projection`, `PlProjectionController`, вкладка «ОПиУ»,
   модуль `MARKETPLACE`): `from`, `to` (по умолчанию текущий месяц, МСК; не длиннее 366 дней), `channel`.
   Колонки дерева — новый расчёт, текущий (`Marketplace\Facade\LegacyPlPreviewFacadeInterface::amountsByCategory()` —
   «Итого» предпросмотра ОПиУ легаси) и разница; ниже — «не сопоставлено» и «исключено» по видам и кодам.
+  Таблица повторяет дерево статей компании до границы — строки с кодом `CM3` и следующей `CM3K`
+  (`Application\Service\TreeCut`), пустые строки на месте (`hide_empty=1` — скрыть); статьи ниже границы с
+  суммой — блок «Ниже СМ3»; кода `CM3` в дереве нет — дерево целиком.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -5854,6 +5864,8 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.205 | 2026-11-16 | MarketplacePlProjection: экран «ОПиУ» повторяет дерево статей компании до СМ3 (`TreeCut`, граница по коду `CM3`), пустые строки на месте, статьи ниже — блок «Ниже СМ3» |
+| 2.204 | 2026-11-16 | MarketplacePlProjection: расчётные строки экрана «ОПиУ» — «Выручка с СПП» (продажи − СПП − соинвестирование) и себестоимость из витрины (`MarketplaceEconomicsFacadeInterface::costPrice()`); `plSums()` делит ключ по знаку суммы |
 | 2.203 | 2026-11-16 | MarketplacePlProjection (этап 3–4): проекция ОПиУ из канона при чтении (`ProjectionBuilder`, без хранимой таблицы), экран `/marketplace/economics/pl` — новый расчёт рядом с текущим; `MarketplaceOperationsFacadeInterface::plSums()`, `companyIds()`; `LegacyPlPreviewFacadeInterface`; cron `sync-template --all` |
 | 2.202 | 2026-11-16 | MarketplacePlProjection (этап 2): `MappingTemplate` v2 — 6 исключений Ozon по коду источника, шаблон равен базовому маппингу легаси; `TemplateLegacyParityTest` |
 | 2.201 | 2026-11-16 | MarketplacePlProjection (этап 1): новый модуль, `mpp_rule` — правила компании «вид канона / код источника → статья ОПиУ» с датой действия и происхождением `preset`/`custom`, `RuleResolver`, шаблон платформы `MappingTemplate` v1, `app:marketplace-pl-projection:sync-template`; в ОПиУ не пишет |

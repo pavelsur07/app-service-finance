@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceEconomics\Facade;
 
+use App\MarketplaceEconomics\Application\DTO\EconomicsCostPrice;
 use App\MarketplaceEconomics\Application\DTO\EconomicsDaySum;
 use Doctrine\DBAL\Connection;
 
@@ -31,5 +32,22 @@ final readonly class MarketplaceEconomicsFacade implements MarketplaceEconomicsF
              GROUP BY d.connection_ref, d.operation_date, d.unallocated_minor ORDER BY d.connection_ref, d.operation_date",
             ['company' => $companyId, 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')],
         ));
+    }
+
+    public function costPrice(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $channel = null): EconomicsCostPrice
+    {
+        $params = ['company' => $companyId, 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')];
+        $filter = '';
+        if (null !== $channel) {
+            $filter = ' AND channel = :channel';
+            $params['channel'] = $channel;
+        }
+        $row = $this->connection->fetchAssociative(
+            'SELECT COALESCE(SUM(cost_price_minor), 0)::bigint AS amount, COUNT(*) FILTER (WHERE without_cost_price > 0) AS days_without
+             FROM me_day WHERE company_id = :company AND operation_date BETWEEN :from AND :to'.$filter,
+            $params,
+        );
+
+        return new EconomicsCostPrice((int) ($row['amount'] ?? 0), (int) ($row['days_without'] ?? 0));
     }
 }

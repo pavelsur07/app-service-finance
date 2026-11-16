@@ -12,15 +12,24 @@ use App\MarketplacePlProjection\Enum\ProjectionStatus;
  */
 final readonly class ProjectionReport
 {
-    /** @param list<ProjectionLine> $lines */
-    public function __construct(public array $lines)
-    {
+    /**
+     * @param list<ProjectionLine> $lines
+     * @param array<string, int> $derivedByCategory расчётные строки (выручка с СПП, себестоимость): plCategoryId → копейки;
+     *                                              в тождество канона не входят
+     * @param list<string> $missingDerivedCodes коды статей расчётных строк, которых нет листом в дереве компании
+     */
+    public function __construct(
+        public array $lines,
+        public array $derivedByCategory = [],
+        public array $missingDerivedCodes = [],
+        public int $daysWithoutCostPrice = 0,
+    ) {
     }
 
     /** @return array<string, string> plCategoryId → сумма в рублях в знаке строки документа `marketplace_pl` */
     public function amountsByCategory(): array
     {
-        $minor = [];
+        $minor = $this->derivedByCategory;
         foreach ($this->lines as $line) {
             if (null !== $line->plCategoryId) {
                 $minor[$line->plCategoryId] = ($minor[$line->plCategoryId] ?? 0) + $line->amountMinor;

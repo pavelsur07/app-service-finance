@@ -144,7 +144,8 @@ final readonly class MarketplaceOperationsFacade implements MarketplaceOperation
         return array_map(static fn (array $r): CanonPlSum => new CanonPlSum((string) $r['channel'], (string) $r['connection_ref'], (string) $r['operation_date'], OperationKind::from((string) $r['kind']), (string) $r['source_type'], (int) $r['amount']), $this->connection->fetchAllAssociative(
             'SELECT channel, connection_ref, operation_date, kind, source_type, SUM(amount_minor) AS amount FROM mo_operation
              WHERE company_id = :company AND operation_date BETWEEN :from AND :to'.$filter.'
-             GROUP BY channel, connection_ref, operation_date, kind, source_type ORDER BY operation_date, channel, connection_ref, kind, source_type',
+             GROUP BY channel, connection_ref, operation_date, kind, source_type, (amount_minor < 0)
+             ORDER BY operation_date, channel, connection_ref, kind, source_type, (amount_minor < 0)',
             $params,
         ));
     }

@@ -49,6 +49,12 @@
                 </select>
             </div>
             <div class="col-12 col-sm-6 col-lg-auto">
+                <label class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" name="hide_empty" value="1" {{ hideEmpty ? 'checked' }}>
+                    <span class="form-check-label">Скрыть пустые строки</span>
+                </label>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-auto">
                 <button class="btn btn-primary" type="submit">Показать</button>
             </div>
         </form>
@@ -67,12 +73,30 @@
         </div>
     {% endif %}
 
+    {% if daysWithoutCostPrice > 0 %}
+        <div class="alert alert-warning" role="alert" data-pl-no-cost>
+            Себестоимость неполная: в {{ daysWithoutCostPrice }} дн. периода у части проданных товаров не задана себестоимость.
+        </div>
+    {% endif %}
+    {% if missingDerivedCodes is not empty %}
+        <div class="alert alert-warning" role="alert" data-pl-missing-codes>
+            В дереве статей компании нет статей с кодами {{ missingDerivedCodes|join(', ') }} — выручка с СПП или себестоимость не показаны.
+        </div>
+    {% endif %}
+
     <p class="text-secondary small">
         «Новый расчёт» — операции маркетплейсов по правилам «вид операции → статья». «Текущий расчёт» — то, что сейчас
-        попадает в ОПиУ. Новый расчёт в ОПиУ не записывается. В нём пока нет себестоимости и блока «Выручка с СПП».
+        попадает в ОПиУ. Новый расчёт в ОПиУ не записывается. «Выручка с СПП» — справочно: продажи за вычетом скидки
+        маркетплейса. Себестоимость — проданное за вычетом возвратов одной суммой в «Себестоимости продаж».
     </p>
 
-    {% set visible = rows|filter(r => (r.values.new ?? 0) != 0 or (r.values.legacy ?? 0) != 0) %}
+    {% if hasTree and not boundaryFound %}
+        <div class="alert alert-info" role="alert" data-pl-no-boundary>
+            В дереве статей компании нет строки с кодом {{ constant('App\\MarketplacePlProjection\\Application\\Service\\TreeCut::BOUNDARY') }} — показано дерево целиком.
+        </div>
+    {% endif %}
+
+    {% set visible = hideEmpty ? rows|filter(r => (r.values.new ?? 0) != 0 or (r.values.legacy ?? 0) != 0) : rows %}
     <section class="card mb-3 me-table-card" data-economics-table>
         <div class="me-table-scroll" data-economics-scroll tabindex="0" role="region" aria-label="ОПиУ маркетплейсов">
         <table class="table table-vcenter card-table me-table" data-pl-projection>
@@ -99,12 +123,34 @@
                         {% endif %}
                     </tr>
                 {% else %}
-                    <tr><td colspan="4" class="text-secondary">{{ rows is empty ? 'У компании нет дерева статей ОПиУ.' : 'За период нет сумм.' }}</td></tr>
+                    <tr><td colspan="4" class="text-secondary">{{ hasTree ? 'За период нет сумм.' : 'У компании нет дерева статей ОПиУ.' }}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
         </div>
     </section>
+
+    {% if below is not empty %}
+        <section class="card mb-3" data-pl-below>
+            <div class="card-header"><h2 class="card-title">Ниже СМ3</h2></div>
+            <div class="card-body pb-0 text-secondary small">Статьи ниже СМ3, на которые попали суммы маркетплейсов. В таблицу выше они не входят.</div>
+            <table class="table table-vcenter card-table">
+                <thead><tr><th>Статья</th><th class="text-end">Новый расчёт</th><th class="text-end">Текущий расчёт</th><th class="text-end">Разница</th></tr></thead>
+                <tbody>
+                    {% for row in below %}
+                        {% set new = row.values.new ?? 0 %}
+                        {% set legacy = row.values.legacy ?? 0 %}
+                        <tr data-row-code="{{ row.code }}">
+                            <td>{{ row.name }}</td>
+                            {{ pl.cell(new, row.format, 'text-end') }}
+                            {{ pl.cell(legacy, row.format, 'text-end') }}
+                            {{ pl.cell(new - legacy, row.format, 'text-end' ~ ((new - legacy)|abs >= 0.005 ? ' text-danger')) }}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    {% endif %}
 
     <section class="card card-body mb-3" data-pl-identity>
         <h2 class="card-title">Куда ушли операции</h2>
