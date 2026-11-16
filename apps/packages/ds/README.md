@@ -138,3 +138,8 @@ transform/scroll panels: fixed top/right24px, gap10px, z-toast200, max-width
   ))}
 </ToastStack>
 ```
+
+Fixture runner сам выполняет npm ci --ignore-scripts для DS из lock перед
+сборкой: matrix production browser runner устанавливает только app, а linked
+file dependency не устанавливает транзитивные зависимости пакета. Проверка
+чистой поставки выполняется с отдельным пустым DS node_modules.

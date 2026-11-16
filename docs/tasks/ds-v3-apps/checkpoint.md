@@ -1,10 +1,10 @@
 ## Current checkpoint
 
 **Phase:** Stage 3 / handoff
-**Status:** implemented/reviewed, local gates green; Draft PR3034, CI in progress
+**Status:** implemented/reviewed, local gates green; implemented/reviewed; handoff PR3034, latest CI tracked in PR
 **Stage base commit:** 18fa0247850e17b7ade692b26c7403385b248a38
 **Branch:** feat/ds-v3-stage-3
-**PR:** https://github.com/pavelsur07/app-service-finance/pull/3034 (Draft, base master verified)
+**PR:** https://github.com/pavelsur07/app-service-finance/pull/3034 (base master verified; Ready/checks — live PR state)
 
 ### Completed
 - Stage1 PR3027 delivered; fallback rule PR3028 в master.
@@ -28,9 +28,12 @@
   RED→GREEN (ToastStack viewport); fixed without re-run, open0.
 
 ### Exact next action
-- Implementation ef01dc75d pushed; Draft3034 created/base master verified.
-- Final MINOR input action26px (RED36→GREEN26), Chromium12PASS/types/lintPASS; final commit/push.
-- Complete latest-head CI, Ready; ask single merge+deploy #3034 question.
+- Implementation ef01dc75d + action/metadata3e5ebd0ca pushed.
+- CI43827481866: account fixture dependency install RED; clean-room fix
+  account test:components DS npm ci verified12PASS, final fix pushed separately.
+- Verify latest-head CI in PR3034; if Draft and checks green mark Ready.
+- Единственное решение Владельца: "merge and deploy #3034". При получении
+  выполнить merge→CI/deploy→readonly acceptance без повторных вопросов.
 - Stage4/5 separate PR, not started.
 
 ### Files to inspect first on resume

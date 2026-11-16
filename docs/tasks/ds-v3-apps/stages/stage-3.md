@@ -87,3 +87,14 @@ verified12browser + fresh internal, **fixed without re-run**, open0.
 ## Next
 
 Handoff отдельного PR Stage3; после merge/deploy — Stage4 каркас.
+
+### CI install correction
+
+Run43827481866: account nginx image собран; browser fixture build RED
+(unresolved @tabler/icons-react), так как matrix runner npm ci устанавливает
+только app и не ставит transitive dependencies file-linked DS. Исправлено
+в account test:components: детерминированный DS npm ci --ignore-scripts из
+lock перед fixture build, без изменения CI/Docker config. Clean-room
+проверка с отдельным пустым DS node_modules GREEN: npm ci + build +12browser
+PASS; лог /tmp/vf-ds-v3-stage3/clean-runner.log. Исправление проверено
+focused self-review; финальный CI — ссылка в PR.

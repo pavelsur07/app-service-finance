@@ -13,7 +13,7 @@
     "build": "tsc --noEmit && vite build",
     "test:e2e": "playwright test && npm run test:components",
     "prebuild": "node ../packages/ds/build/tokens.mjs --check",
-    "test:components": "vite build --config tests/components/vite.config.ts && playwright test --config tests/components/playwright.config.ts"
+    "test:components": "npm --prefix ../packages/ds ci --ignore-scripts --no-audit --no-fund && vite build --config tests/components/vite.config.ts && playwright test --config tests/components/playwright.config.ts"
   },
   "dependencies": {
     "@vashfindir/api": "file:../../site/packages/api",

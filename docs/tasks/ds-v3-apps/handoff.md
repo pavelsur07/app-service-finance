@@ -2,7 +2,7 @@
 
 **Branch:** feat/ds-v3-stage-3
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/3034
-**Implementation:** ef01dc75d; final local action26px fix + handoff metadata.
+**Implementation:** ef01dc75d; action26px3e5ebd0ca; CI runner dependency fix — final PR head.
 **CI:** required latest-head checks tracked in PR; Draft until success.
 
 Stage1 PR3027 и Stage2 PR3030 доставлены; Stage3 заменяет старый UI в apps
@@ -21,6 +21,8 @@ Chromium12PASS; preview26PASS8skips+fixture11; actual nginx builds/smoke
 PHPStan/CS/strict-types PASS; unit4889tests/27145assertions.15before/after1440
 с описанной provenance,4fresh baseline. Контраст текста4.5/borders3 и focus2.
 Актуальный production build/smoke и real HTTP/HTTPS дополнительно в PR CI.
+CI runner correction: test:components устанавливает linked DS из lock перед
+fixture build. Clean-room empty DS node_modules: install/build/12browserPASS.
 
 Internal fresh: B/I0/0, MINOR2fixed (Toast tones); focused review fixes GREEN.
 Финальная локальная MINOR нормализация custom InputGroup action до26px по листу
