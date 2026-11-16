@@ -50,4 +50,5 @@
 - [x] PHPat: модуль → только `Finance\Facade|DTO|Enum`, `MarketplaceOperations\Enum`; канон,
       переводчики, экономика → не знают модуль.
 - [x] `SchemaInSyncWithMigrationsTest`, PHPStan (baseline не растёт), CS.
-- [ ] Прод после миграции: `mpp_rule` пуста; dry-run по 3f4d87cc показывает план без записи.
+- [x] Прод после миграции (16.11, 08:20 МСК): `mpp_rule` пуста.
+- [ ] Dry-run по 3f4d87cc на проде — `codex-console` команду не пропускает; закроется cron этапа 3.

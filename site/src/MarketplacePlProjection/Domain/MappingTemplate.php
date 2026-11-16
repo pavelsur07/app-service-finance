@@ -14,7 +14,7 @@ use App\MarketplaceOperations\Enum\OperationKind;
  */
 final class MappingTemplate
 {
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     /** Вид → код статьи; `null` — справочный вид, в ОПиУ не идёт. */
     private const BY_KIND = [
@@ -55,6 +55,13 @@ final class MappingTemplate
     /** Исключения: [вид | null, канал, код источника | null, код статьи] — как эти строки вёл легаси. */
     private const EXCEPTIONS = [
         ['fine', 'wildberries', null, 'OPEX_WH_PENALTIES'],
+        // Услуги Ozon, которые легаси ведёт не в статью своего вида (сверка с продом 16.11.2026).
+        [null, 'ozon', 'ozon:service:12', 'OPEX_WH_RECEIVING'],
+        [null, 'ozon', 'ozon:service:18', 'OVERHEAD_ADMIN_BANK'],
+        [null, 'ozon', 'ozon:service:68', 'OPEX_WH_MP_DEDUCTIONS'],
+        [null, 'ozon', 'ozon:service:76', 'OPEX_WH_MP_DEDUCTIONS'],
+        [null, 'ozon', 'ozon:service:77', 'OPEX_WH_RECEIVING'],
+        [null, 'ozon', 'ozon:service:118', 'OVERHEAD_PROD_CERT'],
         [null, 'wildberries', 'wb:field:rebillLogisticCost', 'OPEX_WH_STORAGE'],
         [null, 'wildberries', 'wb:field:ppvzReward', 'COGS_RETURNS_DELIVERY'],
         [null, 'wildberries', 'wb:field:paidAcceptance', 'OPEX_WH_RECEIVING'],

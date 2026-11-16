@@ -786,6 +786,8 @@
 - Шаблон платформы — `Domain\MappingTemplate` (`VERSION`, `rules(): list<TemplateRule>`): код статьи
   стандартного дерева на каждый `OperationKind` (справочные виды — «исключено») и исключения по каналу и
   коду. Новый вид канона без строки шаблона роняет `MappingTemplateTest`. Правка шаблона — поднять `VERSION`.
+  Шаблон повторяет базовый маппинг легаси (`default_cost_mapping.yaml`): услуга Ozon, которую легаси ведёт
+  не в статью своего вида, — исключение по коду источника; паритет держит `TemplateLegacyParityTest`.
 - `Application\Action\SyncTemplateAction(companyId, execute): TemplateSyncPlan` — приводит базовые `preset`
   к шаблону по кодам листов (`LEAF_INPUT`) дерева компании; ключ с `custom` не трогает; статьи нет — правила
   нет; `preset` вне шаблона удаляется. Транзакцией владеет Action, блокировка —
@@ -5831,6 +5833,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.202 | 2026-11-16 | MarketplacePlProjection (этап 2): `MappingTemplate` v2 — 6 исключений Ozon по коду источника, шаблон равен базовому маппингу легаси; `TemplateLegacyParityTest` |
 | 2.201 | 2026-11-16 | MarketplacePlProjection (этап 1): новый модуль, `mpp_rule` — правила компании «вид канона / код источника → статья ОПиУ» с датой действия и происхождением `preset`/`custom`, `RuleResolver`, шаблон платформы `MappingTemplate` v1, `app:marketplace-pl-projection:sync-template`; в ОПиУ не пишет |
 | 2.200 | 2026-11-15 | MoySklad: автомаппинг25 листингов Ozon/WB в legacy UI, exact article/explicit size, immutable Redis preview, guarded per-row apply, CAS/replay и audit |
 | 2.199 | 2026-11-15 | MarketplaceWb: строка с артикулом без размера (возмещение логистики, реклама) остаётся на артикуле — по размерам по продажам дня (`wb_size_sales_share`), а не без SKU по всему кабинету; размеры без учёта кириллических двойников; `RULES_VERSION` `wb-sales-report-2` — все дни переводятся заново |
