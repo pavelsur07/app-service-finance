@@ -53,14 +53,24 @@ test('company pagination, switching and revoked access on focus', async ({
   await expect(page.getByText('Текущая компания:')).toContainText(
     'Первая компания',
   );
-  await page.getByRole('button', { name: 'Следующая', exact: true }).click();
-  await expect(page.getByText('Страница 2 из 2')).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Пагинация' })
+    .getByRole('button', { name: 'Страница 2', exact: true })
+    .click();
+  await expect(
+    page.getByRole('navigation', { name: 'Пагинация' }),
+  ).toContainText('2–2');
   await page.getByLabel('Компания', { exact: true }).selectOption('two');
   await expect(page.getByText('Текущая компания:')).toContainText(
     'Вторая компания',
   );
-  await page.getByRole('button', { name: 'Следующая', exact: true }).click();
-  await expect(page.getByText('Страница 2 из 2')).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Пагинация' })
+    .getByRole('button', { name: 'Страница 2', exact: true })
+    .click();
+  await expect(
+    page.getByRole('navigation', { name: 'Пагинация' }),
+  ).toContainText('2–2');
   revoked = true;
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(page.getByText('Текущая компания:')).toContainText('Не выбрана');

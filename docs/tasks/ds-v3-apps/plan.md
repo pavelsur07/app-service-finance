@@ -330,15 +330,15 @@ Risk HIGH-LOCAL; отдельный PR, без site/dependencies/production conf
   handoff gates, screenshots, fresh internal/external review, PR Ready.
 
 Чек-лист приёмки:
-- [ ] All §3.1 components exported; strict/native props/ref, no custom design
+- [x] All §3.1 components exported; strict/native props/ref, no custom design
   for missing §3.2 sheets. No fake business screens/actions.
-- [ ] Money NBSP/U2212/comma/₽, zero/negative/kopecks/large values; expenses
+- [x] Money NBSP/U2212/comma/₽, zero/negative/kopecks/large values; expenses
   ordinary text, KPI only delta color; no financial calculations or API change.
-- [ ] Sort aria-sort on th; totals supplied by caller; pagination bounds and
+- [x] Sort aria-sort on th; totals supplied by caller; pagination bounds and
   empty state; Tabs roving focus/arrows/Home/End/disabled/panel association.
-- [ ] Modal/Drawer native top layer/inert background, focus trap/restore,
+- [x] Modal/Drawer native top layer/inert background, focus trap/restore,
   Esc only top layer, backdrop close, nested cleanup/scroll restoration.
-- [ ] Menu keyboard/disabled/destructive, pickers search/leaf-only/tree keyboard.
-- [ ] Both apps gates, package tests, preview/actual-nginx browser smoke,
+- [x] Menu keyboard/disabled/destructive, pickers search/leaf-only/tree keyboard.
+- [x] Both apps gates, package tests, preview/actual-nginx browser smoke,
   1440 screenshots/contrast; scope gates and all acceptance blockers.
-- [ ] Fresh independent internal/external reviews, fixed B/I, Stage Report.
+- [x] Fresh independent internal/external reviews, fixed B/I, Stage Report.

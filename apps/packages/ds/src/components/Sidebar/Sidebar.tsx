@@ -1,3 +1,4 @@
+import { Avatar } from '../Avatar/Avatar';
 import {
   useEffect,
   useState,
@@ -230,13 +231,16 @@ export function Sidebar({
         >
           {user ? (
             <>
-              <span
-                aria-hidden="true"
-                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-tint text-sm font-semibold text-primary"
-              >
-                {user.avatar ??
-                  user.name.slice(0, 2).toLocaleUpperCase('ru-RU')}
-              </span>
+              {user.avatar ? (
+                <span
+                  aria-hidden="true"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-tint text-sm font-semibold text-primary"
+                >
+                  {user.avatar}
+                </span>
+              ) : (
+                <Avatar aria-hidden="true" name={user.name} />
+              )}
               <div className={collapsed ? 'sr-only' : 'min-w-0 flex-1'}>
                 <p className="truncate text-md font-semibold" title={user.name}>
                   {user.name}

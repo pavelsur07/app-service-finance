@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: '.',
   projects: [
+    { name: 'advanced', testMatch: 'advanced.spec.ts' },
     { name: 'components', testMatch: 'components.spec.ts' },
     {
       name: 'layout',

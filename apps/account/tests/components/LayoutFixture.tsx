@@ -6,6 +6,7 @@ import {
   PageHeader,
   AppFooter,
   Button,
+  Modal,
   IconHome,
   IconInfoCircle,
   useSidebarState,
@@ -43,6 +44,7 @@ export function LayoutFixture() {
   const sidebar = useSidebarState('vf.fixture.sidebar');
   const [long, setLong] = useState(false);
   const [logout, setLogout] = useState(0);
+  const [modal, setModal] = useState(false);
   return (
     <AppShell
       {...sidebar}
@@ -72,6 +74,10 @@ export function LayoutFixture() {
           <Button onClick={() => setLong((v) => !v)}>Длинная страница</Button>
         }
       />
+      <Button onClick={() => setModal(true)}>Открыть окно в каркасе</Button>
+      <Modal open={modal} onClose={() => setModal(false)} title="Окно каркаса">
+        <p>Фон каркаса изолирован</p>
+      </Modal>
       <p>Рабочая зона</p>
       <output aria-label="Выходов">{logout}</output>
       {long && <div className="h-[2400px]">Длинное содержимое</div>}
