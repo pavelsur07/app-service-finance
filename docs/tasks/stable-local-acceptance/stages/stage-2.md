@@ -1,18 +1,22 @@
-# Stage 2: полная приёмка — BLOCKED BY ENVIRONMENT
+# Stage 2: полная приёмка — DONE
 
-Risk MEDIUM; stage_base_commit 5a6456c03. Work items 2.1, 2.2.
+Risk MEDIUM; stage_base_commit5a6456c03. Work items2.1,2.2 complete.
+Реализация, инструкция, regression tests и review завершены. После двух
+доказанных host OOM владелец разрешил постоянный swap8GiB; дальнейшее
+увеличение PHP limit/ослабление gates не потребовалось.
 
-Реализация и инструкция завершены. Fresh final internal review: B0/I0/M0.
-External: 1 round REVIEW_GREEN; B0/I0, 5 MINOR закрыты (stdin, повторный сигнал,
-terminal process group, CI regression hook, docs). Независимый config/Scheduler
-regression подтверждает один main analyser с cache вместо второго PHP worker.
+Контрольные full site-accept: cold1499s, warm667s, warm640s — все GREEN.
+CS, strict types, PHPStan level8/baseline/paths/2GiB, Unit4928, Integration3037,
+Functional1497 в каждом run; все exit0, cleanup0, summary.valid=true.
+Один общий start/end fingerprint всех трёх: 1c949561cdb9c5756ef914931407261e667bcf90e8a66c2193749e384c855507.
+Команды/память/время сохранены в игнорируемых artifacts; measurement summary
+в ../measurements.md. Бизнес-код и финансовые формулы не менялись.
 
-Проверки и точные результаты — ../measurements.md. Все PHP-наборы отдельно
-GREEN; два полных cold завершились доказанным host global OOM на PHPStan.
-Сначала выполнен RCA, затем существенно другой подход (без child workers).
-Оба не снизили level/baseline/paths/2GB и не расширяли права/ресурсы хоста.
+Internal final fresh: B0/I0/M0; internal I2 исправлены с RED→GREEN.
+External1 round REVIEW_GREEN, B0/I0; все5 MINOR закрыты с targeted proof.
+PHPStan workers0 оставляет один main analyser с result cache; подтверждено
+real config/Scheduler regression и cold+warm фактическими запусками.
+No open BLOCKER/IMPORTANT. Definition of Done полностью выполнен.
 
-Definition of Done: runner/tests/docs/review выполнены; три последовательных
-успешных full runs НЕ выполнены. Stage не закрывается как DONE; PR остаётся Draft.
-Production не вызывался; merge/deploy не запрашиваются до выполнения критерия.
-Следующее действие — достаточная свободная память хоста, затем cold+warm+warm.
+Handoff: docs-only commit/push, оба PR Ready, owner merge/deploy decision.
+Production не вызывался; swap approval не является merge approval.
