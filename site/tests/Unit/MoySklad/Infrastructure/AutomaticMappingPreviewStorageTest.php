@@ -49,6 +49,20 @@ final class AutomaticMappingPreviewStorageTest extends TestCase
         self::assertNull($this->get($store, $preview));
     }
 
+    public function testPreviousRuleVersionIsExpiredWithoutTechnicalStorageError(): void
+    {
+        $clock = new MockClock();
+        $pool = new ArrayAdapter();
+        $store = new AutomaticMappingPreviewStorage($pool, new LockFactory(new InMemoryStore()), $clock);
+        $preview = $this->preview($clock);
+        $store->put('session-one', $preview);
+        $item = $pool->getItem('auto.'.hash('sha256', 'session-one').'.'.$preview->id);
+        $data = $item->get();
+        $data['ruleVersion'] = 'article_size_v1';
+        $pool->save($item->set($data));
+        self::assertNull($this->get($store, $preview));
+    }
+
     public function testFourthPreviewEvictsOldestAndForeignPayloadCannotOverwrite(): void
     {
         $clock = new MockClock();

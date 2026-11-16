@@ -17,6 +17,40 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
 {
     public function extend(Schema $schema): void
     {
+        $runs = $schema->createTable('moysklad_mapping_diagnostic_runs');
+        foreach (['id', 'company_id', 'connection_id'] as $column) {
+            $runs->addColumn($column, 'guid');
+        }
+        $runs->addColumn('marketplace', 'string', ['length' => 20]);
+        $runs->addColumn('size_characteristic_id', 'string', ['length' => 255, 'notnull' => false]);
+        $runs->addColumn('rule_version', 'string', ['length' => 40]);
+        foreach (['settings_fingerprint', 'input_fingerprint'] as $column) {
+            $runs->addColumn($column, 'string', ['length' => 64]);
+        }
+        $runs->addColumn('status', 'string', ['length' => 16]);
+        $runs->addColumn('requested_at', 'datetime_immutable_utc_ms', ['precision' => 3]);
+        $runs->addColumn('finished_at', 'datetime_immutable_utc_ms', ['precision' => 3, 'notnull' => false]);
+        $runs->addColumn('after_listing_id', 'guid', ['notnull' => false]);
+        $runs->addColumn('processed', 'integer', ['default' => 0]);
+        $runs->addColumn('total', 'integer');
+        $runs->addColumn('counts', 'jsonb', ['default' => '{}']);
+        $runs->addColumn('error_reason', 'string', ['length' => 64, 'notnull' => false]);
+        $runs->setPrimaryKey(['id']);
+        $runs->addUniqueIndex(['company_id', 'id'], 'uniq_ms_diagnostic_tenant_id');
+        $runs->addIndex(['company_id', 'connection_id', 'marketplace', 'requested_at', 'id'], 'idx_ms_diagnostic_scope');
+        $runs->addForeignKeyConstraint('moysklad_connections', ['company_id', 'connection_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_ms_diagnostic_connection');
+        $rows = $schema->createTable('moysklad_mapping_diagnostic_rows');
+        foreach (['company_id', 'run_id', 'listing_id'] as $column) {
+            $rows->addColumn($column, 'guid');
+        }
+        $rows->addColumn('status', 'string', ['length' => 32]);
+        $rows->addColumn('reasons', 'jsonb');
+        $rows->addColumn('manual_review', 'boolean');
+        $rows->addColumn('payload', 'jsonb');
+        $rows->addColumn('checked_at', 'datetime_immutable_utc_ms', ['precision' => 3]);
+        $rows->setPrimaryKey(['company_id', 'run_id', 'listing_id']);
+        $rows->addIndex(['company_id', 'run_id', 'status', 'listing_id'], 'idx_ms_diagnostic_rows_status');
+        $rows->addForeignKeyConstraint('moysklad_mapping_diagnostic_runs', ['company_id', 'run_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_ms_diagnostic_row_run');
         $reviews = $schema->createTable('moysklad_mapping_package_reviews');
         foreach (['company_id', 'connection_id', 'listing_id', 'actor_user_id'] as $column) {
             $reviews->addColumn($column, 'guid');

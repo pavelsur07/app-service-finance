@@ -28,7 +28,7 @@ Checks: unit policy; integration preview/writer/concurrency.
 Review focus: конфликты правил, размеры, архив, stale preview/confirmation, lock order.
 
 ## Stage 3: диагностика всего кабинета
-Risk: HIGH-LOCAL. stage_base_commit: перед началом.
+Risk: HIGH-LOCAL. stage_base_commit: 58c4f2c65.
 DoD / приёмка:
 - [ ] async_pipeline, <=100 листингов в пакете; общая policy с preview.
 - [ ] Durable progress/counters/rows/time/settings fingerprint; last completed сохраняется при запуске/сбое.

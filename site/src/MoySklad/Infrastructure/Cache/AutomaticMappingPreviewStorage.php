@@ -110,7 +110,7 @@ final readonly class AutomaticMappingPreviewStorage
             return null;
         }
         $data = $this->read($key.'.'.$id);
-        if (null === $data) {
+        if (null === $data || ($data['ruleVersion'] ?? null) !== \App\MoySklad\Application\DTO\AutomaticMappingGuard::RULE_VERSION) {
             return null;
         }
         $preview = AutomaticMappingPreview::fromArray($data);

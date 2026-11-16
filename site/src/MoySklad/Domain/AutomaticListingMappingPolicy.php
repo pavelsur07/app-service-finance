@@ -83,7 +83,7 @@ final readonly class AutomaticListingMappingPolicy
             return new AutomaticMappingDecision(Status::NO_ARTICLE);
         }
         if ($candidates->truncated || $candidates->totalCount > 50) {
-            return new AutomaticMappingDecision(Status::TOO_MANY_CANDIDATES);
+            return new AutomaticMappingDecision(Status::TOO_MANY_CANDIDATES, candidates: $candidates->items);
         }
         $alias = self::articleAlias($source, $wbTrailingW);
         $size = self::normalizeKey($source->size);
@@ -175,12 +175,16 @@ final readonly class AutomaticListingMappingPolicy
             $parentFound => Status::VARIANT_REQUIRED,
             default => Status::NO_MATCH,
         };
+        $allRules = [];
+        foreach ($matches as $match) {
+            $allRules = array_values(array_unique(array_merge($allRules, $match['rules'])));
+        }
         if (Status::READY !== $status) {
-            return new AutomaticMappingDecision($status, comparedSize: $size, selectedCharacteristicId: $sizeCharacteristicId, candidates: $candidates->items);
+            return new AutomaticMappingDecision($status, matchedRules: $allRules, comparedSize: $size, selectedCharacteristicId: $sizeCharacteristicId, candidates: $candidates->items);
         }
         $match = array_values($matches)[0];
         if (!$match['target']->selectable) {
-            return new AutomaticMappingDecision(Status::TARGET_UNAVAILABLE, comparedSize: $size, selectedCharacteristicId: $sizeCharacteristicId, candidates: $candidates->items);
+            return new AutomaticMappingDecision(Status::TARGET_UNAVAILABLE, matchedRules: $allRules, comparedSize: $size, selectedCharacteristicId: $sizeCharacteristicId, candidates: $candidates->items);
         }
 
         return new AutomaticMappingDecision(Status::READY, $match['target'], $match['rules'], $size, $sizeCharacteristicId, $candidates->items);

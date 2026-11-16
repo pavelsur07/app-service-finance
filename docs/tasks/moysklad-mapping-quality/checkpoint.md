@@ -1,8 +1,8 @@
 ## Current checkpoint
 
-**Phase:** Stage 3 / Work item 3.1
+**Phase:** Stage 4 / Work item 4.1
 **Status:** implementing
-**Stage base commit:** d66582791
+**Stage base commit:** 58c4f2c65
 
 ### Completed
 - Stage1: commit d66582791, Draft PR #3032 base master. Targeted concurrency повтор: 11 tests/76 assertions OK; причина исходной задержки boot не подтверждена.
@@ -42,3 +42,16 @@
 
 - Stage2 завершён:456 tests/1770 assertions, focused PHPStan OK; external2 rounds fixed without re-run.
 - Stage3 RED3 errors: отсутствовали tables/message. Начаты новые изолированные DTO/message/migration/query/handler; для GREEN нужны shared evaluator, Marketplace facade methods, schema extension, routing.
+
+### Stage3 progress
+- Work item3.1: run/row schema, DTO/message/query/handler; migration Version20261116122000 applied isolated test DB. Shared evaluator + keyset/fingerprint MarketplaceFacade implemented.
+- Diagnostics RED3 (missing schema/message) → GREEN3 tests/25 assertions:205 rows/3 batch transactions, retry/no duplicates, failure preserves last completed and resumes100, stale filters/scoping.
+- Added in-flight mutation and assignment/confirmation invalidation tests; run pending.
+- Found prior-rule cached preview surfaced as503; regression RED proved it; version mismatch now treated as expired.
+- PR edit via old gh GraphQL failed (deprecated projectCards); REST PATCH body update succeeded; branch push58c4f2c65 succeeded.
+
+- Stage3 полный module461/1803 OK; focused PHPStan corrected run OK. Internal IMPORTANT1 old-preview version503 fixed, no open findings.
+- Stage3 external Claude529 Overloaded (not green); Codex read-only fallback running, logs site/var/external-review/58c4f2c6-codex/.
+- Exact next action: review fallback result, close/commit/push Stage3; Stage4 tests (settings CSRF/permissions, diagnostics states/filters, explicit package review fingerprints) then UI implementation.
+
+- Stage3 external fallback Codex REVIEW_GREEN,0 BLOCKER/IMPORTANT; Stage3 завершён. Stage4 next: перенести подготовленный /tmp/mapping-quality-ui-test.php в Functional/MoySklad, выполнить RED, затем settings/refresh controllers и legacy templates.

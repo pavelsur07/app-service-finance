@@ -25,6 +25,14 @@ final readonly class AutomaticMappingDecision
         $this->reason = $status->label();
     }
 
+    /** @param array<string,mixed> $data */
+    public static function fromArray(array $data): self
+    {
+        return new self(AutomaticMappingDecisionStatus::from($data['status']),
+            null === $data['target'] ? null : new CatalogTargetDTO(...$data['target']), $data['matchedRules'], $data['comparedSize'], $data['selectedCharacteristicId'],
+            array_values(array_map(static fn (array $candidate): AutomaticMappingCandidate => new AutomaticMappingCandidate(new CatalogTargetDTO(...$candidate['target']), $candidate['parentArticle'], $candidate['leaf']), $data['candidates'] ?? [])));
+    }
+
     public function fingerprint(): string
     {
         return hash('sha256', json_encode([$this->status, $this->target, $this->matchedRules, $this->comparedSize, $this->selectedCharacteristicId, $this->candidates], \JSON_THROW_ON_ERROR));

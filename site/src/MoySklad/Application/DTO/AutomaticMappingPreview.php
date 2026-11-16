@@ -6,7 +6,6 @@ namespace App\MoySklad\Application\DTO;
 
 use App\Marketplace\DTO\ListingMetaDTO;
 use App\MoySklad\Domain\AutomaticListingMappingPolicy;
-use App\MoySklad\Enum\AutomaticMappingDecisionStatus;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
 
@@ -59,10 +58,7 @@ final readonly class AutomaticMappingPreview
     {
         $items = [];
         foreach ($data['items'] as $item) {
-            $d = $item['decision'];
-            $target = $d['target'];
-            $decision = new AutomaticMappingDecision(AutomaticMappingDecisionStatus::from($d['status']),
-                null === $target ? null : new CatalogTargetDTO(...$target), $d['matchedRules'], $d['comparedSize'], $d['selectedCharacteristicId'], array_values(array_map(static fn (array $candidate): AutomaticMappingCandidate => new AutomaticMappingCandidate(new CatalogTargetDTO(...$candidate['target']), $candidate['parentArticle'], $candidate['leaf']), $d['candidates'] ?? [])));
+            $decision = AutomaticMappingDecision::fromArray($item['decision']);
             $items[] = new AutomaticMappingPreviewItem(new ListingMetaDTO(...$item['source']), $item['sourceFingerprint'], $item['requestId'], $decision);
         }
 

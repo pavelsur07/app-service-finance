@@ -6520,3 +6520,28 @@ fingerprints, scoped company/connection/listing/revision. Ручной спор�
 требует явного подтверждения и актуального packageReviewFingerprint. Повторное
 подтверждение текущей связи не создаёт новую ревизию назначения. Query сверяет
 подтверждения с текущими данными и показывает package_review, сохраняя target.
+
+### MoySklad: диагностика кабинета
+
+`DiagnoseMappingsMessage(companyId, connectionId, marketplace, runId,
+sizeCharacteristicId)` идёт в существующий async_pipeline. Постановка сообщения
+не меняет БД; Handler создаёт run. Один delivery обходит keyset listing ID
+пакетами <=100; результаты, счётчики и cursor коммитятся вместе. Повтор delivery
+продолжает cursor, unique(company,run,listing) исключает дубли. Session advisory
+lock диагностики сериализует одинаковый scope, не блокируя импорт каталога.
+Ошибка сохраняется после rollback отдельно; retry возобновляет тот же run.
+`moysklad_mapping_diagnostic_runs/rows` хранят время, версию правил/настроек,
+input fingerprint, прогресс/счётчики и ограниченные кандидаты каждой строки.
+`MarketplaceFacade::getListingsAfterForExternalMapping(companyId, marketplace,
+afterId, limit<=100)` — стабильный keyset, возвращает list<ListingMetaDTO>.
+`getExternalMappingSourceVersion(companyId, marketplace)` возвращает
+ExternalMappingSourceVersion(fingerprint,total) по источникам и barcode sets.
+`MappingDiagnosticsQuery::inputVersion` объединяет этот fingerprint с каталогом,
+готовностью подключения, настройками, ревизиями и подтверждениями. Сверка идёт
+до/после каждого пакета и при чтении завершённого отчёта. Изменения во время
+расчёта → stale run, который не заменяет предыдущий completed. Незавершённый
+или failed run также не заменяет его. `page` выдаёт по25 сохранённых строк с
+фильтрами status/reason/manualReview; причины — MappingDiagnosticReason.
+`AutomaticMappingPreviewQuery::evaluate` — единый evaluator preview/diagnosis;
+SQL отчёта фильтрует сохранённые причины, не повторяет правила сопоставления.
+Предыдущая версия cached preview считается истёкшей, без ложной503 storage error.
