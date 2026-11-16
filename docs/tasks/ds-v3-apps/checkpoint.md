@@ -4,6 +4,8 @@
 **Status:** stopped — named production Docker/CI approval, AGENTS.md §3.4 item2
 **Stage base commit:** fbfcc71c88984d560b4cf80e56310031cdd11eff
 **Branch:** feat/ds-v3-stage-2
+**PR:** [#3030](https://github.com/pavelsur07/app-service-finance/pull/3030) — Draft, base master проверена.
+**Implementation commit:** 404c35c8b
 
 ### Completed
 - Stage1 / PR3027 merged/deployed fbfcc71c8; workflow43804985365 SUCCESS,
@@ -14,6 +16,7 @@
   explicit sources/test exclusions, Manrope/OFL, current screen CSS migration.
 - 2.4: internal/fix cycle, Codex REVIEW_GREEN, exact production proposal
   (не применён), локальные images/smoke и release contracts проверены.
+- 2.4 commit/push выполнены: отдельный Draft PR3030, base master.
 - site/, auth/session logic и фактические production configs не менялись.
 
 ### Checks and baseline
@@ -34,7 +37,8 @@
   Lock/binary directly not reviewed; author checked provenance/install/build.
 
 ### Exact next action
-- Commit/push Stage2 и создать отдельный Draft PR, base master.
+- Stage2 опубликован в Draft PR #3030, commit404c35c8b; merge не выполнять
+  до применения reviewed production patch и фактического зелёного CI.
 - Получить named approval, затем применить тот же reviewed patch:
   git apply docs/tasks/ds-v3-apps/proposals/stage-2-production.patch
 - Проверить реальные CI/release/build, Ready и merge+deploy Stage2.

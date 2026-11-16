@@ -5,6 +5,8 @@
 **Risk:** HIGH-LOCAL (apps), HIGH-EXTERNAL (production build/CI).
 **Stage base commit:** `fbfcc71c88984d560b4cf80e56310031cdd11eff`.
 **Branch:** `feat/ds-v3-stage-2`.
+**PR:** [#3030](https://github.com/pavelsur07/app-service-finance/pull/3030) — Draft, base master.
+**Implementation commit:** `404c35c8b`.
 **Work items:** 2.1–2.3 DONE, 2.4 approval/application/CI pending.
 
 ## Изменения

@@ -1,6 +1,8 @@
 # ds-v3-apps — Stage 2, approval gate
 
 **Branch:** `feat/ds-v3-stage-2`, base `fbfcc71c8`.
+**PR:** [#3030](https://github.com/pavelsur07/app-service-finance/pull/3030) — Draft, base master.
+**Implementation commit:** `404c35c8b`.
 **Статус:** Draft, локальная реализация и ревью завершены; требуется отдельное
 согласование production Docker/CI patch (AGENTS.md §3.3).
 
