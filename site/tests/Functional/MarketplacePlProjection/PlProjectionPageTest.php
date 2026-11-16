@@ -31,6 +31,11 @@ final class PlProjectionPageTest extends WebTestCaseBase
         $this->op(self::COMPANY_ID, 'ozon', 'spp', 'ozon:field:bonus', 20000);
         $this->op(self::COMPANY_ID, 'ozon', 'sale', 'ozon:field:sale_amount', 77700, '2026-11-11');
         $this->op(self::OTHER_ID, 'ozon', 'sale', 'ozon:field:sale_amount', 999900);
+        foreach ([[self::COMPANY_ID, '2026-11-05', -30000, 1], [self::COMPANY_ID, '2026-11-11', -77700, 0], [self::OTHER_ID, '2026-11-05', -99900, 0]] as [$company, $date, $cost, $without]) {
+            static::getContainer()->get(Connection::class)->insert('me_day', ['company_id' => $company, 'channel' => 'ozon', 'connection_ref' => 'cab-1', 'operation_date' => $date,
+                'rules_version' => 'economics-2', 'canon_minor' => 0, 'unallocated_minor' => 0, 'cost_price_minor' => $cost, 'without_cost_price' => $without, 'line_count' => 1,
+                'currency' => 'RUB', 'refreshed_at' => '2026-11-14 10:00:00']);
+        }
         (static::getContainer()->get(SyncTemplateAction::class))(self::COMPANY_ID, true);
 
         $client->loginUser($owner);
@@ -42,6 +47,10 @@ final class PlProjectionPageTest extends WebTestCaseBase
         $revenue = $crawler->filter('tr[data-row-code="REV_NOT_SPP"]')->text();
         self::assertMatchesRegularExpression('/1\s000,00.*0,00.*1\s000,00/u', $revenue, 'новый, текущий, разница');
         self::assertStringContainsString('(150,00)', $crawler->filter('tr[data-row-code="COGS_MP_COMMISSION"]')->text());
+        self::assertMatchesRegularExpression('/800,00/u', $crawler->filter('tr[data-row-code="REV_SPP_SALES"]')->text(), 'продажа 1000 − СПП 200');
+        self::assertStringContainsString('(300,00)', $crawler->filter('tr[data-row-code="COGS_PRODUCT_REV"]')->text());
+        self::assertSelectorTextContains('[data-pl-no-cost]', 'в 1 дн.');
+        self::assertSelectorNotExists('[data-pl-missing-codes]');
         self::assertStringNotContainsString('777', $crawler->filter('[data-pl-projection]')->text(), 'день вне периода');
         self::assertStringNotContainsString('999', $crawler->text(), 'чужая компания');
 
@@ -91,6 +100,8 @@ final class PlProjectionPageTest extends WebTestCaseBase
         $em->persist(CompanyBuilder::aCompany()->withId(self::OTHER_ID)->withOwner($other)->build());
         $em->persist($this->category($company, 'REV_NOT_SPP', PLFlow::INCOME));
         $em->persist($this->category($company, 'COGS_MP_COMMISSION', PLFlow::EXPENSE));
+        $em->persist($this->category($company, 'REV_SPP_SALES', PLFlow::INCOME));
+        $em->persist($this->category($company, 'COGS_PRODUCT_REV', PLFlow::EXPENSE));
         $em->flush();
 
         return $owner;

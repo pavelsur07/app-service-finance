@@ -67,9 +67,21 @@
         </div>
     {% endif %}
 
+    {% if daysWithoutCostPrice > 0 %}
+        <div class="alert alert-warning" role="alert" data-pl-no-cost>
+            Себестоимость неполная: в {{ daysWithoutCostPrice }} дн. периода у части проданных товаров не задана себестоимость.
+        </div>
+    {% endif %}
+    {% if missingDerivedCodes is not empty %}
+        <div class="alert alert-warning" role="alert" data-pl-missing-codes>
+            В дереве статей компании нет статей с кодами {{ missingDerivedCodes|join(', ') }} — выручка с СПП или себестоимость не показаны.
+        </div>
+    {% endif %}
+
     <p class="text-secondary small">
         «Новый расчёт» — операции маркетплейсов по правилам «вид операции → статья». «Текущий расчёт» — то, что сейчас
-        попадает в ОПиУ. Новый расчёт в ОПиУ не записывается. В нём пока нет себестоимости и блока «Выручка с СПП».
+        попадает в ОПиУ. Новый расчёт в ОПиУ не записывается. «Выручка с СПП» — справочно: продажи за вычетом скидки
+        маркетплейса. Себестоимость — проданное за вычетом возвратов одной суммой в «Себестоимости продаж».
     </p>
 
     {% set visible = rows|filter(r => (r.values.new ?? 0) != 0 or (r.values.legacy ?? 0) != 0) %}
