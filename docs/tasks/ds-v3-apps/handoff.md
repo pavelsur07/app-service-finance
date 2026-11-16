@@ -1,41 +1,39 @@
-# ds-v3-apps — Stage4 handoff
+# ds-v3-apps — Stage5 handoff
 
-**Branch:** feat/ds-v3-stage-4
-**PR:** https://github.com/pavelsur07/app-service-finance/pull/3037 (base master)
-**Base:** d99ede00d; plan0177e328c, runtime b0350c8df, integration based321bc79d (PR3035/3036).
-**CI:** live PR latest-head checks; Draft до завершения gates.
+**Branch:** feat/ds-v3-stage-5
+**PR:** https://github.com/pavelsur07/app-service-finance/pull/3039 (master)
+**Stage base:**03a34a2db176d0ecbb67ad904f28b8a7760c57c2
+**Integration base:**5a7725216; runtime04703c014, integration3a3d74aa3 preserves apps.
+**Runtime/CI:** latest PR head/checks; Ready only after exact-head CI success.
 
-Stages1/2/3 delivered PR3027/3030/3034. Stage4 — общий header/sidebar/footer
-и page headers, nested navigation/collapse264/72/persistence, skip link и
-независимые scrollbar-stable main/nav. Public about/404 без session bootstrap;
-real identity/email и прежний logout, включая pending background refresh.
+Stages1–4 delivered PR3027/3030/3034/3037. Stage5 completes specified §3.1
+Data/Tags/Table/Tabs/KPI/overlays/pickers/formatters. Account uses DS Pagination
+in existing server CompanyPicker; Sidebar reuses Avatar. No financial formulas,
+auth/store/API/new business screens or data changes. Native dialog/popover need
+no new dependency; native top-layer notifications explicitly scoped.
 
-Files: apps/packages/ds layout components/icons/CSS, apps/* app composition/
-Home/About/tests, README/task docs. site/, backend/API/session store/CSRF,
-production Docker/CI, locks/dependencies/generated токены unchanged.
-Миграций и ручных production mutations нет.
+Files: apps/packages/ds components/format/styles/exports/docs, account picker,
+shared Sidebar, test-only advanced fixture/tests, apps README/task docs.
+site/, deps/locks/generated and production config unchanged. No migrations.
 
-Checks: front types/lint/test/build PASS92/88; package57; browser21; preview
-36PASS10skips +targeted logout4PASS; final nginx builds/smoke44PASS6skips
-+fixture21. PHPStan/CS/strict/unit4894PASS после integration;17before/after1440
-+full/rail snapshots. Real HTTP/HTTPS и latest code проверяются в PR CI.
+Checks: frontend types/lint/tests/build140/136PASS, package105;48browserPASS
+(27advanced/12base/9layout), text4.5/control3/approved icons; required/FormData,
+IME, menu, drafts/leaf-tree, native inert/trap/scroll/restore and same-commit
+nesting. Preview40PASS10skips; actual nginx44PASS6skips+fixture47, final
+required correction fixture48.17before/after +8fixture screenshots; loading
+baseline reused delivered Stage4 identical expanded shell with provenance.
+PHPStan/CS/strict/unit4928PASS. Final actual image equivalence/CI linked in PR.
 
-Internal totals B/I0/2(author regressions fixed), independent reviewer0/0/0
-GREEN +focused final GREEN; author MINOR1fixed (rail CSS layer). External Codex1round0/0 exact REVIEW_GREEN;
-static stdin-only fallback, Claude unavailable. Post-green logout correction
-verified RED→GREEN4 and fresh internal review; rail gutter assertion RED→GREEN
-и fixture21PASS, focused independent GREEN. External re-run not required.
+Review metrics: internal BLOCKER/IMPORTANT0/4fixed (author3 +fresh reviewer1),
+MINOR1fixed; fresh independent +focused INTERNAL_REVIEW_GREEN/open0. External
+Codex1round BLOCKER/IMPORTANT0/1fixed; **fixed without re-run**, no raw green
+marker claimed. Native required validates committed tags; draft not serialized.
 
-Risks/follow-ups: only actual actions/routes; no role/profile fake data;
-caption accessible text-tertiary; TODO(ds) pending auth/error/loading sheets
-и source error-border retained. CSS+12.52%/4KB justified by shell utilities;
-JS+~4.7%. Stage5 data/overlays/formatters не начат.
+Risks/follow-ups: CSS+11451B (~31.8%) shared Stage5 utility surface; account
+JS+2439B (~0.82%), admin+605B (~0.20%). Apps JS tree-shakes unused components.
+Native dialog/ToastStack scope gap documented TODO(ds); P1 calendar/auth/error/
+loading/combobox/bulk table/dark deferred pending sheets. Details stage-5.md
+and checklist-stage-5.md; no open B/I.
 
-Reports: stages/stage-4.md, reviews/codex-stage-4.md, checkpoint.md.
-
-Ready: PR #3037 "feat(ds): Stage 4 — общий каркас account и admin" — merge into master with automatic production deploy?
-Reply: "merge and deploy #3037"
-
-Integration: current master merged; subsequent scoped rail correction reviewed/tested.
-Own diff to origin/master excludes site/financial code from those other PRs.
-Latest-head CI and integrated backend checks linked in PR; no new migrations.
+Ready: PR #3039 "feat(ds): Stage 5 — данные, оверлеи и форматтеры" — merge into master with automatic production deploy?
+Reply: "merge and deploy #3039"

@@ -1,3 +1,4 @@
+import { AdvancedFixture } from './AdvancedFixture';
 import { LayoutFixture } from './LayoutFixture';
 import { StrictMode, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -245,7 +246,9 @@ const root = document.getElementById('root');
 if (!root) throw new Error('Missing fixture root');
 createRoot(root).render(
   <StrictMode>
-    {new URLSearchParams(window.location.search).has('layout') ? (
+    {new URLSearchParams(window.location.search).has('advanced') ? (
+      <AdvancedFixture />
+    ) : new URLSearchParams(window.location.search).has('layout') ? (
       <LayoutFixture />
     ) : (
       <Fixture />

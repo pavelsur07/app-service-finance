@@ -191,9 +191,90 @@ logout, не общий busy сессии: существующий logout до�
 
 Public about/404 используют layout без SessionProvider; authenticated layout
 потребляет текущий provider. API, CSRF и session store не меняются.
-Generic DropdownMenu/Avatar остаются Stage5; user row/logout сейчас по layout.
+DropdownMenu/Avatar доступны; Sidebar переиспользует Avatar, user row/logout сохраняет layout.
 Source group captions text-disabled заменены semantic text-tertiary для4.5:1.
 
 Тестовый fixture имеет проекты components и layout, последний с обычными
 scrollbars; проверяет реальную ширину gutter и отсутствие сдвига content.
 Новые runtime routes, production config и зависимости для каркаса не нужны.
+
+## Данные, форматтеры и оверлеи (Stage 5)
+
+`Table` принимает native table props/ref, обязательный `caption` и обычные
+`thead/tbody/tfoot`. `SortHeader` — `th` с direction `ascending/descending/null`,
+`onSort` и align; sorting выполняет потребитель. `TotalsRow` — native tr,
+итоги передаются готовыми. Для строк доступны `data-kind="day|subtotal"`,
+`data-selected`, для ячеек `data-align="right"`. `Pagination` получает
+page/pageSize/total/onPageChange: диапазон, first/last/ellipsis, безопасные границы.
+
+`Tabs`: label, items `{id,label,count?,tone?,disabled?,content?}`, value/onChange;
+selected panel ассоциирован по ID, стрелки/Home/End пропускают disabled.
+`KpiCard`: label/value/meta/status, hero, delta `{value,tone:up|down|neutral}`.
+Значение нейтральное; ДС не вычисляет деньги, проценты или благоприятность дельты.
+`Chip`: selected/onSelect и отдельный onRemove/removeLabel; interactive элементы
+не вкладываются друг в друга. `AbcPill`: revenue/profit A/B/C. `MarketplaceMark`:
+ozon/wb/yamarket/megamarket, mark28 или inline16. `Avatar`: name/src, sm24/md32/lg40,
+circle/square, initials/error fallback. `TagsInput`: label, controlled string[]
+value/onChange, optional suggestions; trim/case-insensitive duplicate protection,
+Enter/arrows/Escape/IME, two-step Backspace, native disabled/readOnly/ref.
+`required` проверяет committed tags, незавершённый текст не удовлетворяет
+обязательности; `name` сериализует каждую выбранную метку отдельным hidden
+полем (повтор имени), сохраняя native form/disabled.
+
+Форматтеры — только представление, не бухгалтерские вычисления:
+
+| API                              | Контракт                                                                                                                                                                    |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `formatMoney(value, options?)`   | number/bigint/exact decimal string/null; по умолчанию2decimal, RUB; `fractionDigits:0` — явное отображение целых; `withCurrency:false` — валюта в заголовке; USD/EUR prefix |
+| `formatNumber(value, options?)`  | до2decimal по умолчанию; `fractionDigits`, `sign:auto                                                                                                                       | always` |
+| `formatPercent(value, options?)` | **процентные пункты**,12.4→12,4%;1decimal по умолчанию; ratio не пересчитывается                                                                                            |
+| `formatDate(value, options?)`    | ISO date-only/qualified instant, Date или epoch milliseconds; timezoneUTC по умолчанию, опциональные timeZone/includeTime; calendar date не сдвигается                      |
+
+Деньги: NBSP U+00A0, U+2212, comma, ₽ suffix; отсутствие — em dash,
+нулевой результат округления без отрицательного знака. Intl обрабатывает decimal
+strings без предварительного Number. Неверные/nonfinite числа, digits вне0–20,
+неверные календарные даты и timezone-free timestamps выбрасывают RangeError.
+Потребитель выбирает нужную точность и единицы; существующие финансовые формулы,
+API и код форматирования site не меняются.
+
+`Modal`: controlled open/onClose, title/description, size sm440/md520/lg640,
+children/footer, initialFocusRef, dismissible/closeOnBackdrop/showClose и native
+props/ref. `Drawer` использует тот же lifecycle и фиксированную ширину680 справа.
+Native dialog.showModal() дает top layer/inert; Tab/Escape/restore, nested scroll
+lock и cleanup проверяются браузером. Не передавайте native open attribute и
+не вызывайте showModal вручную. `ConfirmDialog`: onConfirm, confirmLabel,
+cancelLabel, busy/destructive; initial focus на cancel, busy блокирует повтор
+и dismiss. Destructive использует существующую outline danger кнопку (без
+красного solid background, как требует checklist).
+
+`DropdownMenu`: controlled open/onOpenChange, trigger **строка подписи**,
+triggerProps для Button, items `{id,label,onSelect,disabled?,tone?,icon?,shortcut?}`
+или `{id,separator:true}`. Native popover top layer избегает clipping; позиция
+вычисляется от trigger с viewport clamp. Arrow/Home/End/Enter/Space/Escape/Tab,
+outside pointer, focus restore; callbacks — действия, не fake navigation.
+
+`EntityPicker` и `TreePicker`: Modal props + open/onOpenChange, items,
+value:string|null/onChange, searchable/allowClear. Каждый open начинает новый
+draft; Cancel ничего не меняет, Apply подтверждает валидный выбор. Entity items:
+id/label/meta/searchText/leading/trailing/disabled; дополнительные ReactNode
+только presentation, без вложенных interactive controls. Tree items:
+id/label/meta/searchText/disabled/children; наличие children означает branch,
+даже пустой; branch раскрывается, выбирается только enabled leaf. IDs уникальны.
+Search сохраняет ancestors, arrows/Home/End и Enter/Space управляют деревом,
+query clear возвращает прежнюю expansion. Никаких запросов/скрытой server pagination.
+Существующий account CompanyPicker сохраняет native Select и server store,
+переиспользует только новый Pagination.
+
+### Уведомления и верхний слой
+
+Без открытого modal используйте root `ToastStack` вне scroll/transform panels.
+TODO(ds): канон задаёт z-toast200/z-overlay100 и native dialog, но не задаёт
+межслойную маршрутизацию глобальных уведомлений. Native top layer выше обычных
+z-index, а фон inert. Для уведомлений активного окна передавайте существующий
+`ToastStack` в `notifications` Modal/Drawer (вне scroll body); во вложенных окнах —
+только в верхнее. Уведомление остаётся доступно для assistive technology и
+клавиатуры. Автоматической глобальной маршрутизации нет. При dismiss уведомления
+потребитель возвращает фокус, если удаляется текущий focused control.
+
+Browser fixture `?advanced` собирается отдельно от production; native dialog и
+popover проверяются существующим Chromium runner, новые зависимости не нужны.

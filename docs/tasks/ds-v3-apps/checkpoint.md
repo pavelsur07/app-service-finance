@@ -1,42 +1,36 @@
 ## Current checkpoint
 
-**Phase:** Stage 4 / handoff
-**Status:** implemented/reviewed; PR3037 final rail fix / latest-head CI
-**Stage base commit:** d99ede00de60e210d373feea8b80e371daa521e4
-**Branch:** feat/ds-v3-stage-4
-**PR:** https://github.com/pavelsur07/app-service-finance/pull/3037 (base master; Ready/checks are live PR state)
+**Phase:** Stage5 /handoff
+**Status:** implemented/reviewed; latest-head CI then Ready (live PR state)
+**Stage base:**03a34a2db176d0ecbb67ad904f28b8a7760c57c2
+**Integration base:**5a7725216bc02dc01d428bc14a80fdac63cb9eca
+**Runtime commit:**04703c014; integration3a3d74aa3, apps byte-identical
+**Branch:**feat/ds-v3-stage-5
+**PR:**https://github.com/pavelsur07/app-service-finance/pull/3039 (master)
 
 ### Completed
-- Stages1/2/3 delivered: PR3027/3030/3034; fallback rule PR3028 in master.
-- Stage3 merge d99ede00d, deploy43830874625SUCCESS; both apps healthy SHA,
-  HTTPS23/23 + public browser native fields/navigationPASS.
-- Stage4 spec/reference read from Git3882c5dd9; plan/DoD in plan.md.
+Stages1–4 delivered PR3027/3030/3034/3037; fallback rule3028. Stage5
+all specified §3.1 components/formatters implemented. API/risks/source
+deviations and acceptance evidence in stage-5.md/checklist-stage-5.md.
 
-### Checks and baseline
-- Baseline front-test82/78 and preview PASS;15before1440 snapshots.
-- Shell SSR10RED→GREEN10, browser20PASS (12base+8layout), Typecheck/lint/build
-  both apps PASS after removing obsolete store binding in RequireSession.
-- Preview migrated apps36PASS/10skips +fixture20PASS.
-- Responsive focus RED→GREEN; logout refresh RED→GREEN4PASS, nginx final44PASS6skips+fixture21.
+### Checks
+Baseline92/88; final frontend types/lint/test/build140/136PASS; package105.
+Final fixture48PASS; preview40PASS10skip +fixture45 before scoped fixes;
+actual nginx44PASS6skip+fixture47 before required correction, finalfixture48.
+Both images'5distfiles byte-identical to final builds; extra50x nginx base only.
+PHPStan/CS/strict4928tests/27251assertionsPASS.17before/after +8fixture
+screenshots; loading baseline reused Stage4 delivered expanded shell,
+provenance recorded, new after captured. site/deps/config unchanged.
 
-### Review status
-- Author IMPORTANT2fixed: resize focus и logout during background refresh (RED→GREEN).
-- Independent fresh internal0/0/0GREEN +focused updated full diffGREEN.
-- External separate Codex1round exact REVIEW_GREEN0/0, stdin-only static;
-  post-green scoped logout correction verified bothapps desktop/mobile4PASS.
-- Author MINOR1fixed: utility layer scrollbar gutter in rail; assertion RED→GREEN,
-  fixture21PASS, focused independent INTERNAL_REVIEW_GREEN/open0.
-- Integrated backend gates PASS:4894tests/27154assertions.
+### Review
+Fresh independent internal +focused GREEN; totals B/I0/4fixed,M1fixed.
+External Codex round1 B/I0/1fixed(required tags), fixed without re-run,
+RED→GREEN48 +SSR +focused independent GREEN; open0, no raw green claimed.
 
 ### Exact next action
-- Runtime b0350c8df pushed; synced masterd321bc79d (PR3035/3036).
-  Integration preserved apps; subsequent rail CSS correction independently reviewed.
-  Own diff origin/master has no site/production changes.
-- Verify latest-head CI in PR3037; markReady if Draft and checks green.
-- Единственное решение Владельца: "merge and deploy #3037". Upon approval
-  run full pipeline through readonly post-deploy acceptance without more questions.
-- Stage5 separate PR, not started.
-
-### Files to inspect first on resume
-- plan.md, apps/*/src/app, apps/packages/ds/src/components
-- apps/account/tests/components, apps/README.md
+Wait latest-head PR CI and verify all required checks; markReady if Draft.
+Then sole owner decision: "merge and deploy #3039". Do not merge before it.
+Approval covers pipeline through readonly production acceptance.
+Runtime/source untouched after final focused review; upstream master merged
+clean after task commit, only services WB code inherited, no owned diff there.
+P1 missing sheets/dark deferred; no new design or implementation now.

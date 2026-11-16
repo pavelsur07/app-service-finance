@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Button, Card, FormField, Select, Alert } from '@vashfindir/ds';
+import {
+  Button,
+  Card,
+  FormField,
+  Select,
+  Alert,
+  Pagination,
+} from '@vashfindir/ds';
 import { ApiError } from '@vashfindir/api';
 import { useSession } from '../../app/SessionProvider';
 import type { Companies } from './session';
@@ -80,25 +87,12 @@ export function CompanyPicker() {
               ))}
             </Select>
           </FormField>
-          <div className="wz-actions">
-            <Button
-              variant="secondary"
-              disabled={page <= 1}
-              onClick={() => setPage((value) => value - 1)}
-            >
-              Предыдущая
-            </Button>
-            <span>
-              Страница {result.meta.page} из {result.meta.pages}
-            </span>
-            <Button
-              variant="secondary"
-              disabled={page >= result.meta.pages}
-              onClick={() => setPage((value) => value + 1)}
-            >
-              Следующая
-            </Button>
-          </div>
+          <Pagination
+            page={result.meta.page}
+            pageSize={result.meta.per_page}
+            total={result.meta.total}
+            onPageChange={setPage}
+          />
         </>
       )}
     </Card>

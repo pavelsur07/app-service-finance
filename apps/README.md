@@ -57,7 +57,7 @@ Node: `24.18.1-bookworm-slim`, Playwright npm и браузерный образ
 
 App `prebuild` проверяет generated CSS/TS; source JSON не меняется вручную.
 OFL шрифта лежит в `apps/packages/ds/public/fonts/Manrope-OFL.txt` и попадает
-в dist обоих приложений. Базовые React-компоненты ДС уже подключены; каркас также общий; следующий Stage — данные и оверлеи.
+в dist обоих приложений. Базовые React-компоненты, каркас, компоненты данных, форматтеры и оверлеи доступны из пакета ДС. API и особенности native dialog/notifications описаны в apps/packages/ds/README.md.
 
 ## Структура и общие пакеты
 
