@@ -19,7 +19,7 @@ site-clear:
 site-init: site-composer-install site-wait-db site-migrations site-fixtures site-frontend-install
 
 site-composer-install:
-	$(DOCKER_COMPOSE) run --rm site-php-cli composer install
+	$(DOCKER_COMPOSE) run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer install
 
 site-frontend-install:
 	$(DOCKER_COMPOSE) run --rm site-frontend npm run build
@@ -33,20 +33,28 @@ site-migrations:
 site-fixtures:
 	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction
 
+.PHONY: site-accept test-site-accept
+
+site-accept:
+	DOCKER_COMPOSE="$(DOCKER_COMPOSE)" python3 site/bin/site-accept.py
+
+test-site-accept:
+	python3 tests/shell/site-accept-test.py
+
 site-cs-check:
-	$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:check   # Проверка PHP-стиля
+	$(DOCKER_COMPOSE) run --rm $(CHECK_ENV) site-php-cli composer cs:check   # Проверка PHP-стиля
 
 site-cs-strict-types:
-	$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:strict-types   # Гейт: declare(strict_types=1) в каждом файле
+	$(DOCKER_COMPOSE) run --rm $(CHECK_ENV) site-php-cli composer cs:strict-types   # Гейт: declare(strict_types=1) в каждом файле
 
 site-cs-fix:
-	$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:fix # Автопочинка PHP-стиля
+	$(DOCKER_COMPOSE) run --rm $(CHECK_ENV) site-php-cli composer cs:fix # Автопочинка PHP-стиля
 
 site-cs-twig:
-	$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:twig   # Гейт Twig: twigcs (site/.twigcs.php) + lint:twig
+	$(DOCKER_COMPOSE) run --rm $(CHECK_ENV) site-php-cli composer cs:twig   # Гейт Twig: twigcs (site/.twigcs.php) + lint:twig
 	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console lint:twig templates
 
-    #$(DOCKER_COMPOSE) run --rm site-php-cli composer cs:phpcs   # Проверка через phpcs (PSR-12)
+    #$(DOCKER_COMPOSE) run --rm $(CHECK_ENV) site-php-cli composer cs:phpcs   # Проверка через phpcs (PSR-12)
 
 # ===== СТАТИЧЕСКИЙ АНАЛИЗ =====
 # Гейт достижимо зелёный: существующие ошибки лежат в site/phpstan-baseline.neon,
@@ -57,15 +65,15 @@ site-cs-twig:
 # из var/cache/test. Прогрев — предусловие цели, а не отдельное знание в голове:
 # без него анализ падает, и это должно быть невозможно сделать случайно.
 site-stan-prepare:
-	$(DOCKER_COMPOSE) run --rm site-php-cli php bin/console cache:warmup --env=test
+	$(DOCKER_COMPOSE) run --rm $(CHECK_ENV) site-php-cli php bin/console cache:warmup --env=test
 
 site-stan: site-stan-prepare
-	$(DOCKER_COMPOSE) run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer stan   # Гейт: статический анализ типизации (PHPStan, level 8)
+	$(DOCKER_COMPOSE) run --rm $(CHECK_ENV) site-php-cli composer stan -- --configuration=phpstan.local.neon   # Гейт: статический анализ типизации (PHPStan, level 8)
 
 # Baseline только сокращать. Перегенерация «начисто» стирает ratchet: регресс
 # перестаёт отличаться от унаследованного долга.
 site-stan-baseline: site-stan-prepare
-	$(DOCKER_COMPOSE) run --rm -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer stan:baseline   # Перегенерация baseline PHPStan
+	$(DOCKER_COMPOSE) run --rm $(CHECK_ENV) site-php-cli composer stan:baseline   # Перегенерация baseline PHPStan
 
 # ===== TESTS =====
 
@@ -85,10 +93,12 @@ test-gt:
 test-deploy-workflow:
 	bash tests/shell/deploy-workflow-test.sh
 	python3 -m unittest discover -s site/tools/tests
+	python3 tests/shell/site-accept-test.py
 
 # Xdebug в dev-образе включён в режиме debug и замедляет прогон на ~22%;
 # для тестов он не нужен. Покрытие (site-test-cov) задаёт свой XDEBUG_MODE.
-TEST_ENV := -e XDEBUG_MODE=off
+CHECK_ENV := -e XDEBUG_MODE=off -e COMPOSER_PROCESS_TIMEOUT=0
+TEST_ENV := $(CHECK_ENV)
 
 site-test-telegram:
 	$(DOCKER_COMPOSE) run --rm $(TEST_ENV) site-php-cli composer test:smoke
@@ -101,11 +111,11 @@ site-test-unit:
 site-test-int: site-test-integration
 
 site-test-integration: site-test-wait-db
-	$(DOCKER_COMPOSE) run --rm $(TEST_ENV) -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer test:integration
+	$(DOCKER_COMPOSE) run --rm $(TEST_ENV) site-php-cli composer test:integration
 
 # Все тесты
 site-test: site-test-prepare
-	$(DOCKER_COMPOSE) run --rm $(TEST_ENV) -e COMPOSER_PROCESS_TIMEOUT=0 site-php-cli composer test
+	$(DOCKER_COMPOSE) run --rm $(TEST_ENV) site-php-cli composer test
 
 # ---- подготовка окружения тестов (smoke) ----
 site-test-smoke-init: site-test-env site-test-wait-db site-test-db site-test-migrations
@@ -115,7 +125,7 @@ site-test-smoke: site-test-smoke-init
 
 # Покрытие (нужен xdebug или pcov в CLI-образе)
 site-test-cov: site-test-prepare
-	$(DOCKER_COMPOSE) run --rm -e XDEBUG_MODE=coverage site-php-cli ./vendor/bin/phpunit -c phpunit.xml --coverage-html var/coverage --coverage-text
+	$(DOCKER_COMPOSE) run --rm -e COMPOSER_PROCESS_TIMEOUT=0 -e XDEBUG_MODE=coverage site-php-cli ./vendor/bin/phpunit -c phpunit.xml --coverage-html var/coverage --coverage-text
 
 # ---- подготовка окружения тестов ----
 site-test-init: site-test-prepare
