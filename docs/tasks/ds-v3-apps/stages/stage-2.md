@@ -1,12 +1,14 @@
 # Stage 2 — Tailwind v4 и стили apps
 
-**Статус:** локальная реализация/ревью завершены, production patch одобрен
-и применён; фактический CI проверяется. Stage ещё не закрыт.
+**Статус:** DONE — Stage2 Ready/handoff; ожидается решение merge+deploy #3030.
 **Risk:** HIGH-LOCAL (apps), HIGH-EXTERNAL (production build/CI).
 **Stage base commit:** `fbfcc71c88984d560b4cf80e56310031cdd11eff`.
 **Branch:** `feat/ds-v3-stage-2`.
-**PR:** [#3030](https://github.com/pavelsur07/app-service-finance/pull/3030) — Draft, base master.
+**PR:** [#3030](https://github.com/pavelsur07/app-service-finance/pull/3030) — Ready, base master.
 **Implementation commit:** `404c35c8b`.
+**Approved pipeline patch:** `f2df0325f`.
+**Integration base:** `87e6a7338254cc2942ac908b679e8e390817eec3`.
+**Tested code head:** `f82ec6d78f1055147056128fd24cddd21c6e2f8b`.
 **Work items:** 2.1–2.3 DONE, 2.4 approval/application/CI pending.
 
 ## Изменения
@@ -45,8 +47,8 @@ CompanyPicker, SessionStatus обоих; `apps/README.md`, `CLAUDE.frontend.md`,
 - [x] 15 screenshots before + 15 after, 1440×900, просмотр login/about/home.
 - [x] Полный независимый internal review, фиксы, отдельный Codex REVIEW_GREEN.
 - [x] Named approval §3.3 и применение production patch.
-- [ ] Фактический CI зелёный.
-- [ ] Ready/merge+deploy — только после предыдущего пункта.
+- [x] Фактический CI зелёный (43814469343).
+- [x] Ready/handoff; merge+deploy ожидает решения Владельца.
 
 ## Проверки
 
@@ -115,8 +117,8 @@ BLOCKER/IMPORTANT 0/0, 1 round REVIEW_GREEN.
 - DS npm audit: HIGH/CRITICAL 0, moderate4/low2 — те же транзитивные build-only
   зависимости Stage 1, audit exit1 сохранён и не скрывается. Существующие
   версии пакетов apps в lock не изменялись; добавлены только DS/Tailwind deps.
-- Proposal применён после approval; current branch не готов к merge
-  до фактических зелёных CI checks.
+- Proposal применён после approval, фактический CI зелёный; production
+  rollout Stage2 ожидает решения Владельца.
 - Источник эталона по-прежнему в PR #3022; provenance записан в plan/README.
 
 ## Применение согласованного patch / продолжение
@@ -130,7 +132,13 @@ PASS; `make front-install APP=admin` свежо установил DS перед
 Предыдущий CI43809997304 падал ожидаемо до согласования: TS2307 tailwindcss
 в обоих apps, ERR_MODULE_NOT_FOUND style-dictionary в real-auth preview.
 Корневая причина — отсутствие установки DS; patch её устраняет.
-Следующий шаг — фактический CI нового head, Ready и один запрос
-merge+deploy #3030. Stage 3–5 ещё не начаты, production deploy Stage 2
+[CI43814469343](https://github.com/pavelsur07/app-service-finance/actions/runs/43814469343)
+SUCCESS на f82ec6d78: оба SPA checks, images/browser smoke и real-auth
+dev/preview/production HTTPS, PHP checks/functional/integration/API types/
+empty-db migrations. Никаких новых findings. После review UI runtime/lock
+не менялись; actual config побайтно совпал с candidate.
+Ветка синхронизирована со свежим master, полный task diff к87e6a7338
+не содержит site/ изменений. Последующие изменения — итоговая документация.
+Stage2 Ready; следующий шаг — решение merge+deploy #3030. Stage 3–5 ещё не начаты, production deploy Stage 2
 не выполнялся. Docs PR #3028 merged (87e6a7338), workflow SUCCESS;
 build/deploy штатно skipped для docs-only изменений.

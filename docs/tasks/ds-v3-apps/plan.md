@@ -158,7 +158,8 @@ Stage base commit: `fbfcc71c88984d560b4cf80e56310031cdd11eff`.
 - [x] Независимое internal review и отдельный Codex REVIEW_GREEN, отчёт.
 - [x] Production patch применён после named approval 2026-11-16;
   actual release contracts и fresh admin install/typecheck/tests PASS.
-- [ ] Реальный CI PR #3030 зелёный; Stage 2 Ready/merge+deploy после этого gate.
+- [x] Реальный CI PR #3030 зелёный (43814469343, f82ec6d78); Stage 2
+  Ready/handoff. Merge+deploy #3030 ожидает решения Владельца.
 
 Work items:
 - 2.1 — baseline, screenshots before, тесты темы/визуального контракта RED.
@@ -231,3 +232,8 @@ Stage 2 reviewed: internal 0/0, MINOR1 fixed; separate Codex 0/0, REVIEW_GREEN.
 Владелец одобрил patch 2026-11-16: production proposal применён побайтно,
 проверяются фактические CI/release gates. PR #3028 merged (87e6a7338),
 workflow43813732309 SUCCESS, build/deploy skipped для docs-only изменения.
+
+Stage 2 handoff: approved patch f2df0325f, integration base87e6a7338,
+code head f82ec6d78; actual CI43814469343 SUCCESS. После independent review
+UI runtime/lock не менялись; actual config exact reviewed candidate.
+Stage2 закрыт, PR3030 Ready; production rollout Stage2 ещё не выполнялся.

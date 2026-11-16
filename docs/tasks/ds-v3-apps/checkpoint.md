@@ -1,11 +1,13 @@
 ## Current checkpoint
 
-**Phase:** Stage 2 / Work item 2.4 / actual CI gate
-**Status:** checking — approval received, production patch applied
+**Phase:** Stage 2 / handoff
+**Status:** done — Stage 2 ready; ожидается merge+deploy #3030
 **Stage base commit:** fbfcc71c88984d560b4cf80e56310031cdd11eff
 **Branch:** feat/ds-v3-stage-2
-**PR:** [#3030](https://github.com/pavelsur07/app-service-finance/pull/3030) — Draft, base master проверена.
-**Implementation commit:** 404c35c8b
+**PR:** [#3030](https://github.com/pavelsur07/app-service-finance/pull/3030) — Ready, base master проверена.
+**Implementation commit:** 404c35c8b; approved pipeline patch f2df0325f
+**Integration base:** 87e6a7338254cc2942ac908b679e8e390817eec3
+**Tested code head:** f82ec6d78f1055147056128fd24cddd21c6e2f8b
 
 ### Completed
 - Stage1 / PR3027 merged/deployed fbfcc71c8; workflow43804985365 SUCCESS,
@@ -35,16 +37,24 @@
 - Actual release contracts PASS; fresh front-install/typecheck/test APP=admin
   PASS44. CI до patch: TS2307 tailwindcss + missing style-dictionary.
 
+- Actual CI43814469343 на f82ec6d78 SUCCESS: SPA checks обоих apps,
+  реальные dev/preview/production HTTPS auth, images/browser smoke,
+  все PHP checks/functional/integration/API types/migrations-empty PASS.
+- После review UI runtime/lock не менялись; applied config byte-identical
+  candidate. Ветка синхронизирована с master87e6a7338, diff site/ пуст.
+- PR3028 post-check19/19 PASS; оба production SPA healthy на текущем61798e4d5;
+  новая выкатка docs-only PR3028 штатно skipped.
+
 ### Review status
 - Internal fresh reviewer: BLOCKER/IMPORTANT0/0, MINOR1 fixed, open0.
 - External separate Codex1round, stdin-only: REVIEW_GREEN0/0, exit0.
   Lock/binary directly not reviewed; author checked provenance/install/build.
 
 ### Exact next action
-- Commit/push применённый согласованный patch + актуальные отчёты в PR3030.
-- Дождаться actual CI/release/build, проверить полный task diff к master.
-- После зелёных checks: Ready и запрос merge and deploy #3030.
-- Stage3–5 не начаты; merge/deploy Stage2 ещё не разрешён.
+- Получить единственное решение "merge and deploy #3030"; после него
+  выполнить весь pipeline до post-deploy acceptance без новых вопросов.
+- Применение production patch уже одобрено/выполнено; повторно не спрашивать.
+- Stage3–5 ещё не начаты, отдельные PR по исходному поручению Владельца.
 
 ### Files to inspect first on resume
 - docs/tasks/ds-v3-apps/proposals/{README.md,stage-2-production.patch}
