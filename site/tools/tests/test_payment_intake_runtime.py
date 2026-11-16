@@ -25,7 +25,9 @@ class PaymentIntakeRuntimeTest(unittest.TestCase):
         workflow = WORKFLOW.read_text()
         start = workflow.index('                    echo "🐳 [4/5]')
         end = workflow.index('                    echo "🐳 Обновляем account/admin SPA"', start)
-        script = 'docker() { printf "DOCKER %s\\n" "$*"; }\n' + textwrap.dedent(workflow[start:end])
+        script = ('docker() { printf "DOCKER %s\\n" "$*"; }\n'
+                  + f'source "{REPO}/docker/release/production.sh"\n'
+                  + 'release_service_migrations\n' + textwrap.dedent(workflow[start:end]))
         env = {'PATH': os.environ['PATH'], 'AI_SERVICE_EVAL_ENABLED': nightly,
                **{key: 'synthetic-test-' + 'a' * 32 for key in SECRETS}}
         if stale:

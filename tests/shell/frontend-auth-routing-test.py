@@ -28,9 +28,12 @@ class AuthRoutingTest(unittest.TestCase):
     def test_real_backend_suite_is_a_required_deploy_gate(self):
         workflow = (ROOT / '.github/workflows/deploy.yml').read_text()
         self.assertIn('    spa-auth-e2e:', workflow)
-        gate = workflow.split('    schema-ready:', 1)[1].split('    deploy:', 1)[0]
+        gate = workflow.split('    release-manifest:', 1)[1].split('    production:', 1)[0]
         self.assertIn('spa-auth-e2e', gate)
-        self.assertIn("needs['spa-auth-e2e'].result == 'success'", gate)
+        self.assertIn("needs.spa-auth-e2e.result == 'success'", gate)
+        production = workflow.split('    production:', 1)[1].split('        steps:', 1)[0]
+        self.assertIn('needs: release-manifest', production)
+        self.assertIn("needs.release-manifest.result == 'success'", production)
         for mode in ('dev', 'preview', 'production'):
             self.assertIn(f'make front-auth-e2e MODE={mode}', workflow)
 
