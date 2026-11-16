@@ -121,6 +121,21 @@ sys.exit(subprocess.run(['bash', '-euo', 'pipefail', '-c', script]).returncode)
         production = workflow.split('    production:\n', 1)[1].split('        steps:', 1)[0]
         self.assertIn('cancel-in-progress: false', production)
 
+    def test_release_uploads_include_hidden_files_with_narrow_paths(self):
+        workflow = (ROOT / '.github/workflows/deploy.yml').read_text()
+        uploads = re.findall(r'            - uses: actions/upload-artifact@v4\n(.*?)(?=^            -|^    \S|\Z)',
+                             workflow, re.M | re.S)
+        self.assertEqual(len(uploads), 4)
+        for upload in uploads:
+            with self.subTest(upload=upload):
+                self.assertRegex(upload, r'(?m)^                  include-hidden-files: true$')
+                paths = re.search(r'^                  path: (.*?)(?=^                  \w[\w-]*:|\Z)',
+                                  upload, re.M | re.S)[1]
+                paths = [line.strip() for line in paths.splitlines() if line.strip() != '|']
+                self.assertIn(paths, [['.descriptor/*.json'],
+                                     ['.release/manifest.json', '.release/compose.digest.json',
+                                      '.release/infrastructure.tsv']])
+
     def test_disabled_healthchecks_are_never_passed_to_wait_and_infrastructure_is_never_recreated(self):
         result, calls = self.run_workflow()
         self.assertEqual(result.returncode, 0, result.stderr)

@@ -58,6 +58,7 @@ jobs:
                       .release/manifest.json
                       .release/compose.digest.json
                       .release/infrastructure.tsv
+                  include-hidden-files: true
                   if-no-files-found: error
                   retention-days: 30
 
@@ -900,6 +901,7 @@ jobs:
               with:
                   name: descriptor-${{ matrix.image }}-${{ github.run_attempt }}
                   path: .descriptor/*.json
+                  include-hidden-files: true
                   if-no-files-found: error
 
     release-manifest:
@@ -963,6 +965,7 @@ jobs:
                       .release/compose.digest.json
                       .release/infrastructure.tsv
                   retention-days: 90
+                  include-hidden-files: true
                   if-no-files-found: error
             - id: bundle-name
               run: echo "artifact=production-bundle-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
@@ -973,6 +976,7 @@ jobs:
                       .release/manifest.json
                       .release/compose.digest.json
                       .release/infrastructure.tsv
+                  include-hidden-files: true
                   if-no-files-found: error
 
     production:

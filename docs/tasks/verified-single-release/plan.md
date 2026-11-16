@@ -42,3 +42,13 @@ images, включая aliases workers/scheduler. Одна версия — од
 - Сохранён существующий image prune 336h; upload tar и успешные previous-config
   удаляются. Backup retention и cleanup неуспешных staging — отдельный follow-up
   по утверждённому плану, без заявления о новом согласии владельца.
+
+## Stage 3: исправление публикации hidden artifacts после первого master-run
+Risk: HIGH-LOCAL. stage_base_commit: 13e657577c176f044de43a2719487f073ba98832.
+DoD: четыре metadata uploads публикуют явно разрешённые hidden files;
+нет расширения path allowlist; отсутствующие файлы по-прежнему блокируют выпуск.
+Work items: 3.1 regression RED на всех 4 шагах; 3.2 include-hidden-files;
+3.3 regression/related contracts, fresh internal + external review, отдельный PR.
+Acceptance: CI → manifest → production → SHA/digest/schema/health/timings.
+Owner approval: «PR в Ready; merge и production» распространяется на этот
+исправляющий PR того же релиза по AGENTS §3.2.
