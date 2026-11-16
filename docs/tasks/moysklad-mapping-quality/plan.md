@@ -38,7 +38,7 @@ Checks: integration batching/retry/failure/stale/scoping.
 Review focus: transactions, queue delivery, snapshot invalidation, bounded memory.
 
 ## Stage 4: legacy UI
-Risk: HIGH-LOCAL (существующая legacy UI). stage_base_commit: перед началом.
+Risk: HIGH-LOCAL (существующая legacy UI). stage_base_commit: 8372aa8f9.
 DoD / приёмка:
 - [ ] Сводка/фильтры состояния и ручного разбора, основания/сравниваемые значения/конкуренты.
 - [ ] WB preset, refresh diagnosis, ручное подтверждение; CSRF и права.

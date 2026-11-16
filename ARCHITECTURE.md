@@ -6164,11 +6164,12 @@ Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/defa
 Настройки изолированы составным ключом company/connection/marketplace.
 
 
-Автомаппинг v1 использует `AutomaticListingMappingPolicy`: точный собственный
-article либо parent.article + размер по явно выбранному ID характеристики.
+Автомаппинг identity_package_v2 использует `AutomaticListingMappingPolicy`: точный собственный
+article, parent.article + размер по явно выбранному ID характеристики, код позиции,
+включённый алиас WB и точный штрихкод. Комплектация проверяется для каждого основания.
 Нормализуется только краевой ASCII whitespace, регистр/нули/NBSP сохраняются.
 `AutomaticMappingCandidatesQuery` одним scoped SQL получает максимум50 целей
-на артикул (до100 артикулов); truncation и неразрешимые размеры запрещают READY.
+на листинг (до100 листингов); truncation, неразрешимые размеры и спорная комплектация запрещают READY.
 Архивные дубли участвуют в неоднозначности, parent с детьми не является leaf.
 `AutomaticMappingPreviewQuery` обрабатывает только текущие25 листингов через
 MarketplaceFacade; существующие ревизии, включая clear, не предлагаются.
@@ -6185,7 +6186,7 @@ Lock получают NullLogger, чтобы session hash не попал в fra
 глобальный LockFactory/logger не меняется. Scope включает
 company/actor/connection/provider; sessionId/hash не возвращаются в UI.
 UUIDv7 preview/requestId генерируются сервером; Guard фиксирует версию
-`article_size_v1`, fingerprint и выбранный opaque characteristic ID.
+`identity_package_v2`, source/candidate fingerprints и выбранный opaque characteristic ID.
 `ApplyAutomaticListingMappingsAction` вызывает существующий writer отдельно
 для каждой строки без внешней транзакции/flush. Guarded order: connection
 FOR SHARE → mapping advisory → accepted replay → catalog try-lock → source
@@ -6545,3 +6546,21 @@ ExternalMappingSourceVersion(fingerprint,total) по источникам и bar
 `AutomaticMappingPreviewQuery::evaluate` — единый evaluator preview/diagnosis;
 SQL отчёта фильтрует сохранённые причины, не повторяет правила сопоставления.
 Предыдущая версия cached preview считается истёкшей, без ложной503 storage error.
+
+### MoySklad: legacy UI качества сопоставления
+
+Scoped POST moysklad_mapping_settings требует MARKETPLACE_READ+WRITE и CSRF;
+ChangeMappingSettingsAction меняет WB preset под connection FOR UPDATE,
+повтор без изменения значения сохраняет version. Scoped POST
+moysklad_mapping_diagnostics_refresh требует READ+CSRF и отправляет scalar
+DiagnoseMappingsMessage с UUID запроса. UI показывает время/прогресс, последний
+completed, stale/failed/empty и status/reason/manualReview filters по25 строк.
+Предпросмотр/apply также по25; отчёт не разрешает назначение.
+Evidence partial показывает основания, количества в названиях, артикулы,
+коды, штрихкоды и конкурентов. Ручной поиск поддерживает точный штрихкод.
+Manual SET передаёт явный checkbox и fingerprints показанных источника/целей;
+изменившаяся спорная связь требует нового подтверждения. После POST redirect
+перечитывает свежий ListingMappingState, включая package review.
+Legacy pagination принимает optional pageParam (default page) для независимых
+diagnostic/main pagers. Версии назначений/подтверждений учитываются по всему
+подключению, чтобы изменение marketplace листинга не скрыло старую ревизию.

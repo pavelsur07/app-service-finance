@@ -26,7 +26,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class MoySkladListingMappingsController extends AbstractController
 {
     #[Route('/moy-sklad/connections/{connectionId}/mappings/{marketplace}', name: 'moysklad_listing_mappings', requirements: ['connectionId' => Requirement::UUID, 'marketplace' => 'ozon|wildberries'], methods: ['GET'])]
-    public function __invoke(string $connectionId, string $marketplace, Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionWriteRepository $connections, MarketplaceFacade $listings, MoySkladListingMappingsQuery $mappings, MoySkladCatalogTargetsQuery $targets, MappingCharacteristicsQuery $characteristics, CsrfTokenManagerInterface $csrf): Response
+    public function __invoke(string $connectionId, string $marketplace, Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionWriteRepository $connections, MarketplaceFacade $listings, MoySkladListingMappingsQuery $mappings, MoySkladCatalogTargetsQuery $targets, MappingCharacteristicsQuery $characteristics, CsrfTokenManagerInterface $csrf, \App\MoySklad\Infrastructure\Query\MappingDiagnosticsQuery $diagnostics, \App\MoySklad\Infrastructure\Query\MappingSettingsQuery $settings): Response
     {
         $connectionId = strtolower($connectionId);
         $companyId = (string) $activeCompany->getActiveCompany()->getId();
@@ -63,9 +63,24 @@ final class MoySkladListingMappingsController extends AbstractController
                 '_token' => $csrf->getToken(AutomaticMappingsPreviewType::csrfId($connectionId, $marketplace, $charQ, $charPage, $selected))->getValue()],
             ['characteristics' => $choices, 'action' => $this->generateUrl('moysklad_automatic_mapping_preview',
                 ['connectionId' => $connectionId, 'marketplace' => $marketplace, 'char_q' => $charQ, 'char_page' => $charPage, 'selected' => $selected ?? ''])]);
+        $diagPage = filter_var($values['diag_page'] ?? 1, \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 2147483647]]);
+        $diagStatus = $values['diag_status'] ?? '';
+        $diagReason = $values['diag_reason'] ?? '';
+        $diagManual = $values['diag_manual'] ?? '';
+        if (false === $diagPage || !is_string($diagStatus) || !is_string($diagReason) || !is_string($diagManual)
+            || ('' !== $diagStatus && null === \App\MoySklad\Enum\AutomaticMappingDecisionStatus::tryFrom($diagStatus))
+            || ('' !== $diagReason && null === \App\MoySklad\Enum\MappingDiagnosticReason::tryFrom($diagReason)) || !in_array($diagManual, ['', '0', '1'], true)) {
+            throw new UnprocessableEntityHttpException('Некорректный фильтр диагностики.');
+        }
+        $diagnosticPage = $diagnostics->page($companyId, $connectionId, $marketplace, $diagPage, '' === $diagStatus ? null : $diagStatus, '' === $diagReason ? null : $diagReason, '' === $diagManual ? null : '1' === $diagManual);
         $states = $mappings->currentForListings($companyId, $connectionId, array_column($result->items, 'id'));
 
         return $this->render('moy_sklad/mappings/index.html.twig', [
+            'diagnostics' => $diagnosticPage, 'mappingCompanyId' => $companyId, 'mappingSettings' => $settings->get($companyId, $connectionId, $marketplace),
+            'diagnosticCharacteristicChoices' => $choices,
+            'diagnosticRequestId' => \Ramsey\Uuid\Uuid::uuid7()->toString(),
+            'diagnosticStatuses' => \App\MoySklad\Enum\AutomaticMappingDecisionStatus::cases(), 'diagnosticReasons' => \App\MoySklad\Enum\MappingDiagnosticReason::cases(),
+            'diagStatus' => $diagStatus, 'diagReason' => $diagReason, 'diagManual' => $diagManual,
             'connection' => $connection, 'mappingConnectionId' => $connectionId, 'mappingMarketplace' => $marketplace,
             'providerName' => MarketplaceType::from($marketplace)->getDisplayName(),
             'previewForm' => $previewForm->createView(), 'characteristicsPage' => $charResult, 'charQ' => $charQ, 'selectedCharacteristicId' => $selected,

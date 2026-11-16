@@ -125,6 +125,30 @@ final class MappingDiagnosticsTest extends PostgresResetTestCase
         self::assertTrue($view->stale);
     }
 
+    public function testConfirmationInvalidatesReportAfterListingChangesMarketplace(): void
+    {
+        $d = $this->mappingCatalog($this->em);
+        $company = $d['connection']->getCompanyId();
+        $connection = $d['connection']->getId();
+        $id = $d['listing']->getId();
+        $this->connection->executeStatement("UPDATE marketplace_listings SET name='Набор 3 шт' WHERE id=?", [$id]);
+        $this->connection->executeStatement("UPDATE moysklad_products SET name='Товар 1 шт' WHERE external_id=?", [$d['product']->getExternalId()]);
+        $confirm = function (int $revision) use ($d, $company, $connection, $id): void {
+            $source = self::getContainer()->get(\App\Marketplace\Facade\MarketplaceFacade::class)->getListingsMetaByIds($company, [$id])[$id];
+            $target = self::getContainer()->get(\App\MoySklad\Infrastructure\Query\MoySkladCatalogTargetsQuery::class)->find($company, $connection, 'product', $d['product']->getExternalId());
+            self::assertNotNull($target);
+            $fingerprint = (new \App\MoySklad\Domain\AutomaticListingMappingPolicy())->packageReviewFingerprint($source, $target);
+            self::getContainer()->get(\App\MoySklad\Application\Action\ChangeListingMappingAction::class)(new \App\MoySklad\Application\Command\ChangeListingMappingCommand($company, $d['actor'], $connection, $id, \App\MoySklad\Enum\ListingMappingOperation::SET, 'product', $target->externalId, $revision, Uuid::uuid7()->toString(), packageReviewConfirmed: true, packageReviewFingerprint: $fingerprint));
+        };
+        $confirm(0);
+        $this->connection->executeStatement("UPDATE marketplace_listings SET marketplace='wildberries', name='Набор 5 шт' WHERE id=?", [$id]);
+        self::getContainer()->get(DiagnoseMappingsHandler::class)(new DiagnoseMappingsMessage($company, $connection, 'wildberries', Uuid::uuid7()->toString()));
+        $query = self::getContainer()->get(MappingDiagnosticsQuery::class);
+        self::assertFalse($query->page($company, $connection, 'wildberries', 1)->stale);
+        $confirm(1);
+        self::assertTrue($query->page($company, $connection, 'wildberries', 1)->stale);
+    }
+
     public function testSourceCatalogSettingsAssignmentsAndConfirmationsInvalidateCompletedReport(): void
     {
         $d = $this->mappingCatalog($this->em);

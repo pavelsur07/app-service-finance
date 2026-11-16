@@ -29,7 +29,7 @@
             {{ form_errors(clearForm.requestId) }}
             {% if canSet %}
                 <form method="get" class="mb-3">
-                    <label for="mapping-target-search" class="form-label">Найти в МойСклад по названию, коду или артикулу</label>
+                    <label for="mapping-target-search" class="form-label">Найти в МойСклад по названию, коду, артикулу или точному штрихкоду</label>
                     <div class="input-group"><input id="mapping-target-search" class="form-control" name="q" type="search" value="{{ q }}" maxlength="100"><button type="submit" class="btn">Найти</button></div>
                     <input type="hidden" name="expectedRevision" value="{{ formExpectedRevision }}">
                     <input type="hidden" name="requestId" value="{{ formRequestId }}">
@@ -40,7 +40,10 @@
                     <input type="hidden" name="_token" value="{{ csrfToken }}">
                     <input type="hidden" name="q" value="{{ q }}">
                     <input type="hidden" name="page" value="{{ searchPage.page }}">
+                    <p class="text-secondary">Количество в названии листинга: {{ sourceQuantities ? sourceQuantities|join(', ') : 'неизвестно' }}. Штрихкоды: {{ sourceBarcodes ? sourceBarcodes|join(', ') : 'не указаны' }}.</p>
                     {{ form_row(setForm.target) }}
+                    {{ form_row(setForm.packageReviewConfirmed) }}
+                    <p class="form-hint">Для позиций с пометкой «Проверить комплектацию» требуется явное подтверждение. Изменение исходных данных потребует новой проверки.</p>
                     {% if choices|length == 0 %}<p class="text-secondary">Подходящих позиций пока нет. Уточните поиск или загрузите каталог.</p>{% endif %}
                     <button class="btn btn-primary" type="submit" data-save-mapping{% if choices|length == 0 %} disabled{% endif %}>Сохранить связь</button>
                 {{ form_end(setForm) }}

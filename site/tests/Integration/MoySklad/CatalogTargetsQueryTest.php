@@ -93,6 +93,16 @@ final class CatalogTargetsQueryTest extends IntegrationTestCase
         self::assertSame('Shadow', $states->currentForListings($other->getCompanyId(), $other->getId(), [$data['listing']->getId()])[$data['listing']->getId()]->target?->name);
     }
 
+    public function testExactBarcodeSearchPreservesLeadingZeros(): void
+    {
+        $d = $this->mappingCatalog($this->em);
+        $this->connection->executeStatement('UPDATE moysklad_products SET barcodes=? WHERE external_id=?', ['["000123"]', $d['product']->getExternalId()]);
+        $query = self::getContainer()->get(MoySkladCatalogTargetsQuery::class);
+        self::assertSame(1, $query->search($d['connection']->getCompanyId(), $d['connection']->getId(), '000123')->totalItems);
+        self::assertSame(0, $query->search($d['connection']->getCompanyId(), $d['connection']->getId(), '123')->totalItems);
+        self::assertSame(0, $query->search($d['connection']->getCompanyId(), $d['connection']->getId(), '00012')->totalItems);
+    }
+
     public function testSearchEscapesLiteralBackslashAndPagePastEnd(): void
     {
         $data = $this->mappingCatalog($this->em);

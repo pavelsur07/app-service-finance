@@ -14,7 +14,7 @@ require dirname(__DIR__, 3).'/vendor/autoload.php';
 $kernel = new App\Kernel('test', true);
 $kernel->boot();
 $container = $kernel->getContainer()->get('test.service_container');
-/** @var array{company:string,connection:string,listing:string,product:string,request:string,application:string,mode?:string,targetType?:string,target?:string,guard?:array{previewId:string,ruleVersion:string,sourceFingerprint:string,sizeCharacteristicId:?string}} $data */
+/** @var array{company:string,connection:string,listing:string,product:string,request:string,application:string,mode?:string,other?:string,targetType?:string,target?:string,guard?:array{previewId:string,ruleVersion:string,sourceFingerprint:string,sizeCharacteristicId:?string,candidateFingerprint:string}} $data */
 $data = json_decode((string) stream_get_contents(\STDIN), true, 512, \JSON_THROW_ON_ERROR);
 $db = $container->get(EntityManagerInterface::class)->getConnection();
 $db->fetchOne("SELECT set_config('application_name', ?, false)", [$data['application']]);
@@ -40,6 +40,9 @@ try {
         $db->executeStatement("INSERT INTO marketplace_listing_barcodes (id,listing_id,company_id,marketplace,barcode) VALUES (?, ?, ?, 'ozon', '000123')", [Uuid::uuid7()->toString(), $data['listing'], $data['company']]);
         echo "success:barcode\n";
     } elseif ('barcode_move' === ($data['mode'] ?? '')) {
+        if (!isset($data['other'])) {
+            throw new InvalidArgumentException('Barcode move requires a target listing.');
+        }
         $db->executeStatement("UPDATE marketplace_listing_barcodes SET listing_id=? WHERE company_id=? AND barcode='000123'", [$data['other'], $data['company']]);
         echo "success:barcode\n";
     } elseif (str_starts_with($data['mode'] ?? '', 'sync_')) {

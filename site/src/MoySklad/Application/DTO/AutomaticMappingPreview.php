@@ -34,7 +34,7 @@ final readonly class AutomaticMappingPreview
         $policy = new AutomaticListingMappingPolicy();
         $items = [];
         foreach ($page->listingsPage->items as $source) {
-            $items[] = new AutomaticMappingPreviewItem($source, $policy->sourceFingerprint($source, $page->barcodes[$source->id] ?? [], $page->settings), Uuid::uuid7()->toString(), $page->decisions[$source->id]);
+            $items[] = new AutomaticMappingPreviewItem($source, $policy->sourceFingerprint($source, $page->barcodes[$source->id] ?? [], $page->settings), Uuid::uuid7()->toString(), $page->decisions[$source->id], $page->barcodes[$source->id] ?? []);
         }
 
         return new self(Uuid::uuid7()->toString(), $companyId, $actorUserId, $connectionId, $marketplace,
@@ -59,7 +59,7 @@ final readonly class AutomaticMappingPreview
         $items = [];
         foreach ($data['items'] as $item) {
             $decision = AutomaticMappingDecision::fromArray($item['decision']);
-            $items[] = new AutomaticMappingPreviewItem(new ListingMetaDTO(...$item['source']), $item['sourceFingerprint'], $item['requestId'], $decision);
+            $items[] = new AutomaticMappingPreviewItem(new ListingMetaDTO(...$item['source']), $item['sourceFingerprint'], $item['requestId'], $decision, $item['barcodes'] ?? []);
         }
 
         return new self($data['id'], $data['companyId'], $data['actorUserId'], $data['connectionId'], $data['marketplace'],

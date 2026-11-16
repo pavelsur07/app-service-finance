@@ -16,6 +16,12 @@ final readonly class CatalogTargetDTO
     ) {
     }
 
+    /** @return list<string> */
+    public function getPieceQuantities(): array
+    {
+        return \App\MoySklad\Domain\AutomaticListingMappingPolicy::quantities($this->name);
+    }
+
     public function getValue(): string
     {
         return $this->type.':'.$this->externalId;

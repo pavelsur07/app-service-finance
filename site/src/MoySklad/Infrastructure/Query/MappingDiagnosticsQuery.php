@@ -39,14 +39,14 @@ final readonly class MappingDiagnosticsQuery
         $state = $this->db->fetchAssociative(<<<'SQL'
             SELECT
                 (SELECT md5(COALESCE(string_agg(id::text, '' ORDER BY id), '')) FROM moysklad_listing_mapping_revisions
-                 WHERE company_id=:company AND connection_id=:connection AND listing_snapshot->>'marketplace'=:marketplace) AS mappings,
+                 WHERE company_id=:company AND connection_id=:connection) AS mappings,
                 (SELECT md5(COALESCE(string_agg(jsonb_build_array(r.listing_id, r.revision, r.source_fingerprint, r.target_fingerprint)::text, '' ORDER BY r.listing_id, r.revision, r.source_fingerprint, r.target_fingerprint), ''))
                  FROM moysklad_mapping_package_reviews r JOIN moysklad_listing_mapping_revisions m
                  ON m.company_id=r.company_id AND m.connection_id=r.connection_id AND m.listing_id=r.listing_id AND m.revision=r.revision
-                 WHERE r.company_id=:company AND r.connection_id=:connection AND m.listing_snapshot->>'marketplace'=:marketplace) AS reviews,
+                 WHERE r.company_id=:company AND r.connection_id=:connection) AS reviews,
                 (SELECT jsonb_build_array(is_active, account_id)::text FROM moysklad_connections WHERE company_id=:company AND id=:connection) AS connection,
                 (SELECT COUNT(*) FROM moysklad_sync_cursors WHERE company_id=:company AND connection_id=:connection AND entity_type IN ('product','variant') AND last_completed_at IS NOT NULL) AS cursors
-            SQL, ['company' => $companyId, 'connection' => $connectionId, 'marketplace' => $marketplace]);
+            SQL, ['company' => $companyId, 'connection' => $connectionId]);
 
         return new ExternalMappingSourceVersion(hash('sha256', json_encode([$source->fingerprint, $catalog, $state,
             $this->settings->get($companyId, $connectionId, $marketplace)->fingerprint(), AutomaticMappingGuard::RULE_VERSION, $sizeCharacteristicId], \JSON_THROW_ON_ERROR)), $source->total);

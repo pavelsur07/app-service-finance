@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MoySklad\Infrastructure\Doctrine;
 
 use App\Shared\Infrastructure\Doctrine\Schema\SchemaExtension;
+use Doctrine\DBAL\Schema\PrimaryKeyConstraint;
 use Doctrine\DBAL\Schema\Schema;
 
 /**
@@ -35,7 +36,7 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
         $runs->addColumn('total', 'integer');
         $runs->addColumn('counts', 'jsonb', ['default' => '{}']);
         $runs->addColumn('error_reason', 'string', ['length' => 64, 'notnull' => false]);
-        $runs->setPrimaryKey(['id']);
+        $runs->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('id')->create());
         $runs->addUniqueIndex(['company_id', 'id'], 'uniq_ms_diagnostic_tenant_id');
         $runs->addIndex(['company_id', 'connection_id', 'marketplace', 'requested_at', 'id'], 'idx_ms_diagnostic_scope');
         $runs->addForeignKeyConstraint('moysklad_connections', ['company_id', 'connection_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_ms_diagnostic_connection');
@@ -48,7 +49,7 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
         $rows->addColumn('manual_review', 'boolean');
         $rows->addColumn('payload', 'jsonb');
         $rows->addColumn('checked_at', 'datetime_immutable_utc_ms', ['precision' => 3]);
-        $rows->setPrimaryKey(['company_id', 'run_id', 'listing_id']);
+        $rows->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'run_id', 'listing_id')->create());
         $rows->addIndex(['company_id', 'run_id', 'status', 'listing_id'], 'idx_ms_diagnostic_rows_status');
         $rows->addForeignKeyConstraint('moysklad_mapping_diagnostic_runs', ['company_id', 'run_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_ms_diagnostic_row_run');
         $reviews = $schema->createTable('moysklad_mapping_package_reviews');
@@ -59,7 +60,7 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
         $reviews->addColumn('source_fingerprint', 'string', ['length' => 64]);
         $reviews->addColumn('target_fingerprint', 'string', ['length' => 64]);
         $reviews->addColumn('checked_at', 'datetime_immutable_utc_ms', ['precision' => 3]);
-        $reviews->setPrimaryKey(['company_id', 'connection_id', 'listing_id', 'revision', 'source_fingerprint', 'target_fingerprint']);
+        $reviews->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'connection_id', 'listing_id', 'revision', 'source_fingerprint', 'target_fingerprint')->create());
         $reviews->addForeignKeyConstraint('moysklad_listing_mapping_revisions', ['company_id', 'connection_id', 'listing_id', 'revision'], ['company_id', 'connection_id', 'listing_id', 'revision'], ['onDelete' => 'RESTRICT'], 'fk_ms_review_revision');
         $settings = $schema->createTable('moysklad_mapping_settings');
         $settings->addColumn('company_id', 'guid');
@@ -67,7 +68,7 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
         $settings->addColumn('marketplace', 'string', ['length' => 20]);
         $settings->addColumn('wb_trailing_w', 'boolean', ['default' => false]);
         $settings->addColumn('version', 'integer', ['default' => 0]);
-        $settings->setPrimaryKey(['company_id', 'connection_id', 'marketplace']);
+        $settings->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'connection_id', 'marketplace')->create());
         $settings->addForeignKeyConstraint('moysklad_connections', ['company_id', 'connection_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_ms_settings_connection');
         $schema->getTable('moysklad_listing_mapping_revisions')->addForeignKeyConstraint('moysklad_connections', ['company_id', 'connection_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_ms_mapping_connection');
         $schema->getTable('moysklad_listing_mapping_revisions')->addForeignKeyConstraint('moysklad_products', ['company_id', 'connection_id', 'product_external_id'], ['company_id', 'connection_id', 'external_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_mapping_product');

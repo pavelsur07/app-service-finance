@@ -51,7 +51,7 @@ final readonly class MoySkladCatalogTargetsQuery
             return new CatalogTargetPage([], $page, 0);
         }
 
-        return $this->page($companyId, $connectionId, self::SELECTABLE.' AND (LOWER(name) LIKE :q OR LOWER(code) LIKE :q OR LOWER(article) LIKE :q)', ['q' => '%'.addcslashes(mb_strtolower($q), '%_\\').'%'], $page);
+        return $this->page($companyId, $connectionId, self::SELECTABLE.' AND (LOWER(name) LIKE :q OR LOWER(code) LIKE :q OR LOWER(article) LIKE :q OR jsonb_exists(barcodes, :barcode))', ['barcode' => $q, 'q' => '%'.addcslashes(mb_strtolower($q), '%_\\').'%'], $page);
     }
 
     public function suggest(string $companyId, string $connectionId, ?string $supplierSku): CatalogTargetPage

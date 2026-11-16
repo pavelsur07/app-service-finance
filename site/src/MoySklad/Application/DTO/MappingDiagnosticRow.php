@@ -16,11 +16,13 @@ final readonly class MappingDiagnosticRow
     /** @var list<string> */
     public array $reasons;
 
-    /** @param list<string> $barcodes */
-    public function __construct(public ListingMetaDTO $source, public AutomaticMappingDecision $decision, public array $barcodes = [])
+    /** @param list<string> $barcodes
+     * @param list<string>|null $recordedReasons
+     */
+    public function __construct(public ListingMetaDTO $source, public AutomaticMappingDecision $decision, public array $barcodes = [], ?array $recordedReasons = null, ?bool $recordedManualReview = null)
     {
         $this->listingId = $source->id;
-        $this->manualReview = !in_array($decision->status, [Status::READY, Status::EXISTING_MAPPING, Status::CLEARED_MAPPING, Status::LISTING_UNAVAILABLE], true);
+        $this->manualReview = $recordedManualReview ?? !in_array($decision->status, [Status::READY, Status::EXISTING_MAPPING, Status::CLEARED_MAPPING, Status::LISTING_UNAVAILABLE], true);
         $reasons = [];
         if (null === AutomaticListingMappingPolicy::normalizeKey($source->supplierSku)) {
             $reasons[] = Reason::NO_ARTICLE->value;
@@ -40,12 +42,19 @@ final readonly class MappingDiagnosticRow
         if (null !== $reason) {
             $reasons[] = $reason->value;
         }
+        $unresolved = !in_array($decision->status, [Status::READY, Status::EXISTING_MAPPING, Status::CLEARED_MAPPING], true);
+        if ($unresolved && count(AutomaticListingMappingPolicy::quantities($source->title)) > 1) {
+            $reasons[] = Reason::PACKAGE->value;
+        }
         foreach ($decision->candidates as $candidate) {
+            if ($unresolved && AutomaticListingMappingPolicy::packageNeedsReview($source->title, $candidate->target->name)) {
+                $reasons[] = Reason::PACKAGE->value;
+            }
             if (in_array($candidate->target->reason, ['archived', 'parent_archived'], true)) {
                 $reasons[] = Reason::ARCHIVED->value;
             }
         }
-        $this->reasons = array_values(array_unique($reasons));
+        $this->reasons = $recordedReasons ?? array_values(array_unique($reasons));
     }
 
     /** @return list<string> */
@@ -57,6 +66,12 @@ final readonly class MappingDiagnosticRow
     /** @param array<string,mixed> $data */
     public static function fromArray(array $data): self
     {
-        return new self(new ListingMetaDTO(...$data['source']), AutomaticMappingDecision::fromArray($data['decision']), $data['barcodes']);
+        return new self(new ListingMetaDTO(...$data['source']), AutomaticMappingDecision::fromArray($data['decision']), $data['barcodes'], $data['reasons'], $data['manualReview']);
+    }
+
+    /** @return list<string> */
+    public function getSourceQuantities(): array
+    {
+        return AutomaticListingMappingPolicy::quantities($this->source->title);
     }
 }

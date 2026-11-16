@@ -5,10 +5,11 @@
 
   Pagerfanta:  {% include 'partials/_pagination.html.twig' with {pager: pager} %}
   Без Pagerfanta: {% include 'partials/_pagination.html.twig' with {page: page, total: total, perPage: limit} %}
-  Необязательно: route (по умолчанию текущий), params (по умолчанию query текущего запроса).
+  Необязательно: route (по умолчанию текущий), params (по умолчанию query текущего запроса), pageParam (по умолчанию page).
 #}
 {% set route = route ?? app.request.attributes.get('_route') %}
 {% set params = params ?? app.request.query.all %}
+{% set pageParam = pageParam ?? 'page' %}
 
 {% if pager is defined and pager %}
     {% set currentPage = pager.currentPage %}
@@ -49,7 +50,7 @@
                 <ul class="pagination m-0 flex-wrap">
                     <li class="page-item {{ currentPage > 1 ? '' : 'disabled' }}">
                         {% if currentPage > 1 %}
-                            <a class="page-link" href="{{ path(route, params|merge({page: currentPage - 1})) }}" aria-label="Назад"><i class="ti ti-chevron-left" aria-hidden="true"></i></a>
+                            <a class="page-link" href="{{ path(route, params|merge({(pageParam): currentPage - 1})) }}" aria-label="Назад"><i class="ti ti-chevron-left" aria-hidden="true"></i></a>
                         {% else %}
                             <span class="page-link" aria-disabled="true" aria-label="Назад"><i class="ti ti-chevron-left" aria-hidden="true"></i></span>
                         {% endif %}
@@ -61,13 +62,13 @@
                         {% elseif pageNumber == currentPage %}
                             <li class="page-item active"><span class="page-link" aria-current="page">{{ pageNumber }}</span></li>
                         {% else %}
-                            <li class="page-item"><a class="page-link" href="{{ path(route, params|merge({page: pageNumber})) }}">{{ pageNumber }}</a></li>
+                            <li class="page-item"><a class="page-link" href="{{ path(route, params|merge({(pageParam): pageNumber})) }}">{{ pageNumber }}</a></li>
                         {% endif %}
                     {% endfor %}
 
                     <li class="page-item {{ currentPage < totalPages ? '' : 'disabled' }}">
                         {% if currentPage < totalPages %}
-                            <a class="page-link" href="{{ path(route, params|merge({page: currentPage + 1})) }}" aria-label="Вперёд"><i class="ti ti-chevron-right" aria-hidden="true"></i></a>
+                            <a class="page-link" href="{{ path(route, params|merge({(pageParam): currentPage + 1})) }}" aria-label="Вперёд"><i class="ti ti-chevron-right" aria-hidden="true"></i></a>
                         {% else %}
                             <span class="page-link" aria-disabled="true" aria-label="Вперёд"><i class="ti ti-chevron-right" aria-hidden="true"></i></span>
                         {% endif %}
