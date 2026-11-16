@@ -114,7 +114,7 @@ Toast не перемещает фокус. Card не рассчитывает �
 Vitest SSR-контракты запускаются командами обоих apps. Поведение DOM, keyboard,
 ref, Toast и контраст — Chromium fixture `apps/account/tests/components`;
 `npm run test:components` из account внутри Playwright-контейнера. Он также
-вызывается `test:e2e`. Fixture собирается в test-results, в production dist
+вызывается через `posttest:e2e`: CLI args --config остаются у Playwright. Fixture собирается в test-results, в production dist
 и маршруты не попадает.
 
 Доступность: source component input-border-error ссылается на danger-dot,

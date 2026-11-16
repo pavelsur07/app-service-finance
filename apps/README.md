@@ -239,7 +239,7 @@ anonymous csrf/session, wrong host/prefix и старый login; успешны�
 
 ## Браузерные контракты базовых компонентов
 
-Account `test:e2e` после app smoke собирает отдельный fixture и запускает
+Account `posttest:e2e` после app smoke собирает отдельный fixture и запускает
 `test:components`: native keyboard, label/error/ref, password/clear, Toast
 4s/pause/unmount, focus/contrast и screenshot1440. Новые test dependencies не
 нужны; fixture использует установленный Playwright и Vite. Артефакты —

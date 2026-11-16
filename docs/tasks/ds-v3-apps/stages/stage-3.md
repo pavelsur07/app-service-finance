@@ -98,3 +98,10 @@ lock перед fixture build, без изменения CI/Docker config. Clean
 проверка с отдельным пустым DS node_modules GREEN: npm ci + build +12browser
 PASS; лог /tmp/vf-ds-v3-stage3/clean-runner.log. Исправление проверено
 focused self-review; финальный CI — ссылка в PR.
+
+В том же CI run обнаружен test:e2e args forwarding regression: shell chain
+прикреплял --config к последней команде, auth stack запускал default suite
+на неверном host. Исправление: test:e2e вновь ровно playwright test; fixture
+вызывается npm posttest:e2e lifecycle, аргументы остаются у main command.
+Проверка: npm run test:e2e -- --list --config playwright.auth.config.ts
+должна перечислить real auth suite, затем успешно выполнить fixture12.

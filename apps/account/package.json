@@ -11,9 +11,10 @@
     "format": "prettier --write . ../../site/packages",
     "test": "vitest run",
     "build": "tsc --noEmit && vite build",
-    "test:e2e": "playwright test && npm run test:components",
+    "test:e2e": "playwright test",
     "prebuild": "node ../packages/ds/build/tokens.mjs --check",
-    "test:components": "npm --prefix ../packages/ds ci --ignore-scripts --no-audit --no-fund && vite build --config tests/components/vite.config.ts && playwright test --config tests/components/playwright.config.ts"
+    "test:components": "npm --prefix ../packages/ds ci --ignore-scripts --no-audit --no-fund && vite build --config tests/components/vite.config.ts && playwright test --config tests/components/playwright.config.ts",
+    "posttest:e2e": "npm run test:components"
   },
   "dependencies": {
     "@vashfindir/api": "file:../../site/packages/api",

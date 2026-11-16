@@ -23,6 +23,8 @@ PHPStan/CS/strict-types PASS; unit4889tests/27145assertions.15before/after1440
 Актуальный production build/smoke и real HTTP/HTTPS дополнительно в PR CI.
 CI runner correction: test:components устанавливает linked DS из lock перед
 fixture build. Clean-room empty DS node_modules: install/build/12browserPASS.
+Test:e2e сохраняет CLI --config через отдельный posttest:e2e lifecycle;
+actual auth suite --list выбирает2реальных теста, затем fixture12PASS.
 
 Internal fresh: B/I0/0, MINOR2fixed (Toast tones); focused review fixes GREEN.
 Финальная локальная MINOR нормализация custom InputGroup action до26px по листу

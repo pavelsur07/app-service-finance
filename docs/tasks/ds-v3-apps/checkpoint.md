@@ -29,8 +29,10 @@
 
 ### Exact next action
 - Implementation ef01dc75d + action/metadata3e5ebd0ca pushed.
-- CI43827481866: account fixture dependency install RED; clean-room fix
-  account test:components DS npm ci verified12PASS, final fix pushed separately.
+- CI43827481866: fixture dependency install и test:e2e --config forwarding RED.
+  DS npm ci clean-room12PASS; test:e2e restored to playwright test, fixture via
+  posttest:e2e; actual --list --config lists2real auth tests +12fixturePASS.
+  Runtime components unchanged, latest runner fixes — final PR head.
 - Verify latest-head CI in PR3034; if Draft and checks green mark Ready.
 - Единственное решение Владельца: "merge and deploy #3034". При получении
   выполнить merge→CI/deploy→readonly acceptance без повторных вопросов.
