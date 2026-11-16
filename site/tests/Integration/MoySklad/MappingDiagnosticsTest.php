@@ -39,8 +39,14 @@ final class MappingDiagnosticsTest extends PostgresResetTestCase
         try {
             $message = new DiagnoseMappingsMessage($d['connection']->getCompanyId(), $d['connection']->getId(), 'ozon', Uuid::uuid7()->toString());
             $handler = self::getContainer()->get(DiagnoseMappingsHandler::class);
+            $holder = self::getContainer()->get('doctrine.debug_data_holder');
+            $holder->reset();
             $handler($message);
             $handler($message);
+            /** @var array<string,list<array{sql:string}>> $queries */
+            $queries = $holder->getData();
+            $catalogScans = array_filter($queries['default'] ?? [], static fn (array $query): bool => str_contains($query['sql'], 'string_agg(hash'));
+            self::assertCount(2, $catalogScans, 'Whole-account fingerprints are bounded to initialization and final publication, independent of batches/replay.');
             $view = self::getContainer()->get(MappingDiagnosticsQuery::class)->page($message->companyId, $message->connectionId, 'ozon', 1);
             self::assertSame('completed', $view->latestRun?->status);
             self::assertSame(205, $view->completedRun?->processed);
@@ -106,6 +112,10 @@ final class MappingDiagnosticsTest extends PostgresResetTestCase
         $message = new DiagnoseMappingsMessage($d['connection']->getCompanyId(), $d['connection']->getId(), 'ozon', Uuid::uuid7()->toString());
         $handler = self::getContainer()->get(DiagnoseMappingsHandler::class);
         $handler($message);
+        foreach (range(2, 205) as $i) {
+            $this->em->persist(MarketplaceListingBuilder::aListing()->forCompany($d['company'])->withIndex($i)->withMarketplace(MarketplaceType::OZON)->withMarketplaceSku('OZ-'.$i)->withSupplierSku('001')->build());
+        }
+        $this->em->flush();
         $this->connection->executeStatement(<<<'SQL'
             CREATE FUNCTION pg_temp.change_diagnostic_source() RETURNS trigger LANGUAGE plpgsql AS $$
             BEGIN
@@ -121,6 +131,7 @@ final class MappingDiagnosticsTest extends PostgresResetTestCase
         }
         $view = self::getContainer()->get(MappingDiagnosticsQuery::class)->page($message->companyId, $message->connectionId, 'ozon', 1);
         self::assertSame('stale', $view->latestRun?->status);
+        self::assertSame(205, $view->latestRun->processed, 'Drift in a committed early batch prevents publication after the final batch.');
         self::assertSame($message->runId, $view->completedRun?->id);
         self::assertTrue($view->stale);
     }

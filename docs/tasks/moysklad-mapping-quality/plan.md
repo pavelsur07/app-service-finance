@@ -48,7 +48,7 @@ Checks: functional MoySklad, twigcs/lint:twig.
 Review focus: company isolation, CSRF, errors/empty/responsive, no implicit write from diagnosis.
 
 ## Stage 5: проверка и поставка
-Risk: HIGH-LOCAL. stage_base_commit: перед началом.
+Risk: HIGH-LOCAL. stage_base_commit: 31378ad4d.
 DoD / приёмка:
 - [ ] Полные гейты stan/cs/strict-types/unit/integration/functional/Twig.
 - [ ] Независимое внутреннее review полного diff и внешнее Claude CLI (fallback по правилам проекта).

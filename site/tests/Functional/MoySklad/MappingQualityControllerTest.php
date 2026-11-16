@@ -50,7 +50,9 @@ final class MappingQualityControllerTest extends WebTestCaseBase
         $client->request('GET', $url);
         self::assertResponseIsSuccessful();
         self::assertSelectorNotExists('form[data-wb-alias-settings]');
-        self::assertSelectorExists('form[data-diagnostic-refresh]');
+        self::assertSelectorNotExists('form[data-diagnostic-refresh]');
+        $client->request('POST', '/moy-sklad/connections/'.$d['connection']->getId().'/mappings/wildberries/diagnostics', ['runId' => Uuid::uuid7()->toString()]);
+        self::assertResponseStatusCodeSame(403);
         $client->request('POST', $form->getUri(), $payload);
         self::assertResponseStatusCodeSame(403);
     }

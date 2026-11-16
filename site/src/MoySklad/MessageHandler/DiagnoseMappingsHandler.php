@@ -96,15 +96,14 @@ final readonly class DiagnoseMappingsHandler
             if (false === $run || 'running' !== $run['status']) {
                 return false;
             }
-            $version = $this->reports->inputVersion($message->companyId, $message->connectionId, $message->marketplace, $message->sizeCharacteristicId);
-            if ($run['input_fingerprint'] !== $version->fingerprint || AutomaticMappingGuard::RULE_VERSION !== $run['rule_version']) {
+            if (AutomaticMappingGuard::RULE_VERSION !== $run['rule_version']) {
                 $this->markStale($message);
 
                 return false;
             }
             $sources = $this->marketplace->getListingsAfterForExternalMapping($message->companyId, $message->marketplace, $run['after_listing_id'], 100);
             $page = $this->evaluator->evaluate($message->companyId, $message->connectionId, $message->marketplace,
-                new ListingMetaPageDTO($sources, 1, 100, $version->total), '', $message->sizeCharacteristicId);
+                new ListingMetaPageDTO($sources, 1, 100, (int) $run['total']), '', $message->sizeCharacteristicId);
             /** @var array<string,int> $counts */
             $counts = json_decode((string) $run['counts'], true, 512, \JSON_THROW_ON_ERROR);
             foreach ($sources as $source) {
@@ -121,7 +120,8 @@ final readonly class DiagnoseMappingsHandler
             }
             $after = [] === $sources ? $run['after_listing_id'] : $sources[array_key_last($sources)]->id;
             $done = count($sources) < 100;
-            $unchanged = $run['input_fingerprint'] === $this->reports->inputVersion($message->companyId, $message->connectionId, $message->marketplace, $message->sizeCharacteristicId)->fingerprint;
+            // Partial rows stay unpublished. Scan the full input only at the publication boundary.
+            $unchanged = !$done || $run['input_fingerprint'] === $this->reports->inputVersion($message->companyId, $message->connectionId, $message->marketplace, $message->sizeCharacteristicId)->fingerprint;
             $status = !$unchanged ? 'stale' : ($done ? 'completed' : 'running');
             $this->db->executeStatement('UPDATE moysklad_mapping_diagnostic_runs SET after_listing_id=?, processed=processed+?, counts=?, status=?, finished_at=? WHERE company_id=? AND connection_id=? AND id=?',
                 [$after, count($sources), json_encode($counts, \JSON_THROW_ON_ERROR), $status, 'running' === $status ? null : $this->now(), $message->companyId, $message->connectionId, $message->runId]);

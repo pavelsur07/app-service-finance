@@ -22,6 +22,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted(ModuleAccess::MARKETPLACE_READ)]
 final class RefreshMappingDiagnosticsController extends AbstractController
 {
+    #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
     #[Route('/moy-sklad/connections/{connectionId}/mappings/{marketplace}/diagnostics', name: 'moysklad_mapping_diagnostics_refresh', requirements: ['connectionId' => Requirement::UUID, 'marketplace' => 'ozon|wildberries'], methods: ['POST'])]
     public function __invoke(string $connectionId, string $marketplace, Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionWriteRepository $connections, MappingCharacteristicsQuery $characteristics, MessageBusInterface $bus): Response
     {

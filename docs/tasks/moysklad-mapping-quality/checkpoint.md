@@ -88,3 +88,10 @@
 - Browser desktop1280/mobile390 smoke passed for report/manual form, no body overflow; screenshot review corrected new small filter/save buttons to standard existing btn style and prevents mid-word reason wrapping. Scripts/remote application requests blocked during fixture smoke, static CSS/fonts only.
 
 - Final targeted fixes GREEN13 tests/106 assertions (recorded report reasons, schema API, settings/UI/diagnosis); focused PHPStan including worker fixtures GREEN. Full make site-test launched once; Stage4 checkpoint commit triggers fresh CI before final review.
+
+### Final review fixes — current state
+- Fresh independent internal reviewer (spec/full diff/checklists only) completed: BLOCKER0/IMPORTANT1/FOLLOW-UP1. IMPORTANT repeated full fingerprints per batch: RED205rows/3batches gave7 scans vs2; fixed initial+final hash, recorded total, rule-version check stays. GREEN5tests/38assertions; mutation in first committed batch→final stale preserved. GET O(N) fingerprint follow-up recorded in handoff; no tracking infra scope expansion.
+- CI integration3035tests/14497assertions failed only ModuleWriteGateCoverageTest: diagnostic refresh missing MARKETPLACE_WRITE. Added write gate and hide producer form for reader (GET report remains READ). UI regression RED→GREEN; combined diagnosis/UI/module gate11tests/116assertions GREEN.
+- Focused final fix PHPStan GREEN; fixer0/4; full CI previous code static/style/unit/all functional/Twig/migrations-empty-db GREEN. Next CI on final fixes must pass integration too.
+- Local full make site-test still running (36244), log /tmp/mapping-quality-full-test.log; failure observed corresponds to route gate already diagnosed remotely, await complete output before report. Independent regression DB mapping_quality_review_test avoids interfering with full test DB.
+- Exact next: commit/push final review fixes; inspect full test output; final external review from7423a1562 after internal fixes; reports/handoff, exact-head CI, Ready. No production actions/merge authorized.

@@ -23,13 +23,15 @@
             </div>
         {% else %}<p class="text-secondary" data-diagnostic-empty>Завершённого отчёта пока нет. Запустите проверку всего выбранного кабинета.</p>{% endif %}
         <div class="d-flex flex-wrap gap-2 mb-3">
-            <form method="post" action="{{ path('moysklad_mapping_diagnostics_refresh', routeParams) }}" data-diagnostic-refresh class="w-100">
-                <input type="hidden" name="_token" value="{{ csrf_token('moysklad_mapping_diagnostics' ~ companyId ~ connectionId ~ marketplace) }}">
-                <input type="hidden" name="runId" value="{{ requestId }}">
-                <label for="diagnostic-characteristic" class="form-label">Характеристика размера для проверки</label>
-                <select id="diagnostic-characteristic" name="diagnosticSizeCharacteristicId" class="form-select mb-2"><option value="">Без правила размера</option>{% for characteristic in characteristicChoices %}<option value="{{ characteristic.id }}"{% if characteristicId == characteristic.id %} selected{% endif %}>{{ characteristic.name }} · {{ characteristic.id }}</option>{% endfor %}</select>
-                <button class="btn text-wrap h-auto" type="submit">Обновить диагностику всего кабинета</button>
-            </form>
+            {% if is_granted('module.marketplace.write') %}
+                <form method="post" action="{{ path('moysklad_mapping_diagnostics_refresh', routeParams) }}" data-diagnostic-refresh class="w-100">
+                    <input type="hidden" name="_token" value="{{ csrf_token('moysklad_mapping_diagnostics' ~ companyId ~ connectionId ~ marketplace) }}">
+                    <input type="hidden" name="runId" value="{{ requestId }}">
+                    <label for="diagnostic-characteristic" class="form-label">Характеристика размера для проверки</label>
+                    <select id="diagnostic-characteristic" name="diagnosticSizeCharacteristicId" class="form-select mb-2"><option value="">Без правила размера</option>{% for characteristic in characteristicChoices %}<option value="{{ characteristic.id }}"{% if characteristicId == characteristic.id %} selected{% endif %}>{{ characteristic.name }} · {{ characteristic.id }}</option>{% endfor %}</select>
+                    <button class="btn text-wrap h-auto" type="submit">Обновить диагностику всего кабинета</button>
+                </form>
+            {% endif %}
             <a class="btn" href="{{ path('moysklad_listing_mappings', routeParams|merge({sizeCharacteristicId: characteristicId ?? ''})) }}">Обновить статус</a>
         </div>
         <p class="form-hint">Если нужной характеристики нет в списке, используйте поиск характеристики ниже, затем выберите её для проверки.</p>
