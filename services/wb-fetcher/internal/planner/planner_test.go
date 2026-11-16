@@ -231,3 +231,19 @@ func TestAdsCabinetLoadsHistoryOnceAndRefreshesLastWeek(t *testing.T) {
 	assert.Equal(t, KindAdsTail, plan.Refreshes[0].Kind)
 	assert.Len(t, plan.Refreshes[0].Specs, AdsRefreshDays+1, "вчера и неделя до него")
 }
+
+func TestHistoryDaysAreLoadedOnceBelowTailAndNeverRefreshed(t *testing.T) {
+	cfg := DefaultConfig(msk)
+	cfg.HistoryDays = DailyHistoryDays
+	now := at("2026-11-16 12:00")
+	plan := Build(now, []connections.Cabinet{daily("wb-1")}, cfg)
+
+	require.Len(t, plan.Ensure, DailyHistoryDays, "вчера + хвост + история")
+	oldest := plan.Ensure[len(plan.Ensure)-1]
+	assert.Equal(t, "2026-08-18", oldest.PeriodKey)
+	assert.Equal(t, PriorityHistory, oldest.Priority, "история не задерживает вчера и хвост")
+	assert.Equal(t, now, oldest.RunAt)
+	assert.False(t, oldest.Refresh)
+	assert.Equal(t, PriorityTail, plan.Ensure[14].Priority, "хвост — прежним приоритетом")
+	assert.Len(t, plan.Refreshes[0].Specs, 15, "история не перечитывается")
+}

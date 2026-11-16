@@ -124,6 +124,7 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 
 	plannerCfg := planner.DefaultConfig(loc)
 	plannerCfg.TailDays = cfg.DailyTailDays
+	plannerCfg.HistoryDays = planner.DailyHistoryDays
 	scheduler := planner.NewScheduler(plannerCfg, cfg.PlanEvery, tasks, cabinets, logger, now)
 
 	hostname, _ := os.Hostname()
