@@ -31,6 +31,7 @@
                 {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
                     {label: 'По SKU', href: path('marketplace_economics_sku'), active: false},
                     {label: 'Динамика', href: path('marketplace_economics_dynamics'), active: false},
+                    {label: 'ОПиУ', href: path('marketplace_pl_projection'), active: false},
                     {label: 'Качество данных', href: path('marketplace_economics_quality'), active: true},
                 ]} only %}
             </nav>

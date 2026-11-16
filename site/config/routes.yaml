@@ -185,6 +185,12 @@ marketplace_quality_controllers:
         namespace: App\MarketplaceQuality\Controller
     type: attribute
 
+marketplace_pl_projection_controllers:
+    resource:
+        path: ../src/MarketplacePlProjection/Controller/
+        namespace: App\MarketplacePlProjection\Controller
+    type: attribute
+
 api_management_controllers:
     resource:
         path: ../src/Api/Controller/

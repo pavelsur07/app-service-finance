@@ -7,6 +7,7 @@ namespace App\Tests\Integration\MarketplacePlProjection;
 use App\Company\Entity\Company;
 use App\Finance\Enum\PLCategoryType;
 use App\MarketplaceOperations\Enum\OperationKind;
+use App\MarketplaceOperations\Facade\MarketplaceOperationsFacadeInterface;
 use App\MarketplacePlProjection\Application\Action\SyncTemplateAction;
 use App\MarketplacePlProjection\Domain\MappingTemplate;
 use App\MarketplacePlProjection\Domain\Rule;
@@ -132,6 +133,30 @@ final class SyncTemplateTest extends IntegrationTestCase
         self::assertNotSame([], $this->store->rules($this->companyId));
 
         self::assertSame(1, $tester->execute(['--company-id' => ['not-a-uuid']]));
+        self::assertSame(1, $tester->execute([]));
+    }
+
+    public function testAllTakesCompaniesFromCanonAndCanonSumsAreScopedToCompanyAndChannel(): void
+    {
+        $other = '11111111-1111-1111-1111-000000000971';
+        foreach ([[$this->companyId, 'ozon', 'sale', 100], [$this->companyId, 'ozon', 'sale', 50], [$this->companyId, 'wildberries', 'fine', -7], [$other, 'ozon', 'sale', 999]] as [$company, $channel, $kind, $amount]) {
+            $this->connection->insert('mo_operation', ['id' => \Ramsey\Uuid\Uuid::uuid7()->toString(), 'company_id' => $company, 'channel' => $channel, 'connection_ref' => 'cab-1',
+                'operation_date' => '2026-11-05', 'source_type' => 'code:'.$kind, 'kind' => $kind, 'amount_minor' => $amount, 'currency' => 'RUB', 'source_refs' => '[]',
+                'rules_version' => 'test', 'created_at' => '2026-11-14 10:00:00']);
+        }
+        $operations = self::getContainer()->get(MarketplaceOperationsFacadeInterface::class);
+        $day = new \DateTimeImmutable('2026-11-05');
+
+        $sums = $operations->plSums($this->companyId, $day, $day);
+        self::assertSame([['ozon', 'sale', 150], ['wildberries', 'fine', -7]], array_map(static fn ($s): array => [$s->channel, $s->kind->value, $s->amountMinor], $sums));
+        self::assertCount(1, $operations->plSums($this->companyId, $day, $day, 'wildberries'));
+        self::assertSame([], $operations->plSums($this->companyId, $day->modify('+1 day'), $day->modify('+1 day')));
+        self::assertContains($this->companyId, $operations->companyIds());
+
+        $tester = new CommandTester((new Application(self::$kernel ?? throw new \LogicException()))->find('app:marketplace-pl-projection:sync-template'));
+        self::assertSame(0, $tester->execute(['--all' => true, '--execute' => true]));
+        self::assertNotSame([], $this->store->rules($this->companyId));
+        self::assertNotSame([], $this->store->rules($other), 'компания из канона без дерева — только правила «исключено»');
     }
 
     /** @param list<Rule> $rules */

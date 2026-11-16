@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplacePlProjection\Command;
 
+use App\MarketplaceOperations\Facade\MarketplaceOperationsFacadeInterface;
 use App\MarketplacePlProjection\Application\Action\SyncTemplateAction;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -19,8 +20,10 @@ use Symfony\Component\Console\Output\OutputInterface;
 #[AsCommand(name: 'app:marketplace-pl-projection:sync-template', description: 'Syncs company preset P&L mapping rules with the platform template')]
 final class SyncTemplateCommand extends Command
 {
-    public function __construct(private readonly SyncTemplateAction $sync)
-    {
+    public function __construct(
+        private readonly SyncTemplateAction $sync,
+        private readonly MarketplaceOperationsFacadeInterface $operations,
+    ) {
         parent::__construct();
     }
 
@@ -28,6 +31,7 @@ final class SyncTemplateCommand extends Command
     {
         $this
             ->addOption('company-id', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Company UUID (repeatable)')
+            ->addOption('all', null, InputOption::VALUE_NONE, 'Every company with canonical marketplace operations')
             ->addOption('execute', null, InputOption::VALUE_NONE, 'Write the rules (default: dry-run)');
     }
 
@@ -36,8 +40,14 @@ final class SyncTemplateCommand extends Command
         /** @var list<string> $companyIds */
         $companyIds = $input->getOption('company-id');
         $execute = (bool) $input->getOption('execute');
+        if ((bool) $input->getOption('all')) {
+            $companyIds = $this->operations->companyIds();
+            if ([] === $companyIds) {
+                return self::SUCCESS;
+            }
+        }
         if ([] === $companyIds || [] !== array_filter($companyIds, static fn (string $id): bool => !Uuid::isValid($id))) {
-            $output->writeln('--company-id: нужен хотя бы один UUID компании');
+            $output->writeln('нужен --all либо хотя бы один UUID в --company-id');
 
             return self::FAILURE;
         }

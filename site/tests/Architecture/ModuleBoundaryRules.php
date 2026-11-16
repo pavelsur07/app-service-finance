@@ -541,9 +541,11 @@ final class ModuleBoundaryRules
             ->excluding(
                 Selector::inNamespace('App\Finance\Facade'),
                 Selector::inNamespace('App\Finance\DTO'),
+                Selector::inNamespace('App\Finance\Application\DTO'),
                 Selector::inNamespace('App\Finance\Enum'),
+                Selector::inNamespace('App\Marketplace\Facade'),
             )
-            ->because('проекция ОПиУ считается из канона и правил компании; статьи — только через фасад Finance.');
+            ->because('проекция ОПиУ считается из канона и правил компании; статьи — через фасад Finance, текущий расчёт для сравнения — через фасад Marketplace.');
     }
 
     /** Канон, переводчики и экономика SKU о маппинге на ОПиУ не знают (`DATA.md` §9.3). */

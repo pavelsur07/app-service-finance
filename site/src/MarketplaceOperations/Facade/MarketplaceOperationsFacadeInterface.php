@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceOperations\Facade;
 
 use App\MarketplaceOperations\Application\DTO\CanonDaySum;
+use App\MarketplaceOperations\Application\DTO\CanonPlSum;
 use App\MarketplaceOperations\Application\DTO\DayOperations;
 use App\MarketplaceOperations\Application\DTO\DayWindow;
 use App\MarketplaceOperations\Application\DTO\OperationRecord;
@@ -48,6 +49,23 @@ interface MarketplaceOperationsFacadeInterface
      * @return list<CanonDaySum>
      */
     public function daySums(string $channel, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $companyId = null): array;
+
+    /**
+     * Σ канона компании по (канал, кабинет, день, вид, код источника) за период, все виды включая
+     * справочные; `$channel` — только один канал. Только чтение.
+     *
+     * @return list<CanonPlSum>
+     */
+    public function plSums(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $channel = null): array;
+
+    /**
+     * Компании, у которых есть операции канона.
+     *
+     * @companyScopeExempt обход всех компаний контура (cron)
+     *
+     * @return list<string>
+     */
+    public function companyIds(): array;
 
     /**
      * Забрать день для пересчёта витрины: блокировка дня (та же, что у `replaceDay`), операции и
