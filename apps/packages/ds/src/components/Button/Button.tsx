@@ -1,4 +1,5 @@
 import type { ComponentPropsWithRef, ReactNode } from 'react';
+import { IconLoader2 } from '@tabler/icons-react';
 
 export interface ButtonProps extends ComponentPropsWithRef<'button'> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -31,7 +32,15 @@ export function Button({
       aria-busy={loading || props['aria-busy']}
       className={`btn btn-${variant} btn-${size} ${iconOnly ? 'btn-icon' : ''} ${className}`}
     >
-      {icon && (
+      {loading && (
+        <IconLoader2
+          className="ds-spinner"
+          size={18}
+          stroke={2}
+          aria-hidden="true"
+        />
+      )}
+      {!loading && icon && (
         <span aria-hidden="true" className="inline-flex shrink-0">
           {icon}
         </span>

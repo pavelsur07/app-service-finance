@@ -5,7 +5,12 @@ import { SessionStatus } from '../shared/session/SessionStatus';
 export function RequireSession() {
   const { state } = useSession();
   if (state.status === 'anonymous')
-    return <Navigate to="/login?returnTo=%2F" replace />;
+    return (
+      <Navigate
+        to={`/login?returnTo=%2F${state.expired ? '&reason=expired' : ''}`}
+        replace
+      />
+    );
   if (!state.data) return <SessionStatus />;
   return (
     <>

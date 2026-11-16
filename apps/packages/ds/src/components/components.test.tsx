@@ -288,3 +288,18 @@ it('ToastStack has an accessible region only when notifications exist', () => {
   expect(html).toContain('<section aria-label="Уведомления"');
   expect(html).toContain('Сохранено');
 });
+
+describe('Login controls v3.4', () => {
+  it('shows an accessible-hidden spinner when Button is loading', () => {
+    const html = renderToStaticMarkup(<Button loading>Входим…</Button>);
+    expect(html).toContain('ds-spinner');
+    expect(html).toContain('aria-busy="true"');
+  });
+  it('supports the auth InputGroup with 18px password action icon', () => {
+    const html = renderToStaticMarkup(
+      <InputGroup variant="auth" type="password" />,
+    );
+    expect(html).toContain('ds-input-group-auth');
+    expect(html).toContain('width="18"');
+  });
+});

@@ -6,12 +6,12 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { Outlet } from 'react-router';
-import { createSessionStore } from '../shared/session/session';
+import { createSessionPresentation } from '../shared/session/presentation';
 const SessionContext = createContext<ReturnType<
-  typeof createSessionStore
+  typeof createSessionPresentation
 > | null>(null);
 export function SessionProvider() {
-  const [store] = useState(() => createSessionStore());
+  const [store] = useState(() => createSessionPresentation());
   useEffect(() => {
     void store.refresh();
     const focus = () => {

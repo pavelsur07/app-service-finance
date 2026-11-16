@@ -9,6 +9,7 @@ import { Input, type InputProps } from '../Input/Input';
 import { Button, type ButtonProps } from '../Button/Button';
 
 export interface InputGroupProps extends Omit<InputProps, 'prefix'> {
+  variant?: 'default' | 'auth';
   prefix?: ReactNode;
   suffix?: ReactNode;
   icon?: ReactNode;
@@ -18,6 +19,7 @@ export interface InputGroupProps extends Omit<InputProps, 'prefix'> {
 }
 /** DS-Controls: adornments are decorative; actions have their own names. */
 export function InputGroup({
+  variant = 'default',
   prefix,
   suffix,
   icon,
@@ -42,7 +44,9 @@ export function InputGroup({
   const password = type === 'password';
   const hasRight = Boolean(suffix || action || canClear || password);
   return (
-    <div className="ds-input-group">
+    <div
+      className={`ds-input-group ${variant === 'auth' ? 'ds-input-group-auth' : ''}`}
+    >
       {(icon || prefix) && (
         <span
           aria-hidden="true"
@@ -96,9 +100,9 @@ export function InputGroup({
               aria-pressed={showPassword}
               icon={
                 showPassword ? (
-                  <IconEyeOff size={16} stroke={2} />
+                  <IconEyeOff size={variant === 'auth' ? 18 : 16} stroke={2} />
                 ) : (
-                  <IconEye size={16} stroke={2} />
+                  <IconEye size={variant === 'auth' ? 18 : 16} stroke={2} />
                 )
               }
               onClick={(event) => {
