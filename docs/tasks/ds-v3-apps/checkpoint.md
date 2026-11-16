@@ -1,42 +1,36 @@
 ## Current checkpoint
 
-**Phase:** Stage5 /5.5 handoff checks and external review
-**Status:** implemented/reviewed; final gates/CI handoff
-**Stage base commit:** 03a34a2db176d0ecbb67ad904f28b8a7760c57c2
-**Branch:** feat/ds-v3-stage-5
-**PR:** https://github.com/pavelsur07/app-service-finance/pull/3039 (Draft, base master verified)
+**Phase:** Stage5 /handoff
+**Status:** implemented/reviewed; latest-head CI then Ready (live PR state)
+**Stage base:**03a34a2db176d0ecbb67ad904f28b8a7760c57c2
+**Integration base:**5a7725216bc02dc01d428bc14a80fdac63cb9eca
+**Runtime commit:**04703c014; integration3a3d74aa3, apps byte-identical
+**Branch:**feat/ds-v3-stage-5
+**PR:**https://github.com/pavelsur07/app-service-finance/pull/3039 (master)
 
 ### Completed
-Stages1–4 delivered PR3027/3030/3034/3037; fallback rule3028. Stage4
-merge558586ee0, pipeline43848374373SUCCESS; healthy bothSHA, HTTPS23/23
-and public browser2/2PASS. Latest plan Stage5 in plan.md.
+Stages1–4 delivered PR3027/3030/3034/3037; fallback rule3028. Stage5
+all specified §3.1 components/formatters implemented. API/risks/source
+deviations and acceptance evidence in stage-5.md/checklist-stage-5.md.
 
-### Current work
-Canonical source Git3882c5dd9; read-only reference research delegated per
-AGENTS offload rule. Baseline front-test92/88PASS;15before1440screenshots. New contracts RED
-(missing format/index and18component cases),57existingPASS. Data/formatters
-implemented; package98PASS +tree helper cases added. Canonical reference research complete.
-Advanced fixture17PASS after picker reopen reset race fixed.
-Author IMPORTANT3: EntityPicker reopen race fixed; invalid ISO calendar date
-regression RED→GREEN, strict calendar validation applied; Tag Escape
-parent-close fixed RED→GREEN.
-Integration: account CompanyPicker uses DS Pagination; Sidebar reuses Avatar.
-Environment: concurrent DS npm ci/typecheck caused missing Tabler; sequential
-typecheck PASS. Browser runner correction Node→Playwright made pagination
-contract RED (missing nav), not an app regression.
+### Checks
+Baseline92/88; final frontend types/lint/test/build140/136PASS; package105.
+Final fixture48PASS; preview40PASS10skip +fixture45 before scoped fixes;
+actual nginx44PASS6skip+fixture47 before required correction, finalfixture48.
+Both images'5distfiles byte-identical to final builds; extra50x nginx base only.
+PHPStan/CS/strict4928tests/27251assertionsPASS.17before/after +8fixture
+screenshots; loading baseline reused Stage4 delivered expanded shell,
+provenance recorded, new after captured. site/deps/config unchanged.
+
+### Review
+Fresh independent internal +focused GREEN; totals B/I0/4fixed,M1fixed.
+External Codex round1 B/I0/1fixed(required tags), fixed without re-run,
+RED→GREEN48 +SSR +focused independent GREEN; open0, no raw green claimed.
 
 ### Exact next action
-47fixturePASS; frontend139/135/DS104 and backend4928PASS. Preview40PASS10skip
-+fixture45 before last scoped review fixes. Internal fresh0/1/1 findings
-fixed RED→GREEN, focused INTERNAL_REVIEW_GREEN. External Codex round1IMPORTANT required TagsInput fixed RED→GREEN48,
-SSR and focused independent GREEN; external fixed without re-run, no BLOCKER.
-Finish last frontend gates, image equivalence, report/checklist; task commit
-and push; integrate disjoint upstream master with clean worktree if needed;
-wait latest-head CI, mark Ready and ask only merge+deploy #3039.
-48fixturePASS; finalfrontend140/136/package105. Actual nginx44PASS6skips
-+fixture47 before required fix, finalfixture48;17before/after +8fixture.
-No runtime change after last focused independent GREEN.
-Master5a77252 service-only upstream; dirty intent-to-add prevents backup stash
-merge, integrate after task-owned runtime commit (no force/stash/reset). Do not run DS npm ci concurrently with types/lint.
-No site/, dependencies or production config changes. Stage5 own PR;
-merge/deploy after concrete handoff and owner decision.
+Wait latest-head PR CI and verify all required checks; markReady if Draft.
+Then sole owner decision: "merge and deploy #3039". Do not merge before it.
+Approval covers pipeline through readonly production acceptance.
+Runtime/source untouched after final focused review; upstream master merged
+clean after task commit, only services WB code inherited, no owned diff there.
+P1 missing sheets/dark deferred; no new design or implementation now.

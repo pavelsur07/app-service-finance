@@ -88,7 +88,10 @@ per §7.2; no raw REVIEW_GREEN claimed. Details ../reviews/codex-stage-5.md.
 Concurrent DS npm ci/typecheck temporarily removed Tabler; sequential types
 PASS. Node-only runner lacks browsers: corrected to existing Playwright image
 and pagination contract RED proved missing kit nav, then implementation.
-Git merge with intent-to-add fails backup stash (also with autoStash false);
-upstream services-only PR3038 is disjoint. Integrate clean after task commit
-if needed; never edit incoming services. No owner files changed. Image comparison initially included nginx base50x.html;
+Git merge with intent-to-add failed backup stash (also with autoStash false);
+resolved by committing task-owned code first, then merging master5a7725216
+(PR3038 services-only). Integration3a3d74aa3 preserves apps byte-for-byte
+from reviewed runtime04703c014; own diff origin/master has no site/config/
+services changes. Incoming code untouched; PHP/apps contracts unchanged.
+No owner files changed. Image comparison initially included nginx base50x.html;
 corrected comparison verifies every dist asset plus only that expected extra.

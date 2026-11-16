@@ -3,6 +3,7 @@
 **Branch:** feat/ds-v3-stage-5
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/3039 (master)
 **Stage base:**03a34a2db176d0ecbb67ad904f28b8a7760c57c2
+**Integration base:**5a7725216; runtime04703c014, integration3a3d74aa3 preserves apps.
 **Runtime/CI:** latest PR head/checks; Ready only after exact-head CI success.
 
 Stages1–4 delivered PR3027/3030/3034/3037. Stage5 completes specified §3.1
