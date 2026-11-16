@@ -6,7 +6,7 @@ import { LoginPage } from './LoginPage';
 import { cleanup, fill, input, render, submit } from '../../tests/dom';
 import type { SessionState } from '../shared/session/session';
 
-let state: SessionState & { expiredEmail?: string | null };
+let state: SessionState & { expired: boolean; expiredEmail: string | null };
 const login = vi.fn(async () => {});
 vi.mock('../app/SessionProvider', () => ({
   useSession: () => ({
@@ -27,7 +27,14 @@ async function mount(path = '/login') {
   );
 }
 beforeEach(() => {
-  state = { status: 'anonymous', data: null, error: null, busy: false };
+  state = {
+    status: 'anonymous',
+    data: null,
+    error: null,
+    busy: false,
+    expired: false,
+    expiredEmail: null,
+  };
   login.mockClear();
   document.cookie = 'vf_cookie_consent=; Max-Age=0; Path=/';
 });
@@ -38,6 +45,9 @@ describe('LoginPage', () => {
     await submit();
     expect(document.body.textContent).toContain('Укажите email');
     expect(document.body.textContent).toContain('Введите пароль');
+    expect(
+      document.querySelectorAll('.ds-auth-field-error[role="alert"]'),
+    ).toHaveLength(2);
     expect(document.activeElement).toBe(input('email'));
     expect(input('email').getAttribute('aria-invalid')).toBe('true');
     expect(input('password').getAttribute('aria-describedby')).toContain(
@@ -103,6 +113,7 @@ describe('LoginPage', () => {
     expect(eye?.getAttribute('aria-label')).toBe('Скрыть пароль');
   });
   it('expired info only appears for explicit expiry reason', async () => {
+    state.expired = true;
     state.expiredEmail = 'known@company.ru';
     await mount('/login?reason=expired&returnTo=%2Fabout');
     expect(input('email').value).toBe('known@company.ru');
@@ -162,4 +173,27 @@ it.each([
   });
   expect(document.querySelector('[aria-label="Файлы cookie"]')).toBeNull();
   document.removeEventListener('vf:cookie-consent', listener);
+});
+
+it('other login errors display the exact state.error text', async () => {
+  await mount();
+  await fill('email', 'name@company.ru');
+  await fill('password', 'password');
+  login.mockImplementationOnce(async () => {
+    state = { ...state, error: 'Сеть временно недоступна.' };
+  });
+  await submit();
+  expect(document.querySelector('[role="alert"]')?.textContent).toBe(
+    'Сеть временно недоступна.',
+  );
+});
+
+it('a guest cannot trigger expiry info by adding a query parameter', async () => {
+  await mount('/login?reason=expired');
+  expect(document.body.textContent).not.toContain('Сессия истекла.');
+});
+it('expiry provenance alone without the redirect reason shows no info', async () => {
+  state.expired = true;
+  await mount();
+  expect(document.body.textContent).not.toContain('Сессия истекла.');
 });

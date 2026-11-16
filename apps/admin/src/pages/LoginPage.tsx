@@ -17,7 +17,7 @@ export function LoginPage() {
           staff
           initialEmail={state.expiredEmail ?? ''}
           busy={state.busy}
-          expired={params.get('reason') === 'expired'}
+          expired={state.expired && params.get('reason') === 'expired'}
           onLogin={async (credentials) => {
             await store.login(credentials);
             return store.getSnapshot().error;

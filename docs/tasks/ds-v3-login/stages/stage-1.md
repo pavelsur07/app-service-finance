@@ -25,4 +25,5 @@ BLOCKER0/IMPORTANT1: expired recovery терял известный email и н�
 LoginForm получает initialEmail и фокусирует пароль при expired. Regression сначала RED,
 затем focused16/16 в обоих apps + оба typecheck GREEN. Fixed without re-run, по §7.2.
 Второй self-review исправления: открытых BLOCKER/IMPORTANT нет.
-Backend/PHP gates не применяются: site исключён явным поручением.
+Stage backend/PHP checks не запускались: код site вне scope. Общие обязательные
+PHP gates выполнены один раз на handoff (см. handoff.md).

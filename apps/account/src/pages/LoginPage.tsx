@@ -26,7 +26,7 @@ export function LoginPage() {
         <LoginForm
           initialEmail={state.expiredEmail ?? ''}
           busy={state.busy}
-          expired={params.get('reason') === 'expired'}
+          expired={state.expired && params.get('reason') === 'expired'}
           onLogin={async (credentials) => {
             setAfterLogin(true);
             await store.login(credentials);

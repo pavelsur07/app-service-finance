@@ -116,6 +116,7 @@ export function CompanyPicker({ onContinue }: CompanyPickerProps) {
         <p role="status">Загружаем компании…</p>
       ) : (
         <>
+          {/* TODO(ds): discovery API has no global search; filter this page and label that scope. */}
           {result.meta.total >= 8 && (
             <div className="ds-auth-company-search">
               <FormField id="company-search" label="Поиск компании">
@@ -148,6 +149,7 @@ export function CompanyPicker({ onContinue }: CompanyPickerProps) {
                     <Avatar
                       name={item.name}
                       shape="square"
+                      tone="tint"
                       aria-hidden="true"
                     />
                     <span>{item.name}</span>

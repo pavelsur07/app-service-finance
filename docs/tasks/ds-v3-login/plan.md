@@ -53,7 +53,7 @@ page changes, no forced company mutation, race/cancellation.
 
 ## Stage 3 — браузерная и визуальная приёмка, handoff
 
-Risk: MEDIUM; stage_base_commit: записать перед началом.
+Risk: MEDIUM; stage_base_commit: `c716a8d1e`.
 Definition of Done: account/admin 1440/390, loading/invalid password/cookie/expired,
 парные скриншоты с эталоном, contrast/focus, full frontend gates, свежий internal и
 external review, Ready PR + handoff с отклонениями/TODO.
@@ -67,15 +67,15 @@ review этого Stage по AGENTS §7.2. Fresh internal reviewer read-only.
 
 ## Чек-лист приёмки
 
-- [ ] Logo 32, header 20×40/16×20, card 440/520, mobile ≤560 square/full width.
-- [ ] h1 28/34, fields 40/text14, eye32/icon18, CTA44, cookie actions32.
-- [ ] Пустая форма: обе ошибки, focus email; email blur/invalid; aria-describedby.
-- [ ] Loading disabled/aria-busy/spinner; 401 generic alert/clear/focus; other error.
-- [ ] Expired only after genuine prior-auth 401; logout/initial guest без info;
+- [x] Logo 32, header 20×40/16×20, card 440/520, mobile ≤560 square/full width.
+- [x] h1 28/34, fields 40/text14, eye32/icon18, CTA44, cookie actions32.
+- [x] Пустая форма: обе ошибки, focus email; email blur/invalid; aria-describedby.
+- [x] Loading disabled/aria-busy/spinner; 401 generic alert/clear/focus; other error.
+- [x] Expired only after genuine prior-auth 401; logout/initial guest без info;
       safeReturnPath unchanged, returnTo respected.
-- [ ] account chooser >1, radio/selected/disabled, search≥8, pagination/401/422.
-- [ ] Admin «Вход для сотрудников», без регистрации; нет вымышленных ссылок/API.
-- [ ] Footer legal text/note/copy, no fake company data; cookie persists180days/event.
-- [ ] Скриншоты 1440/390 рядом с эталоном; text≥4.5, field≥3, visible focus.
-- [ ] Full frontend gates + preview E2E; internal/external no open BLOCKER/IMPORTANT.
-- [ ] site diff пуст; один PR, merge/deploy только после handoff решения Владельца.
+- [x] account chooser >1, radio/selected/disabled, search≥8, pagination/401/422.
+- [x] Admin «Вход для сотрудников», без регистрации; нет вымышленных ссылок/API.
+- [x] Footer legal text/note/copy, no fake company data; cookie persists180days/event.
+- [x] Скриншоты 1440/390 рядом с эталоном; text≥4.5, field≥3, visible focus.
+- [x] Full frontend gates + preview E2E; internal/external no open BLOCKER/IMPORTANT.
+- [x] site diff пуст; один PR, merge/deploy только после handoff решения Владельца.

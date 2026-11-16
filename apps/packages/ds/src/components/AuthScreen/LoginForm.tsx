@@ -79,7 +79,7 @@ export function LoginForm({
   };
   const fieldError = (message: string) =>
     message ? (
-      <span className="ds-auth-field-error">
+      <span className="ds-auth-field-error" role="alert">
         <IconAlertCircle size={16} stroke={2} aria-hidden="true" />
         {message}
       </span>

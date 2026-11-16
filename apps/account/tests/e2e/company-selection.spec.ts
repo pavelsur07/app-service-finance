@@ -131,6 +131,25 @@ test('login with multiple companies requires Continue and preserves safe returnT
     'width',
     test.info().project.name === 'mobile' ? '390px' : '520px',
   );
+  await expect(page.locator('.ds-auth-companies')).toHaveCSS(
+    'border-top-width',
+    '1px',
+  );
+  await expect(page.locator('.ds-auth-company').first()).toHaveCSS(
+    'border-radius',
+    '0px',
+  );
+  await expect(page.locator('.ds-auth-company [role=img]').first()).toHaveCSS(
+    'background-color',
+    'rgb(238, 240, 245)',
+  );
+  await page.screenshot({
+    path: test
+      .info()
+      .outputPath(`account-companies-${test.info().project.name}.png`),
+    fullPage: true,
+    scale: 'css',
+  });
   await page.getByRole('radio', { name: 'Вторая компания' }).check();
   expect(selections).toBe(0);
   await page.getByRole('button', { name: 'Продолжить', exact: true }).click();

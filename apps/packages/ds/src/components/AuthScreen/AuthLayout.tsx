@@ -51,8 +51,11 @@ function CookieConsent() {
     </div>
   );
 }
+interface AuthLayoutProps {
+  children: ReactNode;
+}
 /** Shared product auth shell; no router, API, or invented legal endpoints. */
-export function AuthLayout({ children }: { children: ReactNode }) {
+export function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <div className="ds-auth">
       <header className="ds-auth-header">

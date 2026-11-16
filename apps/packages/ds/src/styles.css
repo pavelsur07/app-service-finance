@@ -650,6 +650,9 @@
     max-width: 100%;
     padding: 36px 40px 32px;
     border-radius: var(--ds-r-lg);
+    box-shadow:
+      0 1px 2px var(--ds-alpha-ink-04),
+      0 8px 24px var(--ds-alpha-ink-04);
   }
   .ds-auth-card.ds-auth-card-wide {
     width: 520px;
@@ -774,10 +777,10 @@
     display: flex;
     align-items: center;
     gap: 24px;
-    padding: 16px 40px;
+    padding: 12px 40px;
     background: var(--ds-bg-card);
     border-top: 1px solid var(--ds-border);
-    box-shadow: var(--ds-shadow-sm);
+    box-shadow: 0 -4px 16px var(--ds-alpha-ink-06);
   }
   .ds-auth-cookie > p {
     flex: 1;
@@ -813,8 +816,8 @@
     .ds-auth-cookie {
       flex-direction: column;
       align-items: stretch;
-      gap: 12px;
-      padding: 16px 20px;
+      gap: 10px;
+      padding: 12px 16px;
     }
     .ds-auth-cookie-actions {
       flex-direction: column;
@@ -839,25 +842,31 @@
   .ds-auth-companies {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0;
     margin: 0 0 20px;
     padding: 0;
-    border: 0;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-r-md);
+    overflow: hidden;
   }
   .ds-auth-company {
     display: flex;
     gap: 12px;
     padding: 12px 14px;
-    border: 1px solid var(--ds-border);
-    border-radius: var(--ds-r-md);
-    font-size: 14px;
+    border: 0;
+    border-radius: 0;
+    font-size: 13px;
     line-height: 20px;
+  }
+  .ds-auth-company + .ds-auth-company {
+    border-top: 1px solid var(--ds-border-soft);
   }
   .ds-auth-company > input {
     width: 18px;
     height: 18px;
   }
   .ds-auth-company > span:last-child {
+    font-weight: var(--ds-fw-semibold);
     min-width: 0;
     overflow-wrap: anywhere;
   }

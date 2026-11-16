@@ -227,3 +227,12 @@ describe('Stage5 semantic/native SSR contracts', () => {
     expect(html).toContain('type="button"');
   });
 });
+
+it('Avatar supports the company picker tint without changing its solid default', () => {
+  const html = render(<Avatar name="Первая компания" tone="tint" />);
+  expect(html).toContain('bg-primary-tint');
+  expect(html).toContain('text-primary');
+  expect(render(<Avatar name="Первая компания" />)).toContain(
+    'text-fg-inverse',
+  );
+});
