@@ -2,7 +2,7 @@
 
 PR [#3043](https://github.com/pavelsur07/app-service-finance/pull/3043),
 branch `feat/ds-v3-login`, base `master`. Stage commits: `62fbe9d82`, `c716a8d1e`,
-финальный commit — tip PR (Stage3). Merge/deploy ещё не выполнены: нужно единственное
+Stage3 code `56d0adc94`; дополнительный tests/docs commit — tip PR. Merge/deploy ещё не выполнены: нужно единственное
 решение Владельца `merge and deploy #3043` по AGENTS §3.2. Миграций нет.
 
 ## Результат и файлы
@@ -34,6 +34,10 @@ branch `feat/ds-v3-login`, base `master`. Stage commits: `62fbe9d82`, `c716a8d1e
   site-cs-strict-types site-test-unit` GREEN; unit4928/27251 assertions.
 - Contrast фактического DOM: текст минимум4.682:1, field border3.280:1, focus2px
   на семи элементах формы/баннера в обоих apps и обеих ширинах. [Метрики](artifacts/acceptance-metrics.json).
+- `make front-auth-e2e MODE=dev` GREEN: настоящий Symfony account2/admin2 и DS48.
+  Старые CI ожидания select/мгновенного sidebar обновлены под chooser; изоляция
+  cookie/host/CSRF/legacy сохранена, fresh internal review GREEN. Nginx smoke на
+  code56d0adc94 прошёл; итоговый tests/docs tip проверяется PR CI перед Ready.
 - `git diff --stat origin/master -- site/` пуст; raw store diff тоже пуст.
 
 ## Ревью

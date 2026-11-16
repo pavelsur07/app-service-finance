@@ -26,3 +26,16 @@ B0/I0; Claude CLI отсутствует. Stage1: Codex round1 B0/I1 fixed witho
 utility layer: расширен существующий Avatar tone=solid|tint с SSR RED→GREEN и
 actual-color E2E, default сохранён. Fresh internal снова REVIEW_GREEN; повтор
 external ради MINOR не выполнялся (§7.2). Reviewer сам тесты не запускал.
+
+## CI acceptance — исправление старого сценария
+
+CI старых Stage1/2: nginx smoke ожидал высоту38 вместо40 (обновлено в Stage3),
+real Symfony scenario ждал sidebar сразу после login и прежний select. Production
+runtime не менялся: обновлены `apps/{account,admin}/tests/auth/session-isolation.spec.ts`
+под chooser+Continue/radio и однозначный sidebar logout. Cookie/host/CSRF/legacy
+проверки сохранены, fresh internal REVIEW_GREEN. Оба typecheck/lint GREEN.
+`make front-auth-e2e MODE=dev`: настоящий Symfony account2/admin2 + DS48 GREEN;
+локальный изолированный stack автоматически остановлен. Первый ошибочный target
+`make front-auth-test` отсутствовал; найден правильный front-auth-e2e, выполнен успешно.
+CI nginx images на code commit56d0adc94 уже GREEN; для нового tests-only tip CI
+ожидается при handoff. Текущий результат — в PR checks.
