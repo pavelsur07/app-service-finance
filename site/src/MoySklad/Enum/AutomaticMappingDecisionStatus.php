@@ -6,6 +6,7 @@ namespace App\MoySklad\Enum;
 
 enum AutomaticMappingDecisionStatus: string
 {
+    case PACKAGE_REVIEW = 'package_review';
     case READY = 'ready';
     case NO_ARTICLE = 'no_article';
     case NO_MATCH = 'no_match';
@@ -25,9 +26,10 @@ enum AutomaticMappingDecisionStatus: string
     public function label(): string
     {
         return match ($this) {
+            self::PACKAGE_REVIEW => 'Проверить комплектацию',
             self::READY => 'Однозначное соответствие',
             self::NO_ARTICLE => 'Не указан артикул продавца',
-            self::NO_MATCH => 'Совпадений артикула нет',
+            self::NO_MATCH => 'Совпадений нет',
             self::AMBIGUOUS => 'Подходят несколько позиций',
             self::TOO_MANY_CANDIDATES => 'Слишком много совпадений: требуется ручной выбор',
             self::VARIANT_REQUIRED => 'Нужно выбрать конкретную модификацию',

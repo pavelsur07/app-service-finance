@@ -9,6 +9,20 @@
         {% if not catalogReady %}
             <div class="alert alert-info" data-catalog-not-ready>Для назначения связей включите подключение и загрузите товары и модификации. <a href="{{ path('moysklad_connections_index') }}">Перейти к подключениям</a></div>
         {% endif %}
+        {% if mappingMarketplace == 'wildberries' %}
+            <div class="card mb-3"><div class="card-body">
+                <h3 class="card-title">Артикулы Wildberries</h3>
+                {% if is_granted('module.marketplace.write') %}
+                    <form method="post" action="{{ path('moysklad_mapping_settings', {connectionId: mappingConnectionId}) }}" data-wb-alias-settings>
+                        <input type="hidden" name="_token" value="{{ csrf_token('moysklad_mapping_settings' ~ mappingCompanyId ~ mappingConnectionId) }}">
+                        <label class="form-check"><input type="checkbox" name="enabled" value="1" class="form-check-input"{% if mappingSettings.wbTrailingW %} checked{% endif %}><span class="form-check-label">Убирать один конечный W/w при поиске артикула WB</span></label>
+                        <p class="form-hint">Настройка действует только для этой компании, подключения МойСклад и Wildberries. Существующие назначения сохраняются.</p>
+                        <button type="submit" class="btn">Сохранить настройку</button>
+                    </form>
+                {% else %}<p>Удаление конечного W/w: {{ mappingSettings.wbTrailingW ? 'включено' : 'выключено' }}.</p>{% endif %}
+            </div></div>
+        {% endif %}
+        {% include 'moy_sklad/mappings/_diagnostics.html.twig' with {report: diagnostics, companyId: mappingCompanyId, connectionId: mappingConnectionId, marketplace: mappingMarketplace, characteristicId: selectedCharacteristicId, characteristicChoices: diagnosticCharacteristicChoices, requestId: diagnosticRequestId, statuses: diagnosticStatuses, reasons: diagnosticReasons, selectedStatus: diagStatus, selectedReason: diagReason, selectedManual: diagManual, listingPage: listingsPage.page, q: q} only %}
         <form method="get" class="mb-3">
             <label for="mapping-listings-search" class="form-label">Название, артикул продавца или SKU</label>
             <div class="input-group">
@@ -19,7 +33,7 @@
         <div class="card mb-3">
             <div class="card-body">
                 <h3 class="card-title">Автоматическое сопоставление</h3>
-                <p class="text-secondary">Точный артикул позиции или артикул родителя и размер. Для проверки размера выберите характеристику МойСклад. Регистр и ведущие нули учитываются. Существующие и снятые связи сохраняются.</p>
+                <p class="text-secondary">Точный артикул, код позиции, настроенный алиас WB или штрихкод. Артикул родителя проверяется вместе с размером. Комплектация проверяется по количеству штук в названиях. Для проверки размера выберите характеристику МойСклад. Регистр и ведущие нули учитываются. Существующие и снятые связи сохраняются.</p>
                 <form method="get" class="mb-3" data-characteristic-search>
                     <input type="hidden" name="q" value="{{ q }}">
                     <input type="hidden" name="page" value="{{ listingsPage.page }}">
@@ -66,7 +80,7 @@
                 </table>
             </div>
             <div class="card-footer">
-                {% include 'partials/_pagination.html.twig' with {page: listingsPage.page, total: listingsPage.totalItems, perPage: listingsPage.perPage, route: 'moysklad_listing_mappings', params: {connectionId: mappingConnectionId, marketplace: mappingMarketplace, q: q, char_q: charQ, char_page: characteristicsPage.page, sizeCharacteristicId: selectedCharacteristicId ?? ''}} only %}
+                {% include 'partials/_pagination.html.twig' with {page: listingsPage.page, total: listingsPage.totalItems, perPage: listingsPage.perPage, route: 'moysklad_listing_mappings', params: {connectionId: mappingConnectionId, marketplace: mappingMarketplace, diag_page: diagnostics.page, diag_status: diagStatus, diag_reason: diagReason, diag_manual: diagManual, q: q, char_q: charQ, char_page: characteristicsPage.page, sizeCharacteristicId: selectedCharacteristicId ?? ''}} only %}
             </div>
         </div>
     </section>

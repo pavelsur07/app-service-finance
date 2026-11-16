@@ -14,6 +14,7 @@ final readonly class ChangeListingMappingCommand
         public string $companyId, public string $actorUserId, public string $connectionId,
         public string $listingId, public ListingMappingOperation $operation,
         public ?string $targetType, public ?string $targetExternalId, public int $expectedRevision, public string $requestId, public ?AutomaticMappingGuard $automaticGuard = null,
+        public bool $packageReviewConfirmed = false, public ?string $packageReviewFingerprint = null,
     ) {
         foreach ([$companyId, $actorUserId, $connectionId, $listingId, $requestId] as $uuid) {
             Assert::regex($uuid, '/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iD');

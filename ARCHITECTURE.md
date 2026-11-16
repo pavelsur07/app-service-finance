@@ -6187,11 +6187,23 @@ Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/defa
 
 ## MoySklad: подключение и проверка доступа
 
-Автомаппинг v1 использует `AutomaticListingMappingPolicy`: точный собственный
-article либо parent.article + размер по явно выбранному ID характеристики.
+`ProductSnapshot` / `VariantSnapshot` и сущности каталога хранят `barcodes`:
+`null` — не загружено, `[]` — загружен пустой список; значения строковые,
+без изменения регистра и ведущих нулей. Формат JSON API: список одноэлементных
+объектов ean8/ean13/code128/gtin/upc.
+`MarketplaceFacade::getListingBarcodesByIds(companyId, listingIds)` принимает
+до100 ID, возвращает listingId → list<string>, чужие ID исключены.
+`MappingSettingsQuery::get(companyId, connectionId, marketplace)` возвращает
+`MappingSettings(wbTrailingW, version)`; preset по умолчанию выключен.
+Настройки изолированы составным ключом company/connection/marketplace.
+
+
+Автомаппинг identity_package_v2 использует `AutomaticListingMappingPolicy`: точный собственный
+article, parent.article + размер по явно выбранному ID характеристики, код позиции,
+включённый алиас WB и точный штрихкод. Комплектация проверяется для каждого основания.
 Нормализуется только краевой ASCII whitespace, регистр/нули/NBSP сохраняются.
 `AutomaticMappingCandidatesQuery` одним scoped SQL получает максимум50 целей
-на артикул (до100 артикулов); truncation и неразрешимые размеры запрещают READY.
+на листинг (до100 листингов); truncation, неразрешимые размеры и спорная комплектация запрещают READY.
 Архивные дубли участвуют в неоднозначности, parent с детьми не является leaf.
 `AutomaticMappingPreviewQuery` обрабатывает только текущие25 листингов через
 MarketplaceFacade; существующие ревизии, включая clear, не предлагаются.
@@ -6208,15 +6220,15 @@ Lock получают NullLogger, чтобы session hash не попал в fra
 глобальный LockFactory/logger не меняется. Scope включает
 company/actor/connection/provider; sessionId/hash не возвращаются в UI.
 UUIDv7 preview/requestId генерируются сервером; Guard фиксирует версию
-`article_size_v1`, fingerprint и выбранный opaque characteristic ID.
+`identity_package_v2`, source/candidate fingerprints и выбранный opaque characteristic ID.
 `ApplyAutomaticListingMappingsAction` вызывает существующий writer отдельно
 для каждой строки без внешней транзакции/flush. Guarded order: connection
 FOR SHARE → mapping advisory → accepted replay → catalog try-lock → source
-FOR SHARE через MarketplaceFacade → recompute policy/candidates → target lock
+FOR UPDATE + barcodes FOR SHARE через MarketplaceFacade → recompute policy/candidates → target lock
 → append/flush/commit. Общий `MoySkladCatalogLock` использует прежний session
 ключ `moysklad-catalog`/connectionId в SyncCatalogAction и writer; освобождение
 во внешнем finally после wrapInTransaction, занятость409 без закрытия EM.
-Facade `lockListingMetaForExternalMapping(companyId, listingId)` требует
+Facade `lockListingMetaForExternalMapping(companyId, listingId)` блокирует родительский listing FOR UPDATE (защита FK INSERT) и существующие barcodes FOR SHARE (защита transfer/delete), требует
 caller transaction, возвращает свежий DBAL DTO, не Entity из identity map.
 Audit listing_snapshot.autoMapping хранит origin/preview/rule/fingerprint/
 characteristic/matchedRules. Replay проверяет полный payload и guard прежде
@@ -6524,3 +6536,71 @@ SettlementUiQuery возвращает scoped own entities/readonly position DTO
 движений, формы имеют подписанный preview50позиций и полный scoped choice set.
 Doc detail показывает текущий свободный остаток и связь обеих сторон погашения.
 Все money HTML значения — точные строки через vf_money/vf_amount.
+
+### MoySklad: identity/package mapping v2
+
+`AutomaticListingMappingPolicy` объединяет direct_article, parent_article_size,
+exact_code, wb_article_alias и exact_barcode. Только WB preset удаляет один
+конечный W/w; регистр/нули не меняются. `forListings(companyId, connectionId,
+listings<=100, barcodeMap, wbTrailingW)` получает bounded union кандидатов,
+включая архивные; `AutomaticMappingDecision` хранит кандидатов и matchedRules.
+`identity_package_v2` fingerprint включает source name/barcodes/settings;
+Guard также содержит fingerprint полного решения/кандидатов. Writer повторяет
+выбор внутри существующих блокировок и проверяет оба fingerprint. Настройки
+меняются только под exclusive connection lock, конфликтующим с writer SHARE.
+`quantities()` извлекает явно указанные целые шт/шт./штук/штуки/штука;
+неизвестное количество не равно одному; разные/неоднозначные запрещают READY.
+`moysklad_mapping_package_reviews` хранит actor/time и отдельные source/target
+fingerprints, scoped company/connection/listing/revision. Ручной спорный SET
+требует явного подтверждения и актуального packageReviewFingerprint. Повторное
+подтверждение текущей связи не создаёт новую ревизию назначения. Query сверяет
+подтверждения с текущими данными и показывает package_review, сохраняя target.
+
+### MoySklad: диагностика кабинета
+
+`DiagnoseMappingsMessage(companyId, connectionId, marketplace, runId,
+sizeCharacteristicId)` идёт в существующий async_pipeline. Постановка сообщения
+не меняет БД; Handler создаёт run. Один delivery обходит keyset listing ID
+пакетами <=100; результаты, счётчики и cursor коммитятся вместе. Повтор delivery
+продолжает cursor, unique(company,run,listing) исключает дубли. Session advisory
+lock диагностики сериализует одинаковый scope, не блокируя импорт каталога.
+Ошибка сохраняется после rollback отдельно; retry возобновляет тот же run.
+`moysklad_mapping_diagnostic_runs/rows` хранят время, версию правил/настроек,
+input fingerprint, прогресс/счётчики и ограниченные кандидаты каждой строки.
+`MarketplaceFacade::getListingsAfterForExternalMapping(companyId, marketplace,
+afterId, limit<=100)` — стабильный keyset, возвращает list<ListingMetaDTO>.
+`getExternalMappingSourceVersion(companyId, marketplace)` возвращает
+ExternalMappingSourceVersion(fingerprint,total) по источникам и barcode sets.
+`MappingDiagnosticsQuery::inputVersion` объединяет этот fingerprint с каталогом,
+готовностью подключения, настройками, ревизиями и подтверждениями. Сверка идёт
+при инициализации, перед публикацией завершённого отчёта и при его чтении.
+Между пакетами используется сохранённый total; версия правил проверяется всегда. Изменения во время
+расчёта → stale run, который не заменяет предыдущий completed. Незавершённый
+или failed run также не заменяет его. `page` выдаёт по25 сохранённых строк с
+фильтрами status/reason/manualReview; причины — MappingDiagnosticReason.
+`AutomaticMappingPreviewQuery::evaluate` — единый evaluator preview/diagnosis;
+SQL отчёта фильтрует сохранённые причины, не повторяет правила сопоставления.
+При completed сохраняются подробные строки только этого отчёта внутри scope;
+старые headers остаются для audit, потерявшие partial rows failed/running
+запуски становятся stale и не могут возобновить старый cursor. Stale run удаляет
+свои строки, не затрагивая последний completed. При уже running POST не ставит
+ещё один запуск; конфликт параметров существующего runId не ретраится.
+Предыдущая версия cached preview считается истёкшей, без ложной503 storage error.
+
+### MoySklad: legacy UI качества сопоставления
+
+Scoped POST moysklad_mapping_settings требует MARKETPLACE_READ+WRITE и CSRF;
+ChangeMappingSettingsAction меняет WB preset под connection FOR UPDATE,
+повтор без изменения значения сохраняет version. Scoped POST
+moysklad_mapping_diagnostics_refresh требует READ+WRITE+CSRF и отправляет scalar
+DiagnoseMappingsMessage с UUID запроса. UI показывает время/прогресс, последний
+completed, stale/failed/empty и status/reason/manualReview filters по25 строк.
+Предпросмотр/apply также по25; отчёт не разрешает назначение.
+Evidence partial показывает основания, количества в названиях, артикулы,
+коды, штрихкоды и конкурентов. Ручной поиск поддерживает точный штрихкод.
+Manual SET передаёт явный checkbox и fingerprints показанных источника/целей;
+изменившаяся спорная связь требует нового подтверждения. После POST redirect
+перечитывает свежий ListingMappingState, включая package review.
+Legacy pagination принимает optional pageParam (default page) для независимых
+diagnostic/main pagers. Версии назначений/подтверждений учитываются по всему
+подключению, чтобы изменение marketplace листинга не скрыло старую ревизию.

@@ -49,6 +49,20 @@ final class AutomaticMappingPreviewStorageTest extends TestCase
         self::assertNull($this->get($store, $preview));
     }
 
+    public function testPreviousRuleVersionIsExpiredWithoutTechnicalStorageError(): void
+    {
+        $clock = new MockClock();
+        $pool = new ArrayAdapter();
+        $store = new AutomaticMappingPreviewStorage($pool, new LockFactory(new InMemoryStore()), $clock);
+        $preview = $this->preview($clock);
+        $store->put('session-one', $preview);
+        $item = $pool->getItem('auto.'.hash('sha256', 'session-one').'.'.$preview->id);
+        $data = $item->get();
+        $data['ruleVersion'] = 'article_size_v1';
+        $pool->save($item->set($data));
+        self::assertNull($this->get($store, $preview));
+    }
+
     public function testFourthPreviewEvictsOldestAndForeignPayloadCannotOverwrite(): void
     {
         $clock = new MockClock();
@@ -94,7 +108,7 @@ final class AutomaticMappingPreviewStorageTest extends TestCase
     public function testGuardRejectsMalformedAndUnsupportedRule(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new AutomaticMappingGuard(Uuid::uuid7()->toString(), 'guessed_rule', str_repeat('a', 64), null);
+        new AutomaticMappingGuard(Uuid::uuid7()->toString(), 'guessed_rule', str_repeat('a', 64), null, str_repeat('b', 64));
     }
 
     public function testAttemptsRemainSeparateBoundedAndImmutable(): void

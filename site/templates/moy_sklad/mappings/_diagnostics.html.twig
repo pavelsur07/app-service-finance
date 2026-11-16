@@ -1,0 +1,66 @@
+{# Parameters: report, companyId, connectionId, marketplace, characteristicId, characteristicChoices, requestId, statuses, reasons, selectedStatus, selectedReason, selectedManual, listingPage, q. #}
+{% set routeParams = {connectionId: connectionId, marketplace: marketplace} %}
+<section class="card mb-3" data-mapping-diagnostics>
+    <div class="card-body">
+        <h3 class="card-title">Диагностика всего кабинета</h3>
+        <p class="text-secondary">Проверка справочников и соответствий помогает разобрать спорные позиции. Назначения сохраняются только через отдельный предпросмотр или ручной выбор.</p>
+        {% if report.latestRun %}
+            <p class="text-secondary">Последняя проверка: {{ report.latestRun.statusLabel }}. Начало: {{ report.latestRun.requestedAt|date('d.m.Y H:i T') }}.</p>
+            {% if report.latestRun.status == 'running' %}<div class="alert alert-info" data-diagnostic-running role="status">Расчёт выполняется: {{ report.latestRun.processed|vf_number }} из {{ report.latestRun.total|vf_number }}. Обновите страницу, чтобы увидеть прогресс.</div>{% endif %}
+            {% if report.latestRun.status == 'failed' %}<div class="alert alert-warning" data-diagnostic-error>Техническая ошибка расчёта. Последний завершённый отчёт сохранён. Повторите проверку.</div>{% endif %}
+        {% endif %}
+        {% if report.stale or (report.latestRun and report.latestRun.status == 'stale') %}<div class="alert alert-warning" data-diagnostic-stale>Данные изменились. Результаты устарели: обновите диагностику перед разбором соответствий.</div>{% endif %}
+        {% if report.completedRun %}
+            <div class="mb-3" data-diagnostic-completed>
+                <strong>Проверено {{ report.completedRun.processed|vf_number }} из {{ report.completedRun.total|vf_number }} · {{ report.completedRun.checkedAt|date('d.m.Y H:i T') }}</strong>
+                <div class="d-flex flex-wrap gap-3 mt-2">
+                    <span>Предложений: {{ report.completedRun.counts.ready|vf_number }}</span>
+                    <span>Проверенных связей: {{ report.completedRun.counts.existing_mapping|vf_number }}</span>
+                    <span>Ручная проверка: {{ report.completedRun.counts.manual_review|vf_number }}</span>
+                    <span>Комплектация: {{ report.completedRun.counts.reason_package_review|vf_number }}</span>
+                    <span>Несколько кандидатов: {{ report.completedRun.counts.ambiguous|vf_number }}</span>
+                </div>
+            </div>
+        {% else %}<p class="text-secondary" data-diagnostic-empty>Завершённого отчёта пока нет. Запустите проверку всего выбранного кабинета.</p>{% endif %}
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            {% if is_granted('module.marketplace.write') %}
+                <form method="post" action="{{ path('moysklad_mapping_diagnostics_refresh', routeParams) }}" data-diagnostic-refresh class="w-100">
+                    <input type="hidden" name="_token" value="{{ csrf_token('moysklad_mapping_diagnostics' ~ companyId ~ connectionId ~ marketplace) }}">
+                    <input type="hidden" name="runId" value="{{ requestId }}">
+                    <label for="diagnostic-characteristic" class="form-label">Характеристика размера для проверки</label>
+                    <select id="diagnostic-characteristic" name="diagnosticSizeCharacteristicId" class="form-select mb-2"><option value="">Без правила размера</option>{% for characteristic in characteristicChoices %}<option value="{{ characteristic.id }}"{% if characteristicId == characteristic.id %} selected{% endif %}>{{ characteristic.name }} · {{ characteristic.id }}</option>{% endfor %}</select>
+                    <button class="btn text-wrap h-auto" type="submit">Обновить диагностику всего кабинета</button>
+                </form>
+            {% endif %}
+            <a class="btn" href="{{ path('moysklad_listing_mappings', routeParams|merge({sizeCharacteristicId: characteristicId ?? ''})) }}">Обновить статус</a>
+        </div>
+        <p class="form-hint">Если нужной характеристики нет в списке, используйте поиск характеристики ниже, затем выберите её для проверки.</p>
+        {% if report.completedRun %}
+            <form method="get" class="row g-2 mb-3" data-diagnostic-filters>
+                <input type="hidden" name="q" value="{{ q }}">
+                <input type="hidden" name="page" value="{{ listingPage }}">
+                <input type="hidden" name="sizeCharacteristicId" value="{{ characteristicId ?? '' }}">
+                <div class="col-md-4"><label class="form-label" for="diagnostic-status">Состояние</label><select id="diagnostic-status" name="diag_status" class="form-select"><option value="">Все состояния</option>{% for status in statuses %}<option value="{{ status.value }}"{% if selectedStatus == status.value %} selected{% endif %}>{{ status.label }}</option>{% endfor %}</select></div>
+                <div class="col-md-4"><label class="form-label" for="diagnostic-reason">Причина</label><select id="diagnostic-reason" name="diag_reason" class="form-select"><option value="">Все причины</option>{% for reason in reasons %}<option value="{{ reason.value }}"{% if selectedReason == reason.value %} selected{% endif %}>{{ reason.label }}</option>{% endfor %}</select></div>
+                <div class="col-md-4"><label class="form-label" for="diagnostic-manual">Ручная проверка</label><select id="diagnostic-manual" name="diag_manual" class="form-select"><option value="">Все строки</option><option value="1"{% if selectedManual == '1' %} selected{% endif %}>Требует проверки</option><option value="0"{% if selectedManual == '0' %} selected{% endif %}>Не требует проверки</option></select></div>
+                <div class="col-12"><button class="btn" type="submit">Применить фильтры</button></div>
+            </form>
+            <div class="table-responsive">
+                <table class="table table-vcenter">
+                    <thead><tr><th>Листинг</th><th>Причины</th><th>Сопоставление</th><th>Действие</th></tr></thead>
+                    <tbody>
+                        {% for row in report.rows %}
+                            <tr data-diagnostic-listing-id="{{ row.listingId }}">
+                                <td class="text-break">{{ row.source.title ?? row.source.sku }}<div class="text-secondary">{{ row.source.sku }} · {{ row.source.supplierSku ?? '—' }} · {{ row.source.size ?? '—' }}</div></td>
+                                <td>{% for reason in row.reasonLabels %}<div>{{ reason }}</div>{% else %}—{% endfor %}</td>
+                                <td>{% include 'moy_sklad/mappings/_evidence.html.twig' with {source: row.source, decision: row.decision, barcodes: row.barcodes, sourceQuantities: row.sourceQuantities} only %}</td>
+                                <td><a class="btn" href="{{ path('moysklad_listing_mapping_edit', routeParams|merge({listingId: row.listingId})) }}">Разобрать</a></td>
+                            </tr>
+                        {% else %}<tr><td colspan="4" class="text-secondary">{{ report.completedRun.total == 0 ? 'В кабинете пока нет листингов.' : 'Нет строк по выбранным фильтрам.' }}</td></tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% include 'partials/_pagination.html.twig' with {page: report.page, total: report.totalItems, perPage: report.perPage, route: 'moysklad_listing_mappings', params: routeParams|merge({page: listingPage, diag_status: selectedStatus, diag_reason: selectedReason, diag_manual: selectedManual, q: q, sizeCharacteristicId: characteristicId ?? ''}), pageParam: 'diag_page'} only %}
+        {% endif %}
+    </div>
+</section>

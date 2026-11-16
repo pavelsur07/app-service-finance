@@ -16,6 +16,57 @@ final class AutomaticMappingConcurrencyTest extends PostgresResetTestCase
 {
     use MappingFixtures;
 
+    public function testBusyListingReturnsRetryableConflictWithinBoundedWait(): void
+    {
+        $input = $this->input();
+        $processes = [];
+        $this->connection->beginTransaction();
+        try {
+            $this->connection->fetchOne('SELECT id FROM marketplace_listings WHERE id=? FOR KEY SHARE', [$input['listing']]);
+            $processes[] = $this->worker($input + ['mode' => 'auto']);
+            $started = microtime(true);
+            self::assertSame(0, $processes[0]->wait(), $processes[0]->getErrorOutput());
+            self::assertStringContainsString('rejected:listing_busy', $processes[0]->getOutput());
+            self::assertLessThan(10, microtime(true) - $started);
+            self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM moysklad_listing_mapping_revisions'));
+        } finally {
+            $this->finish($processes);
+        }
+    }
+
+    #[DataProvider('barcodeMutations')]
+    public function testSourceLockProtectsBarcodeInsertAndTransfer(string $mode): void
+    {
+        $input = $this->input();
+        $company = $this->em->getReference(\App\Company\Entity\Company::class, $input['company']);
+        self::assertInstanceOf(\App\Company\Entity\Company::class, $company);
+        $other = \App\Tests\Builders\Marketplace\MarketplaceListingBuilder::aListing()->forCompany($company)->withIndex(2)->withMarketplace(\App\Marketplace\Enum\MarketplaceType::OZON)->withMarketplaceSku('OTHER')->build();
+        $this->em->persist($other);
+        $this->em->flush();
+        if ('barcode_move' === $mode) {
+            $this->connection->executeStatement("INSERT INTO marketplace_listing_barcodes (id,listing_id,company_id,marketplace,barcode) VALUES (?, ?, ?, 'ozon', '000123')", [Uuid::uuid7()->toString(), $input['listing'], $input['company']]);
+        }
+        $processes = [];
+        $this->connection->beginTransaction();
+        try {
+            self::getContainer()->get(MarketplaceFacade::class)->lockListingMetaForExternalMapping($input['company'], $input['listing']);
+            $processes[] = $this->worker($input + ['mode' => $mode, 'other' => $other->getId()]);
+            $this->assertWaiting($input['application']);
+            $this->connection->commit();
+            self::assertSame(0, $processes[0]->wait(), $processes[0]->getErrorOutput());
+            self::assertStringContainsString('success:barcode', $processes[0]->getOutput());
+        } finally {
+            $this->finish($processes);
+        }
+    }
+
+    /** @return iterable<string,array{string}> */
+    public static function barcodeMutations(): iterable
+    {
+        yield 'new barcode' => ['barcode_insert'];
+        yield 'barcode moved away' => ['barcode_move'];
+    }
+
     #[DataProvider('catalogOrders')]
     public function testActualCatalogImportAndAutomaticWriterUseSameSessionLock(bool $importFirst, string $kind): void
     {
@@ -166,9 +217,11 @@ final class AutomaticMappingConcurrencyTest extends PostgresResetTestCase
         $company = $data['connection']->getCompanyId();
         $source = self::getContainer()->get(MarketplaceFacade::class)->getListingsMetaByIds($company, [$data['listing']->getId()])[$data['listing']->getId()];
 
+        $decision = self::getContainer()->get(\App\MoySklad\Infrastructure\Query\AutomaticMappingPreviewQuery::class)->page($company, $data['connection']->getId(), 'ozon', '', 1, null)->decisions[$source->id];
+
         return ['company' => $company, 'connection' => $data['connection']->getId(), 'listing' => $source->id, 'product' => $data['product']->getExternalId(),
             'request' => Uuid::uuid7()->toString(), 'application' => 'auto-race-'.Uuid::uuid7()->toString(),
-            'guard' => ['previewId' => Uuid::uuid7()->toString(), 'ruleVersion' => 'article_size_v1', 'sourceFingerprint' => (new AutomaticListingMappingPolicy())->sourceFingerprint($source), 'sizeCharacteristicId' => null]];
+            'guard' => ['previewId' => Uuid::uuid7()->toString(), 'ruleVersion' => \App\MoySklad\Application\DTO\AutomaticMappingGuard::RULE_VERSION, 'sourceFingerprint' => (new AutomaticListingMappingPolicy())->sourceFingerprint($source), 'sizeCharacteristicId' => null, 'candidateFingerprint' => $decision->fingerprint()]];
     }
 
     private function pause(string $application): void

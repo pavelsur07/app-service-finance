@@ -693,7 +693,47 @@ final readonly class MarketplaceFacade
         return $this->listingMetaQuery->findByIds($companyId, $listingIds);
     }
 
-    /** Holds FOR SHARE until the calling Action commits. Returns fresh DBAL metadata. */
+    public function getExternalMappingSourceVersion(string $companyId, string $marketplace): \App\Marketplace\DTO\ExternalMappingSourceVersion
+    {
+        Assert::uuid($companyId);
+        Assert::inArray($marketplace, ['ozon', 'wildberries']);
+        $row = $this->connection->fetchAssociative(<<<'SQL'
+            SELECT COUNT(*) AS total, md5(COALESCE(string_agg(md5(jsonb_build_array(l.id, l.marketplace_sku, l.supplier_sku,
+                l.name, l.size, l.is_active, l.marketplace_variant_id,
+                (SELECT jsonb_agg(b.barcode ORDER BY b.barcode COLLATE "C") FROM marketplace_listing_barcodes b
+                    WHERE b.company_id=l.company_id AND b.listing_id=l.id AND b.marketplace=l.marketplace))::text), '' ORDER BY l.id), '')) AS fingerprint
+            FROM marketplace_listings l WHERE l.company_id=:company AND l.marketplace=:marketplace
+            SQL, ['company' => $companyId, 'marketplace' => $marketplace]);
+
+        Assert::isArray($row);
+
+        return new \App\Marketplace\DTO\ExternalMappingSourceVersion((string) $row['fingerprint'], (int) $row['total']);
+    }
+
+    /** @return list<\App\Marketplace\DTO\ListingMetaDTO> Keyset scan; ID order is stable under concurrent inserts. */
+    public function getListingsAfterForExternalMapping(string $companyId, string $marketplace, ?string $afterId, int $limit = 100): array
+    {
+        Assert::uuid($companyId);
+        Assert::inArray($marketplace, ['ozon', 'wildberries']);
+        Assert::range($limit, 1, 100);
+        if (null !== $afterId) {
+            Assert::uuid($afterId);
+        }
+        $ids = $this->connection->fetchFirstColumn('SELECT id FROM marketplace_listings WHERE company_id=:company AND marketplace=:marketplace
+            AND (CAST(:after AS UUID) IS NULL OR id>CAST(:after AS UUID)) ORDER BY id LIMIT '.$limit,
+            ['company' => $companyId, 'marketplace' => $marketplace, 'after' => $afterId]);
+        $metadata = $this->listingMetaQuery->findByIds($companyId, $ids);
+        $items = [];
+        foreach ($ids as $id) {
+            if (isset($metadata[$id])) {
+                $items[] = $metadata[$id];
+            }
+        }
+
+        return $items;
+    }
+
+    /** Holds listing FOR UPDATE and existing barcodes FOR SHARE until caller commit; prevents barcode inserts, transfers and deletes. Returns fresh DBAL metadata. */
     public function lockListingMetaForExternalMapping(string $companyId, string $listingId): ?\App\Marketplace\DTO\ListingMetaDTO
     {
         return $this->listingMetaQuery->lockForExternalMapping($companyId, $listingId);
@@ -762,6 +802,35 @@ final readonly class MarketplaceFacade
         Assert::allUuid($listingIds);
 
         return $this->listingRepository->findListingToProductMap($companyId, $listingIds);
+    }
+
+    /** @param list<string> $listingIds
+     * @return array<string,list<string>> listingId => all exact barcode strings; missing/foreign IDs omitted
+     */
+    public function getListingBarcodesByIds(string $companyId, array $listingIds): array
+    {
+        Assert::uuid($companyId);
+        Assert::maxCount($listingIds, 100);
+        Assert::allUuid($listingIds);
+        if ([] === $listingIds) {
+            return [];
+        }
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT l.id, b.barcode FROM marketplace_listings l
+             LEFT JOIN marketplace_listing_barcodes b ON b.listing_id=l.id AND b.company_id=l.company_id AND b.marketplace=l.marketplace
+             WHERE l.company_id=:company AND l.id IN (:ids) ORDER BY l.id, b.barcode COLLATE "C"',
+            ['company' => $companyId, 'ids' => $listingIds], ['ids' => ArrayParameterType::STRING],
+        );
+        $result = [];
+        foreach ($rows as $row) {
+            $id = (string) $row['id'];
+            $result[$id] ??= [];
+            if (null !== $row['barcode']) {
+                $result[$id][] = (string) $row['barcode'];
+            }
+        }
+
+        return $result;
     }
 
     /**

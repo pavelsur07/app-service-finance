@@ -41,6 +41,10 @@ class MoySkladProduct
     #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
     private ?string $article;
 
+    /** @var list<string>|null */
+    #[ORM\Column(type: Types::JSONB, nullable: true)]
+    private ?array $barcodes = null;
+
     #[ORM\Column(type: Types::INTEGER)]
     private int $variantsCount;
 
@@ -74,7 +78,7 @@ class MoySkladProduct
         $changed = $this->name !== $snapshot->name || $this->externalCode !== $snapshot->externalCode
             || $this->code !== $snapshot->code || $this->article !== $snapshot->article
             || $this->variantsCount !== $snapshot->variantsCount || $this->archived !== $snapshot->archived
-            || $this->sourceUpdatedAt != $snapshot->sourceUpdatedAt;
+            || $this->barcodes !== $snapshot->barcodes || $this->sourceUpdatedAt != $snapshot->sourceUpdatedAt;
         $this->replaceSnapshot($snapshot, $loadedAt);
 
         return $changed;
@@ -86,10 +90,17 @@ class MoySkladProduct
         $this->externalCode = $snapshot->externalCode;
         $this->code = $snapshot->code;
         $this->article = $snapshot->article;
+        $this->barcodes = $snapshot->barcodes;
         $this->variantsCount = $snapshot->variantsCount;
         $this->archived = $snapshot->archived;
         $this->sourceUpdatedAt = $snapshot->sourceUpdatedAt;
         $this->loadedAt = $loadedAt;
+    }
+
+    /** @return list<string>|null */
+    public function getBarcodes(): ?array
+    {
+        return $this->barcodes;
     }
 
     public function getExternalId(): string

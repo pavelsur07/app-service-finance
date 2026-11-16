@@ -35,6 +35,7 @@ final readonly class ListingMappingState
     public function getReasonLabel(): string
     {
         return match ($this->reason) {
+            'package_review' => 'Проверить комплектацию',
             'listing_unavailable' => 'Листинг недоступен',
             'archived' => 'Позиция в архиве',
             'parent_archived' => 'Товар модификации в архиве',

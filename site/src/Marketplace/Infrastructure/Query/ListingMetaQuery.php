@@ -23,9 +23,11 @@ final readonly class ListingMetaQuery
         if (!$this->connection->isTransactionActive()) {
             throw new \LogicException('Listing lock requires a caller transaction.');
         }
-        if (false === $this->connection->fetchOne('SELECT id FROM marketplace_listings WHERE company_id=? AND id=? FOR SHARE', [$companyId, $listingId])) {
+        if (false === $this->connection->fetchOne('SELECT id FROM marketplace_listings WHERE company_id=? AND id=? FOR UPDATE', [$companyId, $listingId])) {
             return null;
         }
+
+        $this->connection->fetchFirstColumn('SELECT id FROM marketplace_listing_barcodes WHERE company_id=? AND listing_id=? ORDER BY id FOR SHARE', [$companyId, $listingId]);
 
         return $this->findByIds($companyId, [strtolower($listingId)])[strtolower($listingId)] ?? null;
     }

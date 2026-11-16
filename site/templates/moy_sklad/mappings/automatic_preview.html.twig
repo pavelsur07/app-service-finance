@@ -48,7 +48,7 @@
                                             {% for characteristic in item.decision.target.characteristics %}<div class="text-secondary">{{ characteristic.name }}: {{ characteristic.value }}</div>{% endfor %}
                                         {% else %}—{% endif %}
                                     </td>
-                                    <td class="text-break">{{ item.decision.reason }}{% for rule in item.decision.ruleLabels %}<div class="text-secondary">{{ rule }}</div>{% endfor %}</td>
+                                    <td>{% include 'moy_sklad/mappings/_evidence.html.twig' with {source: item.source, decision: item.decision, barcodes: item.barcodes, sourceQuantities: item.sourceQuantities} only %}</td>
                                     <td class="text-break" data-current-state>
                                         {% set state = states[item.listingId] %}
                                         {{ state.statusLabel }}

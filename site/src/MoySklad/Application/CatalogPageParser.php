@@ -33,6 +33,7 @@ final class CatalogPageParser
                 $variantsCount,
                 $archived,
                 $this->parseUpdated($row['updated'] ?? null),
+                $this->barcodes($row),
             );
         }
 
@@ -80,6 +81,7 @@ final class CatalogPageParser
                 $characteristics,
                 $archived,
                 $this->parseUpdated($row['updated'] ?? null),
+                $this->barcodes($row),
             );
         }
 
@@ -139,6 +141,32 @@ final class CatalogPageParser
         $value = $this->requiredString($row, $key, $maxLength);
 
         return '' === $value ? null : $value;
+    }
+
+    /** @param array<string,mixed> $row
+     * @return list<string>|null
+     */
+    private function barcodes(array $row): ?array
+    {
+        if (!array_key_exists('barcodes', $row)) {
+            return null;
+        }
+        if (!is_array($row['barcodes']) || !array_is_list($row['barcodes'])) {
+            throw new CatalogSyncException('invalid_response');
+        }
+        $result = [];
+        foreach ($row['barcodes'] as $item) {
+            if (!is_array($item) || 1 !== count($item) || !in_array(array_key_first($item), ['ean8', 'ean13', 'code128', 'gtin', 'upc'], true)) {
+                throw new CatalogSyncException('invalid_response');
+            }
+            $value = array_values($item)[0];
+            if (!is_string($value) || '' === $value || mb_strlen($value) > 255) {
+                throw new CatalogSyncException('invalid_response');
+            }
+            $result[] = $value;
+        }
+
+        return array_values(array_unique($result));
     }
 
     private function assertAccountId(string $accountId): void

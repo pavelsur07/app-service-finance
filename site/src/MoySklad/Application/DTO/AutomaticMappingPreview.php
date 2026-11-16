@@ -6,7 +6,6 @@ namespace App\MoySklad\Application\DTO;
 
 use App\Marketplace\DTO\ListingMetaDTO;
 use App\MoySklad\Domain\AutomaticListingMappingPolicy;
-use App\MoySklad\Enum\AutomaticMappingDecisionStatus;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
 
@@ -35,7 +34,7 @@ final readonly class AutomaticMappingPreview
         $policy = new AutomaticListingMappingPolicy();
         $items = [];
         foreach ($page->listingsPage->items as $source) {
-            $items[] = new AutomaticMappingPreviewItem($source, $policy->sourceFingerprint($source), Uuid::uuid7()->toString(), $page->decisions[$source->id]);
+            $items[] = new AutomaticMappingPreviewItem($source, $policy->sourceFingerprint($source, $page->barcodes[$source->id] ?? [], $page->settings), Uuid::uuid7()->toString(), $page->decisions[$source->id], $page->barcodes[$source->id] ?? []);
         }
 
         return new self(Uuid::uuid7()->toString(), $companyId, $actorUserId, $connectionId, $marketplace,
@@ -59,11 +58,8 @@ final readonly class AutomaticMappingPreview
     {
         $items = [];
         foreach ($data['items'] as $item) {
-            $d = $item['decision'];
-            $target = $d['target'];
-            $decision = new AutomaticMappingDecision(AutomaticMappingDecisionStatus::from($d['status']),
-                null === $target ? null : new CatalogTargetDTO(...$target), $d['matchedRules'], $d['comparedSize'], $d['selectedCharacteristicId']);
-            $items[] = new AutomaticMappingPreviewItem(new ListingMetaDTO(...$item['source']), $item['sourceFingerprint'], $item['requestId'], $decision);
+            $decision = AutomaticMappingDecision::fromArray($item['decision']);
+            $items[] = new AutomaticMappingPreviewItem(new ListingMetaDTO(...$item['source']), $item['sourceFingerprint'], $item['requestId'], $decision, $item['barcodes'] ?? []);
         }
 
         return new self($data['id'], $data['companyId'], $data['actorUserId'], $data['connectionId'], $data['marketplace'],

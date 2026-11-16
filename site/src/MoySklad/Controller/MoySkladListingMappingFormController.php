@@ -49,7 +49,7 @@ final class MoySkladListingMappingFormController extends AbstractController
     }
 
     #[Route('/moy-sklad/connections/{connectionId}/mappings/{marketplace}/{listingId}/edit', name: 'moysklad_listing_mapping_edit', requirements: ['connectionId' => Requirement::UUID, 'listingId' => Requirement::UUID, 'marketplace' => 'ozon|wildberries'], methods: ['GET', 'POST'])]
-    public function edit(string $connectionId, string $marketplace, string $listingId, Request $request, ChangeListingMappingAction $action): Response
+    public function edit(string $connectionId, string $marketplace, string $listingId, Request $request, ChangeListingMappingAction $action, \App\MoySklad\Domain\AutomaticListingMappingPolicy $policy): Response
     {
         $connectionId = strtolower($connectionId);
         $listingId = strtolower($listingId);
@@ -63,7 +63,7 @@ final class MoySkladListingMappingFormController extends AbstractController
             if (!is_string($values['_token'] ?? null) || !$this->isCsrfTokenValid($csrfId, $values['_token'])) {
                 throw $this->createAccessDeniedException('Invalid CSRF token.');
             }
-            foreach (['operation', 'target', 'expectedRevision', 'requestId', 'q', 'page'] as $key) {
+            foreach (['operation', 'target', 'expectedRevision', 'requestId', 'q', 'page', 'packageReviewConfirmed', 'reviewFingerprints'] as $key) {
                 if (isset($values[$key]) && !is_scalar($values[$key])) {
                     throw new UnprocessableEntityHttpException('Поля формы должны быть скалярами.');
                 }
@@ -125,11 +125,21 @@ final class MoySkladListingMappingFormController extends AbstractController
         if (!is_scalar($expected) || !is_string($requestId)) {
             throw new UnprocessableEntityHttpException('Неверная версия формы.');
         }
+        $sourceBarcodes = null === $context['source'] ? [] : ($this->listings->getListingBarcodesByIds($context['companyId'], [$listingId])[$listingId] ?? []);
+        $reviewFingerprints = $packageWarnings = [];
+        foreach ($choices as $target) {
+            if (null !== $context['source']) {
+                $reviewFingerprints[$target->getValue()] = $policy->packageReviewFingerprint($context['source'], $target, $sourceBarcodes);
+                $packageWarnings[$target->getValue()] = $policy::packageNeedsReview($context['source']->title, $target->name);
+            }
+        }
         $setData = ['operation' => 'set', 'expectedRevision' => (string) $expected, 'requestId' => $requestId,
             'target' => $request->isMethod('POST') && ListingMappingOperation::SET === $operation ? ($values['target'] ?? null) : $context['state']->target?->getValue()];
         $clearData = ['operation' => 'clear', 'expectedRevision' => (string) $expected,
             'requestId' => $request->isMethod('POST') && ListingMappingOperation::CLEAR === $operation ? $requestId : Uuid::uuid7()->toString()];
-        $setForm = $this->createForm(MoySkladListingMappingType::class, $setData, ['targets' => $choices]);
+        $setData['reviewFingerprints'] = json_encode($reviewFingerprints, \JSON_THROW_ON_ERROR);
+        $setData['packageReviewConfirmed'] = false;
+        $setForm = $this->createForm(MoySkladListingMappingType::class, $setData, ['targets' => $choices, 'packageWarnings' => $packageWarnings]);
         $clearForm = $this->createForm(MoySkladListingMappingType::class, $clearData, ['operation' => 'clear']);
         $active = ListingMappingOperation::CLEAR === $operation ? $clearForm : $setForm;
         $active->handleRequest($request);
@@ -139,12 +149,17 @@ final class MoySkladListingMappingFormController extends AbstractController
             if (!$user instanceof User) {
                 throw $this->createAccessDeniedException();
             }
-            /** @var array{operation:string,expectedRevision:string,requestId:string,target?:string} $data */
+            /** @var array{operation:string,expectedRevision:string,requestId:string,target?:string,reviewFingerprints?:string,packageReviewConfirmed?:bool} $data */
             $data = $active->getData();
+            $reviewData = json_decode($data['reviewFingerprints'] ?? '{}', true);
+            if (!is_array($reviewData)) {
+                throw new UnprocessableEntityHttpException('Некорректные данные проверки комплектации.');
+            }
+            $reviewFingerprint = $reviewData[$data['target'] ?? ''] ?? null;
             $targetParts = ListingMappingOperation::SET === $operation ? explode(':', $data['target'] ?? '', 2) : [];
             try {
                 $action(new ChangeListingMappingCommand($context['companyId'], (string) $user->getId(), $connectionId, $listingId, $operation,
-                    $targetParts[0] ?? null, $targetParts[1] ?? null, (int) $data['expectedRevision'], $data['requestId']));
+                    $targetParts[0] ?? null, $targetParts[1] ?? null, (int) $data['expectedRevision'], $data['requestId'], packageReviewConfirmed: $data['packageReviewConfirmed'] ?? false, packageReviewFingerprint: is_string($reviewFingerprint) ? $reviewFingerprint : null));
                 $this->addFlash('success', ListingMappingOperation::CLEAR === $operation ? 'Связь снята. История сохранена.' : 'Связь сохранена.');
 
                 return $this->redirectToRoute('moysklad_listing_mappings', ['connectionId' => $connectionId, 'marketplace' => $marketplace], 303);
@@ -162,6 +177,7 @@ final class MoySkladListingMappingFormController extends AbstractController
 
         return $this->render('moy_sklad/mappings/form.html.twig', $context + [
             'setForm' => $setForm->createView(), 'clearForm' => $clearForm->createView(), 'csrfToken' => $token,
+            'sourceQuantities' => $policy::quantities($context['source']?->title), 'sourceBarcodes' => $sourceBarcodes,
             'choices' => $choices, 'suggestions' => $suggestions, 'searchPage' => $search, 'q' => $q,
             'mappingConnectionId' => $connectionId, 'mappingMarketplace' => $marketplace, 'routeParams' => $params,
             'providerName' => MarketplaceType::from($marketplace)->getDisplayName(), 'catalogReady' => $ready,

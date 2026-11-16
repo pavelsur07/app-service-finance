@@ -8,10 +8,11 @@ use Webmozart\Assert\Assert;
 
 final readonly class AutomaticMappingGuard
 {
-    public const RULE_VERSION = 'article_size_v1';
+    public const RULE_VERSION = 'identity_package_v2';
 
-    public function __construct(public string $previewId, public string $ruleVersion, public string $sourceFingerprint, public ?string $sizeCharacteristicId)
+    public function __construct(public string $previewId, public string $ruleVersion, public string $sourceFingerprint, public ?string $sizeCharacteristicId, public string $candidateFingerprint)
     {
+        Assert::regex($candidateFingerprint, '/^[a-f0-9]{64}$/D');
         Assert::uuid($previewId);
         Assert::same($ruleVersion, self::RULE_VERSION);
         Assert::regex($sourceFingerprint, '/^[a-f0-9]{64}$/D');
@@ -25,6 +26,6 @@ final readonly class AutomaticMappingGuard
     public function toSnapshot(): array
     {
         return ['origin' => 'automatic', 'previewId' => $this->previewId, 'ruleVersion' => $this->ruleVersion,
-            'sourceFingerprint' => $this->sourceFingerprint, 'sizeCharacteristicId' => $this->sizeCharacteristicId];
+            'sourceFingerprint' => $this->sourceFingerprint, 'sizeCharacteristicId' => $this->sizeCharacteristicId, 'candidateFingerprint' => $this->candidateFingerprint];
     }
 }

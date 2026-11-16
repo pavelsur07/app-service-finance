@@ -14,7 +14,7 @@ final class ListingMappingException extends \RuntimeException
     public function getStatusCode(): int
     {
         return match ($this->reason) {
-            'not_found' => 404, 'stale_mapping', 'idempotency_conflict', 'preview_conflict', 'preview_busy', 'catalog_busy', 'automatic_mapping_conflict' => 409, 'preview_unavailable' => 503, default => 422,
+            'not_found' => 404, 'listing_busy' => 409, 'stale_mapping', 'idempotency_conflict', 'preview_conflict', 'preview_busy', 'catalog_busy', 'automatic_mapping_conflict' => 409, 'preview_unavailable' => 503, default => 422,
         };
     }
 }

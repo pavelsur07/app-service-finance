@@ -6,6 +6,7 @@ namespace App\MoySklad\Form;
 
 use App\MoySklad\Application\DTO\CatalogTargetDTO;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -26,13 +27,16 @@ final class MoySkladListingMappingType extends AbstractType
         if ('set' === $options['operation']) {
             /** @var array<string,CatalogTargetDTO> $targets */
             $targets = $options['targets'];
+            $warnings = $options['packageWarnings'];
+            $builder->add('reviewFingerprints', HiddenType::class, ['empty_data' => '{}']);
+            $builder->add('packageReviewConfirmed', CheckboxType::class, ['required' => false, 'label' => 'Я проверил количество штук в названиях листинга и выбранной позиции МойСклад']);
             $builder->add('target', ChoiceType::class, [
                 'label' => 'Позиция МойСклад', 'choices' => array_keys($targets), 'expanded' => true, 'multiple' => false,
-                'choice_label' => static function (string $value) use ($targets): string {
+                'choice_label' => static function (string $value) use ($targets, $warnings): string {
                     $target = $targets[$value];
                     $characteristics = implode(', ', array_map(static fn (array $item): string => $item['name'].': '.$item['value'], $target->characteristics));
 
-                    return $target->name.' · '.$target->getTypeLabel().' · '.($target->article ?? $target->code ?? '').('' === $characteristics ? '' : ' · '.$characteristics);
+                    return $target->name.' · '.$target->getTypeLabel().' · '.($target->article ?? $target->code ?? '').('' === $characteristics ? '' : ' · '.$characteristics).(($warnings[$value] ?? false) ? ' · Проверить комплектацию' : '');
                 },
                 'choice_attr' => static fn (string $value): array => $targets[$value]->selectable ? [] : ['disabled' => 'disabled'],
                 'constraints' => [new NotBlank(message: 'Выберите позицию из списка.')],
@@ -42,9 +46,10 @@ final class MoySkladListingMappingType extends AbstractType
 
     public function configureOptions(OptionsResolver $resolver): void
     {
-        $resolver->setDefaults(['data_class' => null, 'csrf_protection' => false, 'allow_extra_fields' => true, 'operation' => 'set', 'targets' => []]);
+        $resolver->setDefaults(['data_class' => null, 'csrf_protection' => false, 'allow_extra_fields' => true, 'operation' => 'set', 'targets' => [], 'packageWarnings' => []]);
         $resolver->setAllowedValues('operation', ['set', 'clear']);
         $resolver->setAllowedTypes('targets', 'array');
+        $resolver->setAllowedTypes('packageWarnings', 'array');
     }
 
     public function getBlockPrefix(): string

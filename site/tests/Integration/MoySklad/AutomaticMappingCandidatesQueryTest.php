@@ -23,7 +23,7 @@ final class AutomaticMappingCandidatesQueryTest extends IntegrationTestCase
         $this->em->persist($variant);
         $this->em->persist($archived);
         $this->em->flush();
-        $result = self::getContainer()->get(AutomaticMappingCandidatesQuery::class)->forArticles($data['connection']->getCompanyId(), $data['connection']->getId(), ['001', ' 001 ']);
+        $result = $this->candidateGroupsForArticles(self::getContainer()->get(AutomaticMappingCandidatesQuery::class), $data['connection']->getCompanyId(), $data['connection']->getId(), ['001', ' 001 ']);
         $group = $result['article:001'];
         self::assertSame(3, $group->totalCount, 'Own and parent article must not duplicate a variant.');
         $items = [];
@@ -55,14 +55,57 @@ final class AutomaticMappingCandidatesQueryTest extends IntegrationTestCase
         }
         $this->em->flush();
         $query = self::getContainer()->get(AutomaticMappingCandidatesQuery::class);
-        $groups = $query->forArticles($data['connection']->getCompanyId(), $data['connection']->getId(), ['001', '1', 'AbC', " KEY\n", 'absent']);
+        $groups = $this->candidateGroupsForArticles($query, $data['connection']->getCompanyId(), $data['connection']->getId(), ['001', '1', 'AbC', " KEY\n", 'absent']);
         self::assertSame(1, $groups['article:001']->totalCount);
         self::assertSame(1, $groups['article:1']->totalCount);
         self::assertSame('AbC', $groups['article:AbC']->items[0]->target->article);
         self::assertSame(1, $groups['article:KEY']->totalCount);
         self::assertSame(0, $groups['article:absent']->totalCount);
-        self::assertSame([], $query->forArticles($data['connection']->getCompanyId(), $data['connection']->getId(), []));
-        self::assertSame(0, $query->forArticles($foreign->getCompanyId(), $data['connection']->getId(), ['001'])['article:001']->totalCount);
+        self::assertSame([], $this->candidateGroupsForArticles($query, $data['connection']->getCompanyId(), $data['connection']->getId(), []));
+        self::assertSame(0, $this->candidateGroupsForArticles($query, $foreign->getCompanyId(), $data['connection']->getId(), ['001'])['article:001']->totalCount);
+    }
+
+    public function testBarcodeCandidatesKeepNullEmptyDuplicatesAndTenantBoundaries(): void
+    {
+        $d = $this->mappingCatalog($this->em);
+        $company = $d['connection']->getCompanyId();
+        $connection = $d['connection']->getId();
+        $source = new \App\Marketplace\DTO\ListingMetaDTO($d['listing']->getId(), null, 'SKU', 'ozon');
+        $query = self::getContainer()->get(AutomaticMappingCandidatesQuery::class);
+        $this->connection->executeStatement("UPDATE moysklad_products SET code='OTHER', article=NULL, barcodes=NULL WHERE connection_id=?", [$connection]);
+        self::assertSame(0, $query->forListings($company, $connection, [$source], [$source->id => ['000123']], false)[$source->id]->totalCount);
+        $this->connection->executeStatement("UPDATE moysklad_products SET barcodes='[]' WHERE connection_id=?", [$connection]);
+        self::assertSame(0, $query->forListings($company, $connection, [$source], [$source->id => ['000123']], false)[$source->id]->totalCount);
+        $this->connection->executeStatement("UPDATE moysklad_products SET barcodes='[\"000123\"]' WHERE connection_id=?", [$connection]);
+        foreach (range(2, 51) as $i) {
+            $this->em->persist(MoySkladProductBuilder::aProduct()->forConnection($d['connection'])->withIndex($i)->withArticle('OTHER')->build());
+        }
+        $this->em->flush();
+        $this->connection->executeStatement("UPDATE moysklad_products SET barcodes='[\"000123\"]' WHERE connection_id=?", [$connection]);
+        $group = $query->forListings($company, $connection, [$source], [$source->id => ['000123']], false)[$source->id];
+        self::assertSame(51, $group->totalCount);
+        self::assertCount(50, $group->items);
+        self::assertTrue($group->truncated);
+        self::assertSame(0, $query->forListings('99999999-9999-4999-8999-999999999999', $connection, [$source], [$source->id => ['000123']], false)[$source->id]->totalCount);
+        self::assertSame(0, $query->forListings($company, \Ramsey\Uuid\Uuid::uuid7()->toString(), [$source], [$source->id => ['000123']], false)[$source->id]->totalCount);
+    }
+
+    /** @param list<string> $articles
+     * @return array<string,\App\MoySklad\Application\DTO\AutomaticMappingCandidates>
+     */
+    private function candidateGroupsForArticles(AutomaticMappingCandidatesQuery $query, string $companyId, string $connectionId, array $articles): array
+    {
+        $sources = [];
+        foreach ($articles as $i => $article) {
+            $sources[] = new \App\Marketplace\DTO\ListingMetaDTO(sprintf('33333333-3333-4333-8333-%012d', $i), null, 'SKU', 'ozon', $article);
+        }
+        $groups = $query->forListings($companyId, $connectionId, $sources, [], false);
+        $result = [];
+        foreach ($sources as $source) {
+            $result['article:'.\App\MoySklad\Domain\AutomaticListingMappingPolicy::normalizeKey($source->supplierSku)] = $groups[$source->id];
+        }
+
+        return $result;
     }
 
     public function testFiftyOneMatchesAreTruncatedAndHundredInputKeysAreAllowed(): void
@@ -73,15 +116,15 @@ final class AutomaticMappingCandidatesQueryTest extends IntegrationTestCase
         }
         $this->em->flush();
         $query = self::getContainer()->get(AutomaticMappingCandidatesQuery::class);
-        $group = $query->forArticles($data['connection']->getCompanyId(), $data['connection']->getId(), ['001'])['article:001'];
+        $group = $this->candidateGroupsForArticles($query, $data['connection']->getCompanyId(), $data['connection']->getId(), ['001'])['article:001'];
         self::assertSame(51, $group->totalCount);
         self::assertCount(50, $group->items);
         self::assertTrue($group->truncated);
         $preview = self::getContainer()->get(\App\MoySklad\Infrastructure\Query\AutomaticMappingPreviewQuery::class)->page($data['connection']->getCompanyId(), $data['connection']->getId(), 'ozon', '', 1, null);
         self::assertSame(1, $preview->counts['too_many_candidates']);
         self::assertNull($preview->decisions[$data['listing']->getId()]->target);
-        self::assertCount(100, $query->forArticles($data['connection']->getCompanyId(), $data['connection']->getId(), array_map(strval(...), range(1, 100))));
+        self::assertCount(100, $this->candidateGroupsForArticles($query, $data['connection']->getCompanyId(), $data['connection']->getId(), array_map(strval(...), range(1, 100))));
         $this->expectException(\InvalidArgumentException::class);
-        $query->forArticles($data['connection']->getCompanyId(), $data['connection']->getId(), array_map(strval(...), range(1, 101)));
+        $this->candidateGroupsForArticles($query, $data['connection']->getCompanyId(), $data['connection']->getId(), array_map(strval(...), range(1, 101)));
     }
 }

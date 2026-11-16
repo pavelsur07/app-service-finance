@@ -26,14 +26,14 @@ final class AutomaticListingMappingPolicyTest extends TestCase
             $id = sprintf('44444444-4444-4444-8444-%012d', $row['index'] ?? $index + 1);
             $items[] = new AutomaticMappingCandidate(new CatalogTargetDTO($type, $id,
                 'variant' === $type ? ($row['parentId'] ?? '55555555-5555-4555-8555-000000000001') : null,
-                'Позиция', null, array_key_exists('article', $row) ? $row['article'] : '001', $row['characteristics'] ?? [],
-                $row['selectable'] ?? true, $row['reason'] ?? null), $row['parent'] ?? null, $row['leaf'] ?? true);
+                $row['name'] ?? 'Позиция', $row['code'] ?? null, array_key_exists('article', $row) ? $row['article'] : '001', $row['characteristics'] ?? [],
+                $row['selectable'] ?? true, $row['reason'] ?? null, $row['barcodes'] ?? null), $row['parent'] ?? null, $row['leaf'] ?? true);
         }
-        $source = new ListingMetaDTO('11111111-1111-4111-8111-000000000001', 'Листинг', 'SKU',
-            'ozon', array_key_exists('article', $scenario) ? $scenario['article'] : '001',
+        $source = new ListingMetaDTO('11111111-1111-4111-8111-000000000001', $scenario['title'] ?? 'Листинг', 'SKU',
+            $scenario['marketplace'] ?? 'ozon', array_key_exists('article', $scenario) ? $scenario['article'] : '001',
             $scenario['size'] ?? null, $scenario['active'] ?? true);
         $decision = $policy->decide($source, new AutomaticMappingCandidates($items,
-            $scenario['total'] ?? count($items), $scenario['truncated'] ?? false), $scenario['characteristic'] ?? null);
+            $scenario['total'] ?? count($items), $scenario['truncated'] ?? false), $scenario['characteristic'] ?? null, $scenario['barcodes'] ?? [], $scenario['preset'] ?? false);
         self::assertSame($scenario['status'], $decision->status->value);
         if ('ready' === $scenario['status']) {
             self::assertNotNull($decision->target);
@@ -50,6 +50,32 @@ final class AutomaticListingMappingPolicyTest extends TestCase
         $m = [['id' => 'size', 'name' => 'Размер', 'value' => 'M']];
         $l = [['id' => 'size', 'name' => 'Размер', 'value' => 'L']];
         $variant = ['type' => 'variant', 'characteristics' => $m];
+        yield 'exact code independent from article' => [['rows' => [['article' => 'OTHER', 'code' => '001']], 'status' => 'ready', 'rules' => ['exact_code']]];
+        yield 'article and code same target merge grounds' => [['rows' => [['code' => '001']], 'status' => 'ready', 'rules' => ['direct_article', 'exact_code']]];
+        yield 'article versus code conflict' => [['rows' => [[], ['article' => 'OTHER', 'code' => '001']], 'status' => 'ambiguous']];
+        yield 'code zeros stay significant' => [['rows' => [['article' => null, 'code' => '1']], 'status' => 'no_match']];
+        yield 'sized variant cannot hide unrelated parent code' => [['size' => 'M', 'characteristic' => 'size', 'rows' => [array_replace($variant, ['article' => 'OTHER', 'parent' => '001']), ['article' => 'OTHER', 'code' => '001', 'leaf' => false]], 'status' => 'ambiguous']];
+        yield 'sized variant cannot hide unrelated parent barcode' => [['size' => 'M', 'characteristic' => 'size', 'barcodes' => ['000123'], 'rows' => [array_replace($variant, ['article' => 'OTHER', 'parent' => '001']), ['article' => 'OTHER', 'barcodes' => ['000123'], 'leaf' => false]], 'status' => 'ambiguous']];
+        yield 'parent code without leaf stays unresolved' => [['rows' => [['article' => null, 'code' => '001', 'leaf' => false]], 'status' => 'variant_required']];
+        yield 'WB suffix off by default' => [['marketplace' => 'wildberries', 'article' => '001W', 'status' => 'no_match']];
+        yield 'WB upper suffix enabled' => [['marketplace' => 'wildberries', 'preset' => true, 'article' => '001W', 'status' => 'ready', 'rules' => ['wb_article_alias']]];
+        yield 'WB lower suffix enabled' => [['marketplace' => 'wildberries', 'preset' => true, 'article' => '001w', 'status' => 'ready', 'rules' => ['wb_article_alias']]];
+        yield 'WB removes only one suffix' => [['marketplace' => 'wildberries', 'preset' => true, 'article' => '001WW', 'status' => 'no_match']];
+        yield 'WB never removes other suffix' => [['marketplace' => 'wildberries', 'preset' => true, 'article' => '001X', 'status' => 'no_match']];
+        yield 'WB preset never applies to Ozon' => [['preset' => true, 'article' => '001W', 'status' => 'no_match']];
+        yield 'barcode independent without article' => [['article' => null, 'barcodes' => ['000123'], 'rows' => [['barcodes' => ['000123']]], 'status' => 'ready', 'rules' => ['exact_barcode']]];
+        yield 'barcode duplicate' => [['barcodes' => ['000123'], 'rows' => [['article' => null, 'barcodes' => ['000123']], ['article' => null, 'barcodes' => ['000123']]], 'status' => 'ambiguous']];
+        yield 'barcode versus article conflict' => [['barcodes' => ['000123'], 'rows' => [[], ['article' => 'OTHER', 'barcodes' => ['000123']]], 'status' => 'ambiguous']];
+        yield 'barcode leading zeros preserved' => [['barcodes' => ['000123'], 'rows' => [['article' => 'OTHER', 'barcodes' => ['123']]], 'status' => 'no_match']];
+        yield 'barcode contradictory size blocks other match' => [['size' => 'M', 'characteristic' => 'size', 'barcodes' => ['000123'], 'rows' => [$variant, array_replace($variant, ['article' => 'OTHER', 'barcodes' => ['000123'], 'characteristics' => $l])], 'status' => 'size_mismatch']];
+        foreach (['3 шт', '5 шт.', '2 штуки', '3 штук', '2 ШТУКА'] as $title) {
+            yield 'pack mismatch '.$title => [['title' => 'Набор '.$title, 'rows' => [['name' => 'Товар 1 шт']], 'status' => 'package_review']];
+        }
+        yield 'ambiguous source package' => [['title' => 'Набор 2 шт + 3 шт', 'rows' => [['name' => 'Товар']], 'status' => 'package_review']];
+        yield 'ambiguous target package' => [['rows' => [['name' => 'Набор 2 шт + 3 шт']], 'status' => 'package_review']];
+        yield 'same pack repeated is not ambiguous' => [['title' => 'Набор 3 шт / 3 штуки', 'rows' => [['name' => 'Товар 3 штук']], 'status' => 'ready']];
+        yield 'unknown package is not one' => [['title' => 'Набор 3 шт', 'status' => 'ready']];
+        yield 'decimal is not integer quantity' => [['title' => 'Вес 1.5 шт', 'rows' => [['name' => 'Товар 2 шт']], 'status' => 'ready']];
         yield 'simple exact article' => [['status' => 'ready']];
         yield 'missing source article' => [['article' => null, 'status' => 'no_article']];
         yield 'blank source article' => [['article' => " \t\r\n\v\f ", 'status' => 'no_article']];
@@ -95,15 +121,16 @@ final class AutomaticListingMappingPolicyTest extends TestCase
         yield 'truncation never proves uniqueness' => [['total' => 51, 'truncated' => true, 'status' => 'too_many_candidates']];
     }
 
-    public function testFingerprintUsesIdentityAndIgnoresDisplayName(): void
+    public function testFingerprintUsesNamesBecauseTheyAffectPackageChecks(): void
     {
         $policy = new AutomaticListingMappingPolicy();
         $base = ['id' => '11111111-1111-4111-8111-000000000001', 'title' => 'Название', 'sku' => 'SKU',
             'marketplace' => 'wildberries', 'supplierSku' => '001', 'size' => 'M', 'isActive' => true, 'marketplaceVariantId' => '123'];
         $fingerprint = $policy->sourceFingerprint(new ListingMetaDTO(...$base));
         self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/D', $fingerprint);
-        self::assertSame($fingerprint, $policy->sourceFingerprint(new ListingMetaDTO(...array_replace($base, ['title' => 'Другое название', 'supplierSku' => "\t001 ", 'size' => ' M ']))));
+        self::assertSame($fingerprint, $policy->sourceFingerprint(new ListingMetaDTO(...array_replace($base, ['supplierSku' => "\t001 ", 'size' => ' M ']))));
         $variations = [
+            new ListingMetaDTO(...array_replace($base, ['title' => 'Набор 3 шт'])),
             new ListingMetaDTO(...array_replace($base, ['supplierSku' => '1'])),
             new ListingMetaDTO(...array_replace($base, ['size' => 'L'])),
             new ListingMetaDTO(...array_replace($base, ['sku' => 'OTHER'])),
