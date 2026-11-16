@@ -1,60 +1,48 @@
 ## Current checkpoint
 
-**Phase:** Stage 1 / handoff
-**Status:** Stage 1 done / handoff — ожидается решение merge+deploy
-**Stage base commit:** cd19c36b043746e6502ba2cdebb9b09616127b81
-**Branch:** feat/ds-v3-stage-1
-**PR:** [#3027](https://github.com/pavelsur07/app-service-finance/pull/3027) — Ready, base master проверена.
-**Implementation commit:** c5233de52
+**Phase:** Stage 2 / Work item 2.4 / approval gate
+**Status:** stopped — named production Docker/CI approval, AGENTS.md §3.4 item2
+**Stage base commit:** fbfcc71c88984d560b4cf80e56310031cdd11eff
+**Branch:** feat/ds-v3-stage-2
 
 ### Completed
-
-- Phase 0: план пяти отдельных PR, production build path, UI consumers, API
-  компонентов, screenshot matrix; решения Владельца по деньгам/иконкам закрыты.
-- 1.1–1.2: пакет @vashfindir/ds, точный light JSON, Style Dictionary 5.8.0,
-  361 CSS/TS токен, exports и 8 тестов RED→GREEN.
-- 1.3: проверки apps включают пакет; все локальные gates и независимое internal
-  review пройдены; stage-1.md/handoff.md обновлены по результатам review.
-- Stage 1 commit c5233de52 опубликован; создан отдельный Draft PR #3027 в master.
-- 2026-11-16: отдельный Codex review по прямому поручению Владельца — REVIEW_GREEN,
-  BLOCKER/IMPORTANT 0/0; две сессии, 1 corrected retry, stdin-only limitation.
-- CI reviewed head ccb24c23d: оба SPA checks, real backend/HTTPS isolation,
-  production images account/admin SUCCESS.
-- site/, runtime apps, Docker/CI не менялись. Stage 2–5 ещё не начаты.
+- Stage1 / PR3027 merged/deployed fbfcc71c8; workflow43804985365 SUCCESS,
+  оба SPA healthy на SHA,19/19 HTTPS PASS.
+- Отдельные project rules: PR3028 Ready, commit c043a73dc, fallback
+  Claude CLI→separate fresh read-only Codex. Пока не merged.
+- Stage2 2.1–2.3: tests-first, Tailwind4.3.5/Vite/DS theme/preflight,
+  explicit sources/test exclusions, Manrope/OFL, current screen CSS migration.
+- 2.4: internal/fix cycle, Codex REVIEW_GREEN, exact production proposal
+  (не применён), локальные images/smoke и release contracts проверены.
+- site/, auth/session logic и фактические production configs не менялись.
 
 ### Checks and baseline
-
-- Baseline: front-install PASS; account 35 и admin 31 tests PASS.
-- Финал: front-typecheck/front-lint/front-build PASS; front-test 43 account + 39 admin.
-- Пакет: build/test8/typecheck/check:generated PASS; JSON source cmp exact.
-- Preview E2E: 12 account + 10 admin PASS, 4 production-only skipped.
-- 30 PNG 1440, 15 before/after пар SHA256 identical; отдельные baseline
-  HTML/CSS/JS обоих apps также identical. Временные baseline containers убраны.
-- npm audit DS: HIGH/CRITICAL 0, moderate 4 / low 2 (builder-only).
-- Начальные EACCES, сравнение prefix, lint URL, Vitest fs.allow и screenshot
-  hostname исправлены; повторные проверки зелёные, детали в stage-1.md.
+- Baseline front-test43/39 PASS. New5Vitest+2browser RED→GREEN.
+- front-typecheck/front-lint/front-test/front-build PASS:48/44,13DS tests.
+- Preview26PASS/8skipped; production-candidate nginx30PASS/4skipped.
+- После MINOR fix: contract RED2→GREEN5, builds/typecheck обоих apps PASS,
+  assert compiled CSS no .visible PASS; nginx smoke повторён PASS.
+- 15 before+15 after screenshots1440; /tmp/vf-ds-v3-stage2-artifacts.
+- Candidate release path test RED(old)→GREEN6; deploy workflow+tools6 PASS;
+  git apply --check и bash -n PASS. DS check:generated PASS.
+- DS audit exit1:4moderate/2low, HIGH/CRITICAL0, как Stage1. Apps existing
+  dependency versions unchanged. CSS73766→23189B, font164700B.
 
 ### Review status
-
-- Internal: полный diff в свежем контексте + focused review SD 5.8/lock;
-  BLOCKER/IMPORTANT/MINOR 0/0/0. Reviewer дополнительно проверил изолированный admin.
-- Отдельный Codex review вместо Claude по решению Владельца: REVIEW_GREEN,
-  BLOCKER/IMPORTANT 0/0. Первая сессия ограничена bwrap; вторая без инструментов
-  анализировала переданные полный diff, исходные эталоны и правила; exit 0.
-- Исправлений кода нет; добавлена только документация review.
-- Stage 1 закрыт, PR Ready; merge/deploy пока не выполнялись.
+- Internal fresh reviewer: BLOCKER/IMPORTANT0/0, MINOR1 fixed, open0.
+- External separate Codex1round, stdin-only: REVIEW_GREEN0/0, exit0.
+  Lock/binary directly not reviewed; author checked provenance/install/build.
 
 ### Exact next action
-
-- Получить единственное решение "merge and deploy #3027"; затем выполнить
-  pipeline до post-deploy acceptance без промежуточных вопросов.
-- После доставки Stage 1 продолжить Stage 2 отдельным PR. Production Docker/CI
-  diff требует отдельного named approval по §3.3 после подготовки diff.
+- Commit/push Stage2 и создать отдельный Draft PR, base master.
+- Получить named approval, затем применить тот же reviewed patch:
+  git apply docs/tasks/ds-v3-apps/proposals/stage-2-production.patch
+- Проверить реальные CI/release/build, Ready и merge+deploy Stage2.
+- До named approval actual Docker/CI не менять. PR3028 ждёт отдельного
+  решения merge and deploy #3028. Stage3–5 не начаты.
 
 ### Files to inspect first on resume
-
-- docs/tasks/ds-v3-apps/plan.md
-- docs/tasks/ds-v3-apps/stages/stage-1.md
-- docs/tasks/ds-v3-apps/handoff.md
-- apps/packages/ds/README.md
-- docs/workflow/external-review.md
+- docs/tasks/ds-v3-apps/proposals/{README.md,stage-2-production.patch}
+- docs/tasks/ds-v3-apps/stages/stage-2.md
+- docs/tasks/ds-v3-apps/reviews/codex-stage-2.md
+- apps/packages/ds/src/styles.css и styles.test.ts

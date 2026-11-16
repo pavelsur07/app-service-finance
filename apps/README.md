@@ -49,20 +49,40 @@ docker compose -p vf-finance-frontend -f docker-compose.frontend.yml down
 и `CONTAINER_UID`/`CONTAINER_GID` (по умолчанию текущий пользователь).
 Node: `24.18.1-bookworm-slim`, Playwright npm и браузерный образ: `1.56.1`.
 
+## Подготовка пакета ДС v3.4
+
+До применения Stage 2 build-context/CI proposal пакет устанавливается отдельно
+перед `front-*` командами (Node только в контейнере):
+
+```sh
+docker compose -p vf-finance-frontend -f docker-compose.frontend.yml run --rm \
+  --no-deps --user "$(id -u):$(id -g)" -w /workspace/apps/packages/ds account npm ci --ignore-scripts
+```
+
+App `prebuild` проверяет generated CSS/TS; source JSON не меняется вручную.
+После одобрения proposal `front-install` будет устанавливать пакет автоматически.
+OFL шрифта лежит в `apps/packages/ds/public/fonts/Manrope-OFL.txt` и попадает
+в dist обоих приложений. Новые React DS wrappers — следующие Stage.
+
 ## Структура и общие пакеты
 
 - `apps/*/src/app/` — маршрутизация и композиция приложения.
 - `apps/*/src/pages/` — главная, описание и неизвестный маршрут.
 - `apps/*/src/shared/session/` — типы, адаптеры и жизненный цикл сессии; account picker.
 - `apps/*/src/app/SessionProvider.tsx` — React subscription и проверка на focus.
-- `site/packages/ui/` — Button, cn, EmptyState, ErrorBoundary, вход CSS.
+- `apps/packages/ds/` — токены v3.4, Tailwind theme/preflight, локальный Manrope,
+  общий CSS и будущие React-компоненты.
+- `site/packages/ui/` — временно JS wrappers Button/EmptyState/ErrorBoundary;
+  их CSS в apps больше не подключается (замена wrappers — Stage 3).
 - `site/packages/api/` — JSON-транспорт и общий MSW-контракт тестирования.
 
 Пакеты подключаются через `file:../../site/packages/...`. Они находятся внутри
 `site/`, поскольку production build context старого приложения ограничен этим
 каталогом. Это сохраняет его сборку без изменений production Docker/CI.
-Канонические токены и CSS остаются в `site/assets/styles/kit/`; общий UI
-импортирует их, не копирует. React/React DOM — peer dependencies UI с поддержкой
+Для apps каноническая реализация — `apps/packages/ds`: JSON v3.4, generated
+`--ds-*` токены, Tailwind v4 и Manrope. CSS-кит `site/assets/styles/kit/`
+остаётся только у site. App CSS entry добавляет собственный `@source`;
+вход ДС отключает автоматический поиск и добавляет свои компоненты. React/React DOM — peer dependencies UI с поддержкой
 18 и 19. Vite каждого приложения разрешает React из его собственных зависимостей.
 Старые импорты Button/cn/API сохранены реэкспортами и адаптером.
 
@@ -89,7 +109,7 @@ UI request fixtures не заменяют actual-backend suite ниже.
 Production-публикация описана ниже.
 
 Dev-контейнеры видят только `apps`, общие пакеты и CSS кита (CSS read-only).
-`server.fs.allow` ограничен выбранным приложением, пакетами и стилями;
+`server.fs.allow` ограничен выбранным приложением, пакетами и пакетом ДС;
 корневые служебные файлы, локальные секреты и `site/var` им недоступны.
 Тест необработанного запроса MSW использует встроенную стратегию `error`,
 проверяет отклонение запроса и отсутствие вызова сетевого fallback.

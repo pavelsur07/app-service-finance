@@ -19,8 +19,9 @@ export function LoginPage() {
     form.reset();
     void store.login({ email, password });
   };
+  // TODO(ds): v3 auth screen sheet pending; compose existing card/controls.
   return (
-    <section className="card">
+    <section className="card mx-auto w-full max-w-(--ds-modal-width-compact)">
       <h1 className="wz-title">Вход — администрирование</h1>
       <form onSubmit={submit} aria-busy={state.busy}>
         <div className="form-field">

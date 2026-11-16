@@ -43,7 +43,7 @@ export function CompanyPicker() {
   }, [store, page, retry, state.data]);
   const company = state.data?.active_company;
   return (
-    <section className="card" aria-label="Выбор компании">
+    <section className="card grid gap-3" aria-label="Выбор компании">
       <p>
         Текущая компания: <strong>{company?.name ?? 'Не выбрана'}</strong>
       </p>

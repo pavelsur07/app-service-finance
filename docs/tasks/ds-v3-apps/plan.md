@@ -135,7 +135,39 @@ Reviewer focus: плоские ссылки, пропущенные/устаре
 
 ## Stage 2 — Tailwind v4 и стили
 
-Risk: HIGH-LOCAL. Stage base commit: записать после доставки Stage 1.
+Risk: HIGH-LOCAL (apps/styles), HIGH-EXTERNAL (production Docker/CI).
+Stage base commit: `fbfcc71c88984d560b4cf80e56310031cdd11eff`.
+
+Чек-лист приёмки Stage 2:
+- [x] Tailwind v4 + preflight подключены через Vite обоих apps; каждый app
+  компилирует только собственные src и пакет DS (без site/tests/чужого app).
+- [x] Тема по v3/tailwind/app.css, только --ds- значения; дефолтные палитра,
+  размеры текста, радиусы, тени и breakpoints сброшены; compile-тест подтверждает
+  отсутствие bg-blue-500/text-base и наличие DS utilities.
+- [x] Manrope self-hosted, OFL сохранена, русский/латиница; body 13px,
+  tabular-nums, rem=16px; страницы login/home/about/404 на DS, без старого CSS.
+- [x] Классы используемых старых React wrappers получают временные стили v3
+  в пакете (Stage 3 заменит wrappers); site не изменён, session/CSRF не менялись.
+- [x] Скриншоты 1440 до/после, контраст текста/границ, focus/disabled/error,
+  loading/empty/error и существующий mobile smoke пройдены.
+- [x] front typecheck/lint/test/build + preview E2E; пакет check:generated.
+- [x] Подготовлены точные production Docker/CI changes: копирование/установка
+  пакета в build context, включение DS в SPA filter и npm ci/check:generated.
+  До отдельного named approval §3.3 — только proposal patch, без применения
+  к production config. Локально проверяются эквивалентные временные файлы.
+- [x] Независимое internal review и отдельный Codex REVIEW_GREEN, отчёт.
+- [ ] Production patch применён после named approval, реальный CI зелёный;
+  Stage 2 Ready/merge+deploy после этого gate.
+
+Work items:
+- 2.1 — baseline, screenshots before, тесты темы/визуального контракта RED.
+- 2.2 — Tailwind package/theme/font и подключение обоих приложений.
+- 2.3 — существующие экраны, states и screenshot/contrast/E2E приёмка.
+- 2.4 — review, build-context proposal, Draft PR и named approval Docker/CI.
+
+Дополнение 2026-11-16: Stage 1 merged/deployed (`fbfcc71c8`), workflow
+43804985365 SUCCESS, post-deploy 19/19 HTTPS, оба контейнера healthy на SHA.
+Правило автоматического Codex fallback подготовлено отдельным PR #3028.
 DoD: Tailwind/preflight в обоих apps, только тема ДС, Manrope, body 13px,
 сброс default palette/type/radius/shadow/breakpoint, старый CSS не импортируется;
 вход/главная/about/404 стилизованы, прежнее поведение сохранено. Production
@@ -190,3 +222,9 @@ REVIEW_GREEN. Вторая сессия получила полный diff и э
 поскольку bwrap не позволяет read-only shell; ограничение и результат
 записаны в reviews/codex-stage-1.md. Это согласованная замена reviewer
 для данного handoff, а не изменение общих правил репозитория.
+
+Обновление 2026-11-16: Владелец поручил закрепить постоянный fallback
+Claude CLI → отдельная свежая read-only сессия Codex. Правило подготовлено
+отдельным docs PR #3028; в текущей задаче применяется по явной инструкции.
+Stage 2 reviewed: internal 0/0, MINOR1 fixed; separate Codex 0/0, REVIEW_GREEN.
+Ожидается только named approval production proposal и его реальная CI-проверка.

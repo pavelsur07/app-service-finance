@@ -1,5 +1,6 @@
 import { Button, EmptyState } from '@vashfindir/ui';
 import { useSession } from '../../app/SessionProvider';
+// TODO(ds): loading/error page sheets pending; compose existing DS patterns.
 export function SessionStatus() {
   const { store, state } = useSession();
   if (state.status === 'loading') return <p role="status">Проверяем сессию…</p>;

@@ -272,8 +272,13 @@ import * as Icons from '@tabler/icons-react';
 Правила выше про React 18, отсутствие typecheck и список установленных библиотек
 относятся к `site/`. Новые приложения имеют независимые npm lock-файлы,
 строгий typecheck, ESLint/Prettier, Vitest/MSW и Playwright. Команды и границы:
-`apps/README.md`. Общие UI/API исходники — `site/packages/` (внутри старого
-Docker build context); токены/CSS по-прежнему в `assets/styles/kit/`.
+`apps/README.md`. Общий API и временные UI JS wrappers — `site/packages/`.
+Apps используют `apps/packages/ds` (`@vashfindir/ds`): v3.4 токены `--ds-*`,
+Tailwind v4/preflight, локальный Manrope. CSS из `site/assets/styles/kit/` и
+`@vashfindir/ui/styles.css` в apps не импортировать. App CSS entry импортирует
+DS styles и сканирует только свой src; shared DS добавляет компоненты.
+Команды typecheck/lint/test/build включают пакет; prebuild проверяет generated
+токены. Старые Button/EmptyState wrappers заменяются отдельным Stage 3.
 Старые API/Button/cn импорты совместимы; только старый API-адаптер перенаправляет
 на `/login`. Account/admin используют same-origin Symfony session API с отдельными host-only
 сессиями. Оркестрация находится в приложениях; shared API не делает redirect.
