@@ -18,6 +18,7 @@ const (
 	PriorityYesterday = 10
 	PriorityWeek      = 7
 	PriorityTail      = 5
+	PriorityHistory   = 1
 )
 
 // KindDailyTail — суточное перечитывание вчера и хвоста: WB дописывает строки
@@ -33,6 +34,10 @@ const RefreshWeeks = 3
 
 // DefaultTailDays — дней перед вчера в окне загрузки и перечитывания.
 const DefaultTailDays = 14
+
+// DailyHistoryDays — дней дневного отчёта до вчера включительно, загружаемых однократно: новый
+// контур считает ОПиУ и экономику за прошлые месяцы, окна перечитывания для этого мало.
+const DailyHistoryDays = 90
 
 // DefaultDailyStart — с этого часа МСК грузится отчёт за вчера: ночью WB его
 // ещё не опубликовал (Symfony — 03:10), пустой ответ закрыл бы день до завтра.
@@ -51,9 +56,10 @@ const (
 
 // Config — параметры окна.
 type Config struct {
-	Location   *time.Location // Europe/Moscow
-	TailDays   int            // дней перед вчера
-	DailyStart time.Duration  // смещение от полуночи МСК для вчера и перечитывания
+	Location    *time.Location // Europe/Moscow
+	TailDays    int            // дней перед вчера
+	HistoryDays int            // дней до вчера включительно, загружаемых один раз; 0 — только окно
+	DailyStart  time.Duration  // смещение от полуночи МСК для вчера и перечитывания
 }
 
 func DefaultConfig(loc *time.Location) Config {
@@ -93,6 +99,10 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) schedule.P
 				}
 				plan.Ensure = append(plan.Ensure, ensure)
 				tail.Specs = append(tail.Specs, store.TaskSpec{TaskKey: k, Priority: ensure.Priority, Refresh: true, RunAt: start})
+			}
+			for i := days + 1; i < cfg.HistoryDays; i++ {
+				k := key(cab.Ref, executor.ResourceDaily, yesterday.AddDate(0, 0, -i).Format(time.DateOnly))
+				plan.Ensure = append(plan.Ensure, store.TaskSpec{TaskKey: k, Priority: PriorityHistory, RunAt: now})
 			}
 			plan.Refreshes = append(plan.Refreshes, tail)
 		}
