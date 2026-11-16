@@ -295,7 +295,14 @@ the same finding, do root-cause analysis and change the approach.
 
 The implementing agent runs the **other** agent as a read-only reviewer over
 the cleaned diff: Codex reviews Claude Code, Claude Code reviews Codex.
-Mechanics, prompt and failure handling: `docs/workflow/external-review.md`.
+If the Claude CLI is unavailable (missing executable or an environment/auth
+failure prevents it from starting), Codex automatically runs the review in a
+**separate, fresh, read-only Codex session** with no implementation history.
+No owner approval is needed for this fallback. Supply the complete task diff,
+spec and checklist; record the reason, reviewer and limitations. Findings are
+not a reason to switch reviewers. The same finding/fix budgets and green
+criteria apply. Mechanics, prompts and failure handling:
+`docs/workflow/external-review.md`.
 Policy:
 
 - **When.** Fast Path and XS: never. Small: only when the change touches a
@@ -305,7 +312,10 @@ Policy:
   diff too large to review well at handoff. Never after a Work item.
 - **How.** One call: `site/bin/external-review.sh <base_commit> --effort
   medium` with `--context` for findings already fixed internally and facts the
-  reviewer cannot obtain itself. Exits 0 only on `REVIEW_GREEN`.
+  reviewer cannot obtain itself. For paths the wrapper does not include (for
+  example `apps/`), invoke the selected reviewer directly with the full diff;
+  an empty wrapper diff does not count as a review. A successful command also
+  requires the actual review result under the green criteria below.
 - **Green.** The exact line `REVIEW_GREEN`, **or** no BLOCKER and every
   confirmed IMPORTANT fixed and verified — record "fixed without re-run".
   Re-run only after a fixed BLOCKER. Budget: three rounds per review point; a
