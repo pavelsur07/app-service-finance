@@ -4,12 +4,14 @@ export interface AvatarProps extends ComponentPropsWithRef<'span'> {
   src?: string;
   size?: 'sm' | 'md' | 'lg';
   shape?: 'circle' | 'square';
+  tone?: 'solid' | 'tint';
 }
 export function Avatar({
   name,
   src,
   size = 'md',
   shape = 'circle',
+  tone = 'solid',
   className = '',
   ...props
 }: AvatarProps) {
@@ -32,7 +34,7 @@ export function Avatar({
       role="img"
       aria-label={name}
       {...props}
-      className={`inline-flex shrink-0 items-center justify-center overflow-hidden bg-primary font-bold text-fg-inverse ${sizes[size]} ${shape === 'circle' ? 'rounded-full' : 'rounded-md'} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center overflow-hidden font-bold ${tone === 'tint' ? 'bg-primary-tint text-primary' : 'bg-primary text-fg-inverse'} ${sizes[size]} ${shape === 'circle' ? 'rounded-full' : 'rounded-md'} ${className}`}
     >
       {src && failed !== src ? (
         <img

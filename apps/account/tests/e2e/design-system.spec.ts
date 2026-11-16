@@ -87,7 +87,7 @@ test('DS login controls have token dimensions, contrast and focus', async ({
   await page.goto('/login');
   const input = page.getByLabel('Email', { exact: true });
   await expect(input).toBeVisible();
-  await expect(input).toHaveCSS('height', '38px');
+  await expect(input).toHaveCSS('height', '40px');
   const colors = await input.evaluate((element) => {
     const style = getComputedStyle(element);
     return { border: style.borderTopColor, background: style.backgroundColor };
@@ -96,7 +96,7 @@ test('DS login controls have token dimensions, contrast and focus', async ({
   await input.focus();
   await expect(input).toHaveCSS('outline-width', '2px');
   const button = page.getByRole('button', { name: 'Войти', exact: true });
-  await expect(button).toHaveCSS('height', '36px');
+  await expect(button).toHaveCSS('height', '44px');
   await expect(button).toHaveCSS('background-color', 'rgb(30, 42, 68)');
   const buttonColors = await button.evaluate((element) => {
     const style = getComputedStyle(element);

@@ -45,3 +45,5 @@ export * from './components/ConfirmDialog';
 export * from './components/DropdownMenu';
 export * from './components/EntityPicker';
 export * from './components/TreePicker';
+
+export * from './components/AuthScreen';

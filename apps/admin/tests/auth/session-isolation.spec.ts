@@ -70,10 +70,18 @@ test('real login, company, cookies, sibling and legacy sessions, logout', async 
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Пароль', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Войти', exact: true }).click();
+  if (realm === 'account') {
+    await expect(
+      page.getByRole('heading', { name: 'Выберите компанию' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  }
   await expect(page.getByText(email, { exact: true })).toBeVisible();
   await page.reload();
   await expect(
-    page.getByRole('button', { name: 'Выйти', exact: true }),
+    page
+      .getByRole('complementary')
+      .getByRole('button', { name: 'Выйти', exact: true }),
   ).toBeVisible();
   const cookie = (await context.cookies(baseURL)).find((item) => item.httpOnly);
   if (!cookie || !anonymousCookie) throw new Error('Session cookie missing');
@@ -96,14 +104,15 @@ test('real login, company, cookies, sibling and legacy sessions, logout', async 
     expect(list.meta.pages).toBe(2);
     const choice = list.data[0];
     if (!choice) throw new Error('Fixture company missing');
-    await page.getByLabel('Компания', { exact: true }).selectOption(choice.id);
-    await expect(page.getByText('Текущая компания:')).toContainText(
-      choice.name,
-    );
+    await page.getByRole('radio', { name: choice.name, exact: true }).check();
+    await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+    await expect(
+      page.getByRole('radio', { name: choice.name, exact: true }),
+    ).toBeChecked();
     await page.reload();
-    await expect(page.getByText('Текущая компания:')).toContainText(
-      choice.name,
-    );
+    await expect(
+      page.getByRole('radio', { name: choice.name, exact: true }),
+    ).toBeChecked();
   }
   // The same browser owns all three hosts. A legacy session must remain usable.
   const legacyPage = await page.request.get(`${oldOrigin}/login`);
@@ -149,7 +158,10 @@ test('real login, company, cookies, sibling and legacy sessions, logout', async 
   expect(hostile.status()).toBe(403);
   expect(hostile.headers()['access-control-allow-origin']).toBeUndefined();
   expect((await page.request.get(`${prefix}/session`)).status()).toBe(200);
-  await page.getByRole('button', { name: 'Выйти', exact: true }).click();
+  await page
+    .getByRole('complementary')
+    .getByRole('button', { name: 'Выйти', exact: true })
+    .click();
   await expect(
     page.getByRole('button', { name: 'Войти', exact: true }),
   ).toBeVisible();
