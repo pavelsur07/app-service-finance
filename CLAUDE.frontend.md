@@ -266,6 +266,25 @@ import * as Icons from '@tabler/icons-react';
 - `docs/plan/ds-legacy-tabler-audit.md` — решения по DS и расхождения с поручением.
 - `site/screens/README.md` — матрица реализации макетов.
 
+## Дизайн-система в apps (ДС v3.4, 2026-11-15)
+
+Для `apps/account` и `apps/admin` эталон визуала — ДС v3.4: `docs/design-system/v3/`
+(листы `sheets/DS-*.html`, токены `tokens/ds-v3.tokens.json`, каркас
+`screens/App-Layout.html`). План и этапы — `docs/plan/ds-v3.md`. Правила этого файла
+про `site/` (Tabler, `assets/styles/kit`, листы `sheets/*.dc.html`) к apps не применяются,
+и наоборот: работа по ДС v3.4 `site/` не трогает.
+- Визуал apps — только из пакета `apps/packages/ds` (`@vashfindir/ds`): токены
+  (`--ds-*`, генерируются из JSON), стили, React-компоненты, `formatMoney`. CSS из
+  `site/assets` в apps не импортировать.
+- Tailwind v4 в apps — полностью; тема только на токенах ДС (`v3/tailwind/app.css`),
+  палитра Tailwind по умолчанию отключена, `bg-[#…]` запрещён. Компоненты — в пакете,
+  в приложениях Tailwind — раскладка и утилиты.
+- Главная кнопка — navy; красный бренда — только логотип и промо; ошибки и
+  деструктивные действия — оранжевый. Тёмная тема отложена: `[data-theme="dark"]` и
+  `prefers-color-scheme: dark` в CSS apps не добавлять.
+- Нет листа для случая — ближайшее решение из компонентов пакета и `TODO(ds)`; новый
+  компонент — только с экраном в продукте (Decision 45).
+
 ## Самостоятельные frontend-приложения (2026-11-11)
 
 `apps/account/` и `apps/admin/` — React 19 SPA, локальная подготовка интерфейсов.

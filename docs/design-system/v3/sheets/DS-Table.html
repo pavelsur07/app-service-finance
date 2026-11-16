@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DS-Table · ДС «Ваш Финдир» v3.4</title>
+<!--
+  Лист дизайн-системы «Ваш Финдир» v3.4 — Таблицы и отчёты.
+  Источник: UI Kit v3.4 (канвас Claude Design, страница ui-kit-v3.0), сгенерировано 15.11.2026.
+  Обычный HTML: открывается в браузере. Значения — из ds-kit.css (токены в :root) и разметки.
+  Не править вручную: изменения вносятся в UI Kit и перегенерируются.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="ds-kit.css">
+</head>
+<body>
+<main class="main">
+<h1 class="page-h1">DS-Table</h1>
+<p class="page-sub">Table row, Sort header, Totals row, Pagination (Decision 46), Report, Heavy analytical table.</p>
+<div class="page-meta">ДС «Ваш Финдир» v3.4 · 15.11.2026 · все листы: <a href="../README.md">README</a></div>
+<div class="cb" id="table">
+<div class="cb-head">
+<span class="cb-name">Table row</span>
+<span class="cb-tag">.t-table .t-row--*</span>
+<span class="cb-when">Все состояния строки. Day-divider группирует операции, subtotal — итог по группе.</span>
+</div>
+<table class="t-table">
+<thead>
+<tr>
+<th style="width:36px">#</th>
+<th>Контрагент</th>
+<th class="t-cell--right" style="width:160px">Сумма</th>
+<th style="width:140px">Статус</th>
+</tr>
+</thead>
+<tbody>
+<tr class="t-row--day"><td colspan="4">Сегодня · 24 июня</td></tr>
+<tr>
+<td>1</td>
+<td>ООО «Технопарк»<div style="color:var(--text-muted); font-size:var(--fs-xs)">Оплата по счёту № 245</div></td>
+<td class="t-cell--right"><span class="money money--14 money--in">+245 000 ₽</span></td>
+<td><span class="status status--success"><span class="dot"></span>Проведено</span></td>
+</tr>
+<tr class="t-row--hover">
+<td>2</td>
+<td>Яндекс.Директ<div style="color:var(--text-muted); font-size:var(--fs-xs)">Реклама</div></td>
+<td class="t-cell--right"><span class="money money--14 money--out">−38 500 ₽</span></td>
+<td><span class="status status--success"><span class="dot"></span>Проведено</span></td>
+</tr>
+<tr class="t-row--selected">
+<td>3</td>
+<td>ФНС России<div style="color:var(--text-muted); font-size:var(--fs-xs)">НДС за 2 кв. 2026</div></td>
+<td class="t-cell--right"><span class="money money--14 money--out">−156 200 ₽</span></td>
+<td><span class="status status--warning"><span class="dot"></span>На согласовании</span></td>
+</tr>
+<tr class="t-row--subtotal">
+<td></td>
+<td>Итого за день</td>
+<td class="t-cell--right"><span class="money money--14 money--strong">+50 300 ₽</span></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<span class="demo-label" style="margin-top:var(--s-5);">Dot-prefix cell · <code class="code-inline">.t-cell--dot</code> (event log / транспорт)</span>
+<table class="t-table">
+<thead>
+<tr>
+<th>Транспорт</th>
+<th style="width:160px">Старт</th>
+<th class="t-cell--right" style="width:120px">Длительность</th>
+<th style="width:180px">Причина</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="t-cell--dot"><span class="ddot" style="background:var(--success-dot);"></span><span class="mono">banks_import</span></span></td>
+<td style="font-variant-numeric:tabular-nums;">27.06 06:38:14</td>
+<td class="t-cell--right">12 с</td>
+<td><span class="status status--warning"><span class="dot"></span>auto-restart</span></td>
+</tr>
+<tr>
+<td><span class="t-cell--dot"><span class="ddot" style="background:var(--danger-dot);"></span><span class="mono">marketplaces</span></span></td>
+<td style="font-variant-numeric:tabular-nums;">27.06 06:14:52</td>
+<td class="t-cell--right">8 мин 04 с</td>
+<td><span class="status status--danger"><span class="dot"></span>dead worker</span></td>
+</tr>
+<tr>
+<td><span class="t-cell--dot"><span class="ddot" style="background:var(--color-primary);"></span><span class="mono">categorize</span></span></td>
+<td style="font-variant-numeric:tabular-nums;">27.06 04:02:11</td>
+<td class="t-cell--right">3 с</td>
+<td><span class="status status--neutral"><span class="dot"></span>deploy</span></td>
+</tr>
+<tr>
+<td><span class="t-cell--dot"><span class="ddot" style="background:var(--text-disabled);"></span><span class="mono">archive_sweep</span></span></td>
+<td style="font-variant-numeric:tabular-nums;">26.06 23:00:00</td>
+<td class="t-cell--right">47 с</td>
+<td><span style="color:var(--text-faint);">—</span></td>
+</tr>
+</tbody>
+</table>
+</div><div class="cb" id="t-sort">
+<div class="cb-head">
+<span class="cb-name">Table sort header</span>
+<span class="cb-tag">.t-sort-th[.is-active]</span>
+<span class="cb-when">Кликабельный заголовок колонки. Состояние is-active подсвечивается primary-tint фоном и primary-цветом; стрелочка указывает направление (вверх — asc, вниз — desc, оба faint — не отсортировано).</span>
+</div>
+<div class="demo" style="padding:0; display:block;">
+<table class="t-table">
+<thead>
+<tr>
+<th>Артикул</th>
+<th class="t-sort-th is-active u-text-right">
+<span style="display:inline-flex; align-items:center; gap:var(--s-1_5);">Выручка — desc
+                    <svg class="sort-ico" fill="none" height="11" viewbox="0 0 10 12" width="9"><path d="M5 1 L9 5 L1 5 Z" fill="var(--text-faint)"></path><path d="M5 11 L1 7 L9 7 Z" fill="currentColor"></path></svg>
+</span>
+</th>
+<th class="t-sort-th u-text-right">
+<span style="display:inline-flex; align-items:center; gap:var(--s-1_5);">Прибыль
+                    <svg class="sort-ico" fill="none" height="11" viewbox="0 0 10 12" width="9"><path d="M5 1 L9 5 L1 5 Z" fill="var(--text-faint)"></path><path d="M5 11 L1 7 L9 7 Z" fill="var(--text-faint)"></path></svg>
+</span>
+</th>
+<th class="u-text-right">Маржа</th>
+</tr>
+</thead>
+</table>
+</div>
+</div><div class="cb" id="t-totals">
+<div class="cb-head">
+<span class="cb-name">Table totals row</span>
+<span class="cb-tag">.t-row--totals</span>
+<span class="cb-when">Обязательная последняя строка любой аналитической таблицы (Decision 21). bg --bg-subtle, top-border 2px solid text-strong. Складывайте суммы; проценты — взвешенно (margin = profit/revenue, ROI = profit/costs). Per-unit метрики («Себест. ед.») оставляйте прочерком.</span>
+</div>
+<div class="demo" style="padding:0; display:block;">
+<table class="t-table">
+<thead>
+<tr>
+<th>Артикул</th>
+<th class="u-text-right">Выручка</th>
+<th class="u-text-right">Кол-во</th>
+<th class="u-text-right">Прибыль</th>
+<th class="u-text-right">Маржа</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>ЦРМ250-1С</td><td class="t-cell--right">1 430 805 ₽</td><td class="t-cell--right">450</td><td class="t-cell--right">288 160 ₽</td><td class="t-cell--right" style="color:var(--success-text);">20,1%</td></tr>
+<tr><td>ОКЛ50К</td><td class="t-cell--right">977 323 ₽</td><td class="t-cell--right">1 144</td><td class="t-cell--right">191 430 ₽</td><td class="t-cell--right">19,6%</td></tr>
+<tr><td>ЦРМ250-100</td><td class="t-cell--right">949 613 ₽</td><td class="t-cell--right">1 251</td><td class="t-cell--right">102 855 ₽</td><td class="t-cell--right" style="color:var(--danger-text);">10,8%</td></tr>
+<tr class="t-row--totals">
+<td><span class="t-totals-label">ИТОГО</span> <span class="t-totals-meta">· 3 SKU</span></td>
+<td class="t-cell--right t-totals-strong">3 357 741 ₽</td>
+<td class="t-cell--right">2 845</td>
+<td class="t-cell--right t-totals-strong">582 445 ₽</td>
+<td class="t-cell--right">17,3%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div><div class="cb" id="t-pg">
+<div class="cb-head">
+<span class="cb-name">Table pagination</span>
+<span class="cb-tag">.t-pagination</span>
+<span class="cb-when">Под таблицей. Слева — диапазон + total. Справа — prev/next и номера страниц. .t-pg-ellipsis после первой и перед последней для длинных списков.</span>
+</div>
+<div class="demo" style="padding:0; display:block; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden;">
+<div class="t-pagination">
+<div class="t-pagination-info">Показано <b>1–15</b> из <b>79</b></div>
+<div class="t-pagination-pages">
+<button class="t-pg-btn" title="Предыдущая"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+<button class="t-pg-btn is-active">1</button>
+<button class="t-pg-btn">2</button>
+<button class="t-pg-btn">3</button>
+<span class="t-pg-ellipsis">…</span>
+<button class="t-pg-btn">6</button>
+<button class="t-pg-btn" title="Следующая"><svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+</div>
+</div>
+</div>
+</div><div class="cb" id="report">
+<div class="cb-head">
+<span class="cb-name">Report (period grid)</span>
+<span class="cb-tag">.report · .r-row · .r-cell</span>
+<span class="cb-when">Грид-отчёт за периоды (ДДС, P&amp;L, баланс). Иерархия статей со сворачиванием, ячейки с двумя значениями (сумма + Δ%), залипающая первая колонка, фиксированная колонка итога. Формат (месяцы / кварталы) переключается на уровне страницы.</span>
+</div>
+<span class="demo-label">По кварталам · 4 периода · с раскрытием</span>
+<div class="demo" style="padding:0; background:transparent">
+<div class="report" style="width:100%; --r-periods:4; --r-label-w:300px; --r-total-w:150px;">
+<div class="report-scroll">
+<div>
+<!-- Column header -->
+<div class="r-row r-row--head">
+<div class="r-label"><span class="r-label-hint">Статья ДДС</span></div>
+<div class="r-cell"><div class="r-cell-head-label">III кв.</div><div class="r-cell-head-sub">2025</div></div>
+<div class="r-cell"><div class="r-cell-head-label">IV кв.</div><div class="r-cell-head-sub">2025</div></div>
+<div class="r-cell"><div class="r-cell-head-label">I кв.</div><div class="r-cell-head-sub">2026</div></div>
+<div class="r-cell"><div class="r-cell-head-label">II кв.</div><div class="r-cell-head-sub">2026</div></div>
+<div class="r-total"><div class="r-cell-head-label">Итого</div><div class="r-cell-head-sub">за период</div></div>
+</div>
+<!-- Opening balance -->
+<div class="r-row r-row--balance">
+<div class="r-label">
+<svg fill="none" height="14" stroke="#475569" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><rect height="13" rx="2" width="20" x="2" y="6"></rect><circle cx="12" cy="12.5" r="2.2"></circle></svg>
+<div class="r-label-block">
+<div class="r-label-text">Остаток на начало периода</div>
+<div class="r-label-sub">на первый день</div>
+</div>
+</div>
+<div class="r-cell"><div class="r-cell-val">2 100 000 ₽</div></div>
+<div class="r-cell"><div class="r-cell-val">2 295 000 ₽</div></div>
+<div class="r-cell"><div class="r-cell-val">2 580 000 ₽</div></div>
+<div class="r-cell"><div class="r-cell-val">2 840 000 ₽</div></div>
+<div class="r-total"><div class="r-cell-val">2 100 000 ₽</div></div>
+</div>
+<!-- Section root (Operational, expanded) -->
+<div class="r-row r-row--section r-row--income">
+<div class="r-label">
+<button class="r-chev"><svg fill="none" height="13" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6" viewbox="0 0 24 24" width="13"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+<div class="r-label-block">
+<div class="r-label-text">1. Операционная деятельность</div>
+<div class="r-label-sub">текущая деятельность по продажам</div>
+</div>
+</div>
+<div class="r-cell"><div class="r-cell-val">+1 195 К</div><span class="delta delta--up">+8,2%</span></div>
+<div class="r-cell"><div class="r-cell-val">+1 380 К</div><span class="delta delta--up">+15,5%</span></div>
+<div class="r-cell"><div class="r-cell-val">+1 250 К</div><span class="delta delta--down">−9,4%</span></div>
+<div class="r-cell"><div class="r-cell-val">+1 420 К</div><span class="delta delta--up">+13,6%</span></div>
+<div class="r-total"><div class="r-cell-val">+5 245 К ₽</div><span class="delta delta--up">+18,8%</span></div>
+</div>
+<!-- Inner group: Поступления -->
+<div class="r-row">
+<div class="r-label">
+<button class="r-chev"><svg fill="none" height="11" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8" viewbox="0 0 24 24" width="11"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+<div class="r-label-text r-label-text--group">Поступления от продаж</div>
+</div>
+<div class="r-cell"><div class="r-cell-val r-cell-val--group">+3 245 К</div><span class="delta delta--up">+6,2%</span></div>
+<div class="r-cell"><div class="r-cell-val r-cell-val--group">+3 420 К</div><span class="delta delta--up">+5,4%</span></div>
+<div class="r-cell"><div class="r-cell-val r-cell-val--group">+3 580 К</div><span class="delta delta--up">+4,7%</span></div>
+<div class="r-cell"><div class="r-cell-val r-cell-val--group">+3 720 К</div><span class="delta delta--up">+3,9%</span></div>
+<div class="r-total"><div class="r-cell-val r-cell-val--group">+13 965 К ₽</div><span class="delta delta--up">+14,6%</span></div>
+</div>
+<!-- Leaf in -->
+<div class="r-row">
+<div class="r-label">
+<span class="r-indent" style="width:18px"></span>
+<span class="r-leaf-dot"></span>
+<span class="r-dir-dot r-dir-dot--in"></span>
+<div class="r-label-text">Маркетплейс — Ozon</div>
+</div>
+<div class="r-cell"><div class="r-cell-val">+1 245 К</div><span class="delta delta--up">+4,2%</span></div>
+<div class="r-cell"><div class="r-cell-val">+1 312 К</div><span class="delta delta--up">+5,4%</span></div>
+<div class="r-cell"><div class="r-cell-val">+1 380 К</div><span class="delta delta--up">+5,2%</span></div>
+<div class="r-cell"><div class="r-cell-val">+1 420 К</div><span class="delta delta--up">+2,9%</span></div>
+<div class="r-total"><div class="r-cell-val">+5 357 К ₽</div><span class="delta delta--up">+14,0%</span></div>
+</div>
+<!-- Leaf out -->
+<div class="r-row">
+<div class="r-label">
+<span class="r-indent" style="width:18px"></span>
+<span class="r-leaf-dot"></span>
+<span class="r-dir-dot r-dir-dot--out"></span>
+<div class="r-label-text">Закупка материалов</div>
+</div>
+<div class="r-cell"><div class="r-cell-val">−685 К</div><span class="delta delta--down">+2,1%</span></div>
+<div class="r-cell"><div class="r-cell-val">−720 К</div><span class="delta delta--down">+5,1%</span></div>
+<div class="r-cell"><div class="r-cell-val">−695 К</div><span class="delta delta--up">−3,5%</span></div>
+<div class="r-cell"><div class="r-cell-val">−742 К</div><span class="delta delta--down">+6,8%</span></div>
+<div class="r-total"><div class="r-cell-val">−2 842 К ₽</div><span class="delta delta--down">+8,3%</span></div>
+</div>
+<!-- Net subtotal -->
+<div class="r-row r-row--net r-row--income">
+<div class="r-label">
+<svg fill="none" height="13" stroke="#10B981" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" style="flex-shrink:0" viewbox="0 0 24 24" width="13"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+<div class="r-label-text">Чистый поток · операционная</div>
+</div>
+<div class="r-cell"><div class="r-cell-val">+1 195 К</div><span class="delta delta--up">+8,2%</span></div>
+<div class="r-cell"><div class="r-cell-val">+1 380 К</div><span class="delta delta--up">+15,5%</span></div>
+<div class="r-cell"><div class="r-cell-val">+1 250 К</div><span class="delta delta--down">−9,4%</span></div>
+<div class="r-cell"><div class="r-cell-val">+1 420 К</div><span class="delta delta--up">+13,6%</span></div>
+<div class="r-total"><div class="r-cell-val">+5 245 К ₽</div><span class="delta delta--up">+18,8%</span></div>
+</div>
+<!-- Section root (Financing, collapsed) -->
+<div class="r-row r-row--section r-row--projects">
+<div class="r-label">
+<button class="r-chev"><svg fill="none" height="13" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6" viewbox="0 0 24 24" width="13"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<div class="r-label-block">
+<div class="r-label-text">2. Финансовая деятельность</div>
+<div class="r-label-sub">кредиты, дивиденды (свёрнуто)</div>
+</div>
+</div>
+<div class="r-cell"><div class="r-cell-val">−37 К</div><span class="delta delta--down">+8,4%</span></div>
+<div class="r-cell"><div class="r-cell-val">−237 К</div><span class="delta delta--down">+540%</span></div>
+<div class="r-cell"><div class="r-cell-val">+463 К</div><span class="delta delta--up">+295%</span></div>
+<div class="r-cell"><div class="r-cell-val">−237 К</div><span class="delta delta--down">−151%</span></div>
+<div class="r-total"><div class="r-cell-val">−48 К ₽</div><span class="delta delta--neutral">0,0%</span></div>
+</div>
+<!-- Grand net -->
+<div class="r-row r-row--grand">
+<div class="r-label">
+<svg fill="none" height="15" stroke="#0B1220" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" style="flex-shrink:0" viewbox="0 0 24 24" width="15"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+<div class="r-label-block">
+<div class="r-label-text">Чистое изменение денежных средств</div>
+<div class="r-label-sub">итог по всем видам деятельности</div>
+</div>
+</div>
+<div class="r-cell"><div class="r-cell-val">+195 К</div><span class="delta delta--up">+12,8%</span></div>
+<div class="r-cell"><div class="r-cell-val">+285 К</div><span class="delta delta--up">+46,2%</span></div>
+<div class="r-cell"><div class="r-cell-val">+260 К</div><span class="delta delta--down">−8,8%</span></div>
+<div class="r-cell"><div class="r-cell-val">+490 К</div><span class="delta delta--up">+88,5%</span></div>
+<div class="r-total"><div class="r-cell-val">+1 230 К ₽</div><span class="delta delta--up">+136%</span></div>
+</div>
+<!-- Closing balance (dark) -->
+<div class="r-row r-row--closing">
+<div class="r-label">
+<svg fill="none" height="14" stroke="#94A3B8" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14"><rect height="13" rx="2" width="20" x="2" y="6"></rect><circle cx="12" cy="12.5" r="2.2"></circle></svg>
+<div class="r-label-block">
+<div class="r-label-text">Остаток на конец периода</div>
+<div class="r-label-sub">на последний день</div>
+</div>
+</div>
+<div class="r-cell"><div class="r-cell-val">2 295 000 ₽</div></div>
+<div class="r-cell"><div class="r-cell-val">2 580 000 ₽</div></div>
+<div class="r-cell"><div class="r-cell-val">2 840 000 ₽</div></div>
+<div class="r-cell"><div class="r-cell-val">3 330 000 ₽</div></div>
+<div class="r-total"><div class="r-cell-val">3 330 000 ₽</div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div><div class="cb" id="heavy-table">
+<div class="cb-head">
+<span class="cb-name">Heavy analytical table</span>
+<span class="cb-tag">pattern · v1.5</span>
+<span class="cb-when">Шаблон сложной аналитической таблицы. Применять, когда: ≥15 колонок, разные группы колонок, нужны раскрывающиеся строки. Канонический живой пример — UnitEconomics.dc.html.</span>
+</div>
+<!-- Architecture summary -->
+<div style="background:var(--bg-page); border-radius:var(--r-md); padding:var(--s-4) var(--s-5); margin-bottom:var(--s-3_5); font-size:var(--fs-md); color:var(--text-secondary); line-height:1.75;">
+<div style="font-size:var(--fs-md); font-weight:var(--fw-bold); color:var(--text-strong); margin-bottom:var(--s-1_5);">Архитектура (снаружи внутрь)</div>
+<div><b style="color:var(--text-strong);">1.</b> <code class="code-inline">.app-header</code> + sticky thead под ней (<code class="code-inline">top: var(--app-header-height)</code>)</div>
+<div><b style="color:var(--text-strong);">2.</b> Двухярусная sticky-шапка: верхний tier — группы колонок (<code class="code-inline">.t-tier1</code>), нижний — сами колонки</div>
+<div><b style="color:var(--text-strong);">3.</b> Sticky-left колонка (SKU) + sticky-right колонка (Прибыль) + горизонтально скроллящая середина</div>
+<div><b style="color:var(--text-strong);">4.</b> Sync'нутый горизонтальный скроллбар сверху (<code class="code-inline">.t-scrollbar--top</code>) + sticky-viewport снизу (<code class="code-inline">.t-scrollbar--bottom</code>)</div>
+<div><b style="color:var(--text-strong);">5.</b> <code class="code-inline">.t-row--totals</code> в конце (Decision 21)</div>
+<div><b style="color:var(--text-strong);">6.</b> <code class="code-inline">.t-pagination</code> под таблицей</div>
+<div style="margin-top:var(--s-2_5);"><b style="color:var(--text-strong);">Контролы:</b> <code class="code-inline">.cols-popover</code> (видимость колонок + пресеты), <code class="code-inline">.tabs</code> (фильтрация по ABC-классу), <code class="code-inline">.t-sort-th</code> на сортируемых колонках</div>
+<div><b style="color:var(--text-strong);">Внутри ячеек:</b> <code class="code-inline">.mp-mark--sm</code>, <code class="code-inline">.abc-pill</code>, <code class="code-inline">.t-expand-btn</code>, <code class="code-inline">.t-profit-bar</code>, <code class="code-inline">.money</code></div>
+<div><b style="color:var(--text-strong);">Развёрнутая строка:</b> <code class="code-inline">.t-breakdown</code> — sub-таблица внутри строки с группированными подсуммами</div>
+</div>
+<!-- 2.1 — Two-tier sticky header -->
+<span class="demo-label">2.1 — Two-tier sticky header (группы + колонки)</span>
+<div class="demo" style="padding:0; display:block;">
+<div style="background:var(--bg-row-hover); border:1px solid var(--border); border-radius:var(--r-md); overflow:hidden;">
+<div class="t-tier1">
+<div class="t-tier1-group" style="width:130px;">Идентификатор</div>
+<div class="t-tier1-group" style="width:160px;">Товар</div>
+<div class="t-tier1-group" style="width:130px;">Продажи</div>
+<div class="t-tier1-group" style="width:180px;">Себестоимость</div>
+<div class="t-tier1-group" style="width:180px;">Маркетинг</div>
+<div class="t-tier1-group t-tier1-group--accent" style="flex:1; text-align:right;">Итог</div>
+</div>
+<div style="display:flex;">
+<div style="width:130px; padding:var(--s-2_5) var(--s-3); font-size:var(--fs-xs); font-weight:var(--fw-bold); color:var(--text-muted); letter-spacing:0.06em; text-transform:uppercase;">SKU</div>
+<div style="width:160px; padding:var(--s-2_5) var(--s-3); font-size:var(--fs-xs); font-weight:var(--fw-bold); color:var(--text-muted); letter-spacing:0.06em; text-transform:uppercase;">Наименование</div>
+<div class="t-sort-th is-active" style="width:130px; padding:var(--s-2_5) var(--s-3); font-size:var(--fs-xs); font-weight:var(--fw-bold); letter-spacing:0.06em; text-transform:uppercase; text-align:right; cursor:pointer;">Выручка</div>
+<div style="width:180px; padding:var(--s-2_5) var(--s-3); font-size:var(--fs-xs); font-weight:var(--fw-bold); color:var(--text-muted); letter-spacing:0.06em; text-transform:uppercase; text-align:right;">Себест + Логистика</div>
+<div style="width:180px; padding:var(--s-2_5) var(--s-3); font-size:var(--fs-xs); font-weight:var(--fw-bold); color:var(--text-muted); letter-spacing:0.06em; text-transform:uppercase; text-align:right;">Комиссия + РР</div>
+<div style="flex:1; padding:var(--s-2_5) var(--s-5) var(--s-2_5) var(--s-3); font-size:var(--fs-xs); font-weight:var(--fw-bold); color:var(--color-primary-hover); letter-spacing:0.06em; text-transform:uppercase; text-align:right; background:var(--color-primary-tint);">Прибыль</div>
+</div>
+</div>
+</div>
+<!-- 2.2 — In-cell expand button -->
+<span class="demo-label">2.2 — In-cell expand button (.t-expand-btn)</span>
+<div class="demo demo--center">
+<span class="cb-note" style="display:inline;">closed:</span>
+<button class="t-expand-btn">186 240 ₽
+            <svg fill="none" height="10" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24" width="10"><polyline points="6 9 12 15 18 9"></polyline></svg>
+</button>
+<span class="cb-note" style="display:inline; margin-left:var(--s-3_5);">open:</span>
+<button class="t-expand-btn is-open">186 240 ₽
+            <svg fill="none" height="10" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24" width="10"><polyline points="6 15 12 9 18 15"></polyline></svg>
+</button>
+</div>
+<!-- 2.3 — In-cell profit bar -->
+<span class="demo-label">2.3 — In-cell profit bar (.t-profit-bar)</span>
+<div class="demo">
+<div style="display:flex; flex-direction:column; align-items:flex-end;">
+<span class="money money--14 money--strong">288 160 ₽</span>
+<span class="t-profit-bar"><span class="t-profit-bar-fill t-profit-bar-fill--up" style="width:80%;"></span></span>
+</div>
+<div style="display:flex; flex-direction:column; align-items:flex-end;">
+<span class="money money--14 money--strong">102 855 ₽</span>
+<span class="t-profit-bar"><span class="t-profit-bar-fill t-profit-bar-fill--mid" style="width:35%;"></span></span>
+</div>
+<div style="display:flex; flex-direction:column; align-items:flex-end;">
+<span class="money money--14 money--out">−24 320 ₽</span>
+<span class="t-profit-bar"><span class="t-profit-bar-fill t-profit-bar-fill--down" style="width:12%;"></span></span>
+</div>
+</div>
+<!-- 2.4 — In-row breakdown panel -->
+<span class="demo-label">2.4 — In-row breakdown panel (.t-breakdown)</span>
+<div class="demo" style="padding:0; display:block; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden;">
+<div class="t-breakdown">
+<div class="t-breakdown-title">Прочие затраты (без комиссии и логистики)</div>
+<div class="t-breakdown-head">
+<span class="label">Группа / категория</span>
+<span>Начислено</span>
+</div>
+<div class="t-breakdown-group">
+<button class="t-breakdown-group-row">
+<svg fill="none" height="11" stroke="var(--text-secondary)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="11"><polyline points="6 9 12 15 18 9"></polyline></svg>
+<span class="label">Услуги партнёров</span>
+<span class="total">134 093 ₽</span>
+</button>
+<div class="t-breakdown-item"><span class="label">Last mile Ozon</span><span class="value">36 070 ₽</span></div>
+<div class="t-breakdown-item"><span class="label">Эквайринг Ozon</span><span class="value">94 803 ₽</span></div>
+<div class="t-breakdown-item"><span class="label">Перевыставление возврата ПВЗ</span><span class="value">2 280 ₽</span></div>
+</div>
+<div class="t-breakdown-group">
+<button class="t-breakdown-group-row">
+<svg fill="none" height="11" stroke="var(--text-secondary)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="11"><polyline points="9 6 15 12 9 18"></polyline></svg>
+<span class="label">Услуги FBO</span>
+<span class="total">33 523 ₽</span>
+</button>
+</div>
+<div class="t-breakdown-group" style="border-bottom:0;">
+<button class="t-breakdown-group-row">
+<svg fill="none" height="11" stroke="var(--text-secondary)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" viewbox="0 0 24 24" width="11"><polyline points="9 6 15 12 9 18"></polyline></svg>
+<span class="label">Другие услуги и штрафы</span>
+<span class="total">18 624 ₽</span>
+</button>
+</div>
+</div>
+</div>
+<!-- 2.5 — Columns popover -->
+<span class="demo-label">2.5 — Columns popover (.cols-popover) — пресеты + видимость</span>
+<div class="demo">
+<div class="cols-popover">
+<div class="cols-popover-section">Готовые пресеты</div>
+<button class="cols-popover-row is-active">
+<span class="radio"></span>
+<span class="label">Все колонки</span>
+<span class="count">21</span>
+</button>
+<button class="cols-popover-row">
+<span class="radio"></span>
+<span class="label">Только маржа и ROI</span>
+<span class="count">9</span>
+</button>
+<button class="cols-popover-row">
+<span class="radio"></span>
+<span class="label">Только продажи</span>
+<span class="count">7</span>
+</button>
+<div class="cols-popover-section" style="margin-top:var(--s-1_5); border-top:1px solid var(--border-soft); padding-top:var(--s-2_5);">Колонки → Себестоимость</div>
+<button class="cols-popover-row is-checked">
+<span class="check"><svg fill="none" height="10" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24" width="10"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+<span class="label">Себестоимость</span>
+</button>
+<button class="cols-popover-row is-checked">
+<span class="check"><svg fill="none" height="10" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24" width="10"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+<span class="label">Себест. ед.</span>
+</button>
+<button class="cols-popover-row">
+<span class="check"></span>
+<span class="label">Кап. р.</span>
+</button>
+<button class="cols-popover-row" style="padding-bottom:var(--s-2_5);">
+<span class="check"></span>
+<span class="label">Ост. шт.</span>
+</button>
+</div>
+</div>
+<!-- 2.6 — ABC filter tabs -->
+</div>
+</main>
+</body>
+</html>

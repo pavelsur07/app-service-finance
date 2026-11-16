@@ -1,0 +1,180 @@
+/*
+ * ДС «Ваш Финдир» v3.4 — точка входа стилей для apps (референс, Tailwind v4).
+ * Только apps/account и apps/admin (+ apps/packages/ds). site/ не затрагивается.
+ *
+ * Принципы:
+ *   - Tailwind не хранит значения: тема ссылается на CSS-переменные пакета ДС.
+ *     В пакете токены выпускаются с префиксом --ds- (Style Dictionary, prefix "ds"):
+ *     токен листа --text-tertiary = --ds-text-tertiary в коде.
+ *     Префикс нужен, чтобы имена темы Tailwind (--color-*, --radius-*) не пересекались с токенами.
+ *   - @theme inline: утилиты пишут var(--ds-…) напрямую — тёмная тема (позже) переключится
+ *     одними переменными, без классов dark:.
+ *   - Палитра, кегли, радиусы, тени, брейкпоинты Tailwind по умолчанию сброшены: доступны только токены ДС.
+ *   - Компоненты (Button, Input, Modal …) — React-компоненты @vashfindir/ds. В приложениях Tailwind —
+ *     для раскладки и мелких утилит.
+ *   - Отступы — шкала Tailwind с шагом 4px: p-1=4, p-1.5=6, p-2.5=10, p-3.5=14 … совпадает с --s-*;
+ *     --s-7 (32px) = 8, --s-8 (40px) = 10, --s-9 (48px) = 12, --s-10 (64px) = 16.
+ */
+@import '@vashfindir/ds/tokens.css'; /* :root { --ds-… } из tokens/ds-v3.tokens.json */
+@import 'tailwindcss';
+
+@source '../../packages/ds/src';
+
+@theme inline {
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-surface-page: var(--ds-bg-page);
+  --color-surface-card: var(--ds-bg-card);
+  --color-surface-subtle: var(--ds-bg-subtle);
+  --color-surface-subtle-hover: var(--ds-bg-subtle-hover);
+  --color-surface-row-hover: var(--ds-bg-row-hover);
+  --color-surface-row-selected: var(--ds-bg-row-selected);
+
+  --color-fg-strong: var(--ds-text-strong);
+  --color-fg-secondary: var(--ds-text-secondary);
+  --color-fg-tertiary: var(--ds-text-tertiary);
+  --color-fg-muted: var(--ds-text-muted);
+  --color-fg-disabled: var(--ds-text-disabled);
+  --color-fg-faint: var(--ds-text-faint);
+  --color-fg-inverse: var(--ds-text-inverse);
+
+  --color-line: var(--ds-border);
+  --color-line-soft: var(--ds-border-soft);
+  --color-line-hover: var(--ds-border-hover);
+  --color-line-strong: var(--ds-border-strong);
+
+  --color-primary: var(--ds-color-primary);
+  --color-primary-hover: var(--ds-color-primary-hover);
+  --color-primary-tint: var(--ds-color-primary-tint);
+  --color-primary-border: var(--ds-color-primary-border);
+  --color-primary-selection: var(--ds-color-primary-selection);
+  /* Только бренд-моменты (логотип, промо). Не для кнопок — Decision 44. */
+  --color-accent: var(--ds-color-accent);
+
+  --color-success-bg: var(--ds-success-bg);
+  --color-success-border: var(--ds-success-border);
+  --color-success-text: var(--ds-success-text);
+  --color-success-dot: var(--ds-success-dot);
+  --color-danger-bg: var(--ds-danger-bg);
+  --color-danger-border: var(--ds-danger-border);
+  --color-danger-text: var(--ds-danger-text);
+  --color-danger-dot: var(--ds-danger-dot);
+  --color-warning-bg: var(--ds-warning-bg);
+  --color-warning-border: var(--ds-warning-border);
+  --color-warning-text: var(--ds-warning-text);
+  --color-warning-dot: var(--ds-warning-dot);
+  --color-info-bg: var(--ds-info-bg);
+  --color-info-border: var(--ds-info-border);
+  --color-info-text: var(--ds-info-text);
+  --color-info-dot: var(--ds-info-dot);
+
+  --font-*: initial;
+  --font-sans: var(--ds-font-family);
+  --font-mono: var(--ds-font-mono);
+
+  --text-*: initial;
+  --text-2xs: var(--ds-fs-2xs);
+  --text-2xs--line-height: 1.35;
+  --text-xs: var(--ds-fs-xs);
+  --text-xs--line-height: 1.35;
+  --text-sm: var(--ds-fs-sm);
+  --text-sm--line-height: 1.35;
+  --text-md: var(--ds-fs-md);
+  --text-md--line-height: 1.5;
+  --text-lg: var(--ds-fs-lg);
+  --text-lg--line-height: 1.5;
+  --text-xl: var(--ds-fs-xl);
+  --text-xl--line-height: 1.2;
+  --text-2xl: var(--ds-fs-2xl);
+  --text-2xl--line-height: 1.2;
+  --text-3xl: var(--ds-fs-3xl);
+  --text-3xl--line-height: 1.2;
+  --text-4xl: var(--ds-fs-4xl);
+  --text-4xl--line-height: 1.2;
+
+  --radius-*: initial;
+  --radius-xs: var(--ds-r-xs);
+  --radius-sm: var(--ds-r-sm);
+  --radius-md: var(--ds-r-md);
+  --radius-lg: var(--ds-r-lg);
+  --radius-xl: var(--ds-r-xl);
+  --radius-full: var(--ds-r-pill);
+
+  --shadow-*: initial;
+  --shadow-sm: var(--ds-shadow-sm);
+  --shadow-card-hover: var(--ds-shadow-card-hover);
+  --shadow-primary: var(--ds-shadow-primary);
+  --shadow-menu: var(--ds-shadow-menu);
+  --shadow-modal: var(--ds-shadow-modal);
+  --shadow-drawer: var(--ds-shadow-drawer);
+
+  --tracking-tight: var(--ds-ls-tight);
+  --tracking-caps: var(--ds-ls-caps);
+
+  --ease-standard: var(--ds-ease-standard);
+  --ease-exit: var(--ds-ease-exit);
+
+  --spacing: 4px;
+  --spacing-sidebar: var(--ds-app-sidebar-width);
+  --spacing-sidebar-rail: 72px;
+  --spacing-header: var(--ds-app-header-height);
+  --spacing-control: var(--ds-control-h);
+  --spacing-control-sm: var(--ds-control-h-sm);
+}
+
+/* Брейкпоинты — литералы (в @theme для media нельзя var()); значения = --bp-* листа DS-Tokens.
+   Продукт — десктоп от 1280px; ниже сайдбар сворачивается в рейку. */
+@theme {
+  --breakpoint-*: initial;
+  --breakpoint-sm: 768px;
+  --breakpoint-md: 960px;
+  --breakpoint-lg: 1280px;
+  --breakpoint-xl: 1440px;
+}
+
+/* Слои наложения — именованные утилиты вместо магических чисел */
+@utility z-raised {
+  z-index: var(--ds-z-raised);
+}
+@utility z-sticky {
+  z-index: var(--ds-z-sticky);
+}
+@utility z-header {
+  z-index: var(--ds-z-header);
+}
+@utility z-dropdown {
+  z-index: var(--ds-z-dropdown);
+}
+@utility z-overlay {
+  z-index: var(--ds-z-overlay);
+}
+@utility z-toast {
+  z-index: var(--ds-z-toast);
+}
+
+/* Место под полосу прокрутки резервируется всегда — контент не прыгает (сайдбар, рабочая зона) */
+@utility scroll-stable {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ds-border-hover) transparent;
+}
+
+@layer base {
+  /* rem не трогаем (spacing задан в px), кегль body — из токена */
+  body {
+    font-family: var(--ds-font-family);
+    font-size: var(--ds-fs-md);
+    line-height: var(--ds-lh-base);
+    color: var(--ds-text-strong);
+    background: var(--ds-bg-page);
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+  :where(a, button, summary, [tabindex]:not([tabindex='-1'])):focus-visible {
+    outline: 2px solid var(--ds-focus-ring-color);
+    outline-offset: 2px;
+  }
+}
