@@ -1,3 +1,4 @@
+import { LayoutFixture } from './LayoutFixture';
 import { StrictMode, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { IconPlus } from '@vashfindir/ds';
@@ -244,6 +245,10 @@ const root = document.getElementById('root');
 if (!root) throw new Error('Missing fixture root');
 createRoot(root).render(
   <StrictMode>
-    <Fixture />
+    {new URLSearchParams(window.location.search).has('layout') ? (
+      <LayoutFixture />
+    ) : (
+      <Fixture />
+    )}
   </StrictMode>,
 );

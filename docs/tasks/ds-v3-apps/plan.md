@@ -279,13 +279,13 @@ Risk HIGH-LOCAL, branch feat/ds-v3-stage-4; base d99ede00d.
 - 4.4: gates/preview/real HTTP/actual images, screenshot/scrollbar checks,
   fresh internal + external review, Stage Report, отдельный PR.
 
-DoD: [ ] header60/aside264/72; [ ] вложенность aria-expanded/controls/current;
-[ ] rail labels sr-only + group click expands; [ ] focus collapse↔expand;
-[ ] separate persistence account/admin + storage failure; [ ] auto-rail<1280;
-[ ] first skip link/main focus; [ ] sidebar/main scroll-stable + visible
-scrollbar no jump; [ ] email/current logout from real session; [ ] public
-about/404 no API; [ ] no horizontal overflow in existing mobile smoke;
-[ ] package/apps tests/types/lint/build, preview/actual HTTP/CI/reviews.
+DoD: [x] header60/aside264/72; [x] вложенность aria-expanded/controls/current;
+[x] rail labels sr-only + group click expands; [x] focus collapse↔expand;
+[x] separate persistence account/admin + storage failure; [x] auto-rail<1280;
+[x] first skip link/main focus; [x] sidebar/main scroll-stable + visible
+scrollbar no jump; [x] email/current logout from real session; [x] public
+about/404 no API; [x] no horizontal overflow in existing mobile smoke;
+[x] package/apps tests/types/lint/build, preview/actual HTTP/CI/reviews.
 
 Source App-Layout is canonical for composition: brand padding16, content24×32,
 footer12×32. Header accepts period/search/notifications slots; apps do not
@@ -299,3 +299,7 @@ AppShell context coordinates controlled collapse/refs; app hook stores only UI
 preference per realm. Responsive rail does not overwrite the desktop preference.
 Public layout never mounts SessionProvider; session layout uses existing provider.
 No production Docker/CI config changes or dependencies required.
+
+Stage4 verified: SSR10, apps92/88, fixture21, nginx44PASS6skips+fixture21,
+17screenshots pairs. Author IMPORTANT2fixed; fresh internal0/0/0, external
+1roundREVIEW_GREEN0/0; final logout scoped fix independently checked. PR3037.

@@ -50,7 +50,7 @@ test('DS light foundation, local font, preflight and focus', async ({
   ).toBe(true);
   await page.keyboard.press('Tab');
   await expect(
-    page.getByRole('link', { name: 'Главная', exact: true }),
+    page.getByRole('link', { name: 'Перейти к содержимому', exact: true }),
   ).toBeFocused();
   await expect(page.locator(':focus')).toHaveCSS('outline-width', '2px');
   await expect(page.locator(':focus')).toHaveCSS('outline-style', 'solid');

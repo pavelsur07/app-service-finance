@@ -1,19 +1,6 @@
-.root {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: var(--ds-s-4);
-  display: grid;
-  gap: var(--ds-s-5);
-}
-
-.root > *,
-.root main {
+.content {
   min-width: 0;
 }
-.root {
-  overflow-wrap: anywhere;
-}
-.root main {
-  display: grid;
-  gap: var(--ds-s-4);
+.content > * {
+  min-width: 0;
 }

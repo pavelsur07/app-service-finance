@@ -1,7 +1,14 @@
 import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: '.',
-  testMatch: 'components.spec.ts',
+  projects: [
+    { name: 'components', testMatch: 'components.spec.ts' },
+    {
+      name: 'layout',
+      testMatch: 'layout.spec.ts',
+      use: { launchOptions: { args: ['--disable-features=OverlayScrollbar'] } },
+    },
+  ],
   workers: 1,
   retries: 0,
   outputDir: '../../test-results/components-browser',

@@ -1,4 +1,4 @@
-# @vashfindir/ds — v3.4, Stage 3
+# @vashfindir/ds — v3.4, Stage 4
 
 Общая ДС для account/admin. Runtime exports: `.` (tokens, TokenName и React-компоненты),
 `./tokens.css` (`:root` с `--ds-`), `./styles.css` (Tailwind v4 + preflight,
@@ -143,3 +143,57 @@ Fixture runner сам выполняет npm ci --ignore-scripts для DS из 
 сборкой: matrix production browser runner устанавливает только app, а linked
 file dependency не устанавливает транзитивные зависимости пакета. Проверка
 чистой поставки выполняется с отдельным пустым DS node_modules.
+
+## Каркас приложения
+
+AppShell получает header/sidebar/footer/children и controlled collapsed с
+onCollapsedChange. AppHeader и Sidebar монтируются внутри его context;
+публичный useShell не экспортируется. Общий header60px, sidebar264/72,
+бренд «ВФ»32px, content24×32 и footer12×32 повторяют App-Layout.
+
+```tsx
+const sidebar = useSidebarState('vf.account.sidebar');
+return (
+  <AppShell
+    {...sidebar}
+    header={
+      <AppHeader brandLabel="Ваш Финдир" breadcrumbs={[{ label: 'Обзор' }]} />
+    }
+    sidebar={
+      <Sidebar items={items} activeId="home" user={user} onLogout={logout} />
+    }
+    footer={<AppFooter>Ваш Финдир</AppFooter>}
+  >
+    <PageHeader title="Обзор" description="Описание страницы" />
+    {children}
+  </AppShell>
+);
+```
+
+Native props/ref передаются корневым элементам. mainId связывает первый skip
+link и focusable main. Sidebar groups — native disclosure buttons и вложенные
+списки, без искусственного role=tree; activeId открывает ancestors. В rail
+labels sr-only, submenus hidden, клик группы раскрывает и sidebar и subtree.
+Collapse↔expand и автоматический responsive переход сохраняют видимый фокус.
+
+useSidebarState хранит только expanded/collapsed UI preference; keys apps
+раздельные vf.account.sidebar/vf.admin.sidebar. <1280 автоматически rail без
+перезаписи desktop preference, storage failures не ломают UI.
+Рекомендуется постоянный storageKey на протяжении жизни компонента.
+
+AppShell владеет viewport, body не прокручивается; main и sidebar nav имеют
+независимый scroll и stable gutter. Footer расположен после flex1 main content.
+Header period/search/notifications/actions — слоты, отсутствующие функции
+не рисуются. renderLink позволяет сохранить router click/history semantics.
+Sidebar user.name берётся из реальной identity (email fallback), detail
+опционален; профиль/роли не выдумываются. logoutBusy — только реальный pending
+logout, не общий busy сессии: существующий logout должен прерывать refresh.
+
+Public about/404 используют layout без SessionProvider; authenticated layout
+потребляет текущий provider. API, CSRF и session store не меняются.
+Generic DropdownMenu/Avatar остаются Stage5; user row/logout сейчас по layout.
+Source group captions text-disabled заменены semantic text-tertiary для4.5:1.
+
+Тестовый fixture имеет проекты components и layout, последний с обычными
+scrollbars; проверяет реальную ширину gutter и отсутствие сдвига content.
+Новые runtime routes, production config и зависимости для каркаса не нужны.
