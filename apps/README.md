@@ -57,7 +57,7 @@ Node: `24.18.1-bookworm-slim`, Playwright npm и браузерный образ
 
 App `prebuild` проверяет generated CSS/TS; source JSON не меняется вручную.
 OFL шрифта лежит в `apps/packages/ds/public/fonts/Manrope-OFL.txt` и попадает
-в dist обоих приложений. Базовые React-компоненты ДС уже подключены; следующие Stage — каркас и данные.
+в dist обоих приложений. Базовые React-компоненты ДС уже подключены; каркас также общий; следующий Stage — данные и оверлеи.
 
 ## Структура и общие пакеты
 
@@ -66,7 +66,7 @@ OFL шрифта лежит в `apps/packages/ds/public/fonts/Manrope-OFL.txt` �
 - `apps/*/src/shared/session/` — типы, адаптеры и жизненный цикл сессии; account picker.
 - `apps/*/src/app/SessionProvider.tsx` — React subscription и проверка на focus.
 - `apps/packages/ds/` — токены v3.4, Tailwind theme/preflight, локальный Manrope,
-  общий CSS и базовые React-компоненты.
+  общий CSS, базовые React-компоненты и общий каркас.
 - `site/packages/ui/` — только старый frontend; apps от пакета больше не зависят.
 - `site/packages/api/` — JSON-транспорт и общий MSW-контракт тестирования.
 
@@ -244,3 +244,19 @@ Account `posttest:e2e` после app smoke собирает отдельный 
 4s/pause/unmount, focus/contrast и screenshot1440. Новые test dependencies не
 нужны; fixture использует установленный Playwright и Vite. Артефакты —
 `apps/account/test-results/`, app dist и production URLs не меняются.
+
+## Каркас account/admin
+
+AppShell/AppHeader/Sidebar/PageHeader/AppFooter находятся в DS. Header60px,
+sidebar264/72, content/footer независимо от scroll навигации; main/nav имеют
+стабильный gutter. Первый Tab — «Перейти к содержимому».
+
+Меню каждого app содержит только существующие destinations. Навигация сохраняет
+SPA history; about/404 не монтируют SessionProvider. Пользователь — реальный
+email, выход через прежний store; background refresh не блокирует logout.
+Каркас не добавляет поиск/период/notifications/profile без соответствующей
+функциональности. Sidebar UI state хранится раздельно по app; <1280 — rail.
+
+Layout browser project в account test:components проверяет keyboard/focus,
+persistence/resize/storage failure, реальные scrollbars и full/rail1440;
+app E2E обоих apps проверяют public no-bootstrap и logout/realm isolation.

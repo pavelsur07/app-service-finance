@@ -44,12 +44,16 @@ test('public routes, keyboard, styles, history and network isolation', async ({
   );
   await page.keyboard.press('Tab');
   await expect(
-    page.getByRole('link', { name: 'Главная', exact: true }),
+    page.getByRole('link', { name: 'Перейти к содержимому' }),
   ).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(
-    page.getByRole('link', { name: 'О приложении', exact: true }),
-  ).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('main')).toBeFocused();
+  const group = page.getByRole('button', {
+    name: /^(Кабинет|Администрирование)$/,
+  });
+  if ((await group.getAttribute('aria-expanded')) !== 'true')
+    await group.click();
+  await page.getByRole('link', { name: 'О приложении', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/about$/);
   await expect(

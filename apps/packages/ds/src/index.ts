@@ -16,4 +16,16 @@ export * from './components/StatusPill';
 export * from './components/Textarea';
 export * from './components/Toast';
 export * from './components/Toggle';
-export { IconPlus, type DsIconProps } from './icons';
+export {
+  IconPlus,
+  IconHome,
+  IconInfoCircle,
+  IconUserCircle,
+  IconShield,
+  type DsIconProps,
+} from './icons';
+export * from './components/AppShell';
+export * from './components/AppHeader';
+export * from './components/Sidebar';
+export * from './components/PageHeader';
+export * from './components/AppFooter';

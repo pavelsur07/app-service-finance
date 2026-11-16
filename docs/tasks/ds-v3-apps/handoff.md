@@ -1,45 +1,41 @@
-# ds-v3-apps — Stage 3 handoff
+# ds-v3-apps — Stage4 handoff
 
-**Branch:** feat/ds-v3-stage-3
-**PR:** https://github.com/pavelsur07/app-service-finance/pull/3034
-**Implementation:** ef01dc75d; action26px3e5ebd0ca; CI runner dependency fix — final PR head.
-**CI:** required latest-head checks tracked in PR; Draft until success.
+**Branch:** feat/ds-v3-stage-4
+**PR:** https://github.com/pavelsur07/app-service-finance/pull/3037 (base master)
+**Base:** d99ede00d; plan0177e328c, runtime b0350c8df, integration based321bc79d (PR3035/3036).
+**CI:** live PR latest-head checks; Draft до завершения gates.
 
-Stage1 PR3027 и Stage2 PR3030 доставлены; Stage3 заменяет старый UI в apps
-16 базовыми компонентами ДС. Дополнительно ErrorBoundary для полной изоляции
-от old UI и ToastStack для фиксированного размещения уведомлений. Native
-props/ref/validation/keyboard; auth/session/CSRF handlers не изменены.
+Stages1/2/3 delivered PR3027/3030/3034. Stage4 — общий header/sidebar/footer
+и page headers, nested navigation/collapse264/72/persistence, skip link и
+независимые scrollbar-stable main/nav. Public about/404 без session bootstrap;
+real identity/email и прежний logout, включая pending background refresh.
 
-Файлы: apps/packages/ds components/icons/styles/config/locks; apps/account
-и apps/admin screens/manifests/vitest; test-only Chromium fixture account;
-README/task docs. site/, production Docker/CI, backend и migrations untouched.
-Публичного API или финансовых изменений нет.
+Files: apps/packages/ds layout components/icons/CSS, apps/* app composition/
+Home/About/tests, README/task docs. site/, backend/API/session store/CSRF,
+production Docker/CI, locks/dependencies/generated токены unchanged.
+Миграций и ручных production mutations нет.
 
-Проверки: front-install/typecheck/lint/test/build PASS; apps82/78, package47;
-Chromium12PASS; preview26PASS8skips+fixture11; actual nginx builds/smoke
-30PASS4skips+fixture11 до последнего ToastStack, targeted12PASS после.
-PHPStan/CS/strict-types PASS; unit4889tests/27145assertions.15before/after1440
-с описанной provenance,4fresh baseline. Контраст текста4.5/borders3 и focus2.
-Актуальный production build/smoke и real HTTP/HTTPS дополнительно в PR CI.
-CI runner correction: test:components устанавливает linked DS из lock перед
-fixture build. Clean-room empty DS node_modules: install/build/12browserPASS.
-Test:e2e сохраняет CLI --config через отдельный posttest:e2e lifecycle;
-actual auth suite --list выбирает2реальных теста, затем fixture12PASS.
+Checks: front types/lint/test/build PASS92/88; package57; browser21; preview
+36PASS10skips +targeted logout4PASS; final nginx builds/smoke44PASS6skips
++fixture21. PHPStan/CS/strict/unit4894PASS после integration;17before/after1440
++full/rail snapshots. Real HTTP/HTTPS и latest code проверяются в PR CI.
 
-Internal fresh: B/I0/0, MINOR2fixed (Toast tones); focused review fixes GREEN.
-Финальная локальная MINOR нормализация custom InputGroup action до26px по листу
-проверена RED36→GREEN26. External separate Codex1round: B/I0/1, IMPORTANT
-Toast position fixed/regression verified, **fixed without re-run**, open0.
-Static stdin-only (Claude отсутствует), без независимого запуска тестов.
+Internal totals B/I0/2(author regressions fixed), independent reviewer0/0/0
+GREEN +focused final GREEN; author MINOR1fixed (rail CSS layer). External Codex1round0/0 exact REVIEW_GREEN;
+static stdin-only fallback, Claude unavailable. Post-green logout correction
+verified RED→GREEN4 and fresh internal review; rail gutter assertion RED→GREEN
+и fixture21PASS, focused independent GREEN. External re-run not required.
 
-Риски/отклонения: source error-border2.803:1 заменён существующим semantic
-danger-text с TODO(ds); native Select и outline2px по owner brief.
-Auth/loading/error/404 sheets ещё отсутствуют — минимальные композиции.
-DS audit baseline4moderate2low (build-only), apps dependencies versions
-не менялись. CSS23.19→32.01KB (полный базовый kit); JS~+2%, Manrope unchanged.
+Risks/follow-ups: only actual actions/routes; no role/profile fake data;
+caption accessible text-tertiary; TODO(ds) pending auth/error/loading sheets
+и source error-border retained. CSS+12.52%/4KB justified by shell utilities;
+JS+~4.7%. Stage5 data/overlays/formatters не начат.
 
-Stage4/5 не начаты. Миграций и ручных production mutations нет.
-Подробности: stages/stage-3.md, reviews/codex-stage-3.md, checkpoint.md.
+Reports: stages/stage-4.md, reviews/codex-stage-4.md, checkpoint.md.
 
-Ready: PR #3034 "feat(ds): Stage 3 — базовые компоненты v3.4 в apps" — merge into master with automatic production deploy?
-Reply: "merge and deploy #3034"
+Ready: PR #3037 "feat(ds): Stage 4 — общий каркас account и admin" — merge into master with automatic production deploy?
+Reply: "merge and deploy #3037"
+
+Integration: current master merged; subsequent scoped rail correction reviewed/tested.
+Own diff to origin/master excludes site/financial code from those other PRs.
+Latest-head CI and integrated backend checks linked in PR; no new migrations.

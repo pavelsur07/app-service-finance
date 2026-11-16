@@ -422,3 +422,40 @@
     }
   }
 }
+
+@layer components {
+  .ds-app-shell {
+    overflow-wrap: anywhere;
+  }
+  .ds-sidebar-width {
+    width: var(--ds-app-sidebar-width);
+  }
+  [data-sidebar='collapsed'] .ds-sidebar-width {
+    width: 72px;
+  }
+  [data-sidebar='collapsed'] .ds-sidebar-nav {
+    scrollbar-gutter: auto;
+    scrollbar-width: none;
+  }
+  [data-sidebar='collapsed'] .ds-sidebar-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .ds-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .ds-scroll::-webkit-scrollbar-thumb {
+    background: var(--ds-border-hover);
+    border-radius: var(--ds-r-pill);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .ds-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .ds-sidebar-width {
+      transition: width var(--ds-dur-slow) var(--ds-ease-standard);
+    }
+  }
+}

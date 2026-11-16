@@ -1,2 +1,2 @@
 @import '../../../packages/ds/src/styles.css';
-@source './main.tsx';
+@source './*.tsx';
