@@ -764,6 +764,34 @@
   звеньям (не переведён, карантин, перевод ≠ канон, канон ≠ витрина). Каналы Ozon и WB — каждый со своим
   переводчиком, ресурсом фактов (WB — отчёт о продажах) и каноном канала. Гейты — в модулях звеньев.
 
+### MarketplacePlProjection: ОПиУ маркетплейсов из канона
+
+Шестой модуль нового контура (`docs/tasks/marketplace-pl-projection`).
+
+**Устав.** Причина изменений — правила «операция канона → статья ОПиУ компании» и проекция ОПиУ по дням.
+В документы ОПиУ, `pl_daily_totals` и закрытие месяца модуль **не пишет**: ОПиУ ведёт легаси. Зависимости —
+`Finance\Facade` / `DTO` / `Enum` (статьи) и виды `MarketplaceOperations` (PHPat
+`test_marketplace_pl_projection_reads_facades_only`); канон, переводчики и экономика SKU модуль не знают
+(`test_pipeline_does_not_know_pl_projection`).
+
+- `mpp_rule` (сущность-схема `ProjectionRule`, запись — `Infrastructure\Query\RuleStore`, DBAL): ключ — вид
+  `kind` (для всех каналов или с `channel`) либо код источника `source_type` канала (вид пуст; форму держит
+  CHECK `chk_mpp_rule_key`); `valid_from` — с какого дня действует (базовое — `Rule::BASE_DATE`);
+  `pl_category_id = NULL` — «исключено из ОПиУ»; `origin` — `RuleOrigin` `preset` / `custom`;
+  `template_version` — версия шаблона, записавшая `preset`. Unique
+  `(company_id, kind, channel, source_type, valid_from) NULLS NOT DISTINCT`.
+- Подбор — `Domain\RuleResolver::resolve(rules, kind, channel, sourceType, day): ?Rule`: среди действующих на
+  день — код источника → вид × канал → вид, при равной точности — более поздний `valid_from`; `null` —
+  правила нет («не сопоставлено»).
+- Шаблон платформы — `Domain\MappingTemplate` (`VERSION`, `rules(): list<TemplateRule>`): код статьи
+  стандартного дерева на каждый `OperationKind` (справочные виды — «исключено») и исключения по каналу и
+  коду. Новый вид канона без строки шаблона роняет `MappingTemplateTest`. Правка шаблона — поднять `VERSION`.
+- `Application\Action\SyncTemplateAction(companyId, execute): TemplateSyncPlan` — приводит базовые `preset`
+  к шаблону по кодам листов (`LEAF_INPUT`) дерева компании; ключ с `custom` не трогает; статьи нет — правила
+  нет; `preset` вне шаблона удаляется. Транзакцией владеет Action, блокировка —
+  `pg_advisory_xact_lock('mpp_rule:{companyId}')`. Консоль —
+  `app:marketplace-pl-projection:sync-template --company-id=… [--execute]` (без `--execute` — план); cron нет.
+
 ### Marketplace: WB financial report sync status (дневной статус)
 
 - Entity: `MarketplaceFinancialReportSyncStatus`.
@@ -5803,6 +5831,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.201 | 2026-11-16 | MarketplacePlProjection (этап 1): новый модуль, `mpp_rule` — правила компании «вид канона / код источника → статья ОПиУ» с датой действия и происхождением `preset`/`custom`, `RuleResolver`, шаблон платформы `MappingTemplate` v1, `app:marketplace-pl-projection:sync-template`; в ОПиУ не пишет |
 | 2.200 | 2026-11-15 | MoySklad: автомаппинг25 листингов Ozon/WB в legacy UI, exact article/explicit size, immutable Redis preview, guarded per-row apply, CAS/replay и audit |
 | 2.199 | 2026-11-15 | MarketplaceWb: строка с артикулом без размера (возмещение логистики, реклама) остаётся на артикуле — по размерам по продажам дня (`wb_size_sales_share`), а не без SKU по всему кабинету; размеры без учёта кириллических двойников; `RULES_VERSION` `wb-sales-report-2` — все дни переводятся заново |
 | 2.198 | 2026-11-15 | ServiceGateway: ключ повтора задачи ИИ вне печатного ASCII или длиннее 200 символов уходит в сервис хешем `sha256:…` (заголовок `Idempotency-Key` искажал кириллицу — 422), `task_id` — от исходного ключа; MarketplaceOzon/MarketplaceWb: запрос черновика без ответа дольше часа повторяется |
