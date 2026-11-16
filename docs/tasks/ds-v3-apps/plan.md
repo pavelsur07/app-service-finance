@@ -156,8 +156,9 @@ Stage base commit: `fbfcc71c88984d560b4cf80e56310031cdd11eff`.
   До отдельного named approval §3.3 — только proposal patch, без применения
   к production config. Локально проверяются эквивалентные временные файлы.
 - [x] Независимое internal review и отдельный Codex REVIEW_GREEN, отчёт.
-- [ ] Production patch применён после named approval, реальный CI зелёный;
-  Stage 2 Ready/merge+deploy после этого gate.
+- [x] Production patch применён после named approval 2026-11-16;
+  actual release contracts и fresh admin install/typecheck/tests PASS.
+- [ ] Реальный CI PR #3030 зелёный; Stage 2 Ready/merge+deploy после этого gate.
 
 Work items:
 - 2.1 — baseline, screenshots before, тесты темы/визуального контракта RED.
@@ -227,4 +228,6 @@ REVIEW_GREEN. Вторая сессия получила полный diff и э
 Claude CLI → отдельная свежая read-only сессия Codex. Правило подготовлено
 отдельным docs PR #3028; в текущей задаче применяется по явной инструкции.
 Stage 2 reviewed: internal 0/0, MINOR1 fixed; separate Codex 0/0, REVIEW_GREEN.
-Ожидается только named approval production proposal и его реальная CI-проверка.
+Владелец одобрил patch 2026-11-16: production proposal применён побайтно,
+проверяются фактические CI/release gates. PR #3028 merged (87e6a7338),
+workflow43813732309 SUCCESS, build/deploy skipped для docs-only изменения.

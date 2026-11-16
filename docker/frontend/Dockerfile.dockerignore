@@ -5,13 +5,12 @@
 !apps/account/**
 !apps/admin/
 !apps/admin/**
+!apps/packages/
+!apps/packages/ds/
+!apps/packages/ds/**
 !site/
 !site/packages/
 !site/packages/**
-!site/assets/
-!site/assets/styles/
-!site/assets/styles/kit/
-!site/assets/styles/kit/**
 !docker/
 !docker/frontend/
 !docker/frontend/**

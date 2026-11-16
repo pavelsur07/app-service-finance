@@ -1,7 +1,7 @@
 # Stage 2 — Tailwind v4 и стили apps
 
-**Статус:** локальная реализация/приёмка и ревью завершены; delivery BLOCKED
-на отдельном согласовании production Docker/CI proposal (§3.3). Stage не закрыт.
+**Статус:** локальная реализация/ревью завершены, production patch одобрен
+и применён; фактический CI проверяется. Stage ещё не закрыт.
 **Risk:** HIGH-LOCAL (apps), HIGH-EXTERNAL (production build/CI).
 **Stage base commit:** `fbfcc71c88984d560b4cf80e56310031cdd11eff`.
 **Branch:** `feat/ds-v3-stage-2`.
@@ -23,9 +23,10 @@
   не импортируется. Поля 38px, кнопки 30/36/44px — как в источнике.
 - Vite больше не разрешает fs-доступ к старому CSS; auth/session/CSRF/API и
   финансовые правила не менялись. site/ tracked diff пуст.
-- Production config не менялся. Подготовлен [точный patch](../proposals/stage-2-production.patch)
+- После отдельного одобрения Владельца 2026-11-16 применён [точный patch](../proposals/stage-2-production.patch)
   для Dockerfile/build allowlist, CI filter/install/cache, front-install и
-  release-contract test. [Описание и применение](../proposals/README.md).
+  release-contract test. Пять файлов побайтно совпали с reviewed/tested candidate.
+  [История согласования](../proposals/README.md).
 
 ## Файлы
 
@@ -43,7 +44,8 @@ CompanyPicker, SessionStatus обоих; `apps/README.md`, `CLAUDE.frontend.md`,
 - [x] Полные локальные apps gates и preview/production-candidate E2E.
 - [x] 15 screenshots before + 15 after, 1440×900, просмотр login/about/home.
 - [x] Полный независимый internal review, фиксы, отдельный Codex REVIEW_GREEN.
-- [ ] Named approval §3.3, применение production patch, фактический CI зелёный.
+- [x] Named approval §3.3 и применение production patch.
+- [ ] Фактический CI зелёный.
 - [ ] Ready/merge+deploy — только после предыдущего пункта.
 
 ## Проверки
@@ -113,21 +115,22 @@ BLOCKER/IMPORTANT 0/0, 1 round REVIEW_GREEN.
 - DS npm audit: HIGH/CRITICAL 0, moderate4/low2 — те же транзитивные build-only
   зависимости Stage 1, audit exit1 сохранён и не скрывается. Существующие
   версии пакетов apps в lock не изменялись; добавлены только DS/Tailwind deps.
-- Применение proposal не выполнено, фактический Docker/CI остаётся прежним;
-  current branch не готов к production до отдельного approval/application/CI.
+- Proposal применён после approval; current branch не готов к merge
+  до фактических зелёных CI checks.
 - Источник эталона по-прежнему в PR #3022; provenance записан в plan/README.
 
-## STOP / продолжение
+## Применение согласованного patch / продолжение
 
-Нужно отдельное разрешение на команду:
+2026-11-16 Владелец разрешил применение stage-2-production.patch.
+`git apply --check` + `git apply` выполнены, пять файлов побайтно совпали
+с ранее reviewed candidate. Actual `make test-deploy-workflow test-frontend-release`
+PASS; `make front-install APP=admin` свежо установил DS перед app,
+`make front-typecheck front-test APP=admin` PASS (44 tests).
 
-```sh
-git apply docs/tasks/ds-v3-apps/proposals/stage-2-production.patch
-```
-
-Patch меняет production Docker и CI/CD (AGENTS.md §3.3). Это следующий обязательный
-шаг; применять без named approval нельзя. До применения штатный CI/build
-context не умеет устанавливать DS, поэтому Draft не готов к выпуску.
-После approval: применить **тот же** reviewed patch, проверить реальные
-release/build gates и CI, Ready и единственный merge+deploy запрос Stage 2.
-Stage 3–5 ещё не начаты. Данные/production вручную не менялись.
+Предыдущий CI43809997304 падал ожидаемо до согласования: TS2307 tailwindcss
+в обоих apps, ERR_MODULE_NOT_FOUND style-dictionary в real-auth preview.
+Корневая причина — отсутствие установки DS; patch её устраняет.
+Следующий шаг — фактический CI нового head, Ready и один запрос
+merge+deploy #3030. Stage 3–5 ещё не начаты, production deploy Stage 2
+не выполнялся. Docs PR #3028 merged (87e6a7338), workflow SUCCESS;
+build/deploy штатно skipped для docs-only изменений.

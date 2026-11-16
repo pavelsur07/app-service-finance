@@ -1,10 +1,10 @@
-# ds-v3-apps — Stage 2, approval gate
+# ds-v3-apps — Stage 2, CI gate
 
 **Branch:** `feat/ds-v3-stage-2`, base `fbfcc71c8`.
 **PR:** [#3030](https://github.com/pavelsur07/app-service-finance/pull/3030) — Draft, base master.
 **Implementation commit:** `404c35c8b`.
-**Статус:** Draft, локальная реализация и ревью завершены; требуется отдельное
-согласование production Docker/CI patch (AGENTS.md §3.3).
+**Статус:** Draft, production Docker/CI patch одобрен и применён;
+проверяется фактический CI нового head.
 
 Stage 1: PR #3027 merged/deployed (`fbfcc71c8`), workflow 43804985365 SUCCESS,
 account/admin healthy на новом SHA, HTTPS acceptance 19/19 PASS.
@@ -25,16 +25,15 @@ Internal review0/0, MINOR1fixed; separate Codex1round REVIEW_GREEN0/0.
 diff, исходного эталона и production candidate; не независимый запуск тестов.
 [Stage Report](stages/stage-2.md) содержит команды, результаты и ограничения.
 
-Следующий обязательный шаг требует named approval:
-[stage-2-production.patch](proposals/stage-2-production.patch).
-Он меняет только Docker frontend build context, SPA filter/install/cache,
-локальный front-install и release-contract test. Patch пока не применён.
-Без него штатные production build/CI не готовы; Stage 2 не переводится Ready.
-После применения и фактических зелёных checks — обычный merge+deploy запрос.
+Владелец одобрил [stage-2-production.patch](proposals/stage-2-production.patch)
+2026-11-16. Пять actual файлов побайтно совпали с reviewed candidate.
+Actual release contracts PASS; front-install APP=admin установил DS перед app;
+свежие admin typecheck/tests44 PASS. Следующий обязательный шаг — зелёный
+фактический CI, Ready и запрос merge+deploy #3030 (ещё не разрешён).
 
-Отдельное поручение по правилам: PR #3028 Ready, commit c043a73dc —
-автоматический separate Codex fallback при недоступном Claude CLI.
-Этот docs PR ещё не merged, decision merge+deploy #3028 ожидается.
+Отдельное поручение по правилам: PR #3028 merged, commit87e6a7338;
+workflow43813732309 SUCCESS, docs-only build/deploy skipped.
+Автоматический отдельный Codex fallback теперь в master.
 
 Риски: DS audit4moderate/2low build-only (HIGH/CRITICAL0), старые apps package
 versions не менялись; эталон пока PR #3022, непокрытые листами auth/loading/

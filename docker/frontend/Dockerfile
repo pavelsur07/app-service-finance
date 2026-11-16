@@ -4,13 +4,15 @@ FROM node:24.18.1-bookworm-slim AS build
 ARG APP
 WORKDIR /workspace
 RUN case "$APP" in account|admin) ;; *) echo 'APP must be account or admin' >&2; exit 2 ;; esac
+COPY apps/packages/ds/package.json apps/packages/ds/package-lock.json ./apps/packages/ds/
+RUN cd apps/packages/ds && npm ci --ignore-scripts --no-audit --no-fund
 COPY apps/${APP}/package.json apps/${APP}/package-lock.json ./apps/${APP}/
 COPY site/packages/api/package.json ./site/packages/api/
 COPY site/packages/ui/package.json ./site/packages/ui/
 RUN cd "apps/$APP" && npm ci --no-audit --no-fund
 COPY apps/${APP}/ ./apps/${APP}/
+COPY apps/packages/ds/ ./apps/packages/ds/
 COPY site/packages/ ./site/packages/
-COPY site/assets/styles/kit/ ./site/assets/styles/kit/
 RUN cd "apps/$APP" && npm run build
 
 FROM nginx:1.27-alpine3.21

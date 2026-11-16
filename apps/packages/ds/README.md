@@ -63,8 +63,10 @@ make front-typecheck front-lint front-test front-build
 Оба приложения включают тесты/типы/линт пакета в существующие команды;
 `npm run build` также вызывает check:generated. Дополнительные compile-тесты
 проверяют сброс default palette/type/radius/shadow/breakpoints и DS utilities.
-Production Docker/CI integration подготовлена proposal patch в
-`docs/tasks/ds-v3-apps/proposals/`; применение — после named approval §3.3.
+Production Docker/CI integration применена после named approval §3.3.
+`front-install` устанавливает пакет перед apps; Docker build копирует DS,
+CI учитывает DS paths/lock и устанавливает пакет отдельно. История согласованного
+patch — `docs/tasks/ds-v3-apps/proposals/`.
 
 Деньги: U+00A0, U+2212, запятая, ₽ суффиксом, расходы обычным цветом.
 Иконки: @tabler/icons-react, размеры 16/18/20, stroke 2 (реализация позднее).

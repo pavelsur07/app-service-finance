@@ -51,16 +51,11 @@ Node: `24.18.1-bookworm-slim`, Playwright npm и браузерный образ
 
 ## Подготовка пакета ДС v3.4
 
-До применения Stage 2 build-context/CI proposal пакет устанавливается отдельно
-перед `front-*` командами (Node только в контейнере):
-
-```sh
-docker compose -p vf-finance-frontend -f docker-compose.frontend.yml run --rm \
-  --no-deps --user "$(id -u):$(id -g)" -w /workspace/apps/packages/ds account npm ci --ignore-scripts
-```
+`make front-install` сначала устанавливает зависимости пакета ДС, затем
+выбранных apps. Все npm-команды по-прежнему выполняются в Node-контейнере.
+`APP=account` / `APP=admin` сохраняет независимую установку приложения.
 
 App `prebuild` проверяет generated CSS/TS; source JSON не меняется вручную.
-После одобрения proposal `front-install` будет устанавливать пакет автоматически.
 OFL шрифта лежит в `apps/packages/ds/public/fonts/Manrope-OFL.txt` и попадает
 в dist обоих приложений. Новые React DS wrappers — следующие Stage.
 

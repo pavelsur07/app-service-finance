@@ -17,6 +17,9 @@ compose=(docker compose -p "${FRONT_PROJECT:-vf-finance-frontend}" -f docker-com
 case "$action" in
   dev) "${compose[@]}" up -d "${apps[@]}" ;;
   install|typecheck|lint|test|build)
+    if [[ $action == install ]]; then
+      "${compose[@]}" run --rm --no-deps -w /workspace/apps/packages/ds "${apps[0]}" npm ci --ignore-scripts
+    fi
     for app in "${apps[@]}"; do
       if [[ $action == install ]]; then
         "${compose[@]}" run --rm --no-deps "$app" npm ci

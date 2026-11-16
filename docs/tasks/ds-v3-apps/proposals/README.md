@@ -1,12 +1,14 @@
 # Stage 2: production build / CI proposal
 
-`stage-2-production.patch` — точный patch, **не применён к файлам проекта**.
-Применение требует отдельного одобрения AGENTS.md §3.3:
+`stage-2-production.patch` — сохранённый точный reviewed patch.
+**Одобрен Владельцем и применён 2026-11-16** к Stage 2. Реальные пять файлов
+побайтно совпали с проверенным candidate; повторно применять patch не нужно.
+Основание отдельного согласования — AGENTS.md §3.3:
 
 > changes to production Docker, Traefik, workers, scheduler, queues, secrets,
 > credentials, CI/CD behavior
 
-Предлагаемые изменения:
+Применённые изменения:
 
 - `docker/frontend/Dockerfile`: manifest/lock и npm ci пакета DS до npm ci app;
   исходники DS до app build. App prebuild проверяет generated токены.
@@ -21,11 +23,12 @@
   это поддерживает existing real-auth workflow и локальное окружение.
 
 Сервисы, сети, порты, credentials, права, deploy-команды, порядок выкладки и
-механизм миграций не меняются. site/ не изменяется. После одобрения:
+механизм миграций не меняются. site/ не изменяется. Выполненная команда:
 
 ```sh
 git apply docs/tasks/ds-v3-apps/proposals/stage-2-production.patch
 ```
 
-Для проверки до одобрения используются эквивалентные файлы вне repo в
-`/tmp/vf-ds-v3-stage2-proposal/`. Ни pipeline, ни production не запускаются.
+До одобрения проверены эквивалентные файлы вне repo в
+`/tmp/vf-ds-v3-stage2-proposal/`. После применения проходят фактические
+release/build/CI gates PR #3030; production deploy Stage 2 ещё не разрешён.
