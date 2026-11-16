@@ -93,7 +93,7 @@ final readonly class MoySkladCatalogTargetsQuery
             ['products' => ArrayParameterType::STRING, 'variants' => ArrayParameterType::STRING]);
         $result = [];
         foreach ($rows as $row) {
-            $target = $this->target($row);
+            $target = CatalogTargetDTO::fromRow($row);
             $result[$target->getValue()] = $target;
         }
 
@@ -133,20 +133,6 @@ final readonly class MoySkladCatalogTargetsQuery
         }
         $rows = $this->db->fetchAllAssociative('SELECT type, external_id, parent_external_id, name, code, article, characteristics, archived, parent_archived, variants_count, has_variants'.$sql.' ORDER BY name, type, external_id LIMIT 20 OFFSET '.(($page - 1) * 20), $params);
 
-        return new CatalogTargetPage(array_map($this->target(...), $rows), $page, $total);
-    }
-
-    /** @param array<string,mixed> $row */
-    private function target(array $row): CatalogTargetDTO
-    {
-        $reason = (bool) $row['archived'] ? 'archived' : ((bool) $row['parent_archived'] ? 'parent_archived' : null);
-        if ('product' === $row['type'] && ((int) $row['variants_count'] > 0 || (bool) $row['has_variants'])) {
-            $reason ??= 'requires_variant';
-        }
-        /** @var list<array{id:string,name:string,value:string}> $characteristics */
-        $characteristics = json_decode((string) $row['characteristics'], true, 512, \JSON_THROW_ON_ERROR);
-
-        return new CatalogTargetDTO((string) $row['type'], (string) $row['external_id'], null === $row['parent_external_id'] ? null : (string) $row['parent_external_id'],
-            (string) $row['name'], null === $row['code'] ? null : (string) $row['code'], null === $row['article'] ? null : (string) $row['article'], $characteristics, null === $reason, $reason);
+        return new CatalogTargetPage(array_map(CatalogTargetDTO::fromRow(...), $rows), $page, $total);
     }
 }

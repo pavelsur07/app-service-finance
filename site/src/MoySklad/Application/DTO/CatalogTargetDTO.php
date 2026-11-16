@@ -30,4 +30,18 @@ final readonly class CatalogTargetDTO
         return ['type' => $this->type, 'externalId' => $this->externalId, 'parentExternalId' => $this->parentExternalId,
             'name' => $this->name, 'code' => $this->code, 'article' => $this->article, 'characteristics' => $this->characteristics];
     }
+
+    /** @param array<string,mixed> $row */
+    public static function fromRow(array $row): self
+    {
+        $reason = (bool) $row['archived'] ? 'archived' : ((bool) $row['parent_archived'] ? 'parent_archived' : null);
+        if ('product' === $row['type'] && ((int) $row['variants_count'] > 0 || (bool) $row['has_variants'])) {
+            $reason ??= 'requires_variant';
+        }
+        /** @var list<array{id:string,name:string,value:string}> $characteristics */
+        $characteristics = json_decode((string) $row['characteristics'], true, 512, \JSON_THROW_ON_ERROR);
+
+        return new self((string) $row['type'], (string) $row['external_id'], null === $row['parent_external_id'] ? null : (string) $row['parent_external_id'],
+            (string) $row['name'], null === $row['code'] ? null : (string) $row['code'], null === $row['article'] ? null : (string) $row['article'], $characteristics, null === $reason, $reason);
+    }
 }

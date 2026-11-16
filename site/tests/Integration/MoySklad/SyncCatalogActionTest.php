@@ -283,6 +283,7 @@ final class SyncCatalogActionTest extends WebTestCaseBase
             new CatalogPageParser(),
             static::getContainer()->get(ConnectionTokenCodec::class),
             new NullLogger(),
+            self::getContainer()->get(\App\MoySklad\Infrastructure\Lock\MoySkladCatalogLock::class),
         );
     }
 

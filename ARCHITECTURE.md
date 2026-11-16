@@ -5803,6 +5803,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.200 | 2026-11-15 | MoySklad: автомаппинг25 листингов Ozon/WB в legacy UI, exact article/explicit size, immutable Redis preview, guarded per-row apply, CAS/replay и audit |
 | 2.199 | 2026-11-15 | MarketplaceWb: строка с артикулом без размера (возмещение логистики, реклама) остаётся на артикуле — по размерам по продажам дня (`wb_size_sales_share`), а не без SKU по всему кабинету; размеры без учёта кириллических двойников; `RULES_VERSION` `wb-sales-report-2` — все дни переводятся заново |
 | 2.198 | 2026-11-15 | ServiceGateway: ключ повтора задачи ИИ вне печатного ASCII или длиннее 200 символов уходит в сервис хешем `sha256:…` (заголовок `Idempotency-Key` искажал кириллицу — 422), `task_id` — от исходного ключа; MarketplaceOzon/MarketplaceWb: запрос черновика без ответа дольше часа повторяется |
 | 2.197 | 2026-11-15 | MarketplaceWb: черновики ИИ для кодов WB (этап 8.3b) — `RequestWbSourceTypeDraftsAction`, `WbSourceTypeDraftConsumer`, колонка черновика на экране кодов; ServiceGateway: результат ИИ получают все потребители его task_type |
@@ -6119,6 +6120,59 @@ Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/defa
 `ApiScopeCatalog`: explicit resources/actions/presets, all disconnected. `ApiScopePolicy::effectiveScopes(selected,enabled,connected)` даёт только известное пересечение. ApiKey хранит JSON selectedScopes/enabledResources с пустыми defaults. `SaveApiKeyPermissionsAction(companyId,userId,keyId,selectedScopes,enabledResources,expectedVersion): ApiKey` проверяет владельца и optimistic version под scoped row lock;409 требует перечитать, unknown scope/enable disconnected422, no-op без аудита. Отдельная миграция20260913090200; подключение модуля не включает ресурс старого ключа. Principal несёт preparedScopes/effectiveScopes, ApiAccessSubscriber требует известный effective scope либо auth.check; тестовые endpoints толькоenv=test.
 
 ## MoySklad: подключение и проверка доступа
+
+Автомаппинг v1 использует `AutomaticListingMappingPolicy`: точный собственный
+article либо parent.article + размер по явно выбранному ID характеристики.
+Нормализуется только краевой ASCII whitespace, регистр/нули/NBSP сохраняются.
+`AutomaticMappingCandidatesQuery` одним scoped SQL получает максимум50 целей
+на артикул (до100 артикулов); truncation и неразрешимые размеры запрещают READY.
+Архивные дубли участвуют в неоднозначности, parent с детьми не является leaf.
+`AutomaticMappingPreviewQuery` обрабатывает только текущие25 листингов через
+MarketplaceFacade; существующие ревизии, включая clear, не предлагаются.
+`MappingCharacteristicsQuery` выдаёт по20 непрозрачных ID из локального JSONB.
+Никакой записи и внешнего HTTP в этих Query нет.
+`AutomaticMappingPreviewStorage` хранит scalar-array envelope в отдельном
+Redis pool `cache.moysklad_automatic_mapping`: TTL900, максимум3 preview на
+SHA256(sessionId), максимум3 immutable attempt results на preview. READ/WRITE
+индекса сериализуется существующим LockFactory, acquire(false); busy409,
+Redis failure503, чужой/истёкший preview одинаково отсутствует.
+Dedicated `AutomaticMappingRedisAdapter` сохраняет штатный marshaller/write
+protocol, но mget false/error/incomplete не превращает в miss. Pool и private
+Lock получают NullLogger, чтобы session hash не попал в framework diagnostics;
+глобальный LockFactory/logger не меняется. Scope включает
+company/actor/connection/provider; sessionId/hash не возвращаются в UI.
+UUIDv7 preview/requestId генерируются сервером; Guard фиксирует версию
+`article_size_v1`, fingerprint и выбранный opaque characteristic ID.
+`ApplyAutomaticListingMappingsAction` вызывает существующий writer отдельно
+для каждой строки без внешней транзакции/flush. Guarded order: connection
+FOR SHARE → mapping advisory → accepted replay → catalog try-lock → source
+FOR SHARE через MarketplaceFacade → recompute policy/candidates → target lock
+→ append/flush/commit. Общий `MoySkladCatalogLock` использует прежний session
+ключ `moysklad-catalog`/connectionId в SyncCatalogAction и writer; освобождение
+во внешнем finally после wrapInTransaction, занятость409 без закрытия EM.
+Facade `lockListingMetaForExternalMapping(companyId, listingId)` требует
+caller transaction, возвращает свежий DBAL DTO, не Entity из identity map.
+Audit listing_snapshot.autoMapping хранит origin/preview/rule/fingerprint/
+characteristic/matchedRules. Replay проверяет полный payload и guard прежде
+новой валидации каталога, поэтому не восстанавливает последующий manual clear.
+SyncCatalogAction сначала берёт отдельный session import-intent lock
+`moysklad-catalog-sync`/connectionId: другой настоящий import→skip без retry.
+Затем shared catalog lock; его занятость auto writer→существующий `temporary`
+и штатный Handler retry. Оба lock освобождаются finally; duplicate-sync
+контракт и текст UI сохранены. Auto
+source/target lock wait ограничен LOCAL lock_timeout2s. Manual snapshot не
+наследует autoMapping прежней ревизии при отсутствующем source.
+Технический сбой останавливает остаток; ACCEPTED включает прежний request,
+CONFLICT/FAILED/NOT_PROCESSED отдельны; закрытый EM не переиспользуется.
+Legacy index содержит bounded поиск/выбор характеристики и POST preview
+(READ+CSRF), Show GET привязан к полному scope, Apply POST требует READ+WRITE
+и CSRF. Показанный контекст характеристики включён в CSRF id/form action;
+свой ID вне ChoiceType422, неизвестный/чужой404. Клиент передаёт только
+selectedIds из25 READY; target/rule/requestId берутся из Redis envelope.
+POST сохраняет отдельный server attemptId →303 GET со свежим EM/current
+states; ACCEPTED не выдаётся за число новых ревизий или актуальную связь.
+Cache failure после commit возвращает честный503 без ORM-render.
+
 
 Legacy UI маппинга размещён в `templates/moy_sklad/mappings/` под общим
 `moy_sklad/layout.html.twig`: отдельные вкладки Ozon и Wildberries используют

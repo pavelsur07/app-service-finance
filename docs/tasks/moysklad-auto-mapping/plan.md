@@ -21,7 +21,7 @@ Twig/Tabler, PHPUnit. Новых зависимостей, Messenger/cron и Rea
 
 ## Global Constraints
 
-- Это план, реализация не начата. Текущая поставка — только эти документы.
+- Владелец разрешил автономную реализацию четырёх Stage. Выпуск отдельно на handoff.
 - Реализация Large, HIGH-LOCAL: четыре Stage, backend отдельно от frontend.
 - Компания и actor определяются сервером. Межмодульные данные — только Facade.
 - Ozon/Wildberries отдельно, в выбранном подключении. Internal Catalog,
@@ -245,7 +245,7 @@ Files: новые Policy/Decision/Candidate/Page DTO, DecisionStatus, три Que
 tests/Integration/MoySklad/AutomaticMappingCandidatesQueryTest.php,
 AutomaticMappingPreviewQueryTest.php, MappingCharacteristicsQueryTest.php.
 
-- [ ] **1.1 RED:** тесты точного article, регистра/001 vs1, variant own article,
+- [x] **1.1 RED:** тесты точного article, регистра/001 vs1, variant own article,
   parent article+size, TAB/CR краёв и неприравнивания NBSP, дубликатов (включая архивный), неархивного ребёнка
   архивного parent, parent с variants_count0 но реальными children,
   двух цветов размераM, неизвестного размера, «0», отсутствующей и
@@ -253,13 +253,13 @@ AutomaticMappingPreviewQueryTest.php, MappingCharacteristicsQueryTest.php.
   двух правил с одним target и двух разных targets, inactive/current/clear.
   Assert READY только при доказанно единственной доступной leaf-цели;
   ambiguous/unresolved cases имеют target=null. Запустить: ожидается RED.
-- [ ] **1.2 RED:** integration fixtures foreign company/connection, одинаковый
+- [x] **1.2 RED:** integration fixtures foreign company/connection, одинаковый
   externalId двух подключений, 51 candidates (нужный размер у 51-го),
   100 articles и101 rejected, numeric article keys, pagination characteristics,
   query count1 vs25. Ожидается RED на отсутствующих Query/контрактах.
-- [ ] **1.3 GREEN:** минимальные pure policy и set-based Query; no SELECT *,
+- [x] **1.3 GREEN:** минимальные pure policy и set-based Query; no SELECT *,
   no raw чужих таблиц, no per-listing SQL loop. Переиспользовать Facade/state.
-- [ ] **1.4 VERIFY/REVIEW:** narrow tests → module set, focused PHPStan/CS,
+- [x] **1.4 VERIFY/REVIEW:** narrow tests → module set, focused PHPStan/CS,
   EXPLAIN на50k fixture targets; self-review scope/tenant/ambiguity. Обновить
   ARCHITECTURE/checkpoint/StageReport. Commit/push Draft PR, продолжить Stage2.
 
@@ -273,7 +273,7 @@ site/config/packages/cache.yaml и site/config/services_test.yaml; tests/Unit/Mo
 и tests/Integration/MoySklad/AutomaticMappingPreviewStorageConcurrencyTest.php;
 worker tests/Fixtures/MoySklad/automatic-preview-worker.php (только local/test).
 
-- [ ] **2.1 RED:** MockClock/ArrayAdapter/Lock test store: TTL15m, максимум3, вытеснение oldest,
+- [x] **2.1 RED:** MockClock/ArrayAdapter/Lock test store: TTL15m, максимум3, вытеснение oldest,
   roundtrip scalar serialization, stable requestIds на retry, два preview
   независимы, foreign session/actor/company/connection/provider ->null, expiry ->null.
   Два реальных параллельных put: оба успешны либо один явно409; повтор
@@ -281,13 +281,13 @@ worker tests/Fixtures/MoySklad/automatic-preview-worker.php (только local/
   записи, активны не более3. Same id/different payload ->409.
   Два attempt не теряют/не смешивают results, limit3, cache outage до apply.
   Невалидные поля Guard отклоняются DTO. Ожидается RED на новом storage.
-- [ ] **2.2 GREEN:** storage + envelope, UUIDv7 per preview/per row, source hash
+- [x] **2.2 GREEN:** storage + envelope, UUIDv7 per preview/per row, source hash
   из Policy. Версия `article_size_v1`. Выделенный Redis pool, существующий
   LockFactory: mutex session-key только на короткое перечитывание/изменение
   индексов, без matcher/SQL/HTTP внутри. Не ждать mutex бесконечно: acquire(false),
   при занятости409, при недоступном Redis503. Не класть Entity, токены МС и
   полный marketplaceData в cache; pruning/TTL без фоновых задач.
-- [ ] **2.3 VERIFY/REVIEW:** unit/module и focused gates; self-review размера
+- [x] **2.3 VERIFY/REVIEW:** unit/module и focused gates; self-review размера
   cache payload/ownership/TTL/конкурентных обновлений, reports и commit/push. Продолжить Stage3.
 
 ## Stage 3: guarded writer и частичное массовое применение
@@ -301,7 +301,7 @@ tests/Integration/MoySklad/ApplyAutomaticListingMappingsActionTest.php,
 AutomaticMappingConcurrencyTest.php; расширение mapping-worker.php,
 ChangeListingMappingActionTest.php, SyncCatalogActionTest.php и MarketplaceFacadeTest.php.
 
-- [ ] **3.1 RED:** single/batch25, explicit size rule, no replaces/clear restore,
+- [x] **3.1 RED:** single/batch25, explicit size rule, no replaces/clear restore,
   source changed/archived/foreign, target moved/duplicate appeared, disabled
   connection, provider mismatch, invalid selection26 and duplicateIDs,
   expired/foreign envelope, id не из READY набора, подмена цели из POST,
@@ -310,17 +310,17 @@ ChangeListingMappingActionTest.php, SyncCatalogActionTest.php и MarketplaceFaca
   Отдельно EM remains open on domain reject; EM closed -> остаток NOT_PROCESSED.
   Cache outage после успешной строки не скрывает commit; независимые attempt
   имеют свои результаты. Потеря preview посреди запроса не откатывает принятые строки.
-- [ ] **3.2 RED:** независимые PG-процессы: реальный auto Action vs SyncCatalog
+- [x] **3.2 RED:** независимые PG-процессы: реальный auto Action vs SyncCatalog
   writer c общим catalog lock в обоих порядках; duplicate INSERT другой цели,
   parent/target archive, source article/size change, manual SET/CLEAR и два
   одинаковых POST. Проверить actual lock wait/try-lock refusal и число ревизий.
   Mutation без catalog guard должна давать RED на duplicate race; без source
   lock — RED на source race. Не подменять тест Action тестом одного Query.
-- [ ] **3.3 GREEN:** извлечь общий существующий catalog lock, Facade source
+- [x] **3.3 GREEN:** извлечь общий существующий catalog lock, Facade source
   lock с документированной caller transaction; optional guard в Command и
   защищённый путь в том же writer. Batch без внешней транзакции и дублирования
   append. Snapshot audit и полная проверка idempotency guard.
-- [ ] **3.4 VERIFY/REVIEW:** module + старые sync/manual tests, focused gates,
+- [x] **3.4 VERIFY/REVIEW:** module + старые sync/manual tests, focused gates,
   full Stage diff review (lock order/phantoms/EM/retry). Внешний Claude review,
   если HIGH-LOCAL diff>500 строк; иначе только handoff. Исправить confirmed
   B/I, reports, commit/push и автоматически перейти Stage4.
@@ -340,12 +340,12 @@ POST `/automatic/preview` (READ+CSRF), GET `/automatic/{previewId}` (READ),
 POST `/automatic/{previewId}/apply` (READ+WRITE+CSRF). Requirement UUID для
 connectionId/previewId; marketplace только ozon|wildberries.
 
-- [ ] **4.1 RED:** выбор правил/характеристики, source page25/q<=100,
+- [x] **4.1 RED:** выбор правил/характеристики, source page25/q<=100,
   обе вкладки и одинаковый nmId с разными размерами, READY checkboxes,
   disabled reasons, foreign/bad IDs/other provider404, invalid CSRF403,
   malformed arrays/limits422, source/CAS conflicts в summary, истёкшая сессия,
   повтор POST и replay после последующего manual clear. Нет WRITE -> нельзя apply.
-- [ ] **4.2 GREEN:** кнопка «Найти соответствия на этой странице», явный выбор
+- [x] **4.2 GREEN:** кнопка «Найти соответствия на этой странице», явный выбор
   характеристики размера по id (bounded list20 с поиском), таблица с причиной,
   правилами и текущей целью, READY по умолчанию выбраны, остальные disabled.
   Селектор/поиск характеристики на index использует char_q/char_page и
@@ -353,10 +353,10 @@ connectionId/previewId; marketplace только ozon|wildberries.
   Apply только selectedIds; POST303 → summary/current states. Частичную ошибку
   не выдавать за полное успешное сохранение. Нет общей кнопки на весь каталог.
   Tabler/существующие формы, flash, pagination; no new CSS/JS/React.
-- [ ] **4.3 VERIFY:** functional/module, Twig gates. Browser desktop1440/
+- [x] **4.3 VERIFY:** functional/module, Twig gates. Browser desktop1440/
   mobile375, keyboard/checkbox, длинные названия, empty/error/no permission,
   no-JS формы, конфликт и частичное применение. Нет document overflow.
-- [ ] **4.4 HANDOFF:** full gates один раз, fresh-session internal whole-diff
+- [x] **4.4 HANDOFF:** full gates один раз, fresh-session internal whole-diff
   review, Claude external review по task base и fix cycle. ARCHITECTURE,
   reports/checkpoint/handoff; Ready PR и один запрос merge+deploy. В текущем
   scope миграции нет; если scope изменён — release.md и именованное approval.
@@ -396,26 +396,26 @@ round после IMPORTANT/MINOR, если исправления подтвер
 
 ## 6. Чек-лист приёмки
 
-- [ ] Exact article и parent article+explicit size rule работают для обоих MP.
-- [ ] Case/ведущие нули не изменены; штрихкод/code/name не подменяют ключ.
-- [ ] Неоднозначные, truncated, unknown характеристики не дают READY.
-- [ ] Parent с модификациями никогда не назначается; архивные дубли не спрятаны.
-- [ ] Current mapped/needs_review/clear не перезаписываются; inactive пропускается.
-- [ ] Company/actor/connection/provider, READ/WRITE и CSRF проверяются сервером.
-- [ ] Параллельные preview/attempt не теряют и не смешивают результаты; Redis
+- [x] Exact article и parent article+explicit size rule работают для обоих MP.
+- [x] Case/ведущие нули не изменены; штрихкод/code/name не подменяют ключ.
+- [x] Неоднозначные, truncated, unknown характеристики не дают READY.
+- [x] Parent с модификациями никогда не назначается; архивные дубли не спрятаны.
+- [x] Current mapped/needs_review/clear не перезаписываются; inactive пропускается.
+- [x] Company/actor/connection/provider, READ/WRITE и CSRF проверяются сервером.
+- [x] Параллельные preview/attempt не теряют и не смешивают результаты; Redis
   outage до записи не пишет ревизии, после commit не выдаётся за rollback.
-- [ ] Клиент не может выбрать target, изменить rule/guard/requestId или выйти
+- [x] Клиент не может выбрать target, изменить rule/guard/requestId или выйти
   за пределы 25 READY listingId своего preview.
-- [ ] Истёкший/вытесненный preview не применяется; retry действительного не дублирует.
-- [ ] После preview изменились source/target/кандидаты/связь — конфликт без retarget.
-- [ ] Синхронизация каталога и изменение источника защищены реальными locks.
-- [ ] Catalog lock держится до commit; replay не зависит от текущего catalog lock.
-- [ ] Partial apply/EM close показаны честно; retry не восстанавливает manual clear.
-- [ ] Snapshot хранит origin/rule/guard; старые manual snapshots совместимы.
-- [ ] SQL выдача bounded; число запросов preview не растёт с размером страницы.
-- [ ] Legacy UI/no-JS, mobile/keyboard, loading/empty/error/role states пройдены.
-- [ ] Нет side effects в Catalog/Finance/Inventory/FIFO или внешних API.
-- [ ] Gates/reviews/reports выполнены, open B/I=0/0; Ready PR создан.
+- [x] Истёкший/вытесненный preview не применяется; retry действительного не дублирует.
+- [x] После preview изменились source/target/кандидаты/связь — конфликт без retarget.
+- [x] Синхронизация каталога и изменение источника защищены реальными locks.
+- [x] Catalog lock держится до commit; replay не зависит от текущего catalog lock.
+- [x] Partial apply/EM close показаны честно; retry не восстанавливает manual clear.
+- [x] Snapshot хранит origin/rule/guard; старые manual snapshots совместимы.
+- [x] SQL выдача bounded; число запросов preview не растёт с размером страницы.
+- [x] Legacy UI/no-JS, mobile/keyboard, loading/empty/error/role states пройдены.
+- [x] Нет side effects в Catalog/Finance/Inventory/FIFO или внешних API.
+- [x] Gates/reviews/reports выполнены, open B/I=0/0; Ready PR создан.
 
 ## 7. Дальнейшие расширения
 
@@ -423,3 +423,9 @@ round после IMPORTANT/MINOR, если исправления подтвер
 явные словари размеров/цветов, постоянная конфигурация правил, обработка
 всего каталога с cursor/job/status и отдельным batch ledger. Их schema/API/
 очереди/финансовые контракты не добавлять по ходу этой реализации.
+
+## Implementation rulings / финальные уточнения
+- Dedicated Redis pool использует AutomaticMappingRedisAdapter (наследник штатного RedisAdapter, текущий native phpredis provider), чтобы transport false/error не становились cache miss и не теряли immutable index. Тот же marshaller/write protocol, без зависимостей.
+- Импорт имеет дополнительный session import-intent lock moysklad-catalog-sync: duplicate sync skip сохранён, collision auto→existing temporary retry. Auto shared catalog key не изменён.
+- Preview READ+CSRF классифицирован exact existing authenticated-self ROUTE_POLICY только для private cache. Apply WRITE проверен valid-CSRF mutation.
+- Полный suite/Stan исключения и green narrow rechecks описаны в handoff; baseline не расширялся. Browser states и fresh/final external reviews завершены.

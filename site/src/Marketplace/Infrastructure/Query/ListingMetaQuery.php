@@ -15,6 +15,21 @@ final readonly class ListingMetaQuery
     ) {
     }
 
+    /** Caller owns a transaction; lock before the fresh DBAL metadata read. */
+    public function lockForExternalMapping(string $companyId, string $listingId): ?ListingMetaDTO
+    {
+        \Webmozart\Assert\Assert::uuid($companyId);
+        \Webmozart\Assert\Assert::uuid($listingId);
+        if (!$this->connection->isTransactionActive()) {
+            throw new \LogicException('Listing lock requires a caller transaction.');
+        }
+        if (false === $this->connection->fetchOne('SELECT id FROM marketplace_listings WHERE company_id=? AND id=? FOR SHARE', [$companyId, $listingId])) {
+            return null;
+        }
+
+        return $this->findByIds($companyId, [strtolower($listingId)])[strtolower($listingId)] ?? null;
+    }
+
     /**
      * @param list<string> $listingIds
      *

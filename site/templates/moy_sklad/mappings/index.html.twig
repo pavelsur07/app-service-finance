@@ -16,6 +16,31 @@
                 <button class="btn" type="submit">Найти</button>
             </div>
         </form>
+        <div class="card mb-3">
+            <div class="card-body">
+                <h3 class="card-title">Автоматическое сопоставление</h3>
+                <p class="text-secondary">Точный артикул позиции или артикул родителя и размер. Для проверки размера выберите характеристику МойСклад. Регистр и ведущие нули учитываются. Существующие и снятые связи сохраняются.</p>
+                <form method="get" class="mb-3" data-characteristic-search>
+                    <input type="hidden" name="q" value="{{ q }}">
+                    <input type="hidden" name="page" value="{{ listingsPage.page }}">
+                    <input type="hidden" name="sizeCharacteristicId" value="{{ selectedCharacteristicId ?? '' }}">
+                    <label for="mapping-characteristic-search" class="form-label">Поиск характеристики размера</label>
+                    <div class="input-group">
+                        <input id="mapping-characteristic-search" class="form-control" type="search" name="char_q" value="{{ charQ }}" maxlength="100">
+                        <button class="btn" type="submit">Найти характеристику</button>
+                    </div>
+                </form>
+                {% set charParams = {connectionId: mappingConnectionId, marketplace: mappingMarketplace, q: q, page: listingsPage.page, char_q: charQ, sizeCharacteristicId: selectedCharacteristicId ?? ''} %}
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    {% if characteristicsPage.page > 1 %}<a class="btn btn-sm" href="{{ path('moysklad_listing_mappings', charParams|merge({char_page: characteristicsPage.page - 1})) }}">Предыдущие характеристики</a>{% endif %}
+                    {% if characteristicsPage.page * characteristicsPage.perPage < characteristicsPage.totalItems %}<a class="btn btn-sm" href="{{ path('moysklad_listing_mappings', charParams|merge({char_page: characteristicsPage.page + 1})) }}">Следующие характеристики</a>{% endif %}
+                </div>
+                {{ form_start(previewForm, {attr: {'data-automatic-preview': ''}}) }}
+                {{ form_row(previewForm.sizeCharacteristicId) }}
+                <button class="btn btn-primary" type="submit">Найти соответствия на этой странице</button>
+                {{ form_end(previewForm) }}
+            </div>
+        </div>
         <div class="card">
             <div class="table-responsive">
                 <table class="table table-vcenter card-table">
@@ -41,7 +66,7 @@
                 </table>
             </div>
             <div class="card-footer">
-                {% include 'partials/_pagination.html.twig' with {page: listingsPage.page, total: listingsPage.totalItems, perPage: listingsPage.perPage, route: 'moysklad_listing_mappings', params: {connectionId: mappingConnectionId, marketplace: mappingMarketplace, q: q}} only %}
+                {% include 'partials/_pagination.html.twig' with {page: listingsPage.page, total: listingsPage.totalItems, perPage: listingsPage.perPage, route: 'moysklad_listing_mappings', params: {connectionId: mappingConnectionId, marketplace: mappingMarketplace, q: q, char_q: charQ, char_page: characteristicsPage.page, sizeCharacteristicId: selectedCharacteristicId ?? ''}} only %}
             </div>
         </div>
     </section>
