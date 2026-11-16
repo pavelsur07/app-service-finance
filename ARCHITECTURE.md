@@ -812,6 +812,9 @@
   модуль `MARKETPLACE`): `from`, `to` (по умолчанию текущий месяц, МСК; не длиннее 366 дней), `channel`.
   Колонки дерева — новый расчёт, текущий (`Marketplace\Facade\LegacyPlPreviewFacadeInterface::amountsByCategory()` —
   «Итого» предпросмотра ОПиУ легаси) и разница; ниже — «не сопоставлено» и «исключено» по видам и кодам.
+  Таблица повторяет дерево статей компании до границы — строки с кодом `CM3` и следующей `CM3K`
+  (`Application\Service\TreeCut`), пустые строки на месте (`hide_empty=1` — скрыть); статьи ниже границы с
+  суммой — блок «Ниже СМ3»; кода `CM3` в дереве нет — дерево целиком.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -5861,6 +5864,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.205 | 2026-11-16 | MarketplacePlProjection: экран «ОПиУ» повторяет дерево статей компании до СМ3 (`TreeCut`, граница по коду `CM3`), пустые строки на месте, статьи ниже — блок «Ниже СМ3» |
 | 2.204 | 2026-11-16 | MarketplacePlProjection: расчётные строки экрана «ОПиУ» — «Выручка с СПП» (продажи − СПП − соинвестирование) и себестоимость из витрины (`MarketplaceEconomicsFacadeInterface::costPrice()`); `plSums()` делит ключ по знаку суммы |
 | 2.203 | 2026-11-16 | MarketplacePlProjection (этап 3–4): проекция ОПиУ из канона при чтении (`ProjectionBuilder`, без хранимой таблицы), экран `/marketplace/economics/pl` — новый расчёт рядом с текущим; `MarketplaceOperationsFacadeInterface::plSums()`, `companyIds()`; `LegacyPlPreviewFacadeInterface`; cron `sync-template --all` |
 | 2.202 | 2026-11-16 | MarketplacePlProjection (этап 2): `MappingTemplate` v2 — 6 исключений Ozon по коду источника, шаблон равен базовому маппингу легаси; `TemplateLegacyParityTest` |

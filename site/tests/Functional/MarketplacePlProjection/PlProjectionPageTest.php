@@ -29,6 +29,7 @@ final class PlProjectionPageTest extends WebTestCaseBase
         $this->op(self::COMPANY_ID, 'ozon', 'commission', 'ozon:field:commission', -15000);
         $this->op(self::COMPANY_ID, 'ozon', 'logistics_to', 'ozon:service:32', -5000);
         $this->op(self::COMPANY_ID, 'ozon', 'spp', 'ozon:field:bonus', 20000);
+        $this->op(self::COMPANY_ID, 'ozon', 'service_correction', 'ozon:service:18', -1200);
         $this->op(self::COMPANY_ID, 'ozon', 'sale', 'ozon:field:sale_amount', 77700, '2026-11-11');
         $this->op(self::OTHER_ID, 'ozon', 'sale', 'ozon:field:sale_amount', 999900);
         foreach ([[self::COMPANY_ID, '2026-11-05', -30000, 1], [self::COMPANY_ID, '2026-11-11', -77700, 0], [self::OTHER_ID, '2026-11-05', -99900, 0]] as [$company, $date, $cost, $without]) {
@@ -51,16 +52,22 @@ final class PlProjectionPageTest extends WebTestCaseBase
         self::assertStringContainsString('(300,00)', $crawler->filter('tr[data-row-code="COGS_PRODUCT_REV"]')->text());
         self::assertSelectorTextContains('[data-pl-no-cost]', 'в 1 дн.');
         self::assertSelectorNotExists('[data-pl-missing-codes]');
+        // структура — как в справочнике до СМ3: пустая статья на месте, строки ниже СМ3 — отдельным списком
+        self::assertSame(['REV_NOT_SPP', 'COGS_MP_COMMISSION', 'REV_SPP_SALES', 'COGS_PRODUCT_REV', 'COGS_ACQUIRING', 'CM3'], $crawler->filter('[data-pl-projection] tbody tr')->each(static fn ($r): string => (string) $r->attr('data-row-code')));
+        self::assertStringContainsString('(12,00)', $crawler->filter('[data-pl-below] tr[data-row-code="OVERHEAD_ADMIN_BANK"]')->text());
+        self::assertSelectorNotExists('[data-pl-no-boundary]');
+        self::assertCount(4, $client->request('GET', self::URL.'&hide_empty=1')->filter('[data-pl-projection] tbody tr'), 'без пустых: эквайринг и СМ3 без формулы');
+        $crawler = $client->request('GET', self::URL);
         self::assertStringNotContainsString('777', $crawler->filter('[data-pl-projection]')->text(), 'день вне периода');
         self::assertStringNotContainsString('999', $crawler->text(), 'чужая компания');
 
         $identity = $crawler->filter('[data-pl-identity]')->text();
-        self::assertMatchesRegularExpression('/Всего операций за период: 1\s000,00 ₽/u', $identity);
-        self::assertMatchesRegularExpression('/На статьи ОПиУ: 850,00 ₽; исключено из ОПиУ: 200,00 ₽; не сопоставлено: −50,00 ₽/u', $identity);
+        self::assertMatchesRegularExpression('/Всего операций за период: 988,00 ₽/u', $identity);
+        self::assertMatchesRegularExpression('/На статьи ОПиУ: 838,00 ₽; исключено из ОПиУ: 200,00 ₽; не сопоставлено: −50,00 ₽/u', $identity);
         self::assertStringContainsString('ozon:service:32', $crawler->filter('[data-pl-lines="unmapped"]')->text());
         self::assertStringContainsString('ozon:field:bonus', $crawler->filter('[data-pl-lines="excluded"]')->text());
 
-        $crawler = $client->request('GET', self::URL.'&channel=wildberries');
+        $crawler = $client->request('GET', self::URL.'&channel=wildberries&hide_empty=1');
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('[data-pl-projection] tbody', 'За период нет сумм.');
         self::assertSelectorNotExists('[data-pl-lines]');
@@ -102,6 +109,9 @@ final class PlProjectionPageTest extends WebTestCaseBase
         $em->persist($this->category($company, 'COGS_MP_COMMISSION', PLFlow::EXPENSE));
         $em->persist($this->category($company, 'REV_SPP_SALES', PLFlow::INCOME));
         $em->persist($this->category($company, 'COGS_PRODUCT_REV', PLFlow::EXPENSE));
+        $em->persist($this->category($company, 'COGS_ACQUIRING', PLFlow::EXPENSE));
+        $em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('CM3')->withCode('CM3')->withType(\App\Finance\Enum\PLCategoryType::KPI)->withFlow(PLFlow::NONE)->build());
+        $em->persist($this->category($company, 'OVERHEAD_ADMIN_BANK', PLFlow::EXPENSE));
         $em->flush();
 
         return $owner;
