@@ -745,7 +745,7 @@ final readonly class MarketplaceFacade
      *
      * Используется при парсинге raw snapshot'ов остатков в нормализованные StockSnapshot записи.
      *
-     * @param string $companyId UUID компании
+     * @param string        $companyId  UUID компании
      * @param array<string> $listingIds массив UUID листингов (max 5000)
      *
      * @return array<string, string|null> map listingId → productId|null
@@ -762,6 +762,35 @@ final readonly class MarketplaceFacade
         Assert::allUuid($listingIds);
 
         return $this->listingRepository->findListingToProductMap($companyId, $listingIds);
+    }
+
+    /** @param list<string> $listingIds
+     * @return array<string,list<string>> listingId => all exact barcode strings; missing/foreign IDs omitted
+     */
+    public function getListingBarcodesByIds(string $companyId, array $listingIds): array
+    {
+        Assert::uuid($companyId);
+        Assert::maxCount($listingIds, 100);
+        Assert::allUuid($listingIds);
+        if ([] === $listingIds) {
+            return [];
+        }
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT l.id, b.barcode FROM marketplace_listings l
+             LEFT JOIN marketplace_listing_barcodes b ON b.listing_id=l.id AND b.company_id=l.company_id AND b.marketplace=l.marketplace
+             WHERE l.company_id=:company AND l.id IN (:ids) ORDER BY l.id, b.barcode COLLATE "C"',
+            ['company' => $companyId, 'ids' => $listingIds], ['ids' => ArrayParameterType::STRING],
+        );
+        $result = [];
+        foreach ($rows as $row) {
+            $id = (string) $row['id'];
+            $result[$id] ??= [];
+            if (null !== $row['barcode']) {
+                $result[$id][] = (string) $row['barcode'];
+            }
+        }
+
+        return $result;
     }
 
     /**

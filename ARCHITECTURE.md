@@ -6153,6 +6153,17 @@ Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/defa
 
 ## MoySklad: подключение и проверка доступа
 
+`ProductSnapshot` / `VariantSnapshot` и сущности каталога хранят `barcodes`:
+`null` — не загружено, `[]` — загружен пустой список; значения строковые,
+без изменения регистра и ведущих нулей. Формат JSON API: список одноэлементных
+объектов ean8/ean13/code128/gtin/upc.
+`MarketplaceFacade::getListingBarcodesByIds(companyId, listingIds)` принимает
+до100 ID, возвращает listingId → list<string>, чужие ID исключены.
+`MappingSettingsQuery::get(companyId, connectionId, marketplace)` возвращает
+`MappingSettings(wbTrailingW, version)`; preset по умолчанию выключен.
+Настройки изолированы составным ключом company/connection/marketplace.
+
+
 Автомаппинг v1 использует `AutomaticListingMappingPolicy`: точный собственный
 article либо parent.article + размер по явно выбранному ID характеристики.
 Нормализуется только краевой ASCII whitespace, регистр/нули/NBSP сохраняются.

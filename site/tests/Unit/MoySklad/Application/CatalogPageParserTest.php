@@ -28,6 +28,28 @@ final class CatalogPageParserTest extends TestCase
         self::assertSame([['id' => '00000000-0000-4000-8000-000000000201', 'name' => 'Цвет', 'value' => 'Синий']], $variants[0]->characteristics);
     }
 
+    public function testBarcodesPreserveZerosAndDistinguishMissingFromEmpty(): void
+    {
+        $parser = new CatalogPageParser();
+        foreach (['parseProducts' => 'Product/products_active_page_0.json', 'parseVariants' => 'Variant/variants_documented_page_0.json'] as $method => $fixture) {
+            $page = $this->fixture($fixture);
+            unset($page['rows'][0]['barcodes']);
+            self::assertNull($parser->$method($page, self::ACCOUNT_ID, false)[0]->barcodes);
+            $page['rows'][0]['barcodes'] = [];
+            self::assertSame([], $parser->$method($page, self::ACCOUNT_ID, false)[0]->barcodes);
+            $page['rows'][0]['barcodes'] = [['ean13' => '0012345678901'], ['code128' => '000A'], ['gtin' => '00000000000130']];
+            self::assertSame(['0012345678901', '000A', '00000000000130'], $parser->$method($page, self::ACCOUNT_ID, false)[0]->barcodes);
+        }
+    }
+
+    public function testRejectsNumericBarcodeRatherThanLosingLeadingZeros(): void
+    {
+        $page = $this->fixture('Product/products_active_page_0.json');
+        $page['rows'][0]['barcodes'] = [['ean13' => 1234567890123]];
+        $this->expectException(CatalogSyncException::class);
+        (new CatalogPageParser())->parseProducts($page, self::ACCOUNT_ID, false);
+    }
+
     #[DataProvider('invalidProduct')]
     public function testRejectsInvalidProduct(string $field, mixed $value): void
     {

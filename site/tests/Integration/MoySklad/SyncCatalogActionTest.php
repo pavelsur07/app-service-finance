@@ -55,6 +55,8 @@ final class SyncCatalogActionTest extends WebTestCaseBase
         self::assertSame(1, (int) $db->fetchOne('SELECT COUNT(*) FROM moysklad_variants'));
         $run = static::getContainer()->get(MoySkladSyncRunRepository::class)->latestFor($connection->getCompanyId(), $connection->getId(), 'variant');
         self::assertSame(1, $run?->getUnchanged());
+        self::assertSame(['0012345678901'], $variant->getBarcodes());
+        self::assertSame('["0012345678901"]', $db->fetchOne('SELECT barcodes FROM moysklad_variants WHERE external_id=?', [$variant->getExternalId()]));
     }
 
     public function testVariantFailureKeepsProductCursorAndOldVariantCursor(): void
@@ -303,6 +305,10 @@ final class SyncCatalogActionTest extends WebTestCaseBase
         $body = file_get_contents(__DIR__.'/../../Fixtures/MoySklad/'.$name);
         self::assertIsString($body);
         $page = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
+        foreach ($page['rows'] as &$row) {
+            $row['barcodes'] = [['ean13' => '0012345678901']];
+        }
+        unset($row);
         $page['meta']['limit'] = 100;
         $page['meta']['offset'] = 0;
         $page['meta']['size'] = count($page['rows']);

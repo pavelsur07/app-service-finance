@@ -17,6 +17,14 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
 {
     public function extend(Schema $schema): void
     {
+        $settings = $schema->createTable('moysklad_mapping_settings');
+        $settings->addColumn('company_id', 'guid');
+        $settings->addColumn('connection_id', 'guid');
+        $settings->addColumn('marketplace', 'string', ['length' => 20]);
+        $settings->addColumn('wb_trailing_w', 'boolean', ['default' => false]);
+        $settings->addColumn('version', 'integer', ['default' => 0]);
+        $settings->setPrimaryKey(['company_id', 'connection_id', 'marketplace']);
+        $settings->addForeignKeyConstraint('moysklad_connections', ['company_id', 'connection_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_ms_settings_connection');
         $schema->getTable('moysklad_listing_mapping_revisions')->addForeignKeyConstraint('moysklad_connections', ['company_id', 'connection_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_ms_mapping_connection');
         $schema->getTable('moysklad_listing_mapping_revisions')->addForeignKeyConstraint('moysklad_products', ['company_id', 'connection_id', 'product_external_id'], ['company_id', 'connection_id', 'external_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_mapping_product');
         $schema->getTable('moysklad_listing_mapping_revisions')->addForeignKeyConstraint('moysklad_variants', ['company_id', 'connection_id', 'variant_external_id'], ['company_id', 'connection_id', 'external_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_mapping_variant');
