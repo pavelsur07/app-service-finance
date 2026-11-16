@@ -2,6 +2,7 @@
 
 **Risk:** HIGH-LOCAL
 **Stage base commit:** d99ede00de60e210d373feea8b80e371daa521e4
+**Integration base:** `d321bc79d7a104ccd01acfb51c94beb84ae95393` (master PR3035/3036, own apps unchanged)
 **Branch/PR:** feat/ds-v3-stage-4 — https://github.com/pavelsur07/app-service-finance/pull/3037
 **Work items:**4.1baseline/tests;4.2components;4.3apps;4.4checks/reviews/handoff.
 
@@ -85,3 +86,11 @@ External Codex1round exact REVIEW_GREEN, B/I0/0, read-only stdin-only.
 ## Next
 
 Latest PR CI→Ready→единственное merge+deploy #3037; после доставки Stage5.
+
+### Integration with current master
+
+Master advanced via approved PR3035/3036; merged into task branch before
+handoff. No edits to incoming site/financial code. Own task diff against
+origin/master has no site/Docker/CI/services changes; apps byte-identical
+to reviewed/tested b0350c8df. Complete task review applies to this unchanged
+owned diff. Integrated PHP gates rechecked; latest CI tracked in PR.

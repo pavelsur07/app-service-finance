@@ -1,10 +1,10 @@
 ## Current checkpoint
 
 **Phase:** Stage 4 / handoff
-**Status:** implemented/reviewed; PR3037 final runtime delivery/CI
+**Status:** implemented/reviewed; PR3037 latest integration CI
 **Stage base commit:** d99ede00de60e210d373feea8b80e371daa521e4
 **Branch:** feat/ds-v3-stage-4
-**PR:** https://github.com/pavelsur07/app-service-finance/pull/3037 (Draft, base master verified)
+**PR:** https://github.com/pavelsur07/app-service-finance/pull/3037 (base master; Ready/checks are live PR state)
 
 ### Completed
 - Stages1/2/3 delivered: PR3027/3030/3034; fallback rule PR3028 in master.
@@ -26,10 +26,12 @@
   post-green scoped logout correction verified bothapps desktop/mobile4PASS.
 
 ### Exact next action
-- Push full runtime/stage report/handoff to Draft3037, verify latest-head CI.
-- After green markReady and ask single "merge and deploy #3037".
-- On approval run pipeline to post-deploy readonly acceptance without more questions.
-- Stage5 separate PR, not started. No site/production config changes.
+- Runtime b0350c8df pushed; synced masterd321bc79d (PR3035/3036).
+  Own apps unchanged; own diff origin/master has no site/production changes.
+- Verify latest-head CI in PR3037; markReady if Draft and checks green.
+- Единственное решение Владельца: "merge and deploy #3037". Upon approval
+  run full pipeline through readonly post-deploy acceptance without more questions.
+- Stage5 separate PR, not started.
 
 ### Files to inspect first on resume
 - plan.md, apps/*/src/app, apps/packages/ds/src/components

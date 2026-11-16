@@ -2,7 +2,7 @@
 
 **Branch:** feat/ds-v3-stage-4
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/3037 (base master)
-**Base:** d99ede00d; plan commit0177e328c, runtime stage commit follows.
+**Base:** d99ede00d; plan0177e328c, runtime b0350c8df, integration based321bc79d (PR3035/3036).
 **CI:** live PR latest-head checks; Draft до завершения gates.
 
 Stages1/2/3 delivered PR3027/3030/3034. Stage4 — общий header/sidebar/footer
@@ -34,3 +34,7 @@ Reports: stages/stage-4.md, reviews/codex-stage-4.md, checkpoint.md.
 
 Ready: PR #3037 "feat(ds): Stage 4 — общий каркас account и admin" — merge into master with automatic production deploy?
 Reply: "merge and deploy #3037"
+
+Integration: approved current master merged, apps identical to reviewed code.
+Own diff to origin/master excludes site/financial code from those other PRs.
+Latest-head CI and integrated backend checks linked in PR; no new migrations.

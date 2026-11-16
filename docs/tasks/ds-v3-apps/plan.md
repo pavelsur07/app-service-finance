@@ -303,3 +303,6 @@ No production Docker/CI config changes or dependencies required.
 Stage4 verified: SSR10, apps92/88, fixture21, nginx44PASS6skips+fixture21,
 17screenshots pairs. Author IMPORTANT2fixed; fresh internal0/0/0, external
 1roundREVIEW_GREEN0/0; final logout scoped fix independently checked. PR3037.
+
+Stage4 integration based321bc79d: master PR3035/3036 merged; own apps unchanged,
+site/ own diff to origin/master empty. Final delivery state/checks in PR3037.
