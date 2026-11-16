@@ -52,6 +52,33 @@ final class ProjectionBuilderTest extends TestCase
         self::assertSame(['old' => '-10.00', 'new' => '-20.00'], $report->amountsByCategory());
     }
 
+    public function testRevenueWithSppIsSaleMinusMarketplaceDiscountAndReturnsKeepTheirSign(): void
+    {
+        // пример DATA.md §9.2: 2999 − 1818,74 − 11,69 = 1168,57; у возврата СПП и соинвест отрицательные
+        $amounts = ProjectionBuilder::revenueWithSpp([
+            new CanonPlSum('ozon', 'cab-1', '2026-11-01', OperationKind::SALE, 'ozon:field:sale_amount', 299900),
+            new CanonPlSum('ozon', 'cab-1', '2026-11-01', OperationKind::SPP, 'ozon:field:bonus', 181874),
+            new CanonPlSum('ozon', 'cab-1', '2026-11-01', OperationKind::COINVESTMENT, 'ozon:field:coinvestment', 1169),
+            new CanonPlSum('ozon', 'cab-1', '2026-11-02', OperationKind::RETURN, 'ozon:field:sale_amount', -299900),
+            new CanonPlSum('ozon', 'cab-1', '2026-11-02', OperationKind::SPP, 'ozon:field:bonus', -181874),
+            new CanonPlSum('ozon', 'cab-1', '2026-11-02', OperationKind::COINVESTMENT, 'ozon:field:coinvestment', -1169),
+            new CanonPlSum('ozon', 'cab-1', '2026-11-02', OperationKind::COMMISSION, 'ozon:field:commission', -50000),
+        ]);
+
+        self::assertSame([ProjectionBuilder::SPP_SALES => 116857, ProjectionBuilder::SPP_RETURNS => -116857], $amounts);
+    }
+
+    public function testDerivedLinesJoinTheTreeButNotTheCanonIdentity(): void
+    {
+        $report = new ProjectionReport(
+            ProjectionBuilder::project([new CanonPlSum('ozon', 'cab-1', '2026-11-01', OperationKind::SALE, 'x', 100000)], [$this->rule(OperationKind::SALE, 'revenue')]),
+            ['spp' => 80000, 'cogs' => -30000],
+        );
+
+        self::assertSame(['spp' => '800.00', 'cogs' => '-300.00', 'revenue' => '1000.00'], $report->amountsByCategory());
+        self::assertSame(100000, $report->totalMinor());
+    }
+
     private function rule(OperationKind $kind, ?string $category, string $validFrom = Rule::BASE_DATE): Rule
     {
         return new Rule($kind, null, null, $category, RuleOrigin::PRESET, $validFrom);

@@ -68,6 +68,8 @@ final class PlProjectionController extends AbstractController
             'unplaced' => $tree->unplaced,
             'unmapped' => $report->linesOf(ProjectionStatus::UNMAPPED),
             'excluded' => $report->linesOf(ProjectionStatus::EXCLUDED),
+            'missingDerivedCodes' => $report->missingDerivedCodes,
+            'daysWithoutCostPrice' => $report->daysWithoutCostPrice,
             'canonMinor' => $report->totalMinor(),
             'mappedMinor' => $report->totalMinor(ProjectionStatus::MAPPED),
             'excludedMinor' => $report->totalMinor(ProjectionStatus::EXCLUDED),
