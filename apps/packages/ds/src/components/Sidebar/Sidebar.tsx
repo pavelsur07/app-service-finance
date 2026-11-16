@@ -195,7 +195,7 @@ export function Sidebar({
       )}
       <nav
         aria-label="Основная навигация"
-        className={`ds-sidebar-nav ds-scroll scroll-stable min-h-0 flex-1 overflow-y-auto pb-2 ${collapsed ? 'px-2' : 'pr-0.5 pl-2'}`}
+        className={`ds-sidebar-nav ds-scroll min-h-0 flex-1 overflow-y-auto pb-2 ${collapsed ? 'px-2' : 'scroll-stable pr-0.5 pl-2'}`}
       >
         <p
           aria-hidden={collapsed || undefined}

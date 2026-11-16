@@ -1,7 +1,7 @@
 ## Current checkpoint
 
 **Phase:** Stage 4 / handoff
-**Status:** implemented/reviewed; PR3037 latest integration CI
+**Status:** implemented/reviewed; PR3037 final rail fix / latest-head CI
 **Stage base commit:** d99ede00de60e210d373feea8b80e371daa521e4
 **Branch:** feat/ds-v3-stage-4
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/3037 (base master; Ready/checks are live PR state)
@@ -24,10 +24,14 @@
 - Independent fresh internal0/0/0GREEN +focused updated full diffGREEN.
 - External separate Codex1round exact REVIEW_GREEN0/0, stdin-only static;
   post-green scoped logout correction verified bothapps desktop/mobile4PASS.
+- Author MINOR1fixed: utility layer scrollbar gutter in rail; assertion RED→GREEN,
+  fixture21PASS, focused independent INTERNAL_REVIEW_GREEN/open0.
+- Integrated backend gates PASS:4894tests/27154assertions.
 
 ### Exact next action
 - Runtime b0350c8df pushed; synced masterd321bc79d (PR3035/3036).
-  Own apps unchanged; own diff origin/master has no site/production changes.
+  Integration preserved apps; subsequent rail CSS correction independently reviewed.
+  Own diff origin/master has no site/production changes.
 - Verify latest-head CI in PR3037; markReady if Draft and checks green.
 - Единственное решение Владельца: "merge and deploy #3037". Upon approval
   run full pipeline through readonly post-deploy acceptance without more questions.

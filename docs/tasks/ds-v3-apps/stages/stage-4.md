@@ -2,7 +2,7 @@
 
 **Risk:** HIGH-LOCAL
 **Stage base commit:** d99ede00de60e210d373feea8b80e371daa521e4
-**Integration base:** `d321bc79d7a104ccd01acfb51c94beb84ae95393` (master PR3035/3036, own apps unchanged)
+**Integration base:** `d321bc79d7a104ccd01acfb51c94beb84ae95393` (master PR3035/3036)
 **Branch/PR:** feat/ds-v3-stage-4 — https://github.com/pavelsur07/app-service-finance/pull/3037
 **Work items:**4.1baseline/tests;4.2components;4.3apps;4.4checks/reviews/handoff.
 
@@ -52,7 +52,8 @@ Site/, Docker/CI config, dependencies/locks, generated tokens не измене�
 - Preview migrated apps36PASS10skips+fixture20 до последних targeted fixes;
   final extra logout regression4PASS. Final actual nginx both builds PASS;
   final smoke44PASS6skips +fixture21PASS, включая logout-during-refresh.
-- PHPStan/CS/strict-types PASS; unit4889tests/27145assertions (stage base).
+- PHPStan/CS/strict-types PASS; unit4894tests/27154assertions (integrated master).
+- Rail CSS layer regression RED→GREEN: scrollbar-gutter:auto/width:none; fixture21PASS.
 - Real dev/preview/HTTPS/backend+final images также проверяются в PR CI.
 - 17pairs screenshots1440 (login/error/home/company/about/404/sessionerror/
   403/loading) +full/rail screenshots обоих apps и fixture. Loading baseline
@@ -65,7 +66,8 @@ Site/, Docker/CI config, dependencies/locks, generated tokens не измене�
 Fresh independent internal0/0/0GREEN, последующий focused full diff GREEN.
 Author IMPORTANT2(resizefocus,refresh/logout) fixed с RED→GREEN.
 External Codex1round exact REVIEW_GREEN, B/I0/0, read-only stdin-only.
-После scoped logout fix — independent focused review и4regression PASS;
+Author MINOR1(rail utility layer gutter) fixed с RED→GREEN.
+После scoped logout/rail fixes — independent focused reviews и browser PASS;
 повтор внешнего раунда не требуется. Детали ../reviews/codex-stage-4.md.
 
 ## Отклонения и follow-up
@@ -91,6 +93,6 @@ Latest PR CI→Ready→единственное merge+deploy #3037; после �
 
 Master advanced via approved PR3035/3036; merged into task branch before
 handoff. No edits to incoming site/financial code. Own task diff against
-origin/master has no site/Docker/CI/services changes; apps byte-identical
-to reviewed/tested b0350c8df. Complete task review applies to this unchanged
-owned diff. Integrated PHP gates rechecked; latest CI tracked in PR.
+origin/master has no site/Docker/CI/services changes. Integration preserved
+apps; subsequent rail correction received focused review and regression checks.
+Integrated PHP gates passed4894/27154; latest CI tracked in PR.

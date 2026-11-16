@@ -13,6 +13,12 @@ test('viewport shell: header60, sidebar264/72, focus follows collapse/expand', a
   await page.getByRole('button', { name: 'Свернуть меню' }).click();
   await expect(aside).toHaveCSS('width', '72px');
   await expect(
+    page.getByRole('navigation', { name: 'Основная навигация' }),
+  ).toHaveCSS('scrollbar-gutter', 'auto');
+  await expect(
+    page.getByRole('navigation', { name: 'Основная навигация' }),
+  ).toHaveCSS('scrollbar-width', 'none');
+  await expect(
     page.getByRole('button', { name: 'Развернуть меню' }),
   ).toBeFocused();
   await expect(

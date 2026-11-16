@@ -21,6 +21,13 @@ INTERNAL_REVIEW_GREEN, новых B/I/M0/0/0. Сам reviewer тесты не з
   store/API. Regression REDdisabled→GREEN both apps desktop/mobile4PASS;
   final nginx smoke также включает этот сценарий.
 
+## Author finding — MINOR1fixed
+
+- Utility layer `scroll-stable` перекрывал component rail scrollbar rules,
+  оставляя gutter в72px. Класс применяется только expanded; rail получает
+  auto/none. Browser assertion RED→GREEN, полный fixture21PASS. Независимый
+  focused review: INTERNAL_REVIEW_GREEN, новых B/I/M0/0/0, open0.
+
 ## External Codex — round1
 
 Claude CLI отсутствует; fallback по AGENTS §7.2. site/bin/external-review.sh
@@ -37,10 +44,11 @@ ds-kit.css из Git3882c5dd9, текущие токены/стили/компо�
 REVIEW_GREEN
 ```
 
-B/I0/0, rounds1. После внешнего GREEN изменено только busy→logoutBusy binding
-и regression tests/docs; correction получил focused independent internal GREEN
-и фактический RED→GREEN, повторный внешний раунд не нужен по §7.2.
+B/I0/0, rounds1. После внешнего GREEN исправлены busy→logoutBusy binding
+и scoped rail CSS layer, добавлены regression assertions/docs. Обе правки
+получили focused independent internal GREEN и фактический RED→GREEN;
+повторный внешний раунд не нужен по §7.2.
 Артефакты локально: /tmp/vf-ds-v3-stage4/external.
 
 Review metrics: internal BLOCKER0/IMPORTANT2(author, fixed), independent
-reviewer0/0/0; external BLOCKER0/IMPORTANT0, rounds1REVIEW_GREEN; open0.
+reviewer0/0/0; author MINOR1fixed; external BLOCKER0/IMPORTANT0, rounds1REVIEW_GREEN; open0.
