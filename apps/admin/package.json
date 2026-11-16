@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "lint": "cd ../.. && apps/admin/node_modules/.bin/eslint --config apps/admin/eslint.config.js apps/admin site/packages --max-warnings=0 && cd apps/admin && prettier --check . ../../site/packages",
+    "lint": "cd ../.. && apps/admin/node_modules/.bin/eslint --config apps/admin/eslint.config.js apps/admin site/packages apps/packages/ds --max-warnings=0 && cd apps/admin && prettier --check . ../../site/packages && prettier --check --ignore-path ../packages/ds/.prettierignore ../packages/ds",
     "format": "prettier --write . ../../site/packages",
     "test": "vitest run",
     "build": "tsc --noEmit && vite build",

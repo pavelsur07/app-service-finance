@@ -1,0 +1,6 @@
+node_modules
+package-lock.json
+# Source copy and generated outputs are checked by contract tests/check:generated.
+tokens/ds-v3.tokens.json
+src/tokens.css
+src/tokens.ts

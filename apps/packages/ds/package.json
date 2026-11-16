@@ -1,0 +1,23 @@
+{
+  "name": "@vashfindir/ds",
+  "version": "3.4.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens.css": "./src/tokens.css",
+    "./styles.css": "./src/styles.css"
+  },
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "scripts": {
+    "build": "node build/tokens.mjs",
+    "check:generated": "node build/tokens.mjs --check",
+    "test": "../../account/node_modules/.bin/vitest run --config ../../account/vitest.config.ts --root .",
+    "typecheck": "../../account/node_modules/.bin/tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "style-dictionary": "5.8.0"
+  }
+}
