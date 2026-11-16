@@ -248,6 +248,10 @@ test('InputGroup adornments do not cover the input and disabled blocks custom ac
   await expect(
     page.getByRole('button', { name: 'Действие поля' }),
   ).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Действие поля' })).toHaveCSS(
+    'height',
+    '26px',
+  );
 });
 
 test('Toast tones have semantic borders and circular icon backgrounds', async ({

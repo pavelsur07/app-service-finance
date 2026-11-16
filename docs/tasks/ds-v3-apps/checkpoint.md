@@ -1,10 +1,10 @@
 ## Current checkpoint
 
 **Phase:** Stage 3 / handoff
-**Status:** implemented/reviewed, local gates green; PR/CI preparation
+**Status:** implemented/reviewed, local gates green; Draft PR3034, CI in progress
 **Stage base commit:** 18fa0247850e17b7ade692b26c7403385b248a38
 **Branch:** feat/ds-v3-stage-3
-**PR:** ещё не создан
+**PR:** https://github.com/pavelsur07/app-service-finance/pull/3034 (Draft, base master verified)
 
 ### Completed
 - Stage1 PR3027 delivered; fallback rule PR3028 в master.
@@ -23,13 +23,14 @@
 - TSconfig autonomous fixes actual admin Docker RED; subsequent both images GREEN.
 
 ### Review status
-- Fresh internal B/I0/0, MINOR1fixed; final focus checks GREEN.
+- Fresh internal B/I0/0, MINOR2fixed; final focus checks GREEN.
 - External separate Codex1round B/I0/1, IMPORTANTfixed with regression
   RED→GREEN (ToastStack viewport); fixed without re-run, open0.
 
 ### Exact next action
-- Finish post-fix gates, commit/push, create Stage3 Draft PR/base master.
-- Complete CI, update handoff, Ready; ask single merge+deploy question.
+- Implementation ef01dc75d pushed; Draft3034 created/base master verified.
+- Final MINOR input action26px (RED36→GREEN26), Chromium12PASS/types/lintPASS; final commit/push.
+- Complete latest-head CI, Ready; ask single merge+deploy #3034 question.
 - Stage4/5 separate PR, not started.
 
 ### Files to inspect first on resume

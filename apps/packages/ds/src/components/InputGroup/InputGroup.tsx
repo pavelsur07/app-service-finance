@@ -113,6 +113,7 @@ export function InputGroup({
           {action &&
             cloneElement(action, {
               disabled: disabled || action.props.disabled,
+              className: `ds-input-action ${action.props.className ?? ''}`,
             })}
         </span>
       )}

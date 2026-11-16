@@ -48,7 +48,7 @@ Package tests47; apps82/78 (последний вывод — в логах/PR).
 - package typecheck и test PASS; новые .test.tsx включены и при package --root.
 - Preview apps26PASS/8skips + fixture11PASS до ToastStack; финальный fixture
   с stack12PASS. Actual nginx builds/smoke обоих apps PASS30/4skips +fixture11;
-  последний stack не меняет используемые в apps JS, targeted12PASS.
+  последние stack/action26px проверены targeted12PASS; final actual images — PR CI.
 - PHPStan, CS check, strict-types PASS; site-test-unit4889 tests/27145assertions.
   Backend/integration contracts не менялись; real HTTP/HTTPS CI также проверяется.
 - 15 снимков after;15before взяты из exact delivered Stage2 screenshots
@@ -65,7 +65,7 @@ Toast clock test использует paused clock и учитывает мин�
 
 ## Review
 
-Fresh internal: B/I0/0; MINOR1 Toast tones fixed, open0.
+Fresh internal: B/I0/0; MINOR2 fixed: Toast tones и custom InputGroup action26px (RED36→GREEN26), open0.
 External separate Codex1round: B/I0/1; IMPORTANT Toast positioning fixed,
 verified12browser + fresh internal, **fixed without re-run**, open0.
 Ограничения и детали: ../reviews/codex-stage-3.md.

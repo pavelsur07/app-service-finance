@@ -35,5 +35,8 @@ REVIEW_GREEN; зелёный статус по правилу исправлен
 MINOR1 Toast tone border/icon background; исправлен и проверен4tone Chromium
 assertions. Два focused check после runtime fixes и внешнего finding — GREEN.
 
-Review metrics: internal BLOCKER/IMPORTANT0/0, MINOR1fixed; external
+Review metrics: internal BLOCKER/IMPORTANT0/0, MINOR2fixed; external
 BLOCKER/IMPORTANT0/1, confirmed IMPORTANT1fixed, open0, rounds1.
+
+Финальный author MINOR: custom InputGroup action нормализован до26px по
+листу; browser RED36→GREEN26, suite12PASS; targeted types/lint PASS.
