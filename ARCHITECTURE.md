@@ -603,6 +603,7 @@
   (`@companyScopeExempt`, cron); `takeDay(DayWindow): list<OperationRecord>` — та же блокировка дня, что у
   `replaceDay`, операции и снятие отметки `mo_dirty_window`. **Коммитит вызывающий** (команда витрины);
   без транзакции — `\LogicException`; откат вызывающего возвращает отметку.
+- Проекция ОПиУ: `plSums(companyId, from, to, ?channel): list<CanonPlSum>` — Σ по (канал, кабинет, день, вид, код источника), все виды; `companyIds()` — компании с операциями (cron). Только чтение.
 - Сверки: `daySums(channel, from, to, ?companyId): list<CanonDaySum>` — Σ канона по (компания, кабинет,
   день) без видов уровня «справочно»; без компании — гейт переводчика (`@companyScopeExempt`), с компанией —
   экран R10. Только чтение.
@@ -792,7 +793,18 @@
   к шаблону по кодам листов (`LEAF_INPUT`) дерева компании; ключ с `custom` не трогает; статьи нет — правила
   нет; `preset` вне шаблона удаляется. Транзакцией владеет Action, блокировка —
   `pg_advisory_xact_lock('mpp_rule:{companyId}')`. Консоль —
-  `app:marketplace-pl-projection:sync-template --company-id=… [--execute]` (без `--execute` — план); cron нет.
+  `app:marketplace-pl-projection:sync-template --company-id=… | --all [--execute]` (без `--execute` — план;
+  `--all` — компании с операциями канона); cron `40 * * * *` — `--all --execute`.
+- Проекция — `Application\Service\ProjectionBuilder::build(companyId, from, to, ?channel): ProjectionReport`:
+  `MarketplaceOperationsFacadeInterface::plSums()` (Σ канона по каналу, кабинету, дню, виду и коду источника)
+  × правило на день. Считается при чтении, ничего не хранит. Строка `ProjectionLine` — канал × вид × код ×
+  `ProjectionStatus` (`mapped` / `excluded` — правило без статьи / `unmapped` — правила нет) × статья;
+  Σ канона = Σ трёх статусов. `ProjectionReport::amountsByCategory()` — рубли в знаке строки документа
+  `marketplace_pl`, вход `FinanceFacade::calculatePlPreview()`.
+- Экран — `GET /marketplace/economics/pl` (`marketplace_pl_projection`, `PlProjectionController`, вкладка «ОПиУ»,
+  модуль `MARKETPLACE`): `from`, `to` (по умолчанию текущий месяц, МСК; не длиннее 366 дней), `channel`.
+  Колонки дерева — новый расчёт, текущий (`Marketplace\Facade\LegacyPlPreviewFacadeInterface::amountsByCategory()` —
+  «Итого» предпросмотра ОПиУ легаси) и разница; ниже — «не сопоставлено» и «исключено» по видам и кодам.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -3190,6 +3202,14 @@ deleteCostMapping(string $companyId, string $mappingId): void
 // Переназначить статью юнит-экономики для маппинга (API только, UI кнопки нет)
 // Выбрасывает DomainException если маппинг не найден
 remapCostMapping(string $companyId, string $mappingId, UnitEconomyCostType $newType): UnitEconomyCostMapping
+```
+
+### `LegacyPlPreviewFacadeInterface` (`src/Marketplace/Facade/LegacyPlPreviewFacade.php`)
+```php
+// Что текущий расчёт отнёс бы на статьи ОПиУ за период («Итого» предпросмотра ОПиУ), в знаке строки
+// документа marketplace_pl. Только чтение; потребитель — MarketplacePlProjection (колонка сравнения).
+// @return array<string, string> plCategoryId → сумма
+amountsByCategory(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $marketplace = null): array
 ```
 
 ### `ListingTagFacade` (`src/Marketplace/Facade/ListingTagFacade.php`)
@@ -5728,6 +5748,7 @@ config/
 | `app:marketplace-ozon:translate --relink` | `57 6 * * *` | То же + повторный перевод дней с операциями без листинга (листинг появился после перевода) |
 | `app:marketplace-economics:refresh` | `10-59/15 * * * *` | Пересчёт витрины экономики SKU по дням, заменённым в каноне; день — транзакция; сбой дня — ERROR в конце прогона |
 | `app:marketplace-economics:refresh --recent=45` | `15 7 * * *` | То же + все дни с операциями за 45 суток (себестоимость и реклама легаси меняются без отметки в каноне) |
+| `app:marketplace-pl-projection:sync-template --all --execute` | `40 * * * *` | preset-правила «вид операции → статья ОПиУ» компаний с операциями канона — по шаблону платформы; custom не трогает; в ОПиУ не пишет |
 | `app:marketplace-economics:health-check` | `30 9 * * *` | Гейт витрины: Σ витрины дня ≠ Σ канона, заменённый день не пересчитан > 60 мин или нераспределённое за 7 дней > 1 % затрат — ERROR, exit 1 |
 | `app:marketplace-economics:weekly-report` | `0 9 * * 1` | Отчёт R3 «Неделя»: сводка и xlsx за прошлую неделю владельцу (почта) и в Telegram; `ECONOMICS_WEEKLY_REPORT_COMPANIES`; сбой компании — ERROR, exit 1 |
 | `app:marketplace-wb:translate` | `7-59/15 * * * *` | Перевод дневного отчёта WB из `sf_fact` в канон (все кабинеты); `--relink` — `58 6 * * *` |
@@ -5833,6 +5854,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.203 | 2026-11-16 | MarketplacePlProjection (этап 3–4): проекция ОПиУ из канона при чтении (`ProjectionBuilder`, без хранимой таблицы), экран `/marketplace/economics/pl` — новый расчёт рядом с текущим; `MarketplaceOperationsFacadeInterface::plSums()`, `companyIds()`; `LegacyPlPreviewFacadeInterface`; cron `sync-template --all` |
 | 2.202 | 2026-11-16 | MarketplacePlProjection (этап 2): `MappingTemplate` v2 — 6 исключений Ozon по коду источника, шаблон равен базовому маппингу легаси; `TemplateLegacyParityTest` |
 | 2.201 | 2026-11-16 | MarketplacePlProjection (этап 1): новый модуль, `mpp_rule` — правила компании «вид канона / код источника → статья ОПиУ» с датой действия и происхождением `preset`/`custom`, `RuleResolver`, шаблон платформы `MappingTemplate` v1, `app:marketplace-pl-projection:sync-template`; в ОПиУ не пишет |
 | 2.200 | 2026-11-15 | MoySklad: автомаппинг25 листингов Ozon/WB в legacy UI, exact article/explicit size, immutable Redis preview, guarded per-row apply, CAS/replay и audit |

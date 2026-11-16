@@ -50,6 +50,7 @@
                 {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
                     {label: 'По SKU', href: path('marketplace_economics_sku', params), active: true},
                     {label: 'Динамика', href: path('marketplace_economics_dynamics', params|merge({sort: null, dir: null, page: null, limit: null})), active: false},
+                    {label: 'ОПиУ', href: path('marketplace_pl_projection'), active: false},
                     {label: 'Качество данных', href: path('marketplace_economics_quality'), active: false},
                 ]} only %}
             </nav>

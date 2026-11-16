@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceOperations\Facade;
 
 use App\MarketplaceOperations\Application\DTO\CanonDaySum;
+use App\MarketplaceOperations\Application\DTO\CanonPlSum;
 use App\MarketplaceOperations\Application\DTO\DayOperations;
 use App\MarketplaceOperations\Application\DTO\DayWindow;
 use App\MarketplaceOperations\Application\DTO\OperationRecord;
@@ -129,6 +130,31 @@ final readonly class MarketplaceOperationsFacade implements MarketplaceOperation
             $params,
             $types,
         ));
+    }
+
+    public function plSums(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $channel = null): array
+    {
+        $params = ['company' => $companyId, 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')];
+        $filter = '';
+        if (null !== $channel) {
+            $filter = ' AND channel = :channel';
+            $params['channel'] = $channel;
+        }
+
+        return array_map(static fn (array $r): CanonPlSum => new CanonPlSum((string) $r['channel'], (string) $r['connection_ref'], (string) $r['operation_date'], OperationKind::from((string) $r['kind']), (string) $r['source_type'], (int) $r['amount']), $this->connection->fetchAllAssociative(
+            'SELECT channel, connection_ref, operation_date, kind, source_type, SUM(amount_minor) AS amount FROM mo_operation
+             WHERE company_id = :company AND operation_date BETWEEN :from AND :to'.$filter.'
+             GROUP BY channel, connection_ref, operation_date, kind, source_type ORDER BY operation_date, channel, connection_ref, kind, source_type',
+            $params,
+        ));
+    }
+
+    public function companyIds(): array
+    {
+        /** @var list<string> $ids */
+        $ids = $this->connection->fetchFirstColumn('SELECT DISTINCT company_id FROM mo_operation ORDER BY company_id');
+
+        return $ids;
     }
 
     public function takeDay(DayWindow $day): array
