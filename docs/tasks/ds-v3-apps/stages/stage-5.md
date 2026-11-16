@@ -95,3 +95,15 @@ from reviewed runtime04703c014; own diff origin/master has no site/config/
 services changes. Incoming code untouched; PHP/apps contracts unchanged.
 No owner files changed. Image comparison initially included nginx base50x.html;
 corrected comparison verifies every dist asset plus only that expected extra.
+
+
+## Production delivery — завершено
+
+PR3039 merged da7cef6550cfac694e00d92cf7ef7b6efaf0eff9;
+[pipeline43863099728](https://github.com/pavelsur07/app-service-finance/actions/runs/43863099728) SUCCESS, deploy SUCCESS.
+Readonly wrapper: оба apps healthy exact SHA. HTTPS23/23, CSS Stage5
+в обоих bundles, public browser2/2PASS,0page errors/external requests.
+Production login/data mutations вручную не выполнялись.
+
+Задача закрыта 2026-11-16. Исторические /tmp артефакты после приёмки
+архивированы и убраны; архив/SHA256/cleanup — checkpoint.md.

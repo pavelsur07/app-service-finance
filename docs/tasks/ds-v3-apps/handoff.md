@@ -1,10 +1,11 @@
-# ds-v3-apps — Stage5 handoff
+# ds-v3-apps — закрыто / Stage5 доставлен
 
-**Branch:** feat/ds-v3-stage-5
+**Branch:** feat/ds-v3-stage-5 (merged, удалена)
 **PR:** https://github.com/pavelsur07/app-service-finance/pull/3039 (master)
 **Stage base:**03a34a2db176d0ecbb67ad904f28b8a7760c57c2
 **Integration base:**5a7725216; runtime04703c014, integration3a3d74aa3 preserves apps.
-**Runtime/CI:** latest PR head/checks; Ready only after exact-head CI success.
+**Production:** merge `da7cef6550cfac694e00d92cf7ef7b6efaf0eff9`; [pipeline43863099728](https://github.com/pavelsur07/app-service-finance/actions/runs/43863099728) SUCCESS.
+**Acceptance:** account/admin healthy SHA; HTTPS23/23 +Stage5 CSS; public browser2/2PASS.
 
 Stages1–4 delivered PR3027/3030/3034/3037. Stage5 completes specified §3.1
 Data/Tags/Table/Tabs/KPI/overlays/pickers/formatters. Account uses DS Pagination
@@ -35,5 +36,14 @@ Native dialog/ToastStack scope gap documented TODO(ds); P1 calendar/auth/error/
 loading/combobox/bulk table/dark deferred pending sheets. Details stage-5.md
 and checklist-stage-5.md; no open B/I.
 
-Ready: PR #3039 "feat(ds): Stage 5 — данные, оверлеи и форматтеры" — merge into master with automatic production deploy?
-Reply: "merge and deploy #3039"
+Владелец одобрил merge/deploy #3039 2026-11-16; pipeline и read-only
+production acceptance завершены. Phase0 и Stages1–5 закрыты.
+
+Ветки этапов и fallback-rule удалены по отдельной просьбе Владельца,
+Рабочие артефакты, сборки и результаты тестов убраны, доказательства перенесены в архив
+`/home/deploy/.codex/artifacts/ds-v3-apps-2026-11-16-closeout.tar.gz`
+с сохранением имён каталогов из исторических ссылок /tmp. Подробности
+и SHA256 — checkpoint.md. Архив и скриншоты в Git не добавляются.
+
+P1 без утверждённых листов и тёмная тема остаются отложенными согласно
+исходному плану.

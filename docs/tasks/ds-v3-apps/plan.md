@@ -342,3 +342,15 @@ Risk HIGH-LOCAL; отдельный PR, без site/dependencies/production conf
 - [x] Both apps gates, package tests, preview/actual-nginx browser smoke,
   1440 screenshots/contrast; scope gates and all acceptance blockers.
 - [x] Fresh independent internal/external reviews, fixed B/I, Stage Report.
+
+
+## Закрытие — 2026-11-16
+
+Phase0 и Stages1–5 выполнены и доставлены: PR3027/3030/3034/3037/3039,
+правило reviewer fallback — PR3028. Финальная поставка: merge da7cef655,
+production43863099728SUCCESS, оба apps healthy SHA, HTTPS23/23 и browser2/2PASS.
+Все обязательные критерии согласованного scope закрыты; P1/dark отложены.
+
+Состояние закрытия и сохранённый архив доказательств — checkpoint.md.
+Ветки этапов/fallback удалены после проверки merge ancestry и live head;
+рабочие артефакты/test builds очищены по просьбе Владельца.
