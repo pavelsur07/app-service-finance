@@ -94,7 +94,7 @@ final class AutomaticMappingPreviewStorageTest extends TestCase
     public function testGuardRejectsMalformedAndUnsupportedRule(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new AutomaticMappingGuard(Uuid::uuid7()->toString(), 'guessed_rule', str_repeat('a', 64), null);
+        new AutomaticMappingGuard(Uuid::uuid7()->toString(), 'guessed_rule', str_repeat('a', 64), null, str_repeat('b', 64));
     }
 
     public function testAttemptsRemainSeparateBoundedAndImmutable(): void

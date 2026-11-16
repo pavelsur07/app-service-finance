@@ -18,16 +18,24 @@ final readonly class AutomaticMappingDecision
         public array $matchedRules = [],
         public ?string $comparedSize = null,
         public ?string $selectedCharacteristicId = null,
+        /** @var list<AutomaticMappingCandidate> */
+        public array $candidates = [],
     ) {
         Assert::true((AutomaticMappingDecisionStatus::READY === $status) === (null !== $target));
         $this->reason = $status->label();
+    }
+
+    public function fingerprint(): string
+    {
+        return hash('sha256', json_encode([$this->status, $this->target, $this->matchedRules, $this->comparedSize, $this->selectedCharacteristicId, $this->candidates], \JSON_THROW_ON_ERROR));
     }
 
     /** @return list<string> */
     public function getRuleLabels(): array
     {
         return array_map(static fn (string $rule): string => match ($rule) {
-            'direct_article' => 'Артикул позиции', 'parent_article_size' => 'Артикул родителя и размер', default => $rule,
+            'direct_article' => 'Артикул позиции', 'parent_article_size' => 'Артикул родителя и размер',
+            'exact_code' => 'Точный код позиции', 'wb_article_alias' => 'Алиас WB (конечный W/w)', 'exact_barcode' => 'Точный штрихкод', default => $rule,
         }, $this->matchedRules);
     }
 }

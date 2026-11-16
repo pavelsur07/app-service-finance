@@ -44,9 +44,12 @@ final readonly class ApplyAutomaticListingMappingsAction
             try {
                 $state = ($this->writer)(new ChangeListingMappingCommand($command->companyId, $command->actorUserId, $command->connectionId, $id,
                     ListingMappingOperation::SET, $item->targetType, $item->targetExternalId, 0, $item->requestId,
-                    new AutomaticMappingGuard($preview->id, $preview->ruleVersion, $item->sourceFingerprint, $preview->sizeCharacteristicId)));
+                    new AutomaticMappingGuard($preview->id, $preview->ruleVersion, $item->sourceFingerprint, $preview->sizeCharacteristicId, $item->decision->fingerprint())));
                 $results[] = new AutomaticMappingApplyItem($id, Status::ACCEPTED, revisionId: $state->revisionId);
             } catch (ListingMappingException $error) {
+                if ('listing_busy' === $error->reason) {
+                    $this->logger->warning('MoySklad mapping source is busy.', ['companyId' => $command->companyId, 'listingId' => $id]);
+                }
                 $results[] = new AutomaticMappingApplyItem($id, Status::CONFLICT, $error->getMessage());
                 $stopped = !$this->em->isOpen();
             } catch (\Throwable $error) {

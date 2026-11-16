@@ -19,6 +19,7 @@ final readonly class AutomaticMappingPreviewQuery
         private MarketplaceFacade $marketplace, private MoySkladListingMappingsQuery $mappings,
         private MoySkladCatalogTargetsQuery $catalog, private AutomaticMappingCandidatesQuery $candidates,
         private AutomaticListingMappingPolicy $policy, private MappingCharacteristicsQuery $characteristics,
+        private MappingSettingsQuery $settings,
     ) {
     }
 
@@ -30,30 +31,29 @@ final readonly class AutomaticMappingPreviewQuery
             throw new ListingMappingException('not_found', 'Характеристика недоступна в выбранном подключении.');
         }
         $source = $this->marketplace->paginateListingsForExternalMapping($companyId, $marketplace, $q, $page, 25);
+        $barcodes = $this->marketplace->getListingBarcodesByIds($companyId, array_column($source->items, 'id'));
+        $settings = $this->settings->get($companyId, $connectionId, $marketplace);
         $states = $this->mappings->currentForListings($companyId, $connectionId, array_column($source->items, 'id'));
         $ready = $this->catalog->isReady($companyId, $connectionId);
         $decisions = [];
-        $articles = [];
         foreach ($source->items as $listing) {
             $state = $states[$listing->id];
             $status = match (true) {
+                'package_review' === $state->reason => Status::PACKAGE_REVIEW,
                 $state->revision > 0 => 'unmapped' === $state->status ? Status::CLEARED_MAPPING : Status::EXISTING_MAPPING,
                 !$listing->isActive => Status::LISTING_UNAVAILABLE,
-                null === AutomaticListingMappingPolicy::normalizeKey($listing->supplierSku) => Status::NO_ARTICLE,
                 !$ready => Status::CATALOG_NOT_READY,
                 default => null,
             };
             if (null !== $status) {
                 $decisions[$listing->id] = new AutomaticMappingDecision($status);
-            } else {
-                $articles[] = $listing->supplierSku ?? '';
             }
         }
-        $groups = $this->candidates->forArticles($companyId, $connectionId, $articles);
+        $groups = $this->candidates->forListings($companyId, $connectionId, array_values(array_filter($source->items, static fn ($listing): bool => !isset($decisions[$listing->id]))), $barcodes, $settings->wbTrailingW);
         foreach ($source->items as $listing) {
             if (!isset($decisions[$listing->id])) {
-                $group = $groups['article:'.AutomaticListingMappingPolicy::normalizeKey($listing->supplierSku)] ?? new AutomaticMappingCandidates([], 0);
-                $decisions[$listing->id] = $this->policy->decide($listing, $group, $sizeCharacteristicId);
+                $group = $groups[$listing->id] ?? new AutomaticMappingCandidates([], 0);
+                $decisions[$listing->id] = $this->policy->decide($listing, $group, $sizeCharacteristicId, $barcodes[$listing->id] ?? [], $settings->wbTrailingW);
             }
         }
         $counts = array_fill_keys(array_column(Status::cases(), 'value'), 0);
@@ -62,6 +62,6 @@ final readonly class AutomaticMappingPreviewQuery
         }
         $counts['total_shown'] = count($source->items);
 
-        return new AutomaticMappingPreviewPage($source, $decisions, $counts, $q, $sizeCharacteristicId);
+        return new AutomaticMappingPreviewPage($source, $decisions, $counts, $q, $sizeCharacteristicId, $barcodes, $settings);
     }
 }

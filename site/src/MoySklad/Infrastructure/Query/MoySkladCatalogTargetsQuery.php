@@ -15,13 +15,13 @@ final readonly class MoySkladCatalogTargetsQuery
 {
     private const TARGETS = <<<'SQL'
         SELECT 'product' AS type, p.external_id, NULL::uuid AS parent_external_id,
-            p.name, p.code, p.article, '[]'::jsonb AS characteristics, p.archived,
+            p.name, p.code, p.article, p.barcodes, '[]'::jsonb AS characteristics, p.archived,
             FALSE AS parent_archived, p.variants_count,
             EXISTS(SELECT 1 FROM moysklad_variants child WHERE child.company_id=p.company_id AND child.connection_id=p.connection_id AND child.product_external_id=p.external_id) AS has_variants
         FROM moysklad_products p WHERE p.company_id=:company AND p.connection_id=:connection
         UNION ALL
         SELECT 'variant' AS type, v.external_id, v.product_external_id AS parent_external_id,
-            v.name, v.code, v.article, v.characteristics, v.archived,
+            v.name, v.code, v.article, v.barcodes, v.characteristics, v.archived,
             p.archived AS parent_archived, 0 AS variants_count, FALSE AS has_variants
         FROM moysklad_variants v JOIN moysklad_products p
             ON p.company_id=v.company_id AND p.connection_id=v.connection_id AND p.external_id=v.product_external_id
@@ -88,7 +88,7 @@ final readonly class MoySkladCatalogTargetsQuery
             Assert::keyExists($ids, $parts[0]);
             $ids[$parts[0]][] = Uuid::fromString($parts[1])->toString();
         }
-        $rows = $this->db->fetchAllAssociative('SELECT type, external_id, parent_external_id, name, code, article, characteristics, archived, parent_archived, variants_count, has_variants FROM ('.self::TARGETS.") targets WHERE (type = 'product' AND external_id IN (:products)) OR (type = 'variant' AND external_id IN (:variants))",
+        $rows = $this->db->fetchAllAssociative('SELECT type, external_id, parent_external_id, name, code, article, barcodes, characteristics, archived, parent_archived, variants_count, has_variants FROM ('.self::TARGETS.") targets WHERE (type = 'product' AND external_id IN (:products)) OR (type = 'variant' AND external_id IN (:variants))",
             ['company' => $companyId, 'connection' => $connectionId, 'products' => $ids['product'], 'variants' => $ids['variant']],
             ['products' => ArrayParameterType::STRING, 'variants' => ArrayParameterType::STRING]);
         $result = [];
@@ -131,7 +131,7 @@ final readonly class MoySkladCatalogTargetsQuery
         if ($page > max(1, (int) ceil($total / 20))) {
             return new CatalogTargetPage([], $page, $total);
         }
-        $rows = $this->db->fetchAllAssociative('SELECT type, external_id, parent_external_id, name, code, article, characteristics, archived, parent_archived, variants_count, has_variants'.$sql.' ORDER BY name, type, external_id LIMIT 20 OFFSET '.(($page - 1) * 20), $params);
+        $rows = $this->db->fetchAllAssociative('SELECT type, external_id, parent_external_id, name, code, article, barcodes, characteristics, archived, parent_archived, variants_count, has_variants'.$sql.' ORDER BY name, type, external_id LIMIT 20 OFFSET '.(($page - 1) * 20), $params);
 
         return new CatalogTargetPage(array_map(CatalogTargetDTO::fromRow(...), $rows), $page, $total);
     }

@@ -17,6 +17,16 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
 {
     public function extend(Schema $schema): void
     {
+        $reviews = $schema->createTable('moysklad_mapping_package_reviews');
+        foreach (['company_id', 'connection_id', 'listing_id', 'actor_user_id'] as $column) {
+            $reviews->addColumn($column, 'guid');
+        }
+        $reviews->addColumn('revision', 'integer');
+        $reviews->addColumn('source_fingerprint', 'string', ['length' => 64]);
+        $reviews->addColumn('target_fingerprint', 'string', ['length' => 64]);
+        $reviews->addColumn('checked_at', 'datetime_immutable_utc_ms', ['precision' => 3]);
+        $reviews->setPrimaryKey(['company_id', 'connection_id', 'listing_id', 'revision', 'source_fingerprint', 'target_fingerprint']);
+        $reviews->addForeignKeyConstraint('moysklad_listing_mapping_revisions', ['company_id', 'connection_id', 'listing_id', 'revision'], ['company_id', 'connection_id', 'listing_id', 'revision'], ['onDelete' => 'RESTRICT'], 'fk_ms_review_revision');
         $settings = $schema->createTable('moysklad_mapping_settings');
         $settings->addColumn('company_id', 'guid');
         $settings->addColumn('connection_id', 'guid');

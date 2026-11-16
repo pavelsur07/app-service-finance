@@ -16,7 +16,7 @@ Checks: unit MoySklad; integration SyncCatalogAction, storage/facade.
 Review focus: company/connection/marketplace scope, leading zeros, schema consistency.
 
 ## Stage 2: правила и защищённая запись
-Risk: HIGH-LOCAL. stage_base_commit: перед началом.
+Risk: HIGH-LOCAL. stage_base_commit: d66582791.
 DoD / приёмка:
 - [ ] Объединение точного артикула/родителя+размера/кода/алиаса/штрихкода; разные кандидаты блокируют автомаппинг.
 - [ ] WB: удаление одного конечного W/w только при включении scoped пресета.

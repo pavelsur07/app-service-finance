@@ -218,6 +218,8 @@ final class ListingMappingConcurrencyTest extends PostgresResetTestCase
         $process = null;
         $this->connection->beginTransaction();
         try {
+            // Reproduce the historical migration's schema before the later review-audit FK existed.
+            $this->connection->executeStatement('ALTER TABLE moysklad_mapping_package_reviews DROP CONSTRAINT fk_ms_review_revision');
             require_once \dirname(__DIR__, 3).'/migrations/Version20261115153000.php';
             $migration = new \DoctrineMigrations\Version20261115153000($this->connection, new \Psr\Log\NullLogger());
             $migration->down(new \Doctrine\DBAL\Schema\Schema());

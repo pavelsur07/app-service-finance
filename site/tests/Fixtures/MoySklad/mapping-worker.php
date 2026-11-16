@@ -36,6 +36,12 @@ try {
             $db->rollBack();
             echo "rejected:history_not_empty\n";
         }
+    } elseif ('barcode_insert' === ($data['mode'] ?? '')) {
+        $db->executeStatement("INSERT INTO marketplace_listing_barcodes (id,listing_id,company_id,marketplace,barcode) VALUES (?, ?, ?, 'ozon', '000123')", [Uuid::uuid7()->toString(), $data['listing'], $data['company']]);
+        echo "success:barcode\n";
+    } elseif ('barcode_move' === ($data['mode'] ?? '')) {
+        $db->executeStatement("UPDATE marketplace_listing_barcodes SET listing_id=? WHERE company_id=? AND barcode='000123'", [$data['other'], $data['company']]);
+        echo "success:barcode\n";
     } elseif (str_starts_with($data['mode'] ?? '', 'sync_')) {
         $http = new Symfony\Component\HttpClient\MockHttpClient(function (string $method, string $url) use ($db, $data): Symfony\Component\HttpClient\Response\MockResponse {
             if (str_ends_with($data['mode'], '_paused')) {
@@ -124,7 +130,8 @@ try {
                 $container->get(App\MoySklad\Infrastructure\Lock\MoySkladCatalogLock::class),
                 $container->get(App\MoySklad\Domain\AutomaticListingMappingPolicy::class),
                 $container->get(App\MoySklad\Infrastructure\Query\AutomaticMappingCandidatesQuery::class),
-                $container->get(App\MoySklad\Infrastructure\Query\MappingCharacteristicsQuery::class));
+                $container->get(App\MoySklad\Infrastructure\Query\MappingCharacteristicsQuery::class),
+                $container->get(App\MoySklad\Infrastructure\Query\MappingSettingsQuery::class));
         }
         $result = $action(new ChangeListingMappingCommand($data['company'], '22222222-2222-4222-8222-000000000001',
             $data['connection'], $data['listing'], ListingMappingOperation::SET, $data['targetType'] ?? 'product', $data['target'] ?? $data['product'], 0, $data['request'],

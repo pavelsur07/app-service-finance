@@ -35,7 +35,7 @@ final readonly class AutomaticMappingPreview
         $policy = new AutomaticListingMappingPolicy();
         $items = [];
         foreach ($page->listingsPage->items as $source) {
-            $items[] = new AutomaticMappingPreviewItem($source, $policy->sourceFingerprint($source), Uuid::uuid7()->toString(), $page->decisions[$source->id]);
+            $items[] = new AutomaticMappingPreviewItem($source, $policy->sourceFingerprint($source, $page->barcodes[$source->id] ?? [], $page->settings), Uuid::uuid7()->toString(), $page->decisions[$source->id]);
         }
 
         return new self(Uuid::uuid7()->toString(), $companyId, $actorUserId, $connectionId, $marketplace,
@@ -62,7 +62,7 @@ final readonly class AutomaticMappingPreview
             $d = $item['decision'];
             $target = $d['target'];
             $decision = new AutomaticMappingDecision(AutomaticMappingDecisionStatus::from($d['status']),
-                null === $target ? null : new CatalogTargetDTO(...$target), $d['matchedRules'], $d['comparedSize'], $d['selectedCharacteristicId']);
+                null === $target ? null : new CatalogTargetDTO(...$target), $d['matchedRules'], $d['comparedSize'], $d['selectedCharacteristicId'], array_values(array_map(static fn (array $candidate): AutomaticMappingCandidate => new AutomaticMappingCandidate(new CatalogTargetDTO(...$candidate['target']), $candidate['parentArticle'], $candidate['leaf']), $d['candidates'] ?? [])));
             $items[] = new AutomaticMappingPreviewItem(new ListingMetaDTO(...$item['source']), $item['sourceFingerprint'], $item['requestId'], $decision);
         }
 

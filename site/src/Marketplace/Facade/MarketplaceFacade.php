@@ -693,7 +693,7 @@ final readonly class MarketplaceFacade
         return $this->listingMetaQuery->findByIds($companyId, $listingIds);
     }
 
-    /** Holds FOR SHARE until the calling Action commits. Returns fresh DBAL metadata. */
+    /** Holds listing FOR UPDATE and existing barcodes FOR SHARE until caller commit; prevents barcode inserts, transfers and deletes. Returns fresh DBAL metadata. */
     public function lockListingMetaForExternalMapping(string $companyId, string $listingId): ?\App\Marketplace\DTO\ListingMetaDTO
     {
         return $this->listingMetaQuery->lockForExternalMapping($companyId, $listingId);

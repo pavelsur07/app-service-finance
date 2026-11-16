@@ -6189,11 +6189,11 @@ UUIDv7 preview/requestId генерируются сервером; Guard фик
 `ApplyAutomaticListingMappingsAction` вызывает существующий writer отдельно
 для каждой строки без внешней транзакции/flush. Guarded order: connection
 FOR SHARE → mapping advisory → accepted replay → catalog try-lock → source
-FOR SHARE через MarketplaceFacade → recompute policy/candidates → target lock
+FOR UPDATE + barcodes FOR SHARE через MarketplaceFacade → recompute policy/candidates → target lock
 → append/flush/commit. Общий `MoySkladCatalogLock` использует прежний session
 ключ `moysklad-catalog`/connectionId в SyncCatalogAction и writer; освобождение
 во внешнем finally после wrapInTransaction, занятость409 без закрытия EM.
-Facade `lockListingMetaForExternalMapping(companyId, listingId)` требует
+Facade `lockListingMetaForExternalMapping(companyId, listingId)` блокирует родительский listing FOR UPDATE (защита FK INSERT) и существующие barcodes FOR SHARE (защита transfer/delete), требует
 caller transaction, возвращает свежий DBAL DTO, не Entity из identity map.
 Audit listing_snapshot.autoMapping хранит origin/preview/rule/fingerprint/
 characteristic/matchedRules. Replay проверяет полный payload и guard прежде
@@ -6501,3 +6501,22 @@ SettlementUiQuery возвращает scoped own entities/readonly position DTO
 движений, формы имеют подписанный preview50позиций и полный scoped choice set.
 Doc detail показывает текущий свободный остаток и связь обеих сторон погашения.
 Все money HTML значения — точные строки через vf_money/vf_amount.
+
+### MoySklad: identity/package mapping v2
+
+`AutomaticListingMappingPolicy` объединяет direct_article, parent_article_size,
+exact_code, wb_article_alias и exact_barcode. Только WB preset удаляет один
+конечный W/w; регистр/нули не меняются. `forListings(companyId, connectionId,
+listings<=100, barcodeMap, wbTrailingW)` получает bounded union кандидатов,
+включая архивные; `AutomaticMappingDecision` хранит кандидатов и matchedRules.
+`identity_package_v2` fingerprint включает source name/barcodes/settings;
+Guard также содержит fingerprint полного решения/кандидатов. Writer повторяет
+выбор внутри существующих блокировок и проверяет оба fingerprint. Настройки
+меняются только под exclusive connection lock, конфликтующим с writer SHARE.
+`quantities()` извлекает явно указанные целые шт/шт./штук/штуки/штука;
+неизвестное количество не равно одному; разные/неоднозначные запрещают READY.
+`moysklad_mapping_package_reviews` хранит actor/time и отдельные source/target
+fingerprints, scoped company/connection/listing/revision. Ручной спорный SET
+требует явного подтверждения и актуального packageReviewFingerprint. Повторное
+подтверждение текущей связи не создаёт новую ревизию назначения. Query сверяет
+подтверждения с текущими данными и показывает package_review, сохраняя target.

@@ -32,6 +32,7 @@ final readonly class ChangeListingMappingAction
         private MoySkladListingMappingRepository $revisions, private MoySkladCatalogTargetsQuery $targets, private ClockInterface $clock,
         private MoySkladCatalogLock $catalogLock, private AutomaticListingMappingPolicy $automaticPolicy,
         private AutomaticMappingCandidatesQuery $automaticCandidates, private MappingCharacteristicsQuery $characteristics,
+        private \App\MoySklad\Infrastructure\Query\MappingSettingsQuery $settings,
     ) {
     }
 
@@ -41,6 +42,9 @@ final readonly class ChangeListingMappingAction
         try {
             $result = $this->em->wrapInTransaction(function () use ($command, &$catalogLocked): ListingMappingState|ListingMappingException {
                 $db = $this->em->getConnection();
+                if (ListingMappingOperation::SET === $command->operation) {
+                    $db->fetchOne("SELECT set_config('lock_timeout', '2s', true)");
+                }
                 $connection = $db->fetchAssociative('SELECT id FROM moysklad_connections WHERE company_id=:company AND id=:id FOR SHARE',
                     ['company' => $command->companyId, 'id' => $command->connectionId]);
                 if (false === $connection) {
@@ -66,12 +70,8 @@ final readonly class ChangeListingMappingAction
                         return new ListingMappingException('catalog_busy', 'Каталог синхронизируется. Повторите применение.');
                     }
                 }
-                if (null !== $command->automaticGuard) {
-                    // Bound source/target waits while holding the catalog session lock.
-                    $db->fetchOne("SELECT set_config('lock_timeout', '2s', true)");
-                }
                 $current = $this->revisions->latest($command->companyId, $command->connectionId, $command->listingId);
-                if (null !== $command->automaticGuard) {
+                if (ListingMappingOperation::SET === $command->operation) {
                     $source = $this->marketplace->lockListingMetaForExternalMapping($command->companyId, $command->listingId);
                 } else {
                     $sources = $this->marketplace->getListingsMetaByIds($command->companyId, [$command->listingId]);
@@ -83,21 +83,27 @@ final readonly class ChangeListingMappingAction
                 if (($current?->getRevision() ?? 0) !== $command->expectedRevision) {
                     return new ListingMappingException('stale_mapping', 'Связь изменилась. Обновите страницу.');
                 }
-                if ((ListingMappingOperation::CLEAR === $command->operation && (null === $current || ListingMappingOperation::CLEAR === $current->getOperation()))
-                    || (ListingMappingOperation::SET === $command->operation && $current?->getTargetType() === $command->targetType && $current?->getTargetExternalId() === strtolower($command->targetExternalId ?? ''))) {
+                if (ListingMappingOperation::CLEAR === $command->operation && (null === $current || ListingMappingOperation::CLEAR === $current->getOperation())) {
                     return null === $current ? new ListingMappingState() : $this->state($current);
+                }
+                if (!$command->packageReviewConfirmed && null === $command->automaticGuard && ListingMappingOperation::SET === $command->operation
+                    && $current?->getTargetType() === $command->targetType && $current?->getTargetExternalId() === strtolower($command->targetExternalId ?? '')) {
+                    return $this->state($current);
                 }
                 $automaticDecision = null;
                 if (null !== $command->automaticGuard && null !== $source) {
                     $guard = $command->automaticGuard;
-                    if ($this->automaticPolicy->sourceFingerprint($source) !== $guard->sourceFingerprint
+                    $barcodes = $this->marketplace->getListingBarcodesByIds($command->companyId, [$source->id])[$source->id] ?? [];
+                    // Settings writer must take the connection FOR UPDATE; our SHARE lock keeps this version stable.
+                    $settings = $this->settings->get($command->companyId, $command->connectionId, $source->marketplace);
+                    if ($this->automaticPolicy->sourceFingerprint($source, $barcodes, $settings) !== $guard->sourceFingerprint
                         || (null !== $guard->sizeCharacteristicId && null === $this->characteristics->find($command->companyId, $command->connectionId, $guard->sizeCharacteristicId))) {
                         return new ListingMappingException('automatic_mapping_conflict', 'Данные листинга или правило размера изменились. Сформируйте новый предпросмотр.');
                     }
-                    $article = AutomaticListingMappingPolicy::normalizeKey($source->supplierSku);
-                    $groups = $this->automaticCandidates->forArticles($command->companyId, $command->connectionId, null === $article ? [] : [$article]);
-                    $automaticDecision = $this->automaticPolicy->decide($source, $groups['article:'.$article] ?? new AutomaticMappingCandidates([], 0), $guard->sizeCharacteristicId);
-                    if (AutomaticMappingDecisionStatus::READY !== $automaticDecision->status || $automaticDecision->target?->type !== $command->targetType
+                    $groups = $this->automaticCandidates->forListings($command->companyId, $command->connectionId, [$source], [$source->id => $barcodes], $settings->wbTrailingW);
+                    $automaticDecision = $this->automaticPolicy->decide($source, $groups[$source->id] ?? new AutomaticMappingCandidates([], 0), $guard->sizeCharacteristicId, $barcodes, $settings->wbTrailingW);
+                    if ($automaticDecision->fingerprint() !== $guard->candidateFingerprint
+                        || AutomaticMappingDecisionStatus::READY !== $automaticDecision->status || $automaticDecision->target?->type !== $command->targetType
                         || $automaticDecision->target?->externalId !== strtolower($command->targetExternalId ?? '')) {
                         return new ListingMappingException('automatic_mapping_conflict', 'Соответствие изменилось. Сформируйте новый предпросмотр.');
                     }
@@ -115,6 +121,23 @@ final readonly class ChangeListingMappingAction
                         return new ListingMappingException('target_unavailable', 'Позиция недоступна. Выберите неархивный товар или конкретную модификацию.');
                     }
                 }
+                $packageReview = null !== $source && null !== $target && AutomaticListingMappingPolicy::packageNeedsReview($source->title, $target->name);
+                $reviewBarcodes = !$packageReview ? [] : ($barcodes ?? ($this->marketplace->getListingBarcodesByIds($command->companyId, [$source->id])[$source->id] ?? []));
+                if ($packageReview) {
+                    if (!$command->packageReviewConfirmed || null !== $command->automaticGuard) {
+                        return new ListingMappingException('package_review_required', 'Проверить комплектацию: подтвердите проверку количества штук.');
+                    }
+                    if ($command->packageReviewFingerprint !== $this->automaticPolicy->packageReviewFingerprint($source, $target, $reviewBarcodes)) {
+                        return new ListingMappingException('stale_package_review', 'Данные комплектации изменились. Обновите страницу и проверьте их снова.');
+                    }
+                }
+                if (ListingMappingOperation::SET === $command->operation && $current?->getTargetType() === $command->targetType && $current?->getTargetExternalId() === strtolower($command->targetExternalId ?? '')) {
+                    if ($packageReview) {
+                        $this->recordPackageReview($command, $current->getRevision(), $source, $target, $reviewBarcodes);
+                    }
+
+                    return $this->state($current);
+                }
                 $snapshot = null === $source ? $current->getListingSnapshot() : $this->listingSnapshot($source);
                 unset($snapshot['autoMapping']);
                 if (null !== $command->automaticGuard) {
@@ -124,6 +147,11 @@ final readonly class ChangeListingMappingAction
                     $command->expectedRevision + 1, $command->operation, $command->targetType, $command->targetExternalId,
                     $command->requestId, $command->actorUserId, $command->expectedRevision, $this->clock->now(), $snapshot, $target?->toSnapshot());
                 $this->revisions->append($revision);
+                if ($packageReview) {
+                    // Make the revision visible to the composite FK within this same transaction.
+                    $this->em->flush();
+                    $this->recordPackageReview($command, $revision->getRevision(), $source, $target, $reviewBarcodes);
+                }
 
                 return ListingMappingState::fromRevision(MappingRevisionDTO::fromEntity($revision), $target, null !== $source);
             });
@@ -132,17 +160,31 @@ final readonly class ChangeListingMappingAction
             }
 
             return $result;
-        } catch (UniqueConstraintViolationException $error) {
-            if (!str_contains($error->getMessage(), 'uniq_ms_mapping_request')) {
-                throw $error;
+        } catch (\Doctrine\DBAL\Exception\DriverException $error) {
+            if (in_array($error->getSQLState(), ['55P03', '40P01'], true)) {
+                throw new ListingMappingException('listing_busy', 'Листинг занят обновлением данных. Повторите запрос после обновления страницы.');
             }
-            throw new ListingMappingException('idempotency_conflict', 'Ключ запроса уже использован для другого действия.');
+            if ($error instanceof UniqueConstraintViolationException && str_contains($error->getMessage(), 'uniq_ms_mapping_request')) {
+                throw new ListingMappingException('idempotency_conflict', 'Ключ запроса уже использован для другого действия.');
+            }
+            throw $error;
         } finally {
             if ($catalogLocked) {
                 // Outside callback: Doctrine has already flushed and committed.
                 $this->catalogLock->release($command->connectionId);
             }
         }
+    }
+
+    /** @param list<string> $barcodes */
+    private function recordPackageReview(ChangeListingMappingCommand $command, int $revision, ListingMetaDTO $source, \App\MoySklad\Application\DTO\CatalogTargetDTO $target, array $barcodes): void
+    {
+        $this->em->getConnection()->executeStatement('INSERT INTO moysklad_mapping_package_reviews
+            (company_id, connection_id, listing_id, revision, source_fingerprint, target_fingerprint, actor_user_id, checked_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
+            [$command->companyId, $command->connectionId, $command->listingId, $revision,
+                $this->automaticPolicy->sourceFingerprint($source, $barcodes), AutomaticListingMappingPolicy::targetFingerprint($target),
+                $command->actorUserId, $this->clock->now()->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s.v')]);
     }
 
     /** @param array<string,mixed>|null $snapshot */

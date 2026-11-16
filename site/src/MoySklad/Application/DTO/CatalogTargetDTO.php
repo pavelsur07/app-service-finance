@@ -11,6 +11,8 @@ final readonly class CatalogTargetDTO
         public string $type, public string $externalId, public ?string $parentExternalId,
         public string $name, public ?string $code, public ?string $article,
         public array $characteristics, public bool $selectable, public ?string $reason = null,
+        /** @var list<string>|null */
+        public ?array $barcodes = null,
     ) {
     }
 
@@ -28,7 +30,7 @@ final readonly class CatalogTargetDTO
     public function toSnapshot(): array
     {
         return ['type' => $this->type, 'externalId' => $this->externalId, 'parentExternalId' => $this->parentExternalId,
-            'name' => $this->name, 'code' => $this->code, 'article' => $this->article, 'characteristics' => $this->characteristics];
+            'name' => $this->name, 'code' => $this->code, 'article' => $this->article, 'characteristics' => $this->characteristics, 'barcodes' => $this->barcodes];
     }
 
     /** @param array<string,mixed> $row */
@@ -42,6 +44,6 @@ final readonly class CatalogTargetDTO
         $characteristics = json_decode((string) $row['characteristics'], true, 512, \JSON_THROW_ON_ERROR);
 
         return new self((string) $row['type'], (string) $row['external_id'], null === $row['parent_external_id'] ? null : (string) $row['parent_external_id'],
-            (string) $row['name'], null === $row['code'] ? null : (string) $row['code'], null === $row['article'] ? null : (string) $row['article'], $characteristics, null === $reason, $reason);
+            (string) $row['name'], null === $row['code'] ? null : (string) $row['code'], null === $row['article'] ? null : (string) $row['article'], $characteristics, null === $reason, $reason, isset($row['barcodes']) ? json_decode((string) $row['barcodes'], true, 512, \JSON_THROW_ON_ERROR) : null);
     }
 }

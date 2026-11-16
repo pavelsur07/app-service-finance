@@ -55,6 +55,14 @@ final class ApplyAutomaticListingMappingsActionTest extends IntegrationTestCase
         $preview = $this->preview($data);
         if ('duplicate' === $change) {
             $this->em->persist(MoySkladProductBuilder::aProduct()->forConnection($data['connection'])->withIndex(2)->build());
+        } elseif ('settings' === $change) {
+            $this->connection->executeStatement("INSERT INTO moysklad_mapping_settings VALUES (?, ?, 'ozon', FALSE, 1)", [$preview->companyId, $preview->connectionId]);
+        } elseif ('target_name' === $change) {
+            $this->connection->executeStatement('UPDATE moysklad_products SET name=?', ['Новое название']);
+        } elseif ('target_barcode' === $change) {
+            $this->connection->executeStatement('UPDATE moysklad_products SET barcodes=?', ['["000123"]']);
+        } elseif ('source_barcode' === $change) {
+            $this->em->persist(new \App\Marketplace\Entity\MarketplaceListingBarcode(Uuid::uuid7()->toString(), $data['listing'], $preview->companyId, 'ozon', '000123'));
         } elseif ('clear' === $change) {
             $writer = self::getContainer()->get(ChangeListingMappingAction::class);
             $writer(new ChangeListingMappingCommand($preview->companyId, $preview->actorUserId, $preview->connectionId, $preview->items[0]->listingId, ListingMappingOperation::SET, 'product', $data['product']->getExternalId(), 0, Uuid::uuid7()->toString()));
@@ -65,7 +73,7 @@ final class ApplyAutomaticListingMappingsActionTest extends IntegrationTestCase
             $this->connection->executeStatement('UPDATE moysklad_products SET archived=TRUE');
         } else {
             $column = match ($change) {
-                'article' => 'supplier_sku', 'size' => 'size', 'provider' => 'marketplace', 'inactive' => 'is_active', default => 'marketplace_sku',
+                'name' => 'name', 'article' => 'supplier_sku', 'size' => 'size', 'provider' => 'marketplace', 'inactive' => 'is_active', default => 'marketplace_sku',
             };
             $value = match ($change) {
                 'provider' => 'wildberries', 'inactive' => 'false', default => 'CHANGED',
@@ -83,7 +91,7 @@ final class ApplyAutomaticListingMappingsActionTest extends IntegrationTestCase
     /** @return iterable<string,array{string}> */
     public static function changes(): iterable
     {
-        foreach (['duplicate', 'clear', 'disabled', 'archive', 'article', 'size', 'provider', 'inactive', 'sku'] as $change) {
+        foreach (['settings', 'target_name', 'target_barcode', 'source_barcode', 'name', 'duplicate', 'clear', 'disabled', 'archive', 'article', 'size', 'provider', 'inactive', 'sku'] as $change) {
             yield $change => [$change];
         }
     }
@@ -94,9 +102,9 @@ final class ApplyAutomaticListingMappingsActionTest extends IntegrationTestCase
         $preview = $this->preview($data);
         $item = $preview->items[0];
         $writer = self::getContainer()->get(ChangeListingMappingAction::class);
-        $guard = new AutomaticMappingGuard($preview->id, $preview->ruleVersion, $item->sourceFingerprint, null);
+        $guard = new AutomaticMappingGuard($preview->id, $preview->ruleVersion, $item->sourceFingerprint, null, $item->decision->fingerprint());
         $writer(new ChangeListingMappingCommand($preview->companyId, $preview->actorUserId, $preview->connectionId, $item->listingId, ListingMappingOperation::SET, $item->targetType, $item->targetExternalId, 0, $item->requestId, $guard));
-        foreach ([null, new AutomaticMappingGuard(Uuid::uuid7()->toString(), $preview->ruleVersion, $item->sourceFingerprint, null)] as $otherGuard) {
+        foreach ([null, new AutomaticMappingGuard(Uuid::uuid7()->toString(), $preview->ruleVersion, $item->sourceFingerprint, null, $item->decision->fingerprint())] as $otherGuard) {
             try {
                 $writer(new ChangeListingMappingCommand($preview->companyId, $preview->actorUserId, $preview->connectionId, $item->listingId, ListingMappingOperation::SET, $item->targetType, $item->targetExternalId, 0, $item->requestId, $otherGuard));
                 self::fail('Guard mismatch accepted.');
@@ -169,7 +177,7 @@ final class ApplyAutomaticListingMappingsActionTest extends IntegrationTestCase
         $item = $p->items[0];
         self::assertSame('ready', $item->decision->status->value);
         try {
-            self::getContainer()->get(ChangeListingMappingAction::class)(new ChangeListingMappingCommand($p->companyId, $p->actorUserId, $p->connectionId, $item->listingId, ListingMappingOperation::SET, 'variant', Uuid::uuid7()->toString(), 0, $item->requestId, new AutomaticMappingGuard($p->id, $p->ruleVersion, $item->sourceFingerprint, 'size')));
+            self::getContainer()->get(ChangeListingMappingAction::class)(new ChangeListingMappingCommand($p->companyId, $p->actorUserId, $p->connectionId, $item->listingId, ListingMappingOperation::SET, 'variant', Uuid::uuid7()->toString(), 0, $item->requestId, new AutomaticMappingGuard($p->id, $p->ruleVersion, $item->sourceFingerprint, 'size', $item->decision->fingerprint())));
             self::fail('Tampered target accepted.');
         } catch (ListingMappingException $error) {
             self::assertSame('automatic_mapping_conflict', $error->reason);

@@ -14,6 +14,8 @@ final readonly class AutomaticMappingPreviewPage
     public function __construct(
         public ListingMetaPageDTO $listingsPage, public array $decisions, public array $counts,
         public string $q, public ?string $sizeCharacteristicId,
+        /** @var array<string,list<string>> */
+        public array $barcodes = [], public ?MappingSettings $settings = null,
     ) {
     }
 }

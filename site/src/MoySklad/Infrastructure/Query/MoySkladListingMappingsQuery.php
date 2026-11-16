@@ -16,7 +16,7 @@ use Webmozart\Assert\Assert;
 
 final readonly class MoySkladListingMappingsQuery
 {
-    public function __construct(private Connection $db, private MoySkladCatalogTargetsQuery $targets, private MarketplaceFacade $marketplace)
+    public function __construct(private Connection $db, private MoySkladCatalogTargetsQuery $targets, private MarketplaceFacade $marketplace, private MappingPackageReviewsQuery $reviews, private \App\MoySklad\Domain\AutomaticListingMappingPolicy $policy)
     {
     }
 
@@ -46,10 +46,25 @@ final readonly class MoySkladListingMappingsQuery
         }
         $targets = $this->targets->findMany($companyId, $connectionId, array_values(array_unique($references)));
         $sources = [] === $rows ? [] : $this->marketplace->getListingsMetaByIds($companyId, array_column($rows, 'listing_id'));
+        $barcodes = [] === $rows ? [] : $this->marketplace->getListingBarcodesByIds($companyId, array_column($rows, 'listing_id'));
+        $reviews = $this->reviews->forListings($companyId, $connectionId, $listingIds);
         $result = array_fill_keys($listingIds, new ListingMappingState());
         foreach ($rows as $row) {
             $reference = null !== $row['product_external_id'] ? 'product:'.$row['product_external_id'] : 'variant:'.$row['variant_external_id'];
-            $result[$row['listing_id']] = ListingMappingState::fromRevision($this->revision($row), $targets[$reference] ?? null, isset($sources[$row['listing_id']]));
+            $state = ListingMappingState::fromRevision($this->revision($row), $targets[$reference] ?? null, isset($sources[$row['listing_id']]));
+            $id = (string) $row['listing_id'];
+            if (null === $state->reason && null !== $state->target && isset($sources[$id]) && \App\MoySklad\Domain\AutomaticListingMappingPolicy::packageNeedsReview($sources[$id]->title, $state->target->name)) {
+                $sourceFingerprint = $this->policy->sourceFingerprint($sources[$id], $barcodes[$id] ?? []);
+                $targetFingerprint = \App\MoySklad\Domain\AutomaticListingMappingPolicy::targetFingerprint($state->target);
+                $confirmed = false;
+                foreach ($reviews[$id] ?? [] as $review) {
+                    $confirmed = $confirmed || ($review['revision'] === $state->revision && $review['source'] === $sourceFingerprint && $review['target'] === $targetFingerprint);
+                }
+                if (!$confirmed) {
+                    $state = new ListingMappingState($state->revision, $state->revisionId, $state->target, 'needs_review', 'package_review', $state->listingSnapshot);
+                }
+            }
+            $result[$id] = $state;
         }
 
         return $result;
