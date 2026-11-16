@@ -103,7 +103,8 @@ class Acceptance:
         try:
             with (self.artifacts / f'{label}.log').open('wb') as log:
                 result = subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
-                                        start_new_session=self.creating)
+                                        stdin=subprocess.DEVNULL,
+                                        start_new_session=self.creating or label == 'cleanup')
                 code = result.returncode
         finally:
             record = {'label': label, 'command': command, 'exit_code': code,
@@ -178,6 +179,9 @@ class Acceptance:
         except (OSError, KeyboardInterrupt) as error:
             print(f'Приёмка прервана: {type(error).__name__}', file=sys.stderr)
         finally:
+            # Finish cleanup even if the terminal/harness interrupts repeatedly.
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
+            signal.signal(signal.SIGTERM, signal.SIG_IGN)
             if self.started:
                 cleanup = self.run('cleanup', ['docker', 'rm', '-f', self.name], check=False)
                 if cleanup and code == 0:

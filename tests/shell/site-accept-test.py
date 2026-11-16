@@ -3,6 +3,7 @@
 import ast
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import signal
@@ -29,6 +30,7 @@ class AcceptanceTest(unittest.TestCase):
 import json, os, sys
 from pathlib import Path
 a = sys.argv[1:]
+if os.environ.get('FAIL_IF_STDIN') and sys.stdin.read(): sys.exit(19)
 with open('commands.jsonl', 'a') as f:
     f.write(json.dumps(a) + '\\n')
 if os.environ.get('MUTATE') and 'test:unit' in a:
@@ -45,6 +47,10 @@ if os.environ.get('DELAY_CREATE') and 'run' in a:
     import time
     time.sleep(1)
 if a[:2] == ['rm', '-f']:
+    if os.environ.get('DELAY_CLEANUP'):
+        Path('cleaning').touch()
+        import time
+        time.sleep(.5)
     if os.environ.get('DELAY_CREATE') and not Path('created').exists():
         sys.exit(1)
     Path('created').unlink(missing_ok=True)
@@ -60,7 +66,7 @@ if 'resource-snapshot' in ' '.join(a):
     def run_accept(self, **extra):
         env = dict(os.environ, PATH=f'{self.root / "bin"}:{os.environ["PATH"]}', **extra)
         result = subprocess.run(['python3', str(self.runner)], cwd=self.root,
-                                env=env, text=True, capture_output=True)
+                                env=env, input='caller input', text=True, capture_output=True)
         log = self.root / 'commands.jsonl'
         commands = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
         summaries = list(self.root.glob('site/var/accept/*/summary.json'))
@@ -119,8 +125,16 @@ if 'resource-snapshot' in ' '.join(a):
     def test_terminal_interrupt_during_daemon_create_leaves_no_container(self):
         self.signal_during_create(True)
 
-    def signal_during_create(self, terminal):
-        env = dict(os.environ, PATH=f'{self.root / "bin"}:{os.environ["PATH"]}', DELAY_CREATE='1')
+    def test_second_signal_during_cleanup_still_cleans_and_writes_summary(self):
+        self.signal_during_create(True, double=True)
+
+    def test_commands_cannot_consume_callers_stdin(self):
+        result, _, _ = self.run_accept(FAIL_IF_STDIN='1')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def signal_during_create(self, terminal, double=False):
+        env = dict(os.environ, PATH=f'{self.root / "bin"}:{os.environ["PATH"]}', DELAY_CREATE='1',
+                   DELAY_CLEANUP='1' if double else '')
         process = subprocess.Popen(['python3', str(self.runner)], cwd=self.root, env=env,
                                    start_new_session=True,
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -133,13 +147,45 @@ if 'resource-snapshot' in ' '.join(a):
                 os.killpg(process.pid, signal.SIGINT)
             else:
                 process.send_signal(signal.SIGTERM)
+            if double:
+                deadline = time.monotonic() + 5
+                while not (self.root / 'cleaning').exists() and time.monotonic() < deadline:
+                    time.sleep(.01)
+                self.assertTrue((self.root / 'cleaning').exists())
+                os.killpg(process.pid, signal.SIGINT)
             self.assertNotEqual(process.wait(timeout=5), 0)
             time.sleep(.6)
             self.assertFalse((self.root / 'created').exists(), 'daemon created container after cleanup')
+            self.assertTrue(list(self.root.glob('site/var/accept/*/summary.json')))
         finally:
             if process.poll() is None:
                 process.kill()
                 process.wait()
+
+    @unittest.skipUnless(os.environ.get('SITE_ACCEPT_TEST_IMAGE'), 'opt-in real PHP preflight in Docker')
+    def test_phpstan_local_configuration_does_not_spawn_a_second_analyser(self):
+        command = ['docker', 'run', '--rm', '--network', 'none', '-e', 'XDEBUG_MODE=off',
+                   '-v', f'{ROOT / "site"}:/app', '-w', '/app', os.environ['SITE_ACCEPT_TEST_IMAGE']]
+        result = subprocess.run(command + ['php', 'vendor/bin/phpstan', 'dump-parameters',
+                                '--configuration=phpstan.local.neon', '--memory-limit=2G', '--json'],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        # This PHPStan version's full dump may contain non-JSON escaped class names.
+        parallel = json.loads(re.search(r'"parallel"\s*:\s*(\{[^}]+\})', result.stdout)[1])
+        script = '''
+            $root = 'phar:///app/vendor/phpstan/phpstan/phpstan.phar/';
+            require $root . 'src/Diagnose/DiagnoseExtension.php';
+            require $root . 'src/Parallel/Schedule.php';
+            require $root . 'src/Parallel/Scheduler.php';
+            $scheduler = new PHPStan\\Parallel\\Scheduler((int)$argv[1], (int)$argv[2], 2);
+            echo $scheduler->scheduleWork(2, array_map('strval', range(1, 5000)),
+                static fn(string $file): int => 1)->getNumberOfProcesses();
+        '''
+        schedule = subprocess.run(command + ['php', '-r', script, str(parallel['jobSize']),
+                                  str(parallel['maximumNumberOfProcesses'])],
+                                  capture_output=True, text=True)
+        self.assertEqual(schedule.returncode, 0, schedule.stderr)
+        self.assertEqual(schedule.stdout, '0', 'one main analyser, no second PHP worker')
 
     @unittest.skipUnless(os.environ.get('SITE_ACCEPT_TEST_IMAGE'), 'opt-in real PHP preflight in Docker')
     def test_unwritable_cache_is_rejected_even_when_system_tmp_is_writable(self):

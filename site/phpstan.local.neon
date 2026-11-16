@@ -1,7 +1,8 @@
-# Локальный прогон сохраняет level, baseline и paths основного конфига.
+# Локальный анализ выполняется в одном основном PHP-процессе.
+# 0 отключает дочерние parallel workers в установленном PHPStan; cache сохраняется.
 includes:
     - phpstan.dist.neon
 
 parameters:
     parallel:
-        maximumNumberOfProcesses: 1
+        maximumNumberOfProcesses: 0

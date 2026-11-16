@@ -93,6 +93,7 @@ test-gt:
 test-deploy-workflow:
 	bash tests/shell/deploy-workflow-test.sh
 	python3 -m unittest discover -s site/tools/tests
+	python3 tests/shell/site-accept-test.py
 
 # Xdebug в dev-образе включён в режиме debug и замедляет прогон на ~22%;
 # для тестов он не нужен. Покрытие (site-test-cov) задаёт свой XDEBUG_MODE.
