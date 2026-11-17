@@ -2687,7 +2687,27 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 можно. `SaveCashflowCategoryAction` и `DeleteCashflowCategoryAction` перепроверяют код и родителя
 по строке под `FOR UPDATE` (`CashflowCategoryRepository::lockStoredPlacement()`, `wrapInTransaction`):
 форма могла загрузить статью до того, как ей проставили код. Команда берёт дерево компании
-`lockTreeByCompany()` (FOR UPDATE + refresh) после advisory lock. Ставят код онбординг (`ApplyCashflowCoreTemplateAction`) и `app:cash:cashflow-core:apply`.
+`lockTreeByCompany()` (FOR UPDATE + refresh) после advisory lock. Ставят код онбординг (`ApplyCashflowCoreTemplateAction`), `app:cash:cashflow-core:apply` и
+синхронизация с эталоном группы.
+
+**Синхронизация с эталоном группы** — `SyncCashflowGroupChartAction` и команда
+`app:cash:group-chart:sync <companyId> [--execute]` (без `--execute` — план, `plan()` только
+читает). Эталон участника группы (`ConsolidationGroupFacadeInterface::headOf() ≠ сама`) —
+несистемные статьи головной компании; статьи головной без кода получают `group_code` = свой id.
+Эталон головной компании и компании вне группы — `core.yaml`. Для каждого узла эталона, от
+родителей к детям:
+- статья с тем же кодом уже есть — ничего не меняется;
+- одна статья без кода с тем же названием (регистр, «ё», знаки) в ветке привязанного родителя —
+  получает код;
+- две и больше — конфликт: узел и его дети пропускаются;
+- нет ни одной — статья создаётся.
+Ничего не удаляется, не переименовывается и не переносится. Транзакцией владеет команда
+(`wrapInTransaction`). Порядок блокировок: `pg_advisory_xact_lock(hashtext(...))` сначала
+головной компании, потом компании (источник раньше производных; ключ тот же, что у
+`CashflowCategoryStructureMigrator`), затем `lockTreeByCompany()` обеих. Применение с
+изменениями пишется в журнал `cashflow_group_chart_applications` (миграция
+`Version20261117180000`): `source` (`core`/`head`), `head_company_id`, счётчики привязанных,
+созданных, конфликтов и кодов головной компании.
 
 Компании, созданные до онбординга, дозаполняет `app:company:onboarding-backfill
 [--company=<uuid>] [--execute --expected-count=N] [-v]` (`BackfillCompanyOnboardingAction`):
@@ -5908,6 +5928,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.209 | 2026-11-17 | Cash: синхронизация дерева ДДС с эталоном группы — `SyncCashflowGroupChartAction`, `app:cash:group-chart:sync`, журнал `cashflow_group_chart_applications` (миграция `Version20261117180000`), задача `cashflow-group-chart`, этап 2 |
 | 2.208 | 2026-11-17 | Company: группа консолидации `company_consolidation_member` (миграция `Version20261117150000`), `ConsolidationGroupFacadeInterface`, `ConfigureConsolidationGroupAction`, блок «Консолидация» в настройках компании (задача `cashflow-group-chart`, этап 1b) |
 | 2.207 | 2026-11-17 | Cash: `cashflow_categories.group_code` (миграция `Version20261117120000`) — код консолидации; `core.yaml` v2 с кодами, защита удаления и переноса статьи с кодом, `app:cash:cashflow-core:apply` проставляет коды дереву ядра (задача `cashflow-group-chart`, этап 1) |
 | 2.206 | 2026-11-17 | Cash: `app:cash:cashflow-core:apply` — ядро ДДС для существующей компании вместо неиспользуемых статей (`ReplaceUnusedCashflowTreeWithCoreAction`, `CashCategorySuggestionRepository::findSuggestedForCategories()`), задача `cashflow-group-chart`, этап 0a |
