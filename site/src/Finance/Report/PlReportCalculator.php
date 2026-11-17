@@ -31,6 +31,8 @@ final class PlReportCalculator
         private readonly TopoSort $topo = new TopoSort(),
         private readonly ValueFormatter $fmt = new ValueFormatter(),
         private readonly ?PlFormulaVariables $variables = null,
+        // false — факты заданы суммой колонки и от периода не зависят (withFacts): по месяцам их не разложить.
+        private readonly bool $factsFollowPeriod = true,
     ) {
     }
 
@@ -229,7 +231,8 @@ final class PlReportCalculator
      * Ставка менялась внутри периода: денежные статьи с переменной ставки считаются помесячно и
      * складываются — итог периода совпадает с суммой месячных колонок. Профиль меняется с 1-го числа,
      * поэтому месяц — точная единица. Проценты и коэффициенты не складываются: они остаются по ставке
-     * конца периода.
+     * конца периода. Расчёт на заранее посчитанных фактах (withFacts — предпросмотр, бюджет) не
+     * раскладывается: сумма колонки одна на любой период, там действует ставка конца периода.
      *
      * @param list<string> $categoryIds
      * @param ProjectDirection|list<ProjectDirection>|null $projectDirection
@@ -246,7 +249,7 @@ final class PlReportCalculator
         string|array|null $responsibilityCenterId,
         array &$warnings,
     ): array {
-        if (null === $this->variables || [] === $categoryIds) {
+        if (null === $this->variables || !$this->factsFollowPeriod || [] === $categoryIds) {
             return [];
         }
 
@@ -343,6 +346,6 @@ final class PlReportCalculator
      */
     public function withFacts(FactsProviderInterface $facts): self
     {
-        return new self($this->categories, $facts, $this->tokenizer, $this->parser, $this->evaluator, $this->deps, $this->topo, $this->fmt, $this->variables);
+        return new self($this->categories, $facts, $this->tokenizer, $this->parser, $this->evaluator, $this->deps, $this->topo, $this->fmt, $this->variables, false);
     }
 }

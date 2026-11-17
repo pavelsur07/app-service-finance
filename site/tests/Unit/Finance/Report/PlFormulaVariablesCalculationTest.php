@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Finance\Report;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\ProjectDirection;
 use App\Company\Enum\TaxRegime;
 use App\Company\Enum\VatMode;
 use App\Company\Facade\CompanyTaxProfileFacadeInterface;
@@ -12,6 +13,7 @@ use App\Company\Facade\DTO\CompanyTaxProfileDTO;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLValueFormat;
+use App\Finance\Facts\FactsProviderInterface;
 use App\Finance\Facts\InMemoryFactsProvider;
 use App\Finance\Report\PlFormulaVariables;
 use App\Finance\Report\PlReportCalculator;
@@ -79,7 +81,7 @@ final class PlFormulaVariablesCalculationTest extends TestCase
 
     public function testPeriodAcrossRateChangeSumsMoneyRowsByMonth(): void
     {
-        // Без НДС до октября 2026, УСН 5% с октября; налог 6% весь год. Факт выручки — 1000 за любой период.
+        // Без НДС до октября 2026, УСН 5% с октября; налог 6% весь год. Выручка — 1000 в каждом месяце.
         $profiles = static fn (\DateTimeImmutable $date): CompanyTaxProfileDTO => new CompanyTaxProfileDTO(
             TaxRegime::USN,
             $date->format('Y-m') >= '2026-10' ? VatMode::USN_5 : VatMode::EXEMPT,
@@ -94,15 +96,36 @@ final class PlFormulaVariablesCalculationTest extends TestCase
         // 9 месяцев без НДС + 3 месяца по 1000 * 5 / 105 — как сумма месячных колонок, а не 5% на весь год.
         self::assertEqualsWithDelta(3 * 1000 * 5 / 105, $this->value($result, 'VAT'), 1e-9);
         // Статья, зависящая от помесячной, берёт уже сложенное значение.
-        self::assertEqualsWithDelta(1000 - 3 * 1000 * 5 / 105, $this->value($result, 'REV_NET'), 1e-9);
+        self::assertEqualsWithDelta(12000 - 3 * 1000 * 5 / 105, $this->value($result, 'REV_NET'), 1e-9);
         // Процент не складывается: ставка конца периода.
         self::assertSame(5.0, $this->value($result, 'VAT_PCT'));
-        // Налог 6% не менялся, но расчёт помесячный для всех денежных статей с переменной: 12 × 60.
-        self::assertEqualsWithDelta(12 * 60.0, $this->value($result, 'TAX'), 1e-9);
+        // Налог 6% не менялся: помесячная сумма равна расчёту за год целиком.
+        self::assertEqualsWithDelta(12000 * 6 / 100, $this->value($result, 'TAX'), 1e-9);
 
         // Ставка в периоде одна — период считается целиком, как раньше.
         self::assertSame(0.0, $this->value($this->calculate($profiles, $quarter3, withVatAmount: true), 'VAT'));
-        self::assertSame(60.0, $this->value($this->calculate($profiles, $quarter3, withVatAmount: true), 'TAX'));
+        self::assertSame(180.0, $this->value($this->calculate($profiles, $quarter3, withVatAmount: true), 'TAX'));
+    }
+
+    public function testPrecomputedFactsAreNotSplitByMonth(): void
+    {
+        // Регрессия: предпросмотр и бюджет передают сумму колонки (withFacts), она не зависит от периода.
+        // Помесячное сложение учло бы выручку 1000 двенадцать раз: 9 × 60 + 3 × 150 = 990.
+        $profiles = static fn (\DateTimeImmutable $date): CompanyTaxProfileDTO => new CompanyTaxProfileDTO(
+            TaxRegime::USN,
+            VatMode::EXEMPT,
+            null,
+            $date->format('Y-m') >= '2026-10' ? '15.00' : '6.00',
+        );
+        $company = CompanyBuilder::aCompany()->build();
+        $repo = $this->createMock(PLCategoryRepository::class);
+        $repo->method('findBy')->willReturn($this->tree($company, false));
+
+        $result = (new PlReportCalculator($repo, new InMemoryFactsProvider([]), variables: new PlFormulaVariables($this->facade($profiles))))
+            ->withFacts(new InMemoryFactsProvider(['REV' => 1000.0]))
+            ->calculate($company, PlReportPeriod::forRange(new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-12-31')));
+
+        self::assertSame(150.0, $this->value($result, 'TAX'), 'ставка конца периода, выручка учтена один раз');
     }
 
     public function testCategoryWithReservedCodeDoesNotShadowVariable(): void
@@ -157,9 +180,29 @@ final class PlFormulaVariablesCalculationTest extends TestCase
         }
         $repo->method('findBy')->willReturn($tree);
 
+        // Факты зависят от периода, как регистр: выручка 1000 за каждый месяц периода.
+        $facts = new class implements FactsProviderInterface {
+            public function value(
+                Company $company,
+                PlReportPeriod $period,
+                string $code,
+                ProjectDirection|array|null $projectDirection = null,
+                string|array|null $responsibilityCenterId = null,
+            ): float {
+                $months = 12 * ((int) $period->to->format('Y') - (int) $period->from->format('Y'))
+                    + (int) $period->to->format('n') - (int) $period->from->format('n') + 1;
+
+                return match ($code) {
+                    'REV' => 1000.0 * $months,
+                    'TAX_RATE' => 999.0,
+                    default => 0.0,
+                };
+            }
+        };
+
         $calculator = new PlReportCalculator(
             $repo,
-            new InMemoryFactsProvider(['REV' => 1000.0, 'TAX_RATE' => 999.0]),
+            $facts,
             variables: new PlFormulaVariables($this->facade($profileOn)),
         );
 
