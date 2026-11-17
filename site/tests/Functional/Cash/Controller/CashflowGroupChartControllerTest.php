@@ -97,7 +97,7 @@ final class CashflowGroupChartControllerTest extends WebTestCaseBase
         self::assertSame('OP_OUT_RENT', $this->db()->fetchOne('SELECT group_code FROM cashflow_categories WHERE id = ?', [$premises]));
 
         // Повтор — отказ флешем, код не меняется.
-        $this->client->request('POST', sprintf('/cashflow-categories/%s/group-code', $premises), ['code' => 'OP_OUT_SALARY', '_token' => $form->get('_token')->getValue()]);
+        $this->client->request('POST', sprintf('/cashflow-categories/%s/group-code', $premises), ['code' => 'OP_OUT_SALARY', '_token' => (string) $form->getValues()['_token']]);
         self::assertResponseRedirects('/cashflow-categories/group-chart');
         self::assertStringContainsString('уже есть код', $this->client->followRedirect()->filter('.toast.text-bg-danger')->text());
         self::assertSame('OP_OUT_RENT', $this->db()->fetchOne('SELECT group_code FROM cashflow_categories WHERE id = ?', [$premises]));
