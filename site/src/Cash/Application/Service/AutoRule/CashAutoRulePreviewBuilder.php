@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Cash\Application\Service\AutoRule;
 
+use App\Cash\Application\DTO\CashAutoRulePreviewImpact;
+use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;
 use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;
 use App\Cash\Application\DTO\CashTransactionAutoRulePreviewResult;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
+use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Company\Application\DTO\FinancialResponsibilityCenterProjectDTO;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
@@ -65,7 +69,21 @@ final readonly class CashAutoRulePreviewBuilder
         $byResponsibilityCenter = [];
         $activeRules = array_values($this->ruleRepo->findActiveByCompany($rule->getCompany()));
         $companyId = (string) $rule->getCompany()->getId();
-        $needsPairSnapshot = $this->planner->requiresPairSnapshot($activeRules);
+        $proposedRules = [$rule];
+        $currentRule = null;
+        $activeVersions = [];
+        foreach ($activeRules as $active) {
+            $activeVersions[(string) $active->getId()] = $active->getRevision();
+            if ($active->getId() === $rule->getId()) {
+                $currentRule = $active;
+            } else {
+                $proposedRules[] = $active;
+            }
+        }
+        ksort($activeVersions);
+        $impact = new CashAutoRulePreviewImpact();
+        $hasExclusions = $rule->getConditions()->exists(static fn ($key, CashTransactionAutoRuleCondition $condition): bool => CashTransactionAutoRuleConditionOperator::NOT_CONTAINS === $condition->getOperator());
+        $needsPairSnapshot = $this->planner->requiresPairSnapshot($activeRules) || $this->planner->requiresPairSnapshot([$rule]);
         $activePairs = $needsPairSnapshot
             ? $this->responsibilityCenterFacade->getActivePairs($companyId)
             : [];
@@ -75,18 +93,27 @@ final readonly class CashAutoRulePreviewBuilder
 
         foreach ($transactions as $transaction) {
             ++$summary['scanned'];
-            if (!$this->matcher->matches($rule, $transaction)) {
+            $matchesDraft = $this->matcher->matches($rule, $transaction);
+            if (!$matchesDraft && $hasExclusions && $this->matcher->matches($rule, $transaction, ignorePurposeExclusions: true)) {
+                $impact->record('excluded', $transaction);
+            }
+            if (!$matchesDraft && (null === $currentRule || !$this->matcher->matches($currentRule, $transaction))) {
                 continue;
             }
 
-            ++$summary['matched'];
             $skipReason = $this->matcher->getSkipReason($transaction);
-            $match = null === $skipReason
-                ? $this->matcher->match($transaction, $activeRules)
-                : new CashTransactionAutoRuleMatchResult(null);
-            $plan = $match->hasWinners() || $this->planner->hasPairConflict($match)
-                ? $this->planner->create($match, $transaction, $activePairs)
-                : null;
+            $before = $this->matcher->match($transaction, $activeRules);
+            $match = $this->matcher->match($transaction, $proposedRules);
+            $oldPlan = $this->applicationPlan($before, $transaction, $activePairs);
+            $plan = $this->applicationPlan($match, $transaction, $activePairs);
+            $impact->compare($transaction, $before, $match, $oldPlan, $plan, $skipReason, $responsibilityCenterLabels);
+            if (!$matchesDraft) {
+                $impact->record('oldOnly', $transaction);
+
+                continue;
+            }
+            $impact->record('matched', $transaction);
+            ++$summary['matched'];
             $wouldChange = null !== $plan && $plan->hasChanges();
             $hasConflict = $match->hasConflict();
             $skipped = null !== $skipReason;
@@ -181,7 +208,17 @@ final readonly class CashAutoRulePreviewBuilder
             array_values($byProject),
             array_values($byResponsibilityCenter),
             $responsibilityCenterLabels,
+            $activeVersions,
+            $impact,
         );
+    }
+
+    /** @param list<FinancialResponsibilityCenterProjectDTO> $pairs */
+    private function applicationPlan(CashTransactionAutoRuleMatchResult $match, CashTransaction $transaction, array $pairs): ?CashTransactionAutoRuleApplicationPlan
+    {
+        return $match->hasWinners() || $this->planner->hasPairConflict($match)
+            ? $this->planner->create($match, $transaction, $pairs)
+            : null;
     }
 
     /**

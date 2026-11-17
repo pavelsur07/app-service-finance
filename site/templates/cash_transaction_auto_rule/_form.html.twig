@@ -66,8 +66,17 @@
                 <span class="sr-only" aria-live="polite" data-auto-rule-conditions-target="status"></span>
             </fieldset>
             {% do form.conditions.setRendered %}
+            <p class="text-muted">Проверка охватывает последние шесть месяцев. Для обработки прошлых операций в списке правил есть отдельное действие.</p>
+            {% if preview %}
+                {% include 'cash_transaction_auto_rule/_rule_impact.html.twig' with {preview: preview, periodLabel: 'за последние шесть месяцев'} only %}
+                <input type="hidden" name="confirmation" value="{{ confirmation }}">
+                <input type="hidden" name="draftId" value="{{ draftId }}">
+            {% endif %}
             <div class="btn-list mt-3">
-                <button class="btn btn-primary">Сохранить</button>
+                <button type="submit" class="btn btn-outline-primary" name="intent" value="preview">Проверить</button>
+                {% if preview %}
+                    <button type="submit" class="btn btn-primary" name="intent" value="confirm">Подтвердить и включить</button>
+                {% endif %}
                 <a class="btn btn-secondary" href="{{ path('cash_transaction_auto_rule_index') }}">Отмена</a>
             </div>
             {{ form_end(form) }}

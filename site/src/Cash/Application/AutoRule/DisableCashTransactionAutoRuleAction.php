@@ -8,10 +8,9 @@ use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Включает или выключает автоправило. Сохраняет только реальную смену
- * состояния: повторное выключение ничего не пишет.
+ * Повторное выключение правила сохраняет текущую ревизию.
  */
-final class ChangeCashTransactionAutoRuleActivityAction
+final class DisableCashTransactionAutoRuleAction
 {
     public function __construct(private readonly EntityManagerInterface $entityManager)
     {
@@ -20,9 +19,9 @@ final class ChangeCashTransactionAutoRuleActivityAction
     /**
      * @return bool состояние изменилось
      */
-    public function __invoke(CashTransactionAutoRule $rule, bool $active, ?string $actorUserId): bool
+    public function __invoke(CashTransactionAutoRule $rule, ?string $actorUserId): bool
     {
-        $changed = $active ? $rule->enable($actorUserId) : $rule->disable($actorUserId);
+        $changed = $rule->disable($actorUserId);
         if ($changed) {
             $this->entityManager->flush();
         }

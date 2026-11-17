@@ -11,11 +11,11 @@ use App\Shared\Entity\AuditLog;
 use App\Shared\Enum\AuditLogAction;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Event\PostUpdateEventArgs;
+use Doctrine\ORM\Event\PrePersistEventArgs;
 use Doctrine\ORM\Events;
 
-#[AsDoctrineListener(event: Events::postPersist)]
+#[AsDoctrineListener(event: Events::prePersist)]
 #[AsDoctrineListener(event: Events::postUpdate)]
 final class AuditLogListener
 {
@@ -26,34 +26,23 @@ final class AuditLogListener
     ) {
     }
 
-    public function postPersist(PostPersistEventArgs $args): void
+    public function prePersist(PrePersistEventArgs $args): void
     {
         $entity = $args->getObject();
-
-        if ($entity instanceof AuditLog) {
-            return;
-        }
 
         if (!$entity instanceof CashTransaction) {
             return;
         }
 
-        // ИСПРАВЛЕНИЕ: Используем безопасный метод получения ID компании
-        $companyId = $this->resolveCompanyId($entity);
-
-        // Получаем ID пользователя (или null, если это делает система)
-        $actorUserId = $this->resolveActorUserId();
-
-        $auditLog = new AuditLog(
-            $companyId,
-            $entity::class,
+        // Ассоциируем CREATE с операцией до flush: в postPersist INSERT уже выполнены.
+        $this->entityManager->persist(new AuditLog(
+            (string) $entity->getCompany()->getId(),
+            CashTransaction::class,
             (string) $entity->getId(),
             AuditLogAction::CREATE,
             null,
-            $actorUserId,
-        );
-
-        $this->entityManager->persist($auditLog);
+            $this->resolveActorUserId(),
+        ));
     }
 
     public function postUpdate(PostUpdateEventArgs $args): void

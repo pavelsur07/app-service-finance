@@ -364,6 +364,70 @@ class CashTransactionAutoRule
         return $this;
     }
 
+    /** Detached form data. Symfony may change existing condition objects during handleRequest(). */
+    public function editableDraft(): self
+    {
+        $draft = clone $this;
+        $draft->conditions = new ArrayCollection();
+        foreach ($this->conditions as $condition) {
+            $draft->addCondition(clone $condition);
+        }
+
+        return $draft;
+    }
+
+    public function definitionHash(): string
+    {
+        return hash('sha256', json_encode([
+            $this->name, $this->priority, $this->action->value, $this->operationType->value,
+            $this->cashflowCategory?->getId(), $this->projectDirection?->getId(),
+            $this->responsibilityCenterId, $this->counterparty?->getId(), $this->conditionDefinitions(),
+        ], \JSON_THROW_ON_ERROR));
+    }
+
+    public function approveDraft(self $draft, string $actorUserId): void
+    {
+        Assert::same($this->id, $draft->id);
+        Assert::same($this->company->getId(), $draft->company->getId());
+        if ($this->definitionHash() !== $draft->definitionHash()) {
+            $this->name = $draft->name;
+            $this->priority = $draft->priority;
+            $this->action = $draft->action;
+            $this->operationType = $draft->operationType;
+            $this->cashflowCategory = $draft->cashflowCategory;
+            $this->projectDirection = $draft->projectDirection;
+            $this->responsibilityCenterId = $draft->responsibilityCenterId;
+            $this->counterparty = $draft->counterparty;
+            if ($this->conditionDefinitions() !== $draft->conditionDefinitions()) {
+                foreach ($this->conditions->toArray() as $condition) {
+                    $this->removeCondition($condition);
+                }
+                foreach ($draft->conditions as $condition) {
+                    $this->addCondition(clone $condition);
+                }
+            }
+            $this->recordUpdate($actorUserId);
+        }
+        $this->enable($actorUserId);
+    }
+
+    /** @return list<string> */
+    private function conditionDefinitions(): array
+    {
+        $conditions = [];
+        foreach ($this->conditions as $condition) {
+            $conditions[] = json_encode([
+                $condition->getField()->value, $condition->getOperator()->value,
+                $condition->getCounterparty()?->getId(), $condition->getMoneyAccount()?->getId(),
+                $condition->getValue(), $condition->getValueTo(),
+            ], \JSON_THROW_ON_ERROR);
+        }
+        // Условия объединены через И; порядок строк в коллекции Doctrine не задан.
+        sort($conditions, \SORT_STRING);
+
+        return $conditions;
+    }
+
     #[AssertConstraint\Callback]
     public function validateCompanyScope(ExecutionContextInterface $context): void
     {

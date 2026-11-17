@@ -80,7 +80,7 @@ final class CashTransactionAutoRuleActionsMenuTest extends WebTestCaseBase
             static fn (string $text): string => trim($text),
             $crawler->filter('td .dropdown-menu .dropdown-item')->extract(['_text']),
         );
-        self::assertSame(['Проверка', 'Редактирование', 'Включить', 'Удалить'], $labels);
+        self::assertSame(['Проверка', 'Редактирование', 'Проверить и включить', 'Удалить'], $labels);
         self::assertCount(0, $crawler->filter('#disable-modal-'.$rule->getId()));
         self::assertCount(1, $crawler->filter('#delete-modal-'.$rule->getId()));
     }
@@ -94,7 +94,20 @@ final class CashTransactionAutoRuleActionsMenuTest extends WebTestCaseBase
         $ruleId = (string) $rule->getId();
 
         $crawler = $this->openIndex($client, $user, $company, '?status=disabled');
-        $client->submit($crawler->filter('td .dropdown-menu form')->form());
+        self::assertSame('/cash-transaction-auto-rules/'.$ruleId.'/edit', $crawler->selectLink('Проверить и включить')->attr('href'));
+        // Закладки и старые формы больше не включают правило напрямую.
+        $client->request('POST', '/cash-transaction-auto-rules/'.$ruleId.'/enable', [
+            '_token' => $this->csrfToken($client, 'enable'.$ruleId),
+        ]);
+        self::assertResponseRedirects('/cash-transaction-auto-rules/'.$ruleId.'/edit');
+        $this->em()->clear();
+        $disabled = $this->em()->find(CashTransactionAutoRule::class, $ruleId);
+        self::assertNotNull($disabled);
+        self::assertFalse($disabled->isActive());
+        $crawler = $client->followRedirect();
+        $checked = $client->submit($crawler->selectButton('Проверить')->form());
+        self::assertResponseIsSuccessful();
+        $client->submit($checked->selectButton('Подтвердить и включить')->form());
 
         self::assertResponseRedirects('/cash-transaction-auto-rules/');
         $this->em()->clear();

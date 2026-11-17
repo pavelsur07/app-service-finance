@@ -38,12 +38,23 @@
         {% endblock %}
     {% endembed %}
     <div class="container-xl mt-3">
+        <p class="text-secondary">
+            Назначения за {{ qualityPeriod.from|date('d.m.Y') }} — {{ qualityPeriod.to|date('d.m.Y') }} и последующие ручные исправления.
+            {% if observedSince is null %}
+                Учёт конфликтов начнётся при первой обработке операции.
+            {% elseif qualityPeriod.from < observedSince %}
+                Конфликты учитываются с {{ observedSince|date('d.m.Y') }}.
+            {% endif %}
+        </p>
         <div class="card auto-rule-list">
-            <div class="card-body">
+            <div class="card-body table-responsive">
                 <table class="table">
                     <thead>
                         <tr>
                             <th>Название</th>
+                            {% for metric in qualityMetrics %}
+                                <th>{{ metric.label }}</th>
+                            {% endfor %}
                             <th>Приоритет</th>
                             <th>Статус</th>
                             <th>Действие</th>
@@ -68,6 +79,17 @@
                                 <div>{{ item.name }}</div>
                                 <small class="text-muted">{{ titleParts|join(' + ') }}</small>
                             </td>
+                            {% for metric in qualityMetrics %}
+                                <td>
+                                    {% for revision, counts in qualityCounts[item.id] %}
+                                        <div class="text-nowrap">
+                                            <a href="{{ path('cash_transaction_auto_rule_quality', {id: item.id, revision: revision, metric: metric.value, from: filters.from, to: filters.to}) }}"
+                                               aria-label="{{ metric.label }}, версия {{ revision }}">{{ attribute(counts, metric.value) }}</a>
+                                            <small class="text-secondary">вер. {{ revision }}</small>
+                                        </div>
+                                    {% endfor %}
+                                </td>
+                            {% endfor %}
                             <td>{{ item.priority }}</td>
                             <td>
                                 {% if item.active %}
@@ -113,13 +135,9 @@
                                                 <i class="ti ti-ban me-2"></i> Отключить
                                             </button>
                                         {% else %}
-                                            {# Включение обратимо, поэтому подтверждения не требует. #}
-                                            <form method="post" action="{{ path('cash_transaction_auto_rule_enable', {id: item.id}) }}">
-                                                <input type="hidden" name="_token" value="{{ csrf_token('enable' ~ item.id) }}">
-                                                <button type="submit" class="dropdown-item">
-                                                    <i class="ti ti-player-play me-2"></i> Включить
-                                                </button>
-                                            </form>
+                                            <a class="dropdown-item" href="{{ path('cash_transaction_auto_rule_edit', {id: item.id}) }}">
+                                                <i class="ti ti-player-play me-2"></i> Проверить и включить
+                                            </a>
                                         {% endif %}
 
                                         <div class="dropdown-divider"></div>
@@ -136,7 +154,7 @@
                                 {% if item.active %}
                                     {{ include('cash_transaction_auto_rule/_confirm_modal.html.twig', {
                                         modalId: 'disable-modal-' ~ item.id,
-                                        body: 'Отключить правило «' ~ item.name ~ '»? Включить его обратно нельзя.',
+                                        body: 'Отключить правило «' ~ item.name ~ '»? Для повторного включения потребуется предпросмотр.',
                                         actionPath: path('cash_transaction_auto_rule_disable', {id: item.id}),
                                         token: csrf_token('disable' ~ item.id),
                                         submitLabel: 'Отключить',
@@ -157,7 +175,7 @@
                         {# «Правил ещё нет» и «под фильтры ничего не подошло» — разные
                            состояния: одинаковый текст толкает завести дубль правила. #}
                         <tr>
-                            <td colspan="9" class="text-center text-muted">
+                            <td colspan="12" class="text-center text-muted">
                                 {% if hasAnyRule %}
                                     По заданным условиям ничего не найдено.
                                     {# Именно «показать все», а не «сбросить»: сброс вернёт
@@ -190,6 +208,14 @@
                     <input type="hidden" name="q" value="{{ filters.q }}">
                 {% endif %}
                 <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label" for="quality-from">Статистика с</label>
+                        <input class="form-control" type="date" id="quality-from" name="from" value="{{ filters.from }}">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="quality-to">Статистика по</label>
+                        <input class="form-control" type="date" id="quality-to" name="to" value="{{ filters.to }}">
+                    </div>
                     <div class="col-12">
                         <label class="form-label" for="filter-status">Статус</label>
                         <select id="filter-status" name="status" class="form-select">

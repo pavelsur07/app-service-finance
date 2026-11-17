@@ -955,7 +955,7 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
         self::assertNull($service->match($transaction)->rule);
     }
 
-    public function testPreviewIncludesInactiveRuleWithoutSelectingItAsWinner(): void
+    public function testPreviewCanSelectInactiveRuleWhileWorkerStillUsesActiveSet(): void
     {
         $company = CompanyBuilder::aCompany()->build();
         $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
@@ -968,8 +968,9 @@ final class CashTransactionAutoRuleServiceTest extends TestCase
 
         self::assertCount(1, $preview->rows);
         self::assertSame($transaction, $preview->rows[0]['transaction']);
-        self::assertNull($preview->rows[0]['match']->rule);
-        self::assertNull($preview->rows[0]['plan']);
+        self::assertSame($rule, $preview->rows[0]['match']->rule);
+        self::assertSame($rule->getCashflowCategory(), $preview->rows[0]['plan']?->cashflowCategory);
+        self::assertNull($service->match($transaction)->rule);
     }
 
     public function testPreviewStatisticsCoverAllMatchesBeyondTheRowLimitWithoutMutation(): void

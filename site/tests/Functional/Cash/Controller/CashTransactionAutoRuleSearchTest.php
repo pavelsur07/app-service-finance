@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Cash\Controller;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
@@ -13,7 +14,11 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Shared\Entity\AuditLog;
+use App\Shared\Enum\AuditLogAction;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
+use App\Tests\Builders\Cash\CashTransactionBuilder;
+use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CounterpartyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -37,6 +42,47 @@ final class CashTransactionAutoRuleSearchTest extends WebTestCaseBase
         [$user, $company] = $this->fixtures();
 
         self::assertSame([self::ADS_RULE], $this->names($this->open($client, $user, $company, '?q=реклама')));
+    }
+
+    public function testQualityNumbersOpenScopedOperationListForSelectedPeriod(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->fixtures();
+        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
+        $tx = CashTransactionBuilder::aCashTransaction()->withId(Uuid::uuid7()->toString())->forCompany($company)->withMoneyAccount($account)->build();
+        $tx->setDescription('Оплата рекламы');
+        $this->em()->persist($account);
+        $this->em()->persist($tx);
+        $this->em()->persist(new AuditLog((string) $company->getId(), CashTransaction::class, (string) $tx->getId(), AuditLogAction::UPDATE, [
+            'autoRules' => ['cashflowCategory' => ['id' => '66666666-6666-6666-6666-666666666601', 'revision' => 1]],
+            'changes' => ['cashflowCategory' => ['before' => null, 'after' => 'маркетинг']],
+        ], createdAt: new \DateTimeImmutable('2026-01-04')));
+        $otherOwner = UserBuilder::aUser()->withIndex(14011)->build();
+        $otherCompany = CompanyBuilder::aCompany()->withIndex(14011)->withOwner($otherOwner)->build();
+        $otherCategory = CashflowCategoryBuilder::aCashflowCategory()->withId(Uuid::uuid7()->toString())->withCompany($otherCompany)->build();
+        $otherRule = $this->rule($otherCompany, $otherCategory, 'Чужое правило', Uuid::uuid7()->toString());
+        foreach ([$otherOwner, $otherCompany, $otherCategory, $otherRule] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+
+        $crawler = $this->open($client, $user, $company, '?q=реклама&from=2026-01-01&to=2026-01-31');
+        self::assertStringContainsString('Учёт конфликтов начнётся при первой обработке операции.', $crawler->text());
+        $this->em()->getConnection()->insert('cash_auto_rule_observation', ['company_id' => $company->getId(), 'started_at' => '2026-03-09 14:45:00']);
+        $crawler = $client->reload();
+        self::assertStringContainsString('Конфликты учитываются с 09.03.2026.', $crawler->text());
+        $count = $crawler->filter('a[aria-label="Назначенные операции, версия 1"]');
+        self::assertSame('1', $count->text());
+        $client->click($count->link());
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.page-title', self::ADS_RULE);
+        self::assertSelectorTextContains('.container-xl.mt-3', '01.01.2026');
+        self::assertSelectorExists('a[href*="from=2026-01-01"]');
+        self::assertSelectorTextContains('tbody', 'Оплата рекламы');
+        self::assertSelectorExists(sprintf('tbody a[href$="/%s"]', $tx->getId()));
+
+        $client->request('GET', '/cash-transaction-auto-rules/'.$otherRule->getId().'/quality/1/assigned?from=2026-01-01&to=2026-01-31');
+        self::assertResponseStatusCodeSame(404);
     }
 
     public function testSearchMatchesConditionValue(): void

@@ -10,7 +10,7 @@
 
     <div class="container-xl mt-3">
         <div class="alert alert-info" role="status">
-            Отчёт только для чтения. Он не создаёт правила и не изменяет транзакции.
+            Из кандидата можно подготовить черновик и проверить его на операциях компании.
             Показаны совпадения со статьёй, подтверждённой пользователем в
             {{ minSamples }} и более операциях минимум за {{ minDistinctDates }} разные даты,
             с согласованностью 100% за период {{ dateFrom|date('d.m.Y') }}–{{ dateTo|date('d.m.Y') }}.
@@ -26,7 +26,8 @@
                             <th>Тип операции</th>
                             <th>Предлагаемая статья</th>
                             <th>Подтверждения</th>
-                            <th>Уверенность</th>
+                            <th>Примеры операций</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -37,11 +38,20 @@
                             <td>{{ candidate.operationTypeLabel }}</td>
                             <td>{{ candidate.categoryName }}</td>
                             <td>{{ candidate.sampleCount }} операций / {{ candidate.distinctDateCount }} дат</td>
-                            <td><span class="badge bg-success-lt">100%</span></td>
+                            <td>
+                                {% for example in candidate.examples %}
+                                    <a class="operation-example" href="{{ path('cash_transaction_show', {id: example.id}) }}">{{ example.date|date('d.m.Y') }}</a>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% if is_granted('module.finance.write') %}
+                                    <a href="{{ path('cash_transaction_auto_rule_new', {candidate: candidate.key}) }}" class="btn btn-sm btn-outline-primary">Подготовить правило</a>
+                                {% endif %}
+                            </td>
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-4">
+                            <td colspan="7" class="text-center text-muted py-4">
                                 За выбранный период нет кандидатов, соответствующих безопасному порогу.
                             </td>
                         </tr>
@@ -53,6 +63,59 @@
                 <div class="card-footer text-muted">Показаны первые {{ maxCandidates }} кандидатов.</div>
             {% endif %}
         </div>
+
+        <h3 class="mt-4 mb-2">Фразы в назначениях платежей</h3>
+        {% if phraseAvailable and phraseTargets and is_granted('module.finance.write') %}
+            <form method="post" action="{{ path('cash_transaction_auto_rule_phrase_request') }}" class="mb-3">
+                <input type="hidden" name="_token" value="{{ csrf_token('cash_rule_phrase_' ~ companyId) }}">
+                <label for="phrase-target" class="form-label">Контрагент и статья, подтверждённая финансистом</label>
+                <select id="phrase-target" name="target" class="form-select mb-2" required>
+                    {% for target in phraseTargets %}
+                        <option value="{{ target.counterpartyId }}/{{ target.direction.value }}/{{ target.categoryId }}">{{ target.counterpartyName }} · {{ target.direction.value == 'INFLOW' ? 'Приток' : 'Отток' }} · {{ target.categoryName }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-outline-primary">Найти повторяющуюся фразу с ИИ</button>
+            </form>
+        {% elseif not phraseAvailable %}
+            <p class="text-muted">Поиск фраз недоступен по настройкам или бюджету компании.</p>
+        {% elseif not phraseTargets %}
+            <p class="text-muted">Для поиска нужны хотя бы два подтверждённых платежа одного контрагента по одной статье.</p>
+        {% endif %}
+        {% if phraseSearches %}
+            <ul class="list-group mb-3">
+                {% for search in phraseSearches %}
+                    <li class="list-group-item">
+                        {{ search.counterpartyName }} · {{ search.categoryName }} ·
+                        {% if search.status == 'ready' %}
+                            <a href="{{ path('cash_transaction_auto_rule_candidates', {search: search.taskId}) }}#phrase-review">Проверить «{{ search.phrase }}»</a>
+                        {% elseif search.status == 'pending' %}В очереди
+                        {% elseif search.status == 'sending' %}Отправляется
+                        {% elseif search.status == 'retryable' %}Не отправлено. Повторите поиск с теми же условиями.
+                        {% elseif search.status == 'delayed' %}Ответ задерживается. Повторите поиск с теми же условиями.
+                        {% elseif search.status == 'insufficient' %}Недостаточно данных
+                        {% else %}Поиск завершился ошибкой. Можно повторить запрос.{% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        {% if phraseReview %}
+            <div id="phrase-review" class="card card-body">
+                <h4>Совпадения на подтверждённых платежах</h4>
+                {% for group, examples in phraseReview.examples %}
+                    <p>{{ group == 'target' ? 'Выбрана предлагаемая статья' : 'Человек выбрал другую статью' }} — {{ group == 'target' ? phraseReview.matches : phraseReview.other }}</p>
+                    {% if examples %}
+                        <ul>
+                            {% for payment in examples %}
+                                <li><a href="{{ path('cash_transaction_show', {id: payment.id}) }}">{{ payment.occurredAt|date('d.m.Y') }}</a> · {{ payment.categoryName }} · {{ payment.description }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endfor %}
+                {% if phraseReview.candidate and is_granted('module.finance.write') %}
+                    <a href="{{ path('cash_transaction_auto_rule_new', {candidate: selectedSearch}) }}" class="btn btn-sm btn-outline-primary">Подготовить правило по фразе</a>
+                {% endif %}
+            </div>
+        {% endif %}
 
         <h3 class="mt-4 mb-2">Предложения ИИ</h3>
         <p class="text-muted mb-2">

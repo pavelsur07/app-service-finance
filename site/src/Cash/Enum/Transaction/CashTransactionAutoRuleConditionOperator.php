@@ -10,5 +10,6 @@ enum CashTransactionAutoRuleConditionOperator: string
     case GREATER_THAN = 'GREATER_THAN';
     case LESS_THAN = 'LESS_THAN';
     case BETWEEN = 'BETWEEN';
+    case NOT_CONTAINS = 'NOT_CONTAINS';
     case CONTAINS = 'CONTAINS';
 }

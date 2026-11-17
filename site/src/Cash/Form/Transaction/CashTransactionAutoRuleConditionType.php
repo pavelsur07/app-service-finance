@@ -32,7 +32,7 @@ class CashTransactionAutoRuleConditionType extends AbstractType
                         CashTransactionAutoRuleConditionField::INN => 'ИНН контрагента',
                         CashTransactionAutoRuleConditionField::DATE => 'Дата операции',
                         CashTransactionAutoRuleConditionField::AMOUNT => 'Сумма',
-                        CashTransactionAutoRuleConditionField::DESCRIPTION => 'Описание содержит',
+                        CashTransactionAutoRuleConditionField::DESCRIPTION => 'Назначение платежа',
                         CashTransactionAutoRuleConditionField::CURRENCY => 'Валюта (точное совпадение)',
                         CashTransactionAutoRuleConditionField::IMPORT_SOURCE => 'Источник импорта (точное совпадение)',
                         CashTransactionAutoRuleConditionField::IS_TRANSFER => 'Внутренний перевод',
@@ -47,10 +47,11 @@ class CashTransactionAutoRuleConditionType extends AbstractType
                 'row_attr' => ['class' => 'condition-operator-row'],
                 'choice_label' => static function (CashTransactionAutoRuleConditionOperator $choice) {
                     return match ($choice) {
-                        CashTransactionAutoRuleConditionOperator::EQUAL => 'Равно',
+                        CashTransactionAutoRuleConditionOperator::EQUAL => 'Точно равно',
                         CashTransactionAutoRuleConditionOperator::GREATER_THAN => 'Больше',
                         CashTransactionAutoRuleConditionOperator::LESS_THAN => 'Меньше',
                         CashTransactionAutoRuleConditionOperator::BETWEEN => 'Между',
+                        CashTransactionAutoRuleConditionOperator::NOT_CONTAINS => 'Не содержит',
                         CashTransactionAutoRuleConditionOperator::CONTAINS => 'Содержит',
                     };
                 },

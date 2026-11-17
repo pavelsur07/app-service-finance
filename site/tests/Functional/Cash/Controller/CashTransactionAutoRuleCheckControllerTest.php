@@ -11,6 +11,9 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Cash\Message\ApplyAutoRulesForTransaction;
+use App\Cash\MessageHandler\ApplyAutoRulesForTransactionHandler;
+use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
@@ -135,6 +138,36 @@ final class CashTransactionAutoRuleCheckControllerTest extends WebTestCaseBase
         self::assertNull($reloadedTransaction?->getCashflowCategory());
     }
 
+    public function testPreviewStreamsSeveralBatchesWithoutRetainingTransactionsInFormEntityManager(): void
+    {
+        static::createClient();
+        $user = UserBuilder::aUser()->withIndex(870)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(870)->withOwner($user)->build();
+        $account = MoneyAccountBuilder::aMoneyAccount()->forCompany($company)->build();
+        $today = new \DateTimeImmutable('today');
+        foreach ([$user, $company, $account] as $entity) {
+            $this->em()->persist($entity);
+        }
+        for ($i = 0; $i < 205; ++$i) {
+            $tx = CashTransactionBuilder::aCashTransaction()->forCompany($company)->withMoneyAccount($account)->build();
+            $tx->setOccurredAt($today);
+            $this->em()->persist($tx);
+        }
+        $this->em()->flush();
+        $this->em()->clear();
+        $company = $this->em()->find($company::class, $company->getId());
+        self::assertNotNull($company);
+        $repository = static::getContainer()->get(CashTransactionRepository::class);
+        $count = 0;
+        foreach ($repository->iterateForAutoRulePreview($company, $today, $today) as $operation) {
+            self::assertSame($company->getId(), $operation->getCompany()->getId());
+            ++$count;
+        }
+        self::assertSame(205, $count);
+        self::assertTrue($this->em()->contains($company));
+        self::assertEmpty($this->em()->getUnitOfWork()->getIdentityMap()[CashTransaction::class] ?? []);
+    }
+
     public function testPreviewShowsAtomicProjectAndResponsibilityCenterPlanWithoutMutation(): void
     {
         $client = static::createClient();
@@ -206,5 +239,13 @@ final class CashTransactionAutoRuleCheckControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'Проект: Не задано → Продажа компьютеров');
         self::assertSelectorTextContains('body', 'ЦФО: Не задано → Краснодар');
+
+        $handler = static::getContainer()->get(ApplyAutoRulesForTransactionHandler::class);
+        $handler(new ApplyAutoRulesForTransaction((string) $transaction->getId(), (string) $company->getId(), new \DateTimeImmutable()));
+        $applied = $this->em()->find(CashTransaction::class, $transaction->getId());
+        self::assertInstanceOf(CashTransaction::class, $applied);
+        self::assertSame($project->getId(), $applied->getProjectDirection()?->getId());
+        self::assertSame($center->getId(), $applied->getResponsibilityCenterId());
+        self::assertSame($category->getId(), $applied->getCashflowCategory()?->getId());
     }
 }
