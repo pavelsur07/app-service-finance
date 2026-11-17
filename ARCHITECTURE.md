@@ -2833,7 +2833,9 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
 - Entity `CashCategorySuggestion`: компания, операция, `task_id`, статус
   `CashCategorySuggestionStatus` (`requested` → `suggested` / `no_answer` /
   `failed` / `stale`; `suggested` → `accepted` / `dismissed` / `auto_applied` /
-  `stale`), статья,
+  `stale`; `no_answer` → `stale` одним UPDATE `CashCategorySuggestionRepository::reopenNoAnswer()` после смены дерева статей — операция снова
+  кандидат: при замене ядром `ReplaceUnusedCashflowTreeWithCoreAction` (`category_tree_replaced`)
+  и командой `app:cash:ai-suggestions:reopen-no-answer <companyId> [--execute]` (`reopened`)), статья,
   уверенность `decimal(5,4)`, вердикт, модель, версия промпта, кто и когда решил.
   Unique (`task_id`, `transaction_id`); частичный unique
   `uniq_cash_category_suggestion_open` — не больше одной открытой
@@ -6006,6 +6008,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.212 | 2026-11-18 | Cash: «нет ответа» ИИ переоткрывается при замене дерева ДДС ядром и командой `app:cash:ai-suggestions:reopen-no-answer`; задача `ai-no-answer-reopen` |
 | 2.211 | 2026-11-17 | Cash: консолидированный отчёт ДДС группы — `BuildCashflowGroupReport`, `CashflowGroupReportQuery`, xlsx; задача `cashflow-group-chart`, этап 4 |
 | 2.210 | 2026-11-17 | Cash: экран «Эталон группы» (план, «Применить», ручная привязка), `BindCashflowCategoryGroupCodeAction`, ночная строка `ДДС-группа` в `app:directories:integrity-check`; Company: `ConsolidationGroupFacadeInterface::headsOf()`; задача `cashflow-group-chart`, этап 3 |
 | 2.209 | 2026-11-17 | Cash: синхронизация дерева ДДС с эталоном группы — `SyncCashflowGroupChartAction`, `app:cash:group-chart:sync`, журнал `cashflow_group_chart_applications` (миграция `Version20261117180000`), задача `cashflow-group-chart`, этап 2 |
