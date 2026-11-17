@@ -62,6 +62,23 @@ final class CashCategorySuggestionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Открытые подсказки (`suggested`), предлагающие одну из статей.
+     *
+     * @param list<string> $categoryIds
+     *
+     * @return list<CashCategorySuggestion>
+     */
+    public function findSuggestedForCategories(string $companyId, array $categoryIds): array
+    {
+        Assert::uuid($companyId);
+        if ([] === $categoryIds) {
+            return [];
+        }
+
+        return $this->findBy(['companyId' => $companyId, 'status' => Status::SUGGESTED, 'categoryId' => $categoryIds]);
+    }
+
+    /**
      * Были ли у компании запросы, истёкшие без ответа (`failed/expired`) с момента: сервис мог
      * выполнить их платно, а импорт — не дойти.
      */

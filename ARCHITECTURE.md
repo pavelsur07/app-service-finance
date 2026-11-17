@@ -2645,6 +2645,15 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 | Finance `ApplyDefaultPLTreeOnCompanyCreated` | дерево ОПиУ шаблона профиля (`config/finance/pl_templates/`) | нет ни одной статьи ОПиУ |
 | Balance `SeedBalanceStructureOnCompanyCreated` | книга (не инициализирована), статьи и учётные счета шаблона профиля (`config/balance/templates/`) | статьи — нет статей; счета — нет ни одного счёта |
 
+Существующей компании ядро ДДС ставит `app:cash:cashflow-core:apply <companyId> [--execute]`
+(`ReplaceUnusedCashflowTreeWithCoreAction`): без `--execute` печатает план; с `--execute`
+команда владеет транзакцией (`wrapInTransaction`, `pg_advisory_xact_lock(hashtext(companyId))` —
+тот же ключ, что у `CashflowCategoryStructureMigrator`). Внутри: системные статьи (идемпотентно),
+открытые ИИ-подсказки на удаляемые статьи → `stale`, удаление несистемных статей (с листьев),
+ядро. Если хоть на одну несистемную статью ссылается операция (в т. ч. удалённая), разбивка,
+платёжный календарь или правило, команда отказывает и данные не меняет. Дерево, уже совпадающее
+с ядром по путям названий, не трогает.
+
 Компании, созданные до онбординга, дозаполняет `app:company:onboarding-backfill
 [--company=<uuid>] [--execute --expected-count=N] [-v]` (`BackfillCompanyOnboardingAction`):
 по каждой компании диспатчит `CompanyOnboardingBackfillEvent(companyId, businessProfile, execute)`; подписчики
@@ -5864,6 +5873,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.206 | 2026-11-17 | Cash: `app:cash:cashflow-core:apply` — ядро ДДС для существующей компании вместо неиспользуемых статей (`ReplaceUnusedCashflowTreeWithCoreAction`, `CashCategorySuggestionRepository::findSuggestedForCategories()`), задача `cashflow-group-chart`, этап 0a |
 | 2.205 | 2026-11-16 | MarketplacePlProjection: экран «ОПиУ» повторяет дерево статей компании до СМ3 (`TreeCut`, граница по коду `CM3`), пустые строки на месте, статьи ниже — блок «Ниже СМ3» |
 | 2.204 | 2026-11-16 | MarketplacePlProjection: расчётные строки экрана «ОПиУ» — «Выручка с СПП» (продажи − СПП − соинвестирование) и себестоимость из витрины (`MarketplaceEconomicsFacadeInterface::costPrice()`); `plSums()` делит ключ по знаку суммы |
 | 2.203 | 2026-11-16 | MarketplacePlProjection (этап 3–4): проекция ОПиУ из канона при чтении (`ProjectionBuilder`, без хранимой таблицы), экран `/marketplace/economics/pl` — новый расчёт рядом с текущим; `MarketplaceOperationsFacadeInterface::plSums()`, `companyIds()`; `LegacyPlPreviewFacadeInterface`; cron `sync-template --all` |
