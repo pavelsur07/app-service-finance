@@ -62,6 +62,7 @@
     {% embed 'partials/_page_header.html.twig' with {title: 'Статьи ДДС'} %}
         {% block actions %}
             <div class="d-flex gap-2">
+                <a href="{{ path('cashflow_group_chart') }}" class="btn btn-outline-primary">Эталон группы</a>
                 <a href="{{ path('cashflow_category_export_json') }}" class="btn btn-outline-primary">Выгрузить справочник ДДС (JSON)</a>
                 <a href="{{ path('cashflow_category_new') }}" class="btn btn-primary">+ Добавить статью</a>
             </div>

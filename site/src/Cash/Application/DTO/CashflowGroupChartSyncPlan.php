@@ -14,6 +14,8 @@ final readonly class CashflowGroupChartSyncPlan
      * @param list<string> $bind «путь статьи компании → код»
      * @param list<string> $create «путь в эталоне (код)»
      * @param list<string> $conflicts «код «название»: причина»
+     * @param array<string, string> $unmatched несистемные статьи компании без кода после плана: id => путь
+     * @param array<string, string> $freeCodes коды эталона, которых у компании не было до плана: код => путь в эталоне
      */
     public function __construct(
         public string $source,
@@ -22,6 +24,8 @@ final readonly class CashflowGroupChartSyncPlan
         public array $create,
         public array $conflicts,
         public int $headCodes,
+        public array $unmatched = [],
+        public array $freeCodes = [],
     ) {
     }
 
