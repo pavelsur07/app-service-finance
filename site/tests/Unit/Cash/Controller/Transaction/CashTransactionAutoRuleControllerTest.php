@@ -8,6 +8,7 @@ use App\Cash\Application\AutoRule\ApplyAutoRuleToTransactionAction;
 use App\Cash\Application\DTO\CashTransactionAutoRuleApplicationPlan;
 use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;
 use App\Cash\Application\Service\AutoRule\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\AutoRule\CashAutoRuleConflictRecorder;
 use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleProvenanceResolver;
 use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Cash\Application\Service\Transaction\CashTransactionSplitSynchronizer;
@@ -26,6 +27,7 @@ use App\Shared\Service\ActiveCompanyService;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -374,6 +376,7 @@ final class CashTransactionAutoRuleControllerTest extends TestCase
             $dispatchGuard,
             $auditContextProvider,
             new CashTransactionSplitSynchronizer($entityManager, $auditContextProvider, new AutoRuleDispatchGuard(), new CashTransactionAutoRuleProvenanceResolver($this->createMock(AuditLogRepository::class), new NullLogger())),
+            new CashAutoRuleConflictRecorder($this->createStub(Connection::class)),
         );
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Entity;
 
 use App\Shared\Enum\AuditLogAction;
+use App\Shared\Infrastructure\Doctrine\MicrosecondDateTimeImmutableType;
 use App\Shared\Repository\AuditLogRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
@@ -37,7 +38,7 @@ class AuditLog
     #[ORM\Column(name: 'actor_user_id', type: 'guid', nullable: true)]
     private ?string $actorUserId;
 
-    #[ORM\Column(name: 'created_at', type: 'datetime_immutable')]
+    #[ORM\Column(name: 'created_at', type: MicrosecondDateTimeImmutableType::NAME)]
     private \DateTimeImmutable $createdAt;
 
     /**

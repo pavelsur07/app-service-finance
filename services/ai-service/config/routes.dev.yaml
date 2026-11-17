@@ -20,3 +20,7 @@ tasks:
   parse_payment_message:
     mode: single
     models: [stub/payment-intake]
+
+  cash_rule_phrase:
+    mode: single
+    models: [stub/cash-rule-phrase]

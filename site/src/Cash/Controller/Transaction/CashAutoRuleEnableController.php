@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
-use App\Cash\Application\AutoRule\ChangeCashTransactionAutoRuleActivityAction;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Company\Security\ModuleAccess;
-use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -22,8 +20,6 @@ final class CashAutoRuleEnableController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $companyService,
         private readonly CashTransactionAutoRuleRepository $repo,
-        private readonly ChangeCashTransactionAutoRuleActivityAction $changeActivity,
-        private readonly AuditContextProvider $auditContextProvider,
     ) {
     }
 
@@ -37,7 +33,7 @@ final class CashAutoRuleEnableController extends AbstractController
             throw $this->createNotFoundException();
         }
         if ($this->isCsrfTokenValid('enable'.$rule->getId(), (string) $request->request->get('_token'))) {
-            ($this->changeActivity)($rule, true, $this->auditContextProvider->getActorUserId());
+            return $this->redirectToRoute('cash_transaction_auto_rule_edit', ['id' => $id]);
         }
 
         return $this->redirectToRoute('cash_transaction_auto_rule_index');

@@ -6,17 +6,51 @@ namespace App\Tests\Unit\Cash\Application\Service\AutoRule;
 
 use App\Cash\Application\Service\AutoRule\CashAutoRuleMatcher;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
+use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Company\Entity\ProjectDirection;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
 final class CashAutoRuleMatcherTest extends TestCase
 {
+    /** @return iterable<string, array{string, ?string, bool}> */
+    public static function paymentPurposes(): iterable
+    {
+        yield 'substring' => ['CONTAINS', 'ПО ДОГОВОРУ АРЕНДЫ', true];
+        yield 'excluded' => ['NOT_CONTAINS', 'Обеспечительный платеж', false];
+        yield 'not excluded' => ['NOT_CONTAINS', 'по договору аренды', true];
+        yield 'exact folded' => ['EQUAL', 'ОБЕСПЕЧИТЕЛЬНЫЙ ПЛАТЕЖ', true];
+        yield 'not exact' => ['EQUAL', 'Это обеспечительный платёж', false];
+        foreach (['CONTAINS', 'NOT_CONTAINS', 'EQUAL'] as $operator) {
+            yield 'empty '.$operator => [$operator, null, false];
+            yield 'blank '.$operator => [$operator, '   ', false];
+        }
+    }
+
+    #[DataProvider('paymentPurposes')]
+    public function testPaymentPurpose(string $operator, ?string $purpose, bool $expected): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $rule = new CashTransactionAutoRule(Uuid::uuid7()->toString(), $company, 'Аренда', CashTransactionAutoRuleAction::FILL, CashTransactionAutoRuleOperationType::ANY);
+        $rule->addCondition(new CashTransactionAutoRuleCondition(
+            field: CashTransactionAutoRuleConditionField::DESCRIPTION,
+            operator: CashTransactionAutoRuleConditionOperator::from($operator),
+            value: 'CONTAINS' === $operator ? 'договору' : 'обеспечительный платёж',
+        ));
+        $transaction = CashTransactionBuilder::aCashTransaction()->forCompany($company)->build();
+        $transaction->setDescription($purpose);
+
+        self::assertSame($expected, (new CashAutoRuleMatcher())->matches($rule, $transaction));
+    }
+
     public function testSnapshotOrderDoesNotChangeWinnersOrFieldConflicts(): void
     {
         $company = CompanyBuilder::aCompany()->build();

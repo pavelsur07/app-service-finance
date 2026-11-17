@@ -90,7 +90,7 @@ final readonly class CashAutoRuleMatcher
         );
     }
 
-    public function matches(CashTransactionAutoRule $rule, CashTransaction $transaction): bool
+    public function matches(CashTransactionAutoRule $rule, CashTransaction $transaction, bool $ignorePurposeExclusions = false): bool
     {
         if (!$this->belongsToSameCompany($rule->getCompany(), $transaction->getCompany())
             || !$this->hasConsistentCompanyScope($rule)) {
@@ -112,7 +112,8 @@ final readonly class CashAutoRuleMatcher
             $exactValue = trim($value);
 
             $matches = match ($condition->getField()) {
-                CashTransactionAutoRuleConditionField::COUNTERPARTY => $transaction->getCounterparty() === $condition->getCounterparty(),
+                CashTransactionAutoRuleConditionField::COUNTERPARTY => null !== $condition->getCounterparty()
+                    && $transaction->getCounterparty()?->getId() === $condition->getCounterparty()->getId(),
                 CashTransactionAutoRuleConditionField::COUNTERPARTY_NAME => StringNormalizer::contains(
                     $transaction->getCounterparty()?->getName() ?? '',
                     $value,
@@ -131,9 +132,11 @@ final readonly class CashAutoRuleMatcher
                     $value,
                     $valueTo,
                 ),
-                CashTransactionAutoRuleConditionField::DESCRIPTION => StringNormalizer::contains(
-                    $transaction->getDescription() ?? '',
+                CashTransactionAutoRuleConditionField::DESCRIPTION => $this->purposeMatches(
+                    $transaction->getDescription(),
                     $value,
+                    $operator,
+                    $ignorePurposeExclusions,
                 ),
                 CashTransactionAutoRuleConditionField::CURRENCY => $transaction->getCurrency() === $exactValue,
                 CashTransactionAutoRuleConditionField::IMPORT_SOURCE => CashTransactionAutoRuleCondition::MISSING_IMPORT_SOURCE_VALUE === $exactValue
@@ -152,6 +155,24 @@ final readonly class CashAutoRuleMatcher
         }
 
         return true;
+    }
+
+    private function purposeMatches(
+        ?string $description,
+        string $value,
+        CashTransactionAutoRuleConditionOperator $operator,
+        bool $ignoreExclusions,
+    ): bool {
+        if ('' === trim((string) $description) || '' === trim($value)) {
+            return false;
+        }
+
+        return match ($operator) {
+            CashTransactionAutoRuleConditionOperator::CONTAINS => StringNormalizer::contains((string) $description, $value),
+            CashTransactionAutoRuleConditionOperator::NOT_CONTAINS => $ignoreExclusions || !StringNormalizer::contains((string) $description, $value),
+            CashTransactionAutoRuleConditionOperator::EQUAL => StringNormalizer::normalize(trim((string) $description)) === StringNormalizer::normalize(trim($value)),
+            default => false,
+        };
     }
 
     private function normalizedExactText(?string $value): string

@@ -1,0 +1,58 @@
+{# preview — результаты сравнения действующих правил и редакции формы в безопасном режиме. #}
+{% macro countWithExamples(metric) %}
+  {% if metric.count|default(0) %}
+    <details>
+      <summary>{{ metric.count }}</summary>
+      <ul class="list-unstyled small mt-2">
+        {% for example in metric.examples %}
+          {% set operation = example.transaction %}
+          <li class="mb-1">
+            <a href="{{ path('cash_transaction_show', {id: operation.id}) }}" target="_blank" rel="noopener">{{ operation.occurredAt|date('d.m.Y') }} · {{ operation.amount|vf_amount }} {{ operation.currency }}</a>
+            {% if operation.description %}<div>{{ operation.description }}</div>{% endif %}
+            {% if example.detail %}<div class="text-muted">{{ example.detail }}</div>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </details>
+  {% else %}
+    0
+  {% endif %}
+{% endmacro %}
+
+{% set metrics = preview.impact.metrics %}
+<div class="card mb-3">
+  <div class="card-header"><h3 class="card-title">Что изменится после подтверждения</h3></div>
+  <div class="card-body">
+    <p>Сравнение действующих правил с предложенной редакцией. Операций {{ periodLabel|default('за выбранный период') }} — {{ preview.summary.scanned }}. Раскройте число, чтобы посмотреть примеры.</p>
+    <dl class="row mb-0">
+      {% set outcomes = {
+        newCategory: 'Впервые получат статью',
+        matched: 'Подходят под предложенные условия',
+        oldOnly: 'Перестанут подходить под правило',
+        excluded: 'Исключены условием «не содержит»',
+        SKIPPED_LOCKED_PERIOD: 'Пропущены из-за закрытого периода',
+        SKIPPED_MANUAL_SPLIT: 'Пропущены из-за ручной разбивки'
+      } %}
+      {% for key, label in outcomes %}
+        <dt class="col-md-7">{{ label }}</dt>
+        <dd class="col-md-5">{{ _self.countWithExamples(metrics[key]|default(null)) }}</dd>
+      {% endfor %}
+    </dl>
+  </div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <caption class="visually-hidden">Различия по полям операции</caption>
+      <thead><tr><th>Поле</th><th>Сменится победившее правило</th><th>Изменится итоговое значение</th><th>Появится конфликт</th><th>Устранится конфликт</th></tr></thead>
+      <tbody>
+        {% for field, label in constant('App\\Cash\\Application\\DTO\\CashAutoRulePreviewImpact::FIELDS') %}
+          <tr>
+            <th scope="row">{{ label }}</th>
+            {% for key in ['winner', 'value', 'conflictAdded', 'conflictRemoved'] %}
+              <td>{{ _self.countWithExamples(metrics[key ~ '.' ~ field]|default(null)) }}</td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

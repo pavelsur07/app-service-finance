@@ -9,6 +9,7 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 
 final readonly class CashTransactionAutoRuleCandidate
 {
+    /** @param list<array{id: string, date: string}> $examples */
     public function __construct(
         public CashTransactionAutoRuleConditionField $field,
         public string $value,
@@ -18,7 +19,14 @@ final readonly class CashTransactionAutoRuleCandidate
         public string $categoryName,
         public int $sampleCount,
         public int $distinctDateCount,
+        public array $examples = [],
+        public ?string $phrase = null,
     ) {
+    }
+
+    public function key(): string
+    {
+        return hash('sha256', json_encode([$this->field, $this->value, $this->operationType, $this->categoryId], \JSON_THROW_ON_ERROR));
     }
 
     public function fieldLabel(): string

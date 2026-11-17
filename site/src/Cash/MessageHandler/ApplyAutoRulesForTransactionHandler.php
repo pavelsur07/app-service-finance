@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\MessageHandler;
 
 use App\Cash\Application\Service\AutoRule\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\AutoRule\CashAutoRuleConflictRecorder;
 use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleProvenanceResolver;
 use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Cash\Application\Service\Category\CashflowSystemCategoryService;
@@ -33,6 +34,7 @@ final class ApplyAutoRulesForTransactionHandler
         private readonly AutoRuleDispatchGuard $dispatchGuard,
         private readonly CashTransactionAutoRuleProvenanceResolver $provenanceResolver,
         private readonly LoggerInterface $logger,
+        private readonly CashAutoRuleConflictRecorder $conflictRecorder,
     ) {
     }
 
@@ -83,6 +85,7 @@ final class ApplyAutoRulesForTransactionHandler
         }
 
         $match = $this->autoRuleService->match($transaction);
+        $this->conflictRecorder->record($transaction, $match);
         $rule = $match->rule;
         $provenance = $message->mode->replacesAutoAssigned() && $match->hasWinners()
             ? $this->provenanceResolver->resolve($transaction)

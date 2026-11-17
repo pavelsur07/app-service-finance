@@ -120,7 +120,7 @@ final class CashTransactionAutoRuleFormTest extends WebTestCaseBase
         $this->setClientSessionValue($client, 'active_company_id', $company->getId());
 
         $crawler = $client->request('GET', '/cash-transaction-auto-rules/new');
-        $client->submit($crawler->selectButton('Сохранить')->form(), [
+        $client->submit($crawler->selectButton('Проверить')->form(), [
             'cash_transaction_auto_rule[name]' => '',
         ]);
 

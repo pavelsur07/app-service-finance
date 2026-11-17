@@ -35,6 +35,7 @@
   </form>
 
   {% if preview %}
+    {% include 'cash_transaction_auto_rule/_rule_impact.html.twig' with {preview: preview} only %}
     <div class="row row-cards mb-3 auto-rule-preview-summary"
          data-scanned="{{ preview.summary.scanned }}"
          data-matched="{{ preview.summary.matched }}"
