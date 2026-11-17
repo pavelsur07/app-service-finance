@@ -60,6 +60,21 @@ final class ApplyCashflowCoreToCompanyCommandTest extends IntegrationTestCase
         self::assertSame(1, (int) $this->db()->fetchOne('SELECT COUNT(*) FROM cash_transaction WHERE company_id = ?', [$company->getId()]));
     }
 
+    /** «Нет ответа» на старом дереве ИИ иначе не переспросит: замена ядром переоткрывает операцию. */
+    public function testExecuteReopensNoAnswerOnOldTree(): void
+    {
+        $company = $this->companyWithOldTree();
+        $other = $this->companyWithOldTree();
+        $noAnswer = $this->noAnswer($company);
+        $foreign = $this->noAnswer($other);
+
+        $tester = $this->runCommand($company, ['--execute' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        self::assertSame(['stale', 'category_tree_replaced'], array_values((array) $this->db()->fetchAssociative('SELECT status, error_code FROM cash_category_suggestion WHERE id = ?', [$noAnswer->getId()])));
+        self::assertSame('no_answer', $this->db()->fetchOne('SELECT status FROM cash_category_suggestion WHERE id = ?', [$foreign->getId()]), 'чужая компания не тронута');
+    }
+
     /** Пользователь отклонил подсказку после плана: решение не перезаписывается в stale. */
     public function testSuggestionDismissedAfterPlanKeepsUserDecision(): void
     {
@@ -279,6 +294,21 @@ final class ApplyCashflowCoreToCompanyCommandTest extends IntegrationTestCase
             ->withTransactionId((string) $this->transaction($company)->getId())
             ->withTaskId(Uuid::uuid4()->toString())
             ->suggesting((string) $category->getId())
+            ->build();
+        $this->em->persist($suggestion);
+        $this->em->flush();
+
+        return $suggestion;
+    }
+
+    private function noAnswer(Company $company): CashCategorySuggestion
+    {
+        $suggestion = CashCategorySuggestionBuilder::aSuggestion()
+            ->withId(Uuid::uuid4()->toString())
+            ->withCompanyId((string) $company->getId())
+            ->withTransactionId((string) $this->transaction($company)->getId())
+            ->withTaskId(Uuid::uuid4()->toString())
+            ->suggesting(null)
             ->build();
         $this->em->persist($suggestion);
         $this->em->flush();

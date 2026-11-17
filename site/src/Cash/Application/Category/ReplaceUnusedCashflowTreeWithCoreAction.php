@@ -20,7 +20,8 @@ use Symfony\Component\Clock\ClockInterface;
 /**
  * Базовое дерево ДДС (`core.yaml`) для существующей компании: несистемные статьи
  * удаляются и заменяются ядром, но только когда ни на одну из них ничего не ссылается.
- * Открытые ИИ-подсказки на удаляемые статьи (поле без FK) становятся `stale`.
+ * Открытые ИИ-подсказки на удаляемые статьи (поле без FK) становятся `stale`, «нет ответа»
+ * компании переоткрывается (`stale`, `category_tree_replaced`) — ИИ спросит снова на новом дереве.
  * Повтор на дереве, уже совпадающем с ядром, ничего не меняет.
  *
  * Транзакцией владеет вызывающий (команда `app:cash:cashflow-core:apply`, `wrapInTransaction`).
@@ -133,6 +134,8 @@ final class ReplaceUnusedCashflowTreeWithCoreAction
         foreach ($this->suggestions->findSuggestedForCategoriesForUpdate($companyId, $ids) as $suggestion) {
             $suggestion->markStale('category_removed', $now);
         }
+        // «Нет ответа» на старом дереве ИИ иначе не переспросит: на новом дереве ответ может найтись.
+        $this->suggestions->reopenNoAnswer($companyId, 'category_tree_replaced', $now);
 
         // Сначала листья: строка родителя держит FK parent_id детей.
         $byDepth = [];

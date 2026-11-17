@@ -7,7 +7,8 @@ namespace App\Cash\Enum\Transaction;
 /**
  * Жизненный цикл ИИ-подсказки статьи ДДС (docs/tasks/ai/stages/stage-2.md).
  *
- * requested → suggested | no_answer | failed | stale; suggested → accepted | dismissed | stale.
+ * requested → suggested | no_answer | failed | stale; suggested → accepted | dismissed | stale;
+ * no_answer → stale (переоткрыто после смены дерева статей, CashCategorySuggestionRepository::reopenNoAnswer).
  */
 enum CashCategorySuggestionStatus: string
 {

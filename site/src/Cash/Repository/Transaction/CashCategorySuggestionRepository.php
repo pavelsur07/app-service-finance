@@ -119,6 +119,36 @@ final class CashCategorySuggestionRepository extends ServiceEntityRepository
         return $rows;
     }
 
+    public function countNoAnswer(string $companyId): int
+    {
+        Assert::uuid($companyId);
+
+        return $this->count(['companyId' => $companyId, 'status' => Status::NO_ANSWER]);
+    }
+
+    /**
+     * Переоткрывает «нет ответа» компании после смены дерева статей (`no_answer` → `stale`, причина в
+     * `error_code`): операции снова кандидаты ИИ. Один UPDATE без загрузки истории в память; строки
+     * блокируются им же. Только внутри транзакции вызывающего — откатывается вместе с ней.
+     *
+     * @return int сколько переоткрыто
+     */
+    public function reopenNoAnswer(string $companyId, string $reason, \DateTimeImmutable $at): int
+    {
+        Assert::uuid($companyId);
+        Assert::lengthBetween($reason, 1, 64);
+        $connection = $this->getEntityManager()->getConnection();
+        if (!$connection->isTransactionActive()) {
+            throw new \LogicException('Переоткрытие «нет ответа» — только внутри транзакции вызывающего.');
+        }
+
+        return (int) $connection->executeStatement(
+            "UPDATE cash_category_suggestion SET status = 'stale', error_code = :reason, responded_at = COALESCE(responded_at, :at)
+             WHERE company_id = :companyId AND status = 'no_answer'",
+            ['reason' => $reason, 'at' => $at->format('Y-m-d H:i:s'), 'companyId' => $companyId],
+        );
+    }
+
     /**
      * Были ли у компании запросы, истёкшие без ответа (`failed/expired`) с момента: сервис мог
      * выполнить их платно, а импорт — не дойти.

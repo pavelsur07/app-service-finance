@@ -436,6 +436,20 @@ case "$cmd" in
     done
     if [ "$seen_company" -ne 1 ]; then echo "companyId is required for $cmd" >&2; exit 2; fi
     ;;
+  app:cash:ai-suggestions:reopen-no-answer)
+    # Переоткрыть ИИ-подсказки «нет ответа» компании после смены дерева ДДС
+    # (docs/tasks/ai-no-answer-reopen/TASK.md). Без --execute — только счёт; с --execute
+    # подсказки становятся stale и операции попадают в часовой app:cash:ai-categorize (платно, копейки).
+    # Запуск с --execute — одобрение Владельца. UUID компании позиционный и обязателен.
+    seen_company=0
+    for arg in "$@"; do
+      if   [[ "$arg" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] && [ "$seen_company" -eq 0 ]; then seen_company=1
+      elif [ "$arg" = "--execute" ] || [ "$arg" = "--no-interaction" ] || [ "$arg" = "-n" ]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    if [ "$seen_company" -ne 1 ]; then echo "companyId is required for $cmd" >&2; exit 2; fi
+    ;;
   app:cash:group-chart:sync)
     # Синхронизация дерева ДДС компании с эталоном группы
     # (docs/tasks/cashflow-group-chart/stages/stage-2.md). Без --execute — read-only план;
