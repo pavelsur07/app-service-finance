@@ -11,6 +11,11 @@ final class InvalidCompanyTaxProfileException extends \RuntimeException
         return new self(sprintf('Режим «%s» не допускает «%s».', $taxRegime, $vatMode));
     }
 
+    public static function taxRateOutOfRange(): self
+    {
+        return new self('Ставка налога — число от 0 до 100.');
+    }
+
     public static function validFromNotFirstDay(): self
     {
         return new self('Налоговый режим меняется с 1-го числа месяца.');

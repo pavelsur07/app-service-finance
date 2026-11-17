@@ -17,6 +17,7 @@ final class CompanyTaxProfileBuilder
     private TaxRegime $taxRegime = TaxRegime::USN;
     private VatMode $vatMode = VatMode::EXEMPT;
     private ?\DateTimeImmutable $validFrom = null;
+    private ?string $taxRatePercent = null;
 
     public static function aProfile(): self
     {
@@ -56,6 +57,14 @@ final class CompanyTaxProfileBuilder
         return $clone;
     }
 
+    public function withTaxRate(?string $percent): self
+    {
+        $clone = clone $this;
+        $clone->taxRatePercent = $percent;
+
+        return $clone;
+    }
+
     public function build(): CompanyTaxProfile
     {
         return new CompanyTaxProfile(
@@ -65,6 +74,7 @@ final class CompanyTaxProfileBuilder
             $this->validFrom,
             new \DateTimeImmutable('2026-11-01 10:00:00'),
             $this->id,
+            $this->taxRatePercent,
         );
     }
 }

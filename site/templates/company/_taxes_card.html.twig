@@ -15,6 +15,7 @@
                         <th>Действует</th>
                         <th>Режим налогообложения</th>
                         <th>НДС</th>
+                        <th>Ставка налога</th>
                         <th class="w-1"></th>
                     </tr>
                     </thead>
@@ -28,6 +29,7 @@
                             </td>
                             <td>{{ profile.taxRegime.label }}</td>
                             <td>{{ profile.vatMode.label }}</td>
+                            <td>{{ profile.taxRatePercent is null ? '—' : profile.taxRatePercent|replace({'.00': '', '.': ','}) ~ '%' }}</td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-ghost-danger"
                                         data-bs-toggle="modal" data-bs-target="#company-confirm"

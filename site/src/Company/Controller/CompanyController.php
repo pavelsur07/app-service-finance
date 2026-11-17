@@ -89,7 +89,7 @@ class CompanyController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            /** @var array{taxRegime: ?TaxRegime, vatMode: ?VatMode} $taxProfile */
+            /** @var array{taxRegime: ?TaxRegime, vatMode: ?VatMode, taxRatePercent: ?string} $taxProfile */
             $taxProfile = $form->get('taxProfile')->getData();
 
             // Подписчики события (Balance) ищут данные через SQL, поэтому им нужен flush до события.
@@ -98,7 +98,7 @@ class CompanyController extends AbstractController
                 $companyOwnerMembershipCreator->persistCompanyWithOwnerMembership($company, $user);
                 // Начальный налоговый профиль; форма пропускает только оба поля или ни одного.
                 if (null !== $taxProfile['taxRegime'] && null !== $taxProfile['vatMode']) {
-                    $taxProfileWriter->upsert((string) $company->getId(), $taxProfile['taxRegime'], $taxProfile['vatMode'], null);
+                    $taxProfileWriter->upsert((string) $company->getId(), $taxProfile['taxRegime'], $taxProfile['vatMode'], null, $taxProfile['taxRatePercent']);
                 }
                 $em->flush();
                 $eventDispatcher->dispatch(new CompanyCreatedEvent((string) $company->getId(), $company->getBusinessProfile()));

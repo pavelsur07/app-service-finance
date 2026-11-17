@@ -29,7 +29,7 @@ final class SaveCompanyTaxProfileAction
     /**
      * @throws InvalidCompanyTaxProfileException
      */
-    public function __invoke(string $companyId, TaxRegime $taxRegime, VatMode $vatMode, ?\DateTimeImmutable $validFrom): string
+    public function __invoke(string $companyId, TaxRegime $taxRegime, VatMode $vatMode, ?\DateTimeImmutable $validFrom, ?string $taxRatePercent = null): string
     {
         Assert::uuid($companyId);
         // Проверка до транзакции: исключение внутри wrapInTransaction закрывает EntityManager.
@@ -37,11 +37,12 @@ final class SaveCompanyTaxProfileAction
             throw InvalidCompanyTaxProfileException::vatModeNotAllowed($taxRegime->label(), $vatMode->label());
         }
         $validFrom = CompanyTaxProfile::normalizeValidFrom($validFrom);
+        $taxRatePercent = CompanyTaxProfile::normalizeTaxRate($taxRatePercent);
 
         /** @var string $profileId */
-        $profileId = $this->entityManager->wrapInTransaction(function () use ($companyId, $taxRegime, $vatMode, $validFrom): string {
+        $profileId = $this->entityManager->wrapInTransaction(function () use ($companyId, $taxRegime, $vatMode, $validFrom, $taxRatePercent): string {
             $this->writer->lockCompany($companyId);
-            $profile = $this->writer->upsert($companyId, $taxRegime, $vatMode, $validFrom);
+            $profile = $this->writer->upsert($companyId, $taxRegime, $vatMode, $validFrom, $taxRatePercent);
             $this->entityManager->flush();
 
             return $profile->getId();
@@ -53,6 +54,7 @@ final class SaveCompanyTaxProfileAction
             'taxRegime' => $taxRegime->value,
             'vatMode' => $vatMode->value,
             'validFrom' => $validFrom?->format('Y-m-d'),
+            'taxRatePercent' => $taxRatePercent,
         ]);
 
         return $profileId;

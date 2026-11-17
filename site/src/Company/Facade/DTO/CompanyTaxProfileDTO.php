@@ -14,6 +14,8 @@ final readonly class CompanyTaxProfileDTO
         public VatMode $vatMode,
         /** null — начальный профиль («с начала учёта») */
         public ?\DateTimeImmutable $validFrom,
+        /** Ставка налога режима, % ('6.00'); null — не задана */
+        public ?string $taxRatePercent = null,
     ) {
     }
 
