@@ -8,6 +8,7 @@ use App\Cash\Entity\Transaction\CashCategorySuggestion;
 use App\Cash\Enum\Transaction\CashCategorySuggestionStatus as Status;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\LockMode;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
@@ -59,6 +60,63 @@ final class CashCategorySuggestionRepository extends ServiceEntityRepository
         Assert::uuid($taskId);
 
         return $this->findBy(['companyId' => $companyId, 'taskId' => $taskId, 'status' => Status::REQUESTED]);
+    }
+
+    /**
+     * Открытые подсказки (`suggested`), предлагающие одну из статей.
+     *
+     * @param list<string> $categoryIds
+     *
+     * @return list<CashCategorySuggestion>
+     */
+    public function findSuggestedForCategories(string $companyId, array $categoryIds): array
+    {
+        Assert::uuid($companyId);
+        if ([] === $categoryIds) {
+            return [];
+        }
+
+        return $this->findBy(['companyId' => $companyId, 'status' => Status::SUGGESTED, 'categoryId' => $categoryIds]);
+    }
+
+    /** Сколько подсказок компании ждут ответа ИИ (`requested`). */
+    public function countRequested(string $companyId): int
+    {
+        Assert::uuid($companyId);
+
+        return $this->count(['companyId' => $companyId, 'status' => Status::REQUESTED]);
+    }
+
+    /**
+     * То же под FOR UPDATE со свежим состоянием: только внутри транзакции вызывающего.
+     * Отклонённая параллельно подсказка в выборку не попадает — PostgreSQL перепроверяет
+     * условие по строке, дождавшись чужого commit.
+     *
+     * @param list<string> $categoryIds
+     *
+     * @return list<CashCategorySuggestion>
+     */
+    public function findSuggestedForCategoriesForUpdate(string $companyId, array $categoryIds): array
+    {
+        Assert::uuid($companyId);
+        if ([] === $categoryIds) {
+            return [];
+        }
+
+        /** @var list<CashCategorySuggestion> $rows */
+        $rows = $this->createQueryBuilder('s')
+            ->where('s.companyId = :companyId')
+            ->andWhere('s.status = :status')
+            ->andWhere('s.categoryId IN (:categoryIds)')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('status', Status::SUGGESTED)
+            ->setParameter('categoryIds', $categoryIds)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getResult();
+
+        return $rows;
     }
 
     /**
