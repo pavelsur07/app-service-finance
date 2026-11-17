@@ -29,6 +29,12 @@ final class PaymentIntakeDraftRepository extends ServiceEntityRepository
         return $query->getOneOrNullResult();
     }
 
+    /** @return list<string> */
+    public function getOpenIdsForActor(string $companyId, string $actorUserId): array
+    {
+        return array_map('strval', $this->getEntityManager()->getConnection()->fetchFirstColumn("SELECT id FROM cash_payment_intake_draft WHERE company_id = :company AND actor_user_id = :actor AND status NOT IN ('confirmed', 'cancelled') ORDER BY id DESC LIMIT 200", ['company' => $companyId, 'actor' => $actorUserId]));
+    }
+
     public function getByTask(string $companyId, string $taskId): ?PaymentIntakeDraft
     {
         return $this->createQueryBuilder('d')->where('d.companyId = :company')->andWhere('d.taskId = :task')->setParameter('company', $companyId)->setParameter('task', $taskId)->getQuery()->setHint(Query::HINT_REFRESH, true)->setLockMode(LockMode::PESSIMISTIC_WRITE)->getOneOrNullResult();

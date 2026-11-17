@@ -4279,6 +4279,14 @@ identity bytes, другие каналы используют собствен�
 
 `CashFacade::findPaymentIntakeDraftBySource(sourceKey, actorUserId)` возвращает
 авторизованный PaymentIntakeDraftView или null.
+`CashFacade::openPaymentIntakeDraftIds(companyId, actorUserId): list<string>`
+возвращает до 200 новейших незавершённых черновиков строго этого actor после
+проверки финансового доступа. Telegram фильтрует их по своей binding/chat и
+показывает до 20 вариантов. `/draft` открывает текущий разбор, `/cancel`
+отменяет незавершённый черновик; при нескольких требуется явный выбор.
+Отмена инвалидирует poll generation и durable pending intent, закрывает
+доставку и редактирование. Уже начатый HTTP может завершиться, но его
+финализация не публикует следующий шаг отменённой цепочки.
 `CashFacade::hasPaymentIntakeSource(sourceKey, ?replyIdempotencyKey=null): bool` возвращает
 только глобальный признак владения исходным сообщением или обработанным reply,
 без данных компании. Reply key передаётся адаптером явно; Telegram сохраняет

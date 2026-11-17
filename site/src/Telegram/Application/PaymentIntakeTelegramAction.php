@@ -127,6 +127,9 @@ final readonly class PaymentIntakeTelegramAction
         if (($message['chat']['type'] ?? 'private') !== 'private' || $chatId !== (string) $user->getTgUserId()) {
             return ['text' => 'Разбор платежей доступен только в личном чате с ботом.'];
         }
+        if (in_array(trim($text), ['📋 Текущий черновик', '/draft', '🛑 Остановить разбор', '/cancel'], true)) {
+            return $this->current($binding, $chatId, in_array(trim($text), ['🛑 Остановить разбор', '/cancel'], true));
+        }
         if ($session instanceof PaymentIntakeSession) {
             $this->cash->recoverPaymentIntakeDraft($companyId, $actor, $session->getDraftId());
         }
@@ -222,16 +225,14 @@ final readonly class PaymentIntakeTelegramAction
         $draft = $this->cash->getPaymentIntakeDraft($companyId, $actor, $session->getDraftId());
         $revision = (int) $parts[2];
         $action = $parts[3];
-        if ($draft->revision !== $revision && 'refresh' !== $action) {
+        if ($draft->revision !== $revision && !in_array($action, ['refresh', 'cancel'], true)) {
             return ['text' => 'Карточка устарела. Нажмите «Обновить» в актуальной версии.'];
         }
         if ('refresh' === $action) {
             $session->finishPolling();
             $session->requireDelivery();
         } elseif ('cancel' === $action) {
-            $this->markDeliveryPending($session);
-            $this->cash->cancelPaymentIntakeDraft($companyId, $actor, $draft->id, $revision);
-            $session->requireDelivery();
+            return $this->stop($session, $draft->revision);
         } elseif ('resolve' === $action) {
             if ([] === $draft->items) {
                 return ['text' => 'Сначала добавьте конкретные платежи и их суммы.'];
@@ -373,6 +374,49 @@ final readonly class PaymentIntakeTelegramAction
     {
         $session->requireDelivery();
         $this->em->flush();
+    }
+
+    /** @return array<string, mixed> */
+    private function current(ClientBinding $binding, string $chatId, bool $cancel): array
+    {
+        $companyId = (string) $binding->getCompany()->getId();
+        $actor = (string) $binding->getActorUserId();
+        $ids = $this->cash->openPaymentIntakeDraftIds($companyId, $actor);
+        $sessions = [] === $ids ? [] : $this->em->getRepository(PaymentIntakeSession::class)->findBy(['binding' => $binding, 'companyId' => $companyId, 'chatId' => $chatId, 'draftId' => $ids], ['id' => 'DESC'], 20);
+        if ([] === $sessions) {
+            return ['text' => 'Открытых черновиков нет. Отправьте сообщение с платежами.'];
+        }
+        if (1 === count($sessions)) {
+            $session = $sessions[0];
+            $draft = $this->cash->getPaymentIntakeDraft($companyId, $actor, $session->getDraftId());
+            if ($cancel) {
+                return $this->stop($session, $draft->revision);
+            }
+            $session->finishPolling();
+            $session->requireDelivery();
+            $this->dispatch($session);
+
+            return ['text' => 'Открываю текущий разбор. Новая задача ИИ не создаётся.'];
+        }
+        $buttons = [];
+        foreach ($sessions as $index => $session) {
+            $buttons[] = [['text' => ($cancel ? 'Отменить' : 'Открыть').' черновик '.($index + 1), 'callback_data' => 'pi:'.PaymentIntakePresenter::encodeId($session->getId()).':0:'.($cancel ? 'cancel' : 'refresh')]];
+        }
+
+        return ['text' => 'Выберите черновик в текущей компании. «Отменить» останавливает разбор без сохранения платежей.', 'reply_markup' => ['inline_keyboard' => $buttons]];
+    }
+
+    /** @return array<string, mixed> */
+    private function stop(PaymentIntakeSession $session, int $revision): array
+    {
+        $this->cash->cancelPaymentIntakeDraft($session->getCompanyId(), (string) $session->getBinding()->getActorUserId(), $session->getDraftId(), $revision);
+        $this->em->refresh($session);
+        $session->clearEdit();
+        $session->finishPolling();
+        $session->markDelivered($revision.':cancelled', []);
+        $this->em->flush();
+
+        return ['text' => 'Разбор остановлен, черновик отменён. Платежи не сохранены. Можно отправить новый список.'];
     }
 
     private function dispatch(PaymentIntakeSession $session): void

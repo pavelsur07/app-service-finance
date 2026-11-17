@@ -30,6 +30,62 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
     /** @var list<string> */
     private array $aiTaskKeys = [];
 
+    public function testStopFromMenuCancelsDraftAndOldDeliveryCannotResume(): void
+    {
+        $client = $this->setupClient(true, true);
+        $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
+        $transport = $client->getContainer()->get('messenger.transport.async_payment_intake');
+        self::assertInstanceOf(\Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport::class, $transport);
+        $old = $transport->getSent()[0]->getMessage();
+        $this->post($client, ['message' => array_replace($this->message('🛑 Остановить разбор'), ['message_id' => 60])]);
+        self::assertSame('cancelled', $this->em()->getConnection()->fetchOne('SELECT status FROM cash_payment_intake_draft WHERE company_id = ?', [self::COMPANY]));
+        self::assertNull($this->em()->getConnection()->fetchOne('SELECT poll_generation FROM telegram_payment_intake_session WHERE company_id = ?', [self::COMPANY]));
+        $count = count($this->sent);
+        $client->getContainer()->get(\App\Telegram\MessageHandler\RefreshPaymentIntakeMessageHandler::class)($old);
+        self::assertCount($count, $this->sent);
+        self::assertCount(1, $this->aiTaskKeys);
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction'));
+    }
+
+    public function testCurrentDraftFromMenuDoesNotCreateAnotherAiTask(): void
+    {
+        $client = $this->setupClient(true, true);
+        $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
+        $this->post($client, ['message' => array_replace($this->message('📋 Текущий черновик'), ['message_id' => 61])]);
+        self::assertCount(1, $this->aiTaskKeys);
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_payment_intake_draft'));
+        self::assertStringContainsString('разбор', mb_strtolower($this->lastText()));
+    }
+
+    public function testStopWithMultipleDraftsRequiresExplicitChoice(): void
+    {
+        $client = $this->setupClient(true, true);
+        $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
+        $this->post($client, ['message' => array_replace($this->message('Оплатил аренду 2500'), ['message_id' => 62])]);
+        $this->post($client, ['message' => array_replace($this->message('🛑 Остановить разбор'), ['message_id' => 63])]);
+        self::assertStringContainsString('Выберите', $this->lastText());
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne("SELECT count(*) FROM cash_payment_intake_draft WHERE status='cancelled'"));
+        self::assertCount(2, $this->aiTaskKeys);
+    }
+
+    public function testCancelDuringDeliveryFencesSuccessor(): void
+    {
+        $client = $this->setupClient(true, true);
+        $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
+        $transport = $client->getContainer()->get('messenger.transport.async_payment_intake');
+        self::assertInstanceOf(\Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport::class, $transport);
+        $poll = $transport->getSent()[0]->getMessage();
+        $bot = $this->em()->getRepository(TelegramBot::class)->findOneBy(['isActive' => true]);
+        self::assertInstanceOf(TelegramBot::class, $bot);
+        $this->duringDelivery = function () use ($client, $bot): void {
+            $client->getContainer()->get(\App\Telegram\Application\PaymentIntakeTelegramAction::class)->message($bot, array_replace($this->message('/cancel'), ['message_id' => 64]), '/cancel');
+        };
+        $client->getContainer()->get(\App\Telegram\MessageHandler\RefreshPaymentIntakeMessageHandler::class)($poll);
+        self::assertSame('cancelled', $this->em()->getConnection()->fetchOne('SELECT status FROM cash_payment_intake_draft'));
+        self::assertNull($this->em()->getConnection()->fetchOne('SELECT pending_poll FROM telegram_payment_intake_session'));
+        self::assertFalse($this->em()->getConnection()->fetchOne('SELECT delivery_pending FROM telegram_payment_intake_session'));
+    }
+
     public function testAdminGrantedNonpilotCompanyUsesPaymentIntakeWithoutEnv(): void
     {
         $names = ['TELEGRAM_PAYMENT_INTAKE_ENABLED', 'TELEGRAM_PAYMENT_INTAKE_COMPANIES'];

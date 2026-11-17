@@ -98,6 +98,14 @@ final readonly class PaymentIntakeAction
         return $this->view($draft);
     }
 
+    /** @return list<string> */
+    public function openIds(string $companyId, string $actorUserId): array
+    {
+        $this->authorize($companyId, $actorUserId);
+
+        return $this->drafts->getOpenIdsForActor($companyId, $actorUserId);
+    }
+
     public function getBySource(string $sourceKey, string $actorUserId): ?PaymentIntakeDraftView
     {
         self::validateSourceKey($sourceKey);
@@ -439,7 +447,7 @@ final readonly class PaymentIntakeAction
     }
 
     /**
-     * @param array<string, mixed> $item
+     * @param array<string, mixed>  $item
      * @param array<string, string> $eligible
      */
     private function validateReferences(PaymentIntakeDraft $draft, array $item, MoneyAccount $account, array $eligible): void

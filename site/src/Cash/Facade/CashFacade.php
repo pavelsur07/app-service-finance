@@ -87,6 +87,12 @@ final readonly class CashFacade
         return $this->paymentIntake->get($companyId, $actorUserId, $draftId);
     }
 
+    /** @return list<string> At most 200 newest open drafts owned by the authorized actor. */
+    public function openPaymentIntakeDraftIds(string $companyId, string $actorUserId): array
+    {
+        return $this->paymentIntake->openIds($companyId, $actorUserId);
+    }
+
     public function findPaymentIntakeDraftBySource(string $sourceKey, string $actorUserId): ?\App\Cash\Application\DTO\PaymentIntake\PaymentIntakeDraftView
     {
         return $this->paymentIntake->getBySource($sourceKey, $actorUserId);
@@ -282,7 +288,7 @@ final readonly class CashFacade
      * транзакции вызывающего (`wrapInTransaction()`): коммитит он, вместе со своим курсором.
      *
      * @throws StatementImportOutsideTransactionException транзакция не открыта
-     * @throws StatementImportTargetNotFoundException счёт не принадлежит компании
+     * @throws StatementImportTargetNotFoundException     счёт не принадлежит компании
      */
     public function importBankStatementDay(
         string $companyId,

@@ -107,6 +107,9 @@ final readonly class RefreshPaymentIntakeMessageHandler
             }
             $cursor = $session->deliveryCursor($state);
             if (isset($messages[$cursor])) {
+                if ($this->em->getConnection()->fetchOne('SELECT poll_generation FROM telegram_payment_intake_session WHERE id = :id AND company_id = :company', ['id' => $message->sessionId, 'company' => $message->companyId]) !== $message->generation) {
+                    return;
+                }
                 $payload = $messages[$cursor];
                 try {
                     $response = $this->http->request('POST', sprintf('%s/bot%s/sendMessage', rtrim($this->telegramApiBaseUrl, '/'), $binding->getBot()->getToken()), ['json' => ['chat_id' => $session->getChatId()] + $payload, 'timeout' => 5, 'max_duration' => 8]);
