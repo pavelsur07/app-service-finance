@@ -31,4 +31,17 @@ final class ConsolidationGroupFacade implements ConsolidationGroupFacadeInterfac
             $this->repository->findGroupOfHead($headCompanyId),
         );
     }
+
+    public function headsOf(array $companyIds): array
+    {
+        $rows = $this->repository->findByCompanies($companyIds);
+        $heads = [];
+        foreach ($companyIds as $companyId) {
+            if (isset($rows[$companyId])) {
+                $heads[$companyId] = $rows[$companyId]->getHeadCompanyId();
+            }
+        }
+
+        return $heads;
+    }
 }

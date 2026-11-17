@@ -2226,6 +2226,8 @@ manage — только владелец. Новые права автомати
   - `lockedHeadOf(string $companyId): ?string` — то же, что `headOf()`, но из БД и под
     блокировкой кабинета владельца до конца транзакции вызывающего; брать первой, до блокировок
     своего модуля.
+  - `headsOf(list<string> $companyIds): array<string, string>` — головные одним запросом
+    (ночная проверка): companyId => headCompanyId в порядке входа, вне группы — нет ключа.
   Дерево ДДС головной компании — эталон группы (задача `cashflow-group-chart`).
 - Запись: `ConfigureConsolidationGroupAction(headCompanyId, ownerUserId, enabled, memberIds)` —
   транзакцией владеет сам, под `pg_advisory_xact_lock(hashtextextended(
@@ -2715,6 +2717,20 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 изменениями пишется в журнал `cashflow_group_chart_applications` (миграция
 `Version20261117180000`): `source` (`core`/`head`), `head_company_id`, счётчики привязанных,
 созданных, конфликтов и кодов головной компании.
+
+Экран «Эталон группы» — `GET /cashflow-categories/group-chart` (активная компания, ссылка со
+страницы статей ДДС): эталон, план `plan()`, «Не сопоставлено» (несистемные статьи без кода,
+`CashflowGroupChartSyncPlan::unmatched`) с выбором свободного кода эталона (`freeCodes`).
+«Применить план» — `POST …/group-chart/apply` (`ApplyCashflowGroupChartAction` владеет
+транзакцией вокруг той же синхронизации). Ручная привязка — `POST /cashflow-categories/{id}/group-code`:
+`BindCashflowCategoryGroupCodeAction` владеет транзакцией, внутри `SyncCashflowGroupChartAction::bind()`
+под теми же блокировками; только ставит код, дерево не перестраивает. Отказ (статья не своя или
+системная, уже с кодом, кода нет в эталоне или он занят, другое действующее направление или вид
+деятельности) — значением из транзакции до записи, затем `CashflowGroupChartBindingException` (flash).
+Привязка к статье головной без кода ставит коды головной, как синхронизация. Запись — FINANCE_WRITE.
+Ночная проверка `app:directories:integrity-check`: `CheckCashflowGroupChartDrift` для компаний групп
+(`headsOf`) делает `plan()` и при расхождении (привязать, создать, конфликты, статьи без кода)
+пишет справочную строку `ДДС-группа` — на exit code не влияет; компании вне групп не проверяются.
 
 Компании, созданные до онбординга, дозаполняет `app:company:onboarding-backfill
 [--company=<uuid>] [--execute --expected-count=N] [-v]` (`BackfillCompanyOnboardingAction`):
@@ -5977,6 +5993,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.210 | 2026-11-17 | Cash: экран «Эталон группы» (план, «Применить», ручная привязка), `BindCashflowCategoryGroupCodeAction`, ночная строка `ДДС-группа` в `app:directories:integrity-check`; Company: `ConsolidationGroupFacadeInterface::headsOf()`; задача `cashflow-group-chart`, этап 3 |
 | 2.209 | 2026-11-17 | Cash: синхронизация дерева ДДС с эталоном группы — `SyncCashflowGroupChartAction`, `app:cash:group-chart:sync`, журнал `cashflow_group_chart_applications` (миграция `Version20261117180000`), задача `cashflow-group-chart`, этап 2 |
 | 2.208 | 2026-11-17 | Company: группа консолидации `company_consolidation_member` (миграция `Version20261117150000`), `ConsolidationGroupFacadeInterface`, `ConfigureConsolidationGroupAction`, блок «Консолидация» в настройках компании (задача `cashflow-group-chart`, этап 1b) |
 | 2.207 | 2026-11-17 | Cash: `cashflow_categories.group_code` (миграция `Version20261117120000`) — код консолидации; `core.yaml` v2 с кодами, защита удаления и переноса статьи с кодом, `app:cash:cashflow-core:apply` проставляет коды дереву ядра (задача `cashflow-group-chart`, этап 1) |

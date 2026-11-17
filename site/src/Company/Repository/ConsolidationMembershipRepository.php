@@ -50,11 +50,11 @@ final class ConsolidationMembershipRepository extends ServiceEntityRepository
     }
 
     /**
-     * Строки перечисленных компаний — для экрана настроек (в какой группе каждая).
+     * Строки перечисленных компаний — для экрана настроек (в какой группе каждая) и ночной проверки.
      *
-     * @companyScopeExempt список — компании кабинета владельца (findByUserId), каждая из них сама компания-скоуп
+     * @companyScopeExempt список — компании кабинета владельца (findByUserId) либо все активные компании ночной проверки; отдаёт только связи группы
      *
-     * @param list<string> $companyIds компании кабинета вызывающего
+     * @param list<string> $companyIds компании кабинета вызывающего или ночной проверки
      *
      * @return array<string, ConsolidationMembership> companyId => строка
      */

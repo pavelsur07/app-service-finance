@@ -26,4 +26,14 @@ interface ConsolidationGroupFacadeInterface
      * @return list<string>
      */
     public function members(string $headCompanyId): array;
+
+    /**
+     * Головные компании одним запросом (ночная проверка): companyId => headCompanyId в порядке
+     * входа; компании вне группы ключа не получают.
+     *
+     * @param list<string> $companyIds
+     *
+     * @return array<string, string>
+     */
+    public function headsOf(array $companyIds): array;
 }

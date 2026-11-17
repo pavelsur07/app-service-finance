@@ -109,6 +109,8 @@ final class ConsolidationGroupTest extends IntegrationTestCase
         self::assertSame([self::HEAD, self::A, self::B], $facade->members(self::HEAD));
         self::assertSame([], $facade->members(self::A), 'участник — не головная');
         self::assertSame([], $facade->members(self::C));
+        self::assertSame([self::A => self::HEAD, self::HEAD => self::HEAD], $facade->headsOf([self::C, self::A, self::HEAD]), 'порядок входа; вне группы — нет ключа');
+        self::assertSame([], $facade->headsOf([]));
     }
 
     /** Под блокировкой состав читается из БД, а не из уже загруженной строки. */

@@ -1,0 +1,109 @@
+{% extends 'base.html.twig' %}
+{% block title %}Эталон группы — статьи ДДС{% endblock %}
+
+{% block body %}
+    {% embed 'partials/_page_header.html.twig' with {title: 'Эталон группы'} %}
+        {% block actions %}
+            <a href="{{ path('cashflow_category_index') }}" class="btn btn-outline-secondary">К статьям ДДС</a>
+        {% endblock %}
+    {% endembed %}
+    {% set token = csrf_token('group-chart' ~ companyId) %}
+    {% set canWrite = is_granted('module.finance.write') %}
+    <div class="container-xl mt-3">
+        <div class="card mb-3">
+            <div class="card-body">
+                <p class="mb-0" data-test="group-chart-source">
+                    Эталон:
+                    {% if plan.source == 'head' %}
+                        дерево статей головной компании «{{ headName ?? plan.headCompanyId }}»
+                    {% else %}
+                        базовое дерево статей
+                    {% endif %}
+                </p>
+                <p class="text-secondary small mb-0">
+                    Синхронизация привязывает статьи с тем же названием в той же ветке и создаёт недостающие.
+                    Ничего не удаляет, не переименовывает и не переносит.
+                </p>
+            </div>
+        </div>
+
+        <div class="card mb-3" data-test="group-chart-plan">
+            <div class="card-header"><h3 class="card-title">План синхронизации</h3></div>
+            <div class="card-body">
+                {% if plan.isEmpty and plan.conflicts is empty and plan.unmatched is empty %}
+                    <p class="mb-0">Дерево ДДС совпадает с эталоном, менять нечего.</p>
+                {% elseif plan.isEmpty %}
+                    <p class="mb-0">Автоматических изменений нет — разберите конфликты и «Не сопоставлено».</p>
+                {% else %}
+                    {% if plan.headCodes > 0 %}
+                        <p>Статьи головной компании без кода получат код: {{ plan.headCodes }}.</p>
+                    {% endif %}
+                    {% if plan.bind is not empty %}
+                        <h4>Будет привязано</h4>
+                        <ul data-test="group-chart-bind">
+                            {% for line in plan.bind %}<li>{{ line }}</li>{% endfor %}
+                        </ul>
+                    {% endif %}
+                    {% if plan.create is not empty %}
+                        <h4>Будет создано</h4>
+                        <ul data-test="group-chart-create">
+                            {% for line in plan.create %}<li>{{ line }}</li>{% endfor %}
+                        </ul>
+                    {% endif %}
+                    {% if canWrite %}
+                        <form method="post" action="{{ path('cashflow_group_chart_apply') }}" data-test="group-chart-apply">
+                            <input type="hidden" name="_token" value="{{ token }}">
+                            <button type="submit" class="btn btn-primary">Применить план</button>
+                        </form>
+                    {% endif %}
+                {% endif %}
+                {% if plan.conflicts is not empty %}
+                    <h4 class="mt-3">Конфликты — не трогаем, привяжите вручную</h4>
+                    <ul data-test="group-chart-conflicts">
+                        {% for line in plan.conflicts %}<li>{{ line }}</li>{% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card" data-test="group-chart-unmatched">
+            <div class="card-header"><h3 class="card-title">Не сопоставлено</h3></div>
+            <div class="card-body">
+                {% if plan.unmatched is empty %}
+                    <p class="mb-0">Все статьи компании привязаны к эталону.</p>
+                {% else %}
+                    <p class="text-secondary small">
+                        Статьи без кода в консолидации попадают в строку «Не сопоставлено». Привязка только ставит код:
+                        статья остаётся на своём месте.
+                    </p>
+                    <table class="table table-sm align-middle mb-0">
+                        <tbody>
+                        {% for id, path in plan.unmatched %}
+                            <tr data-category="{{ id }}">
+                                <td>{{ path }}</td>
+                                <td>
+                                    {% if not canWrite %}
+                                        <span class="text-secondary">без кода</span>
+                                    {% elseif plan.freeCodes is not empty %}
+                                        <form method="post" action="{{ path('cashflow_group_chart_bind', {id: id}) }}" class="d-flex gap-2">
+                                            <input type="hidden" name="_token" value="{{ token }}">
+                                            <select name="code" class="form-select form-select-sm" required aria-label="Статья эталона">
+                                                {% for code, label in plan.freeCodes %}
+                                                    <option value="{{ code }}">{{ label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <button type="submit" class="btn btn-sm btn-outline-primary">Привязать</button>
+                                        </form>
+                                    {% else %}
+                                        <span class="text-secondary">свободных статей эталона нет</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

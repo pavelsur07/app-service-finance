@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Cash\Application;
 
 use App\Cash\Application\Category\ApplyCashflowCoreTemplateAction;
+use App\Cash\Application\Category\BindCashflowCategoryGroupCodeAction;
 use App\Cash\Application\Category\EnsureCashflowSystemCategoriesAction;
 use App\Cash\Application\Category\SyncCashflowGroupChartAction;
 use App\Cash\Application\DTO\CashflowGroupChartSyncPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
+use App\Cash\EventListener\CheckCashflowGroupChartDrift;
+use App\Cash\Exception\CashflowGroupChartBindingException;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Company\Event\DirectoryIntegrityCheckEvent;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -255,6 +259,98 @@ final class SyncCashflowGroupChartActionTest extends IntegrationTestCase
         ));
     }
 
+    public function testManualBindSetsCodeAndJournal(): void
+    {
+        $head = $this->headWithCore();
+        $member = $this->company();
+        $premises = $this->addCategory($member, 'Помещение', null, CashflowCategory::CODE_OPERATING);
+        $this->group($head, $member);
+
+        $this->bind($member, $premises, 'OP_OUT_RENT');
+
+        self::assertSame('OP_OUT_RENT', $this->db()->fetchOne('SELECT group_code FROM cashflow_categories WHERE id = ?', [$premises]));
+        self::assertSame(1, $this->journalCount($member));
+        $plan = self::getContainer()->get(SyncCashflowGroupChartAction::class)->plan((string) $member->getId());
+        self::assertNotContains($premises, array_keys($plan->unmatched), 'привязанная статья ушла из «Не сопоставлено»');
+        self::assertArrayNotHasKey('OP_OUT_RENT', $plan->freeCodes, 'занятый код больше не предлагается');
+    }
+
+    public function testManualBindRefusesInvalidRequests(): void
+    {
+        $head = $this->headWithCore();
+        $member = $this->company();
+        $premises = $this->addCategory($member, 'Помещение', null, CashflowCategory::CODE_OPERATING);
+        $loan = $this->addCategory($member, 'Заём', null, CashflowCategory::CODE_FINANCING);
+        $income = $this->addCategory($member, 'Доход', null, CashflowCategory::CODE_OPERATING);
+        $this->db()->executeStatement("UPDATE cashflow_categories SET operation_type = 'INFLOW' WHERE id = ?", [$income]);
+        $spare = $this->addCategory($member, 'Запасная', null, CashflowCategory::CODE_OPERATING);
+        $system = (string) $this->db()->fetchOne("SELECT id FROM cashflow_categories WHERE company_id = ? AND system_code = 'CF_OP'", [$member->getId()]);
+        $this->group($head, $member);
+        $this->bind($member, $premises, 'OP_OUT_RENT');
+
+        $cases = [
+            'системная' => [$system, 'OP_OUT_SALARY'],
+            'уже с кодом' => [$premises, 'OP_OUT_SALARY'],
+            'код занят' => [$spare, 'OP_OUT_RENT'],
+            'кода нет в эталоне' => [$spare, 'NO_SUCH_CODE'],
+            'другой вид деятельности' => [$loan, 'OP_OUT_SALARY'],
+            'другое направление' => [$income, 'OP_OUT_SALARY'],
+            'чужая статья' => [$this->addCategory($head, 'Чужая', 'Выплаты'), 'OP_OUT_SALARY'],
+        ];
+        foreach ($cases as $case => [$categoryId, $code]) {
+            try {
+                $this->bind($member, $categoryId, $code);
+                self::fail('Привязка должна быть отклонена: '.$case);
+            } catch (CashflowGroupChartBindingException) {
+            }
+        }
+
+        self::assertSame(['OP_OUT_RENT'], $this->codes($member), 'отказы ничего не записали');
+        self::assertSame(1, $this->journalCount($member));
+    }
+
+    public function testManualBindToUncodedHeadCategoryCodesHeadToo(): void
+    {
+        $head = $this->headWithCore();
+        $marketplaces = $this->addCategory($head, 'Маркетплейсы', 'Поступления');
+        $member = $this->company();
+        $own = $this->addCategory($member, 'Озон и ВБ', null, CashflowCategory::CODE_OPERATING);
+        $this->group($head, $member);
+
+        $this->bind($member, $own, $marketplaces);
+
+        self::assertSame($marketplaces, $this->db()->fetchOne('SELECT group_code FROM cashflow_categories WHERE id = ?', [$marketplaces]));
+        self::assertSame($marketplaces, $this->db()->fetchOne('SELECT group_code FROM cashflow_categories WHERE id = ?', [$own]));
+    }
+
+    public function testNightlyCheckReportsOnlyGroupCompaniesWithDrift(): void
+    {
+        $head = $this->headWithCore();
+        $synced = $this->company();
+        $drifting = $this->company();
+        $outsider = $this->company();
+        $this->group($head, $synced, $drifting);
+        $this->sync($synced);
+        $this->sync($drifting);
+        $this->addCategory($head, 'Новая статья головной', 'Выплаты');
+        $this->addCategory($drifting, 'Своя без кода', null, CashflowCategory::CODE_OPERATING);
+        // synced тоже отстаёт от новой статьи головной — синхронизируем ещё раз.
+        $this->sync($synced);
+        $this->em->clear();
+
+        $event = new DirectoryIntegrityCheckEvent([(string) $head->getId(), (string) $synced->getId(), (string) $drifting->getId(), (string) $outsider->getId()]);
+        self::getContainer()->get(CheckCashflowGroupChartDrift::class)($event);
+
+        $notes = $event->notes();
+        self::assertCount(1, $notes, implode("\n", array_map(static fn (array $n): string => implode(' ', $n), $notes)));
+        [$directory, $companyId, $text] = $notes[0];
+        self::assertSame('ДДС-группа', $directory);
+        self::assertSame((string) $drifting->getId(), $companyId);
+        self::assertStringContainsString('создать 1', $text);
+        self::assertStringContainsString('без кода 1', $text);
+        self::assertSame([], $event->duplicates(), 'расхождение с эталоном — справка, не находка');
+    }
+
     private function sync(Company $company): CashflowGroupChartSyncPlan
     {
         $action = self::getContainer()->get(SyncCashflowGroupChartAction::class);
@@ -263,6 +359,15 @@ final class SyncCashflowGroupChartActionTest extends IntegrationTestCase
         $this->em->clear();
 
         return $plan;
+    }
+
+    private function bind(Company $company, string $categoryId, string $code): void
+    {
+        try {
+            self::getContainer()->get(BindCashflowCategoryGroupCodeAction::class)((string) $company->getId(), $categoryId, $code);
+        } finally {
+            $this->em->clear();
+        }
     }
 
     private function company(): Company
