@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Cash\Command;
 
 use App\Cash\Application\Category\EnsureCashflowSystemCategoriesAction;
+use App\Cash\Application\Category\ReplaceUnusedCashflowTreeWithCoreAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Transaction\CashCategorySuggestion;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
@@ -42,16 +44,7 @@ final class ApplyCashflowCoreToCompanyCommandTest extends IntegrationTestCase
         $company = $this->companyWithOldTree();
         $other = $this->companyWithOldTree();
         $interest = $this->category($company, 'Проценты полученные');
-        $transaction = $this->transaction($company);
-        $suggestion = CashCategorySuggestionBuilder::aSuggestion()
-            ->withId(Uuid::uuid4()->toString())
-            ->withCompanyId((string) $company->getId())
-            ->withTransactionId((string) $transaction->getId())
-            ->withTaskId(Uuid::uuid4()->toString())
-            ->suggesting((string) $interest->getId())
-            ->build();
-        $this->em->persist($suggestion);
-        $this->em->flush();
+        $suggestion = $this->suggestion($company, $interest);
 
         $tester = $this->runCommand($company, ['--execute' => true]);
 
@@ -63,6 +56,21 @@ final class ApplyCashflowCoreToCompanyCommandTest extends IntegrationTestCase
         self::assertSame('stale', $this->db()->fetchOne('SELECT status FROM cash_category_suggestion WHERE id = ?', [$suggestion->getId()]));
         self::assertSame(['Дивиденды выплаченные', 'Проценты полученные'], $this->regularNames($other), 'Чужая компания не тронута.');
         self::assertSame(1, (int) $this->db()->fetchOne('SELECT COUNT(*) FROM cash_transaction WHERE company_id = ?', [$company->getId()]));
+    }
+
+    /** Пользователь отклонил подсказку после плана: решение не перезаписывается в stale. */
+    public function testSuggestionDismissedAfterPlanKeepsUserDecision(): void
+    {
+        $company = $this->companyWithOldTree();
+        $suggestion = $this->suggestion($company, $this->category($company, 'Проценты полученные'));
+        $action = self::getContainer()->get(ReplaceUnusedCashflowTreeWithCoreAction::class);
+        self::assertSame(1, $action->plan((string) $company->getId())->staleSuggestions);
+
+        $this->db()->executeStatement("UPDATE cash_category_suggestion SET status = 'dismissed' WHERE id = ?", [$suggestion->getId()]);
+        $this->em->wrapInTransaction(fn (): int => $action((string) $company->getId()));
+
+        self::assertSame('dismissed', $this->db()->fetchOne('SELECT status FROM cash_category_suggestion WHERE id = ?', [$suggestion->getId()]));
+        self::assertCount(self::CORE_NODES, $this->regularNames($company));
     }
 
     public function testNestedUnusedTreeIsRemovedFromLeaves(): void
@@ -154,6 +162,21 @@ final class ApplyCashflowCoreToCompanyCommandTest extends IntegrationTestCase
         $this->em->flush();
 
         return $company;
+    }
+
+    private function suggestion(Company $company, CashflowCategory $category): CashCategorySuggestion
+    {
+        $suggestion = CashCategorySuggestionBuilder::aSuggestion()
+            ->withId(Uuid::uuid4()->toString())
+            ->withCompanyId((string) $company->getId())
+            ->withTransactionId((string) $this->transaction($company)->getId())
+            ->withTaskId(Uuid::uuid4()->toString())
+            ->suggesting((string) $category->getId())
+            ->build();
+        $this->em->persist($suggestion);
+        $this->em->flush();
+
+        return $suggestion;
     }
 
     private function category(Company $company, string $name): CashflowCategory

@@ -108,7 +108,7 @@ final class ReplaceUnusedCashflowTreeWithCoreAction
         $regular = $this->regular($this->company($companyId));
         $ids = array_map(static fn (CashflowCategory $c): string => (string) $c->getId(), $regular);
         $now = $this->clock->now();
-        foreach ($this->suggestions->findSuggestedForCategories($companyId, $ids) as $suggestion) {
+        foreach ($this->suggestions->findSuggestedForCategoriesForUpdate($companyId, $ids) as $suggestion) {
             $suggestion->markStale('category_removed', $now);
         }
 

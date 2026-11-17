@@ -8,6 +8,7 @@ use App\Cash\Entity\Transaction\CashCategorySuggestion;
 use App\Cash\Enum\Transaction\CashCategorySuggestionStatus as Status;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\LockMode;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
@@ -76,6 +77,38 @@ final class CashCategorySuggestionRepository extends ServiceEntityRepository
         }
 
         return $this->findBy(['companyId' => $companyId, 'status' => Status::SUGGESTED, 'categoryId' => $categoryIds]);
+    }
+
+    /**
+     * То же под FOR UPDATE со свежим состоянием: только внутри транзакции вызывающего.
+     * Отклонённая параллельно подсказка в выборку не попадает — PostgreSQL перепроверяет
+     * условие по строке, дождавшись чужого commit.
+     *
+     * @param list<string> $categoryIds
+     *
+     * @return list<CashCategorySuggestion>
+     */
+    public function findSuggestedForCategoriesForUpdate(string $companyId, array $categoryIds): array
+    {
+        Assert::uuid($companyId);
+        if ([] === $categoryIds) {
+            return [];
+        }
+
+        /** @var list<CashCategorySuggestion> $rows */
+        $rows = $this->createQueryBuilder('s')
+            ->where('s.companyId = :companyId')
+            ->andWhere('s.status = :status')
+            ->andWhere('s.categoryId IN (:categoryIds)')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('status', Status::SUGGESTED)
+            ->setParameter('categoryIds', $categoryIds)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getResult();
+
+        return $rows;
     }
 
     /**
