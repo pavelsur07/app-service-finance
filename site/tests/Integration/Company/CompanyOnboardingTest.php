@@ -29,8 +29,8 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         'project' => 'PROJECT_GENERAL:Общий',
         'responsibility_center' => 'CFO_GENERAL:Общий',
         'cashflow_system_categories' => 7,
-        // Ядро ДДС: группы:статьи, статьи с описанием, статьи с направлением, связи с ОПиУ.
-        'cashflow_core' => '7:30:30:30:0',
+        // Ядро ДДС: группы:статьи, статьи с описанием, статьи с направлением, связи с ОПиУ, узлы с group_code.
+        'cashflow_core' => '7:30:30:30:0:37',
         'pl_categories' => 72,
         'balance_articles' => 33,
         'balance_accounts' => 'ACC_MAIN_BANK, ACC_MAIN_REGISTER',
@@ -149,6 +149,7 @@ final class CompanyOnboardingTest extends IntegrationTestCase
                     || ':' || COUNT(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM cashflow_categories ch WHERE ch.parent_id = c.id) AND c.description LIKE '%ОПиУ — %')
                     || ':' || COUNT(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM cashflow_categories ch WHERE ch.parent_id = c.id) AND c.operation_type IN ('INFLOW', 'OUTFLOW'))
                     || ':' || COUNT(*) FILTER (WHERE c.pl_category_id IS NOT NULL OR c.allow_pl_document)
+                    || ':' || COUNT(*) FILTER (WHERE c.group_code IS NOT NULL)
                  FROM cashflow_categories c WHERE c.company_id = ? AND c.is_system = false",
                 [$companyId],
             ),

@@ -54,18 +54,28 @@ final class ReplaceUnusedCashflowTreeWithCoreAction
             $paths[(string) $category->getId()] = $this->path($category);
         }
 
-        $template = $this->templatePaths();
+        $templateCodes = $this->templateCodes();
+        $template = array_keys($templateCodes);
+        sort($template);
         $current = array_values($paths);
         sort($current);
         if ([] !== $current && $current === $template) {
-            return new CashflowCoreReplacePlan(true, [], [], 0, \count($template));
+            $missing = array_filter($regular, static fn (CashflowCategory $c): bool => null === $c->getGroupCode());
+
+            return new CashflowCoreReplacePlan(true, [], [], 0, \count($template), \count($missing));
         }
 
         $usage = ($this->usageQuery)($companyId);
         $removable = [];
         $blocked = [];
+        $coded = [];
+        foreach ($regular as $category) {
+            $coded[(string) $category->getId()] = $category->getGroupCode();
+        }
         foreach ($paths as $id => $path) {
-            if (isset($usage[$id]) && $usage[$id]->isUsed()) {
+            if (null !== $coded[$id]) {
+                $blocked[] = $path.' — статья базового дерева (код '.$coded[$id].')';
+            } elseif (isset($usage[$id]) && $usage[$id]->isUsed()) {
                 $blocked[] = $path.' — '.$usage[$id]->summary();
             } else {
                 $removable[] = $path;
@@ -85,11 +95,13 @@ final class ReplaceUnusedCashflowTreeWithCoreAction
             $blocked,
             \count($this->suggestions->findSuggestedForCategories($companyId, array_keys($paths))),
             \count($template),
+            0,
         );
     }
 
     /**
-     * @return int сколько узлов ядра создано (0 — ядро уже применено)
+     * @return int сколько узлов ядра создано или, если дерево уже совпадает с ядром, сколько кодов
+     *             проставлено (0 — менять нечего)
      *
      * @throws CashflowCoreTemplateException хоть одна статья компании используется
      */
@@ -106,7 +118,7 @@ final class ReplaceUnusedCashflowTreeWithCoreAction
 
         $plan = $this->plan($companyId);
         if ($plan->alreadyApplied) {
-            return 0;
+            return $this->assignMissingCodes($companyId);
         }
         if ([] !== $plan->blocked) {
             throw new CashflowCoreTemplateException('Замена дерева ДДС невозможна: '.implode('; ', $plan->blocked));
@@ -150,6 +162,26 @@ final class ReplaceUnusedCashflowTreeWithCoreAction
         return $created;
     }
 
+    /** Дерево совпадает с ядром по путям: статьям без кода — код узла ядра того же пути. */
+    private function assignMissingCodes(string $companyId): int
+    {
+        $templateCodes = $this->templateCodes();
+        $assigned = 0;
+        foreach ($this->regular($this->company($companyId)) as $category) {
+            if (null === $category->getGroupCode()) {
+                $category->assignGroupCode($templateCodes[$this->path($category)]);
+                ++$assigned;
+            }
+        }
+        $this->entityManager->flush();
+
+        if ($assigned > 0) {
+            $this->logger->info('Cashflow core group codes assigned', ['companyId' => $companyId, 'assigned' => $assigned]);
+        }
+
+        return $assigned;
+    }
+
     private function company(string $companyId): Company
     {
         return $this->companyFacade->findById($companyId)
@@ -173,22 +205,21 @@ final class ReplaceUnusedCashflowTreeWithCoreAction
         return implode('/', [$node?->getSystemCode() ?? '-', ...array_reverse($names)]);
     }
 
-    /** @return list<string> */
-    private function templatePaths(): array
+    /** @return array<string, string> путь узла ядра → его код */
+    private function templateCodes(): array
     {
-        $paths = [];
-        $walk = static function (string $prefix, array $nodes) use (&$walk, &$paths): void {
+        $codes = [];
+        $walk = static function (string $prefix, array $nodes) use (&$walk, &$codes): void {
             /** @var list<CashflowCoreTemplateNode> $nodes */
             foreach ($nodes as $node) {
-                $paths[] = $prefix.'/'.$node->name;
+                $codes[$prefix.'/'.$node->name] = $node->code;
                 $walk($prefix.'/'.$node->name, $node->children);
             }
         };
         foreach ($this->reader->read() as $section => $nodes) {
             $walk($section, $nodes);
         }
-        sort($paths);
 
-        return $paths;
+        return $codes;
     }
 }

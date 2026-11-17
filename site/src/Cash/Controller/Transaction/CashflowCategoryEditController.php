@@ -43,7 +43,8 @@ final class CashflowCategoryEditController extends AbstractController
         $article = $this->repo->findOneByIdAndCompanyId($id, (string) $company->getId()) ?? throw $this->createNotFoundException();
         $parents = $article->isSystem() ? [] : $this->page->regularParentChoices($this->repo->findTreeByCompany($company), $article);
         $plCategories = $this->plCategoryFacade->findTreeEntitiesByCompanyId((string) $company->getId());
-        $form = $this->createForm(CashflowCategoryType::class, $article, ['parents' => $parents, 'plCategories' => $plCategories, 'allow_flow_kind_edit' => !$article->isSystem(), 'protected_system_fields' => $article->isSystem()]);
+        $coded = null !== $article->getGroupCode();
+        $form = $this->createForm(CashflowCategoryType::class, $article, ['parents' => $parents, 'plCategories' => $plCategories, 'allow_flow_kind_edit' => !$article->isSystem() && !$coded, 'protected_system_fields' => $article->isSystem(), 'lock_parent' => $coded]);
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             try {

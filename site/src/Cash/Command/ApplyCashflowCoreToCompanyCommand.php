@@ -48,8 +48,20 @@ final class ApplyCashflowCoreToCompanyCommand extends Command
             return Command::FAILURE;
         }
 
-        if ($plan->alreadyApplied) {
+        if ($plan->alreadyApplied && 0 === $plan->codesToAssign) {
             $io->success('Базовое дерево ДДС уже применено, менять нечего.');
+
+            return Command::SUCCESS;
+        }
+        if ($plan->alreadyApplied) {
+            $io->writeln(sprintf('Дерево совпадает с ядром. Будет проставлено кодов: %d', $plan->codesToAssign));
+            if (!$input->getOption('execute')) {
+                $io->note('Режим просмотра: данные не изменены. Для применения добавьте --execute.');
+
+                return Command::SUCCESS;
+            }
+            $assigned = $this->entityManager->wrapInTransaction(fn (): int => ($this->replace)($companyId));
+            $io->success(sprintf('Проставлено кодов: %d.', $assigned));
 
             return Command::SUCCESS;
         }
@@ -81,7 +93,7 @@ final class ApplyCashflowCoreToCompanyCommand extends Command
             return Command::FAILURE;
         }
 
-        $io->success(sprintf('Создано узлов ядра: %d.', $created));
+        $io->success(sprintf('Создано узлов ядра: %d (с кодами консолидации).', $created));
 
         return Command::SUCCESS;
     }

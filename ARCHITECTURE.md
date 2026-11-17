@@ -2640,7 +2640,7 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 |---|---|---|
 | Company (`CompanyOwnerMembershipCreator`, до события) | участник-владелец, проект «Общий» (`PROJECT_GENERAL`), ЦФО «Общий» (`CFO_GENERAL`) и их связь | — |
 | Cash `EnsureCashflowSystemCategoriesOnCompanyCreated` | 7 системных статей ДДС | по `system_code` |
-| Cash `ApplyCashflowCoreTemplateOnCompanyCreated` (priority −10, после системных) | ядро ДДС `config/cash/cashflow_templates/core.yaml`: 7 групп и 30 статей с направлением и описанием «что входит и почему» с пометкой «ОПиУ — напрямую, в …» или «ОПиУ — не попадает»; связи с ОПиУ не ставит; одно на все профили; backfill не применяет | нет ни одной несистемной статьи ДДС |
+| Cash `ApplyCashflowCoreTemplateOnCompanyCreated` (priority −10, после системных) | ядро ДДС `config/cash/cashflow_templates/core.yaml` (v2): 7 групп и 30 статей с кодом консолидации (`group_code`), направлением и описанием «что входит и почему» с пометкой «ОПиУ — напрямую, в …» или «ОПиУ — не попадает»; связи с ОПиУ не ставит; одно на все профили; backfill не применяет | нет ни одной несистемной статьи ДДС |
 | Cash `EnsureDefaultMoneyAccountsOnCompanyCreated` | «Основной счет» BANK RUB, касса «Основная» CASH RUB | нет ни одного денежного счёта |
 | Finance `ApplyDefaultPLTreeOnCompanyCreated` | дерево ОПиУ шаблона профиля (`config/finance/pl_templates/`) | нет ни одной статьи ОПиУ |
 | Balance `SeedBalanceStructureOnCompanyCreated` | книга (не инициализирована), статьи и учётные счета шаблона профиля (`config/balance/templates/`) | статьи — нет статей; счета — нет ни одного счёта |
@@ -2654,8 +2654,17 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 платёжный календарь или правило, а также пока подсказки ИИ ждут ответа (`requested`: ответ на
 старый список статей сослался бы на удалённую), команда отказывает и данные не меняет. Открытые
 подсказки берутся `FOR UPDATE`; если ядро создано не полностью (статью завели параллельно),
-транзакция откатывается. Дерево, уже совпадающее
-с ядром по путям названий, не трогает.
+транзакция откатывается. Если дерево уже совпадает с ядром по путям названий, команда не
+пересоздаёт его, а только проставляет `group_code` статьям без кода. Статья с кодом блокирует замену.
+
+**Код консолидации `cashflow_categories.group_code`** (`varchar(64) NULL`, unique
+`(company_id, group_code)`) — ключ, по которому статьи разных компаний сводятся в
+консолидированный ДДС (задача `cashflow-group-chart`). Коды ядра заданы в `core.yaml`
+(`{OP|FIN|INV}_{IN|OUT}[_SLUG]`, проверяет `CashflowCoreTemplateReader`, утверждены в
+`docs/tasks/cashflow-group-chart/chart.md`) и не меняются. `CashflowCategory::assignGroupCode()`
+назначает код один раз. Статью с кодом нельзя удалить (`assertCanDelete`, `PreRemove`) и
+перенести (`setParent`); в форме правки поле «Родитель» скрыто (`lock_parent`), переименовать
+можно. Ставят код онбординг (`ApplyCashflowCoreTemplateAction`) и `app:cash:cashflow-core:apply`.
 
 Компании, созданные до онбординга, дозаполняет `app:company:onboarding-backfill
 [--company=<uuid>] [--execute --expected-count=N] [-v]` (`BackfillCompanyOnboardingAction`):
@@ -5876,6 +5885,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.207 | 2026-11-17 | Cash: `cashflow_categories.group_code` (миграция `Version20261117120000`) — код консолидации; `core.yaml` v2 с кодами, защита удаления и переноса статьи с кодом, `app:cash:cashflow-core:apply` проставляет коды дереву ядра (задача `cashflow-group-chart`, этап 1) |
 | 2.206 | 2026-11-17 | Cash: `app:cash:cashflow-core:apply` — ядро ДДС для существующей компании вместо неиспользуемых статей (`ReplaceUnusedCashflowTreeWithCoreAction`, `CashCategorySuggestionRepository::findSuggestedForCategories()`), задача `cashflow-group-chart`, этап 0a |
 | 2.205 | 2026-11-16 | MarketplacePlProjection: экран «ОПиУ» повторяет дерево статей компании до СМ3 (`TreeCut`, граница по коду `CM3`), пустые строки на месте, статьи ниже — блок «Ниже СМ3» |
 | 2.204 | 2026-11-16 | MarketplacePlProjection: расчётные строки экрана «ОПиУ» — «Выручка с СПП» (продажи − СПП − соинвестирование) и себестоимость из витрины (`MarketplaceEconomicsFacadeInterface::costPrice()`); `plSums()` делит ключ по знаку суммы |

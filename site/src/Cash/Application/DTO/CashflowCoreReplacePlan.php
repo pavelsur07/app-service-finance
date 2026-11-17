@@ -19,6 +19,8 @@ final readonly class CashflowCoreReplacePlan
         public array $blocked,
         public int $staleSuggestions,
         public int $coreNodes,
+        /** Дерево уже совпадает с ядром: столько статей получат код консолидации. */
+        public int $codesToAssign,
     ) {
     }
 }

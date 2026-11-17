@@ -38,6 +38,37 @@ final class CashflowCoreTemplateReaderTest extends TestCase
         self::assertSame(PaymentPlanType::OUTFLOW, $leaves['CF_OP / Выплаты / Налоги / НДС']->direction);
         self::assertArrayHasKey('CF_INV / Поступления / Проценты по депозитам и остаткам', $leaves);
         self::assertArrayHasKey('CF_OP / Выплаты / Налоги с ФОТ', $leaves);
+        self::assertSame('OP_IN_CUSTOMERS', $leaves['CF_OP / Поступления / Поступления от покупателей']->code);
+        self::assertStringContainsString('Для селлеров', (string) $leaves['CF_OP / Выплаты / Возвраты покупателям']->description);
+        self::assertStringContainsString('остаточную стоимость', (string) $leaves['CF_INV / Поступления / Продажа оборудования']->description);
+    }
+
+    /** Коды утверждены Владельцем 17.11.2026 (docs/tasks/cashflow-group-chart/chart.md) и не меняются. */
+    public function testShippedCodesAreTheApprovedOnes(): void
+    {
+        $codes = [];
+        $walk = static function (array $nodes) use (&$walk, &$codes): void {
+            foreach ($nodes as $node) {
+                $codes[] = $node->code;
+                $walk($node->children);
+            }
+        };
+        foreach ((new CashflowCoreTemplateReader(self::CORE))->read() as $nodes) {
+            $walk($nodes);
+        }
+        sort($codes);
+
+        self::assertSame([
+            'FIN_IN', 'FIN_IN_LOANS', 'FIN_IN_OWNER_CONTRIBUTION',
+            'FIN_OUT', 'FIN_OUT_DIVIDENDS', 'FIN_OUT_INTEREST', 'FIN_OUT_LOAN_REPAYMENT',
+            'INV_IN', 'INV_IN_ASSET_SALE', 'INV_IN_DEPOSIT_RETURN', 'INV_IN_INTEREST',
+            'INV_OUT', 'INV_OUT_ASSET_PURCHASE', 'INV_OUT_DEPOSIT_PLACEMENT',
+            'OP_IN', 'OP_IN_CUSTOMERS', 'OP_IN_OTHER', 'OP_IN_SUPPLIER_REFUNDS',
+            'OP_OUT', 'OP_OUT_BANK_FEES', 'OP_OUT_CUSTOMER_REFUNDS', 'OP_OUT_DELIVERY', 'OP_OUT_MARKETING',
+            'OP_OUT_OTHER', 'OP_OUT_PAYROLL_TAXES', 'OP_OUT_PROFESSIONAL', 'OP_OUT_RENT', 'OP_OUT_SALARY',
+            'OP_OUT_SOFTWARE', 'OP_OUT_SUPPLIERS', 'OP_OUT_TAXES', 'OP_OUT_TAX_OTHER', 'OP_OUT_TAX_PROFIT',
+            'OP_OUT_TAX_USN', 'OP_OUT_TAX_VAT', 'OP_OUT_TELECOM', 'OP_OUT_UTILITIES',
+        ], $codes);
     }
 
     /**
@@ -45,15 +76,20 @@ final class CashflowCoreTemplateReaderTest extends TestCase
      */
     public static function brokenTemplates(): iterable
     {
-        yield 'version' => ["version: 2\nsections: {}", 'версии 1'];
-        yield 'unknown section' => ["version: 1\nsections:\n  CF_TECH:\n    - {name: A, direction: INFLOW, description: d}", 'sections.CF_TECH'];
-        yield 'leaf without description' => ["version: 1\nsections:\n  CF_OP:\n    - {name: A, direction: INFLOW}", 'обязательно описание'];
-        yield 'no direction at top' => ["version: 1\nsections:\n  CF_OP:\n    - {name: A, description: d}", 'direction обязателен'];
-        yield 'direction differs from parent' => ["version: 1\nsections:\n  CF_OP:\n    - name: G\n      direction: INFLOW\n      children:\n        - {name: A, direction: OUTFLOW, description: d}", 'отличается от родителя'];
-        yield 'transfer direction' => ["version: 1\nsections:\n  CF_OP:\n    - {name: A, direction: TRANSFER, description: d}", 'INFLOW или OUTFLOW'];
-        yield 'duplicate name' => ["version: 1\nsections:\n  CF_OP:\n    - {name: A, direction: INFLOW, description: d}\n    - {name: A, direction: INFLOW, description: d}", 'повторяется'];
-        yield 'unknown key' => ["version: 1\nsections:\n  CF_OP:\n    - {name: A, direction: INFLOW, descripton: d, description: d}", 'неизвестные ключи descripton'];
-        yield 'too deep' => ["version: 1\nsections:\n  CF_OP:\n    - name: A\n      direction: INFLOW\n      children:\n        - name: B\n          children:\n            - name: C\n              children:\n                - {name: D, description: d}", 'глубина'];
+        yield 'version 1 is retired' => ["version: 1\nsections: {}", 'версии 2'];
+        yield 'unknown section' => ["version: 2\nsections:\n  CF_TECH:\n    - {code: OP_IN_A, name: A, direction: INFLOW, description: d}", 'sections.CF_TECH'];
+        yield 'leaf without description' => ["version: 2\nsections:\n  CF_OP:\n    - {code: OP_IN_A, name: A, direction: INFLOW}", 'обязательно описание'];
+        yield 'no direction at top' => ["version: 2\nsections:\n  CF_OP:\n    - {code: OP_IN_A, name: A, description: d}", 'direction обязателен'];
+        yield 'direction differs from parent' => ["version: 2\nsections:\n  CF_OP:\n    - code: OP_IN\n      name: G\n      direction: INFLOW\n      children:\n        - {code: OP_IN_A, name: A, direction: OUTFLOW, description: d}", 'отличается от родителя'];
+        yield 'transfer direction' => ["version: 2\nsections:\n  CF_OP:\n    - {code: OP_IN_A, name: A, direction: TRANSFER, description: d}", 'INFLOW или OUTFLOW'];
+        yield 'duplicate name' => ["version: 2\nsections:\n  CF_OP:\n    - {code: OP_IN_A, name: A, direction: INFLOW, description: d}\n    - {code: OP_IN_B, name: A, direction: INFLOW, description: d}", 'повторяется на одном уровне'];
+        yield 'unknown key' => ["version: 2\nsections:\n  CF_OP:\n    - {code: OP_IN_A, name: A, direction: INFLOW, descripton: d, description: d}", 'неизвестные ключи descripton'];
+        yield 'no code' => ["version: 2\nsections:\n  CF_OP:\n    - {name: A, direction: INFLOW, description: d}", 'code обязателен'];
+        yield 'bad code format' => ["version: 2\nsections:\n  CF_OP:\n    - {code: op_in, name: A, direction: INFLOW, description: d}", 'code обязателен'];
+        yield 'code of other section' => ["version: 2\nsections:\n  CF_OP:\n    - {code: FIN_IN, name: A, direction: INFLOW, description: d}", 'начинаться с OP_IN'];
+        yield 'code of other direction' => ["version: 2\nsections:\n  CF_OP:\n    - {code: OP_OUT_A, name: A, direction: INFLOW, description: d}", 'начинаться с OP_IN'];
+        yield 'duplicate code' => ["version: 2\nsections:\n  CF_OP:\n    - {code: OP_IN_A, name: A, direction: INFLOW, description: d}\n    - {code: OP_IN_A, name: B, direction: INFLOW, description: d}", 'повторяется в шаблоне'];
+        yield 'too deep' => ["version: 2\nsections:\n  CF_OP:\n    - code: OP_IN\n      name: A\n      direction: INFLOW\n      children:\n        - code: OP_IN_B\n          name: B\n          children:\n            - code: OP_IN_C\n              name: C\n              children:\n                - {code: OP_IN_D, name: D, description: d}", 'глубина'];
     }
 
     #[DataProvider('brokenTemplates')]
