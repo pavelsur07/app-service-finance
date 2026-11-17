@@ -72,6 +72,13 @@ final class ReplaceUnusedCashflowTreeWithCoreAction
             }
         }
 
+        // Ответ ИИ на уже отправленный список статей мог бы сослаться на удалённую статью:
+        // такая подсказка не видна в UI и исключает операцию из повторной категоризации.
+        $pendingAi = $this->suggestions->countRequested($companyId);
+        if ($pendingAi > 0) {
+            $blocked[] = sprintf('ИИ ещё не ответил по %d операциям — повторите после ответа', $pendingAi);
+        }
+
         return new CashflowCoreReplacePlan(
             false,
             $removable,
@@ -102,7 +109,7 @@ final class ReplaceUnusedCashflowTreeWithCoreAction
             return 0;
         }
         if ([] !== $plan->blocked) {
-            throw new CashflowCoreTemplateException('Статьи ДДС компании используются, замена невозможна: '.implode('; ', $plan->blocked));
+            throw new CashflowCoreTemplateException('Замена дерева ДДС невозможна: '.implode('; ', $plan->blocked));
         }
 
         $regular = $this->regular($this->company($companyId));

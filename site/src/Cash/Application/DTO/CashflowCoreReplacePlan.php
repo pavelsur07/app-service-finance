@@ -11,7 +11,7 @@ final readonly class CashflowCoreReplacePlan
 {
     /**
      * @param list<string> $removable путь статей без ссылок, которые будут удалены
-     * @param list<string> $blocked «путь — где используется»: каждая запрещает замену
+     * @param list<string> $blocked «путь — где используется» и ожидающие ответа ИИ: каждая запрещает замену
      */
     public function __construct(
         public bool $alreadyApplied,

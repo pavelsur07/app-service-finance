@@ -54,7 +54,7 @@ final class ApplyCashflowCoreToCompanyCommand extends Command
             return Command::SUCCESS;
         }
         if ([] !== $plan->blocked) {
-            $io->error('Статьи используются, замена невозможна:');
+            $io->error('Замена невозможна:');
             $io->listing($plan->blocked);
 
             return Command::FAILURE;

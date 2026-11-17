@@ -79,6 +79,14 @@ final class CashCategorySuggestionRepository extends ServiceEntityRepository
         return $this->findBy(['companyId' => $companyId, 'status' => Status::SUGGESTED, 'categoryId' => $categoryIds]);
     }
 
+    /** Сколько подсказок компании ждут ответа ИИ (`requested`). */
+    public function countRequested(string $companyId): int
+    {
+        Assert::uuid($companyId);
+
+        return $this->count(['companyId' => $companyId, 'status' => Status::REQUESTED]);
+    }
+
     /**
      * То же под FOR UPDATE со свежим состоянием: только внутри транзакции вызывающего.
      * Отклонённая параллельно подсказка в выборку не попадает — PostgreSQL перепроверяет

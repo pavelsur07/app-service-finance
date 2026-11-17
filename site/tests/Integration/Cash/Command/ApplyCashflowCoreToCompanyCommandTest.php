@@ -114,6 +114,26 @@ final class ApplyCashflowCoreToCompanyCommandTest extends IntegrationTestCase
         self::assertSame('suggested', $this->db()->fetchOne('SELECT status FROM cash_category_suggestion WHERE id = ?', [$suggestion->getId()]));
     }
 
+    /** Задача ИИ ещё не ответила: её ответ мог бы сослаться на удалённую статью — отказ. */
+    public function testPendingAiRequestRefuses(): void
+    {
+        $company = $this->companyWithOldTree();
+        $pending = CashCategorySuggestionBuilder::aSuggestion()
+            ->withId(Uuid::uuid4()->toString())
+            ->withCompanyId((string) $company->getId())
+            ->withTransactionId((string) $this->transaction($company)->getId())
+            ->withTaskId(Uuid::uuid4()->toString())
+            ->build();
+        $this->em->persist($pending);
+        $this->em->flush();
+
+        $tester = $this->runCommand($company, ['--execute' => true]);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('ИИ', $tester->getDisplay());
+        self::assertSame(['Дивиденды выплаченные', 'Проценты полученные'], $this->regularNames($company));
+    }
+
     public function testNestedUnusedTreeIsRemovedFromLeaves(): void
     {
         $company = $this->companyWithOldTree();
