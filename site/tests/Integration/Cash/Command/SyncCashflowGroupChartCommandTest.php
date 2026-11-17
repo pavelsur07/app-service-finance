@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Cash\Command;
 
 use App\Cash\Application\Category\EnsureCashflowSystemCategoriesAction;
+use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -38,6 +40,37 @@ final class SyncCashflowGroupChartCommandTest extends IntegrationTestCase
         self::assertSame(37, $this->coded((string) $company->getId()));
 
         self::assertStringContainsString('менять нечего', $this->runSync((string) $company->getId(), ['--execute' => true])->getDisplay());
+    }
+
+    /** Остались только конфликты — команда не говорит, что дерево совпадает с эталоном. */
+    public function testOnlyConflictsAreNotReportedAsInSync(): void
+    {
+        $owner = UserBuilder::aUser()->withId(Uuid::uuid4()->toString())->withEmail('cmd-'.Uuid::uuid4()->toString().'@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId(Uuid::uuid7()->toString())->withOwner($owner)->build();
+        $this->em->persist($owner);
+        $this->em->persist($company);
+        $this->em->flush();
+        self::getContainer()->get(EnsureCashflowSystemCategoriesAction::class)((string) $company->getId());
+        $this->em->flush();
+        $this->runSync((string) $company->getId(), ['--execute' => true]);
+        // Код с ветки «Выплаты» снят, рядом вторая «Выплаты»: привязать нечего, остаётся конфликт.
+        $this->em->getConnection()->executeStatement("UPDATE cashflow_categories SET group_code = NULL WHERE company_id = ? AND group_code LIKE 'OP_OUT%'", [$company->getId()]);
+        $this->em->clear();
+        $managed = $this->em->find(Company::class, $company->getId());
+        \assert($managed instanceof Company);
+        $op = $this->em->getRepository(CashflowCategory::class)->findOneBy(['company' => $managed, 'systemCode' => CashflowCategory::CODE_OPERATING]);
+        \assert($op instanceof CashflowCategory);
+        $duplicate = (new CashflowCategory(Uuid::uuid7()->toString(), $managed))->setName('Выплаты')->setParent($op);
+        $duplicate->syncFlowKindWithParent();
+        $this->em->persist($duplicate);
+        $this->em->flush();
+        $this->em->clear();
+
+        $display = $this->runSync((string) $company->getId(), [])->getDisplay();
+
+        self::assertStringContainsString('Конфликты', $display);
+        self::assertStringNotContainsString('совпадает с эталоном', $display);
+        self::assertStringContainsString('сопоставление не завершено', $display);
     }
 
     public function testUnknownCompanyFails(): void

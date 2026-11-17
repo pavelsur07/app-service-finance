@@ -49,6 +49,11 @@ final class SyncCashflowGroupChartCommand extends Command
         }
 
         $this->print($io, $plan);
+        if ($plan->isEmpty() && [] !== $plan->conflicts) {
+            $io->warning('Автоматически менять нечего, но сопоставление не завершено: конфликты выше разберите вручную.');
+
+            return Command::SUCCESS;
+        }
         if ($plan->isEmpty()) {
             $io->success('Дерево ДДС совпадает с эталоном, менять нечего.');
 

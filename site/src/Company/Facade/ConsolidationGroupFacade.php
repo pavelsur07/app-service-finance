@@ -19,6 +19,11 @@ final class ConsolidationGroupFacade implements ConsolidationGroupFacadeInterfac
         return $this->repository->findOneByCompany($companyId)?->getHeadCompanyId();
     }
 
+    public function lockedHeadOf(string $companyId): ?string
+    {
+        return $this->repository->lockedHeadOf($companyId);
+    }
+
     public function members(string $headCompanyId): array
     {
         return array_map(

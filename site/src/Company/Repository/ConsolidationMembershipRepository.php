@@ -71,4 +71,38 @@ final class ConsolidationMembershipRepository extends ServiceEntityRepository
 
         return $result;
     }
+
+    /**
+     * Блокировка кабинета владельца до конца транзакции вызывающего: ею сериализуются изменение
+     * состава групп и всё, что читает состав и пишет по нему (синхронизация дерева ДДС).
+     */
+    public function lockCabinet(string $ownerUserId): void
+    {
+        Assert::uuid($ownerUserId);
+        $this->getEntityManager()->getConnection()->executeStatement(
+            'SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))',
+            ['key' => 'company_consolidation:'.$ownerUserId],
+        );
+    }
+
+    /**
+     * Под блокировкой кабинета владельца компании — головная её группы из БД (не из identity map).
+     * Только внутри транзакции вызывающего.
+     */
+    public function lockedHeadOf(string $companyId): ?string
+    {
+        Assert::uuid($companyId);
+        $connection = $this->getEntityManager()->getConnection();
+        if (!$connection->isTransactionActive()) {
+            throw new \LogicException('Состав группы под блокировкой читается только внутри транзакции.');
+        }
+        $owner = $connection->fetchOne('SELECT user_id FROM companies WHERE id = :companyId', ['companyId' => $companyId]);
+        if (false === $owner || null === $owner) {
+            return null;
+        }
+        $this->lockCabinet((string) $owner);
+        $head = $connection->fetchOne('SELECT head_company_id FROM company_consolidation_member WHERE company_id = :companyId', ['companyId' => $companyId]);
+
+        return false === $head ? null : (string) $head;
+    }
 }

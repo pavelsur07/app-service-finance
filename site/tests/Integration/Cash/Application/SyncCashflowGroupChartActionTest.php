@@ -9,6 +9,7 @@ use App\Cash\Application\Category\EnsureCashflowSystemCategoriesAction;
 use App\Cash\Application\Category\SyncCashflowGroupChartAction;
 use App\Cash\Application\DTO\CashflowGroupChartSyncPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
@@ -151,6 +152,66 @@ final class SyncCashflowGroupChartActionTest extends IntegrationTestCase
         self::assertSame([], $this->codes($member));
         self::assertNull($this->db()->fetchOne('SELECT group_code FROM cashflow_categories WHERE id = ?', [$extra]));
         self::assertSame(0, $this->journalCount($member));
+    }
+
+    /** «Аренда» с поступлением под «Выплатами» — конфликт, а не расходный код. */
+    public function testOppositeDirectionIsConflict(): void
+    {
+        $head = $this->headWithCore();
+        $member = $this->company();
+        $outflows = $this->addCategory($member, 'Выплаты', null, CashflowCategory::CODE_OPERATING);
+        $rent = $this->addCategory($member, 'Аренда', null, null, $outflows);
+        $this->db()->executeStatement("UPDATE cashflow_categories SET operation_type = 'INFLOW' WHERE id = ?", [$rent]);
+        $this->group($head, $member);
+
+        $plan = $this->sync($member);
+
+        self::assertNotEmpty(array_filter($plan->conflicts, static fn (string $c): bool => str_starts_with($c, 'OP_OUT_RENT ') && str_contains($c, 'направление')));
+        self::assertNull($this->db()->fetchOne('SELECT group_code FROM cashflow_categories WHERE id = ?', [$rent]));
+        self::assertSame('OP_OUT', $this->db()->fetchOne('SELECT group_code FROM cashflow_categories WHERE id = ?', [$outflows]));
+    }
+
+    /** Обычная корневая статья головной и её дети доходят до участника. */
+    public function testRegularRootOfHeadIsCopied(): void
+    {
+        $head = $this->headWithCore();
+        $headCompany = $this->em->find(Company::class, $head->getId());
+        \assert($headCompany instanceof Company);
+        $root = (new CashflowCategory(Uuid::uuid7()->toString(), $headCompany))->setName('Проекты')->setFlowKind(CashflowFlowKind::INVESTING);
+        $this->em->persist($root);
+        $this->em->flush();
+        $child = $this->addCategory($head, 'Проект Альфа', null, null, (string) $root->getId());
+        $member = $this->company();
+        $this->group($head, $member);
+
+        $this->sync($member);
+
+        $row = $this->db()->fetchAssociative('SELECT parent_id, flow_kind FROM cashflow_categories WHERE company_id = ? AND group_code = ?', [$member->getId(), $root->getId()]);
+        self::assertIsArray($row);
+        self::assertNull($row['parent_id']);
+        self::assertSame(CashflowFlowKind::INVESTING->value, $row['flow_kind']);
+        self::assertSame('Проект Альфа', $this->db()->fetchOne('SELECT name FROM cashflow_categories WHERE company_id = ? AND group_code = ?', [$member->getId(), $child]));
+    }
+
+    /** Узел, который у участника оказался бы глубже 5 уровней, — конфликт с пропуском детей. */
+    public function testTooDeepIsConflict(): void
+    {
+        $head = $this->headWithCore();
+        $member = $this->company();
+        $group = $this->addCategory($member, 'Своя группа', null, CashflowCategory::CODE_OPERATING);
+        $sub = $this->addCategory($member, 'Подгруппа', null, null, $group);
+        $outflows = $this->addCategory($member, 'Выплаты', null, null, $sub);
+        $this->addCategory($member, 'Налоги', null, null, $outflows);
+        $this->group($head, $member);
+
+        $plan = $this->sync($member);
+
+        self::assertSame('OP_OUT_TAXES', $this->db()->fetchOne("SELECT group_code FROM cashflow_categories WHERE company_id = ? AND name = 'Налоги'", [$member->getId()]));
+        self::assertNotEmpty(array_filter($plan->conflicts, static fn (string $c): bool => str_contains($c, 'глубже 5 уровней')));
+        self::assertSame(5, (int) $this->db()->fetchOne(
+            'WITH RECURSIVE t AS (SELECT id, 1 AS lvl FROM cashflow_categories WHERE company_id = ? AND parent_id IS NULL UNION ALL SELECT c.id, t.lvl + 1 FROM cashflow_categories c JOIN t ON c.parent_id = t.id) SELECT MAX(lvl) FROM t',
+            [$member->getId()],
+        ));
     }
 
     private function sync(Company $company): CashflowGroupChartSyncPlan

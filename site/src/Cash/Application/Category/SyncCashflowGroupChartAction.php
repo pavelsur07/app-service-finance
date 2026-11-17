@@ -9,6 +9,8 @@ use App\Cash\Application\DTO\CashflowGroupChartSyncPlan;
 use App\Cash\Application\DTO\Template\CashflowCoreTemplateNode;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashflowGroupChartApplication;
+use App\Cash\Enum\PaymentPlan\PaymentPlanType;
+use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\Company\Facade\CompanyFacade;
@@ -31,6 +33,11 @@ use Symfony\Component\Clock\ClockInterface;
  */
 final class SyncCashflowGroupChartAction
 {
+    /** parentKey обычной корневой статьи головной компании. */
+    public const ROOT = '';
+    /** Та же вложенность, что проверяет SaveCashflowCategoryAction. */
+    private const MAX_LEVEL = 5;
+
     public function __construct(
         private readonly CompanyFacade $companyFacade,
         private readonly ConsolidationGroupFacadeInterface $groups,
@@ -45,7 +52,7 @@ final class SyncCashflowGroupChartAction
 
     public function plan(string $companyId): CashflowGroupChartSyncPlan
     {
-        return $this->run($companyId, false);
+        return $this->run($companyId, $this->sourceHead($companyId), false);
     }
 
     public function __invoke(string $companyId): CashflowGroupChartSyncPlan
@@ -54,17 +61,16 @@ final class SyncCashflowGroupChartAction
         if (!$connection->isTransactionActive()) {
             throw new \LogicException('Синхронизация дерева ДДС выполняется только внутри транзакции вызывающего.');
         }
-        $head = $this->sourceHead($companyId);
+        // Состав группы — первым и до конца транзакции: ConfigureConsolidationGroupAction ждёт.
+        $locked = $this->groups->lockedHeadOf($companyId);
+        $head = null !== $locked && $locked !== $companyId ? $locked : null;
         foreach (null === $head ? [$companyId] : [$head, $companyId] as $lockedId) {
             $connection->executeQuery('SELECT pg_advisory_xact_lock(hashtext(:companyId))', ['companyId' => $lockedId]);
             ($this->ensureSystem)($lockedId);
             $this->categories->lockTreeByCompany($this->company($lockedId));
         }
-        if ($this->sourceHead($companyId) !== $head) {
-            throw new \DomainException('Состав группы изменился во время синхронизации — повторите.');
-        }
 
-        $result = $this->run($companyId, true);
+        $result = $this->run($companyId, $head, true);
         if (!$result->isEmpty()) {
             $this->entityManager->flush();
             $this->entityManager->persist(new CashflowGroupChartApplication(
@@ -93,10 +99,9 @@ final class SyncCashflowGroupChartAction
         return $result;
     }
 
-    private function run(string $companyId, bool $apply): CashflowGroupChartSyncPlan
+    private function run(string $companyId, ?string $head, bool $apply): CashflowGroupChartSyncPlan
     {
         $company = $this->company($companyId);
-        $head = $this->sourceHead($companyId);
         $headCodes = 0;
         $nodes = null === $head ? $this->coreNodes() : $this->headNodes($this->company($head), $apply, $headCodes);
 
@@ -115,23 +120,32 @@ final class SyncCashflowGroupChartAction
         $bind = [];
         $create = [];
         $conflicts = [];
-        /** @var array<string, true> $virtual коды, которые будут созданы (в плане без записи) */
+        /** @var array<string, int> $virtual коды, которые будут созданы в плане, → уровень */
         $virtual = [];
         /** @var array<string, true> $taken статьи, привязанные в этом прогоне */
         $taken = [];
+        /** @var array<string, PaymentPlanType|null> $direction действующее направление узла эталона */
+        $direction = [];
         foreach ($nodes as $node) {
+            $direction[$node->code] = $node->direction ?? $direction[$node->parentKey] ?? null;
             if (isset($byKey[$node->code]) || isset($virtual[$node->code])) {
                 continue;
             }
             $label = sprintf('%s «%s»', $node->code, $node->name);
-            if (isset($virtual[$node->parentKey])) {
-                $virtual[$node->code] = true;
-                $create[] = $label;
+            $isRoot = self::ROOT === $node->parentKey;
+            $parent = $isRoot ? null : ($byKey[$node->parentKey] ?? null);
+            if (!$isRoot && null === $parent && !isset($virtual[$node->parentKey])) {
+                $conflicts[] = $label.': родитель не сопоставлен';
                 continue;
             }
-            $parent = $byKey[$node->parentKey] ?? null;
-            if (null === $parent) {
-                $conflicts[] = $label.': родитель не сопоставлен';
+            $level = $isRoot ? 1 : 1 + ($parent?->getLevel() ?? $virtual[$node->parentKey]);
+            if ($level > self::MAX_LEVEL) {
+                $conflicts[] = $label.sprintf(': у компании статья оказалась бы глубже %d уровней — разместите вручную', self::MAX_LEVEL);
+                continue;
+            }
+            if (!$isRoot && null === $parent) {
+                $virtual[$node->code] = $level;
+                $create[] = $label;
                 continue;
             }
 
@@ -140,7 +154,7 @@ final class SyncCashflowGroupChartAction
                 fn (CashflowCategory $c): bool => !$c->isSystem()
                     && null === $c->getGroupCode()
                     && !isset($taken[(string) $c->getId()])
-                    && $c->isDescendantOf($parent)
+                    && ($isRoot ? null === $c->getParent() : $c->isDescendantOf($parent))
                     && self::normalize($c->getName()) === self::normalize($node->name),
             ));
             if (\count($candidates) > 1) {
@@ -149,6 +163,11 @@ final class SyncCashflowGroupChartAction
             }
             if (1 === \count($candidates)) {
                 $category = $candidates[0];
+                $own = self::effectiveDirection($category);
+                if (null !== $own && null !== $direction[$node->code] && $own !== $direction[$node->code]) {
+                    $conflicts[] = $label.sprintf(': у статьи «%s» другое направление — привяжите вручную', $this->path($category));
+                    continue;
+                }
                 $taken[(string) $category->getId()] = true;
                 $bind[] = $this->path($category).' → '.$node->code;
                 if ($apply) {
@@ -160,7 +179,7 @@ final class SyncCashflowGroupChartAction
 
             $create[] = $label;
             if (!$apply) {
-                $virtual[$node->code] = true;
+                $virtual[$node->code] = $level;
                 continue;
             }
             $category = new CashflowCategory(Uuid::uuid7()->toString(), $company);
@@ -171,12 +190,28 @@ final class SyncCashflowGroupChartAction
                 ->setSort($node->sort)
                 ->setParent($parent)
                 ->assignGroupCode($node->code);
-            $category->syncFlowKindWithParent();
+            if (null === $parent) {
+                $category->setFlowKind($node->flowKind ?? CashflowFlowKind::OPERATING);
+            } else {
+                $category->syncFlowKindWithParent();
+            }
             $this->entityManager->persist($category);
             $byKey[$node->code] = $category;
         }
 
         return new CashflowGroupChartSyncPlan(null === $head ? 'core' : 'head', $head, $bind, $create, $conflicts, $headCodes);
+    }
+
+    /** Направление статьи с наследованием от ближайшего предка, где оно задано. */
+    private static function effectiveDirection(CashflowCategory $category): ?PaymentPlanType
+    {
+        for ($node = $category; null !== $node; $node = $node->getParent()) {
+            if (null !== $node->getOperationType()) {
+                return $node->getOperationType();
+            }
+        }
+
+        return null;
     }
 
     /** Головная компания-источник: только у участника; головная и компания вне группы — core.yaml. */
@@ -232,8 +267,8 @@ final class SyncCashflowGroupChartAction
                 }
             }
             $parent = $category->getParent();
-            $parentKey = null === $parent ? 'sys:' : ($parent->isSystem() ? 'sys:'.$parent->getSystemCode() : $code($parent));
-            $nodes[] = new CashflowGroupChartNode($code($category), $category->getName(), $category->getDescription(), $category->getOperationType(), $category->getSort(), $parentKey);
+            $parentKey = null === $parent ? self::ROOT : ($parent->isSystem() ? 'sys:'.$parent->getSystemCode() : $code($parent));
+            $nodes[] = new CashflowGroupChartNode($code($category), $category->getName(), $category->getDescription(), $category->getOperationType(), $category->getSort(), $parentKey, null === $parent ? $category->getFlowKind() : null);
         }
 
         return $nodes;
