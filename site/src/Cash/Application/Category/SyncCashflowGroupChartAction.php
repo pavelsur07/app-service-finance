@@ -168,6 +168,10 @@ final class SyncCashflowGroupChartAction
                     $conflicts[] = $label.sprintf(': у статьи «%s» другое направление — привяжите вручную', $this->path($category));
                     continue;
                 }
+                if ($isRoot && null !== $node->flowKind && $category->getEffectiveFlowKind() !== $node->flowKind) {
+                    $conflicts[] = $label.sprintf(': у статьи «%s» другой вид деятельности — привяжите вручную', $this->path($category));
+                    continue;
+                }
                 $taken[(string) $category->getId()] = true;
                 $bind[] = $this->path($category).' → '.$node->code;
                 if ($apply) {

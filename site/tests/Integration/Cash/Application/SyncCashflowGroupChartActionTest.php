@@ -193,6 +193,31 @@ final class SyncCashflowGroupChartActionTest extends IntegrationTestCase
         self::assertSame('Проект Альфа', $this->db()->fetchOne('SELECT name FROM cashflow_categories WHERE company_id = ? AND group_code = ?', [$member->getId(), $child]));
     }
 
+    /** Одноимённые корни разных видов деятельности — конфликт, дети пропускаются. */
+    public function testRootWithOtherFlowKindIsConflict(): void
+    {
+        $head = $this->headWithCore();
+        $headCompany = $this->em->find(Company::class, $head->getId());
+        \assert($headCompany instanceof Company);
+        $root = (new CashflowCategory(Uuid::uuid7()->toString(), $headCompany))->setName('Проекты')->setFlowKind(CashflowFlowKind::INVESTING);
+        $this->em->persist($root);
+        $this->em->flush();
+        $this->addCategory($head, 'Проект Альфа', null, null, (string) $root->getId());
+        $member = $this->company();
+        $memberCompany = $this->em->find(Company::class, $member->getId());
+        \assert($memberCompany instanceof Company);
+        $memberRoot = (new CashflowCategory(Uuid::uuid7()->toString(), $memberCompany))->setName('Проекты')->setFlowKind(CashflowFlowKind::OPERATING);
+        $this->em->persist($memberRoot);
+        $this->em->flush();
+        $this->group($head, $member);
+
+        $plan = $this->sync($member);
+
+        self::assertNotEmpty(array_filter($plan->conflicts, static fn (string $c): bool => str_contains($c, 'вид деятельности')));
+        self::assertNull($this->db()->fetchOne('SELECT group_code FROM cashflow_categories WHERE id = ?', [$memberRoot->getId()]));
+        self::assertSame(0, (int) $this->db()->fetchOne("SELECT COUNT(*) FROM cashflow_categories WHERE company_id = ? AND name = 'Проект Альфа'", [$member->getId()]));
+    }
+
     /** Узел, который у участника оказался бы глубже 5 уровней, — конфликт с пропуском детей. */
     public function testTooDeepIsConflict(): void
     {
