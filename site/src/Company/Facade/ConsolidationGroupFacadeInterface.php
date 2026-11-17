@@ -14,6 +14,13 @@ interface ConsolidationGroupFacadeInterface
     public function headOf(string $companyId): ?string;
 
     /**
+     * То же, что headOf(), но из БД и под блокировкой кабинета владельца до конца транзакции
+     * вызывающего: состав группы не изменится, пока вызывающий пишет по нему. Брать первой,
+     * до блокировок своего модуля.
+     */
+    public function lockedHeadOf(string $companyId): ?string;
+
+    /**
      * Все компании группы, головная первой; пусто, если компания не головная.
      *
      * @return list<string>

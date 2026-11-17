@@ -436,6 +436,20 @@ case "$cmd" in
     done
     if [ "$seen_company" -ne 1 ]; then echo "companyId is required for $cmd" >&2; exit 2; fi
     ;;
+  app:cash:group-chart:sync)
+    # Синхронизация дерева ДДС компании с эталоном группы
+    # (docs/tasks/cashflow-group-chart/stages/stage-2.md). Без --execute — read-only план;
+    # с --execute привязывает статьи по коду и названию и создаёт недостающие, ничего не удаляет.
+    # Запуск с --execute — одобрение Владельца. UUID компании позиционный и обязателен.
+    seen_company=0
+    for arg in "$@"; do
+      if   [[ "$arg" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] && [ "$seen_company" -eq 0 ]; then seen_company=1
+      elif [ "$arg" = "--execute" ] || [ "$arg" = "--no-interaction" ] || [ "$arg" = "-n" ]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    if [ "$seen_company" -ne 1 ]; then echo "companyId is required for $cmd" >&2; exit 2; fi
+    ;;
   *) echo "Command not allowed: $cmd" >&2; exit 2 ;;
 esac
 

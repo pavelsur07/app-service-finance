@@ -111,6 +111,19 @@ final class ConsolidationGroupTest extends IntegrationTestCase
         self::assertSame([], $facade->members(self::C));
     }
 
+    /** Под блокировкой состав читается из БД, а не из уже загруженной строки. */
+    public function testLockedHeadOfReadsFreshMembership(): void
+    {
+        $this->configure(self::HEAD, true, [self::A]);
+        $facade = new ConsolidationGroupFacade(self::getContainer()->get(ConsolidationMembershipRepository::class));
+        self::assertSame(self::HEAD, $facade->headOf(self::A));
+
+        $this->em->getConnection()->executeStatement('DELETE FROM company_consolidation_member WHERE company_id = ?', [self::A]);
+
+        self::assertNull($this->em->wrapInTransaction(fn (): ?string => $facade->lockedHeadOf(self::A)));
+        self::assertSame(self::HEAD, $this->em->wrapInTransaction(fn (): ?string => $facade->lockedHeadOf(self::HEAD)));
+    }
+
     /** @param list<string> $members */
     private function configure(string $head, bool $enabled, array $members): void
     {

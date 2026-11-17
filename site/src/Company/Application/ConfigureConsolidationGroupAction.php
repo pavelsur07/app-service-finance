@@ -61,10 +61,7 @@ final class ConfigureConsolidationGroupAction
 
         /** @var string|null $refusal */
         $refusal = $this->entityManager->wrapInTransaction(function () use ($headCompanyId, $ownerUserId, $enabled, $memberIds, $names): ?string {
-            $this->entityManager->getConnection()->executeStatement(
-                'SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))',
-                ['key' => 'company_consolidation:'.$ownerUserId],
-            );
+            $this->memberships->lockCabinet($ownerUserId);
 
             $own = $this->memberships->findOneByCompany($headCompanyId);
             if (null !== $own && !$own->isHead()) {
