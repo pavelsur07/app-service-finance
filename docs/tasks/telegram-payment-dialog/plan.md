@@ -28,7 +28,7 @@ Reviewer focus: no guessed money/year/accounting policy, validation all rows,
 receipt replay, permissions, preserve unrelated questions/manual selections.
 
 ## Stage 3: проверка и завершение списка
-Risk: MEDIUM. stage_base_commit: записать после Stage 2.
+Risk: MEDIUM. stage_base_commit: `dc1ae96c7`.
 DoD: компактная сводка с общими вопросами и доступом к деталям, короткие
 кнопки, итоги по валюте/направлению, явное подтверждение сохранения.
 Work items: 3.1 RED presentation tests → UI; 3.2 docs, full gates and reviews.

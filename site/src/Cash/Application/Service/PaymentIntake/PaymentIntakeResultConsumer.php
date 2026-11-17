@@ -41,9 +41,16 @@ final readonly class PaymentIntakeResultConsumer implements AiTaskResultConsumer
         }
         $output = PaymentIntakeCommonFields::applyHeaders($result->output, $draft->getText(), $draft->getPayload());
         $output = $this->sanitizeReferences($output, $draft->getPayload());
+        if (!$this->validOutput($output, $draft->getText())) {
+            $draft->fail($result->taskId, 'contract_violation');
+
+            return;
+        }
         if ($draft->acceptResult($result->taskId, $output)) {
-            $general = $this->centers->findGeneralPair($result->companyId);
-            $draft->applyGeneralPairDefault($general?->projectDirectionId, $general?->responsibilityCenterId);
+            if (!PaymentIntakeCommonFields::hasUnresolvedHeaders($output['questions'])) {
+                $general = $this->centers->findGeneralPair($result->companyId);
+                $draft->applyGeneralPairDefault($general?->projectDirectionId, $general?->responsibilityCenterId);
+            }
         }
     }
 
@@ -72,8 +79,8 @@ final readonly class PaymentIntakeResultConsumer implements AiTaskResultConsumer
             $center = $item['cfo_id'];
             if ((null !== $project || null !== $center)
                 && (null === $project || null === $center || !isset($projects[$project], $centers[$center], $pairs[$project.'/'.$center]))) {
-                $item['project_id'] = null;
-                $item['cfo_id'] = null;
+                $item['project_id'] = null !== $project && isset($projects[$project]) ? $project : null;
+                $item['cfo_id'] = null !== $center && isset($centers[$center]) ? $center : null;
                 $item['questions'][] = 'Укажите доступную пару проекта и ЦФО.';
             }
             $item['questions'] = array_values(array_unique($item['questions']));
@@ -138,7 +145,7 @@ final readonly class PaymentIntakeResultConsumer implements AiTaskResultConsumer
 
     /**
      * @param array<string, mixed> $value
-     * @param list<string>         $keys
+     * @param list<string> $keys
      */
     private function exactKeys(array $value, array $keys): bool
     {

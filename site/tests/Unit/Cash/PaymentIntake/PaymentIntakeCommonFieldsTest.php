@@ -46,5 +46,19 @@ final class PaymentIntakeCommonFieldsTest extends TestCase
         self::assertTrue(PaymentIntakeCommonFields::resolved('Подтвердите факт оплаты и укажите дату.', ['date' => '2026-10-14', 'execution_status' => 'paid']));
         self::assertFalse(PaymentIntakeCommonFields::resolved('Оплатила сотрудница: уточните источник денег и компенсацию.', ['execution_status' => 'paid']));
         self::assertFalse(PaymentIntakeCommonFields::resolved('Это отдельные платежи или части одного?', ['date' => '2026-10-14']));
+        self::assertFalse(PaymentIntakeCommonFields::resolved('Это расход или перевод между счетами?', ['direction' => 'outflow']));
+        self::assertFalse(PaymentIntakeCommonFields::resolved('Это расход, который ещё надо проверить?', ['direction' => 'outflow']));
+        self::assertFalse(PaymentIntakeCommonFields::resolved('Уточните: этот расход является авансом?', ['direction' => 'outflow']));
+    }
+
+    public function testUnknownHeaderProjectRequiresClarification(): void
+    {
+        $output = ['items' => [['date' => null, 'direction' => null, 'project_id' => null, 'cfo_id' => null, 'questions' => []], ['project_id' => 'local-project', 'cfo_id' => 'local-center', 'questions' => []]], 'questions' => []];
+        $result = PaymentIntakeCommonFields::applyHeaders($output, "проект Неизвестный\n1. Аренда 100 руб.", []);
+        self::assertNotEmpty($result['questions']);
+        self::assertNull($result['items'][0]['project_id']);
+        self::assertSame('local-project', $result['items'][1]['project_id']);
+        self::assertSame('local-center', $result['items'][1]['cfo_id']);
+        self::assertTrue(PaymentIntakeCommonFields::resolved($result['questions'][0], ['project_id' => 'chosen-project']));
     }
 }

@@ -100,6 +100,57 @@ final class PaymentIntakeTest extends IntegrationTestCase
         self::assertSame(0, $this->ledgerCount());
     }
 
+    public function testUnknownHeaderCanBeCorrectedAndExplicitlyConfirmed(): void
+    {
+        $draft = $this->request(text: "проект Неизвестный\n1. оплатил 100");
+        $this->deliverResult($draft->taskId);
+        $draft = $this->get($draft);
+        self::assertNotEmpty($draft->questions);
+        self::assertNull($draft->items[0]['project_id']);
+        $draft = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, commonText: 'проект Общий; ЦФО Общий'));
+        self::assertSame([], $draft->questions);
+        $draft = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, commonText: 'все оплачены со средств компании'));
+        self::assertTrue($draft->items[0]['paid_confirmed']);
+        $this->action->confirm(new ConfirmPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$draft->items[0]['id']]));
+        self::assertSame(1, $this->ledgerCount());
+    }
+
+    public function testHeaderErrorCannotBeDismissedWithoutCorrectingItsFields(): void
+    {
+        $draft = $this->request(text: "проект Неизвестный\n1. оплатил 100");
+        $this->deliverResult($draft->taskId);
+        $draft = $this->get($draft);
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('исправьте неприменённые общие реквизиты');
+        $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, questions: []));
+    }
+
+    public function testKnownHeaderProjectWithoutCenterIsNotReplacedByGeneralProject(): void
+    {
+        $project = new ProjectDirection(Uuid::uuid7()->toString(), $this->company, 'КС Тест');
+        $this->em->persist($project);
+        $this->em->flush();
+        $draft = $this->request(text: "проект КС Тест\n1. оплатил 100");
+        $this->deliverResult($draft->taskId);
+        $draft = $this->get($draft);
+        self::assertSame($project->getId(), $draft->items[0]['project_id']);
+        self::assertNull($draft->items[0]['cfo_id']);
+        self::assertNotEmpty($draft->items[0]['questions']);
+    }
+
+    public function testBatchPaymentApprovalKeepsUnknownFinancialQuestionsUnconfirmed(): void
+    {
+        $draft = $this->request();
+        $item = $this->candidate();
+        $item['questions'] = ['Оплатил своими деньгами. Нужен возврат?'];
+        $this->deliverResult($draft->taskId, output: ['intent' => 'payments', 'items' => [$item], 'questions' => [], 'target_ref' => null]);
+        $draft = $this->get($draft);
+        $draft = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, commonText: 'все оплачены со средств компании'));
+        self::assertSame($item['questions'], $draft->items[0]['questions']);
+        self::assertFalse($draft->items[0]['paid_confirmed']);
+        self::assertSame(0, $this->ledgerCount());
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

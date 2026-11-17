@@ -7,7 +7,6 @@ namespace App\Telegram\MessageHandler;
 use App\Cash\Application\DTO\PaymentIntake\PaymentIntakeDraftView;
 use App\Cash\Facade\CashFacade;
 use App\Company\Facade\CompanyFacade;
-use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\ServiceGateway\Facade\AiTaskResultFacadeInterface;
 use App\Telegram\Application\PaymentIntakePresenter;
 use App\Telegram\Application\QueuePaymentIntakePollAction;
@@ -25,7 +24,7 @@ final readonly class RefreshPaymentIntakeMessageHandler
 {
     private const MAX_ATTEMPTS = 15;
 
-    public function __construct(private EntityManagerInterface $em, private CashFacade $cash, private CompanyFacade $companies, private FinancialResponsibilityCenterFacade $centers, private AiTaskResultFacadeInterface $results, private PaymentIntakePresenter $presenter, private HttpClientInterface $http, private QueuePaymentIntakePollAction $polls, private LoggerInterface $telegramLogger, private string $telegramApiBaseUrl = 'https://api.telegram.org')
+    public function __construct(private EntityManagerInterface $em, private CashFacade $cash, private CompanyFacade $companies, private AiTaskResultFacadeInterface $results, private PaymentIntakePresenter $presenter, private HttpClientInterface $http, private QueuePaymentIntakePollAction $polls, private LoggerInterface $telegramLogger, private string $telegramApiBaseUrl = 'https://api.telegram.org')
     {
     }
 
@@ -84,16 +83,6 @@ final readonly class RefreshPaymentIntakeMessageHandler
         $sentMessageId = null;
         $rendered = $session->needsDelivery($state);
         if ($rendered) {
-            $names = [];
-            foreach ($this->companies->listProjectDirections($message->companyId) as $project) {
-                $names['project_id'][$project->id] = $project->name;
-            }
-            foreach ($this->cash->getCashflowCategoryTree($message->companyId) as $category) {
-                $names['category_id'][$category->id] = $category->name;
-            }
-            foreach ($this->centers->getActiveChoices($message->companyId) as $center) {
-                $names['cfo_id'][$center->id] = $center->name;
-            }
             $accountName = 'Недоступная касса';
             foreach ($this->cash->listMoneyAccounts($message->companyId, false) as $account) {
                 if ($account->id === $draft->moneyAccountId) {
@@ -101,7 +90,7 @@ final readonly class RefreshPaymentIntakeMessageHandler
                     break;
                 }
             }
-            $messages = $this->presenter->present($draft, $session->getId(), [], $accountName, $names);
+            $messages = $this->presenter->summary($draft, $session->getId(), $accountName);
             if ($timedOut) {
                 $messages[0]['text'] = 'Разбор ещё выполняется. Платежи не созданы. Нажмите «Обновить» позже; исходный черновик сохранён.';
             }

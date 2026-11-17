@@ -102,6 +102,14 @@ final class PaymentIntakeCommonFields
         if ([] === $lines) {
             return $output;
         }
+        $required = [];
+        foreach ($lines as $line) {
+            foreach (['date' => '/^дата/iu', 'project_id' => '/^(?:проект|расход по проекту|приход по проекту)/iu', 'cfo_id' => '/^цфо/iu', 'direction' => '/^(?:направление|расход по проекту|приход по проекту)/iu', 'currency' => '/^валюта/iu'] as $field => $pattern) {
+                if (preg_match($pattern, trim($line))) {
+                    $required[$field] = true;
+                }
+            }
+        }
         try {
             $parsed = self::parse(implode("\n", $lines));
             $fields = $parsed['fields'];
@@ -111,8 +119,7 @@ final class PaymentIntakeCommonFields
                 }
                 $matches = array_values(array_filter($snapshot[$key] ?? [], static fn (array $choice): bool => mb_strtolower($choice['name']) === mb_strtolower($fields[$field])));
                 if (1 !== count($matches)) {
-                    unset($fields[$field]);
-                    continue;
+                    throw new \DomainException('Общий проект или ЦФО не найден однозначно.');
                 }
                 $fields[$field] = $matches[0]['id'];
             }
@@ -131,32 +138,64 @@ final class PaymentIntakeCommonFields
             unset($item);
             $output['questions'] = array_values(array_filter($output['questions'], static fn (string $question): bool => !self::resolved($question, $fields)));
         } catch (\DomainException) {
-            $output['questions'][] = 'Общие реквизиты не применены. Ответьте на сводку: «дата ДД.ММ.ГГГГ; проект Название». Проверьте даты всех строк.';
+            foreach (array_keys($required) as $field) {
+                $output['questions'][] = self::HEADER_QUESTIONS[$field];
+            }
+            $output['questions'] = array_values(array_unique($output['questions']));
         }
 
         return $output;
     }
 
-    /** @param array<string, mixed> $fields */
+    private const array HEADER_QUESTIONS = [
+        'date' => 'Общая дата не применена. Укажите дату для всех строк.',
+        'project_id' => 'Общий проект не применён. Укажите точное название проекта.',
+        'cfo_id' => 'Общий ЦФО не применён. Укажите точное название ЦФО.',
+        'direction' => 'Общее направление не применено. Укажите приход или расход.',
+        'currency' => 'Общая валюта не применена. Укажите валюту.',
+    ];
+
+    /** @param list<string> $questions */
+    public static function hasUnresolvedHeaders(array $questions): bool
+    {
+        return [] !== array_intersect($questions, self::HEADER_QUESTIONS);
+    }
+
+    /** Only known simple questions can be resolved automatically. Free-form meaning requires review.
+     * @param array<string, mixed> $fields
+     */
     public static function resolved(string $question, array $fields, bool $separate = false): bool
     {
-        if (preg_match('/личн|источник|компенсац|подотч|сотрудниц|не счита|зарплат|масштаб|тысяч|налог|ндс|дубл|повтор/iu', $question)) {
-            return false;
+        foreach (self::HEADER_QUESTIONS as $field => $known) {
+            if ($known === $question) {
+                return isset($fields[$field]);
+            }
         }
-        if (preg_match('/отдельные платежи|части одного/iu', $question)) {
+        $simple = [
+            'укажите дату.' => ['date'],
+            'укажите дату платежа.' => ['date'],
+            'уточните дату этого платежа.' => ['date'],
+            'подтвердите факт оплаты.' => ['execution_status'],
+            'подтвердите факт оплаты и укажите дату.' => ['execution_status', 'date'],
+            'уточните направление: приход или расход?' => ['direction'],
+            'какой проект?' => ['project_id'],
+            'укажите проект и цфо.' => ['project_id', 'cfo_id'],
+            'укажите доступную пару проекта и цфо.' => ['project_id', 'cfo_id'],
+            'укажите валюту.' => ['currency'],
+        ];
+        $normalized = mb_strtolower(trim($question));
+        if (in_array($normalized, ['это отдельные платежи или части одного?', 'это отдельные платежи или части одного платежа?', 'это отдельные платежи?'], true)) {
             return $separate;
         }
-        $topics = ['date' => '/дат/iu', 'execution_status' => '/опла|выплат/iu', 'direction' => '/направлен|приход|расход/iu', 'project_id' => '/проект/iu', 'cfo_id' => '/цфо/iu', 'currency' => '/валют/iu', 'amount' => '/сумм|рубл|стоим/iu', 'category_id' => '/стать/iu'];
-        $found = false;
-        foreach ($topics as $field => $pattern) {
-            if (preg_match($pattern, $question)) {
-                $found = true;
-                if (!isset($fields[$field])) {
-                    return false;
-                }
+        if (!isset($simple[$normalized])) {
+            return false;
+        }
+        foreach ($simple[$normalized] as $field) {
+            if (!isset($fields[$field])) {
+                return false;
             }
         }
 
-        return $found;
+        return true;
     }
 }

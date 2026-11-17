@@ -848,7 +848,9 @@ final class TelegramWebhookController extends AbstractController
             return new JsonResponse(['status' => 'ignored']);
         }
 
-        return $this->respondWithMessage($bot, $message, $reply['text'] ?? 'Для изменения платежа отправьте новое сообщение.', $reply['reply_markup'] ?? null);
+        $session = $reply['session'] ?? null;
+
+        return $this->respondWithMessage($bot, $message, $reply['text'] ?? 'Для изменения платежа отправьте новое сообщение.', $reply['reply_markup'] ?? null, $session instanceof \App\Telegram\Entity\PaymentIntakeSession ? fn (string $id) => $this->paymentIntake->rememberReply($session, $id) : null);
     }
 
     private function handleTextMessage(TelegramBot $bot, array $update, array $message, string $text): Response
@@ -900,7 +902,7 @@ final class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage($bot, $message, 'Не удалось обработать черновик. Платежи не создаются без подтверждения. Попробуйте позже.');
         }
         if (null !== $intakeReply) {
-            return $this->respondWithMessage($bot, $message, $intakeReply['text'], $intakeReply['reply_markup'] ?? null);
+            return $this->respondToIntake($bot, $message, static fn () => $intakeReply);
         }
 
         $tgUserId = isset($message['from']['id']) ? (string) $message['from']['id'] : null;
@@ -1207,7 +1209,7 @@ final class TelegramWebhookController extends AbstractController
         return hash_equals($this->telegramWebhookSecret, $provided);
     }
 
-    private function respondWithMessage(TelegramBot $bot, array $message, string $text, ?array $replyMarkup = null): Response
+    private function respondWithMessage(TelegramBot $bot, array $message, string $text, ?array $replyMarkup = null, ?callable $onSent = null): Response
     {
         // Отправляем простой ответ через Telegram API
         // chat.id лучше from.id: ответы должны приходить в чат (в том числе групповой), а не личные сообщения отправителя
@@ -1256,6 +1258,12 @@ final class TelegramWebhookController extends AbstractController
             $content = $response->getContent(false);
 
             $this->logTelegramApiOutcome('sendMessage', $chatId, $statusCode, $content);
+            if (200 === $statusCode && null !== $onSent) {
+                $result = json_decode($content, true);
+                if (true === ($result['ok'] ?? false) && isset($result['result']['message_id'])) {
+                    $onSent((string) $result['result']['message_id']);
+                }
+            }
         } catch (\Throwable $exception) {
             $this->logTelegramApiFailure('sendMessage', $chatId, $exception);
         }

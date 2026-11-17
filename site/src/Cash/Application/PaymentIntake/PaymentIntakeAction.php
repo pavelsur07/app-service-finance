@@ -157,6 +157,9 @@ final readonly class PaymentIntakeAction
                 }
             }
             $draft = $this->owned($command->companyId, $command->actorUserId, $command->draftId, true);
+            if ([] === $command->questions && PaymentIntakeCommonFields::hasUnresolvedHeaders($draft->getQuestions())) {
+                throw new \DomainException('Сначала исправьте неприменённые общие реквизиты ответом на сводку.');
+            }
             [$patches, $questions] = null === $command->commonText ? [$command->items, $command->questions] : $this->commonAmendment($draft, $command->commonText);
             $changed = $draft->amend($command->expectedRevision, $patches, $command->text, $command->sourceRevision, $questions, $command->retry);
             if ($changed && ($command->retry || null !== $command->text)) {
@@ -229,11 +232,14 @@ final readonly class PaymentIntakeAction
             }
             $answered = $patch;
             foreach (['date', 'direction', 'currency'] as $field) {
-                if (null !== $item[$field] && ('date' !== $field || 'message_date_default' !== ($item['provenance']['date'] ?? null))) {
+                if (null !== $item[$field] && 'user' === ($item['provenance'][$field] ?? null)) {
                     $answered[$field] ??= $item[$field];
                 }
             }
             $patch['questions'] = array_values(array_filter($item['questions'], static fn (string $question): bool => !PaymentIntakeCommonFields::resolved($question, $answered, $parsed['separate'])));
+            if ([] !== $patch['questions'] && isset($patch['paid_confirmed'])) {
+                $patch['paid_confirmed'] = false;
+            }
             $patches[$item['id']] = $patch;
         }
         if ([] === $patches) {
@@ -513,7 +519,7 @@ final readonly class PaymentIntakeAction
     }
 
     /**
-     * @param array<string, mixed>  $item
+     * @param array<string, mixed> $item
      * @param array<string, string> $eligible
      */
     private function validateReferences(PaymentIntakeDraft $draft, array $item, MoneyAccount $account, array $eligible): void

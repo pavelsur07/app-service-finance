@@ -29,6 +29,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
     private ?\Closure $duringDelivery = null;
     /** @var list<string> */
     private array $aiTaskKeys = [];
+    private ?int $nextUniqueMessageId = null;
 
     public function testStopFromMenuCancelsDraftAndOldDeliveryCannotResume(): void
     {
@@ -37,6 +38,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         $transport = $client->getContainer()->get('messenger.transport.async_payment_intake');
         self::assertInstanceOf(\Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport::class, $transport);
         $old = $transport->getSent()[0]->getMessage();
+        self::assertInstanceOf(\App\Telegram\Message\RefreshPaymentIntakeMessage::class, $old);
         $this->post($client, ['message' => array_replace($this->message('🛑 Остановить разбор'), ['message_id' => 60])]);
         self::assertSame('cancelled', $this->em()->getConnection()->fetchOne('SELECT status FROM cash_payment_intake_draft WHERE company_id = ?', [self::COMPANY]));
         self::assertNull($this->em()->getConnection()->fetchOne('SELECT poll_generation FROM telegram_payment_intake_session WHERE company_id = ?', [self::COMPANY]));
@@ -58,7 +60,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
     }
 
     #[DataProvider('commonReplyScopeProvider')]
-    public function testCommonReplyToSummaryChangesAllRowsWithoutSelectingOne(bool $threaded): void
+    public function testCommonReplyToSummaryChangesAllRowsWithoutSelectingOne(bool $threaded, bool $editing): void
     {
         $client = $this->setupClient(true, true);
         $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
@@ -71,7 +73,11 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         $session->markDelivered('1:needs_clarification', ['900']);
         $this->em()->flush();
         $this->em()->getConnection()->executeStatement("UPDATE cash_payment_intake_draft SET status='needs_clarification', items=CAST(? AS JSONB) WHERE id=?", [json_encode($items, \JSON_THROW_ON_ERROR), $session->getDraftId()]);
-        $reply = array_replace($this->message('все оплачены и у всех дата оплаты 14.10.26'), ['message_id' => 65, 'reply_to_message' => ['message_id' => 900]]);
+        if ($editing) {
+            $session->awaitEdit($items[0]['id'], 1);
+            $this->em()->flush();
+        }
+        $reply = array_replace($this->message('все оплачены и у всех дата оплаты 14.10.26'), ['message_id' => 65, 'reply_to_message' => ['message_id' => 900, 'text' => 'Черновик · версия 1']]);
         if (!$threaded) {
             unset($reply['reply_to_message']);
         }
@@ -86,12 +92,49 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         }
         $this->post($client, ['message' => $reply]);
         self::assertSame(2, (int) $this->em()->getConnection()->fetchOne('SELECT revision FROM cash_payment_intake_draft'));
+        if ($threaded) {
+            $stale = array_replace($reply, ['message_id' => 66, 'text' => 'дата 2026-10-15']);
+            $this->post($client, ['message' => $stale]);
+            self::assertStringContainsString('устарела', $this->lastText());
+            self::assertSame(2, (int) $this->em()->getConnection()->fetchOne('SELECT revision FROM cash_payment_intake_draft'));
+        }
         self::assertCount(1, $this->aiTaskKeys);
     }
 
+    /** @return list<array{bool, bool}> */
     public static function commonReplyScopeProvider(): array
     {
-        return [[true], [false]];
+        return [[true, false], [false, false], [true, true]];
+    }
+
+    public function testDetailCardHasShortButtonsAndItsReplyCanEditSelectedRow(): void
+    {
+        $client = $this->setupClient(true, true);
+        $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
+        $session = $this->em()->getRepository(\App\Telegram\Entity\PaymentIntakeSession::class)->findOneBy(['companyId' => self::COMPANY]);
+        self::assertInstanceOf(\App\Telegram\Entity\PaymentIntakeSession::class, $session);
+        $id = Uuid::uuid7()->toString();
+        $item = ['id' => $id, 'transaction_id' => Uuid::uuid7()->toString(), 'amount' => '100.00', 'currency' => 'RUB', 'date' => '2026-10-14', 'direction' => 'outflow', 'execution_status' => 'paid', 'paid_confirmed' => false, 'category_id' => null, 'project_id' => null, 'cfo_id' => null, 'description' => 'Расход', 'questions' => [], 'provenance' => []];
+        $this->em()->getConnection()->executeStatement("UPDATE cash_payment_intake_draft SET status='needs_clarification', items=CAST(? AS JSONB) WHERE id=?", [json_encode([$item], \JSON_THROW_ON_ERROR), $session->getDraftId()]);
+        $prefix = 'pi:'.\App\Telegram\Application\PaymentIntakePresenter::encodeId($session->getId()).':1:';
+        $callback = ['id' => 'details', 'from' => ['id' => 70090], 'message' => ['chat' => ['id' => 70090]], 'data' => $prefix.'r'.\App\Telegram\Application\PaymentIntakePresenter::encodeId($id).'.0'];
+        $this->nextUniqueMessageId = 1000;
+        $this->post($client, ['callback_query' => $callback]);
+        self::assertStringContainsString('Сумма: 100.00', $this->lastText());
+        self::assertStringContainsString('1000', (string) $this->em()->getConnection()->fetchOne('SELECT reply_message_ids FROM telegram_payment_intake_session WHERE id=?', [$session->getId()]));
+        $markup = json_decode($this->sent[count($this->sent) - 1]['reply_markup'], true);
+        self::assertCount(1, $markup['inline_keyboard'][0]);
+        self::assertSame('Проверено и оплачено', $markup['inline_keyboard'][0][0]['text']);
+        $callback['data'] = $prefix.'e'.\App\Telegram\Application\PaymentIntakePresenter::encodeId($id);
+        $this->post($client, ['callback_query' => $callback]);
+        $this->post($client, ['message' => array_replace($this->message('сумма 200'), ['message_id' => 68, 'reply_to_message' => ['message_id' => 1000]])]);
+        self::assertSame('200', $client->getContainer()->get(\App\Cash\Facade\CashFacade::class)->getPaymentIntakeDraft(self::COMPANY, '22222222-2222-2222-2222-abcd0000ee01', $session->getDraftId())->items[0]['amount']);
+        $newCardId = $this->nextUniqueMessageId - 1;
+        $callback['data'] = str_replace(':1:', ':2:', $callback['data']);
+        $this->post($client, ['callback_query' => $callback]);
+        $this->post($client, ['message' => array_replace($this->message('сумма 300'), ['message_id' => 69, 'reply_to_message' => ['message_id' => $newCardId]])]);
+        self::assertSame('300', $client->getContainer()->get(\App\Cash\Facade\CashFacade::class)->getPaymentIntakeDraft(self::COMPANY, '22222222-2222-2222-2222-abcd0000ee01', $session->getDraftId())->items[0]['amount']);
+        self::assertCount(1, $this->aiTaskKeys);
     }
 
     public function testStopWithMultipleDraftsRequiresExplicitChoice(): void
@@ -112,6 +155,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         $transport = $client->getContainer()->get('messenger.transport.async_payment_intake');
         self::assertInstanceOf(\Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport::class, $transport);
         $poll = $transport->getSent()[0]->getMessage();
+        self::assertInstanceOf(\App\Telegram\Message\RefreshPaymentIntakeMessage::class, $poll);
         $bot = $this->em()->getRepository(TelegramBot::class)->findOneBy(['isActive' => true]);
         self::assertInstanceOf(TelegramBot::class, $bot);
         $this->duringDelivery = function () use ($client, $bot): void {
@@ -264,13 +308,20 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         self::assertStringContainsString('обновите привязку', implode("\n", array_column($this->sent, 'text')));
     }
 
-    public function testEditWithNoOriginalDraftDoesNotInvokeLegacy(): void
+    #[DataProvider('unknownEditProvider')]
+    public function testEditWithNoOriginalDraftDoesNotInvokeLegacy(string $text): void
     {
         $client = $this->setupClient(true, true);
-        $this->post($client, ['edited_message' => $this->message('+1500 доход')]);
+        $this->post($client, ['edited_message' => $this->message($text)]);
         self::assertResponseIsSuccessful();
         self::assertStringContainsString('Исходный черновик не найден', implode("\n", array_column($this->sent, 'text')));
         self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction WHERE company_id = ?', [self::COMPANY]));
+    }
+
+    /** @return list<array{string}> */
+    public static function unknownEditProvider(): array
+    {
+        return [['+1500 доход'], ['дата 2026-10-14'], ['/cancel']];
     }
 
     public function testOrdinaryTextCreatesOnePinnedDraftAndDuplicateDoesNotStartSecondPoll(): void
@@ -361,7 +412,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         $this->em()->getConnection()->executeStatement('DELETE FROM client_bindings WHERE company_id = ?', [self::COMPANY]);
         $this->em()->clear();
         $container = $client->getContainer();
-        $disabledAction = new \App\Telegram\Application\PaymentIntakeTelegramAction($this->em(), $container->get(\App\Cash\Facade\CashFacade::class), $container->get(\App\Company\Facade\CompanyFacade::class), $container->get(\App\Company\Facade\FinancialResponsibilityCenterFacade::class), $container->get(AiTaskFacadeInterface::class), $container->get(\App\Telegram\Application\QueuePaymentIntakePollAction::class));
+        $disabledAction = new \App\Telegram\Application\PaymentIntakeTelegramAction($this->em(), $container->get(\App\Cash\Facade\CashFacade::class), $container->get(\App\Company\Facade\CompanyFacade::class), $container->get(\App\Company\Facade\FinancialResponsibilityCenterFacade::class), $container->get(AiTaskFacadeInterface::class), $container->get(\App\Telegram\Application\QueuePaymentIntakePollAction::class), $container->get(\App\Telegram\Application\PaymentIntakePresenter::class));
         $replay = $disabledAction->message($binding->getBot(), $this->message('+1500 доход'), '+1500 доход');
         self::assertIsArray($replay, 'Known Cash intake source must never fall through to legacy after its binding/session was removed.');
     }
@@ -460,7 +511,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         for ($i = 0; $i < 20; ++$i) {
             $items[] = ['id' => Uuid::uuid7()->toString(), 'transaction_id' => Uuid::uuid7()->toString(), 'amount' => '100.00', 'currency' => 'RUB', 'date' => '2026-11-13', 'direction' => 'outflow', 'execution_status' => 'paid', 'paid_confirmed' => false, 'category_id' => null, 'project_id' => null, 'cfo_id' => null, 'description' => 'Расход '.$i, 'questions' => [], 'provenance' => []];
         }
-        $this->em()->getConnection()->executeStatement("UPDATE cash_payment_intake_draft SET status = 'needs_clarification', items = CAST(? AS JSONB) WHERE company_id = ?", [json_encode($items, \JSON_THROW_ON_ERROR), self::COMPANY]);
+        $this->em()->getConnection()->executeStatement("UPDATE cash_payment_intake_draft SET status = 'needs_clarification', items = CAST(? AS JSONB), questions = '[\"Это отдельные платежи?\"]'::jsonb WHERE company_id = ?", [json_encode($items, \JSON_THROW_ON_ERROR), self::COMPANY]);
         $handler = $client->getContainer()->get(\App\Telegram\MessageHandler\RefreshPaymentIntakeMessageHandler::class);
         $handler($poll);
         self::assertSame(1, (int) $this->em()->getConnection()->fetchOne('SELECT delivery_cursor FROM telegram_payment_intake_session WHERE company_id = ?', [self::COMPANY]));
@@ -517,7 +568,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         $queued[] = $poll;
         self::assertInstanceOf(\App\Telegram\Message\RefreshPaymentIntakeMessage::class, $poll);
         $container = $client->getContainer();
-        $handler = new \App\Telegram\MessageHandler\RefreshPaymentIntakeMessageHandler($this->em(), $container->get(\App\Cash\Facade\CashFacade::class), $container->get(\App\Company\Facade\CompanyFacade::class), $container->get(\App\Company\Facade\FinancialResponsibilityCenterFacade::class), $results, $container->get(\App\Telegram\Application\PaymentIntakePresenter::class), $container->get('http_client'), new \App\Telegram\Application\QueuePaymentIntakePollAction($this->em(), $bus), $container->get('monolog.logger.telegram'));
+        $handler = new \App\Telegram\MessageHandler\RefreshPaymentIntakeMessageHandler($this->em(), $container->get(\App\Cash\Facade\CashFacade::class), $container->get(\App\Company\Facade\CompanyFacade::class), $results, $container->get(\App\Telegram\Application\PaymentIntakePresenter::class), $container->get('http_client'), new \App\Telegram\Application\QueuePaymentIntakePollAction($this->em(), $bus), $container->get('monolog.logger.telegram'));
         try {
             $handler($poll);
             self::fail('Successor enqueue must fail once.');
@@ -772,12 +823,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         $item = ['id' => Uuid::uuid7()->toString(), 'transaction_id' => Uuid::uuid7()->toString(), 'amount' => '100.00', 'currency' => 'RUB', 'date' => '2026-11-13', 'direction' => 'outflow', 'execution_status' => 'paid', 'paid_confirmed' => false, 'category_id' => null, 'project_id' => null, 'cfo_id' => null, 'description' => 'Расход', 'questions' => [], 'provenance' => []];
         $this->em()->getConnection()->executeStatement("UPDATE cash_payment_intake_draft SET status = 'needs_clarification', items = CAST(? AS JSONB) WHERE company_id = ?", [json_encode([$item], \JSON_THROW_ON_ERROR), self::COMPANY]);
         $handler = $client->getContainer()->get(\App\Telegram\MessageHandler\RefreshPaymentIntakeMessageHandler::class);
-        for ($i = 0; $i < 2; ++$i) {
-            $sent = $transport->getSent();
-            $message = $sent[count($sent) - 1]->getMessage();
-            self::assertInstanceOf(\App\Telegram\Message\RefreshPaymentIntakeMessage::class, $message);
-            $handler($message);
-        }
+        // The compact summary is the final delivery part when there are no common questions.
         $this->duringDelivery = function () use ($client, $session, $item): void {
             $client->getContainer()->get(\App\Cash\Facade\CashFacade::class)->amendPaymentIntakeDraft(new \App\Cash\Application\DTO\PaymentIntake\AmendPaymentIntakeDraftCommand(self::COMPANY, '22222222-2222-2222-2222-abcd0000ee01', $session->getDraftId(), 1, [$item['id'] => ['amount' => '250.00']]));
             $session->requireDelivery();
@@ -990,7 +1036,7 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
             }
             $this->sent[] = json_decode((string) ($options['body'] ?? '{}'), true);
 
-            return new MockResponse('{"ok":true,"result":{"message_id":900}}');
+            return new MockResponse(json_encode(['ok' => true, 'result' => ['message_id' => null === $this->nextUniqueMessageId ? 900 : $this->nextUniqueMessageId++]], \JSON_THROW_ON_ERROR));
         }));
 
         return $client;
