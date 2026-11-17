@@ -15,6 +15,7 @@ use App\Company\Form\CompanyTaxProfileType;
 use App\Company\Form\CompanyType;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyTaxProfileRepository;
+use App\Company\Repository\ConsolidationMembershipRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -131,6 +132,7 @@ class CompanyController extends AbstractController
         Request $request,
         CompanyRepository $companyRepository,
         CompanyTaxProfileRepository $taxProfileRepository,
+        ConsolidationMembershipRepository $consolidationRepository,
         EntityManagerInterface $em,
         LoggerInterface $logger,
     ): Response {
@@ -158,11 +160,19 @@ class CompanyController extends AbstractController
             'action' => $this->generateUrl('company_tax_profile_save', ['id' => $id]),
         ]);
 
+        $cabinet = $companyRepository->findByUserId((string) $company->getUser()?->getId());
+        $cabinetNames = [];
+        foreach ($cabinet as $cabinetCompany) {
+            $cabinetNames[(string) $cabinetCompany->getId()] = (string) $cabinetCompany->getName();
+        }
+
         return $this->render('company/edit.html.twig', [
             'form' => $form->createView(),
             'company' => $company,
             'taxProfiles' => $taxProfileRepository->findByCompany($id),
             'taxProfileForm' => $taxProfileForm->createView(),
+            'cabinetNames' => $cabinetNames,
+            'consolidation' => $consolidationRepository->findByCompanies(array_keys($cabinetNames)),
         ]);
     }
 }

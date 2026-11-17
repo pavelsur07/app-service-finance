@@ -8,6 +8,7 @@ use App\Billing\Controller\Client\CompanyTariffController;
 use App\Billing\Controller\Client\StartCheckoutController;
 use App\Company\Controller\Api\CounterpartySearchController;
 use App\Company\Controller\CompanyController;
+use App\Company\Controller\Consolidation\SaveConsolidationGroupController;
 use App\Company\Controller\Counterparty\ApplyCounterpartyDisplayNameController;
 use App\Company\Controller\Counterparty\ResetCounterpartyDisplayNameController;
 use App\Company\Controller\CounterpartyController;
@@ -89,6 +90,7 @@ final class ModuleAccessMap
         CompanyController::class,   // список/создание/переключение компаний; работает и без активной компании, свои owner-проверки
         DeleteCompanyController::class,  // удаление компании: работает и без активной компании, владельца сверяет Action
         RestoreCompanyController::class, // восстановление помеченной к удалению компании — она не бывает активной
+        SaveConsolidationGroupController::class, // группа консолидации своей компании: владельца и CSRF сверяет сам, активная компания ни при чём
         HomeRedirectController::class, // роутер лендинга «/», доступен любому участнику; сам проверяет права через is_granted
         CompanyTariffController::class, // тариф и оплата активного кабинета (только чтение) — любому участнику; историю оплат видит владелец
         StartCheckoutController::class, // онлайн-оплата тарифа активного кабинета — сам проверяет владельца
