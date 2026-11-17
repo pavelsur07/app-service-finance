@@ -112,6 +112,9 @@
             {% include 'company/_tax_profile_line.html.twig' %}
         </div>
         <div class="col-auto ms-auto d-print-none">
+            <a href="{{ path('report_cashflow_group') }}" class="btn btn-outline-secondary" title="Консолидированный отчёт по группе компаний">
+                ДДС группы
+            </a>
             <a
                 href="{{ path('report_cashflow_export_json', export_state) }}"
                 class="btn btn-outline-secondary"
