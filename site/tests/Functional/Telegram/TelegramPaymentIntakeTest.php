@@ -57,6 +57,43 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         self::assertStringContainsString('разбор', mb_strtolower($this->lastText()));
     }
 
+    #[DataProvider('commonReplyScopeProvider')]
+    public function testCommonReplyToSummaryChangesAllRowsWithoutSelectingOne(bool $threaded): void
+    {
+        $client = $this->setupClient(true, true);
+        $this->post($client, ['message' => $this->message('Оплатил рекламу 1500')]);
+        $session = $this->em()->getRepository(\App\Telegram\Entity\PaymentIntakeSession::class)->findOneBy(['companyId' => self::COMPANY]);
+        self::assertInstanceOf(\App\Telegram\Entity\PaymentIntakeSession::class, $session);
+        $items = [];
+        for ($i = 0; $i < 2; ++$i) {
+            $items[] = ['id' => Uuid::uuid7()->toString(), 'transaction_id' => Uuid::uuid7()->toString(), 'amount' => '100.00', 'currency' => 'RUB', 'date' => '2026-11-16', 'direction' => 'outflow', 'execution_status' => 'unknown', 'paid_confirmed' => false, 'category_id' => null, 'project_id' => null, 'cfo_id' => null, 'description' => 'Расход', 'questions' => ['Подтвердите факт оплаты и укажите дату.'], 'provenance' => []];
+        }
+        $session->markDelivered('1:needs_clarification', ['900']);
+        $this->em()->flush();
+        $this->em()->getConnection()->executeStatement("UPDATE cash_payment_intake_draft SET status='needs_clarification', items=CAST(? AS JSONB) WHERE id=?", [json_encode($items, \JSON_THROW_ON_ERROR), $session->getDraftId()]);
+        $reply = array_replace($this->message('все оплачены и у всех дата оплаты 14.10.26'), ['message_id' => 65, 'reply_to_message' => ['message_id' => 900]]);
+        if (!$threaded) {
+            unset($reply['reply_to_message']);
+        }
+        $this->post($client, ['message' => $reply]);
+        $draft = $client->getContainer()->get(\App\Cash\Facade\CashFacade::class)->getPaymentIntakeDraft(self::COMPANY, '22222222-2222-2222-2222-abcd0000ee01', $session->getDraftId());
+        self::assertSame(2, $draft->revision);
+        foreach ($draft->items as $item) {
+            self::assertSame('2026-10-14', $item['date']);
+            self::assertSame('paid', $item['execution_status']);
+            self::assertSame([], $item['questions']);
+            self::assertFalse($item['paid_confirmed']);
+        }
+        $this->post($client, ['message' => $reply]);
+        self::assertSame(2, (int) $this->em()->getConnection()->fetchOne('SELECT revision FROM cash_payment_intake_draft'));
+        self::assertCount(1, $this->aiTaskKeys);
+    }
+
+    public static function commonReplyScopeProvider(): array
+    {
+        return [[true], [false]];
+    }
+
     public function testStopWithMultipleDraftsRequiresExplicitChoice(): void
     {
         $client = $this->setupClient(true, true);

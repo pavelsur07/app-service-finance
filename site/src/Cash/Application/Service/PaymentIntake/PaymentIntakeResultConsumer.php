@@ -39,7 +39,8 @@ final readonly class PaymentIntakeResultConsumer implements AiTaskResultConsumer
 
             return;
         }
-        $output = $this->sanitizeReferences($result->output, $draft->getPayload());
+        $output = PaymentIntakeCommonFields::applyHeaders($result->output, $draft->getText(), $draft->getPayload());
+        $output = $this->sanitizeReferences($output, $draft->getPayload());
         if ($draft->acceptResult($result->taskId, $output)) {
             $general = $this->centers->findGeneralPair($result->companyId);
             $draft->applyGeneralPairDefault($general?->projectDirectionId, $general?->responsibilityCenterId);
@@ -137,7 +138,7 @@ final readonly class PaymentIntakeResultConsumer implements AiTaskResultConsumer
 
     /**
      * @param array<string, mixed> $value
-     * @param list<string> $keys
+     * @param list<string>         $keys
      */
     private function exactKeys(array $value, array $keys): bool
     {

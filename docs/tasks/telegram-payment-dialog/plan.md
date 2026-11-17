@@ -17,7 +17,7 @@ Reviewer focus: company/actor isolation, stale callbacks, concurrent cancel/send
 generation/request-token fencing, отсутствие повторных LLM calls.
 
 ## Stage 2: пакетные уточнения
-Risk: HIGH-LOCAL. stage_base_commit: записать после Stage 1.
+Risk: HIGH-LOCAL. stage_base_commit: `5467b7b49`.
 DoD: date/project/CFO/direction/status ответы на сводку применяются атомарно
 ко всем неисключённым строкам; общий reply идемпотентен; явно заданная дата
 не заменяется датой сообщения; unresolved financial questions сохраняются.

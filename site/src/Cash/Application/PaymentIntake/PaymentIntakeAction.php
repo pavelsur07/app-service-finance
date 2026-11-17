@@ -13,6 +13,7 @@ use App\Cash\Application\DTO\PaymentIntake\PaymentIntakeDraftView;
 use App\Cash\Application\DTO\PaymentIntake\RequestPaymentIntakeCommand;
 use App\Cash\Application\Service\AiCategorization\CashCategorizationPayloadMapper;
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
+use App\Cash\Application\Service\PaymentIntake\PaymentIntakeCommonFields;
 use App\Cash\Application\Service\Transaction\CashTransactionService;
 use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\Entity\Accounts\MoneyAccount;
@@ -137,7 +138,10 @@ final readonly class PaymentIntakeAction
     public function amend(AmendPaymentIntakeDraftCommand $command): PaymentIntakeDraftView
     {
         $replyKey = $command->replyIdempotencyKey;
-        if (null !== $replyKey && ('' === $replyKey || \strlen($replyKey) > 255 || 1 !== \count($command->items) || null !== $command->text || null !== $command->sourceRevision || $command->retry)) {
+        if (null !== $command->commonText && ([] !== $command->items || null !== $command->text || null !== $command->questions || null !== $command->sourceRevision || $command->retry)) {
+            throw new \DomainException('Передайте общие уточнения отдельным действием.');
+        }
+        if (null !== $replyKey && ('' === $replyKey || \strlen($replyKey) > 255 || (null === $command->commonText && 1 !== \count($command->items)) || null !== $command->text || null !== $command->sourceRevision || $command->retry)) {
             throw new \DomainException('Ответ должен исправлять одну строку отдельным действием.');
         }
         $receiptKey = null === $replyKey ? null : hash('sha256', $replyKey);
@@ -153,21 +157,22 @@ final readonly class PaymentIntakeAction
                 }
             }
             $draft = $this->owned($command->companyId, $command->actorUserId, $command->draftId, true);
-            $changed = $draft->amend($command->expectedRevision, $command->items, $command->text, $command->sourceRevision, $command->questions, $command->retry);
+            [$patches, $questions] = null === $command->commonText ? [$command->items, $command->questions] : $this->commonAmendment($draft, $command->commonText);
+            $changed = $draft->amend($command->expectedRevision, $patches, $command->text, $command->sourceRevision, $questions, $command->retry);
             if ($changed && ($command->retry || null !== $command->text)) {
                 $this->queue($draft);
             }
             if ($changed && !$draft->isDispatchPending()) {
                 [$account, $eligible] = $this->validationContext($draft);
                 foreach ($draft->getItems() as $item) {
-                    if (isset($command->items[$item['id']]) && !($item['excluded'] ?? false)) {
+                    if (isset($patches[$item['id']]) && !($item['excluded'] ?? false)) {
                         $this->validateReferences($draft, $item, $account, $eligible);
                     }
                 }
             }
 
             if ($changed && null !== $receiptKey) {
-                $itemId = array_key_first($command->items);
+                $itemId = null === $command->commonText ? array_key_first($command->items) : $draft->getId();
                 \assert(\is_string($itemId));
                 $this->em->persist(new PaymentIntakeReplyReceipt($receiptKey, $draft, $itemId, $command->expectedRevision, $this->clock->now()));
             }
@@ -180,6 +185,67 @@ final readonly class PaymentIntakeAction
         $this->dispatch($draft);
 
         return $this->view($draft);
+    }
+
+    /** @return array{array<string, array<string, mixed>>, list<string>} */
+    private function commonAmendment(PaymentIntakeDraft $draft, string $text): array
+    {
+        if (mb_strlen($text) > 2000 || [] === $draft->getItems() || !\in_array($draft->getStatus(), ['needs_clarification', 'ready'], true)) {
+            throw new \DomainException('Дождитесь разбора и укажите общее уточнение длиной до 2000 символов.');
+        }
+        $parsed = PaymentIntakeCommonFields::parse($text);
+        $fields = $parsed['fields'];
+        foreach (['project_id', 'cfo_id'] as $field) {
+            if (!isset($fields[$field])) {
+                continue;
+            }
+            $choices = 'project_id' === $field ? $this->companies->listProjectDirections($draft->getCompanyId()) : $this->centers->getActiveChoices($draft->getCompanyId());
+            $matches = array_values(array_filter($choices, static fn ($choice): bool => mb_strtolower($choice->name) === mb_strtolower($fields[$field])));
+            if (1 !== \count($matches)) {
+                throw new \DomainException('Название не найдено или неоднозначно. Укажите точное название из справочника компании.');
+            }
+            $fields[$field] = $matches[0]->id;
+        }
+        $patches = [];
+        foreach ($draft->getItems() as $item) {
+            if ($item['excluded'] ?? false) {
+                continue;
+            }
+            $patch = $fields;
+            if (isset($patch['paid_confirmed'])) {
+                $patch['paid_confirmed'] = true;
+                foreach ($item['questions'] as $question) {
+                    if (preg_match('/личн|источник|компенсац|подотч|сотрудниц/iu', $question)) {
+                        unset($patch['paid_confirmed']);
+                        break;
+                    }
+                }
+            }
+            if ($parsed['confirm_projects']) {
+                if (null === $item['project_id']) {
+                    throw new \DomainException('Сначала укажите проект для каждой выбранной строки.');
+                }
+                $patch['project_id'] = $item['project_id'];
+            }
+            $answered = $patch;
+            foreach (['date', 'direction', 'currency'] as $field) {
+                if (null !== $item[$field] && ('date' !== $field || 'message_date_default' !== ($item['provenance']['date'] ?? null))) {
+                    $answered[$field] ??= $item[$field];
+                }
+            }
+            $patch['questions'] = array_values(array_filter($item['questions'], static fn (string $question): bool => !PaymentIntakeCommonFields::resolved($question, $answered, $parsed['separate'])));
+            $patches[$item['id']] = $patch;
+        }
+        if ([] === $patches) {
+            throw new \DomainException('Нет выбранных строк. Включите нужные платежи.');
+        }
+        $resolved = $fields;
+        if ($parsed['confirm_projects']) {
+            $resolved['project_id'] = 'confirmed';
+        }
+        $questions = array_values(array_filter($draft->getQuestions(), static fn (string $question): bool => !PaymentIntakeCommonFields::resolved($question, $resolved, $parsed['separate'])));
+
+        return [$patches, $questions];
     }
 
     public function confirm(ConfirmPaymentIntakeDraftCommand $command): PaymentIntakeConfirmation

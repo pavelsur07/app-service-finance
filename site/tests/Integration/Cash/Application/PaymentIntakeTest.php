@@ -52,6 +52,54 @@ final class PaymentIntakeTest extends IntegrationTestCase
     /** @var list<string> */
     private array $failingDraftIds = [];
 
+    public function testCommonReplyAmendsSelectedRowsAtomicallyAndReplayIsInert(): void
+    {
+        $draft = $this->request();
+        $this->deliverResult($draft->taskId, count: 3);
+        $draft = $this->get($draft);
+        $draft = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$draft->items[2]['id'] => ['excluded' => true]]));
+        $key = 'telegram:common-reply-200';
+        $changed = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, replyIdempotencyKey: $key, commonText: 'все оплачены и у всех дата оплаты 14.10.26'));
+        self::assertSame($draft->revision + 1, $changed->revision);
+        self::assertSame('2026-10-14', $changed->items[0]['date']);
+        self::assertSame('2026-10-14', $changed->items[1]['date']);
+        self::assertSame($draft->items[2]['date'], $changed->items[2]['date']);
+        self::assertSame(0, $this->ledgerCount());
+        try {
+            $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $changed->revision, replyIdempotencyKey: $key, commonText: 'дата 2026-10-15'));
+            self::fail('Replay must be rejected.');
+        } catch (\DomainException $exception) {
+            self::assertStringContainsString('уже обработан', $exception->getMessage());
+        }
+        self::assertSame($changed->revision, $this->get($draft)->revision);
+        self::assertCount(1, $this->requests);
+    }
+
+    public function testCommonReplyWithUnknownProjectRollsBackAllFieldsAndReceipt(): void
+    {
+        $draft = $this->ready();
+        try {
+            $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, replyIdempotencyKey: 'invalid-common', commonText: 'дата 2026-10-14; проект Неизвестный'));
+            self::fail('Unknown company choice must reject the whole batch.');
+        } catch (\DomainException $exception) {
+            self::assertStringContainsString('не найдено', $exception->getMessage());
+        }
+        self::assertSame($draft->revision, (int) $this->connection->fetchOne('SELECT revision FROM cash_payment_intake_draft WHERE id=?', [$draft->id]));
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM cash_payment_intake_reply_receipt'));
+        self::assertSame(0, $this->ledgerCount());
+    }
+
+    public function testExplicitListDateSurvivesConsumerInsteadOfMessageDateDefault(): void
+    {
+        $draft = $this->request(text: "дата всех платежей ниже 14.10.26\n1. оплатил 100");
+        $this->deliverResult($draft->taskId);
+        $current = $this->get($draft);
+        self::assertSame('2026-10-14', $current->items[0]['date']);
+        self::assertNotSame('message_date_default', $current->items[0]['provenance']['date'] ?? null);
+        self::assertFalse($current->items[0]['paid_confirmed']);
+        self::assertSame(0, $this->ledgerCount());
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

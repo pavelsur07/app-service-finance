@@ -130,6 +130,9 @@ final readonly class PaymentIntakeTelegramAction
         if (in_array(trim($text), ['📋 Текущий черновик', '/draft', '🛑 Остановить разбор', '/cancel'], true)) {
             return $this->current($binding, $chatId, in_array(trim($text), ['🛑 Остановить разбор', '/cancel'], true));
         }
+        if (!$session instanceof PaymentIntakeSession && preg_match('/^(?:отдельные платежи|проекты (?:ты выбрал|выбраны) верно|все оплачены|дата\s+\S+(?:\s+на все платежи[^\n]*)?$|для всех\s|всем\s|у всех\s)/iu', trim($text))) {
+            return $this->current($binding, $chatId, false, $text, $messageId);
+        }
         if ($session instanceof PaymentIntakeSession) {
             $this->cash->recoverPaymentIntakeDraft($companyId, $actor, $session->getDraftId());
         }
@@ -289,7 +292,10 @@ final readonly class PaymentIntakeTelegramAction
     private function correct(PaymentIntakeSession $session, int $revision, string $text, string $replyMessageId): array
     {
         $itemId = $session->getEditingItemId();
-        if (null === $itemId || $session->getEditingRevision() !== $revision) {
+        if (null === $itemId) {
+            return $this->correctCommon($session, $revision, $text, $replyMessageId);
+        }
+        if ($session->getEditingRevision() !== $revision) {
             return ['text' => 'Сначала нажмите «Исправить» у нужной строки в актуальной карточке.'];
         }
         $patch = [];
@@ -377,7 +383,7 @@ final readonly class PaymentIntakeTelegramAction
     }
 
     /** @return array<string, mixed> */
-    private function current(ClientBinding $binding, string $chatId, bool $cancel): array
+    private function current(ClientBinding $binding, string $chatId, bool $cancel, ?string $commonText = null, ?string $replyMessageId = null): array
     {
         $companyId = (string) $binding->getCompany()->getId();
         $actor = (string) $binding->getActorUserId();
@@ -392,6 +398,9 @@ final readonly class PaymentIntakeTelegramAction
             if ($cancel) {
                 return $this->stop($session, $draft->revision);
             }
+            if (null !== $commonText && null !== $replyMessageId) {
+                return $this->correctCommon($session, $draft->revision, $commonText, $replyMessageId);
+            }
             $session->finishPolling();
             $session->requireDelivery();
             $this->dispatch($session);
@@ -404,6 +413,19 @@ final readonly class PaymentIntakeTelegramAction
         }
 
         return ['text' => 'Выберите черновик в текущей компании. «Отменить» останавливает разбор без сохранения платежей.', 'reply_markup' => ['inline_keyboard' => $buttons]];
+    }
+
+    /** @return array<string, mixed> */
+    private function correctCommon(PaymentIntakeSession $session, int $revision, string $text, string $replyMessageId): array
+    {
+        $this->markDeliveryPending($session);
+        $this->cash->amendPaymentIntakeDraft(new AmendPaymentIntakeDraftCommand($session->getCompanyId(), (string) $session->getBinding()->getActorUserId(), $session->getDraftId(), $revision, replyIdempotencyKey: TelegramPaymentIntakeSource::replyIdempotencyKey((string) $session->getBinding()->getBot()->getId(), $session->getChatId(), $replyMessageId), commonText: $text));
+        $session->clearEdit();
+        $session->requireDelivery();
+        $this->em->flush();
+        $this->dispatch($session);
+
+        return ['text' => 'Общие данные применены ко всем неисключённым строкам. Проверьте сводку перед сохранением.'];
     }
 
     /** @return array<string, mixed> */
