@@ -2732,6 +2732,19 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 (`headsOf`) делает `plan()` и при расхождении (привязать, создать, конфликты, статьи без кода)
 пишет справочную строку `ДДС-группа` — на exit code не влияет; компании вне групп не проверяются.
 
+**Консолидированный ДДС группы** — `GET /finance/reports/cashflow/group?from=&to=` (по умолчанию —
+текущий месяц) и `…/group/export.xlsx`, ссылка «ДДС группы» на странице отчёта ДДС. Группа активной
+компании (`headOf`, `members` — головная первой). `BuildCashflowGroupReport` (только чтение): суммы
+`CashflowGroupReportQuery` (один SQL по компаниям группы, охват как у `listCashflowReportRows`: строки
+разбивки не удалённых транзакций, дата в периоде, знак по направлению) сворачиваются к ключу статьи —
+ближайший предок с `group_code`; операция прямо на системной статье — `sys:<systemCode>` (секция);
+статья без кода под системной и код, которого нет в дереве головной, — «Не сопоставлено». Строки —
+дерево головной компании, суммы с подстатьями; колонки — компании, «Внутригрупповые» (ИНН
+контрагента = ИНН другой компании группы, `companies.inn`), «Итого по группе» = сумма компаний минус
+внутригрупповые. Только RUB, другие валюты — отдельно по компаниям; компании без ИНН перечисляются
+предупреждением. Деньги — bcmath. Доступ (`CashflowGroupReportRequest`): владелец всех компаний
+группы, иначе 403; компания вне группы — пояснение. DTO: `CashflowGroupReport`, `CashflowGroupReportLine`.
+
 Компании, созданные до онбординга, дозаполняет `app:company:onboarding-backfill
 [--company=<uuid>] [--execute --expected-count=N] [-v]` (`BackfillCompanyOnboardingAction`):
 по каждой компании диспатчит `CompanyOnboardingBackfillEvent(companyId, businessProfile, execute)`; подписчики
@@ -5993,6 +6006,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.211 | 2026-11-17 | Cash: консолидированный отчёт ДДС группы — `BuildCashflowGroupReport`, `CashflowGroupReportQuery`, xlsx; задача `cashflow-group-chart`, этап 4 |
 | 2.210 | 2026-11-17 | Cash: экран «Эталон группы» (план, «Применить», ручная привязка), `BindCashflowCategoryGroupCodeAction`, ночная строка `ДДС-группа` в `app:directories:integrity-check`; Company: `ConsolidationGroupFacadeInterface::headsOf()`; задача `cashflow-group-chart`, этап 3 |
 | 2.209 | 2026-11-17 | Cash: синхронизация дерева ДДС с эталоном группы — `SyncCashflowGroupChartAction`, `app:cash:group-chart:sync`, журнал `cashflow_group_chart_applications` (миграция `Version20261117180000`), задача `cashflow-group-chart`, этап 2 |
 | 2.208 | 2026-11-17 | Company: группа консолидации `company_consolidation_member` (миграция `Version20261117150000`), `ConsolidationGroupFacadeInterface`, `ConfigureConsolidationGroupAction`, блок «Консолидация» в настройках компании (задача `cashflow-group-chart`, этап 1b) |
