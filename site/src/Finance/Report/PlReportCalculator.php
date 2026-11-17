@@ -29,6 +29,7 @@ final class PlReportCalculator
         private readonly DependencyExtractor $deps = new DependencyExtractor(),
         private readonly TopoSort $topo = new TopoSort(),
         private readonly ValueFormatter $fmt = new ValueFormatter(),
+        private readonly ?PlFormulaVariables $variables = null,
     ) {
     }
 
@@ -43,6 +44,9 @@ final class PlReportCalculator
         ProjectDirection|array|null $projectDirection = null,
         string|array|null $responsibilityCenterId = null,
     ): PlReportResult {
+        /** @var ProjectDirection|list<ProjectDirection>|null $projectDirection */
+        /** @var string|list<string>|null $responsibilityCenterId */
+        /** @var list<PLCategory> $all */
         $all = $this->categories->findBy(['company' => $company], ['parent' => 'ASC', 'sortOrder' => 'ASC']);
         $displayOrder = $this->orderByTree($all);
         /** @var array<string,PLCategory> $byId */
@@ -54,14 +58,17 @@ final class PlReportCalculator
         $astById = [];
         $g = new Graph();
         $warnings = [];
+        /** @var list<array{string, string}> $variableUses [имя переменной, название статьи] */
+        $variableUses = [];
 
         foreach ($all as $cat) {
-            $g->addNode($cat->getId());
+            $catId = (string) $cat->getId();
+            $g->addNode($catId);
             $formula = trim((string) ($cat->getFormula() ?? ''));
 
             if (PLCategoryType::SUBTOTAL === $cat->getType() && '' === $formula) {
                 foreach ($cat->getChildren() as $child) {
-                    $g->addEdge($child->getId(), $cat->getId());
+                    $g->addEdge((string) $child->getId(), $catId);
                 }
                 continue;
             }
@@ -70,11 +77,15 @@ final class PlReportCalculator
                 try {
                     $tokens = $this->tokenizer->tokenize($formula);
                     $ast = $this->parser->parse($tokens);
-                    $astById[$cat->getId()] = $ast;
+                    $astById[$catId] = $ast;
                     foreach ($this->deps->extract($ast) as $code) {
+                        if (PlFormulaVariables::isVariable($code)) {
+                            $variableUses[] = [strtoupper($code), $cat->getName()];
+                            continue;
+                        }
                         $depCat = $this->findByCode($all, $code);
                         if ($depCat) {
-                            $g->addEdge($depCat->getId(), $cat->getId());
+                            $g->addEdge((string) $depCat->getId(), $catId);
                         } else {
                             $warnings[] = "Unknown code `$code` in formula of `{$cat->getName()}`";
                         }
@@ -87,8 +98,24 @@ final class PlReportCalculator
 
         $order = $this->topo->sort($g, $byId);
 
+        // Профиль читается, только если переменная есть хотя бы в одной формуле.
+        $variableValues = [] === $variableUses ? [] : ($this->variables?->values((string) $company->getId(), $period) ?? []);
+        foreach ($variableUses as [$variable, $categoryName]) {
+            if (null === ($variableValues[$variable] ?? null)) {
+                $warnings[] = "Переменная $variable в формуле «{$categoryName}»: ставка не задана в налоговом профиле компании, принято 0";
+            }
+        }
+
         $values = [];
-        $env = new class($values, $all, $company, $period, $projectDirection, $responsibilityCenterId, $this->facts, $warnings) implements \App\Finance\Formula\Env {
+        $env = new class($values, $all, $company, $period, $projectDirection, $responsibilityCenterId, $this->facts, $warnings, $variableValues) implements \App\Finance\Formula\Env {
+            /**
+             * @param array<string, float> $values
+             * @param list<PLCategory> $all
+             * @param ProjectDirection|list<ProjectDirection>|null $projectDirection
+             * @param string|list<string>|null $responsibilityCenterId
+             * @param list<string> $warnings
+             * @param array<string, ?float> $variableValues
+             */
             public function __construct(
                 public array &$values,
                 private array $all,
@@ -97,12 +124,16 @@ final class PlReportCalculator
                 private ProjectDirection|array|null $projectDirection,
                 private string|array|null $responsibilityCenterId,
                 private FactsProviderInterface $facts,
-                private array &$warnings,
+                private array &$warnings, // @phpstan-ignore property.onlyWritten (ссылка на список предупреждений расчёта)
+                private array $variableValues,
             ) {
             }
 
             public function get(string $code): float
             {
+                if (PlFormulaVariables::isVariable($code)) {
+                    return (float) ($this->variableValues[strtoupper($code)] ?? 0.0);
+                }
                 foreach ($this->all as $c) {
                     if ($c->getCode() && strtoupper($c->getCode()) === strtoupper($code)) {
                         $v = $this->values[$c->getId()] ?? $this->facts->value(
@@ -168,7 +199,7 @@ final class PlReportCalculator
             $parent = $c->getParent();
             $depthById[$c->getId()] = null === $parent ? 1 : ($depthById[$parent->getId()] ?? 0) + 1;
             $rows[] = new PlComputedRow(
-                id: $c->getId(),
+                id: (string) $c->getId(),
                 code: $c->getCode(),
                 name: $c->getName(),
                 level: $depthById[$c->getId()],
@@ -182,6 +213,11 @@ final class PlReportCalculator
         return new PlReportResult($period, $rows, array_values(array_unique($warnings)));
     }
 
+    /**
+     * @param list<PLCategory> $all
+     *
+     * @return list<PLCategory>
+     */
     private function orderByTree(array $all): array
     {
         $childrenByParent = [];
@@ -220,6 +256,9 @@ final class PlReportCalculator
         return $out;
     }
 
+    /**
+     * @param list<PLCategory> $all
+     */
     private function findByCode(array $all, string $code): ?PLCategory
     {
         foreach ($all as $c) {
@@ -237,6 +276,6 @@ final class PlReportCalculator
      */
     public function withFacts(FactsProviderInterface $facts): self
     {
-        return new self($this->categories, $facts, $this->tokenizer, $this->parser, $this->evaluator, $this->deps, $this->topo, $this->fmt);
+        return new self($this->categories, $facts, $this->tokenizer, $this->parser, $this->evaluator, $this->deps, $this->topo, $this->fmt, $this->variables);
     }
 }
