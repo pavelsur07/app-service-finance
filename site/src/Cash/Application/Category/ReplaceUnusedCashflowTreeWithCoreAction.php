@@ -115,6 +115,9 @@ final class ReplaceUnusedCashflowTreeWithCoreAction
         $connection->executeQuery('SELECT pg_advisory_xact_lock(hashtext(:companyId))', ['companyId' => $companyId]);
 
         ($this->ensureSystem)($companyId);
+        // Дерево, загруженное планом до транзакции, могло устареть (форма advisory lock не берёт):
+        // строки под FOR UPDATE и перечитаны — пути и коды считаются по текущему состоянию.
+        $this->categories->lockTreeByCompany($this->company($companyId));
 
         $plan = $this->plan($companyId);
         if ($plan->alreadyApplied) {

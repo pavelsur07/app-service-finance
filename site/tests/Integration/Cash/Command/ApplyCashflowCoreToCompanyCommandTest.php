@@ -201,6 +201,27 @@ final class ApplyCashflowCoreToCompanyCommandTest extends IntegrationTestCase
         self::assertStringContainsString('уже применено', $again->getDisplay());
     }
 
+    /** Статью перенесли после плана: код не уходит перенесённой статье по устаревшему пути. */
+    public function testCategoryMovedAfterPlanDoesNotGetStaleCode(): void
+    {
+        $company = $this->companyWithOldTree();
+        $this->runCommand($company, ['--execute' => true]);
+        $this->db()->executeStatement('UPDATE cashflow_categories SET group_code = NULL WHERE company_id = ?', [$company->getId()]);
+        $this->em->clear();
+        $action = self::getContainer()->get(ReplaceUnusedCashflowTreeWithCoreAction::class);
+        self::assertTrue($action->plan((string) $company->getId())->alreadyApplied);
+
+        $finOut = $this->db()->fetchOne("SELECT c.id FROM cashflow_categories c JOIN cashflow_categories p ON p.id = c.parent_id WHERE c.company_id = ? AND c.name = 'Выплаты' AND p.system_code = 'CF_FIN'", [$company->getId()]);
+        $this->db()->executeStatement("UPDATE cashflow_categories SET parent_id = ? WHERE company_id = ? AND name = 'Аренда'", [$finOut, $company->getId()]);
+        $this->em->wrapInTransaction(fn (): int => $action((string) $company->getId()));
+
+        $section = $this->db()->fetchOne(
+            "SELECT gp.system_code FROM cashflow_categories c JOIN cashflow_categories p ON p.id = c.parent_id JOIN cashflow_categories gp ON gp.id = p.parent_id WHERE c.company_id = ? AND c.group_code = 'OP_OUT_RENT'",
+            [$company->getId()],
+        );
+        self::assertContains($section, [false, 'CF_OP'], 'OP_OUT_RENT не может стоять на статье в финансовой деятельности.');
+    }
+
     public function testCompanyWithoutRegularCategoriesGetsCore(): void
     {
         $company = $this->company();

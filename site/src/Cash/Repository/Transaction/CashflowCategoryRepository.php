@@ -7,6 +7,8 @@ namespace App\Cash\Repository\Transaction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\LockMode;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 use Webmozart\Assert\Assert;
 
@@ -99,6 +101,27 @@ class CashflowCategoryRepository extends ServiceEntityRepository
             'company' => $company,
             'systemCode' => $code,
         ]);
+    }
+
+    /**
+     * Все статьи компании под FOR UPDATE со свежим состоянием (родитель, код): правка формой
+     * ждёт commit вызывающего, а уже загруженные сущности перечитываются из БД.
+     * Только внутри транзакции вызывающего.
+     *
+     * @return list<CashflowCategory>
+     */
+    public function lockTreeByCompany(Company $company): array
+    {
+        /** @var list<CashflowCategory> $rows */
+        $rows = $this->createQueryBuilder('c')
+            ->where('c.company = :company')
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getResult();
+
+        return $rows;
     }
 
     /**
