@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Company;
 
+use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CompanyMemberBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -62,6 +64,29 @@ final class ConsolidationGroupSettingsTest extends WebTestCaseBase
         $block = $crawler->filter('#consolidation')->text();
         self::assertStringContainsString('Входит в группу компании «Головная»', $block);
         self::assertCount(0, $crawler->filter('#consolidation form'), 'состав меняют в настройках головной компании');
+    }
+
+    /** Активна чужая компания, где владелец — рядовой участник: настройки своей головной всё равно сохраняются. */
+    public function testSavesWhileForeignCompanyIsActive(): void
+    {
+        $foreign = $this->em()->find(Company::class, self::FOREIGN);
+        $owner = $this->em()->find(User::class, $this->owner->getId());
+        self::assertNotNull($foreign);
+        self::assertNotNull($owner);
+        $this->em()->persist(CompanyMemberBuilder::aMember()->withCompany($foreign)->withUser($owner)->build());
+        $this->em()->flush();
+        $this->em()->clear();
+        $this->client->loginUser($this->owner);
+        $this->setClientSessionValue($this->client, 'active_company_id', self::FOREIGN);
+
+        $this->client->request('POST', sprintf('/company/%s/consolidation', self::HEAD), [
+            '_token' => $this->csrfToken($this->client, 'consolidation'.self::HEAD),
+            'enabled' => '1',
+            'members' => [self::MEMBER],
+        ]);
+
+        self::assertResponseRedirects(sprintf('/company/%s/edit#consolidation', self::HEAD));
+        self::assertSame([self::HEAD => self::HEAD, self::MEMBER => self::HEAD], $this->rows());
     }
 
     public function testForeignCompanyInMembersIsRefused(): void
