@@ -12,6 +12,7 @@ use App\Finance\Engine\TopoSort;
 use App\Finance\Engine\ValueFormatter;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PLValueFormat;
 use App\Finance\Facts\FactsProviderInterface;
 use App\Finance\Formula\Evaluator;
 use App\Finance\Formula\Parser;
@@ -60,6 +61,8 @@ final class PlReportCalculator
         $warnings = [];
         /** @var list<array{string, string}> $variableUses [имя переменной, название статьи] */
         $variableUses = [];
+        /** @var list<string> $moneyVariableIds денежные статьи, чья формула читает переменную ставки */
+        $moneyVariableIds = [];
 
         foreach ($all as $cat) {
             $catId = (string) $cat->getId();
@@ -81,6 +84,9 @@ final class PlReportCalculator
                     foreach ($this->deps->extract($ast) as $code) {
                         if (PlFormulaVariables::isVariable($code)) {
                             $variableUses[] = [strtoupper($code), $cat->getName()];
+                            if (PLValueFormat::MONEY === $cat->getFormat()) {
+                                $moneyVariableIds[] = $catId;
+                            }
                             continue;
                         }
                         $depCat = $this->findByCode($all, $code);
@@ -105,6 +111,8 @@ final class PlReportCalculator
                 $warnings[] = "Переменная $variable в формуле «{$categoryName}»: ставка не задана в налоговом профиле компании, принято 0";
             }
         }
+
+        $monthlySums = $this->sumByMonthsIfRateChanges($company, $period, $moneyVariableIds, $projectDirection, $responsibilityCenterId, $warnings);
 
         $values = [];
         $env = new class($values, $all, $company, $period, $projectDirection, $responsibilityCenterId, $this->facts, $warnings, $variableValues) implements \App\Finance\Formula\Env {
@@ -161,6 +169,10 @@ final class PlReportCalculator
         foreach ($order as $id) {
             /** @var PLCategory $c */
             $c = $byId[$id];
+            if (isset($monthlySums[$id])) {
+                $values[$id] = $monthlySums[$id];
+                continue;
+            }
             $t = $c->getType();
             $val = 0.0;
 
@@ -211,6 +223,61 @@ final class PlReportCalculator
         }
 
         return new PlReportResult($period, $rows, array_values(array_unique($warnings)));
+    }
+
+    /**
+     * Ставка менялась внутри периода: денежные статьи с переменной ставки считаются помесячно и
+     * складываются — итог периода совпадает с суммой месячных колонок. Профиль меняется с 1-го числа,
+     * поэтому месяц — точная единица. Проценты и коэффициенты не складываются: они остаются по ставке
+     * конца периода.
+     *
+     * @param list<string> $categoryIds
+     * @param ProjectDirection|list<ProjectDirection>|null $projectDirection
+     * @param string|list<string>|null $responsibilityCenterId
+     * @param list<string> $warnings
+     *
+     * @return array<string, float> сумма по id статьи; пусто — ставка в периоде одна
+     */
+    private function sumByMonthsIfRateChanges(
+        Company $company,
+        PlReportPeriod $period,
+        array $categoryIds,
+        ProjectDirection|array|null $projectDirection,
+        string|array|null $responsibilityCenterId,
+        array &$warnings,
+    ): array {
+        if (null === $this->variables || [] === $categoryIds) {
+            return [];
+        }
+
+        $months = [];
+        for ($start = $period->from->modify('first day of this month'); $start <= $period->to; $start = $start->modify('first day of next month')) {
+            $months[] = PlReportPeriod::forRange(max($start, $period->from), min($start->modify('last day of this month'), $period->to));
+        }
+        if (\count($months) < 2) {
+            return [];
+        }
+
+        // ponytail: профиль читается на каждый месяц периода; кэшировать периоды профиля,
+        // если отчёты за многолетние диапазоны станут медленными.
+        $companyId = (string) $company->getId();
+        $rates = array_map(fn (PlReportPeriod $month): array => $this->variables->values($companyId, $month), $months);
+        if (1 === \count(array_unique($rates, \SORT_REGULAR))) {
+            return [];
+        }
+
+        $sums = array_fill_keys($categoryIds, 0.0);
+        foreach ($months as $month) {
+            $result = $this->calculate($company, $month, $projectDirection, $responsibilityCenterId);
+            foreach ($result->rows as $row) {
+                if (isset($sums[$row->id])) {
+                    $sums[$row->id] += $row->rawValue;
+                }
+            }
+            array_push($warnings, ...$result->warnings);
+        }
+
+        return $sums;
     }
 
     /**

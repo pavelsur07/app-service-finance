@@ -35,9 +35,8 @@ final readonly class PlFormulaVariables
      */
     public function values(string $companyId, PlReportPeriod $period): array
     {
-        // ponytail: ставка берётся на последний день периода. Для месяца точно (профиль меняется
-        // с 1-го числа); диапазон через смену профиля считается по ставке конца периода —
-        // если понадобится точнее, считать помесячно в вызывающем коде.
+        // Ставка на последний день периода: для месяца точно (профиль меняется с 1-го числа).
+        // Период через смену профиля PlReportCalculator для денежных статей считает помесячно.
         $profile = $this->taxProfiles->taxProfileOn($companyId, $period->to);
 
         return [

@@ -11,6 +11,7 @@ use App\Company\Facade\CompanyTaxProfileFacadeInterface;
 use App\Company\Facade\DTO\CompanyTaxProfileDTO;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PLValueFormat;
 use App\Finance\Facts\InMemoryFactsProvider;
 use App\Finance\Report\PlFormulaVariables;
 use App\Finance\Report\PlReportCalculator;
@@ -76,6 +77,34 @@ final class PlFormulaVariablesCalculationTest extends TestCase
         self::assertSame(150.0, $this->value($this->calculate($profiles, '2026-03-01'), 'TAX'));
     }
 
+    public function testPeriodAcrossRateChangeSumsMoneyRowsByMonth(): void
+    {
+        // Без НДС до октября 2026, УСН 5% с октября; налог 6% весь год. Факт выручки — 1000 за любой период.
+        $profiles = static fn (\DateTimeImmutable $date): CompanyTaxProfileDTO => new CompanyTaxProfileDTO(
+            TaxRegime::USN,
+            $date->format('Y-m') >= '2026-10' ? VatMode::USN_5 : VatMode::EXEMPT,
+            null,
+            '6.00',
+        );
+        $year = PlReportPeriod::forRange(new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-12-31'));
+        $quarter3 = PlReportPeriod::forRange(new \DateTimeImmutable('2026-07-01'), new \DateTimeImmutable('2026-09-30'));
+
+        $result = $this->calculate($profiles, $year, withVatAmount: true);
+
+        // 9 месяцев без НДС + 3 месяца по 1000 * 5 / 105 — как сумма месячных колонок, а не 5% на весь год.
+        self::assertEqualsWithDelta(3 * 1000 * 5 / 105, $this->value($result, 'VAT'), 1e-9);
+        // Статья, зависящая от помесячной, берёт уже сложенное значение.
+        self::assertEqualsWithDelta(1000 - 3 * 1000 * 5 / 105, $this->value($result, 'REV_NET'), 1e-9);
+        // Процент не складывается: ставка конца периода.
+        self::assertSame(5.0, $this->value($result, 'VAT_PCT'));
+        // Налог 6% не менялся, но расчёт помесячный для всех денежных статей с переменной: 12 × 60.
+        self::assertEqualsWithDelta(12 * 60.0, $this->value($result, 'TAX'), 1e-9);
+
+        // Ставка в периоде одна — период считается целиком, как раньше.
+        self::assertSame(0.0, $this->value($this->calculate($profiles, $quarter3, withVatAmount: true), 'VAT'));
+        self::assertSame(60.0, $this->value($this->calculate($profiles, $quarter3, withVatAmount: true), 'TAX'));
+    }
+
     public function testCategoryWithReservedCodeDoesNotShadowVariable(): void
     {
         $result = $this->calculate(
@@ -117,11 +146,16 @@ final class PlFormulaVariablesCalculationTest extends TestCase
     /**
      * @param \Closure(\DateTimeImmutable): ?CompanyTaxProfileDTO $profileOn
      */
-    private function calculate(\Closure $profileOn, string $month, bool $withShadowCategory = false): PlReportResult
+    private function calculate(\Closure $profileOn, string|PlReportPeriod $month, bool $withShadowCategory = false, bool $withVatAmount = false): PlReportResult
     {
         $company = CompanyBuilder::aCompany()->build();
         $repo = $this->createMock(PLCategoryRepository::class);
-        $repo->method('findBy')->willReturn($this->tree($company, $withShadowCategory));
+        $tree = $this->tree($company, $withShadowCategory);
+        if ($withVatAmount) {
+            $tree[] = $this->category($company, 'VAT', 'НДС', PLCategoryType::KPI, 'REV * VAT_RATE / (100 + VAT_RATE)');
+            $tree[] = $this->category($company, 'REV_NET', 'Выручка без НДС', PLCategoryType::KPI, 'REV - VAT');
+        }
+        $repo->method('findBy')->willReturn($tree);
 
         $calculator = new PlReportCalculator(
             $repo,
@@ -129,7 +163,7 @@ final class PlFormulaVariablesCalculationTest extends TestCase
             variables: new PlFormulaVariables($this->facade($profileOn)),
         );
 
-        return $calculator->calculate($company, PlReportPeriod::forMonth(new \DateTimeImmutable($month)));
+        return $calculator->calculate($company, \is_string($month) ? PlReportPeriod::forMonth(new \DateTimeImmutable($month)) : $month);
     }
 
     /**
@@ -157,6 +191,9 @@ final class PlFormulaVariablesCalculationTest extends TestCase
         $category->setCode($code);
         $category->setType($type);
         $category->setFormula($formula);
+        if (str_ends_with($code, '_PCT')) {
+            $category->setFormat(PLValueFormat::PERCENT);
+        }
 
         return $category;
     }
