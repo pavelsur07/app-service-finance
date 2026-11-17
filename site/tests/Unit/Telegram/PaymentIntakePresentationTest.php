@@ -10,6 +10,42 @@ use PHPUnit\Framework\TestCase;
 
 final class PaymentIntakePresentationTest extends TestCase
 {
+    public function testEveryLongCommonQuestionPartKeepsRevisionAndScope(): void
+    {
+        $questions = array_fill(0, 20, str_repeat('Общий вопрос. ', 35));
+        $view = new PaymentIntakeDraftView('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333', '44444444-4444-4444-4444-444444444444', 7, 'needs_clarification', null, [], $questions, null);
+        $messages = (new PaymentIntakePresenter())->summary($view, $view->id, 'Касса');
+        self::assertGreaterThan(2, count($messages));
+        foreach ($messages as $message) {
+            self::assertStringStartsWith('Черновик · версия 7', $message['text']);
+            self::assertLessThanOrEqual(3500, mb_strlen($message['text']));
+        }
+    }
+
+    public function testSummaryLimitsAutomaticDeliveryAndKeepsCurrencyTotalsSeparate(): void
+    {
+        $rows = [];
+        for ($i = 0; $i < 20; ++$i) {
+            $rows[] = ['id' => sprintf('11111111-1111-1111-1111-%012d', $i), 'amount' => 0 === $i ? '100' : '100.10', 'currency' => 0 === $i ? 'USD' : 'RUB', 'direction' => 'outflow', 'date' => '2026-10-14', 'description' => 'Расход '.$i, 'questions' => [], 'paid_confirmed' => false];
+        }
+        $view = new PaymentIntakeDraftView('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333', '44444444-4444-4444-4444-444444444444', 3, 'needs_clarification', null, $rows, ['Это отдельные платежи?'], null);
+        $messages = (new PaymentIntakePresenter())->summary($view, $view->id, 'Касса');
+        self::assertLessThanOrEqual(3, count($messages));
+        $text = implode("\n", array_column($messages, 'text'));
+        self::assertStringContainsString('100.00 USD', $text);
+        self::assertStringContainsString('1901.90 RUB', $text);
+        self::assertStringContainsString('Это отдельные платежи?', $text);
+        self::assertStringNotContainsString('Расход 19', $text, 'Later rows are opened explicitly, not pushed as a long stream.');
+        foreach ($messages as $message) {
+            self::assertLessThanOrEqual(3500, mb_strlen($message['text']));
+            foreach ($message['reply_markup']['inline_keyboard'] ?? [] as $buttons) {
+                foreach ($buttons as $button) {
+                    self::assertLessThanOrEqual(64, strlen($button['callback_data']));
+                }
+            }
+        }
+    }
+
     public function testAllRowsAndQuestionsArePresentedAsPlainTextWithCompactCallbacks(): void
     {
         $rows = [];

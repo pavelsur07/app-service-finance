@@ -87,6 +87,12 @@ final readonly class CashFacade
         return $this->paymentIntake->get($companyId, $actorUserId, $draftId);
     }
 
+    /** @return list<string> At most 200 newest open drafts owned by the authorized actor. */
+    public function openPaymentIntakeDraftIds(string $companyId, string $actorUserId): array
+    {
+        return $this->paymentIntake->openIds($companyId, $actorUserId);
+    }
+
     public function findPaymentIntakeDraftBySource(string $sourceKey, string $actorUserId): ?\App\Cash\Application\DTO\PaymentIntake\PaymentIntakeDraftView
     {
         return $this->paymentIntake->getBySource($sourceKey, $actorUserId);
@@ -108,9 +114,14 @@ final readonly class CashFacade
         return $this->paymentIntake->confirm($command);
     }
 
-    public function cancelPaymentIntakeDraft(string $companyId, string $actorUserId, string $draftId, int $expectedRevision): void
+    public function cancelPaymentIntakeDraft(string $companyId, string $actorUserId, string $draftId, int $expectedRevision, ?string $replyKey = null): void
     {
-        $this->paymentIntake->cancel($companyId, $actorUserId, $draftId, $expectedRevision);
+        $this->paymentIntake->cancel($companyId, $actorUserId, $draftId, $expectedRevision, $replyKey);
+    }
+
+    public function rememberPaymentIntakeReply(string $companyId, string $actorUserId, string $draftId, string $replyKey): void
+    {
+        $this->paymentIntake->rememberReply($companyId, $actorUserId, $draftId, $replyKey);
     }
 
     /** Retry only the authorized actor's selected draft; safe for interactive poll callers. */
