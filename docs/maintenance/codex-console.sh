@@ -497,9 +497,18 @@ if [ -z "$project_dir" ] || [ -z "$config_file" ]; then
 fi
 cd "$project_dir"
 
+# Метка перечисляет файлы через запятую: с #3042 деплой поднимает контейнеры с
+# `-f docker-compose.prod.yml -f compose.digest.json` (digest закрепляет образ релиза).
+# Каждый файл — отдельный -f, иначе compose ищет один файл с запятой в имени.
+compose_files=()
+IFS=',' read -ra config_files <<< "$config_file"
+for f in "${config_files[@]}"; do
+    compose_files+=(-f "$f")
+done
+
 # memory_limit не переопределяем. Тяжёлую работу делают подпроцессы, которые
 # стартуют как новый php и читают php.ini (1024M) — родительский `php -d` на них
 # не распространяется, поэтому прежний `-d memory_limit=512M` ограничивал только
 # оркестратор. Потолок задаёт cgroup контейнера: 1536M.
-exec docker compose -f "$config_file" run --rm --no-deps -T "$RUN_SERVICE" \
+exec docker compose "${compose_files[@]}" run --rm --no-deps -T "$RUN_SERVICE" \
     bin/console "$cmd" "$@"
