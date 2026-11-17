@@ -190,7 +190,8 @@ final class SyncCashflowGroupChartAction
             $category
                 ->setName($node->name)
                 ->setDescription($node->description)
-                ->setOperationType($node->direction)
+                // Действующее направление эталона: у родителя компании его может не быть.
+                ->setOperationType($direction[$node->code])
                 ->setSort($node->sort)
                 ->setParent($parent)
                 ->assignGroupCode($node->code);

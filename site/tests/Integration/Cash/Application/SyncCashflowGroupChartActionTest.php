@@ -193,6 +193,22 @@ final class SyncCashflowGroupChartActionTest extends IntegrationTestCase
         self::assertSame('Проект Альфа', $this->db()->fetchOne('SELECT name FROM cashflow_categories WHERE company_id = ? AND group_code = ?', [$member->getId(), $child]));
     }
 
+    /** Родитель участника без направления: созданная статья получает действующее направление эталона. */
+    public function testCreatedCategoryKeepsInheritedDirection(): void
+    {
+        $head = $this->headWithCore();
+        $projects = $this->addCategory($head, 'Проекты', null, CashflowCategory::CODE_INVESTING);
+        $this->db()->executeStatement("UPDATE cashflow_categories SET operation_type = 'INFLOW' WHERE id = ?", [$projects]);
+        $this->addCategory($head, 'Альфа', null, null, $projects);
+        $member = $this->company();
+        $this->addCategory($member, 'Проекты', null, CashflowCategory::CODE_INVESTING);
+        $this->group($head, $member);
+
+        $this->sync($member);
+
+        self::assertSame('INFLOW', $this->db()->fetchOne("SELECT operation_type FROM cashflow_categories WHERE company_id = ? AND name = 'Альфа'", [$member->getId()]));
+    }
+
     /** Одноимённые корни разных видов деятельности — конфликт, дети пропускаются. */
     public function testRootWithOtherFlowKindIsConflict(): void
     {
