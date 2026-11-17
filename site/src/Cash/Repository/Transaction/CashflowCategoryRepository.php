@@ -125,6 +125,29 @@ class CashflowCategoryRepository extends ServiceEntityRepository
     }
 
     /**
+     * Сохранённые в БД код консолидации и родитель статьи, строка под FOR UPDATE: форма могла
+     * загрузить статью до того, как ей проставили код. Только внутри транзакции вызывающего.
+     *
+     * @return array{groupCode: ?string, parentId: ?string}|null null — статьи ещё нет в БД
+     */
+    public function lockStoredPlacement(string $companyId, string $id): ?array
+    {
+        Assert::uuid($companyId);
+        $row = $this->getEntityManager()->getConnection()->fetchAssociative(
+            'SELECT group_code, parent_id FROM "cashflow_categories" WHERE id = :id AND company_id = :companyId FOR UPDATE',
+            ['id' => $id, 'companyId' => $companyId],
+        );
+        if (false === $row) {
+            return null;
+        }
+
+        return [
+            'groupCode' => null === $row['group_code'] ? null : (string) $row['group_code'],
+            'parentId' => null === $row['parent_id'] ? null : (string) $row['parent_id'],
+        ];
+    }
+
+    /**
      * Есть ли у компании хоть одна несистемная статья ДДС — признак, что дерево уже своё.
      */
     public function hasRegularByCompany(Company $company): bool

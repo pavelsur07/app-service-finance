@@ -2664,7 +2664,10 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 `docs/tasks/cashflow-group-chart/chart.md`) и не меняются. `CashflowCategory::assignGroupCode()`
 назначает код один раз. Статью с кодом нельзя удалить (`assertCanDelete`, `PreRemove`) и
 перенести (`setParent`); в форме правки поле «Родитель» скрыто (`lock_parent`), переименовать
-можно. Ставят код онбординг (`ApplyCashflowCoreTemplateAction`) и `app:cash:cashflow-core:apply`.
+можно. `SaveCashflowCategoryAction` и `DeleteCashflowCategoryAction` перепроверяют код и родителя
+по строке под `FOR UPDATE` (`CashflowCategoryRepository::lockStoredPlacement()`, `wrapInTransaction`):
+форма могла загрузить статью до того, как ей проставили код. Команда берёт дерево компании
+`lockTreeByCompany()` (FOR UPDATE + refresh) после advisory lock. Ставят код онбординг (`ApplyCashflowCoreTemplateAction`) и `app:cash:cashflow-core:apply`.
 
 Компании, созданные до онбординга, дозаполняет `app:company:onboarding-backfill
 [--company=<uuid>] [--execute --expected-count=N] [-v]` (`BackfillCompanyOnboardingAction`):
