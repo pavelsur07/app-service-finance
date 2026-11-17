@@ -126,6 +126,11 @@ final class ReplaceUnusedCashflowTreeWithCoreAction
         }
 
         $created = ($this->applyCore)($companyId);
+        if ($created !== $plan->coreNodes) {
+            // Статью завели параллельно (форма advisory lock не берёт), и ядро себя пропустило:
+            // откатываем удаление, иначе компания останется без дерева.
+            throw new CashflowCoreTemplateException(sprintf('Ядро не применено: создано %d из %d узлов — дерево ДДС компании изменили во время замены, повторите.', $created, $plan->coreNodes));
+        }
         $this->entityManager->flush();
 
         $this->logger->info('Cashflow tree replaced with core template', [

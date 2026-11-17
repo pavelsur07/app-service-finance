@@ -11,6 +11,7 @@ use App\Cash\Entity\Transaction\CashCategorySuggestion;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Exception\CashflowCoreTemplateException;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Cash\CashCategorySuggestionBuilder;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
@@ -71,6 +72,46 @@ final class ApplyCashflowCoreToCompanyCommandTest extends IntegrationTestCase
 
         self::assertSame('dismissed', $this->db()->fetchOne('SELECT status FROM cash_category_suggestion WHERE id = ?', [$suggestion->getId()]));
         self::assertCount(self::CORE_NODES, $this->regularNames($company));
+    }
+
+    /** Статья появилась после выборки удаляемых: ядро не создаётся — откат целиком. */
+    public function testCategoryCreatedConcurrentlyRollsBackEverything(): void
+    {
+        $company = $this->companyWithOldTree();
+        $suggestion = $this->suggestion($company, $this->category($company, 'Проценты полученные'));
+        $parentId = $this->db()->fetchOne("SELECT id FROM cashflow_categories WHERE company_id = ? AND system_code = 'CF_OP'", [$company->getId()]);
+        // Flush №1 — системные статьи, №2 — удаление старого дерева; статья появляется после него.
+        $listener = new class($this->db(), (string) $company->getId(), (string) $parentId) {
+            private int $flushes = 0;
+
+            public function __construct(private \Doctrine\DBAL\Connection $db, private string $companyId, private string $parentId)
+            {
+            }
+
+            public function postFlush(): void
+            {
+                if (2 !== ++$this->flushes) {
+                    return;
+                }
+                $this->db->executeStatement(
+                    "INSERT INTO cashflow_categories (id, company_id, parent_id, name, status, sort, flow_kind, is_system, allow_pl_document) VALUES (?, ?, ?, 'Параллельная', 'active', 0, 'OPERATING', false, false)",
+                    [Uuid::uuid7()->toString(), $this->companyId, $this->parentId],
+                );
+            }
+        };
+        $action = self::getContainer()->get(ReplaceUnusedCashflowTreeWithCoreAction::class);
+        $action->plan((string) $company->getId());
+        $this->em->getEventManager()->addEventListener(\Doctrine\ORM\Events::postFlush, $listener);
+        try {
+            $this->em->wrapInTransaction(fn (): int => $action((string) $company->getId()));
+            self::fail('Ожидался отказ: ядро не создано.');
+        } catch (CashflowCoreTemplateException) {
+        } finally {
+            $this->em->getEventManager()->removeEventListener(\Doctrine\ORM\Events::postFlush, $listener);
+        }
+
+        self::assertSame(['Дивиденды выплаченные', 'Проценты полученные'], $this->regularNames($company));
+        self::assertSame('suggested', $this->db()->fetchOne('SELECT status FROM cash_category_suggestion WHERE id = ?', [$suggestion->getId()]));
     }
 
     public function testNestedUnusedTreeIsRemovedFromLeaves(): void
