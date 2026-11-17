@@ -2212,6 +2212,26 @@ manage — только владелец. Новые права автомати
 - Откат миграции (`DROP TABLE`) возвращает состояние до неё, но теряет периоды,
   сохранённые после деплоя; `tax_system` к тому времени устаревает.
 
+### Company: группа консолидации (`company_consolidation_member`)
+
+- Одна таблица: `company_id` PK, `head_company_id`, `created_at`. FK обоих столбцов на
+  `companies` с `ON DELETE CASCADE` — в миграции `Version20261117150000`. У головной компании
+  своя строка, в которой `head_company_id = company_id`. PK держит инварианты: компания входит
+  не больше чем в одну группу, головная не участник чужой группы, участник не головная.
+- `ConsolidationGroupFacadeInterface`:
+  - `headOf(string $companyId): ?string` — головная компания группы (для головной — она сама,
+    вне группы — `null`);
+  - `members(string $headCompanyId): list<string>` — все компании группы, головная первой;
+    пусто, если компания не головная.
+  Дерево ДДС головной компании — эталон группы (задача `cashflow-group-chart`).
+- Запись: `ConfigureConsolidationGroupAction(headCompanyId, ownerUserId, enabled, memberIds)` —
+  транзакцией владеет сам, под `pg_advisory_xact_lock(hashtextextended(
+  'company_consolidation:'||ownerUserId))`. Выключение удаляет группу целиком, включение
+  заменяет состав. Головная компания и участники — только компании этого владельца. Отказ —
+  `InvalidConsolidationGroupException`, данные не меняются. Меняет только владелец, в блоке
+  «Консолидация» настроек компании (`POST /company/{id}/consolidation`). Участнику блок
+  показывает его группу без формы.
+
 ### Billing: тарифы и оплаченный период (`billing_*`)
 
 План задачи — `docs/tasks/billing/TASK.md`. Есть ядро, админка, страница
@@ -5888,6 +5908,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.208 | 2026-11-17 | Company: группа консолидации `company_consolidation_member` (миграция `Version20261117150000`), `ConsolidationGroupFacadeInterface`, `ConfigureConsolidationGroupAction`, блок «Консолидация» в настройках компании (задача `cashflow-group-chart`, этап 1b) |
 | 2.207 | 2026-11-17 | Cash: `cashflow_categories.group_code` (миграция `Version20261117120000`) — код консолидации; `core.yaml` v2 с кодами, защита удаления и переноса статьи с кодом, `app:cash:cashflow-core:apply` проставляет коды дереву ядра (задача `cashflow-group-chart`, этап 1) |
 | 2.206 | 2026-11-17 | Cash: `app:cash:cashflow-core:apply` — ядро ДДС для существующей компании вместо неиспользуемых статей (`ReplaceUnusedCashflowTreeWithCoreAction`, `CashCategorySuggestionRepository::findSuggestedForCategories()`), задача `cashflow-group-chart`, этап 0a |
 | 2.205 | 2026-11-16 | MarketplacePlProjection: экран «ОПиУ» повторяет дерево статей компании до СМ3 (`TreeCut`, граница по коду `CM3`), пустые строки на месте, статьи ниже — блок «Ниже СМ3» |
