@@ -54,6 +54,7 @@ final class ApplyCashflowCoreToCompanyCommandTest extends IntegrationTestCase
         self::assertCount(self::CORE_NODES, $names);
         self::assertNotContains('Дивиденды выплаченные', $names);
         self::assertContains('Поступления от покупателей', $names);
+        self::assertSame(self::CORE_NODES, $this->codedCount($company));
         self::assertSame('stale', $this->db()->fetchOne('SELECT status FROM cash_category_suggestion WHERE id = ?', [$suggestion->getId()]));
         self::assertSame(['Дивиденды выплаченные', 'Проценты полученные'], $this->regularNames($other), 'Чужая компания не тронута.');
         self::assertSame(1, (int) $this->db()->fetchOne('SELECT COUNT(*) FROM cash_transaction WHERE company_id = ?', [$company->getId()]));
@@ -176,6 +177,51 @@ final class ApplyCashflowCoreToCompanyCommandTest extends IntegrationTestCase
         self::assertSame($ids, $this->regularIds($company));
     }
 
+    /** Компания с ядром до кодов (прод: Максимедиа, Информ-ТВ, Телегис) получает коды той же командой. */
+    public function testCoreTreeWithoutCodesGetsCodes(): void
+    {
+        $company = $this->companyWithOldTree();
+        $this->runCommand($company, ['--execute' => true]);
+        $ids = $this->regularIds($company);
+        $this->db()->executeStatement('UPDATE cashflow_categories SET group_code = NULL WHERE company_id = ?', [$company->getId()]);
+        $this->em->clear();
+
+        $dryRun = $this->runCommand($company);
+        self::assertStringContainsString('Будет проставлено кодов: 37', $dryRun->getDisplay());
+        self::assertSame(0, $this->codedCount($company), 'Без --execute коды не пишутся.');
+
+        $tester = $this->runCommand($company, ['--execute' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        self::assertSame(self::CORE_NODES, $this->codedCount($company));
+        self::assertSame($ids, $this->regularIds($company), 'Статьи те же, дерево не пересоздано.');
+        self::assertSame('OP_IN_CUSTOMERS', $this->db()->fetchOne("SELECT group_code FROM cashflow_categories WHERE company_id = ? AND name = 'Поступления от покупателей'", [$company->getId()]));
+
+        $again = $this->runCommand($company, ['--execute' => true]);
+        self::assertStringContainsString('уже применено', $again->getDisplay());
+    }
+
+    /** Статью перенесли после плана: код не уходит перенесённой статье по устаревшему пути. */
+    public function testCategoryMovedAfterPlanDoesNotGetStaleCode(): void
+    {
+        $company = $this->companyWithOldTree();
+        $this->runCommand($company, ['--execute' => true]);
+        $this->db()->executeStatement('UPDATE cashflow_categories SET group_code = NULL WHERE company_id = ?', [$company->getId()]);
+        $this->em->clear();
+        $action = self::getContainer()->get(ReplaceUnusedCashflowTreeWithCoreAction::class);
+        self::assertTrue($action->plan((string) $company->getId())->alreadyApplied);
+
+        $finOut = $this->db()->fetchOne("SELECT c.id FROM cashflow_categories c JOIN cashflow_categories p ON p.id = c.parent_id WHERE c.company_id = ? AND c.name = 'Выплаты' AND p.system_code = 'CF_FIN'", [$company->getId()]);
+        $this->db()->executeStatement("UPDATE cashflow_categories SET parent_id = ? WHERE company_id = ? AND name = 'Аренда'", [$finOut, $company->getId()]);
+        $this->em->wrapInTransaction(fn (): int => $action((string) $company->getId()));
+
+        $section = $this->db()->fetchOne(
+            "SELECT gp.system_code FROM cashflow_categories c JOIN cashflow_categories p ON p.id = c.parent_id JOIN cashflow_categories gp ON gp.id = p.parent_id WHERE c.company_id = ? AND c.group_code = 'OP_OUT_RENT'",
+            [$company->getId()],
+        );
+        self::assertContains($section, [false, 'CF_OP'], 'OP_OUT_RENT не может стоять на статье в финансовой деятельности.');
+    }
+
     public function testCompanyWithoutRegularCategoriesGetsCore(): void
     {
         $company = $this->company();
@@ -252,6 +298,11 @@ final class ApplyCashflowCoreToCompanyCommandTest extends IntegrationTestCase
     private function regularNames(Company $company): array
     {
         return $this->db()->fetchFirstColumn('SELECT name FROM cashflow_categories WHERE company_id = ? AND NOT is_system ORDER BY name', [$company->getId()]);
+    }
+
+    private function codedCount(Company $company): int
+    {
+        return (int) $this->db()->fetchOne('SELECT COUNT(*) FROM cashflow_categories WHERE company_id = ? AND group_code IS NOT NULL', [$company->getId()]);
     }
 
     /** @return list<string> */

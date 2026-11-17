@@ -228,4 +228,40 @@ final class CashflowCategoryTest extends TestCase
             ->setFlowKind(CashflowFlowKind::TECHNICAL);
         self::assertFalse($regularTechnical->acceptsRegularChildren());
     }
+
+    public function testGroupCodeIsAssignedOnceAndProtectsCategory(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $parent = (new CashflowCategory('11111111-1111-4111-8111-111111111111', $company))->setName('Выплаты');
+        $other = (new CashflowCategory('22222222-2222-4222-8222-222222222222', $company))->setName('Другая');
+        $rent = (new CashflowCategory('33333333-3333-4333-8333-333333333333', $company))->setName('Аренда')->setParent($parent);
+
+        $rent->assignGroupCode('OP_OUT_RENT');
+        $rent->assignGroupCode('OP_OUT_RENT'); // тот же код повторно — без изменений
+        self::assertSame('OP_OUT_RENT', $rent->getGroupCode());
+
+        $rent->setName('Аренда офиса');
+        self::assertSame('Аренда офиса', $rent->getName(), 'Переименование статьи с кодом разрешено.');
+
+        foreach ([
+            'другой код' => static fn () => $rent->assignGroupCode('OP_OUT_OTHER'),
+            'перенос' => static fn () => $rent->setParent($other),
+            'удаление' => static fn () => $rent->assertCanDelete(),
+        ] as $case => $change) {
+            try {
+                $change();
+                self::fail($case.': ожидался отказ.');
+            } catch (\DomainException) {
+            }
+        }
+        self::assertSame($parent, $rent->getParent());
+    }
+
+    public function testGroupCodeFormatIsValidated(): void
+    {
+        $category = (new CashflowCategory('11111111-1111-4111-8111-111111111111', CompanyBuilder::aCompany()->build()))->setName('A');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $category->assignGroupCode('op in');
+    }
 }

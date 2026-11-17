@@ -19,6 +19,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity(repositoryClass: CashflowCategoryRepository::class)]
 #[ORM\Table(name: '`cashflow_categories`')]
 #[ORM\UniqueConstraint(name: 'uniq_cashflow_category_company_code', columns: ['company_id', 'system_code'])]
+#[ORM\UniqueConstraint(name: 'uniq_cashflow_category_company_group_code', columns: ['company_id', 'group_code'])]
 #[ORM\HasLifecycleCallbacks]
 #[UniqueEntity(fields: ['company', 'systemCode'], message: 'Код уже используется в этой компании.')]
 class CashflowCategory
@@ -86,6 +87,13 @@ class CashflowCategory
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $isSystem = false;
+
+    /**
+     * Ключ консолидации: код узла базового дерева (`core.yaml`) или эталона группы. Назначается
+     * один раз; статью с кодом нельзя удалить или перенести — переименовать можно.
+     */
+    #[ORM\Column(type: 'string', length: 64, nullable: true)]
+    private ?string $groupCode = null;
 
     public function __construct(string $id, Company $company)
     {
@@ -171,6 +179,10 @@ class CashflowCategory
 
         if ($this->isSystem) {
             throw new \DomainException('Системную категорию нельзя перемещать.');
+        }
+
+        if (null !== $this->groupCode) {
+            throw new \DomainException('Статью базового дерева нельзя переносить: по ней строится консолидированная отчётность.');
         }
 
         if ($parent === $this || (null !== $parent && $parent->isDescendantOf($this))) {
@@ -408,9 +420,33 @@ class CashflowCategory
             throw new \DomainException('Системную категорию нельзя удалить.');
         }
 
+        if (null !== $this->groupCode) {
+            throw new \DomainException('Статью базового дерева нельзя удалить: по ней строится консолидированная отчётность. Её можно переименовать.');
+        }
+
         if (!$this->children->isEmpty()) {
             throw new \DomainException('Нельзя удалить категорию, у которой есть дочерние статьи.');
         }
+    }
+
+    public function getGroupCode(): ?string
+    {
+        return $this->groupCode;
+    }
+
+    /**
+     * @throws \InvalidArgumentException код не в формате ключа
+     * @throws \DomainException у статьи уже другой код
+     */
+    public function assignGroupCode(string $code): self
+    {
+        Assert::regex($code, '/^[A-Za-z0-9_-]{1,64}$/', 'Код консолидации: латиница, цифры, «_» и «-», до 64 символов.');
+        if (null !== $this->groupCode && $this->groupCode !== $code) {
+            throw new \DomainException(sprintf('У статьи уже есть код консолидации %s, код не меняется.', $this->groupCode));
+        }
+        $this->groupCode = $code;
+
+        return $this;
     }
 
     #[ORM\PreRemove]

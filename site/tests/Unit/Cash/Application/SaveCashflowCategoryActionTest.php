@@ -7,9 +7,11 @@ namespace App\Tests\Unit\Cash\Application;
 use App\Cash\Application\Category\SaveCashflowCategoryAction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
+use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -223,6 +225,10 @@ final class SaveCashflowCategoryActionTest extends TestCase
         $validator = $this->createMock(ValidatorInterface::class);
         $validator->method('validate')->willReturn($violations ?? new ConstraintViolationList());
 
-        return new SaveCashflowCategoryAction($entityManager, $validator);
+        if ($entityManager instanceof MockObject) {
+            $entityManager->method('wrapInTransaction')->willReturnCallback(static fn (callable $func): mixed => $func($entityManager));
+        }
+
+        return new SaveCashflowCategoryAction($entityManager, $validator, $this->createStub(CashflowCategoryRepository::class));
     }
 }

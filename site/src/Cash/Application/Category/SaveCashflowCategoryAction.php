@@ -6,6 +6,7 @@ namespace App\Cash\Application\Category;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
+use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -20,6 +21,7 @@ final class SaveCashflowCategoryAction
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly ValidatorInterface $validator,
+        private readonly CashflowCategoryRepository $categories,
     ) {
     }
 
@@ -70,8 +72,17 @@ final class SaveCashflowCategoryAction
             throw new \DomainException(implode('; ', $messages));
         }
 
-        $this->entityManager->persist($category);
-        $this->entityManager->flush();
+        // Код консолидации могли проставить после того, как форма загрузила статью: перенос
+        // проверяется по строке под FOR UPDATE, а не по состоянию объекта.
+        $this->entityManager->wrapInTransaction(function () use ($category): void {
+            $stored = $this->categories->lockStoredPlacement((string) $category->getCompany()->getId(), (string) $category->getId());
+            if (null !== $stored && null !== $stored['groupCode'] && $stored['parentId'] !== $category->getParent()?->getId()) {
+                throw new \DomainException('Статью базового дерева нельзя переносить: по ней строится консолидированная отчётность. Обновите страницу.');
+            }
+
+            $this->entityManager->persist($category);
+            $this->entityManager->flush();
+        });
     }
 
     private function targetLevel(CashflowCategory $category): int

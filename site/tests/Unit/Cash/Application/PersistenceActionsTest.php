@@ -13,6 +13,7 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Infrastructure\Query\CashflowCategoryUsageQuery;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
+use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\MoneyFundBuilder;
@@ -37,6 +38,7 @@ final class PersistenceActionsTest extends TestCase
     protected function setUp(): void
     {
         $this->entityManager = $this->createMock(EntityManagerInterface::class);
+        $this->entityManager->method('wrapInTransaction')->willReturnCallback(fn (callable $func): mixed => $func($this->entityManager));
     }
 
     public function testSaveMoneyFundPersistsAndFlushes(): void
@@ -69,7 +71,7 @@ final class PersistenceActionsTest extends TestCase
         $this->entityManager->expects(self::once())->method('remove')->with($category);
         $this->entityManager->expects(self::once())->method('flush');
 
-        (new DeleteCashflowCategoryAction($this->entityManager, $this->usageOfNothing()))($category);
+        (new DeleteCashflowCategoryAction($this->entityManager, $this->usageOfNothing(), $this->createStub(CashflowCategoryRepository::class)))($category);
     }
 
     public function testDeleteSystemCashflowCategoryWritesNothing(): void
@@ -82,7 +84,7 @@ final class PersistenceActionsTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Системную категорию нельзя удалить.');
 
-        (new DeleteCashflowCategoryAction($this->entityManager, $this->usageOfNothing()))($category);
+        (new DeleteCashflowCategoryAction($this->entityManager, $this->usageOfNothing(), $this->createStub(CashflowCategoryRepository::class)))($category);
     }
 
     public function testChangeAutoRuleActivityFlushesOnlyOnRealChange(): void

@@ -59,7 +59,13 @@
                                     {{ form_row(form.code) }}
                                 </div>
                                 <div class="col-md-6">
-                                    {{ form_row(form.parent) }}
+                                    {% if form.children.parent is defined %}
+                                        {{ form_row(form.parent) }}
+                                    {% else %}
+                                        <label class="form-label">Родитель</label>
+                                        <input type="text" class="form-control" value="{{ article.parent ? article.parent.name : '— Нет (корневая категория) —' }}" disabled>
+                                        <div class="form-text">Статья базового дерева: перенос недоступен, переименовать можно.</div>
+                                    {% endif %}
                                 </div>
                             {% endif %}
                             <div class="col-md-6">
