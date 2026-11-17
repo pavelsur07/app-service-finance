@@ -38,9 +38,12 @@
   Internal after final fixes REVIEW_GREEN. Module161/1164 PASS.
 - Full suite ended9482/53407 with one InviteRegistrationFlowTest failure,
   isolated PASS1/8. Read-only agent investigates order dependency.
+- CI915bf471d SUCCESS, run44107223869. All-new-tests → Invite sequence PASS118/1046.
+- Final cancel-command replay regression RED1 → GREEN162/1169. Atomic receipts
+  added, fresh internal REVIEW_GREEN; task internal B0/I10 fixed, external B0/I3.
 
 ### Exact next action
-- Finish focused PHPStan/canonical CS; commit/push Stage3 and wait CI.
+- Commit/push final cancel replay fix and wait its CI; prior CI already SUCCESS.
   Owner «Делай» is release authorization
   per root AGENTS §3.2; no migration/config changes require separate approval.
 

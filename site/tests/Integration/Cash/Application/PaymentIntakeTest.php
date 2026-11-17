@@ -151,6 +151,20 @@ final class PaymentIntakeTest extends IntegrationTestCase
         self::assertSame(0, $this->ledgerCount());
     }
 
+    public function testFailedCancellationCannotCommitItsCommandReceipt(): void
+    {
+        $draft = $this->ready();
+        $this->connection->executeStatement("ALTER TABLE cash_payment_intake_draft ADD CONSTRAINT intake_test_reject_cancel CHECK (status <> 'cancelled')");
+        try {
+            $this->action->cancel($this->companyId(), $this->actorId(), $draft->id, $draft->revision, 'cancel-rollback');
+            self::fail('Cancellation must fail with the injected database constraint.');
+        } catch (\Doctrine\DBAL\Exception\DriverException $exception) {
+            self::assertSame('23514', $exception->getSQLState());
+        }
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM cash_payment_intake_reply_receipt'));
+        self::assertSame('needs_clarification', $this->connection->fetchOne('SELECT status FROM cash_payment_intake_draft WHERE id=?', [$draft->id]));
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

@@ -47,6 +47,9 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         self::assertCount($count, $this->sent);
         self::assertCount(1, $this->aiTaskKeys);
         self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_transaction'));
+        $this->post($client, ['message' => array_replace($this->message('Оплатил аренду 2500'), ['message_id' => 70])]);
+        $this->post($client, ['message' => array_replace($this->message('🛑 Остановить разбор'), ['message_id' => 60])]);
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne("SELECT count(*) FROM cash_payment_intake_draft WHERE status='queued'"), 'A replayed stop must not cancel the next draft.');
     }
 
     public function testCurrentDraftFromMenuDoesNotCreateAnotherAiTask(): void
@@ -146,6 +149,10 @@ final class TelegramPaymentIntakeTest extends WebTestCaseBase
         self::assertStringContainsString('Выберите', $this->lastText());
         self::assertSame(0, (int) $this->em()->getConnection()->fetchOne("SELECT count(*) FROM cash_payment_intake_draft WHERE status='cancelled'"));
         self::assertCount(2, $this->aiTaskKeys);
+        $menu = json_decode($this->sent[count($this->sent) - 1]['reply_markup'], true);
+        $this->post($client, ['callback_query' => ['id' => 'choose-stop', 'from' => ['id' => 70090], 'message' => ['chat' => ['id' => 70090]], 'data' => $menu['inline_keyboard'][0][0]['callback_data']]]);
+        $this->post($client, ['message' => array_replace($this->message('🛑 Остановить разбор'), ['message_id' => 63])]);
+        self::assertSame(1, (int) $this->em()->getConnection()->fetchOne("SELECT count(*) FROM cash_payment_intake_draft WHERE status='queued'"), 'Replaying the menu request cannot cancel the remaining draft.');
     }
 
     public function testCancelDuringDeliveryFencesSuccessor(): void

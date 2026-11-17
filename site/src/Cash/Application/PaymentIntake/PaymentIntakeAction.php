@@ -306,12 +306,49 @@ final readonly class PaymentIntakeAction
         return new PaymentIntakeConfirmation($draft->getId(), $draft->getTransactionIds());
     }
 
-    public function cancel(string $companyId, string $actorUserId, string $draftId, int $expectedRevision): void
+    public function cancel(string $companyId, string $actorUserId, string $draftId, int $expectedRevision, ?string $replyKey = null): void
     {
+        if (null !== $replyKey) {
+            $this->recordReplyCommand($companyId, $actorUserId, $draftId, $replyKey, $expectedRevision);
+
+            return;
+        }
         $this->em->wrapInTransaction(function () use ($companyId, $actorUserId, $draftId, $expectedRevision): void {
             $this->authorize($companyId, $actorUserId, true);
             $this->owned($companyId, $actorUserId, $draftId, true)->cancel($expectedRevision);
         });
+    }
+
+    public function rememberReply(string $companyId, string $actorUserId, string $draftId, string $replyKey): void
+    {
+        $this->recordReplyCommand($companyId, $actorUserId, $draftId, $replyKey);
+    }
+
+    /** A menu choice only records identity; direct cancellation records it with the state change. */
+    private function recordReplyCommand(string $companyId, string $actorUserId, string $draftId, string $replyKey, ?int $cancelRevision = null): void
+    {
+        if ('' === $replyKey || \strlen($replyKey) > 255) {
+            throw new \DomainException('Некорректный идентификатор команды.');
+        }
+        $key = hash('sha256', $replyKey);
+        $duplicate = false;
+        $this->em->wrapInTransaction(function () use ($companyId, $actorUserId, $draftId, $key, $cancelRevision, &$duplicate): void {
+            $this->authorize($companyId, $actorUserId, true);
+            $this->em->getConnection()->executeQuery('SELECT pg_advisory_xact_lock(hashtextextended(:reply, 0))', ['reply' => 'payment-intake-reply:'.$key]);
+            if ($this->replyReceipts->hasReceipt($key)) {
+                $duplicate = true;
+
+                return;
+            }
+            $draft = $this->owned($companyId, $actorUserId, $draftId, true);
+            if (null !== $cancelRevision) {
+                $draft->cancel($cancelRevision);
+            }
+            $this->em->persist(new PaymentIntakeReplyReceipt($key, $draft, $draft->getId(), $draft->getRevision(), $this->clock->now()));
+        });
+        if ($duplicate) {
+            throw new \DomainException('Эта команда уже обработана. Откройте текущий черновик из меню.');
+        }
     }
 
     /** @return list<string> */

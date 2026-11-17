@@ -131,7 +131,7 @@ final readonly class PaymentIntakeTelegramAction
             return ['text' => 'Исходный черновик не найден. Изменённое старое сообщение не меняет текущий разбор.'];
         }
         if (in_array(trim($text), ['📋 Текущий черновик', '/draft', '🛑 Остановить разбор', '/cancel'], true)) {
-            return $this->current($binding, $chatId, in_array(trim($text), ['🛑 Остановить разбор', '/cancel'], true));
+            return $this->current($binding, $chatId, in_array(trim($text), ['🛑 Остановить разбор', '/cancel'], true), replyMessageId: $messageId);
         }
         if (!$session instanceof PaymentIntakeSession && preg_match('/^(?:отдельные платежи|проекты (?:ты выбрал|выбраны) верно|все оплачены|дата\s+\S+(?:\s+на все платежи[^\n]*)?$|для всех\s|всем\s|у всех\s)/iu', trim($text))) {
             return $this->current($binding, $chatId, false, $text, $messageId);
@@ -462,7 +462,7 @@ final readonly class PaymentIntakeTelegramAction
             $session = $sessions[0];
             $draft = $this->cash->getPaymentIntakeDraft($companyId, $actor, $session->getDraftId());
             if ($cancel) {
-                return $this->stop($session, $draft->revision);
+                return $this->stop($session, $draft->revision, null === $replyMessageId ? null : TelegramPaymentIntakeSource::replyIdempotencyKey((string) $binding->getBot()->getId(), $chatId, $replyMessageId));
             }
             if (null !== $commonText && null !== $replyMessageId) {
                 return $this->correctCommon($session, $draft->revision, $commonText, $replyMessageId);
@@ -474,6 +474,9 @@ final readonly class PaymentIntakeTelegramAction
             return ['text' => 'Открываю текущий разбор. Новая задача ИИ не создаётся.'];
         }
         $buttons = [];
+        if ($cancel && null !== $replyMessageId) {
+            $this->cash->rememberPaymentIntakeReply($companyId, $actor, $sessions[0]->getDraftId(), TelegramPaymentIntakeSource::replyIdempotencyKey((string) $binding->getBot()->getId(), $chatId, $replyMessageId));
+        }
         foreach ($sessions as $index => $session) {
             $buttons[] = [['text' => ($cancel ? 'Отменить' : 'Открыть').' черновик '.($index + 1), 'callback_data' => 'pi:'.PaymentIntakePresenter::encodeId($session->getId()).':0:'.($cancel ? 'cancel' : 'refresh')]];
         }
@@ -495,9 +498,9 @@ final readonly class PaymentIntakeTelegramAction
     }
 
     /** @return array<string, mixed> */
-    private function stop(PaymentIntakeSession $session, int $revision): array
+    private function stop(PaymentIntakeSession $session, int $revision, ?string $replyKey = null): array
     {
-        $this->cash->cancelPaymentIntakeDraft($session->getCompanyId(), (string) $session->getBinding()->getActorUserId(), $session->getDraftId(), $revision);
+        $this->cash->cancelPaymentIntakeDraft($session->getCompanyId(), (string) $session->getBinding()->getActorUserId(), $session->getDraftId(), $revision, $replyKey);
         $this->em->refresh($session);
         $session->clearEdit();
         $session->finishPolling();

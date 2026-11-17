@@ -36,3 +36,10 @@ React/Vite/Twig не затронуты; frontend build не требуется.
 проверку Telegram payload (короткие кнопки/строки, main action alone,
 plain text, chunks≤3500, callbacks≤64); live Telegram/LLM не вызывались.
 Next: handoff/CI/release pipeline.
+
+Post-handoff regression: повтор текстового /cancel после нового сообщения
+мог отменить следующий draft (RED1 failure). Исправлено через тот же receipt:
+отмена+identity commit одной транзакцией; выбор из нескольких drafts также
+помечает команду. Тест rollback проверяет отсутствие receipt при ошибке отмены.
+Module162/1169 PASS; focused fresh internal REVIEW_GREEN. Internal total B0/I10.
+CI915bf471d SUCCESS; финальный retry-guard SHA проходит отдельный CI перед merge.

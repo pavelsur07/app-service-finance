@@ -4287,6 +4287,11 @@ identity bytes, другие каналы используют собствен�
 Отмена инвалидирует poll generation и durable pending intent, закрывает
 доставку и редактирование. Уже начатый HTTP может завершиться, но его
 финализация не публикует следующий шаг отменённой цепочки.
+Текстовая команда отмены передаёт reply key в `cancelPaymentIntakeDraft`:
+receipt и отмена фиксируются атомарно. `rememberPaymentIntakeReply(companyId,
+actorUserId, draftId, replyKey): void` сохраняет только identity запроса меню
+выбора без изменения платежей. Повтор старой команды или меню не отменяет
+следующий/оставшийся черновик; используется тот же global reply guard.
 `CashFacade::hasPaymentIntakeSource(sourceKey, ?replyIdempotencyKey=null): bool` возвращает
 только глобальный признак владения исходным сообщением или обработанным reply,
 без данных компании. Reply key передаётся адаптером явно; Telegram сохраняет
