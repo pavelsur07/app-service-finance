@@ -52,6 +52,8 @@ final class ConsolidationMembershipRepository extends ServiceEntityRepository
     /**
      * Строки перечисленных компаний — для экрана настроек (в какой группе каждая).
      *
+     * @companyScopeExempt список — компании кабинета владельца (findByUserId), каждая из них сама компания-скоуп
+     *
      * @param list<string> $companyIds компании кабинета вызывающего
      *
      * @return array<string, ConsolidationMembership> companyId => строка
