@@ -20,15 +20,16 @@ class FunnelDay
     private string $companyId;
 
     #[ORM\Id]
+    #[ORM\Column(type: 'string', length: 16)]
+    private string $channel;
+
+    #[ORM\Id]
     #[ORM\Column(type: 'string', length: 64)]
     private string $connectionRef;
 
     #[ORM\Id]
     #[ORM\Column(type: 'date_immutable')]
     private \DateTimeImmutable $operationDate;
-
-    #[ORM\Column(type: 'string', length: 16)]
-    private string $channel;
 
     #[ORM\Column(type: 'integer')]
     private int $factsRevision;

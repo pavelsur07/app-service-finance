@@ -134,8 +134,9 @@ func splitAds(page []byte) ([]fkhttp.FactRecord, error) {
 	return out, nil
 }
 
-// splitFunnel — запись = карточка дня как прислал WB ({"product","statistic"}),
-// ключ wb:analytics.funnel:{nmId}.
+// splitFunnel — запись = воронка карточки за день: {"product":{"nmId"},"statistic":{"selected"}},
+// ключ wb:analytics.funnel:{nmId}. Остальное в карточке (остатки, рейтинг, прошлый период) — состояние
+// «на сейчас»: с ним каждое суточное перечитывание меняло бы запись при тех же цифрах дня.
 func splitFunnel(page []byte) ([]fkhttp.FactRecord, error) {
 	var day struct {
 		Schema   string            `json:"schema"`
@@ -150,11 +151,24 @@ func splitFunnel(page []byte) ([]fkhttp.FactRecord, error) {
 			Product struct {
 				NmID int64 `json:"nmId"`
 			} `json:"product"`
+			Statistic struct {
+				Selected json.RawMessage `json:"selected"`
+			} `json:"statistic"`
 		}
 		if json.Unmarshal(raw, &row) != nil || row.Product.NmID <= 0 {
 			return nil, fmt.Errorf("facts: funnel product %d has no nmId", i)
 		}
-		out = append(out, fkhttp.FactRecord{SourceKey: fmt.Sprintf("%s%d", funnelKeyPrefix, row.Product.NmID), Payload: raw})
+		if row.Statistic.Selected == nil {
+			row.Statistic.Selected = json.RawMessage("null")
+		}
+		payload, err := json.Marshal(map[string]any{
+			"product":   map[string]int64{"nmId": row.Product.NmID},
+			"statistic": map[string]json.RawMessage{"selected": row.Statistic.Selected},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("facts: encode funnel product %d: %w", i, err)
+		}
+		out = append(out, fkhttp.FactRecord{SourceKey: fmt.Sprintf("%s%d", funnelKeyPrefix, row.Product.NmID), Payload: payload})
 	}
 	return out, nil
 }

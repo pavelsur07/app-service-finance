@@ -709,18 +709,18 @@
 
 | Таблица | Что | Ключ |
 |---|---|---|
-| `mfn_day` | переведённый день кабинета: `channel`, ревизия фактов, версия правил, `available` (false — маркетплейс не отдал день по тарифу: «нет данных»), `row_count`, `control_sum` (Σ всех ступеней строк дня) | `(company_id, connection_ref, operation_date)` |
-| `mfn_row` | воронка товара за день: `marketplace_sku` (SKU Ozon, nmId WB), `source` (`total`), `impressions`, `impressions_search`, `card_views`, `cart_adds`, `orders`, `revenue_minor`, `buyouts`, `cancels`, `returns`; ступень без данных — NULL | `(company_id, connection_ref, operation_date, marketplace_sku, source)` |
+| `mfn_day` | переведённый день кабинета: `channel`, ревизия фактов, версия правил, `available` (false — маркетплейс не отдал день по тарифу: «нет данных»), `row_count`, `control_sum` (Σ всех ступеней строк дня) | `(company_id, channel, connection_ref, operation_date)` |
+| `mfn_row` | воронка товара за день: `marketplace_sku` (SKU Ozon, nmId WB), `source` (`total`), `impressions`, `impressions_search`, `card_views`, `cart_adds`, `orders`, `revenue_minor`, `buyouts`, `cancels`, `returns`; ступень без данных — NULL | `(company_id, channel, connection_ref, operation_date, marketplace_sku, source)` |
 
 - Ozon — `OzonFunnelTranslator`: метрики по порядку запроса сервиса (`ozon.FunnelMetrics`, 14 штук);
   другое число метрик — день не переводится. Запись `ozon:analytics.funnel:unavailable` — день без строк,
   `available = false`.
-- WB — `WbFunnelTranslator`: `statistic.selected`; общих показов и возвратов нет (NULL), первая ступень —
+- WB — `WbFunnelTranslator`: `statistic.selected`; ступень без поля — NULL; общих показов и возвратов нет (NULL), первая ступень —
   `card_views` (`openCount`).
 - `app:marketplace-funnel:translate` (cron `9-59/15`) — точка входа и владелец транзакций: день — одна
   транзакция, замена целиком под `pg_advisory_xact_lock` дня (`FunnelStore::replaceDay`). Переводится день
   с новой ревизией фактов или другой версией правил (`FunnelRow::RULES_VERSION`). Все кабинеты с фактами.
-- Гейт `app:marketplace-funnel:health-check` (cron 09:35 МСК): день с фактами не переведён; строки
+- Гейт `app:marketplace-funnel:health-check` (cron 09:43 МСК): день с фактами не переведён; строки
   `mfn_row` дня расходятся с `mfn_day` (число строк, контрольная сумма).
 - Товар хранится идентификатором маркетплейса: строка без листинга не отбрасывается, листинг находит читатель.
   Фасада чтения нет — появится с экраном (этап 6).
@@ -6048,7 +6048,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.217 | 2026-11-18 | MarketplaceFunnel: новый модуль — таблица воронки продаж (`mfn_day`, `mfn_row`, `Version20261118120000`), `app:marketplace-funnel:translate` (`9-59/15`) и гейт `app:marketplace-funnel:health-check` (09:35); сервисы публикуют фактами `ozon.analytics.funnel` и `wb.analytics.funnel`; задача `marketplace-funnel`, этап 5 |
+| 2.217 | 2026-11-18 | MarketplaceFunnel: новый модуль — таблица воронки продаж (`mfn_day`, `mfn_row`, `Version20261118120000`), `app:marketplace-funnel:translate` (`9-59/15`) и гейт `app:marketplace-funnel:health-check` (09:43); сервисы публикуют фактами `ozon.analytics.funnel` и `wb.analytics.funnel`; задача `marketplace-funnel`, этап 5 |
 | 2.216 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж WB `wb.analytics.funnel` в `WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES`, строка «Воронка по карточкам» в покрытии; задача `marketplace-funnel`, этап 1 |
 | 2.215 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж `ozon.analytics.funnel` (`MarketplaceConnectionsSnapshotBuilder::FUNNEL_RESOURCE_TYPE`, список `ozon_fetcher.search_analytics_companies`), строка «Воронка по товарам» в покрытии; задача `marketplace-funnel`, этап 4 |
 | 2.214 | 2026-11-18 | Finance: переменные формул ОПиУ `VAT_RATE` / `TAX_RATE` (`PlFormulaVariables`); Company: `CompanyTaxProfile::$taxRatePercent`, `VatMode::ratePercentOn()` вместо `Cash\…\VatRates`; задача `pl-formula-tax-variables` |

@@ -40,6 +40,7 @@ final class FunnelTranslatorsTest extends TestCase
     {
         yield 'нет SKU' => [['dimensions' => [], 'metrics' => array_fill(0, 14, 0)]];
         yield 'другое число метрик' => [['dimensions' => [['id' => '11']], 'metrics' => [1, 2, 3]]];
+        yield 'дробный счётчик' => [['dimensions' => [['id' => '11']], 'metrics' => array_merge([5.4], array_fill(0, 13, 0))]];
         yield 'метрика не число' => [['dimensions' => [['id' => '11']], 'metrics' => array_merge(array_fill(0, 13, 0), ['x'])]];
     }
 
@@ -54,6 +55,15 @@ final class FunnelTranslatorsTest extends TestCase
             'impressions' => null, 'impressions_search' => null, 'card_views' => 40, 'cart_adds' => 8, 'orders' => 3,
             'revenue_minor' => 450000, 'buyouts' => 2, 'cancels' => 1, 'returns' => null,
         ], $row->values, 'нет ступени — null, а не ноль');
+    }
+
+    public function testWbStageWithoutFieldIsNoDataNotFailure(): void
+    {
+        $row = WbFunnelTranslator::translate(['product' => ['nmId' => 7], 'statistic' => ['selected' => ['openCount' => 4, 'cancelCount' => null]]]);
+
+        self::assertSame(4, $row->values['card_views']);
+        self::assertNull($row->values['cancels']);
+        self::assertNull($row->values['orders']);
     }
 
     public function testWbCardWithoutStatisticIsRejected(): void

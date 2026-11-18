@@ -20,6 +20,10 @@ class FunnelDayRow
     private string $companyId;
 
     #[ORM\Id]
+    #[ORM\Column(type: 'string', length: 16)]
+    private string $channel;
+
+    #[ORM\Id]
     #[ORM\Column(type: 'string', length: 64)]
     private string $connectionRef;
 
@@ -34,9 +38,6 @@ class FunnelDayRow
     #[ORM\Id]
     #[ORM\Column(type: 'string', length: 16)]
     private string $source;
-
-    #[ORM\Column(type: 'string', length: 16)]
-    private string $channel;
 
     #[ORM\Column(type: 'bigint', nullable: true)]
     private ?int $impressions = null;

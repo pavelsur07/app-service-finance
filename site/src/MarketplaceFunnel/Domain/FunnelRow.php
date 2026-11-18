@@ -33,11 +33,11 @@ final readonly class FunnelRow
     /** Число из источника: целое либо целое, записанное дробным (`5.0`). */
     public static function count(mixed $value): int
     {
-        if (!\is_int($value) && !\is_float($value)) {
-            throw new \DomainException('funnel metric is not a number');
+        if ((!\is_int($value) && !\is_float($value)) || $value < 0 || (float) (int) $value !== (float) $value) {
+            throw new \DomainException('funnel metric is not a non-negative whole number');
         }
 
-        return (int) round($value);
+        return (int) $value;
     }
 
     /** Сумма в рублях из источника → копейки. */

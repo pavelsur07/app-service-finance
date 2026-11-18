@@ -72,11 +72,11 @@ func TestSplitAdsRejectsOtherSchema(t *testing.T) {
 
 func TestSplitFunnelCardPerNmID(t *testing.T) {
 	records, err := Split(ResourceFunnel, []byte(`{"schema":"wb-funnel-daily-v1","currency":"RUB","products":[
-		{"product":{"nmId":7,"vendorCode":"a"},"statistic":{"selected":{"openCount":3}}}]}`))
+		{"product":{"nmId":7,"vendorCode":"a","stocks":{"wb":5}},"statistic":{"selected":{"openCount":3},"past":{"openCount":1}}}]}`))
 	require.NoError(t, err)
 	require.Len(t, records, 1)
 	assert.Equal(t, "wb:analytics.funnel:7", records[0].SourceKey)
-	assert.JSONEq(t, `{"product":{"nmId":7,"vendorCode":"a"},"statistic":{"selected":{"openCount":3}}}`, string(records[0].Payload))
+	assert.JSONEq(t, `{"product":{"nmId":7},"statistic":{"selected":{"openCount":3}}}`, string(records[0].Payload), "только цифры дня: остатки и прошлый период меняются без изменения дня")
 
 	empty, err := Split(ResourceFunnel, []byte(`{"schema":"wb-funnel-daily-v1","currency":"RUB","products":[]}`))
 	require.NoError(t, err)

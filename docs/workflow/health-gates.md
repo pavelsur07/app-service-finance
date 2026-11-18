@@ -110,7 +110,7 @@ ozon-fetcher и `app:source-facts:pull`; отключённый кабинет �
 пока нет); `wb:payout:*` — выплата без выручки, вид выбирают по названию операции; непереведённые дни — `error` прогона
 `app:marketplace-wb:translate`; отставание — покрытие wb-fetcher.
 
-Гейт таблицы воронки — `app:marketplace-funnel:health-check` (09:35 МСК, модуль `MarketplaceFunnel`, таблицы
+Гейт таблицы воронки — `app:marketplace-funnel:health-check` (09:43 МСК, модуль `MarketplaceFunnel`, таблицы
 `mfn_*`): день с фактами `ozon.analytics.funnel` / `wb.analytics.funnel` не переведён либо строки `mfn_row` расходятся
 с `mfn_day`. Непереведённый день — смотреть ERROR `Funnel translation: days failed` (запись источника другой формы)
 и прогон `app:marketplace-funnel:translate`; расхождение — перевести день заново (сбросить `facts_revision` дня).

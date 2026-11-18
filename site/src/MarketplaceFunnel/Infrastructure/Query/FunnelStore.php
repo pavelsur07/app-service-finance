@@ -31,8 +31,8 @@ final readonly class FunnelStore
     public function dayStates(): array
     {
         $states = [];
-        foreach ($this->connection->fetchAllAssociative('SELECT company_id, connection_ref, operation_date, facts_revision, rules_version FROM mfn_day') as $row) {
-            $states[self::dayKey((string) $row['company_id'], (string) $row['connection_ref'], (string) $row['operation_date'])] = [
+        foreach ($this->connection->fetchAllAssociative('SELECT company_id, channel, connection_ref, operation_date, facts_revision, rules_version FROM mfn_day') as $row) {
+            $states[self::dayKey((string) $row['company_id'], (string) $row['channel'], (string) $row['connection_ref'], (string) $row['operation_date'])] = [
                 'revision' => (int) $row['facts_revision'],
                 'rules' => (string) $row['rules_version'],
             ];
@@ -49,9 +49,9 @@ final readonly class FunnelStore
      */
     public function replaceDay(string $companyId, string $connectionRef, string $channel, string $date, int $revision, bool $available, array $rows): void
     {
-        $key = ['company' => $companyId, 'connection' => $connectionRef, 'date' => $date];
-        $this->connection->executeStatement('SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))', ['key' => 'mfn:'.self::dayKey($companyId, $connectionRef, $date)]);
-        $this->connection->executeStatement('DELETE FROM mfn_row WHERE company_id = :company AND connection_ref = :connection AND operation_date = :date', $key);
+        $key = ['company' => $companyId, 'channel' => $channel, 'connection' => $connectionRef, 'date' => $date];
+        $this->connection->executeStatement('SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))', ['key' => 'mfn:'.self::dayKey($companyId, $channel, $connectionRef, $date)]);
+        $this->connection->executeStatement('DELETE FROM mfn_row WHERE company_id = :company AND channel = :channel AND connection_ref = :connection AND operation_date = :date', $key);
 
         $columns = implode(', ', FunnelRow::COLUMNS);
         $tuple = '('.implode(', ', array_fill(0, 6 + \count(FunnelRow::COLUMNS), '?')).')';
@@ -74,11 +74,10 @@ final readonly class FunnelStore
         $this->connection->executeStatement(
             'INSERT INTO mfn_day (company_id, connection_ref, operation_date, channel, facts_revision, rules_version, available, row_count, control_sum, translated_at)
              VALUES (:company, :connection, :date, :channel, :revision, :rules, :available, :rows, :control, :now)
-             ON CONFLICT (company_id, connection_ref, operation_date) DO UPDATE SET
-                channel = EXCLUDED.channel, facts_revision = EXCLUDED.facts_revision, rules_version = EXCLUDED.rules_version, available = EXCLUDED.available,
+             ON CONFLICT (company_id, channel, connection_ref, operation_date) DO UPDATE SET
+                facts_revision = EXCLUDED.facts_revision, rules_version = EXCLUDED.rules_version, available = EXCLUDED.available,
                 row_count = EXCLUDED.row_count, control_sum = EXCLUDED.control_sum, translated_at = EXCLUDED.translated_at',
             $key + [
-                'channel' => $channel,
                 'revision' => $revision,
                 'rules' => FunnelRow::RULES_VERSION,
                 'available' => $available ? 'true' : 'false',
@@ -90,7 +89,8 @@ final readonly class FunnelStore
     }
 
     /**
-     * Дни, у которых строки таблицы расходятся с переведённым (число строк или контрольная сумма).
+     * Дни, у которых строки таблицы расходятся с переведённым (число строк или контрольная сумма):
+     * ловит потерянные и чужие строки, не перестановку значений внутри строки.
      *
      * @companyScopeExempt системный гейт по всем компаниям
      *
@@ -101,20 +101,20 @@ final readonly class FunnelStore
         $sum = implode(' + ', array_map(static fn (string $c): string => "COALESCE(r.$c, 0)", FunnelRow::COLUMNS));
 
         return array_map(
-            static fn (array $row): string => self::dayKey((string) $row['company_id'], (string) $row['connection_ref'], (string) $row['operation_date']),
+            static fn (array $row): string => self::dayKey((string) $row['company_id'], (string) $row['channel'], (string) $row['connection_ref'], (string) $row['operation_date']),
             $this->connection->fetchAllAssociative(
-                "SELECT d.company_id, d.connection_ref, d.operation_date
+                "SELECT d.company_id, d.channel, d.connection_ref, d.operation_date
                  FROM mfn_day d
-                 LEFT JOIN mfn_row r ON r.company_id = d.company_id AND r.connection_ref = d.connection_ref AND r.operation_date = d.operation_date
-                 GROUP BY d.company_id, d.connection_ref, d.operation_date, d.row_count, d.control_sum
+                 LEFT JOIN mfn_row r ON r.company_id = d.company_id AND r.channel = d.channel AND r.connection_ref = d.connection_ref AND r.operation_date = d.operation_date
+                 GROUP BY d.company_id, d.channel, d.connection_ref, d.operation_date, d.row_count, d.control_sum
                  HAVING COUNT(r.marketplace_sku) <> d.row_count OR COALESCE(SUM($sum), 0) <> d.control_sum
                  ORDER BY d.operation_date",
             ),
         );
     }
 
-    public static function dayKey(string $companyId, string $connectionRef, string $date): string
+    public static function dayKey(string $companyId, string $channel, string $connectionRef, string $date): string
     {
-        return $companyId.'|'.$connectionRef.'|'.$date;
+        return $companyId.'|'.$channel.'|'.$connectionRef.'|'.$date;
     }
 }

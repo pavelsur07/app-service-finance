@@ -44,7 +44,7 @@ final class TranslateFunnelCommand extends Command
 
     protected function configure(): void
     {
-        $this->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Max days per run', '500');
+        $this->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Max days per resource per run', '500');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -57,33 +57,34 @@ final class TranslateFunnelCommand extends Command
 
         try {
             $states = $this->store->dayStates();
-            $due = [];
-            foreach (array_keys(self::RESOURCES) as $resource) {
+            $limit = max(1, (int) $input->getOption('limit'));
+            $total = $done = $rows = 0;
+            $failed = [];
+            // Предел — на ресурс: дни одного маркетплейса, которые не переводятся, не задерживают другой.
+            foreach (self::RESOURCES as $resource => $channel) {
+                $due = [];
                 foreach ($this->sourceFacts->periods($resource) as $period) {
-                    $state = $states[FunnelStore::dayKey($period->companyId, $period->connectionRef, $period->periodKey)] ?? null;
+                    $state = $states[FunnelStore::dayKey($period->companyId, $channel, $period->connectionRef, $period->periodKey)] ?? null;
                     if (null === $state || $state['revision'] !== $period->revision || FunnelRow::RULES_VERSION !== $state['rules']) {
-                        $due[] = [$resource, $period];
+                        $due[] = $period;
                     }
                 }
-            }
-
-            $limit = max(1, (int) $input->getOption('limit'));
-            $done = $rows = 0;
-            $failed = [];
-            foreach (\array_slice($due, 0, $limit) as [$resource, $period]) {
-                try {
-                    $rows += $this->connection->transactional(fn (): int => $this->translateDay($resource, $period));
-                    ++$done;
-                } catch (\Throwable $e) {
-                    $failed[] = ['companyId' => $period->companyId, 'resource' => $resource, 'date' => $period->periodKey, 'error' => mb_substr($e->getMessage(), 0, 200)];
+                $total += \count($due);
+                foreach (\array_slice($due, 0, $limit) as $period) {
+                    try {
+                        $rows += $this->connection->transactional(fn (): int => $this->translateDay($resource, $period));
+                        ++$done;
+                    } catch (\Throwable $e) {
+                        $failed[] = ['companyId' => $period->companyId, 'resource' => $resource, 'date' => $period->periodKey, 'error' => mb_substr($e->getMessage(), 0, 200)];
+                    }
                 }
             }
 
             if ([] !== $failed) {
                 $this->logger->error('Funnel translation: days failed.', ['count' => \count($failed), 'days' => \array_slice($failed, 0, 10)]);
             }
-            $this->logger->info('Funnel translation finished.', ['due' => \count($due), 'translated' => $done, 'rows' => $rows, 'failed' => \count($failed), 'left' => max(0, \count($due) - $limit)]);
-            $output->writeln(sprintf('marketplace-funnel translate: %d due, %d translated (%d rows), %d failed', \count($due), $done, $rows, \count($failed)));
+            $this->logger->info('Funnel translation finished.', ['due' => $total, 'translated' => $done, 'rows' => $rows, 'failed' => \count($failed)]);
+            $output->writeln(sprintf('marketplace-funnel translate: %d due, %d translated (%d rows), %d failed', $total, $done, $rows, \count($failed)));
 
             return [] === $failed ? self::SUCCESS : self::FAILURE;
         } finally {
@@ -91,6 +92,10 @@ final class TranslateFunnelCommand extends Command
         }
     }
 
+    /**
+     * Ревизия периода прочитана раньше фактов: если между ними пришла следующая, день запишется с новыми
+     * данными под старой ревизией и следующий прогон переведёт его ещё раз — расхождение живёт до 15 минут.
+     */
     private function translateDay(string $resource, SourcePeriod $period): int
     {
         $rows = [];

@@ -6,7 +6,7 @@ namespace App\MarketplaceFunnel\Domain;
 
 /**
  * Карточка дня из фактов `wb.analytics.funnel` (`{"product","statistic"}`, wb-fetcher) → строка воронки.
- * Общих показов и возвратов в воронке WB нет: первая ступень — переходы в карточку.
+ * Общих показов и возвратов в воронке WB нет: первая ступень — переходы в карточку. Ступень без поля — NULL.
  */
 final class WbFunnelTranslator
 {
@@ -30,7 +30,10 @@ final class WbFunnelTranslator
 
         $values = array_fill_keys(FunnelRow::COLUMNS, null);
         foreach (self::FIELDS as $column => $field) {
-            $values[$column] = 'revenue_minor' === $column ? FunnelRow::minor($selected[$field] ?? null) : FunnelRow::count($selected[$field] ?? null);
+            if (null === ($selected[$field] ?? null)) {
+                continue; // поля нет — «нет данных» по ступени, остальные ступени карточки переводятся
+            }
+            $values[$column] = 'revenue_minor' === $column ? FunnelRow::minor($selected[$field]) : FunnelRow::count($selected[$field]);
         }
 
         return new FunnelRow((string) $nmId, $values);

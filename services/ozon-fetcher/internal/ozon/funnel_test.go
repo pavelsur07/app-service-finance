@@ -55,7 +55,10 @@ func TestFetchFunnelRequestsDayBySKUAndPagesByOffset(t *testing.T) {
 		"dimension": []any{"sku"}, "limit": float64(FunnelPageSize), "offset": float64(0),
 	}, (*bodies)[0])
 	assert.InDelta(t, FunnelPageSize, (*bodies)[1]["offset"], 0)
-	assert.LessOrEqual(t, len(FunnelMetrics), 14, "Ozon принимает не больше 14 метрик")
+	assert.Equal(t, []string{
+		"hits_view_search", "hits_view_pdp", "hits_view", "session_view_search", "session_view_pdp", "session_view",
+		"hits_tocart_search", "hits_tocart_pdp", "hits_tocart", "ordered_units", "revenue", "returns", "cancellations", "delivered_units",
+	}, FunnelMetrics, "порядок — контракт фактов: Symfony (OzonFunnelTranslator::POSITIONS) разбирает метрики по позиции")
 }
 
 func TestFetchFunnelEmptyDayIsOnePage(t *testing.T) {

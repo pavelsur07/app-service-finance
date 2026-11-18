@@ -63,6 +63,10 @@ final class TranslateFunnelCommandTest extends IntegrationTestCase
         $this->translate();
         self::assertSame([], $this->rows($this->companyId));
         self::assertFalse((bool) $this->connection->fetchOne('SELECT available FROM mfn_day WHERE company_id = ?', [$this->companyId]), 'нет тарифа — «нет данных», а не нули');
+
+        $this->facts($this->companyId, 'oz-1', OzonFunnelTranslator::RESOURCE, 4, []);
+        $this->translate();
+        self::assertTrue((bool) $this->connection->fetchOne('SELECT available FROM mfn_day WHERE company_id = ?', [$this->companyId]), 'пустой день — данные есть, продаж нет');
     }
 
     public function testGateSeesLostRowsUntranslatedDaysAndBrokenFacts(): void
@@ -76,9 +80,15 @@ final class TranslateFunnelCommandTest extends IntegrationTestCase
         $this->connection->executeStatement('DELETE FROM mfn_row WHERE company_id = ?', [$this->companyId]);
         self::assertSame(Command::FAILURE, $this->healthCheck(), 'строка таблицы потеряна');
 
-        $this->facts($this->otherCompanyId, 'oz-2', OzonFunnelTranslator::RESOURCE, 1, ['ozon:analytics.funnel:11' => ['dimensions' => [['id' => '11']], 'metrics' => [1]]]);
+        $this->connection->executeStatement('UPDATE mfn_day SET facts_revision = 0 WHERE company_id = ?', [$this->companyId]);
+        $this->translate();
+        $this->connection->executeStatement('UPDATE mfn_row SET orders = orders + 1 WHERE company_id = ?', [$this->companyId]);
+        self::assertSame(Command::FAILURE, $this->healthCheck(), 'число строк то же, сумма другая');
+        $this->connection->executeStatement('UPDATE mfn_row SET orders = orders - 1 WHERE company_id = ?', [$this->companyId]);
+
+        $this->facts($this->companyId, 'oz-1', OzonFunnelTranslator::RESOURCE, 2, ['ozon:analytics.funnel:11' => self::ozon('11', 7, 7), 'ozon:analytics.funnel:13' => ['dimensions' => [['id' => '13']], 'metrics' => [1]]]);
         self::assertStringContainsString('1 failed', $this->translate(), 'день с записью другой формы не переводится частично');
-        self::assertSame([], $this->rows($this->otherCompanyId));
+        self::assertSame(100, $this->rows($this->companyId)[0]['impressions'], 'прежние строки дня остаются');
     }
 
     /** @return array<string, mixed> */

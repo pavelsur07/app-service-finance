@@ -14,7 +14,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Гейт таблицы воронки (cron 09:35 МСК):
+ * Гейт таблицы воронки (cron 09:43 МСК — после перевода 09:39 и до забора фактов 09:45):
  * - error: день с фактами не переведён на текущей ревизии или версии правил — переводчик стоит либо
  *   запись источника другой формы;
  * - error: строки `mfn_row` дня расходятся с переведённым (число строк, контрольная сумма) — строки
@@ -37,9 +37,9 @@ final class FunnelHealthCheckCommand extends Command
     {
         $states = $this->store->dayStates();
         $behind = [];
-        foreach (array_keys(TranslateFunnelCommand::RESOURCES) as $resource) {
+        foreach (TranslateFunnelCommand::RESOURCES as $resource => $channel) {
             foreach ($this->sourceFacts->periods($resource) as $period) {
-                $state = $states[FunnelStore::dayKey($period->companyId, $period->connectionRef, $period->periodKey)] ?? null;
+                $state = $states[FunnelStore::dayKey($period->companyId, $channel, $period->connectionRef, $period->periodKey)] ?? null;
                 if (null === $state || $state['revision'] !== $period->revision || FunnelRow::RULES_VERSION !== $state['rules']) {
                     $behind[$period->companyId] = ($behind[$period->companyId] ?? 0) + 1;
                 }
