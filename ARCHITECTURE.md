@@ -3326,6 +3326,11 @@ getAdSpendByListingForPeriod(
     ?string $marketplace = null,
     ?AdSpendKind $kind = null,
 ): array
+
+// Оплата за заказ Ozon с привязкой к действующим листингам компании, с опциональным фильтром.
+// estimated входит в linked и содержит расходы, распределённые по продажам.
+// @return array{linked: float, estimated: float}
+getOzonPayPerOrderAttribution(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?array $listingIds = null): array
 ```
 
 ### `MarketplaceAnalyticsFacade` (`src/MarketplaceAnalytics/Facade/MarketplaceAnalyticsFacade.php`)

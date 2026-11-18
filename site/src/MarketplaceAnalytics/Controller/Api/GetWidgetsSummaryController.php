@@ -98,6 +98,7 @@ final class GetWidgetsSummaryController extends AbstractController
             $periodFrom,
             $periodTo,
             $listingIds,
+            withOrderAds: true,
         );
 
         $days = $periodFrom->diff($periodTo)->days;

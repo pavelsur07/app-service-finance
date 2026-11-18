@@ -1,5 +1,19 @@
 import type { CostGroupBreakdown } from '../unitExtended.types';
 
+export interface OrderAdAccrual {
+    campaignId: string | null;
+    date: string;
+    amount: number;
+}
+
+export interface OrderAdsSummary {
+    linked: number;
+    estimated: number;
+    unlinked: number;
+    lastAccrualDate: string | null;
+    accruals: OrderAdAccrual[];
+}
+
 export interface WidgetsSummary {
     revenue: number;
     returnsTotal: number;
@@ -9,6 +23,7 @@ export interface WidgetsSummary {
     marginPercent: number | null;
     /** Реклама по начислениям маркетплейса (P&L-знак) — справка; null под фильтром тегов. */
     adAccrued: number | null;
+    orderAds?: OrderAdsSummary | null;
     widgetGroups: CostGroupBreakdown[];
 }
 

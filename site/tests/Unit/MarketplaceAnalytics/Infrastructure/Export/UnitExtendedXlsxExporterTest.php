@@ -362,8 +362,8 @@ final class UnitExtendedXlsxExporterTest extends TestCase
             'otherCosts' => 10.0,
             'profit' => 990.0,
         ]];
-        $unallocated = ['commission' => 0.0, 'logistics' => 0.0, 'otherCosts' => 300.0, 'totalCosts' => 300.0, 'profit' => -300.0];
-        $totals = ['revenue' => 1000.0, 'otherCosts' => 310.0, 'profit' => 690.0];
+        $unallocated = ['commission' => 0.0, 'logistics' => 0.0, 'otherCosts' => 20.0, 'adSpend' => 280.0, 'totalCosts' => 300.0, 'profit' => -300.0];
+        $totals = ['revenue' => 1000.0, 'otherCosts' => 30.0, 'adSpend' => 280.0, 'profit' => 690.0];
 
         $exporter = new UnitExtendedXlsxExporter($this->queryReturning($items, $totals, $unallocated));
         $this->tempFile = tempnam(sys_get_temp_dir(), 'unit_extended_unalloc_').'.xlsx';
@@ -386,16 +386,20 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         self::assertNotNull($headerRowIndex);
         $header = $rows[$headerRowIndex];
         $otherIndex = array_search('Прочие затраты', $header, true);
+        $adsIndex = array_search('РР', $header, true);
         $revenueIndex = array_search('Выручка', $header, true);
         self::assertNotFalse($otherIndex);
+        self::assertNotFalse($adsIndex);
         self::assertNotFalse($revenueIndex);
 
         $unallocatedRow = $rows[$headerRowIndex + 2];
         self::assertSame('Не распределено по товарам', $unallocatedRow[0]);
-        self::assertSame('300', $unallocatedRow[$otherIndex]);
+        self::assertSame('20', $unallocatedRow[$otherIndex]);
+        self::assertSame('280', $unallocatedRow[$adsIndex]);
         // Выручки у строки нет — пустая ячейка, а не ноль.
         self::assertSame('', $unallocatedRow[$revenueIndex] ?? '');
         self::assertSame('ИТОГО', $rows[$headerRowIndex + 3][0]);
+        self::assertSame('280', $rows[$headerRowIndex + 3][$adsIndex]);
     }
 
     /**
