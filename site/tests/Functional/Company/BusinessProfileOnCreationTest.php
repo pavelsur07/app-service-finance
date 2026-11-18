@@ -126,23 +126,26 @@ final class BusinessProfileOnCreationTest extends WebTestCaseBase
         $plBefore = (int) $connection->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [(string) $company->getId()]);
         self::assertSame(43, $plBefore);
 
-        $crawler = $client->request('GET', sprintf('/company/%s/edit', $company->getId()));
+        $editUrl = sprintf('/company/%s/edit', $company->getId());
+        $crawler = $client->request('GET', $editUrl);
         self::assertResponseIsSuccessful();
         self::assertSame('UNIVERSAL', $crawler->filter('input[name="company[businessProfile]"]:checked')->attr('value'));
         self::assertStringContainsString('Справочники компании не изменятся', $crawler->filter('body')->text());
 
         $client->submit($crawler->selectButton('Сохранить')->form(['company[businessProfile]' => 'MARKETPLACE']));
-        self::assertResponseRedirects('/company/');
+        self::assertResponseRedirects($editUrl.'#company');
+        $client->followRedirect();
+        self::assertSelectorTextContains('.toast-body', 'Настройки компании сохранены.');
         self::assertSame(BusinessProfile::MARKETPLACE, $this->companyNamed('New Universal Co')->getBusinessProfile());
         self::assertSame($plBefore, (int) $connection->fetchOne('SELECT COUNT(*) FROM pl_categories WHERE company_id = ?', [(string) $company->getId()]), 'справочники не меняются');
 
         // Запрос без поля профиль не меняет (а не сбрасывает на значение по умолчанию).
         $connection->update('companies', ['business_profile' => 'UNIVERSAL'], ['id' => (string) $company->getId()]);
-        $crawler = $client->request('GET', sprintf('/company/%s/edit', $company->getId()));
+        $crawler = $client->request('GET', $editUrl);
         $form = $crawler->selectButton('Сохранить')->form();
         $form->remove('company[businessProfile]');
         $client->submit($form);
-        self::assertResponseRedirects('/company/');
+        self::assertResponseRedirects($editUrl.'#company');
         self::assertSame(BusinessProfile::UNIVERSAL, $this->companyNamed('New Universal Co')->getBusinessProfile());
     }
 

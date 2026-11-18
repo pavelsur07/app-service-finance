@@ -61,6 +61,7 @@ import { initCategoryTree } from './pages/category_tree.js';
 import { initTelegramIntegration } from './pages/telegram_integration.js';
 import { initOzonReconciliation } from './pages/ozon_reconciliation.js';
 import { initCompanyMembers } from './pages/company_members.js';
+import { initCompanyEditTabs } from './pages/company_edit.js';
 import { initProductShow } from './pages/product_show.js';
 import { initBillingTariff } from './pages/billing_tariff.js';
 import { initCashImportPreview } from './pages/cash_import_preview.js';
@@ -128,6 +129,7 @@ const initDds = () => {
   initTelegramIntegration();
   initOzonReconciliation();
   initCompanyMembers();
+  initCompanyEditTabs();
   initProductShow();
   initBillingTariff();
   initCashImportPreview();

@@ -59,6 +59,30 @@ final class CompanyTaxProfileTest extends WebTestCaseBase
         self::assertStringContainsString('НДС 5%', $text);
     }
 
+    public function testEditPageGroupsIndependentFormsUnderNamedTabs(): void
+    {
+        $crawler = $this->client->request('GET', sprintf('/company/%s/edit', self::COMPANY_ID));
+        self::assertResponseIsSuccessful();
+        $tabs = $crawler->filter('[data-company-edit-tabs] [role="tablist"] [role="tab"]');
+        self::assertSame(['Компания', 'Налоги', 'Консолидация'], array_map('trim', $tabs->extract(['_text'])));
+        self::assertSame(['company', 'taxes', 'consolidation'], $tabs->extract(['aria-controls']));
+        self::assertSame(['true', 'false', 'false'], $tabs->extract(['aria-selected']));
+
+        self::assertSelectorExists('#company[role="tabpanel"].active form[name="company"]');
+        self::assertSelectorExists('#company form[action="/finance/reports/account-balances/recalc"]');
+        self::assertSelectorExists(sprintf('#taxes[role="tabpanel"] form[action="/company/%s/tax-profile"]', self::COMPANY_ID));
+        self::assertSelectorExists(sprintf('#consolidation[role="tabpanel"] form[action="/company/%s/consolidation"]', self::COMPANY_ID));
+    }
+
+    public function testInvalidCompanySettingsShowErrorInsideCompanyTab(): void
+    {
+        $crawler = $this->client->request('GET', sprintf('/company/%s/edit', self::COMPANY_ID));
+        $this->client->submit($crawler->selectButton('Сохранить')->form(['company[minimumBalance][amount]' => '-0.01']));
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('#company.active .invalid-feedback', 'Минимальный остаток не может быть отрицательным.');
+    }
+
     public function testCompanyListShowsDetailsForEachOwnedCompany(): void
     {
         $company = $this->em()->getRepository(Company::class)->find(self::COMPANY_ID);
