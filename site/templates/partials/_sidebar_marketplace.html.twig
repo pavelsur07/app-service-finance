@@ -11,7 +11,7 @@
     {% set marketplace_menu_show = marketplace_menu_active ? 'show' : '' %}
     <div class="dropdown-menu {{ marketplace_menu_show }}">
         <div class="dropdown-menu-column">
-            {% set mp_charges_active = current_route starts with 'marketplace_' and not (current_route starts with 'marketplace_analytics_') and not (current_route starts with 'marketplace_ads_') and not (current_route starts with 'marketplace_inventory_') and current_route != 'marketplace_listing_tags_manage' and current_route != 'marketplace_listings_index' and not (current_route starts with 'marketplace_pl_preview_') %}
+            {% set mp_charges_active = current_route starts with 'marketplace_' and not (current_route starts with 'marketplace_analytics_') and not (current_route starts with 'marketplace_ads_') and not (current_route starts with 'marketplace_inventory_') and current_route != 'marketplace_listing_tags_manage' and current_route != 'marketplace_listings_index' and not (current_route starts with 'marketplace_pl_preview_') and current_route != 'marketplace_funnel' %}
             <a class="dropdown-item {{ mp_charges_active ? 'active' : '' }}" href="{{ path('marketplace_index') }}">
                 <span>Начисления</span>
             </a>
@@ -21,6 +21,9 @@
             </a>
             <a class="dropdown-item" href="{{ path('marketplace_economics_sku') }}">
                 <span>Экономика SKU (новая)</span>
+            </a>
+            <a class="dropdown-item {{ current_route == 'marketplace_funnel' ? 'active' : '' }}" href="{{ path('marketplace_funnel') }}">
+                <span>Воронка продаж</span>
             </a>
             {% set mp_ads_active = current_route starts with 'marketplace_ads_' %}
             <a class="dropdown-item {{ mp_ads_active ? 'active' : '' }}" href="{{ path('marketplace_ads_efficiency_index') }}">

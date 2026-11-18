@@ -179,6 +179,12 @@ marketplace_economics_controllers:
         namespace: App\MarketplaceEconomics\Controller
     type: attribute
 
+marketplace_funnel_controllers:
+    resource:
+        path: ../src/MarketplaceFunnel/Controller/
+        namespace: App\MarketplaceFunnel\Controller
+    type: attribute
+
 marketplace_quality_controllers:
     resource:
         path: ../src/MarketplaceQuality/Controller/
