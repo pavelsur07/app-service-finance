@@ -21,6 +21,8 @@ const (
 
 // FunnelMetrics — показы, переходы в карточку, корзины, заказы и их исходы.
 // Ozon принимает не больше 14 метрик; конверсии считаются из этих счётчиков.
+// Состав и порядок — часть контракта фактов: Symfony (MarketplaceFunnel) разбирает
+// метрики по позиции. Менять только вместе с OzonFunnelTranslator и версией правил.
 var FunnelMetrics = []string{
 	"hits_view_search", "hits_view_pdp", "hits_view",
 	"session_view_search", "session_view_pdp", "session_view",

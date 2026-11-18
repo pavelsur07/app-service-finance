@@ -170,7 +170,7 @@ func TestSnapshotPublishesOnlySupplies(t *testing.T) {
 }
 
 func TestFactsPublishOnlyListedResources(t *testing.T) {
-	assert.Equal(t, []string{executor.ResourceAccrualByDay, executor.ResourceAdsStatistics}, facts.Resources, "имена ресурсов в пакете facts — те же, что у загрузчика")
+	assert.Equal(t, []string{executor.ResourceAccrualByDay, executor.ResourceAdsStatistics, executor.ResourceFunnel}, facts.Resources, "имена ресурсов в пакете facts — те же, что у загрузчика")
 
 	d := deps(t)
 	var asked []string

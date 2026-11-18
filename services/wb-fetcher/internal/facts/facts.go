@@ -26,7 +26,12 @@ const ResourceDaily = "wb.finance.sales-report.daily"
 const ResourceAds = "wb.ads.daily"
 
 // Resources — ресурсы, чьи ревизии публикуются фактами.
-var Resources = []string{ResourceDaily, ResourceAds}
+var Resources = []string{ResourceDaily, ResourceAds, ResourceFunnel}
+
+// ResourceFunnel — воронка продаж по карточкам за день (executor.ResourceFunnel).
+const ResourceFunnel = "wb.analytics.funnel"
+
+const funnelKeyPrefix = "wb:analytics.funnel:"
 
 const adsKeyPrefix = "wb:ads.daily:"
 
@@ -39,6 +44,9 @@ var rrdID = regexp.MustCompile(`^[0-9]{1,20}$`)
 func Split(resourceType string, page []byte) ([]fkhttp.FactRecord, error) {
 	if resourceType == ResourceAds {
 		return splitAds(page)
+	}
+	if resourceType == ResourceFunnel {
+		return splitFunnel(page)
 	}
 	if resourceType != ResourceDaily {
 		return nil, fmt.Errorf("facts: resource %q is not published", resourceType)
@@ -122,6 +130,31 @@ func splitAds(page []byte) ([]fkhttp.FactRecord, error) {
 			return nil, fmt.Errorf("facts: encode campaign %s: %w", id, err)
 		}
 		out = append(out, fkhttp.FactRecord{SourceKey: adsKeyPrefix + id, Payload: payload})
+	}
+	return out, nil
+}
+
+// splitFunnel — запись = карточка дня как прислал WB ({"product","statistic"}),
+// ключ wb:analytics.funnel:{nmId}.
+func splitFunnel(page []byte) ([]fkhttp.FactRecord, error) {
+	var day struct {
+		Schema   string            `json:"schema"`
+		Products []json.RawMessage `json:"products"`
+	}
+	if err := json.Unmarshal(page, &day); err != nil || day.Schema != wb.FunnelSchema {
+		return nil, fmt.Errorf("facts: funnel page is not %s", wb.FunnelSchema)
+	}
+	out := make([]fkhttp.FactRecord, 0, len(day.Products))
+	for i, raw := range day.Products {
+		var row struct {
+			Product struct {
+				NmID int64 `json:"nmId"`
+			} `json:"product"`
+		}
+		if json.Unmarshal(raw, &row) != nil || row.Product.NmID <= 0 {
+			return nil, fmt.Errorf("facts: funnel product %d has no nmId", i)
+		}
+		out = append(out, fkhttp.FactRecord{SourceKey: fmt.Sprintf("%s%d", funnelKeyPrefix, row.Product.NmID), Payload: raw})
 	}
 	return out, nil
 }

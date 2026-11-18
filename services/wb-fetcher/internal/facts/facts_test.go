@@ -69,3 +69,21 @@ func TestSplitAdsRejectsOtherSchema(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, records, "день без рекламы — ноль записей")
 }
+
+func TestSplitFunnelCardPerNmID(t *testing.T) {
+	records, err := Split(ResourceFunnel, []byte(`{"schema":"wb-funnel-daily-v1","currency":"RUB","products":[
+		{"product":{"nmId":7,"vendorCode":"a"},"statistic":{"selected":{"openCount":3}}}]}`))
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	assert.Equal(t, "wb:analytics.funnel:7", records[0].SourceKey)
+	assert.JSONEq(t, `{"product":{"nmId":7,"vendorCode":"a"},"statistic":{"selected":{"openCount":3}}}`, string(records[0].Payload))
+
+	empty, err := Split(ResourceFunnel, []byte(`{"schema":"wb-funnel-daily-v1","currency":"RUB","products":[]}`))
+	require.NoError(t, err)
+	assert.Empty(t, empty)
+
+	for _, page := range []string{`{"schema":"v0","products":[]}`, `{"schema":"wb-funnel-daily-v1","products":[{"product":{}}]}`} {
+		_, err := Split(ResourceFunnel, []byte(page))
+		require.Error(t, err, page)
+	}
+}

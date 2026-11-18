@@ -533,7 +533,8 @@
 (`WB_FETCHER_BASE_URL`/`_API_TOKEN`). Клиент без базового URL в `sources()` не попадает.
 
 - `SourceFactsGatewayFacadeInterface`: `sources()` (сервис → публикуемые ресурсы:
-  `ozon.finance.accrual-by-day`, `wb.finance.sales-report.daily`), `batches()`, `page()`, `ack()`. Данных не меняет и не коммитит.
+  `ozon.finance.accrual-by-day`, `ozon.ads.statistics`, `ozon.analytics.funnel`, `wb.finance.sales-report.daily`,
+  `wb.ads.daily`, `wb.analytics.funnel`), `batches()`, `page()`, `ack()`. Данных не меняет и не коммитит.
 - Компанию пачки определяет фасад по `connection_ref` из активных подключений
   (`getActiveOzonSellerConnections()` ∪ `getActiveWbSellerConnections()`); подключения нет — `companyId = null`.
 - Страница отдаётся телом ответа как есть (`SourceFactPage::body`), проверенным по контракту:
@@ -695,6 +696,34 @@
   вид заранее (вид из `WbSourceTypeSeed::SUGGESTED` важнее).
 - `MarketplaceWbFacadeInterface::dayStates(companyId, from, to): list<WbDayState>` — переведённые дни
   (ревизия фактов отчёта, актуальность правил, `total` / `canon` / `quarantine`) для экрана R10. Только чтение.
+
+### MarketplaceFunnel: таблица воронки продаж
+
+Модуль задачи `docs/tasks/marketplace-funnel` (этап 5).
+
+**Устав.** Причина изменений — ступени воронки маркетплейсов (показы, переходы в карточку, корзины,
+заказы, выкупы). Модуль переводит факты `ozon.analytics.funnel` и `wb.analytics.funnel` из `SourceFacts`
+в дневную таблицу. В модуле не должно быть: денег канона, статей ОПиУ, экономики SKU, листингов,
+обращений к API маркетплейсов. Зависимость одна — фасад `SourceFacts` (гейт
+`ModuleBoundaryRules::test_marketplace_funnel_uses_only_source_facts`).
+
+| Таблица | Что | Ключ |
+|---|---|---|
+| `mfn_day` | переведённый день кабинета: `channel`, ревизия фактов, версия правил, `available` (false — маркетплейс не отдал день по тарифу: «нет данных»), `row_count`, `control_sum` (Σ всех ступеней строк дня) | `(company_id, connection_ref, operation_date)` |
+| `mfn_row` | воронка товара за день: `marketplace_sku` (SKU Ozon, nmId WB), `source` (`total`), `impressions`, `impressions_search`, `card_views`, `cart_adds`, `orders`, `revenue_minor`, `buyouts`, `cancels`, `returns`; ступень без данных — NULL | `(company_id, connection_ref, operation_date, marketplace_sku, source)` |
+
+- Ozon — `OzonFunnelTranslator`: метрики по порядку запроса сервиса (`ozon.FunnelMetrics`, 14 штук);
+  другое число метрик — день не переводится. Запись `ozon:analytics.funnel:unavailable` — день без строк,
+  `available = false`.
+- WB — `WbFunnelTranslator`: `statistic.selected`; общих показов и возвратов нет (NULL), первая ступень —
+  `card_views` (`openCount`).
+- `app:marketplace-funnel:translate` (cron `9-59/15`) — точка входа и владелец транзакций: день — одна
+  транзакция, замена целиком под `pg_advisory_xact_lock` дня (`FunnelStore::replaceDay`). Переводится день
+  с новой ревизией фактов или другой версией правил (`FunnelRow::RULES_VERSION`). Все кабинеты с фактами.
+- Гейт `app:marketplace-funnel:health-check` (cron 09:35 МСК): день с фактами не переведён; строки
+  `mfn_row` дня расходятся с `mfn_day` (число строк, контрольная сумма).
+- Товар хранится идентификатором маркетплейса: строка без листинга не отбрасывается, листинг находит читатель.
+  Фасада чтения нет — появится с экраном (этап 6).
 
 ### MarketplaceEconomics: витрина экономики SKU
 
@@ -6019,6 +6048,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.217 | 2026-11-18 | MarketplaceFunnel: новый модуль — таблица воронки продаж (`mfn_day`, `mfn_row`, `Version20261118120000`), `app:marketplace-funnel:translate` (`9-59/15`) и гейт `app:marketplace-funnel:health-check` (09:35); сервисы публикуют фактами `ozon.analytics.funnel` и `wb.analytics.funnel`; задача `marketplace-funnel`, этап 5 |
 | 2.216 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж WB `wb.analytics.funnel` в `WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES`, строка «Воронка по карточкам» в покрытии; задача `marketplace-funnel`, этап 1 |
 | 2.215 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж `ozon.analytics.funnel` (`MarketplaceConnectionsSnapshotBuilder::FUNNEL_RESOURCE_TYPE`, список `ozon_fetcher.search_analytics_companies`), строка «Воронка по товарам» в покрытии; задача `marketplace-funnel`, этап 4 |
 | 2.214 | 2026-11-18 | Finance: переменные формул ОПиУ `VAT_RATE` / `TAX_RATE` (`PlFormulaVariables`); Company: `CompanyTaxProfile::$taxRatePercent`, `VatMode::ratePercentOn()` вместо `Cash\…\VatRates`; задача `pl-formula-tax-variables` |

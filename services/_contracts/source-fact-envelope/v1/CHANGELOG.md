@@ -1,5 +1,14 @@
 # source-fact-envelope — CHANGELOG
 
+## Правка (2026-11-18) — воронка продаж
+
+- `ozon-fetcher` публикует `ozon.analytics.funnel`: запись = строка SKU дня как в ответе Ozon
+  (`{"dimensions","metrics"}`, метрики по порядку запроса сервиса), ключ `ozon:analytics.funnel:{sku}`.
+  День, который Ozon не отдал по тарифу кабинета, — одна запись `ozon:analytics.funnel:unavailable`.
+- `wb-fetcher` публикует `wb.analytics.funnel`: запись = карточка дня (`{"product","statistic"}`),
+  ключ `wb:analytics.funnel:{nmId}`.
+- Схема envelope не менялась.
+
 ## v1.3.0 (2026-11-15) — новый ресурс, форма не менялась
 
 - `wb.ads.daily` (wb-fetcher): реклама WB за день, запись — кампания (списания `upd` и её
