@@ -704,7 +704,7 @@
 **Устав.** Причина изменений — ступени воронки маркетплейсов (показы, переходы в карточку, корзины,
 заказы, выкупы). Модуль переводит факты `ozon.analytics.funnel` и `wb.analytics.funnel` из `SourceFacts`
 в дневную таблицу. В модуле не должно быть: денег канона, статей ОПиУ, экономики SKU, листингов,
-обращений к API маркетплейсов. Зависимость одна — фасад `SourceFacts` (гейт
+обращений к API маркетплейсов. Зависимости — фасады `SourceFacts` и `Marketplace` (названия листингов) (гейт
 `ModuleBoundaryRules::test_marketplace_funnel_uses_only_source_facts`).
 
 | Таблица | Что | Ключ |
@@ -723,7 +723,10 @@
 - Гейт `app:marketplace-funnel:health-check` (cron 09:43 МСК): день с фактами не переведён; строки
   `mfn_row` дня расходятся с `mfn_day` (число строк, контрольная сумма).
 - Товар хранится идентификатором маркетплейса: строка без листинга не отбрасывается, листинг находит читатель.
-  Фасада чтения нет — появится с экраном (этап 6).
+- Экран R9 `/marketplace/funnel` (`FunnelController`, доступ `module.marketplace.read`, `?format=xlsx`):
+  `FunnelReportQuery` (всегда с `companyId`) суммирует ступени по товарам за период, `FunnelReportBuilder`
+  подставляет названия листингов (`Marketplace\Facade`), считает итог и сортирует. Ступень без данных —
+  «нет данных», не ноль; дни `available = false` показаны числом в пояснении.
 
 ### MarketplaceEconomics: витрина экономики SKU
 
@@ -6048,6 +6051,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.218 | 2026-11-18 | MarketplaceFunnel: экран R9 «Воронка продаж» `/marketplace/funnel` (товар × ступени, конверсии, xlsx), модуль в карте доступа `ModuleAccessMap`, пункт меню; задача `marketplace-funnel`, этап 6 |
 | 2.217 | 2026-11-18 | MarketplaceFunnel: новый модуль — таблица воронки продаж (`mfn_day`, `mfn_row`, `Version20261118120000`), `app:marketplace-funnel:translate` (`9-59/15`) и гейт `app:marketplace-funnel:health-check` (09:43); сервисы публикуют фактами `ozon.analytics.funnel` и `wb.analytics.funnel`; задача `marketplace-funnel`, этап 5 |
 | 2.216 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж WB `wb.analytics.funnel` в `WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES`, строка «Воронка по карточкам» в покрытии; задача `marketplace-funnel`, этап 1 |
 | 2.215 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж `ozon.analytics.funnel` (`MarketplaceConnectionsSnapshotBuilder::FUNNEL_RESOURCE_TYPE`, список `ozon_fetcher.search_analytics_companies`), строка «Воронка по товарам» в покрытии; задача `marketplace-funnel`, этап 4 |

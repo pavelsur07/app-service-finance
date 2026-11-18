@@ -434,7 +434,8 @@ final class ModuleBoundaryRules
                 Selector::inNamespace('App\Finance'),
                 Selector::inNamespace('App\Cash'),
             )
-            ->because('воронка — не деньги: в экономику и ОПиУ она не подмешивается, факты приходят из SourceFacts.');
+            ->excluding(Selector::inNamespace('App\Marketplace\Facade'), Selector::inNamespace('App\Marketplace\DTO'))
+            ->because('воронка — не деньги: в экономику и ОПиУ она не подмешивается, факты приходят из SourceFacts, названия товаров — из Marketplace\\Facade.');
     }
 
     /**
