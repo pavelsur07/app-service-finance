@@ -116,6 +116,10 @@ final class CoverageHeatmapBuilderTest extends TestCase
         self::assertContains('Воронка по карточкам', array_map(static fn ($r) => $r->title, $wbFunnel->rows));
         $wbSearch = $builder->build(self::month('2026-10', [self::cell('wb.analytics.search', '2026-10-18', 1, 1)], null, 'wb-fetcher'), self::now());
         self::assertContains('Поиск по карточкам', array_map(static fn ($r) => $r->title, $wbSearch->rows));
+        // Одна загруженная ячейка: у разовой проверки давность дня на покрытие не влияет, у ежедневного ресурса — влияет.
+        $percent = static fn (string $resource, string $day): ?int => $builder->build(self::month('2026-10', [self::cell($resource, $day, 50, 50)], null, 'wb-fetcher'), self::now())->coveragePercent;
+        self::assertSame($percent('wb.analytics.search', '2026-10-17'), $percent('wb.analytics.search', '2026-10-03'), 'дни без задачи после проверки — не пропуск');
+        self::assertGreaterThan($percent('wb.analytics.funnel', '2026-10-03'), $percent('wb.analytics.funnel', '2026-10-17'), 'ежедневный ресурс: дни без задачи — пропуск');
 
         $returns = $builder->build(self::month('2026-10', [self::cell('ozon.returns', '2026-10-18', 1, 1)]), self::now());
         self::assertContains('Возвраты', array_map(static fn ($r) => $r->title, $returns->rows));
