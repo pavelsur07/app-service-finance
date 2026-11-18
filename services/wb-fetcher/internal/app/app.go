@@ -65,6 +65,7 @@ func Limits(interval time.Duration) ratelimit.Config {
 			wb.EndpointAdsFullStats: every(20 * time.Second),
 			// Воронка: лимит WB — 3 запроса в минуту на продавца (персональный токен).
 			wb.EndpointFunnel: every(20 * time.Second),
+			wb.EndpointSearch: every(20 * time.Second),
 		},
 		Fallback:  limit,
 		GrowAfter: 5, IncreaseStep: ceiling,

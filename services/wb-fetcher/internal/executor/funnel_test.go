@@ -31,6 +31,30 @@ func (f *fakeFunnel) FunnelDay(_ context.Context, ref, token, day string) (wb.Fu
 	return wb.FunnelDay{Body: []byte(`{"schema":"wb-funnel-daily-v1","currency":"RUB","products":[]}`), Products: 3}, nil
 }
 
+func (f *fakeFunnel) SearchDay(_ context.Context, ref, token, day string) (wb.FunnelDay, error) {
+	f.days = append(f.days, "search "+ref+" "+token+" "+day)
+	return wb.FunnelDay{Body: []byte(`{"schema":"wb-search-daily-v1","currency":"RUB","products":[]}`), Products: 2}, f.err
+}
+
+func TestSearchDayIsOnePageWithOwnAccess(t *testing.T) {
+	c := funnelCab
+	c.ResourceTypes = []string{ResourceDaily, ResourceSearch}
+	tk := funnelTask("")
+	tk.ResourceType = ResourceSearch
+	f := &fakeFunnel{}
+
+	res, h := runFunnel(t, f, tk, c)
+
+	assert.Equal(t, "done", res.Outcome)
+	assert.Equal(t, []string{"search wb-1 tok 2026-11-17"}, f.days)
+	require.Len(t, h.raw.keys, 1)
+	assert.True(t, strings.HasPrefix(h.raw.keys[0], "wb/wb-1/wb.analytics.search/2026-11-17/"), h.raw.keys[0])
+	assert.True(t, ownAccess(ResourceSearch), "отказ в доступе — пауза только задачи")
+
+	_, h = runFunnel(t, &fakeFunnel{}, tk, funnelCab)
+	assert.Empty(t, h.raw.keys, "ресурс кабинету не выдан")
+}
+
 var funnelCab = connections.Cabinet{Ref: "wb-1", CompanyID: "c1", Token: "tok", ResourceTypes: []string{ResourceDaily, ResourceFunnel}}
 
 func funnelTask(lastError string) store.Task {

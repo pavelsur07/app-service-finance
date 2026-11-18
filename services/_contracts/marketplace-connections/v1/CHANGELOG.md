@@ -1,5 +1,10 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-11-18) — поиск по карточкам WB
+
+- Новое значение `resource_types` у Wildberries: `wb.analytics.search` (API аналитики тем же
+  токеном, у WB — только с подпиской «Джем»), тем же компаниям, что отчёт. Схема не менялась.
+
 ## Правка (2026-11-18) — воронка продаж WB
 
 - Новое значение `resource_types` у Wildberries: `wb.analytics.funnel` (API аналитики тем же

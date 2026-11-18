@@ -114,6 +114,8 @@ final class CoverageHeatmapBuilderTest extends TestCase
 
         $wbFunnel = $builder->build(self::month('2026-10', [self::cell('wb.analytics.funnel', '2026-10-18', 1, 1)], null, 'wb-fetcher'), self::now());
         self::assertContains('Воронка по карточкам', array_map(static fn ($r) => $r->title, $wbFunnel->rows));
+        $wbSearch = $builder->build(self::month('2026-10', [self::cell('wb.analytics.search', '2026-10-18', 1, 1)], null, 'wb-fetcher'), self::now());
+        self::assertContains('Поиск по карточкам', array_map(static fn ($r) => $r->title, $wbSearch->rows));
 
         $returns = $builder->build(self::month('2026-10', [self::cell('ozon.returns', '2026-10-18', 1, 1)]), self::now());
         self::assertContains('Возвраты', array_map(static fn ($r) => $r->title, $returns->rows));
