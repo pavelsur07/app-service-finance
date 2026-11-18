@@ -26,7 +26,12 @@ const ResourceDaily = "wb.finance.sales-report.daily"
 const ResourceAds = "wb.ads.daily"
 
 // Resources — ресурсы, чьи ревизии публикуются фактами.
-var Resources = []string{ResourceDaily, ResourceAds}
+var Resources = []string{ResourceDaily, ResourceAds, ResourceFunnel}
+
+// ResourceFunnel — воронка продаж по карточкам за день (executor.ResourceFunnel).
+const ResourceFunnel = "wb.analytics.funnel"
+
+const funnelKeyPrefix = "wb:analytics.funnel:"
 
 const adsKeyPrefix = "wb:ads.daily:"
 
@@ -39,6 +44,9 @@ var rrdID = regexp.MustCompile(`^[0-9]{1,20}$`)
 func Split(resourceType string, page []byte) ([]fkhttp.FactRecord, error) {
 	if resourceType == ResourceAds {
 		return splitAds(page)
+	}
+	if resourceType == ResourceFunnel {
+		return splitFunnel(page)
 	}
 	if resourceType != ResourceDaily {
 		return nil, fmt.Errorf("facts: resource %q is not published", resourceType)
@@ -122,6 +130,45 @@ func splitAds(page []byte) ([]fkhttp.FactRecord, error) {
 			return nil, fmt.Errorf("facts: encode campaign %s: %w", id, err)
 		}
 		out = append(out, fkhttp.FactRecord{SourceKey: adsKeyPrefix + id, Payload: payload})
+	}
+	return out, nil
+}
+
+// splitFunnel — запись = воронка карточки за день: {"product":{"nmId"},"statistic":{"selected"}},
+// ключ wb:analytics.funnel:{nmId}. Остальное в карточке (остатки, рейтинг, прошлый период) — состояние
+// «на сейчас»: с ним каждое суточное перечитывание меняло бы запись при тех же цифрах дня.
+func splitFunnel(page []byte) ([]fkhttp.FactRecord, error) {
+	var day struct {
+		Schema   string            `json:"schema"`
+		Products []json.RawMessage `json:"products"`
+	}
+	if err := json.Unmarshal(page, &day); err != nil || day.Schema != wb.FunnelSchema {
+		return nil, fmt.Errorf("facts: funnel page is not %s", wb.FunnelSchema)
+	}
+	out := make([]fkhttp.FactRecord, 0, len(day.Products))
+	for i, raw := range day.Products {
+		var row struct {
+			Product struct {
+				NmID int64 `json:"nmId"`
+			} `json:"product"`
+			Statistic struct {
+				Selected json.RawMessage `json:"selected"`
+			} `json:"statistic"`
+		}
+		if json.Unmarshal(raw, &row) != nil || row.Product.NmID <= 0 {
+			return nil, fmt.Errorf("facts: funnel product %d has no nmId", i)
+		}
+		if row.Statistic.Selected == nil {
+			row.Statistic.Selected = json.RawMessage("null")
+		}
+		payload, err := json.Marshal(map[string]any{
+			"product":   map[string]int64{"nmId": row.Product.NmID},
+			"statistic": map[string]json.RawMessage{"selected": row.Statistic.Selected},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("facts: encode funnel product %d: %w", i, err)
+		}
+		out = append(out, fkhttp.FactRecord{SourceKey: fmt.Sprintf("%s%d", funnelKeyPrefix, row.Product.NmID), Payload: payload})
 	}
 	return out, nil
 }

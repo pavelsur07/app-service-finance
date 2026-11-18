@@ -414,6 +414,30 @@ final class ModuleBoundaryRules
     }
 
     /**
+     * `MarketplaceFunnel` — таблица воронки продаж: факты берёт только из фасада `SourceFacts`;
+     * переводчики денег, канон, легаси и учёт ему недоступны.
+     */
+    public function test_marketplace_funnel_uses_only_source_facts(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplaceFunnel'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceWb'),
+                Selector::inNamespace('App\MarketplaceOperations'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->because('воронка — не деньги: в экономику и ОПиУ она не подмешивается, факты приходят из SourceFacts.');
+    }
+
+    /**
      * `MarketplaceWb` — переводчик WB нового контура (этап 8.3): как `MarketplaceOzon` — только фасады
      * `SourceFacts`, канона и `Marketplace`; переводчик Ozon, легаси WB и учёт ему недоступны.
      */
