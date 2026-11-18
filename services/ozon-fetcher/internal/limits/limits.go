@@ -55,7 +55,7 @@ func DefaultConfig() ratelimit.Config {
 			// (429 code 8, замер 24.10.2026) — ozon-9-search-analytics.md.
 			ozon.EndpointSearchQueries:        {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
 			ozon.EndpointSearchQueriesDetails: {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},
-			// Воронка: Ozon ограничивает метод одним запросом в минуту на кабинет.
+			// Воронка: консервативно запрос в минуту на кабинет — лимит метода не замерен.
 			ozon.EndpointFunnel: {Start: 1.0 / 60, Floor: 1.0 / 60, Ceiling: 1.0 / 60, DefaultPause: 60 * time.Second},
 			// Возвраты: страница на день, ключ общий (ozon-10-returns.md).
 			ozon.EndpointReturns: {Start: 0.2, Floor: 0.2, Ceiling: 0.2, DefaultPause: 5 * time.Second, SharedQuota: true},

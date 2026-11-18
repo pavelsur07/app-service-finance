@@ -141,7 +141,12 @@ func (c *Client) post(ctx context.Context, creds Credentials, connectionRef, met
 	}
 
 	if apiErr := Classify(endpoint, resp.StatusCode, resp.Header, raw, c.now()); apiErr != nil {
-		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, string(apiErr.Class))
+		outcome := string(apiErr.Class)
+		if IsSubscriptionRequired(apiErr) {
+			// Тариф кабинета не открывает метрики — штатный отказ, не предупреждение.
+			outcome = outcomeSubscriptionRequired
+		}
+		c.log(ctx, connectionRef, endpoint, resp.StatusCode, duration, outcome)
 		return Response{}, apiErr
 	}
 
@@ -151,7 +156,7 @@ func (c *Client) post(ctx context.Context, creds Credentials, connectionRef, met
 
 func (c *Client) log(ctx context.Context, connectionRef, endpoint string, status int, duration time.Duration, outcome string) {
 	level := slog.LevelInfo
-	if outcome != "ok" && outcome != "canceled" {
+	if outcome != "ok" && outcome != "canceled" && outcome != outcomeSubscriptionRequired {
 		level = slog.LevelWarn
 	}
 	c.logger.Log(ctx, level, "ozon request",

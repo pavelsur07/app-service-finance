@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,11 +70,10 @@ func TestFetchFunnelEmptyDayIsOnePage(t *testing.T) {
 func TestFetchFunnelRejectsBrokenResponses(t *testing.T) {
 	for name, respond := range map[string]func(map[string]any) (int, string){
 		"not object": func(map[string]any) (int, string) { return http.StatusOK, `[]` },
-		"no data":    func(map[string]any) (int, string) { return http.StatusOK, `{"result":{}}` },
+		"no result":  func(map[string]any) (int, string) { return http.StatusOK, `{}` },
 		"row without sku": func(map[string]any) (int, string) {
 			return http.StatusOK, `{"result":{"data":[{"dimensions":[],"metrics":[]}]}}`
 		},
-		"repeat across pages": func(map[string]any) (int, string) { return http.StatusOK, funnelBody(0, FunnelPageSize) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			handler, _ := productServer(t, EndpointFunnel, respond)
@@ -99,4 +99,29 @@ func TestIsSubscriptionRequired(t *testing.T) {
 	_, _, err = collectFunnel(t, other)
 	require.Error(t, err)
 	assert.False(t, IsSubscriptionRequired(err))
+}
+
+func TestSubscriptionRefusalIsLoggedAsInfo(t *testing.T) {
+	client, logs := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"code":3,"message":"deprecated metrics used"}`))
+	}, time.Second)
+
+	_, err := client.FetchFunnel(context.Background(), testCreds, "conn-1", "2026-11-17", 1, func(Page) error { return nil })
+
+	require.True(t, IsSubscriptionRequired(err))
+	assert.Contains(t, logs.String(), `"outcome":"subscription_required"`)
+	assert.NotContains(t, logs.String(), `"level":"WARN"`, "нет тарифа — штатно, на каждом дне догона")
+}
+
+func TestFetchFunnelNullDataAndShiftedOrder(t *testing.T) {
+	empty, _ := productServer(t, EndpointFunnel, func(map[string]any) (int, string) { return http.StatusOK, `{"result":{"data":null}}` })
+	pages, rows, err := collectFunnel(t, empty)
+	require.NoError(t, err)
+	assert.Zero(t, rows)
+	assert.Len(t, pages, 1)
+
+	repeat, _ := productServer(t, EndpointFunnel, func(map[string]any) (int, string) { return http.StatusOK, funnelBody(0, FunnelPageSize) })
+	_, _, err = collectFunnel(t, repeat)
+	assert.ErrorIs(t, err, ErrFunnelShifted, "та же страница дважды — порядок сдвинулся")
 }

@@ -107,6 +107,9 @@ func (e *Executor) Classify(c *fetch.Classification) (store.Outcome, bool) {
 	if errors.Is(err, errFunnelRestart) {
 		return c.Retryable("funnel_restart", false), true
 	}
+	if errors.Is(err, errFunnelRefused) {
+		return store.Outcome{Status: store.StatusFailedPermanent, Label: "funnel_refused", ErrorClass: "funnel_refused", NextRunAt: now}, true
+	}
 	if errors.Is(err, errReturnsRestart) {
 		return c.Retryable("returns_restart", false), true
 	}

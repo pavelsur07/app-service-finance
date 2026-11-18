@@ -61,6 +61,36 @@ func TestFunnelWithoutSubscriptionStoresServicePage(t *testing.T) {
 	assert.Equal(t, "unchanged", newHarness(o).exec.Run(context.Background(), tk, funnelCabinet, "trace").Outcome)
 }
 
+func TestFunnelSubscriptionLostBetweenPagesRestartsDay(t *testing.T) {
+	o := &fakeOzon{
+		funnelPages: []ozon.Page{page(`{"result":{"data":[1]}}`, "1000")},
+		funnelErr:   &ozon.APIError{Class: ozon.ClassInvalidRequest, Endpoint: ozon.EndpointFunnel, Status: 400, Code: 3, Message: "deprecated metrics used"},
+	}
+	h := newHarness(o)
+
+	res := h.exec.Run(context.Background(), task(ResourceFunnel, today), funnelCabinet, "trace")
+
+	assert.Equal(t, "funnel_restart", res.Outcome, "часть дня не выдаётся за день: заново, затем служебная страница")
+	assert.False(t, h.tasks.finished.KeepCursor)
+	assert.NotContains(t, h.logs.String(), `"level":"ERROR"`)
+}
+
+func TestFunnelRefusalNeverOverwritesLoadedDay(t *testing.T) {
+	o := &fakeOzon{funnelErr: &ozon.APIError{Class: ozon.ClassInvalidRequest, Endpoint: ozon.EndpointFunnel, Status: 400, Code: 3, Message: "deprecated metrics used"}}
+	h := newHarness(o)
+	tk := task(ResourceFunnel, today)
+	tk.ContentHash = contentHash([]string{sha256Hex([]byte(`{"result":{"data":[1]}}`))})
+
+	res := h.exec.Run(context.Background(), tk, funnelCabinet, "trace")
+
+	assert.Equal(t, "funnel_refused", res.Outcome, "ревизия с данными не заменяется служебной страницей")
+	assert.Equal(t, "failed_permanent", string(h.tasks.finished.Status))
+	assert.Empty(t, h.raw.puts)
+
+	shifted := newHarness(&fakeOzon{funnelErr: ozon.ErrFunnelShifted})
+	assert.Equal(t, "funnel_restart", shifted.exec.Run(context.Background(), task(ResourceFunnel, today), funnelCabinet, "trace").Outcome)
+}
+
 func TestFunnelResumeDisabledAndRateLimit(t *testing.T) {
 	// Прерванный день — заново: повтор SKU между страницами проверяется в одной попытке.
 	o := &fakeOzon{}

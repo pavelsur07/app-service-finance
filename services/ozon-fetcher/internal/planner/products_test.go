@@ -178,7 +178,7 @@ func TestFunnelBackfillAndTail(t *testing.T) {
 
 	days := periods(p.Ensure, executor.ResourceFunnel)
 	require.Len(t, days, FunnelDepthDays)
-	assert.Equal(t, "2026-08-20", days[0], "догон не глубже FunnelDepthDays")
+	assert.Equal(t, "2026-10-19", days[0], "догон не глубже FunnelDepthDays")
 	assert.Equal(t, "2026-11-17", days[len(days)-1], "вчера; сегодня — день неполный")
 	tail := refresh(p, KindFunnelTail)
 	require.NotNil(t, tail)

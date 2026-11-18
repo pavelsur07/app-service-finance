@@ -49,9 +49,10 @@ const SearchDepthDays = 33
 // Ozon может досчитывать дни.
 const SearchTailDays = 5
 
-// FunnelDepthDays — глубина догона воронки: без подписки Ozon отдаёт
-// аналитику за три месяца.
-const FunnelDepthDays = 90
+// FunnelDepthDays — глубина догона воронки. Запрос — раз в минуту на кабинет,
+// форма ответа живым запросом не подтверждена: глубже — после подтверждения
+// (docs/tasks/marketplace-funnel/TASK.md, этап 4).
+const FunnelDepthDays = 30
 
 // FunnelTailDays — дней до сегодня, перечитываемых раз в сутки: отмены,
 // возвраты и доставки Ozon пишет на день заказа; этим же проходом кабинет
