@@ -107,6 +107,25 @@ final class PlFormulaVariablesCalculationTest extends TestCase
         self::assertSame(180.0, $this->value($this->calculate($profiles, $quarter3, withVatAmount: true), 'TAX'));
     }
 
+    public function testMoneyRowReadingRateThroughPercentRowIsSummedByMonth(): void
+    {
+        // Регрессия: TAX_BY_SHARE = REV * TAX_PCT / 100, где TAX_PCT = TAX_RATE. Январь 6%, февраль 15%,
+        // выручка 1000 в месяц: 60 + 150 = 210, а не 15% от 2000.
+        $profiles = static fn (\DateTimeImmutable $date): CompanyTaxProfileDTO => new CompanyTaxProfileDTO(
+            TaxRegime::USN,
+            VatMode::EXEMPT,
+            null,
+            $date->format('Y-m') >= '2026-02' ? '15.00' : '6.00',
+        );
+        $period = PlReportPeriod::forRange(new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-02-28'));
+
+        $result = $this->calculate($profiles, $period, withVatAmount: true);
+
+        self::assertEqualsWithDelta(210.0, $this->value($result, 'TAX_BY_SHARE'), 1e-9);
+        self::assertEqualsWithDelta(210.0, $this->value($result, 'TAX'), 1e-9);
+        self::assertSame(15.0, $this->value($result, 'TAX_PCT'));
+    }
+
     public function testPrecomputedFactsAreNotSplitByMonth(): void
     {
         // Регрессия: предпросмотр и бюджет передают сумму колонки (withFacts), она не зависит от периода.
@@ -177,6 +196,7 @@ final class PlFormulaVariablesCalculationTest extends TestCase
         if ($withVatAmount) {
             $tree[] = $this->category($company, 'VAT', 'НДС', PLCategoryType::KPI, 'REV * VAT_RATE / (100 + VAT_RATE)');
             $tree[] = $this->category($company, 'REV_NET', 'Выручка без НДС', PLCategoryType::KPI, 'REV - VAT');
+            $tree[] = $this->category($company, 'TAX_BY_SHARE', 'Налог через процент', PLCategoryType::KPI, 'REV * TAX_PCT / 100');
         }
         $repo->method('findBy')->willReturn($tree);
 

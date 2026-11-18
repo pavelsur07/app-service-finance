@@ -63,8 +63,10 @@ final class PlReportCalculator
         $warnings = [];
         /** @var list<array{string, string}> $variableUses [имя переменной, название статьи] */
         $variableUses = [];
-        /** @var list<string> $moneyVariableIds денежные статьи, чья формула читает переменную ставки */
-        $moneyVariableIds = [];
+        /** @var array<string, true> $readsRate статьи, чья формула читает переменную ставки */
+        $readsRate = [];
+        /** @var array<string, list<string>> $formulaDeps id статьи => id статей из её формулы */
+        $formulaDeps = [];
 
         foreach ($all as $cat) {
             $catId = (string) $cat->getId();
@@ -86,14 +88,13 @@ final class PlReportCalculator
                     foreach ($this->deps->extract($ast) as $code) {
                         if (PlFormulaVariables::isVariable($code)) {
                             $variableUses[] = [strtoupper($code), $cat->getName()];
-                            if (PLValueFormat::MONEY === $cat->getFormat()) {
-                                $moneyVariableIds[] = $catId;
-                            }
+                            $readsRate[$catId] = true;
                             continue;
                         }
                         $depCat = $this->findByCode($all, $code);
                         if ($depCat) {
                             $g->addEdge((string) $depCat->getId(), $catId);
+                            $formulaDeps[$catId][] = (string) $depCat->getId();
                         } else {
                             $warnings[] = "Unknown code `$code` in formula of `{$cat->getName()}`";
                         }
@@ -113,6 +114,27 @@ final class PlReportCalculator
                 $warnings[] = "Переменная $variable в формуле «{$categoryName}»: ставка не задана в налоговом профиле компании, принято 0";
             }
         }
+
+        // Ставка доходит до статьи и через промежуточные неденежные статьи (TAX = REV * TAX_PCT / 100,
+        // где TAX_PCT = TAX_RATE). Через денежную не идёт: та уже сложена по месяцам, сумма линейна.
+        do {
+            $grew = false;
+            foreach ($formulaDeps as $id => $depIds) {
+                if (isset($readsRate[$id])) {
+                    continue;
+                }
+                foreach ($depIds as $depId) {
+                    if (isset($readsRate[$depId]) && PLValueFormat::MONEY !== $byId[$depId]->getFormat()) {
+                        $readsRate[$id] = $grew = true;
+                        break;
+                    }
+                }
+            }
+        } while ($grew);
+        $moneyVariableIds = array_values(array_filter(
+            array_keys($readsRate),
+            static fn (string $id): bool => PLValueFormat::MONEY === $byId[$id]->getFormat(),
+        ));
 
         $monthlySums = $this->sumByMonthsIfRateChanges($company, $period, $moneyVariableIds, $projectDirection, $responsibilityCenterId, $warnings);
 
