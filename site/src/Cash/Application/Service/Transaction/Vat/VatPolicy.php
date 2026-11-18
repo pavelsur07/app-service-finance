@@ -11,7 +11,6 @@ use App\Company\Facade\CompanyTaxProfileFacadeInterface;
 final readonly class VatPolicy
 {
     public function __construct(
-        private VatRates $vatRates,
         private CompanyTaxProfileFacadeInterface $taxProfiles,
     ) {
     }
@@ -32,11 +31,6 @@ final readonly class VatPolicy
             return null;
         }
 
-        return match ($profile->vatMode) {
-            VatMode::EXEMPT => null,
-            VatMode::USN_5 => 5,
-            VatMode::USN_7 => 7,
-            VatMode::GENERAL => $this->vatRates->generalRateOn($occurredAt),
-        };
+        return VatMode::EXEMPT === $profile->vatMode ? null : $profile->vatMode->ratePercentOn($occurredAt);
     }
 }

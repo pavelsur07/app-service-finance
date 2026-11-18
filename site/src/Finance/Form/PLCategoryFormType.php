@@ -9,6 +9,7 @@ use App\Finance\Enum\PLCategoryType as PLCategoryTypeEnum;
 use App\Finance\Enum\PLExpenseType;
 use App\Finance\Enum\PLFlow;
 use App\Finance\Enum\PLValueFormat;
+use App\Finance\Report\PlFormulaVariables;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
@@ -19,6 +20,7 @@ use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\Regex;
 
 class PLCategoryFormType extends AbstractType
 {
@@ -46,6 +48,11 @@ class PLCategoryFormType extends AbstractType
                 'required' => false,
                 'help' => 'Уникален в компании, используется в формулах',
                 'attr' => ['placeholder' => 'REV_WB, COGS, EBITDA ...'],
+                'constraints' => [new Regex(
+                    pattern: '/^\s*('.implode('|', PlFormulaVariables::NAMES).')\s*$/i',
+                    message: 'Код зарезервирован под переменную налоговой ставки.',
+                    match: false,
+                )],
             ])
             ->add('type', ChoiceType::class, [
                 'label' => 'Тип строки',
@@ -99,7 +106,7 @@ class PLCategoryFormType extends AbstractType
             ->add('formula', TextareaType::class, [
                 'label' => 'Формула (для KPI/особых итогов)',
                 'required' => false,
-                'help' => 'Пример: REV_TOTAL - VAR_COSTS_TOTAL',
+                'help' => 'Пример: REV_TOTAL - VAR_COSTS_TOTAL. Ставки из налогового профиля, %: VAT_RATE — НДС, TAX_RATE — налог УСН/АУСН (REV_TOTAL * TAX_RATE / 100).',
                 'attr' => ['rows' => 5, 'placeholder' => 'Напр.: REV_TOTAL - VAR_COSTS_TOTAL', 'class' => 'font-monospace'],
             ])
             ->add('calcOrder', IntegerType::class, [

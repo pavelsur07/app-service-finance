@@ -73,6 +73,25 @@ final class CompanyTaxProfileTest extends WebTestCaseBase
         self::assertSame(TaxRegime::OSNO, $profiles[0]->getTaxRegime());
     }
 
+    public function testOwnerSetsTaxRate(): void
+    {
+        $this->saveProfile('USN', 'EXEMPT', '', '6');
+        self::assertSame('6.00', $this->profiles()[0]->getTaxRatePercent());
+
+        $crawler = $this->client->request('GET', sprintf('/company/%s/edit', self::COMPANY_ID));
+        self::assertStringContainsString('6%', $crawler->filter('#taxes table')->text());
+
+        // Ставка вне 0…100 отклоняется формой, период не меняется.
+        $this->saveProfile('USN', 'EXEMPT', '', '150');
+        $this->client->followRedirect();
+        self::assertStringContainsString('Ставка налога — число от 0 до 100.', (string) $this->client->getResponse()->getContent());
+        self::assertSame('6.00', $this->profiles()[0]->getTaxRatePercent());
+
+        // Пустая ставка — «не задана».
+        $this->saveProfile('USN', 'EXEMPT', '');
+        self::assertNull($this->profiles()[0]->getTaxRatePercent());
+    }
+
     public function testDisallowedCombinationIsRejected(): void
     {
         $crawler = $this->client->request('GET', sprintf('/company/%s/edit', self::COMPANY_ID));
@@ -197,7 +216,7 @@ final class CompanyTaxProfileTest extends WebTestCaseBase
         self::assertSelectorTextContains('[data-tax-profile-line]', 'Налоговый режим: УСН, без НДС');
     }
 
-    private function saveProfile(string $regime, string $vatMode, string $validFrom): void
+    private function saveProfile(string $regime, string $vatMode, string $validFrom, string $taxRate = ''): void
     {
         $crawler = $this->client->request('GET', sprintf('/company/%s/edit', self::COMPANY_ID));
         $form = $crawler->selectButton('Сохранить режим')->form();
@@ -205,6 +224,7 @@ final class CompanyTaxProfileTest extends WebTestCaseBase
             'company_tax_profile[taxRegime]' => $regime,
             'company_tax_profile[vatMode]' => $vatMode,
             'company_tax_profile[validFrom]' => $validFrom,
+            'company_tax_profile[taxRatePercent]' => $taxRate,
         ]);
         $this->client->submit($form);
         self::assertResponseRedirects(sprintf('/company/%s/edit#taxes', self::COMPANY_ID));

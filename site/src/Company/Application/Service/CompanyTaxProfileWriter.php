@@ -32,19 +32,19 @@ final readonly class CompanyTaxProfileWriter
         );
     }
 
-    public function upsert(string $companyId, TaxRegime $taxRegime, VatMode $vatMode, ?\DateTimeImmutable $validFrom): CompanyTaxProfile
+    public function upsert(string $companyId, TaxRegime $taxRegime, VatMode $vatMode, ?\DateTimeImmutable $validFrom, ?string $taxRatePercent = null): CompanyTaxProfile
     {
         $validFrom = CompanyTaxProfile::normalizeValidFrom($validFrom);
         $now = $this->clock->now();
 
         $existing = $this->repository->findOneByCompanyAndValidFrom($companyId, $validFrom);
         if (null !== $existing) {
-            $existing->change($taxRegime, $vatMode, $now);
+            $existing->change($taxRegime, $vatMode, $taxRatePercent, $now);
 
             return $existing;
         }
 
-        $profile = new CompanyTaxProfile($companyId, $taxRegime, $vatMode, $validFrom, $now);
+        $profile = new CompanyTaxProfile($companyId, $taxRegime, $vatMode, $validFrom, $now, null, $taxRatePercent);
         $this->entityManager->persist($profile);
 
         return $profile;

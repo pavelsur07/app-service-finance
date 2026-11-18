@@ -8,6 +8,7 @@ use App\Company\Enum\TaxRegime;
 use App\Company\Enum\VatMode;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Symfony\Component\Form\Extension\Core\Type\NumberType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\Options;
@@ -17,7 +18,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 /**
  * Период налогового профиля: режим, режим НДС и месяц начала (пусто — начальный профиль).
- * Данные — массив {taxRegime: ?TaxRegime, vatMode: ?VatMode, validFrom: ?string 'YYYY-MM'}.
+ * Данные — массив {taxRegime: ?TaxRegime, vatMode: ?VatMode, taxRatePercent: ?string, validFrom: ?string 'YYYY-MM'}.
  *
  * @extends AbstractType<array<string, mixed>>
  */
@@ -47,6 +48,16 @@ final class CompanyTaxProfileType extends AbstractType
                 'required' => $required,
                 'constraints' => $required ? [new Assert\NotNull(message: 'Выберите режим НДС.')] : [],
                 'attr' => ['class' => 'form-select', 'data-vat-mode' => ''],
+            ])
+            ->add('taxRatePercent', NumberType::class, [
+                'label' => 'Ставка налога, %',
+                'required' => false,
+                'input' => 'string',
+                'scale' => 2,
+                'help' => 'УСН — 6 или 15, АУСН — 8 или 20. Переменная TAX_RATE в формулах ОПиУ.',
+                'attr' => ['class' => 'form-control', 'inputmode' => 'decimal'],
+                'invalid_message' => 'Ставка налога — число от 0 до 100.',
+                'constraints' => [new Assert\Range(notInRangeMessage: 'Ставка налога — число от 0 до 100.', min: 0, max: 100)],
             ]);
 
         if ($options['with_valid_from']) {

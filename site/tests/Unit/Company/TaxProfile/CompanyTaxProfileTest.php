@@ -78,15 +78,59 @@ final class CompanyTaxProfileTest extends TestCase
         $profile = CompanyTaxProfileBuilder::aProfile()->forCompany(CompanyBuilder::DEFAULT_COMPANY_ID)->build();
         $created = $profile->getUpdatedAt();
 
-        $profile->change(TaxRegime::USN, VatMode::EXEMPT, new \DateTimeImmutable('2026-12-01'));
+        $profile->change(TaxRegime::USN, VatMode::EXEMPT, null, new \DateTimeImmutable('2026-12-01'));
         self::assertSame($created, $profile->getUpdatedAt(), 'без изменений дата не двигается');
 
-        $profile->change(TaxRegime::OSNO, VatMode::GENERAL, new \DateTimeImmutable('2026-12-01'));
+        $profile->change(TaxRegime::OSNO, VatMode::GENERAL, null, new \DateTimeImmutable('2026-12-01'));
         self::assertSame(TaxRegime::OSNO, $profile->getTaxRegime());
         self::assertSame(VatMode::GENERAL, $profile->getVatMode());
         self::assertNull($profile->getValidFrom());
 
         $this->expectException(InvalidCompanyTaxProfileException::class);
-        $profile->change(TaxRegime::AUSN, VatMode::USN_5, new \DateTimeImmutable());
+        $profile->change(TaxRegime::AUSN, VatMode::USN_5, null, new \DateTimeImmutable());
+    }
+
+    public function testTaxRateIsOptionalAndStoredWithTwoDecimals(): void
+    {
+        self::assertNull(CompanyTaxProfileBuilder::aProfile()->build()->getTaxRatePercent());
+        self::assertSame('6.00', CompanyTaxProfileBuilder::aProfile()->withTaxRate('6')->build()->getTaxRatePercent());
+        self::assertSame('0.00', CompanyTaxProfileBuilder::aProfile()->withTaxRate('0')->build()->getTaxRatePercent());
+        self::assertSame('100.00', CompanyTaxProfileBuilder::aProfile()->withTaxRate('100')->build()->getTaxRatePercent());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function invalidTaxRateProvider(): iterable
+    {
+        yield 'отрицательная' => ['-1'];
+        yield 'больше 100' => ['100.01'];
+        yield 'не число' => ['шесть'];
+    }
+
+    #[DataProvider('invalidTaxRateProvider')]
+    public function testRejectsTaxRateOutsideRange(string $rate): void
+    {
+        $this->expectException(InvalidCompanyTaxProfileException::class);
+        $this->expectExceptionMessage('Ставка налога — число от 0 до 100.');
+
+        CompanyTaxProfileBuilder::aProfile()->withTaxRate($rate)->build();
+    }
+
+    public function testChangeSetsAndClearsTaxRate(): void
+    {
+        $profile = CompanyTaxProfileBuilder::aProfile()->build();
+        $created = $profile->getUpdatedAt();
+
+        $profile->change(TaxRegime::USN, VatMode::EXEMPT, '15', new \DateTimeImmutable('2026-12-01'));
+        self::assertSame('15.00', $profile->getTaxRatePercent());
+        self::assertNotSame($created, $profile->getUpdatedAt());
+
+        $updated = $profile->getUpdatedAt();
+        $profile->change(TaxRegime::USN, VatMode::EXEMPT, '15.0', new \DateTimeImmutable('2026-12-02'));
+        self::assertSame($updated, $profile->getUpdatedAt(), 'та же ставка в другой записи — без изменений');
+
+        $profile->change(TaxRegime::USN, VatMode::EXEMPT, null, new \DateTimeImmutable('2026-12-03'));
+        self::assertNull($profile->getTaxRatePercent());
     }
 }

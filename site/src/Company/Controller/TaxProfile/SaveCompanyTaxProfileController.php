@@ -46,11 +46,11 @@ final class SaveCompanyTaxProfileController extends AbstractController
             return $this->redirectToTaxes($id);
         }
 
-        /** @var array{taxRegime: TaxRegime, vatMode: VatMode, validFrom: ?string} $data */
+        /** @var array{taxRegime: TaxRegime, vatMode: VatMode, validFrom: ?string, taxRatePercent: ?string} $data */
         $data = $form->getData();
 
         try {
-            ($this->saveTaxProfile)($id, $data['taxRegime'], $data['vatMode'], CompanyTaxProfileType::parseValidFrom($data['validFrom']));
+            ($this->saveTaxProfile)($id, $data['taxRegime'], $data['vatMode'], CompanyTaxProfileType::parseValidFrom($data['validFrom']), $data['taxRatePercent']);
         } catch (InvalidCompanyTaxProfileException $exception) {
             $this->addFlash('danger', $exception->getMessage());
 
