@@ -87,7 +87,7 @@
     {% else %}
         <div class="mb-3">
             <p class="text-secondary small mb-0">
-                Дней с данными: {{ (report.days - report.unavailableDays)|vf_number }}.
+                Дней с данными по кабинетам: {{ (report.days - report.unavailableDays)|vf_number }}.
                 {% if report.unavailableDays > 0 %}{{ report.unavailableDays|vf_number }} дн. без данных: маркетплейс не отдаёт воронку по тарифу кабинета.{% endif %}
                 Проценты под числом — конверсия из предыдущей ступени. У WB нет общих показов и возвратов: первая ступень — переходы в карточку.
                 Выкупы и отмены относятся к дню заказа и дозревают.
