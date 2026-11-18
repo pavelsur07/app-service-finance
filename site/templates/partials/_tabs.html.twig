@@ -8,21 +8,23 @@
       {label: 'Требуют внимания', href: path('y'), count: 3, warn: true},
   ]} %}
   Клиентские вкладки Bootstrap: pane: 'id-панели' вместо href.
-  Необязательно: class — доп. классы <ul> (например, card-header-tabs).
+  Необязательно: class — доп. классы <ul> (например, card-header-tabs), label — доступное имя tablist.
 #}
 {% set max_visible = 6 %}
+{% set hasPanes = tabs|filter(t => t.pane is defined)|length > 0 %}
 {# Клиентские вкладки-панели в «Ещё» не уходят: пункт меню — ссылка, а не переключатель панели. #}
-{% set overflows = tabs|length > max_visible and tabs|filter(t => t.pane is defined)|length == 0 %}
+{% set overflows = tabs|length > max_visible and not hasPanes %}
 {% set visible = overflows ? tabs|slice(0, max_visible - 1) : tabs %}
 {% set overflow = overflows ? tabs|slice(max_visible - 1) : [] %}
 {% set overflow_active = overflow|filter(t => t.active ?? false)|first %}
-<ul class="nav nav-tabs {{ class ?? '' }}"{% if tabs|filter(t => t.pane is defined)|length > 0 %} role="tablist"{% endif %}>
+<ul class="nav nav-tabs {{ class ?? '' }}"{% if hasPanes %} role="tablist"{% if label is defined %} aria-label="{{ label }}"{% endif %}{% endif %}>
     {% for tab in visible %}
         {% set active = tab.active ?? false %}
         <li class="nav-item"{% if tab.pane is defined %} role="presentation"{% endif %}>
             <a class="nav-link {{ active ? 'active' : '' }}"
                 {% if tab.pane is defined %}
-                    href="#{{ tab.pane }}" data-bs-toggle="tab" role="tab" aria-controls="{{ tab.pane }}" aria-selected="{{ active ? 'true' : 'false' }}"
+                    id="tab-{{ tab.pane }}" href="#{{ tab.pane }}" data-bs-toggle="tab" role="tab" aria-controls="{{ tab.pane }}"
+                    aria-selected="{{ active ? 'true' : 'false' }}"
                 {% else %}
                     href="{{ tab.href }}"{% if active %} aria-current="page"{% endif %}
                 {% endif %}>

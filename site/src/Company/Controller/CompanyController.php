@@ -172,8 +172,9 @@ class CompanyController extends AbstractController
             if ($company->getBusinessProfile() !== $profileBefore) {
                 $logger->info('Company business profile changed', ['companyId' => $id, 'from' => $profileBefore->value, 'to' => $company->getBusinessProfile()->value]);
             }
+            $this->addFlash('success', 'Настройки компании сохранены.');
 
-            return $this->redirectToRoute('company_index');
+            return $this->redirectToRoute('company_edit', ['id' => $id, '_fragment' => 'company']);
         }
 
         $taxProfileForm = $this->createForm(CompanyTaxProfileType::class, null, [

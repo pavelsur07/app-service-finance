@@ -1,7 +1,6 @@
-{# Блок «Консолидация» карточки компании: головная компания группы и состав из компаний кабинета (cashflow-group-chart, этап 1b). #}
+{# Вкладка «Консолидация». Параметры: company, consolidation, cabinetNames. #}
 {% set own = consolidation[company.id] ?? null %}
-<div class="card mt-3" id="consolidation">
-    <div class="card-header"><b>Консолидация</b></div>
+<section id="consolidation" class="tab-pane" role="tabpanel" aria-labelledby="tab-consolidation" tabindex="0">
     <div class="card-body">
         {% if own and own.companyId != own.headCompanyId %}
             <p class="mb-0">
@@ -43,4 +42,4 @@
             </form>
         {% endif %}
     </div>
-</div>
+</section>
