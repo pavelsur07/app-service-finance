@@ -213,7 +213,7 @@ final readonly class UnitExtendedQuery
                 $costMarketplace = '' !== $mp ? $mp : $marketplace;
                 $orderAdCost = MarketplaceCostAnalyticsGroupResolver::isOzonOrderAdCost($costMarketplace, $code);
                 if ($orderAdCost && $remainingOrderAdCoverage > 0.0) {
-                    $covered = min($remainingOrderAdCoverage, max(0.0, $net));
+                    $covered = min($remainingOrderAdCoverage, $costsAmt);
                     $remainingOrderAdCoverage -= $covered;
                     $net -= $covered;
                     $costsAmt -= $covered;

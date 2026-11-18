@@ -31,7 +31,7 @@ const OrderAdsDetailPanel: React.FC<OrderAdsDetailPanelProps> = ({ report, from,
                     Период {formatDateRu(from)} — {formatDateRu(to)}.{' '}
                     {report.lastAccrualDate
                         ? `Последнее начисление Ozon — ${formatDateRu(report.lastAccrualDate)}.`
-                        : 'За выбранный период есть данные рекламной статистики. Начислений Ozon пока нет.'}
+                        : 'В этой выборке есть данные рекламной статистики. Строк начислений Ozon для неё нет.'}
                 </p>
 
                 <dl className="row mb-3">
@@ -45,7 +45,7 @@ const OrderAdsDetailPanel: React.FC<OrderAdsDetailPanelProps> = ({ report, from,
                             {formatMoney(report.linked, 2)}
                             {report.estimated !== 0 && (
                                 <small className="d-block text-secondary">
-                                    Из них распределено по продажам — {formatMoney(report.estimated, 2)}
+                                    Распределено по продажам — {formatMoney(report.estimated, 2)}
                                 </small>
                             )}
                         </dd>

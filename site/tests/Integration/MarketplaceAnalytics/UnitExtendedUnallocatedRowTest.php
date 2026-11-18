@@ -166,21 +166,33 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
         self::assertNull($result['unallocated']);
     }
 
-    public function testListingAccrualUsesSameStatisticsOnlyOnceIncludingUnderTags(): void
+    /** @return iterable<string, array{0: string, 1: float, 2: float}> */
+    public static function listingAccrualCases(): iterable
+    {
+        yield 'списание' => ['0.00', 144.0, 124.0];
+        yield 'частичное сторно' => ['10.00', 134.0, 114.0];
+        yield 'полное сторно' => ['24.00', 120.0, 100.0];
+    }
+
+    #[DataProvider('listingAccrualCases')]
+    public function testListingAccrualUsesSameStatisticsOnlyOnceIncludingUnderTags(string $storno, float $totalAds, float $taggedAds): void
     {
         $listing = $this->em->getReference(MarketplaceListing::class, self::LISTING_ID);
         $this->cost('ozon_marketing_action', '24.00', MarketplaceCostOperationType::CHARGE, $listing);
+        if ('0.00' !== $storno) {
+            $this->cost('ozon_marketing_action', $storno, MarketplaceCostOperationType::STORNO, $listing);
+        }
         $this->adStatistics('SKU-1', self::LISTING_ID, '24.00', 'search-promo');
         $this->em->flush();
 
         $query = self::getContainer()->get(UnitExtendedQuery::class);
         $unfiltered = $query->execute(self::COMPANY_ID, 'ozon', self::FROM, self::TO);
-        self::assertSame(144.0, $unfiltered['totals']['adSpend']);
+        self::assertSame($totalAds, $unfiltered['totals']['adSpend']);
         self::assertSame(20.0, $unfiltered['unallocated']['adSpend'] ?? null);
         $this->assertWidgetsMatchTotals($this->widgets(null), $unfiltered['totals']);
 
         $tagged = $query->execute(self::COMPANY_ID, 'ozon', self::FROM, self::TO, tagIds: [self::TAG_ID]);
-        self::assertSame(124.0, $tagged['totals']['adSpend']);
+        self::assertSame($taggedAds, $tagged['totals']['adSpend']);
         $this->assertWidgetsMatchTotals($this->widgets([self::LISTING_ID, self::AD_ONLY_LISTING_ID]), $tagged['totals']);
     }
 

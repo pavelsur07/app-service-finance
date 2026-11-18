@@ -23,26 +23,26 @@ final readonly class OzonOrderAdCoverage
      */
     public function byListing(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, array $costs): array
     {
-        $netByListing = [];
+        $chargesByListing = [];
         foreach ($costs as $listingId => $categories) {
             foreach ($categories as $category) {
                 if (AdStatisticsCostCategories::payPerOrderCode() === $category->categoryCode) {
-                    $netByListing[$listingId] = ($netByListing[$listingId] ?? 0.0) + (float) $category->netAmount;
+                    $chargesByListing[$listingId] = ($chargesByListing[$listingId] ?? 0.0) + (float) $category->costsAmount;
                 }
             }
         }
 
-        $positiveNet = array_filter($netByListing, static fn (float $amount): bool => $amount > 0.0);
-        if ([] === $positiveNet) {
+        $chargesByListing = array_filter($chargesByListing, static fn (float $amount): bool => $amount > 0.0);
+        if ([] === $chargesByListing) {
             return [];
         }
 
         $statistics = $this->adsFacade->getAdSpendByListingForPeriod($companyId, $from, $to, MarketplaceType::OZON->value, AdSpendKind::PAY_PER_ORDER);
-        foreach ($positiveNet as $listingId => $amount) {
-            $positiveNet[$listingId] = min(round($amount, 2), max(0.0, (float) ($statistics[$listingId] ?? 0)));
+        foreach ($chargesByListing as $listingId => $amount) {
+            $chargesByListing[$listingId] = min(round($amount, 2), max(0.0, (float) ($statistics[$listingId] ?? 0)));
         }
 
-        return $positiveNet;
+        return $chargesByListing;
     }
 
     public function withoutListing(float $netAccrued, float $periodStatistics, float $alreadyCovered): float
