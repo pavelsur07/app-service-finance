@@ -146,6 +146,8 @@ final class CompanyDeletionTest extends WebTestCaseBase
 
         $crawler = $client->request('GET', '/company/');
         self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('#companies-list .vf-empty', 'Пока нет компаний');
+        self::assertSelectorExists('button[aria-label="Восстановить компанию «Единственная компания»"]');
         self::assertCount(1, $crawler->filter('form[action="/company/'.$onlyId.'/restore"]'));
         self::assertCount(0, $crawler->filter('select[name="company_id"] option'));
     }

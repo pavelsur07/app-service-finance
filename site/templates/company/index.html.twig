@@ -1,82 +1,111 @@
 {% extends 'base.html.twig' %}
 {% block title %}Компании{% endblock %}
-{% block body %}
-    {% embed 'partials/_page_header.html.twig' with {title: 'Компании'} %}
-        {% block actions %}
-            <a href="{{ path('company_new') }}" class="btn btn-primary">
-                + Добавить компанию
-            </a>
-        {% endblock %}
-    {% endembed %}
-    <div class="container-xl mt-3">
-        <div class="card">
-            <div class="card-body">
-                <table class="table table-vcenter">
-                    <thead>
-                    <tr>
-                        <th>Наименование</th>
-                        <th>Wildberries API</th>
-                        <th>Ozon Seller ID</th>
-                        <th>Ozon API</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for company in companies %}
-                        <tr>
-                            <td>
-                                <a href="{{ path('company_edit', {'id': company.id}) }}">{{ company.name }}</a>
-                            </td>
-                            <td>
-                                <span class="badge bg-red-lt">Нет</span>
-                            </td>
-                            <td>
-                                <span class="badge bg-red-lt">Нет</span>
-                            </td>
-                            <td>
-                                <span class="badge bg-red-lt">Нет</span>
-                            </td>
-                            <td>
-                                <a href="{{ path('company_edit', {'id': company.id}) }}" class="btn btn-sm btn-warning">✏️</a>
-                                <a href="{{ path('company_delete', {'id': company.id}) }}" class="btn btn-sm btn-danger" title="Удалить">🗑</a>
-                            </td>
-                        </tr>
-                    {% else %}
-                        <tr><td colspan="5" class="text-center">Нет компаний.</td></tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+
+{% block content %}
+<div class="vf-page-head">
+    <div class="vf-page-head__title">
+        <nav aria-label="Путь">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">Компания и доступы</li>
+                <li class="breadcrumb-item active" aria-current="page">Компании</li>
+            </ol>
+        </nav>
+        <h1 id="companies-heading">Компании</h1>
+    </div>
+    <div class="btn-list d-print-none">
+        <a href="{{ path('company_new') }}" class="btn btn-primary">
+            <i class="ti ti-plus me-1" aria-hidden="true"></i>
+            Добавить компанию
+        </a>
+    </div>
+</div>
+
+<section id="companies-list" class="card vf-card mb-4" aria-labelledby="companies-heading">
+    {% if companies is empty %}
+        <div class="vf-empty">
+            <h2 class="vf-empty__title mb-0">Пока нет компаний</h2>
         </div>
-        {% if deletionRequested is not empty %}
-            <div class="card mt-3">
-                <div class="card-header"><b>Будут удалены</b></div>
-                <div class="card-body">
-                    <table class="table table-vcenter">
-                        <thead>
-                        <tr>
-                            <th>Наименование</th>
-                            <th>Данные будут удалены</th>
-                            <th></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for company in deletionRequested %}
-                            <tr>
-                                <td>{{ company.name }}</td>
-                                <td>{{ company.deletionDueAt|date('d.m.Y') }}</td>
-                                <td>
-                                    <form method="post" action="{{ path('company_restore', {'id': company.id}) }}" class="d-inline">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('restore' ~ company.id) }}">
-                                        <button class="btn btn-sm btn-outline-primary">Восстановить</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+    {% else %}
+        <div class="table-responsive" tabindex="0" role="region" aria-label="Список компаний">
+            <table class="table card-table table-vcenter vf-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Наименование</th>
+                        <th scope="col">ИНН</th>
+                        <th scope="col">Система налогов</th>
+                        <th scope="col">НДС</th>
+                        <th scope="col" class="w-1 d-print-none" aria-label="Действия"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for company in companies %}
+                    {% set taxProfile = taxProfiles[company.id] ?? null %}
+                    {% set editUrl = path('company_edit', {id: company.id}) %}
+                    <tr>
+                        <td><a href="{{ editUrl }}" class="vf-strong text-break">{{ company.name }}</a></td>
+                        <td class="vf-num">{{ company.inn ?: '—' }}</td>
+                        <td>{{ taxProfile ? taxProfile.taxRegime.label : '—' }}</td>
+                        <td>{{ taxProfile ? taxProfile.vatMode.label : '—' }}</td>
+                        <td class="vf-actions text-end d-print-none">
+                            <div class="dropdown">
+                                <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm"
+                                        data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}'
+                                        aria-expanded="false" aria-label="Действия: {{ company.name }}">
+                                    <i class="ti ti-dots" aria-hidden="true"></i>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-end">
+                                    <a class="dropdown-item" href="{{ editUrl }}">
+                                        <i class="ti ti-pencil me-2" aria-hidden="true"></i>Редактировать
+                                    </a>
+                                    <a class="dropdown-item text-danger" href="{{ path('company_delete', {id: company.id}) }}">
+                                        <i class="ti ti-trash me-2" aria-hidden="true"></i>Удалить
+                                    </a>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if pager.haveToPaginate %}
+            <div class="card-footer">
+                {% include 'partials/_pagination.html.twig' with {pager: pager, params: {}} only %}
             </div>
         {% endif %}
-    </div>
+    {% endif %}
+</section>
+
+{% if deletionRequested is not empty %}
+    <section class="card vf-card mb-4">
+        <div class="card-header">
+            <h2 id="pending-deletion-heading" class="card-title">Будут удалены</h2>
+        </div>
+        <div class="table-responsive" tabindex="0" role="region" aria-labelledby="pending-deletion-heading">
+            <table class="table card-table table-vcenter vf-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Наименование</th>
+                        <th scope="col">Данные будут удалены</th>
+                        <th scope="col" class="w-1 d-print-none" aria-label="Действия"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for company in deletionRequested %}
+                    <tr>
+                        <td class="vf-strong text-break">{{ company.name }}</td>
+                        <td class="vf-num">{{ company.deletionDueAt|date('d.m.Y') }}</td>
+                        <td class="vf-actions text-end d-print-none">
+                            <form method="post" action="{{ path('company_restore', {id: company.id}) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('restore' ~ company.id) }}">
+                                <button type="submit" class="btn btn-sm" aria-label="Восстановить компанию «{{ company.name }}»">Восстановить</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+{% endif %}
 {% endblock %}

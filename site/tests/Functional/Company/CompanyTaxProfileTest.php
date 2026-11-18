@@ -59,6 +59,84 @@ final class CompanyTaxProfileTest extends WebTestCaseBase
         self::assertStringContainsString('НДС 5%', $text);
     }
 
+    public function testCompanyListShowsDetailsForEachOwnedCompany(): void
+    {
+        $company = $this->em()->getRepository(Company::class)->find(self::COMPANY_ID);
+        self::assertInstanceOf(Company::class, $company);
+        $company->setInn('7707083893');
+        $owner = $company->getUser();
+        self::assertInstanceOf(User::class, $owner);
+
+        $second = CompanyBuilder::aCompany()->withIndex(2)->withName('Другая компания')->withOwner($owner)->build();
+        $withoutProfile = CompanyBuilder::aCompany()->withIndex(3)->withName('Без настроек')->withOwner($owner)->build();
+        $stranger = UserBuilder::aUser()->withIndex(2)->build();
+        $foreign = CompanyBuilder::aCompany()->withIndex(4)->withName('Чужая компания')->withOwner($stranger)->build();
+        $this->em()->persist($second);
+        $this->em()->persist($withoutProfile);
+        $this->em()->persist($stranger);
+        $this->em()->persist($foreign);
+        $this->em()->flush();
+
+        $this->em()->persist(CompanyTaxProfileBuilder::aProfile()->forCompany(self::COMPANY_ID)->with(TaxRegime::USN, VatMode::USN_5)->build());
+        $this->em()->persist(CompanyTaxProfileBuilder::aProfile()->withId('0193bbbb-0000-7000-8000-0000000000a2')->forCompany(self::COMPANY_ID)->with(TaxRegime::USN, VatMode::USN_7)->validFrom('9999-01-01')->build());
+        $this->em()->persist(CompanyTaxProfileBuilder::aProfile()->withId('0193bbbb-0000-7000-8000-0000000000a3')->forCompany((string) $second->getId())->with(TaxRegime::OSNO, VatMode::EXEMPT)->build());
+        $this->em()->flush();
+
+        $crawler = $this->client->request('GET', '/company/');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('.vf-page-head a[href="/company/new"]');
+        $table = $crawler->filter('#companies-list table');
+        self::assertSame(['Наименование', 'ИНН', 'Система налогов', 'НДС'], array_slice($table->filter('thead th')->extract(['_text']), 0, 4));
+        self::assertCount(3, $table->filter('tbody tr'));
+
+        foreach ([
+            self::COMPANY_ID => ['Tax Co', '7707083893', 'УСН', 'НДС 5%'],
+            (string) $second->getId() => ['Другая компания', '—', 'ОСНО', 'без НДС'],
+            (string) $withoutProfile->getId() => ['Без настроек', '—', '—', '—'],
+        ] as $companyId => $expected) {
+            $row = $table->filter(sprintf('tbody a.vf-strong[href="/company/%s/edit"]', $companyId))->closest('tr');
+            self::assertNotNull($row);
+            self::assertSame($expected, array_slice($row->filter('td')->extract(['_text']), 0, 4));
+            self::assertCount(1, $row->filter(sprintf('a[href="/company/%s/delete"]', $companyId)));
+        }
+
+        self::assertStringNotContainsString('Чужая компания', $table->text());
+    }
+
+    public function testCompanyListPaginatesActiveCompanies(): void
+    {
+        $company = $this->em()->getRepository(Company::class)->find(self::COMPANY_ID);
+        self::assertInstanceOf(Company::class, $company);
+        $company->setName('Компания 00');
+        $owner = $company->getUser();
+        self::assertInstanceOf(User::class, $owner);
+
+        for ($index = 1; $index <= 20; ++$index) {
+            $company = CompanyBuilder::aCompany()->withIndex($index)->withName(sprintf('Компания %02d', $index))->withOwner($owner)->build();
+            $this->em()->persist($company);
+        }
+        $this->em()->flush();
+        $lastCompanyId = (string) $company->getId();
+        $this->em()->persist(CompanyTaxProfileBuilder::aProfile()->forCompany($lastCompanyId)->with(TaxRegime::USN, VatMode::USN_7)->build());
+        $this->em()->flush();
+
+        $firstPage = $this->client->request('GET', '/company/');
+        self::assertResponseIsSuccessful();
+        self::assertCount(20, $firstPage->filter('#companies-list tbody tr'));
+        self::assertStringNotContainsString('Компания 20', $firstPage->filter('#companies-list table')->text());
+        /** @var array<string, list<array{sql: string, params: array<int, mixed>}>> $queries */
+        $queries = self::getContainer()->get('doctrine.debug_data_holder')->getData();
+        $taxQueries = array_values(array_filter($queries['default'] ?? [], static fn (array $query): bool => str_contains($query['sql'], 'FROM company_tax_profiles')));
+        self::assertCount(1, $taxQueries);
+        self::assertNotContains($lastCompanyId, $taxQueries[0]['params']);
+
+        $secondPage = $this->client->click($firstPage->filter('#companies-list a[aria-label="Вперёд"]')->link());
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $secondPage->filter('#companies-list tbody tr'));
+        self::assertSelectorTextContains('#companies-list tbody tr', 'Компания 20');
+        self::assertSelectorTextContains('#companies-list tbody tr', 'НДС 7%');
+    }
+
     public function testRepeatedSaveOfSameMonthChangesSamePeriod(): void
     {
         $this->saveProfile('USN', 'USN_5', '2026-03');

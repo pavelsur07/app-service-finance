@@ -17,9 +17,12 @@ use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyTaxProfileRepository;
 use App\Company\Repository\ConsolidationMembershipRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Pagerfanta;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,17 +33,34 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/company')]
 class CompanyController extends AbstractController
 {
+    private const PER_PAGE = 20;
+
     #[Route('/', name: 'company_index', methods: ['GET'])]
-    public function index(CompanyRepository $companyRepository): Response
-    {
+    public function index(
+        Request $request,
+        CompanyRepository $companyRepository,
+        CompanyTaxProfileRepository $taxProfileRepository,
+        ClockInterface $clock,
+    ): Response {
         $user = $this->getUser();
         if (!$user instanceof User) {
             throw $this->createAccessDeniedException();
         }
 
-        // Только свои компании; помеченные к удалению — отдельным блоком с восстановлением.
+        $page = filter_var($request->query->all()['page'] ?? '1', \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 1;
+        /** @var Pagerfanta<Company> $pager */
+        $pager = new Pagerfanta(new QueryAdapter($companyRepository->createOwnedActiveQueryBuilder($user), false));
+        $pager->setMaxPerPage(self::PER_PAGE);
+        $pager->setCurrentPage(min($page, $pager->getNbPages()));
+        $companies = iterator_to_array($pager->getCurrentPageResults(), false);
+
         return $this->render('company/index.html.twig', [
-            'companies' => $companyRepository->findActiveByUser($user),
+            'companies' => $companies,
+            'pager' => $pager,
+            'taxProfiles' => $taxProfileRepository->findEffectiveForCompanies(
+                array_map(static fn (Company $company): string => (string) $company->getId(), $companies),
+                $clock->now(),
+            ),
             'deletionRequested' => $companyRepository->findDeletionRequestedByUser($user),
         ]);
     }
