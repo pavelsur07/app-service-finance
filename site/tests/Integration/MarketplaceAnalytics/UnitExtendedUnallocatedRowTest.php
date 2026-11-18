@@ -166,6 +166,24 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
         self::assertNull($result['unallocated']);
     }
 
+    public function testListingAccrualUsesSameStatisticsOnlyOnceIncludingUnderTags(): void
+    {
+        $listing = $this->em->getReference(MarketplaceListing::class, self::LISTING_ID);
+        $this->cost('ozon_marketing_action', '24.00', MarketplaceCostOperationType::CHARGE, $listing);
+        $this->adStatistics('SKU-1', self::LISTING_ID, '24.00', 'search-promo');
+        $this->em->flush();
+
+        $query = self::getContainer()->get(UnitExtendedQuery::class);
+        $unfiltered = $query->execute(self::COMPANY_ID, 'ozon', self::FROM, self::TO);
+        self::assertSame(144.0, $unfiltered['totals']['adSpend']);
+        self::assertSame(20.0, $unfiltered['unallocated']['adSpend'] ?? null);
+        $this->assertWidgetsMatchTotals($this->widgets(null), $unfiltered['totals']);
+
+        $tagged = $query->execute(self::COMPANY_ID, 'ozon', self::FROM, self::TO, tagIds: [self::TAG_ID]);
+        self::assertSame(124.0, $tagged['totals']['adSpend']);
+        $this->assertWidgetsMatchTotals($this->widgets([self::LISTING_ID, self::AD_ONLY_LISTING_ID]), $tagged['totals']);
+    }
+
     public function testOrderAdsShowAccrualsWithoutInventingAttribution(): void
     {
         $date = new \DateTimeImmutable('2026-11-06');
@@ -202,7 +220,13 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
                 ['campaignId' => null, 'date' => '2026-11-05', 'amount' => 20.0],
             ],
         ], $widgets['orderAds']);
-        self::assertNull($this->widgets([self::LISTING_ID], withOrderAds: true)['orderAds']);
+        self::assertSame([
+            'linked' => 12.0,
+            'estimated' => 12.0,
+            'unlinked' => 0.0,
+            'lastAccrualDate' => null,
+            'accruals' => [],
+        ], $this->widgets([self::LISTING_ID], withOrderAds: true)['orderAds']);
     }
 
     /**

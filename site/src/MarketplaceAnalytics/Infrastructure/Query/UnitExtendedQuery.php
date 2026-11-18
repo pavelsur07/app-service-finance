@@ -13,6 +13,7 @@ use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
+use App\MarketplaceAnalytics\Application\Service\OzonOrderAdCoverage;
 use App\MarketplaceAnalytics\Domain\Service\AbcClassificationPolicy;
 use App\MarketplaceAnalytics\Enum\AbcClass;
 
@@ -25,6 +26,7 @@ final readonly class UnitExtendedQuery
         private MarketplaceCostAnalyticsGroupResolver $groupResolver,
         private ListingTagFacade $listingTagFacade,
         private AbcClassificationPolicy $abcPolicy,
+        private OzonOrderAdCoverage $orderAdCoverage,
     ) {
     }
 
@@ -130,6 +132,13 @@ final readonly class UnitExtendedQuery
             $to,
         );
 
+        $coveredByListing = $this->orderAdCoverage->byListing(
+            $companyId,
+            $from,
+            $to,
+            array_intersect_key($costs, array_flip($allListingIds)),
+        );
+
         $items = [];
         $summaryRows = [];
         // База ABC — все листинги набора (как totals), до поиска и лимита: иначе класс
@@ -192,6 +201,7 @@ final readonly class UnitExtendedQuery
             $logistics = 0.0;
             $otherCosts = 0.0;
             $orderAdAccrued = 0.0;
+            $remainingOrderAdCoverage = $coveredByListing[$listingId] ?? 0.0;
             $allCategoriesRaw = [];
 
             foreach ($listingCosts as $cat) {
@@ -202,6 +212,12 @@ final readonly class UnitExtendedQuery
 
                 $costMarketplace = '' !== $mp ? $mp : $marketplace;
                 $orderAdCost = MarketplaceCostAnalyticsGroupResolver::isOzonOrderAdCost($costMarketplace, $code);
+                if ($orderAdCost && $remainingOrderAdCoverage > 0.0) {
+                    $covered = min($remainingOrderAdCoverage, max(0.0, $net));
+                    $remainingOrderAdCoverage -= $covered;
+                    $net -= $covered;
+                    $costsAmt -= $covered;
+                }
 
                 $allCategoriesRaw[] = [
                     'marketplace' => '' !== $costMarketplace ? $costMarketplace : null,
@@ -341,7 +357,14 @@ final readonly class UnitExtendedQuery
         if (!$tagFilterActive) {
             $statisticsTotal = (float) $this->adsFacade->getTotalAdCostForPeriod($companyId, $from, $to, $marketplace);
             $linkedStatistics = array_sum(array_intersect_key($adSpendByListing, array_flip($allListingIds)));
-            $unallocated = $this->buildUnallocated($companyId, $marketplace, $from, $to, round($statisticsTotal - $linkedStatistics, 2));
+            $unallocated = $this->buildUnallocated(
+                $companyId,
+                $marketplace,
+                $from,
+                $to,
+                round($statisticsTotal - $linkedStatistics, 2),
+                array_sum($coveredByListing),
+            );
         }
         if (null !== $unallocated) {
             $totals['commission'] += $unallocated['commission'];
@@ -489,7 +512,7 @@ final readonly class UnitExtendedQuery
 
     /**
      * @param array<string, array<string, mixed>> $buckets
-     * @param array<string, mixed>                $row
+     * @param array<string, mixed> $row
      */
     private function accumulateSummaryBucket(array &$buckets, string $key, ?string $tagId, string $name, array $row): void
     {
@@ -543,6 +566,7 @@ final readonly class UnitExtendedQuery
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
         float $unallocatedStatistics,
+        float $coveredByListing,
     ): ?array {
         $rows = $this->marketplaceFacade->getUnallocatedCostAggregates($companyId, $marketplace, $from, $to);
         if ([] === $rows && 0.0 === $unallocatedStatistics) {
@@ -551,6 +575,8 @@ final readonly class UnitExtendedQuery
 
         $buckets = ['commission' => 0.0, 'logistics' => 0.0, 'other' => 0.0, 'ads' => $unallocatedStatistics];
         $categories = [];
+        $payPerOrderStatistics = null;
+        $usedCoverage = $coveredByListing;
         foreach ($rows as $row) {
             /** @var UnallocatedCostCategoryAggregateDTO $row */
             $net = (float) $row->netAmount;
@@ -559,10 +585,9 @@ final readonly class UnitExtendedQuery
             if ($orderAdCost) {
                 // Оплата за заказ из отчёта Ozon уже в рекламе листингов (adSpend): без товара остаётся
                 // только часть учёта, которой в отчёте нет.
-                $covered = min(
-                    max(0.0, (float) $this->adsFacade->getTotalAdCostForPeriod($companyId, $from, $to, MarketplaceType::OZON->value, AdSpendKind::PAY_PER_ORDER)),
-                    max(0.0, $net),
-                );
+                $payPerOrderStatistics ??= (float) $this->adsFacade->getTotalAdCostForPeriod($companyId, $from, $to, MarketplaceType::OZON->value, AdSpendKind::PAY_PER_ORDER);
+                $covered = $this->orderAdCoverage->withoutListing($net, $payPerOrderStatistics, $usedCoverage);
+                $usedCoverage += $covered;
                 $net -= $covered;
                 $costs -= $covered;
             }
@@ -581,7 +606,7 @@ final readonly class UnitExtendedQuery
         if (0.0 !== $unallocatedStatistics) {
             $categories[] = [
                 'marketplace' => $marketplace,
-                'code' => 'unallocated_ad_statistics',
+                'code' => MarketplaceCostAnalyticsGroupResolver::UNALLOCATED_AD_STATISTICS,
                 'name' => 'Реклама по статистике без привязки к товару',
                 'costsAmount' => max(0.0, $unallocatedStatistics),
                 'stornoAmount' => max(0.0, -$unallocatedStatistics),

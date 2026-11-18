@@ -12,6 +12,7 @@ use App\Marketplace\Facade\CostCategoryCatalogFacade;
 final class MarketplaceCostAnalyticsGroupResolver
 {
     public const string OZON_ORDER_AD_COST_NAME = 'Оплата за заказ Ozon';
+    public const string UNALLOCATED_AD_STATISTICS = 'unallocated_ad_statistics';
 
     public static function isOzonOrderAdCost(?string $marketplace, string $code): bool
     {
@@ -31,7 +32,7 @@ final class MarketplaceCostAnalyticsGroupResolver
 
     public function resolveBreakdownGroup(?string $marketplace, string $code, string $name): string
     {
-        if ('unallocated_ad_statistics' === $code || self::isOzonOrderAdCost($marketplace, $code)) {
+        if (self::UNALLOCATED_AD_STATISTICS === $code || self::isOzonOrderAdCost($marketplace, $code)) {
             return 'Реклама';
         }
 
@@ -50,7 +51,7 @@ final class MarketplaceCostAnalyticsGroupResolver
 
     public function resolveUnitBucket(?string $marketplace, string $code, string $name): string
     {
-        if (self::isOzonOrderAdCost($marketplace, $code)) {
+        if (self::UNALLOCATED_AD_STATISTICS === $code || self::isOzonOrderAdCost($marketplace, $code)) {
             return 'ads';
         }
 

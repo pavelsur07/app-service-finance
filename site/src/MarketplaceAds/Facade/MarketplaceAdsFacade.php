@@ -45,9 +45,9 @@ final readonly class MarketplaceAdsFacade
     /**
      * Суммарные рекламные затраты компании за период.
      *
-     * @param string|null      $marketplace значение MarketplaceType::value ('wildberries', 'ozon').
-     *                                      Если null — суммируются все площадки.
-     * @param AdSpendKind|null $kind        только оплата за клики или только за заказ; null — весь расход
+     * @param string|null $marketplace значение MarketplaceType::value ('wildberries', 'ozon').
+     *                                 Если null — суммируются все площадки.
+     * @param AdSpendKind|null $kind только оплата за клики или только за заказ; null — весь расход
      *
      * @return string decimal-строка, например "4567.89"; "0" если данных нет.
      */
@@ -61,10 +61,18 @@ final readonly class MarketplaceAdsFacade
         return $this->adDocumentQuery->sumTotalCostForPeriod($companyId, $dateFrom, $dateTo, $marketplace, $kind);
     }
 
-    /** @return array{linked: float, estimated: float} Из привязанных к товарам расходов часть распределена по продажам. */
-    public function getOzonPayPerOrderAttribution(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
-        return $this->adSpendByListingQuery->getOzonPayPerOrderAttribution($companyId, $from, $to);
+    /**
+     * @param list<string>|null $listingIds
+     *
+     * @return array{linked: float, estimated: float}
+     */
+    public function getOzonPayPerOrderAttribution(
+        string $companyId,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        ?array $listingIds = null,
+    ): array {
+        return $this->adSpendByListingQuery->getOzonPayPerOrderAttribution($companyId, $from, $to, $listingIds);
     }
 
     /**
@@ -74,9 +82,9 @@ final readonly class MarketplaceAdsFacade
      * Для totals (полная сумма за период, включая non-attributed) использовать
      * {@see self::getTotalAdCostForPeriod()}.
      *
-     * @param string|null      $marketplace значение MarketplaceType::value ('wildberries', 'ozon').
-     *                                      Если null — суммируются все площадки.
-     * @param AdSpendKind|null $kind        только оплата за клики или только за заказ; null — весь расход
+     * @param string|null $marketplace значение MarketplaceType::value ('wildberries', 'ozon').
+     *                                 Если null — суммируются все площадки.
+     * @param AdSpendKind|null $kind только оплата за клики или только за заказ; null — весь расход
      *
      * @return array<string, string> listingId => decimal-string adSpend
      */

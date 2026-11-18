@@ -17,6 +17,7 @@ use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
+use App\MarketplaceAnalytics\Application\Service\OzonOrderAdCoverage;
 use App\MarketplaceAnalytics\Domain\Service\AbcClassificationPolicy;
 use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
 use DG\BypassFinals;
@@ -86,6 +87,7 @@ final class UnitExtendedQueryTest extends TestCase
             new MarketplaceCostAnalyticsGroupResolver(new CostCategoryCatalogFacade()),
             $this->listingTagFacade,
             new AbcClassificationPolicy(),
+            new OzonOrderAdCoverage($this->adsFacade),
         );
 
         $this->listingTagFacade->method('list')->willReturn([]);

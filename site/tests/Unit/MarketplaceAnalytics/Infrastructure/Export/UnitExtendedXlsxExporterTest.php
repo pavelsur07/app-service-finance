@@ -407,8 +407,8 @@ final class UnitExtendedXlsxExporterTest extends TestCase
      * createMock() даёт PHPStan-ошибку, вынесенную в baseline поштучно.
      *
      * @param list<array<string, mixed>> $items
-     * @param array<string, mixed>       $totals
-     * @param array<string, mixed>|null  $unallocated
+     * @param array<string, mixed> $totals
+     * @param array<string, mixed>|null $unallocated
      */
     private function queryReturning(array $items, array $totals, ?array $unallocated = null): UnitExtendedQuery
     {

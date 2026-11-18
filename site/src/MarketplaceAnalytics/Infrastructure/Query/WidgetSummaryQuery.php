@@ -10,6 +10,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
+use App\MarketplaceAnalytics\Application\Service\OzonOrderAdCoverage;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
@@ -46,6 +47,7 @@ final readonly class WidgetSummaryQuery
         private Connection $connection,
         private MarketplaceCostAnalyticsGroupResolver $groupResolver,
         private OzonOrderAdAccrualQuery $orderAdAccruals,
+        private OzonOrderAdCoverage $orderAdCoverage,
     ) {
     }
 
@@ -119,6 +121,19 @@ final readonly class WidgetSummaryQuery
         $adCodes = AdStatisticsCostCategories::codes();
         $adAccrued = 0.0;
         $payPerOrderStatistics = null;
+        $coveredByListing = 0.0;
+        foreach ($costRows as $row) {
+            if ($row['has_listing'] && MarketplaceCostAnalyticsGroupResolver::isOzonOrderAdCost($row['marketplace'], $row['category_code'])) {
+                $listingCosts = $this->marketplaceFacade->getCostAggregatesByListing($companyId, MarketplaceType::OZON->value, $dateFrom, $dateTo);
+                if (null !== $listingIds) {
+                    $listingCosts = array_intersect_key($listingCosts, array_flip($listingIds));
+                }
+                $coveredByListing = array_sum($this->orderAdCoverage->byListing($companyId, $dateFrom, $dateTo, $listingCosts));
+                break;
+            }
+        }
+        $remainingLinkedCoverage = $coveredByListing;
+        $usedCoverage = $coveredByListing;
         $orderAdNet = 0.0;
         $orderAdUnlinkedNet = 0.0;
         foreach ($costRows as $row) {
@@ -140,15 +155,19 @@ final readonly class WidgetSummaryQuery
             if (MarketplaceCostAnalyticsGroupResolver::isOzonOrderAdCost($marketplaceFromRow, $code)) {
                 $adAccrued += $netAmt;
                 $unlinkedNet = (float) $row['unlinked_net_amount'];
-                $covered = 0.0;
+                $coveredUnlinked = 0.0;
                 if (null === $listingIds && $unlinkedNet < 0.0) {
                     $payPerOrderStatistics ??= (float) $this->adsFacade->getTotalAdCostForPeriod($companyId, $dateFrom, $dateTo, MarketplaceType::OZON->value, AdSpendKind::PAY_PER_ORDER);
-                    $covered = min(max(0.0, $payPerOrderStatistics), -$unlinkedNet);
+                    $coveredUnlinked = $this->orderAdCoverage->withoutListing(-$unlinkedNet, $payPerOrderStatistics, $usedCoverage);
+                    $usedCoverage += $coveredUnlinked;
                 }
+                $coveredLinked = min($remainingLinkedCoverage, -(float) $row['linked_costs_amount']);
+                $remainingLinkedCoverage -= $coveredLinked;
+                $covered = $coveredUnlinked + $coveredLinked;
                 $costsAmt += $covered;
                 $netAmt += $covered;
                 $orderAdNet += $netAmt;
-                $orderAdUnlinkedNet += $unlinkedNet + $covered;
+                $orderAdUnlinkedNet += $unlinkedNet + $coveredUnlinked;
                 $name = MarketplaceCostAnalyticsGroupResolver::OZON_ORDER_AD_COST_NAME;
             }
             $bucket = $this->groupResolver->resolveUnitBucket($marketplaceFromRow, $code, $name);
@@ -192,11 +211,13 @@ final readonly class WidgetSummaryQuery
         $groups[self::WIDGET_GROUPS['ads']]['netAmount'] -= $adSpend;
 
         $orderAds = null;
-        if ($withOrderAds && null === $listingIds && (null === $marketplace || MarketplaceType::OZON->value === $marketplace)) {
-            $payPerOrderStatistics ??= (float) $this->adsFacade->getTotalAdCostForPeriod($companyId, $dateFrom, $dateTo, MarketplaceType::OZON->value, AdSpendKind::PAY_PER_ORDER);
-            $accruals = $this->orderAdAccruals->byCampaignAndDay($companyId, $dateFrom, $dateTo);
+        if ($withOrderAds && (null === $marketplace || MarketplaceType::OZON->value === $marketplace)) {
+            $attribution = $this->adsFacade->getOzonPayPerOrderAttribution($companyId, $dateFrom, $dateTo, $listingIds);
+            $payPerOrderStatistics ??= null === $listingIds
+                ? (float) $this->adsFacade->getTotalAdCostForPeriod($companyId, $dateFrom, $dateTo, MarketplaceType::OZON->value, AdSpendKind::PAY_PER_ORDER)
+                : $attribution['linked'];
+            $accruals = $this->orderAdAccruals->byCampaignAndDay($companyId, $dateFrom, $dateTo, $listingIds);
             if ([] !== $accruals || 0.0 !== $payPerOrderStatistics) {
-                $attribution = $this->adsFacade->getOzonPayPerOrderAttribution($companyId, $dateFrom, $dateTo);
                 $orderAds = [
                     'linked' => round($attribution['linked'] - ($orderAdNet - $orderAdUnlinkedNet), 2),
                     'estimated' => round($attribution['estimated'], 2),
@@ -294,6 +315,8 @@ final readonly class WidgetSummaryQuery
      *     costs_amount: string,
      *     storno_amount: string,
      *     unlinked_net_amount: string,
+     *     has_listing: bool,
+     *     linked_costs_amount: string,
      * }>
      */
     private function getCostAggregates(
@@ -320,6 +343,8 @@ final readonly class WidgetSummaryQuery
          *     costs_amount: string,
          *     storno_amount: string,
          *     unlinked_net_amount: string,
+         *     has_listing: bool,
+         *     linked_costs_amount: string,
          * }> $rows */
         $rows = $this->connection->fetchAllAssociative(
             <<<SQL
@@ -331,7 +356,9 @@ final readonly class WidgetSummaryQuery
                 SUM(CASE WHEN effective_op = 'storno' THEN 0            ELSE -ABS(amount) END) AS costs_amount,
                 SUM(CASE WHEN effective_op = 'storno' THEN  ABS(amount) ELSE 0             END) AS storno_amount,
                 COALESCE(SUM(CASE WHEN effective_op = 'storno' THEN ABS(amount) ELSE -ABS(amount) END)
-                    FILTER (WHERE listing_id IS NULL), 0) AS unlinked_net_amount
+                    FILTER (WHERE listing_id IS NULL), 0) AS unlinked_net_amount,
+                BOOL_OR(listing_id IS NOT NULL) AS has_listing,
+                COALESCE(SUM(-ABS(amount)) FILTER (WHERE listing_id IS NOT NULL AND effective_op IS DISTINCT FROM 'storno'), 0) AS linked_costs_amount
             FROM (
                 SELECT
                     c.marketplace AS marketplace,
@@ -341,7 +368,7 @@ final readonly class WidgetSummaryQuery
                     c.listing_id,
                     c.operation_type AS effective_op
                 FROM marketplace_costs c
-                JOIN marketplace_cost_categories cc ON cc.id = c.category_id
+                JOIN marketplace_cost_categories cc ON cc.id = c.category_id AND cc.company_id = c.company_id
                 WHERE c.company_id = :companyId
                   AND c.cost_date >= :periodFrom
                   AND c.cost_date <= :periodTo

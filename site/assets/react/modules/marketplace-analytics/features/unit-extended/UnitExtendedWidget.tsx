@@ -176,7 +176,7 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
                         <h3 className="card-title">Юнит-экономика по листингам</h3>
                         <div className="text-muted small">
                             Общие затраты кабинета — строкой «Не распределено по товарам»
-                            перед «Итого»; реклама — по статистике рекламного кабинета
+                            перед «Итого».
                         </div>
                     </div>
                     <div className={`ms-3 ${styles.listingSearch}`}>

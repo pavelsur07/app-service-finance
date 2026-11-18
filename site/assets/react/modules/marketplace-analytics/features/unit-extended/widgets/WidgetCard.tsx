@@ -8,6 +8,8 @@ interface WidgetCardProps {
     previous: WidgetsSummary;
     isExpanded: boolean;
     isExpandable: boolean;
+    allocationNote?: string;
+    detailLabel?: string;
     onToggle: (key: string) => void;
 }
 
@@ -35,6 +37,8 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
     previous,
     isExpanded,
     isExpandable,
+    allocationNote,
+    detailLabel,
     onToggle,
 }) => {
     const currentValue = config.getValue(current);
@@ -62,6 +66,7 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
             className={cardClass}
             onClick={handleClick}
             role={isExpandable ? 'button' : undefined}
+            aria-expanded={isExpandable ? isExpanded : undefined}
             tabIndex={isExpandable ? 0 : undefined}
             onKeyDown={(e) => {
                 if (isExpandable && (e.key === 'Enter' || e.key === ' ')) {
@@ -77,7 +82,9 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
                 </div>
 
                 <div className="h2 mb-1">{formatMoney(currentValue)}</div>
+                {allocationNote && <div className="text-muted small mb-1">{allocationNote}</div>}
                 {note && <div className="text-muted small mb-1">{note}</div>}
+                {detailLabel && <div className="text-primary small mb-1">{detailLabel}</div>}
 
                 <div className="d-flex align-items-center">
                     {delta === null ? (

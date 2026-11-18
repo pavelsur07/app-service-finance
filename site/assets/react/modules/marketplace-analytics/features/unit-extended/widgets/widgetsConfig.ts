@@ -18,8 +18,7 @@ function getGroupNet(s: WidgetsSummary, ...names: string[]): number {
 
 /**
  * 8 карточек — величины строки «Итого» таблицы под ними (в P&L-знаке: расход < 0).
- * Реклама — по статистике рекламного кабинета, как в таблице; начисления маркетплейса
- * по рекламе — справкой под карточкой (#2940, этап 3).
+ * Реклама включает статистику и оплату за заказ Ozon без покрытия статистикой.
  */
 export const WIDGETS: readonly WidgetCardConfig[] = [
     {
@@ -65,7 +64,7 @@ export const WIDGETS: readonly WidgetCardConfig[] = [
         getValue: (s) => getGroupNet(s, 'Реклама'),
         getNote: (s) => (s.adAccrued === null
             ? null
-            : `по начислениям маркетплейса: ${formatMoney(s.adAccrued)}`),
+            : `По начислениям маркетплейса: ${formatMoney(s.adAccrued)}`),
     },
     {
         key: 'other',

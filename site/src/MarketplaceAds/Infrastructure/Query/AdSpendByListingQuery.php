@@ -6,6 +6,7 @@ namespace App\MarketplaceAds\Infrastructure\Query;
 
 use App\Marketplace\Enum\AdSpendKind;
 use App\MarketplaceAds\Domain\ValueObject\OzonSearchPromoCampaign;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -30,10 +31,23 @@ final readonly class AdSpendByListingQuery
     ) {
     }
 
-    /** @return array{linked: float, estimated: float} */
-    public function getOzonPayPerOrderAttribution(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
+    /**
+     * @param list<string>|null $listingIds
+     *
+     * @return array{linked: float, estimated: float}
+     */
+    public function getOzonPayPerOrderAttribution(
+        string $companyId,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        ?array $listingIds,
+    ): array {
+        if ([] === $listingIds) {
+            return ['linked' => 0.0, 'estimated' => 0.0];
+        }
+
         $campaignFilter = OzonSearchPromoCampaign::campaignCondition('ad.campaign_id', AdSpendKind::PAY_PER_ORDER);
+        $listingFilter = null === $listingIds ? '' : 'AND line.listing_id IN (:listingIds)';
         $row = $this->connection->fetchAssociative(
             <<<SQL
             SELECT COALESCE(SUM(line.cost), 0) AS linked,
@@ -44,13 +58,15 @@ final readonly class AdSpendByListingQuery
                 AND listing.company_id = ad.company_id AND listing.marketplace = ad.marketplace
             WHERE ad.company_id = :company AND ad.marketplace = 'ozon'
                 AND ad.report_date BETWEEN :dateFrom AND :dateTo AND {$campaignFilter}
+                {$listingFilter}
             SQL,
             [
                 'company' => $companyId,
                 'dateFrom' => $from->format('Y-m-d'),
                 'dateTo' => $to->format('Y-m-d'),
                 'estimated' => OzonSearchPromoCampaign::ALL_SKU_CAMPAIGN_ID,
-            ],
+            ] + (null === $listingIds ? [] : ['listingIds' => $listingIds]),
+            null === $listingIds ? [] : ['listingIds' => ArrayParameterType::STRING],
         );
 
         return ['linked' => (float) ($row['linked'] ?? 0), 'estimated' => (float) ($row['estimated'] ?? 0)];
