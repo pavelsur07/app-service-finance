@@ -6,6 +6,8 @@ namespace App\MarketplaceFunnel\Controller;
 
 use App\Company\Security\ModuleAccess;
 use App\MarketplaceFunnel\Application\Service\FunnelReportBuilder;
+use App\MarketplaceFunnel\Domain\FunnelRow;
+use App\MarketplaceFunnel\Exception\InvalidFunnelFilterException;
 use App\MarketplaceFunnel\Infrastructure\Export\FunnelXlsxExporter;
 use App\Shared\Service\ActiveCompanyService;
 use Pagerfanta\Adapter\ArrayAdapter;
@@ -45,7 +47,7 @@ final class FunnelController extends AbstractController
             'to' => (string) $query->get('to', $today->modify('-1 day')->format('Y-m-d')),
             'channel' => (string) $query->get('channel', ''),
             'search' => trim((string) $query->get('q', '')),
-            'sort' => (string) $query->get('sort', 'orders'),
+            'sort' => \in_array($query->get('sort'), FunnelRow::COLUMNS, true) ? (string) $query->get('sort') : 'orders',
             'desc' => 'asc' !== $query->get('dir'),
             'report' => null,
             'pager' => null,
@@ -61,12 +63,12 @@ final class FunnelController extends AbstractController
             $pager->setMaxPerPage(self::PER_PAGE);
             $page = $query->getInt('page', 1);
             if ($page < 1 || $page > $pager->getNbPages()) {
-                throw new \InvalidArgumentException('Запрошенная страница не существует.');
+                throw new InvalidFunnelFilterException('Запрошенная страница не существует.');
             }
             $pager->setCurrentPage($page);
             $view['report'] = $report;
             $view['pager'] = $pager;
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidFunnelFilterException $e) {
             $view['error'] = $e->getMessage();
 
             return $this->render('marketplace_funnel/index.html.twig', $view, new Response(status: Response::HTTP_UNPROCESSABLE_ENTITY));
@@ -79,7 +81,7 @@ final class FunnelController extends AbstractController
     {
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
         if (false === $date || $date->format('Y-m-d') !== $value) {
-            throw new \InvalidArgumentException('Дата — в формате ГГГГ-ММ-ДД.');
+            throw new InvalidFunnelFilterException('Дата — в формате ГГГГ-ММ-ДД.');
         }
 
         return $date;

@@ -8,6 +8,7 @@ use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceFunnel\Application\DTO\FunnelReport;
 use App\MarketplaceFunnel\Application\DTO\FunnelReportRow;
 use App\MarketplaceFunnel\Domain\FunnelRow;
+use App\MarketplaceFunnel\Exception\InvalidFunnelFilterException;
 use App\MarketplaceFunnel\Infrastructure\Query\FunnelReportQuery;
 
 /**
@@ -27,13 +28,13 @@ final readonly class FunnelReportBuilder
     public function build(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $channel, string $search, string $sort, bool $desc): FunnelReport
     {
         if (null !== $channel && !isset(FunnelReport::CHANNELS[$channel])) {
-            throw new \InvalidArgumentException('Неизвестный маркетплейс.');
+            throw new InvalidFunnelFilterException('Неизвестный маркетплейс.');
         }
         if ($from > $to) {
-            throw new \InvalidArgumentException('Начало периода позже конца.');
+            throw new InvalidFunnelFilterException('Начало периода позже конца.');
         }
         if ((int) $from->diff($to)->days + 1 > self::MAX_DAYS) {
-            throw new \InvalidArgumentException(sprintf('Период — не больше %d дней.', self::MAX_DAYS));
+            throw new InvalidFunnelFilterException(sprintf('Период — не больше %d дней.', self::MAX_DAYS));
         }
 
         $data = $this->query->bySku($companyId, $from, $to, $channel);
@@ -56,7 +57,9 @@ final readonly class FunnelReportBuilder
         }
 
         $sort = \in_array($sort, FunnelRow::COLUMNS, true) ? $sort : 'orders';
-        usort($rows, static fn (FunnelReportRow $a, FunnelReportRow $b): int => ($desc ? -1 : 1) * (($a->values[$sort] ?? -1) <=> ($b->values[$sort] ?? -1)) ?: strcmp($a->channel.$a->sku, $b->channel.$b->sku));
+        // «нет данных» — всегда в конце, при любом направлении
+        usort($rows, static fn (FunnelReportRow $a, FunnelReportRow $b): int => [null === $a->values[$sort], ($desc ? -1 : 1) * ($a->values[$sort] ?? 0)] <=> [null === $b->values[$sort], ($desc ? -1 : 1) * ($b->values[$sort] ?? 0)]
+            ?: strcmp($a->channel.$a->sku, $b->channel.$b->sku));
 
         $coverage = $this->query->coverage($companyId, $from, $to, $channel);
 

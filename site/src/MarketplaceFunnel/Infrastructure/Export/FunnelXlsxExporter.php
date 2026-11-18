@@ -8,6 +8,7 @@ use App\MarketplaceFunnel\Application\DTO\FunnelReport;
 use App\MarketplaceFunnel\Application\DTO\FunnelReportRow;
 use App\MarketplaceFunnel\Domain\FunnelRow;
 use OpenSpout\Common\Entity\Cell;
+use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Writer\XLSX\Writer;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -24,9 +25,8 @@ final readonly class FunnelXlsxExporter
         $writer = new Writer();
         $writer->openToFile($path);
         try {
-            // строки пишутся через fromValue: текст с «=» остаётся текстом, формулы OpenSpout сам не создаёт
-            $writer->addRow(new Row([Cell::fromValue(sprintf('Воронка · %s – %s', $report->from->format('d.m.Y'), $report->to->format('d.m.Y')))]));
-            $writer->addRow(new Row(array_map(static fn (string $h): Cell => Cell::fromValue($h), self::HEADER)));
+            $writer->addRow(new Row([new StringCell(sprintf('Воронка · %s – %s', $report->from->format('d.m.Y'), $report->to->format('d.m.Y')), null)]));
+            $writer->addRow(new Row(array_map(static fn (string $h): Cell => new StringCell($h, null), self::HEADER)));
             foreach ([...$report->rows, $report->total] as $row) {
                 $writer->addRow($this->row($row));
             }
@@ -50,6 +50,7 @@ final readonly class FunnelXlsxExporter
             $cells[] = null === $value ? '' : ('revenue_minor' === $column ? $value / 100 : $value);
         }
 
-        return new Row(array_map(static fn (string|int|float $v): Cell => Cell::fromValue($v), $cells));
+        // текст — только StringCell: Cell::fromValue() превращает строку на «=» в формулу
+        return new Row(array_map(static fn (string|int|float $v): Cell => \is_string($v) ? new StringCell($v, null) : Cell::fromValue($v), $cells));
     }
 }

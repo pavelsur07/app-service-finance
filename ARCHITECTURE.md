@@ -705,7 +705,7 @@
 заказы, выкупы). Модуль переводит факты `ozon.analytics.funnel` и `wb.analytics.funnel` из `SourceFacts`
 в дневную таблицу. В модуле не должно быть: денег канона, статей ОПиУ, экономики SKU, листингов,
 обращений к API маркетплейсов. Зависимости — фасады `SourceFacts` и `Marketplace` (названия листингов) (гейт
-`ModuleBoundaryRules::test_marketplace_funnel_uses_only_source_facts`).
+`ModuleBoundaryRules::test_marketplace_funnel_stays_out_of_money_and_legacy`).
 
 | Таблица | Что | Ключ |
 |---|---|---|

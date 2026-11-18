@@ -417,7 +417,7 @@ final class ModuleBoundaryRules
      * `MarketplaceFunnel` — таблица воронки продаж: факты берёт только из фасада `SourceFacts`;
      * переводчики денег, канон, легаси и учёт ему недоступны.
      */
-    public function test_marketplace_funnel_uses_only_source_facts(): Rule
+    public function test_marketplace_funnel_stays_out_of_money_and_legacy(): Rule
     {
         return PHPat::rule()
             ->classes(Selector::inNamespace('App\MarketplaceFunnel'))
@@ -434,7 +434,7 @@ final class ModuleBoundaryRules
                 Selector::inNamespace('App\Finance'),
                 Selector::inNamespace('App\Cash'),
             )
-            ->excluding(Selector::inNamespace('App\Marketplace\Facade'), Selector::inNamespace('App\Marketplace\DTO'))
+            ->excluding(Selector::inNamespace('App\Marketplace\Facade'))
             ->because('воронка — не деньги: в экономику и ОПиУ она не подмешивается, факты приходят из SourceFacts, названия товаров — из Marketplace\\Facade.');
     }
 

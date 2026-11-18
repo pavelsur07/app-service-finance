@@ -55,7 +55,7 @@ final class FunnelPageTest extends WebTestCaseBase
         $client = static::createClient();
         $owner = $this->seed();
         $this->row(self::COMPANY_ID, 'ozon', 'oz-1', '2026-11-10', 'SKU-971', ['impressions' => 10, 'orders' => 1]);
-        $this->row(self::COMPANY_ID, 'wildberries', 'wb-1', '2026-11-10', '555', ['card_views' => 50, 'orders' => 2]);
+        $this->row(self::COMPANY_ID, 'wildberries', 'wb-1', '2026-11-10', '=1+1', ['card_views' => 50, 'orders' => 2]);
         $client->loginUser($owner);
         $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
 
@@ -66,6 +66,14 @@ final class FunnelPageTest extends WebTestCaseBase
         $client->request('GET', self::URL, ['from' => '2026-11-10', 'to' => '2026-11-10', 'format' => 'xlsx']);
         self::assertResponseIsSuccessful();
         self::assertStringContainsString('spreadsheetml', (string) $client->getResponse()->headers->get('Content-Type'));
+        // файл удаляется после отправки — содержимое берётся из ответа клиента
+        $file = (string) tempnam(sys_get_temp_dir(), 'mfn-test-');
+        file_put_contents($file, $client->getInternalResponse()->getContent());
+        $zip = new \ZipArchive();
+        self::assertTrue($zip->open($file));
+        $sheet = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+        self::assertStringContainsString('=1+1', $sheet);
+        self::assertStringNotContainsString('<f>', $sheet, 'идентификатор товара на «=» — текст, не формула');
 
         $client->request('GET', self::URL, ['from' => '2026-11-12', 'to' => '2026-11-10']);
         self::assertResponseStatusCodeSame(422);
