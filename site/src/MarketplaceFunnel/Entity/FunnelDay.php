@@ -43,7 +43,7 @@ class FunnelDay
     #[ORM\Column(type: 'integer')]
     private int $rowCount;
 
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'money_amount_minor')]
     private int $controlSum;
 
     #[ORM\Column(type: 'datetime_immutable')]

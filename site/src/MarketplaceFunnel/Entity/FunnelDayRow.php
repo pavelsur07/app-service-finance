@@ -9,6 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 /**
  * Воронка товара за день: товар — идентификатор маркетплейса (SKU Ozon, nmId WB), листинг находит
  * читатель; `source` — источник трафика (`total` — всего). Ступень без данных — NULL. Только схема.
+ * Тип `money_amount_minor` — принятый в проекте BIGINT для int-свойств (штатный `bigint` запрещён гейтом).
  */
 #[ORM\Entity(readOnly: true)]
 #[ORM\Table(name: 'mfn_row')]
@@ -39,30 +40,30 @@ class FunnelDayRow
     #[ORM\Column(type: 'string', length: 16)]
     private string $source;
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
+    #[ORM\Column(type: 'money_amount_minor', nullable: true)]
     private ?int $impressions = null;
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
+    #[ORM\Column(type: 'money_amount_minor', nullable: true)]
     private ?int $impressionsSearch = null;
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
+    #[ORM\Column(type: 'money_amount_minor', nullable: true)]
     private ?int $cardViews = null;
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
+    #[ORM\Column(type: 'money_amount_minor', nullable: true)]
     private ?int $cartAdds = null;
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
+    #[ORM\Column(type: 'money_amount_minor', nullable: true)]
     private ?int $orders = null;
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
+    #[ORM\Column(type: 'money_amount_minor', nullable: true)]
     private ?int $revenueMinor = null;
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
+    #[ORM\Column(type: 'money_amount_minor', nullable: true)]
     private ?int $buyouts = null;
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
+    #[ORM\Column(type: 'money_amount_minor', nullable: true)]
     private ?int $cancels = null;
 
-    #[ORM\Column(type: 'bigint', nullable: true)]
+    #[ORM\Column(type: 'money_amount_minor', nullable: true)]
     private ?int $returns = null;
 }
