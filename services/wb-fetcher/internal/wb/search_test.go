@@ -55,7 +55,11 @@ func TestSearchDayClassifiesRefusals(t *testing.T) {
 		body   string
 		class  apierr.Class
 	}{
-		"no token category": {http.StatusForbidden, `{"title":"Authorization error"}`, apierr.ClassAuth},
+		// Отказ в доступе — конечный исход, не пауза и не повторы: проверка разовая.
+		"no token category": {http.StatusForbidden, `{"title":"Authorization error"}`, apierr.ClassInvalidRequest},
+		"payment required":  {http.StatusPaymentRequired, `{"title":"payment required"}`, apierr.ClassInvalidRequest},
+		"bad request":       {http.StatusBadRequest, `{"title":"Invalid request body"}`, apierr.ClassInvalidRequest},
+		"rate limit":        {http.StatusTooManyRequests, `{}`, apierr.ClassRateLimit},
 		"card without nmId": {http.StatusOK, `{"data":{"products":[{"openCard":{}}]}}`, apierr.ClassInvalidResponse},
 	} {
 		t.Run(name, func(t *testing.T) {

@@ -80,8 +80,18 @@ func (a *Analytics) FunnelDay(ctx context.Context, ref, token, day string) (Funn
 
 // SearchDay — поиск по всем карточкам кабинета за день day: та же сборка
 // страницы дня, что у воронки. Сортировка обязательна в запросе; итоговый
-// порядок — по nmId.
+// порядок — по nmId. Отказ в доступе (402, 403) — конечный: без подписки
+// повтор ничего не изменит, а текст отказа нужен в покрытии как есть.
 func (a *Analytics) SearchDay(ctx context.Context, ref, token, day string) (FunnelDay, error) {
+	out, err := a.searchDay(ctx, ref, token, day)
+	var apiErr *apierr.APIError
+	if errors.As(err, &apiErr) && (apiErr.Status == http.StatusPaymentRequired || apiErr.Status == http.StatusForbidden) {
+		apiErr.Class = apierr.ClassInvalidRequest
+	}
+	return out, err
+}
+
+func (a *Analytics) searchDay(ctx context.Context, ref, token, day string) (FunnelDay, error) {
 	return a.dayReport(ctx, ref, token, EndpointSearch, SearchSchema,
 		map[string]any{
 			"currentPeriod":   map[string]string{"start": day, "end": day},

@@ -63,10 +63,11 @@ const KindFunnelTail = "wb_funnel_tail"
 // живой проверки метода (docs/tasks/marketplace-funnel/TASK.md, этап 1).
 const FunnelDays = 30
 
-// SearchDays — дней поиска до вчера включительно, загружаются один раз и не
-// перечитываются: доступ по «Джему» и форма отказа проверяются на проде
-// (docs/tasks/marketplace-funnel/TASK.md, этап 3).
-const SearchDays = 1
+// SearchProbeDay — единственный день поиска: разовая проверка, каким кабинетам
+// WB отдаёт метод (подписка «Джем») и в какой форме отказывает. Новые дни не
+// планируются, день не перечитывается (docs/tasks/marketplace-funnel/TASK.md, этап 3).
+// ponytail: дата константой; окно и перечитывание — когда появится кабинет с данными.
+const SearchProbeDay = "2026-11-17"
 
 // Config — параметры окна.
 type Config struct {
@@ -146,10 +147,7 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) schedule.P
 			plan.Refreshes = append(plan.Refreshes, tail)
 		}
 		if cab.Supports(executor.ResourceSearch) {
-			for i := 0; i < SearchDays; i++ {
-				k := key(cab.Ref, executor.ResourceSearch, yesterday.AddDate(0, 0, -i).Format(time.DateOnly))
-				plan.Ensure = append(plan.Ensure, store.TaskSpec{TaskKey: k, Priority: PriorityHistory, RunAt: start})
-			}
+			plan.Ensure = append(plan.Ensure, store.TaskSpec{TaskKey: key(cab.Ref, executor.ResourceSearch, SearchProbeDay), Priority: PriorityHistory, RunAt: now})
 		}
 		if weekly {
 			tail := schedule.Refresh{Kind: KindWeeklyTail, RunDate: runDate, ConnectionRef: cab.Ref}
