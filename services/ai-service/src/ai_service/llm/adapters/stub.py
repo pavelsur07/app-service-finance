@@ -33,6 +33,9 @@ class StubAdapter:
                         "questions": ["Тестовый адаптер: разбор моделью не выполнялся."],
                     }
                 )
+            case "cash-rule-phrase":
+                samples = json.loads(extract_data_block(request.user))["examples"]
+                text = json.dumps({"phrase": _phrase(samples)}, ensure_ascii=False)
             case "source-type-draft":
                 text = json.dumps(_source_type_draft(json.loads(extract_data_block(request.user))), ensure_ascii=False)
             case "invalid":
@@ -85,3 +88,18 @@ def _source_type_draft(data: dict[str, Any]) -> dict[str, Any]:
         "reason": "похожих кодов нет",
         "confidence": 0.3,
     }
+
+
+def _phrase(samples: list[dict[str, Any]]) -> str | None:
+    """Локальный режим: повторяющиеся слова сравниваются с отрицательными примерами."""
+    positive: dict[str, int] = {}
+    negative: set[str] = set()
+    for sample in samples:
+        words = {word for word in sample["text"].split() if word not in {"#", "за", "по", "от", "и", "в", "оплата"}}
+        if sample["target"]:
+            for word in words:
+                positive[word] = positive.get(word, 0) + 1
+        else:
+            negative.update(words)
+    options = (word for word, count in positive.items() if count >= 2 and word not in negative)
+    return max(options, key=lambda word: (positive[word], len(word), word), default=None)

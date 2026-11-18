@@ -76,6 +76,12 @@ class CashTransactionAutoRuleCondition
         $this->moneyAccount = $moneyAccount;
     }
 
+    public function __clone()
+    {
+        $this->id = Uuid::uuid7()->toString();
+        $this->autoRule = null;
+    }
+
     public function getId(): ?string
     {
         return $this->id;
@@ -205,8 +211,12 @@ class CashTransactionAutoRuleCondition
         $allowedOperators = match ($this->field) {
             CashTransactionAutoRuleConditionField::COUNTERPARTY => [CashTransactionAutoRuleConditionOperator::EQUAL],
             CashTransactionAutoRuleConditionField::COUNTERPARTY_NAME,
-            CashTransactionAutoRuleConditionField::INN,
-            CashTransactionAutoRuleConditionField::DESCRIPTION => [CashTransactionAutoRuleConditionOperator::CONTAINS],
+            CashTransactionAutoRuleConditionField::INN => [CashTransactionAutoRuleConditionOperator::CONTAINS],
+            CashTransactionAutoRuleConditionField::DESCRIPTION => [
+                CashTransactionAutoRuleConditionOperator::CONTAINS,
+                CashTransactionAutoRuleConditionOperator::NOT_CONTAINS,
+                CashTransactionAutoRuleConditionOperator::EQUAL,
+            ],
             CashTransactionAutoRuleConditionField::CURRENCY,
             CashTransactionAutoRuleConditionField::IMPORT_SOURCE,
             CashTransactionAutoRuleConditionField::IS_TRANSFER,

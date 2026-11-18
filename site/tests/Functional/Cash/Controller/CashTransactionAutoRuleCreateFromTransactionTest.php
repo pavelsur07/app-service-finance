@@ -66,7 +66,7 @@ final class CashTransactionAutoRuleCreateFromTransactionTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
 
-        $form = $crawler->selectButton('Сохранить')->form();
+        $form = $crawler->selectButton('Проверить')->form();
         self::assertSame('ООО Ромашка → Аренда', $form['cash_transaction_auto_rule[name]']->getValue());
         self::assertSame('OUTFLOW', $form['cash_transaction_auto_rule[operationType]']->getValue());
         self::assertSame($category->getId(), $form['cash_transaction_auto_rule[cashflowCategory]']->getValue());
@@ -83,6 +83,17 @@ final class CashTransactionAutoRuleCreateFromTransactionTest extends WebTestCase
             'Оплата по счету №1423 от 12.03.2026 за аренду',
             (string) $client->getResponse()->getContent(),
         );
+        $checked = $client->submit($form);
+        self::assertResponseIsSuccessful();
+        $connection = $this->em()->getConnection();
+        $countRules = fn (): int => (int) $connection->fetchOne('SELECT COUNT(*) FROM cash_transaction_auto_rule WHERE company_id = ?', [$company->getId()]);
+        self::assertSame(0, $countRules());
+        $confirmation = $checked->selectButton('Подтвердить и включить')->form();
+        $client->submit($confirmation);
+        self::assertResponseRedirects('/cash-transaction-auto-rules/');
+        $client->submit($confirmation);
+        self::assertResponseRedirects('/cash-transaction-auto-rules/');
+        self::assertSame(1, $countRules());
     }
 
     /**
@@ -132,7 +143,7 @@ final class CashTransactionAutoRuleCreateFromTransactionTest extends WebTestCase
         );
 
         // Условие «контрагент» без контрагента не проходит валидацию.
-        $crawler = $client->submit($crawler->selectButton('Сохранить')->form(), [
+        $crawler = $client->submit($crawler->selectButton('Проверить')->form(), [
             'cash_transaction_auto_rule[conditions][0][counterparty]' => '',
         ]);
 

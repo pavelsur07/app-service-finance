@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Application\AutoRule;
 
 use App\Cash\Application\Service\AutoRule\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\AutoRule\CashAutoRuleConflictRecorder;
 use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Cash\Application\Service\Transaction\CashTransactionSplitSynchronizer;
 use App\Cash\Entity\Transaction\CashTransaction;
@@ -32,6 +33,7 @@ final class ApplyAutoRuleToTransactionAction
         private readonly AutoRuleDispatchGuard $dispatchGuard,
         private readonly AuditContextProvider $auditContextProvider,
         private readonly CashTransactionSplitSynchronizer $splitSynchronizer,
+        private readonly CashAutoRuleConflictRecorder $conflictRecorder,
     ) {
     }
 
@@ -60,6 +62,7 @@ final class ApplyAutoRuleToTransactionAction
             }
 
             $match = $this->autoRuleService->match($t);
+            $this->conflictRecorder->record($t, $match);
             if (!$match->hasWinners() && $match->hasConflict()) {
                 return [
                     'ok' => false,

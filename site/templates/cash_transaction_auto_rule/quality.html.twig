@@ -1,0 +1,40 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ metric.label }} — {{ rule.name }}{% endblock %}
+
+{% block body %}
+    {% set dates = {from: period.from|date('Y-m-d'), to: period.to|date('Y-m-d')} %}
+    {% embed 'partials/_page_header.html.twig' with {title: rule.name ~ ' · версия ' ~ revision} %}
+        {% block actions %}
+            <a class="btn btn-outline-secondary" href="{{ path('cash_transaction_auto_rule_index', dates|merge({status: 'all'})) }}">К правилам</a>
+        {% endblock %}
+    {% endembed %}
+    <div class="container-xl mt-3">
+        <h2>{{ metric.label }}</h2>
+        <p>Период {{ period.from|date('d.m.Y') }} — {{ period.to|date('d.m.Y') }}.
+            {% if metric.value == 'conflicts' and observedSince is null %}
+                Учёт конфликтов начнётся при первой обработке операции.
+            {% elseif observedSince and period.from < observedSince %}
+                Конфликты учитываются с {{ observedSince|date('d.m.Y') }}.
+            {% endif %}
+        </p>
+        <div class="card table-responsive">
+            <table class="table">
+                <thead><tr><th>Дата операции</th><th>Назначение платежа</th><th class="text-end">Сумма</th></tr></thead>
+                <tbody>
+                    {% for operation in pager.currentPageResults %}
+                        <tr>
+                            <td><a href="{{ path('cash_transaction_show', {id: operation.id}) }}">{{ operation.occurred_at|date('d.m.Y') }}</a></td>
+                            <td>{{ operation.description|default('—') }}</td>
+                            <td class="text-end">{{ operation.amount|vf_money(vf_currency_digits(operation.currency), operation.currency) }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="3">За этот период операций нет.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="card-footer">
+                {% include 'partials/_pagination.html.twig' with {pager: pager, params: dates|merge({id: rule.id, revision: revision, metric: metric.value})} only %}
+            </div>
+        </div>
+    </div>
+{% endblock %}
