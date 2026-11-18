@@ -71,6 +71,7 @@ func TestFetchFunnelRejectsBrokenResponses(t *testing.T) {
 	for name, respond := range map[string]func(map[string]any) (int, string){
 		"not object": func(map[string]any) (int, string) { return http.StatusOK, `[]` },
 		"no result":  func(map[string]any) (int, string) { return http.StatusOK, `{}` },
+		"no data":    func(map[string]any) (int, string) { return http.StatusOK, `{"result":{}}` },
 		"row without sku": func(map[string]any) (int, string) {
 			return http.StatusOK, `{"result":{"data":[{"dimensions":[],"metrics":[]}]}}`
 		},

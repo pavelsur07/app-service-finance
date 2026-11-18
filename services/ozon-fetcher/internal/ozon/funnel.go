@@ -48,8 +48,8 @@ var ErrFunnelShifted = errors.New("ozon: funnel sku repeated between pages")
 
 // FetchFunnel выгружает воронку дня day (YYYY-MM-DD) по SKU постранично по
 // offset; возвращает число строк. Page.Cursor — offset следующей страницы, ""
-// у последней. Строка без SKU — invalid_response, повтор SKU между страницами —
-// ErrFunnelShifted; "data": null — пустой день.
+// у последней. Нет поля data, строка без SKU — invalid_response, повтор SKU
+// между страницами — ErrFunnelShifted; "data": null — пустой день.
 func (c *Client) FetchFunnel(ctx context.Context, creds Credentials, connectionRef, day string, firstPageNo int, onPage PageHandler) (int, error) {
 	// SKU прежних страниц попытки: порядок выдачи Ozon не закреплён, сдвиг
 	// между страницами дал бы повторы и потери.
@@ -74,8 +74,12 @@ func (c *Client) FetchFunnel(ctx context.Context, creds Credentials, connectionR
 				} `json:"data"`
 			} `json:"result"`
 		}
-		if json.Unmarshal(resp.Body, &root) != nil || root.Result == nil {
-			return 0, invalidResponse(EndpointFunnel, `response has no "result" object`)
+		var probe struct {
+			Result map[string]json.RawMessage `json:"result"`
+		}
+		// "data": null — пустой день; поля нет вовсе — повреждённый ответ.
+		if json.Unmarshal(resp.Body, &probe) != nil || probe.Result["data"] == nil || json.Unmarshal(resp.Body, &root) != nil || root.Result == nil {
+			return 0, invalidResponse(EndpointFunnel, `response has no "result.data"`)
 		}
 		for _, row := range root.Result.Data {
 			if len(row.Dimensions) == 0 || row.Dimensions[0].ID == "" {

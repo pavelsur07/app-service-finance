@@ -64,6 +64,7 @@ func TestFunnelDayRequestsOneDayAndSortsCardsAcrossPages(t *testing.T) {
 		"limit":          float64(FunnelPageLimit), "offset": float64(0),
 	}, (*bodies)[0])
 	require.Len(t, *bodies, 2, "полная страница — запрос следующей")
+	assert.InDelta(t, FunnelPageLimit, (*bodies)[1]["offset"], 0)
 	var body struct {
 		Schema   string `json:"schema"`
 		Currency string `json:"currency"`
