@@ -288,6 +288,10 @@ Raw этого ресурса — байты файла отчёта, не JSON.
   ответ ошибкой не считает: день закрывается служебной страницей `{"subscription_required":true}`
   (INFO «funnel skipped»), перечитывание хвоста пробует снова раз в сутки и заменит её данными.
   Дни старше хвоста после появления тарифа сами не догружаются.
+- **Прод 18.11.2026.** Отказа 400 не получил ни один из четырёх кабинетов: двум Ozon отдал все 14
+  метрик, двум — строки с двумя метриками (`ordered_units`, `revenue`, в порядке запроса) без ошибки.
+  Symfony (`OzonFunnelTranslator`) переводит такую строку в заказы и выручку, остальные ступени —
+  «нет данных».
 - **Запрос:** `{"date_from": "D", "date_to": "D", "metrics": [...], "dimension": ["sku"],
   "limit": 1000, "offset": N}`. Метрики (14 — предел Ozon): `hits_view_search`, `hits_view_pdp`,
   `hits_view`, `session_view_search`, `session_view_pdp`, `session_view`, `hits_tocart_search`,

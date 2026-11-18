@@ -25,6 +25,16 @@ final class FunnelTranslatorsTest extends TestCase
         self::assertSame(100 + 70 + 30 + 6 + 5 + 123450 + 3 + 2 + 1, $row->controlSum());
     }
 
+    /** Живой ответ 18.11.2026: кабинету без тарифа Ozon отдаёт только заказы и выручку — две метрики вместо 14. */
+    public function testOzonRowWithoutSubscriptionHasOnlyOrdersAndRevenue(): void
+    {
+        $row = OzonFunnelTranslator::translate(['dimensions' => [['id' => '11', 'name' => 'Товар']], 'metrics' => [5, 1234.5]]);
+
+        self::assertSame(5, $row->values['orders']);
+        self::assertSame(123450, $row->values['revenue_minor']);
+        self::assertSame([], array_filter($row->values, static fn (?int $v, string $k): bool => null !== $v && !\in_array($k, ['orders', 'revenue_minor'], true), \ARRAY_FILTER_USE_BOTH), 'остальные ступени — «нет данных», не ноль');
+    }
+
     /**
      * @param array<string, mixed> $payload
      */
