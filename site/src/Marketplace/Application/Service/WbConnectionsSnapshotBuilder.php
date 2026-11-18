@@ -22,8 +22,11 @@ final readonly class WbConnectionsSnapshotBuilder
 {
     public const PROVIDER = 'wildberries';
 
-    /** Детальный отчёт о реализации, дневной и недельный (`docs/tasks/wb-fetcher-finance/plan.md`), и расход рекламы за день. */
-    public const FINANCE_RESOURCE_TYPES = ['wb.finance.sales-report.daily', 'wb.finance.sales-report.weekly', 'wb.ads.daily'];
+    /**
+     * Детальный отчёт о реализации, дневной и недельный (`docs/tasks/wb-fetcher-finance/plan.md`), расход рекламы за день
+     * и воронка продаж по карточкам (`docs/tasks/marketplace-funnel/TASK.md`).
+     */
+    public const FINANCE_RESOURCE_TYPES = ['wb.finance.sales-report.daily', 'wb.finance.sales-report.weekly', 'wb.ads.daily', 'wb.analytics.funnel'];
 
     /** Значение списка компаний: все кабинеты. */
     public const ALL_COMPANIES = '*';

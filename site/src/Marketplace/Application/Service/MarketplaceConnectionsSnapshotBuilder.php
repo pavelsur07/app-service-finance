@@ -68,6 +68,12 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
      */
     public const SEARCH_ANALYTICS_RESOURCE_TYPES = ['ozon.analytics.queries', 'ozon.analytics.queries.details'];
 
+    /**
+     * Воронка продаж по товарам (`docs/tasks/marketplace-funnel/TASK.md`): показы, переходы в карточку, корзины по SKU за день.
+     * Выдаётся тем же компаниям, что поисковая аналитика; кабинет без нужного тарифа Ozon сервис пропускает сам.
+     */
+    public const FUNNEL_RESOURCE_TYPE = 'ozon.analytics.funnel';
+
     /** Возвраты и отмены построчно (`docs/tasks/marketplace-data-ingestion/stages/ozon-10-returns.md`); по списку компаний. */
     public const RETURNS_RESOURCE_TYPE = 'ozon.returns';
 
@@ -103,7 +109,7 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
      * @param list<string> $adsCompanyIds то же для рекламы (ключ performance)
      * @param list<string> $adsReportsCompanyIds то же для отчётов по товарам (из тех, кому выдана реклама)
      * @param list<string> $snapshotsCompanyIds то же для снимков цен и остатков по складам
-     * @param list<string> $searchAnalyticsCompanyIds то же для поисковой аналитики (только с остатками)
+     * @param list<string> $searchAnalyticsCompanyIds то же для поисковой аналитики (только с остатками) и воронки продаж
      * @param list<string> $returnsCompanyIds то же для возвратов
      * @param list<string> $referenceCompanyIds то же для снимков акций, поставок и кластеров
      */
@@ -187,6 +193,7 @@ final readonly class MarketplaceConnectionsSnapshotBuilder
                     ? [self::WAREHOUSE_STOCKS_RESOURCE_TYPE] : []),
                 ...(null !== $sellerCredentials && self::listed($this->stocksCompanyIds, $companyId) && self::listed($this->searchAnalyticsCompanyIds, $companyId)
                     ? self::SEARCH_ANALYTICS_RESOURCE_TYPES : []),
+                ...(null !== $sellerCredentials && self::listed($this->searchAnalyticsCompanyIds, $companyId) ? [self::FUNNEL_RESOURCE_TYPE] : []),
                 ...(null !== $sellerCredentials && self::listed($this->returnsCompanyIds, $companyId) ? [self::RETURNS_RESOURCE_TYPE] : []),
                 ...(null !== $sellerCredentials && self::listed($this->referenceCompanyIds, $companyId) ? self::REFERENCE_RESOURCE_TYPES : []),
                 ...(null !== $performanceCredentials && self::listed($this->adsCompanyIds, $companyId) ? self::ADS_RESOURCE_TYPES : []),

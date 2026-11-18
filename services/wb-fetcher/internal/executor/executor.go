@@ -28,6 +28,19 @@ const ResourceAds = "wb.ads.daily"
 // IsAdsResource — ресурс семейства рекламы: свой слот кабинета, свой ключ доступа.
 func IsAdsResource(resource string) bool { return strings.HasPrefix(resource, "wb.ads.") }
 
+// ResourceFunnel — воронка продаж по карточкам за день МСК (одна страница):
+// переходы в карточку, корзины, заказы, выкупы (docs/tasks/marketplace-funnel/TASK.md).
+const ResourceFunnel = "wb.analytics.funnel"
+
+// ownAccess — ресурс со своей категорией доступа токена (продвижение,
+// аналитика): отказ 401/403 — пауза только этой задачи, финансы кабинета идут.
+func ownAccess(resource string) bool { return IsAdsResource(resource) || resource == ResourceFunnel }
+
+// FunnelSource — день воронки (wb.Analytics).
+type FunnelSource interface {
+	FunnelDay(ctx context.Context, ref, token, day string) (wb.FunnelDay, error)
+}
+
 // AdsSource — день рекламы (wb.Ads).
 type AdsSource interface {
 	Day(ctx context.Context, ref, token, day string) (wb.AdsDay, error)
@@ -78,7 +91,14 @@ type Executor struct {
 	cfg    Config
 	report Report
 	ads    AdsSource
+	funnel FunnelSource
 	now    func() time.Time
+}
+
+// WithFunnel — источник воронки; без него задачи wb.analytics.funnel — неизвестный ресурс.
+func (e *Executor) WithFunnel(f FunnelSource) *Executor {
+	e.funnel = f
+	return e
 }
 
 // WithAds — источник рекламы; без него задачи wb.ads.daily — неизвестный ресурс.
@@ -111,7 +131,16 @@ func (e *Executor) Run(ctx context.Context, task store.Task, cabinet connections
 func (e *Executor) Fetch(ctx context.Context, run *fetch.Run, cab connections.Cabinet) error {
 	resource := run.Task.ResourceType
 	if resource == ResourceAds && e.ads != nil {
-		return e.adsDay(ctx, run, cab)
+		return e.dayPage(ctx, run, cab, func(day string) ([]byte, slog.Attr, error) {
+			page, err := e.ads.Day(ctx, cab.Ref, cab.Token.Reveal(), day)
+			return page.Body, slog.Int("campaigns", page.Campaigns), err
+		})
+	}
+	if resource == ResourceFunnel && e.funnel != nil {
+		return e.dayPage(ctx, run, cab, func(day string) ([]byte, slog.Attr, error) {
+			page, err := e.funnel.FunnelDay(ctx, cab.Ref, cab.Token.Reveal(), day)
+			return page.Body, slog.Int("products", page.Products), err
+		})
 	}
 	if resource != ResourceDaily && resource != ResourceWeekly {
 		return fmt.Errorf("%w: %q", fetch.ErrUnknownResource, resource)
@@ -137,12 +166,13 @@ func (e *Executor) Fetch(ctx context.Context, run *fetch.Run, cab connections.Ca
 	return e.pages(ctx, run, cab, wb.PeriodDaily, day.Format(time.DateOnly), day.Format(time.DateOnly), time.Time{})
 }
 
-// adsDay — день рекламы одной страницей: upd и fullstats его кампаний.
-func (e *Executor) adsDay(ctx context.Context, run *fetch.Run, cab connections.Cabinet) error {
+// dayPage — день ресурса одной страницей (реклама, воронка): load собирает
+// страницу дня и счётчик для журнала.
+func (e *Executor) dayPage(ctx context.Context, run *fetch.Run, cab connections.Cabinet, load func(day string) ([]byte, slog.Attr, error)) error {
 	if cab.Token == "" {
 		return fetch.ErrNoCredentials
 	}
-	if !cab.Supports(ResourceAds) {
+	if !cab.Supports(run.Task.ResourceType) {
 		return fetch.ErrResourceNotEnabled
 	}
 	if len(run.Hashes) > 0 {
@@ -152,14 +182,14 @@ func (e *Executor) adsDay(ctx context.Context, run *fetch.Run, cab connections.C
 	if err != nil {
 		return fmt.Errorf("%w: %q", fetch.ErrBadPeriod, run.Task.PeriodKey)
 	}
-	page, err := e.ads.Day(ctx, cab.Ref, cab.Token.Reveal(), day.Format(time.DateOnly))
+	body, count, err := load(day.Format(time.DateOnly))
 	if err != nil {
 		return err
 	}
-	if err := run.Store(ctx, fetch.Page{No: run.NextPage, Body: page.Body, ContentType: "application/json"}); err != nil {
+	if err := run.Store(ctx, fetch.Page{No: run.NextPage, Body: body, ContentType: "application/json"}); err != nil {
 		return err
 	}
-	run.Log.Info("ads day read", slog.String("stage", "fetch"), slog.Int("campaigns", page.Campaigns))
+	run.Log.Info("day page read", slog.String("stage", "fetch"), count)
 	return nil
 }
 
@@ -220,12 +250,12 @@ func (e *Executor) Classify(c *fetch.Classification) (store.Outcome, bool) {
 			label = "symfony_quota_unavailable"
 		}
 		return store.Outcome{Status: store.StatusPending, Label: label, ErrorClass: label, KeepCursor: true, NextRunAt: qe.Until}, true
-	case IsAdsResource(c.Task.ResourceType) && isAuth(c.Err):
-		// Токен без доступа к продвижению: пауза только этой задаче, финансы кабинета идут дальше.
+	case ownAccess(c.Task.ResourceType) && isAuth(c.Err):
+		// Токен без доступа к продвижению или аналитике: пауза только этой задаче, финансы кабинета идут дальше.
 		pause := e.cfg.AuthRetryPause
 		if c.Task.LastErrorClass == string(apierr.ClassAuth) {
 			pause = e.cfg.AuthSuspend
-			c.Log.Error("wb promotion api rejected cabinet token again, ads task paused", slog.String("stage", "fetch"))
+			c.Log.Error("wb api rejected cabinet token again, ads task paused", slog.String("stage", "fetch"))
 		}
 		return store.Outcome{Status: store.StatusPending, Label: string(apierr.ClassAuth), ErrorClass: string(apierr.ClassAuth), NextRunAt: c.Now.Add(pause)}, true
 	case errors.Is(c.Err, errTooManyPages):
@@ -234,8 +264,8 @@ func (e *Executor) Classify(c *fetch.Classification) (store.Outcome, bool) {
 	return store.Outcome{}, false
 }
 
-// ResumesConnection — успех отчёта снимает паузу кабинета после 401; реклама — другой доступ токена.
-func (e *Executor) ResumesConnection(resource string) bool { return !IsAdsResource(resource) }
+// ResumesConnection — успех отчёта снимает паузу кабинета после 401; реклама и аналитика — другой доступ токена.
+func (e *Executor) ResumesConnection(resource string) bool { return !ownAccess(resource) }
 
 func isAuth(err error) bool {
 	var apiErr *apierr.APIError
