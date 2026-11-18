@@ -63,6 +63,8 @@ func Limits(interval time.Duration) ratelimit.Config {
 			wb.EndpointSalesReport:  limit,
 			wb.EndpointAdsExpenses:  every(10 * time.Second),
 			wb.EndpointAdsFullStats: every(20 * time.Second),
+			// Воронка: лимит WB — 3 запроса в минуту на продавца (персональный токен).
+			wb.EndpointFunnel: every(20 * time.Second),
 		},
 		Fallback:  limit,
 		GrowAfter: 5, IncreaseStep: ceiling,
@@ -120,7 +122,8 @@ func Start(ctx context.Context, cfg config.Config, pool *store.Pool, logger *slo
 	execCfg := executor.DefaultConfig()
 	execCfg.Location = loc
 	ads := wb.NewAds(cfg.WBAdvertBaseURL, &http.Client{Timeout: wb.DefaultTimeout}, now).WithLimiter(limits)
-	exec := executor.New(execCfg, tasks, raw, report, cabinets, logger, now, jitter).WithAds(ads)
+	analytics := wb.NewAnalytics(cfg.WBAnalyticsBaseURL, &http.Client{Timeout: wb.DefaultTimeout}, now).WithLimiter(limits)
+	exec := executor.New(execCfg, tasks, raw, report, cabinets, logger, now, jitter).WithAds(ads).WithFunnel(analytics)
 
 	plannerCfg := planner.DefaultConfig(loc)
 	plannerCfg.TailDays = cfg.DailyTailDays

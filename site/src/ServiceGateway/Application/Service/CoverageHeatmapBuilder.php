@@ -72,6 +72,7 @@ final readonly class CoverageHeatmapBuilder
         'ozon.ads.daily' => ['Реклама: статистика по дням', self::STEP_DAY],
         'ozon.ads.statistics' => ['Реклама: отчёт по товарам', self::STEP_DAY],
         'ozon.ads.statistics.tail' => ['Реклама: отчёт, хвост 14 дней', self::STEP_DAY],
+        'wb.analytics.funnel' => ['Воронка по карточкам', self::STEP_DAY],
     ];
 
     private const STATUS_LABELS = [

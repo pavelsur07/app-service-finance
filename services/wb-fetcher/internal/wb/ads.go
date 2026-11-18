@@ -1,6 +1,7 @@
 package wb
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"encoding/json"
@@ -102,47 +103,12 @@ func (a *Ads) list(ctx context.Context, ref, token, endpoint string, q url.Value
 }
 
 func (a *Ads) get(ctx context.Context, token, endpoint string, q url.Values) ([]json.RawMessage, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.baseURL+endpoint+"?"+q.Encode(), nil)
+	body, err := roundTrip(ctx, a.http, a.now, http.MethodGet, a.baseURL+endpoint+"?"+q.Encode(), nil, token, endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("wb: build request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Authorization", token)
-	req.Header.Set("Accept", "application/json")
-	resp, err := a.http.Do(req)
-	if err != nil {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		return nil, &apierr.APIError{Source: Source, Class: apierr.ClassTransient, Endpoint: endpoint, Err: redactErr(err, token)}
-	}
-	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, adsMaxBodyBytes+1))
-	if err != nil {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		return nil, &apierr.APIError{Source: Source, Class: apierr.ClassTransient, Endpoint: endpoint, Status: resp.StatusCode, Err: redactErr(err, token)}
-	}
-	fail := func(class apierr.Class, pause time.Duration) error {
-		return &apierr.APIError{Source: Source, Class: class, Endpoint: endpoint, Status: resp.StatusCode, Message: excerpt(body, token), RetryAfter: pause}
-	}
-	switch resp.StatusCode {
-	case http.StatusNoContent:
+	if body == nil {
 		return []json.RawMessage{}, nil
-	case http.StatusOK:
-	case http.StatusTooManyRequests:
-		return nil, fail(apierr.ClassRateLimit, retryAfter(resp.Header, a.now()))
-	case http.StatusUnauthorized, http.StatusForbidden:
-		return nil, fail(apierr.ClassAuth, 0)
-	case http.StatusBadRequest:
-		return nil, fail(apierr.ClassInvalidRequest, 0)
-	case http.StatusNotFound, http.StatusGone:
-		return nil, fail(apierr.ClassObsoleteEndpoint, 0)
-	default:
-		return nil, fail(apierr.ClassTransient, 0)
-	}
-	if len(body) > adsMaxBodyBytes {
-		return nil, invalidAds(endpoint, fmt.Errorf("body exceeds %d bytes", adsMaxBodyBytes))
 	}
 	if strings.TrimSpace(string(body)) == "null" {
 		return []json.RawMessage{}, nil
@@ -200,6 +166,61 @@ func sortNumeric(ids []string) {
 		}
 		return strings.Compare(a, b)
 	})
+}
+
+// roundTrip — запрос к API WB тем же токеном кабинета: тело ответа 200, nil при
+// 204, иначе ошибка класса apierr; токен в текст ошибок не попадает.
+func roundTrip(ctx context.Context, client *http.Client, now func() time.Time, method, target string, payload []byte, token, endpoint string) ([]byte, error) {
+	var reader io.Reader
+	if payload != nil {
+		reader = bytes.NewReader(payload)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, target, reader)
+	if err != nil {
+		return nil, fmt.Errorf("wb: build request: %w", err)
+	}
+	req.Header.Set("Authorization", token)
+	req.Header.Set("Accept", "application/json")
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, &apierr.APIError{Source: Source, Class: apierr.ClassTransient, Endpoint: endpoint, Err: redactErr(err, token)}
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, adsMaxBodyBytes+1))
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, &apierr.APIError{Source: Source, Class: apierr.ClassTransient, Endpoint: endpoint, Status: resp.StatusCode, Err: redactErr(err, token)}
+	}
+	fail := func(class apierr.Class, pause time.Duration) error {
+		return &apierr.APIError{Source: Source, Class: class, Endpoint: endpoint, Status: resp.StatusCode, Message: excerpt(body, token), RetryAfter: pause}
+	}
+	switch resp.StatusCode {
+	case http.StatusNoContent:
+		return nil, nil
+	case http.StatusOK:
+	case http.StatusTooManyRequests:
+		return nil, fail(apierr.ClassRateLimit, retryAfter(resp.Header, now()))
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return nil, fail(apierr.ClassAuth, 0)
+	case http.StatusBadRequest:
+		return nil, fail(apierr.ClassInvalidRequest, 0)
+	case http.StatusNotFound, http.StatusGone:
+		return nil, fail(apierr.ClassObsoleteEndpoint, 0)
+	default:
+		return nil, fail(apierr.ClassTransient, 0)
+	}
+	if len(body) > adsMaxBodyBytes {
+		return nil, invalidAds(endpoint, fmt.Errorf("body exceeds %d bytes", adsMaxBodyBytes))
+	}
+	return body, nil
 }
 
 func invalidAds(endpoint string, err error) *apierr.APIError {

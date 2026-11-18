@@ -247,3 +247,20 @@ func TestHistoryDaysAreLoadedOnceBelowTailAndNeverRefreshed(t *testing.T) {
 	assert.Equal(t, PriorityTail, plan.Ensure[14].Priority, "хвост — прежним приоритетом")
 	assert.Len(t, plan.Refreshes[0].Specs, 15, "история не перечитывается")
 }
+
+func TestFunnelCabinetLoadsAndRefreshesThirtyDaysBelowReport(t *testing.T) {
+	cab := connections.Cabinet{Ref: "wb-1", ResourceTypes: []string{executor.ResourceFunnel}}
+
+	plan := Build(at("2026-11-18 03:00"), []connections.Cabinet{cab}, DefaultConfig(msk))
+
+	require.Len(t, plan.Ensure, FunnelDays)
+	assert.Equal(t, executor.ResourceFunnel, plan.Ensure[0].ResourceType)
+	assert.Equal(t, "2026-11-17", plan.Ensure[0].PeriodKey, "вчера; сегодня — день неполный")
+	assert.Equal(t, "2026-10-19", plan.Ensure[FunnelDays-1].PeriodKey)
+	assert.Equal(t, at("2026-11-18 04:00"), plan.Ensure[0].RunAt)
+	assert.Less(t, plan.Ensure[0].Priority, PriorityTail, "воронка не опережает отчёт в слоте кабинета")
+	require.Len(t, plan.Refreshes, 1)
+	assert.Equal(t, KindFunnelTail, plan.Refreshes[0].Kind)
+	assert.Len(t, plan.Refreshes[0].Specs, FunnelDays, "выкупы и отмены WB пишет на день заказа")
+	assert.True(t, plan.Refreshes[0].Specs[0].Refresh)
+}

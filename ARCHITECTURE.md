@@ -6019,6 +6019,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.216 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж WB `wb.analytics.funnel` в `WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES`, строка «Воронка по карточкам» в покрытии; задача `marketplace-funnel`, этап 1 |
 | 2.215 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж `ozon.analytics.funnel` (`MarketplaceConnectionsSnapshotBuilder::FUNNEL_RESOURCE_TYPE`, список `ozon_fetcher.search_analytics_companies`), строка «Воронка по товарам» в покрытии; задача `marketplace-funnel`, этап 4 |
 | 2.214 | 2026-11-18 | Finance: переменные формул ОПиУ `VAT_RATE` / `TAX_RATE` (`PlFormulaVariables`); Company: `CompanyTaxProfile::$taxRatePercent`, `VatMode::ratePercentOn()` вместо `Cash\…\VatRates`; задача `pl-formula-tax-variables` |
 | 2.213 | 2026-11-17 | Cash: предпросмотр и подтверждение автоправил, исключения по назначению, кандидаты с задачей `cash_rule_phrase/v1` и статистика по версиям. |

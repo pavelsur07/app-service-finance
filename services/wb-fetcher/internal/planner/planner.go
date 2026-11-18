@@ -54,6 +54,15 @@ const (
 	AdsRefreshDays = 7
 )
 
+// KindFunnelTail — суточное перечитывание воронки: выкупы и отмены WB пишет на
+// день заказа, поэтому прошедшие дни меняются.
+const KindFunnelTail = "wb_funnel_tail"
+
+// FunnelDays — дней воронки до вчера включительно: загружаются и перечитываются
+// каждые сутки (запрос на день — до 1000 карточек). Глубже — только после
+// живой проверки метода (docs/tasks/marketplace-funnel/TASK.md, этап 1).
+const FunnelDays = 30
+
 // Config — параметры окна.
 type Config struct {
 	Location    *time.Location // Europe/Moscow
@@ -118,6 +127,16 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) schedule.P
 				if i <= AdsRefreshDays {
 					tail.Specs = append(tail.Specs, store.TaskSpec{TaskKey: k, Priority: ensure.Priority, Refresh: true, RunAt: start})
 				}
+			}
+			plan.Refreshes = append(plan.Refreshes, tail)
+		}
+		if cab.Supports(executor.ResourceFunnel) {
+			tail := schedule.Refresh{Kind: KindFunnelTail, RunDate: runDate, ConnectionRef: cab.Ref}
+			for i := 0; i < FunnelDays; i++ {
+				// Ниже отчёта и рекламы: воронка делит с отчётом слот кабинета.
+				k := key(cab.Ref, executor.ResourceFunnel, yesterday.AddDate(0, 0, -i).Format(time.DateOnly))
+				plan.Ensure = append(plan.Ensure, store.TaskSpec{TaskKey: k, Priority: PriorityHistory, RunAt: start})
+				tail.Specs = append(tail.Specs, store.TaskSpec{TaskKey: k, Priority: PriorityHistory, Refresh: true, RunAt: start})
 			}
 			plan.Refreshes = append(plan.Refreshes, tail)
 		}

@@ -36,6 +36,7 @@ type Config struct {
 
 	WBFinanceBaseURL   string
 	WBAdvertBaseURL    string        // API продвижения (реклама)
+	WBAnalyticsBaseURL string        // API аналитики (воронка продаж)
 	DailyTailDays      int           // дней перед вчера в окне дневного отчёта
 	FinanceMinInterval time.Duration // не чаще одного запроса отчёта на кабинет
 	PlanEvery          time.Duration
@@ -63,6 +64,7 @@ func Load() (Config, error) {
 		MaxParallelConnections:  defaultMaxParallel,
 		WBFinanceBaseURL:        envOr("WB_FINANCE_BASE_URL", "https://finance-api.wildberries.ru"),
 		WBAdvertBaseURL:         envOr("WB_ADVERT_BASE_URL", "https://advert-api.wildberries.ru"),
+		WBAnalyticsBaseURL:      envOr("WB_ANALYTICS_BASE_URL", "https://seller-analytics-api.wildberries.ru"),
 		DailyTailDays:           14,
 		FinanceMinInterval:      70 * time.Second,
 		PlanEvery:               time.Hour,
@@ -117,6 +119,9 @@ func Load() (Config, error) {
 
 	if !httpURL(cfg.WBFinanceBaseURL) {
 		return Config{}, errors.New("config: WB_FINANCE_BASE_URL must be an http(s) URL")
+	}
+	if !httpURL(cfg.WBAnalyticsBaseURL) {
+		return Config{}, errors.New("config: WB_ANALYTICS_BASE_URL must be an http(s) URL")
 	}
 	if !httpURL(cfg.WBAdvertBaseURL) {
 		return Config{}, errors.New("config: WB_ADVERT_BASE_URL must be an http(s) URL")

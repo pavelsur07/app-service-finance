@@ -1,5 +1,10 @@
 # marketplace-connections — CHANGELOG
 
+## Правка (2026-11-18) — воронка продаж WB
+
+- Новое значение `resource_types` у Wildberries: `wb.analytics.funnel` (API аналитики тем же
+  токеном), тем же компаниям, что отчёт (`wb_fetcher.finance_companies`). Схема не менялась.
+
 ## Правка (2026-11-18) — воронка продаж Ozon
 
 - Новое значение `resource_types` у seller: `ozon.analytics.funnel` (`/v1/analytics/data`), тем же
