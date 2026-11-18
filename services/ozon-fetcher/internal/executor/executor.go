@@ -80,6 +80,7 @@ var gatedResources = map[string]bool{
 	ResourceProductsList: true, ResourceProductsInfo: true,
 	ResourceStocks: true, ResourcePrices: true, ResourceStocksWarehouses: true,
 	ResourceSearchQueries: true, ResourceSearchDetails: true,
+	ResourceFunnel:  true,
 	ResourceReturns: true, ResourceActions: true, ResourceSupplies: true, ResourceClusters: true,
 }
 
@@ -128,6 +129,7 @@ type Ozon interface {
 	FetchPrices(ctx context.Context, creds ozon.Credentials, connectionRef, fromCursor string, firstPageNo int, onPage ozon.PageHandler) error
 	FetchWarehouseStocks(ctx context.Context, creds ozon.Credentials, connectionRef string, skus []int64) (ozon.Page, ozon.WarehouseStocks, error)
 	FetchSearchPage(ctx context.Context, creds ozon.Credentials, connectionRef string, details bool, day time.Time, skus []int64, page int) (ozon.Page, ozon.SearchPage, error)
+	FetchFunnel(ctx context.Context, creds ozon.Credentials, connectionRef, day string, firstPageNo int, onPage ozon.PageHandler) (int, error)
 	FetchReturns(ctx context.Context, creds ozon.Credentials, connectionRef string, from, to time.Time, fromCursor string, firstPageNo int, onPage ozon.PageHandler) error
 	FetchActions(ctx context.Context, creds ozon.Credentials, connectionRef string) (ozon.Page, []int64, error)
 	FetchActionProducts(ctx context.Context, creds ozon.Credentials, connectionRef string, candidates bool, actionID int64, lastID string) (ozon.Page, ozon.ActionProductsPage, error)
@@ -331,6 +333,8 @@ func (r *taskRun) fetch(ctx context.Context, cabinet connections.Cabinet) error 
 			return r.warehouseStocks(ctx, creds, cabinet)
 		case ResourceSearchQueries, ResourceSearchDetails:
 			return r.searchAnalytics(ctx, creds, cabinet)
+		case ResourceFunnel:
+			return r.funnel(ctx, creds)
 		case ResourceReturns:
 			return r.returns(ctx, creds)
 		case ResourceActions, ResourceSupplies, ResourceClusters:

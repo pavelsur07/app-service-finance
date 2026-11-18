@@ -252,10 +252,7 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 Сводка и топ поисковых запросов по SKU за день МСК
 (`docs/tasks/marketplace-data-ingestion/stages/ozon-9-search-analytics.md`).
 
-**Воронка `/v1/analytics/data` снята Ozon** (живая проверка 24.10.2026, Premium включён): метрики
-`hits_view*`, `session_view*`, `hits_tocart*`, `returns`, `cancellations`, `delivered_units`,
-`position_category`, `conv_tocart`, `adv_view_all` — 400 `deprecated metrics used`; работают только
-`ordered_units` и `revenue` (дублируют заказы). Метод не грузится.
+Общая воронка — отдельный ресурс `ozon.analytics.funnel` (ниже).
 
 - **`POST /v1/analytics/product-queries`:** `{"date_from": "DT00:00:00+03:00", "date_to":
   "DT23:59:59+03:00", "skus": ["…"], "page": 0, "page_size": 1000}`; `skus` обязательны (1–1000).
@@ -280,6 +277,32 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 - **Журнал:** INFO «search analytics read» — SKU, страниц, строк; строк ≠ `total` — WARNING; смена
   формы ответа — WARNING.
 - **Включение:** Symfony `ozon_fetcher.search_analytics_companies` — только вместе с `ozon.stocks`.
+
+### `ozon.analytics.funnel` — `POST /v1/analytics/data`
+
+Воронка продаж по SKU за день МСК (`docs/tasks/marketplace-funnel/TASK.md`, этап 4).
+
+- **Доступ по тарифу.** Живая проверка 24.10.2026 (кабинет с Premium): метрики показов, переходов и
+  корзин — 400 `code 3` `deprecated metrics used`; работали только `ordered_units` и `revenue`. По
+  сторонним источникам метрики открывает Premium Plus; официального подтверждения нет. Сервис этот
+  ответ ошибкой не считает: день закрывается служебной страницей `{"subscription_required":true}`
+  (INFO «funnel skipped»), перечитывание хвоста пробует снова раз в сутки и заменит её данными.
+  Дни старше хвоста после появления тарифа сами не догружаются.
+- **Запрос:** `{"date_from": "D", "date_to": "D", "metrics": [...], "dimension": ["sku"],
+  "limit": 1000, "offset": N}`. Метрики (14 — предел Ozon): `hits_view_search`, `hits_view_pdp`,
+  `hits_view`, `session_view_search`, `session_view_pdp`, `session_view`, `hits_tocart_search`,
+  `hits_tocart_pdp`, `hits_tocart`, `ordered_units`, `revenue`, `returns`, `cancellations`,
+  `delivered_units`. Конверсии считаются из них; `position_category` не грузится.
+- **Ответ** (по документации Ozon, **живой формой не подтверждён**): `{"result": {"data":
+  [{"dimensions": [{"id": "<sku>", "name"}], "metrics": [...]}], "totals": [...]}, "timestamp"}`.
+- **Страницы:** по `offset`, полная страница (1000 строк) — есть следующая; предел 100 страниц.
+  Прерванный день — заново (`funnel_restart`): повтор SKU между страницами проверяется в одной попытке.
+- **Проверка:** нет `result.data`, строка без SKU, повтор SKU между страницами — `invalid_response`.
+- **`period_key`:** день МСК. Догон — 90 дней до вчера; хвост 7 дней перечитывается раз в сутки
+  (отмены, возвраты и доставки Ozon пишет на день заказа). Задержка появления дня не измерена:
+  ранний пустой ответ исправит перечитывание хвоста.
+- **Журнал:** INFO «funnel read» — страниц, строк.
+- **Включение:** Symfony `ozon_fetcher.search_analytics_companies`; снимок остатков не нужен.
 
 ### `ozon.returns` — `POST /v1/returns/list`
 
@@ -444,6 +467,7 @@ Raw этого ресурса — байты файла отчёта, не JSON.
 | `/v3/product/list`, `/v3/product/info/list` | 0.2 | 0.05 | 1 | 60 с | каталог — 2–3 запроса на кабинет в сутки |
 | `/v4/product/info/stocks` | 0.2 | 0.05 | 1 | 60 с | остатки — 2 запроса на снимок |
 | `/v1/analytics/product-queries`, `/v1/analytics/product-queries/details` | 0.2 | 0.2 | 0.2 | 5 с | **по замеру** 24.10.2026: квота общая, у детализации — предел «в секунду» (429 code 8 `You have reached request rate limit per second`); `SharedQuota` |
+| `/v1/analytics/data` | 1/60 | 1/60 | 1/60 | 60 с | **консервативно**: исторический предел метода — запрос в минуту на кабинет; новые правила лимита Ozon не замерены |
 | `/v1/actions*`, `/v3/supply-order/*`, `/v1/supply-order/bundle`, `/v1/cluster/list` | 0.2 | 0.2 | 0.2 | 5 с | `SharedQuota`: ключ общий; единицы запросов на снимок |
 | `/v1/returns/list` | 0.2 | 0.2 | 0.2 | 5 с | `SharedQuota`: ключ общий; страница на день |
 | `/v5/product/info/prices`, `/v1/analytics/stocks` | 0.2 | 0.2 | 0.2 | 5 с | **по замеру** 24.10.2026: `ratelimit-remaining` между соседними запросами скачет 49 → 21 → 44 → 32 — квота ключа общая с другими клиентами; `SharedQuota` — 429 только пауза; 2–5 запросов на снимок |

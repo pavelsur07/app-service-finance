@@ -62,6 +62,7 @@ final readonly class CoverageHeatmapBuilder
         'ozon.prices' => ['Цены: снимок 05:00', self::STEP_DAY],
         'ozon.analytics.queries' => ['Поиск: сводка по товарам', self::STEP_DAY],
         'ozon.analytics.queries.details' => ['Поиск: запросы по товарам', self::STEP_DAY],
+        'ozon.analytics.funnel' => ['Воронка по товарам', self::STEP_DAY],
         'ozon.returns' => ['Возвраты', self::STEP_DAY],
         'ozon.actions' => ['Акции: снимок 05:00', self::STEP_DAY],
         'ozon.supplies' => ['Поставки в пути: снимок 05:00', self::STEP_DAY],

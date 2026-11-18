@@ -30,6 +30,7 @@ const (
 	KindAdsTail         = "ads_tail"
 	KindSearchTail      = "search_tail"
 	KindReturnsTail     = "returns_tail"
+	KindFunnelTail      = "funnel_tail"
 )
 
 // DefaultAdsFrom — первый день расхода и статистики рекламы
@@ -47,6 +48,15 @@ const SearchDepthDays = 33
 // SearchTailDays — день D−3…D−(2+SearchTailDays) перечитывается раз в сутки:
 // Ozon может досчитывать дни.
 const SearchTailDays = 5
+
+// FunnelDepthDays — глубина догона воронки: без подписки Ozon отдаёт
+// аналитику за три месяца.
+const FunnelDepthDays = 90
+
+// FunnelTailDays — дней до сегодня, перечитываемых раз в сутки: отмены,
+// возвраты и доставки Ozon пишет на день заказа; этим же проходом кабинет
+// без нужного тарифа проверяется заново.
+const FunnelTailDays = 7
 
 // DefaultReturnsFrom — первый день возвратов (начало витрины покрытия;
 // история API глубже) — ozon-10-returns.md.
@@ -251,7 +261,8 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) Plan {
 		}
 		search := planSearch(&plan, cab, today, runDate, now, cfg)
 		returns := planReturns(&plan, cab, today, runDate, now, cfg)
-		for _, r := range []Refresh{tail, types, reconcile, final, orders, accrualPostings, search, returns} {
+		funnel := planFunnel(&plan, cab, today, runDate, now)
+		for _, r := range []Refresh{tail, types, reconcile, final, orders, accrualPostings, search, returns, funnel} {
 			if len(r.Specs) > 0 {
 				plan.Refreshes = append(plan.Refreshes, r)
 			}
@@ -374,6 +385,22 @@ func planReturns(plan *Plan, cab connections.Cabinet, today time.Time, runDate s
 			break
 		}
 		tail.Specs = append(tail.Specs, spec(cab.Ref, executor.ResourceReturns, d.Format(time.DateOnly), PriorityBackfill, true, now))
+	}
+	return tail
+}
+
+// planFunnel — воронка: догон FunnelDepthDays до вчера, перечитывание
+// FunnelTailDays раз в сутки; сегодня не грузится (день неполный).
+func planFunnel(plan *Plan, cab connections.Cabinet, today time.Time, runDate string, now time.Time) Refresh {
+	tail := Refresh{Kind: KindFunnelTail, RunDate: runDate, ConnectionRef: cab.Ref}
+	if !cab.Supports(executor.ResourceFunnel) {
+		return tail
+	}
+	for i := FunnelDepthDays; i >= 1; i-- {
+		plan.Ensure = append(plan.Ensure, spec(cab.Ref, executor.ResourceFunnel, today.AddDate(0, 0, -i).Format(time.DateOnly), PriorityBackfill, false, now))
+	}
+	for i := 1; i <= FunnelTailDays; i++ {
+		tail.Specs = append(tail.Specs, spec(cab.Ref, executor.ResourceFunnel, today.AddDate(0, 0, -i).Format(time.DateOnly), PriorityBackfill, true, now))
 	}
 	return tail
 }

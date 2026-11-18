@@ -39,7 +39,7 @@
 | № | Новые данные | Методы Ozon | Как часто | План |
 |---|---|---|---|---|
 | 8 | Цены и остатки по складам и кластерам | `/v5/product/info/prices`, `/v1/analytics/stocks` | снимок раз в сутки 05:00 | `stages/ozon-8-prices-warehouse-stocks.md` |
-| 9 | Поисковая аналитика Premium по SKU (воронка `/v1/analytics/data` снята Ozon) | `/v1/analytics/product-queries`, `/details` | D−2 ежедневно, хвост D−3…D−7, история ~33 дня | `stages/ozon-9-search-analytics.md` |
+| 9 | Поисковая аналитика Premium по SKU (воронка `/v1/analytics/data` — отдельный ресурс `ozon.analytics.funnel`, задача `marketplace-funnel`) | `/v1/analytics/product-queries`, `/details` | D−2 ежедневно, хвост D−3…D−7, история ~33 дня | `stages/ozon-9-search-analytics.md` |
 | 10 | Возвраты и отмены построчно | `/v1/returns/list` | догон с 01.08, перечитывание 30 дней | `stages/ozon-10-returns.md` |
 | 11 | Акции с товарами, поставки в пути, кластеры и склады | `/v1/actions*`, `/v3/supply-order/*`, `/v1/supply-order/bundle`, `/v1/cluster/list` | снимки раз в сутки 05:00 | `stages/ozon-11-actions-supplies-clusters.md` |
 

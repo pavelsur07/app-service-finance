@@ -221,6 +221,11 @@ type fakeOzon struct {
 	returnErr   error
 	returnFrom  []string
 	returnDays  []string
+	// Воронка: страницы дня, число строк, ошибка после страниц, дни запросов.
+	funnelPages []ozon.Page
+	funnelRows  int
+	funnelErr   error
+	funnelDays  []string
 	// Снимки акций, поставок, кластеров: ответы и вызовы по endpoint.
 	refCalls    []string
 	actionIDs   []int64

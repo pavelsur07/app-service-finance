@@ -5267,7 +5267,8 @@ query: owner или ACTIVE membership, без deletionRequestedAt, DISTINCT, nam
   остатков по складам (`ozon.stocks.warehouses`, только вместе с `ozon.stocks`) — компаниям
   `ozon_fetcher.snapshots_companies`, поисковая аналитика (`ozon.analytics.queries`,
   `ozon.analytics.queries.details`, только вместе с `ozon.stocks`) — компаниям
-  `ozon_fetcher.search_analytics_companies`, возвраты (`ozon.returns`) — компаниям
+  `ozon_fetcher.search_analytics_companies`, воронка продаж (`ozon.analytics.funnel`) — им же без условия
+  остатков, возвраты (`ozon.returns`) — компаниям
   `ozon_fetcher.returns_companies`, снимки акций, поставок и кластеров (`ozon.actions`, `ozon.supplies`,
   `ozon.clusters`) — компаниям `ozon_fetcher.reference_companies`; ресурсы
   рекламы performance (`ozon.ads.campaigns`, `ozon.ads.expense`, `ozon.ads.daily`) — компаниям
@@ -6018,6 +6019,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.215 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж `ozon.analytics.funnel` (`MarketplaceConnectionsSnapshotBuilder::FUNNEL_RESOURCE_TYPE`, список `ozon_fetcher.search_analytics_companies`), строка «Воронка по товарам» в покрытии; задача `marketplace-funnel`, этап 4 |
 | 2.214 | 2026-11-18 | Finance: переменные формул ОПиУ `VAT_RATE` / `TAX_RATE` (`PlFormulaVariables`); Company: `CompanyTaxProfile::$taxRatePercent`, `VatMode::ratePercentOn()` вместо `Cash\…\VatRates`; задача `pl-formula-tax-variables` |
 | 2.213 | 2026-11-17 | Cash: предпросмотр и подтверждение автоправил, исключения по назначению, кандидаты с задачей `cash_rule_phrase/v1` и статистика по версиям. |
 | 2.212 | 2026-11-18 | Cash: «нет ответа» ИИ переоткрывается при замене дерева ДДС ядром и командой `app:cash:ai-suggestions:reopen-no-answer`; задача `ai-no-answer-reopen` |
