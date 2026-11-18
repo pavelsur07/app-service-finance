@@ -7,6 +7,7 @@ namespace App\Company\Repository;
 use App\Company\Entity\CompanyTaxProfile;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -66,16 +67,52 @@ final class CompanyTaxProfileRepository extends ServiceEntityRepository
      */
     public function findEffectiveOn(string $companyId, \DateTimeImmutable $date): ?CompanyTaxProfile
     {
-        return $this->createQueryBuilder('p')
+        return $this->effectiveProfilesOn($date)
             ->addSelect('CASE WHEN p.validFrom IS NULL THEN 0 ELSE 1 END AS HIDDEN dated')
             ->andWhere('p.companyId = :companyId')
-            ->andWhere('p.validFrom IS NULL OR p.validFrom <= :day')
             ->setParameter('companyId', $companyId)
-            ->setParameter('day', new \DateTimeImmutable($date->format('Y-m-d')), Types::DATE_IMMUTABLE)
             ->orderBy('dated', \SortDirection::Descending)
             ->addOrderBy('p.validFrom', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /**
+     * @param list<string> $companyIds
+     *
+     * @return array<string, CompanyTaxProfile>
+     *
+     * @companyScopeExempt выборка ограничена переданным списком идентификаторов компаний владельца
+     */
+    public function findEffectiveForCompanies(array $companyIds, \DateTimeImmutable $date): array
+    {
+        if ([] === $companyIds) {
+            return [];
+        }
+
+        $newerProfile = $this->createQueryBuilder('newer')
+            ->select('1')
+            ->where('newer.companyId = p.companyId')
+            ->andWhere('newer.validFrom <= :day')
+            ->andWhere('p.validFrom IS NULL OR newer.validFrom > p.validFrom');
+
+        /** @var array<string, CompanyTaxProfile> $profiles */
+        $profiles = $this->effectiveProfilesOn($date)
+            ->indexBy('p', 'p.companyId')
+            ->andWhere('p.companyId IN (:companyIds)')
+            ->andWhere('NOT EXISTS ('.$newerProfile->getDQL().')')
+            ->setParameter('companyIds', $companyIds)
+            ->getQuery()
+            ->getResult();
+
+        return $profiles;
+    }
+
+    private function effectiveProfilesOn(\DateTimeImmutable $date): QueryBuilder
+    {
+        return $this->createQueryBuilder('p')
+            ->andWhere('p.validFrom IS NULL OR p.validFrom <= :day')
+            ->setParameter('day', new \DateTimeImmutable($date->format('Y-m-d')), Types::DATE_IMMUTABLE);
     }
 }

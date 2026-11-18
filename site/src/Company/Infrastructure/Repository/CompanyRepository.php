@@ -117,23 +117,15 @@ class CompanyRepository extends ServiceEntityRepository
         return $companies;
     }
 
-    /**
-     * Работающие (не помеченные к удалению) компании владельца.
-     *
-     * @return list<Company>
-     */
-    public function findActiveByUser(User $user): array
+    /** Работающие (не помеченные к удалению) компании владельца. */
+    public function createOwnedActiveQueryBuilder(User $user): QueryBuilder
     {
-        /** @var list<Company> $companies */
-        $companies = $this->createQueryBuilder('c')
+        return $this->createQueryBuilder('c')
             ->andWhere('c.user = :user')
             ->andWhere('c.deletionRequestedAt IS NULL')
             ->setParameter('user', $user)
             ->orderBy('c.name', \SortDirection::Ascending)
-            ->getQuery()
-            ->getResult();
-
-        return $companies;
+            ->addOrderBy('c.id', \SortDirection::Ascending);
     }
 
     /** Компания по id, только если ею владеет пользователь (в т.ч. помеченная к удалению). */
