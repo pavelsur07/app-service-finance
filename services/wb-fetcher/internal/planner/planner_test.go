@@ -264,3 +264,17 @@ func TestFunnelCabinetLoadsAndRefreshesThirtyDaysBelowReport(t *testing.T) {
 	assert.Len(t, plan.Refreshes[0].Specs, FunnelDays, "выкупы и отмены WB пишет на день заказа")
 	assert.True(t, plan.Refreshes[0].Specs[0].Refresh)
 }
+
+func TestSearchCabinetGetsOneProbeDayForever(t *testing.T) {
+	cab := connections.Cabinet{Ref: "wb-1", ResourceTypes: []string{executor.ResourceSearch}}
+
+	for _, day := range []string{"2026-11-18 15:00", "2026-11-19 03:00", "2026-12-25 03:00"} {
+		plan := Build(at(day), []connections.Cabinet{cab}, DefaultConfig(msk))
+
+		require.Len(t, plan.Ensure, 1, day)
+		assert.Equal(t, executor.ResourceSearch, plan.Ensure[0].ResourceType)
+		assert.Equal(t, SearchProbeDay, plan.Ensure[0].PeriodKey, "тот же ключ задачи каждый день — новых проверок нет")
+		assert.Equal(t, PriorityHistory, plan.Ensure[0].Priority)
+		assert.Empty(t, plan.Refreshes, "день не перечитывается")
+	}
+}

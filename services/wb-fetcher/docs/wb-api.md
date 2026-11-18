@@ -56,6 +56,27 @@
 - Заголовки ответа: `X-Ratelimit-Limit: 1`, `X-Ratelimit-Remaining: 0` — лимит тот же,
   1 запрос/мин, общий с дневным.
 
+## Поиск по карточкам (`wb.analytics.search`)
+
+`POST https://seller-analytics-api.wildberries.ru/api/v2/search-report/table/details`, лимит 3 запроса
+в минуту на продавца. Задача `docs/tasks/marketplace-funnel/TASK.md`, этап 3. **Живым запросом не
+проверено** — форма по OpenAPI-спецификации WB от 18.11.2026.
+
+- **Доступ.** По документации — только с подпиской «Джем». Форма отказа кабинету без неё не описана
+  (в спецификации есть 402 `payment required` и 403 `Authorization error`): 402, 403 и 400 —
+  `failed_permanent` без повторов, текст отказа виден в покрытии. По живому отказу дописать
+  распознавание «недоступно по тарифу».
+- **Запрос:** `{"currentPeriod": {"start": "D", "end": "D"}, "orderBy": {"field": "openCard",
+  "mode": "desc"}, "positionCluster": "all", "includeSubstitutedSKUs": true, "includeSearchTexts":
+  true, "limit": 1000, "offset": N}` — все карточки продавца за день, без фильтров.
+- **Ответ:** `{"data": {"products": [{"nmId", "avgPosition": {"current"}, "openCard": {"current"},
+  "addToCart": {"current"}, "orders": {"current"}, "visibility": {"current"}, …}], "currency"}}`.
+- **Страница raw:** одна на день — `{"schema": "wb-search-daily-v1", "currency", "products": […]}`,
+  карточки как прислал WB, по возрастанию `nmId`.
+- **Объём:** один день `planner.SearchProbeDay` на кабинет, один раз, без перечитывания.
+- Топ поисковых запросов по карточке (`product/search-texts`) не грузится: запрос на каждую
+  карточку, смысл есть только у кабинетов с «Джемом».
+
 ## Воронка продаж (`wb.analytics.funnel`)
 
 `POST https://seller-analytics-api.wildberries.ru/api/analytics/v3/sales-funnel/products`, токен

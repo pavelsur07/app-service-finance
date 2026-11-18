@@ -6056,6 +6056,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.219 | 2026-11-18 | Marketplace / ServiceGateway: ресурс поиска по карточкам WB `wb.analytics.search` в `WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES`, строка «Поиск по карточкам» в покрытии; только сырьё, фактами не публикуется; задача `marketplace-funnel`, этап 3 |
 | 2.218 | 2026-11-18 | MarketplaceFunnel: экран R9 «Воронка продаж» `/marketplace/funnel` (товар × ступени, конверсии, xlsx), модуль в карте доступа `ModuleAccessMap`, пункт меню; задача `marketplace-funnel`, этап 6 |
 | 2.217 | 2026-11-18 | MarketplaceFunnel: новый модуль — таблица воронки продаж (`mfn_day`, `mfn_row`, `Version20261118120000`), `app:marketplace-funnel:translate` (`9-59/15`) и гейт `app:marketplace-funnel:health-check` (09:43); сервисы публикуют фактами `ozon.analytics.funnel` и `wb.analytics.funnel`; задача `marketplace-funnel`, этап 5 |
 | 2.216 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж WB `wb.analytics.funnel` в `WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES`, строка «Воронка по карточкам» в покрытии; задача `marketplace-funnel`, этап 1 |

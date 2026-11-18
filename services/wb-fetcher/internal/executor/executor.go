@@ -34,11 +34,18 @@ const ResourceFunnel = "wb.analytics.funnel"
 
 // ownAccess — ресурс со своей категорией доступа токена (продвижение,
 // аналитика): отказ 401/403 — пауза только этой задачи, финансы кабинета идут.
-func ownAccess(resource string) bool { return IsAdsResource(resource) || resource == ResourceFunnel }
+func ownAccess(resource string) bool {
+	return IsAdsResource(resource) || resource == ResourceFunnel || resource == ResourceSearch
+}
+
+// ResourceSearch — поиск по карточкам за день МСК (одна страница): видимость,
+// позиция, переходы, корзины и заказы из поиска; у WB — только с «Джемом».
+const ResourceSearch = "wb.analytics.search"
 
 // FunnelSource — день воронки (wb.Analytics).
 type FunnelSource interface {
 	FunnelDay(ctx context.Context, ref, token, day string) (wb.FunnelDay, error)
+	SearchDay(ctx context.Context, ref, token, day string) (wb.FunnelDay, error)
 }
 
 // AdsSource — день рекламы (wb.Ads).
@@ -139,6 +146,12 @@ func (e *Executor) Fetch(ctx context.Context, run *fetch.Run, cab connections.Ca
 	if resource == ResourceFunnel && e.funnel != nil {
 		return e.dayPage(ctx, run, cab, func(day string) ([]byte, slog.Attr, error) {
 			page, err := e.funnel.FunnelDay(ctx, cab.Ref, cab.Token.Reveal(), day)
+			return page.Body, slog.Int("products", page.Products), err
+		})
+	}
+	if resource == ResourceSearch && e.funnel != nil {
+		return e.dayPage(ctx, run, cab, func(day string) ([]byte, slog.Attr, error) {
+			page, err := e.funnel.SearchDay(ctx, cab.Ref, cab.Token.Reveal(), day)
 			return page.Body, slog.Int("products", page.Products), err
 		})
 	}
