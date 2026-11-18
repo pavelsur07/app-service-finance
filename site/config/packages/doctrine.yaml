@@ -179,6 +179,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/MarketplaceWb/Entity'
                 prefix: 'App\MarketplaceWb\Entity'
                 alias: MarketplaceWb
+            MarketplaceFunnel:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/MarketplaceFunnel/Entity'
+                prefix: 'App\MarketplaceFunnel\Entity'
+                alias: MarketplaceFunnel
             MarketplaceAds:
                 type: attribute
                 is_bundle: false

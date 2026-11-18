@@ -377,6 +377,11 @@
 58 6 * * * cd /app && php bin/console app:marketplace-wb:translate --relink --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 25 9 * * * cd /app && php bin/console app:marketplace-wb:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# Воронка продаж (модуль MarketplaceFunnel): факты воронки Ozon и WB из sf_fact → mfn_row, все кабинеты.
+# Гейт 09:43 МСК (после перевода 09:39, до забора фактов 09:45): непереведённый день или строки таблицы расходятся с переведённым — ERROR и exit 1.
+9-59/15 * * * * cd /app && php bin/console app:marketplace-funnel:translate --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+43 9 * * * cd /app && php bin/console app:marketplace-funnel:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Витрина экономики SKU (модуль MarketplaceEconomics): дни, заменённые в каноне, — через 5 минут после перевода.
 # Ночью (--recent=45, после --relink переводчика) — все дни за 45 суток: себестоимость и реклама легаси меняются
 # без отметки в каноне. Сбой дня — ERROR в конце прогона, exit 1. Гейт 09:30 МСК: Σ витрины дня ≠ Σ канона или
