@@ -22,9 +22,9 @@ use Doctrine\DBAL\Connection;
  *
  * Затраты берутся напрямую из marketplace_costs БЕЗ фильтра listing_id IS NOT NULL —
  * это товары плюс строка «Не распределено по товарам» таблицы — и раскладываются по
- * колонкам таблицы (resolveUnitBucket). Реклама — статистика MarketplaceAds, как
- * totals.adSpend; учётные рекламные категории (AdStatisticsCostCategories) в группы
- * не входят и отдаются справкой adAccrued.
+ * колонкам таблицы (resolveUnitBucket). Реклама — статистика MarketplaceAds и оплата
+ * за заказ Ozon, которой в статистике нет. Начисления рекламных категорий также
+ * отдаются справкой adAccrued.
  *
  * Исключение — фильтр по тегам: тег живёт на листинге, поэтому под фильтром
  * считаются только затраты отфильтрованных листингов, а строки с
@@ -45,6 +45,7 @@ final readonly class WidgetSummaryQuery
         private MarketplaceAdsFacade $adsFacade,
         private Connection $connection,
         private MarketplaceCostAnalyticsGroupResolver $groupResolver,
+        private OzonOrderAdAccrualQuery $orderAdAccruals,
     ) {
     }
 
@@ -63,6 +64,7 @@ final readonly class WidgetSummaryQuery
      *     profit: float,
      *     marginPercent: float|null,
      *     adAccrued: float|null,
+     *     orderAds: array{linked: float, estimated: float, unlinked: float, lastAccrualDate: string|null, accruals: list<array{campaignId: string|null, date: string, amount: float}>}|null,
      *     widgetGroups: list<array<string, mixed>>,
      * }
      */
@@ -72,6 +74,7 @@ final readonly class WidgetSummaryQuery
         \DateTimeImmutable $dateFrom,
         \DateTimeImmutable $dateTo,
         ?array $listingIds = null,
+        bool $withOrderAds = false,
     ): array {
         $sales = $this->marketplaceFacade->getSalesAggregatesByListing($companyId, $marketplace, $dateFrom, $dateTo);
         $returns = $this->marketplaceFacade->getReturnAggregatesByListing($companyId, $marketplace, $dateFrom, $dateTo);
@@ -115,6 +118,9 @@ final readonly class WidgetSummaryQuery
         // Включает категории с listing_id = NULL (CPC, хранение и т.п.).
         $adCodes = AdStatisticsCostCategories::codes();
         $adAccrued = 0.0;
+        $payPerOrderStatistics = null;
+        $orderAdNet = 0.0;
+        $orderAdUnlinkedNet = 0.0;
         foreach ($costRows as $row) {
             $code = (string) $row['category_code'];
             $name = (string) $row['category_name'];
@@ -131,18 +137,21 @@ final readonly class WidgetSummaryQuery
             }
 
             $marketplaceFromRow = (string) $row['marketplace'];
-            if (MarketplaceType::OZON->value === $marketplaceFromRow && AdStatisticsCostCategories::payPerOrderCode() === $code) {
-                // Оплата за заказ из отчёта Ozon уже в группе «Реклама» (статистика): здесь остаётся
-                // только часть учёта, которой в отчёте нет. Расход в этих строках со знаком «−».
-                $covered = min(
-                    (float) $this->adsFacade->getTotalAdCostForPeriod($companyId, $dateFrom, $dateTo, MarketplaceType::OZON->value, AdSpendKind::PAY_PER_ORDER),
-                    max(0.0, -$netAmt),
-                );
+            if (MarketplaceCostAnalyticsGroupResolver::isOzonOrderAdCost($marketplaceFromRow, $code)) {
+                $adAccrued += $netAmt;
+                $unlinkedNet = (float) $row['unlinked_net_amount'];
+                $covered = 0.0;
+                if (null === $listingIds && $unlinkedNet < 0.0) {
+                    $payPerOrderStatistics ??= (float) $this->adsFacade->getTotalAdCostForPeriod($companyId, $dateFrom, $dateTo, MarketplaceType::OZON->value, AdSpendKind::PAY_PER_ORDER);
+                    $covered = min(max(0.0, $payPerOrderStatistics), -$unlinkedNet);
+                }
                 $costsAmt += $covered;
                 $netAmt += $covered;
+                $orderAdNet += $netAmt;
+                $orderAdUnlinkedNet += $unlinkedNet + $covered;
+                $name = MarketplaceCostAnalyticsGroupResolver::OZON_ORDER_AD_COST_NAME;
             }
             $bucket = $this->groupResolver->resolveUnitBucket($marketplaceFromRow, $code, $name);
-            // Как в таблице: всё, что не комиссия и не логистика, — «Прочие».
             $group = self::WIDGET_GROUPS[$bucket] ?? self::WIDGET_GROUPS['other'];
 
             $groups[$group]['costsAmount'] += $costsAmt;
@@ -181,6 +190,22 @@ final readonly class WidgetSummaryQuery
             ));
         $groups[self::WIDGET_GROUPS['ads']]['costsAmount'] -= $adSpend;
         $groups[self::WIDGET_GROUPS['ads']]['netAmount'] -= $adSpend;
+
+        $orderAds = null;
+        if ($withOrderAds && null === $listingIds && (null === $marketplace || MarketplaceType::OZON->value === $marketplace)) {
+            $payPerOrderStatistics ??= (float) $this->adsFacade->getTotalAdCostForPeriod($companyId, $dateFrom, $dateTo, MarketplaceType::OZON->value, AdSpendKind::PAY_PER_ORDER);
+            $accruals = $this->orderAdAccruals->byCampaignAndDay($companyId, $dateFrom, $dateTo);
+            if ([] !== $accruals || 0.0 !== $payPerOrderStatistics) {
+                $attribution = $this->adsFacade->getOzonPayPerOrderAttribution($companyId, $dateFrom, $dateTo);
+                $orderAds = [
+                    'linked' => round($attribution['linked'] - ($orderAdNet - $orderAdUnlinkedNet), 2),
+                    'estimated' => round($attribution['estimated'], 2),
+                    'unlinked' => round($payPerOrderStatistics - $attribution['linked'] - $orderAdUnlinkedNet, 2),
+                    'lastAccrualDate' => $accruals[0]['date'] ?? null,
+                    'accruals' => $accruals,
+                ];
+            }
+        }
 
         // Build widgetGroups list with rounding and sorting
         $widgetGroups = [];
@@ -230,6 +255,7 @@ final readonly class WidgetSummaryQuery
             'marginPercent' => $marginPercent,
             // Под тегами учётную рекламу не к чему относить — она лежит на кабинете.
             'adAccrued' => null === $listingIds ? round($adAccrued, 2) : null,
+            'orderAds' => $orderAds,
             'widgetGroups' => $widgetGroups,
         ];
     }
@@ -267,6 +293,7 @@ final readonly class WidgetSummaryQuery
      *     net_amount: string,
      *     costs_amount: string,
      *     storno_amount: string,
+     *     unlinked_net_amount: string,
      * }>
      */
     private function getCostAggregates(
@@ -285,6 +312,15 @@ final readonly class WidgetSummaryQuery
         $mpFilter = null !== $marketplace ? 'AND c.marketplace = :marketplace' : '';
         $listingFilter = null !== $listingIds ? 'AND c.listing_id IN (:listingIds)' : '';
 
+        /** @var list<array{
+         *     marketplace: string,
+         *     category_code: string,
+         *     category_name: string,
+         *     net_amount: string,
+         *     costs_amount: string,
+         *     storno_amount: string,
+         *     unlinked_net_amount: string,
+         * }> $rows */
         $rows = $this->connection->fetchAllAssociative(
             <<<SQL
             SELECT
@@ -293,13 +329,16 @@ final readonly class WidgetSummaryQuery
                 category_name,
                 SUM(CASE WHEN effective_op = 'storno' THEN  ABS(amount) ELSE -ABS(amount) END) AS net_amount,
                 SUM(CASE WHEN effective_op = 'storno' THEN 0            ELSE -ABS(amount) END) AS costs_amount,
-                SUM(CASE WHEN effective_op = 'storno' THEN  ABS(amount) ELSE 0             END) AS storno_amount
+                SUM(CASE WHEN effective_op = 'storno' THEN  ABS(amount) ELSE 0             END) AS storno_amount,
+                COALESCE(SUM(CASE WHEN effective_op = 'storno' THEN ABS(amount) ELSE -ABS(amount) END)
+                    FILTER (WHERE listing_id IS NULL), 0) AS unlinked_net_amount
             FROM (
                 SELECT
                     c.marketplace AS marketplace,
                     cc.code  AS category_code,
                     cc.name  AS category_name,
                     c.amount AS amount,
+                    c.listing_id,
                     c.operation_type AS effective_op
                 FROM marketplace_costs c
                 JOIN marketplace_cost_categories cc ON cc.id = c.category_id
@@ -322,14 +361,6 @@ final readonly class WidgetSummaryQuery
             null !== $listingIds ? ['listingIds' => ArrayParameterType::STRING] : [],
         );
 
-        /* @var list<array{
-         *     marketplace: string,
-         *     category_code: string,
-         *     category_name: string,
-         *     net_amount: string,
-         *     costs_amount: string,
-         *     storno_amount: string,
-         * }> $rows */
         return $rows;
     }
 }

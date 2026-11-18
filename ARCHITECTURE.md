@@ -3294,6 +3294,11 @@ getAdSpendByListingForPeriod(
     ?string $marketplace = null,
     ?AdSpendKind $kind = null,
 ): array
+
+// Оплата за заказ Ozon с привязкой к действующим листингам компании.
+// estimated входит в linked и содержит расходы, распределённые по продажам.
+// @return array{linked: float, estimated: float}
+getOzonPayPerOrderAttribution(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
 ```
 
 ### `MarketplaceAnalyticsFacade` (`src/MarketplaceAnalytics/Facade/MarketplaceAnalyticsFacade.php`)
@@ -6019,6 +6024,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.217 | 2026-11-18 | MarketplaceAnalytics: «Оплата за заказ Ozon» в рекламе расширенной юнит-экономики. Карточка и XLSX учитывают остаток начислений, а виджет раскрывает начисления по дню и кампании, дату последнего начисления и долю с привязкой к товарам |
 | 2.216 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж WB `wb.analytics.funnel` в `WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES`, строка «Воронка по карточкам» в покрытии; задача `marketplace-funnel`, этап 1 |
 | 2.215 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж `ozon.analytics.funnel` (`MarketplaceConnectionsSnapshotBuilder::FUNNEL_RESOURCE_TYPE`, список `ozon_fetcher.search_analytics_companies`), строка «Воронка по товарам» в покрытии; задача `marketplace-funnel`, этап 4 |
 | 2.214 | 2026-11-18 | Finance: переменные формул ОПиУ `VAT_RATE` / `TAX_RATE` (`PlFormulaVariables`); Company: `CompanyTaxProfile::$taxRatePercent`, `VatMode::ratePercentOn()` вместо `Cash\…\VatRates`; задача `pl-formula-tax-variables` |

@@ -30,6 +30,32 @@ final readonly class AdSpendByListingQuery
     ) {
     }
 
+    /** @return array{linked: float, estimated: float} */
+    public function getOzonPayPerOrderAttribution(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $campaignFilter = OzonSearchPromoCampaign::campaignCondition('ad.campaign_id', AdSpendKind::PAY_PER_ORDER);
+        $row = $this->connection->fetchAssociative(
+            <<<SQL
+            SELECT COALESCE(SUM(line.cost), 0) AS linked,
+                   COALESCE(SUM(line.cost) FILTER (WHERE ad.campaign_id = :estimated), 0) AS estimated
+            FROM marketplace_ad_documents ad
+            JOIN marketplace_ad_document_lines line ON line.ad_document_id = ad.id
+            JOIN marketplace_listings listing ON listing.id = line.listing_id
+                AND listing.company_id = ad.company_id AND listing.marketplace = ad.marketplace
+            WHERE ad.company_id = :company AND ad.marketplace = 'ozon'
+                AND ad.report_date BETWEEN :dateFrom AND :dateTo AND {$campaignFilter}
+            SQL,
+            [
+                'company' => $companyId,
+                'dateFrom' => $from->format('Y-m-d'),
+                'dateTo' => $to->format('Y-m-d'),
+                'estimated' => OzonSearchPromoCampaign::ALL_SKU_CAMPAIGN_ID,
+            ],
+        );
+
+        return ['linked' => (float) ($row['linked'] ?? 0), 'estimated' => (float) ($row['estimated'] ?? 0)];
+    }
+
     /**
      * РР с разрезом по листингам за период.
      *

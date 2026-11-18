@@ -10,6 +10,7 @@ use App\Marketplace\Facade\CostCategoryCatalogFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
+use App\MarketplaceAnalytics\Infrastructure\Query\OzonOrderAdAccrualQuery;
 use App\MarketplaceAnalytics\Infrastructure\Query\WidgetSummaryQuery;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
@@ -32,7 +33,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $this->adsFacade = $this->mockObject(MarketplaceAdsFacade::class);
         $this->connection = $this->createMock(Connection::class);
         $this->groupResolver = new MarketplaceCostAnalyticsGroupResolver(new CostCategoryCatalogFacade());
-        $this->query = new WidgetSummaryQuery($this->facade, $this->asAdsFacade($this->adsFacade), $this->connection, $this->groupResolver);
+        $this->query = new WidgetSummaryQuery($this->facade, $this->asAdsFacade($this->adsFacade), $this->connection, $this->groupResolver, new OzonOrderAdAccrualQuery($this->connection));
     }
 
     public function testReturnsNegativeReturnsTotal(): void
@@ -452,7 +453,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         [$sql, $params] = $this->captureCostQuery(null);
 
         self::assertNotNull($sql);
-        self::assertStringNotContainsString('listing_id', $sql);
+        self::assertStringNotContainsString('c.listing_id IN', $sql);
         self::assertArrayNotHasKey('listingIds', $params);
     }
 

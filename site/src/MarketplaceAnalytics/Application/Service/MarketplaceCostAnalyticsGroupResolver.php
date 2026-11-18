@@ -5,11 +5,19 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Application\Service;
 
 use App\Marketplace\Application\DTO\CostCategoryGroupsDTO;
+use App\Marketplace\Domain\PlPreview\AdStatisticsCostCategories;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\CostCategoryCatalogFacade;
 
 final class MarketplaceCostAnalyticsGroupResolver
 {
+    public const string OZON_ORDER_AD_COST_NAME = 'Оплата за заказ Ozon';
+
+    public static function isOzonOrderAdCost(?string $marketplace, string $code): bool
+    {
+        return MarketplaceType::OZON->value === $marketplace && AdStatisticsCostCategories::payPerOrderCode() === $code;
+    }
+
     /** @var array<string, CostCategoryGroupsDTO>|null */
     private ?array $ozonGroups = null;
 
@@ -23,6 +31,10 @@ final class MarketplaceCostAnalyticsGroupResolver
 
     public function resolveBreakdownGroup(?string $marketplace, string $code, string $name): string
     {
+        if ('unallocated_ad_statistics' === $code || self::isOzonOrderAdCost($marketplace, $code)) {
+            return 'Реклама';
+        }
+
         if ($marketplace === MarketplaceType::WILDBERRIES->value) {
             return $this->wb($code)->breakdownGroup ?? 'Другие услуги и штрафы';
         }
@@ -38,6 +50,10 @@ final class MarketplaceCostAnalyticsGroupResolver
 
     public function resolveUnitBucket(?string $marketplace, string $code, string $name): string
     {
+        if (self::isOzonOrderAdCost($marketplace, $code)) {
+            return 'ads';
+        }
+
         if ($marketplace === MarketplaceType::WILDBERRIES->value) {
             return $this->wb($code)->unitBucket ?? 'other';
         }

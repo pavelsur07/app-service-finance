@@ -269,13 +269,15 @@ final class UnitExtendedQueryTest extends TestCase
         $row = $result['unallocated'];
         self::assertNotNull($row);
         self::assertSame(30.0, $row['commission']);
-        self::assertSame(200.0, $row['otherCosts']);
+        self::assertSame(0.0, $row['otherCosts']);
+        self::assertSame(200.0, $row['adSpend']);
         self::assertSame(230.0, $row['totalCosts']);
         self::assertSame(-230.0, $row['profit']);
 
-        // Итого = листинги + строка: комиссия 100 + 30, прочие 200.
+        // Итого = листинги + строка: комиссия 100 + 30, реклама 200.
         self::assertSame(130.0, $result['totals']['commission']);
-        self::assertSame(200.0, $result['totals']['otherCosts']);
+        self::assertSame(0.0, $result['totals']['otherCosts']);
+        self::assertSame(200.0, $result['totals']['adSpend']);
         self::assertSame(330.0, $result['totals']['totalCosts']);
         // profit = 1000 − 300 − 130 − 200 = 370; прибыль строк 700 + (−230) + … сходится.
         self::assertSame(370.0, $result['totals']['profit']);

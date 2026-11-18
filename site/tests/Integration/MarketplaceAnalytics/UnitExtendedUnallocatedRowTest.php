@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
@@ -25,7 +26,7 @@ use Ramsey\Uuid\Uuid;
 /**
  * Карточки (WidgetSummaryQuery) = «Итого» таблицы (UnitExtendedQuery) — без тегов и под
  * тегом. Две разные «Прибыли» на одной странице — исходная жалоба (issue #2940); с этапа 3
- * реклама везде по статистике, учётные рекламные категории — только справка adAccrued.
+ * реклама по статистике и непокрытой ею оплате за заказ Ozon.
  */
 final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
 {
@@ -88,7 +89,6 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
         $this->adStatistics('SKU-1', self::LISTING_ID, '70.00');
         $this->adStatistics('SKU-2', self::AD_ONLY_LISTING_ID, '30.00');
         $this->em->flush();
-        $this->em->clear();
     }
 
     public function testWidgetsEqualTotalsWithoutTags(): void
@@ -99,6 +99,9 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
         // 50 + 30 − 10 = 70; клики и предоплата в строку не входят — реклама из статистики.
         self::assertNotNull($result['unallocated']);
         self::assertEqualsWithDelta(70.0, $result['unallocated']['totalCosts'], 0.001);
+        self::assertSame(20.0, $result['unallocated']['adSpend']);
+        self::assertSame(50.0, $result['unallocated']['otherCosts']);
+        self::assertSame(120.0, $result['totals']['adSpend']);
         // Строка товара: учётные клики 40 не входят в «Прочие» — иначе реклама дважды.
         $row = $this->row($result['items'], self::LISTING_ID);
         self::assertEqualsWithDelta(0.0, $row['otherCosts'], 0.001);
@@ -109,8 +112,8 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
 
         $widgets = $this->widgets(null);
         $this->assertWidgetsMatchTotals($widgets, $result['totals']);
-        // Справка: учёт рекламы 40 + 70 + 500.
-        self::assertEqualsWithDelta(-610.0, $widgets['adAccrued'], 0.001);
+        // Справка: учёт рекламы 40 + 70 + 500 + 20.
+        self::assertEqualsWithDelta(-630.0, $widgets['adAccrued'], 0.001);
     }
 
     public function testWidgetsEqualTotalsUnderTag(): void
@@ -134,7 +137,7 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
     {
         // Учёт «Маркетинговых акций» 30 − 10 = 20. Оплата за заказ из отчёта уже в рекламе листинга:
         // без товара остаётся часть учёта, которой в отчёте нет.
-        yield 'отчёт меньше учёта' => ['15.00', 55.0, 115.0];
+        yield 'отчёт меньше учёта' => ['15.00', 55.0, 120.0];
         // Отчёт больше учёта (лаг D+2, предоплата): без товара 0, не минус.
         yield 'отчёт больше учёта' => ['50.00', 50.0, 150.0];
     }
@@ -150,6 +153,7 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
 
         self::assertNotNull($result['unallocated']);
         self::assertEqualsWithDelta($unallocated, $result['unallocated']['totalCosts'], 0.001);
+        self::assertSame(50.0, $result['totals']['otherCosts']);
         self::assertEqualsWithDelta($adSpend, $result['totals']['adSpend'], 0.001);
         $this->assertWidgetsMatchTotals($this->widgets(null), $result['totals']);
     }
@@ -160,6 +164,45 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
             ->execute(self::COMPANY_ID, 'wildberries', self::FROM, self::TO);
 
         self::assertNull($result['unallocated']);
+    }
+
+    public function testOrderAdsShowAccrualsWithoutInventingAttribution(): void
+    {
+        $date = new \DateTimeImmutable('2026-11-06');
+        $raw = new MarketplaceRawDocument(Uuid::uuid4()->toString(), $this->company, MarketplaceType::OZON, 'accrual_by_day');
+        $raw->setPeriodFrom($date);
+        $raw->setPeriodTo($date);
+        $raw->setApiEndpoint('/v1/finance/accrual/by-day');
+        $raw->setRawData(['accruals' => [
+            ['accrual_id' => '100', 'unit_number' => '23660699', 'non_item_fee' => ['type_id' => 54]],
+        ]]);
+        $this->em->persist($raw);
+        $cost = $this->cost('ozon_marketing_action', '20.00', MarketplaceCostOperationType::CHARGE, null, '2026-11-06');
+        $cost->setRawDocumentId($raw->getId());
+        $cost->setExternalId('ozon-accrual-100-non-item-type-54');
+        $this->adStatistics('SKU-1', self::LISTING_ID, '12.00', 'all-sku-promo');
+        $this->adStatistics('SKU-2', self::AD_ONLY_LISTING_ID, '8.00', 'search-promo');
+        $this->adStatistics('unmapped', '55555555-5555-5555-5555-999999999999', '3.00', 'search-promo');
+        $this->em->flush();
+        $this->em->clear();
+
+        $report = self::getContainer()->get(UnitExtendedQuery::class)
+            ->execute(self::COMPANY_ID, 'ozon', self::FROM, self::TO);
+        $widgets = $this->widgets(null, withOrderAds: true);
+        $this->assertWidgetsMatchTotals($widgets, $report['totals']);
+        self::assertNotNull($report['unallocated']);
+        self::assertSame(20.0, $report['unallocated']['adSpend']);
+        self::assertSame([
+            'linked' => 20.0,
+            'estimated' => 12.0,
+            'unlinked' => 20.0,
+            'lastAccrualDate' => '2026-11-06',
+            'accruals' => [
+                ['campaignId' => '23660699', 'date' => '2026-11-06', 'amount' => 20.0],
+                ['campaignId' => null, 'date' => '2026-11-05', 'amount' => 20.0],
+            ],
+        ], $widgets['orderAds']);
+        self::assertNull($this->widgets([self::LISTING_ID], withOrderAds: true)['orderAds']);
     }
 
     /**
@@ -188,7 +231,7 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
      *
      * @return array<string, mixed>
      */
-    private function widgets(?array $listingIds): array
+    private function widgets(?array $listingIds, bool $withOrderAds = false): array
     {
         return self::getContainer()->get(WidgetSummaryQuery::class)->getSummary(
             self::COMPANY_ID,
@@ -196,6 +239,7 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
             new \DateTimeImmutable(self::FROM),
             new \DateTimeImmutable(self::TO),
             $listingIds,
+            $withOrderAds,
         );
     }
 
@@ -250,7 +294,7 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
         MarketplaceCostOperationType $type,
         ?MarketplaceListing $listing = null,
         string $date = '2026-11-05',
-    ): void {
+    ): MarketplaceCost {
         if (!isset($this->categories[$code])) {
             $category = new MarketplaceCostCategory(Uuid::uuid4()->toString(), $this->company, MarketplaceType::OZON);
             $category->setCode($code);
@@ -267,5 +311,7 @@ final class UnitExtendedUnallocatedRowTest extends IntegrationTestCase
         $cost->setOperationType($type);
         $cost->setExternalId('ext-'.Uuid::uuid4()->toString());
         $this->em->persist($cost);
+
+        return $cost;
     }
 }
