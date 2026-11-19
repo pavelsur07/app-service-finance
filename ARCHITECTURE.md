@@ -1815,12 +1815,16 @@ setManualDisplayName(string $name): void  // правка пользовател
 // CounterpartyDisplayNameSuggestion
 
 // src/Company/Application/RefreshCounterpartyDisplayNamesAction.php
-// Пересчёт по всем компаниям: CounterpartyDisplayNameBacklogQuery (скалярные порции по id,
-// кросс-компанийный, только CLI) + CounterpartyDisplayNameWriter::writeAutoIfUnchanged()
-// — условный UPDATE (name не изменился, источник не manual): параллельная правка
-// пользователя не перезаписывается. updatedAt не меняется; идемпотентно.
+// Пересчёт: CounterpartyDisplayNameBacklogQuery (скалярные порции по id; companyId = null — все
+// компании, только CLI; companyId — одна компания) + CounterpartyDisplayNameWriter::writeAutoIfUnchanged()
+// — условный UPDATE (name не изменился, источник не manual, версия правил ещё не текущая):
+// параллельная правка пользователя не перезаписывается, параллельный повтор не пишет дважды.
+// updatedAt не меняется; идемпотентно. Транзакции нет: каждый UPDATE независим (autocommit),
+// обрыв посередине оставляет согласованное состояние, повтор дописывает остаток.
 // CLI: app:counterparty:refresh-display-names [--dry-run] [--samples=50, только с --dry-run]
-__invoke(bool $dryRun, int $sampleLimit = 50): CounterpartyDisplayNameRefreshResult
+// Кнопка «Нормализовать названия» в списке: Preview/ApplyCounterpartyNormalizeController
+// (FINANCE_WRITE, активная компания; предпросмотр — dry-run, «Применить» — запись)
+__invoke(bool $dryRun, int $sampleLimit = 50, ?string $companyId = null): CounterpartyDisplayNameRefreshResult
 
 // src/Company/Infrastructure/Query/CounterpartySearchQuery.php — DBAL, скаляры
 // Цифры → префикс по inn; иначе nameCore префикс + similarity(nameCore) > 0.3.
@@ -6139,6 +6143,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.228 | 2026-11-19 | Company: кнопка «Нормализовать названия» в списке контрагентов — предпросмотр и применение правил по активной компании (`RefreshCounterpartyDisplayNamesAction` с `companyId`) |
 | 2.227 | 2026-11-19 | Company: правила отображаемого названия контрагента v3 — ИНН с запятой перед названием, маскированное ФИО «Б. Имя Отчество» |
 | 2.226 | 2026-11-19 | Cash: после смены дерева ДДС (замена ядром, загрузка JSON, разовая команда) переоткрываются и показанные без решения подсказки ИИ, не только «нет ответа» |
 | 2.225 | 2026-11-19 | Cash: загрузка статей ДДС из JSON создаёт статью с `id` из файла, если такого нет ни у одной компании; `id` статьи другой компании — отказ |

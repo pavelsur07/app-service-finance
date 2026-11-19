@@ -76,6 +76,26 @@ final class RefreshCounterpartyDisplayNamesActionTest extends IntegrationTestCas
         self::assertSame(['display_name' => null, 'display_name_source' => 'auto', 'display_rules_version' => CounterpartyDisplayNameFormatter::RULES_VERSION], $this->fetchDisplay($unrecognisedId));
     }
 
+    public function testCompanyScopeTouchesOnlyThatCompany(): void
+    {
+        // Given: такие же сырые названия у своей и у чужой компании
+        $owner = UserBuilder::aUser()->withIndex(2)->withEmail('owner-display-name-2@example.com')->build();
+        $other = CompanyBuilder::aCompany()->withIndex(2)->withOwner($owner)->build();
+        $this->em->persist($owner);
+        $this->em->persist($other);
+        $own = $this->persist($this->company, 'ООО "Ромашка"');
+        $foreign = $this->persist($other, 'ООО "Ромашка"');
+        $this->em->flush();
+
+        // When
+        $result = ($this->refresh)(false, 50, (string) $this->company->getId());
+
+        // Then
+        self::assertSame(1, $result->processed);
+        self::assertSame('ООО «Ромашка»', $this->fetchDisplay($own)['display_name']);
+        self::assertNull($this->fetchDisplay($foreign)['display_name']);
+    }
+
     public function testSecondRunFindsNothing(): void
     {
         // Given

@@ -21,10 +21,11 @@ final class CounterpartyDisplayNameBacklogQuery
 
     /**
      * Порция по возрастанию id после $afterId (keyset: порции не съезжают, пока пересчёт пишет).
+     * $companyId — только эта компания (кнопка в списке); null — все компании (консольная команда).
      *
      * @return list<array{id: string, company_id: string, name: string, display_name: ?string}>
      */
-    public function fetch(int $rulesVersion, ?string $afterId, int $limit): array
+    public function fetch(int $rulesVersion, ?string $afterId, int $limit, ?string $companyId = null): array
     {
         $sql = <<<'SQL'
             SELECT id, company_id, name, display_name
@@ -32,6 +33,7 @@ final class CounterpartyDisplayNameBacklogQuery
             WHERE (display_name_source IS NULL
                    OR (display_name_source = :auto AND (display_rules_version IS NULL OR display_rules_version <> :version)))
               AND (CAST(:afterId AS uuid) IS NULL OR id > CAST(:afterId AS uuid))
+              AND (CAST(:companyId AS uuid) IS NULL OR company_id = CAST(:companyId AS uuid))
             ORDER BY id
             LIMIT :limit
             SQL;
@@ -39,7 +41,7 @@ final class CounterpartyDisplayNameBacklogQuery
         /** @var list<array{id: string, company_id: string, name: string, display_name: ?string}> $rows */
         $rows = $this->connection->fetchAllAssociative(
             $sql,
-            ['auto' => 'auto', 'version' => $rulesVersion, 'afterId' => $afterId, 'limit' => $limit],
+            ['auto' => 'auto', 'version' => $rulesVersion, 'afterId' => $afterId, 'limit' => $limit, 'companyId' => $companyId],
             ['version' => ParameterType::INTEGER, 'limit' => ParameterType::INTEGER],
         );
 
