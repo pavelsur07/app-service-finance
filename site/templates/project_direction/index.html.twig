@@ -12,6 +12,7 @@
                     {% endif %}
                     {% if is_granted('module.finance.write') %}
                         <a href="{{ path('project_direction_import') }}" class="btn btn-outline-primary">Загрузить JSON</a>
+                        <a href="{{ path('project_direction_copy') }}" class="btn btn-outline-primary">Скопировать из компании</a>
                     {% endif %}
                     <a href="{{ path('project_direction_new') }}" class="btn btn-success">+ Добавить</a>
                 </div>

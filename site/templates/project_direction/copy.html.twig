@@ -1,0 +1,107 @@
+{% extends 'base.html.twig' %}
+{% block title %}Копирование проектов{% endblock %}
+
+{% block body %}
+    {% include 'partials/_page_header.html.twig' with {title: 'Копирование проектов'} only %}
+    <div class="container-xl mt-3" id="project-direction-copy">
+        <form method="post" action="{{ path('project_direction_copy_preview') }}"
+              data-controller="project-direction-copy" data-action="formdata->project-direction-copy#packDecisions input->project-direction-copy#requirePreview">
+            <input type="hidden" name="_token" value="{{ csrf_token('project_direction_copy_preview') }}">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <p>Компания-получатель — <strong>{{ targetName }}</strong></p>
+                    {% if sources %}
+                        <div class="mb-3">
+                            <label class="form-label" for="copy-source">Компания-источник</label>
+                            <select class="form-select" id="copy-source" name="sourceId" required>
+                                <option value="">Выберите компанию</option>
+                                {% for id, name in sources %}
+                                    <option value="{{ id }}"{% if id == sourceId %} selected{% endif %}>{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="submit" class="btn btn-primary">Предпросмотр</button>
+                            <a href="{{ path('project_direction_index') }}" class="btn btn-outline-secondary">К списку проектов</a>
+                        </div>
+                    {% else %}
+                        <p>Нет доступных компаний-источников.</p>
+                        <a href="{{ path('project_direction_index') }}" class="btn btn-outline-secondary">К списку проектов</a>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if preview %}
+                {% if preview.errors %}
+                    <div class="alert alert-danger" role="alert">
+                        <ul class="mb-0 ps-3">
+                            {% for error in preview.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+                {% if preview.rows %}
+                    <div class="card">
+                        <input type="hidden" name="editDecisions" value="1">
+                        {% if previewId %}
+                            <input type="hidden" name="previewId" value="{{ previewId }}">
+                            <input type="hidden" name="confirmToken" value="{{ csrf_token('project_direction_copy_confirm') }}">
+                        {% endif %}
+                        <div class="card-header">
+                            <h2 class="card-title">Предпросмотр из компании «{{ sources[sourceId] }}»</h2>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-vcenter card-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Проект источника</th>
+                                        <th scope="col">Код</th>
+                                        <th scope="col">Результат и причина</th>
+                                        <th scope="col">Решение при занятом коде</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in preview.rows %}
+                                        <tr>
+                                            <th scope="row" class="fw-normal"><span aria-hidden="true">{{ row.indent }}</span>{{ row.name }}</th>
+                                            <td>
+                                                {{ row.sourceCode ?? '—' }}
+                                                {% if row.code is not null and row.sourceCode != row.code %}
+                                                    → {{ row.code }}
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ row.action }}<div class="text-secondary">{{ row.detail }}</div></td>
+                                            <td>
+                                                {% if row.conflict is not null %}
+                                                    <select class="form-select form-select-sm mb-2" name="decisions[{{ row.id }}][mode]" aria-label="Решение для проекта {{ row.name }}">
+                                                        <option value="skip"{% if row.decision.mode == 'skip' %} selected{% endif %}>Пропустить</option>
+                                                        <option value="link"{% if row.decision.mode == 'link' %} selected{% endif %}>Связать с «{{ row.conflict }}»</option>
+                                                        <option value="rename"{% if row.decision.mode == 'rename' %} selected{% endif %}>Указать свободный код</option>
+                                                    </select>
+                                                    <input class="form-control form-control-sm" type="text" name="decisions[{{ row.id }}][code]" value="{{ row.decision.code }}" maxlength="15" placeholder="Новый код" aria-label="Новый код для проекта {{ row.name }}">
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <input type="hidden" name="decisionsComplete" value="1">
+                        <div class="card-footer d-flex flex-wrap gap-2">
+                            <button type="submit" class="btn btn-outline-primary">Обновить предпросмотр</button>
+                            {% if previewId %}
+                                <button type="submit" class="btn btn-success" data-project-direction-copy-target="confirm"
+                                        formaction="{{ path('project_direction_copy_confirm') }}">Подтвердить копирование</button>
+                            {% elseif preview.errors is empty %}
+                                <span class="align-self-center text-secondary">Нет проектов для создания или связывания.</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% elseif preview.errors is empty %}
+                    <p>В компании-источнике нет проектов.</p>
+                {% endif %}
+            {% endif %}
+        </form>
+    </div>
+{% endblock %}

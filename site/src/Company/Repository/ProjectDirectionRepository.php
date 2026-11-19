@@ -16,6 +16,7 @@ use Webmozart\Assert\Assert;
 /**
  * @extends ServiceEntityRepository<ProjectDirection>
  *
+ * @phpstan-type DirectorySnapshot array{revision: ?string, projects: array<string, ProjectRow>, systemProjects: array<string, string>}
  * @phpstan-type ProjectRow array{id: string, name: string, code: ?string, description: ?string, sort: int, parentId: ?string}
  */
 class ProjectDirectionRepository extends ServiceEntityRepository
@@ -83,18 +84,18 @@ class ProjectDirectionRepository extends ServiceEntityRepository
         return $projects;
     }
 
-    /** @return array{revision: ?string, projects: array<string, ProjectRow>} */
+    /** @return DirectorySnapshot */
     public function readDirectory(string $companyId): array
     {
         // Один снимок PostgreSQL для ревизии и строк, в том числе для пустого справочника.
-        /** @var list<array{revision: ?string, id: ?string, name: string, code: ?string, description: ?string, sort: int|string, parent_id: ?string}> $rows */
+        /** @var list<array{revision: ?string, id: ?string, name: string, code: ?string, description: ?string, sort: int|string, parent_id: ?string, system_code: ?string}> $rows */
         $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
-            'SELECT c.project_direction_revision AS revision, p.id, p.name, p.code, p.description, p.sort, p.parent_id
+            'SELECT c.project_direction_revision AS revision, p.id, p.name, p.code, p.description, p.sort, p.parent_id, p.system_code
                FROM companies c LEFT JOIN project_directions p ON p.company_id = c.id
               WHERE c.id = :companyId ORDER BY p.id',
             ['companyId' => $companyId],
         );
-        $projects = [];
+        $projects = $systemProjects = [];
         foreach ($rows as $row) {
             if (null !== $row['id']) {
                 $projects[$row['id']] = [
@@ -105,10 +106,13 @@ class ProjectDirectionRepository extends ServiceEntityRepository
                     'sort' => (int) $row['sort'],
                     'parentId' => $row['parent_id'],
                 ];
+                if (null !== $row['system_code']) {
+                    $systemProjects[$row['system_code']] = $row['id'];
+                }
             }
         }
 
-        return ['revision' => $rows[0]['revision'] ?? null, 'projects' => $projects];
+        return ['revision' => $rows[0]['revision'] ?? null, 'projects' => $projects, 'systemProjects' => $systemProjects];
     }
 
     public function lockDirectory(string $companyId): void

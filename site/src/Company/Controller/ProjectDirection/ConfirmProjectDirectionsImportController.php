@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Company\Controller\ProjectDirection;
 
 use App\Company\Application\ProjectDirection\ImportProjectDirectionsAction;
-use App\Company\Application\ProjectDirection\ProjectDirectionImportPreviewStore;
+use App\Company\Application\ProjectDirection\ProjectDirectionPreviewStore;
 use App\Company\Entity\User;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
@@ -22,7 +22,7 @@ final class ConfirmProjectDirectionsImportController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $activeCompany,
-        private readonly ProjectDirectionImportPreviewStore $previews,
+        private readonly ProjectDirectionPreviewStore $previews,
         private readonly ImportProjectDirectionsAction $import,
     ) {
     }
@@ -41,7 +41,7 @@ final class ConfirmProjectDirectionsImportController extends AbstractController
             (string) $company->getId(),
             $request->request->getString('previewId'),
         );
-        if (null === $draft) {
+        if (!\is_array($draft)) {
             $this->addFlash('danger', 'Предпросмотр недоступен или истёк. Загрузите файл ещё раз.');
 
             return $this->redirectToRoute('project_direction_import');

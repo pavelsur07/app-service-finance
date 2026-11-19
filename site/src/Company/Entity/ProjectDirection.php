@@ -16,6 +16,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(name: 'idx_project_directions_parent', columns: ['parent_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_project_direction_company_system_code', columns: ['company_id', 'system_code'])]
 #[ORM\UniqueConstraint(name: 'uniq_project_direction_company_code', columns: ['company_id', 'code'])]
+#[ORM\UniqueConstraint(name: 'uniq_project_direction_company_id', columns: ['company_id', 'id'])]
 #[ORM\HasLifecycleCallbacks]
 class ProjectDirection
 {

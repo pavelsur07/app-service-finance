@@ -160,7 +160,8 @@ class CompanyMemberRepository extends ServiceEntityRepository
         /** @var list<CompanyMember> $result */
         $result = $this->createQueryBuilder('companyMember')
             ->innerJoin('companyMember.company', 'company')
-            ->addSelect('company')
+            ->addSelect('company', 'accessRole')
+            ->leftJoin('companyMember.accessRole', 'accessRole')
             ->innerJoin('companyMember.user', 'user')
             ->andWhere('user.id = :userId')
             ->andWhere('companyMember.status = :status')

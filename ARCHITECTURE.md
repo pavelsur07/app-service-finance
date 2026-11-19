@@ -1702,6 +1702,22 @@ JSON v1 содержит `version`, `companyId`, `projects` с полями `id`
 предпросмотр. Подтверждение забирает его один раз. Перед декодированием
 проверяется сложность структуры JSON. При массовых ошибках показаны первые 100.
 
+Экран `GET /project-directions/copy` и оба POST (`copy/preview`,
+`copy/confirm`) требуют `finance.write` в активной компании. Оба POST
+проверяют CSRF и `finance.read` в источнике. Одноразовый предпросмотр
+хранится в Redis 15 минут с привязкой к пользователю, сессии и паре компаний.
+
+Межкомпанийное копирование сохраняет в `project_direction_copy_mappings`
+одну запись на пару (проект источника, компания-получатель). Внешние ключи
+связывают её с обоими проектами и удаляют соответствие при удалении любого
+из них. Системные проекты сопоставляются по `systemCode`. Запись добавляет
+только новые проекты и связи, сохраняя поля и родителей существующих проектов.
+
+`CopyProjectDirectionsAction` берёт блокировки обоих справочников в порядке
+UUID. Подтверждение сравнивает обе ревизии, заново строит план и проверяет
+коды и дерево. Пакетная запись проектов, соответствий и новой ревизии
+получателя выполняется в одной транзакции.
+
 ### Справочник контрагентов (`Company`)
 
 `CounterpartyFacade` (`src/Company/Facade/CounterpartyFacade.php`) — единственная точка
@@ -5381,7 +5397,7 @@ Login throttling: 5 попыток / 15 мин (`security.yaml`, firewall `main`
 | `ModuleAccess` | Константы атрибутов `module.<group>.read|write` + `parse()` |
 | `ModuleAccessMap` | Карта FQCN/namespace-префиксов контроллеров → `Module`; побеждает самый длинный префикс |
 | `ModuleAccessVoter` | Голосует по `module.*`, делегирует резолверу |
-| `ModuleAccessResolver` | Уровни текущего пользователя; мемоизация на запрос по паре (user, company), `ResetInterface` |
+| `ModuleAccessResolver` | Уровни текущего пользователя; мемоизация на запрос по паре (user, company), `ResetInterface`; `allowsForCompany()` применяет те же правила к явной компании и её членству |
 | `ModuleAccessSubscriber` | **Read-гейт fail-closed** на `kernel.controller`: неклассифицированный контроллер без `#[PublicAccess]` → 403 |
 | `PublicAccess` (attribute) | Снимает модульный гейт с класса или метода |
 | `SystemCompanyRoles` | 5 системных шаблонов с фиксированными UUID (те же значения вставляет миграция) |
@@ -6089,6 +6105,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.222 | 2026-11-19 | Company: предпросмотр и копирование проектов между компаниями, миграция `Version20261119140000` |
 | 2.221 | 2026-11-19 | Company: код и описание проектов, JSON v1, ревизия и блокировка записи справочника; миграция `Version20261119130000` |
 | 2.220 | 2026-11-19 | MarketplaceFunnel: поиск WB — факты `wb.analytics.search` (`WbSearchTranslator`), источник `search` в `mfn_row`, `mfn_day.source` в ключе (`Version20261119120000`), фильтр «Источник» на экране R9; ServiceGateway: `wb.analytics.search` — ежедневный ресурс покрытия и ресурс фактов `wb-fetcher`; задача `marketplace-funnel`, этап 3, часть 2 |
 | 2.219 | 2026-11-18 | Marketplace / ServiceGateway: ресурс поиска по карточкам WB `wb.analytics.search` в `WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES`, строка «Поиск по карточкам» в покрытии; только сырьё, фактами не публикуется; задача `marketplace-funnel`, этап 3 |
