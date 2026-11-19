@@ -11,7 +11,10 @@
                 data-project-direction-sort-next-by-parent-value="{{ next_sort_by_parent|json_encode|e('html_attr') }}"
             >
                 {{ form_start(form) }}
+                {{ form_errors(form) }}
                 {{ form_row(form.name) }}
+                {{ form_row(form.code) }}
+                {{ form_row(form.description) }}
                 {{ form_row(form.sort, {
                     attr: {'data-project-direction-sort-target': 'sort'}
                 }) }}

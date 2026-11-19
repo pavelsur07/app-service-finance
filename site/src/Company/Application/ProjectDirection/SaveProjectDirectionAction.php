@@ -36,7 +36,7 @@ final class SaveProjectDirectionAction
                 'id' => $id,
                 'name' => $draft->getName(),
                 'code' => $draft->getCode(),
-                'description' => $draft->getDescription(),
+                'description' => ProjectDirection::normalizeDescription($draft->getDescription()),
                 'sort' => $draft->getSort(),
                 'parentId' => $parentId,
             ];
@@ -62,6 +62,7 @@ final class SaveProjectDirectionAction
             }
 
             if ($create) {
+                $draft->setDescription($row['description']);
                 $this->entityManager->persist($draft);
             } else {
                 $project = $this->repository->findForDirectoryWrite($companyId, [$id])[$id];

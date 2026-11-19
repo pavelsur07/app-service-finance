@@ -11,7 +11,11 @@ use Ramsey\Uuid\Uuid;
 /** @phpstan-import-type ProjectRow from ProjectDirectionRepository */
 final readonly class ProjectDirectionExchange
 {
+    public const MAX_FILE_BYTES = 8 * 1024 * 1024;
+    public const FILE_SIZE_MESSAGE = 'Размер файла JSON не должен превышать 8 МиБ.';
+
     private const VERSION = 1;
+    private const MAX_ERRORS = 100;
     private const REQUIRED_FIELDS = ['id', 'name', 'code', 'description', 'sort', 'parentId'];
 
     public function __construct(private ProjectDirectionRepository $repository)
@@ -25,10 +29,20 @@ final readonly class ProjectDirectionExchange
      */
     public function export(string $companyId): array
     {
+        return $this->document($companyId, $this->repository->readDirectory($companyId)['projects']);
+    }
+
+    /**
+     * @param array<string, ProjectRow> $projects
+     *
+     * @return array{version: int, companyId: string, projects: list<ProjectRow>}
+     */
+    public function document(string $companyId, array $projects): array
+    {
         return [
             'version' => self::VERSION,
             'companyId' => $companyId,
-            'projects' => array_values($this->repository->readDirectory($companyId)['projects']),
+            'projects' => array_values($projects),
         ];
     }
 
@@ -43,8 +57,11 @@ final readonly class ProjectDirectionExchange
     /** @param array<string, ProjectRow> $current */
     public function validate(string $companyId, string $json, ?string $revision, array $current): ProjectDirectionImportPreview
     {
+        if (\strlen($json) > self::MAX_FILE_BYTES) {
+            return new ProjectDirectionImportPreview($revision, errors: [self::FILE_SIZE_MESSAGE]);
+        }
         try {
-            $file = json_decode($json, depth: 16, flags: \JSON_THROW_ON_ERROR);
+            $file = json_decode($json, depth: 4, flags: \JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
             return new ProjectDirectionImportPreview($revision, errors: ['Некорректный JSON.']);
         }
@@ -61,6 +78,9 @@ final readonly class ProjectDirectionExchange
 
         $incoming = $numbers = $codes = $errors = [];
         foreach ($file->projects as $index => $value) {
+            if (\count($errors) >= self::MAX_ERRORS) {
+                break;
+            }
             $number = $index + 1;
             $row = $this->readRow($value, $number, $errors);
             if (null === $row) {
@@ -81,15 +101,18 @@ final readonly class ProjectDirectionExchange
             }
         }
         if ([] !== $errors) {
-            return new ProjectDirectionImportPreview($revision, errors: $errors);
+            return $this->invalid($revision, $errors);
         }
 
         foreach ($this->repository->findConflictingIds($companyId, array_keys(array_diff_key($incoming, $current))) as $id) {
             $errors[] = "Запись $numbers[$id]: UUID уже занят в другой компании.";
+            if (\count($errors) >= self::MAX_ERRORS) {
+                return $this->invalid($revision, $errors);
+            }
         }
         array_push($errors, ...$this->directoryErrors(array_replace($current, $incoming), $numbers));
         if ([] !== $errors) {
-            return new ProjectDirectionImportPreview($revision, errors: $errors);
+            return $this->invalid($revision, $errors);
         }
 
         $created = $updated = $unchanged = 0;
@@ -107,7 +130,18 @@ final readonly class ProjectDirectionExchange
             $changes[$id] = $row;
         }
 
-        return new ProjectDirectionImportPreview($revision, $created, $updated, $unchanged, changes: $changes);
+        return new ProjectDirectionImportPreview($revision, $created, $updated, $unchanged, changes: $changes, projects: $incoming);
+    }
+
+    /** @param list<string> $errors */
+    private function invalid(?string $revision, array $errors): ProjectDirectionImportPreview
+    {
+        if (\count($errors) >= self::MAX_ERRORS) {
+            $errors = \array_slice($errors, 0, self::MAX_ERRORS);
+            $errors[] = 'Показаны первые 100 ошибок. Исправьте их и загрузите файл заново.';
+        }
+
+        return new ProjectDirectionImportPreview($revision, errors: $errors);
     }
 
     /**
@@ -127,6 +161,9 @@ final readonly class ProjectDirectionExchange
         $name = $value->name;
         $code = $value->code;
         $description = $value->description;
+        if (\is_string($description)) {
+            $description = ProjectDirection::normalizeDescriptionNewlines($description);
+        }
         $sort = $value->sort;
         $parentId = $value->parentId;
 
@@ -135,7 +172,7 @@ final readonly class ProjectDirectionExchange
             !\is_string($name) || '' === trim($name) || mb_strlen($name) > 255 || str_contains($name, "\0") => 'наименование должно содержать от 1 до 255 символов.',
             null !== $code && !\is_string($code) => 'код должен быть строкой или null.',
             null !== $description && (!\is_string($description) || mb_strlen($description) > ProjectDirection::DESCRIPTION_LENGTH || str_contains($description, "\0")) => 'описание должно содержать до 300 символов или быть null.',
-            !\is_int($sort) || $sort < -2147483648 || $sort > 2147483647 => 'сортировка должна быть целым числом от −2147483648 до 2147483647.',
+            !\is_int($sort) || $sort < ProjectDirection::MIN_SORT || $sort > ProjectDirection::MAX_SORT => 'сортировка должна быть целым числом от −2147483648 до 2147483647.',
             null !== $parentId && (!\is_string($parentId) || 36 !== \strlen($parentId) || !Uuid::isValid($parentId)) => 'родитель должен быть корректным UUID или null.',
             default => null,
         };
@@ -164,7 +201,7 @@ final readonly class ProjectDirectionExchange
 
     /**
      * @param array<string, ProjectRow> $projects
-     * @param array<string, int>        $numbers
+     * @param array<string, int> $numbers
      *
      * @return list<string>
      */
@@ -172,6 +209,9 @@ final readonly class ProjectDirectionExchange
     {
         $errors = $codes = $checked = [];
         foreach ($projects as $id => $row) {
+            if (\count($errors) >= self::MAX_ERRORS) {
+                break;
+            }
             $label = isset($numbers[$id]) ? 'Запись '.$numbers[$id] : 'Проект '.$id;
             $parentId = $row['parentId'];
             if (null !== $parentId && !isset($projects[$parentId])) {

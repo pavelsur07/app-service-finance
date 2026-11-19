@@ -1689,6 +1689,13 @@ JSON v1 содержит `version`, `companyId`, `projects` с полями `id`
 итогового дерева до первой записи. Форма редактирования передаёт ревизию
 открытого справочника. При конфликте правки сохраняются в форме для сверки.
 
+`GET /project-directions/export` требует `finance.read`. Предпросмотр на
+`/project-directions/import` и подтверждение на
+`POST /project-directions/import/confirm` требуют `finance.write`; оба POST
+проверяют CSRF. Redis хранит проверенные поля JSON и ревизию до 15 минут.
+Для каждой сессии, пользователя и компании действует последний успешный
+предпросмотр. Подтверждение забирает его один раз.
+
 ### Справочник контрагентов (`Company`)
 
 `CounterpartyFacade` (`src/Company/Facade/CounterpartyFacade.php`) — единственная точка
@@ -6076,7 +6083,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.220 | 2026-11-19 | Company: код и описание проектов, JSON v1, ревизия и блокировка записи справочника; миграция `Version20261119120000` |
+| 2.221 | 2026-11-19 | Company: код и описание проектов, JSON v1, ревизия и блокировка записи справочника; миграция `Version20261119130000` |
 | 2.219 | 2026-11-18 | Marketplace / ServiceGateway: ресурс поиска по карточкам WB `wb.analytics.search` в `WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES`, строка «Поиск по карточкам» в покрытии; только сырьё, фактами не публикуется; задача `marketplace-funnel`, этап 3 |
 | 2.218 | 2026-11-18 | MarketplaceFunnel: экран R9 «Воронка продаж» `/marketplace/funnel` (товар × ступени, конверсии, xlsx), модуль в карте доступа `ModuleAccessMap`, пункт меню; задача `marketplace-funnel`, этап 6 |
 | 2.217 | 2026-11-18 | MarketplaceFunnel: новый модуль — таблица воронки продаж (`mfn_day`, `mfn_row`, `Version20261118120000`), `app:marketplace-funnel:translate` (`9-59/15`) и гейт `app:marketplace-funnel:health-check` (09:43); сервисы публикуют фактами `ozon.analytics.funnel` и `wb.analytics.funnel`; задача `marketplace-funnel`, этап 5 |

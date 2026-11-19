@@ -10,8 +10,9 @@ use App\Company\Repository\ProjectDirectionRepository;
 final readonly class ProjectDirectionImportPreview
 {
     /**
-     * @param list<string>              $errors
+     * @param list<string> $errors
      * @param array<string, ProjectRow> $changes
+     * @param array<string, ProjectRow> $projects
      */
     public function __construct(
         public ?string $revision,
@@ -20,6 +21,7 @@ final readonly class ProjectDirectionImportPreview
         public int $unchanged = 0,
         public array $errors = [],
         public array $changes = [],
+        public array $projects = [],
     ) {
     }
 }

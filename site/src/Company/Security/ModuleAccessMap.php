@@ -71,6 +71,7 @@ final class ModuleAccessMap
         'App\\MoySklad\\' => Module::MARKETPLACE,
         'App\\Deals\\' => Module::DEALS,
         'App\\Catalog\\' => Module::CATALOG,
+        'App\\Company\\Controller\\ProjectDirection\\' => Module::FINANCE,
         'App\\Company\\Controller\\' => Module::ADMIN,
         'App\\Billing\\' => Module::ADMIN,
         'App\\Telegram\\' => Module::ADMIN,

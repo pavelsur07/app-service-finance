@@ -8,6 +8,7 @@ use App\Company\Entity\ProjectDirection;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
+use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
@@ -19,6 +20,19 @@ class ProjectDirectionType extends AbstractType
         $builder
             ->add('name', TextType::class, [
                 'label' => 'Наименование',
+            ])
+            ->add('code', TextType::class, [
+                'label' => 'Код',
+                'required' => false,
+                'trim' => false,
+                'help' => 'До 15 символов. Начните с латинской буквы. Допустимы латинские буквы, цифры и подчёркивания.',
+            ])
+            ->add('description', TextareaType::class, [
+                'label' => 'Описание',
+                'required' => false,
+                'trim' => false,
+                'attr' => ['rows' => 3],
+                'help' => 'До 300 символов.',
             ])
             ->add('sort', IntegerType::class, [
                 'label' => 'Сортировка',

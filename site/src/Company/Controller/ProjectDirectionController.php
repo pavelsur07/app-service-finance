@@ -62,7 +62,7 @@ class ProjectDirectionController extends AbstractController
         }
 
         return $this->render('project_direction/new.html.twig', [
-            'form' => $form->createView(),
+            'form' => $form,
             'next_sort_by_parent' => $nextSortByParent,
         ]);
     }
@@ -103,8 +103,7 @@ class ProjectDirectionController extends AbstractController
         }
 
         return $this->render('project_direction/edit.html.twig', [
-            'form' => $form->createView(),
-            'item' => $direction,
+            'form' => $form,
         ]);
     }
 
@@ -164,11 +163,11 @@ class ProjectDirectionController extends AbstractController
         }
 
         $nextSortByParent = [
-            '' => ($maxSortByParent[''] ?? 0) + self::SORT_STEP,
+            '' => min(ProjectDirection::MAX_SORT, ($maxSortByParent[''] ?? 0) + self::SORT_STEP),
         ];
         foreach ($directions as $direction) {
             $id = (string) $direction->getId();
-            $nextSortByParent[$id] = ($maxSortByParent[$id] ?? 0) + self::SORT_STEP;
+            $nextSortByParent[$id] = min(ProjectDirection::MAX_SORT, ($maxSortByParent[$id] ?? 0) + self::SORT_STEP);
         }
 
         return $nextSortByParent;

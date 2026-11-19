@@ -2367,7 +2367,7 @@ parameters:
 		-
 			message: '#^Call to an undefined method object\:\:getCompany\(\)\.$#'
 			identifier: method.notFound
-			count: 2
+			count: 1
 			path: src/Finance/Facade/FinanceFacade.php
 
 		-
@@ -2390,18 +2390,6 @@ parameters:
 
 		-
 			message: '#^Parameter \#1 \$document of method App\\Finance\\Application\\Service\\PLRegisterUpdater\:\:updateForDocument\(\) expects App\\Finance\\Entity\\Document, object given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Finance/Facade/FinanceFacade.php
-
-		-
-			message: '#^Parameter \#1 \$projectDirection of method App\\Finance\\Entity\\Document\:\:setProjectDirection\(\) expects App\\Company\\Entity\\ProjectDirection\|null, object\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Finance/Facade/FinanceFacade.php
-
-		-
-			message: '#^Parameter \#1 \$projectDirection of method App\\Finance\\Entity\\DocumentOperation\:\:setProjectDirection\(\) expects App\\Company\\Entity\\ProjectDirection\|null, object\|null given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Finance/Facade/FinanceFacade.php
@@ -12275,24 +12263,6 @@ parameters:
 			identifier: vashfindir.flushOutsideBoundary
 			count: 2
 			path: src/Company/Controller/CounterpartyController.php
-
-		-
-			message: '#^flush\(\) в App\\Company\\Controller\\ProjectDirectionController\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'
-			identifier: vashfindir.flushOutsideBoundary
-			count: 3
-			path: src/Company/Controller/ProjectDirectionController.php
-
-		-
-			message: '#^Действие App\\Company\\Controller\\ProjectDirectionController\:\:delete\(\) принимает сущность компании App\\Company\\Entity\\ProjectDirection аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
-			identifier: vashfindir.controllerEntityArgument
-			count: 1
-			path: src/Company/Controller/ProjectDirectionController.php
-
-		-
-			message: '#^Действие App\\Company\\Controller\\ProjectDirectionController\:\:edit\(\) принимает сущность компании App\\Company\\Entity\\ProjectDirection аргументом\: Entity value resolver загружает её без companyId \(IDOR\)\.$#'
-			identifier: vashfindir.controllerEntityArgument
-			count: 1
-			path: src/Company/Controller/ProjectDirectionController.php
 
 		-
 			message: '#^flush\(\) в App\\Company\\Repository\\UserRepository\: граница транзакции — только Action, MessageHandler и консольная Command \(CLAUDE\.md, «Транзакции»\)\.$#'

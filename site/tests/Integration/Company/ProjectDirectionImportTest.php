@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Company;
 
+use App\Company\Application\ProjectDirection\DeleteProjectDirectionAction;
 use App\Company\Application\ProjectDirection\ImportProjectDirectionsAction;
 use App\Company\Application\ProjectDirection\ProjectDirectionExchange;
 use App\Company\Application\ProjectDirection\SaveProjectDirectionAction;
@@ -75,7 +76,10 @@ final class ProjectDirectionImportTest extends IntegrationTestCase
             ],
             array_slice($export['projects'], 0, 3),
         );
-        self::assertSame(ProjectDirection::CODE_GENERAL, $first->getSystemCode());
+        self::assertSame(ProjectDirection::CODE_GENERAL, $this->connection->fetchOne(
+            'SELECT system_code FROM project_directions WHERE company_id = :companyId AND id = :id',
+            ['companyId' => $company->getId(), 'id' => self::FIRST],
+        ));
 
         $repeat = $exchange->preview((string) $company->getId(), $this->file($company, $export['projects']));
         self::assertSame([0, 0, 4], [$repeat->created, $repeat->updated, $repeat->unchanged]);
@@ -188,6 +192,31 @@ final class ProjectDirectionImportTest extends IntegrationTestCase
 
         self::assertSame([], $result->errors);
         self::assertSame($rows, $this->exchange->export($companyId)['projects']);
+    }
+
+    public function testPreviewBecomesStaleWhenAnExistingProjectIsDeleted(): void
+    {
+        $company = $this->createCompany();
+        $this->persistProject($company, self::FIRST, null);
+        $companyId = (string) $company->getId();
+        $delete = static::getContainer()->get(DeleteProjectDirectionAction::class);
+        $file = $this->file($company, [self::row(self::THIRD)]);
+        $preview = $this->exchange->preview($companyId, $file);
+
+        self::assertTrue($delete($companyId, self::FIRST));
+        self::assertStringContainsString('изменился', implode(' ', ($this->import)($company, $file, $preview->revision)->errors));
+        self::assertSame([], $this->exchange->export($companyId)['projects']);
+    }
+
+    public function testInvalidRowsReturnABoundedErrorList(): void
+    {
+        $company = $this->createCompany();
+        $file = $this->file($company, array_fill(0, 150, []));
+        $preview = $this->exchange->preview((string) $company->getId(), $file);
+
+        self::assertCount(101, $preview->errors);
+        self::assertStringContainsString('Запись 100', $preview->errors[99]);
+        self::assertStringContainsString('Показаны первые 100 ошибок', $preview->errors[100]);
     }
 
     public function testImportWaitsForTheCompanyWriterLock(): void

@@ -22,3 +22,6 @@ framework:
 
             cache.moysklad_automatic_mapping:
                 adapter: App\MoySklad\Infrastructure\Cache\AutomaticMappingRedisAdapter
+
+            cache.project_direction_import:
+                adapter: cache.adapter.redis
