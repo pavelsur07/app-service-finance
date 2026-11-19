@@ -2808,7 +2808,8 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 пишет справочную строку `ДДС-группа` — на exit code не влияет; компании вне групп не проверяются.
 
 **Загрузка дерева из JSON** — `GET|POST /cashflow-categories/import` (выбор файла и предпросмотр,
-ничего не пишет) и `POST /cashflow-categories/import/apply`; оба — FINANCE_WRITE. Формат файла —
+ничего не пишет) и `POST /cashflow-categories/import/apply`; POST обоих — FINANCE_WRITE (на
+смешанном маршруте — рантайм-гейт в теле). Формат файла —
 выгрузка `GET /cashflow-categories/export/json`. План строит `CashflowCategoryImportPlanner`
 (только читает): статья с `id` обновляется, без `id` создаётся, `id` не из компании — отказ;
 родителя задаёт вложенность `children`, у статьи верхнего уровня — `parentId`; поля, которого нет

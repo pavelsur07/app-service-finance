@@ -28,10 +28,13 @@ final class CashflowCategoryImportController extends AbstractController
     }
 
     #[Route('/import', name: 'cashflow_category_import', methods: ['GET', 'POST'])]
-    #[IsGranted(ModuleAccess::FINANCE_WRITE)]
     public function __invoke(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
+        // Один экшен на GET и POST: read покрыт ModuleAccessSubscriber, write гейтим здесь.
+        if ($request->isMethod('POST')) {
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
+        }
         $view = ['companyId' => (string) $company->getId(), 'plan' => null, 'errors' => [], 'fileName' => null, 'payload' => null];
         if (!$request->isMethod('POST')) {
             return $this->render('cashflow_category/import.html.twig', $view);

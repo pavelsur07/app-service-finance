@@ -207,7 +207,7 @@ final class CashflowCategoryImportControllerTest extends WebTestCaseBase
         $crawler = $this->client->request('GET', '/cashflow-categories/');
         self::assertResponseIsSuccessful();
         self::assertSame(['/cashflow-categories/export/json'], $crawler->filter('[data-test="cashflow-category-json"] a.dropdown-item')->each(static fn (Crawler $link): ?string => $link->attr('href')));
-        $this->client->request('GET', '/cashflow-categories/import');
+        $this->client->request('POST', '/cashflow-categories/import');
         self::assertResponseStatusCodeSame(403);
         $this->client->request('POST', '/cashflow-categories/import/apply');
         self::assertResponseStatusCodeSame(403);
