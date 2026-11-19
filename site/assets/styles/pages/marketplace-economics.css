@@ -17,8 +17,8 @@
 .me-table td {
     white-space: nowrap;
 }
-.me-table th:first-child,
-.me-table td:first-child {
+.me-table:where(:not(.me-sku-table)) th:first-child,
+.me-table:where(:not(.me-sku-table)) td:first-child {
     position: sticky;
     left: 0;
     min-width: 140px;
@@ -29,9 +29,58 @@
     border-right: 1px solid var(--vf-border);
     z-index: 1;
 }
-.me-table thead th:first-child {
+.me-table:where(:not(.me-sku-table)) thead th:first-child {
     background: var(--vf-navy-50);
     z-index: 3;
+}
+.me-sku-table {
+    --me-sku-width: 140px;
+    --me-name-width: 240px;
+}
+.me-sku-table :is(.me-sku-code, .me-sku-name, .me-sku-summary) {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+}
+.me-sku-table td:is(.me-sku-code, .me-sku-name) {
+    background: var(--tblr-bg-surface);
+}
+.me-sku-table th:is(.me-sku-code, .me-sku-name) {
+    z-index: 3;
+}
+.me-sku-table .me-sku-code {
+    width: var(--me-sku-width);
+    min-width: var(--me-sku-width);
+    max-width: var(--me-sku-width);
+}
+.me-sku-table .me-sku-name {
+    left: var(--me-sku-offset, var(--me-sku-width));
+    width: var(--me-name-width);
+    min-width: var(--me-name-width);
+    max-width: var(--me-name-width);
+}
+.me-sku-table :is(.me-sku-name, .me-sku-summary) {
+    border-right: 1px solid var(--vf-border);
+}
+.me-sku-code-value {
+    min-width: 0;
+}
+.me-sku-value,
+.me-sku-table summary {
+    display: block;
+}
+.me-sku-table summary {
+    cursor: pointer;
+}
+.me-sku-table details[open] .me-sku-value {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.me-sku-empty {
+    position: sticky;
+    left: var(--vf-space-2);
+    max-width: calc(100vw - 4 * var(--vf-space-4));
+    white-space: normal;
 }
 .me-table tbody tr:hover td {
     background: var(--tblr-bg-surface-secondary);
@@ -70,6 +119,15 @@
 .me-fixed-header[hidden],
 .me-floating-scroll[hidden] {
     display: none;
+}
+@media (max-width: 575px) {
+    .me-sku-table {
+        --me-sku-width: 84px;
+        --me-name-width: 116px;
+    }
+    .me-sku-table > :is(thead, tbody) > tr > :is(.me-sku-code, .me-sku-name, .me-sku-summary) {
+        padding-inline: var(--vf-space-2);
+    }
 }
 @media print {
     .me-fixed-header,

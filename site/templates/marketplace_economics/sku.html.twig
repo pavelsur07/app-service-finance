@@ -12,6 +12,11 @@
 
 {% macro money(minor) %}{{ minor|vf_minor(2)|vf_amount(2) }}{% endmacro %}
 {% macro pct(value) %}{{ value is null ? '—' : value|vf_number(1) ~ ' %' }}{% endmacro %}
+{% macro skuValue(value) %}
+    {% if value is not empty %}
+        <span class="me-sku-value text-truncate" title="{{ value }}">{{ value }}</span>
+    {% endif %}
+{% endmacro %}
 {% macro delta(current, previous) %}
     {%- if previous != 0 -%}
         <p class="text-secondary small mb-0">{{ (current - previous)|vf_minor(2)|vf_amount(2, null, true) }}{% if previous > 0 %} · {{ ((current - previous) * 100 / previous)|vf_number(1) }} %{% endif %}</p>
@@ -138,10 +143,11 @@
         </div>
         <section class="card mb-3 me-table-card" data-economics-table>
             <div class="me-table-scroll" data-economics-scroll tabindex="0" role="region" aria-label="Экономика SKU">
-            <table class="table table-vcenter card-table me-table">
+            <table class="table table-vcenter card-table me-table me-sku-table">
                 <thead>
                     <tr>
-                        <th>SKU</th>
+                        <th class="me-sku-code" scope="col">SKU</th>
+                        <th class="me-sku-name" scope="col">Наименование</th>
                         <th class="text-end">
                             <a href="{{ path('marketplace_economics_sku', params|merge({sort: 'sales', dir: sort == 'sales' and desc ? 'asc' : 'desc', page: null})) }}">Продано, шт.</a>
                         </th>
@@ -163,10 +169,14 @@
                     {% for row in pager.currentPageResults %}
                         {% set m = row.current %}
                         <tr>
-                            <td>
-                                {% if report.channels|length > 1 and row.channel %}<span class="badge bg-secondary-lt" data-channel="{{ row.channel }}">{{ constant('App\\MarketplaceEconomics\\Application\\DTO\\SkuEconomicsFilter::CHANNELS')[row.channel] ?? row.channel }}</span>{% endif %}
-                                {{ row.sku }}
-                                <p class="text-secondary small mb-0">{{ row.title ?? row.supplierSku ?? '' }}</p>
+                            <td class="me-sku-code">
+                                <div class="d-flex align-items-center gap-1">
+                                    {% if report.channels|length > 1 and row.channel %}<span class="badge bg-secondary-lt" data-channel="{{ row.channel }}">{{ constant('App\\MarketplaceEconomics\\Application\\DTO\\SkuEconomicsFilter::CHANNELS')[row.channel] ?? row.channel }}</span>{% endif %}
+                                    <div class="text-secondary small me-sku-code-value">{{ ui.skuValue(row.sku) }}</div>
+                                </div>
+                            </td>
+                            <td class="me-sku-name">
+                                {{ ui.skuValue(row.title is not empty ? row.title : row.supplierSku) }}
                             </td>
                             <td class="text-end">{{ m.salesQty|vf_number }}{% if m.returnsQty %}<p class="text-secondary small mb-0">возвр. {{ m.returnsQty|vf_number }}</p>{% endif %}</td>
                             {% for column in columns %}
@@ -181,12 +191,14 @@
                         </tr>
                     {% else %}
                         <tr>
-                            <td class="text-center text-secondary py-5" colspan="{{ columns|length + 5 }}">Нет продаж и затрат по SKU за период.</td>
+                            <td class="text-secondary py-5" colspan="{{ columns|length + 6 }}">
+                                <span class="me-sku-empty d-inline-block">Нет продаж и затрат по SKU за период.</span>
+                            </td>
                         </tr>
                     {% endfor %}
                     {% for label, m in report.unallocated is not null ? {'Нераспределено': report.unallocated, 'Итого': report.total} : {'Итого по выбранным': report.total} %}
                         <tr class="me-totals">
-                            <td class="fw-semibold">{{ label }}</td>
+                            <td class="me-sku-summary fw-semibold" colspan="2">{{ label }}</td>
                             <td class="text-end">{{ m.salesQty|vf_number }}</td>
                             {% for column in columns %}
                                 <td class="text-end">
