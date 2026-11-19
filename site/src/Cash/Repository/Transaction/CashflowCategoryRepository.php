@@ -148,6 +148,36 @@ class CashflowCategoryRepository extends ServiceEntityRepository
     }
 
     /**
+     * Блокировка дерева статей компании — тот же ключ у формы, загрузки из JSON, синхронизации с
+     * эталоном группы и миграции дерева — и сохранённые в БД родитель и код каждой статьи.
+     * Только внутри транзакции вызывающего: advisory lock держится до её commit.
+     *
+     * @return array<string, array{parentId: ?string, code: ?string, flowKind: string}> id статьи → размещение
+     */
+    public function lockTreePlacements(string $companyId): array
+    {
+        $this->lockTree($companyId);
+
+        $placements = [];
+        foreach ($this->getEntityManager()->getConnection()->iterateAssociative('SELECT id, parent_id, system_code, flow_kind FROM "cashflow_categories" WHERE company_id = :companyId', ['companyId' => $companyId]) as $row) {
+            $placements[(string) $row['id']] = [
+                'parentId' => null === $row['parent_id'] ? null : (string) $row['parent_id'],
+                'code' => null === $row['system_code'] ? null : (string) $row['system_code'],
+                'flowKind' => (string) $row['flow_kind'],
+            ];
+        }
+
+        return $placements;
+    }
+
+    /** Только блокировка дерева компании (см. lockTreePlacements()); внутри транзакции вызывающего. */
+    public function lockTree(string $companyId): void
+    {
+        Assert::uuid($companyId);
+        $this->getEntityManager()->getConnection()->executeQuery('SELECT pg_advisory_xact_lock(hashtext(:companyId))', ['companyId' => $companyId]);
+    }
+
+    /**
      * Есть ли у компании хоть одна несистемная статья ДДС — признак, что дерево уже своё.
      */
     public function hasRegularByCompany(Company $company): bool

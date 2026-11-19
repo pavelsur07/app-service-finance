@@ -151,6 +151,17 @@ final class CashflowCategoryImportPlannerTest extends TestCase
         self::assertSame('Вид деятельности', $plan->items[1]['changes'][0]['label']);
     }
 
+    public function testOperationTypeOfRegularCategoryCanBeChanged(): void
+    {
+        $payload = $this->export();
+        $payload[0]['children'][1]['operationType'] = 'OUTFLOW';
+
+        $plan = $this->plan($payload);
+
+        self::assertSame([], $plan->errors);
+        self::assertSame([['label' => 'Тип операции', 'from' => '—', 'to' => 'OUTFLOW']], $plan->items[0]['changes']);
+    }
+
     public function testFingerprintDependsOnPlannedChanges(): void
     {
         $payload = $this->export();
@@ -255,6 +266,17 @@ final class CashflowCategoryImportPlannerTest extends TestCase
 
             return $p;
         }, 'консолидированная'];
+        yield 'тип операции системной' => [static function (array $p): array {
+            $p[0]['operationType'] = 'INFLOW';
+
+            return $p;
+        }, 'тип операции'];
+        yield 'тип операции статьи с кодом консолидации' => [static function (array $p, self $test): array {
+            $test->tree[self::RENT]->assignGroupCode('OP_OUT_RENT');
+            $p[0]['children'][0]['operationType'] = 'INFLOW';
+
+            return $p;
+        }, 'тип операции'];
         yield 'технический корень' => [static function (array $p): array {
             $p[] = ['name' => 'Техника', 'flowKind' => 'TECHNICAL'];
 

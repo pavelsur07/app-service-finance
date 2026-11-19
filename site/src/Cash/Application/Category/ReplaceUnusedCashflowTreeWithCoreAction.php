@@ -116,7 +116,7 @@ final class ReplaceUnusedCashflowTreeWithCoreAction
         $connection->executeQuery('SELECT pg_advisory_xact_lock(hashtext(:companyId))', ['companyId' => $companyId]);
 
         ($this->ensureSystem)($companyId);
-        // Дерево, загруженное планом до транзакции, могло устареть (форма advisory lock не берёт):
+        // Дерево, загруженное планом до транзакции, могло устареть (план читается без блокировки):
         // строки под FOR UPDATE и перечитаны — пути и коды считаются по текущему состоянию.
         $this->categories->lockTreeByCompany($this->company($companyId));
 
@@ -152,7 +152,7 @@ final class ReplaceUnusedCashflowTreeWithCoreAction
 
         $created = ($this->applyCore)($companyId);
         if ($created !== $plan->coreNodes) {
-            // Статью завели параллельно (форма advisory lock не берёт), и ядро себя пропустило:
+            // Статью завели в обход блокировки дерева (форма и удаление её берут), и ядро себя пропустило:
             // откатываем удаление, иначе компания останется без дерева.
             throw new CashflowCoreTemplateException(sprintf('Ядро не применено: создано %d из %d узлов — дерево ДДС компании изменили во время замены, повторите.', $created, $plan->coreNodes));
         }
