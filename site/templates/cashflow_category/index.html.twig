@@ -63,7 +63,15 @@
         {% block actions %}
             <div class="d-flex gap-2">
                 <a href="{{ path('cashflow_group_chart') }}" class="btn btn-outline-primary">Эталон группы</a>
-                <a href="{{ path('cashflow_category_export_json') }}" class="btn btn-outline-primary">Выгрузить справочник ДДС (JSON)</a>
+                <div class="dropdown" data-test="cashflow-category-json">
+                    <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">JSON</button>
+                    <div class="dropdown-menu dropdown-menu-end">
+                        <a class="dropdown-item" href="{{ path('cashflow_category_export_json') }}">Выгрузить JSON</a>
+                        {% if is_granted('module.finance.write') %}
+                            <a class="dropdown-item" href="{{ path('cashflow_category_import') }}">Загрузить JSON</a>
+                        {% endif %}
+                    </div>
+                </div>
                 <a href="{{ path('cashflow_category_new') }}" class="btn btn-primary">+ Добавить статью</a>
             </div>
         {% endblock %}
