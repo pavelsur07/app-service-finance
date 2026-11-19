@@ -10,6 +10,7 @@ use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -213,9 +214,12 @@ final class SaveCashflowCategoryActionTest extends TestCase
         ($this->action($entityManager, $violations))($category);
     }
 
+    /** @var list<CashflowCategory> статьи теста: «сохранённое» дерево для блокировки */
+    private array $categories = [];
+
     private function category(string $id, Company $company): CashflowCategory
     {
-        return (new CashflowCategory($id, $company))->setName('Статья');
+        return $this->categories[] = (new CashflowCategory($id, $company))->setName('Статья');
     }
 
     private function action(
@@ -226,9 +230,18 @@ final class SaveCashflowCategoryActionTest extends TestCase
         $validator->method('validate')->willReturn($violations ?? new ConstraintViolationList());
 
         if ($entityManager instanceof MockObject) {
-            $entityManager->method('wrapInTransaction')->willReturnCallback(static fn (callable $func): mixed => $func($entityManager));
+            $connection = $this->createStub(Connection::class);
+            $connection->method('transactional')->willReturnCallback(static fn (callable $func): mixed => $func($connection));
+            $entityManager->method('getConnection')->willReturn($connection);
         }
 
-        return new SaveCashflowCategoryAction($entityManager, $validator, $this->createStub(CashflowCategoryRepository::class));
+        // Сохранённое дерево совпадает с объектами теста: перепроверка под блокировкой ничего не меняет.
+        $repository = $this->createStub(CashflowCategoryRepository::class);
+        $repository->method('lockTreePlacements')->willReturnCallback(fn (): array => array_combine(
+            array_map(static fn (CashflowCategory $c): string => (string) $c->getId(), $this->categories),
+            array_map(static fn (CashflowCategory $c): array => ['parentId' => $c->getParent()?->getId(), 'code' => $c->getCode(), 'flowKind' => $c->getEffectiveFlowKind()->value], $this->categories),
+        ));
+
+        return new SaveCashflowCategoryAction($entityManager, $validator, $repository);
     }
 }

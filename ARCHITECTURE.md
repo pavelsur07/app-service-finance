@@ -2780,9 +2780,17 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 `docs/tasks/cashflow-group-chart/chart.md`) и не меняются. `CashflowCategory::assignGroupCode()`
 назначает код один раз. Статью с кодом нельзя удалить (`assertCanDelete`, `PreRemove`) и
 перенести (`setParent`); в форме правки поле «Родитель» скрыто (`lock_parent`), переименовать
-можно. `SaveCashflowCategoryAction` и `DeleteCashflowCategoryAction` перепроверяют код и родителя
-по строке под `FOR UPDATE` (`CashflowCategoryRepository::lockStoredPlacement()`, `wrapInTransaction`):
-форма могла загрузить статью до того, как ей проставили код. Команда берёт дерево компании
+можно. `DeleteCashflowCategoryAction` берёт блокировку дерева компании (`lockTree()`) и перепроверяет
+код по строке под `FOR UPDATE` (`CashflowCategoryRepository::lockStoredPlacement()`,
+`wrapInTransaction`): форма могла загрузить статью до того, как ей проставили код. `SaveCashflowCategoryAction` владеет транзакцией соединения
+(`Connection::transactional()`, не `wrapInTransaction()` — тот сделал бы `flush()` изменённой формой
+статьи и при отказе): `lockTreePlacements()` берёт `pg_advisory_xact_lock(hashtext(companyId))` (ключ
+загрузки из JSON и синхронизации эталона) и читает родителя и код всех статей компании; по ним с
+новым местом статьи перепроверяются: статья и родитель не удалены, цикл, глубина до 5 уровней с
+потомками, уникальность кода, вид деятельности нового корня по базе равен вычисленному формой, а при
+смене вида деятельности — состав поддерева по базе равен поддереву в памяти;
+затем `lockStoredPlacement()` — код консолидации. Отказ — строкой из транзакции до записи, затем
+`DomainException` (flash); EntityManager остаётся открытым. Команда берёт дерево компании
 `lockTreeByCompany()` (FOR UPDATE + refresh) после advisory lock. Ставят код онбординг (`ApplyCashflowCoreTemplateAction`), `app:cash:cashflow-core:apply` и
 синхронизация с эталоном группы.
 
@@ -2831,7 +2839,7 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 родителя задаёт вложенность `children`, у статьи верхнего уровня — `parentId`; поля, которого нет
 в файле, и статьи, которых нет в файле, загрузка не меняет и ничего не удаляет. Вид деятельности
 читается только у корня, потомкам проставляется производным. Любая ошибка (системная статья,
-перенос статьи с `group_code`, глубина больше 5, цикл, дубль кода, чужая статья ОПиУ) отклоняет
+перенос статьи с `group_code` или смена её `operationType`, глубина больше 5, цикл, дубль кода, чужая статья ОПиУ) отклоняет
 файл целиком. `ImportCashflowCategoryTreeAction` владеет транзакцией (`wrapInTransaction`):
 `pg_advisory_xact_lock(hashtext(companyId))` (ключ тот же, что у синхронизации эталона), затем
 `lockTreeByCompany()`, пересчёт плана и сверка отпечатка с показанным в предпросмотре — при
@@ -6121,6 +6129,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.224 | 2026-11-19 | Cash: сохранение и удаление статьи ДДС под блокировкой дерева компании; форма перепроверяет по базе удаление статьи и родителя, цикл, глубину, код и вид деятельности; загрузка из JSON не меняет `operationType` системных статей и статей с `group_code` |
 | 2.223 | 2026-11-19 | Company: предпросмотр и копирование проектов между компаниями, миграция `Version20261119140000` |
 | 2.222 | 2026-11-19 | Cash: загрузка изменённого дерева статей ДДС из JSON с предпросмотром (`ImportCashflowCategoryTreeAction`, `CashflowCategoryImportPlanner`, `/cashflow-categories/import`), кнопки JSON на странице статей — дропдаун |
 | 2.221 | 2026-11-19 | Company: код и описание проектов, JSON v1, ревизия и блокировка записи справочника; миграция `Version20261119130000` |

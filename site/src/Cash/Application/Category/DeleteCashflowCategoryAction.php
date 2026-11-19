@@ -40,6 +40,8 @@ final class DeleteCashflowCategoryAction
 
         try {
             $this->entityManager->wrapInTransaction(function () use ($category): void {
+                // Блокировка дерева — как у формы и загрузки из JSON: перенос под удаляемую статью ждёт.
+                $this->categories->lockTree((string) $category->getCompany()->getId());
                 // Код консолидации могли проставить после загрузки статьи: проверка по строке под FOR UPDATE.
                 $stored = $this->categories->lockStoredPlacement((string) $category->getCompany()->getId(), (string) $category->getId());
                 if (null !== $stored && null !== $stored['groupCode']) {

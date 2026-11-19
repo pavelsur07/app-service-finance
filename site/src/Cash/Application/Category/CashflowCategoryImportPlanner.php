@@ -41,7 +41,7 @@ final readonly class CashflowCategoryImportPlanner
         'code' => 'Код',
         'flowKind' => 'Вид деятельности',
     ];
-    private const SYSTEM_LOCKED = ['name', 'sort', 'parentId', 'code', 'flowKind'];
+    private const SYSTEM_LOCKED = ['name', 'sort', 'parentId', 'code', 'flowKind', 'operationType'];
 
     /**
      * @param array<CashflowCategory> $existing все статьи компании
@@ -329,6 +329,10 @@ final readonly class CashflowCategoryImportPlanner
 
         if (null !== $old && $moved && ($grouped[$id] ?? false)) {
             $errors[] = sprintf('Статью %s нельзя переносить: по ней строится консолидированная отчётность.', $name);
+        }
+        // Направление сверяется с эталоном группы при синхронизации и привязке.
+        if (null !== $old && ($grouped[$id] ?? false) && $old['operationType'] !== $values['operationType']) {
+            $errors[] = sprintf('У статьи %s нельзя менять тип операции: по ней строится консолидированная отчётность.', $name);
         }
         if (CashflowCategory::isSystemCode($values['code'])) {
             $errors[] = sprintf('Статья %s: код %s зарезервирован для системной статьи.', $name, $values['code']);
