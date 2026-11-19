@@ -33,7 +33,8 @@ final readonly class CashCategorizationQuery
     /** Операция с таким числом сбоев ответа больше не запрашивается: не платить за безнадёжные. Истечение без ответа (`expired`) — сбой доставки, не считается. */
     public const MAX_FAILED_ATTEMPTS = 3;
 
-    private const UNCATEGORIZED = <<<'SQL'
+    /** Операция `tx` ждёт статью; нужны `company`, `category` и параметры :companyId, :unallocatedCodes. */
+    public const UNCATEGORIZED = <<<'SQL'
         tx.company_id = :companyId
         AND tx.deleted_at IS NULL
         AND tx.is_transfer = false

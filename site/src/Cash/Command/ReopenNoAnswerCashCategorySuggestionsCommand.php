@@ -18,13 +18,14 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Webmozart\Assert\Assert;
 
 /**
- * Переоткрывает ИИ-подсказки «нет ответа» компании после смены дерева статей ДДС: операции снова
- * попадают в часовой `app:cash:ai-categorize`. Замена дерева ядром делает это сама; команда — для
- * компаний, у которых дерево сменилось раньше. Без --execute только считает.
+ * Переоткрывает ИИ-подсказки компании без решения («нет ответа» и показанные) после смены дерева
+ * статей ДДС: операции снова попадают в часовой `app:cash:ai-categorize`. Замена дерева ядром и
+ * загрузка из JSON делают это сами; команда — для компаний, у которых дерево сменилось раньше.
+ * Имя команды прежнее: его пропускает wrapper codex-console. Без --execute только считает.
  */
 #[AsCommand(
     name: 'app:cash:ai-suggestions:reopen-no-answer',
-    description: 'Переоткрыть ИИ-подсказки «нет ответа» компании после смены дерева ДДС. Без --execute только план.',
+    description: 'Переоткрыть ИИ-подсказки без решения компании после смены дерева ДДС. Без --execute только план.',
 )]
 final class ReopenNoAnswerCashCategorySuggestionsCommand extends Command
 {
@@ -50,9 +51,9 @@ final class ReopenNoAnswerCashCategorySuggestionsCommand extends Command
         $companyId = (string) $input->getArgument('companyId');
         Assert::uuid($companyId);
 
-        $count = $this->suggestions->countNoAnswer($companyId);
+        $count = $this->suggestions->countReopenable($companyId);
         if (0 === $count) {
-            $io->success('Переоткрывать нечего: подсказок «нет ответа» у компании нет.');
+            $io->success('Переоткрывать нечего: подсказок без решения у компании нет.');
 
             return Command::SUCCESS;
         }
@@ -64,7 +65,7 @@ final class ReopenNoAnswerCashCategorySuggestionsCommand extends Command
         }
 
         /** @var int $reopened */
-        $reopened = $this->entityManager->wrapInTransaction(fn (): int => $this->suggestions->reopenNoAnswer($companyId, 'reopened', $this->clock->now()));
+        $reopened = $this->entityManager->wrapInTransaction(fn (): int => $this->suggestions->reopenAfterTreeChange($companyId, 'reopened', $this->clock->now()));
         $this->logger->info('Cash AI no-answer suggestions reopened', ['companyId' => $companyId, 'count' => $reopened]);
         $io->success(sprintf('Переоткрыто: %d. ИИ спросит заново на ближайшем часовом запуске.', $reopened));
 

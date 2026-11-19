@@ -2952,9 +2952,15 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
 - Entity `CashCategorySuggestion`: компания, операция, `task_id`, статус
   `CashCategorySuggestionStatus` (`requested` → `suggested` / `no_answer` /
   `failed` / `stale`; `suggested` → `accepted` / `dismissed` / `auto_applied` /
-  `stale`; `no_answer` → `stale` одним UPDATE `CashCategorySuggestionRepository::reopenNoAnswer()` после смены дерева статей — операция снова
-  кандидат: при замене ядром `ReplaceUnusedCashflowTreeWithCoreAction` (`category_tree_replaced`)
-  и командой `app:cash:ai-suggestions:reopen-no-answer <companyId> [--execute]` (`reopened`)), статья,
+  `stale`; `no_answer` и `suggested` у операции, ещё ждущей статью, → `stale` одним UPDATE
+  `CashCategorySuggestionRepository::reopenAfterTreeChange()` после смены дерева статей — ответ выбран
+  из старого дерева, операция снова кандидат (`suggested` у разнесённой человеком операции — решение
+  правкой, история точности, не трогается): при замене
+  ядром `ReplaceUnusedCashflowTreeWithCoreAction` (`category_tree_replaced`), при загрузке из JSON
+  `ImportCashflowCategoryTreeAction` (`category_tree_imported`, в транзакции загрузки) и командой
+  `app:cash:ai-suggestions:reopen-no-answer <companyId> [--execute]` (`reopened`; имя прежнее ради
+  wrapper codex-console); принятие и автоприменение (`CashCategorySuggestionApplier`) сначала берут
+  блокировку дерева компании, потом подсказку), статья,
   уверенность `decimal(5,4)`, вердикт, модель, версия промпта, кто и когда решил.
   Unique (`task_id`, `transaction_id`); частичный unique
   `uniq_cash_category_suggestion_open` — не больше одной открытой
@@ -6133,6 +6139,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.226 | 2026-11-19 | Cash: после смены дерева ДДС (замена ядром, загрузка JSON, разовая команда) переоткрываются и показанные без решения подсказки ИИ, не только «нет ответа» |
 | 2.225 | 2026-11-19 | Cash: загрузка статей ДДС из JSON создаёт статью с `id` из файла, если такого нет ни у одной компании; `id` статьи другой компании — отказ |
 | 2.224 | 2026-11-19 | Cash: сохранение и удаление статьи ДДС под блокировкой дерева компании; форма перепроверяет по базе удаление статьи и родителя, цикл, глубину, код и вид деятельности; загрузка из JSON не меняет `operationType` системных статей и статей с `group_code` |
 | 2.223 | 2026-11-19 | Company: предпросмотр и копирование проектов между компаниями, миграция `Version20261119140000` |

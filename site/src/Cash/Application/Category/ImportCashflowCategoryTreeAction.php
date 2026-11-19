@@ -9,6 +9,7 @@ use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use App\Cash\Enum\Transaction\CashflowCategoryStatus;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
+use App\Cash\Repository\Transaction\CashCategorySuggestionRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\Finance\Entity\PLCategory;
@@ -16,6 +17,7 @@ use App\Finance\Facade\PLCategoryFacade;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Clock\ClockInterface;
 
 /**
  * Загрузка изменённого дерева статей ДДС из файла выгрузки: предпросмотр и применение.
@@ -31,6 +33,8 @@ final class ImportCashflowCategoryTreeAction
         private readonly PLCategoryFacade $plCategoryFacade,
         private readonly EntityManagerInterface $entityManager,
         private readonly CashflowCategoryImportPlanner $planner,
+        private readonly CashCategorySuggestionRepository $suggestions,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -73,6 +77,8 @@ final class ImportCashflowCategoryTreeAction
                 }
 
                 $this->apply($company, $plan, $existing, $plCategories);
+                // Подсказки ИИ без решения выбраны из старого дерева — часовой запуск спросит заново.
+                $this->suggestions->reopenAfterTreeChange((string) $company->getId(), 'category_tree_imported', $this->clock->now());
 
                 return $plan;
             });
