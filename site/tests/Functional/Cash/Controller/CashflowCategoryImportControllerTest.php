@@ -170,6 +170,12 @@ final class CashflowCategoryImportControllerTest extends WebTestCaseBase
 
     public function testFileOfAnotherCompanyIsRejectedWithoutWriting(): void
     {
+        $owner = $this->em()->find(User::class, $this->owner->getId());
+        \assert($owner instanceof User);
+        $other = CompanyBuilder::aCompany()->withId('0193ffff-0000-7000-8000-0000000004a3')->withOwner($owner)->build();
+        $this->em()->persist($other);
+        $this->em()->persist((new CashflowCategory('0193ffff-0000-7000-8000-00000000dead', $other))->setName('Чужая'));
+        $this->em()->flush();
         $payload = $this->export();
         $payload[0]['children'][0]['id'] = '0193ffff-0000-7000-8000-00000000dead';
         $payload[0]['children'][1]['name'] = 'Оплата труда';
@@ -177,9 +183,25 @@ final class CashflowCategoryImportControllerTest extends WebTestCaseBase
         $crawler = $this->upload($payload);
 
         self::assertResponseIsSuccessful();
-        self::assertStringContainsString('не найдена среди статей компании', $crawler->filter('[data-test="import-errors"]')->text());
+        self::assertStringContainsString('используется вне этой компании', $crawler->filter('[data-test="import-errors"]')->text());
         self::assertCount(0, $crawler->filter('form[data-test="import-apply"]'));
         self::assertSame('Зарплата', $this->em()->getConnection()->fetchOne('SELECT name FROM cashflow_categories WHERE id = ?', [self::SALARY]));
+    }
+
+    public function testInventedIdCreatesCategoryAndReuploadChangesNothing(): void
+    {
+        $payload = $this->export();
+        $payload[0]['children'][1]['children'][] = ['id' => '0193ffff-0000-7000-8000-0000000004d1', 'name' => 'Премии'];
+
+        $this->client->submit($this->upload($payload)->filter('form[data-test="import-apply"]')->form());
+
+        self::assertResponseRedirects('/cashflow-categories/');
+        self::assertSame(self::SALARY, $this->em()->getConnection()->fetchOne('SELECT parent_id FROM cashflow_categories WHERE id = ?', ['0193ffff-0000-7000-8000-0000000004d1']));
+        self::assertSame(4, $this->categoryCount());
+
+        $this->upload($payload);
+        self::assertSelectorTextContains('[data-test="import-empty"]', 'Изменений нет');
+        self::assertSame(4, $this->categoryCount());
     }
 
     public function testBrokenJsonIsRejected(): void

@@ -15,7 +15,8 @@ use Ramsey\Uuid\Uuid;
  * Сравнивает дерево статей ДДС из файла выгрузки с деревом компании и строит план загрузки.
  * Ничего не меняет: сущности только читаются.
  *
- * Статья файла сопоставляется по `id`; без `id` — новая. Родителя задаёт вложенность `children`;
+ * Статья файла сопоставляется по `id`; без `id` или с `id` (UUID), которого нет ни у одной компании, —
+ * новая (во втором случае с этим `id`: он же ключ повтора). `id` статьи другой компании — отказ. Родителя задаёт вложенность `children`;
  * у статьи верхнего уровня — `parentId`, чтобы фрагмент дерева остался на своём месте. Поле,
  * которого в файле нет, не меняется. Статьи компании, которых нет в файле, не меняются и не
  * удаляются — кроме вида деятельности, который потомок наследует от корня.
@@ -27,7 +28,8 @@ final readonly class CashflowCategoryImportPlanner
 {
     private const MAX_LEVEL = 5;
     private const MAX_NODES = 2000;
-    private const UUID = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
+    // D: «$» не пропускает завершающий перевод строки — Assert::uuid() в сущности его не примет.
+    private const UUID = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/D';
     private const SYSTEM_PARENTS = [CashflowCategory::CODE_OPERATING, CashflowCategory::CODE_FINANCING, CashflowCategory::CODE_INVESTING];
     private const LABELS = [
         'name' => 'Название',
@@ -48,8 +50,9 @@ final readonly class CashflowCategoryImportPlanner
      * @param mixed $payload разобранный JSON файла
      * @param array<string, string> $plCategoryNames статьи ОПиУ компании: id → название
      * @param list<string> $newIds ID, выданные предпросмотром статьям без id
+     * @param list<string> $takenIds id из файла, занятые статьями других компаний (см. fileIds())
      */
-    public function plan(array $existing, mixed $payload, array $plCategoryNames, array $newIds = []): CashflowCategoryImportPlan
+    public function plan(array $existing, mixed $payload, array $plCategoryNames, array $newIds = [], array $takenIds = []): CashflowCategoryImportPlan
     {
         if (!\is_array($payload) || !array_is_list($payload)) {
             return $this->rejected(['Файл должен содержать список статей — в том же формате, что и выгрузка.']);
@@ -76,7 +79,8 @@ final readonly class CashflowCategoryImportPlanner
 
         $final = $current;
         $inFile = $fileKind = $generated = $errors = [];
-        $this->collect($payload, null, true, $current, $system, $plCategoryNames, $newIds, $final, $inFile, $fileKind, $generated, $errors);
+        $taken = array_fill_keys($takenIds, true);
+        $this->collect($payload, null, true, $current, $system, $taken, $plCategoryNames, $newIds, $final, $inFile, $fileKind, $generated, $errors);
         if ([] !== $errors) {
             return $this->rejected($errors);
         }
@@ -165,6 +169,7 @@ final readonly class CashflowCategoryImportPlanner
      * @param array<mixed> $nodes
      * @param array<string, Values> $current
      * @param array<string, bool> $system
+     * @param array<string, true> $taken
      * @param array<string, string> $plCategoryNames
      * @param list<string> $newIds
      * @param array<string, Values> $final
@@ -173,7 +178,7 @@ final readonly class CashflowCategoryImportPlanner
      * @param list<string> $generated
      * @param list<string> $errors
      */
-    private function collect(array $nodes, ?string $parentId, bool $top, array $current, array $system, array $plCategoryNames, array &$newIds, array &$final, array &$inFile, array &$fileKind, array &$generated, array &$errors): void
+    private function collect(array $nodes, ?string $parentId, bool $top, array $current, array $system, array $taken, array $plCategoryNames, array &$newIds, array &$final, array &$inFile, array &$fileKind, array &$generated, array &$errors): void
     {
         foreach ($nodes as $node) {
             if (\count($inFile) >= self::MAX_NODES) {
@@ -195,8 +200,11 @@ final readonly class CashflowCategoryImportPlanner
                 $id = array_shift($newIds);
                 $id = \is_string($id) && 1 === preg_match(self::UUID, $id) ? $id : Uuid::uuid7()->toString();
                 $generated[] = $id;
-            } elseif (!\is_string($id) || !isset($current[$id = strtolower($id)])) {
-                $fail('не найдена среди статей компании по id. Файл выгружен из другой компании? Чтобы создать статью, уберите поле id.');
+            } elseif (!\is_string($id) || 1 !== preg_match(self::UUID, $id = strtolower($id))) {
+                $fail('поле id не UUID. Чтобы создать статью, уберите поле id.');
+                continue;
+            } elseif (isset($taken[$id])) {
+                $fail('этот id используется вне этой компании — файл выгружен из другой компании? Чтобы создать статью, уберите поле id.');
                 continue;
             }
             if (isset($inFile[$id])) {
@@ -297,7 +305,7 @@ final readonly class CashflowCategoryImportPlanner
                 $fail('поле children — список статей.');
                 continue;
             }
-            $this->collect($children, $id, false, $current, $system, $plCategoryNames, $newIds, $final, $inFile, $fileKind, $generated, $errors);
+            $this->collect($children, $id, false, $current, $system, $taken, $plCategoryNames, $newIds, $final, $inFile, $fileKind, $generated, $errors);
         }
     }
 
@@ -402,6 +410,32 @@ final readonly class CashflowCategoryImportPlanner
         }
 
         return $chain;
+    }
+
+    /**
+     * Все `id` статей файла в нижнем регистре — вызывающий проверяет по ним, какие заняты вне компании.
+     *
+     * @return list<string>
+     */
+    public static function fileIds(mixed $payload): array
+    {
+        $ids = [];
+        $walk = static function (mixed $nodes) use (&$walk, &$ids): void {
+            if (!\is_array($nodes)) {
+                return;
+            }
+            foreach ($nodes as $node) {
+                if (\is_array($node)) {
+                    if (\is_string($node['id'] ?? null) && 1 === preg_match(self::UUID, strtolower($node['id']))) {
+                        $ids[] = strtolower($node['id']);
+                    }
+                    $walk($node['children'] ?? []);
+                }
+            }
+        };
+        $walk($payload);
+
+        return array_values(array_unique($ids));
     }
 
     /** @param list<string> $errors */

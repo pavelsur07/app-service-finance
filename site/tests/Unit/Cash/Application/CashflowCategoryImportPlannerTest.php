@@ -21,6 +21,8 @@ final class CashflowCategoryImportPlannerTest extends TestCase
     private const NEW_ID = '0193a000-0000-7000-8000-000000000001';
 
     private Company $company;
+    /** @var list<string> id из файла, занятые статьями других компаний */
+    private array $taken = [];
     /** @var array<string, CashflowCategory> */
     private array $tree = [];
 
@@ -110,6 +112,20 @@ final class CashflowCategoryImportPlannerTest extends TestCase
         self::assertSame([], $retry->items);
     }
 
+    public function testUnknownUuidCreatesCategoryWithThatId(): void
+    {
+        $payload = $this->export();
+        // Файл правили внешним инструментом, и он вписал новым статьям свои id.
+        $payload[0]['children'][] = ['id' => '0193A000-0000-7000-8000-0000000000AA', 'name' => 'Реклама', 'children' => [['id' => '0193a000-0000-7000-8000-0000000000ab', 'name' => 'Контекст']]];
+
+        $plan = $this->plan($payload);
+
+        self::assertSame([], $plan->errors);
+        self::assertSame(['0193a000-0000-7000-8000-0000000000aa', '0193a000-0000-7000-8000-0000000000ab'], array_column($plan->created(), 'id'));
+        self::assertSame('0193a000-0000-7000-8000-0000000000aa', $plan->created()[1]['values']['parentId']);
+        self::assertSame([], $plan->newIds, 'id из файла — сам ключ повтора, предпросмотру выдавать нечего');
+    }
+
     public function testCategoriesMissingFromFileStayUntouched(): void
     {
         $payload = $this->export();
@@ -191,11 +207,28 @@ final class CashflowCategoryImportPlannerTest extends TestCase
     public static function rejectedPayloads(): iterable
     {
         yield 'не список' => [static fn (): array => ['name' => 'x'], 'список статей'];
-        yield 'id другой компании' => [static function (array $p): array {
+        yield 'id статьи другой компании' => [static function (array $p, self $test): array {
+            $test->taken = ['99999999-9999-4999-8999-999999999999'];
             $p[0]['children'][0]['id'] = '99999999-9999-4999-8999-999999999999';
 
             return $p;
-        }, 'не найдена среди статей компании'];
+        }, 'используется вне этой компании'];
+        yield 'id с переводом строки' => [static function (array $p): array {
+            $p[0]['children'][] = ['id' => "0193a000-0000-7000-8000-0000000000aa\n", 'name' => 'Аренда склада'];
+
+            return $p;
+        }, 'не UUID'];
+        yield 'один id в разном регистре' => [static function (array $p): array {
+            $p[0]['children'][] = ['id' => '0193A000-0000-7000-8000-0000000000AA', 'name' => 'Склад'];
+            $p[0]['children'][] = ['id' => '0193a000-0000-7000-8000-0000000000aa', 'name' => 'Склад 2'];
+
+            return $p;
+        }, 'встречается в файле дважды'];
+        yield 'id не UUID' => [static function (array $p): array {
+            $p[0]['children'][] = ['id' => 'rent-2', 'name' => 'Аренда склада'];
+
+            return $p;
+        }, 'не UUID'];
         yield 'повтор id' => [static function (array $p): array {
             $p[0]['children'][1]['id'] = self::RENT;
 
@@ -289,7 +322,7 @@ final class CashflowCategoryImportPlannerTest extends TestCase
      */
     private function plan(mixed $payload, array $newIds = []): CashflowCategoryImportPlan
     {
-        return (new CashflowCategoryImportPlanner())->plan(array_values($this->tree), $payload, ['77777777-7777-4777-8777-777777777777' => 'Выручка'], $newIds);
+        return (new CashflowCategoryImportPlanner())->plan(array_values($this->tree), $payload, ['77777777-7777-4777-8777-777777777777' => 'Выручка'], $newIds, $this->taken);
     }
 
     /** @return list<array<string, mixed>> */

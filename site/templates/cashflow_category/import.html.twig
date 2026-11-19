@@ -12,7 +12,7 @@
             <div class="card-body">
                 <p class="text-secondary">
                     Выгрузите дерево («JSON → Выгрузить JSON»), измените файл и загрузите его сюда.
-                    Статья с <code>id</code> обновляется, без <code>id</code> — создаётся. Родителя задаёт вложенность <code>children</code>.
+                    Статья с <code>id</code> из этой компании обновляется; без <code>id</code> или с новым <code>id</code> — создаётся. Родителя задаёт вложенность <code>children</code>.
                     Статьи, которых нет в файле, не меняются и не удаляются. До кнопки «Применить» ничего не записывается.
                 </p>
                 <form method="post" action="{{ path('cashflow_category_import') }}" enctype="multipart/form-data" class="row g-2 align-items-end" data-test="import-upload">
