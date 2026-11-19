@@ -77,6 +77,10 @@ class CompanyController extends AbstractController
 
         $request->getSession()->set('active_company_id', $company->getId());
 
+        if ('company_edit' === ($request->request->all()['returnTo'] ?? null)) {
+            return $this->redirectToRoute('company_edit', ['id' => $company->getId()]);
+        }
+
         $referer = $request->headers->get('referer');
 
         if (null !== $referer) {

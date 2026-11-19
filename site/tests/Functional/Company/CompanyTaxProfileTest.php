@@ -83,6 +83,37 @@ final class CompanyTaxProfileTest extends WebTestCaseBase
         self::assertSelectorTextContains('#company.active .invalid-feedback', 'Минимальный остаток не может быть отрицательным.');
     }
 
+    public function testSwitchingActiveCompanyOpensItsSettings(): void
+    {
+        $company = $this->em()->getRepository(Company::class)->find(self::COMPANY_ID);
+        self::assertInstanceOf(Company::class, $company);
+        $owner = $company->getUser();
+        self::assertInstanceOf(User::class, $owner);
+        $nextCompany = CompanyBuilder::aCompany()->withIndex(2)->withName('Другая компания')->withOwner($owner)->build();
+        $this->em()->persist($nextCompany);
+        $this->em()->flush();
+        $nextId = (string) $nextCompany->getId();
+
+        $editUrl = sprintf('/company/%s/edit', self::COMPANY_ID);
+        $this->setClientSessionValue($this->client, 'active_company_id', self::COMPANY_ID);
+        $crawler = $this->client->request('GET', $editUrl);
+        $switcher = $crawler->filter('form[action="/company/active"]')->form(['company_id' => $nextId]);
+        $this->client->submit($switcher, [], ['HTTP_REFERER' => 'http://localhost'.$editUrl]);
+
+        self::assertResponseRedirects(sprintf('/company/%s/edit', $nextId));
+        $crawler = $this->client->followRedirect();
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.vf-page-head h1', 'Другая компания');
+        self::assertSelectorExists(sprintf('#taxes form[action="/company/%s/tax-profile"]', $nextId));
+        self::assertSelectorExists(sprintf('#consolidation form[action="/company/%s/consolidation"]', $nextId));
+        self::assertSame($nextId, $crawler->filter('form[action="/company/active"] option[selected]')->attr('value'));
+
+        $crawler = $this->client->request('GET', '/company/');
+        $switcher = $crawler->filter('form[action="/company/active"]')->form(['company_id' => self::COMPANY_ID]);
+        $this->client->submit($switcher, [], ['HTTP_REFERER' => 'http://localhost/company/']);
+        self::assertResponseRedirects('http://localhost/company/');
+    }
+
     public function testCompanyListShowsDetailsForEachOwnedCompany(): void
     {
         $company = $this->em()->getRepository(Company::class)->find(self::COMPANY_ID);
