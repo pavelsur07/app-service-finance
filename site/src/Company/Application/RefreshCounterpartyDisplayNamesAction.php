@@ -9,6 +9,7 @@ use App\Company\Domain\Service\CounterpartyDisplayNameFormatter;
 use App\Company\Infrastructure\Persistence\CounterpartyDisplayNameWriter;
 use App\Company\Infrastructure\Query\CounterpartyDisplayNameBacklogQuery;
 use Psr\Log\LoggerInterface;
+use Webmozart\Assert\Assert;
 
 /**
  * Пересчёт отображаемого названия контрагентов правилами (docs/plan/counterparty-display-name.md).
@@ -31,16 +32,20 @@ final class RefreshCounterpartyDisplayNamesAction
     ) {
     }
 
-    public function __invoke(bool $dryRun, int $sampleLimit = 50): CounterpartyDisplayNameRefreshResult
+    /** @param string|null $companyId только эта компания (кнопка в списке); null — все (консольная команда) */
+    public function __invoke(bool $dryRun, int $sampleLimit = 50, ?string $companyId = null): CounterpartyDisplayNameRefreshResult
     {
+        if (null !== $companyId) {
+            Assert::uuid($companyId);
+        }
         $version = CounterpartyDisplayNameFormatter::RULES_VERSION;
         $result = new CounterpartyDisplayNameRefreshResult();
 
-        $this->logger->info('Counterparty display name refresh started.', ['dryRun' => $dryRun, 'rulesVersion' => $version]);
+        $this->logger->info('Counterparty display name refresh started.', ['dryRun' => $dryRun, 'rulesVersion' => $version, 'companyId' => $companyId]);
 
         $afterId = null;
         do {
-            $batch = $this->backlog->fetch($version, $afterId, self::BATCH_SIZE);
+            $batch = $this->backlog->fetch($version, $afterId, self::BATCH_SIZE, $companyId);
 
             foreach ($batch as $row) {
                 ++$result->processed;
@@ -65,6 +70,7 @@ final class RefreshCounterpartyDisplayNamesAction
         $this->logger->info('Counterparty display name refresh finished.', [
             'dryRun' => $dryRun,
             'rulesVersion' => $version,
+            'companyId' => $companyId,
             'processed' => $result->processed,
             'changed' => $result->changed,
             'becameUnrecognised' => $result->becameUnrecognised,

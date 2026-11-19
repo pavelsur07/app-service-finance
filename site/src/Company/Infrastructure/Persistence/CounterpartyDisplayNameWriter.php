@@ -30,6 +30,7 @@ final class CounterpartyDisplayNameWriter
                 WHERE id = :id
                   AND name = :rawNameSeen
                   AND (display_name_source IS NULL OR display_name_source = :auto)
+                  AND display_rules_version IS DISTINCT FROM :version
                 SQL,
             ['displayName' => $displayName, 'auto' => 'auto', 'version' => $rulesVersion, 'id' => $id, 'rawNameSeen' => $rawNameSeen],
             ['version' => ParameterType::INTEGER],

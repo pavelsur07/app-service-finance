@@ -1,0 +1,67 @@
+{% extends 'base.html.twig' %}
+{% block title %}Нормализация названий контрагентов{% endblock %}
+
+{% block body %}
+    {% embed 'partials/_page_header.html.twig' with {title: 'Нормализация названий контрагентов'} %}
+        {% block actions %}
+            <a href="{{ path('counterparty_index') }}" class="btn btn-outline-secondary">К контрагентам</a>
+        {% endblock %}
+    {% endembed %}
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-secondary">
+                    Названия приводятся к виду «ООО «Ромашка»», «ИП Иванов Иван Иванович». Исходное название
+                    сохраняется, названия, исправленные вручную, не меняются. Учитываются и архивные контрагенты.
+                    До кнопки «Применить» ничего не записывается.
+                </p>
+                <div class="row g-3 mb-3">
+                    <div class="col-auto">
+                        <div class="text-secondary">Изменится</div>
+                        <div class="h2 mb-0">{{ result.changed }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="text-secondary">Останется как есть</div>
+                        <div class="h2 mb-0">{{ result.unchanged }}</div>
+                    </div>
+                </div>
+
+                {% if result.changed == 0 %}
+                    <div class="alert alert-secondary{{ result.processed > 0 ? ' mb-3' : ' mb-0' }}" data-test="normalize-empty">Видимых изменений нет — названия уже приведены.</div>
+                {% else %}
+                    {% if result.changedSamples is not empty %}
+                        <div class="table-responsive mb-3">
+                            <table class="table table-vcenter" data-test="normalize-changes">
+                                <thead>
+                                    <tr><th>Было</th><th>Станет</th></tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in result.changedSamples %}
+                                        <tr>
+                                            <td>{{ row.before ?? row.raw }}</td>
+                                            <td>{{ row.after }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% if result.changedSamples|length >= samplesLimit %}
+                            <p class="text-secondary">Показаны первые {{ samplesLimit }}.</p>
+                        {% endif %}
+                    {% endif %}
+                    {% if result.becameUnrecognised > 0 %}
+                        <p class="text-secondary">Ещё {{ result.becameUnrecognised }} вернутся к исходному названию: правила не уверены в разборе.</p>
+                    {% endif %}
+                {% endif %}
+                {# Без видимых изменений строки всё равно ждут записи версии правил — иначе пересчитываются при каждом открытии. #}
+                {% if result.processed > 0 %}
+                    <form method="post" action="{{ path('counterparty_normalize_apply') }}" data-test="normalize-apply" onsubmit="this.querySelector('button[type=submit]').disabled = true">
+                        <input type="hidden" name="_token" value="{{ csrf_token('normalize_display_names' ~ companyId) }}">
+                        <button type="submit" class="btn btn-primary">Применить</button>
+                        <a href="{{ path('counterparty_index') }}" class="btn btn-link">Отмена</a>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

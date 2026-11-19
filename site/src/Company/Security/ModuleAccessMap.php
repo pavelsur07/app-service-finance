@@ -10,6 +10,8 @@ use App\Company\Controller\Api\CounterpartySearchController;
 use App\Company\Controller\CompanyController;
 use App\Company\Controller\Consolidation\SaveConsolidationGroupController;
 use App\Company\Controller\Counterparty\ApplyCounterpartyDisplayNameController;
+use App\Company\Controller\Counterparty\ApplyCounterpartyNormalizeController;
+use App\Company\Controller\Counterparty\PreviewCounterpartyNormalizeController;
 use App\Company\Controller\Counterparty\ResetCounterpartyDisplayNameController;
 use App\Company\Controller\CounterpartyController;
 use App\Company\Controller\Deletion\DeleteCompanyController;
@@ -39,6 +41,8 @@ final class ModuleAccessMap
         CounterpartyController::class => Module::FINANCE,
         ApplyCounterpartyDisplayNameController::class => Module::FINANCE,
         ResetCounterpartyDisplayNameController::class => Module::FINANCE,
+        PreviewCounterpartyNormalizeController::class => Module::FINANCE,
+        ApplyCounterpartyNormalizeController::class => Module::FINANCE,
         FinancialResponsibilityCenterController::class => Module::FINANCE,
         ProjectDirectionController::class => Module::FINANCE,
     ];
