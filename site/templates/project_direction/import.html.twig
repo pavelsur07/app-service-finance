@@ -1,0 +1,43 @@
+{% extends 'base.html.twig' %}
+{% block title %}Загрузка проектов из JSON{% endblock %}
+
+{% block body %}
+    {% include 'partials/_page_header.html.twig' with {title: 'Загрузка проектов из JSON'} only %}
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                {{ form_start(form) }}
+                {{ form_errors(form) }}
+                {{ form_row(form.file) }}
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-primary">Предпросмотр</button>
+                    <a href="{{ path('project_direction_index') }}" class="btn btn-outline-secondary">К списку проектов</a>
+                </div>
+                {{ form_end(form) }}
+
+                {% if preview and preview.errors %}
+                    <div class="alert alert-danger mt-3 mb-0" role="alert">
+                        <ul class="mb-0 ps-3">
+                            {% for error in preview.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% elseif previewId %}
+                    <div class="mt-3">
+                        <ul class="list-unstyled">
+                            <li>Новых проектов: {{ preview.created }}</li>
+                            <li>Изменённых проектов: {{ preview.updated }}</li>
+                            <li>Без изменений: {{ preview.unchanged }}</li>
+                        </ul>
+                        <form method="post" action="{{ path('project_direction_import_confirm') }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token('project_direction_import_confirm') }}">
+                            <input type="hidden" name="previewId" value="{{ previewId }}">
+                            <button type="submit" class="btn btn-success">Подтвердить загрузку</button>
+                        </form>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

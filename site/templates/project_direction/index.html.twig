@@ -6,37 +6,47 @@
     <div class="container-xl mt-3">
         <div class="card">
             <div class="card-body">
-                <div class="mb-3 text-end">
+                <div class="mb-3 d-flex flex-wrap gap-2 justify-content-end">
+                    {% if is_granted('module.finance.read') %}
+                        <a href="{{ path('project_direction_export') }}" class="btn btn-outline-primary">Выгрузить JSON</a>
+                    {% endif %}
+                    {% if is_granted('module.finance.write') %}
+                        <a href="{{ path('project_direction_import') }}" class="btn btn-outline-primary">Загрузить JSON</a>
+                    {% endif %}
                     <a href="{{ path('project_direction_new') }}" class="btn btn-success">+ Добавить</a>
                 </div>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Наименование</th>
-                            <th>Сортировка</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for item in items %}
-                        <tr>
-                            <td>{{ item.indentedName }}</td>
-                            <td>{{ item.sort }}</td>
-                            <td class="text-end">
-                                <a href="{{ path('project_direction_edit', {id: item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
-                                <button type="button" class="btn btn-sm btn-danger"
-                                        data-bs-toggle="modal" data-bs-target="#project-direction-confirm"
-                                        data-confirm-action="{{ path('project_direction_delete', {id: item.id}) }}"
-                                        data-confirm-token="{{ csrf_token('delete' ~ item.id) }}"
-                                        data-confirm-title="Удалить направление?"
-                                        data-confirm-submit="Удалить" data-confirm-variant="danger">🗑</button>
-                            </td>
-                        </tr>
-                    {% else %}
-                        <tr><td colspan="3" class="text-center">Нет данных</td></tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Наименование</th>
+                                <th>Сортировка</th>
+                                <th>Код</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for item in items %}
+                            <tr>
+                                <td>{{ item.indentedName }}</td>
+                                <td>{{ item.sort }}</td>
+                                <td>{{ item.code ?? '—' }}</td>
+                                <td class="text-end">
+                                    <a href="{{ path('project_direction_edit', {id: item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
+                                    <button type="button" class="btn btn-sm btn-danger"
+                                            data-bs-toggle="modal" data-bs-target="#project-direction-confirm"
+                                            data-confirm-action="{{ path('project_direction_delete', {id: item.id}) }}"
+                                            data-confirm-token="{{ csrf_token('delete' ~ item.id) }}"
+                                            data-confirm-title="Удалить направление?"
+                                            data-confirm-submit="Удалить" data-confirm-variant="danger">🗑</button>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="4" class="text-center">Нет данных</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

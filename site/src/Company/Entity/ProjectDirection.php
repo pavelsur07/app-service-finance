@@ -8,16 +8,23 @@ use App\Company\Repository\ProjectDirectionRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as AssertField;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: ProjectDirectionRepository::class)]
 #[ORM\Table(name: 'project_directions')]
 #[ORM\Index(name: 'idx_project_directions_parent', columns: ['parent_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_project_direction_company_system_code', columns: ['company_id', 'system_code'])]
+#[ORM\UniqueConstraint(name: 'uniq_project_direction_company_code', columns: ['company_id', 'code'])]
 #[ORM\HasLifecycleCallbacks]
 class ProjectDirection
 {
     public const CODE_GENERAL = 'PROJECT_GENERAL';
+    public const CODE_LENGTH = 15;
+    public const CODE_PATTERN = '/\A[A-Z][A-Z0-9_]{0,14}\z/';
+    public const DESCRIPTION_LENGTH = 300;
+    public const MIN_SORT = -2147483648;
+    public const MAX_SORT = 2147483647;
 
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
@@ -28,9 +35,22 @@ class ProjectDirection
     private Company $company;
 
     #[ORM\Column(length: 255)]
+    #[AssertField\NotBlank(message: 'Укажите наименование проекта.')]
+    #[AssertField\Length(max: 255)]
+    #[AssertField\Regex(pattern: '/\x00/', match: false, message: 'Наименование содержит недопустимый символ.')]
     private string $name;
 
+    #[ORM\Column(length: self::CODE_LENGTH, nullable: true)]
+    #[AssertField\Regex(pattern: self::CODE_PATTERN, message: 'Код должен начинаться с латинской буквы и содержать до 15 латинских букв, цифр или знаков подчёркивания.')]
+    private ?string $code = null;
+
+    #[ORM\Column(length: self::DESCRIPTION_LENGTH, nullable: true)]
+    #[AssertField\Length(max: self::DESCRIPTION_LENGTH, maxMessage: 'Описание должно содержать до {{ limit }} символов.')]
+    #[AssertField\Regex(pattern: '/\x00/', match: false, message: 'Описание содержит недопустимый символ.')]
+    private ?string $description = null;
+
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    #[AssertField\Range(min: self::MIN_SORT, max: self::MAX_SORT)]
     private int $sort = 0;
 
     #[ORM\Column(length: 64, nullable: true)]
@@ -91,6 +111,47 @@ class ProjectDirection
     public function getSort(): int
     {
         return $this->sort;
+    }
+
+    public function getCode(): ?string
+    {
+        return $this->code;
+    }
+
+    public function setCode(?string $code): self
+    {
+        $this->code = self::normalizeCode($code);
+
+        return $this;
+    }
+
+    public static function normalizeCode(?string $code): ?string
+    {
+        $code = trim($code ?? '', " \t\n\r\v\f");
+
+        return '' === $code ? null : strtoupper($code);
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function setDescription(?string $description): self
+    {
+        $this->description = null === $description ? null : self::normalizeDescriptionNewlines($description);
+
+        return $this;
+    }
+
+    public static function normalizeDescription(?string $description): ?string
+    {
+        return '' === trim($description ?? '', " \t\n\r\v\f") ? null : $description;
+    }
+
+    public static function normalizeDescriptionNewlines(string $description): string
+    {
+        return str_replace(["\r\n", "\r"], "\n", $description);
     }
 
     public function getSystemCode(): ?string
