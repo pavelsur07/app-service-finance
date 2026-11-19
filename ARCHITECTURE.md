@@ -702,22 +702,25 @@
 Модуль задачи `docs/tasks/marketplace-funnel` (этап 5).
 
 **Устав.** Причина изменений — ступени воронки маркетплейсов (показы, переходы в карточку, корзины,
-заказы, выкупы). Модуль переводит факты `ozon.analytics.funnel` и `wb.analytics.funnel` из `SourceFacts`
+заказы, выкупы). Модуль переводит факты `ozon.analytics.funnel`, `wb.analytics.funnel` и `wb.analytics.search` из `SourceFacts`
 в дневную таблицу. В модуле не должно быть: денег канона, статей ОПиУ, экономики SKU, листингов,
 обращений к API маркетплейсов. Зависимости — фасады `SourceFacts` и `Marketplace` (названия листингов) (гейт
 `ModuleBoundaryRules::test_marketplace_funnel_stays_out_of_money_and_legacy`).
 
 | Таблица | Что | Ключ |
 |---|---|---|
-| `mfn_day` | переведённый день кабинета: `channel`, ревизия фактов, версия правил, `available` (false — маркетплейс не отдал день по тарифу: «нет данных»), `row_count`, `control_sum` (Σ всех ступеней строк дня) | `(company_id, channel, connection_ref, operation_date)` |
-| `mfn_row` | воронка товара за день: `marketplace_sku` (SKU Ozon, nmId WB), `source` (`total`), `impressions`, `impressions_search`, `card_views`, `cart_adds`, `orders`, `revenue_minor`, `buyouts`, `cancels`, `returns`; ступень без данных — NULL | `(company_id, channel, connection_ref, operation_date, marketplace_sku, source)` |
+| `mfn_day` | переведённый день источника кабинета: `channel`, `source`, ревизия фактов, версия правил, `available` (false — маркетплейс не отдал день по тарифу: «нет данных»), `row_count`, `control_sum` (Σ всех ступеней строк дня) | `(company_id, channel, connection_ref, operation_date, source)` |
+| `mfn_row` | воронка товара за день: `marketplace_sku` (SKU Ozon, nmId WB), `source` (`total` — вся воронка, `search` — переходы из поиска WB; `search` — часть `total`, не слагаемое), `impressions`, `impressions_search`, `card_views`, `cart_adds`, `orders`, `revenue_minor`, `buyouts`, `cancels`, `returns`; ступень без данных — NULL | `(company_id, channel, connection_ref, operation_date, marketplace_sku, source)` |
 
 - Ozon — `OzonFunnelTranslator`: метрики по порядку запроса сервиса (`ozon.FunnelMetrics`, 14 штук);
   другое число метрик — день не переводится. Запись `ozon:analytics.funnel:unavailable` — день без строк,
   `available = false`.
 - WB — `WbFunnelTranslator`: `statistic.selected`; ступень без поля — NULL; общих показов и возвратов нет (NULL), первая ступень —
   `card_views` (`openCount`).
-- `app:marketplace-funnel:translate` (cron `9-59/15`) — точка входа и владелец транзакций: день — одна
+- Поиск WB — `WbSearchTranslator`: источник `search`, ступени `card_views` (`openCard`), `cart_adds`
+  (`addToCart`), `orders`; остальные — NULL. Запись `wb:analytics.search:unavailable` (нет подписки «Джем») —
+  день без строк, `available = false`. Видимость и средняя позиция остаются в фактах.
+- `app:marketplace-funnel:translate` (cron `9-59/15`) — точка входа и владелец транзакций: день источника — одна
   транзакция, замена целиком под `pg_advisory_xact_lock` дня (`FunnelStore::replaceDay`). Переводится день
   с новой ревизией фактов или другой версией правил (`FunnelRow::RULES_VERSION`). Все кабинеты с фактами.
 - Гейт `app:marketplace-funnel:health-check` (cron 09:43 МСК): день с фактами не переведён; строки
@@ -727,6 +730,8 @@
   `FunnelReportQuery` (всегда с `companyId`) суммирует ступени по товарам за период, `FunnelReportBuilder`
   подставляет названия листингов (`Marketplace\Facade`), считает итог и сортирует. Ступень без данных —
   «нет данных», не ноль; дни `available = false` показаны числом в пояснении.
+  Фильтр `source` (`FunnelReport::SOURCES`) выбирает источник строк и дней; виден компании, у которой
+  есть дни поиска. Источники не складываются: без фильтра — только `total`.
 
 ### MarketplaceEconomics: витрина экономики SKU
 
@@ -6056,6 +6061,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.220 | 2026-11-19 | MarketplaceFunnel: поиск WB — факты `wb.analytics.search` (`WbSearchTranslator`), источник `search` в `mfn_row`, `mfn_day.source` в ключе (`Version20261119120000`), фильтр «Источник» на экране R9; ServiceGateway: `wb.analytics.search` — ежедневный ресурс покрытия и ресурс фактов `wb-fetcher`; задача `marketplace-funnel`, этап 3, часть 2 |
 | 2.219 | 2026-11-18 | Marketplace / ServiceGateway: ресурс поиска по карточкам WB `wb.analytics.search` в `WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES`, строка «Поиск по карточкам» в покрытии; только сырьё, фактами не публикуется; задача `marketplace-funnel`, этап 3 |
 | 2.218 | 2026-11-18 | MarketplaceFunnel: экран R9 «Воронка продаж» `/marketplace/funnel` (товар × ступени, конверсии, xlsx), модуль в карте доступа `ModuleAccessMap`, пункт меню; задача `marketplace-funnel`, этап 6 |
 | 2.217 | 2026-11-18 | MarketplaceFunnel: новый модуль — таблица воронки продаж (`mfn_day`, `mfn_row`, `Version20261118120000`), `app:marketplace-funnel:translate` (`9-59/15`) и гейт `app:marketplace-funnel:health-check` (09:43); сервисы публикуют фактами `ozon.analytics.funnel` и `wb.analytics.funnel`; задача `marketplace-funnel`, этап 5 |

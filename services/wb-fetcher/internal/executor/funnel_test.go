@@ -106,3 +106,44 @@ func TestFunnelNeedsResourceAndDoesNotResumeCabinet(t *testing.T) {
 	e := New(DefaultConfig(), &fakeTasks{}, &fakeRaw{}, &fakeReport{}, noRefresh{}, slog.Default(), time.Now, nil)
 	assert.False(t, e.ResumesConnection(ResourceFunnel))
 }
+
+func TestSearchRefusalByTariffIsDoneDayWithServicePage(t *testing.T) {
+	c := funnelCab
+	c.ResourceTypes = []string{ResourceDaily, ResourceSearch}
+	tk := funnelTask("")
+	tk.ResourceType = ResourceSearch
+	// 403 без «Джема»: класс auth не должен ставить задачу на паузу.
+	refusal := &apierr.APIError{Source: wb.Source, Class: apierr.ClassAuth, Endpoint: wb.EndpointSearch, Status: 403}
+
+	res, h := runFunnel(t, &fakeFunnel{err: refusal}, tk, c)
+
+	assert.Equal(t, "done", res.Outcome, "нет подписки — день пройден, не ошибка и не повтор")
+	require.Len(t, h.raw.bodies, 1)
+	assert.JSONEq(t, `{"schema":"wb-search-daily-v1","unavailable":true,"status":403}`, h.raw.bodies[0])
+	assert.NotContains(t, h.logs.String(), `"level":"ERROR"`)
+	assert.NotContains(t, h.logs.String(), `"level":"WARN"`)
+
+	// Перечитывание без подписки — то же содержимое, новой ревизии нет.
+	tk.ContentHash = fetch.ContentHash([]string{fetch.SHA256Hex(wb.SearchUnavailablePage(403))})
+	res, _ = runFunnel(t, &fakeFunnel{err: refusal}, tk, c)
+	assert.Equal(t, "unchanged", res.Outcome)
+
+	// Подписка закончилась: загруженный день служебной страницей не затирается.
+	tk.ContentHash = fetch.ContentHash([]string{fetch.SHA256Hex([]byte(`{"schema":"wb-search-daily-v1","products":[]}`))})
+	res, h = runFunnel(t, &fakeFunnel{err: refusal}, tk, c)
+	assert.Equal(t, "search_refused", res.Outcome)
+	assert.Equal(t, store.StatusFailedPermanent, h.tasks.finished[0].Status)
+	assert.Empty(t, h.raw.keys)
+
+	// Неверный запрос — не тариф: конечная ошибка.
+	bad := &apierr.APIError{Source: wb.Source, Class: apierr.ClassInvalidRequest, Endpoint: wb.EndpointSearch, Status: 400}
+	_, h = runFunnel(t, &fakeFunnel{err: bad}, funnelSearchTask(), c)
+	assert.Equal(t, store.StatusFailedPermanent, h.tasks.finished[0].Status)
+	assert.Empty(t, h.raw.keys)
+}
+
+func funnelSearchTask() store.Task {
+	tk := funnelTask("")
+	tk.ResourceType = ResourceSearch
+	return tk
+}

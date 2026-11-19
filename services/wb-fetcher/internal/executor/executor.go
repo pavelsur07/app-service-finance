@@ -39,7 +39,8 @@ func ownAccess(resource string) bool {
 }
 
 // ResourceSearch — поиск по карточкам за день МСК (одна страница): видимость,
-// позиция, переходы, корзины и заказы из поиска; у WB — только с «Джемом».
+// позиция, переходы, корзины и заказы из поиска; у WB — только с «Джемом»,
+// без него день — служебная страница wb.SearchUnavailablePage.
 const ResourceSearch = "wb.analytics.search"
 
 // FunnelSource — день воронки (wb.Analytics).
@@ -58,6 +59,14 @@ type AdsSource interface {
 const DefaultMaxPages = 250
 
 var errTooManyPages = errors.New("executor: page limit exceeded")
+
+// errSearchRefused — WB отказал в поиске дню, у которого уже есть ревизия с
+// данными (подписка закончилась): данные не затираются служебной страницей.
+var errSearchRefused = errors.New("executor: wb refused search for a day that already has data")
+
+func unavailableHash(status int) string {
+	return fetch.ContentHash([]string{fetch.SHA256Hex(wb.SearchUnavailablePage(status))})
+}
 
 // Report — страница отчёта (wb.Client).
 type Report interface {
@@ -152,6 +161,12 @@ func (e *Executor) Fetch(ctx context.Context, run *fetch.Run, cab connections.Ca
 	if resource == ResourceSearch && e.funnel != nil {
 		return e.dayPage(ctx, run, cab, func(day string) ([]byte, slog.Attr, error) {
 			page, err := e.funnel.SearchDay(ctx, cab.Ref, cab.Token.Reveal(), day)
+			if status := wb.SearchUnavailable(err); status != 0 {
+				if h := run.Task.ContentHash; h != "" && h != unavailableHash(http.StatusPaymentRequired) && h != unavailableHash(http.StatusForbidden) {
+					return nil, slog.Attr{}, errSearchRefused
+				}
+				return wb.SearchUnavailablePage(status), slog.Int("unavailable_status", status), nil
+			}
 			return page.Body, slog.Int("products", page.Products), err
 		})
 	}
@@ -271,6 +286,8 @@ func (e *Executor) Classify(c *fetch.Classification) (store.Outcome, bool) {
 			c.Log.Error("wb api rejected cabinet token again, ads task paused", slog.String("stage", "fetch"))
 		}
 		return store.Outcome{Status: store.StatusPending, Label: string(apierr.ClassAuth), ErrorClass: string(apierr.ClassAuth), NextRunAt: c.Now.Add(pause)}, true
+	case errors.Is(c.Err, errSearchRefused):
+		return store.Outcome{Status: store.StatusFailedPermanent, Label: "search_refused", ErrorClass: "search_refused", NextRunAt: c.Now}, true
 	case errors.Is(c.Err, errTooManyPages):
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "too_many_pages", ErrorClass: "too_many_pages", NextRunAt: c.Now}, true
 	}

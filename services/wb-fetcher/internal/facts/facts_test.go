@@ -87,3 +87,28 @@ func TestSplitFunnelCardPerNmID(t *testing.T) {
 		require.Error(t, err, page)
 	}
 }
+
+func TestSplitSearchCardPerNmIDAndUnavailableDay(t *testing.T) {
+	records, err := Split(ResourceSearch, []byte(`{"schema":"wb-search-daily-v1","currency":"RUB","products":[
+		{"nmId":7,"name":"x","rating":4.5,"openCard":{"current":3,"dynamics":50},"addToCart":{"current":2},"orders":{"current":1,"dynamics":0},
+		 "visibility":{"current":12},"avgPosition":{"current":40}},
+		{"nmId":9,"openCard":{"current":5}}]}`))
+	require.NoError(t, err)
+	require.Len(t, records, 2)
+	assert.Equal(t, "wb:analytics.search:7", records[0].SourceKey)
+	assert.JSONEq(t, `{"nmId":7,"openCard":3,"addToCart":2,"orders":1,"visibility":12,"avgPosition":40}`, string(records[0].Payload),
+		"только значения дня: динамика, рейтинг и название меняются без изменения дня")
+	assert.JSONEq(t, `{"nmId":9,"openCard":5,"addToCart":null,"orders":null,"visibility":null,"avgPosition":null}`, string(records[1].Payload))
+
+	skipped, err := Split(ResourceSearch, []byte(`{"schema":"wb-search-daily-v1","unavailable":true,"status":403}`))
+	require.NoError(t, err)
+	require.Len(t, skipped, 1)
+	assert.Equal(t, SearchUnavailableKey, skipped[0].SourceKey)
+	assert.JSONEq(t, `{"unavailable":true,"status":403}`, string(skipped[0].Payload))
+
+	for _, page := range []string{`{"schema":"v0","products":[]}`, `{"schema":"wb-search-daily-v1","products":[{"openCard":{}}]}`} {
+		_, err := Split(ResourceSearch, []byte(page))
+		require.Error(t, err, page)
+	}
+	assert.Contains(t, Resources, ResourceSearch)
+}

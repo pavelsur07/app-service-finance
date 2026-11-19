@@ -76,11 +76,15 @@ func (f *fakeTasks) RecordAuthFailure(context.Context, string, time.Time, func(i
 func (f *fakeTasks) ResumeConnection(context.Context, string) error     { return nil }
 func (f *fakeTasks) StopResource(context.Context, string, string) error { return nil }
 
-type fakeRaw struct{ keys []string }
+type fakeRaw struct {
+	keys   []string
+	bodies []string
+}
 
 func (f *fakeRaw) Put(_ context.Context, o rawstore.Object) (rawstore.Stored, error) {
 	k := rawstore.Key(o, strings.Repeat("a", 64))
 	f.keys = append(f.keys, k)
+	f.bodies = append(f.bodies, string(o.Body))
 	return rawstore.Stored{URI: "s3://b/" + k, Key: k}, nil
 }
 

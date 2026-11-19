@@ -7,6 +7,7 @@ namespace App\MarketplaceFunnel\Command;
 use App\MarketplaceFunnel\Domain\FunnelRow;
 use App\MarketplaceFunnel\Domain\OzonFunnelTranslator;
 use App\MarketplaceFunnel\Domain\WbFunnelTranslator;
+use App\MarketplaceFunnel\Domain\WbSearchTranslator;
 use App\MarketplaceFunnel\Infrastructure\Query\FunnelStore;
 use App\SourceFacts\Application\DTO\SourcePeriod;
 use App\SourceFacts\Facade\SourceFactsFacadeInterface;
@@ -20,7 +21,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Перевод фактов воронки Ozon и WB в таблицу `mfn_row` (cron каждые 15 минут, после `app:source-facts:pull`).
+ * Перевод фактов воронки Ozon и WB и поиска WB в таблицу `mfn_row` (cron каждые 15 минут, после `app:source-facts:pull`).
  *
  * День переводится, если у его фактов новая ревизия или сменилась версия правил. День — одна транзакция
  * и замена целиком; запись другой формы — день не переводится (в конце один `error`), остальные идут.
@@ -30,8 +31,12 @@ final class TranslateFunnelCommand extends Command
 {
     use LockableTrait;
 
-    /** ресурс фактов → канал */
-    public const RESOURCES = [OzonFunnelTranslator::RESOURCE => OzonFunnelTranslator::CHANNEL, WbFunnelTranslator::RESOURCE => WbFunnelTranslator::CHANNEL];
+    /** ресурс фактов → [канал, источник переходов] */
+    public const RESOURCES = [
+        OzonFunnelTranslator::RESOURCE => [OzonFunnelTranslator::CHANNEL, FunnelStore::SOURCE_TOTAL],
+        WbFunnelTranslator::RESOURCE => [WbFunnelTranslator::CHANNEL, FunnelStore::SOURCE_TOTAL],
+        WbSearchTranslator::RESOURCE => [WbSearchTranslator::CHANNEL, WbSearchTranslator::SOURCE],
+    ];
 
     public function __construct(
         private readonly SourceFactsFacadeInterface $sourceFacts,
@@ -61,10 +66,10 @@ final class TranslateFunnelCommand extends Command
             $total = $done = $rows = 0;
             $failed = [];
             // Предел — на ресурс: дни одного маркетплейса, которые не переводятся, не задерживают другой.
-            foreach (self::RESOURCES as $resource => $channel) {
+            foreach (self::RESOURCES as $resource => [$channel, $source]) {
                 $due = [];
                 foreach ($this->sourceFacts->periods($resource) as $period) {
-                    $state = $states[FunnelStore::dayKey($period->companyId, $channel, $period->connectionRef, $period->periodKey)] ?? null;
+                    $state = $states[FunnelStore::dayKey($period->companyId, $channel, $period->connectionRef, $period->periodKey, $source)] ?? null;
                     if (null === $state || $state['revision'] !== $period->revision || FunnelRow::RULES_VERSION !== $state['rules']) {
                         $due[] = $period;
                     }
@@ -101,13 +106,19 @@ final class TranslateFunnelCommand extends Command
         $rows = [];
         $available = true;
         foreach ($this->sourceFacts->activeFacts($period->companyId, $period->connectionRef, $resource, $period->periodKey) as $fact) {
-            if (OzonFunnelTranslator::UNAVAILABLE_KEY === $fact->sourceKey) {
+            if (\in_array($fact->sourceKey, [OzonFunnelTranslator::UNAVAILABLE_KEY, WbSearchTranslator::UNAVAILABLE_KEY], true)) {
                 $available = false;
                 continue;
             }
-            $rows[] = OzonFunnelTranslator::RESOURCE === $resource ? OzonFunnelTranslator::translate($fact->payload) : WbFunnelTranslator::translate($fact->payload);
+            $rows[] = match ($resource) {
+                OzonFunnelTranslator::RESOURCE => OzonFunnelTranslator::translate($fact->payload),
+                WbFunnelTranslator::RESOURCE => WbFunnelTranslator::translate($fact->payload),
+                WbSearchTranslator::RESOURCE => WbSearchTranslator::translate($fact->payload),
+                default => throw new \LogicException('no funnel translator for '.$resource),
+            };
         }
-        $this->store->replaceDay($period->companyId, $period->connectionRef, self::RESOURCES[$resource], $period->periodKey, $period->revision, $available, $rows);
+        [$channel, $source] = self::RESOURCES[$resource];
+        $this->store->replaceDay($period->companyId, $period->connectionRef, $channel, $source, $period->periodKey, $period->revision, $available, $rows);
 
         return \count($rows);
     }

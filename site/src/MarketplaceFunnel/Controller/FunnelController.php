@@ -46,6 +46,7 @@ final class FunnelController extends AbstractController
             'from' => (string) $query->get('from', $today->modify('-30 days')->format('Y-m-d')),
             'to' => (string) $query->get('to', $today->modify('-1 day')->format('Y-m-d')),
             'channel' => (string) $query->get('channel', ''),
+            'source' => (string) $query->get('source', 'total'),
             'search' => trim((string) $query->get('q', '')),
             'sort' => \in_array($query->get('sort'), FunnelRow::COLUMNS, true) ? (string) $query->get('sort') : 'orders',
             'desc' => 'asc' !== $query->get('dir'),
@@ -55,7 +56,7 @@ final class FunnelController extends AbstractController
         ];
 
         try {
-            $report = $this->reports->build($companyId, $this->date($view['from']), $this->date($view['to']), '' === $view['channel'] ? null : $view['channel'], $view['search'], $view['sort'], $view['desc']);
+            $report = $this->reports->build($companyId, $this->date($view['from']), $this->date($view['to']), '' === $view['channel'] ? null : $view['channel'], $view['search'], $view['sort'], $view['desc'], $view['source']);
             if ('xlsx' === $query->get('format')) {
                 return $this->exporter->response($report);
             }
