@@ -7,6 +7,7 @@ namespace App\Cash\Repository\Transaction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
@@ -168,6 +169,30 @@ class CashflowCategoryRepository extends ServiceEntityRepository
         }
 
         return $placements;
+    }
+
+    /**
+     * Какие из id заняты статьями других компаний: такой id в файле загрузки — отказ, а не новая статья.
+     *
+     * @param list<string> $ids
+     *
+     * @return list<string>
+     */
+    public function findIdsOutsideCompany(string $companyId, array $ids): array
+    {
+        Assert::uuid($companyId);
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<string> $taken */
+        $taken = $this->getEntityManager()->getConnection()->fetchFirstColumn(
+            'SELECT id::text FROM "cashflow_categories" WHERE id IN (:ids) AND company_id <> :companyId',
+            ['ids' => $ids, 'companyId' => $companyId],
+            ['ids' => ArrayParameterType::STRING],
+        );
+
+        return $taken;
     }
 
     /** Только блокировка дерева компании (см. lockTreePlacements()); внутри транзакции вызывающего. */
