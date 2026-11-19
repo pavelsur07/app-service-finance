@@ -11,10 +11,11 @@ use Ramsey\Uuid\Uuid;
 /** @phpstan-import-type ProjectRow from ProjectDirectionRepository */
 final readonly class ProjectDirectionExchange
 {
-    public const MAX_FILE_BYTES = 8 * 1024 * 1024;
-    public const FILE_SIZE_MESSAGE = 'Размер файла JSON не должен превышать 8 МиБ.';
-
     private const VERSION = 1;
+    // Даже минимальная строка проекта занимает больше 100 байт и содержит 5 запятых.
+    private const MAX_JSON_CONTAINERS = 350_000;
+    private const MAX_JSON_SEPARATORS = 2_250_000;
+    private const JSON_SKIP_STRINGS = '"(?:[^"\\\\]++|\\\\.)*+"(*SKIP)(*F)';
     private const MAX_ERRORS = 100;
     private const REQUIRED_FIELDS = ['id', 'name', 'code', 'description', 'sort', 'parentId'];
 
@@ -49,17 +50,27 @@ final readonly class ProjectDirectionExchange
     /** @phpstan-impure */
     public function preview(string $companyId, string $json): ProjectDirectionImportPreview
     {
+        // Ограничения учитывают компактные выгрузки в пределах 32 МиБ.
+        if ($this->exceedsJsonBudget($json, '[{\[]', self::MAX_JSON_CONTAINERS)
+            || $this->exceedsJsonBudget($json, ',', self::MAX_JSON_SEPARATORS)
+        ) {
+            return new ProjectDirectionImportPreview(null, errors: ['JSON содержит слишком много элементов для предпросмотра.']);
+        }
         $snapshot = $this->repository->readDirectory($companyId);
 
         return $this->validate($companyId, $json, $snapshot['revision'], $snapshot['projects']);
     }
 
+    private function exceedsJsonBudget(string $json, string $tokenPattern, int $limit): bool
+    {
+        $count = preg_match_all('~'.self::JSON_SKIP_STRINGS.'|'.$tokenPattern.'~s', $json);
+
+        return false === $count || $count > $limit;
+    }
+
     /** @param array<string, ProjectRow> $current */
     public function validate(string $companyId, string $json, ?string $revision, array $current): ProjectDirectionImportPreview
     {
-        if (\strlen($json) > self::MAX_FILE_BYTES) {
-            return new ProjectDirectionImportPreview($revision, errors: [self::FILE_SIZE_MESSAGE]);
-        }
         try {
             $file = json_decode($json, depth: 4, flags: \JSON_THROW_ON_ERROR);
         } catch (\JsonException) {

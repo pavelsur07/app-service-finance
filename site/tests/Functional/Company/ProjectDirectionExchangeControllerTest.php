@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Company;
 
-use App\Company\Application\ProjectDirection\ProjectDirectionExchange;
 use App\Company\Application\Service\CompanyOwnerMembershipCreator;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyMember;
@@ -99,19 +98,65 @@ final class ProjectDirectionExchangeControllerTest extends WebTestCaseBase
         self::assertSame($before, $this->export($client));
     }
 
-    public function testPreviewRejectsAnOversizeFileBeforeParsing(): void
+    public function testPreviewRejectsTooManyContainersBeforeParsing(): void
     {
         $client = static::createClient();
         $owner = $this->createUser(860);
         $company = $this->createCompany($owner);
         $this->login($client, $owner, $company);
-        $json = $this->json($company, [$this->row()]);
-        $preview = $this->preview($client, str_pad($json, ProjectDirectionExchange::MAX_FILE_BYTES + 1));
+        $json = sprintf('{"version":1,"companyId":"%s","projects":[%s{}]}', $company->getId(), str_repeat('{"x":0},', 350_000));
+        $preview = $this->preview($client, $json);
 
         self::assertResponseStatusCodeSame(422);
-        self::assertSelectorTextContains('body', 'Размер файла JSON не должен превышать 8 МиБ.');
+        self::assertSelectorTextContains('body', 'JSON содержит слишком много элементов для предпросмотра.');
         self::assertCount(0, $preview->selectButton('Подтвердить загрузку'));
         self::assertCount(1, $this->export($client)['projects']);
+    }
+
+    public function testPreviewRejectsExcessivelyWideJsonBeforeReadingRows(): void
+    {
+        $client = static::createClient();
+        $owner = $this->createUser(862);
+        $company = $this->createCompany($owner);
+        $this->login($client, $owner, $company);
+        $json = sprintf('{"version":1,"companyId":"%s","projects":[%s0]}', $company->getId(), str_repeat('0,', 2_250_000));
+        $preview = $this->preview($client, $json);
+
+        self::assertSame(422, $client->getResponse()->getStatusCode());
+        self::assertStringContainsString('JSON содержит слишком много элементов для предпросмотра.', $preview->filter('body')->text());
+        self::assertCount(0, $preview->selectButton('Подтвердить загрузку'));
+    }
+
+    public function testLargeExportCanBeUploadedAgain(): void
+    {
+        $client = static::createClient();
+        $owner = $this->createUser(861);
+        $company = $this->createCompany($owner);
+        $this->login($client, $owner, $company);
+        $rows = [];
+        $description = str_repeat('🟢', 300);
+        for ($i = 1; $i <= 8000; ++$i) {
+            $rows[] = array_replace($this->row(), [
+                'id' => sprintf('019abcdf-0000-7000-8000-%012d', $i),
+                'code' => null,
+                'description' => $description,
+            ]);
+        }
+        $json = $this->json($company, $rows);
+        $preview = $this->preview($client, $json);
+        self::assertSame(200, $client->getResponse()->getStatusCode());
+        $client->submit($preview->selectButton('Подтвердить загрузку')->form());
+        self::assertResponseRedirects(self::INDEX);
+
+        $client->request('GET', self::EXPORT);
+        self::assertResponseIsSuccessful();
+        $exportedJson = (string) $client->getResponse()->getContent();
+        self::assertGreaterThan(8 * 1024 * 1024, \strlen($exportedJson));
+        $preview = $this->preview($client, $exportedJson);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Без изменений: 8001');
+        $client->submit($preview->selectButton('Подтвердить загрузку')->form());
+        self::assertResponseRedirects(self::INDEX);
     }
 
     public function testReadOnlyMemberCanExportButCannotImport(): void
@@ -318,7 +363,7 @@ final class ProjectDirectionExchangeControllerTest extends WebTestCaseBase
     /** @param list<array<string, mixed>> $projects */
     private function json(Company $company, array $projects): string
     {
-        return json_encode(['version' => 1, 'companyId' => $company->getId(), 'projects' => $projects], \JSON_THROW_ON_ERROR);
+        return json_encode(['version' => 1, 'companyId' => $company->getId(), 'projects' => $projects], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
     }
 
     /** @return array{id: string, name: string, code: string, description: null, sort: int, parentId: null} */
