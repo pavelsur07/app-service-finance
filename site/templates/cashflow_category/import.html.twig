@@ -1,0 +1,109 @@
+{% extends 'base.html.twig' %}
+{% block title %}Загрузка статей ДДС из JSON{% endblock %}
+
+{% block body %}
+    {% embed 'partials/_page_header.html.twig' with {title: 'Загрузка статей ДДС из JSON'} %}
+        {% block actions %}
+            <a href="{{ path('cashflow_category_index') }}" class="btn btn-outline-secondary">К статьям ДДС</a>
+        {% endblock %}
+    {% endembed %}
+    <div class="container-xl mt-3">
+        <div class="card mb-3">
+            <div class="card-body">
+                <p class="text-secondary">
+                    Выгрузите дерево («JSON → Выгрузить JSON»), измените файл и загрузите его сюда.
+                    Статья с <code>id</code> обновляется, без <code>id</code> — создаётся. Родителя задаёт вложенность <code>children</code>.
+                    Статьи, которых нет в файле, не меняются и не удаляются. До кнопки «Применить» ничего не записывается.
+                </p>
+                <form method="post" action="{{ path('cashflow_category_import') }}" enctype="multipart/form-data" class="row g-2 align-items-end" data-test="import-upload">
+                    <input type="hidden" name="_token" value="{{ csrf_token('cashflow-category-import' ~ companyId) }}">
+                    <div class="col-auto">
+                        <label class="form-label" for="import_file">Файл выгрузки (JSON, до 1 МБ)</label>
+                        <input type="file" class="form-control" id="import_file" name="import_file" accept="application/json,.json" required>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary">Показать предпросмотр</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if errors is not empty %}
+            <div class="alert alert-danger" role="alert" data-test="import-errors">
+                <div class="fw-bold mb-1">Файл{% if fileName %} {{ fileName }}{% endif %} не загружен — исправьте и загрузите заново:</div>
+                <ul class="mb-0">
+                    {% for error in errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        {% if plan is not null %}
+            {% set created = plan.created %}
+            {% set updated = plan.updated %}
+            <div class="card" data-test="import-preview">
+                <div class="card-header"><h3 class="card-title">Предпросмотр — файл {{ fileName }}</h3></div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-auto">
+                            <div class="text-secondary">Будет добавлено</div>
+                            <div class="h2 mb-0">{{ created|length }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="text-secondary">Будет изменено</div>
+                            <div class="h2 mb-0">{{ updated|length }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="text-secondary">Без изменений</div>
+                            <div class="h2 mb-0">{{ plan.unchangedCount }}</div>
+                        </div>
+                    </div>
+
+                    {% if plan.items is empty %}
+                        <div class="alert alert-secondary mb-0" data-test="import-empty">Изменений нет — файл совпадает с деревом статей.</div>
+                    {% else %}
+                        {% if created is not empty %}
+                            <h4>Добавится</h4>
+                            <ul data-test="import-created">
+                                {% for item in created %}
+                                    <li>{{ item.path }}{% if item.values.code %} <span class="badge bg-secondary-lt">{{ item.values.code }}</span>{% endif %}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                        {% if updated is not empty %}
+                            <h4>Изменится</h4>
+                            <div class="table-responsive mb-3">
+                                <table class="table table-vcenter" data-test="import-updated">
+                                    <thead>
+                                        <tr><th>Статья</th><th>Что меняется</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in updated %}
+                                            <tr>
+                                                <td>{{ item.path }}</td>
+                                                <td>
+                                                    {% for change in item.changes %}
+                                                        <div><span class="text-secondary">{{ change.label }}:</span> {{ change.from }} → {{ change.to }}</div>
+                                                    {% endfor %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endif %}
+                        <form method="post" action="{{ path('cashflow_category_import_apply') }}" data-test="import-apply">
+                            <input type="hidden" name="_token" value="{{ csrf_token('cashflow-category-import-apply' ~ companyId) }}">
+                            <input type="hidden" name="payload" value="{{ payload }}">
+                            <input type="hidden" name="new_ids" value="{{ plan.newIds|join(',') }}">
+                            <input type="hidden" name="fingerprint" value="{{ plan.fingerprint }}">
+                            <button type="submit" class="btn btn-primary">Применить</button>
+                            <a href="{{ path('cashflow_category_import') }}" class="btn btn-link">Отмена</a>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
