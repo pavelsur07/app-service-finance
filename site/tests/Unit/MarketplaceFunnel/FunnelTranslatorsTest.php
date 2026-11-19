@@ -6,11 +6,26 @@ namespace App\Tests\Unit\MarketplaceFunnel;
 
 use App\MarketplaceFunnel\Domain\OzonFunnelTranslator;
 use App\MarketplaceFunnel\Domain\WbFunnelTranslator;
+use App\MarketplaceFunnel\Domain\WbSearchTranslator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class FunnelTranslatorsTest extends TestCase
 {
+    public function testWbSearchCardHasOnlyStagesOfSearch(): void
+    {
+        $row = WbSearchTranslator::translate(['nmId' => 7, 'openCard' => 30, 'addToCart' => 4.0, 'orders' => null, 'visibility' => 12, 'avgPosition' => 40]);
+
+        self::assertSame('7', $row->sku);
+        self::assertSame([
+            'impressions' => null, 'impressions_search' => null, 'card_views' => 30, 'cart_adds' => 4, 'orders' => null,
+            'revenue_minor' => null, 'buyouts' => null, 'cancels' => null, 'returns' => null,
+        ], $row->values, 'видимость и позиция — не ступени воронки; показателя нет — «нет данных»');
+
+        $this->expectException(\DomainException::class);
+        WbSearchTranslator::translate(['openCard' => 30]);
+    }
+
     public function testOzonRowMapsMetricsByRequestOrder(): void
     {
         // порядок ozon.FunnelMetrics: показы поиск/карточка/всего, сессии ×3, корзины поиск/карточка/всего,

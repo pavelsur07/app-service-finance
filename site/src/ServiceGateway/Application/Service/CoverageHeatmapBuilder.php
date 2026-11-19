@@ -76,9 +76,6 @@ final readonly class CoverageHeatmapBuilder
         'wb.analytics.search' => ['Поиск по карточкам', self::STEP_DAY],
     ];
 
-    /** Разовая проверка доступа: ожидаются только дни с задачей, остальные дни — не пропуск. */
-    private const PROBE_RESOURCES = ['wb.analytics.search'];
-
     private const STATUS_LABELS = [
         'running' => 'в работе',
         'pending' => 'в очереди',
@@ -136,7 +133,7 @@ final readonly class CoverageHeatmapBuilder
                     $key = sprintf('%s-%02d', $month->month, $day->day);
                     $isFuture = $key >= $today;
                     $built[] = $this->cell($title, $this->dayLabel($key), $cells[$key] ?? null, $isFuture);
-                    if (!$isFuture && (null === $firstLoaded || $key >= $firstLoaded) && (isset($cells[$key]) || !\in_array($resourceType, self::PROBE_RESOURCES, true))) {
+                    if (!$isFuture && (null === $firstLoaded || $key >= $firstLoaded)) {
                         $periods[] = $cells[$key] ?? null;
                     }
                 }

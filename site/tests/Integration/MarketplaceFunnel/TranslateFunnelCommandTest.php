@@ -8,6 +8,7 @@ use App\MarketplaceFunnel\Command\FunnelHealthCheckCommand;
 use App\MarketplaceFunnel\Command\TranslateFunnelCommand;
 use App\MarketplaceFunnel\Domain\OzonFunnelTranslator;
 use App\MarketplaceFunnel\Domain\WbFunnelTranslator;
+use App\MarketplaceFunnel\Domain\WbSearchTranslator;
 use App\MarketplaceFunnel\Infrastructure\Query\FunnelStore;
 use App\SourceFacts\Facade\SourceFactsFacadeInterface;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -67,6 +68,32 @@ final class TranslateFunnelCommandTest extends IntegrationTestCase
         $this->facts($this->companyId, 'oz-1', OzonFunnelTranslator::RESOURCE, 4, []);
         $this->translate();
         self::assertTrue((bool) $this->connection->fetchOne('SELECT available FROM mfn_day WHERE company_id = ?', [$this->companyId]), 'пустой день — данные есть, продаж нет');
+    }
+
+    public function testSearchDayIsTranslatedNextToTotalDayOfSameCabinet(): void
+    {
+        $this->facts($this->companyId, 'wb-1', WbFunnelTranslator::RESOURCE, 1, ['wb:analytics.funnel:7' => self::wb(7, 40, 3)]);
+        $this->facts($this->companyId, 'wb-1', WbSearchTranslator::RESOURCE, 1, ['wb:analytics.search:7' => ['nmId' => 7, 'openCard' => 25, 'addToCart' => 2, 'orders' => 1, 'visibility' => 9, 'avgPosition' => 31]]);
+        $this->facts($this->companyId, 'wb-2', WbSearchTranslator::RESOURCE, 1, [WbSearchTranslator::UNAVAILABLE_KEY => ['unavailable' => true, 'status' => 403]]);
+
+        self::assertStringContainsString('3 due, 3 translated (2 rows), 0 failed', $this->translate());
+
+        self::assertEquals([
+            ['channel' => 'wildberries', 'marketplace_sku' => '7', 'source' => 'search', 'impressions' => null, 'card_views' => 25, 'orders' => 1],
+            ['channel' => 'wildberries', 'marketplace_sku' => '7', 'source' => 'total', 'impressions' => null, 'card_views' => 40, 'orders' => 3],
+        ], $this->connection->fetchAllAssociative('SELECT channel, marketplace_sku, source, impressions, card_views, orders FROM mfn_row WHERE company_id = ? ORDER BY source', [$this->companyId]));
+        self::assertSame(
+            [['connection_ref' => 'wb-1', 'source' => 'search', 'available' => true], ['connection_ref' => 'wb-1', 'source' => 'total', 'available' => true], ['connection_ref' => 'wb-2', 'source' => 'search', 'available' => false]],
+            $this->connection->fetchAllAssociative('SELECT connection_ref, source, available FROM mfn_day WHERE company_id = ? ORDER BY connection_ref, source', [$this->companyId]),
+            'кабинет без подписки — «нет данных», а не ошибка',
+        );
+        self::assertSame(Command::SUCCESS, $this->healthCheck());
+
+        // Новая ревизия поиска заменяет только строки поиска.
+        $this->facts($this->companyId, 'wb-1', WbSearchTranslator::RESOURCE, 2, []);
+        self::assertStringContainsString('1 due, 1 translated (0 rows)', $this->translate());
+        self::assertSame(['total'], $this->connection->fetchFirstColumn('SELECT source FROM mfn_row WHERE company_id = ?', [$this->companyId]));
+        self::assertSame(Command::SUCCESS, $this->healthCheck());
     }
 
     public function testGateSeesLostRowsUntranslatedDaysAndBrokenFacts(): void

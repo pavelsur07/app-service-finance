@@ -25,7 +25,7 @@ final readonly class FunnelXlsxExporter
         $writer = new Writer();
         $writer->openToFile($path);
         try {
-            $writer->addRow(new Row([new StringCell(sprintf('Воронка · %s – %s', $report->from->format('d.m.Y'), $report->to->format('d.m.Y')), null)]));
+            $writer->addRow(new Row([new StringCell(sprintf('Воронка · %s · %s – %s', FunnelReport::SOURCES[$report->source] ?? $report->source, $report->from->format('d.m.Y'), $report->to->format('d.m.Y')), null)]));
             $writer->addRow(new Row(array_map(static fn (string $h): Cell => new StringCell($h, null), self::HEADER)));
             foreach ([...$report->rows, $report->total] as $row) {
                 $writer->addRow($this->row($row));

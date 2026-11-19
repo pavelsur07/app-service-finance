@@ -25,8 +25,11 @@ final readonly class FunnelReportBuilder
     ) {
     }
 
-    public function build(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $channel, string $search, string $sort, bool $desc): FunnelReport
+    public function build(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $channel, string $search, string $sort, bool $desc, string $source = 'total'): FunnelReport
     {
+        if (!isset(FunnelReport::SOURCES[$source])) {
+            throw new InvalidFunnelFilterException('Неизвестный источник.');
+        }
         if (null !== $channel && !isset(FunnelReport::CHANNELS[$channel])) {
             throw new InvalidFunnelFilterException('Неизвестный маркетплейс.');
         }
@@ -37,7 +40,7 @@ final readonly class FunnelReportBuilder
             throw new InvalidFunnelFilterException(sprintf('Период — не больше %d дней.', self::MAX_DAYS));
         }
 
-        $data = $this->query->bySku($companyId, $from, $to, $channel);
+        $data = $this->query->bySku($companyId, $from, $to, $channel, $source);
         $titles = $this->titles($companyId, $data);
         $needle = mb_strtolower(trim($search));
 
@@ -61,9 +64,9 @@ final readonly class FunnelReportBuilder
         usort($rows, static fn (FunnelReportRow $a, FunnelReportRow $b): int => [null === $a->values[$sort], ($desc ? -1 : 1) * ($a->values[$sort] ?? 0)] <=> [null === $b->values[$sort], ($desc ? -1 : 1) * ($b->values[$sort] ?? 0)]
             ?: strcmp($a->channel.$a->sku, $b->channel.$b->sku));
 
-        $coverage = $this->query->coverage($companyId, $from, $to, $channel);
+        $coverage = $this->query->coverage($companyId, $from, $to, $channel, $source);
 
-        return new FunnelReport($from, $to, $rows, new FunnelReportRow('', 'Итого', null, null, $total), $coverage['channels'], $coverage['days'], $coverage['unavailableDays']);
+        return new FunnelReport($from, $to, $rows, new FunnelReportRow('', 'Итого', null, null, $total), $coverage['channels'], $coverage['days'], $coverage['unavailableDays'], $source, $coverage['sources']);
     }
 
     /**

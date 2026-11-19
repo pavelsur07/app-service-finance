@@ -1,5 +1,13 @@
 # source-fact-envelope — CHANGELOG
 
+## v1.5.0 (2026-11-19) — новый ресурс поиска WB, форма не менялась
+
+- `wb-fetcher` публикует `wb.analytics.search`: запись = карточка в поиске за день
+  (`{"nmId","openCard","addToCart","orders","visibility","avgPosition"}` — значения дня, показателя
+  нет — `null`), ключ `wb:analytics.search:{nmId}`. День, который WB не отдал по тарифу кабинета (нет
+  подписки «Джем»), — одна запись `wb:analytics.search:unavailable` (`{"unavailable":true,"status"}`).
+- Схема envelope не менялась.
+
 ## v1.4.0 (2026-11-18) — новые ресурсы воронки, форма не менялась
 
 - `ozon-fetcher` публикует `ozon.analytics.funnel`: запись = строка SKU дня как в ответе Ozon

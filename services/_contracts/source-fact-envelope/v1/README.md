@@ -3,7 +3,7 @@
 Канал «сервис загрузки → Symfony» для данных, которые сервис загружает
 периодами (начисления дня, отчёт недели). Schema: [schema.json](schema.json),
 примеры — [examples/](examples/), история решений — [CHANGELOG.md](CHANGELOG.md).
-Статус: **действует** с 2026-11-13, ресурсы `ozon.finance.accrual-by-day`, `ozon.ads.statistics` (с 2026-11-14), `wb.finance.sales-report.daily` (с 2026-11-14), `ozon.analytics.funnel` и `wb.analytics.funnel` (с 2026-11-18).
+Статус: **действует** с 2026-11-13, ресурсы `ozon.finance.accrual-by-day`, `ozon.ads.statistics` (с 2026-11-14), `wb.finance.sales-report.daily` (с 2026-11-14), `ozon.analytics.funnel` и `wb.analytics.funnel` (с 2026-11-18), `wb.analytics.search` (с 2026-11-19).
 
 Снимки «на сейчас» (остатки, поставки) идут другим контрактом —
 `service-snapshot` v1 (pull без подтверждения).
@@ -80,6 +80,7 @@ Symfony подтверждает пачку **после** commit примене
 | `wb.ads.daily` | `wb:ads.daily:{advertId}`. `payload` — кампания дня: `{"advertId": "…", "expenses": [строки /adv/v1/upd кампании как есть], "statistics": строка /adv/v3/fullstats кампании как есть или null}`; день без списаний — 0 записей | `YYYY-MM-DD`, день списания (МСК) |
 | `ozon.analytics.funnel` | `ozon:analytics.funnel:{sku}`. `payload` — строка SKU ответа `/v1/analytics/data` как есть: `{"dimensions": [{"id", "name"}], "metrics": [14 чисел]}`, метрики по порядку запроса сервиса (`ozon.FunnelMetrics`, порядок — часть контракта). День, который Ozon не отдал по тарифу кабинета, — одна запись `ozon:analytics.funnel:unavailable` с `payload` `{"subscription_required": true}` | `YYYY-MM-DD`, день МСК |
 | `wb.analytics.funnel` | `wb:analytics.funnel:{nmId}`. `payload` — `{"product": {"nmId"}, "statistic": {"selected": …как в ответе `sales-funnel/products`}}`; остальные поля карточки (остатки, рейтинг, прошлый период) не передаются | `YYYY-MM-DD`, день МСК |
+| `wb.analytics.search` | `wb:analytics.search:{nmId}`. `payload` — `{"nmId", "openCard", "addToCart", "orders", "visibility", "avgPosition"}`: значения дня (`current` ответа `search-report/table/details`), показателя нет — `null`. День без подписки «Джем» — одна запись `wb:analytics.search:unavailable`, `payload` — `{"unavailable": true, "status": 402 \| 403}` | `YYYY-MM-DD`, день МСК |
 
 Ключи остальных ресурсов фиксируются здесь до реализации их публикации.
 

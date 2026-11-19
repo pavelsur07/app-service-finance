@@ -63,11 +63,18 @@ const KindFunnelTail = "wb_funnel_tail"
 // живой проверки метода (docs/tasks/marketplace-funnel/TASK.md, этап 1).
 const FunnelDays = 30
 
-// SearchProbeDay — единственный день поиска: разовая проверка, каким кабинетам
-// WB отдаёт метод (подписка «Джем») и в какой форме отказывает. Новые дни не
-// планируются, день не перечитывается (docs/tasks/marketplace-funnel/TASK.md, этап 3).
-// ponytail: дата константой; окно и перечитывание — когда появится кабинет с данными.
-const SearchProbeDay = "2026-11-17"
+// KindSearchTail — суточное перечитывание хвоста поиска.
+const KindSearchTail = "wb_search_tail"
+
+// SearchDays — дней поиска до вчера включительно, загружаемых один раз;
+// SearchRefreshDays — из них перечитываются каждые сутки: вчерашний день WB
+// досчитывает, а кабинету без «Джема» перечитывание заменит служебную страницу
+// данными, когда подписка появится. Прошлые дни поиска не меняются (выкупов в
+// нём нет), поэтому хвост короче, чем у воронки.
+const (
+	SearchDays        = 30
+	SearchRefreshDays = 7
+)
 
 // Config — параметры окна.
 type Config struct {
@@ -147,7 +154,15 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) schedule.P
 			plan.Refreshes = append(plan.Refreshes, tail)
 		}
 		if cab.Supports(executor.ResourceSearch) {
-			plan.Ensure = append(plan.Ensure, store.TaskSpec{TaskKey: key(cab.Ref, executor.ResourceSearch, SearchProbeDay), Priority: PriorityHistory, RunAt: now})
+			tail := schedule.Refresh{Kind: KindSearchTail, RunDate: runDate, ConnectionRef: cab.Ref}
+			for i := 0; i < SearchDays; i++ {
+				k := key(cab.Ref, executor.ResourceSearch, yesterday.AddDate(0, 0, -i).Format(time.DateOnly))
+				plan.Ensure = append(plan.Ensure, store.TaskSpec{TaskKey: k, Priority: PriorityHistory, RunAt: start})
+				if i < SearchRefreshDays {
+					tail.Specs = append(tail.Specs, store.TaskSpec{TaskKey: k, Priority: PriorityHistory, Refresh: true, RunAt: start})
+				}
+			}
+			plan.Refreshes = append(plan.Refreshes, tail)
 		}
 		if weekly {
 			tail := schedule.Refresh{Kind: KindWeeklyTail, RunDate: runDate, ConnectionRef: cab.Ref}

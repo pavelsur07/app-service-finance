@@ -83,6 +83,34 @@ final class FunnelPageTest extends WebTestCaseBase
         self::assertStringContainsString('Данных воронки за период нет', (string) $client->getResponse()->getContent());
     }
 
+    public function testSearchSourceIsSeparateFromTotals(): void
+    {
+        $client = static::createClient();
+        $owner = $this->seed();
+        $this->row(self::COMPANY_ID, 'wildberries', 'wb-1', '2026-11-10', '555', ['card_views' => 50, 'orders' => 4]);
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
+
+        $crawler = $client->request('GET', self::URL, ['from' => '2026-11-10', 'to' => '2026-11-11']);
+        self::assertCount(0, $crawler->filter('select[name="source"]'), 'нет дней поиска — фильтра нет');
+
+        $this->row(self::COMPANY_ID, 'wildberries', 'wb-1', '2026-11-10', '555', ['card_views' => 20, 'orders' => 1], 'search');
+        $this->day(self::COMPANY_ID, 'wildberries', 'wb-2', '2026-11-10', false, 'search');
+
+        $crawler = $client->request('GET', self::URL, ['from' => '2026-11-10', 'to' => '2026-11-11']);
+        self::assertCount(1, $crawler->filter('select[name="source"]'));
+        self::assertSame('4', $crawler->filter('tr[data-funnel-total] td[data-stage="orders"]')->text(), 'поиск — часть общих переходов: в «всего» не складывается');
+        self::assertStringNotContainsString('дн. без данных', (string) $client->getResponse()->getContent(), 'день поиска без подписки — не пропуск общей воронки');
+
+        $crawler = $client->request('GET', self::URL, ['from' => '2026-11-10', 'to' => '2026-11-11', 'source' => 'search']);
+        self::assertSame('1', $crawler->filter('tr[data-funnel-total] td[data-stage="orders"]')->text());
+        self::assertSame('20', $crawler->filter('tbody tr[data-funnel-row] td[data-stage="card_views"]')->text());
+        self::assertStringContainsString('1 дн. без данных', (string) $client->getResponse()->getContent());
+
+        $client->request('GET', self::URL, ['source' => 'ads']);
+        self::assertResponseStatusCodeSame(422);
+    }
+
     public function testAnonymousIsRedirectedToLogin(): void
     {
         $client = static::createClient();
@@ -106,20 +134,20 @@ final class FunnelPageTest extends WebTestCaseBase
     /**
      * @param array<string, int> $values
      */
-    private function row(string $companyId, string $channel, string $connection, string $date, string $sku, array $values): void
+    private function row(string $companyId, string $channel, string $connection, string $date, string $sku, array $values, string $source = 'total'): void
     {
         static::getContainer()->get(Connection::class)->insert('mfn_row', [
-            'company_id' => $companyId, 'channel' => $channel, 'connection_ref' => $connection, 'operation_date' => $date, 'marketplace_sku' => $sku, 'source' => 'total',
+            'company_id' => $companyId, 'channel' => $channel, 'connection_ref' => $connection, 'operation_date' => $date, 'marketplace_sku' => $sku, 'source' => $source,
         ] + $values);
-        $this->day($companyId, $channel, $connection, $date, true);
+        $this->day($companyId, $channel, $connection, $date, true, $source);
     }
 
-    private function day(string $companyId, string $channel, string $connection, string $date, bool $available): void
+    private function day(string $companyId, string $channel, string $connection, string $date, bool $available, string $source = 'total'): void
     {
         static::getContainer()->get(Connection::class)->executeStatement(
-            "INSERT INTO mfn_day (company_id, channel, connection_ref, operation_date, facts_revision, rules_version, available, row_count, control_sum, translated_at)
-             VALUES (?, ?, ?, ?, 1, '1', ?, 0, 0, '2026-11-18 10:00:00') ON CONFLICT DO NOTHING",
-            [$companyId, $channel, $connection, $date, $available ? 'true' : 'false'],
+            "INSERT INTO mfn_day (company_id, channel, connection_ref, operation_date, source, facts_revision, rules_version, available, row_count, control_sum, translated_at)
+             VALUES (?, ?, ?, ?, ?, 1, '1', ?, 0, 0, '2026-11-18 10:00:00') ON CONFLICT DO NOTHING",
+            [$companyId, $channel, $connection, $date, $source, $available ? 'true' : 'false'],
         );
     }
 }
