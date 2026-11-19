@@ -80,18 +80,8 @@ func (a *Analytics) FunnelDay(ctx context.Context, ref, token, day string) (Funn
 
 // SearchDay — поиск по всем карточкам кабинета за день day: та же сборка
 // страницы дня, что у воронки. Сортировка обязательна в запросе; итоговый
-// порядок — по nmId. Отказ в доступе (402, 403) — конечный: без подписки
-// повтор ничего не изменит, а текст отказа нужен в покрытии как есть.
+// порядок — по nmId.
 func (a *Analytics) SearchDay(ctx context.Context, ref, token, day string) (FunnelDay, error) {
-	out, err := a.searchDay(ctx, ref, token, day)
-	var apiErr *apierr.APIError
-	if errors.As(err, &apiErr) && (apiErr.Status == http.StatusPaymentRequired || apiErr.Status == http.StatusForbidden) {
-		apiErr.Class = apierr.ClassInvalidRequest
-	}
-	return out, err
-}
-
-func (a *Analytics) searchDay(ctx context.Context, ref, token, day string) (FunnelDay, error) {
 	return a.dayReport(ctx, ref, token, EndpointSearch, SearchSchema,
 		map[string]any{
 			"currentPeriod":   map[string]string{"start": day, "end": day},
@@ -105,6 +95,25 @@ func (a *Analytics) searchDay(ctx context.Context, ref, token, day string) (Funn
 			_ = json.Unmarshal(raw, &row)
 			return row.NmID
 		})
+}
+
+// SearchUnavailable — код отказа WB в поиске по тарифу (402, 403), иначе 0.
+// Воронка тем же токеном работает, поэтому 403 здесь — нет подписки «Джем», а
+// не категория токена. ponytail: живой отказ не видели; придёт другим кодом —
+// день станет конечной ошибкой, добавить код сюда.
+func SearchUnavailable(err error) int {
+	var apiErr *apierr.APIError
+	if errors.As(err, &apiErr) && (apiErr.Status == http.StatusPaymentRequired || apiErr.Status == http.StatusForbidden) {
+		return apiErr.Status
+	}
+	return 0
+}
+
+// SearchUnavailablePage — служебная страница дня, который WB не отдал по тарифу:
+// день пройден («нет данных»), перечитывание хвоста заменит её данными, когда
+// подписка появится.
+func SearchUnavailablePage(status int) []byte {
+	return fmt.Appendf(nil, `{"schema":%q,"unavailable":true,"status":%d}`, SearchSchema, status)
 }
 
 // dayReport — отчёт по карточкам за день одной страницей raw: запрос request

@@ -8,7 +8,8 @@ use Doctrine\ORM\Mapping as ORM;
 
 /**
  * День кабинета, переведённый в таблицу воронки: ревизия фактов, версия правил и контрольная сумма
- * строк (`control_sum` = Σ всех ступеней `mfn_row` дня). `available = false` — маркетплейс не отдал
+ * строк (`control_sum` = Σ всех ступеней `mfn_row` дня). `source` — источник переходов: `total` (вся
+ * воронка) либо `search` (поиск WB); у каждого свои факты и своя ревизия. `available = false` — маркетплейс не отдал
  * день по тарифу кабинета: строк нет, это «нет данных», а не нули. Только схема.
  */
 #[ORM\Entity(readOnly: true)]
@@ -30,6 +31,10 @@ class FunnelDay
     #[ORM\Id]
     #[ORM\Column(type: 'date_immutable')]
     private \DateTimeImmutable $operationDate;
+
+    #[ORM\Id]
+    #[ORM\Column(type: 'string', length: 16)]
+    private string $source;
 
     #[ORM\Column(type: 'integer')]
     private int $factsRevision;

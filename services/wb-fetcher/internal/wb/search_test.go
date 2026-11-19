@@ -55,9 +55,6 @@ func TestSearchDayClassifiesRefusals(t *testing.T) {
 		body   string
 		class  apierr.Class
 	}{
-		// Отказ в доступе — конечный исход, не пауза и не повторы: проверка разовая.
-		"no token category": {http.StatusForbidden, `{"title":"Authorization error"}`, apierr.ClassInvalidRequest},
-		"payment required":  {http.StatusPaymentRequired, `{"title":"payment required"}`, apierr.ClassInvalidRequest},
 		"bad request":       {http.StatusBadRequest, `{"title":"Invalid request body"}`, apierr.ClassInvalidRequest},
 		"rate limit":        {http.StatusTooManyRequests, `{}`, apierr.ClassRateLimit},
 		"card without nmId": {http.StatusOK, `{"data":{"products":[{"openCard":{}}]}}`, apierr.ClassInvalidResponse},
@@ -71,4 +68,15 @@ func TestSearchDayClassifiesRefusals(t *testing.T) {
 			assert.Equal(t, EndpointSearch, apiErr.Endpoint)
 		})
 	}
+}
+
+func TestSearchUnavailableIsRefusalByTariff(t *testing.T) {
+	for status, want := range map[int]int{http.StatusForbidden: 403, http.StatusPaymentRequired: 402, http.StatusBadRequest: 0, http.StatusTooManyRequests: 0} {
+		a, _ := serveSearch(t, status, `{"title":"refused"}`)
+		_, err := a.SearchDay(context.Background(), "ref-1", token, "2026-11-17")
+		require.Error(t, err)
+		assert.Equal(t, want, SearchUnavailable(err), status)
+	}
+	assert.Zero(t, SearchUnavailable(nil))
+	assert.JSONEq(t, `{"schema":"wb-search-daily-v1","unavailable":true,"status":402}`, string(SearchUnavailablePage(402)))
 }

@@ -25,6 +25,7 @@
     {% import _self as ui %}
     {% set params = app.request.query.all %}
     {% set channels = constant('App\\MarketplaceFunnel\\Application\\DTO\\FunnelReport::CHANNELS') %}
+    {% set sources = constant('App\\MarketplaceFunnel\\Application\\DTO\\FunnelReport::SOURCES') %}
     {# ступень, подпись, от какой ступени считается конверсия #}
     {% set stages = [
         {key: 'impressions', label: 'Показы', base: null},
@@ -61,6 +62,16 @@
                     </select>
                 </div>
             {% endif %}
+            {% if report and 'search' in report.sources %}
+                <div class="col-12 col-sm-6 col-lg-auto">
+                    <label class="form-label" for="mfn-source">Источник</label>
+                    <select class="form-select" id="mfn-source" name="source">
+                        {% for value, label in sources %}
+                            <option value="{{ value }}" {{ value == source ? 'selected' }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
             <div class="col-12 col-sm-6 col-lg-auto">
                 <label class="form-label" for="mfn-q">Поиск</label>
                 <input class="form-control" id="mfn-q" type="search" name="q" value="{{ search }}" placeholder="SKU, артикул, название">
@@ -91,6 +102,7 @@
                 {% if report.unavailableDays > 0 %}{{ report.unavailableDays|vf_number }} дн. без данных: маркетплейс не отдаёт воронку по тарифу кабинета.{% endif %}
                 Проценты под числом — конверсия из предыдущей ступени. У WB нет общих показов и возвратов: первая ступень — переходы в карточку, поэтому в «Итого» показы и возвраты — только Ozon.
                 Выкупы и отмены относятся к дню заказа и дозревают.
+                {% if report.source == 'search' %}Из поиска — только WB с подпиской «Джем»: переходы в карточку, корзины и заказы; это часть общих переходов, не отдельные продажи.{% endif %}
             </p>
         </div>
         <section class="card mb-3 me-table-card" data-economics-table>

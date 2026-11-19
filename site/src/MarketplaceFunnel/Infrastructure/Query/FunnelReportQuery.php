@@ -21,7 +21,7 @@ final readonly class FunnelReportQuery
      *
      * @return list<array{channel: string, sku: string, values: array<string, int|null>}>
      */
-    public function bySku(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $channel): array
+    public function bySku(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $channel, string $source): array
     {
         $sums = implode(', ', array_map(static fn (string $c): string => "SUM($c) AS $c", FunnelRow::COLUMNS));
         $rows = $this->connection->fetchAllAssociative(
@@ -30,7 +30,7 @@ final readonly class FunnelReportQuery
              WHERE company_id = :company AND operation_date BETWEEN :from AND :to AND source = :source
                AND (CAST(:channel AS VARCHAR) IS NULL OR channel = :channel)
              GROUP BY channel, marketplace_sku",
-            ['company' => $companyId, 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d'), 'source' => FunnelStore::SOURCE_TOTAL, 'channel' => $channel],
+            ['company' => $companyId, 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d'), 'source' => $source, 'channel' => $channel],
         );
 
         return array_map(static function (array $row): array {
@@ -44,24 +44,25 @@ final readonly class FunnelReportQuery
     }
 
     /**
-     * Переведённые дни периода: всего, без данных по тарифу и каналы компании.
+     * Переведённые дни источника за период: всего, без данных по тарифу; каналы и источники компании.
      *
-     * @return array{days: int, unavailableDays: int, channels: list<string>}
+     * @return array{days: int, unavailableDays: int, channels: list<string>, sources: list<string>}
      */
-    public function coverage(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $channel): array
+    public function coverage(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $channel, string $source): array
     {
         $row = $this->connection->fetchAssociative(
             'SELECT COUNT(*) AS days, COUNT(*) FILTER (WHERE NOT available) AS unavailable
              FROM mfn_day
-             WHERE company_id = :company AND operation_date BETWEEN :from AND :to
+             WHERE company_id = :company AND operation_date BETWEEN :from AND :to AND source = :source
                AND (CAST(:channel AS VARCHAR) IS NULL OR channel = :channel)',
-            ['company' => $companyId, 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d'), 'channel' => $channel],
+            ['company' => $companyId, 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d'), 'source' => $source, 'channel' => $channel],
         );
 
         return [
             'days' => (int) ($row['days'] ?? 0),
             'unavailableDays' => (int) ($row['unavailable'] ?? 0),
             'channels' => array_map('strval', $this->connection->fetchFirstColumn('SELECT DISTINCT channel FROM mfn_day WHERE company_id = :company ORDER BY channel', ['company' => $companyId])),
+            'sources' => array_map('strval', $this->connection->fetchFirstColumn('SELECT DISTINCT source FROM mfn_day WHERE company_id = :company ORDER BY source', ['company' => $companyId])),
         ];
     }
 }

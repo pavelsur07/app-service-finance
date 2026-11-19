@@ -37,9 +37,9 @@ final class FunnelHealthCheckCommand extends Command
     {
         $states = $this->store->dayStates();
         $behind = [];
-        foreach (TranslateFunnelCommand::RESOURCES as $resource => $channel) {
+        foreach (TranslateFunnelCommand::RESOURCES as $resource => [$channel, $source]) {
             foreach ($this->sourceFacts->periods($resource) as $period) {
-                $state = $states[FunnelStore::dayKey($period->companyId, $channel, $period->connectionRef, $period->periodKey)] ?? null;
+                $state = $states[FunnelStore::dayKey($period->companyId, $channel, $period->connectionRef, $period->periodKey, $source)] ?? null;
                 if (null === $state || $state['revision'] !== $period->revision || FunnelRow::RULES_VERSION !== $state['rules']) {
                     $behind[$period->companyId] = ($behind[$period->companyId] ?? 0) + 1;
                 }
