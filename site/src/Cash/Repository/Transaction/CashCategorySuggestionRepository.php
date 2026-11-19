@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Cash\Repository\Transaction;
 
 use App\Cash\Entity\Transaction\CashCategorySuggestion;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Transaction\CashCategorySuggestionStatus as Status;
+use App\Cash\Infrastructure\Query\CashCategorizationQuery;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
@@ -119,34 +122,61 @@ final class CashCategorySuggestionRepository extends ServiceEntityRepository
         return $rows;
     }
 
-    public function countNoAnswer(string $companyId): int
+    /** Сколько подсказок компании переоткроет reopenAfterTreeChange(). */
+    public function countReopenable(string $companyId): int
     {
         Assert::uuid($companyId);
 
-        return $this->count(['companyId' => $companyId, 'status' => Status::NO_ANSWER]);
+        return (int) $this->getEntityManager()->getConnection()->fetchOne(
+            'SELECT count(*) FROM cash_category_suggestion s WHERE '.self::REOPENABLE,
+            ...$this->reopenableParams($companyId, null),
+        );
     }
 
     /**
-     * Переоткрывает «нет ответа» компании после смены дерева статей (`no_answer` → `stale`, причина в
-     * `error_code`): операции снова кандидаты ИИ. Один UPDATE без загрузки истории в память; строки
-     * блокируются им же. Только внутри транзакции вызывающего — откатывается вместе с ней.
+     * Переоткрывает подсказки компании без решения после смены дерева статей (`no_answer` и
+     * `suggested` у операции, всё ещё ждущей статью → `stale`, причина в `error_code`): ответ выбран из
+     * старого дерева, операции снова кандидаты ИИ. `suggested` у разнесённой человеком операции — решение
+     * правкой, история точности ИИ (ворота автоприменения, предложения правил): не трогается. Один
+     * UPDATE без загрузки истории в память; строки блокируются им же. Только внутри транзакции
+     * вызывающего — откатывается вместе с ней.
      *
      * @return int сколько переоткрыто
      */
-    public function reopenNoAnswer(string $companyId, string $reason, \DateTimeImmutable $at): int
+    public function reopenAfterTreeChange(string $companyId, string $reason, \DateTimeImmutable $at): int
     {
         Assert::uuid($companyId);
         Assert::lengthBetween($reason, 1, 64);
         $connection = $this->getEntityManager()->getConnection();
         if (!$connection->isTransactionActive()) {
-            throw new \LogicException('Переоткрытие «нет ответа» — только внутри транзакции вызывающего.');
+            throw new \LogicException('Переоткрытие подсказок ИИ — только внутри транзакции вызывающего.');
         }
 
         return (int) $connection->executeStatement(
-            "UPDATE cash_category_suggestion SET status = 'stale', error_code = :reason, responded_at = COALESCE(responded_at, :at)
-             WHERE company_id = :companyId AND status = 'no_answer'",
-            ['reason' => $reason, 'at' => $at->format('Y-m-d H:i:s'), 'companyId' => $companyId],
+            'UPDATE cash_category_suggestion s SET status = \'stale\', error_code = :reason, responded_at = COALESCE(s.responded_at, :at) WHERE '.self::REOPENABLE,
+            ...$this->reopenableParams($companyId, ['reason' => $reason, 'at' => $at->format('Y-m-d H:i:s')]),
         );
+    }
+
+    private const REOPENABLE = <<<'SQL'
+        s.company_id = :companyId AND (s.status = 'no_answer' OR (s.status = 'suggested' AND EXISTS (
+            SELECT 1 FROM cash_transaction tx
+            JOIN "companies" company ON company.id = tx.company_id
+            LEFT JOIN "cashflow_categories" category ON category.id = tx.cashflow_category_id
+            WHERE tx.id = s.transaction_id AND
+        SQL.' '.CashCategorizationQuery::UNCATEGORIZED.')))';
+
+    /**
+     * @param array<string, string>|null $extra
+     *
+     * @return array{0: array<string, mixed>, 1: array<string, ArrayParameterType>}
+     */
+    private function reopenableParams(string $companyId, ?array $extra): array
+    {
+        return [
+            ['companyId' => $companyId, 'unallocatedCodes' => [CashflowCategory::CODE_UNALLOCATED, CashflowCategory::SYSTEM_UNALLOCATED]] + ($extra ?? []),
+            ['unallocatedCodes' => ArrayParameterType::STRING],
+        ];
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Cash\Command;
 
 use App\Cash\Entity\Transaction\CashCategorySuggestion;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\Company;
@@ -33,22 +34,35 @@ final class ReopenNoAnswerCashCategorySuggestionsCommandTest extends Integration
         self::assertSame('no_answer', $this->statusOf($noAnswer));
     }
 
-    public function testExecuteReopensOnlyNoAnswerOfCompany(): void
+    public function testExecuteReopensUndecidedSuggestionsOfCompanyOnly(): void
     {
         $company = $this->company();
         $other = $this->company();
         $noAnswer = $this->suggestion($company, null);
+        // Показанная без решения подсказка выбрана из старого дерева: новые статьи ИИ не видел.
         $suggested = $this->suggestion($company, Uuid::uuid4()->toString());
+        $accepted = $this->suggestion($company, Uuid::uuid4()->toString());
+        $this->db()->executeStatement("UPDATE cash_category_suggestion SET status = 'accepted' WHERE id = ?", [$accepted->getId()]);
+        // Человек разнёс операцию сам, подсказка осталась «показана»: это решение правкой — история точности ИИ.
+        $decidedByEdit = $this->suggestion($company, Uuid::uuid4()->toString());
+        $category = (new CashflowCategory(Uuid::uuid4()->toString(), $company))->setName('Аренда');
+        $this->em->persist($category);
+        $this->em->flush();
+        $this->db()->executeStatement('UPDATE cash_transaction SET cashflow_category_id = ? WHERE id = (SELECT transaction_id FROM cash_category_suggestion WHERE id = ?)', [$category->getId(), $decidedByEdit->getId()]);
         $foreign = $this->suggestion($other, null);
+        $foreignSuggested = $this->suggestion($other, Uuid::uuid4()->toString());
 
         $tester = $this->runCommand($company, ['--execute' => true]);
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
-        self::assertStringContainsString('Переоткрыто: 1', $tester->getDisplay());
+        self::assertStringContainsString('Переоткрыто: 2', $tester->getDisplay());
         self::assertSame('stale', $this->statusOf($noAnswer));
         self::assertSame('reopened', $this->db()->fetchOne('SELECT error_code FROM cash_category_suggestion WHERE id = ?', [$noAnswer->getId()]));
-        self::assertSame('suggested', $this->statusOf($suggested));
+        self::assertSame('stale', $this->statusOf($suggested));
+        self::assertSame('accepted', $this->statusOf($accepted));
+        self::assertSame('suggested', $this->statusOf($decidedByEdit));
         self::assertSame('no_answer', $this->statusOf($foreign));
+        self::assertSame('suggested', $this->statusOf($foreignSuggested));
 
         $repeat = $this->runCommand($company, ['--execute' => true]);
         self::assertStringContainsString('Переоткрывать нечего', $repeat->getDisplay());
