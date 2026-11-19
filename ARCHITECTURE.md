@@ -2807,6 +2807,22 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 (`headsOf`) делает `plan()` и при расхождении (привязать, создать, конфликты, статьи без кода)
 пишет справочную строку `ДДС-группа` — на exit code не влияет; компании вне групп не проверяются.
 
+**Загрузка дерева из JSON** — `GET|POST /cashflow-categories/import` (выбор файла и предпросмотр,
+ничего не пишет) и `POST /cashflow-categories/import/apply`; POST обоих — FINANCE_WRITE (на
+смешанном маршруте — рантайм-гейт в теле). Формат файла —
+выгрузка `GET /cashflow-categories/export/json`. План строит `CashflowCategoryImportPlanner`
+(только читает): статья с `id` обновляется, без `id` создаётся, `id` не из компании — отказ;
+родителя задаёт вложенность `children`, у статьи верхнего уровня — `parentId`; поля, которого нет
+в файле, и статьи, которых нет в файле, загрузка не меняет и ничего не удаляет. Вид деятельности
+читается только у корня, потомкам проставляется производным. Любая ошибка (системная статья,
+перенос статьи с `group_code`, глубина больше 5, цикл, дубль кода, чужая статья ОПиУ) отклоняет
+файл целиком. `ImportCashflowCategoryTreeAction` владеет транзакцией (`wrapInTransaction`):
+`pg_advisory_xact_lock(hashtext(companyId))` (ключ тот же, что у синхронизации эталона), затем
+`lockTreeByCompany()`, пересчёт плана и сверка отпечатка с показанным в предпросмотре — при
+расхождении отказ значением из транзакции до записи. Меняющиеся коды освобождаются промежуточным
+`flush()` в той же транзакции. Ключ повтора — ID новых статей (UUIDv7), выданные предпросмотром и
+возвращаемые формой: повторная отправка находит статьи созданными и ничего не пишет.
+
 **Консолидированный ДДС группы** — `GET /finance/reports/cashflow/group?from=&to=` (по умолчанию —
 текущий месяц) и `…/group/export.xlsx`, ссылка «ДДС группы» на странице отчёта ДДС. Группа активной
 компании (`headOf`, `members` — головная первой). `BuildCashflowGroupReport` (только чтение): суммы
@@ -6089,6 +6105,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.222 | 2026-11-19 | Cash: загрузка изменённого дерева статей ДДС из JSON с предпросмотром (`ImportCashflowCategoryTreeAction`, `CashflowCategoryImportPlanner`, `/cashflow-categories/import`), кнопки JSON на странице статей — дропдаун |
 | 2.221 | 2026-11-19 | Company: код и описание проектов, JSON v1, ревизия и блокировка записи справочника; миграция `Version20261119130000` |
 | 2.220 | 2026-11-19 | MarketplaceFunnel: поиск WB — факты `wb.analytics.search` (`WbSearchTranslator`), источник `search` в `mfn_row`, `mfn_day.source` в ключе (`Version20261119120000`), фильтр «Источник» на экране R9; ServiceGateway: `wb.analytics.search` — ежедневный ресурс покрытия и ресурс фактов `wb-fetcher`; задача `marketplace-funnel`, этап 3, часть 2 |
 | 2.219 | 2026-11-18 | Marketplace / ServiceGateway: ресурс поиска по карточкам WB `wb.analytics.search` в `WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES`, строка «Поиск по карточкам» в покрытии; только сырьё, фактами не публикуется; задача `marketplace-funnel`, этап 3 |
