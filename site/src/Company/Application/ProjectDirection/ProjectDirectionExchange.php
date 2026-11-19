@@ -216,7 +216,7 @@ final readonly class ProjectDirectionExchange
      *
      * @return list<string>
      */
-    private function directoryErrors(array $projects, array $numbers): array
+    public function directoryErrors(array $projects, array $numbers = []): array
     {
         $errors = $codes = $checked = [];
         foreach ($projects as $id => $row) {

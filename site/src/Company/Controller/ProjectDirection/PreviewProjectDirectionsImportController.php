@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Company\Controller\ProjectDirection;
 
 use App\Company\Application\ProjectDirection\ProjectDirectionExchange;
-use App\Company\Application\ProjectDirection\ProjectDirectionImportPreviewStore;
+use App\Company\Application\ProjectDirection\ProjectDirectionPreviewStore;
 use App\Company\Entity\User;
 use App\Company\Form\ProjectDirectionImportType;
 use App\Company\Security\ModuleAccess;
@@ -26,7 +26,7 @@ final class PreviewProjectDirectionsImportController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompany,
         private readonly ProjectDirectionExchange $exchange,
-        private readonly ProjectDirectionImportPreviewStore $previews,
+        private readonly ProjectDirectionPreviewStore $previews,
     ) {
     }
 
@@ -66,7 +66,7 @@ final class PreviewProjectDirectionsImportController extends AbstractController
         $session = $request->getSession();
         $session->start();
         $json = json_encode($this->exchange->document($companyId, $preview->projects), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
-        $view['previewId'] = $this->previews->store($session->getId(), (string) $user->getId(), $companyId, $json, $preview->revision);
+        $view['previewId'] = $this->previews->store($session->getId(), (string) $user->getId(), $companyId, ['json' => $json, 'revision' => $preview->revision]);
         if (null === $view['previewId']) {
             $form->addError(new FormError('Не удалось сохранить предпросмотр. Попробуйте загрузить файл ещё раз.'));
 
