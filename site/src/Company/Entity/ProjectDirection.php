@@ -14,10 +14,14 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'project_directions')]
 #[ORM\Index(name: 'idx_project_directions_parent', columns: ['parent_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_project_direction_company_system_code', columns: ['company_id', 'system_code'])]
+#[ORM\UniqueConstraint(name: 'uniq_project_direction_company_code', columns: ['company_id', 'code'])]
 #[ORM\HasLifecycleCallbacks]
 class ProjectDirection
 {
     public const CODE_GENERAL = 'PROJECT_GENERAL';
+    public const CODE_LENGTH = 15;
+    public const CODE_PATTERN = '/\A[A-Z][A-Z0-9_]{0,14}\z/';
+    public const DESCRIPTION_LENGTH = 300;
 
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
@@ -29,6 +33,12 @@ class ProjectDirection
 
     #[ORM\Column(length: 255)]
     private string $name;
+
+    #[ORM\Column(length: self::CODE_LENGTH, nullable: true)]
+    private ?string $code = null;
+
+    #[ORM\Column(length: self::DESCRIPTION_LENGTH, nullable: true)]
+    private ?string $description = null;
 
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
     private int $sort = 0;
@@ -91,6 +101,42 @@ class ProjectDirection
     public function getSort(): int
     {
         return $this->sort;
+    }
+
+    public function getCode(): ?string
+    {
+        return $this->code;
+    }
+
+    public function setCode(?string $code): self
+    {
+        $this->code = self::normalizeCode($code);
+
+        return $this;
+    }
+
+    public static function normalizeCode(?string $code): ?string
+    {
+        $code = trim($code ?? '', " \t\n\r\v\f");
+
+        return '' === $code ? null : strtoupper($code);
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function setDescription(?string $description): self
+    {
+        $this->description = self::normalizeDescription($description);
+
+        return $this;
+    }
+
+    public static function normalizeDescription(?string $description): ?string
+    {
+        return '' === trim($description ?? '', " \t\n\r\v\f") ? null : $description;
     }
 
     public function getSystemCode(): ?string

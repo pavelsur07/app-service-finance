@@ -51,6 +51,9 @@ class Company
     #[ORM\Column(name: 'deletion_requested_by', type: 'guid', nullable: true)]
     private ?string $deletionRequestedBy = null;
 
+    #[ORM\Column(type: 'guid', nullable: true, insertable: false, updatable: false)]
+    private ?string $projectDirectionRevision = null;
+
     public function __construct(string $id, User $user)
     {
         Assert::uuid($id);
