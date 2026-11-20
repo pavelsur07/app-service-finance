@@ -1,0 +1,17 @@
+{# Состояние диагностики кабинета короткими плашками. Кнопка запуска — в шапке страницы. Parameters: report (MappingDiagnosticPage). #}
+<div class="mb-3" data-mapping-diagnostics>
+    {% if report.latestRun and report.latestRun.status == 'running' %}
+        <div class="alert alert-info py-2" data-diagnostic-running role="status">Идёт проверка кабинета: {{ report.latestRun.processed|vf_number }} из {{ report.latestRun.total|vf_number }}. Обновите страницу, чтобы увидеть прогресс.</div>
+    {% endif %}
+    {% if report.latestRun and report.latestRun.status == 'failed' %}
+        <div class="alert alert-warning py-2" data-diagnostic-error>Проверка не завершилась из-за технической ошибки. Показан последний завершённый отчёт — запустите проверку ещё раз.</div>
+    {% endif %}
+    {% if report.stale or (report.latestRun and report.latestRun.status == 'stale') %}
+        <div class="alert alert-warning py-2" data-diagnostic-stale>Каталог или связи изменились после проверки — счётчики и очередь устарели. Обновите диагностику.</div>
+    {% endif %}
+    {% if report.completedRun %}
+        <div class="small text-secondary" data-diagnostic-completed>Проверено {{ report.completedRun.processed|vf_number }} из {{ report.completedRun.total|vf_number }} · {{ report.completedRun.checkedAt|date('d.m.Y H:i T') }}. Счётчики вкладок — по этой проверке, позиция и статус в строке — текущие.</div>
+    {% else %}
+        <div class="alert alert-secondary py-2" data-diagnostic-empty>Проверки кабинета ещё не было. После диагностики появится очередь «Требует внимания» со счётчиками по причинам.</div>
+    {% endif %}
+</div>

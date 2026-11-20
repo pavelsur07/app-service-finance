@@ -78,6 +78,8 @@ final class MappingQualityControllerTest extends WebTestCaseBase
         $client->followRedirect();
         self::assertSelectorExists('[data-diagnostic-completed]');
         self::assertSelectorTextContains('[data-diagnostic-completed]', 'Проверено');
+        self::assertSelectorNotExists('[data-diagnostic-listing-id="'.$d['listing']->getId().'"]', 'Однозначное соответствие не попадает в «Требует внимания».');
+        $client->request('GET', $url, ['view' => 'queue', 'diag_manual' => '']);
         self::assertSelectorExists('[data-diagnostic-listing-id="'.$d['listing']->getId().'"]');
         $this->em()->getConnection()->executeStatement("UPDATE marketplace_listings SET name='Набор 3 шт' WHERE id=?", [$d['listing']->getId()]);
         $this->em()->getConnection()->executeStatement("UPDATE moysklad_products SET name='Товар 1 шт' WHERE external_id=?", [$d['product']->getExternalId()]);
@@ -106,7 +108,7 @@ final class MappingQualityControllerTest extends WebTestCaseBase
         self::assertSelectorExists('[data-diagnostic-completed]');
     }
 
-    public function testDiagnosticPaginationKeepsListingPaginationIndependent(): void
+    public function testQueueAndAllListingsHaveTheirOwnPagination(): void
     {
         [$client, $d] = $this->seed();
         foreach (range(2, 26) as $i) {
@@ -115,22 +117,22 @@ final class MappingQualityControllerTest extends WebTestCaseBase
         $this->em()->flush();
         self::getContainer()->get(DiagnoseMappingsHandler::class)(new \App\MoySklad\Message\DiagnoseMappingsMessage($d['connection']->getCompanyId(), $d['connection']->getId(), 'ozon', Uuid::uuid7()->toString()));
         $url = '/moy-sklad/connections/'.$d['connection']->getId().'/mappings/ozon';
-        $client->request('GET', $url, ['diag_page' => '2']);
+        $client->request('GET', $url, ['view' => 'queue', 'diag_manual' => '', 'diag_page' => '2', 'page' => '2']);
         self::assertResponseIsSuccessful();
         self::assertSelectorCount(1, '[data-diagnostic-listing-id]');
-        self::assertSelectorCount(25, '[data-listing-id]');
-        $back = $client->getCrawler()->filter('[data-mapping-diagnostics] a[aria-label="Назад"]');
+        $back = $client->getCrawler()->filter('[data-mapping-pagination] a[aria-label="Назад"]');
         self::assertStringContainsString('diag_page=1', (string) $back->attr('href'));
+        self::assertStringContainsString('view=queue', (string) $back->attr('href'));
         $client->click($back->link());
         self::assertResponseIsSuccessful();
         self::assertSelectorCount(25, '[data-diagnostic-listing-id]');
+        $client->request('GET', $url, ['view' => 'all', 'page' => '2', 'diag_page' => '2']);
+        self::assertSelectorCount(1, '[data-listing-id]');
+        self::assertSelectorNotExists('[data-diagnostic-listing-id]');
+        $back = $client->getCrawler()->filter('[data-mapping-pagination] a[aria-label="Назад"]');
+        self::assertStringContainsString('view=all', (string) $back->attr('href'));
+        $client->click($back->link());
         self::assertSelectorCount(25, '[data-listing-id]');
-        $client->request('GET', $url, ['diag_page' => '2', 'page' => '2']);
-        self::assertSelectorCount(1, '[data-diagnostic-listing-id]');
-        self::assertSelectorCount(1, '[data-listing-id]');
-        $client->click($client->getCrawler()->filter('[data-mapping-diagnostics] a[aria-label="Назад"]')->link());
-        self::assertSelectorCount(25, '[data-diagnostic-listing-id]');
-        self::assertSelectorCount(1, '[data-listing-id]');
     }
 
     public function testRiskyManualMappingRequiresCheckboxAndRejectsStaleForm(): void

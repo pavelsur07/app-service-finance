@@ -1,86 +1,132 @@
 {% extends 'moy_sklad/layout.html.twig' %}
 
+{# Одна таблица: очередь по последней диагностике или «Все листинги» (docs/tasks/moysklad-mappings-ui/plan.md). #}
 {% block title %}МойСклад — Маппинг {{ providerName }}{% endblock %}
 {% block integration_title %}Маппинг {{ providerName }}{% endblock %}
 
+{% set canWrite = is_granted('module.marketplace.write') %}
+{% set routeParams = {connectionId: mappingConnectionId, marketplace: mappingMarketplace} %}
+{% set keepParams = routeParams|merge({sizeCharacteristicId: selectedCharacteristicId ?? '', char_q: charQ, char_page: characteristicsPage.page}) %}
+{% set hiddenParams = keepParams|filter((v, k) => k not in ['connectionId', 'marketplace']) %}
+{% set completed = diagnostics.completedRun %}
+
+{% block page_actions %}
+    <div class="col-auto ms-auto d-print-none">
+        <div class="btn-list">
+            {% if canWrite %}
+                <form method="post" action="{{ path('moysklad_mapping_diagnostics_refresh', routeParams) }}" data-diagnostic-refresh>
+                    <input type="hidden" name="_token" value="{{ csrf_token('moysklad_mapping_diagnostics' ~ mappingCompanyId ~ mappingConnectionId ~ mappingMarketplace) }}">
+                    <input type="hidden" name="runId" value="{{ diagnosticRequestId }}">
+                    <input type="hidden" name="diagnosticSizeCharacteristicId" value="{{ selectedCharacteristicId ?? '' }}">
+                    <button class="btn" type="submit"><i class="ti ti-refresh me-1" aria-hidden="true"></i>Обновить диагностику</button>
+                </form>
+            {% endif %}
+            {% if view == 'all' %}
+                {{ form_start(previewForm, {attr: {'data-automatic-preview': ''}}) }}
+                {{ form_widget(previewForm.sizeCharacteristicId, {attr: {hidden: true}}) }}
+                <button class="btn btn-primary" type="submit"><i class="ti ti-wand me-1" aria-hidden="true"></i>Подобрать на странице</button>
+                {{ form_end(previewForm) }}
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
+
 {% block integration_content %}
-    <section data-mapping-provider="{{ mappingMarketplace }}" data-connection-id="{{ mappingConnectionId }}">
-        <p class="text-secondary">{{ connection.name }} · Выберите позицию МойСклад для каждого листинга.</p>
+    <section data-mapping-provider="{{ mappingMarketplace }}" data-connection-id="{{ mappingConnectionId }}" data-mapping-view="{{ view }}">
+        <p class="text-secondary mb-3">{{ connection.name }} · сопоставьте листинги {{ providerName }} с позициями МойСклад.</p>
         {% if not catalogReady %}
             <div class="alert alert-info" data-catalog-not-ready>Для назначения связей включите подключение и загрузите товары и модификации. <a href="{{ path('moysklad_connections_index') }}">Перейти к подключениям</a></div>
         {% endif %}
-        {% if mappingMarketplace == 'wildberries' %}
-            <div class="card mb-3"><div class="card-body">
-                <h3 class="card-title">Артикулы Wildberries</h3>
-                {% if is_granted('module.marketplace.write') %}
-                    <form method="post" action="{{ path('moysklad_mapping_settings', {connectionId: mappingConnectionId}) }}" data-wb-alias-settings>
-                        <input type="hidden" name="_token" value="{{ csrf_token('moysklad_mapping_settings' ~ mappingCompanyId ~ mappingConnectionId) }}">
-                        <label class="form-check"><input type="checkbox" name="enabled" value="1" class="form-check-input"{% if mappingSettings.wbTrailingW %} checked{% endif %}><span class="form-check-label">Убирать один конечный W/w при поиске артикула WB</span></label>
-                        <p class="form-hint">Настройка действует только для этой компании, подключения МойСклад и Wildberries. Существующие назначения сохраняются.</p>
-                        <button type="submit" class="btn">Сохранить настройку</button>
-                    </form>
-                {% else %}<p>Удаление конечного W/w: {{ mappingSettings.wbTrailingW ? 'включено' : 'выключено' }}.</p>{% endif %}
-            </div></div>
-        {% endif %}
-        {% include 'moy_sklad/mappings/_diagnostics.html.twig' with {report: diagnostics, companyId: mappingCompanyId, connectionId: mappingConnectionId, marketplace: mappingMarketplace, characteristicId: selectedCharacteristicId, characteristicChoices: diagnosticCharacteristicChoices, requestId: diagnosticRequestId, statuses: diagnosticStatuses, reasons: diagnosticReasons, selectedStatus: diagStatus, selectedReason: diagReason, selectedManual: diagManual, listingPage: listingsPage.page, q: q} only %}
-        <form method="get" class="mb-3">
-            <label for="mapping-listings-search" class="form-label">Название, артикул продавца или SKU</label>
-            <div class="input-group">
-                <input id="mapping-listings-search" class="form-control" type="search" name="q" value="{{ q }}" maxlength="100">
-                <button class="btn" type="submit">Найти</button>
+        {% include 'moy_sklad/mappings/_diagnostic_status.html.twig' with {report: diagnostics} only %}
+        {% include 'moy_sklad/mappings/_settings.html.twig' with {
+            marketplace: mappingMarketplace, connectionId: mappingConnectionId, companyId: mappingCompanyId, settings: mappingSettings, canWrite: canWrite,
+            choices: diagnosticCharacteristicChoices, selected: selectedCharacteristicId, charQ: charQ, charPage: characteristicsPage,
+            keep: {view: view, q: q, page: listingsPage.page, diag_status: diagStatus, diag_reason: diagReason, diag_manual: diagManual},
+        } only %}
+
+        <div class="card vf-card" data-mapping-registry>
+            <div class="card-header" data-mapping-view-tabs>
+                {% if completed %}
+                    {% set counts = completed.counts %}
+                    {% set queue = keepParams|merge({view: 'queue'}) %}
+                    {% set noFilter = diagStatus == '' and diagReason == '' %}
+                    {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
+                        {label: 'Все листинги', href: path('moysklad_listing_mappings', keepParams|merge({view: 'all'})), active: view == 'all', count: listingsPage.totalItems},
+                        {label: 'Требует внимания', href: path('moysklad_listing_mappings', queue|merge({diag_manual: '1'})), active: view == 'queue' and noFilter and diagManual == '1', count: counts.manual_review ?? 0, warn: true},
+                        {label: 'Предложения', href: path('moysklad_listing_mappings', queue|merge({diag_status: 'ready', diag_manual: ''})), active: view == 'queue' and diagStatus == 'ready' and diagReason == '' and diagManual == '', count: counts.ready ?? 0},
+                        {label: 'Несколько кандидатов', href: path('moysklad_listing_mappings', queue|merge({diag_reason: 'duplicate', diag_manual: ''})), active: view == 'queue' and diagStatus == '' and diagReason == 'duplicate' and diagManual == '', count: counts.reason_duplicate ?? 0},
+                        {label: 'Размер', href: path('moysklad_listing_mappings', queue|merge({diag_reason: 'size', diag_manual: ''})), active: view == 'queue' and diagStatus == '' and diagReason == 'size' and diagManual == '', count: counts.reason_size ?? 0},
+                        {label: 'Комплектация', href: path('moysklad_listing_mappings', queue|merge({diag_reason: 'package_review', diag_manual: ''})), active: view == 'queue' and diagStatus == '' and diagReason == 'package_review' and diagManual == '', count: counts.reason_package_review ?? 0},
+                        {label: 'Нет совпадений', href: path('moysklad_listing_mappings', queue|merge({diag_reason: 'no_match', diag_manual: ''})), active: view == 'queue' and diagStatus == '' and diagReason == 'no_match' and diagManual == '', count: counts.reason_no_match ?? 0},
+                    ]} only %}
+                {% else %}
+                    {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
+                        {label: 'Все листинги', href: path('moysklad_listing_mappings', keepParams|merge({view: 'all'})), active: true, count: listingsPage.totalItems},
+                    ]} only %}
+                {% endif %}
             </div>
-        </form>
-        <div class="card mb-3">
-            <div class="card-body">
-                <h3 class="card-title">Автоматическое сопоставление</h3>
-                <p class="text-secondary">Точный артикул, код позиции, настроенный алиас WB или штрихкод. Артикул родителя проверяется вместе с размером. Комплектация проверяется по количеству штук в названиях. Для проверки размера выберите характеристику МойСклад. Регистр и ведущие нули учитываются. Существующие и снятые связи сохраняются.</p>
-                <form method="get" class="mb-3" data-characteristic-search>
-                    <input type="hidden" name="q" value="{{ q }}">
-                    <input type="hidden" name="page" value="{{ listingsPage.page }}">
-                    <input type="hidden" name="sizeCharacteristicId" value="{{ selectedCharacteristicId ?? '' }}">
-                    <label for="mapping-characteristic-search" class="form-label">Поиск характеристики размера</label>
-                    <div class="input-group">
-                        <input id="mapping-characteristic-search" class="form-control" type="search" name="char_q" value="{{ charQ }}" maxlength="100">
-                        <button class="btn" type="submit">Найти характеристику</button>
-                    </div>
-                </form>
-                {% set charParams = {connectionId: mappingConnectionId, marketplace: mappingMarketplace, q: q, page: listingsPage.page, char_q: charQ, sizeCharacteristicId: selectedCharacteristicId ?? ''} %}
-                <div class="d-flex flex-wrap gap-2 mb-3">
-                    {% if characteristicsPage.page > 1 %}<a class="btn btn-sm" href="{{ path('moysklad_listing_mappings', charParams|merge({char_page: characteristicsPage.page - 1})) }}">Предыдущие характеристики</a>{% endif %}
-                    {% if characteristicsPage.page * characteristicsPage.perPage < characteristicsPage.totalItems %}<a class="btn btn-sm" href="{{ path('moysklad_listing_mappings', charParams|merge({char_page: characteristicsPage.page + 1})) }}">Следующие характеристики</a>{% endif %}
+
+            <div class="vf-ops-filterbar d-print-none">
+                <div class="vf-ops-filterbar__row">
+                    {% if view == 'all' %}
+                        <form method="get" class="vf-ops-search" role="search">
+                            {% for k, v in hiddenParams %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+                            <input type="hidden" name="view" value="all">
+                            <button type="submit" class="vf-ops-search__submit" aria-label="Найти"><i class="ti ti-search" aria-hidden="true"></i></button>
+                            <input id="mapping-listings-search" class="form-control" type="search" name="q" value="{{ q }}" maxlength="100" placeholder="Название, артикул продавца или SKU" aria-label="Название, артикул продавца или SKU">
+                        </form>
+                        <span class="vf-ops-filterbar__count" role="status">Листингов: {{ listingsPage.totalItems|vf_number }}</span>
+                    {% else %}
+                        <form method="get" class="d-flex flex-wrap align-items-center gap-2" data-diagnostic-filters>
+                            {% for k, v in hiddenParams %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+                            <input type="hidden" name="view" value="queue">
+                            <label class="visually-hidden" for="diagnostic-status">Состояние</label>
+                            <select id="diagnostic-status" name="diag_status" class="form-select form-select-sm w-auto mw-100"><option value="">Все состояния</option>{% for status in diagnosticStatuses %}<option value="{{ status.value }}"{% if diagStatus == status.value %} selected{% endif %}>{{ status.label }}</option>{% endfor %}</select>
+                            <label class="visually-hidden" for="diagnostic-reason">Причина</label>
+                            <select id="diagnostic-reason" name="diag_reason" class="form-select form-select-sm w-auto mw-100"><option value="">Все причины</option>{% for reason in diagnosticReasons %}<option value="{{ reason.value }}"{% if diagReason == reason.value %} selected{% endif %}>{{ reason.label }}</option>{% endfor %}</select>
+                            <label class="visually-hidden" for="diagnostic-manual">Ручная проверка</label>
+                            <select id="diagnostic-manual" name="diag_manual" class="form-select form-select-sm w-auto mw-100"><option value="">Все строки</option><option value="1"{% if diagManual == '1' %} selected{% endif %}>Требует проверки</option><option value="0"{% if diagManual == '0' %} selected{% endif %}>Не требует проверки</option></select>
+                            <button class="btn btn-sm" type="submit">Применить</button>
+                        </form>
+                        <span class="vf-ops-filterbar__count" role="status">Найдено: {{ diagnostics.totalItems|vf_number }}</span>
+                    {% endif %}
                 </div>
-                {{ form_start(previewForm, {attr: {'data-automatic-preview': ''}}) }}
-                {{ form_row(previewForm.sizeCharacteristicId) }}
-                <button class="btn btn-primary" type="submit">Найти соответствия на этой странице</button>
-                {{ form_end(previewForm) }}
             </div>
-        </div>
-        <div class="card">
+
             <div class="table-responsive">
-                <table class="table table-vcenter card-table">
-                    <thead><tr><th>Листинг {{ providerName }}</th><th>Размер</th><th>Артикул продавца</th><th>Позиция МойСклад</th><th>Статус</th><th>Действия</th></tr></thead>
+                <table class="table table-vcenter card-table vf-table vf-mapping-table" data-mapping-table>
+                    <thead>
+                        <tr>
+                            <th scope="col" class="vf-mapping-table__listing">Листинг {{ providerName }}</th>
+                            <th scope="col" class="vf-mapping-table__article" title="Артикул продавца">Артикул</th>
+                            <th scope="col" class="vf-mapping-table__target">Позиция МойСклад</th>
+                            <th scope="col" class="vf-mapping-table__status">Статус</th>
+                            <th scope="col" class="vf-mapping-table__actions"><span class="visually-hidden">Действия</span></th>
+                        </tr>
+                    </thead>
                     <tbody>
-                        {% for listing in listingsPage.items %}
-                            {% set state = states[listing.id] %}
-                            <tr data-listing-id="{{ listing.id }}">
-                                <td class="text-break">{{ listing.title ?? listing.sku }}<div class="text-secondary">{{ listing.sku }}</div>{% if not listing.isActive %}<span class="badge bg-secondary-lt">Неактивен</span>{% endif %}</td>
-                                <td>{{ listing.size ?? '—' }}</td>
-                                <td class="text-break">{{ listing.supplierSku ?? '—' }}</td>
-                                <td class="text-break">{% if state.target %}{{ state.target.name }}<div class="text-secondary">{{ state.target.typeLabel }} · {{ state.target.article ?? state.target.code ?? '—' }}</div>{% else %}—{% endif %}</td>
-                                <td>{{ state.statusLabel }}{% if state.status == 'needs_review' %}<div class="text-secondary">{{ state.reasonLabel }}</div>{% endif %}</td>
-                                <td>
-                                    <a class="btn btn-sm" href="{{ path('moysklad_listing_mapping_edit', {connectionId: mappingConnectionId, marketplace: mappingMarketplace, listingId: listing.id}) }}">{{ is_granted('module.marketplace.write') ? 'Выбрать' : 'Просмотр' }}</a>
-                                    {% if state.revision > 0 %}<a class="btn btn-sm" href="{{ path('moysklad_listing_mapping_history', {connectionId: mappingConnectionId, marketplace: mappingMarketplace, listingId: listing.id}) }}">История</a>{% endif %}
-                                </td>
-                            </tr>
+                        {% if view == 'queue' %}
+                            {% for row in diagnostics.rows %}
+                                {% include 'moy_sklad/mappings/_row.html.twig' with {listing: row.source, state: states[row.listingId], diagnostic: row, routeParams: routeParams, canWrite: canWrite} only %}
+                            {% else %}
+                                <tr><td colspan="5" class="vf-ops-empty"><div class="vf-ops-empty__title">{{ completed.total == 0 ? 'В кабинете пока нет листингов' : 'Здесь пусто' }}</div><div class="vf-ops-empty__hint">{{ completed.total == 0 ? 'Загрузите каталог маркетплейса.' : 'По выбранному фильтру строк нет.' }}</div></td></tr>
+                            {% endfor %}
                         {% else %}
-                            <tr><td colspan="6" class="text-secondary text-center py-4">Листинги не найдены. Проверьте поиск или загрузите каталог маркетплейса.</td></tr>
-                        {% endfor %}
+                            {% for listing in listingsPage.items %}
+                                {% include 'moy_sklad/mappings/_row.html.twig' with {listing: listing, state: states[listing.id], diagnostic: null, routeParams: routeParams, canWrite: canWrite} only %}
+                            {% else %}
+                                <tr><td colspan="5" class="vf-ops-empty"><div class="vf-ops-empty__title">Листинги не найдены</div><div class="vf-ops-empty__hint">Проверьте поиск или загрузите каталог маркетплейса.</div></td></tr>
+                            {% endfor %}
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
-            <div class="card-footer">
-                {% include 'partials/_pagination.html.twig' with {page: listingsPage.page, total: listingsPage.totalItems, perPage: listingsPage.perPage, route: 'moysklad_listing_mappings', params: {connectionId: mappingConnectionId, marketplace: mappingMarketplace, diag_page: diagnostics.page, diag_status: diagStatus, diag_reason: diagReason, diag_manual: diagManual, q: q, char_q: charQ, char_page: characteristicsPage.page, sizeCharacteristicId: selectedCharacteristicId ?? ''}} only %}
+            <div class="card-footer" data-mapping-pagination>
+                {% if view == 'queue' %}
+                    {% include 'partials/_pagination.html.twig' with {page: diagnostics.page, total: diagnostics.totalItems, perPage: diagnostics.perPage, route: 'moysklad_listing_mappings', params: keepParams|merge({view: 'queue', diag_status: diagStatus, diag_reason: diagReason, diag_manual: diagManual}), pageParam: 'diag_page'} only %}
+                {% else %}
+                    {% include 'partials/_pagination.html.twig' with {page: listingsPage.page, total: listingsPage.totalItems, perPage: listingsPage.perPage, route: 'moysklad_listing_mappings', params: keepParams|merge({view: 'all', q: q})} only %}
+                {% endif %}
             </div>
         </div>
     </section>

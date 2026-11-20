@@ -1,0 +1,56 @@
+{#
+  Строка таблицы маппинга: не выше двух линий, доказательства — в раскрывающейся строке ниже.
+  Parameters: listing (ListingMetaDTO), state (ListingMappingState — живая связь),
+  diagnostic (MappingDiagnosticRow|null — строка последней диагностики), routeParams, canWrite.
+#}
+{% set rowParams = routeParams|merge({listingId: listing.id}) %}
+{% set title = listing.title ?? listing.sku %}
+{% set badge = {mapped: 'bg-success-lt', needs_review: 'bg-warning-lt'}[state.status] ?? 'bg-secondary-lt' %}
+{% set detailsId = 'mapping-evidence-' ~ listing.id %}
+<tr data-listing-id="{{ listing.id }}"{% if diagnostic %} data-diagnostic-listing-id="{{ listing.id }}"{% endif %}{% if not listing.isActive %} class="vf-row-muted"{% endif %}>
+    <td>
+        <div class="text-truncate fw-medium" title="{{ title }}">{{ title }}</div>
+        <div class="small text-secondary text-truncate"><span class="font-monospace">{{ listing.sku }}</span>{% if listing.size %} · {{ listing.size }}{% endif %}{% if not listing.isActive %} · <span class="badge bg-secondary-lt">Неактивен</span>{% endif %}</div>
+    </td>
+    <td class="text-truncate font-monospace" title="{{ listing.supplierSku }}">{{ listing.supplierSku ?? '—' }}</td>
+    <td>
+        {% if state.target %}
+            <div data-mapping-target>
+                <div class="text-truncate" title="{{ state.target.name }}">{{ state.target.name }}</div>
+                <div class="small text-secondary text-truncate">{{ state.target.typeLabel }} · <span class="font-monospace">{{ state.target.article ?? state.target.code ?? '—' }}</span></div>
+            </div>
+        {% elseif diagnostic and diagnostic.decision.target %}
+            <div class="text-secondary" data-mapping-proposal>
+                <div class="text-truncate" title="{{ diagnostic.decision.target.name }}"><i class="ti ti-sparkles me-1" aria-hidden="true"></i>Предложение: {{ diagnostic.decision.target.name }}</div>
+                <div class="small text-truncate">{{ diagnostic.decision.target.typeLabel }} · <span class="font-monospace">{{ diagnostic.decision.target.article ?? diagnostic.decision.target.code ?? '—' }}</span></div>
+            </div>
+        {% else %}
+            <span class="text-secondary">—</span>
+        {% endif %}
+    </td>
+    <td>
+        <span class="badge vf-status {{ badge }}" data-mapping-status>{{ state.statusLabel }}</span>
+        {% if diagnostic and state.status != 'mapped' %}
+            <div class="small text-secondary text-truncate" title="{{ diagnostic.decision.reason }}" data-mapping-reason>{{ diagnostic.decision.reason }}</div>
+        {% elseif state.status == 'needs_review' %}
+            <div class="small text-secondary text-truncate" title="{{ state.reasonLabel }}" data-mapping-reason>{{ state.reasonLabel }}</div>
+        {% endif %}
+    </td>
+    <td class="text-end text-nowrap">
+        {% if diagnostic %}
+            <button type="button" class="btn btn-sm btn-ghost-secondary" data-bs-toggle="collapse" data-bs-target="#{{ detailsId }}" aria-expanded="false" aria-controls="{{ detailsId }}">Подробнее</button>
+        {% endif %}
+        <a class="btn btn-sm" href="{{ path('moysklad_listing_mapping_edit', rowParams) }}">{{ canWrite ? (state.status == 'mapped' ? 'Изменить' : 'Выбрать') : 'Просмотр' }}</a>
+        {% if state.revision > 0 %}
+            <a class="btn btn-sm btn-icon btn-ghost-secondary" href="{{ path('moysklad_listing_mapping_history', rowParams) }}" title="История" aria-label="История"><i class="ti ti-history" aria-hidden="true"></i></a>
+        {% endif %}
+    </td>
+</tr>
+{% if diagnostic %}
+    <tr class="collapse vf-mapping-table__details" id="{{ detailsId }}">
+        <td colspan="5">
+            {% if diagnostic.reasonLabels %}<div class="mb-2">{% for reason in diagnostic.reasonLabels %}<span class="badge bg-secondary-lt me-1">{{ reason }}</span>{% endfor %}</div>{% endif %}
+            {% include 'moy_sklad/mappings/_evidence.html.twig' with {source: diagnostic.source, decision: diagnostic.decision, barcodes: diagnostic.barcodes, sourceQuantities: diagnostic.sourceQuantities} only %}
+        </td>
+    </tr>
+{% endif %}

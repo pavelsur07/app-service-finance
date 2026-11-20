@@ -3,6 +3,7 @@ import './styles/components/dds-pickers.css';
 import './styles/pages/dds-operation.css';
 import './styles/pages/budget.css';
 import './styles/pages/settlement.css';
+import './styles/pages/moysklad-mappings.css';
 import './styles/pages/balance.css';
 import './styles/pages/pl-filter-controls.css';
 import './styles/pages/cashflow-categories.css';
