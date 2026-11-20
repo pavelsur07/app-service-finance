@@ -42,13 +42,24 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('[data-economics-table] .table.table-vcenter.card-table');
         self::assertSelectorExists('[data-economics-table] [data-economics-scroll][tabindex="0"]');
-        $row = $crawler->filter('tbody tr')->first()->text();
-        self::assertStringContainsString('SKU-991', $row);
+        $headers = $crawler->filter('[data-economics-table] thead th');
+        self::assertSame('SKU', $headers->eq(0)->text());
+        self::assertSame('Наименование', $headers->eq(1)->text());
+        self::assertSame('Продано, шт.', $headers->eq(2)->text());
+        $product = $crawler->filter('[data-economics-table] tbody tr')->first();
+        self::assertSame('SKU-991', $product->filter('td')->eq(0)->text());
+        self::assertSame('Платье', $product->filter('td')->eq(1)->text());
+        self::assertCount($headers->count(), $product->filter('td'));
+        $row = $product->text();
         // СМ1 = 3000 − 900 − 450 = 1650; СМ2 = 1500; СМ3 = 1450
         self::assertMatchesRegularExpression('/1\s650,00/u', $row);
         self::assertMatchesRegularExpression('/1\s450,00/u', $row);
         $totals = $crawler->filter('tr.me-totals');
         self::assertSame(['Нераспределено', 'Итого'], $totals->each(static fn ($r): string => $r->filter('td')->first()->text()));
+        foreach ($totals->each(static fn ($total) => $total->filter('td')) as $cells) {
+            self::assertSame('2', $cells->first()->attr('colspan'));
+            self::assertSame($headers->count(), $cells->count() + 1);
+        }
         // итог кабинета: 1450 − 30 нераспределённой подписки
         self::assertMatchesRegularExpression('/1\s420,00/u', $totals->last()->text());
 
@@ -100,6 +111,13 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         self::assertSelectorExists('select[name="alloc"] option[value="0"][selected]');
         self::assertSelectorExists('select[name="tags[]"] option[selected]');
         self::assertSelectorExists('button.btn-primary');
+        $table = $crawler->filter('[data-economics-table] table');
+        $empty = $table->filter('tbody tr')->first()->filter('td');
+        self::assertCount(1, $empty);
+        self::assertSame('Нет продаж и затрат по SKU за период.', $empty->text());
+        self::assertSame('Наименование', $table->filter('thead th')->eq(1)->text());
+        self::assertSame((string) $table->filter('thead th')->count(), $empty->attr('colspan'));
+        self::assertSame('2', $table->filter('tr.me-totals td')->first()->attr('colspan'));
         $href = $crawler->filter('nav[aria-label="Отчёт"] a')->eq(1)->attr('href');
         parse_str((string) parse_url((string) $href, \PHP_URL_QUERY), $query);
         self::assertSame(array_diff_key($params, array_flip(['sort', 'dir', 'limit'])), $query);
@@ -114,7 +132,8 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         $this->day('2026-11-10');
         $company = $this->em()->getReference(Company::class, self::COMPANY_ID);
         self::assertInstanceOf(Company::class, $company);
-        $second = MarketplaceListingBuilder::aListing()->forCompany($company)->withMarketplaceSku('SKU-SECOND')->withName(str_repeat('Длинное название ', 12))->build();
+        $sellerArticle = str_repeat('Артикул продавца ', 6).'2';
+        $second = MarketplaceListingBuilder::aListing()->forCompany($company)->withMarketplaceSku('SKU-SECOND')->withName('')->withSupplierSku($sellerArticle)->build();
         $this->em()->persist($second);
         $this->em()->flush();
         $this->line('2026-11-10', (string) $second->getId(), 'sale', 'revenue', 200000, 2);
@@ -128,7 +147,10 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         $params = ['from' => '2026-11-10', 'to' => '2026-11-18', 'sort' => 'revenue', 'dir' => 'asc', 'limit' => '1', 'page' => '2'];
         $crawler = $client->request('GET', self::URL, $params);
         self::assertResponseIsSuccessful();
-        self::assertStringContainsString('SKU-SECOND', $crawler->filter('tbody tr')->first()->text());
+        $productCells = $crawler->filter('tbody tr')->first()->filter('td');
+        self::assertSame('SKU-SECOND', $productCells->eq(0)->text());
+        self::assertSame($sellerArticle, $productCells->eq(1)->text());
+        self::assertSame($sellerArticle, $productCells->eq(1)->filter('[title]')->attr('title'));
         self::assertMatchesRegularExpression('/3\s000,00/u', $crawler->filter('tr.me-totals')->last()->text());
         self::assertSelectorExists('.pagination .page-item.active [aria-current="page"]');
         self::assertSelectorTextContains('.vf-pager-caption', 'из 2');
