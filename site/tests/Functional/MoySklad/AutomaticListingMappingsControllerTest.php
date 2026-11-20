@@ -114,7 +114,7 @@ final class AutomaticListingMappingsControllerTest extends WebTestCaseBase
         $this->em()->flush();
         $url = $this->url($data['connection']->getId());
         $client->request('GET', $url);
-        self::assertSelectorCount(21, 'select[name="sizeCharacteristicId"] option');
+        self::assertSelectorCount(21, 'form[data-automatic-preview] select[name="sizeCharacteristicId"] option');
         $form = $client->getCrawler()->filter('form[data-automatic-preview]')->form();
         $client->request('POST', $form->getUri(), array_replace($form->getPhpValues(), ['sizeCharacteristicId' => 'char-20']));
         self::assertResponseStatusCodeSame(422);
@@ -122,7 +122,7 @@ final class AutomaticListingMappingsControllerTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(404);
         $client->request('GET', $url, ['char_page' => 2, 'sizeCharacteristicId' => 'char-00']);
         self::assertResponseIsSuccessful();
-        self::assertSelectorCount(3, 'select[name="sizeCharacteristicId"] option');
+        self::assertSelectorCount(3, 'form[data-automatic-preview] select[name="sizeCharacteristicId"] option');
         self::assertSelectorExists('option[value="char-00"][selected]');
         $client->submit($client->getCrawler()->filter('form[data-automatic-preview]')->form());
         self::assertResponseStatusCodeSame(303);

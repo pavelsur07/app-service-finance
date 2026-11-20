@@ -1,0 +1,23 @@
+/* Маппинг МойСклад: строка таблицы не выше двух линий, длинный текст обрезается
+   с полным значением в title (docs/tasks/moysklad-mappings-ui/plan.md). */
+.vf-mapping-table {
+  table-layout: fixed;
+  min-width: 760px;
+}
+
+.vf-mapping-table__listing { width: 30%; }
+.vf-mapping-table__article { width: 11%; }
+.vf-mapping-table__target { width: 24%; }
+.vf-mapping-table__status { width: 19%; }
+.vf-mapping-table__actions { width: 13rem; }
+
+/* Раскрытые доказательства — фон страницы, чтобы отличались от строк. */
+.vf-mapping-table > tbody > tr.vf-mapping-table__details > td {
+  background: var(--vf-bg);
+  overflow-wrap: anywhere;
+}
+
+[data-mapping-settings] > summary {
+  cursor: pointer;
+  list-style-position: inside;
+}

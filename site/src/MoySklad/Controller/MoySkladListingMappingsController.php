@@ -66,21 +66,25 @@ final class MoySkladListingMappingsController extends AbstractController
         $diagPage = filter_var($values['diag_page'] ?? 1, \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 2147483647]]);
         $diagStatus = $values['diag_status'] ?? '';
         $diagReason = $values['diag_reason'] ?? '';
-        $diagManual = $values['diag_manual'] ?? '';
-        if (false === $diagPage || !is_string($diagStatus) || !is_string($diagReason) || !is_string($diagManual)
+        $view = $values['view'] ?? '';
+        // Очередь без явного фильтра открывается на «Требует внимания»; пустой diag_manual в URL — «все строки отчёта».
+        $diagManual = $values['diag_manual'] ?? ('all' !== $view && '' === $diagStatus && '' === $diagReason ? '1' : '');
+        if (false === $diagPage || !is_string($diagStatus) || !is_string($diagReason) || !is_string($diagManual) || !in_array($view, ['', 'queue', 'all'], true)
             || ('' !== $diagStatus && null === \App\MoySklad\Enum\AutomaticMappingDecisionStatus::tryFrom($diagStatus))
             || ('' !== $diagReason && null === \App\MoySklad\Enum\MappingDiagnosticReason::tryFrom($diagReason)) || !in_array($diagManual, ['', '0', '1'], true)) {
             throw new UnprocessableEntityHttpException('Некорректный фильтр диагностики.');
         }
         $diagnosticPage = $diagnostics->page($companyId, $connectionId, $marketplace, $diagPage, '' === $diagStatus ? null : $diagStatus, '' === $diagReason ? null : $diagReason, '' === $diagManual ? null : '1' === $diagManual);
-        $states = $mappings->currentForListings($companyId, $connectionId, array_column($result->items, 'id'));
+        $view = null !== $diagnosticPage->completedRun && ('queue' === $view || ('' === $view && '' === $q)) ? 'queue' : 'all';
+        $rowIds = 'queue' === $view ? array_map(static fn (\App\MoySklad\Application\DTO\MappingDiagnosticRow $row): string => $row->listingId, $diagnosticPage->rows) : array_column($result->items, 'id');
+        $states = $mappings->currentForListings($companyId, $connectionId, $rowIds);
 
         return $this->render('moy_sklad/mappings/index.html.twig', [
             'diagnostics' => $diagnosticPage, 'mappingCompanyId' => $companyId, 'mappingSettings' => $settings->get($companyId, $connectionId, $marketplace),
             'diagnosticCharacteristicChoices' => $choices,
             'diagnosticRequestId' => \Ramsey\Uuid\Uuid::uuid7()->toString(),
             'diagnosticStatuses' => \App\MoySklad\Enum\AutomaticMappingDecisionStatus::cases(), 'diagnosticReasons' => \App\MoySklad\Enum\MappingDiagnosticReason::cases(),
-            'diagStatus' => $diagStatus, 'diagReason' => $diagReason, 'diagManual' => $diagManual,
+            'view' => $view, 'diagStatus' => $diagStatus, 'diagReason' => $diagReason, 'diagManual' => $diagManual,
             'connection' => $connection, 'mappingConnectionId' => $connectionId, 'mappingMarketplace' => $marketplace,
             'providerName' => MarketplaceType::from($marketplace)->getDisplayName(),
             'previewForm' => $previewForm->createView(), 'characteristicsPage' => $charResult, 'charQ' => $charQ, 'selectedCharacteristicId' => $selected,
