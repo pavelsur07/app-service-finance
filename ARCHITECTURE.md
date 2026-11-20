@@ -379,6 +379,13 @@
 - Справочники обеих вкладок (статья, контрагент, проект, основание ДДС) присоединяются с условием `IDENTITY(x.company) = :companyId`: FK компанию не несут, испорченная ссылка на справочник чужой компании гидрируется пустой — чужое название не показывается, не ищется и не входит в итог (как в JSON-выгрузке; тест `testForeignReferenceNamesDoNotLeakOnEitherTab`).
 - Деньги строк и итога — правила регистра ОПиУ: `DocumentPlContribution::forDocument()` (строка документа) и `::forOperation()` (строка операции). Обычный документ — модуль операции; `marketplace_pl` — со знаком суммы найденных операций той же статьи и природы в документе, поэтому сумма строк равна итогу. Итог — `DocumentListTotalsDTO::fromAggregates()` по валютам (основание ДДС без пересчёта, иначе RUB).
 
+### Finance: переход из отчёта ДДС в «Транзакции ДДС»
+
+- Ненулевая сумма статьи в отчёте ДДС (`report_cashflow_index`, макрос `render_category`) — ссылка на `cash_transaction_index` с фильтрами ячейки: `categoryId`, `includeChildren=1` (только у статьи с вложенными), `dateFrom`/`dateTo` — границы колонки, обрезанные периодом отчёта, `currency` — валюта таблицы. JS отчёта (`assets/pages/cashflow_report.js`) открывает ссылку двойным кликом по ячейке, одиночный клик мышью гасит; клавиатура, касание, Ctrl/Cmd и средняя кнопка — как у обычной ссылки.
+- База ссылки — `drilldown` в payload `CashflowReportBuilder::build()`: `projectIds` (уже раскрытые дочерние направления) и `centerIds` (в том числе legacy `responsibilityCenterId`), только когда фильтр отчёта активен; `null` в режиме сверки с дашбордом — там отчёт исключает переводы и технические статьи, список так не фильтрует, и ссылок нет. Сальдо ссылок не имеет.
+- Фильтры списка (`CashTransactionFilters`, общие для экрана и экспорта): `includeChildren=1` — `categoryId` вместе с поддеревом статьи своей компании (`CashTransactionRepository::categoryWithDescendantIds()`); `projectIds`/`centerIds` — UUID через запятую, `IN` по `t.projectDirection`/`t.responsibilityCenterId`; невалидный UUID — flash и redirect. Списки строкой, а не `[]`: контракт фильтров — `array<string, string|null>`.
+- Список показывает полную сумму операции: у операции с разбивкой по нескольким статьям строка больше доли в ячейке, набор операций при этом совпадает.
+
 ### Finance: responsibility-center fact-schema expansion
 
 - Stage 7.5 adds nullable scalar `responsibility_center_id` UUID columns to `cash_transaction`, `documents`, `document_operations`, and `pl_daily_totals`. Each column has a restrictive FK to Company-owned `financial_responsibility_centers`.
@@ -6143,6 +6150,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.229 | 2026-11-20 | Finance/Cash: сумма статьи в отчёте ДДС ведёт в «Транзакции ДДС» с фильтрами ячейки (двойной клик); фильтры списка `includeChildren`, `projectIds`, `centerIds` |
 | 2.228 | 2026-11-19 | Company: кнопка «Нормализовать названия» в списке контрагентов — предпросмотр и применение правил по активной компании (`RefreshCounterpartyDisplayNamesAction` с `companyId`) |
 | 2.227 | 2026-11-19 | Company: правила отображаемого названия контрагента v3 — ИНН с запятой перед названием, маскированное ФИО «Б. Имя Отчество» |
 | 2.226 | 2026-11-19 | Cash: после смены дерева ДДС (замена ядром, загрузка JSON, разовая команда) переоткрываются и показанные без решения подсказки ИИ, не только «нет ответа» |

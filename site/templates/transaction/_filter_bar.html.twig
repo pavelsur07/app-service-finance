@@ -132,10 +132,10 @@
                     <input type="search" class="form-control" placeholder="Название статьи" aria-label="Найти статью по названию" data-ops-pop-search>
                 </div>
                 <div class="vf-ops-pop__list">
-                    <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['categoryId'])) }}"{% if not filters.categoryId %} aria-current="true"{% endif %}>Все статьи</a>
+                    <a class="dropdown-item" href="{{ path(route, baseQuery|filter((v, k) => k not in ['categoryId', 'includeChildren'])) }}"{% if not filters.categoryId %} aria-current="true"{% endif %}>Все статьи</a>
                     {% for c in categories %}
                         <a class="dropdown-item vf-ops-lvl-{{ min(c.level, 5) }}"
-                           href="{{ path(route, baseQuery|filter((v, k) => k not in ['categoryId'])|merge({categoryId: c.id})) }}"
+                           href="{{ path(route, baseQuery|filter((v, k) => k not in ['categoryId', 'includeChildren'])|merge({categoryId: c.id})) }}"
                            data-ops-pop-item="{{ c.name|lower }}"{% if filters.categoryId == c.id %} aria-current="true"{% endif %}>{{ c.name }}</a>
                     {% endfor %}
                     <div class="vf-ops-pop__empty" data-ops-pop-empty hidden>Ничего не нашли. Проверьте название.</div>

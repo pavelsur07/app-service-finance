@@ -171,7 +171,9 @@
     periods: periods,
     periodCount: periodCount,
     categories: categories,
-    categoryTotals: categoryTotals
+    categoryTotals: categoryTotals,
+    drilldown: drilldown ?? null,
+    date_from: date_from
 } only %}
 
 {% include 'report/cashflow/_projects.html.twig' with {

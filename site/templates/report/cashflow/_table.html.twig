@@ -1,6 +1,7 @@
 {#
   Основная таблица ДДС по каждой валюте: сальдо на начало, статьи, сальдо на конец.
-  Параметры: openings, closings, periods, periodCount, categories, categoryTotals.
+  Параметры: openings, closings, periods, periodCount, categories, categoryTotals,
+  drilldown (база ссылки в «Транзакции ДДС», null — без ссылок), date_from.
 #}
 {% import 'report/cashflow/_macros.html.twig' as macros %}
 {% for currency, values in openings %}
@@ -27,7 +28,7 @@
                         {% endfor %}
                     </tr>
                     {% for cat in categories %}
-                        {{ macros.render_category(cat, categoryTotals, currency, periodCount, '') }}
+                        {{ macros.render_category(cat, categoryTotals, currency, periodCount, '', {base: drilldown, periods: periods, from: date_from}) }}
                     {% endfor %}
                     <tr class="fw-bold">
                         <td>Сальдо на конец</td>
