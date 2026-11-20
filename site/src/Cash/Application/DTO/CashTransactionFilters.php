@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Application\DTO;
 
 use App\Cash\Enum\FiatCurrency;
+use Ramsey\Uuid\Uuid;
 
 /**
  * Разбор фильтров списка операций ДДС из query string.
@@ -24,6 +25,11 @@ final readonly class CashTransactionFilters
         'amountMin',
         'amountMax',
         'q',
+        // Переход из отчёта ДДС: статья вместе с поддеревом, проекты и ЦФО списком UUID через запятую.
+        // Списки строкой, а не `[]`: на скалярных значениях держатся экспорт, чипы и пагинация.
+        'includeChildren',
+        'projectIds',
+        'centerIds',
     ];
 
     /**
@@ -41,7 +47,30 @@ final readonly class CashTransactionFilters
         if (null !== $filters['currency']) {
             $filters['currency'] = FiatCurrency::fromCode($filters['currency'])->value;
         }
+        if ('1' !== $filters['includeChildren']) {
+            $filters['includeChildren'] = null;
+        }
+        foreach (['projectIds', 'centerIds'] as $key) {
+            if (null !== $filters[$key]) {
+                $filters[$key] = implode(',', self::uuidList($filters[$key]));
+            }
+        }
 
         return $filters;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function uuidList(string $csv): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('trim', explode(',', $csv)), static fn (string $id): bool => '' !== $id)));
+        foreach ($ids as $id) {
+            if (!Uuid::isValid($id)) {
+                throw new \InvalidArgumentException('Некорректный фильтр перехода из отчёта.');
+            }
+        }
+
+        return $ids;
     }
 }

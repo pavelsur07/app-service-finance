@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Cash\Repository\Transaction;
 
+use App\Cash\Application\DTO\CashTransactionFilters;
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\Company;
@@ -549,7 +551,7 @@ SQL,
             // Фильтр из createFilteredQueryBuilder отбирает транзакции, а здесь строки
             // ещё и присоединены: без этого ограничения выгрузка по одной категории
             // вернула бы и остальные строки разбитой транзакции.
-            $qb->andWhere('split.cashflowCategory = :cat');
+            $qb->andWhere('split.cashflowCategory IN (:cat)');
         }
 
         return $qb
@@ -620,8 +622,19 @@ SQL,
         if ($filters['categoryId'] ?? null) {
             // Фильтр по строкам разбивки: транзакция попадает в выдачу, если её содержит
             // хотя бы одна строка, и показывается суммой именно этой строки.
-            $qb->andWhere('EXISTS (SELECT 1 FROM App\\Cash\\Entity\\Transaction\\CashTransactionSplit fs WHERE fs.cashTransaction = t AND fs.cashflowCategory = :cat)')
-                ->setParameter('cat', $filters['categoryId']);
+            $categoryIds = '1' === ($filters['includeChildren'] ?? null)
+                ? $this->categoryWithDescendantIds($company, $filters['categoryId'])
+                : [$filters['categoryId']];
+            $qb->andWhere('EXISTS (SELECT 1 FROM App\\Cash\\Entity\\Transaction\\CashTransactionSplit fs WHERE fs.cashTransaction = t AND fs.cashflowCategory IN (:cat))')
+                ->setParameter('cat', $categoryIds);
+        }
+        if ($filters['projectIds'] ?? null) {
+            $qb->andWhere('IDENTITY(t.projectDirection) IN (:projectIds)')
+                ->setParameter('projectIds', CashTransactionFilters::uuidList($filters['projectIds']));
+        }
+        if ($filters['centerIds'] ?? null) {
+            $qb->andWhere('t.responsibilityCenterId IN (:centerIds)')
+                ->setParameter('centerIds', CashTransactionFilters::uuidList($filters['centerIds']));
         }
         if ($filters['counterpartyId'] ?? null) {
             $qb->andWhere('t.counterparty = :cp')->setParameter('cp', $filters['counterpartyId']);
@@ -643,5 +656,42 @@ SQL,
         }
 
         return $qb;
+    }
+
+    /**
+     * Статья и все её потомки внутри компании; чужая статья поддерева не даёт.
+     *
+     * @return list<string>
+     */
+    private function categoryWithDescendantIds(Company $company, string $categoryId): array
+    {
+        /** @var list<array{id: string, parentId: string|null}> $rows */
+        $rows = $this->getEntityManager()->createQueryBuilder()
+            ->select('c.id AS id', 'IDENTITY(c.parent) AS parentId')
+            ->from(CashflowCategory::class, 'c')
+            ->where('c.company = :company')
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->getArrayResult();
+
+        $children = [];
+        foreach ($rows as $row) {
+            if (null !== $row['parentId']) {
+                $children[(string) $row['parentId']][] = (string) $row['id'];
+            }
+        }
+
+        $ids = [$categoryId];
+        $seen = [$categoryId => true];
+        for ($i = 0; $i < \count($ids); ++$i) {
+            foreach ($children[$ids[$i]] ?? [] as $childId) {
+                if (!isset($seen[$childId])) {
+                    $seen[$childId] = true;
+                    $ids[] = $childId;
+                }
+            }
+        }
+
+        return $ids;
     }
 }

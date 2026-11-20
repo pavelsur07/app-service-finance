@@ -110,6 +110,14 @@ final class CashTransactionBuilder
         return $clone;
     }
 
+    public function withOccurredAt(\DateTimeImmutable $occurredAt): self
+    {
+        $clone = clone $this;
+        $clone->occurredAt = $occurredAt;
+
+        return $clone;
+    }
+
     public function withCashflowCategory(?CashflowCategory $category): self
     {
         $clone = clone $this;

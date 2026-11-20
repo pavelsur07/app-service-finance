@@ -4,7 +4,9 @@
     {{ value|vf_amount(2, value > 0 ? 'income' : null) }}
 {% endmacro %}
 
-{% macro render_category(cat, totals, currency, periodCount, parentId) %}
+{# drill: {base, periods, from}; base = null — суммы без ссылок. Ссылка ведёт в «Транзакции ДДС»
+   с фильтрами ячейки; JS отчёта открывает её двойным кликом. #}
+{% macro render_category(cat, totals, currency, periodCount, parentId, drill) %}
 {% set hasChildren = cat.children|length > 0 %}
 {% set hidden = cat.level >= 2 %}
 <tr data-id="{{ cat.id }}" data-parent="{{ parentId }}" data-level="{{ cat.level }}"{% if hidden %} style="display:none"{% endif %}>
@@ -20,11 +22,22 @@
     </td>
     {% for i in 0..periodCount - 1 %}
         {% set val = totals[cat.id].totals[currency][i] ?? 0 %}
-        <td class="text-end">{{ _self.format_amount(val)|raw }}</td>
+        {% if drill.base is not null and val != 0 %}
+            {% set period = drill.periods[i] %}
+            {% set href = path('cash_transaction_index', drill.base|merge({
+                categoryId: cat.id,
+                dateFrom: (period.start < drill.from ? drill.from : period.start)|date('Y-m-d'),
+                dateTo: period.end|date('Y-m-d'),
+                currency: currency
+            })|merge(hasChildren ? {includeChildren: 1} : {})) %}
+            <td class="text-end cf-drill" title="Двойной клик — операции"><a href="{{ href }}" class="cf-drill-link" data-cf-drill>{{ _self.format_amount(val)|raw }}</a></td>
+        {% else %}
+            <td class="text-end">{{ _self.format_amount(val)|raw }}</td>
+        {% endif %}
     {% endfor %}
 </tr>
 {% for child in cat.children %}
-    {{ _self.render_category(child, totals, currency, periodCount, cat.id) }}
+    {{ _self.render_category(child, totals, currency, periodCount, cat.id, drill) }}
 {% endfor %}
 {% endmacro %}
 

@@ -186,6 +186,16 @@ final class CashflowReportBuilder
             $dashboardReconciliation = $this->buildDashboardReconciliation($params);
         }
 
+        // Базовые параметры перехода в «Транзакции ДДС» — тот же охват строк, что посчитан выше
+        // (проекты уже с раскрытыми дочерними). Режим сверки исключает переводы и технические
+        // статьи, список так не фильтрует — там ссылок нет.
+        $drilldownCenterIds = $responsibilityCenterIds
+            ?? (null === $params->responsibilityCenterId ? null : [$params->responsibilityCenterId]);
+        $drilldown = $params->isDashboardReconciliation() ? null : array_filter([
+            'projectIds' => null === $projectDirectionIds ? null : implode(',', $projectDirectionIds),
+            'centerIds' => null === $drilldownCenterIds ? null : implode(',', $drilldownCenterIds),
+        ], static fn (?string $value): bool => null !== $value && '' !== $value);
+
         return [
             'company' => $company,
             'group' => $group,
@@ -203,6 +213,7 @@ final class CashflowReportBuilder
             'categoryTree' => $categoryTree,
             'projectCenterMatrix' => $this->buildProjectCenterMatrix($rows, $periods),
             'dashboardReconciliation' => $dashboardReconciliation,
+            'drilldown' => $drilldown,
         ];
     }
 
