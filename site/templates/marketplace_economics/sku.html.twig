@@ -37,34 +37,40 @@
 {% block content %}
     {% import _self as ui %}
     {% set params = app.request.query.all %}
-    {# value — метод/поле SkuMetrics; kind: money — ₽, share — % от выручки до СПП, percent — уже % #}
+    {# value — метод/поле SkuMetrics; kind: money — ₽, share — % от выручки до СПП, percent — уже %;
+       group — верхняя строка шапки, short — подпись под группой, label — полное название (title, «Колонки») #}
     {% set columns = [
-        {id: 'revenue', value: 'revenue', label: 'Выручка, ₽', sort: 'revenue', required: true},
-        {id: 'revenueWithSpp', value: 'revenueWithSpp', label: 'Выручка с СПП, ₽'},
-        {id: 'spp', value: 'spp', label: 'СПП, ₽'},
-        {id: 'vat', value: 'vat', label: 'НДС к уплате, ₽'},
-        {id: 'revenueNet', value: 'revenueNet', label: 'Выручка без НДС, ₽'},
-        {id: 'costPrice', value: 'costPrice', label: 'Себестоимость, ₽'},
-        {id: 'gross', value: 'gross', label: 'Выручка без НДС − себестоимость, ₽', sort: 'gross'},
-        {id: 'commission', value: 'commission', label: 'Комиссия, ₽'},
-        {id: 'logisticsTo', value: 'logisticsTo', label: 'Логистика туда, ₽'},
-        {id: 'logisticsBack', value: 'logisticsBack', label: 'Логистика обратно, ₽'},
-        {id: 'acquiring', value: 'acquiring', label: 'Эквайринг, ₽'},
-        {id: 'otherMd1', value: 'otherMd1', label: 'Прочие СМ1, ₽'},
-        {id: 'md1', value: 'md1', label: 'СМ1, ₽', sort: 'md1', required: true},
-        {id: 'md1Pct', value: 'md1', label: 'СМ1, %', kind: 'share'},
-        {id: 'ads', value: 'ads', label: 'Реклама, ₽', sort: 'ads'},
-        {id: 'drr', value: 'drr', label: 'ДРР, %', kind: 'percent'},
-        {id: 'md2', value: 'md2', label: 'СМ2, ₽', sort: 'md2', required: true},
-        {id: 'md2Pct', value: 'md2', label: 'СМ2, %', kind: 'share', required: not allocated},
+        {id: 'revenue', value: 'revenue', group: 'Выручка', short: 'до СПП', label: 'Выручка, ₽', sort: 'revenue', required: true},
+        {id: 'revenueWithSpp', value: 'revenueWithSpp', group: 'Выручка', short: 'с СПП', label: 'Выручка с СПП, ₽'},
+        {id: 'spp', value: 'spp', group: 'Выручка', short: 'СПП', label: 'СПП, ₽'},
+        {id: 'vat', value: 'vat', group: 'Выручка', short: 'НДС', label: 'НДС к уплате, ₽'},
+        {id: 'revenueNet', value: 'revenueNet', group: 'Выручка', short: 'без НДС', label: 'Выручка без НДС, ₽'},
+        {id: 'costPrice', value: 'costPrice', group: 'Товар', short: 'Себест.', label: 'Себестоимость, ₽'},
+        {id: 'gross', value: 'gross', group: 'Товар', short: 'Выр. − себест.', label: 'Выручка без НДС − себестоимость, ₽', sort: 'gross'},
+        {id: 'commission', value: 'commission', group: 'Расходы МП', short: 'Комиссия', label: 'Комиссия, ₽'},
+        {id: 'logisticsTo', value: 'logisticsTo', group: 'Расходы МП', short: 'Лог. туда', label: 'Логистика туда, ₽'},
+        {id: 'logisticsBack', value: 'logisticsBack', group: 'Расходы МП', short: 'Лог. обр.', label: 'Логистика обратно, ₽'},
+        {id: 'acquiring', value: 'acquiring', group: 'Расходы МП', short: 'Эквайр.', label: 'Эквайринг, ₽'},
+        {id: 'otherMd1', value: 'otherMd1', group: 'Расходы МП', short: 'Прочие', label: 'Прочие СМ1, ₽'},
+        {id: 'md1', value: 'md1', group: 'СМ1', short: '₽', label: 'СМ1, ₽', sort: 'md1', required: true},
+        {id: 'md1Pct', value: 'md1', group: 'СМ1', short: '%', label: 'СМ1, %', kind: 'share'},
+        {id: 'ads', value: 'ads', group: 'Реклама', short: '₽', label: 'Реклама, ₽', sort: 'ads'},
+        {id: 'drr', value: 'drr', group: 'Реклама', short: 'ДРР %', label: 'ДРР, %', kind: 'percent'},
+        {id: 'md2', value: 'md2', group: 'СМ2', short: '₽', label: 'СМ2, ₽', sort: 'md2', required: true},
+        {id: 'md2Pct', value: 'md2', group: 'СМ2', short: '%', label: 'СМ2, %', kind: 'share', required: not allocated},
     ] %}
     {% if allocated %}
         {% set columns = columns|merge([
-            {id: 'overhead', value: 'overhead', label: 'Склад и прочие МП, ₽'},
-            {id: 'full', value: 'full', label: 'СМ3, ₽', sort: 'full', required: true},
-            {id: 'fullPct', value: 'full', label: 'СМ3, %', kind: 'share', required: true},
+            {id: 'overhead', value: 'overhead', group: 'Склад и пр. МП', short: '₽', label: 'Склад и прочие МП, ₽'},
+            {id: 'full', value: 'full', group: 'СМ3', short: '₽', label: 'СМ3, ₽', sort: 'full', required: true},
+            {id: 'fullPct', value: 'full', group: 'СМ3', short: '%', label: 'СМ3, %', kind: 'share', required: true},
         ]) %}
     {% endif %}
+    {# колонки группы идут подряд: группа → id её колонок, порядок — порядок columns #}
+    {% set groups = {} %}
+    {% for column in columns %}
+        {% set groups = groups|merge({(column.group): (groups[column.group] ?? [])|merge([column.id])}) %}
+    {% endfor %}
     {% set profit = allocated ? 'full' : 'md2' %}
 
     <div class="vf-page-head">
@@ -171,6 +177,7 @@
     {% else %}
         <div class="mb-3">
             <p class="text-secondary small mb-0">
+                Суммы в ₽.
                 Сравнение с {{ report.previousFrom|date('d.m.Y') }} – {{ report.previousTo|date('d.m.Y') }}.
                 Дней в витрине: {{ report.days|vf_number }}.
                 {% if report.daysWithoutCostPrice > 0 %}Дней с продажами без себестоимости: {{ report.daysWithoutCostPrice|vf_number }} — себестоимость там 0.{% endif %}
@@ -183,17 +190,22 @@
             <table class="table table-vcenter card-table me-table me-sku-table">
                 <thead>
                     <tr>
-                        <th class="me-sku-code" scope="col">SKU</th>
-                        <th class="me-sku-name" scope="col">Наименование</th>
-                        <th class="text-end">
-                            <a href="{{ path('marketplace_economics_sku', params|merge({sort: 'sales', dir: sort == 'sales' and desc ? 'asc' : 'desc', page: null})) }}">Продано, шт.</a>
+                        <th class="me-sku-code" scope="col" rowspan="2">SKU</th>
+                        <th class="me-sku-name" scope="col" rowspan="2">Наименование</th>
+                        <th class="text-end me-col-qty" scope="col" rowspan="2" title="Продано, шт.">
+                            <a href="{{ path('marketplace_economics_sku', params|merge({sort: 'sales', dir: sort == 'sales' and desc ? 'asc' : 'desc', page: null})) }}">Прод., шт</a>
                         </th>
+                        {% for group, ids in groups %}
+                            <th class="me-col-group text-center" scope="colgroup" colspan="{{ ids|length }}" data-columns="{{ ids|join(' ') }}">{{ group }}</th>
+                        {% endfor %}
+                    </tr>
+                    <tr>
                         {% for column in columns %}
-                            <th class="text-end" data-column="{{ column.id }}">
+                            <th class="text-end{{ (column.kind ?? 'money') == 'money' ? '' : ' me-col-pct' }}" scope="col" data-column="{{ column.id }}" title="{{ column.label }}">
                                 {% if column.sort is defined %}
-                                    <a href="{{ path('marketplace_economics_sku', params|merge({sort: column.sort, dir: sort == column.sort and desc ? 'asc' : 'desc', page: null})) }}">{{ column.label }}</a>
+                                    <a href="{{ path('marketplace_economics_sku', params|merge({sort: column.sort, dir: sort == column.sort and desc ? 'asc' : 'desc', page: null})) }}">{{ column.short }}</a>
                                 {% else %}
-                                    {{ column.label }}
+                                    {{ column.short }}
                                 {% endif %}
                             </th>
                         {% endfor %}

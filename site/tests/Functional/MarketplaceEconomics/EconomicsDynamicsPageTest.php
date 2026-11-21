@@ -144,7 +144,8 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
 
         // $merged — ячеек итога, объединённых colspan (в R1 «Итого» занимает SKU и наименование)
         $vat = static function ($crawler, int $merged = 0): string {
-            $headers = $crawler->filter('thead th')->each(static fn ($th): string => $th->text());
+            // R1 — двухуровневая шапка: полное название в title нижней ячейки, группы не считаются
+            $headers = $crawler->filter('thead th:not(.me-col-group)')->each(static fn ($th): string => $th->attr('title') ?? $th->text());
             $cell = $crawler->filter('tr.me-totals')->last()->filter('td')->eq((int) array_search('НДС к уплате, ₽', $headers, true) - $merged);
 
             return str_replace(["\u{a0}", '−'], [' ', '-'], $cell->text());
