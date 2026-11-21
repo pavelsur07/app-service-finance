@@ -24,7 +24,7 @@
                 <input type="hidden" name="_token" value="{{ csrf_token('moysklad_mapping_diagnostics' ~ mappingCompanyId ~ mappingConnectionId ~ mappingMarketplace) }}">
                 <input type="hidden" name="runId" value="{{ diagnosticRequestId }}">
                 <input type="hidden" name="diagnosticSizeCharacteristicId" value="{{ selectedCharacteristicId ?? '' }}">
-                <button class="btn" type="submit"><i class="ti ti-refresh me-1" aria-hidden="true"></i>Обновить диагностику</button>
+                <button class="btn btn-ghost-secondary" type="submit" title="Отчёт обновляется сам после изменений; кнопка — проверить прямо сейчас"><i class="ti ti-refresh me-1" aria-hidden="true"></i>Проверить заново</button>
             </form>
         {% endif %}
     </div>
@@ -34,11 +34,14 @@
     {% set rows = view == 'queue' ? diagnostics.rows : listingsPage.items %}
     {% set total = view == 'queue' ? diagnostics.totalItems : listingsPage.totalItems %}
     {% set totalWord = total % 10 == 1 and total % 100 != 11 ? 'листинг' : (total % 10 in 2..4 and (total % 100 < 10 or total % 100 >= 20) ? 'листинга' : 'листингов') %}
-    <section data-mapping-provider="{{ mappingMarketplace }}" data-connection-id="{{ mappingConnectionId }}" data-mapping-view="{{ view }}">
+    {% set diagnosticsBusy = diagnosticsQueued or (diagnostics.latestRun and diagnostics.latestRun.status == 'running') %}
+    {% set bulkBusy = bulkJob and (bulkJob.status in ['queued', 'running'] or bulkJob.undoStatus in ['queued', 'running']) %}
+    {# Пока идёт расчёт или пакет, страница перезагружается сама (assets/pages/moysklad_mappings.js). #}
+    <section data-mapping-provider="{{ mappingMarketplace }}" data-connection-id="{{ mappingConnectionId }}" data-mapping-view="{{ view }}"{% if diagnosticsBusy or bulkBusy %} data-mapping-autorefresh{% endif %}>
         {% if not catalogReady %}
             <div class="alert alert-info" data-catalog-not-ready>Для назначения связей включите подключение и загрузите товары и модификации. <a href="{{ path('moysklad_connections_index') }}">Перейти к подключениям</a></div>
         {% endif %}
-        {% include 'moy_sklad/mappings/_diagnostic_status.html.twig' with {report: diagnostics} only %}
+        {% include 'moy_sklad/mappings/_diagnostic_status.html.twig' with {report: diagnostics, queued: diagnosticsQueued} only %}
         {% include 'moy_sklad/mappings/_bulk_job.html.twig' with {job: bulkJob, routeParams: routeParams} only %}
 
         <div class="card vf-card" data-mapping-registry>
@@ -77,7 +80,7 @@
                         {% if canWrite %}
                             {% set phrases = {direct_article: 'по артикулу позиции', parent_article_size: 'по артикулу родителя и размеру', exact_code: 'по коду позиции', wb_article_alias: 'по алиасу WB', exact_barcode: 'по штрихкоду'} %}
                             {% set readyCount = completed.counts.ready ?? 0 %}
-                            {% set blocked = diagnostics.stale ? 'Отчёт устарел: каталог или связи изменились после проверки. Обновите диагностику, затем принимайте предложения.' : (bulkJob and bulkJob.active ? 'Пакет уже обрабатывается. Дождитесь окончания.' : (readyCount == 0 ? 'В отчёте нет предложений.' : '')) %}
+                            {% set blocked = diagnostics.stale ? 'Отчёт обновляется после изменений каталога или связей. Дождитесь окончания — страница обновится сама.' : (bulkJob and bulkJob.active ? 'Пакет уже обрабатывается. Дождитесь окончания.' : (readyCount == 0 ? 'В отчёте нет предложений.' : '')) %}
                             {% set breakdown = bulkBreakdown|map((n, rule) => (phrases[rule] ?? rule) ~ ' — ' ~ n|vf_number)|join(', ') %}
                             <button type="button" class="btn btn-primary" data-bulk-accept-all data-bs-toggle="modal" data-bs-target="#bulk-confirm"
                                     data-confirm-action="{{ path('moysklad_mapping_bulk_start', routeParams) }}"
@@ -120,7 +123,7 @@
                 {% if completed %}
                     <span class="ms-auto" data-diagnostic-completed>Проверено {{ completed.processed|vf_number }} из {{ completed.total|vf_number }} · {{ completed.checkedAt|date('d.m.Y H:i') }} · счётчики вкладок по этой проверке, статус в строке текущий</span>
                 {% else %}
-                    <span class="ms-auto" data-diagnostic-empty>Проверки кабинета ещё не было{% if canWrite %} — нажмите «Обновить диагностику», чтобы появилась очередь «Требует внимания»{% endif %}</span>
+                    <span class="ms-auto" data-diagnostic-empty>Проверки кабинета ещё не было — она запускается автоматически, очередь «Требует внимания» появится по её итогам</span>
                 {% endif %}
             </div>
 

@@ -24,7 +24,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class MoySkladListingMappingsController extends AbstractController
 {
     #[Route('/moy-sklad/connections/{connectionId}/mappings/{marketplace}', name: 'moysklad_listing_mappings', requirements: ['connectionId' => Requirement::UUID, 'marketplace' => 'ozon|wildberries'], methods: ['GET'])]
-    public function __invoke(string $connectionId, string $marketplace, Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionWriteRepository $connections, MarketplaceFacade $listings, MoySkladListingMappingsQuery $mappings, MoySkladCatalogTargetsQuery $targets, MappingCharacteristicsQuery $characteristics, \App\MoySklad\Infrastructure\Query\MappingDiagnosticsQuery $diagnostics, \App\MoySklad\Infrastructure\Query\MappingSettingsQuery $settings, \App\MoySklad\Infrastructure\Query\MappingBulkJobQuery $bulkJobs): Response
+    public function __invoke(string $connectionId, string $marketplace, Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionWriteRepository $connections, MarketplaceFacade $listings, MoySkladListingMappingsQuery $mappings, MoySkladCatalogTargetsQuery $targets, MappingCharacteristicsQuery $characteristics, \App\MoySklad\Infrastructure\Query\MappingDiagnosticsQuery $diagnostics, \App\MoySklad\Infrastructure\Query\MappingSettingsQuery $settings, \App\MoySklad\Infrastructure\Query\MappingBulkJobQuery $bulkJobs, \App\MoySklad\Application\MappingDiagnosticsRefresher $refresher): Response
     {
         $connectionId = strtolower($connectionId);
         $companyId = (string) $activeCompany->getActiveCompany()->getId();
@@ -68,6 +68,9 @@ final class MoySkladListingMappingsController extends AbstractController
             throw new UnprocessableEntityHttpException('Некорректный фильтр диагностики.');
         }
         $diagnosticPage = $diagnostics->page($companyId, $connectionId, $marketplace, $diagPage, '' === $diagStatus ? null : $diagStatus, '' === $diagReason ? null : $diagReason, '' === $diagManual ? null : '1' === $diagManual);
+        // Устаревший или отсутствующий отчёт пересчитывается сам; повторное открытие попадает в тот же расчёт.
+        $diagnosticsQueued = ($diagnosticPage->stale || null === $diagnosticPage->completedRun) && 'running' !== $diagnosticPage->latestRun?->status
+            && $refresher->refreshIfStale($companyId, $connectionId, $marketplace);
         $view = null !== $diagnosticPage->completedRun && ('queue' === $view || ('' === $view && '' === $q)) ? 'queue' : 'all';
         $rowIds = 'queue' === $view ? array_map(static fn (\App\MoySklad\Application\DTO\MappingDiagnosticRow $row): string => $row->listingId, $diagnosticPage->rows) : array_column($result->items, 'id');
         $states = $mappings->currentForListings($companyId, $connectionId, $rowIds);
@@ -77,7 +80,7 @@ final class MoySkladListingMappingsController extends AbstractController
         return $this->render('moy_sklad/mappings/index.html.twig', [
             'bulkJob' => $bulkJobs->latest($companyId, $connectionId, $marketplace), 'autoApply' => $bulkJobs->autoApply($companyId, $connectionId, $marketplace), 'bulkJobId' => \Ramsey\Uuid\Uuid::uuid7()->toString(),
             'bulkBreakdown' => null !== $completedRunId && 'ready' === $diagStatus ? $bulkJobs->readyBreakdown($companyId, $completedRunId) : [],
-            'diagnostics' => $diagnosticPage, 'mappingCompanyId' => $companyId, 'mappingSettings' => $settings->get($companyId, $connectionId, $marketplace),
+            'diagnostics' => $diagnosticPage, 'diagnosticsQueued' => $diagnosticsQueued, 'mappingCompanyId' => $companyId, 'mappingSettings' => $settings->get($companyId, $connectionId, $marketplace),
             'diagnosticCharacteristicChoices' => $choices,
             'diagnosticRequestId' => \Ramsey\Uuid\Uuid::uuid7()->toString(),
             'diagnosticStatuses' => \App\MoySklad\Enum\AutomaticMappingDecisionStatus::cases(), 'diagnosticReasons' => \App\MoySklad\Enum\MappingDiagnosticReason::cases(),

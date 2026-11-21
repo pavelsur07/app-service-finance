@@ -9,9 +9,9 @@
     <div class="alert {{ applying or undoing ? 'alert-info' : (job.status == 'failed' or job.failed > 0 ? 'alert-warning' : 'alert-success') }} py-2 mb-3 d-flex flex-wrap align-items-center gap-2" data-bulk-job data-bulk-status="{{ job.status }}" role="status">
         <span>
             {% if applying %}
-                Принимаем предложения{{ origin }}: {{ job.processed|vf_number }}{% if job.total is not null %} из {{ job.total|vf_number }}{% endif %}. Обновите страницу, чтобы увидеть прогресс.
+                Принимаем предложения{{ origin }}: {{ job.processed|vf_number }}{% if job.total is not null %} из {{ job.total|vf_number }}{% endif %}. Страница обновится сама.
             {% elseif undoing %}
-                Отменяем пакет: снято {{ job.undone|vf_number }} из {{ job.accepted|vf_number }}. Обновите страницу, чтобы увидеть прогресс.
+                Отменяем пакет: снято {{ job.undone|vf_number }} из {{ job.accepted|vf_number }}. Страница обновится сама.
             {% else %}
                 Пакет от {{ job.createdAt|date('d.m.Y H:i') }}{{ origin }}: Принято {{ job.accepted|vf_number }} · пропущено {{ job.skipped|vf_number }} · конфликтов {{ job.conflicts|vf_number }} · ошибок {{ job.failed|vf_number }}{% if job.status == 'failed' %} — остановлен из-за технической ошибки, запустите снова{% endif %}{% if job.undoStatus == 'completed' %}. Отменён: снято {{ job.undone|vf_number }}, оставлено {{ job.undoSkipped|vf_number }}{% elseif job.undoStatus == 'failed' %}. Отмена остановлена из-за технической ошибки{% endif %}.
             {% endif %}

@@ -425,3 +425,7 @@
 # Отдельно от почтовой пробы: ловит смерть supercronic/контейнера, т.е. немоту ВСЕХ кронов.
 # Пустой GLITCHTIP_SCHEDULER_HEARTBEAT_URL = выключено. wget, а не curl: busybox есть в alpine всегда.
 */30 * * * * [ -n "$GLITCHTIP_SCHEDULER_HEARTBEAT_URL" ] && wget -qO /dev/null --timeout=10 "$GLITCHTIP_SCHEDULER_HEARTBEAT_URL" || true
+
+# МойСклад: пересчёт устаревших отчётов диагностики маппинга (синхронизации, ручные связи, настройки).
+# Только чтение и dispatch; повтор для тех же данных попадает в тот же runId.
+*/5 * * * * cd /app && php bin/console app:moysklad:mapping-diagnostics:refresh --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2

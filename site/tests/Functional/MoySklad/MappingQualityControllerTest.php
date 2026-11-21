@@ -84,7 +84,8 @@ final class MappingQualityControllerTest extends WebTestCaseBase
         $this->em()->getConnection()->executeStatement("UPDATE marketplace_listings SET name='Набор 3 шт' WHERE id=?", [$d['listing']->getId()]);
         $this->em()->getConnection()->executeStatement("UPDATE moysklad_products SET name='Товар 1 шт' WHERE external_id=?", [$d['product']->getExternalId()]);
         $client->request('GET', $url);
-        self::assertSelectorExists('[data-diagnostic-stale]');
+        self::assertSelectorExists('[data-diagnostic-running]', 'Устаревший отчёт пересчитывается сам при открытии.');
+        self::assertSelectorNotExists('[data-diagnostic-stale]');
         $client->submit($client->getCrawler()->filter('form[data-diagnostic-refresh]')->form());
         $sent = $transport->getSent();
         $latest = $sent[array_key_last($sent)]->getMessage();
@@ -104,7 +105,8 @@ final class MappingQualityControllerTest extends WebTestCaseBase
         self::assertCount($before, $transport->getSent(), 'An active run must not enqueue another full scan.');
         $this->em()->getConnection()->executeStatement("UPDATE moysklad_mapping_diagnostic_runs SET status='failed', error_reason='diagnostic_failed' WHERE id=?", [$latest->runId]);
         $client->request('GET', $url);
-        self::assertSelectorExists('[data-diagnostic-error]');
+        self::assertSelectorExists('[data-diagnostic-running]', 'Упавший расчёт поверх изменившихся данных повторяется сам.');
+        self::assertSelectorNotExists('[data-diagnostic-error]');
         self::assertSelectorExists('[data-diagnostic-completed]');
     }
 

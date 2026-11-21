@@ -6,6 +6,7 @@ namespace App\MoySklad\MessageHandler;
 
 use App\MoySklad\Application\Action\ChangeListingMappingAction;
 use App\MoySklad\Application\Command\ChangeListingMappingCommand;
+use App\MoySklad\Application\MappingDiagnosticsRefresher;
 use App\MoySklad\Enum\ListingMappingOperation;
 use App\MoySklad\Exception\ListingMappingException;
 use App\MoySklad\Infrastructure\Repository\MoySkladListingMappingRepository;
@@ -27,6 +28,7 @@ final readonly class UndoMappingBulkJobHandler
     public function __construct(
         private Connection $db, private ChangeListingMappingAction $writer, private MoySkladListingMappingRepository $revisions,
         private EntityManagerInterface $em, private ClockInterface $clock, private LoggerInterface $logger,
+        private MappingDiagnosticsRefresher $diagnostics,
     ) {
     }
 
@@ -52,6 +54,12 @@ final readonly class UndoMappingBulkJobHandler
             $this->logger->error('MoySklad bulk mapping undo failed.', ['reason' => 'bulk_undo_failed', 'companyId' => $message->companyId, 'jobId' => $message->jobId, 'exceptionClass' => $error::class]);
         } finally {
             $this->db->fetchOne("SELECT pg_advisory_unlock(hashtext('ms-mapping-bulk-job'), hashtext(?))", [$message->jobId]);
+        }
+        // Отчёт после пакета устарел: пересчёт сразу, после commit. Потеря dispatch не страшна — его подберёт cron-проход.
+        try {
+            $this->diagnostics->refreshIfStale($message->companyId, $job['connection_id'], $job['marketplace']);
+        } catch (\Throwable $error) {
+            $this->logger->warning('MoySklad diagnostics refresh after bulk job failed.', ['companyId' => $message->companyId, 'jobId' => $message->jobId, 'exceptionClass' => $error::class]);
         }
     }
 
@@ -104,7 +112,7 @@ final readonly class UndoMappingBulkJobHandler
     /** @return array<string,mixed>|null */
     private function job(UndoMappingBulkJobMessage $message): ?array
     {
-        $job = $this->db->fetchAssociative('SELECT id, company_id, connection_id, undo_status, undo_actor_user_id FROM moysklad_mapping_bulk_jobs WHERE company_id=? AND id=?', [$message->companyId, $message->jobId]);
+        $job = $this->db->fetchAssociative('SELECT id, company_id, connection_id, marketplace, undo_status, undo_actor_user_id FROM moysklad_mapping_bulk_jobs WHERE company_id=? AND id=?', [$message->companyId, $message->jobId]);
 
         return false === $job ? null : $job;
     }
