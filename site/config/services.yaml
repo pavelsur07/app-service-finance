@@ -672,10 +672,3 @@ services:
             $baseUrl: '%env(default::WB_FETCHER_BASE_URL)%'
             $token: '%env(default::WB_FETCHER_API_TOKEN)%'
         tags: [{ name: 'app.service_coverage_client', priority: 10 }]
-
-    App\MoySklad\Infrastructure\Cache\AutomaticMappingRedisAdapter:
-        parent: cache.adapter.redis
-        class: App\MoySklad\Infrastructure\Cache\AutomaticMappingRedisAdapter
-        abstract: true
-        autowire: false
-        autoconfigure: false

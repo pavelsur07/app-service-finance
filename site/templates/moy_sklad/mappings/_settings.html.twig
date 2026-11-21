@@ -1,8 +1,9 @@
 {#
   «Параметры сопоставления»: одна характеристика размера (URL sizeCharacteristicId — её берут и диагностика,
-  и «Подобрать на странице»), алиас W для WB, правила автосопоставления.
+), алиас W для WB, автоприменение, правила автосопоставления.
   Parameters: marketplace, connectionId, companyId, settings (MappingSettings), canWrite, choices (list{id,name}),
-  selected (?string), charQ, charPage (MappingCharacteristicPage), keep (GET-параметры таблицы).
+  selected (?string), charQ, charPage (MappingCharacteristicPage), keep (GET-параметры таблицы),
+  autoApply ({enabled, sizeCharacteristicId}|null).
 #}
 {% set charParams = {connectionId: connectionId, marketplace: marketplace, char_q: charQ, sizeCharacteristicId: selected ?? ''}|merge(keep) %}
 {# Открыта сразу, пока идёт поиск характеристики: Bootstrap 5.3 показывает .offcanvas.show при загрузке. #}
@@ -32,7 +33,7 @@
                         {% if charPage.page > 1 %}<a class="btn btn-sm btn-ghost-secondary" href="{{ path('moysklad_listing_mappings', charParams|merge({char_page: charPage.page - 1})) }}">Предыдущие характеристики</a>{% endif %}
                         {% if charPage.page * charPage.perPage < charPage.totalItems %}<a class="btn btn-sm btn-ghost-secondary" href="{{ path('moysklad_listing_mappings', charParams|merge({char_page: charPage.page + 1})) }}">Следующие характеристики</a>{% endif %}
                     </div>
-                    <p class="form-hint mt-2">Нужна, чтобы проверять размер при выборе модификации. Действует и на диагностику, и на «Подобрать на странице».</p>
+                    <p class="form-hint mt-2">Нужна, чтобы проверять размер при выборе модификации. Действует на диагностику и принятие предложений.</p>
                 </form>
                 {% if marketplace == 'wildberries' %}
                     <hr class="my-3">
@@ -46,6 +47,19 @@
                     {% else %}
                         <p class="mb-0">Удаление конечного W/w: {{ settings.wbTrailingW ? 'включено' : 'выключено' }}.</p>
                     {% endif %}
+                {% endif %}
+                <hr class="my-3">
+                {% set auto = autoApply ?? null %}
+                {% if canWrite %}
+                    <form method="post" action="{{ path('moysklad_mapping_auto_apply', {connectionId: connectionId, marketplace: marketplace}) }}" data-auto-apply-settings>
+                        <input type="hidden" name="_token" value="{{ csrf_token('moysklad_mapping_auto_apply' ~ companyId ~ connectionId ~ marketplace) }}">
+                        <input type="hidden" name="sizeCharacteristicId" value="{{ selected ?? '' }}">
+                        <label class="form-check"><input type="checkbox" name="enabled" value="1" class="form-check-input"{% if auto and auto.enabled %} checked{% endif %}><span class="form-check-label">Принимать однозначные предложения автоматически</span></label>
+                        <p class="form-hint">Каждый день в 05:30 — только точные совпадения, как «Принять все предложения». Действует от вашего имени и с выбранной выше характеристикой размера; каждый запуск — отдельный пакет, его можно отменить.</p>
+                        <button type="submit" class="btn btn-sm">Сохранить</button>
+                    </form>
+                {% else %}
+                    <p class="mb-0">Автоприменение: {{ auto and auto.enabled ? 'включено' : 'выключено' }}.</p>
                 {% endif %}
             </div>
             <div>

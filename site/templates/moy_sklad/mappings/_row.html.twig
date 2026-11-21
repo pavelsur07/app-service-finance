@@ -2,7 +2,8 @@
   Строка таблицы маппинга: не выше двух линий, доказательства — в раскрывающейся строке ниже.
   Одна текстовая кнопка (Выбрать/Изменить/Просмотр), «Подробнее» — стрелкой у названия, «История» — в меню «⋯».
   Parameters: listing (ListingMetaDTO), state (ListingMappingState — живая связь),
-  diagnostic (MappingDiagnosticRow|null — строка последней диагностики), routeParams, canWrite, isLast.
+  diagnostic (MappingDiagnosticRow|null — строка последней диагностики), routeParams, canWrite, isLast,
+  selectable — чекбокс для «Принять выбранные» у предложения без текущей связи.
 #}
 {% set rowParams = routeParams|merge({listingId: listing.id}) %}
 {% set title = listing.title ?? listing.sku %}
@@ -10,6 +11,9 @@
 <tr data-listing-id="{{ listing.id }}"{% if diagnostic %} data-diagnostic-listing-id="{{ listing.id }}"{% endif %}{% if not listing.isActive %} class="vf-row-muted"{% endif %}>
     <td>
         <div class="vf-mapping-table__name">
+            {% if selectable|default(false) and diagnostic and diagnostic.decision.status.value == 'ready' and state.revision == 0 %}
+                <input type="checkbox" class="form-check-input m-0 mt-2 flex-shrink-0" form="bulk-selected" name="listingIds[]" value="{{ listing.id }}" aria-label="Выбрать предложение для {{ title }}">
+            {% endif %}
             {% if diagnostic %}
                 <button type="button" class="btn btn-sm btn-icon btn-ghost-secondary vf-mapping-table__toggle collapsed" data-bs-toggle="collapse" data-bs-target="#{{ detailsId }}" aria-expanded="false" aria-controls="{{ detailsId }}" aria-label="Подробнее: доказательства и кандидаты" title="Подробнее"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
             {% endif %}
