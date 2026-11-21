@@ -10,7 +10,22 @@ final readonly class PaymentIntakeDraftView
      * @param list<array<string, mixed>> $items
      * @param list<string> $questions
      */
-    public function __construct(public string $id, public string $companyId, public string $actorUserId, public string $moneyAccountId, public int $revision, public string $status, public ?string $taskId, public array $items, public array $questions, public ?string $errorCode, public ?string $mcpExternalId = null, public ?\DateTimeImmutable $confirmedAt = null)
-    {
+    public function __construct(
+        public string $id,
+        public string $companyId,
+        public string $actorUserId,
+        public string $moneyAccountId,
+        public int $revision,
+        public string $status,
+        public ?string $taskId,
+        public array $items,
+        public array $questions,
+        public ?string $errorCode,
+        public ?string $mcpExternalId = null,
+        public ?\DateTimeImmutable $confirmedAt = null,
+        public ?string $confirmedTransactionId = null,
+        public ?string $mcpConnectionId = null,
+        public ?\DateTimeImmutable $receivedAt = null,
+    ) {
     }
 }

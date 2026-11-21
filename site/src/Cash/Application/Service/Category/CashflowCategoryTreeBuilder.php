@@ -75,7 +75,7 @@ final readonly class CashflowCategoryTreeBuilder
     /**
      * @return 'in'|'out'|'both'
      */
-    private static function flow(CashflowCategory $category): string
+    public static function flow(CashflowCategory $category): string
     {
         for ($node = $category; null !== $node; $node = $node->getParent()) {
             $flow = match ($node->getSystemCode()) {

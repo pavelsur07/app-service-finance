@@ -15,6 +15,7 @@ use App\Cash\Application\DTO\PaymentIntake\PaymentIntakeDraftView;
 use App\Cash\Application\DTO\PaymentIntake\RequestPaymentIntakeCommand;
 use App\Cash\Application\Service\AiCategorization\CashCategorizationPayloadMapper;
 use App\Cash\Application\Service\CashTransactionResponsibilityCenterResolver;
+use App\Cash\Application\Service\Category\CashflowCategoryTreeBuilder;
 use App\Cash\Application\Service\PaymentIntake\PaymentIntakeCommonFields;
 use App\Cash\Application\Service\Transaction\CashTransactionService;
 use App\Cash\Domain\Event\CashTransactionsChanged;
@@ -24,11 +25,15 @@ use App\Cash\Entity\PaymentIntake\PaymentIntakeReplyReceipt;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashflowCategoryStatus;
 use App\Cash\Exception\McpCashDraftException;
+use App\Cash\Exception\PaymentIntakeAccessDeniedException;
 use App\Cash\Infrastructure\Query\CashCategorizationQuery;
 use App\Cash\Infrastructure\Query\PaymentIntakeDuplicateQuery;
+use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\PaymentIntake\PaymentIntakeDraftRepository;
 use App\Cash\Repository\PaymentIntake\PaymentIntakeReplyReceiptRepository;
+use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
 use App\ServiceGateway\Facade\AiTaskFacadeInterface;
@@ -59,6 +64,8 @@ final readonly class PaymentIntakeAction
         private ClockInterface $clock,
         private PaymentIntakeReplyReceiptRepository $replyReceipts,
         private CashCategorizationPayloadMapper $categorizationMapper,
+        private MoneyAccountDailyBalanceRepository $balances,
+        private CashflowCategoryRepository $categoryRepository,
     ) {
     }
 
@@ -116,7 +123,7 @@ final readonly class PaymentIntakeAction
             $existing = $this->drafts->getMcpByExternalId($command->companyId, $connectionId, $command->externalId);
             if (null !== $existing) {
                 if ($existing->getActorUserId() !== $command->actorUserId) {
-                    throw new \DomainException('Черновик не найден.');
+                    throw new McpCashDraftException('reference_unavailable', 'Черновик недоступен.');
                 }
                 if ($existing->getSourceRevision() !== self::mcpFingerprint($command, $command->currency ?? $existing->getCurrency())) {
                     throw new McpCashDraftException('idempotency_conflict', 'Внешний ID уже связан с другим платежом.');
@@ -125,11 +132,16 @@ final readonly class PaymentIntakeAction
                 return $existing;
             }
 
+            if (null !== $command->categoryId
+                && !$this->mcpCategoryMatches($command->companyId, strtolower($command->categoryId), $command->direction)) {
+                throw new McpCashDraftException('reference_unavailable', 'Счёт или статья ДДС недоступны.');
+            }
             try {
                 $account = $this->transactions->resolveAccount($command->moneyAccountId, $command->companyId);
             } catch (\DomainException) {
                 throw new McpCashDraftException('reference_unavailable', 'Счёт или статья ДДС недоступны.');
             }
+            $this->balances->acquireRecalculationLock($account);
             $this->em->refresh($account);
             if (!$account->isActive()) {
                 throw new McpCashDraftException('reference_unavailable', 'Счёт или статья ДДС недоступны.');
@@ -137,13 +149,6 @@ final readonly class PaymentIntakeAction
             $currency = $command->currency ?? $account->getCurrency();
             if (null === FiatCurrency::tryFrom($currency) || $currency !== $account->getCurrency()) {
                 throw new McpCashDraftException('invalid_input', 'Укажите поддерживаемую валюту счёта.');
-            }
-            if (null !== $command->categoryId) {
-                $eligible = array_column($this->categoryChoices($command->companyId), 'direction', 'id');
-                $allowed = $eligible[strtolower($command->categoryId)] ?? null;
-                if (null === $allowed || ('any' !== $allowed && $allowed !== strtolower($command->direction->value))) {
-                    throw new McpCashDraftException('reference_unavailable', 'Счёт или статья ДДС недоступны.');
-                }
             }
             $periodLock = $this->companies->getFinanceLockBefore($command->companyId);
             if (null !== $periodLock && $command->date->format('Y-m-d') < $periodLock->format('Y-m-d')) {
@@ -174,12 +179,25 @@ final readonly class PaymentIntakeAction
         ], \JSON_THROW_ON_ERROR));
     }
 
-    /** @return list<string> */
-    public function openMcpIds(string $companyId, string $actorUserId): array
+    private function mcpCategoryMatches(string $companyId, string $categoryId, CashDirection $direction): bool
+    {
+        $this->categoryRepository->lockTree($companyId);
+        $category = $this->categoryRepository->findOneByIdAndCompanyId($categoryId, $companyId);
+        if (null === $category || CashflowCategoryStatus::ACTIVE !== $category->getStatus()
+            || $category->isSystem() || !$category->getChildren()->isEmpty()) {
+            return false;
+        }
+        $flow = CashflowCategoryTreeBuilder::flow($category);
+
+        return 'both' === $flow || (CashDirection::INFLOW === $direction ? 'in' : 'out') === $flow;
+    }
+
+    /** @return list<array{id: string, externalId: string, receivedAt: string}> */
+    public function listMcpDrafts(string $companyId, string $actorUserId, ?string $beforeId, bool $closed): array
     {
         $this->authorize($companyId, $actorUserId);
 
-        return $this->drafts->getOpenIdsForActor($companyId, $actorUserId, mcp: true);
+        return $this->drafts->listMcpDrafts($companyId, $actorUserId, $beforeId, $closed);
     }
 
     public function getMcpDraft(string $companyId, string $actorUserId, string $draftId): PaymentIntakeDraftView
@@ -357,8 +375,12 @@ final readonly class PaymentIntakeAction
         return $this->confirmDraft($command->companyId, $command->actorUserId, $command->draftId, $command->expectedRevision, $command->itemIds);
     }
 
-    public function confirmMcp(string $companyId, string $actorUserId, string $draftId, int $expectedRevision): PaymentIntakeConfirmation
+    public function confirmMcp(string $companyId, string $actorUserId, string $draftId, int $expectedRevision, bool $paidConfirmed): PaymentIntakeConfirmation
     {
+        if (!$paidConfirmed) {
+            throw new \DomainException('Подтвердите факт оплаты.');
+        }
+
         return $this->confirmDraft($companyId, $actorUserId, $draftId, $expectedRevision, null);
     }
 
@@ -377,6 +399,10 @@ final readonly class PaymentIntakeAction
                 $draft->confirmMcpPayment($expectedRevision, $this->clock->now());
             }
             $items = $draft->selectedForConfirmation($expectedRevision, $itemIds);
+            if ($mcp && null !== $items[0]['category_id']
+                && !$this->mcpCategoryMatches($companyId, $items[0]['category_id'], CashDirection::from(strtoupper($items[0]['direction'])))) {
+                throw new \DomainException('Статья недоступна или не подходит направлению платежа.');
+            }
             $ids = [];
             [$account, $eligible] = $this->validationContext($draft);
             $periodLock = $this->companies->getFinanceLockBefore($draft->getCompanyId());
@@ -668,11 +694,14 @@ final readonly class PaymentIntakeAction
     private function validationContext(PaymentIntakeDraft $draft): array
     {
         $account = $this->transactions->resolveAccount($draft->getMoneyAccountId(), $draft->getCompanyId());
+        if ($draft->isMcp()) {
+            $this->balances->acquireRecalculationLock($account);
+        }
         $this->em->refresh($account);
         if (!$account->isActive()) {
             throw new \DomainException('Выбранный счёт недоступен.');
         }
-        $eligible = array_column($this->categoryChoices($draft->getCompanyId()), 'direction', 'id');
+        $eligible = $draft->isMcp() ? [] : array_column($this->categoryChoices($draft->getCompanyId()), 'direction', 'id');
 
         return [$account, $eligible];
     }
@@ -687,7 +716,7 @@ final readonly class PaymentIntakeAction
         if (null !== $item['currency']) {
             $this->transactions->resolveCurrencyForAccount($item['currency'], $account);
         }
-        if (null !== $item['category_id']) {
+        if (!$draft->isMcp() && null !== $item['category_id']) {
             if (!\array_key_exists($item['category_id'], $eligible) || ('any' !== $eligible[$item['category_id']] && $eligible[$item['category_id']] !== $item['direction'])) {
                 throw new \DomainException('Статья недоступна или не подходит направлению платежа.');
             }
@@ -700,7 +729,7 @@ final readonly class PaymentIntakeAction
     private function authorize(string $companyId, string $actorUserId, bool $lock = false): void
     {
         if (!$this->companies->financialAccess($companyId, $actorUserId, $lock)['write']) {
-            throw new \DomainException('Нет права записи платежей компании.');
+            throw new PaymentIntakeAccessDeniedException();
         }
     }
 
@@ -746,7 +775,15 @@ final readonly class PaymentIntakeAction
         }
         unset($item);
 
-        return new PaymentIntakeDraftView($draft->getId(), $draft->getCompanyId(), $draft->getActorUserId(), $draft->getMoneyAccountId(), $draft->getRevision(), $draft->getStatus(), $draft->getTaskId(), $items, $draft->getQuestions(), $draft->getErrorCode(), $draft->getMcpExternalId(), $draft->getConfirmedAt());
+        return new PaymentIntakeDraftView(
+            $draft->getId(), $draft->getCompanyId(), $draft->getActorUserId(), $draft->getMoneyAccountId(),
+            $draft->getRevision(), $draft->getStatus(), $draft->getTaskId(), $items, $draft->getQuestions(), $draft->getErrorCode(),
+            mcpExternalId: $draft->getMcpExternalId(),
+            confirmedAt: $draft->getConfirmedAt(),
+            confirmedTransactionId: $draft->isMcp() ? ($draft->getTransactionIds()[0] ?? null) : null,
+            mcpConnectionId: $draft->getMcpConnectionId(),
+            receivedAt: $draft->getReceivedAt(),
+        );
     }
 
     private static function validateSourceKey(string $sourceKey): void

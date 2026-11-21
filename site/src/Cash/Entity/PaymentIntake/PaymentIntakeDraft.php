@@ -138,6 +138,11 @@ class PaymentIntakeDraft
         return null !== $this->mcpConnectionId;
     }
 
+    public function getMcpConnectionId(): ?string
+    {
+        return $this->mcpConnectionId;
+    }
+
     public function getMcpExternalId(): ?string
     {
         return $this->mcpExternalId;

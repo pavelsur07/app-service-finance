@@ -30,11 +30,32 @@ final class PaymentIntakeDraftRepository extends ServiceEntityRepository
     }
 
     /** @return list<string> */
-    public function getOpenIdsForActor(string $companyId, string $actorUserId, bool $mcp = false): array
+    public function getOpenIdsForActor(string $companyId, string $actorUserId): array
     {
-        $channel = $mcp ? 'mcp_connection_id IS NOT NULL' : 'mcp_connection_id IS NULL';
+        return array_map('strval', $this->getEntityManager()->getConnection()->fetchFirstColumn("SELECT id FROM cash_payment_intake_draft WHERE company_id = :company AND actor_user_id = :actor AND status NOT IN ('confirmed', 'cancelled') AND mcp_connection_id IS NULL ORDER BY id DESC LIMIT 200", ['company' => $companyId, 'actor' => $actorUserId]));
+    }
 
-        return array_map('strval', $this->getEntityManager()->getConnection()->fetchFirstColumn("SELECT id FROM cash_payment_intake_draft WHERE company_id = :company AND actor_user_id = :actor AND status NOT IN ('confirmed', 'cancelled') AND {$channel} ORDER BY id DESC LIMIT 200", ['company' => $companyId, 'actor' => $actorUserId]));
+    /** @return list<array{id: string, externalId: string, receivedAt: string}> */
+    public function listMcpDrafts(string $companyId, string $actorUserId, ?string $beforeId, bool $closed): array
+    {
+        $query = $this->getEntityManager()->getConnection()->createQueryBuilder()
+            ->select('id', 'mcp_external_id', 'received_at')
+            ->from('cash_payment_intake_draft')
+            ->where('company_id = :company', 'actor_user_id = :actor', 'mcp_connection_id IS NOT NULL')
+            ->andWhere($closed ? "status IN ('confirmed', 'cancelled')" : "status NOT IN ('confirmed', 'cancelled')")
+            ->setParameter('company', $companyId)
+            ->setParameter('actor', $actorUserId)
+            ->orderBy('id', 'DESC')
+            ->setMaxResults(51);
+        if (null !== $beforeId) {
+            $query->andWhere('id < :before')->setParameter('before', $beforeId);
+        }
+
+        return array_map(static fn (array $row): array => [
+            'id' => (string) $row['id'],
+            'externalId' => (string) $row['mcp_external_id'],
+            'receivedAt' => (string) $row['received_at'],
+        ], array_values($query->fetchAllAssociative()));
     }
 
     public function getMcpByExternalId(string $companyId, string $connectionId, string $externalId): ?PaymentIntakeDraft

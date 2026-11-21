@@ -20,7 +20,7 @@ try {
         ));
         echo json_encode(['status' => $draft->status, 'id' => $draft->draftId], \JSON_THROW_ON_ERROR)."\n";
     } elseif ('mcp-confirm' === getenv('INTAKE_RACE_OPERATION')) {
-        $result = $action->confirmMcp((string) getenv('INTAKE_COMPANY'), (string) getenv('INTAKE_ACTOR'), (string) getenv('INTAKE_DRAFT'), (int) getenv('INTAKE_REVISION'));
+        $result = $action->confirmMcp((string) getenv('INTAKE_COMPANY'), (string) getenv('INTAKE_ACTOR'), (string) getenv('INTAKE_DRAFT'), (int) getenv('INTAKE_REVISION'), true);
         echo json_encode(['status' => 'confirmed', 'ids' => $result->transactionIds], \JSON_THROW_ON_ERROR)."\n";
     } elseif ('amend' === getenv('INTAKE_RACE_OPERATION')) {
         $draft = $action->amend(new App\Cash\Application\DTO\PaymentIntake\AmendPaymentIntakeDraftCommand((string) getenv('INTAKE_COMPANY'), (string) getenv('INTAKE_ACTOR'), (string) getenv('INTAKE_DRAFT'), (int) getenv('INTAKE_REVISION'), [(string) getenv('INTAKE_ITEM') => ['amount' => '200.00']]));
