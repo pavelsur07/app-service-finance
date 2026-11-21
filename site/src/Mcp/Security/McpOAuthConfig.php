@@ -95,8 +95,7 @@ final readonly class McpOAuthConfig
             }
 
             foreach ($redirects as $redirect) {
-                if (!\is_string($redirect) || 1 !== preg_match('#^http://(?:127\.0\.0\.1|localhost|\[::1\]):[1-9][0-9]{0,4}/[A-Za-z0-9/_-]+$#D', $redirect)
-                    || false === filter_var($redirect, \FILTER_VALIDATE_URL)) {
+                if (!\is_string($redirect) || !$this->isSupportedRedirect($redirect)) {
                     return [];
                 }
             }
@@ -104,5 +103,15 @@ final readonly class McpOAuthConfig
         }
 
         return $clients;
+    }
+
+    private function isSupportedRedirect(string $redirect): bool
+    {
+        if (false === filter_var($redirect, \FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        return 1 === preg_match('#^http://(?:127\.0\.0\.1|localhost|\[::1\]):[1-9][0-9]{0,4}/[A-Za-z0-9/_-]+$#D', $redirect)
+            || 1 === preg_match('#^https://(?:[a-z0-9-]+\.)+[a-z][a-z0-9-]*(?::[1-9][0-9]{0,4})?/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$#D', $redirect);
     }
 }

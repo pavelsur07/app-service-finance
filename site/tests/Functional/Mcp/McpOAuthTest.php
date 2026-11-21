@@ -33,6 +33,7 @@ final class McpOAuthTest extends WebTestCaseBase
 {
     private const ORIGIN = 'https://app.example.test';
     private const REDIRECT = 'http://127.0.0.1:8765/callback';
+    private const HERMES_WEB_REDIRECT = 'https://hermes.example.test/api/mcp/oauth/callback/vashfindir';
     private const VERIFIER = 'test-pkce-verifier-with-enough-unreserved-characters';
     private const SCOPES = 'accounts.read cash_drafts.create';
 
@@ -128,6 +129,41 @@ final class McpOAuthTest extends WebTestCaseBase
         );
         self::assertResponseStatusCodeSame(400);
         self::assertSame('invalid_request', $this->json()['error']);
+    }
+
+    public function testHermesWebRedirectsThroughRegisteredHttpsCallback(): void
+    {
+        $_ENV['MCP_OAUTH_CLIENTS'] = json_encode([
+            'codex-cli' => [self::REDIRECT],
+            'hermes-web' => [self::HERMES_WEB_REDIRECT],
+        ], \JSON_THROW_ON_ERROR);
+        $authorization = ['client_id' => 'hermes-web', 'scope' => 'accounts.read'];
+        $this->start(['redirect_uri' => self::HERMES_WEB_REDIRECT.'-other'] + $authorization);
+        self::assertResponseStatusCodeSame(400);
+        self::assertNull($this->browser->getResponse()->headers->get('Location'));
+
+        $this->start(['redirect_uri' => 'https://other.example.test/api/mcp/oauth/callback/vashfindir'] + $authorization);
+        self::assertResponseStatusCodeSame(400);
+        self::assertNull($this->browser->getResponse()->headers->get('Location'));
+
+        $this->start(['redirect_uri' => self::HERMES_WEB_REDIRECT]);
+        self::assertResponseStatusCodeSame(400);
+        self::assertNull($this->browser->getResponse()->headers->get('Location'));
+
+        [$owner, $company] = $this->ownerAndCompany();
+        $this->subscribe($company);
+        $this->browser->loginUser($owner);
+        $consent = $this->consentUrl(['redirect_uri' => self::HERMES_WEB_REDIRECT] + $authorization);
+        $code = $this->approve($consent, $company, self::HERMES_WEB_REDIRECT);
+
+        $exchange = ['client_id' => 'hermes-web', 'redirect_uri' => self::HERMES_WEB_REDIRECT] + $this->exchange($code);
+        $this->token(['redirect_uri' => self::REDIRECT] + $exchange);
+        self::assertResponseStatusCodeSame(400);
+        $this->token($exchange);
+        self::assertResponseIsSuccessful();
+        $principal = static::getContainer()->get(McpAccess::class)->authenticate($this->bearer($this->json()['access_token']));
+        self::assertSame($company->getId(), $principal->companyId);
+        self::assertSame(['accounts.read'], $principal->scopes);
     }
 
     public function testOnlyTheActualOwnerWithBillingCanApprove(): void
@@ -427,7 +463,7 @@ final class McpOAuthTest extends WebTestCaseBase
         return self::ORIGIN.$location;
     }
 
-    private function approve(string $consent, Company $company): string
+    private function approve(string $consent, Company $company, string $redirect = self::REDIRECT): string
     {
         $this->browser->request('GET', $consent);
         self::assertResponseIsSuccessful();
@@ -441,7 +477,7 @@ final class McpOAuthTest extends WebTestCaseBase
         if (null === $location) {
             return '';
         }
-        self::assertSame(self::REDIRECT, strstr($location, '?', true));
+        self::assertSame($redirect, strstr($location, '?', true));
         parse_str((string) parse_url($location, \PHP_URL_QUERY), $callback);
         self::assertSame('secret-browser-state', $callback['state'] ?? null);
         self::assertSame(self::ORIGIN, $callback['iss'] ?? null);
