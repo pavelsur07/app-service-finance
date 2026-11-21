@@ -93,6 +93,88 @@ final class MappingsPageLayoutTest extends WebTestCaseBase
         self::assertSelectorExists('form[data-automatic-preview] select[name="sizeCharacteristicId"][hidden]');
     }
 
+    public function testHeaderFollowsDesignSystemAndSectionsAreOneSegment(): void
+    {
+        [$client, $d] = $this->seed();
+        $client->request('GET', $this->url($d));
+        self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists('.page-header');
+        self::assertSelectorTextContains('.vf-page-head h1', 'Маппинг Ozon');
+        self::assertSelectorExists('.vf-page-head .breadcrumb a[href="/moy-sklad/connections"]');
+        self::assertSelectorTextContains('nav.vf-seg[data-moysklad-tabs] a.active[aria-current="page"]', 'Маппинг Ozon');
+        self::assertSelectorCount(1, '.nav-tabs', 'Один ряд вкладок — очередь в карточке.');
+
+        $client->request('GET', '/moy-sklad/connections');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.vf-page-head h1', 'Подключения');
+        self::assertSelectorTextContains('nav.vf-seg[data-moysklad-tabs] a.active', 'Подключения');
+    }
+
+    public function testSettingsAreOffcanvasOpenedRightAwayWhileSearchingCharacteristic(): void
+    {
+        [$client, $d] = $this->seed();
+        $client->request('GET', $this->url($d));
+        self::assertSelectorExists('.vf-page-head [data-bs-toggle="offcanvas"][data-bs-target="#mapping-settings"]');
+        self::assertSelectorExists('.offcanvas#mapping-settings[data-mapping-settings]');
+        self::assertSelectorNotExists('.offcanvas.show#mapping-settings');
+
+        $client->request('GET', $this->url($d), ['char_q' => 'Размер']);
+        self::assertSelectorExists('.offcanvas.show#mapping-settings');
+    }
+
+    public function testSummaryBarSearchChipAndEmptyStateWithoutTable(): void
+    {
+        [$client, $d] = $this->seed();
+        $client->request('GET', $this->url($d));
+        self::assertSelectorTextContains('.vf-bar[data-mapping-summary]', 'Найдено 1 листинг');
+        self::assertSelectorExists('.vf-bar [data-diagnostic-empty]');
+        self::assertSelectorNotExists('.vf-chip');
+        self::assertSelectorExists('table[data-mapping-table] thead.sticky-top');
+
+        $this->listing($d, 2, 'A2');
+        $this->listing($d, 3, 'A3');
+        $client->request('GET', $this->url($d), ['q' => 'Листинг']);
+        self::assertSelectorTextContains('.vf-bar[data-mapping-summary]', 'Найдено 3 листинга');
+        self::assertSelectorTextContains('.vf-applied .vf-chip', 'Поиск: «Листинг»');
+        self::assertDoesNotMatchRegularExpression('/[?&]q=/', (string) $client->getCrawler()->filter('.vf-chip a')->attr('href'));
+
+        $client->request('GET', $this->url($d), ['q' => 'нет-такого']);
+        self::assertSelectorTextContains('.vf-empty[data-mapping-empty]', 'Сбросить поиск');
+        self::assertSelectorNotExists('table[data-mapping-table]');
+        self::assertSelectorNotExists('[data-mapping-pagination]');
+    }
+
+    public function testQueueFiltersBySegmentAndRowKeepsOneTextButton(): void
+    {
+        [$client, $d] = $this->seed();
+        $miss = $this->listing($d, 2, 'NOPE');
+        $this->diagnose($d);
+
+        $client->request('GET', $this->url($d));
+        self::assertSelectorNotExists('[data-mapping-registry] select');
+        self::assertSelectorTextContains('[data-diagnostic-manual] a.active', 'Требует проверки');
+        self::assertSelectorTextContains('.vf-bar [data-diagnostic-completed]', 'Проверено');
+        self::assertSelectorNotExists('[data-mapping-diagnostics] .alert');
+        self::assertCount(1, $client->getCrawler()->filter('[data-listing-id="'.$miss.'"] .btn:not(.btn-icon)'));
+
+        $all = $client->getCrawler()->filter('[data-diagnostic-manual] a:not(.active)');
+        $client->click($all->link());
+        self::assertSelectorExists('[data-diagnostic-listing-id="'.$d['listing']->getId().'"]');
+    }
+
+    public function testHistoryMovesToRowMenu(): void
+    {
+        [$client, $d] = $this->seed();
+        $listingId = $d['listing']->getId();
+        $edit = '/moy-sklad/connections/'.$d['connection']->getId().'/mappings/ozon/'.$listingId.'/edit';
+        $client->request('GET', $edit);
+        $form = $client->getCrawler()->filter('form[data-set-mapping-form]')->form();
+        $client->request('POST', $edit, array_replace($form->getPhpValues(), ['target' => 'product:'.$d['product']->getExternalId()]));
+
+        $client->request('GET', $this->url($d));
+        self::assertSelectorExists('[data-listing-id="'.$listingId.'"] .dropdown-menu a[href$="/'.$listingId.'/history"]');
+    }
+
     /** @param array{connection:\App\MoySklad\Entity\MoySkladConnection,company:\App\Company\Entity\Company} $d */
     private function url(array $d): string
     {

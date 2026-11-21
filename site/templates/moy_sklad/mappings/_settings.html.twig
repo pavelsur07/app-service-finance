@@ -4,16 +4,16 @@
   Parameters: marketplace, connectionId, companyId, settings (MappingSettings), canWrite, choices (list{id,name}),
   selected (?string), charQ, charPage (MappingCharacteristicPage), keep (GET-параметры таблицы).
 #}
-{% set current = choices|filter(c => c.id == selected)|first %}
 {% set charParams = {connectionId: connectionId, marketplace: marketplace, char_q: charQ, sizeCharacteristicId: selected ?? ''}|merge(keep) %}
-<details class="card vf-card mb-3" data-mapping-settings{% if charQ != '' or charPage.page > 1 %} open{% endif %}>
-    <summary class="card-header">
-        <span class="fw-medium">Параметры сопоставления</span>
-        <span class="small text-secondary ms-2" data-size-characteristic-current>Размер: {{ current ? current.name : 'без правила размера' }}{% if marketplace == 'wildberries' %} · конечный W/w: {{ settings.wbTrailingW ? 'убирать' : 'не убирать' }}{% endif %}</span>
-    </summary>
-    <div class="card-body">
-        <div class="row g-4">
-            <div class="col-lg-6">
+{# Открыта сразу, пока идёт поиск характеристики: Bootstrap 5.3 показывает .offcanvas.show при загрузке. #}
+<div class="offcanvas offcanvas-end vf-ops-filters{% if charQ != '' or charPage.page > 1 %} show{% endif %}" tabindex="-1" id="mapping-settings" aria-labelledby="mapping-settings-title" data-mapping-settings>
+    <div class="offcanvas-header">
+        <h2 class="offcanvas-title" id="mapping-settings-title">Параметры сопоставления</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Закрыть"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div class="d-flex flex-column gap-4 p-4">
+            <div>
                 <form method="get" data-mapping-characteristic>
                     {% for k, v in keep %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
                     <label for="mapping-characteristic-search" class="form-label">Характеристика размера МойСклад</label>
@@ -48,7 +48,7 @@
                     {% endif %}
                 {% endif %}
             </div>
-            <div class="col-lg-6">
+            <div>
                 <div class="form-label">Как ищется соответствие</div>
                 <ul class="small text-secondary mb-0 ps-3">
                     <li>Точный артикул, код позиции, алиас WB или штрихкод; регистр и ведущие нули учитываются.</li>
@@ -59,4 +59,4 @@
             </div>
         </div>
     </div>
-</details>
+</div>

@@ -2,26 +2,34 @@
 
 {% block title %}МойСклад — Интеграция{% endblock %}
 
+{# Шапка по DS (vf-page-head, как «Операции ДДС»); разделы — сегмент, чтобы на странице маппинга был один ряд вкладок. #}
 {% block body %}
     <div class="container-xl">
-        <div class="page-header d-print-none mb-4">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <div class="page-pretitle">МойСклад</div>
-                    <h1 class="page-title">{% block integration_title %}Интеграция{% endblock %}</h1>
-                </div>
-                {% block page_actions %}{% endblock %}
+        <div class="vf-page-head">
+            <div class="vf-page-head__title">
+                <nav aria-label="Путь">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item">Интеграции</li>
+                        <li class="breadcrumb-item"><a href="{{ path('moysklad_connections_index') }}">МойСклад</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">{{ block('integration_title') }}</li>
+                    </ol>
+                </nav>
+                <h1>{% block integration_title %}Интеграция{% endblock %}</h1>
+                {% block integration_lead %}{% endblock %}
             </div>
+            {% block page_actions %}{% endblock %}
         </div>
         {% set mappingId = mappingConnectionId|default(connection.id|default(null)) %}
         {% set mappingProvider = mappingMarketplace|default(null) %}
-        <div class="mb-3" data-moysklad-tabs>
-            {% include 'partials/_tabs.html.twig' with {tabs: [
+        <nav class="vf-seg mb-3" data-moysklad-tabs aria-label="Разделы МойСклад">
+            {% for tab in [
                 {label: 'Подключения', href: path('moysklad_connections_index'), active: mappingProvider is null},
                 {label: 'Маппинг Ozon', href: mappingId ? path('moysklad_listing_mappings', {connectionId: mappingId, marketplace: 'ozon'}) : path('moysklad_mapping_entry', {marketplace: 'ozon'}), active: mappingProvider == 'ozon'},
                 {label: 'Маппинг Wildberries', href: mappingId ? path('moysklad_listing_mappings', {connectionId: mappingId, marketplace: 'wildberries'}) : path('moysklad_mapping_entry', {marketplace: 'wildberries'}), active: mappingProvider == 'wildberries'},
-            ]} only %}
-        </div>
+            ] %}
+                <a href="{{ tab.href }}"{% if tab.active %} class="active" aria-current="page"{% endif %}>{{ tab.label }}</a>
+            {% endfor %}
+        </nav>
         {% block integration_content %}{% endblock %}
     </div>
     {% block modals %}{% endblock %}
