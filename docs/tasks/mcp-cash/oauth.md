@@ -47,7 +47,7 @@ codex mcp add vashfindir --url https://app.example.test/mcp \
   --oauth-client-id codex-cli
 ```
 
-Codex 0.171.0 сверяет `iss` в OAuth callback с issuer из discovery и принимает с этой проверкой зарегистрированный путь `/callback`. [Исходный код Codex CLI 0.171.0](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/rmcp-client/src/oauth_callback.rs)
+В стендовом прогоне Codex 0.171.0 взял `resource` из discovery и успешно обменял код на токен. Добавление `--oauth-resource` в этой версии привело к повтору параметра и HTTP 400. Codex также сверяет `iss` в OAuth callback с issuer из discovery. [Исходный код Codex CLI 0.171.0](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/rmcp-client/src/oauth_callback.rs)
 
 ## Claude Code 2.1.326
 

@@ -9,4 +9,4 @@
 
 Изменены `.github/workflows/deploy.yml`, `docker-compose.prod.yml`, `docker/release/known_hosts`, тесты shell и инструкция [OAuth](../../mcp-cash/oauth.md).
 
-Новые проверки сначала зафиксировали отсутствие переменных, защиту от неполного набора и отсутствие привязки к SSH-ключу. После исправлений прошли `make test-release-pipeline test-deploy-workflow test-frontend-release test-frontend-auth-routing`. Внутреннее ревью — 0 BLOCKER, 1 IMPORTANT и 2 MINOR. Замечания исправлены.
+Новые проверки сначала зафиксировали отсутствие переменных, отказа при неполном наборе и привязки к SSH-ключу. После исправлений прошли `make test-release-pipeline test-deploy-workflow test-frontend-release test-frontend-auth-routing`. Внутреннее ревью — 0 BLOCKER, 1 IMPORTANT и 2 MINOR. Замечания исправлены.
