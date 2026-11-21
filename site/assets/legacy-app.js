@@ -58,6 +58,7 @@ import { initMarketplaceUnmapped } from './pages/marketplace_unmapped.js';
 import { initPaymentCalendar } from './pages/payment_calendar.js';
 import { initTransactionSplits } from './pages/transaction_splits.js';
 import { initDocumentDelete } from './pages/document_delete.js';
+import { initMoySkladMappings } from './pages/moysklad_mappings.js';
 import { initCategoryTree } from './pages/category_tree.js';
 import { initTelegramIntegration } from './pages/telegram_integration.js';
 import { initOzonReconciliation } from './pages/ozon_reconciliation.js';
@@ -126,6 +127,7 @@ const initDds = () => {
   initPaymentCalendar();
   initTransactionSplits();
   initDocumentDelete();
+  initMoySkladMappings();
   initCategoryTree();
   initTelegramIntegration();
   initOzonReconciliation();

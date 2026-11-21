@@ -6020,6 +6020,7 @@ config/
 | `app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14` | `20 3-23 * * *` | Почасовой (с 03:20 до 23:20, 21 прогон в сутки) safe planner: current-month daily/retry/missing/empty recovery, затем rolling refresh последних 14 дней; не больше одной задачи на подключение за прогон |
 | `app:marketplace:wb-costs:unrecognized-check --days-back=14` | `40 6 * * *` | Read-only гейт: нераспознанные операции затрат WB за 14 дней у активных seller-подключений (`WbUnrecognizedCostsQuery` по `unprocessed_cost_types`); exit 1 — новый тип операции, один агрегированный `error`. Документы старше окна не краснят гейт |
 | `app:moysklad:mapping-bulk:requeue` | `*/10 * * * *` | Переотправка пакетов принятия предложений МойСклад без heartbeat >10 мин; повтор безопасен |
+| `app:moysklad:mapping-diagnostics:refresh` | `*/5 * * * *` | Пересчёт отсутствующих или устаревших отчётов диагностики маппинга МойСклад по активным подключениям; только чтение и dispatch, повтор — тот же runId |
 | `app:moysklad:mapping-auto-apply` | `30 5 * * *` | Пакет однозначных предложений МойСклад для подключений с включённым автоприменением; один в сутки |
 | `app:marketplace:cost-pl-mapping:sync-default` | `35 4 * * *`, `45 6 * * *` | Частичный базовый маппинг затрат в ОПиУ по шаблону для всех активных SELLER-подключений (ozon, wildberries) — до пересборки 04:45, чтобы новые категории ночи попали в ОПиУ утром. Ручные и отключённые правила не трогает. Повтор в 06:45 — перед гейтом, чтобы категории утренних загрузок не краснили его |
 | `app:marketplace:cost-pl-mapping:unmapped-check` | `50 6 * * *` | Read-only гейт: затраты текущего и прошлого месяца без документа ОПиУ, у категории которых нет решения по ОПиУ (`WITHOUT_PL_DECISION`); Ozon — только распознанные коды. exit 1 + один агрегированный `error`; зеленеет, как только статья назначена |
@@ -6174,6 +6175,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.231 | 2026-11-21 | MoySklad: отчёт диагностики маппинга пересчитывается сам — при открытии устаревшего отчёта, после пакета/отмены и cron `app:moysklad:mapping-diagnostics:refresh` (*/5); автообновление страницы, кнопка «Проверить заново» |
 | 2.230 | 2026-11-21 | MoySklad: пакетное принятие предложений маппинга (весь отчёт или отмеченные строки), отмена пакета, ежедневное автоприменение; удалён подбор по странице (preview/Redis pool `cache.moysklad_automatic_mapping`); `CompanyFacade::userHasModuleAccess` |
 | 2.229 | 2026-11-20 | Finance/Cash: сумма статьи в отчёте ДДС ведёт в «Транзакции ДДС» с фильтрами ячейки (двойной клик); фильтры списка `includeChildren`, `projectIds`, `centerIds` |
 | 2.228 | 2026-11-19 | Company: кнопка «Нормализовать названия» в списке контрагентов — предпросмотр и применение правил по активной компании (`RefreshCounterpartyDisplayNamesAction` с `companyId`) |
@@ -6900,6 +6902,15 @@ SQL отчёта фильтрует сохранённые причины, не 
 запуски становятся stale и не могут возобновить старый cursor. Stale run удаляет
 свои строки, не затрагивая последний completed. При уже running POST не ставит
 ещё один запуск; конфликт параметров существующего runId не ретраится.
+Автопересчёт: `MappingDiagnosticsRefresher::refreshIfStale(companyId, connectionId,
+marketplace)` ставит запуск, если подключение активно и completed-отчёта нет (при
+листингах > 0) или его input fingerprint не совпадает с текущим. runId = UUIDv5(scope,
+характеристика последнего completed, fingerprint, id последнего completed) — повтор для тех
+же данных попадает в тот же run; тот же failed повторяется не чаще раза в час, running
+старше часа переотправляется с тем же runId (resume cursor). Вызывают: страница маппинга
+при устаревшем/отсутствующем отчёте, конец пакета и отмены (после commit),
+`app:moysklad:mapping-diagnostics:refresh` (*/5). Пока идёт расчёт или пакет, страница
+перезагружается сама (`assets/pages/moysklad_mappings.js`); кнопка — «Проверить заново».
 
 ### MoySklad: пакеты принятия предложений
 

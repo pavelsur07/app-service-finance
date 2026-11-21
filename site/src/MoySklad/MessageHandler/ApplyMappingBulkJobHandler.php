@@ -12,6 +12,7 @@ use App\MoySklad\Application\Command\ChangeListingMappingCommand;
 use App\MoySklad\Application\DTO\AutomaticMappingDecision;
 use App\MoySklad\Application\DTO\AutomaticMappingGuard;
 use App\MoySklad\Application\DTO\AutomaticMappingPreviewPage;
+use App\MoySklad\Application\MappingDiagnosticsRefresher;
 use App\MoySklad\Domain\AutomaticListingMappingPolicy;
 use App\MoySklad\Enum\AutomaticMappingDecisionStatus;
 use App\MoySklad\Enum\ListingMappingOperation;
@@ -41,6 +42,7 @@ final readonly class ApplyMappingBulkJobHandler
         private Connection $db, private MarketplaceFacade $marketplace, private AutomaticMappingPreviewQuery $evaluator,
         private AutomaticListingMappingPolicy $policy, private ChangeListingMappingAction $writer, private MoySkladListingMappingRepository $revisions,
         private EntityManagerInterface $em, private ClockInterface $clock, private LoggerInterface $logger,
+        private MappingDiagnosticsRefresher $diagnostics,
     ) {
     }
 
@@ -59,6 +61,7 @@ final readonly class ApplyMappingBulkJobHandler
         if (!$this->db->fetchOne("SELECT pg_try_advisory_lock(hashtext('ms-mapping-bulk-job'), hashtext(?))", [$message->jobId])) {
             return;
         }
+        $scope = $job;
         try {
             $this->db->executeStatement("UPDATE moysklad_mapping_bulk_jobs SET status='running', heartbeat_at=? WHERE company_id=? AND id=? AND status IN ('queued','running')", [$this->now(), $message->companyId, $message->jobId]);
             while (null !== ($job = $this->job($message)) && 'running' === $job['status'] && $this->batch($job)) {
@@ -70,6 +73,12 @@ final readonly class ApplyMappingBulkJobHandler
             $this->logger->error('MoySklad bulk mapping job failed.', ['reason' => 'bulk_failed', 'companyId' => $message->companyId, 'jobId' => $message->jobId, 'exceptionClass' => $error::class]);
         } finally {
             $this->db->fetchOne("SELECT pg_advisory_unlock(hashtext('ms-mapping-bulk-job'), hashtext(?))", [$message->jobId]);
+        }
+        // Отчёт после пакета устарел: пересчёт сразу, после commit. Потеря dispatch не страшна — его подберёт cron-проход.
+        try {
+            $this->diagnostics->refreshIfStale($message->companyId, $scope['connection_id'], $scope['marketplace']);
+        } catch (\Throwable $error) {
+            $this->logger->warning('MoySklad diagnostics refresh after bulk job failed.', ['companyId' => $message->companyId, 'jobId' => $message->jobId, 'exceptionClass' => $error::class]);
         }
     }
 
