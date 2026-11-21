@@ -14,7 +14,8 @@ function initEconomicsTable(card) {
     fixed.setAttribute('aria-hidden', 'true');
     const copy = table.cloneNode(false);
     const columns = document.createElement('colgroup');
-    const cells = [...head.querySelectorAll('th')];
+    // двухуровневая шапка R1: колонки задают нижние ячейки, группы (.me-col-group) их только объединяют
+    const cells = [...head.querySelectorAll('th:not(.me-col-group)')];
     const values = isSku ? table.querySelectorAll('.me-sku-value') : [];
     cells.forEach(() => columns.append(document.createElement('col')));
     copy.append(columns, head.cloneNode(true));
@@ -136,6 +137,12 @@ function initColumnPicker(picker) {
         style.textContent = hidden.filter((id) => ids.includes(id))
             .map((id) => `.me-sku-table [data-column="${CSS.escape(id)}"]{display:none}`).join('');
         boxes.forEach((box) => box.checked = !hidden.includes(box.value));
+        // группа шапки сужается до видимых колонок, пустая — прячется (и в фиксированной копии)
+        document.querySelectorAll('.me-sku-table .me-col-group[data-columns]').forEach((group) => {
+            const visible = group.dataset.columns.split(' ').filter((id) => !(ids.includes(id) && hidden.includes(id))).length;
+            group.colSpan = Math.max(visible, 1);
+            group.hidden = visible === 0;
+        });
     }
     boxes.forEach((box) => box.addEventListener('change', () => {
         hidden = [...hidden.filter((id) => !ids.includes(id)), ...boxes.filter((b) => !b.checked).map((b) => b.value)];

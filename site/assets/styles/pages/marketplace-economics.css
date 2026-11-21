@@ -62,6 +62,24 @@
 .me-sku-table :is(.me-sku-name, .me-sku-summary) {
     border-right: 1px solid var(--vf-border);
 }
+/* двухуровневая шапка: подписи переносятся (до двух строк), числа — нет; ширина по самому длинному числу */
+.me-sku-table thead th {
+    vertical-align: bottom;
+}
+.me-sku-table thead th:is([data-column], .me-col-qty) {
+    white-space: normal;
+    min-width: 112px;
+}
+.me-sku-table thead th:is(.me-col-pct, .me-col-qty) {
+    min-width: 72px;
+}
+.me-sku-table .me-col-group {
+    border-left: 1px solid var(--vf-border);
+    border-bottom: 1px solid var(--vf-border);
+}
+.me-sku-table td {
+    font-variant-numeric: tabular-nums;
+}
 .me-sku-code-value {
     min-width: 0;
 }

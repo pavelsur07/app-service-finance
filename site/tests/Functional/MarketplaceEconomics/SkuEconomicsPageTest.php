@@ -45,10 +45,21 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('[data-economics-table] .table.table-vcenter.card-table');
         self::assertSelectorExists('[data-economics-table] [data-economics-scroll][tabindex="0"]');
-        $headers = $crawler->filter('[data-economics-table] thead th');
+        // двухуровневая шапка: группы сверху, под ними короткие подписи с полным названием в title
+        $headers = $crawler->filter('[data-economics-table] thead th:not(.me-col-group)');
         self::assertSame('SKU', $headers->eq(0)->text());
         self::assertSame('Наименование', $headers->eq(1)->text());
-        self::assertSame('Продано, шт.', $headers->eq(2)->text());
+        self::assertSame('Прод., шт', $headers->eq(2)->text());
+        self::assertSame('Продано, шт.', $headers->eq(2)->attr('title'));
+        $groups = $crawler->filter('[data-economics-table] thead th.me-col-group');
+        self::assertSame(['Выручка', 'Товар', 'Расходы МП', 'СМ1', 'Реклама', 'СМ2', 'Склад и пр. МП', 'СМ3'], $groups->each(static fn ($th): string => $th->text()));
+        self::assertSame('5', $groups->first()->attr('colspan'));
+        self::assertSame('revenue revenueWithSpp spp vat revenueNet', $groups->first()->attr('data-columns'));
+        $gross = $crawler->filter('[data-economics-table] thead th[data-column="gross"]');
+        self::assertSame('Выр. − себест.', $gross->text());
+        self::assertSame('Выручка без НДС − себестоимость, ₽', $gross->attr('title'));
+        self::assertStringNotContainsString(', ₽', $crawler->filter('[data-economics-table] thead')->text());
+        self::assertStringContainsString('Суммы в ₽', (string) $client->getResponse()->getContent());
         $product = $crawler->filter('[data-economics-table] tbody tr')->first();
         self::assertSame('SKU-991', $product->filter('td')->eq(0)->text());
         self::assertSame('Платье', $product->filter('td')->eq(1)->text());
@@ -95,19 +106,19 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         $crawler = $client->request('GET', self::URL, ['from' => '2026-10-31', 'to' => '2026-11-01']);
 
         self::assertResponseIsSuccessful();
-        $headers = $crawler->filter('[data-economics-table] thead th')->each(static fn ($th): string => $th->text());
+        $titles = $crawler->filter('[data-economics-table] thead th[data-column]')->each(static fn ($th): string => (string) $th->attr('title'));
         foreach (['Выручка с СПП, ₽', 'НДС к уплате, ₽', 'Выручка без НДС, ₽', 'СМ1, %', 'СМ2, %', 'СМ3, %', 'СПП, ₽'] as $label) {
-            self::assertContains($label, $headers);
+            self::assertContains($label, $titles);
         }
-        self::assertStringNotContainsString('Маржинальность', implode(' ', $headers));
-        $cells = $crawler->filter('[data-economics-table] tbody tr')->first()->filter('td');
-        $cell = static fn (string $label): string => $cells->eq((int) array_search($label, $headers, true))->text();
-        self::assertSame('3 100,00', str_replace("\u{a0}", ' ', $cell('Выручка с СПП, ₽')));
-        self::assertSame('-100,00', str_replace(["\u{a0}", '−'], [' ', '-'], $cell('НДС к уплате, ₽')));
-        self::assertSame('3 300,00', str_replace("\u{a0}", ' ', $cell('Выручка без НДС, ₽')));
-        self::assertSame('300,00', $cell('СПП, ₽'), 'удержание за рекламу — не СПП');
+        self::assertStringNotContainsString('Маржинальность', implode(' ', $titles));
+        $row = $crawler->filter('[data-economics-table] tbody tr')->first();
+        $cell = static fn (string $id): string => $row->filter(sprintf('td[data-column="%s"]', $id))->text();
+        self::assertSame('3 100,00', str_replace("\u{a0}", ' ', $cell('revenueWithSpp')));
+        self::assertSame('-100,00', str_replace(["\u{a0}", '−'], [' ', '-'], $cell('vat')));
+        self::assertSame('3 300,00', str_replace("\u{a0}", ' ', $cell('revenueNet')));
+        self::assertSame('300,00', $cell('spp'), 'удержание за рекламу — не СПП');
         // СМ1 = 3 300 без себестоимости и затрат; СМ1 % = 3 300 / 3 400
-        self::assertSame('97,1 %', str_replace("\u{a0}", ' ', $cell('СМ1, %')));
+        self::assertSame('97,1 %', str_replace("\u{a0}", ' ', $cell('md1Pct')));
 
         // окно колонок: обязательные заблокированы, остальные включены
         $picker = $crawler->filter('[data-economics-columns]');
@@ -161,8 +172,8 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         $empty = $table->filter('tbody tr')->first()->filter('td');
         self::assertCount(1, $empty);
         self::assertSame('Нет продаж и затрат по SKU за период.', $empty->text());
-        self::assertSame('Наименование', $table->filter('thead th')->eq(1)->text());
-        self::assertSame((string) $table->filter('thead th')->count(), $empty->attr('colspan'));
+        self::assertSame('Наименование', $table->filter('thead th:not(.me-col-group)')->eq(1)->text());
+        self::assertSame((string) $table->filter('thead th:not(.me-col-group)')->count(), $empty->attr('colspan'));
         self::assertSame('2', $table->filter('tr.me-totals td')->first()->attr('colspan'));
         $href = $crawler->filter('nav[aria-label="Отчёт"] a')->eq(1)->attr('href');
         parse_str((string) parse_url((string) $href, \PHP_URL_QUERY), $query);
@@ -203,7 +214,7 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         $href = $crawler->filter('a[aria-label="Назад"]')->attr('href');
         parse_str((string) parse_url((string) $href, \PHP_URL_QUERY), $query);
         self::assertSame(array_replace($params, ['page' => '1']), $query);
-        $sortLink = $crawler->selectLink('Выручка, ₽')->link();
+        $sortLink = $crawler->filter('thead th[data-column="revenue"] a')->link();
         $crawler = $client->click($sortLink);
         self::assertResponseIsSuccessful();
         self::assertStringContainsString('SKU-SECOND', $crawler->filter('tbody tr')->first()->text(), 'desc, первая страница');
