@@ -128,6 +128,39 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         self::assertSame('vat', $crawler->filter('[data-economics-table] thead th[data-column="vat"]')->attr('data-column'));
     }
 
+    public function testWithoutAllocationCostsWithoutSkuStayInUnallocatedRowAndNoteExplainsMode(): void
+    {
+        $client = static::createClient();
+        [$owner, $listingId] = $this->seed();
+        $this->line('2026-11-10', $listingId, 'sale', 'revenue', 300000, 3);
+        // drop-off без SKU 10 ₽ и его разнесение парой строк (доля на SKU + обратная без SKU)
+        $this->line('2026-11-10', null, 'logistics_to_dropoff', 'md1', -1000);
+        $this->line('2026-11-10', $listingId, 'logistics_to_dropoff', 'md1', -1000, null, 'sales_qty_share');
+        $this->line('2026-11-10', null, 'logistics_to_dropoff', 'md1', 1000, null, 'sales_qty_share');
+        $this->line('2026-11-10', null, 'subscription', 'overhead', -800);
+        $this->line('2026-11-10', $listingId, 'overhead_share', 'overhead', -800, null, 'revenue_share');
+        $this->line('2026-11-10', null, 'overhead_share', 'overhead', 800, null, 'revenue_share');
+        $this->day('2026-11-10');
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
+        $money = static fn ($crawler, string $row, string $column): string => str_replace(["\u{a0}", '−'], [' ', '-'], $crawler->filter($row)->filter(sprintf('td[data-column="%s"]', $column))->text());
+        $period = ['from' => '2026-11-10', 'to' => '2026-11-10'];
+
+        $crawler = $client->request('GET', self::URL, $period);
+        self::assertSame('-10,00', $money($crawler, 'tbody tr:first-child', 'logisticsTo'), 'разнесено на SKU');
+        self::assertSame('0,00', $money($crawler, 'tr.me-totals:nth-last-child(2)', 'logisticsTo'));
+        self::assertSame('-10,00', $money($crawler, 'tr.me-totals:last-child', 'logisticsTo'));
+        self::assertStringContainsString('по проданным штукам', $crawler->filter('[data-economics-note]')->text());
+
+        $crawler = $client->request('GET', self::URL, $period + ['alloc' => '0']);
+        self::assertSame('0,00', $money($crawler, 'tbody tr:first-child', 'logisticsTo'), 'без разнесения у SKU только свои затраты');
+        self::assertSame('-10,00', $money($crawler, 'tr.me-totals:nth-last-child(2)', 'logisticsTo'), 'затрата без SKU — в «Нераспределено»');
+        self::assertSame('-10,00', $money($crawler, 'tr.me-totals:last-child', 'logisticsTo'), 'итог кабинета тот же');
+        // СМ2 «Нераспределено» = −10 drop-off; подписка (общие) в этом режиме не показывается колонкой
+        self::assertMatchesRegularExpression('/-10,00/', $money($crawler, 'tr.me-totals:nth-last-child(2)', 'md2'));
+        self::assertStringContainsString('только свои затраты', $crawler->filter('[data-economics-note]')->text());
+    }
+
     public function testRejectsTooLongPeriodAndShowsEmptyStateWithoutData(): void
     {
         $client = static::createClient();
@@ -236,11 +269,12 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         return [$owner, (string) $listing->getId()];
     }
 
-    private function line(string $date, ?string $listingId, string $measure, string $level, int $amount, ?int $qty = null): void
+    private function line(string $date, ?string $listingId, string $measure, string $level, int $amount, ?int $qty = null, ?string $allocationKey = null): void
     {
         static::getContainer()->get(Connection::class)->insert('me_day_line', [
             'id' => Uuid::uuid7()->toString(), 'company_id' => self::COMPANY_ID, 'channel' => 'ozon', 'connection_ref' => 'cabinet-1',
             'operation_date' => $date, 'listing_id' => $listingId, 'measure' => $measure, 'level' => $level, 'amount_minor' => $amount, 'quantity' => $qty,
+            'allocation_key' => $allocationKey,
         ]);
     }
 

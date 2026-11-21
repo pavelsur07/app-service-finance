@@ -25,6 +25,8 @@ final readonly class SkuEconomicsFilter
         public string $sort = 'md2',
         public bool $desc = true,
         public ?string $channel = null,
+        /** false — «Без разнесения»: без строк разнесения витрины, затраты без SKU остаются в «Нераспределено». */
+        public bool $allocated = true,
     ) {
         if (null !== $channel && !isset(self::CHANNELS[$channel])) {
             throw new InvalidEconomicsPeriodException('Неизвестный канал.');

@@ -32,8 +32,8 @@ final readonly class SkuEconomicsReportBuilder
         $previousTo = $filter->from->modify('-1 day');
         $previousFrom = $previousTo->modify(sprintf('-%d days', $days - 1));
 
-        $current = $this->query->byListing($companyId, $filter->from, $filter->to, $filter->connectionRef, $filter->channel, $this->vatRates->rates($companyId, $filter->from, $filter->to));
-        $previous = $this->query->byListing($companyId, $previousFrom, $previousTo, $filter->connectionRef, $filter->channel, $this->vatRates->rates($companyId, $previousFrom, $previousTo));
+        $current = $this->query->byListing($companyId, $filter->from, $filter->to, $filter->connectionRef, $filter->channel, $this->vatRates->rates($companyId, $filter->from, $filter->to), $filter->allocated);
+        $previous = $this->query->byListing($companyId, $previousFrom, $previousTo, $filter->connectionRef, $filter->channel, $this->vatRates->rates($companyId, $previousFrom, $previousTo), $filter->allocated);
         $unallocated = $current[''] ?? new SkuMetrics();
         $previousUnallocated = $previous[''] ?? new SkuMetrics();
         unset($current[''], $previous['']);
