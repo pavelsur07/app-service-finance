@@ -105,19 +105,26 @@ final class PlProjectionPageTest extends WebTestCaseBase
         $em->persist($other);
         $em->persist($company);
         $em->persist(CompanyBuilder::aCompany()->withId(self::OTHER_ID)->withOwner($other)->build());
-        $em->persist($this->category($company, 'REV_NOT_SPP', PLFlow::INCOME));
-        $em->persist($this->category($company, 'COGS_MP_COMMISSION', PLFlow::EXPENSE));
-        $em->persist($this->category($company, 'REV_SPP_SALES', PLFlow::INCOME));
-        $em->persist($this->category($company, 'COGS_PRODUCT_REV', PLFlow::EXPENSE));
-        $em->persist($this->category($company, 'COGS_ACQUIRING', PLFlow::EXPENSE));
-        $em->persist(PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('CM3')->withCode('CM3')->withType(\App\Finance\Enum\PLCategoryType::KPI)->withFlow(PLFlow::NONE)->build());
-        $em->persist($this->category($company, 'OVERHEAD_ADMIN_BANK', PLFlow::EXPENSE));
+        $categories = [
+            $this->category($company, 'REV_NOT_SPP', PLFlow::INCOME),
+            $this->category($company, 'COGS_MP_COMMISSION', PLFlow::EXPENSE),
+            $this->category($company, 'REV_SPP_SALES', PLFlow::INCOME),
+            $this->category($company, 'COGS_PRODUCT_REV', PLFlow::EXPENSE),
+            $this->category($company, 'COGS_ACQUIRING', PLFlow::EXPENSE),
+            PLCategoryBuilder::aPLCategory()->forCompany($company)->withName('CM3')->withCode('CM3')->withType(\App\Finance\Enum\PLCategoryType::KPI)->withFlow(PLFlow::NONE)->build(),
+            $this->category($company, 'OVERHEAD_ADMIN_BANK', PLFlow::EXPENSE),
+        ];
+        // дерево сортируется только по sortOrder: при равном порядке PostgreSQL отдаёт строки как придётся,
+        // и CM3 мог оказаться первым — тогда строк «до границы» нет (падал в CI в зависимости от соседей)
+        foreach ($categories as $i => $category) {
+            $em->persist($category->setSortOrder($i));
+        }
         $em->flush();
 
         return $owner;
     }
 
-    private function category(Company $company, string $code, PLFlow $flow): object
+    private function category(Company $company, string $code, PLFlow $flow): \App\Finance\Entity\PLCategory
     {
         return PLCategoryBuilder::aPLCategory()->forCompany($company)->withName($code)->withCode($code)->withFlow($flow)->build();
     }
