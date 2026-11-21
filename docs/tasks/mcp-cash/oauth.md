@@ -23,7 +23,13 @@
 
 Для стенда применяются миграции `Version20261121103000` и `Version20261121110000`. Секреты хранятся в конфигурации окружения. Пока обязательные настройки отсутствуют, маршруты MCP и OAuth отвечают 404. Запросы привязаны к origin из конфигурации. Для публичных клиентов используются заранее зарегистрированный redirect URI и PKCE S256.
 
-Текущий production Compose передаёт PHP только перечисленные в нём переменные. Для включения MCP потребуется отдельно добавить передачу `MCP_OAUTH_*` в PHP-FPM и установить значения в окружении production. Обычный релиз этого PR выкладывает код и схему. При отсутствии настроек `/mcp` продолжает отвечать 404.
+## Production
+
+Канонический адрес — `https://app.vashfindir.ru/mcp`. Для production в примерах ниже используйте хост `app.vashfindir.ru`. Client ID и callback совпадают со списком выше.
+
+Production-выкладка передаёт параметры MCP только в PHP-FPM. В GitHub Actions Secrets используются имена `MCP_OAUTH_PRIVATE_KEY`, `MCP_OAUTH_PUBLIC_KEY` и `MCP_OAUTH_ENCRYPTION_KEY`. Пара RSA хранится в PEM. Ключ Defuse хранится в ASCII-safe формате. Адрес и список публичных клиентов заданы в workflow. При передаче конфигурации проверяется закреплённый SSH-ключ production-хоста. При смене хост-ключа его обновляют в `docker/release/known_hosts` после сверки по доверенному каналу.
+
+Пустой набор из трёх ключей отключает маршруты MCP и OAuth. При неполном наборе выкладка останавливается до передачи конфигурации. После включения проверяются оба документа discovery и ответ 401 с OAuth challenge на запрос к `/mcp` без токена. Для доступа к данным владелец компании завершает согласие в кабинете.
 
 ## Codex CLI 0.171.0
 
@@ -38,10 +44,10 @@ mcp_oauth_callback_url = "http://127.0.0.1:48765/callback"
 
 ```bash
 codex mcp add vashfindir --url https://app.example.test/mcp \
-  --oauth-client-id codex-cli --oauth-resource https://app.example.test/mcp
+  --oauth-client-id codex-cli
 ```
 
-Codex 0.171.0 сверяет `iss` в OAuth callback с issuer из discovery и принимает с этой проверкой зарегистрированный путь `/callback`. [Исходный код Codex CLI 0.171.0](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/rmcp-client/src/oauth_callback.rs)
+В стендовом прогоне Codex 0.171.0 взял `resource` из discovery и успешно обменял код на токен. Добавление `--oauth-resource` в этой версии привело к повтору параметра и HTTP 400. Codex также сверяет `iss` в OAuth callback с issuer из discovery. [Исходный код Codex CLI 0.171.0](https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/rmcp-client/src/oauth_callback.rs)
 
 ## Claude Code 2.1.326
 
