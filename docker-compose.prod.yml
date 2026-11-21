@@ -270,6 +270,11 @@ services:
         logging: *default-logging
         environment:
             <<: *php-env
+            MCP_OAUTH_ORIGIN: ${MCP_OAUTH_ORIGIN:-}
+            MCP_OAUTH_CLIENTS: ${MCP_OAUTH_CLIENTS:-}
+            MCP_OAUTH_PRIVATE_KEY: ${MCP_OAUTH_PRIVATE_KEY:-}
+            MCP_OAUTH_PUBLIC_KEY: ${MCP_OAUTH_PUBLIC_KEY:-}
+            MCP_OAUTH_ENCRYPTION_KEY: ${MCP_OAUTH_ENCRYPTION_KEY:-}
         networks:
             - default
         depends_on:
