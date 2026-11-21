@@ -27,7 +27,7 @@ final class MappingsPageLayoutTest extends WebTestCaseBase
         self::assertSelectorExists('[data-diagnostic-empty]');
         self::assertSelectorExists('[data-listing-id="'.$d['listing']->getId().'"]');
         self::assertSelectorNotExists('[data-diagnostic-listing-id]');
-        self::assertSelectorExists('form[data-automatic-preview]');
+        self::assertSelectorNotExists('form[data-automatic-preview]', 'Подбор по странице заменён пакетом из отчёта.');
         self::assertSelectorCount(1, 'table[data-mapping-table]');
     }
 
@@ -50,7 +50,6 @@ final class MappingsPageLayoutTest extends WebTestCaseBase
         self::assertCount(1, $toggle);
         self::assertSame('false', $toggle->attr('aria-expanded'));
         self::assertSelectorExists('tr.collapse#'.$toggle->attr('aria-controls').' [data-mapping-evidence]');
-        self::assertSelectorNotExists('form[data-automatic-preview]', 'Предпросмотр работает по странице «Все листинги».');
 
         $client->request('GET', $this->url($d), ['view' => 'queue', 'diag_status' => 'ready']);
         self::assertResponseIsSuccessful();
@@ -82,7 +81,7 @@ final class MappingsPageLayoutTest extends WebTestCaseBase
         self::assertSelectorExists('[data-listing-id="'.$listingId.'"] [data-mapping-target]');
     }
 
-    public function testSizeCharacteristicIsChosenOnceForDiagnosticsAndPreview(): void
+    public function testSizeCharacteristicIsChosenOnceForDiagnosticsAndAutoApply(): void
     {
         [$client, $d] = $this->seed();
         $client->request('GET', $this->url($d));
@@ -90,7 +89,7 @@ final class MappingsPageLayoutTest extends WebTestCaseBase
         self::assertSelectorExists('form[data-mapping-characteristic] select[name="sizeCharacteristicId"]');
         self::assertSelectorExists('form[data-diagnostic-refresh] input[type="hidden"][name="diagnosticSizeCharacteristicId"]');
         self::assertSelectorNotExists('form[data-diagnostic-refresh] select');
-        self::assertSelectorExists('form[data-automatic-preview] select[name="sizeCharacteristicId"][hidden]');
+        self::assertSelectorExists('form[data-auto-apply-settings] input[type="hidden"][name="sizeCharacteristicId"]');
     }
 
     public function testHeaderFollowsDesignSystemAndSectionsAreOneSegment(): void

@@ -97,6 +97,8 @@ framework:
 
             # --- async_pipeline: local CPU/DB processing of already-fetched data ---
             'App\MoySklad\Message\DiagnoseMappingsMessage': async_pipeline
+            'App\MoySklad\Message\ApplyMappingBulkJobMessage': async_pipeline
+            'App\MoySklad\Message\UndoMappingBulkJobMessage': async_pipeline
             'App\Marketplace\Message\ProcessDayReportMessage': async_pipeline
             'App\Marketplace\Message\ProcessRawDocumentStepMessage': async_pipeline
             'App\Marketplace\Message\ProcessOzonRealizationMessage': async_pipeline

@@ -1,0 +1,94 @@
+{% extends 'moy_sklad/layout.html.twig' %}
+
+{# Отчёт пакета принятия предложений (docs/tasks/moysklad-bulk-mapping/plan.md). #}
+{% block title %}МойСклад — Пакет {{ providerName }}{% endblock %}
+{% block integration_title %}Пакет от {{ job.createdAt|date('d.m.Y H:i') }}{% endblock %}
+
+{% set canWrite = is_granted('module.marketplace.write') %}
+{% set routeParams = {connectionId: mappingConnectionId, marketplace: mappingMarketplace} %}
+{% set jobParams = routeParams|merge({jobId: job.id}) %}
+
+{% block integration_lead %}
+    <p class="vf-page-head__lead">{{ connection.name }} · {{ providerName }} · {{ job.origin == 'auto' ? 'автоприменение' : (job.scope == 'selected' ? 'отмеченные строки' : 'все предложения отчёта') }}
+        {%- if job.status in ['queued', 'running'] %} · обрабатывается: {{ job.processed|vf_number }}{% if job.total is not null %} из {{ job.total|vf_number }}{% endif %}{% elseif job.status == 'failed' %} · остановлен из-за технической ошибки{% endif %}
+        {%- if job.undoStatus in ['queued', 'running'] %} · идёт отмена{% elseif job.undoStatus == 'completed' %} · отменён: снято {{ job.undone|vf_number }}, оставлено {{ job.undoSkipped|vf_number }}{% endif %}</p>
+{% endblock %}
+
+{% block page_actions %}
+    <div class="btn-list d-print-none">
+        <a class="btn" href="{{ path('moysklad_listing_mappings', routeParams) }}"><i class="ti ti-arrow-left me-1" aria-hidden="true"></i>К маппингу</a>
+        {% if canWrite and job.undoable %}
+            <button type="button" class="btn vf-btn-destructive" data-bulk-undo data-bs-toggle="modal" data-bs-target="#bulk-undo-confirm"
+                    data-confirm-action="{{ path('moysklad_mapping_bulk_undo', jobParams) }}" data-confirm-token="{{ csrf_token('moysklad_mapping_bulk_undo' ~ job.id) }}"
+                    data-confirm-title="Отменить пакет?" data-confirm-variant="danger" data-confirm-submit="Отменить пакет"
+                    data-confirm-body="Будут сняты {{ job.accepted|vf_number }} связей этого пакета, кроме тех, что меняли после него. Снятые связи не будут предлагаться снова — их можно назначить вручную.">
+                <i class="ti ti-arrow-back-up me-1" aria-hidden="true"></i>Отменить пакет
+            </button>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block integration_content %}
+    {% set labels = {accepted: 'Принято', skipped: 'Пропущено', conflict: 'Конфликт', failed: 'Ошибка', pending: 'В очереди'} %}
+    {% set badges = {accepted: 'bg-success-lt', skipped: 'bg-secondary-lt', conflict: 'bg-warning-lt', failed: 'bg-danger-lt', pending: 'bg-azure-lt'} %}
+    {% set counts = {'': job.processed, accepted: job.accepted, skipped: job.skipped, conflict: job.conflicts, failed: job.failed} %}
+    <div class="card vf-card" data-bulk-items>
+        <div class="vf-card-bar d-print-none">
+            <div class="vf-card-bar__row">
+                <div class="vf-seg" role="group" aria-label="Итог строки">
+                    {% for value, label in {'': 'Все'}|merge(labels|filter((l, k) => k != 'pending')) %}
+                        <a href="{{ path('moysklad_mapping_bulk_show', jobParams|merge(value ? {status: value} : {})) }}"{% if status == value %} class="active" aria-current="true"{% endif %}>{{ label }} · {{ counts[value]|vf_number }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="vf-bar" role="status">Найдено строк: {{ total|vf_number }}</div>
+        {% if items is empty %}
+            <div class="vf-empty">
+                <div class="vf-empty__title">{{ job.status in ['queued', 'running'] and status == '' ? 'Пакет ещё обрабатывается' : 'Строк нет' }}</div>
+                <div class="vf-empty__hint">{{ status ? 'С таким итогом строк нет.' : 'Обновите страницу позже.' }}</div>
+            </div>
+        {% else %}
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table vf-table">
+                    <thead class="sticky-top">
+                        <tr>
+                            <th scope="col">Листинг {{ providerName }}</th>
+                            <th scope="col">Итог</th>
+                            <th scope="col">Пояснение</th>
+                            <th scope="col"><span class="visually-hidden">Действия</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                            {% set listing = listings[item.listing_id] ?? null %}
+                            {% set rowParams = routeParams|merge({listingId: item.listing_id}) %}
+                            <tr data-bulk-item-listing-id="{{ item.listing_id }}">
+                                <td>
+                                    <div class="vf-strong">{{ listing ? (listing.title ?? listing.sku) : 'Листинг недоступен' }}</div>
+                                    {% if listing %}<div class="vf-sub font-monospace">{{ listing.sku }}{% if listing.supplierSku %} · {{ listing.supplierSku }}{% endif %}</div>{% endif %}
+                                </td>
+                                <td class="text-nowrap">
+                                    <span class="badge vf-status {{ badges[item.status] }}">{{ labels[item.status] }}</span>
+                                    {% if item.undo_status == 'undone' %}<div class="vf-sub">Снята отменой</div>{% endif %}
+                                </td>
+                                <td class="vf-sub">{{ item.message ?? '—' }}</td>
+                                <td class="text-end text-nowrap">
+                                    {% if listing %}<a class="btn btn-sm" href="{{ path('moysklad_listing_mapping_edit', rowParams) }}">{{ canWrite ? 'Открыть' : 'Просмотр' }}</a>{% endif %}
+                                    {% if item.revision %}<a class="btn btn-sm btn-icon btn-ghost-secondary" href="{{ path('moysklad_listing_mapping_history', rowParams) }}" title="История связи" aria-label="История связи"><i class="ti ti-history" aria-hidden="true"></i></a>{% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer">
+                {% include 'partials/_pagination.html.twig' with {page: page, total: total, perPage: 25, route: 'moysklad_mapping_bulk_show', params: jobParams|merge(status ? {status: status} : {})} only %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block modals %}
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'bulk-undo-confirm'} only %}
+{% endblock %}
