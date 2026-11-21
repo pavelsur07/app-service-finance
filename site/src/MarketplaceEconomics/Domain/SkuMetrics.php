@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\MarketplaceEconomics\Domain;
 
+use App\MarketplaceOperations\Enum\OperationKind;
+
 /**
  * Показатели SKU (или кабинета) за период, копейки со знаком канона: выручка «+», затраты «−».
- * Уровни (`REPORTS.md` §1; на экранах — СМ1/СМ2/СМ3 шаблона ОПиУ `pl_templates/marketplace.json`): gross = выручка + себестоимость; md1 (СМ1) = gross + затраты СМ1;
- * md2 (СМ2) = md1 + реклама; full (СМ3) = md2 + склад и прочие МП.
+ * Уровни (`REPORTS.md` §1; на экранах — СМ1/СМ2/СМ3 шаблона ОПиУ `pl_templates/marketplace.json`):
+ * выручка без НДС = выручка + НДС (НДС — от выручки с СПП); gross = выручка без НДС + себестоимость;
+ * md1 (СМ1) = gross + затраты СМ1; md2 (СМ2) = md1 + реклама; full (СМ3) = md2 + склад и прочие МП.
+ * Проценты уровней — от выручки до СПП.
  */
 final class SkuMetrics
 {
@@ -22,8 +26,10 @@ final class SkuMetrics
     public int $otherMd1 = 0;
     public int $ads = 0;
     public int $overhead = 0;
-    /** СПП и соинвестирование — справочно. */
+    /** СПП и соинвестирование — справочно, в уровни не входят. */
     public int $spp = 0;
+    /** НДС к уплате с выручки с СПП, знак затраты (возвраты больше продаж — «+»); считает `SkuEconomicsQuery`. */
+    public int $vat = 0;
 
     public function add(string $measure, EconomicsLevel $level, int $amount, int $quantity): void
     {
@@ -32,7 +38,8 @@ final class SkuMetrics
             EconomicsLevel::COST_PRICE => $this->costPrice += $amount,
             EconomicsLevel::MD2 => $this->ads += $amount,
             EconomicsLevel::OVERHEAD => $this->overhead += $amount,
-            EconomicsLevel::INFO => $this->spp += $amount,
+            // удержание WB за рекламу (`ads_settlement`) — тоже справочное, но не скидка покупателю
+            EconomicsLevel::INFO => \in_array($measure, [OperationKind::SPP->value, OperationKind::COINVESTMENT->value], true) ? $this->spp += $amount : null,
             EconomicsLevel::MD1 => match (true) {
                 str_starts_with($measure, 'commission') => $this->commission += $amount,
                 str_starts_with($measure, 'logistics_to') => $this->logisticsTo += $amount,
@@ -55,9 +62,20 @@ final class SkuMetrics
         }
     }
 
+    /** Цена покупателя: выручка за вычетом СПП и соинвестирования (`DATA.md` §9.2). */
+    public function revenueWithSpp(): int
+    {
+        return $this->revenue - $this->spp;
+    }
+
+    public function revenueNet(): int
+    {
+        return $this->revenue + $this->vat;
+    }
+
     public function gross(): int
     {
-        return $this->revenue + $this->costPrice;
+        return $this->revenueNet() + $this->costPrice;
     }
 
     public function md1(): int

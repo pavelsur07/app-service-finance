@@ -6,8 +6,11 @@ namespace App\Tests\Functional\MarketplaceEconomics;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Company\Enum\TaxRegime;
+use App\Company\Enum\VatMode;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CompanyTaxProfileBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingTagBuilder;
@@ -69,6 +72,49 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         $client->request('GET', self::URL, ['from' => '2026-11-10', 'to' => '2026-11-18', 'format' => 'xlsx']);
         self::assertResponseIsSuccessful();
         self::assertStringContainsString('spreadsheetml', (string) $client->getResponse()->headers->get('Content-Type'));
+    }
+
+    public function testVatFromRevenueWithSppByTaxProfileOfEachMonthAndColumnPicker(): void
+    {
+        $client = static::createClient();
+        [$owner, $listingId] = $this->seed();
+        $em = $this->em();
+        $em->persist(CompanyTaxProfileBuilder::aProfile()->forCompany(self::COMPANY_ID)->with(TaxRegime::USN, VatMode::EXEMPT)->validFrom(null)->build());
+        $em->persist(CompanyTaxProfileBuilder::aProfile()->withId('01930000-0000-7000-8000-00000000a002')->forCompany(self::COMPANY_ID)->with(TaxRegime::USN, VatMode::USN_5)->validFrom('2026-11-01')->build());
+        $em->flush();
+        // октябрь без НДС, ноябрь — 5 % с выручки с СПП: (2 400 − 300) × 5 / 105 = 100
+        $this->line('2026-10-31', $listingId, 'sale', 'revenue', 100000, 1);
+        $this->line('2026-11-01', $listingId, 'sale', 'revenue', 240000, 2);
+        $this->line('2026-11-01', $listingId, 'spp', 'info', 30000);
+        $this->line('2026-11-01', $listingId, 'ads_settlement', 'info', -50000);
+        $this->day('2026-10-31');
+        $this->day('2026-11-01');
+
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
+        $crawler = $client->request('GET', self::URL, ['from' => '2026-10-31', 'to' => '2026-11-01']);
+
+        self::assertResponseIsSuccessful();
+        $headers = $crawler->filter('[data-economics-table] thead th')->each(static fn ($th): string => $th->text());
+        foreach (['Выручка с СПП, ₽', 'НДС к уплате, ₽', 'Выручка без НДС, ₽', 'СМ1, %', 'СМ2, %', 'СМ3, %', 'СПП, ₽'] as $label) {
+            self::assertContains($label, $headers);
+        }
+        self::assertStringNotContainsString('Маржинальность', implode(' ', $headers));
+        $cells = $crawler->filter('[data-economics-table] tbody tr')->first()->filter('td');
+        $cell = static fn (string $label): string => $cells->eq((int) array_search($label, $headers, true))->text();
+        self::assertSame('3 100,00', str_replace("\u{a0}", ' ', $cell('Выручка с СПП, ₽')));
+        self::assertSame('-100,00', str_replace(["\u{a0}", '−'], [' ', '-'], $cell('НДС к уплате, ₽')));
+        self::assertSame('3 300,00', str_replace("\u{a0}", ' ', $cell('Выручка без НДС, ₽')));
+        self::assertSame('300,00', $cell('СПП, ₽'), 'удержание за рекламу — не СПП');
+        // СМ1 = 3 300 без себестоимости и затрат; СМ1 % = 3 300 / 3 400
+        self::assertSame('97,1 %', str_replace("\u{a0}", ' ', $cell('СМ1, %')));
+
+        // окно колонок: обязательные заблокированы, остальные включены
+        $picker = $crawler->filter('[data-economics-columns]');
+        self::assertCount(1, $picker);
+        self::assertCount(1, $picker->filter('input[value="revenue"][checked][disabled]'));
+        self::assertCount(1, $picker->filter('input[value="vat"][checked]:not([disabled])'));
+        self::assertSame('vat', $crawler->filter('[data-economics-table] thead th[data-column="vat"]')->attr('data-column'));
     }
 
     public function testRejectsTooLongPeriodAndShowsEmptyStateWithoutData(): void

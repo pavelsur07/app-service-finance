@@ -78,19 +78,20 @@ final readonly class SkuEconomicsXlsxExporter
     /** @return list<string> */
     private static function header(bool $allocated): array
     {
-        $columns = ['SKU', 'Название', 'Канал', 'Продано, шт.', 'Возвраты, шт.', 'Выручка', 'Себестоимость', 'Выручка − себестоимость', 'Комиссия', 'Логистика туда', 'Логистика обратно', 'Эквайринг', 'Прочие СМ1', 'СМ1', 'Реклама', 'СМ2'];
+        $columns = ['SKU', 'Название', 'Канал', 'Продано, шт.', 'Возвраты, шт.', 'Выручка', 'Выручка с СПП', 'НДС к уплате', 'Выручка без НДС', 'Себестоимость', 'Выручка без НДС − себестоимость',
+            'Комиссия', 'Логистика туда', 'Логистика обратно', 'Эквайринг', 'Прочие СМ1', 'СМ1', 'СМ1, %', 'Реклама', 'ДРР, %', 'СМ2', 'СМ2, %'];
 
-        return $allocated ? [...$columns, 'Склад и прочие МП', 'СМ3', 'СПП (справочно)'] : [...$columns, 'СПП (справочно)'];
+        return $allocated ? [...$columns, 'Склад и прочие МП', 'СМ3', 'СМ3, %', 'СПП (справочно)'] : [...$columns, 'СПП (справочно)'];
     }
 
     /** @param list<string> $label первые колонки строки */
     private function row(array $label, SkuMetrics $m, bool $allocated): Row
     {
         $rub = static fn (int $minor): float => $minor / 100;
-        $values = [...$label, $m->salesQty, $m->returnsQty, $rub($m->revenue), $rub($m->costPrice), $rub($m->gross()), $rub($m->commission),
-            $rub($m->logisticsTo), $rub($m->logisticsBack), $rub($m->acquiring), $rub($m->otherMd1), $rub($m->md1()), $rub($m->ads), $rub($m->md2())];
-        $values = $allocated ? [...$values, $rub($m->overhead), $rub($m->full()), $rub($m->spp)] : [...$values, $rub($m->spp)];
+        $values = [...$label, $m->salesQty, $m->returnsQty, $rub($m->revenue), $rub($m->revenueWithSpp()), $rub($m->vat), $rub($m->revenueNet()), $rub($m->costPrice), $rub($m->gross()), $rub($m->commission),
+            $rub($m->logisticsTo), $rub($m->logisticsBack), $rub($m->acquiring), $rub($m->otherMd1), $rub($m->md1()), $m->percentOfRevenue($m->md1()), $rub($m->ads), $m->drr(), $rub($m->md2()), $m->percentOfRevenue($m->md2())];
+        $values = $allocated ? [...$values, $rub($m->overhead), $rub($m->full()), $m->percentOfRevenue($m->full()), $rub($m->spp)] : [...$values, $rub($m->spp)];
 
-        return new Row(array_map(static fn (string|int|float $v): Cell => Cell::fromValue($v), $values));
+        return new Row(array_map(static fn (string|int|float|null $v): Cell => Cell::fromValue($v), $values));
     }
 }

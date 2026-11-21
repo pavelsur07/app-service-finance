@@ -148,12 +148,13 @@
                         <th>Период</th>
                         <th class="text-end">Продано, шт.</th>
                         <th class="text-end">Выручка, ₽</th>
+                        <th class="text-end">НДС к уплате, ₽</th>
                         <th class="text-end">СМ1, ₽</th>
                         <th class="text-end">Реклама, ₽</th>
                         <th class="text-end">ДРР, %</th>
                         <th class="text-end">СМ2, ₽</th>
                         {% if allocated %}<th class="text-end">СМ3, ₽</th>{% endif %}
-                        <th class="text-end">Маржинальность {{ profit_label }}, %</th>
+                        <th class="text-end">{{ profit_label }}, %</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -171,6 +172,7 @@
                             </td>
                             <td class="text-end">{{ m.salesQty|vf_number }}</td>
                             <td class="text-end">{{ ui.money(m.revenue) }}</td>
+                            <td class="text-end">{{ ui.money(m.vat) }}</td>
                             <td class="text-end">{{ ui.money(m.md1) }}</td>
                             <td class="text-end">{{ ui.money(m.ads) }}</td>
                             <td class="text-end">{{ ui.pct(m.drr) }}</td>

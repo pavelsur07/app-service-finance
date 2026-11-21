@@ -17,6 +17,17 @@
         <span class="me-sku-value text-truncate" title="{{ value }}">{{ value }}</span>
     {% endif %}
 {% endmacro %}
+{% macro cell(m, column) %}
+    {%- import _self as ui -%}
+    {%- set kind = column.kind ?? 'money' -%}
+    {%- if kind == 'share' -%}
+        {{ ui.pct(m.percentOfRevenue(attribute(m, column.value))) }}
+    {%- elseif kind == 'percent' -%}
+        {{ ui.pct(attribute(m, column.value)) }}
+    {%- else -%}
+        {{ ui.money(attribute(m, column.value)) }}
+    {%- endif -%}
+{% endmacro %}
 {% macro delta(current, previous) %}
     {%- if previous != 0 -%}
         <p class="text-secondary small mb-0">{{ (current - previous)|vf_minor(2)|vf_amount(2, null, true) }}{% if previous > 0 %} · {{ ((current - previous) * 100 / previous)|vf_number(1) }} %{% endif %}</p>
@@ -26,24 +37,35 @@
 {% block content %}
     {% import _self as ui %}
     {% set params = app.request.query.all %}
+    {# value — метод/поле SkuMetrics; kind: money — ₽, share — % от выручки до СПП, percent — уже % #}
     {% set columns = [
-        {key: 'revenue', label: 'Выручка', sort: 'revenue'},
-        {key: 'costPrice', label: 'Себестоимость'},
-        {key: 'gross', label: 'Выручка − себестоимость', sort: 'gross'},
-        {key: 'commission', label: 'Комиссия'},
-        {key: 'logisticsTo', label: 'Логистика туда'},
-        {key: 'logisticsBack', label: 'Логистика обратно'},
-        {key: 'acquiring', label: 'Эквайринг'},
-        {key: 'otherMd1', label: 'Прочие СМ1'},
-        {key: 'md1', label: 'СМ1', sort: 'md1'},
-        {key: 'ads', label: 'Реклама', sort: 'ads'},
-        {key: 'md2', label: 'СМ2', sort: 'md2'},
+        {id: 'revenue', value: 'revenue', label: 'Выручка, ₽', sort: 'revenue', required: true},
+        {id: 'revenueWithSpp', value: 'revenueWithSpp', label: 'Выручка с СПП, ₽'},
+        {id: 'spp', value: 'spp', label: 'СПП, ₽'},
+        {id: 'vat', value: 'vat', label: 'НДС к уплате, ₽'},
+        {id: 'revenueNet', value: 'revenueNet', label: 'Выручка без НДС, ₽'},
+        {id: 'costPrice', value: 'costPrice', label: 'Себестоимость, ₽'},
+        {id: 'gross', value: 'gross', label: 'Выручка без НДС − себестоимость, ₽', sort: 'gross'},
+        {id: 'commission', value: 'commission', label: 'Комиссия, ₽'},
+        {id: 'logisticsTo', value: 'logisticsTo', label: 'Логистика туда, ₽'},
+        {id: 'logisticsBack', value: 'logisticsBack', label: 'Логистика обратно, ₽'},
+        {id: 'acquiring', value: 'acquiring', label: 'Эквайринг, ₽'},
+        {id: 'otherMd1', value: 'otherMd1', label: 'Прочие СМ1, ₽'},
+        {id: 'md1', value: 'md1', label: 'СМ1, ₽', sort: 'md1', required: true},
+        {id: 'md1Pct', value: 'md1', label: 'СМ1, %', kind: 'share'},
+        {id: 'ads', value: 'ads', label: 'Реклама, ₽', sort: 'ads'},
+        {id: 'drr', value: 'drr', label: 'ДРР, %', kind: 'percent'},
+        {id: 'md2', value: 'md2', label: 'СМ2, ₽', sort: 'md2', required: true},
+        {id: 'md2Pct', value: 'md2', label: 'СМ2, %', kind: 'share', required: not allocated},
     ] %}
     {% if allocated %}
-        {% set columns = columns|merge([{key: 'overhead', label: 'Склад и прочие МП'}, {key: 'full', label: 'СМ3', sort: 'full'}]) %}
+        {% set columns = columns|merge([
+            {id: 'overhead', value: 'overhead', label: 'Склад и прочие МП, ₽'},
+            {id: 'full', value: 'full', label: 'СМ3, ₽', sort: 'full', required: true},
+            {id: 'fullPct', value: 'full', label: 'СМ3, %', kind: 'share', required: true},
+        ]) %}
     {% endif %}
     {% set profit = allocated ? 'full' : 'md2' %}
-    {% set profit_label = allocated ? 'СМ3' : 'СМ2' %}
 
     <div class="vf-page-head">
         <div class="vf-page-head__title"><h1>Экономика SKU</h1></div>
@@ -118,6 +140,20 @@
             <div class="col-12 col-lg-auto d-flex flex-wrap gap-2">
                 <button class="btn btn-primary">Показать</button>
                 {% if report and report.hasData %}
+                    <details class="dropdown me-columns" data-economics-columns>
+                        <summary class="btn">Колонки</summary>
+                        <fieldset class="dropdown-menu show me-columns__menu">
+                            <legend class="dropdown-header">Отображаемые колонки</legend>
+                            {% for column in columns %}
+                                <label class="dropdown-item form-check">
+                                    <input class="form-check-input" type="checkbox" value="{{ column.id }}" checked{{ column.required ?? false ? ' disabled' }}>
+                                    <span class="form-check-label">{{ column.label }}</span>
+                                </label>
+                            {% endfor %}
+                        </fieldset>
+                    </details>
+                {% endif %}
+                {% if report and report.hasData %}
                     <a class="btn" href="{{ path('marketplace_economics_sku', params|merge({format: 'xlsx', page: null})) }}">Скачать xlsx</a>
                 {% endif %}
             </div>
@@ -138,6 +174,7 @@
                 Сравнение с {{ report.previousFrom|date('d.m.Y') }} – {{ report.previousTo|date('d.m.Y') }}.
                 Дней в витрине: {{ report.days|vf_number }}.
                 {% if report.daysWithoutCostPrice > 0 %}Дней с продажами без себестоимости: {{ report.daysWithoutCostPrice|vf_number }} — себестоимость там 0.{% endif %}
+                НДС к уплате — с выручки с СПП по налоговому профилю компании на каждый месяц; уровни СМ — без НДС, проценты — от выручки до СПП.
                 Реклама по SKU — по долям прежнего отчёта рекламы; за последние 2 дня — предварительно.
             </p>
         </div>
@@ -152,17 +189,14 @@
                             <a href="{{ path('marketplace_economics_sku', params|merge({sort: 'sales', dir: sort == 'sales' and desc ? 'asc' : 'desc', page: null})) }}">Продано, шт.</a>
                         </th>
                         {% for column in columns %}
-                            <th class="text-end">
+                            <th class="text-end" data-column="{{ column.id }}">
                                 {% if column.sort is defined %}
-                                    <a href="{{ path('marketplace_economics_sku', params|merge({sort: column.sort, dir: sort == column.sort and desc ? 'asc' : 'desc', page: null})) }}">{{ column.label }}, ₽</a>
+                                    <a href="{{ path('marketplace_economics_sku', params|merge({sort: column.sort, dir: sort == column.sort and desc ? 'asc' : 'desc', page: null})) }}">{{ column.label }}</a>
                                 {% else %}
-                                    {{ column.label }}, ₽
+                                    {{ column.label }}
                                 {% endif %}
                             </th>
                         {% endfor %}
-                        <th class="text-end">Маржинальность {{ profit_label }}, %</th>
-                        <th class="text-end">ДРР, %</th>
-                        <th class="text-end">СПП, ₽</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -180,18 +214,15 @@
                             </td>
                             <td class="text-end">{{ m.salesQty|vf_number }}{% if m.returnsQty %}<p class="text-secondary small mb-0">возвр. {{ m.returnsQty|vf_number }}</p>{% endif %}</td>
                             {% for column in columns %}
-                                <td class="text-end">
-                                    {{ ui.money(attribute(m, column.key)) }}
-                                    {% if column.key == profit %}{{ ui.delta(attribute(m, column.key), attribute(row.previous, column.key)) }}{% endif %}
+                                <td class="text-end" data-column="{{ column.id }}">
+                                    {{ ui.cell(m, column) }}
+                                    {% if column.id == profit %}{{ ui.delta(attribute(m, column.value), attribute(row.previous, column.value)) }}{% endif %}
                                 </td>
                             {% endfor %}
-                            <td class="text-end">{{ ui.pct(m.percentOfRevenue(attribute(m, profit))) }}</td>
-                            <td class="text-end">{{ ui.pct(m.drr) }}</td>
-                            <td class="text-end">{{ ui.money(m.spp) }}</td>
                         </tr>
                     {% else %}
                         <tr>
-                            <td class="text-secondary py-5" colspan="{{ columns|length + 6 }}">
+                            <td class="text-secondary py-5" colspan="{{ columns|length + 3 }}">
                                 <span class="me-sku-empty d-inline-block">Нет продаж и затрат по SKU за период.</span>
                             </td>
                         </tr>
@@ -201,14 +232,11 @@
                             <td class="me-sku-summary fw-semibold" colspan="2">{{ label }}</td>
                             <td class="text-end">{{ m.salesQty|vf_number }}</td>
                             {% for column in columns %}
-                                <td class="text-end">
-                                    {{ ui.money(attribute(m, column.key)) }}
-                                    {% if label starts with 'Итого' and column.key == profit %}{{ ui.delta(attribute(m, column.key), attribute(report.previousTotal, column.key)) }}{% endif %}
+                                <td class="text-end" data-column="{{ column.id }}">
+                                    {{ ui.cell(m, column) }}
+                                    {% if label starts with 'Итого' and column.id == profit %}{{ ui.delta(attribute(m, column.value), attribute(report.previousTotal, column.value)) }}{% endif %}
                                 </td>
                             {% endfor %}
-                            <td class="text-end">{{ ui.pct(m.percentOfRevenue(attribute(m, profit))) }}</td>
-                            <td class="text-end">{{ ui.pct(m.drr) }}</td>
-                            <td class="text-end">{{ ui.money(m.spp) }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>

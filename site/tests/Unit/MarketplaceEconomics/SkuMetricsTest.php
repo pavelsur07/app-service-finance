@@ -27,4 +27,33 @@ final class SkuMetricsTest extends TestCase
         self::assertSame([7.5, 130.3], [$m->drr(), $m->roi()]);
         self::assertNull((new SkuMetrics())->percentOfRevenue(100));
     }
+
+    public function testLevelsAreNetOfVatAndPercentsFromRevenueBeforeSpp(): void
+    {
+        $m = new SkuMetrics();
+        $m->add('sale', L::REVENUE, 100000, 1);
+        $m->add('cost_price', L::COST_PRICE, -30000, 1);
+        $m->add('commission', L::MD1, -10000, 0);
+        $m->add('ads_cpc', L::MD2, -5000, 0);
+        $m->add('overhead_share', L::OVERHEAD, -1000, 0);
+        $m->add('spp', L::INFO, 15000, 0);
+        $m->add('coinvestment', L::INFO, 1000, 0);
+        $m->add('ads_settlement', L::INFO, -7000, 0);
+        $m->vat = -4000;
+
+        self::assertSame([16000, 84000, 96000], [$m->spp, $m->revenueWithSpp(), $m->revenueNet()]);
+        self::assertSame([66000, 56000, 51000, 50000], [$m->gross(), $m->md1(), $m->md2(), $m->full()]);
+        self::assertSame([56.0, 51.0, 5.0], [$m->percentOfRevenue($m->md1()), $m->percentOfRevenue($m->md2()), $m->drr()]);
+    }
+
+    public function testMergeAddsVat(): void
+    {
+        $a = new SkuMetrics();
+        $a->vat = -500;
+        $b = new SkuMetrics();
+        $b->vat = 200;
+        $a->merge($b);
+
+        self::assertSame(-300, $a->vat);
+    }
 }
