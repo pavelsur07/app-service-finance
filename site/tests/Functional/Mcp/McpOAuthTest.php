@@ -257,6 +257,25 @@ final class McpOAuthTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(400);
     }
 
+    public function testExpiredConnectionRejectsAccessAndRefresh(): void
+    {
+        [$owner, $company] = $this->ownerAndCompany();
+        $this->subscribe($company);
+        $this->browser->loginUser($owner);
+        $this->token($this->exchange($this->approve($this->consentUrl(), $company)));
+        self::assertResponseIsSuccessful();
+        $tokens = $this->json();
+        $principal = static::getContainer()->get(McpAccess::class)->authenticate($this->bearer($tokens['access_token']));
+        $this->em()->getConnection()->executeStatement(
+            'UPDATE mcp_oauth_connections SET expires_at = CURRENT_TIMESTAMP - INTERVAL \'1 minute\' WHERE id = ?',
+            [$principal->connectionId],
+        );
+
+        $this->assertDeniedAccess($tokens['access_token'], 401);
+        $this->token(['grant_type' => 'refresh_token', 'client_id' => 'codex-cli', 'refresh_token' => $tokens['refresh_token']]);
+        self::assertResponseStatusCodeSame(400);
+    }
+
     public function testOwnerCanCreateReplayAndConfirmDraftThroughMcpAndTheBrowser(): void
     {
         [$owner, $company] = $this->ownerAndCompany();

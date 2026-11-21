@@ -12,8 +12,8 @@ use App\Mcp\Security\McpPrincipal;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Mcp\Server\Stateless\RequestMeta;
 use Monolog\Handler\TestHandler;
-use Monolog\LogRecord;
 use Monolog\Logger;
+use Monolog\LogRecord;
 use Opis\JsonSchema\Validator;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
@@ -91,6 +91,7 @@ final class UserMcpServerTest extends IntegrationTestCase
 
     public function testUnexpectedFailureIsLoggedWithoutExceptionMessageOrArguments(): void
     {
+        // @phpstan-ignore method.unresolvableReturnType (PHPUnit bootstrap enables BypassFinals.)
         $cash = $this->createMock(CashFacade::class);
         $cash->expects(self::once())->method('listExternalAccounts')->willThrowException(new \RuntimeException('private error detail'));
         $tools = new McpCashTools($cash, new Validator(), new McpCashCursor('test-session-secret'));
