@@ -91,6 +91,33 @@ final class EventScrubberTest extends TestCase
         self::assertSame('POST', $request['method']);
     }
 
+    public function testOmitsMcpPayloadAndProtocolHeadersFromErrors(): void
+    {
+        $event = Event::createEvent();
+        $event->setExtra(['arguments' => ['description' => 'тестовое назначение']]);
+        $event->setRequest([
+            'url' => 'https://example.test/mcp?description=sample',
+            'query_string' => 'description=sample',
+            'method' => 'POST',
+            'data' => '{"amount":"1250.00"}',
+            'headers' => [
+                'Authorization' => ['Bearer y'],
+                'Mcp-Session-Id' => ['session'],
+                'Mcp-Param-description' => ['sample'],
+                'Accept' => ['application/json'],
+            ],
+        ]);
+
+        (new EventScrubber())($event);
+
+        self::assertSame([], $event->getExtra());
+        self::assertSame([
+            'url' => 'https://example.test/mcp',
+            'method' => 'POST',
+            'headers' => ['Authorization' => self::REDACTED, 'Accept' => ['application/json']],
+        ], $event->getRequest());
+    }
+
     public function testReturnsSameEventInstanceAndNeverDrops(): void
     {
         $event = Event::createEvent();

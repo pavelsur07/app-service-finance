@@ -72,27 +72,31 @@ final readonly class CashflowCategoryTreeBuilder
         ];
     }
 
-    /**
-     * @return 'in'|'out'|'both'
-     */
+    /** @return 'in'|'out'|'both' */
     private static function flow(CashflowCategory $category): string
     {
         for ($node = $category; null !== $node; $node = $node->getParent()) {
-            $flow = match ($node->getSystemCode()) {
-                CashflowCategory::CODE_TECHNICAL_IN => 'in',
-                CashflowCategory::CODE_TECHNICAL_OUT => 'out',
-                default => match ($node->getOperationType()) {
-                    PaymentPlanType::INFLOW => 'in',
-                    PaymentPlanType::OUTFLOW => 'out',
-                    PaymentPlanType::TRANSFER => 'both',
-                    null => null,
-                },
-            };
+            $flow = self::declaredFlow($node->getSystemCode(), $node->getOperationType());
             if (null !== $flow) {
                 return $flow;
             }
         }
 
         return 'both';
+    }
+
+    /** @return 'in'|'out'|'both'|null */
+    public static function declaredFlow(?string $systemCode, ?PaymentPlanType $operationType): ?string
+    {
+        return match ($systemCode) {
+            CashflowCategory::CODE_TECHNICAL_IN => 'in',
+            CashflowCategory::CODE_TECHNICAL_OUT => 'out',
+            default => match ($operationType) {
+                PaymentPlanType::INFLOW => 'in',
+                PaymentPlanType::OUTFLOW => 'out',
+                PaymentPlanType::TRANSFER => 'both',
+                null => null,
+            },
+        };
     }
 }

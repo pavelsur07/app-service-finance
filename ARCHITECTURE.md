@@ -12,6 +12,7 @@
 | Модуль | Назначение | companyId паттерн |
 |---|---|---|
 | `Cash` | Денежные счета, транзакции, импорт выписок (файл, 1С, контракт для банков), план платежей | `Company $company` (legacy) |
+| `Mcp` | Внешний пользовательский MCP, согласия OAuth и инструменты ДДС через CashFacade | `string $companyId` |
 | `BankSync` | Подключения к API банков (Альфа), загрузка выписки в ДДС через `CashFacade` | `string $companyId` ✅ |
 | `Marketplace` | **Легаси с 13.11.2026**, кроме листингов. WB/Ozon: продажи, возвраты, расходы, закрытие месяца. Развивается только работа с листингами (`MarketplaceListing`, баркоды, теги, связка с товаром) и себестоимость по датам (`MarketplaceInventoryCostPrice`) | смешанный |
 | `Catalog` | Товары, штрихкоды, закупочные цены | смешанный (`Product` ещё на `Company $company`) |
@@ -3182,8 +3183,22 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
 - Cash не зависит от `App\Analytics` — гейт `test_cash_does_not_depend_on_analytics`
   (`site/tests/Architecture/ModuleBoundaryRules.php`).
 
+### Пользовательский MCP (`src/Mcp`)
+
+- `/mcp` использует отдельный stateless firewall и OAuth Authorization Code с PKCE S256. Выдача согласия и отзыв подключений проходят в обычной сессии кабинета. Внешние вызовы используют только bearer-токен, выданный для канонического ресурса `/mcp`.
+- Пользователь выбирает одну собственную компанию при выдаче согласия. Запросы фильтруются актуальными финансовыми правами и статусом подписки. При `NONE` доступ закрыт. Разрешение на черновики выдаётся отдельно. Отзыв применяется к подключению, его access и refresh токенам.
+- MCP-каталог публикует `list_reference_items`, `list_cash_transactions` и `create_cash_draft` по схемам `site/contracts/mcp/v1`. Инструменты работают через DTO Cash и CashFacade. Сессии старой ревизии протокола и лимиты хранятся в Redis. Современная ревизия проверяет полномочия на каждом вызове.
+- Черновик связывает компанию, владельца, подключение и внешний ID. Подтверждение из раздела ДДС создаёт фактическую операцию с `importSource=mcp`. Повтор создания сверяется с исходными параметрами и возвращает прежний ID и текущий статус.
+- В аудит канала `mcp` передаются ID вызова, ID подключения, код результата и длительность. Настройка стенда и клиентов описана в [инструкции](docs/tasks/mcp-cash/oauth.md).
+
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
+// Постраничные справочники Cash для внешних клиентов. Ключ — UUID последней строки.
+listExternalAccounts(string $companyId, ?string $search, ?string $afterId, int $fetchLimit): array
+listExternalCategories(string $companyId, ?string $search, ?string $afterId, int $fetchLimit): array
+// Фактические операции с полным распределением, исключая удалённые. Курсор по дате и ID.
+listExternalTransactions(string $companyId, DateTimeImmutable $from, DateTimeImmutable $to, ?string $accountId, ?string $categoryId, ?CashDirection $direction, ?array $after, int $fetchLimit): array
+
 // Загрузка банковской выписки (вызывает BankSync; раздел «BankSync → Cash: загрузка выписки»)
 // Чтение: активный денежный счёт компании по id — цель загрузки привязанного счёта банка; иначе null
 getStatementImportAccount(string $companyId, string $moneyAccountId): ?StatementImportAccount
@@ -3203,6 +3218,9 @@ finishStatementImportLog(string $companyId, string $importLogId, StatementImport
 abandonStatementImportLog(string $importLogId): void
 // Строки дня → ДДС и пересчёт остатков; только внутри транзакции вызывающего, коммитит он
 importBankStatementDay(string $companyId, string $moneyAccountId, string $source, BankStatementDayInput $day): BankStatementDayResult
+
+// Черновик MCP, без проводки и разбора текста. Доверенный контекст предоставляет MCP.
+createMcpCashDraft(CreateMcpCashDraft $command): McpCashDraftResult
 
 // Создать ДДС-транзакцию из внешнего модуля (идемпотентно для внешних источников)
 createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionResult

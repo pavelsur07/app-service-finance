@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Sentry;
 
+use App\Shared\Infrastructure\Http\McpRequestPath;
 use Sentry\Event;
 use Sentry\EventHint;
 
@@ -39,10 +40,24 @@ final readonly class EventScrubber
 
     public function __invoke(Event $event, ?EventHint $hint = null): ?Event
     {
-        $event->setExtra($this->scrubArray($event->getExtra()));
+        $request = $event->getRequest();
+        $url = $request['url'] ?? null;
+        $path = \is_string($url) ? parse_url($url, \PHP_URL_PATH) : null;
+        $sensitiveMcpRequest = \is_string($path) && McpRequestPath::containsSensitiveData($path);
+        if ($sensitiveMcpRequest) {
+            unset($request['data'], $request['query_string'], $request['cookies'], $request['env']);
+            $request['url'] = substr($url, 0, strcspn($url, '?#'));
+            if (\is_array($request['headers'] ?? null)) {
+                $request['headers'] = array_filter(
+                    $request['headers'],
+                    static fn (int|string $name): bool => !str_starts_with(strtolower((string) $name), 'mcp-'),
+                    \ARRAY_FILTER_USE_KEY,
+                );
+            }
+        }
+        $event->setExtra($sensitiveMcpRequest ? [] : $this->scrubArray($event->getExtra()));
         $event->setTags($this->scrubTags($event->getTags()));
 
-        $request = $event->getRequest();
         if ([] !== $request) {
             $event->setRequest($this->scrubRequest($request));
         }

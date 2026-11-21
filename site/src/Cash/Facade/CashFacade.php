@@ -22,6 +22,8 @@ use App\Cash\Application\DTO\CreateCashTransferResult;
 use App\Cash\Application\DTO\MoneyAccountDailyBalanceRow;
 use App\Cash\Application\DTO\MoneyAccountOpeningBalance;
 use App\Cash\Application\DTO\MoneyAccountSummary;
+use App\Cash\Application\DTO\PaymentIntake\CreateMcpCashDraft;
+use App\Cash\Application\DTO\PaymentIntake\McpCashDraftResult;
 use App\Cash\Application\DTO\StatementImportAccount;
 use App\Cash\Application\DTO\StatementImportSummary;
 use App\Cash\Application\DTO\StatementLinkCandidate;
@@ -33,7 +35,9 @@ use App\Cash\Application\Transfer\CreateCashTransferAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
+use App\Cash\Exception\ExternalCashReferenceUnavailableException;
 use App\Cash\Exception\StatementImportOutsideTransactionException;
 use App\Cash\Exception\StatementImportTargetNotFoundException;
 use App\Cash\Infrastructure\Lock\CashImportAccountLock;
@@ -41,6 +45,7 @@ use App\Cash\Infrastructure\Lock\CashImportLogLease;
 use App\Cash\Infrastructure\Query\CashCategorizationQuery;
 use App\Cash\Infrastructure\Query\CashDashboardQuery;
 use App\Cash\Infrastructure\Query\CashReportQuery;
+use App\Cash\Infrastructure\Query\ExternalCashReadQuery;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
 use App\Cash\Repository\Import\ImportLogRepository;
@@ -52,6 +57,7 @@ use App\Company\Facade\CompanyFacade;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Ramsey\Uuid\Uuid;
 
+/** @phpstan-import-type ExternalCashTransaction from ExternalCashReadQuery */
 final readonly class CashFacade
 {
     public function __construct(
@@ -73,8 +79,14 @@ final readonly class CashFacade
         private ImportLogger $importLogger,
         private ImportLogRepository $importLogRepository,
         private CashCategorizationQuery $categorizationQuery,
+        private ExternalCashReadQuery $externalRead,
         private \App\Cash\Application\PaymentIntake\PaymentIntakeAction $paymentIntake,
     ) {
+    }
+
+    public function createMcpCashDraft(CreateMcpCashDraft $command): McpCashDraftResult
+    {
+        return $this->paymentIntake->createMcpDraft($command);
     }
 
     public function requestPaymentIntake(\App\Cash\Application\DTO\PaymentIntake\RequestPaymentIntakeCommand $command): \App\Cash\Application\DTO\PaymentIntake\PaymentIntakeDraftView
@@ -567,6 +579,41 @@ final readonly class CashFacade
             $account->getOpeningBalanceDate(),
             $account->getCurrentBalance(),
         ), $accounts));
+    }
+
+    /** @return list<array{id: string, name: string, currency: string}> */
+    public function listExternalAccounts(string $companyId, ?string $search, ?string $afterId, int $fetchLimit): array
+    {
+        return $this->externalRead->accounts($companyId, $search, $afterId, $fetchLimit);
+    }
+
+    /** @return list<array{id: string, name: string, parentId: ?string}> */
+    public function listExternalCategories(string $companyId, ?string $search, ?string $afterId, int $fetchLimit): array
+    {
+        return $this->externalRead->categories($companyId, $search, $afterId, $fetchLimit);
+    }
+
+    /**
+     * @param array{date: string, id: string}|null $after
+     *
+     * @return list<ExternalCashTransaction>
+     */
+    public function listExternalTransactions(
+        string $companyId,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        ?string $accountId,
+        ?string $categoryId,
+        ?CashDirection $direction,
+        ?array $after,
+        int $fetchLimit,
+    ): array {
+        if ((null !== $accountId && null === $this->moneyAccountRepository->findOneByIdAndCompanyId($accountId, $companyId))
+            || (null !== $categoryId && null === $this->cashflowCategoryRepository->findOneByIdAndCompanyId($categoryId, $companyId))) {
+            throw new ExternalCashReferenceUnavailableException();
+        }
+
+        return $this->externalRead->transactions($companyId, $from, $to, $accountId, $categoryId, $direction, $after, $fetchLimit);
     }
 
     /**

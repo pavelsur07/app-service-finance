@@ -24,6 +24,9 @@
 <div class="card">
     <div class="card-body">
         <dl class="row">
+            {% if tx.importSource == 'mcp' %}
+                <dt class="col-md-3">Источник</dt><dd class="col-md-9">MCP</dd>
+            {% endif %}
             <dt class="col-md-3">Дата</dt><dd class="col-md-9">{{ tx.occurredAt|date('d.m.Y') }}</dd>
             <dt class="col-md-3">Счет</dt><dd class="col-md-9">{{ tx.moneyAccount.name }}</dd>
             {# direction — enum CashDirection: сравниваем значение, а не объект. DS-Money: расход — не красный. #}

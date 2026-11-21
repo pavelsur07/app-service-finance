@@ -109,6 +109,8 @@ services:
         # add more service definitions when explicit configuration is needed
         # please note that last definitions always *replace* previous ones
         # Клиент Redis для сессий
+    Opis\JsonSchema\Validator: ~
+
     App\Shared\Security\Spa\SpaContext:
         arguments:
             $accountHost: '%env(SPA_ACCOUNT_HOST)%'

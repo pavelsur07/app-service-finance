@@ -31,6 +31,8 @@ final readonly class ReadOnlyRule
         'company_invite_revoke_legacy',
         'settings_api_revoke',
         'settings_report_api_key_revoke',
+        'mcp_user_consent', // Проверяет тариф выбранной компании и разрешения OAuth.
+        'mcp_user_connection_revoke',
         'bank_sync_account_unlink',
         'moysklad_connections_disable',
         'app_profile_password',

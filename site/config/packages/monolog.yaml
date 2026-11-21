@@ -10,6 +10,7 @@ monolog:
         # отвечает 200 на все ветки, поэтому ошибки может не быть вовсе — и отказ канала
         # становится невидимым. ERROR отсюда по-прежнему уходит в sentry-хендлер.
         - telegram
+        - mcp
         # Диагностика производительности Marketplace M1: JSON-строки в var/log/performance-<дата>.jsonl,
         # читает `app:marketplace:perf-report`. Только INFO, без сумм/тел/токенов. Выключается
         # MARKETPLACE_PERF_DIAGNOSTICS=0. См. docs/architecture/marketplace-audit/09-m1-diagnostics.md.
@@ -79,7 +80,7 @@ when@prod:
                 handler: nested
                 excluded_http_codes: [404, 405]
                 buffer_size: 50
-                channels: ["!marketplace_ads", "!telegram", "!performance"]
+                channels: ["!marketplace_ads", "!telegram", "!performance", "!mcp"]
 
             # Файл, а не stderr: отчёт `app:marketplace:perf-report` читает его из общего тома
             # site_var_log (смонтирован во все PHP-контейнеры). Retention — 14 суточных файлов;
@@ -118,6 +119,13 @@ when@prod:
                 path: php://stderr
                 level: info
                 channels: [telegram]
+                formatter: monolog.formatter.json
+
+            mcp:
+                type: stream
+                path: php://stderr
+                level: info
+                channels: [mcp]
                 formatter: monolog.formatter.json
 
             sentry:

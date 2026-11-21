@@ -1,0 +1,72 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Черновик MCP{% endblock %}
+
+{% block content %}
+    <section aria-labelledby="mcp-draft-title">
+        <a href="{{ path('cash_mcp_draft_index') }}">К черновикам MCP</a>
+        <h1 id="mcp-draft-title" class="mt-3">Черновик MCP</h1>
+        <div class="card">
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Источник</dt>
+                    <dd class="col-sm-8">MCP</dd>
+                    <dt class="col-sm-4">Внешний ID</dt>
+                    <dd class="col-sm-8 text-break">{{ draft.mcpExternalId }}</dd>
+                    <dt class="col-sm-4">Подключение</dt>
+                    <dd class="col-sm-8 text-break">{{ draft.mcpConnectionId }}</dd>
+                    <dt class="col-sm-4">Получен</dt>
+                    <dd class="col-sm-8">{{ draft.receivedAt|date('d.m.Y H:i T') }}</dd>
+                    <dt class="col-sm-4">Дата платежа</dt>
+                    <dd class="col-sm-8">{{ item.date|date('d.m.Y', false) }}</dd>
+                    <dt class="col-sm-4">Счёт</dt>
+                    <dd class="col-sm-8">{{ accountName ?? 'Счёт недоступен' }}</dd>
+                    <dt class="col-sm-4">Направление</dt>
+                    <dd class="col-sm-8">{{ item.direction == 'outflow' ? 'Расход' : 'Приход' }}</dd>
+                    <dt class="col-sm-4">Сумма</dt>
+                    <dd class="col-sm-8">{{ item.amount|vf_money(2, item.currency) }} <span class="text-secondary">{{ item.currency }}</span></dd>
+                    <dt class="col-sm-4">Статья ДДС</dt>
+                    <dd class="col-sm-8">{{ categoryName ?? (item.category_id ? 'Статья недоступна' : 'Без статьи') }}</dd>
+                    {% if item.description %}
+                        <dt class="col-sm-4">Назначение</dt>
+                        <dd class="col-sm-8 text-break">{{ item.description }}</dd>
+                    {% endif %}
+                </dl>
+                {% if draft.status == 'confirmed' %}
+                    <p class="text-success">Оплата подтверждена</p>
+                    <p class="text-secondary text-break">{{ confirmedBy }} · {{ draft.confirmedAt|date('d.m.Y H:i T') }}</p>
+                    {% if draft.confirmedTransactionId %}
+                        <a href="{{ path('cash_transaction_show', {id: draft.confirmedTransactionId}) }}">Открыть операцию ДДС</a>
+                    {% endif %}
+                {% elseif draft.status == 'cancelled' %}
+                    <p class="text-secondary mb-0">Черновик отменён</p>
+                {% else %}
+                    {% for warning in item.warnings %}
+                        <p class="alert alert-warning">{{ warning }}</p>
+                    {% endfor %}
+                    {% if not accountActive %}
+                        <p class="text-secondary">Счёт недоступен для проведения.</p>
+                    {% endif %}
+                    <div class="d-flex flex-wrap gap-3 align-items-end">
+                        {% if accountActive %}
+                            <form method="post" action="{{ path('cash_mcp_draft_decide', {id: draft.id, decision: 'confirm'}) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('mcp_draft_confirm_' ~ draft.id) }}">
+                                <input type="hidden" name="revision" value="{{ draft.revision }}">
+                                <label class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="paid" value="1" required>
+                                    <span class="form-check-label">Платёж уже выполнен</span>
+                                </label>
+                                <button type="submit" class="btn btn-primary">Подтвердить оплату</button>
+                            </form>
+                        {% endif %}
+                        <form method="post" action="{{ path('cash_mcp_draft_decide', {id: draft.id, decision: 'cancel'}) }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token('mcp_draft_cancel_' ~ draft.id) }}">
+                            <input type="hidden" name="revision" value="{{ draft.revision }}">
+                            <button type="submit" class="btn btn-outline-secondary">Отменить черновик</button>
+                        </form>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+{% endblock %}
