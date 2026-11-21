@@ -3180,6 +3180,10 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
 
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
+// Постраничные справочники Cash для внешних клиентов. Ключ — UUID последней строки.
+listExternalAccounts(string $companyId, ?string $search, ?string $afterId, int $fetchLimit): array
+listExternalCategories(string $companyId, ?string $search, ?string $afterId, int $fetchLimit): array
+
 // Загрузка банковской выписки (вызывает BankSync; раздел «BankSync → Cash: загрузка выписки»)
 // Чтение: активный денежный счёт компании по id — цель загрузки привязанного счёта банка; иначе null
 getStatementImportAccount(string $companyId, string $moneyAccountId): ?StatementImportAccount

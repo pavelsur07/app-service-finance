@@ -41,6 +41,7 @@ use App\Cash\Infrastructure\Lock\CashImportLogLease;
 use App\Cash\Infrastructure\Query\CashCategorizationQuery;
 use App\Cash\Infrastructure\Query\CashDashboardQuery;
 use App\Cash\Infrastructure\Query\CashReportQuery;
+use App\Cash\Infrastructure\Query\ExternalCashReadQuery;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
 use App\Cash\Repository\Import\ImportLogRepository;
@@ -73,6 +74,7 @@ final readonly class CashFacade
         private ImportLogger $importLogger,
         private ImportLogRepository $importLogRepository,
         private CashCategorizationQuery $categorizationQuery,
+        private ExternalCashReadQuery $externalRead,
         private \App\Cash\Application\PaymentIntake\PaymentIntakeAction $paymentIntake,
     ) {
     }
@@ -567,6 +569,18 @@ final readonly class CashFacade
             $account->getOpeningBalanceDate(),
             $account->getCurrentBalance(),
         ), $accounts));
+    }
+
+    /** @return list<array{id: string, name: string, currency: string}> */
+    public function listExternalAccounts(string $companyId, ?string $search, ?string $afterId, int $fetchLimit): array
+    {
+        return $this->externalRead->accounts($companyId, $search, $afterId, $fetchLimit);
+    }
+
+    /** @return list<array{id: string, name: string, parentId: ?string}> */
+    public function listExternalCategories(string $companyId, ?string $search, ?string $afterId, int $fetchLimit): array
+    {
+        return $this->externalRead->categories($companyId, $search, $afterId, $fetchLimit);
     }
 
     /**
