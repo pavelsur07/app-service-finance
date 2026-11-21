@@ -3183,6 +3183,8 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
 // Постраничные справочники Cash для внешних клиентов. Ключ — UUID последней строки.
 listExternalAccounts(string $companyId, ?string $search, ?string $afterId, int $fetchLimit): array
 listExternalCategories(string $companyId, ?string $search, ?string $afterId, int $fetchLimit): array
+// Фактические операции с полным распределением, исключая удалённые. Курсор по дате и ID.
+listExternalTransactions(string $companyId, DateTimeImmutable $from, DateTimeImmutable $to, ?string $accountId, ?string $categoryId, ?CashDirection $direction, ?array $after, int $fetchLimit): array
 
 // Загрузка банковской выписки (вызывает BankSync; раздел «BankSync → Cash: загрузка выписки»)
 // Чтение: активный денежный счёт компании по id — цель загрузки привязанного счёта банка; иначе null

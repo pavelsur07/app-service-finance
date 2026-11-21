@@ -33,7 +33,9 @@ use App\Cash\Application\Transfer\CreateCashTransferAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
+use App\Cash\Exception\ExternalCashReferenceUnavailableException;
 use App\Cash\Exception\StatementImportOutsideTransactionException;
 use App\Cash\Exception\StatementImportTargetNotFoundException;
 use App\Cash\Infrastructure\Lock\CashImportAccountLock;
@@ -53,6 +55,7 @@ use App\Company\Facade\CompanyFacade;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Ramsey\Uuid\Uuid;
 
+/** @phpstan-import-type ExternalCashTransaction from ExternalCashReadQuery */
 final readonly class CashFacade
 {
     public function __construct(
@@ -581,6 +584,29 @@ final readonly class CashFacade
     public function listExternalCategories(string $companyId, ?string $search, ?string $afterId, int $fetchLimit): array
     {
         return $this->externalRead->categories($companyId, $search, $afterId, $fetchLimit);
+    }
+
+    /**
+     * @param array{date: string, id: string}|null $after
+     *
+     * @return list<ExternalCashTransaction>
+     */
+    public function listExternalTransactions(
+        string $companyId,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        ?string $accountId,
+        ?string $categoryId,
+        ?CashDirection $direction,
+        ?array $after,
+        int $fetchLimit,
+    ): array {
+        if ((null !== $accountId && null === $this->moneyAccountRepository->findOneByIdAndCompanyId($accountId, $companyId))
+            || (null !== $categoryId && null === $this->cashflowCategoryRepository->findOneByIdAndCompanyId($categoryId, $companyId))) {
+            throw new ExternalCashReferenceUnavailableException();
+        }
+
+        return $this->externalRead->transactions($companyId, $from, $to, $accountId, $categoryId, $direction, $after, $fetchLimit);
     }
 
     /**
