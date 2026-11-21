@@ -1,4 +1,4 @@
-# Подключение Codex CLI и Claude Code
+# Подключение Codex CLI, Claude Code и Hermes
 
 Пользовательский MCP работает на каноническом HTTPS-адресе кабинета по пути `/mcp`. Для выдачи доступа владелец входит в обычный кабинет ВашФинДир и выбирает компанию на странице согласия. В [подключениях MCP](/integrations/mcp) владелец видит свои разрешения и может сразу их отозвать.
 
@@ -12,12 +12,13 @@
 | `MCP_OAUTH_ENCRYPTION_KEY` | Ключ Defuse в ASCII-safe формате, создаётся штатным `generate-defuse-key` |
 | `MCP_OAUTH_CLIENTS` | JSON-словарь публичных client ID со списком точных callback URL |
 
-Пример регистраций для двух CLI. Порты относятся к машине, на которой запущен клиент.
+Пример регистраций CLI. Порты относятся к машине, на которой запущен клиент.
 
 ```json
 {
   "codex-cli": ["http://127.0.0.1:48765/callback"],
-  "claude-code": ["http://localhost:48766/callback"]
+  "claude-code": ["http://localhost:48766/callback"],
+  "hermes": ["http://localhost:48767/callback"]
 }
 ```
 
@@ -58,6 +59,31 @@ claude mcp login vashfindir --no-browser
 ```
 
 Claude Code использует `http://localhost:PORT/callback` для фиксированного порта и принимает публичный client ID без секрета. [Документация Claude Code](https://code.claude.com/docs/en/mcp#use-pre-configured-oauth-credentials)
+
+## Hermes Agent 0.23.3
+
+Добавьте запись в `~/.hermes/config.yaml` в раздел `mcp_servers`. Параметр `tools.include` оставляет модели два инструмента чтения.
+
+```yaml
+mcp_servers:
+  vashfindir:
+    url: https://app.vashfindir.ru/mcp
+    auth: oauth
+    oauth:
+      client_id: hermes
+      redirect_host: localhost
+      redirect_port: 48767
+    tools:
+      include: [list_reference_items, list_cash_transactions]
+```
+
+```bash
+hermes mcp login vashfindir
+```
+
+Hermes 0.23.3 запрашивает разрешения из OAuth discovery, включая создание черновиков. Для подключения только на чтение скопируйте исходную ссылку OAuth из терминала и замените в ней только параметр `scope` на `scope=accounts.read%20cash_categories.read%20cash_transactions.read`. Откройте изменённую ссылку в браузере, пока команда входа ожидает ответ.
+
+Войдите как владелец компании, выберите компанию и убедитесь, что на экране согласия запрошены только три права чтения. После подтверждения Hermes получит токен с этими правами. Для запуска Hermes на удалённой машине воспользуйтесь описанным в документации способом возврата OAuth. [Документация Hermes](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp#oauth-authenticated-http-servers) · [Вход с удалённой машины](https://hermes-agent.nousresearch.com/docs/guides/oauth-over-ssh)
 
 ## Проверка
 

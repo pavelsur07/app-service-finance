@@ -15,7 +15,9 @@ ROOT = Path(__file__).resolve().parents[2]
 MCP_KEY_NAMES = ('MCP_OAUTH_PRIVATE_KEY', 'MCP_OAUTH_PUBLIC_KEY', 'MCP_OAUTH_ENCRYPTION_KEY')
 MCP_SETTINGS = {
     'MCP_OAUTH_ORIGIN': 'https://app.vashfindir.ru',
-    'MCP_OAUTH_CLIENTS': '{"codex-cli":["http://127.0.0.1:48765/callback"],"claude-code":["http://localhost:48766/callback"]}',
+    'MCP_OAUTH_CLIENTS': '{"codex-cli":["http://127.0.0.1:48765/callback"],'
+                         '"claude-code":["http://localhost:48766/callback"],'
+                         '"hermes":["http://localhost:48767/callback"]}',
 }
 spec = importlib.util.spec_from_file_location('production_fixture', Path(__file__).with_name('production-release-test.py'))
 fixture = importlib.util.module_from_spec(spec)
