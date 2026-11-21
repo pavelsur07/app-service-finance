@@ -40,8 +40,10 @@ function initEconomicsTable(card) {
         const tableRect = table.getBoundingClientRect();
         const height = head.getBoundingClientRect().height;
         if (measure) {
-            cells.forEach((cell, index) => {
-                columns.children[index].style.width = `${cell.getBoundingClientRect().width}px`;
+            // скрытые колонки (окно «Колонки») выпадают из раскладки: ширины — по видимым ячейкам подряд
+            const visible = cells.filter((cell) => cell.getClientRects().length > 0);
+            [...columns.children].forEach((col, index) => {
+                col.style.width = visible[index] ? `${visible[index].getBoundingClientRect().width}px` : '0';
             });
             if (isSku) {
                 values.forEach((value) => {
@@ -113,4 +115,48 @@ function initEconomicsTable(card) {
     schedule();
 }
 
+// Окно «Колонки» R1: скрытые колонки — в localStorage, новые колонки по умолчанию видны.
+const COLUMNS_KEY = 'marketplace-economics:hidden-columns';
+
+function initColumnPicker(picker) {
+    const style = document.createElement('style');
+    document.head.append(style);
+    // только галочки этого вида: обязательные колонки не скрываются, выбор другого вида сохраняется
+    const boxes = [...picker.querySelectorAll('input[type="checkbox"]:not([disabled])')];
+    const ids = boxes.map((box) => box.value);
+    let hidden = [];
+    try {
+        const stored = JSON.parse(localStorage.getItem(COLUMNS_KEY) || '[]');
+        hidden = Array.isArray(stored) ? stored.filter((id) => typeof id === 'string') : [];
+    } catch {
+        hidden = [];
+    }
+    function apply() {
+        // фиксированная шапка — копия таблицы с тем же классом, правило скрывает колонку и в ней
+        style.textContent = hidden.filter((id) => ids.includes(id))
+            .map((id) => `.me-sku-table [data-column="${CSS.escape(id)}"]{display:none}`).join('');
+        boxes.forEach((box) => box.checked = !hidden.includes(box.value));
+    }
+    boxes.forEach((box) => box.addEventListener('change', () => {
+        hidden = [...hidden.filter((id) => !ids.includes(id)), ...boxes.filter((b) => !b.checked).map((b) => b.value)];
+        try {
+            localStorage.setItem(COLUMNS_KEY, JSON.stringify(hidden));
+        } catch {
+            // приватный режим — выбор действует до перезагрузки
+        }
+        apply();
+    }));
+    document.addEventListener('click', (event) => {
+        if (picker.open && !picker.contains(event.target)) picker.open = false;
+    });
+    picker.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            picker.open = false;
+            picker.querySelector('summary').focus();
+        }
+    });
+    apply();
+}
+
+document.querySelectorAll('[data-economics-columns]').forEach(initColumnPicker);
 document.querySelectorAll('[data-economics-table]').forEach(initEconomicsTable);

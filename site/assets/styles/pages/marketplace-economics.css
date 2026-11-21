@@ -138,3 +138,22 @@
         overflow: visible;
     }
 }
+.me-columns {
+    position: relative;
+}
+.me-columns > summary {
+    list-style: none;
+}
+.me-columns > summary::-webkit-details-marker {
+    display: none;
+}
+.me-columns__menu {
+    max-height: 60vh;
+    overflow-y: auto;
+    min-width: 280px;
+    margin: 0;
+}
+.me-columns__menu .dropdown-item {
+    gap: .5rem;
+    padding-left: 2.25rem;
+}

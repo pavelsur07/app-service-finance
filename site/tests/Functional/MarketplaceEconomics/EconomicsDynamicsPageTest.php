@@ -6,8 +6,11 @@ namespace App\Tests\Functional\MarketplaceEconomics;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Company\Enum\TaxRegime;
+use App\Company\Enum\VatMode;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CompanyTaxProfileBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
@@ -43,6 +46,9 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('[data-economics-table] .table.table-vcenter.card-table');
         self::assertSelectorExists('section.card.card-body svg[role="img"]');
+        $headers = $crawler->filter('thead th')->each(static fn ($th): string => $th->text());
+        self::assertContains('НДС к уплате, ₽', $headers);
+        self::assertContains('СМ3, %', $headers);
         $rows = $crawler->filter('tbody tr')->each(static fn ($r): string => $r->text());
         self::assertCount(3, $rows, 'две недели + итог');
         // неделя обрезана началом периода: 09.11 не входит
@@ -110,6 +116,43 @@ final class EconomicsDynamicsPageTest extends WebTestCaseBase
 
         $client->request('GET', self::URL, $period + ['channel' => 'avito']);
         self::assertResponseStatusCodeSame(422);
+    }
+
+    public function testVatTotalsMatchSkuReportForEveryStepAcrossMonthsWithDifferentRates(): void
+    {
+        $client = static::createClient();
+        [$owner, $first] = $this->seed();
+        $company = $this->em()->find(Company::class, self::COMPANY_ID);
+        self::assertNotNull($company);
+        $second = MarketplaceListingBuilder::aListing()->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withMarketplaceSku('SKU-992-2')->withName('Юбка')->build();
+        $this->em()->persist($second);
+        $this->em()->persist(CompanyTaxProfileBuilder::aProfile()->forCompany(self::COMPANY_ID)->with(TaxRegime::USN, VatMode::EXEMPT)->validFrom(null)->build());
+        $this->em()->persist(CompanyTaxProfileBuilder::aProfile()->withId('01930000-0000-7000-8000-00000000a002')->forCompany(self::COMPANY_ID)->with(TaxRegime::USN, VatMode::USN_5)->validFrom('2026-12-01')->build());
+        $this->em()->flush();
+        // пн 30.11 — без НДС; неделя 30.11–06.12 пересекает границу месяцев
+        $this->line('2026-11-30', $first, 'sale', 'revenue', 10500, 1);
+        // по 10 коп. на SKU: 10 × 5 / 105 → 0 у каждого, сумма шага (20 коп. → 1 коп.) НДС не даёт
+        $this->line('2026-12-01', $first, 'sale', 'revenue', 10, 1);
+        $this->line('2026-12-01', (string) $second->getId(), 'sale', 'revenue', 10, 1);
+        // 210 − 105 СПП = 105 ₽ → НДС 5 ₽
+        $this->line('2026-12-02', $first, 'sale', 'revenue', 21000, 1);
+        $this->line('2026-12-02', $first, 'spp', 'info', 10500);
+        $this->day('2026-12-01');
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
+        $period = ['from' => '2026-11-30', 'to' => '2026-12-02'];
+
+        // $merged — ячеек итога, объединённых colspan (в R1 «Итого» занимает SKU и наименование)
+        $vat = static function ($crawler, int $merged = 0): string {
+            $headers = $crawler->filter('thead th')->each(static fn ($th): string => $th->text());
+            $cell = $crawler->filter('tr.me-totals')->last()->filter('td')->eq((int) array_search('НДС к уплате, ₽', $headers, true) - $merged);
+
+            return str_replace(["\u{a0}", '−'], [' ', '-'], $cell->text());
+        };
+        foreach (['day', 'week', 'month'] as $step) {
+            self::assertSame('-5,00', $vat($client->request('GET', self::URL, $period + ['step' => $step])), $step);
+        }
+        self::assertSame('-5,00', $vat($client->request('GET', '/marketplace/economics', $period), 1), 'R1');
     }
 
     public function testRejectsBadDate(): void
