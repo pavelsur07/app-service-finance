@@ -1,6 +1,6 @@
 # Как подключить ВашФинДир в веб-панели Hermes
 
-Для панели `hermes.vashfindir.com`. Если в разделе MCP уже есть `vashfindir` с клиентом `hermes-web`, начните с входа. Выдать доступ может фактический владелец компании с действующим тарифом.
+Для панели `hermes.vashfindir.com`. Если в профиле уже есть `vashfindir` с клиентом `hermes-web` и HTTPS-адресом возврата из примера, начните с входа. Выдать доступ может фактический владелец компании с действующим тарифом.
 
 ## Войти и проверить подключение
 
@@ -15,7 +15,7 @@ Hermes может запросить чтение справочников и о
 
 ## Настроить профиль Hermes один раз
 
-Если записи ещё нет или она использует старый клиент `hermes`, администратор добавляет или обновляет эти поля в конфигурации нужного профиля. Выберите тот же профиль в веб-панели.
+Администратор добавляет или обновляет эти поля в конфигурации нужного профиля. Выберите тот же профиль в веб-панели.
 
 ```yaml
 mcp_servers:
@@ -24,15 +24,16 @@ mcp_servers:
     auth: oauth
     oauth:
       client_id: hermes-web
+      redirect_uri: https://hermes.vashfindir.com/api/mcp/oauth/callback/vashfindir
 ```
 
-При обновлении старой записи удалите из неё `oauth.redirect_host`, `oauth.redirect_port` и `oauth.redirect_uri`. Остальные настройки профиля сохраните.
+При обновлении старой записи удалите из неё `oauth.redirect_host` и `oauth.redirect_port`, а `oauth.redirect_uri` задайте явно по примеру выше. Остальные настройки профиля сохраните.
 
 Hermes может подготовить настройки по одному сообщению в чате. После сохранения владелец продолжает вход сам в браузере.
 
-> В текущем профиле добавь или обнови MCP-запись vashfindir для URL https://app.vashfindir.ru/mcp. Установи auth: oauth и oauth.client_id: hermes-web. Удали из этой записи oauth.redirect_host, oauth.redirect_port и oauth.redirect_uri. Остальные настройки сохрани. После сохранения сообщи о результате. Авторизацию я начну кнопкой Authenticate в веб-панели.
+> В профиле, выбранном в веб-панели, добавь или обнови MCP-запись vashfindir для URL https://app.vashfindir.ru/mcp. Установи auth: oauth, oauth.client_id: hermes-web и oauth.redirect_uri: https://hermes.vashfindir.com/api/mcp/oauth/callback/vashfindir. Удали из этой записи oauth.redirect_host и oauth.redirect_port. Остальные настройки сохрани. Авторизацию я начну кнопкой Authenticate в веб-панели.
 
-У развёртывания Hermes должен быть настроен вход в веб-панель. Публичный адрес `https://hermes.vashfindir.com` задаётся через `dashboard.public_url` или `HERMES_DASHBOARD_PUBLIC_URL`. Переменная окружения имеет приоритет. Панель строит адрес возврата из публичного адреса и имени MCP-записи. Код попадает в тот экземпляр Dashboard, который начал вход. [Обработчик кнопки в Hermes 0.23.3](https://github.com/NousResearch/hermes-agent/blob/v0.23.3/web/src/pages/McpPage.tsx#L185-L203) · [OAuth-обработчик Dashboard](https://github.com/NousResearch/hermes-agent/blob/v0.23.3/hermes_cli/web_routers/mcp.py#L254-L296)
+У развёртывания Hermes должен быть настроен вход в веб-панель. Публичный адрес `https://hermes.vashfindir.com` задаётся через `dashboard.public_url` или `HERMES_DASHBOARD_PUBLIC_URL`. Переменная окружения имеет приоритет. Веб-панель использует указанный в записи HTTPS-адрес возврата. Код принимает экземпляр Dashboard, который начал вход. [Обработчик кнопки в Hermes 0.23.3](https://github.com/NousResearch/hermes-agent/blob/v0.23.3/web/src/pages/McpPage.tsx#L185-L203) · [OAuth-обработчик Dashboard в Hermes 0.23.0](https://github.com/NousResearch/hermes-agent/blob/v0.23.0/hermes_cli/web_routers/mcp.py#L254-L310)
 
 ## Если возникла ошибка
 
@@ -40,7 +41,7 @@ Hermes может подготовить настройки по одному с
 | --- | --- |
 | **Reading the tool list** | Это статус чтения списка инструментов в Hermes Desktop. Для веб-входа откройте `hermes.vashfindir.com/mcp` в своём браузере и нажмите **Authenticate**. Перейдите во вкладку ВашФинДир, которая открылась после нажатия. [Интерфейс Hermes Desktop 0.23.3](https://github.com/NousResearch/hermes-agent/blob/v0.23.3/apps/desktop/src/i18n/en.ts#L241-L247) |
 | **OAuth popup was blocked** | Разрешите всплывающие окна для `hermes.vashfindir.com` и нажмите **Authenticate** ещё раз. [Обработка всплывающего окна в Hermes](https://github.com/NousResearch/hermes-agent/blob/v0.23.3/web/src/lib/mcp-dashboard-oauth.ts#L24-L46) |
-| `invalid_request`, адрес возврата начинается с `127.0.0.1` или `localhost` | Закройте эту попытку и начните новую кнопкой **Authenticate** в браузерной панели. Если после нажатия кнопки адрес снова локальный, администратору нужно сверить активный профиль и его настройки OAuth с примером выше. |
+| `invalid_request`, адрес возврата начинается с `127.0.0.1` или `localhost` | Администратор проверяет выбранный профиль и ответ `POST /api/mcp/servers/vashfindir/auth` в браузерной панели. В поле `authorization_url` параметр `redirect_uri` должен содержать точный HTTPS-адрес из примера. Если адрес локальный, следующий вход владельца откладывается до исправления на стороне Hermes. |
 | `invalid_request` с HTTPS-адресом | ВашФинДир ожидает точный адрес `https://hermes.vashfindir.com/api/mcp/oauth/callback/vashfindir`. Проверьте имя записи `vashfindir`, клиент `hermes-web` и публичный адрес панели. Для другого домена администратор регистрирует его точный HTTPS-адрес в `MCP_OAUTH_CLIENTS` ВашФинДир. |
 | На экране согласия нет нужной компании | Проверьте, что в ВашФинДир вошёл фактический владелец компании и у компании действует тариф. |
 | **OAuth flow expired** | Вернитесь в Hermes и снова нажмите **Authenticate**. Продолжите вход по только что открытой вкладке. |
