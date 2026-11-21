@@ -27,7 +27,8 @@ final class AutomaticListingMappingPolicyTest extends TestCase
             $items[] = new AutomaticMappingCandidate(new CatalogTargetDTO($type, $id,
                 'variant' === $type ? ($row['parentId'] ?? '55555555-5555-4555-8555-000000000001') : null,
                 $row['name'] ?? 'Позиция', $row['code'] ?? null, array_key_exists('article', $row) ? $row['article'] : '001', $row['characteristics'] ?? [],
-                $row['selectable'] ?? true, $row['reason'] ?? null, $row['barcodes'] ?? null), $row['parent'] ?? null, $row['leaf'] ?? true);
+                $row['selectable'] ?? true, $row['reason'] ?? null, $row['barcodes'] ?? null), $row['parent'] ?? null, $row['leaf'] ?? true,
+                $row['linkedBarcode'] ?? false, $row['linkedElsewhere'] ?? false);
         }
         $source = new ListingMetaDTO('11111111-1111-4111-8111-000000000001', $scenario['title'] ?? 'Листинг', 'SKU',
             $scenario['marketplace'] ?? 'ozon', array_key_exists('article', $scenario) ? $scenario['article'] : '001',
@@ -65,7 +66,25 @@ final class AutomaticListingMappingPolicyTest extends TestCase
         yield 'WB preset never applies to Ozon' => [['preset' => true, 'article' => '001W', 'status' => 'no_match']];
         yield 'barcode independent without article' => [['article' => null, 'barcodes' => ['000123'], 'rows' => [['barcodes' => ['000123']]], 'status' => 'ready', 'rules' => ['exact_barcode']]];
         yield 'barcode duplicate' => [['barcodes' => ['000123'], 'rows' => [['article' => null, 'barcodes' => ['000123']], ['article' => null, 'barcodes' => ['000123']]], 'status' => 'ambiguous']];
-        yield 'barcode versus article conflict' => [['barcodes' => ['000123'], 'rows' => [[], ['article' => 'OTHER', 'barcodes' => ['000123']]], 'status' => 'ambiguous']];
+        // Штрихкод — основание связи (docs/tasks/moysklad-wb-mapping/plan.md): перебивает артикул, расхождение блокирует.
+        yield 'barcode beats article' => [['barcodes' => ['000123'], 'rows' => [[], ['article' => 'OTHER', 'barcodes' => ['000123']]], 'status' => 'ready', 'target' => 2, 'rules' => ['exact_barcode']]];
+        yield 'barcode conflict blocks article' => [['barcodes' => ['000123'], 'rows' => [['barcodes' => ['999']]], 'status' => 'barcode_conflict']];
+        yield 'target barcodes without listing barcodes do not block' => [['rows' => [['barcodes' => ['999']]], 'status' => 'ready']];
+        yield 'own barcode confirms size of product without variants' => [['marketplace' => 'wildberries', 'size' => 'M', 'barcodes' => ['000123'], 'rows' => [['article' => 'X', 'barcodes' => ['000123']]], 'status' => 'ready', 'rules' => ['exact_barcode']]];
+        yield 'barcode of linked listing on other marketplace' => [['marketplace' => 'wildberries', 'size' => 'M', 'article' => 'WB-1', 'rows' => [['article' => 'OTHER', 'linkedBarcode' => true]], 'status' => 'ready', 'rules' => ['linked_barcode']]];
+        yield 'linked barcode versus article size' => [['marketplace' => 'wildberries', 'size' => 'M', 'article' => 'WJ-1', 'rows' => [['article' => 'OTHER', 'linkedBarcode' => true], ['article' => 'WJ-1-M']], 'status' => 'ambiguous']];
+        yield 'own barcode beats linked barcode' => [['barcodes' => ['000123'], 'rows' => [['article' => 'X', 'linkedBarcode' => true], ['article' => 'Y', 'barcodes' => ['000123']]], 'status' => 'ready', 'target' => 2, 'rules' => ['exact_barcode']]];
+        // Каталог без модификаций: размер в артикуле или в названии.
+        yield 'article size with cyrillic size' => [['marketplace' => 'wildberries', 'article' => 'WJ-1', 'size' => 'М', 'rows' => [['article' => 'WJ-1-M']], 'status' => 'ready', 'rules' => ['article_size']]];
+        yield 'article size underscore any case' => [['marketplace' => 'wildberries', 'article' => 'wj-1', 'size' => 'xl', 'rows' => [['article' => 'WJ-1_XL']], 'status' => 'ready', 'rules' => ['article_size']]];
+        yield 'article size other size is no identity' => [['marketplace' => 'wildberries', 'article' => 'WJ-1', 'size' => 'M', 'rows' => [['article' => 'WJ-1-L']], 'status' => 'no_match']];
+        yield 'name size picks one of same article' => [['marketplace' => 'wildberries', 'article' => 'WJ-2', 'size' => 'M', 'rows' => [['article' => 'WJ-2', 'name' => 'Брюки (S, черный)'], ['article' => 'WJ-2', 'name' => 'Брюки (М, черный)'], ['article' => 'WJ-2', 'name' => 'Брюки (L)']], 'status' => 'ready', 'target' => 2, 'rules' => ['name_size']]];
+        yield 'name without size stays unverifiable' => [['marketplace' => 'wildberries', 'article' => 'WJ-2', 'size' => 'M', 'rows' => [['article' => 'WJ-2', 'name' => 'Брюки']], 'status' => 'size_unverifiable']];
+        yield 'name size twice is ambiguous' => [['marketplace' => 'wildberries', 'article' => 'WJ-2', 'size' => 'M', 'rows' => [['article' => 'WJ-2', 'name' => 'Брюки (M)'], ['article' => 'WJ-2', 'name' => 'Брюки (M, синий)']], 'status' => 'ambiguous']];
+        // Один товар — несколько листингов; связанный с другой площадкой кандидат приоритетнее.
+        yield 'linked elsewhere breaks tie' => [['article' => 'A', 'rows' => [['article' => 'A'], ['article' => 'A', 'linkedElsewhere' => true]], 'status' => 'ready', 'target' => 2]];
+        yield 'two linked elsewhere stay ambiguous' => [['article' => 'A', 'rows' => [['article' => 'A', 'linkedElsewhere' => true], ['article' => 'A', 'linkedElsewhere' => true]], 'status' => 'ambiguous']];
+        yield 'single target linked elsewhere is still proposed' => [['rows' => [['linkedElsewhere' => true]], 'status' => 'ready']];
         yield 'barcode leading zeros preserved' => [['barcodes' => ['000123'], 'rows' => [['article' => 'OTHER', 'barcodes' => ['123']]], 'status' => 'no_match']];
         yield 'barcode contradictory size blocks other match' => [['size' => 'M', 'characteristic' => 'size', 'barcodes' => ['000123'], 'rows' => [$variant, array_replace($variant, ['article' => 'OTHER', 'barcodes' => ['000123'], 'characteristics' => $l])], 'status' => 'size_mismatch']];
         foreach (['3 шт', '5 шт.', '2 штуки', '3 штук', '2 ШТУКА'] as $title) {

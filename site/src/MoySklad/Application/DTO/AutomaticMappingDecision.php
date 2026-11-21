@@ -43,7 +43,14 @@ final readonly class AutomaticMappingDecision
     {
         return array_map(static fn (string $rule): string => match ($rule) {
             'direct_article' => 'Артикул позиции', 'parent_article_size' => 'Артикул родителя и размер',
-            'exact_code' => 'Точный код позиции', 'wb_article_alias' => 'Алиас WB (конечный W/w)', 'exact_barcode' => 'Точный штрихкод', default => $rule,
+            'exact_code' => 'Точный код позиции', 'wb_article_alias' => 'Алиас WB (конечный W/w)', 'exact_barcode' => 'Точный штрихкод',
+            'linked_barcode' => 'Штрихкод связанного листинга другой площадки', 'article_size' => 'Артикул с размером', 'name_size' => 'Размер по названию — проверьте', default => $rule,
         }, $this->matchedRules);
+    }
+
+    /** Размер подтверждён только названием позиции: предлагается, но принимается лишь вручную (не «Принять все», не автоприменение). */
+    public function requiresManualAcceptance(): bool
+    {
+        return in_array('name_size', $this->matchedRules, true);
     }
 }

@@ -62,7 +62,8 @@ final readonly class StartMappingBulkJobAction
             $this->db->executeStatement("INSERT INTO moysklad_mapping_bulk_jobs (id, company_id, connection_id, marketplace, actor_user_id, origin, scope, run_id, size_characteristic_id, status, created_at, heartbeat_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?)", [$c->jobId, $c->companyId, $c->connectionId, $c->marketplace, $c->actorUserId, $c->origin, $c->scope, $runId, $size, $now, $now]);
             if (null !== $runId) {
-                $filter = 'selected' === $c->scope ? ' AND listing_id IN (:ids)' : '';
+                // «Размер по названию» принимается только отмеченными строками (selected), не всем отчётом.
+                $filter = 'selected' === $c->scope ? ' AND listing_id IN (:ids)' : " AND NOT jsonb_exists(payload->'decision'->'matchedRules', 'name_size')";
                 $total = (int) $this->db->executeStatement(<<<SQL
                     INSERT INTO moysklad_mapping_bulk_job_items (company_id, job_id, listing_id, target_type, target_external_id, status)
                     SELECT company_id, :job, listing_id, payload->'decision'->'target'->>'type', (payload->'decision'->'target'->>'externalId')::uuid, 'pending'

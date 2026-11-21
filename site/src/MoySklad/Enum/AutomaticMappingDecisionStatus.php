@@ -22,6 +22,7 @@ enum AutomaticMappingDecisionStatus: string
     case CLEARED_MAPPING = 'cleared_mapping';
     case LISTING_UNAVAILABLE = 'listing_unavailable';
     case CATALOG_NOT_READY = 'catalog_not_ready';
+    case BARCODE_CONFLICT = 'barcode_conflict';
 
     public function label(): string
     {
@@ -42,6 +43,7 @@ enum AutomaticMappingDecisionStatus: string
             self::CLEARED_MAPPING => 'Связь снята вручную и не будет восстановлена',
             self::LISTING_UNAVAILABLE => 'Листинг неактивен или недоступен',
             self::CATALOG_NOT_READY => 'Подключите МойСклад и загрузите товары и модификации',
+            self::BARCODE_CONFLICT => 'Штрихкод расходится с позицией МойСклад',
         };
     }
 }

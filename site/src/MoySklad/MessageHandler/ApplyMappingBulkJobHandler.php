@@ -93,7 +93,7 @@ final readonly class ApplyMappingBulkJobHandler
             $page = $this->evaluate($job, $sources);
             foreach ($sources as $source) {
                 $decision = $page->decisions[$source->id];
-                if (AutomaticMappingDecisionStatus::READY !== $decision->status || null === $decision->target) {
+                if (AutomaticMappingDecisionStatus::READY !== $decision->status || null === $decision->target || $decision->requiresManualAcceptance()) {
                     continue;
                 }
                 $this->db->executeStatement("INSERT INTO moysklad_mapping_bulk_job_items (company_id, job_id, listing_id, target_type, target_external_id, status)
