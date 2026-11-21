@@ -37,6 +37,7 @@ final readonly class MappingDiagnosticRow
             Status::SIZE_RULE_REQUIRED, Status::SIZE_UNKNOWN, Status::SIZE_MISMATCH, Status::SIZE_UNVERIFIABLE, Status::VARIANT_REQUIRED => Reason::SIZE,
             Status::TARGET_UNAVAILABLE, Status::CATALOG_NOT_READY, Status::LISTING_UNAVAILABLE => Reason::UNAVAILABLE,
             Status::CLEARED_MAPPING => Reason::CLEARED,
+            Status::BARCODE_CONFLICT => Reason::BARCODE,
             default => null,
         };
         if (null !== $reason) {

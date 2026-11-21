@@ -6175,6 +6175,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.232 | 2026-11-21 | MoySklad: автомаппинг identity_package_v3 — правила `linked_barcode` (штрихкод связанного листинга другой площадки), `article_size`, `name_size` (только вручную), статус `BARCODE_CONFLICT`, приоритет уже связанной позиции; `MarketplaceFacade::getListingIdsByBarcodes` |
 | 2.231 | 2026-11-21 | MoySklad: отчёт диагностики маппинга пересчитывается сам — при открытии устаревшего отчёта, после пакета/отмены и cron `app:moysklad:mapping-diagnostics:refresh` (*/5); автообновление страницы, кнопка «Проверить заново» |
 | 2.230 | 2026-11-21 | MoySklad: пакетное принятие предложений маппинга (весь отчёт или отмеченные строки), отмена пакета, ежедневное автоприменение; удалён подбор по странице (preview/Redis pool `cache.moysklad_automatic_mapping`); `CompanyFacade::userHasModuleAccess` |
 | 2.229 | 2026-11-20 | Finance/Cash: сумма статьи в отчёте ДДС ведёт в «Транзакции ДДС» с фильтрами ячейки (двойной клик); фильтры списка `includeChildren`, `projectIds`, `centerIds` |
@@ -6530,14 +6531,28 @@ Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/defa
 объектов ean8/ean13/code128/gtin/upc.
 `MarketplaceFacade::getListingBarcodesByIds(companyId, listingIds)` принимает
 до100 ID, возвращает listingId → list<string>, чужие ID исключены.
+`MarketplaceFacade::getListingIdsByBarcodes(companyId, barcodes≤5000, excludeMarketplace)` —
+листинги других площадок компании с теми же штрихкодами: barcode → list<listingId>.
 `MappingSettingsQuery::get(companyId, connectionId, marketplace)` возвращает
 `MappingSettings(wbTrailingW, version)`; preset по умолчанию выключен.
 Настройки изолированы составным ключом company/connection/marketplace.
 
 
-Автомаппинг identity_package_v2 использует `AutomaticListingMappingPolicy`: точный собственный
-article, parent.article + размер по явно выбранному ID характеристики, код позиции,
-включённый алиас WB и точный штрихкод. Комплектация проверяется для каждого основания.
+Автомаппинг identity_package_v3 использует `AutomaticListingMappingPolicy`. Правила по силе
+(меньше — сильнее): 1 `exact_barcode`; 2 `linked_barcode` — штрихкод листинга совпал со
+штрихкодом листинга другой площадки, уже связанного с позицией; 3 `direct_article`,
+`parent_article_size` (размер по явно выбранному ID характеристики), `exact_code`,
+`wb_article_alias`; 4 `article_size` — article позиции = article листинга + `-`/`_`/пробел +
+размер; 5 `name_size` — у позиций без модификаций с тем же article размер — первый токен в
+скобках названия. Размер нормализуется: регистр, пробелы, кириллица, совпадающая по начертанию
+с латиницей (`CYRILLIC_AS_LATIN`). Собственный штрихкод решает сам; при уровне 2 любая другая
+найденная позиция — AMBIGUOUS; при 3–5 несколько позиций — AMBIGUOUS, если ровно одна не
+связана уже с каким-либо листингом (`linkedElsewhere`, приоритет связанной). Штрихкоды есть у
+листинга и позиции и не пересекаются → `BARCODE_CONFLICT` (артикул не перебивает). Одна позиция
+может быть целью многих листингов разных площадок. `name_size` предлагается, но принимается
+только отмеченными строками: «Принять все» (scope report) и автоприменение (cabinet) его
+пропускают (`AutomaticMappingDecision::requiresManualAcceptance`). Признаки linked* в JSON решения
+не пишутся. Комплектация проверяется для выбранной позиции.
 Нормализуется только краевой ASCII whitespace, регистр/нули/NBSP сохраняются.
 `AutomaticMappingCandidatesQuery` одним scoped SQL получает максимум50 целей
 на листинг (до100 листингов); truncation, неразрешимые размеры и спорная комплектация запрещают READY.
@@ -6546,7 +6561,7 @@ article, parent.article + размер по явно выбранному ID х�
 MarketplaceFacade; существующие ревизии, включая clear, не предлагаются.
 `MappingCharacteristicsQuery` выдаёт по20 непрозрачных ID из локального JSONB.
 Никакой записи и внешнего HTTP в этих Query нет.
-Guard (`AutomaticMappingGuard`) фиксирует версию `identity_package_v2`, source/candidate
+Guard (`AutomaticMappingGuard`) фиксирует версию `identity_package_v3`, source/candidate
 fingerprints, выбранный opaque characteristic ID и previewId (для пакета — его id).
 Guarded order writer'а: connection
 FOR SHARE → mapping advisory → accepted replay → catalog try-lock → source

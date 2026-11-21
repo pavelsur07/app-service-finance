@@ -78,10 +78,12 @@
                     {% elseif diagStatus == 'ready' %}
                         {# «Предложения» — однозначные совпадения: принять все из отчёта или отмеченные строки (пакет в фоне). #}
                         {% if canWrite %}
-                            {% set phrases = {direct_article: 'по артикулу позиции', parent_article_size: 'по артикулу родителя и размеру', exact_code: 'по коду позиции', wb_article_alias: 'по алиасу WB', exact_barcode: 'по штрихкоду'} %}
-                            {% set readyCount = completed.counts.ready ?? 0 %}
-                            {% set blocked = diagnostics.stale ? 'Отчёт обновляется после изменений каталога или связей. Дождитесь окончания — страница обновится сама.' : (bulkJob and bulkJob.active ? 'Пакет уже обрабатывается. Дождитесь окончания.' : (readyCount == 0 ? 'В отчёте нет предложений.' : '')) %}
-                            {% set breakdown = bulkBreakdown|map((n, rule) => (phrases[rule] ?? rule) ~ ' — ' ~ n|vf_number)|join(', ') %}
+                            {% set phrases = {direct_article: 'по артикулу позиции', parent_article_size: 'по артикулу родителя и размеру', exact_code: 'по коду позиции', wb_article_alias: 'по алиасу WB', exact_barcode: 'по штрихкоду', linked_barcode: 'по штрихкоду связанного листинга другой площадки', article_size: 'по артикулу с размером'} %}
+                            {# «Размер по названию» — только отмеченными строками (docs/tasks/moysklad-wb-mapping/plan.md). #}
+                            {% set manualOnly = bulkBreakdown.name_size ?? 0 %}
+                            {% set readyCount = (completed.counts.ready ?? 0) - manualOnly %}
+                            {% set blocked = diagnostics.stale ? 'Отчёт обновляется после изменений каталога или связей. Дождитесь окончания — страница обновится сама.' : (bulkJob and bulkJob.active ? 'Пакет уже обрабатывается. Дождитесь окончания.' : (readyCount == 0 ? (manualOnly > 0 ? 'Все предложения — с размером по названию: проверьте и примите отмеченными строками.' : 'В отчёте нет предложений.') : '')) %}
+                            {% set breakdown = bulkBreakdown|filter((n, rule) => rule != 'name_size')|map((n, rule) => (phrases[rule] ?? rule) ~ ' — ' ~ n|vf_number)|join(', ') ~ (manualOnly > 0 ? '. Ещё ' ~ manualOnly|vf_number ~ ' с размером по названию — проверьте и примите отмеченными строками' : '') %}
                             <button type="button" class="btn btn-primary" data-bulk-accept-all data-bs-toggle="modal" data-bs-target="#bulk-confirm"
                                     data-confirm-action="{{ path('moysklad_mapping_bulk_start', routeParams) }}"
                                     data-confirm-token="{{ csrf_token('moysklad_mapping_bulk' ~ mappingCompanyId ~ mappingConnectionId ~ mappingMarketplace) }}"

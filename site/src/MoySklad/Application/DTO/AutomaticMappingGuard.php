@@ -8,7 +8,7 @@ use Webmozart\Assert\Assert;
 
 final readonly class AutomaticMappingGuard
 {
-    public const RULE_VERSION = 'identity_package_v2';
+    public const RULE_VERSION = 'identity_package_v3';
 
     public function __construct(public string $previewId, public string $ruleVersion, public string $sourceFingerprint, public ?string $sizeCharacteristicId, public string $candidateFingerprint)
     {

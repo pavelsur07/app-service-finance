@@ -15,6 +15,7 @@ enum MappingDiagnosticReason: string
     case SIZE = 'size';
     case UNAVAILABLE = 'unavailable';
     case CLEARED = 'cleared';
+    case BARCODE = 'barcode';
 
     public function label(): string
     {
@@ -22,6 +23,7 @@ enum MappingDiagnosticReason: string
             self::NO_ARTICLE => 'Не указан артикул', self::NO_NAME => 'Не указано название', self::NO_MATCH => 'Нет совпадений',
             self::DUPLICATE => 'Дубли / несколько кандидатов', self::ARCHIVED => 'Кандидаты в архиве', self::PACKAGE => 'Проверить комплектацию',
             self::SIZE => 'Размер требует проверки', self::UNAVAILABLE => 'Источник или позиция недоступны', self::CLEARED => 'Связь снята вручную',
+            self::BARCODE => 'Штрихкод расходится',
         };
     }
 }

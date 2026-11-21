@@ -804,6 +804,33 @@ final readonly class MarketplaceFacade
         return $this->listingRepository->findListingToProductMap($companyId, $listingIds);
     }
 
+    /**
+     * Листинги других площадок компании с теми же штрихкодами (точное совпадение строки).
+     *
+     * @param list<string> $barcodes
+     *
+     * @return array<string,list<string>> barcode => listing IDs, только площадки кроме $excludeMarketplace
+     */
+    public function getListingIdsByBarcodes(string $companyId, array $barcodes, string $excludeMarketplace): array
+    {
+        Assert::uuid($companyId);
+        Assert::maxCount($barcodes, 5000);
+        if ([] === $barcodes) {
+            return [];
+        }
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT b.barcode, b.listing_id FROM marketplace_listing_barcodes b
+             WHERE b.company_id=:company AND b.marketplace<>:marketplace AND b.barcode IN (:barcodes) ORDER BY b.barcode COLLATE "C", b.listing_id',
+            ['company' => $companyId, 'marketplace' => $excludeMarketplace, 'barcodes' => array_values(array_unique($barcodes))], ['barcodes' => ArrayParameterType::STRING],
+        );
+        $result = [];
+        foreach ($rows as $row) {
+            $result[(string) $row['barcode']][] = (string) $row['listing_id'];
+        }
+
+        return $result;
+    }
+
     /** @param list<string> $listingIds
      * @return array<string,list<string>> listingId => all exact barcode strings; missing/foreign IDs omitted
      */
