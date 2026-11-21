@@ -271,6 +271,7 @@ final class BulkMappingTest extends WebTestCaseBase
     {
         $sent = array_values(array_filter(array_map(static fn ($e) => $e->getMessage(), $this->transport()->getSent()), static fn ($m) => $m instanceof ApplyMappingBulkJobMessage));
         self::assertNotSame([], $sent);
+
         return $sent[array_key_last($sent)];
     }
 
