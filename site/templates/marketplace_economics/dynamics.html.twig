@@ -90,10 +90,10 @@
                 <input class="form-control" id="md-q" type="search" name="q" value="{{ search }}" placeholder="SKU, артикул, название">
             </div>
             <div class="col-12 col-sm-6 col-lg-auto">
-                <label class="form-label" for="md-alloc">Склад и прочие МП</label>
+                <label class="form-label" for="md-alloc">Затраты без товара</label>
                 <select class="form-select" id="md-alloc" name="alloc">
-                    <option value="1" {{ allocated ? 'selected' }}>С разнесением</option>
-                    <option value="0" {{ not allocated ? 'selected' }}>Без разнесения</option>
+                    <option value="1" {{ allocated ? 'selected' }}>Разнести на товары</option>
+                    <option value="0" {{ not allocated ? 'selected' }}>Не разносить</option>
                 </select>
             </div>
             <div class="col-12 col-lg-auto d-flex flex-wrap gap-2">

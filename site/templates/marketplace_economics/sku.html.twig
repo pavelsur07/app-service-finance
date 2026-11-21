@@ -135,10 +135,10 @@
                 <input class="form-control" id="me-q" type="search" name="q" value="{{ search }}" placeholder="SKU, артикул, название">
             </div>
             <div class="col-12 col-sm-6 col-lg-auto">
-                <label class="form-label" for="me-alloc">Склад и прочие МП</label>
+                <label class="form-label" for="me-alloc">Затраты без товара</label>
                 <select class="form-select" id="me-alloc" name="alloc">
-                    <option value="1" {{ allocated ? 'selected' }}>С разнесением</option>
-                    <option value="0" {{ not allocated ? 'selected' }}>Без разнесения</option>
+                    <option value="1" {{ allocated ? 'selected' }}>Разнести на товары</option>
+                    <option value="0" {{ not allocated ? 'selected' }}>Не разносить</option>
                 </select>
             </div>
             <input type="hidden" name="sort" value="{{ sort }}">
@@ -175,7 +175,20 @@
             <div class="alert alert-info" role="status"><div class="d-block"><p class="mb-0">Кабинеты компании ещё не переведены на новый контур данных. Пока пользуйтесь <a href="{{ path('marketplace_analytics_unit_extended_index') }}">прежним отчётом</a>.</p></div></div>
         </div>
     {% else %}
-        <div class="mb-3">
+        <div class="mb-3" data-economics-note>
+            {% if allocated %}
+                <p class="small mb-1"><strong>Затраты без товара разнесены на товары.</strong>
+                    Маркетплейс списал их с кабинета без указания товара, поэтому отчёт делит их так:
+                    drop-off и последняя миля — по проданным штукам; хранение — по остаткам на дату;
+                    прочие затраты СМ1 (эквайринг, комиссия без товара) — по выручке;
+                    реклама — по рекламной статистике товара; подписки, штрафы и прочие расходы кабинета — по выручке,
+                    в колонке «Склад и пр. МП». В строке «Нераспределено» — то, что разделить не на что (дни без продаж).</p>
+            {% else %}
+                <p class="small mb-1"><strong>Затраты без товара не разнесены.</strong>
+                    У товаров — только свои затраты, которые маркетплейс указал по товару.
+                    Затраты без товара (drop-off, хранение, реклама без товара, подписки) — в строке «Нераспределено»;
+                    итог кабинета тот же, что и при разнесении.</p>
+            {% endif %}
             <p class="text-secondary small mb-0">
                 Суммы в ₽.
                 Сравнение с {{ report.previousFrom|date('d.m.Y') }} – {{ report.previousTo|date('d.m.Y') }}.

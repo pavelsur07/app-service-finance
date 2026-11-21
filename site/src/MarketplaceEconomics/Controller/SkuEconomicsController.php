@@ -66,7 +66,7 @@ final class SkuEconomicsController extends AbstractController
             }
             $filter = new SkuEconomicsFilter(
                 $this->date($from), $this->date($to), '' === $view['connection'] ? null : $view['connection'],
-                $view['tagIds'], $view['search'], $view['sort'], $view['desc'], '' === $view['channel'] ? null : $view['channel'],
+                $view['tagIds'], $view['search'], $view['sort'], $view['desc'], '' === $view['channel'] ? null : $view['channel'], $view['allocated'],
             );
             $report = $this->reports->build($companyId, $filter);
             if ('xlsx' === $query->get('format')) {

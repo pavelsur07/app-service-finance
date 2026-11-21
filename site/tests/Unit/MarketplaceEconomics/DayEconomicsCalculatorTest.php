@@ -82,9 +82,10 @@ final class DayEconomicsCalculatorTest extends TestCase
             $this->op(null, K::LOGISTICS_TO, -1001),
         ]);
 
-        // затрата СМ1 без SKU остаётся в СМ1 и в своей статье: у SKU — «Лог. туда», а не «Склад и пр. МП»
+        // затрата СМ1 без SKU остаётся в СМ1 и в своей статье: у SKU — «Лог. туда», а не «Склад и пр. МП»;
+        // логистика до покупателя — по проданным штукам (1 : 1)
         self::assertSame([-501, -500], [$this->sum($day, self::A, EconomicsLevel::MD1), $this->sum($day, self::B, EconomicsLevel::MD1)]);
-        self::assertSame(Calc::KEY_REVENUE, $this->line($day, self::A, K::LOGISTICS_TO->value)?->allocationKey);
+        self::assertSame(Calc::KEY_SALES_QTY, $this->line($day, self::A, K::LOGISTICS_TO->value)?->allocationKey);
         self::assertSame(0, $this->sum($day, self::A, EconomicsLevel::OVERHEAD));
         $this->assertBalanced($day);
     }
@@ -102,9 +103,44 @@ final class DayEconomicsCalculatorTest extends TestCase
         ], [], [], [self::A => 3.0]);
 
         self::assertSame(array_fill_keys(array_map(static fn (EconomicsLevel $l): string => $l->value, EconomicsLevel::cases()), 0), $this->byLevel($day, null));
-        // drop-off по выручке 3 : 1, хранение — только A (остаток есть только у него)
-        self::assertSame([-751 - 100, -250], [$this->sum($day, self::A, EconomicsLevel::MD1), $this->sum($day, self::B, EconomicsLevel::MD1)]);
+        // drop-off по проданным штукам 1 : 1 (не по выручке 3 : 1), хранение — только A (остаток есть только у него)
+        self::assertSame([-501 - 100, -500], [$this->sum($day, self::A, EconomicsLevel::MD1), $this->sum($day, self::B, EconomicsLevel::MD1)]);
         self::assertSame(0, $day->unallocatedMinor);
+        $this->assertBalanced($day);
+    }
+
+    public function testShipmentCostsBySoldQtyOtherDirectByRevenue(): void
+    {
+        // A дорогой (3 000 ₽ × 1 шт.), B дешёвый (1 000 ₽ × 3 шт., 1 возврат): плата за отправление идёт за штуки, эквайринг — за рубли
+        $day = $this->calc([
+            $this->op(self::A, K::SALE, 300000, 1),
+            $this->op(self::B, K::SALE, 300000, 3),
+            $this->op(self::B, K::RETURN, -100000, 1),
+            $this->op(null, K::LOGISTICS_TO_DROPOFF, -400),
+            $this->op(null, K::LOGISTICS_TO_LAST_MILE, -800),
+            $this->op(null, K::ACQUIRING, -400),
+        ]);
+
+        // отгружено A 1 шт., B 3 шт. (возврат отгрузку не отменяет): drop-off 100 / 300, последняя миля 200 / 600
+        self::assertSame([-100, -300], [$this->line($day, self::A, K::LOGISTICS_TO_DROPOFF->value)?->amountMinor, $this->line($day, self::B, K::LOGISTICS_TO_DROPOFF->value)?->amountMinor]);
+        self::assertSame([-200, -600], [$this->line($day, self::A, K::LOGISTICS_TO_LAST_MILE->value)?->amountMinor, $this->line($day, self::B, K::LOGISTICS_TO_LAST_MILE->value)?->amountMinor]);
+        // эквайринг — по выручке 3 000 : 2 000 (у B продажи минус возврат) → 3 : 2
+        self::assertSame([-240, -160], [$this->line($day, self::A, K::ACQUIRING->value)?->amountMinor, $this->line($day, self::B, K::ACQUIRING->value)?->amountMinor]);
+        self::assertSame(Calc::KEY_SALES_QTY, $this->line($day, self::A, K::LOGISTICS_TO_DROPOFF->value)?->allocationKey);
+        self::assertSame(0, $day->unallocatedMinor);
+        $this->assertBalanced($day);
+    }
+
+    public function testShipmentCostsFallBackToRevenueWithoutShippedQty(): void
+    {
+        $day = $this->calc([
+            $this->op(self::A, K::SALE, 300000),
+            $this->op(self::B, K::SALE, 100000),
+            $this->op(null, K::LOGISTICS_TO_DROPOFF, -400),
+        ]);
+
+        self::assertSame([-300, -100], [$this->sum($day, self::A, EconomicsLevel::MD1), $this->sum($day, self::B, EconomicsLevel::MD1)]);
+        self::assertSame(Calc::KEY_REVENUE, $this->line($day, self::A, K::LOGISTICS_TO_DROPOFF->value)?->allocationKey);
         $this->assertBalanced($day);
     }
 

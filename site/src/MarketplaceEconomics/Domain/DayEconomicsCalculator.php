@@ -16,7 +16,9 @@ use App\MarketplaceOperations\Enum\OperationKind;
  * - реклама без SKU (итог канона) — каждый вид по долям SKU в статистике легаси своего вида
  *   (клики — `legacy_clicks_share`, оплата за заказ — `legacy_order_share`); нет статистики — без SKU;
  * - хранение без SKU — по остатку на дату (`stock_share`), нет остатков — по выручке; уровень СМ1;
- * - прямые (СМ1) без SKU — по выручке SKU за день (`revenue_share`, D3), каждый вид своим `measure` на СМ1:
+ * - логистика до покупателя без SKU (`logistics_to*`: drop-off, последняя миля…) — по отгруженным штукам
+ *   (`sales_qty_share`), плата идёт за отправление; нет штук — по выручке;
+ * - прочие прямые (СМ1) без SKU — по выручке SKU за день (`revenue_share`, D3); каждый вид своим `measure` на СМ1:
  *   у SKU затрата в той же статье и на том же уровне, что в итоге кабинета, «Нераспределено» не путает уровни;
  * - общие (OVERHEAD) без SKU — по выручке SKU за день (`revenue_share`).
  *
@@ -36,6 +38,8 @@ final class DayEconomicsCalculator
     ];
     public const KEY_STOCK = 'stock_share';
     public const KEY_REVENUE = 'revenue_share';
+    /** Отгруженные штуки SKU за день (продажи без вычета возвратов) — для платы за отправление. */
+    public const KEY_SALES_QTY = 'sales_qty_share';
 
     /**
      * @param list<OperationRecord> $operations
@@ -49,7 +53,7 @@ final class DayEconomicsCalculator
         /** @var array<string, array{listing: ?string, kind: OperationKind, amount: int, qty: ?int}> $groups */
         $groups = [];
         $revenue = [];
-        $soldQty = [];
+        $soldQty = $shippedQty = [];
         $canon = $storagePool = $overheadPool = 0;
         $adsPools = $md1Pools = [];
 
@@ -75,6 +79,9 @@ final class DayEconomicsCalculator
                     $revenue[$op->listingId] = ($revenue[$op->listingId] ?? 0) + $op->amountMinor;
                     $sign = OperationKind::RETURN === $op->kind ? -1 : 1;
                     $soldQty[$op->listingId] = ($soldQty[$op->listingId] ?? 0) + $sign * abs($op->quantity ?? 0);
+                    if (OperationKind::SALE === $op->kind) {
+                        $shippedQty[$op->listingId] = ($shippedQty[$op->listingId] ?? 0) + abs($op->quantity ?? 0);
+                    }
                 }
                 continue;
             }
@@ -120,9 +127,12 @@ final class DayEconomicsCalculator
                 array_push($lines, ...$this->allocate($pool, $weights, self::ADS_ALLOCATED, EconomicsLevel::MD2, $key));
             }
         }
+        $shippedWeights = array_map('strval', array_filter($shippedQty, static fn (int $q): bool => $q > 0));
         ksort($md1Pools);
         foreach ($md1Pools as $kind => $pool) {
-            array_push($lines, ...$this->allocate($pool, $revenueWeights, $kind, EconomicsLevel::MD1, self::KEY_REVENUE));
+            array_push($lines, ...(str_starts_with($kind, 'logistics_to') && [] !== $shippedWeights
+                ? $this->allocate($pool, $shippedWeights, $kind, EconomicsLevel::MD1, self::KEY_SALES_QTY)
+                : $this->allocate($pool, $revenueWeights, $kind, EconomicsLevel::MD1, self::KEY_REVENUE)));
         }
         array_push(
             $lines,

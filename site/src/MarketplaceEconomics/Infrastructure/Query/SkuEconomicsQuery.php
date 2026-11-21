@@ -29,9 +29,9 @@ final readonly class SkuEconomicsQuery
      *
      * @return array<string, SkuMetrics> listingId (`''` — без SKU) => показатели
      */
-    public function byListing(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $connectionRef = null, ?string $channel = null, array $vatRates = []): array
+    public function byListing(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $connectionRef = null, ?string $channel = null, array $vatRates = [], bool $allocated = true): array
     {
-        [$where, $params, $types] = $this->where($companyId, $from, $to, $connectionRef, $channel, null);
+        [$where, $params, $types] = $this->where($companyId, $from, $to, $connectionRef, $channel, null, $allocated);
 
         return $this->collect("COALESCE(listing_id::text, '')", $where, $params, $types, $vatRates);
     }
@@ -45,7 +45,7 @@ final readonly class SkuEconomicsQuery
      *
      * @return array<string, SkuMetrics> начало шага Y-m-d => показатели
      */
-    public function byStep(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $step, ?string $connectionRef = null, ?array $listingIds = null, ?string $channel = null, array $vatRates = []): array
+    public function byStep(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, string $step, ?string $connectionRef = null, ?array $listingIds = null, ?string $channel = null, array $vatRates = [], bool $allocated = true): array
     {
         if (!\in_array($step, ['day', 'week', 'month'], true)) {
             throw new \InvalidArgumentException('step: '.$step);
@@ -53,7 +53,7 @@ final readonly class SkuEconomicsQuery
         if ([] === $listingIds) {
             return [];
         }
-        [$where, $params, $types] = $this->where($companyId, $from, $to, $connectionRef, $channel, $listingIds);
+        [$where, $params, $types] = $this->where($companyId, $from, $to, $connectionRef, $channel, $listingIds, $allocated);
 
         return $this->collect("to_char(date_trunc('$step', operation_date), 'YYYY-MM-DD')", $where, $params, $types, $vatRates);
     }
@@ -63,9 +63,13 @@ final readonly class SkuEconomicsQuery
      *
      * @return array{0: string, 1: array<string, mixed>, 2: array<string, ArrayParameterType>}
      */
-    private function where(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $connectionRef, ?string $channel, ?array $listingIds): array
+    private function where(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $connectionRef, ?string $channel, ?array $listingIds, bool $allocated): array
     {
         $where = 'company_id = :company AND operation_date BETWEEN :from AND :to';
+        if (!$allocated) {
+            // строки разнесения идут парой (доля на SKU + обратная без SKU) и дают 0 — без них итог тот же
+            $where .= ' AND allocation_key IS NULL';
+        }
         $params = ['company' => $companyId, 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')];
         $types = [];
         if (null !== $connectionRef) {
