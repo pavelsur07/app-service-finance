@@ -23,7 +23,7 @@ use App\MarketplaceOperations\Facade\MarketplaceOperationsFacadeInterface;
 final readonly class RefreshEconomicsDayAction
 {
     /** Меняется при смене правил расчёта витрины — команда пересчитает все дни с прежней версией сама. */
-    public const RULES_VERSION = 'economics-2';
+    public const RULES_VERSION = 'economics-3';
 
     public function __construct(
         private MarketplaceOperationsFacadeInterface $operations,

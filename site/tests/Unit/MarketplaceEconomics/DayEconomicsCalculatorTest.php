@@ -48,10 +48,12 @@ final class DayEconomicsCalculatorTest extends TestCase
             $this->op(null, K::STORAGE, -100),
         ], [], ['ads_cpc' => [self::A => '1.00', self::B => '2.00', 'gone' => '0'], 'ads_pay_per_order' => [self::B => '5.00']], [self::A => 1.0, self::B => 2.0]);
 
-        // клики 1000 по 1 : 2 → 333 / 667 (наибольший остаток); оплата за заказ 500 — только B; хранение 100 по остатку 1 : 2 → 33 / 67
+        // клики 1000 по 1 : 2 → 333 / 667 (наибольший остаток); оплата за заказ 500 — только B;
+        // хранение 100 по остатку 1 : 2 → 33 / 67 — в СМ1, как в итоге кабинета
         self::assertSame([-333, -1167], [$this->sum($day, self::A, EconomicsLevel::MD2), $this->sum($day, self::B, EconomicsLevel::MD2)]);
         self::assertSame('legacy_order_share', $this->lineByKey($day, self::B, 'legacy_order_share')?->allocationKey);
-        self::assertSame([-33, -67], [$this->sum($day, self::A, EconomicsLevel::OVERHEAD), $this->sum($day, self::B, EconomicsLevel::OVERHEAD)]);
+        self::assertSame([-33, -67], [$this->sum($day, self::A, EconomicsLevel::MD1), $this->sum($day, self::B, EconomicsLevel::MD1)]);
+        self::assertSame([0, 0], [$this->sum($day, self::A, EconomicsLevel::OVERHEAD), $this->sum($day, self::B, EconomicsLevel::OVERHEAD)]);
         self::assertSame(Calc::KEY_STOCK, $this->line($day, self::B, Calc::STORAGE_SHARE)?->allocationKey);
         self::assertSame(0, $day->unallocatedMinor);
         $this->assertBalanced($day);
@@ -80,8 +82,43 @@ final class DayEconomicsCalculatorTest extends TestCase
             $this->op(null, K::LOGISTICS_TO, -1001),
         ]);
 
-        self::assertSame([-501, -500], [$this->sum($day, self::A, EconomicsLevel::OVERHEAD), $this->sum($day, self::B, EconomicsLevel::OVERHEAD)]);
-        self::assertSame(Calc::KEY_REVENUE, $this->line($day, self::A, Calc::OVERHEAD_SHARE)?->allocationKey);
+        // затрата СМ1 без SKU остаётся в СМ1 и в своей статье: у SKU — «Лог. туда», а не «Склад и пр. МП»
+        self::assertSame([-501, -500], [$this->sum($day, self::A, EconomicsLevel::MD1), $this->sum($day, self::B, EconomicsLevel::MD1)]);
+        self::assertSame(Calc::KEY_REVENUE, $this->line($day, self::A, K::LOGISTICS_TO->value)?->allocationKey);
+        self::assertSame(0, $this->sum($day, self::A, EconomicsLevel::OVERHEAD));
+        $this->assertBalanced($day);
+    }
+
+    public function testFullyAllocatedDayLeavesNothingWithoutSkuOnAnyLevel(): void
+    {
+        // регрессия 21.11: drop-off и хранение без SKU давали «Нераспределено» −X в СМ1/СМ2 и +X в «Склад и пр. МП»
+        $day = $this->calc([
+            $this->op(self::A, K::SALE, 300000, 1),
+            $this->op(self::B, K::SALE, 100000, 1),
+            $this->op(null, K::LOGISTICS_TO_DROPOFF, -1001),
+            $this->op(null, K::STORAGE, -100),
+            $this->op(null, K::SUBSCRIPTION, -500),
+            $this->op(null, K::COMPENSATION, 1200),
+        ], [], [], [self::A => 3.0]);
+
+        self::assertSame(array_fill_keys(array_map(static fn (EconomicsLevel $l): string => $l->value, EconomicsLevel::cases()), 0), $this->byLevel($day, null));
+        // drop-off по выручке 3 : 1, хранение — только A (остаток есть только у него)
+        self::assertSame([-751 - 100, -250], [$this->sum($day, self::A, EconomicsLevel::MD1), $this->sum($day, self::B, EconomicsLevel::MD1)]);
+        self::assertSame(0, $day->unallocatedMinor);
+        $this->assertBalanced($day);
+    }
+
+    public function testStorageWithoutStockFallsBackToRevenueInMd1(): void
+    {
+        $day = $this->calc([
+            $this->op(self::A, K::SALE, 100000, 1),
+            $this->op(self::B, K::SALE, 100000, 1),
+            $this->op(null, K::STORAGE, -100),
+        ]);
+
+        self::assertSame([-50, -50], [$this->sum($day, self::A, EconomicsLevel::MD1), $this->sum($day, self::B, EconomicsLevel::MD1)]);
+        self::assertSame(Calc::KEY_REVENUE, $this->line($day, self::A, Calc::STORAGE_SHARE)?->allocationKey);
+        self::assertSame(0, $day->unallocatedMinor);
         $this->assertBalanced($day);
     }
 
@@ -119,7 +156,7 @@ final class DayEconomicsCalculatorTest extends TestCase
     }
 
     /** @return array<string, int> */
-    private function byLevel(DayEconomics $day, string $listing): array
+    private function byLevel(DayEconomics $day, ?string $listing): array
     {
         $sums = [];
         foreach (EconomicsLevel::cases() as $level) {
@@ -129,7 +166,7 @@ final class DayEconomicsCalculatorTest extends TestCase
         return $sums;
     }
 
-    private function sum(DayEconomics $day, string $listing, EconomicsLevel $level): int
+    private function sum(DayEconomics $day, ?string $listing, EconomicsLevel $level): int
     {
         $sum = 0;
         foreach ($day->lines as $line) {
