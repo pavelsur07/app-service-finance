@@ -25,7 +25,6 @@ use App\Cash\Entity\PaymentIntake\PaymentIntakeReplyReceipt;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\FiatCurrency;
 use App\Cash\Enum\Transaction\CashDirection;
-use App\Cash\Enum\Transaction\CashflowCategoryStatus;
 use App\Cash\Exception\McpCashDraftException;
 use App\Cash\Exception\PaymentIntakeAccessDeniedException;
 use App\Cash\Infrastructure\Query\CashCategorizationQuery;
@@ -182,14 +181,18 @@ final readonly class PaymentIntakeAction
     private function mcpCategoryMatches(string $companyId, string $categoryId, CashDirection $direction): bool
     {
         $this->categoryRepository->lockTree($companyId);
-        $category = $this->categoryRepository->findOneByIdAndCompanyId($categoryId, $companyId);
-        if (null === $category || CashflowCategoryStatus::ACTIVE !== $category->getStatus()
-            || $category->isSystem() || !$category->getChildren()->isEmpty()) {
+        $ancestry = $this->categoryRepository->findActiveLeafAncestry($companyId, $categoryId);
+        if ([] === $ancestry) {
             return false;
         }
-        $flow = CashflowCategoryTreeBuilder::flow($category);
+        foreach ($ancestry as $category) {
+            $flow = CashflowCategoryTreeBuilder::declaredFlow($category['systemCode'], $category['operationType']);
+            if (null !== $flow) {
+                return 'both' === $flow || (CashDirection::INFLOW === $direction ? 'in' : 'out') === $flow;
+            }
+        }
 
-        return 'both' === $flow || (CashDirection::INFLOW === $direction ? 'in' : 'out') === $flow;
+        return true;
     }
 
     /** @return list<array{id: string, externalId: string, receivedAt: string}> */

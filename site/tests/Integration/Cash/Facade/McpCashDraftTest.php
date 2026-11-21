@@ -117,6 +117,7 @@ final class McpCashDraftTest extends IntegrationTestCase
         $first = $cash->createMcpCashDraft($this->input($companyId, $actorId, $connectionId, $accountId));
         $second = $cash->createMcpCashDraft($this->input($otherId, $otherActor, $connectionId, $otherAccount));
         self::assertNotSame($first->draftId, $second->draftId);
+        self::assertSame(0, $this->countFacts($otherId));
         $intake = self::getContainer()->get(PaymentIntakeAction::class);
         try {
             $intake->getMcpDraft($otherId, $otherActor, $first->draftId);
@@ -128,6 +129,26 @@ final class McpCashDraftTest extends IntegrationTestCase
         $third = $cash->createMcpCashDraft($this->input($companyId, $actorId, Uuid::uuid7()->toString(), $accountId));
         $this->expectException(UniqueConstraintViolationException::class);
         $this->connection->transactional(fn () => $this->connection->executeStatement('UPDATE cash_payment_intake_draft SET mcp_connection_id = ? WHERE id = ?', [$connectionId, $third->draftId]));
+    }
+
+    public function testForeignCompanyCannotConfirmAnExistingDraft(): void
+    {
+        [$company, $actorId, $accountId] = $this->fixture();
+        [$other] = $this->fixture(2);
+        $other->setUser($company->getUser());
+        $this->em->flush();
+        $companyId = (string) $company->getId();
+        $draft = self::getContainer()->get(CashFacade::class)->createMcpCashDraft(
+            $this->input($companyId, $actorId, Uuid::uuid7()->toString(), $accountId),
+        );
+
+        try {
+            self::getContainer()->get(PaymentIntakeAction::class)->confirmMcp((string) $other->getId(), $actorId, $draft->draftId, 1, true);
+            self::fail('Another company cannot post this draft.');
+        } catch (\DomainException $exception) {
+            self::assertSame('Черновик не найден.', $exception->getMessage());
+        }
+        self::assertSame(0, $this->countFacts($companyId));
     }
 
     public function testForeignAccountIsUnavailable(): void
@@ -166,6 +187,33 @@ final class McpCashDraftTest extends IntegrationTestCase
         $cash->createMcpCashDraft(new CreateMcpCashDraft(
             $companyId, $actorId, $connectionId, 'rejected', $accountId, $date, CashDirection::OUTFLOW, '100.00', categoryId: $categoryId,
         ));
+    }
+
+    public function testConfirmationUsesCurrentCategoryDirectionWithAnAlreadyLoadedParent(): void
+    {
+        [$company, $actorId, $accountId] = $this->fixture();
+        $companyId = (string) $company->getId();
+        $parent = new CashflowCategory(Uuid::uuid7()->toString(), $company);
+        $parent->setName('Приход')->setOperationType(PaymentPlanType::INFLOW);
+        $leaf = new CashflowCategory(Uuid::uuid7()->toString(), $company);
+        $leaf->setName('Продажи')->setParent($parent);
+        $this->em->persist($parent);
+        $this->em->persist($leaf);
+        $this->em->flush();
+        $cash = self::getContainer()->get(CashFacade::class);
+        $draft = $cash->createMcpCashDraft(new CreateMcpCashDraft(
+            $companyId, $actorId, Uuid::uuid7()->toString(), 'later-rejected', $accountId,
+            new \DateTimeImmutable('2026-10-10'), CashDirection::INFLOW, '100.00', categoryId: (string) $leaf->getId(),
+        ));
+        $this->connection->executeStatement('UPDATE cashflow_categories SET operation_type = ? WHERE company_id = ? AND id = ?', [PaymentPlanType::OUTFLOW->value, $companyId, $parent->getId()]);
+
+        try {
+            self::getContainer()->get(PaymentIntakeAction::class)->confirmMcp($companyId, $actorId, $draft->draftId, 1, true);
+            self::fail('Posting must use the current category direction.');
+        } catch (\DomainException $exception) {
+            self::assertSame('Статья недоступна или не подходит направлению платежа.', $exception->getMessage());
+        }
+        self::assertSame(0, $this->countFacts($companyId));
     }
 
     #[DataProvider('confirmationRevocations')]

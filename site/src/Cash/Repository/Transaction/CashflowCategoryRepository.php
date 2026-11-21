@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Cash\Repository\Transaction;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\ArrayParameterType;
@@ -94,6 +95,29 @@ class CashflowCategoryRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /** @return list<array{systemCode: ?string, operationType: ?PaymentPlanType}> */
+    public function findActiveLeafAncestry(string $companyId, string $categoryId): array
+    {
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(<<<'SQL'
+            WITH RECURSIVE ancestry AS (
+                SELECT c.id, c.parent_id, c.system_code, c.operation_type, 0 AS depth
+                FROM cashflow_categories c
+                WHERE c.company_id = :company AND c.id = :category AND c.status = 'active' AND NOT c.is_system
+                  AND NOT EXISTS (SELECT 1 FROM cashflow_categories child WHERE child.company_id = :company AND child.parent_id = c.id)
+                UNION ALL
+                SELECT p.id, p.parent_id, p.system_code, p.operation_type, a.depth + 1
+                FROM ancestry a
+                JOIN cashflow_categories p ON p.id = a.parent_id AND p.company_id = :company
+            ) CYCLE id SET is_cycle USING path
+            SELECT system_code, operation_type FROM ancestry WHERE NOT is_cycle ORDER BY depth
+            SQL, ['company' => $companyId, 'category' => $categoryId]);
+
+        return array_map(static fn (array $row): array => [
+            'systemCode' => null === $row['system_code'] ? null : (string) $row['system_code'],
+            'operationType' => null === $row['operation_type'] ? null : PaymentPlanType::from((string) $row['operation_type']),
+        ], $rows);
     }
 
     public function findOneByCompanyAndCode(Company $company, string $code): ?CashflowCategory

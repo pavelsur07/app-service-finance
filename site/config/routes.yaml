@@ -208,3 +208,9 @@ settlement_controllers:
         path: ../src/Settlement/Controller/
         namespace: App\Settlement\Controller
     type: attribute
+
+mcp_controllers:
+    resource:
+        path: ../src/Mcp/Controller/
+        namespace: App\Mcp\Controller
+    type: attribute

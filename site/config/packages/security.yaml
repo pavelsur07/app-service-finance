@@ -30,6 +30,9 @@ security:
             custom_authenticators:
                 - App\Api\Security\ApiAuthenticator
             entry_point: App\Api\Security\ApiAuthenticator
+        mcp_oauth:
+            pattern: '^(?:/mcp|/oauth/(?:authorize|token|revoke)|/\.well-known/oauth-(?:authorization-server|protected-resource(?:/mcp)?))$'
+            stateless: true
         public_api:
             pattern: ^/api/public/
             stateless: true
@@ -107,6 +110,7 @@ security:
         - { path: '^/api/account/v1/', roles: ROLE_USER }
         - { path: ^/internal/, roles: ROLE_INTERNAL_SERVICE }
         - { path: ^/api/external/v1/, roles: ROLE_EXTERNAL_API }
+        - { path: '^(?:/mcp|/oauth/(?:authorize|token|revoke)|/\.well-known/oauth-(?:authorization-server|protected-resource(?:/mcp)?))$', roles: PUBLIC_ACCESS }
         - { path: ^/api/public/, roles: PUBLIC_ACCESS }
         - { path: ^/_health, roles: PUBLIC_ACCESS }
         # регистрация и логин — анонимный доступ

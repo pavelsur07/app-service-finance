@@ -25,3 +25,6 @@ framework:
 
             cache.project_direction_import:
                 adapter: cache.adapter.redis
+
+            cache.mcp_sessions:
+                adapter: cache.adapter.redis

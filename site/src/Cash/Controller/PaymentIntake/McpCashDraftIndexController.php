@@ -33,7 +33,7 @@ final class McpCashDraftIndexController extends AbstractController
         if (null !== $before && !Uuid::isValid($before)) {
             throw new BadRequestHttpException('Некорректная страница черновиков.');
         }
-        $closed = $request->query->getString('status') === 'closed';
+        $closed = 'closed' === $request->query->getString('status');
         try {
             $drafts = $this->intake->listMcpDrafts((string) $company->getId(), (string) $user->getId(), $before, $closed);
         } catch (\DomainException) {
