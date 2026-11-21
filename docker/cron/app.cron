@@ -414,6 +414,13 @@
 */5 * * * * cd /app && php bin/console app:ai-service:quality:pull --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 45 * * * * cd /app && php bin/console app:ai-service:quality:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# МойСклад: страховка пакетов принятия предложений — переотправка queued/running без heartbeat > 10 мин.
+*/10 * * * * cd /app && php bin/console app:moysklad:mapping-bulk:requeue --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# МойСклад: автоприменение однозначных предложений там, где его включили в «Параметрах».
+# После ночной загрузки каталогов маркетплейсов (Ozon 03:40); один пакет в сутки на подключение и маркетплейс.
+30 5 * * * cd /app && php bin/console app:moysklad:mapping-auto-apply --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Dead man's switch: пинг heartbeat-монитора GlitchTip. Молчание → монитор сам заводит issue.
 # Отдельно от почтовой пробы: ловит смерть supercronic/контейнера, т.е. немоту ВСЕХ кронов.
 # Пустой GLITCHTIP_SCHEDULER_HEARTBEAT_URL = выключено. wget, а не curl: busybox есть в alpine всегда.

@@ -27,12 +27,6 @@
                 <button class="btn" type="submit"><i class="ti ti-refresh me-1" aria-hidden="true"></i>Обновить диагностику</button>
             </form>
         {% endif %}
-        {% if view == 'all' %}
-            {{ form_start(previewForm, {attr: {'data-automatic-preview': ''}}) }}
-            {{ form_widget(previewForm.sizeCharacteristicId, {attr: {hidden: true}}) }}
-            <button class="btn btn-primary" type="submit"><i class="ti ti-wand me-1" aria-hidden="true"></i>Подобрать на странице</button>
-            {{ form_end(previewForm) }}
-        {% endif %}
     </div>
 {% endblock %}
 
@@ -45,6 +39,7 @@
             <div class="alert alert-info" data-catalog-not-ready>Для назначения связей включите подключение и загрузите товары и модификации. <a href="{{ path('moysklad_connections_index') }}">Перейти к подключениям</a></div>
         {% endif %}
         {% include 'moy_sklad/mappings/_diagnostic_status.html.twig' with {report: diagnostics} only %}
+        {% include 'moy_sklad/mappings/_bulk_job.html.twig' with {job: bulkJob, routeParams: routeParams} only %}
 
         <div class="card vf-card" data-mapping-registry>
             <div class="card-header" data-mapping-view-tabs>
@@ -77,6 +72,29 @@
                             <button type="submit" class="vf-ops-search__submit" aria-label="Найти"><i class="ti ti-search" aria-hidden="true"></i></button>
                             <input id="mapping-listings-search" class="form-control" type="search" name="q" value="{{ q }}" maxlength="100" placeholder="Название, артикул продавца или SKU" aria-label="Название, артикул продавца или SKU">
                         </form>
+                    {% elseif diagStatus == 'ready' %}
+                        {# «Предложения» — однозначные совпадения: принять все из отчёта или отмеченные строки (пакет в фоне). #}
+                        {% if canWrite %}
+                            {% set phrases = {direct_article: 'по артикулу позиции', parent_article_size: 'по артикулу родителя и размеру', exact_code: 'по коду позиции', wb_article_alias: 'по алиасу WB', exact_barcode: 'по штрихкоду'} %}
+                            {% set readyCount = completed.counts.ready ?? 0 %}
+                            {% set blocked = diagnostics.stale ? 'Отчёт устарел: каталог или связи изменились после проверки. Обновите диагностику, затем принимайте предложения.' : (bulkJob and bulkJob.active ? 'Пакет уже обрабатывается. Дождитесь окончания.' : (readyCount == 0 ? 'В отчёте нет предложений.' : '')) %}
+                            {% set breakdown = bulkBreakdown|map((n, rule) => (phrases[rule] ?? rule) ~ ' — ' ~ n|vf_number)|join(', ') %}
+                            <button type="button" class="btn btn-primary" data-bulk-accept-all data-bs-toggle="modal" data-bs-target="#bulk-confirm"
+                                    data-confirm-action="{{ path('moysklad_mapping_bulk_start', routeParams) }}"
+                                    data-confirm-token="{{ csrf_token('moysklad_mapping_bulk' ~ mappingCompanyId ~ mappingConnectionId ~ mappingMarketplace) }}"
+                                    data-confirm-fields="{{ {scope: 'report', jobId: bulkJobId}|json_encode }}"
+                                    data-confirm-title="{{ blocked ? 'Принять предложения сейчас нельзя' : 'Принять ' ~ readyCount|vf_number ~ ' предложений?' }}"
+                                    data-confirm-body="{{ blocked ?: 'Будет создано до ' ~ readyCount|vf_number ~ ' связей: ' ~ breakdown ~ '. Строки, которые изменились после проверки, будут пропущены. Пакет обрабатывается в фоне, его можно отменить.' }}"
+                                    data-confirm-submit="Принять"{% if blocked %} data-confirm-blocked="true"{% endif %}>
+                                <i class="ti ti-checks me-1" aria-hidden="true"></i>Принять все предложения ({{ readyCount|vf_number }})
+                            </button>
+                            <form method="post" action="{{ path('moysklad_mapping_bulk_start', routeParams) }}" id="bulk-selected" data-bulk-selected>
+                                <input type="hidden" name="_token" value="{{ csrf_token('moysklad_mapping_bulk' ~ mappingCompanyId ~ mappingConnectionId ~ mappingMarketplace) }}">
+                                <input type="hidden" name="jobId" value="{{ bulkJobId }}">
+                                <input type="hidden" name="scope" value="selected">
+                                <button type="submit" class="btn"{% if blocked %} disabled title="{{ blocked }}"{% endif %}>Принять выбранные</button>
+                            </form>
+                        {% endif %}
                     {% else %}
                         {# Состояние и причина — вкладками; здесь только ручная проверка внутри выбранной вкладки. #}
                         {% set queueFilter = keepParams|merge({view: 'queue', diag_status: diagStatus, diag_reason: diagReason}) %}
@@ -136,9 +154,9 @@
                         <tbody>
                             {% for row in rows %}
                                 {% if view == 'queue' %}
-                                    {% include 'moy_sklad/mappings/_row.html.twig' with {listing: row.source, state: states[row.listingId], diagnostic: row, routeParams: routeParams, canWrite: canWrite, isLast: loop.last} only %}
+                                    {% include 'moy_sklad/mappings/_row.html.twig' with {listing: row.source, state: states[row.listingId], diagnostic: row, routeParams: routeParams, canWrite: canWrite, isLast: loop.last, selectable: canWrite and diagStatus == 'ready'} only %}
                                 {% else %}
-                                    {% include 'moy_sklad/mappings/_row.html.twig' with {listing: row, state: states[row.id], diagnostic: null, routeParams: routeParams, canWrite: canWrite, isLast: loop.last} only %}
+                                    {% include 'moy_sklad/mappings/_row.html.twig' with {listing: row, state: states[row.id], diagnostic: null, routeParams: routeParams, canWrite: canWrite, isLast: loop.last, selectable: false} only %}
                                 {% endif %}
                             {% endfor %}
                         </tbody>
@@ -161,5 +179,7 @@
         marketplace: mappingMarketplace, connectionId: mappingConnectionId, companyId: mappingCompanyId, settings: mappingSettings, canWrite: canWrite,
         choices: diagnosticCharacteristicChoices, selected: selectedCharacteristicId, charQ: charQ, charPage: characteristicsPage,
         keep: {view: view, q: q, page: listingsPage.page, diag_status: diagStatus, diag_reason: diagReason, diag_manual: diagManual},
+        autoApply: autoApply,
     } only %}
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'bulk-confirm'} only %}
 {% endblock %}

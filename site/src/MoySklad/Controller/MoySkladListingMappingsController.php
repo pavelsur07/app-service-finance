@@ -7,7 +7,6 @@ namespace App\MoySklad\Controller;
 use App\Company\Security\ModuleAccess;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceFacade;
-use App\MoySklad\Form\AutomaticMappingsPreviewType;
 use App\MoySklad\Infrastructure\Query\MappingCharacteristicsQuery;
 use App\MoySklad\Infrastructure\Query\MoySkladCatalogTargetsQuery;
 use App\MoySklad\Infrastructure\Query\MoySkladListingMappingsQuery;
@@ -19,14 +18,13 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Requirement\Requirement;
-use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted(ModuleAccess::MARKETPLACE_READ)]
 final class MoySkladListingMappingsController extends AbstractController
 {
     #[Route('/moy-sklad/connections/{connectionId}/mappings/{marketplace}', name: 'moysklad_listing_mappings', requirements: ['connectionId' => Requirement::UUID, 'marketplace' => 'ozon|wildberries'], methods: ['GET'])]
-    public function __invoke(string $connectionId, string $marketplace, Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionWriteRepository $connections, MarketplaceFacade $listings, MoySkladListingMappingsQuery $mappings, MoySkladCatalogTargetsQuery $targets, MappingCharacteristicsQuery $characteristics, CsrfTokenManagerInterface $csrf, \App\MoySklad\Infrastructure\Query\MappingDiagnosticsQuery $diagnostics, \App\MoySklad\Infrastructure\Query\MappingSettingsQuery $settings): Response
+    public function __invoke(string $connectionId, string $marketplace, Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionWriteRepository $connections, MarketplaceFacade $listings, MoySkladListingMappingsQuery $mappings, MoySkladCatalogTargetsQuery $targets, MappingCharacteristicsQuery $characteristics, \App\MoySklad\Infrastructure\Query\MappingDiagnosticsQuery $diagnostics, \App\MoySklad\Infrastructure\Query\MappingSettingsQuery $settings, \App\MoySklad\Infrastructure\Query\MappingBulkJobQuery $bulkJobs): Response
     {
         $connectionId = strtolower($connectionId);
         $companyId = (string) $activeCompany->getActiveCompany()->getId();
@@ -58,11 +56,6 @@ final class MoySkladListingMappingsController extends AbstractController
                 $choices[] = $current;
             }
         }
-        $previewForm = $this->createForm(AutomaticMappingsPreviewType::class,
-            ['q' => $q, 'page' => (string) $page, 'sizeCharacteristicId' => $selected,
-                '_token' => $csrf->getToken(AutomaticMappingsPreviewType::csrfId($connectionId, $marketplace, $charQ, $charPage, $selected))->getValue()],
-            ['characteristics' => $choices, 'action' => $this->generateUrl('moysklad_automatic_mapping_preview',
-                ['connectionId' => $connectionId, 'marketplace' => $marketplace, 'char_q' => $charQ, 'char_page' => $charPage, 'selected' => $selected ?? ''])]);
         $diagPage = filter_var($values['diag_page'] ?? 1, \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 2147483647]]);
         $diagStatus = $values['diag_status'] ?? '';
         $diagReason = $values['diag_reason'] ?? '';
@@ -79,7 +72,11 @@ final class MoySkladListingMappingsController extends AbstractController
         $rowIds = 'queue' === $view ? array_map(static fn (\App\MoySklad\Application\DTO\MappingDiagnosticRow $row): string => $row->listingId, $diagnosticPage->rows) : array_column($result->items, 'id');
         $states = $mappings->currentForListings($companyId, $connectionId, $rowIds);
 
+        $completedRunId = $diagnosticPage->completedRun?->id;
+
         return $this->render('moy_sklad/mappings/index.html.twig', [
+            'bulkJob' => $bulkJobs->latest($companyId, $connectionId, $marketplace), 'autoApply' => $bulkJobs->autoApply($companyId, $connectionId, $marketplace), 'bulkJobId' => \Ramsey\Uuid\Uuid::uuid7()->toString(),
+            'bulkBreakdown' => null !== $completedRunId && 'ready' === $diagStatus ? $bulkJobs->readyBreakdown($companyId, $completedRunId) : [],
             'diagnostics' => $diagnosticPage, 'mappingCompanyId' => $companyId, 'mappingSettings' => $settings->get($companyId, $connectionId, $marketplace),
             'diagnosticCharacteristicChoices' => $choices,
             'diagnosticRequestId' => \Ramsey\Uuid\Uuid::uuid7()->toString(),
@@ -87,7 +84,7 @@ final class MoySkladListingMappingsController extends AbstractController
             'view' => $view, 'diagStatus' => $diagStatus, 'diagReason' => $diagReason, 'diagManual' => $diagManual,
             'connection' => $connection, 'mappingConnectionId' => $connectionId, 'mappingMarketplace' => $marketplace,
             'providerName' => MarketplaceType::from($marketplace)->getDisplayName(),
-            'previewForm' => $previewForm->createView(), 'characteristicsPage' => $charResult, 'charQ' => $charQ, 'selectedCharacteristicId' => $selected,
+            'characteristicsPage' => $charResult, 'charQ' => $charQ, 'selectedCharacteristicId' => $selected,
             'listingsPage' => $result, 'states' => $states, 'q' => $q, 'catalogReady' => $targets->isReady($companyId, $connectionId),
         ]);
     }

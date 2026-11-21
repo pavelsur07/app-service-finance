@@ -2139,6 +2139,10 @@ manage — только владелец. Новые права автомати
 транзакцию и берет company FOR SHARE, согласованную с существующим PESSIMISTIC_WRITE
 операций изменения членства и ролей. Запросы с неверными идентификаторами закрыты.
 
+`CompanyFacade::userHasModuleAccess(string $companyId, string $userId, Module $module, AccessLevel $level): bool`
+— право пользователя на модуль без HTTP-сессии (фоновые задачи от имени пользователя): владелец или
+активный участник через `ModuleAccessResolver::allowsForCompany`. Неверные/чужие ID → false.
+
 > **Остальные Facade** добавлять сюда по мере реализации модулей.
 
 ### Cash transaction auto-rule governance
@@ -6015,6 +6019,8 @@ config/
 | `app:marketplace:wb-financial-reports:sync --mode=daily --max-days=1` | `10 3 * * *` | Ежедневное планирование WB financial sync за вчерашний день (date-based команда); задачи — `SyncWbFinancialReportDayMessage` → `async_wb_finance` |
 | `app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14` | `20 3-23 * * *` | Почасовой (с 03:20 до 23:20, 21 прогон в сутки) safe planner: current-month daily/retry/missing/empty recovery, затем rolling refresh последних 14 дней; не больше одной задачи на подключение за прогон |
 | `app:marketplace:wb-costs:unrecognized-check --days-back=14` | `40 6 * * *` | Read-only гейт: нераспознанные операции затрат WB за 14 дней у активных seller-подключений (`WbUnrecognizedCostsQuery` по `unprocessed_cost_types`); exit 1 — новый тип операции, один агрегированный `error`. Документы старше окна не краснят гейт |
+| `app:moysklad:mapping-bulk:requeue` | `*/10 * * * *` | Переотправка пакетов принятия предложений МойСклад без heartbeat >10 мин; повтор безопасен |
+| `app:moysklad:mapping-auto-apply` | `30 5 * * *` | Пакет однозначных предложений МойСклад для подключений с включённым автоприменением; один в сутки |
 | `app:marketplace:cost-pl-mapping:sync-default` | `35 4 * * *`, `45 6 * * *` | Частичный базовый маппинг затрат в ОПиУ по шаблону для всех активных SELLER-подключений (ozon, wildberries) — до пересборки 04:45, чтобы новые категории ночи попали в ОПиУ утром. Ручные и отключённые правила не трогает. Повтор в 06:45 — перед гейтом, чтобы категории утренних загрузок не краснили его |
 | `app:marketplace:cost-pl-mapping:unmapped-check` | `50 6 * * *` | Read-only гейт: затраты текущего и прошлого месяца без документа ОПиУ, у категории которых нет решения по ОПиУ (`WITHOUT_PL_DECISION`); Ozon — только распознанные коды. exit 1 + один агрегированный `error`; зеленеет, как только статья назначена |
 | `app:marketplace:month-preliminary-rebuild` | `45 4 * * *` | Ежедневная пересборка предварительного ОПиУ за текущий месяц для всех активных подключений; вручную `--company-id --marketplace --month=YYYY-MM --stage [--execute]` — один этап за любой месяц, синхронно, без `--execute` только preflight |
@@ -6168,6 +6174,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.230 | 2026-11-21 | MoySklad: пакетное принятие предложений маппинга (весь отчёт или отмеченные строки), отмена пакета, ежедневное автоприменение; удалён подбор по странице (preview/Redis pool `cache.moysklad_automatic_mapping`); `CompanyFacade::userHasModuleAccess` |
 | 2.229 | 2026-11-20 | Finance/Cash: сумма статьи в отчёте ДДС ведёт в «Транзакции ДДС» с фильтрами ячейки (двойной клик); фильтры списка `includeChildren`, `projectIds`, `centerIds` |
 | 2.228 | 2026-11-19 | Company: кнопка «Нормализовать названия» в списке контрагентов — предпросмотр и применение правил по активной компании (`RefreshCounterpartyDisplayNamesAction` с `companyId`) |
 | 2.227 | 2026-11-19 | Company: правила отображаемого названия контрагента v3 — ИНН с запятой перед названием, маскированное ФИО «Б. Имя Отчество» |
@@ -6537,20 +6544,9 @@ article, parent.article + размер по явно выбранному ID х�
 MarketplaceFacade; существующие ревизии, включая clear, не предлагаются.
 `MappingCharacteristicsQuery` выдаёт по20 непрозрачных ID из локального JSONB.
 Никакой записи и внешнего HTTP в этих Query нет.
-`AutomaticMappingPreviewStorage` хранит scalar-array envelope в отдельном
-Redis pool `cache.moysklad_automatic_mapping`: TTL900, максимум3 preview на
-SHA256(sessionId), максимум3 immutable attempt results на preview. READ/WRITE
-индекса сериализуется существующим LockFactory, acquire(false); busy409,
-Redis failure503, чужой/истёкший preview одинаково отсутствует.
-Dedicated `AutomaticMappingRedisAdapter` сохраняет штатный marshaller/write
-protocol, но mget false/error/incomplete не превращает в miss. Pool и private
-Lock получают NullLogger, чтобы session hash не попал в framework diagnostics;
-глобальный LockFactory/logger не меняется. Scope включает
-company/actor/connection/provider; sessionId/hash не возвращаются в UI.
-UUIDv7 preview/requestId генерируются сервером; Guard фиксирует версию
-`identity_package_v2`, source/candidate fingerprints и выбранный opaque characteristic ID.
-`ApplyAutomaticListingMappingsAction` вызывает существующий writer отдельно
-для каждой строки без внешней транзакции/flush. Guarded order: connection
+Guard (`AutomaticMappingGuard`) фиксирует версию `identity_package_v2`, source/candidate
+fingerprints, выбранный opaque characteristic ID и previewId (для пакета — его id).
+Guarded order writer'а: connection
 FOR SHARE → mapping advisory → accepted replay → catalog try-lock → source
 FOR UPDATE + barcodes FOR SHARE через MarketplaceFacade → recompute policy/candidates → target lock
 → append/flush/commit. Общий `MoySkladCatalogLock` использует прежний session
@@ -6568,16 +6564,7 @@ SyncCatalogAction сначала берёт отдельный session import-in
 контракт и текст UI сохранены. Auto
 source/target lock wait ограничен LOCAL lock_timeout2s. Manual snapshot не
 наследует autoMapping прежней ревизии при отсутствующем source.
-Технический сбой останавливает остаток; ACCEPTED включает прежний request,
-CONFLICT/FAILED/NOT_PROCESSED отдельны; закрытый EM не переиспользуется.
-Legacy index содержит bounded поиск/выбор характеристики и POST preview
-(READ+CSRF), Show GET привязан к полному scope, Apply POST требует READ+WRITE
-и CSRF. Показанный контекст характеристики включён в CSRF id/form action;
-свой ID вне ChoiceType422, неизвестный/чужой404. Клиент передаёт только
-selectedIds из25 READY; target/rule/requestId берутся из Redis envelope.
-POST сохраняет отдельный server attemptId →303 GET со свежим EM/current
-states; ACCEPTED не выдаётся за число новых ревизий или актуальную связь.
-Cache failure после commit возвращает честный503 без ORM-render.
+Массовое принятие предложений — раздел «MoySklad: пакеты принятия предложений».
 
 
 Legacy UI маппинга размещён в `templates/moy_sklad/mappings/` под общим
@@ -6913,7 +6900,27 @@ SQL отчёта фильтрует сохранённые причины, не 
 запуски становятся stale и не могут возобновить старый cursor. Stale run удаляет
 свои строки, не затрагивая последний completed. При уже running POST не ставит
 ещё один запуск; конфликт параметров существующего runId не ретраится.
-Предыдущая версия cached preview считается истёкшей, без ложной503 storage error.
+
+### MoySklad: пакеты принятия предложений
+
+`moysklad_mapping_bulk_jobs` / `_items` (DBAL, `MoySkladSchemaExtension`), один активный пакет
+или отмена на company/connection/marketplace под `pg_advisory_xact_lock(ms-mapping-bulk)`.
+- Запуск: POST `moysklad_mapping_bulk_start` (READ+WRITE+CSRF, scope `report` | `selected` ≤100),
+  id пакета — скрытый UUIDv7 формы; повтор с тем же id → тот же пакет и повторный dispatch, другой scope → 422.
+  `StartMappingBulkJobAction` снимает строки READY последнего completed отчёта в items (отчёт stale → отказ,
+  чужие/не-READY выбранные ID → 422), коммитит и отправляет `ApplyMappingBulkJobMessage` → `async_pipeline`.
+- `ApplyMappingBulkJobHandler`: session `pg_try_advisory_lock` на пакет; фазы claim → порции по100 → finalize.
+  Каждая строка — свежий evaluator и существующий writer с guard, requestId = UUIDv5(пакет, листинг);
+  итог строки и счётчики пакета — одной транзакцией. Изменилось → skipped, `ListingMappingException` → conflict,
+  технический сбой → failed и остановка пакета. Scope `cabinet` (только автоприменение) идёт keyset по
+  листингам без отчёта, items пишутся по ходу.
+- Отмена: POST `moysklad_mapping_bulk_undo` → `UndoMappingBulkJobMessage`; CLEAR только если текущая
+  ревизия — созданная пакетом SET, requestId = UUIDv5(пакет, листинг, undo); снятые не предлагаются снова.
+- `app:moysklad:mapping-bulk:requeue` (*/10) переотправляет пакеты/отмены без heartbeat >10 мин.
+- Автоприменение: `moysklad_mapping_auto_apply` (opt-in в «Параметрах», POST `moysklad_mapping_auto_apply`),
+  `app:moysklad:mapping-auto-apply` 05:30 создаёт пакет `cabinet` с id = UUIDv5(scope, дата МСК) от имени
+  включившего; без его MARKETPLACE WRITE (`CompanyFacade::userHasModuleAccess`) пакет не создаётся.
+- Отчёт пакета: GET `moysklad_mapping_bulk_show`, по25 строк, фильтр по итогу.
 
 ### MoySklad: legacy UI качества сопоставления
 
@@ -6923,7 +6930,7 @@ ChangeMappingSettingsAction меняет WB preset под connection FOR UPDATE,
 moysklad_mapping_diagnostics_refresh требует READ+WRITE+CSRF и отправляет scalar
 DiagnoseMappingsMessage с UUID запроса. UI показывает время/прогресс, последний
 completed, stale/failed/empty и status/reason/manualReview filters по25 строк.
-Предпросмотр/apply также по25; отчёт не разрешает назначение.
+Назначение из отчёта — только пакетом (см. ниже) или вручную по строке.
 Evidence partial показывает основания, количества в названиях, артикулы,
 коды, штрихкоды и конкурентов. Ручной поиск поддерживает точный штрихкод.
 Manual SET передаёт явный checkbox и fingerprints показанных источника/целей;
