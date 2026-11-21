@@ -15,8 +15,10 @@ use App\MarketplaceOperations\Enum\OperationKind;
  * - себестоимость (D5) — (продано − возвращено) × цена на дату;
  * - реклама без SKU (итог канона) — каждый вид по долям SKU в статистике легаси своего вида
  *   (клики — `legacy_clicks_share`, оплата за заказ — `legacy_order_share`); нет статистики — без SKU;
- * - хранение без SKU — по остатку на дату (`stock_share`), нет остатков — вместе с общими;
- * - общие и прямые без SKU — по выручке SKU за день (`revenue_share`, D3).
+ * - хранение без SKU — по остатку на дату (`stock_share`), нет остатков — по выручке; уровень СМ1;
+ * - прямые (СМ1) без SKU — по выручке SKU за день (`revenue_share`, D3), каждый вид своим `measure` на СМ1:
+ *   у SKU затрата в той же статье и на том же уровне, что в итоге кабинета, «Нераспределено» не путает уровни;
+ * - общие (OVERHEAD) без SKU — по выручке SKU за день (`revenue_share`).
  *
  * Разнесение пишется парой: доля на SKU и обратная строка без SKU, поэтому Σ строк (без
  * себестоимости и справочных) = Σ канона, а строки без SKU — нераспределённый остаток.
@@ -49,7 +51,7 @@ final class DayEconomicsCalculator
         $revenue = [];
         $soldQty = [];
         $canon = $storagePool = $overheadPool = 0;
-        $adsPools = [];
+        $adsPools = $md1Pools = [];
 
         foreach ($operations as $op) {
             // ponytail: витрина в рублях — у кабинетов РФ другой валюты нет; чужая валюта роняет день, а не считает неверно
@@ -79,7 +81,8 @@ final class DayEconomicsCalculator
             match (true) {
                 CascadeLevel::MD2 === $level => $adsPools[$op->kind->value] = ($adsPools[$op->kind->value] ?? 0) + $op->amountMinor,
                 OperationKind::STORAGE === $op->kind => $storagePool += $op->amountMinor,
-                CascadeLevel::MD1 === $level, CascadeLevel::OVERHEAD === $level => $overheadPool += $op->amountMinor,
+                CascadeLevel::MD1 === $level => $md1Pools[$op->kind->value] = ($md1Pools[$op->kind->value] ?? 0) + $op->amountMinor,
+                CascadeLevel::OVERHEAD === $level => $overheadPool += $op->amountMinor,
                 // выручка без листинга (SKU не нашёлся) и справочные остаются без SKU
                 default => null,
             };
@@ -106,11 +109,8 @@ final class DayEconomicsCalculator
             $lines[] = new EconomicsLine($listingId, self::COST_PRICE, EconomicsLevel::COST_PRICE, $amount, $qty);
         }
 
-        $stockWeights = array_filter($stock, static fn (float $q): bool => $q > 0);
-        if ([] === $stockWeights) {
-            $overheadPool += $storagePool;
-            $storagePool = 0;
-        }
+        $revenueWeights = array_map('strval', array_filter($revenue, static fn (int $r): bool => $r > 0));
+        $stockWeights = array_map(static fn (float $q): string => (string) $q, array_filter($stock, static fn (float $q): bool => $q > 0));
 
         ksort($adsPools);
         foreach ($adsPools as $kind => $pool) {
@@ -120,10 +120,16 @@ final class DayEconomicsCalculator
                 array_push($lines, ...$this->allocate($pool, $weights, self::ADS_ALLOCATED, EconomicsLevel::MD2, $key));
             }
         }
+        ksort($md1Pools);
+        foreach ($md1Pools as $kind => $pool) {
+            array_push($lines, ...$this->allocate($pool, $revenueWeights, $kind, EconomicsLevel::MD1, self::KEY_REVENUE));
+        }
         array_push(
             $lines,
-            ...$this->allocate($storagePool, array_map(static fn (float $q): string => (string) $q, $stockWeights), self::STORAGE_SHARE, EconomicsLevel::OVERHEAD, self::KEY_STOCK),
-            ...$this->allocate($overheadPool, array_map('strval', array_filter($revenue, static fn (int $r): bool => $r > 0)), self::OVERHEAD_SHARE, EconomicsLevel::OVERHEAD, self::KEY_REVENUE),
+            ...([] !== $stockWeights
+                ? $this->allocate($storagePool, $stockWeights, self::STORAGE_SHARE, EconomicsLevel::MD1, self::KEY_STOCK)
+                : $this->allocate($storagePool, $revenueWeights, self::STORAGE_SHARE, EconomicsLevel::MD1, self::KEY_REVENUE)),
+            ...$this->allocate($overheadPool, $revenueWeights, self::OVERHEAD_SHARE, EconomicsLevel::OVERHEAD, self::KEY_REVENUE),
         );
 
         $unallocated = 0;
