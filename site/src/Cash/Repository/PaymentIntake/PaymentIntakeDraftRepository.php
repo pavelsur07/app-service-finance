@@ -30,9 +30,23 @@ final class PaymentIntakeDraftRepository extends ServiceEntityRepository
     }
 
     /** @return list<string> */
-    public function getOpenIdsForActor(string $companyId, string $actorUserId): array
+    public function getOpenIdsForActor(string $companyId, string $actorUserId, bool $mcp = false): array
     {
-        return array_map('strval', $this->getEntityManager()->getConnection()->fetchFirstColumn("SELECT id FROM cash_payment_intake_draft WHERE company_id = :company AND actor_user_id = :actor AND status NOT IN ('confirmed', 'cancelled') ORDER BY id DESC LIMIT 200", ['company' => $companyId, 'actor' => $actorUserId]));
+        $channel = $mcp ? 'mcp_connection_id IS NOT NULL' : 'mcp_connection_id IS NULL';
+
+        return array_map('strval', $this->getEntityManager()->getConnection()->fetchFirstColumn("SELECT id FROM cash_payment_intake_draft WHERE company_id = :company AND actor_user_id = :actor AND status NOT IN ('confirmed', 'cancelled') AND {$channel} ORDER BY id DESC LIMIT 200", ['company' => $companyId, 'actor' => $actorUserId]));
+    }
+
+    public function getMcpByExternalId(string $companyId, string $connectionId, string $externalId): ?PaymentIntakeDraft
+    {
+        return $this->createQueryBuilder('d')
+            ->where('d.companyId = :company', 'd.mcpConnectionId = :connection', 'd.mcpExternalId = :external')
+            ->setParameter('company', $companyId)
+            ->setParameter('connection', $connectionId)
+            ->setParameter('external', $externalId)
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
     }
 
     public function getByTask(string $companyId, string $taskId): ?PaymentIntakeDraft
@@ -43,13 +57,13 @@ final class PaymentIntakeDraftRepository extends ServiceEntityRepository
     /** @companyScopeExempt Global Telegram source binding; caller authorizes exact actor and bound company before exposing data. */
     public function getBySource(string $sourceKey): ?PaymentIntakeDraft
     {
-        return $this->createQueryBuilder('d')->where('d.sourceKey = :source')->setParameter('source', $sourceKey)->getQuery()->setHint(Query::HINT_REFRESH, true)->getOneOrNullResult();
+        return $this->createQueryBuilder('d')->where('d.sourceKey = :source')->andWhere('d.mcpConnectionId IS NULL')->setParameter('source', $sourceKey)->getQuery()->setHint(Query::HINT_REFRESH, true)->getOneOrNullResult();
     }
 
     /** @companyScopeExempt Existence-only global source guard; returns no draft identity, content or tenant data. */
     public function hasSource(string $sourceKey): bool
     {
-        return (int) $this->getEntityManager()->getConnection()->fetchOne('SELECT count(*) FROM cash_payment_intake_draft WHERE source_key = :source', ['source' => $sourceKey]) > 0;
+        return (int) $this->getEntityManager()->getConnection()->fetchOne('SELECT count(*) FROM cash_payment_intake_draft WHERE source_key = :source AND mcp_connection_id IS NULL', ['source' => $sourceKey]) > 0;
     }
 
     /**

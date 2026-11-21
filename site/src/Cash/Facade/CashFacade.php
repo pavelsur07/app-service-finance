@@ -22,6 +22,8 @@ use App\Cash\Application\DTO\CreateCashTransferResult;
 use App\Cash\Application\DTO\MoneyAccountDailyBalanceRow;
 use App\Cash\Application\DTO\MoneyAccountOpeningBalance;
 use App\Cash\Application\DTO\MoneyAccountSummary;
+use App\Cash\Application\DTO\PaymentIntake\CreateMcpCashDraft;
+use App\Cash\Application\DTO\PaymentIntake\McpCashDraftResult;
 use App\Cash\Application\DTO\StatementImportAccount;
 use App\Cash\Application\DTO\StatementImportSummary;
 use App\Cash\Application\DTO\StatementLinkCandidate;
@@ -80,6 +82,11 @@ final readonly class CashFacade
         private ExternalCashReadQuery $externalRead,
         private \App\Cash\Application\PaymentIntake\PaymentIntakeAction $paymentIntake,
     ) {
+    }
+
+    public function createMcpCashDraft(CreateMcpCashDraft $command): McpCashDraftResult
+    {
+        return $this->paymentIntake->createMcpDraft($command);
     }
 
     public function requestPaymentIntake(\App\Cash\Application\DTO\PaymentIntake\RequestPaymentIntakeCommand $command): \App\Cash\Application\DTO\PaymentIntake\PaymentIntakeDraftView

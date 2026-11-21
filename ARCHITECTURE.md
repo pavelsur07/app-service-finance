@@ -3206,6 +3206,9 @@ abandonStatementImportLog(string $importLogId): void
 // Строки дня → ДДС и пересчёт остатков; только внутри транзакции вызывающего, коммитит он
 importBankStatementDay(string $companyId, string $moneyAccountId, string $source, BankStatementDayInput $day): BankStatementDayResult
 
+// Черновик MCP, без проводки и разбора текста. Доверенный контекст предоставляет MCP.
+createMcpCashDraft(CreateMcpCashDraft $command): McpCashDraftResult
+
 // Создать ДДС-транзакцию из внешнего модуля (идемпотентно для внешних источников)
 createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionResult
 
