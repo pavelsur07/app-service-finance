@@ -10,7 +10,7 @@
 | `MCP_OAUTH_PRIVATE_KEY` | Закрытый ключ RSA в PEM или доступный PHP абсолютный путь к файлу |
 | `MCP_OAUTH_PUBLIC_KEY` | Парный открытый ключ RSA в PEM или доступный PHP абсолютный путь к файлу |
 | `MCP_OAUTH_ENCRYPTION_KEY` | Ключ Defuse в ASCII-safe формате, создаётся штатным `generate-defuse-key` |
-| `MCP_OAUTH_CLIENTS` | JSON-словарь публичных client ID со списком точных callback URL |
+| `MCP_OAUTH_CLIENTS` | JSON-словарь публичных client ID со списком точных loopback или HTTPS callback URL |
 
 Пример регистраций CLI. Порты относятся к машине, на которой запущен клиент.
 
@@ -18,7 +18,8 @@
 {
   "codex-cli": ["http://127.0.0.1:48765/callback"],
   "claude-code": ["http://localhost:48766/callback"],
-  "hermes": ["http://localhost:48767/callback"]
+  "hermes": ["http://localhost:48767/callback"],
+  "hermes-web": ["https://hermes.example.test/api/mcp/oauth/callback/vashfindir"]
 }
 ```
 
@@ -60,7 +61,28 @@ claude mcp login vashfindir --no-browser
 
 Claude Code использует `http://localhost:PORT/callback` для фиксированного порта и принимает публичный client ID без секрета. [Документация Claude Code](https://code.claude.com/docs/en/mcp#use-pre-configured-oauth-credentials)
 
-## Hermes Agent 0.23.3
+## Hermes Web Dashboard
+
+Для `hermes.vashfindir.com` зарегистрирован `hermes-web` с адресом `https://hermes.vashfindir.com/api/mcp/oauth/callback/vashfindir`. В конфигурации развёртывания Hermes задаётся публичный адрес Dashboard и MCP-запись с именем `vashfindir`.
+
+```yaml
+dashboard:
+  public_url: https://hermes.vashfindir.com
+mcp_servers:
+  vashfindir:
+    url: https://app.vashfindir.ru/mcp
+    auth: oauth
+    oauth:
+      client_id: hermes-web
+```
+
+Опубликованная панель Hermes должна иметь действующий браузерный провайдер входа. Если задана переменная `HERMES_DASHBOARD_PUBLIC_URL`, панель использует её вместо `dashboard.public_url`.
+
+При переходе с локального подключения удалите из этой MCP-записи параметры `oauth.redirect_host`, `oauth.redirect_port` и `oauth.redirect_uri`, если они заданы. Dashboard сам строит HTTPS callback из публичного адреса и имени MCP-записи. После «Авторизовать» пользователь входит в ВашФинДир и подтверждает доступ. Dashboard получает код на своём HTTPS-маршруте и обменивает его на токен. Прокси сохраняет параметры запроса и передаёт callback тому же Dashboard. [OAuth-обработчик Hermes 0.23.3](https://github.com/NousResearch/hermes-agent/blob/v0.23.3/hermes_cli/web_routers/mcp.py#L67-L79)
+
+Для другого веб-инстанса администратор регистрирует его точный HTTPS callback в `MCP_OAUTH_CLIENTS`. Совпадают схема, хост, порт и путь. Пользователь проходит обычное согласие в интерфейсе Hermes.
+
+## Hermes Agent 0.23.3 с локальным callback
 
 Добавьте запись в `~/.hermes/config.yaml` в раздел `mcp_servers`. Параметр `tools.include` оставляет модели два инструмента чтения.
 
