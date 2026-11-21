@@ -1,5 +1,7 @@
 {% extends 'moy_sklad/layout.html.twig' %}
 
+{% block integration_title %}{{ isEdit ? 'Подключение' : 'Новое подключение' }}{% endblock %}
+
 {% block integration_content %}
     <div class="row">
         <div class="col-12 col-lg-8">

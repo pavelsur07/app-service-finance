@@ -1,15 +1,17 @@
 {% extends 'moy_sklad/layout.html.twig' %}
 
+{% block integration_title %}Подключения{% endblock %}
+{% block integration_lead %}<p class="vf-page-head__lead">Подключите аккаунты МойСклад вашей компании. После проверки можно загрузить контрагентов, товары и модификации.</p>{% endblock %}
+
 {% block page_actions %}
     {% if is_granted('module.marketplace.write') %}
-        <div class="col-12 col-md-auto">
-            <a href="{{ path('moysklad_connections_create') }}" class="btn btn-primary">Добавить подключение</a>
+        <div class="btn-list d-print-none">
+            <a href="{{ path('moysklad_connections_create') }}" class="btn btn-primary"><i class="ti ti-plus me-1" aria-hidden="true"></i>Добавить подключение</a>
         </div>
     {% endif %}
 {% endblock %}
 
 {% block integration_content %}
-    <p class="text-secondary">Подключите аккаунты МойСклад вашей компании. После проверки можно загрузить контрагентов, товары и модификации.</p>
     {% if pager.nbResults == 0 %}
         <div class="card">
             <div class="card-body empty">
