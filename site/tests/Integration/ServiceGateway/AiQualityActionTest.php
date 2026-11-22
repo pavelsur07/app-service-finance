@@ -6,6 +6,7 @@ namespace App\Tests\Integration\ServiceGateway;
 
 use App\ServiceGateway\Application\Action\AiQualityAction;
 use App\ServiceGateway\Application\Service\AiServiceAccess;
+use App\ServiceGateway\Command\AiQualityHealthCheckCommand;
 use App\ServiceGateway\Infrastructure\Client\AiServiceClient;
 use App\ServiceGateway\Infrastructure\Client\AiTaskV1Parser;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -125,7 +126,33 @@ final class AiQualityActionTest extends IntegrationTestCase
 
         $action->pull();
         self::assertSame('version_changed', $action->health());
-        self::assertTrue($this->logs->hasErrorRecords());
+        // Deploy after the nightly run is expected: warn and wait for the next night, do not page hourly.
+        self::assertTrue($this->logs->hasWarningThatContains('waits for the next nightly run'));
+        self::assertFalse($this->logs->hasErrorRecords());
+        $command = new CommandTester(new AiQualityHealthCheckCommand($action));
+        self::assertSame(Command::SUCCESS, $command->execute([]));
+        self::assertCount(1, $this->logs->getRecords());
+    }
+
+    public function testFailedNightAfterVersionChangeIsStillAnError(): void
+    {
+        $old = $this->latest();
+        $old['configuration_fingerprint'] = str_repeat('b', 64);
+        $this->action($this->http($old))->pull();
+        $this->clock->modify('+1 day');
+        $failed = $this->latest('failed');
+        $failed['configuration_fingerprint'] = str_repeat('b', 64);
+        $failed['run']['configuration_fingerprint'] = str_repeat('b', 64);
+        $failed['run']['run_id'] = '0192f0a0-0000-7000-8000-000000000003';
+        $failed['run']['run_date'] = '2026-11-15';
+        foreach (['created_at', 'updated_at', 'completed_at'] as $field) {
+            $failed['run'][$field] = '2026-11-15T00:35:00+00:00';
+        }
+        $action = $this->action($this->http($failed));
+        $action->pull();
+
+        self::assertSame('failed', $action->health());
+        self::assertTrue($this->logs->hasErrorThatContains('PaymentIntake nightly quality check failed.'));
     }
 
     public function testMissingPullBecomesVisibleAndIncidentIsDeduplicated(): void

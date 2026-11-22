@@ -3972,8 +3972,9 @@ entries на модель (case IDs, metric names, counts); raw input/output н�
 постановка начинается с 03:25 МСК. `:health-check` — ежечасно в :45, до 04:00
 оценивает вчерашнюю дату, затем сегодняшнюю; свежесть pull — 20 минут.
 Старый fingerprint, неполный/отсутствующий отчёт и pending не считаются PASSED.
-Инциденты дедуплицируются в БД, ERROR — в существующий GlitchTip; budget skip —
-WARNING, восстановление — INFO. Флаги проверяются независимо от AI grants компаний.
+Инциденты дедуплицируются в БД, ERROR — в существующий GlitchTip; budget skip и
+старый fingerprint (деплой после ночного прогона) — WARNING и exit 0, их
+проверяет следующая ночь; восстановление — INFO. Флаги проверяются независимо от AI grants компаний.
 Отдельный eval-worker использует тот же image/env, restart:on-failure и grace960s;
 disabled exit0 не образует restart loop. Код и prices обновляются только
 перезапуском API и worker одного immutable image, hot patch не поддерживается.
