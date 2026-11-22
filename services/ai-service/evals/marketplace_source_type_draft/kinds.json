@@ -1,0 +1,162 @@
+[
+  {
+    "code": "sale",
+    "level": "revenue",
+    "title": "Продажа"
+  },
+  {
+    "code": "return",
+    "level": "revenue",
+    "title": "Возврат"
+  },
+  {
+    "code": "spp",
+    "level": "info",
+    "title": "Скидка за счёт маркетплейса (СПП)"
+  },
+  {
+    "code": "coinvestment",
+    "level": "info",
+    "title": "Соинвестирование"
+  },
+  {
+    "code": "commission",
+    "level": "md1",
+    "title": "Комиссия за продажу"
+  },
+  {
+    "code": "commission_brand",
+    "level": "md1",
+    "title": "Брендовая комиссия"
+  },
+  {
+    "code": "logistics_to",
+    "level": "md1",
+    "title": "Логистика до покупателя"
+  },
+  {
+    "code": "logistics_to_last_mile",
+    "level": "md1",
+    "title": "Последняя миля"
+  },
+  {
+    "code": "logistics_to_dropoff",
+    "level": "md1",
+    "title": "Обработка отправления (drop-off)"
+  },
+  {
+    "code": "logistics_to_handover",
+    "level": "md1",
+    "title": "Доставка до места передачи"
+  },
+  {
+    "code": "logistics_back",
+    "level": "md1",
+    "title": "Обратная логистика"
+  },
+  {
+    "code": "logistics_back_pvz",
+    "level": "md1",
+    "title": "Обработка возвратов в ПВЗ"
+  },
+  {
+    "code": "acquiring",
+    "level": "md1",
+    "title": "Эквайринг"
+  },
+  {
+    "code": "packaging_labor",
+    "level": "md1",
+    "title": "Упаковка партнёрами"
+  },
+  {
+    "code": "packaging_materials",
+    "level": "md1",
+    "title": "Упаковочные материалы"
+  },
+  {
+    "code": "storage",
+    "level": "md1",
+    "title": "Хранение"
+  },
+  {
+    "code": "stock_removal",
+    "level": "md1",
+    "title": "Вывоз остатков"
+  },
+  {
+    "code": "disposal",
+    "level": "md1",
+    "title": "Утилизация"
+  },
+  {
+    "code": "ads_cpc",
+    "level": "md2",
+    "title": "Реклама: оплата за клик"
+  },
+  {
+    "code": "ads_pay_per_order",
+    "level": "md2",
+    "title": "Реклама: оплата за заказ"
+  },
+  {
+    "code": "promo_stars",
+    "level": "md2",
+    "title": "Звёздные товары"
+  },
+  {
+    "code": "packaging_warehouse",
+    "level": "overhead",
+    "title": "Доп. упаковка на складе"
+  },
+  {
+    "code": "promo_premium",
+    "level": "overhead",
+    "title": "Подписка Premium"
+  },
+  {
+    "code": "promo_seller_bonus",
+    "level": "overhead",
+    "title": "Бонусы продавца"
+  },
+  {
+    "code": "promo_reviews",
+    "level": "overhead",
+    "title": "Отзывы за баллы"
+  },
+  {
+    "code": "promo_chat_points",
+    "level": "overhead",
+    "title": "Баллы за чат"
+  },
+  {
+    "code": "subscription",
+    "level": "overhead",
+    "title": "Подписки и аналитика"
+  },
+  {
+    "code": "fine",
+    "level": "overhead",
+    "title": "Штрафы"
+  },
+  {
+    "code": "service_correction",
+    "level": "overhead",
+    "title": "Корректировка услуг"
+  },
+  {
+    "code": "compensation",
+    "level": "overhead",
+    "title": "Компенсации"
+  },
+  {
+    "code": "mp_other_deductions",
+    "level": "overhead",
+    "title": "Прочие удержания МП"
+  },
+  {
+    "code": "ads_settlement",
+    "level": "info",
+    "title": "Оплата рекламы удержанием (справочно)"
+  }
+]

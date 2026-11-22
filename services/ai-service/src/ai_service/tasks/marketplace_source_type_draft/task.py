@@ -10,7 +10,7 @@ from ai_service.tasks.marketplace_source_type_draft.checks import draft_confiden
 from ai_service.tasks.marketplace_source_type_draft.schemas import DraftInput, DraftOutput
 
 TASK_TYPE = "marketplace_source_type_draft"
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 
 INSTRUCTION = "Предложи вид операции для кода маркетплейса из блока данных."
 
