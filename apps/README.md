@@ -161,6 +161,9 @@ Production deploy явно скачивает оба образа по release S
 `up -d --no-deps --wait account admin`; ошибка readiness блокирует завершение.
 Backend обновляется раньше новых SPA. `spa-auth-e2e` обязателен для schema-ready
 и deploy; проверяет dev, preview и production nginx через настоящий Symfony.
+Три режима идут параллельными leg'ами. В PR job запускается только при правке SPA
+или backend из фильтра `auth_e2e` (`changes` в `deploy.yml`); в master и при
+dispatch — с любой сборкой backend, пропуск в PR ловится там до релиза.
 Релиз проходит обычный Draft PR → checks/reviews → Ready → merge+deploy.
 Миграций или действий с БД для SPA нет. Откат — revert PR через тот же pipeline.
 

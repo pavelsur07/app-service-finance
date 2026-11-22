@@ -17,7 +17,9 @@ GATES = ['🧪 Unit tests', '🎨 PHP code style', '🔬 Static analysis',
          '🧪 Integration tests', '🧪 Functional tests 1/3', '🧪 Functional tests 2/3',
          '🧪 Functional tests 3/3', '🐹 Go services gates (fetchkit, ozon-fetcher, wb-fetcher)',
          '🐍 ai-service gates', 'SPA checks (account)', 'SPA checks (admin)',
-         'SPA real backend and HTTPS isolation', 'migrations-empty-db', '🔍 Check API types sync']
+         'SPA real backend and HTTPS isolation (dev)',
+         'SPA real backend and HTTPS isolation (preview)',
+         'SPA real backend and HTTPS isolation (production)', 'migrations-empty-db', '🔍 Check API types sync']
 
 
 def fixture_manifest():
