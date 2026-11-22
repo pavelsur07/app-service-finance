@@ -179,6 +179,8 @@ jobs:
                         - 'services/ozon-fetcher/**'
                         - 'services/shared/fetchkit/**'
                         - 'services/wb-fetcher/**'
+                        # Правка самих гейтов обязана прогнать их в PR, а не впервые на master.
+                        - '.github/workflows/deploy.yml'
                       # Python-сервис ИИ-задач (docs/tasks/ai, docs/maintenance/ai-service-prod.md).
                       ai_service:
                         - 'services/ai-service/**'
