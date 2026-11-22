@@ -197,6 +197,47 @@ os.execv(Path(__file__).with_name('docker-stub'), sys.argv)
         production = workflow.split('    production:\n', 1)[1].split('        steps:', 1)[0]
         self.assertIn('cancel-in-progress: false', production)
 
+    def test_backend_test_shards_cover_each_suite_exactly_once(self):
+        workflow = (ROOT / '.github/workflows/deploy.yml').read_text()
+        job = workflow.split('    backend-tests:\n', 1)[1].split('        steps:', 1)[0]
+        legs = re.findall(r'- name: (.+)\n +dir: (.+)\n +shard: (\d+)\n +of: (\d+)\n', job)
+        self.assertEqual(len(legs), job.count('- name: '))
+        suites = {}
+        for name, directory, shard, total in legs:
+            suites.setdefault((directory, int(total)), []).append(int(shard))
+            self.assertTrue(name.endswith(f' {int(shard) + 1}/{total}'), name)
+        self.assertEqual({directory for directory, _ in suites}, {'tests/Integration', 'tests/Functional'})
+        self.assertEqual(len(suites), 2)
+        for (directory, total), shards in suites.items():
+            self.assertEqual(sorted(shards), list(range(total)), directory)
+        bundle = (ROOT / 'site/bin/release-bundle.py').read_text()
+        for name, *_ in legs:
+            self.assertIn(f"'🧪 {name}'", bundle)
+        self.assertEqual(len(re.findall(r"'🧪 (?:Integration|Functional) tests", bundle)), len(legs))
+
+    def test_shard_script_splits_a_suite_without_loss_or_overlap(self):
+        script = ROOT / 'site/bin/functional-shard.sh'
+        for directory in ('tests/Integration', 'tests/Functional'):
+            units = sorted(str(path.relative_to(ROOT / 'site')) for path in (ROOT / 'site' / directory).iterdir()
+                           if path.is_dir() or path.name.endswith('Test.php'))
+            shards = [subprocess.run(['sh', str(script), str(index), '3', directory], check=True,
+                                     capture_output=True, text=True).stdout.split() for index in range(3)]
+            self.assertEqual(sorted(unit for shard in shards for unit in shard), units)
+        default = subprocess.run(['sh', str(script), '0', '3'], check=True, capture_output=True, text=True).stdout
+        self.assertIn('tests/Functional/', default)
+
+    def test_go_gates_run_one_leg_per_module_known_to_release_reuse(self):
+        workflow = (ROOT / '.github/workflows/deploy.yml').read_text()
+        job = workflow.split('    services-go:\n', 1)[1].split('        steps:', 1)[0]
+        name = re.search(r'name: (.+) \(\$\{\{ matrix\.module \}\}\)', job)[1]
+        modules = re.search(r'module: \[(.+)\]', job)[1].split(', ')
+        self.assertEqual(modules, ['shared/fetchkit', 'ozon-fetcher', 'wb-fetcher'])
+        self.assertIn('fail-fast: false', job)
+        bundle = (ROOT / 'site/bin/release-bundle.py').read_text()
+        for module in modules:
+            self.assertIn(f"'{name} ({module})'", bundle)
+        self.assertEqual(bundle.count(f"'{name} ("), len(modules))
+
     def test_only_superseded_pull_request_runs_are_cancelled(self):
         workflow = (ROOT / '.github/workflows/deploy.yml').read_text()
         head = workflow.split('\njobs:\n', 1)[0]
