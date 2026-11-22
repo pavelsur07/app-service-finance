@@ -197,6 +197,13 @@ os.execv(Path(__file__).with_name('docker-stub'), sys.argv)
         production = workflow.split('    production:\n', 1)[1].split('        steps:', 1)[0]
         self.assertIn('cancel-in-progress: false', production)
 
+    def test_only_superseded_pull_request_runs_are_cancelled(self):
+        workflow = (ROOT / '.github/workflows/deploy.yml').read_text()
+        head = workflow.split('\njobs:\n', 1)[0]
+        # push и dispatch получают уникальную группу: релиз в master не отменяется никогда.
+        self.assertIn("group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}", head)
+        self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", head)
+
     def test_release_uploads_include_hidden_files_with_narrow_paths(self):
         workflow = (ROOT / '.github/workflows/deploy.yml').read_text()
         uploads = re.findall(r'            - uses: actions/upload-artifact@v4\n(.*?)(?=^            -|^    \S|\Z)',

@@ -21,6 +21,12 @@ on:
                 required: false
                 type: string
 
+# Новый push в PR отменяет устаревший прогон того же PR. У push в master и
+# dispatch группа уникальна (run_id): релизный прогон не отменяется никогда.
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
     resolve-release:
         name: Resolve verified release
@@ -74,6 +80,7 @@ jobs:
             static_analysis: ${{ steps.matrix.outputs.static_analysis }}
             frontend: ${{ steps.matrix.outputs.frontend }}
             spa: ${{ steps.matrix.outputs.spa }}
+            auth_e2e: ${{ steps.matrix.outputs.auth_e2e }}
             landing: ${{ steps.matrix.outputs.landing }}
             services: ${{ steps.matrix.outputs.services }}
             ai_service: ${{ steps.matrix.outputs.ai_service }}
@@ -136,6 +143,35 @@ jobs:
                         - 'tests/shell/deploy-workflow-test.sh'
                         - 'docker-compose.prod.yml'
                         - '.github/workflows/deploy.yml'
+                      # Backend, который реально проходит `spa-auth-e2e`: вход, сессия, CSRF,
+                      # CORS, SPA API, nginx/php-образы стенда, сид и схема. Только для PR:
+                      # вне PR job идёт с любой сборкой backend (см. «Build image matrix»),
+                      # поэтому пропуск здесь ловится на master до релиза, а не на проде.
+                      auth_e2e:
+                        - 'site/src/Kernel.php'
+                        - 'site/src/Shared/Controller/Spa/**'
+                        # Легаси-вход: спек берёт _csrf_token из HTML формы /login.
+                        - 'site/src/Shared/Controller/SecurityController.php'
+                        - 'site/templates/security/**'
+                        # Изоляция хостов, no-store, JSON на 401/403 — SpaHttpSubscriber.
+                        - 'site/src/Shared/Infrastructure/Http/**'
+                        - 'site/src/Shared/Api/**'
+                        - 'site/src/Shared/Service/ActiveCompanyService.php'
+                        - 'site/src/Company/Api/**'
+                        - 'site/src/Company/Application/Query/**'
+                        - 'site/src/Company/Facade/**'
+                        - 'site/src/Company/Infrastructure/Repository/**'
+                        - 'site/src/Admin/Api/**'
+                        - 'site/src/**/Controller/Api/**'
+                        - 'site/src/**/Security/**'
+                        - 'site/src/Company/Entity/**'
+                        - 'site/config/**'
+                        - 'site/migrations/**'
+                        - 'site/public/index.php'
+                        - 'site/composer.json'
+                        - 'site/composer.lock'
+                        - 'site/docker/**'
+                        - 'site/tests/Support/Spa/**'
                       landing:
                         - 'landing/**'
                       # Go-сервис загрузки Ozon (docs/tasks/ozon-fetcher-ingestion).
@@ -172,6 +208,7 @@ jobs:
                   be='${{ steps.f.outputs.backend }}'
                   fe='${{ steps.f.outputs.frontend }}'
                   sp='${{ steps.f.outputs.spa }}'
+                  ae='${{ steps.f.outputs.auth_e2e }}'
                   la='${{ steps.f.outputs.landing }}'
                   sa='${{ steps.f.outputs.static_analysis }}'
                   sv='${{ steps.f.outputs.services }}'
@@ -221,6 +258,11 @@ jobs:
                     be=false; fe=false; sp=false; la=false; sa=false; sv=false; ai=false
                   fi
 
+                  # spa-auth-e2e: в PR — по своему фильтру, вне PR — с любой сборкой
+                  # backend (release-manifest требует его success); правка SPA — всегда.
+                  if [ "$GITHUB_EVENT_NAME" != 'pull_request' ]; then ae=$be; fi
+                  if [ "$sp" = 'true' ]; then ae=true; fi
+
                   items=()
                   # site-nginx и site-php-fpm оба пекут public/build из одного yarn build
                   # (nginx отдаёт файлы, fpm хранит manifest для Twig) — на фронт-правке
@@ -251,6 +293,7 @@ jobs:
                   echo "backend=$be" >> "$GITHUB_OUTPUT"
                   echo "frontend=$fe" >> "$GITHUB_OUTPUT"
                   echo "spa=$sp" >> "$GITHUB_OUTPUT"
+                  echo "auth_e2e=$ae" >> "$GITHUB_OUTPUT"
                   echo "landing=$la" >> "$GITHUB_OUTPUT"
                   echo "static_analysis=$sa" >> "$GITHUB_OUTPUT"
                   echo "services=$sv" >> "$GITHUB_OUTPUT"
@@ -761,11 +804,17 @@ jobs:
               run: make test-deploy-workflow test-frontend-release test-release-pipeline
 
     spa-auth-e2e:
-        name: SPA real backend and HTTPS isolation
+        name: SPA real backend and HTTPS isolation (${{ matrix.mode }})
         needs: [changes, dev-image]
-        if: ${{ !cancelled() && needs.changes.result == 'success' && (needs.changes.outputs.backend == 'true' || needs.changes.outputs.spa == 'true') && needs.dev-image.result == 'success' }}
+        if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.auth_e2e == 'true' && needs.dev-image.result == 'success' }}
         runs-on: ubuntu-latest
         timeout-minutes: 35
+        strategy:
+            # Режимы независимы; подряд они шли ~6,5 мин и держали релиз.
+            # Имена leg'ов сверяет GATES в site/bin/release-bundle.py.
+            fail-fast: false
+            matrix:
+                mode: [dev, preview, production]
         steps:
             - uses: actions/checkout@v6
             - uses: docker/login-action@v4
@@ -798,13 +847,10 @@ jobs:
                   docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
                     -v "$PWD/site:/app" -w /app node:24.18.1-bookworm-slim \
                     sh -c 'yarn install --frozen-lockfile && yarn build'
-            - name: Real Symfony acceptance in dev
-              run: make front-auth-e2e MODE=dev
-            - name: Real Symfony acceptance in preview
-              run: make front-auth-e2e MODE=preview
-            - name: Real Symfony acceptance through production nginx and trusted HTTPS
-              run: make front-auth-e2e MODE=production
+            - name: Real Symfony acceptance in ${{ matrix.mode }}
+              run: make front-auth-e2e MODE=${{ matrix.mode }}
             - name: Routing and release contracts
+              if: ${{ matrix.mode == 'preview' }}
               run: make test-frontend-auth-routing test-frontend-release test-deploy-workflow test-release-pipeline
 
     build-and-push:
