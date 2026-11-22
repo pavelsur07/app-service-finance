@@ -22,8 +22,10 @@ SERVICES = {'traefik': 'traefik', 'land': 'land-nginx', 'account': 'account-ngin
 for worker in ('sync', 'pipeline', 'wb-finance', 'ads', 'payment-intake'):
     SERVICES[f'site-messenger-worker-{worker}'] = 'site-php-cli'
 GATES = {'🧪 Unit tests', '🎨 PHP code style', '🔬 Static analysis',
-         '🧪 Integration tests', '🧪 Functional tests 1/3', '🧪 Functional tests 2/3',
-         '🧪 Functional tests 3/3', '🐹 Go services gates (fetchkit, ozon-fetcher, wb-fetcher)',
+         '🧪 Integration tests 1/3', '🧪 Integration tests 2/3', '🧪 Integration tests 3/3',
+         '🧪 Functional tests 1/3', '🧪 Functional tests 2/3',
+         '🧪 Functional tests 3/3', '🐹 Go gates (shared/fetchkit)',
+         '🐹 Go gates (ozon-fetcher)', '🐹 Go gates (wb-fetcher)',
          '🐍 ai-service gates', 'SPA checks (account)', 'SPA checks (admin)',
          'SPA real backend and HTTPS isolation (dev)',
          'SPA real backend and HTTPS isolation (preview)',

@@ -1,5 +1,6 @@
 #!/bin/sh
-# Печатает пути tests/Functional для шарда N из M — для параллельного прогона в CI.
+# Печатает пути каталога тестов (по умолчанию tests/Functional) для шарда N из M —
+# для параллельного прогона в CI. Тем же способом режется tests/Integration.
 #
 # Зачем: functional-сьют идёт ~275 с одним процессом и делает критическим путём
 # job backend-tests. GitHub даёт параллельные job'ы бесплатно, поэтому сьют
@@ -15,22 +16,23 @@
 #
 # Учитываются и каталоги, и тестовые файлы, лежащие прямо в tests/Functional.
 #
-# Использование:  bin/functional-shard.sh <индекс с 0> <всего шардов>
-# Пример:         php bin/phpunit $(bin/functional-shard.sh 0 3)
+# Использование:  bin/functional-shard.sh <индекс с 0> <всего шардов> [каталог]
+# Пример:         php bin/phpunit $(bin/functional-shard.sh 0 3 tests/Integration)
 
 set -eu
 
 N=${1:?нужен индекс шарда, с нуля}
 M=${2:?нужно общее число шардов}
+DIR=${3:-tests/Functional}
 
 cd "$(dirname "$0")/.."
 
-if [ ! -d tests/Functional ]; then
-    echo "tests/Functional не найден" >&2
+if [ ! -d "$DIR" ]; then
+    echo "$DIR не найден" >&2
     exit 1
 fi
 
-find tests/Functional -mindepth 1 -maxdepth 1 \( -type d -o -name '*Test.php' \) \
+find "$DIR" -mindepth 1 -maxdepth 1 \( -type d -o -name '*Test.php' \) \
 | while read -r unit; do
     if [ -d "$unit" ]; then
         weight=$(find "$unit" -name '*Test.php' | wc -l)
