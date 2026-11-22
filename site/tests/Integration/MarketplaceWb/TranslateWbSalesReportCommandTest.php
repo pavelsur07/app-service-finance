@@ -121,6 +121,20 @@ final class TranslateWbSalesReportCommandTest extends IntegrationTestCase
         self::assertSame(0, (int) $this->connection->fetchOne('SELECT unresolved_listing_count FROM mwb_day WHERE company_id = ?', [$this->companyId]));
     }
 
+    public function testInformationalKindFromDecisionIsNotCountedInCanonTotal(): void
+    {
+        // Удержание «WB Продвижение» по решению — ads_settlement (справочно, реклама уже в ads_cpc): гейт сверяет без него.
+        $this->connection->executeStatement(
+            "INSERT INTO mwb_source_type (source_type, name, kind, status, first_seen_at) VALUES ('wb:deduction:Оказание услуг «WB Продвижение»', 'WB Продвижение', 'ads_settlement', 'confirmed', now())",
+        );
+        $this->facts(1, [$this->sale(1, '42'), $this->cost(2, ['bonusTypeName' => 'Оказание услуг «WB Продвижение»', 'deduction' => '100'])]);
+        $this->translate();
+
+        self::assertSame(-10000, (int) $this->connection->fetchOne("SELECT SUM(amount_minor) FROM mo_operation WHERE company_id = ? AND kind = 'ads_settlement'", [$this->companyId]));
+        self::assertSame(75000, $this->day()[3], 'canon = forPay 750, без справочного удержания');
+        self::assertSame(Command::SUCCESS, $this->healthCheck());
+    }
+
     private function listing(Company $company, string $id, string $size): MarketplaceListing
     {
         return MarketplaceListingBuilder::aListing()->withId($id)->forCompany($company)->withMarketplace(MarketplaceType::WILDBERRIES)->withMarketplaceSku('555')->build()->setSize($size);
