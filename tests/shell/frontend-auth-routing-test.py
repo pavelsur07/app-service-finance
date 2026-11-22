@@ -55,9 +55,25 @@ class AuthRoutingTest(unittest.TestCase):
         block = self.workflow().split('                      auth_e2e:\n', 1)[1].split('                      landing:', 1)[0]
         for path in ('site/src/Shared/Controller/Spa/**', 'site/src/**/Controller/Api/**',
                      'site/src/**/Security/**', 'site/src/Company/Entity/**', 'site/config/**',
+                     'site/src/Shared/Infrastructure/Http/**', 'site/src/Shared/Api/**',
+                     'site/src/Company/Api/**', 'site/src/Admin/Api/**', 'site/templates/security/**',
                      'site/migrations/**', 'site/docker/**', 'site/tests/Support/Spa/**',
                      'site/composer.lock'):
             self.assertIn(f"- '{path}'", block)
+        # Путь вне `backend` не поднимет dev-image, и job молча пропустится.
+        backend = self.workflow().split('                      backend:\n', 1)[1].split('                      frontend:', 1)[0]
+        covered = [p.replace('**', '') for p in re.findall(r"- '([^']+)'", backend)]
+        for path in re.findall(r"- '([^']+)'", block):
+            self.assertTrue(any(path.startswith(prefix) for prefix in covered), path)
+
+    def test_release_reuse_knows_every_leg_by_name(self):
+        job = self.workflow().split('    spa-auth-e2e:\n', 1)[1].split('        steps:', 1)[0]
+        name = re.search(r'name: (.+) \(\$\{\{ matrix\.mode \}\}\)', job)[1]
+        modes = re.search(r'mode: \[(.+)\]', job)[1].split(', ')
+        bundle = (ROOT / 'site/bin/release-bundle.py').read_text()
+        for mode in modes:
+            self.assertIn(f"'{name} ({mode})'", bundle)
+        self.assertEqual(bundle.count(f"'{name} ("), len(modes))
 
     def test_suite_is_skipped_only_on_pull_requests_outside_its_scope(self):
         cases = [
@@ -71,6 +87,9 @@ class AuthRoutingTest(unittest.TestCase):
             ('push', 'refs/heads/master', set(), '', 'false', 'false'),
             ('workflow_dispatch', 'refs/heads/master', set(), 'none', 'false', 'false'),
             ('workflow_dispatch', 'refs/heads/master', set(), 'release', 'false', 'true'),
+            ('workflow_dispatch', 'refs/heads/master', set(), 'deploy', 'false', 'true'),
+            ('workflow_dispatch', 'refs/heads/master', set(), 'migrations', 'false', 'true'),
+            ('push', 'refs/heads/master', {'backend'}, '', 'true', 'false'),
             ('workflow_dispatch', 'refs/heads/master', set(), 'release', 'true', 'false'),
         ]
         for event, ref, changed, action, reuse, expected in cases:
@@ -92,7 +111,8 @@ class AuthRoutingTest(unittest.TestCase):
                 break
             lines.append(line)
         script = re.sub(r"\$\{\{ steps\.f\.outputs\.(\w+) \}\}",
-                        lambda m: 'true' if m[1] in changed else 'false', textwrap.dedent('\n'.join(lines)))
+                        lambda m: 'true' if m[1] in changed else ('' if event == 'workflow_dispatch' else 'false'),
+                        textwrap.dedent('\n'.join(lines)))
         self.assertNotIn('${{', script)
         with tempfile.NamedTemporaryFile('r') as out:
             env = dict(os.environ, GITHUB_EVENT_NAME=event, GITHUB_REF=ref, GITHUB_OUTPUT=out.name,

@@ -150,6 +150,18 @@ jobs:
                       auth_e2e:
                         - 'site/src/Kernel.php'
                         - 'site/src/Shared/Controller/Spa/**'
+                        # Легаси-вход: спек берёт _csrf_token из HTML формы /login.
+                        - 'site/src/Shared/Controller/SecurityController.php'
+                        - 'site/templates/security/**'
+                        # Изоляция хостов, no-store, JSON на 401/403 — SpaHttpSubscriber.
+                        - 'site/src/Shared/Infrastructure/Http/**'
+                        - 'site/src/Shared/Api/**'
+                        - 'site/src/Shared/Service/ActiveCompanyService.php'
+                        - 'site/src/Company/Api/**'
+                        - 'site/src/Company/Application/Query/**'
+                        - 'site/src/Company/Facade/**'
+                        - 'site/src/Company/Infrastructure/Repository/**'
+                        - 'site/src/Admin/Api/**'
                         - 'site/src/**/Controller/Api/**'
                         - 'site/src/**/Security/**'
                         - 'site/src/Company/Entity/**'
@@ -160,7 +172,6 @@ jobs:
                         - 'site/composer.lock'
                         - 'site/docker/**'
                         - 'site/tests/Support/Spa/**'
-                        - 'site/.env.test'
                       landing:
                         - 'landing/**'
                       # Go-сервис загрузки Ozon (docs/tasks/ozon-fetcher-ingestion).
