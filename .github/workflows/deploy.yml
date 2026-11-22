@@ -832,8 +832,21 @@ jobs:
                   path: site/vendor
                   key: composer-${{ hashFiles('site/composer.lock') }}
                   restore-keys: composer-
+            # Dev-образ php-fpm компилирует расширения ~95 с; слои берём из кэша сборки.
+            - uses: docker/setup-buildx-action@v4
+            - uses: docker/build-push-action@v7
+              with:
+                  context: site/docker
+                  file: site/docker/development/php-fpm/Dockerfile
+                  load: true
+                  tags: app-service-finance-site-php-fpm:latest
+                  cache-from: type=gha,scope=site-php-fpm-dev
+                  cache-to: type=gha,scope=site-php-fpm-dev,mode=max
             - name: Prepare PHP test images and dependencies
               run: |
+                  # setup-buildx делает текущим builder, который не кладёт образы в docker;
+                  # `docker build` и `compose build` внутри e2e-скриптов ждут обычный.
+                  docker buildx use default
                   export CONTAINER_UID="$(id -u)" CONTAINER_GID="$(id -g)"
                   IMG="ghcr.io/pavelsur07/site-php-cli-dev:${{ needs.dev-image.outputs.tag }}"
                   if docker pull -q "$IMG"; then
@@ -841,17 +854,31 @@ jobs:
                   else
                       docker compose -f docker-compose.frontend-auth.yml build site-php-cli
                   fi
-                  docker compose -f docker-compose.frontend-auth.yml build site-php-fpm
                   mkdir -p .frontend-auth/var
                   docker compose -f docker-compose.frontend-auth.yml run --rm --no-deps \
                     -e COMPOSER_HOME=/tmp/composer --entrypoint composer site-php-cli \
                     install --no-interaction --prefer-dist --no-progress --no-scripts
+            # Три `npm ci` и `yarn install` — ~140 с сети на каждый leg. Ключ — все
+            # lock-файлы и compose с версией node-образа (нативные бинарники).
+            - uses: actions/cache@v4
+              id: node-modules
+              with:
+                  path: |
+                      apps/account/node_modules
+                      apps/admin/node_modules
+                      apps/packages/ds/node_modules
+                      site/node_modules
+                  key: spa-auth-e2e-node-modules-${{ hashFiles('apps/account/package-lock.json', 'apps/admin/package-lock.json', 'apps/packages/ds/package-lock.json', 'site/yarn.lock', 'docker-compose.frontend*.yml') }}
             - name: Install standalone and legacy frontend artifacts in Node containers
               run: |
-                  make front-install
+                  if [ "${{ steps.node-modules.outputs.cache-hit != 'true' }}" = 'true' ]; then
+                      make front-install
+                      docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+                        -v "$PWD/site:/app" -w /app node:24.18.1-bookworm-slim \
+                        yarn install --frozen-lockfile
+                  fi
                   docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
-                    -v "$PWD/site:/app" -w /app node:24.18.1-bookworm-slim \
-                    sh -c 'yarn install --frozen-lockfile && yarn build'
+                    -v "$PWD/site:/app" -w /app node:24.18.1-bookworm-slim yarn build
             - name: Real Symfony acceptance in ${{ matrix.mode }}
               run: make front-auth-e2e MODE=${{ matrix.mode }}
             - name: Routing and release contracts

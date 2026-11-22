@@ -100,6 +100,28 @@ class AuthRoutingTest(unittest.TestCase):
                 if event != 'pull_request' and outputs['backend'] == 'true':
                     self.assertEqual(outputs['auth_e2e'], 'true')
 
+    def test_stand_preparation_is_cached_without_skipping_builds(self):
+        job = self.workflow().split('    spa-auth-e2e:\n', 1)[1].split('    build-and-push:', 1)[0]
+        cache = job.split('              id: node-modules\n', 1)[1].split('            - ', 1)[0]
+        # npm ci и yarn install ставят ровно эти каталоги; ключ обязан меняться с каждым lock-файлом.
+        for directory, lock in (('apps/account', 'package-lock.json'), ('apps/admin', 'package-lock.json'),
+                                ('apps/packages/ds', 'package-lock.json'), ('site', 'yarn.lock')):
+            self.assertTrue((ROOT / directory / lock).is_file())
+            self.assertIn(f'{directory}/node_modules\n', cache)
+            self.assertIn(f"'{directory}/{lock}'", cache)
+        self.assertIn("'docker-compose.frontend*.yml'", cache)  # версия node-образа
+        install = job.split("steps.node-modules.outputs.cache-hit != 'true'", 1)[1].split('            - name:', 1)[0]
+        guarded, always = install.split('                  fi\n', 1)
+        self.assertIn('make front-install', guarded)
+        self.assertIn('yarn install --frozen-lockfile', guarded)
+        self.assertNotIn('yarn build', guarded)
+        self.assertIn('yarn build', always)
+        # Слои php-fpm — из кэша сборки; до e2e возвращаем builder, который кладёт образы в docker.
+        self.assertIn('cache-from: type=gha,scope=site-php-fpm-dev', job)
+        self.assertIn('tags: app-service-finance-site-php-fpm:latest', job)
+        self.assertNotIn('build site-php-fpm', job)
+        self.assertLess(job.index('docker buildx use default'), job.index('make front-auth-e2e'))
+
     def workflow(self):
         return (ROOT / '.github/workflows/deploy.yml').read_text()
 
