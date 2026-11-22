@@ -166,6 +166,11 @@ final readonly class AiQualityAction
             $context = ['suite' => self::SUITE, 'run_date' => $date, 'reason' => $reason, 'failures' => $this->failures($row['report'] ?? null)];
             if ('skipped_budget' === $reason) {
                 $this->logger->warning('PaymentIntake nightly quality check skipped by budget.', $context);
+            } elseif ('version_changed' === $reason) {
+                // Any ai-service deploy after 03:25 changes the fingerprint; the next night verifies it,
+                // and a failed or missing run then raises its own ERROR.
+                // ponytail: daily deploys after 03:25 keep it on WARNING forever; escalate by streak if that happens.
+                $this->logger->warning('PaymentIntake configuration changed, quality waits for the next nightly run.', $context);
             } else {
                 $this->logger->error('PaymentIntake nightly quality check failed.', $context);
             }

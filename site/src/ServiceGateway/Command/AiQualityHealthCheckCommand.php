@@ -23,6 +23,6 @@ final class AiQualityHealthCheckCommand extends Command
         $state = $this->quality->health();
         $output->writeln('payment intake quality: '.$state);
 
-        return \in_array($state, ['disabled', 'waiting', 'passed'], true) ? self::SUCCESS : self::FAILURE;
+        return \in_array($state, ['disabled', 'waiting', 'passed', 'version_changed'], true) ? self::SUCCESS : self::FAILURE;
     }
 }
