@@ -7,6 +7,7 @@ namespace App\MarketplaceOzon\Application\Action;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceOperations\Application\DTO\DayOperations;
 use App\MarketplaceOperations\Application\DTO\OperationInput;
+use App\MarketplaceOperations\Enum\CascadeLevel;
 use App\MarketplaceOperations\Enum\OperationKind;
 use App\MarketplaceOperations\Facade\MarketplaceOperationsFacadeInterface;
 use App\MarketplaceOzon\Domain\AccrualByDayTranslator;
@@ -53,14 +54,11 @@ final readonly class TranslateOzonDayAction
 
         // ponytail: итоги дня в рублях — у кабинетов Ozon (РФ) другой валюты нет; Money::add
         // бросит на чужой валюте, день упадёт с ошибкой, а не посчитается неверно.
-        $total = $canon = $quarantined = Money::fromMinor(0, 'RUB');
+        $canon = $quarantined = Money::fromMinor(0, 'RUB');
         $components = [];
         foreach ($facts as $fact) {
             foreach ($this->translator->translate($fact->sourceKey, $fact->payload) as $component) {
                 $components[] = $component;
-                if (!AccrualByDayTranslator::isInformational($component)) {
-                    $total = $total->add($component->amount);
-                }
             }
         }
 
@@ -130,10 +128,13 @@ final readonly class TranslateOzonDayAction
             } else {
                 $operations[] = new OperationInput($kind, $component->sourceType, $component->amount, [$component->sourceKey], $listingId, $component->quantity);
             }
-            if (!AccrualByDayTranslator::isInformational($component)) {
+            // Справочность — по итоговому виду: решение по коду тоже может назначить справочный (ads_settlement).
+            if (CascadeLevel::INFO !== $kind->level()) {
                 $canon = $canon->add($component->amount);
             }
         }
+
+        $total = $canon->add($quarantined);
 
         $this->operations->replaceDay(new DayOperations(
             $period->companyId,

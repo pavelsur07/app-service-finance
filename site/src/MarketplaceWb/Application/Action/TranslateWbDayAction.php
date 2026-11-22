@@ -7,6 +7,7 @@ namespace App\MarketplaceWb\Application\Action;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceOperations\Application\DTO\DayOperations;
 use App\MarketplaceOperations\Application\DTO\OperationInput;
+use App\MarketplaceOperations\Enum\CascadeLevel;
 use App\MarketplaceOperations\Enum\OperationKind;
 use App\MarketplaceOperations\Facade\MarketplaceOperationsFacadeInterface;
 use App\MarketplaceWb\Domain\AdsDayTranslator;
@@ -51,21 +52,17 @@ final readonly class TranslateWbDayAction
 
         // ponytail: итоги дня в рублях — у кабинетов WB (РФ) другой валюты нет; Money::add бросит на
         // чужой валюте, день упадёт с ошибкой, а не посчитается неверно.
-        $total = $canon = $quarantined = Money::fromMinor(0, 'RUB');
+        $canon = $quarantined = Money::fromMinor(0, 'RUB');
         $components = [];
         foreach ($facts as $fact) {
             foreach ($this->translator->translate($fact->sourceKey, $fact->payload) as $component) {
                 $components[] = $component;
-                if (!SalesReportTranslator::isInformational($component)) {
-                    $total = $total->add($component->amount);
-                }
             }
         }
         if (0 !== $adsRevision) {
             foreach ($this->sourceFacts->activeFacts($period->companyId, $period->connectionRef, AdsDayTranslator::RESOURCE, $date) as $fact) {
                 foreach (AdsDayTranslator::translate($fact->sourceKey, $fact->payload) as $component) {
                     $components[] = $component;
-                    $total = $total->add($component->amount);
                 }
             }
         }
@@ -119,10 +116,13 @@ final readonly class TranslateWbDayAction
                         $isAds ? AdsDayTranslator::ALLOCATION_KEY : self::SIZE_ALLOCATION_KEY);
                 }
             }
-            if (!SalesReportTranslator::isInformational($component)) {
+            // Справочность — по итоговому виду: решение по коду тоже может назначить справочный (ads_settlement).
+            if (CascadeLevel::INFO !== $kind->level()) {
                 $canon = $canon->add($component->amount);
             }
         }
+
+        $total = $canon->add($quarantined);
 
         $this->operations->replaceDay(new DayOperations(
             $period->companyId,
