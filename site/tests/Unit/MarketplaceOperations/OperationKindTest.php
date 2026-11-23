@@ -15,7 +15,8 @@ final class OperationKindTest extends TestCase
      * `compensation` (14.11) — прочий доход в общих затратах, Σ кабинета = by-day;
      * `mp_other_deductions` (14.11) — прочие удержания МП (шаблон ОПиУ `OPEX_WH_MP_DEDUCTIONS`), СМ3;
      * `ads_settlement` (15.11, этап 8 W6) — оплата рекламы WB удержанием, справочно: расход — из статистики;
-     * 23.11 по шаблону ОПиУ: хранение, упаковка, утилизация — СМ3 («Склад и пр. МП»), подписки и Premium — СМ2 (продвижение).
+     * 23.11 по шаблону ОПиУ: хранение, упаковка, утилизация — СМ3 («Склад и пр. МП»); подписки, Premium,
+     * баллы за отзывы и за чат, бонусы продавца (программа лояльности) — СМ2 (продвижение, «Раздачи»).
      */
     public function testEveryKindHasApprovedLevel(): void
     {
@@ -28,8 +29,8 @@ final class OperationKindTest extends TestCase
             CascadeLevel::REVENUE->value => ['sale', 'return'],
             CascadeLevel::INFO->value => ['spp', 'coinvestment', 'ads_settlement'],
             CascadeLevel::MD1->value => ['commission', 'commission_brand', 'logistics_to', 'logistics_to_last_mile', 'logistics_to_dropoff', 'logistics_to_handover', 'logistics_back', 'logistics_back_pvz', 'acquiring', 'stock_removal'],
-            CascadeLevel::OVERHEAD->value => ['packaging_labor', 'packaging_materials', 'storage', 'disposal', 'packaging_warehouse', 'promo_seller_bonus', 'promo_reviews', 'promo_chat_points', 'fine', 'service_correction', 'compensation', 'mp_other_deductions'],
-            CascadeLevel::MD2->value => ['ads_cpc', 'ads_pay_per_order', 'promo_stars', 'promo_premium', 'subscription'],
+            CascadeLevel::OVERHEAD->value => ['packaging_labor', 'packaging_materials', 'storage', 'disposal', 'packaging_warehouse', 'fine', 'service_correction', 'compensation', 'mp_other_deductions'],
+            CascadeLevel::MD2->value => ['ads_cpc', 'ads_pay_per_order', 'promo_stars', 'promo_premium', 'promo_seller_bonus', 'promo_reviews', 'promo_chat_points', 'subscription'],
         ], $levels);
     }
 }

@@ -5659,12 +5659,6 @@ parameters:
 			path: src/Marketplace/Wildberries/CostCalculator/WbLoyaltyDiscountCalculator.php
 
 		-
-			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLoyaltyDiscountCalculator\:\:calculate\(\) should return array\<int, array\{category_code\: string, amount\: string, external_id\: string, cost_date\: DateTimeImmutable, description\: string\|null, operation_type\?\: App\\Marketplace\\Enum\\MarketplaceCostOperationType, product\: null\}\> but returns array\{array\{category_code\: ''wb_loyalty_discount…'', amount\: numeric\-string, external_id\: string, cost_date\: DateTimeImmutable, description\: ''Компенсация скидки…'', product\: App\\Catalog\\Entity\\Product\|null\}\}\.$#'
-			identifier: return.type
-			count: 1
-			path: src/Marketplace/Wildberries/CostCalculator/WbLoyaltyDiscountCalculator.php
-
-		-
 			message: '#^Method App\\Marketplace\\Wildberries\\CostCalculator\\WbLoyaltyDiscountCalculator\:\:supports\(\) has parameter \$item with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
