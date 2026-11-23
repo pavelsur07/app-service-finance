@@ -6,6 +6,7 @@ namespace App\Tests\Unit\MarketplaceAnalytics\Domain\Service;
 
 use App\Marketplace\DTO\AdvertisingCostDTO;
 use App\Marketplace\DTO\CostData;
+use App\Marketplace\DTO\ReturnData;
 use App\Marketplace\DTO\SaleData;
 use App\Marketplace\Enum\AdvertisingType;
 use App\Marketplace\Enum\MarketplaceType;
@@ -283,6 +284,33 @@ final class SnapshotCalculationPolicyTest extends TestCase
         // costPrice=100.00, salesQuantity=3 → totalCostPrice=300.00
         $this->assertSame('300.00', $snapshot->getTotalCostPrice());
         $this->assertSame(3, $snapshot->getSalesQuantity());
+    }
+
+    /**
+     * Регрессия 23.11: возврат вычитал выручку, а себестоимость возвращённых единиц оставалась
+     * в расходах. Как в ОПиУ (sale_cost_price − return_cost_price): себестоимость дня — по
+     * проданным минус возвращённые единицы; день только с возвратами даёт отрицательную себестоимость.
+     */
+    public function testReturnedUnitsGiveBackTheirCostPrice(): void
+    {
+        $this->marketplaceFacade->method('getSalesForListingAndDate')->willReturnOnConsecutiveCalls(
+            [new SaleData(MarketplaceType::WILDBERRIES, 'ord-1', $this->date, 'SKU-1', 3, '500.00', '1500.00')],
+            [],
+        );
+        $this->marketplaceFacade->method('getReturnsForListingAndDate')->willReturn([
+            new ReturnData(MarketplaceType::WILDBERRIES, 'SKU-1', $this->date, 1, '500.00', null),
+        ]);
+        $this->marketplaceFacade->method('getCostPriceForListing')->willReturn('100.00');
+        $this->marketplaceFacade->method('getCostsForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getOrdersForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getAdvertisingCostsForListingAndDate')->willReturn([]);
+        $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
+
+        $withSales = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'wildberries');
+        $onlyReturn = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'wildberries');
+
+        $this->assertSame('200.00', $withSales->getTotalCostPrice());
+        $this->assertSame('-100.00', $onlyReturn->getTotalCostPrice());
     }
 
     public function testUsesInventoryHistoryInsteadOfStaleRawCostPrice(): void
