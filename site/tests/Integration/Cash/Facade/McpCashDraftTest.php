@@ -23,6 +23,10 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\ORM\EntityManagerInterface;
+use Monolog\Handler\TestHandler;
+use Monolog\Level;
+use Monolog\Logger;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Command\Command;
@@ -91,6 +95,27 @@ final class McpCashDraftTest extends IntegrationTestCase
         self::assertSame(1, $this->countFacts($companyId));
         self::assertSame(Command::SUCCESS, $tester->execute([]));
         self::assertCount(1, $events, 'Повтор без залипших событий ничего не отправляет.');
+    }
+
+    /** Сбой отправки: флаг остаётся для следующего запуска, команда сообщает один агрегированный ERROR и exit 1. */
+    public function testRecoverCommandFailureKeepsEventPendingAndReportsOnce(): void
+    {
+        [$company, $actorId, $accountId] = $this->fixture();
+        $companyId = (string) $company->getId();
+        $intake = self::getContainer()->get(PaymentIntakeAction::class);
+        $draft = self::getContainer()->get(CashFacade::class)->createMcpCashDraft($this->input($companyId, $actorId, Uuid::uuid7()->toString(), $accountId));
+        $intake->confirmMcp($companyId, $actorId, $draft->draftId, $intake->getMcpDraft($companyId, $actorId, $draft->draftId)->revision, true);
+        $this->connection->executeStatement('UPDATE cash_payment_intake_draft SET cash_event_pending = true WHERE id = ?', [$draft->draftId]);
+        self::getContainer()->get('event_dispatcher')->addListener(CashTransactionsChanged::class, static function (): void {
+            throw new \RuntimeException('transport down');
+        });
+        $logs = new TestHandler();
+        $command = new RecoverPaymentIntakeCommand($intake, self::getContainer()->get(EntityManagerInterface::class), new Logger('test', [$logs]));
+
+        self::assertSame(Command::FAILURE, (new CommandTester($command))->execute([]));
+        self::assertTrue((bool) $this->connection->fetchOne('SELECT cash_event_pending FROM cash_payment_intake_draft WHERE id = ?', [$draft->draftId]));
+        self::assertCount(1, array_filter($logs->getRecords(), static fn ($record): bool => Level::Error === $record->level));
+        self::assertTrue($logs->hasErrorThatContains('cash event recovery failed'));
     }
 
     public function testConflictingReplayLeavesOriginalDraftAndNoFact(): void
