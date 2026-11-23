@@ -38,7 +38,8 @@ final readonly class ListingReturnAggregateQuery
                         ELSE r.refund_amount
                     END
                 ) AS returns_total,
-                SUM(r.quantity)      AS returns_quantity
+                SUM(r.quantity)      AS returns_quantity,
+                SUM(COALESCE(r.cost_price * r.quantity, 0)) AS returns_cost_price
             FROM marketplace_returns r
             WHERE r.company_id = :companyId
               AND r.return_date >= :periodFrom
@@ -61,6 +62,7 @@ final readonly class ListingReturnAggregateQuery
                 listingId: $row['listing_id'],
                 returnsTotal: (string) $row['returns_total'],
                 returnsQuantity: (int) $row['returns_quantity'],
+                costPriceTotal: (string) $row['returns_cost_price'],
             );
         }
 

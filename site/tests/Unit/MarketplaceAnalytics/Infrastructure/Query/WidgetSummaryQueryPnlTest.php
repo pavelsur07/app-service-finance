@@ -132,6 +132,24 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         self::assertSame(2600.0, $result['profit']);
     }
 
+    public function testReturnedUnitsGiveBackTheirCostPrice(): void
+    {
+        // Регрессия 23.11: карточки = «Итого» отчёта, себестоимость возврата вычитается из себестоимости.
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l1', 'Товар', 'SKU1', 'ozon', '5000.00', 10, '1000.00', 10),
+        ]);
+        $this->stubReturns([
+            new ListingReturnAggregateDTO('l1', '200.00', 1, '100.00'),
+        ]);
+        $this->stubCostRows([]);
+
+        $result = $this->executeSummary();
+
+        self::assertSame(-900.0, $result['costPriceTotal']);
+        // profit = 5000 − 200 − 900 = 3900
+        self::assertSame(3900.0, $result['profit']);
+    }
+
     public function testMarginPercentCalculation(): void
     {
         $this->stubSales([

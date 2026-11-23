@@ -170,15 +170,17 @@ final readonly class UnitExtendedQuery
             $returnsTotal = null !== $ret ? (float) $ret->returnsTotal : 0.0;
             $returnsQuantity = null !== $ret ? $ret->returnsQuantity : 0;
             $netSoldQty = $quantity - $returnsQuantity;
-            $costPriceTotal = null !== $sale ? (float) $sale->costPriceTotal : 0.0;
+            $salesCostPrice = null !== $sale ? (float) $sale->costPriceTotal : 0.0;
             $costPriceQuantity = null !== $sale ? $sale->costPriceQuantity : 0;
+            // Возвращённые единицы возвращают себестоимость, как в ОПиУ (sale − return_cost_price).
+            $costPriceTotal = $salesCostPrice - (null !== $ret ? (float) $ret->costPriceTotal : 0.0);
             // null = себестоимость единицы неизвестна: нет ни одной проданной единицы с
             // известной себестоимостью, делить нечего. Продажи при этом могли быть —
             // costPriceQuantity считает не все продажи, а только те, где себестоимость
             // известна. Это не то же самое, что «себестоимость равна нулю»: второе
             // возможно при известной себестоимости и должно показываться нулём.
             $costPriceUnit = $costPriceQuantity > 0
-                ? round($costPriceTotal / $costPriceQuantity, 2)
+                ? round($salesCostPrice / $costPriceQuantity, 2)
                 : null;
 
             // Отсутствие листинга в карте означает «остаток неизвестен»: снапшота нет

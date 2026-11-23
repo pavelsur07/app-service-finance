@@ -203,6 +203,30 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertNull($row['stockCapitalRub']);
     }
 
+    public function testReturnedUnitsGiveBackTheirCostPrice(): void
+    {
+        // Регрессия 23.11: возврат вычитал выручку, а себестоимость возвращённых единиц оставалась
+        // в расходах. Как в ОПиУ (sale_cost_price − return_cost_price) и «Экономике SKU».
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-1', 'Товар', 'SKU-1', 'ozon', '1000.00', 5, '300.00', 5),
+        ]);
+        $this->stubReturns([
+            new ListingReturnAggregateDTO('l-1', '200.00', 1, '60.00'),
+        ]);
+
+        $result = $this->execute();
+        $row = $this->findRow($result['items'], 'l-1');
+
+        self::assertNotNull($row);
+        self::assertSame(240.0, $row['costPriceTotal']);
+        // Себестоимость единицы — по проданным единицам, возврат её не меняет.
+        self::assertSame(60.0, $row['costPriceUnit']);
+        // profit = 1000 − 200 − (300 − 60) = 560
+        self::assertSame(560.0, $row['profit']);
+        self::assertSame(240.0, $result['totals']['costPriceTotal']);
+        self::assertSame(560.0, $result['totals']['profit']);
+    }
+
     public function testTagFilterNarrowsItemsAndTotals(): void
     {
         $this->stubSales([
