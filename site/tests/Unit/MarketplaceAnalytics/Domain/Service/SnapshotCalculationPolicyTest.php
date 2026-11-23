@@ -155,6 +155,30 @@ final class SnapshotCalculationPolicyTest extends TestCase
         $this->assertSame('70.00', CostBreakdown::fromArray($snapshot->getCostBreakdown())->commission);
     }
 
+    /** День только с возвратом комиссии: нетто по категории отрицательное, пересчёт не падает. */
+    public function testStornoExceedingChargesGivesNegativeCategory(): void
+    {
+        $this->marketplaceFacade->method('getSalesForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getReturnsForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getCostPriceForListing')->willReturn('100.00');
+        $this->marketplaceFacade->method('getOrdersForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getAdvertisingCostsForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getCostsForListingAndDate')->willReturn([new CostData(
+            marketplace: MarketplaceType::OZON,
+            categoryCode: 'ozon_sale_commission',
+            amount: '30.00',
+            costDate: $this->date,
+            categoryId: 'ozon_sale_commission',
+            operationType: 'storno',
+        )]);
+        $this->costMappingResolver->method('resolve')->willReturn(UnitEconomyCostType::COMMISSION);
+        $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
+
+        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'ozon');
+
+        $this->assertSame('-30.00', CostBreakdown::fromArray($snapshot->getCostBreakdown())->commission);
+    }
+
     public function testAdvertisingDetailsFilledFromAdvertisingCostDTO(): void
     {
         $sale = $this->makeMinimalSale();
