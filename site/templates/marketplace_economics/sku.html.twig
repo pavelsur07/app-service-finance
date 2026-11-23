@@ -146,20 +146,6 @@
             <div class="col-12 col-lg-auto d-flex flex-wrap gap-2">
                 <button class="btn btn-primary">Показать</button>
                 {% if report and report.hasData %}
-                    <details class="dropdown me-columns" data-economics-columns>
-                        <summary class="btn">Колонки</summary>
-                        <fieldset class="dropdown-menu show me-columns__menu">
-                            <legend class="dropdown-header">Отображаемые колонки</legend>
-                            {% for column in columns %}
-                                <label class="dropdown-item form-check">
-                                    <input class="form-check-input" type="checkbox" value="{{ column.id }}" checked{{ column.required ?? false ? ' disabled' }}>
-                                    <span class="form-check-label">{{ column.label }}</span>
-                                </label>
-                            {% endfor %}
-                        </fieldset>
-                    </details>
-                {% endif %}
-                {% if report and report.hasData %}
                     <a class="btn" href="{{ path('marketplace_economics_sku', params|merge({format: 'xlsx', page: null})) }}">Скачать xlsx</a>
                 {% endif %}
             </div>
@@ -199,6 +185,23 @@
             </p>
         </div>
         <section class="card mb-3 me-table-card" data-economics-table>
+            <div class="me-table-toolbar">
+                <details class="dropdown me-columns" data-economics-columns>
+                    <summary class="btn btn-icon" title="Настроить колонки">
+                        <i class="ti ti-settings" aria-hidden="true"></i>
+                        <span class="visually-hidden">Настроить колонки</span>
+                    </summary>
+                    <fieldset class="dropdown-menu dropdown-menu-end show me-columns__menu">
+                        <legend class="dropdown-header">Отображаемые колонки</legend>
+                        {% for column in columns %}
+                            <label class="dropdown-item form-check">
+                                <input class="form-check-input" type="checkbox" value="{{ column.id }}" checked{{ column.required ?? false ? ' disabled' }}>
+                                <span class="form-check-label">{{ column.label }}</span>
+                            </label>
+                        {% endfor %}
+                    </fieldset>
+                </details>
+            </div>
             <div class="me-table-scroll" data-economics-scroll tabindex="0" role="region" aria-label="Экономика SKU">
             <table class="table table-vcenter card-table me-table me-sku-table">
                 <thead>
