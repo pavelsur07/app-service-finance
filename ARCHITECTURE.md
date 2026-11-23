@@ -6197,6 +6197,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.242 | 2026-11-23 | MarketplaceAnalytics: снимок дня (`SnapshotCalculationPolicy`) — себестоимость = цена × (продано − возвращено), как ОПиУ; день только с возвратами — отрицательная; API юнит-экономики и портфеля исправляются через сумму снимков, старые снимки — `app:marketplace-analytics:recalc-snapshots` |
 | 2.241 | 2026-11-23 | MarketplaceAnalytics: «Юнит-экономика» (`UnitExtendedQuery`) и карточки (`WidgetSummaryQuery`) вычитают себестоимость возвращённых единиц, как ОПиУ (`return_cost_price`); `ListingReturnAggregateDTO::costPriceTotal`; себестоимость единицы — по проданным |
 | 2.240 | 2026-11-23 | Marketplace/WB: шаблон затрат по умолчанию — `wb_loyalty_discount_compensation` → `OPEX_WH_COMPENSATION` («Компенсации МП», СМ3), как `ozon_compensation`; маппинги существующих компаний меняются в UI |
 | 2.239 | 2026-11-23 | Marketplace/WB: «Компенсация скидки по программе лояльности» — сторно (доход), как в финотчёте и каноне; MarketplaceOperations: баллы за отзывы и за чат, бонусы продавца — СМ2; MarketplaceWb: `wb:field:rebillLogisticCost` — `storage` (миграция `Version20261123150000`, подсказка экрана кодов), `SalesReportTranslator::RULES_VERSION` `wb-sales-report-4`; `RULES_VERSION` экономики `economics-6` — дни переводятся и пересчитываются сами |
