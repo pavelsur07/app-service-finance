@@ -121,8 +121,13 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         self::assertSame('97,1 %', str_replace("\u{a0}", ' ', $cell('md1Pct')));
 
         // окно колонок: обязательные заблокированы, остальные включены
-        $picker = $crawler->filter('[data-economics-columns]');
-        self::assertCount(1, $picker);
+        $picker = $crawler->filter('[data-economics-table] [data-economics-columns]');
+        self::assertCount(1, $picker, 'настройка колонок — в углу таблицы, не в фильтрах');
+        self::assertCount(0, $crawler->filter('form [data-economics-columns]'));
+        $toggle = $picker->filter('summary');
+        self::assertSame('Настроить колонки', $toggle->attr('title'));
+        self::assertCount(1, $toggle->filter('i.ti-settings[aria-hidden="true"]'));
+        self::assertSame('Настроить колонки', trim($toggle->text()), 'подпись для экранных читалок');
         self::assertCount(1, $picker->filter('input[value="revenue"][checked][disabled]'));
         self::assertCount(1, $picker->filter('input[value="vat"][checked]:not([disabled])'));
         self::assertSame('vat', $crawler->filter('[data-economics-table] thead th[data-column="vat"]')->attr('data-column'));

@@ -41,7 +41,7 @@ function initEconomicsTable(card) {
         const tableRect = table.getBoundingClientRect();
         const height = head.getBoundingClientRect().height;
         if (measure) {
-            // скрытые колонки (окно «Колонки») выпадают из раскладки: ширины — по видимым ячейкам подряд
+            // скрытые колонки (окно настройки колонок) выпадают из раскладки: ширины — по видимым ячейкам подряд
             const visible = cells.filter((cell) => cell.getClientRects().length > 0);
             [...columns.children].forEach((col, index) => {
                 col.style.width = visible[index] ? `${visible[index].getBoundingClientRect().width}px` : '0';
@@ -116,7 +116,7 @@ function initEconomicsTable(card) {
     schedule();
 }
 
-// Окно «Колонки» R1: скрытые колонки — в localStorage, новые колонки по умолчанию видны.
+// Окно настройки колонок R1 (шестерёнка): скрытые колонки — в localStorage, новые колонки по умолчанию видны.
 const COLUMNS_KEY = 'marketplace-economics:hidden-columns';
 
 function initColumnPicker(picker) {
@@ -124,6 +124,7 @@ function initColumnPicker(picker) {
     document.head.append(style);
     // только галочки этого вида: обязательные колонки не скрываются, выбор другого вида сохраняется
     const boxes = [...picker.querySelectorAll('input[type="checkbox"]:not([disabled])')];
+    const summary = picker.querySelector('summary');
     const ids = boxes.map((box) => box.value);
     let hidden = [];
     try {
@@ -137,6 +138,11 @@ function initColumnPicker(picker) {
         style.textContent = hidden.filter((id) => ids.includes(id))
             .map((id) => `.me-sku-table [data-column="${CSS.escape(id)}"]{display:none}`).join('');
         boxes.forEach((box) => box.checked = !hidden.includes(box.value));
+        const hiddenCount = boxes.filter((box) => !box.checked).length;
+        picker.classList.toggle('me-columns--filtered', hiddenCount > 0);
+        const label = hiddenCount > 0 ? `Настроить колонки (скрыто: ${hiddenCount})` : 'Настроить колонки';
+        summary.title = label;
+        summary.querySelector('.visually-hidden').textContent = label;
         // группа шапки сужается до видимых колонок, пустая — прячется (и в фиксированной копии)
         document.querySelectorAll('.me-sku-table .me-col-group[data-columns]').forEach((group) => {
             const visible = group.dataset.columns.split(' ').filter((id) => !(ids.includes(id) && hidden.includes(id))).length;
@@ -159,7 +165,7 @@ function initColumnPicker(picker) {
     picker.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
             picker.open = false;
-            picker.querySelector('summary').focus();
+            summary.focus();
         }
     });
     apply();

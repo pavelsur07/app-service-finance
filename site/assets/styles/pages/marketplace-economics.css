@@ -160,12 +160,34 @@
     position: relative;
 }
 .me-columns > summary {
+    position: relative;
     list-style: none;
 }
 .me-columns > summary::-webkit-details-marker {
     display: none;
 }
+/* Настройка колонок — шестерёнка в правом верхнем углу таблицы */
+.me-table-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    padding: .5rem .75rem;
+    border-bottom: var(--tblr-border-width) solid var(--tblr-border-color);
+}
+/* часть колонок скрыта — точка на шестерёнке */
+.me-columns--filtered > summary::after {
+    content: "";
+    position: absolute;
+    top: .25rem;
+    right: .25rem;
+    width: .5rem;
+    height: .5rem;
+    border-radius: 50%;
+    background: var(--tblr-primary);
+}
 .me-columns__menu {
+    right: 0;
+    left: auto;
+    z-index: 1030;
     max-height: 60vh;
     overflow-y: auto;
     min-width: 280px;
