@@ -15,7 +15,8 @@ use App\MarketplaceOperations\Enum\OperationKind;
  * - себестоимость (D5) — (продано − возвращено) × цена на дату;
  * - реклама без SKU (итог канона) — каждый вид по долям SKU в статистике легаси своего вида
  *   (клики — `legacy_clicks_share`, оплата за заказ — `legacy_order_share`); нет статистики — без SKU;
- * - хранение без SKU — по остатку на дату (`stock_share`), нет остатков — по выручке; уровень СМ1;
+ * - прочее продвижение (СМ2) без SKU и без своей статистики (подписки, Premium) — по выручке, своим `measure`;
+ * - хранение без SKU — по остатку на дату (`stock_share`), нет остатков — по выручке; уровень СМ3;
  * - логистика до покупателя без SKU (`logistics_to*`: drop-off, последняя миля…) — по отгруженным штукам
  *   (`sales_qty_share`), плата идёт за отправление; нет штук — по выручке;
  * - прочие прямые (СМ1) без SKU — по выручке SKU за день (`revenue_share`, D3); каждый вид своим `measure` на СМ1:
@@ -125,6 +126,8 @@ final class DayEconomicsCalculator
             if (null !== $key) {
                 $weights = array_filter($adSpend[$kind] ?? [], static fn (string $v): bool => 1 === bccomp($v, '0', 2));
                 array_push($lines, ...$this->allocate($pool, $weights, self::ADS_ALLOCATED, EconomicsLevel::MD2, $key));
+            } else {
+                array_push($lines, ...$this->allocate($pool, $revenueWeights, $kind, EconomicsLevel::MD2, self::KEY_REVENUE));
             }
         }
         $shippedWeights = array_map('strval', array_filter($shippedQty, static fn (int $q): bool => $q > 0));
@@ -137,8 +140,8 @@ final class DayEconomicsCalculator
         array_push(
             $lines,
             ...([] !== $stockWeights
-                ? $this->allocate($storagePool, $stockWeights, self::STORAGE_SHARE, EconomicsLevel::MD1, self::KEY_STOCK)
-                : $this->allocate($storagePool, $revenueWeights, self::STORAGE_SHARE, EconomicsLevel::MD1, self::KEY_REVENUE)),
+                ? $this->allocate($storagePool, $stockWeights, self::STORAGE_SHARE, EconomicsLevel::OVERHEAD, self::KEY_STOCK)
+                : $this->allocate($storagePool, $revenueWeights, self::STORAGE_SHARE, EconomicsLevel::OVERHEAD, self::KEY_REVENUE)),
             ...$this->allocate($overheadPool, $revenueWeights, self::OVERHEAD_SHARE, EconomicsLevel::OVERHEAD, self::KEY_REVENUE),
         );
 

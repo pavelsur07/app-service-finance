@@ -61,9 +61,11 @@ enum OperationKind: string
         return match ($this) {
             self::SALE, self::RETURN => CascadeLevel::REVENUE,
             self::SPP, self::COINVESTMENT, self::ADS_SETTLEMENT => CascadeLevel::INFO,
-            self::ADS_CPC, self::ADS_PAY_PER_ORDER, self::PROMO_STARS => CascadeLevel::MD2,
-            self::PACKAGING_WAREHOUSE, self::PROMO_PREMIUM, self::PROMO_SELLER_BONUS, self::PROMO_REVIEWS,
-            self::PROMO_CHAT_POINTS, self::SUBSCRIPTION, self::FINE, self::SERVICE_CORRECTION, self::COMPENSATION, self::MP_OTHER_DEDUCTIONS => CascadeLevel::OVERHEAD,
+            // уровни по шаблону ОПиУ (23.11): подписки и Premium — продвижение (CM2), склад и упаковка — CM3
+            self::ADS_CPC, self::ADS_PAY_PER_ORDER, self::PROMO_STARS, self::PROMO_PREMIUM, self::SUBSCRIPTION => CascadeLevel::MD2,
+            self::PACKAGING_LABOR, self::PACKAGING_MATERIALS, self::STORAGE, self::DISPOSAL,
+            self::PACKAGING_WAREHOUSE, self::PROMO_SELLER_BONUS, self::PROMO_REVIEWS,
+            self::PROMO_CHAT_POINTS, self::FINE, self::SERVICE_CORRECTION, self::COMPENSATION, self::MP_OTHER_DEDUCTIONS => CascadeLevel::OVERHEAD,
             default => CascadeLevel::MD1,
         };
     }
