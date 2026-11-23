@@ -9,11 +9,8 @@ use App\Company\Facade\CompanyFacade;
 use App\Telegram\Entity\ClientBinding;
 use Doctrine\ORM\EntityManagerInterface;
 
-/**
- * Выбор кассы и право записи привязки. ИИ-разбор платежей от бота отключён:
- * операции из текста разбирает CreateTelegramCashTransactionAction регулярками.
- */
-final readonly class PaymentIntakeTelegramAction
+/** Выбор кассы и право записи/чтения Telegram-привязки по правам её пользователя в компании. */
+final readonly class TelegramBindingAccess
 {
     public function __construct(private EntityManagerInterface $em, private CompanyFacade $companies)
     {

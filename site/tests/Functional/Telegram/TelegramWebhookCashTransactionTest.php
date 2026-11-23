@@ -4,17 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Telegram;
 
-use App\Cash\Application\DTO\PaymentIntake\RequestPaymentIntakeCommand;
-use App\Cash\Facade\CashFacade;
 use App\Company\Entity\CompanyMember;
 use App\Company\Entity\CompanyRole;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
-use App\ServiceGateway\Application\DTO\AiCompanyBudget;
-use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use App\Shared\Service\Storage\ObjectStorageInterface;
-use App\Telegram\Domain\Service\TelegramPaymentIntakeSource;
 use App\Telegram\Entity\ClientBinding;
 use App\Telegram\Entity\ImportJob;
 use App\Telegram\Entity\TelegramBot;
@@ -132,65 +127,6 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
         self::assertStringContainsString('расход', $body);
     }
 
-    /**
-     * ИИ-разбор отключён от бота: компания с доступом к ИИ и привязка, где раньше
-     * выбрали новый разбор, пишут операцию регулярками, ИИ не вызывается.
-     */
-    public function testAiGrantedSelectedBindingRecordsByRegexWithoutAi(): void
-    {
-        $client = static::createClient();
-        $this->seedBoundUserWithAccount(financeLockBefore: null, aiIntakeSelected: true);
-
-        $ai = $this->createMock(AiTaskFacadeInterface::class);
-        $ai->expects(self::never())->method('requestTask');
-        $client->getContainer()->set(AiTaskFacadeInterface::class, $ai);
-
-        $captured = [];
-        $this->captureTelegramCalls($client, $captured);
-
-        $this->postUpdate($client, '-3500 реклама');
-
-        self::assertResponseIsSuccessful();
-        self::assertStringContainsString('Записал', $this->lastSentMessageText($captured));
-        self::assertSame(1, $this->countCashTransactions());
-        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_payment_intake_draft'));
-    }
-
-    /** Сообщение, уже ставшее черновиком ИИ-разбора, повторно в ДДС не пишется. */
-    public function testMessageAlreadyInIntakeDraftIsNotRecordedAgain(): void
-    {
-        $client = static::createClient();
-        $this->seedBoundUserWithAccount(financeLockBefore: null, aiIntakeSelected: true);
-
-        $ai = $this->createStub(AiTaskFacadeInterface::class);
-        $ai->method('budgetFor')->willReturn(new AiCompanyBudget(1000, 0, 10000, 0, 90));
-        $ai->method('grantedCompanyIds')->willReturnArgument(0);
-        $ai->method('isEnabledForCompany')->willReturn(true);
-        $ai->method('taskIdFor')->willReturn(Uuid::uuid7()->toString());
-        $ai->method('requestTask')->willReturn(Uuid::uuid7()->toString());
-        $client->getContainer()->set(AiTaskFacadeInterface::class, $ai);
-
-        $binding = $this->em()->getRepository(ClientBinding::class)->findOneBy([]);
-        self::assertInstanceOf(ClientBinding::class, $binding);
-        $client->getContainer()->get(CashFacade::class)->requestPaymentIntake(new RequestPaymentIntakeCommand(
-            (string) $binding->getCompany()->getId(),
-            (string) $binding->getActorUserId(),
-            (string) $binding->getMoneyAccount()?->getId(),
-            TelegramPaymentIntakeSource::sourceKey((string) $binding->getBot()->getId(), (string) self::CHAT_ID, '55'),
-            '-3500 реклама',
-            new \DateTimeImmutable('2026-11-13'),
-        ));
-
-        $captured = [];
-        $this->captureTelegramCalls($client, $captured);
-
-        $this->postUpdate($client, '-3500 реклама');
-
-        self::assertResponseIsSuccessful();
-        self::assertStringContainsString('уже принято', $this->lastSentMessageText($captured));
-        self::assertSame(0, $this->countCashTransactions());
-    }
-
     public function testFinanceReaderCannotRecordOperation(): void
     {
         $client = static::createClient();
@@ -221,7 +157,7 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testOldDraftButtonAnswersThatIntakeIsOff(): void
     {
         $client = static::createClient();
-        $this->seedBoundUserWithAccount(financeLockBefore: null, aiIntakeSelected: true);
+        $this->seedBoundUserWithAccount(financeLockBefore: null, actorBound: true);
 
         $captured = [];
         $this->captureTelegramCalls($client, $captured);
@@ -241,7 +177,7 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
     public function testEditedMessageDoesNotRecordOperation(): void
     {
         $client = static::createClient();
-        $this->seedBoundUserWithAccount(financeLockBefore: null, aiIntakeSelected: true);
+        $this->seedBoundUserWithAccount(financeLockBefore: null, actorBound: true);
 
         $captured = [];
         $this->captureTelegramCalls($client, $captured);
@@ -617,7 +553,7 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
         );
     }
 
-    private function seedBoundUserWithAccount(?\DateTimeImmutable $financeLockBefore, bool $aiIntakeSelected = false): void
+    private function seedBoundUserWithAccount(?\DateTimeImmutable $financeLockBefore, bool $actorBound = false): void
     {
         $em = $this->em();
 
@@ -666,10 +602,9 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
 
         $binding = new ClientBinding(Uuid::uuid4()->toString(), $company, $bot, $telegramUser);
         $binding->setMoneyAccount($account);
-        if ($aiIntakeSelected) {
+        if ($actorBound) {
             $binding->setActorUserId((string) $owner->getId());
             $binding->select(true);
-            $binding->selectPaymentIntake();
         }
         $em->persist($binding);
 

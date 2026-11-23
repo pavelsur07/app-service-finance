@@ -479,36 +479,6 @@ services:
                 reservations:
                     memory: 64M
 
-    site-messenger-worker-payment-intake:
-        image: ghcr.io/pavelsur07/site-php-cli:${IMAGE_TAG:-latest}
-        container_name: site-messenger-worker-payment-intake
-        restart: unless-stopped
-        logging: *default-logging
-        command: php bin/console messenger:consume async_payment_intake -vv --time-limit=3600 --memory-limit=160M --no-interaction
-        environment:
-            <<: *php-env
-        networks:
-            - default
-        depends_on:
-            site-postgres:
-                condition: service_healthy
-            site-redis:
-                condition: service_healthy
-        volumes:
-            - ${ALFA_SECRETS_DIR:-./alfa-secrets}:/app/var/secrets/alfa:ro
-            - site_storage:/app/var/storage
-            - site_company_storage:/app/var/storage/companies
-            - site_var_log:/app/var/log
-        stop_grace_period: 60s
-        healthcheck:
-            disable: true
-        deploy:
-            resources:
-                limits:
-                    memory: 256M
-                reservations:
-                    memory: 64M
-
     site-postgres:
         image: postgres:15-alpine
         container_name: symfony-postgres

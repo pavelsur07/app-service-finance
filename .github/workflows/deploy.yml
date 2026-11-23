@@ -1364,7 +1364,7 @@ jobs:
                     echo "✅ land healthy"
 
                     echo "🐳 [4/5] Обновляем воркеры и CLI"
-                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps site-php-cli site-messenger-worker-pipeline site-messenger-worker-ads site-messenger-worker-wb-finance site-messenger-worker-payment-intake scheduler
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps site-php-cli site-messenger-worker-pipeline site-messenger-worker-ads site-messenger-worker-wb-finance scheduler
 
                     # Миграции его БД — до шага 5/5, иначе `up` поднял бы сервис раньше них.
                     echo "🐳 [4b/5] ozon-fetcher: БД и роль, образ, миграции, запуск"
@@ -1418,7 +1418,7 @@ jobs:
                     echo "✅ account/admin healthy"
 
                     echo "🐳 [5/5] Поднимаем остальные сервисы (если есть новые)"
-                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --remove-orphans land site site-php-fpm site-php-cli account admin site-messenger-worker-sync site-messenger-worker-pipeline site-messenger-worker-ads site-messenger-worker-wb-finance site-messenger-worker-payment-intake scheduler ozon-fetcher wb-fetcher ai-service ai-service-worker
+                    docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --remove-orphans land site site-php-fpm site-php-cli account admin site-messenger-worker-sync site-messenger-worker-pipeline site-messenger-worker-ads site-messenger-worker-wb-finance scheduler ozon-fetcher wb-fetcher ai-service ai-service-worker
 
                     # Проба SMTP из env, который реально запечён в контейнер (письмо не шлём — только AUTH).
                     # Ловит протухший секрет сразу, а не через час кроном. Деплой не валим: мёртвая
@@ -1431,7 +1431,7 @@ jobs:
 
                     release_phase health
                     docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --wait --wait-timeout 180 land site site-php-fpm site-messenger-worker-sync site-messenger-worker-pipeline site-messenger-worker-ads site-messenger-worker-wb-finance ozon-fetcher wb-fetcher ai-service account admin
-                    for container in ai-service-worker site-messenger-worker-payment-intake scheduler traefik; do
+                    for container in ai-service-worker scheduler traefik; do
                       [[ $(docker inspect --format '{{.State.Status}}' "$container" < /dev/null) == running ]]
                     done
                     if [[ $AI_SERVICE_EVAL_ENABLED == true ]]; then

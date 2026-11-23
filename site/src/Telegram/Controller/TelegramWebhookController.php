@@ -11,7 +11,7 @@ use App\Shared\Domain\Exception\UserFacingException;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Telegram\Application\CreateTelegramCashTransactionAction;
 use App\Telegram\Application\DTO\CreateTelegramCashTransactionCommand;
-use App\Telegram\Application\PaymentIntakeTelegramAction;
+use App\Telegram\Application\TelegramBindingAccess;
 use App\Telegram\Entity\ClientBinding;
 use App\Telegram\Entity\ImportJob;
 use App\Telegram\Entity\ReportSubscription;
@@ -53,7 +53,7 @@ final class TelegramWebhookController extends AbstractController
         private readonly LoggerInterface $telegramLogger,
         private readonly CreateTelegramCashTransactionAction $createTelegramCashTransactionAction,
         private readonly ObjectStorageInterface $storage,
-        private readonly PaymentIntakeTelegramAction $paymentIntake,
+        private readonly TelegramBindingAccess $bindingAccess,
         private readonly string $telegramWebhookSecret = '',
         private readonly string $telegramApiBaseUrl = 'https://api.telegram.org',
     ) {
@@ -338,11 +338,11 @@ final class TelegramWebhookController extends AbstractController
                 return $this->respondWithMessageAndMenu($bot, $message, 'Касса не найдена или не принадлежит вашей компании.');
             }
 
-            if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->paymentIntake->mayUseBinding($clientBinding)) {
+            if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->bindingAccess->mayUseBinding($clientBinding)) {
                 return $this->respondWithMessageAndMenu($bot, $message, 'Доступ заблокирован администратором');
             }
 
-            $this->paymentIntake->selectMoneyAccount($clientBinding, $moneyAccount);
+            $this->bindingAccess->selectMoneyAccount($clientBinding, $moneyAccount);
 
             // Логируем удачную установку кассы для быстрой диагностики
             $this->telegramLogger->info('Касса установлена через /set_cash', [
@@ -361,7 +361,7 @@ final class TelegramWebhookController extends AbstractController
         if (1 === count($clientBindings)) {
             $clientBinding = $clientBindings[0];
 
-            if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->paymentIntake->mayUseBinding($clientBinding)) {
+            if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->bindingAccess->mayUseBinding($clientBinding)) {
                 return $this->respondWithMessageAndMenu($bot, $message, 'Доступ заблокирован администратором');
             }
 
@@ -452,7 +452,7 @@ final class TelegramWebhookController extends AbstractController
             return $this->respondWithMessageAndMenu($bot, $message, 'Не найдена привязка. Отправьте /start.');
         }
 
-        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->paymentIntake->mayUseBinding($clientBinding, false)) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->bindingAccess->mayUseBinding($clientBinding, false)) {
             return $this->respondWithMessageAndMenu($bot, $message, 'Доступ заблокирован');
         }
 
@@ -512,7 +512,7 @@ final class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage($bot, $callbackQuery, 'Привязка не найдена.');
         }
 
-        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->paymentIntake->mayUseBinding($clientBinding)) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->bindingAccess->mayUseBinding($clientBinding)) {
             return $this->respondWithMessage($bot, $callbackQuery, 'Доступ заблокирован администратором');
         }
 
@@ -549,7 +549,7 @@ final class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage($bot, $callbackQuery, 'Привязка не найдена.');
         }
 
-        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->paymentIntake->mayUseBinding($clientBinding)) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->bindingAccess->mayUseBinding($clientBinding)) {
             return $this->respondWithMessage($bot, $callbackQuery, 'Доступ заблокирован администратором');
         }
 
@@ -563,7 +563,7 @@ final class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage($bot, $callbackQuery, 'Нельзя выбрать кассу другой компании.');
         }
 
-        $this->paymentIntake->selectMoneyAccount($clientBinding, $moneyAccount);
+        $this->bindingAccess->selectMoneyAccount($clientBinding, $moneyAccount);
 
         // Логируем выбор кассы через inline-кнопку для быстрой диагностики
         $this->telegramLogger->info('Касса установлена через callback set_cash', [
@@ -607,7 +607,7 @@ final class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage($bot, $callbackQuery, 'Не найдена привязка. Отправьте /start.');
         }
 
-        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->paymentIntake->mayUseBinding($clientBinding, false)) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->bindingAccess->mayUseBinding($clientBinding, false)) {
             return $this->respondWithMessage($bot, $callbackQuery, 'Доступ заблокирован');
         }
 
@@ -726,7 +726,7 @@ final class TelegramWebhookController extends AbstractController
             return new JsonResponse(['status' => 'ok']);
         }
 
-        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->paymentIntake->mayUseBinding($clientBinding)) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->bindingAccess->mayUseBinding($clientBinding)) {
             return $this->respondWithMessage($bot, $message, 'Доступ заблокирован администратором');
         }
 
@@ -904,7 +904,7 @@ final class TelegramWebhookController extends AbstractController
             return new JsonResponse(['status' => 'ok']);
         }
 
-        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->paymentIntake->mayUseBinding($clientBinding)) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->bindingAccess->mayUseBinding($clientBinding)) {
             return $this->respondWithMessage($bot, $message, 'Доступ заблокирован администратором');
         }
 
@@ -945,10 +945,6 @@ final class TelegramWebhookController extends AbstractController
 
         if (null === $result) {
             return $this->respondWithMessage($bot, $message, 'Формат: потратил 2500 на рекламу');
-        }
-
-        if ($result->skippedPaymentIntakeSource) {
-            return $this->respondWithMessage($bot, $message, 'Сообщение уже принято в черновик платежей. Повтор не создаёт операцию через прежний формат.');
         }
 
         if ($result->skippedMissingMessageIdentity) {
@@ -1324,7 +1320,7 @@ final class TelegramWebhookController extends AbstractController
 
     private function sendMoneyAccountSelection(TelegramBot $bot, array $message, ClientBinding $clientBinding): Response
     {
-        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->paymentIntake->mayUseBinding($clientBinding)) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus() || !$this->bindingAccess->mayUseBinding($clientBinding)) {
             return $this->respondWithMessage($bot, $message, 'Доступ заблокирован администратором');
         }
 
@@ -1385,7 +1381,6 @@ final class TelegramWebhookController extends AbstractController
             'keyboard' => [
                 ['📊 Отчёты', '💼 Выбрать кассу'],
                 ['➕ Добавить операцию', '📥 Загрузить выписку'],
-                ['📋 Текущий черновик', '🛑 Остановить разбор'],
                 ['⚙️ Помощь'],
             ],
             'resize_keyboard' => true,

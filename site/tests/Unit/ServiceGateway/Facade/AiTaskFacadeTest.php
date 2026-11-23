@@ -16,7 +16,6 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 
 final class AiTaskFacadeTest extends TestCase
 {
@@ -27,16 +26,6 @@ final class AiTaskFacadeTest extends TestCase
 
     /** @var list<array<array-key, mixed>> */
     private array $stamps = [];
-
-    public function testPaymentIntakeUsesDedicatedTransport(): void
-    {
-        $this->facade('*')->requestTask(self::COMPANY, 'parse_payment_message', ['text' => 'Оплатил 1000 руб.'], 'intake-1');
-
-        self::assertCount(1, $this->stamps[0]);
-        $stamp = $this->stamps[0][0];
-        self::assertInstanceOf(TransportNamesStamp::class, $stamp);
-        self::assertSame(['async_payment_intake'], $stamp->getTransportNames());
-    }
 
     public function testDispatchesMessageWithCallerKeyWhenEnabled(): void
     {
