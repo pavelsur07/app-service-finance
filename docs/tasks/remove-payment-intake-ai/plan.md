@@ -73,7 +73,8 @@ Entity `PaymentIntakeSession`, `AiQualityMonitor`, `AiQualityRun`, поле
       `McpCashDraftPageTest`, `McpCashToolsTest`, MCP-часть concurrency).
 - [ ] Тест: залипшее событие MCP-confirm переотправляет
       `app:cash:recover-payment-intake`.
-- [ ] Бот: операции регулярками, кнопки `pi:` больше не обрабатываются особо.
+- [ ] Бот: операции регулярками; кнопки `pi:` старых карточек только отвечают
+      «разбор отключён» (решение #3119), черновик и ДДС не меняют.
 - [ ] `git grep parse_payment_message|AiQuality|async_payment_intake|eval-worker|AI_SERVICE_EVAL`
       пуст вне docs/tasks и миграций.
 - [ ] Гейты: PHPStan (baseline только −), CS, strict_types, полный phpunit,
