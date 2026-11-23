@@ -3987,13 +3987,15 @@ Canonical source41/semantic12 и human-reviewed additions hash-pinned; pending
 может хранить amountnull с вопросом и проверяемым anchor. Auto gold/model/prompt
 updates и auto-disable не реализованы. Ночной scheduler ещё не подключён.
 
-Дополнительный rollout-переключатель `TELEGRAM_PAYMENT_INTAKE_ENABLED` по
-умолчанию `0` (только test env `1`). Его включение до live-eval приёмки не
-является частью обычного доступа компании к ИИ. Если новый сценарий выбран,
-его недоступность не включает автоматически legacy запись первой цифры.
-Переключатель глобальный; отдельного company allowlist для intake нет, охват
-при включении задают существующие AI grants. Более узкий независимый пилот
-требует отдельного company gate до включения, без изменения общих grants молча.
+Telegram-бот от ИИ-разбора отключён: текст операции всегда разбирает
+`CreateTelegramCashTransactionAction` регулярками (сумма — первое число,
+направление — знак или слово) и сразу пишет в ДДС выбранной кассы. Доступ
+компании к ИИ и `ClientBinding::paymentIntakeSelected` бот не учитывает.
+Сообщение, ставшее черновиком PaymentIntake раньше (`hasPaymentIntakeSource`),
+повторно в ДДС не пишется. Кнопки `pi:` старых черновиков отвечают «разбор
+отключён» и черновик не меняют; правка сообщения (`edited_message`)
+игнорируется. Telegram-доставка карточек (`RefreshPaymentIntakeMessage`,
+`RecoverPaymentIntakeDeliveryCommand`) новых сессий не получает.
 
 `CashFacade` предоставляет request/get/amend/confirm/cancel сценарии черновика
 через DTO `Application/DTO/PaymentIntake`. Компания и пользователь приходят из
@@ -5517,7 +5519,7 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 | Транспорт | Воркер (`messenger:consume`) | Что идёт |
 |---|---|---|
 | `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad, задачи ai-service кроме parse_payment_message (`SubmitAiTaskMessage`), проверка платежей ЮKassa (`ApplyYooKassaPaymentMessage`) |
-| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake` (profile payment-intake); production worker требует отдельного одобрения | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Worker `messenger:consume async_payment_intake` обязан работать до включения TELEGRAM_PAYMENT_INTAKE_ENABLED |
+| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake` (profile payment-intake); production worker требует отдельного одобрения | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Бот новых сессий не создаёт (ИИ-разбор от бота отключён) |
 | `async_pipeline` | `async_pipeline` | Локальная DB-обработка: Process*-сообщения Marketplace, Ads raw, нормализация inventory, auto-rules, ImportProducts |
 | `async_wb_finance` | `async_wb_finance` | `SyncWbFinancialReportDayMessage` (retry до 20 раз) |
 | `async_ads` | `async_ads` | Ozon Performance polling (`LoadOzonAdStatisticsRangeMessage`, `FetchOzonAdStatisticsMessage`, `RequestOzonAdBatchMessage`) |
@@ -5567,6 +5569,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.171 | 2026-11-23 | Telegram: ИИ-разбор платежей отключён от бота — операции из текста только регулярками; env `TELEGRAM_PAYMENT_INTAKE_ENABLED` удалена; ночной eval выключен переменной репозитория `vars.AI_SERVICE_EVAL_ENABLED=false` (вне кода, применяется деплоем) |
 | 2.170 | 2026-11-13 | SourceFacts: новый модуль — приём фактов из сервисов (`sf_batch`, `sf_period`, `sf_fact`, `Version20261113130402`), `app:source-facts:pull` (cron `*/15`) и гейт `app:source-facts:health-check` (09:10); ServiceGateway: `SourceFactsGatewayFacadeInterface`, клиент `source-fact-envelope` v1; ozon-fetcher публикует `ozon.finance.accrual-by-day`; PHPat — `SourceFacts` не знает каналов и учёта (задача `marketplace-profit-pipeline`, этап 2) |
 | 2.169 | 2026-11-13 | `Ingestion`, `Marketplace` (кроме листингов) и `MarketplaceAds` объявлены легаси — ADR 2026-11-13 |
 | 2.168 | 2026-11-12 | Inventory: поставки Ozon в пути — `StockStatus::InSupply`, `app:inventory:ozon-supplies-sync` (cron 05:50) из снимка `ozon.supplies` ozon-fetcher (`GET /internal/snapshots/latest`, контракт `service-snapshot` v1); отчёт «Остатки» — колонка «В поставке», поставки не входят в остаток (задача `docs/tasks/ozon-supplies-in-transit`) |
