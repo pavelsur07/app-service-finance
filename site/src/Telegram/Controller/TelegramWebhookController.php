@@ -113,8 +113,9 @@ final class TelegramWebhookController extends AbstractController
                 return $this->handleCallbackQuery($bot, $callbackQuery);
             }
 
-            if ($editedMessage && is_string($editedMessage['text'] ?? null)) {
-                return $this->respondToIntake($bot, $editedMessage, fn () => $this->paymentIntake->message($bot, $editedMessage, $editedMessage['text'], true, (int) ($update['update_id'] ?? 0)));
+            // Правка отправленного сообщения не меняет записанную операцию.
+            if ($editedMessage) {
+                return new JsonResponse(['status' => 'ignored']);
             }
 
             if (!$message) {
@@ -400,7 +401,8 @@ final class TelegramWebhookController extends AbstractController
         }
 
         if (str_starts_with($callbackData, 'pi:')) {
-            return $this->respondToIntake($bot, $callbackQuery, fn () => $this->paymentIntake->callback($bot, $callbackQuery));
+            // Кнопки черновиков ИИ-разбора: разбор отключён, черновики не меняются.
+            return $this->respondWithMessage($bot, $callbackQuery, "Разбор платежей отключён, черновик не изменён.\n\nОтправьте операцию сообщением:\n-3500 реклама");
         }
 
         if (str_starts_with($callbackData, 'bind:')) {
@@ -832,27 +834,6 @@ final class TelegramWebhookController extends AbstractController
     }
 
     /** @param array<string, mixed> $message */
-    private function respondToIntake(TelegramBot $bot, array $message, callable $action): Response
-    {
-        try {
-            $reply = $action();
-        } catch (UserFacingException|\DomainException $exception) {
-            return $this->respondWithMessage($bot, $message, $exception->getMessage());
-        } catch (\Throwable $exception) {
-            $this->telegramLogger->error('Telegram payment intake action failed', ['exception' => $exception]);
-
-            return $this->respondWithMessage($bot, $message, 'Не удалось обработать действие. Обновите черновик и проверьте статус; повторное подтверждение не создаст дубль.');
-        }
-
-        if (null === $reply) {
-            return new JsonResponse(['status' => 'ignored']);
-        }
-
-        $session = $reply['session'] ?? null;
-
-        return $this->respondWithMessage($bot, $message, $reply['text'] ?? 'Для изменения платежа отправьте новое сообщение.', $reply['reply_markup'] ?? null, $session instanceof \App\Telegram\Entity\PaymentIntakeSession ? fn (string $id) => $this->paymentIntake->rememberReply($session, $id) : null);
-    }
-
     private function handleTextMessage(TelegramBot $bot, array $update, array $message, string $text): Response
     {
         $normalizedText = trim($text);
@@ -890,19 +871,6 @@ final class TelegramWebhookController extends AbstractController
                 "Команды:\n/set_cash — выбрать кассу\n/reports — отчёты\n\nОперации можно вводить текстом:\n+10000 доход\n-500 расход",
                 $this->buildMainMenuReplyMarkup()
             );
-        }
-
-        try {
-            $intakeReply = $this->paymentIntake->message($bot, $message, $text, false, (int) ($update['update_id'] ?? 0));
-        } catch (UserFacingException|\DomainException $exception) {
-            return $this->respondWithMessage($bot, $message, $exception->getMessage());
-        } catch (\Throwable $exception) {
-            $this->telegramLogger->error('Telegram payment intake failed', ['exception' => $exception]);
-
-            return $this->respondWithMessage($bot, $message, 'Не удалось обработать черновик. Платежи не создаются без подтверждения. Попробуйте позже.');
-        }
-        if (null !== $intakeReply) {
-            return $this->respondToIntake($bot, $message, static fn () => $intakeReply);
         }
 
         $tgUserId = isset($message['from']['id']) ? (string) $message['from']['id'] : null;
@@ -1209,7 +1177,7 @@ final class TelegramWebhookController extends AbstractController
         return hash_equals($this->telegramWebhookSecret, $provided);
     }
 
-    private function respondWithMessage(TelegramBot $bot, array $message, string $text, ?array $replyMarkup = null, ?callable $onSent = null): Response
+    private function respondWithMessage(TelegramBot $bot, array $message, string $text, ?array $replyMarkup = null): Response
     {
         // Отправляем простой ответ через Telegram API
         // chat.id лучше from.id: ответы должны приходить в чат (в том числе групповой), а не личные сообщения отправителя
@@ -1258,12 +1226,6 @@ final class TelegramWebhookController extends AbstractController
             $content = $response->getContent(false);
 
             $this->logTelegramApiOutcome('sendMessage', $chatId, $statusCode, $content);
-            if (200 === $statusCode && null !== $onSent) {
-                $result = json_decode($content, true);
-                if (true === ($result['ok'] ?? false) && isset($result['result']['message_id'])) {
-                    $onSent((string) $result['result']['message_id']);
-                }
-            }
         } catch (\Throwable $exception) {
             $this->logTelegramApiFailure('sendMessage', $chatId, $exception);
         }

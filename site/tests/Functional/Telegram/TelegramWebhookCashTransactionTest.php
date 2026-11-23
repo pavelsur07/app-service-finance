@@ -4,10 +4,17 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Telegram;
 
+use App\Cash\Application\DTO\PaymentIntake\RequestPaymentIntakeCommand;
+use App\Cash\Facade\CashFacade;
+use App\Company\Entity\CompanyMember;
+use App\Company\Entity\CompanyRole;
 use App\Company\Entity\FinancialResponsibilityCenter;
 use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
+use App\ServiceGateway\Application\DTO\AiCompanyBudget;
+use App\ServiceGateway\Facade\AiTaskFacadeInterface;
 use App\Shared\Service\Storage\ObjectStorageInterface;
+use App\Telegram\Domain\Service\TelegramPaymentIntakeSource;
 use App\Telegram\Entity\ClientBinding;
 use App\Telegram\Entity\ImportJob;
 use App\Telegram\Entity\TelegramBot;
@@ -123,6 +130,133 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         $body = $this->lastSentMessageText($captured);
         self::assertStringContainsString('расход', $body);
+    }
+
+    /**
+     * ИИ-разбор отключён от бота: компания с доступом к ИИ и привязка, где раньше
+     * выбрали новый разбор, пишут операцию регулярками, ИИ не вызывается.
+     */
+    public function testAiGrantedSelectedBindingRecordsByRegexWithoutAi(): void
+    {
+        $client = static::createClient();
+        $this->seedBoundUserWithAccount(financeLockBefore: null, aiIntakeSelected: true);
+
+        $ai = $this->createMock(AiTaskFacadeInterface::class);
+        $ai->expects(self::never())->method('requestTask');
+        $client->getContainer()->set(AiTaskFacadeInterface::class, $ai);
+
+        $captured = [];
+        $this->captureTelegramCalls($client, $captured);
+
+        $this->postUpdate($client, '-3500 реклама');
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('Записал', $this->lastSentMessageText($captured));
+        self::assertSame(1, $this->countCashTransactions());
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT count(*) FROM cash_payment_intake_draft'));
+    }
+
+    /** Сообщение, уже ставшее черновиком ИИ-разбора, повторно в ДДС не пишется. */
+    public function testMessageAlreadyInIntakeDraftIsNotRecordedAgain(): void
+    {
+        $client = static::createClient();
+        $this->seedBoundUserWithAccount(financeLockBefore: null, aiIntakeSelected: true);
+
+        $ai = $this->createStub(AiTaskFacadeInterface::class);
+        $ai->method('budgetFor')->willReturn(new AiCompanyBudget(1000, 0, 10000, 0, 90));
+        $ai->method('grantedCompanyIds')->willReturnArgument(0);
+        $ai->method('isEnabledForCompany')->willReturn(true);
+        $ai->method('taskIdFor')->willReturn(Uuid::uuid7()->toString());
+        $ai->method('requestTask')->willReturn(Uuid::uuid7()->toString());
+        $client->getContainer()->set(AiTaskFacadeInterface::class, $ai);
+
+        $binding = $this->em()->getRepository(ClientBinding::class)->findOneBy([]);
+        self::assertInstanceOf(ClientBinding::class, $binding);
+        $client->getContainer()->get(CashFacade::class)->requestPaymentIntake(new RequestPaymentIntakeCommand(
+            (string) $binding->getCompany()->getId(),
+            (string) $binding->getActorUserId(),
+            (string) $binding->getMoneyAccount()?->getId(),
+            TelegramPaymentIntakeSource::sourceKey((string) $binding->getBot()->getId(), (string) self::CHAT_ID, '55'),
+            '-3500 реклама',
+            new \DateTimeImmutable('2026-11-13'),
+        ));
+
+        $captured = [];
+        $this->captureTelegramCalls($client, $captured);
+
+        $this->postUpdate($client, '-3500 реклама');
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('уже принято', $this->lastSentMessageText($captured));
+        self::assertSame(0, $this->countCashTransactions());
+    }
+
+    public function testFinanceReaderCannotRecordOperation(): void
+    {
+        $client = static::createClient();
+        $this->seedBoundUserWithAccount(financeLockBefore: null);
+
+        $binding = $this->em()->getRepository(ClientBinding::class)->findOneBy([]);
+        self::assertInstanceOf(ClientBinding::class, $binding);
+        $reader = UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail('tg-reader@example.test')->build();
+        $role = new CompanyRole(Uuid::uuid7()->toString(), 'Просмотр финансов', ['finance' => 'read'], $binding->getCompany());
+        $member = new CompanyMember(Uuid::uuid7()->toString(), $binding->getCompany(), $reader, CompanyMember::ROLE_OPERATOR);
+        $member->setAccessRole($role);
+        $binding->setActorUserId((string) $reader->getId());
+        foreach ([$reader, $role, $member] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+
+        $captured = [];
+        $this->captureTelegramCalls($client, $captured);
+
+        $this->postUpdate($client, '-3500 реклама');
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('Доступ заблокирован', $this->lastSentMessageText($captured));
+        self::assertSame(0, $this->countCashTransactions());
+    }
+
+    public function testOldDraftButtonAnswersThatIntakeIsOff(): void
+    {
+        $client = static::createClient();
+        $this->seedBoundUserWithAccount(financeLockBefore: null, aiIntakeSelected: true);
+
+        $captured = [];
+        $this->captureTelegramCalls($client, $captured);
+
+        $this->postRaw($client, ['callback_query' => [
+            'id' => 'cb-1',
+            'data' => 'pi:confirm:draft:1',
+            'from' => ['id' => (int) self::TG_USER_ID],
+            'message' => ['message_id' => 56, 'chat' => ['id' => self::CHAT_ID]],
+        ]]);
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('отключ', $this->lastSentMessageText($captured));
+        self::assertSame(0, $this->countCashTransactions());
+    }
+
+    public function testEditedMessageDoesNotRecordOperation(): void
+    {
+        $client = static::createClient();
+        $this->seedBoundUserWithAccount(financeLockBefore: null, aiIntakeSelected: true);
+
+        $captured = [];
+        $this->captureTelegramCalls($client, $captured);
+
+        $this->postRaw($client, ['edited_message' => [
+            'message_id' => 55,
+            'date' => 1718000000,
+            'chat' => ['id' => self::CHAT_ID],
+            'from' => ['id' => (int) self::TG_USER_ID],
+            'text' => '-3500 реклама',
+        ]]);
+
+        self::assertResponseIsSuccessful();
+        self::assertSame(0, $this->countCashTransactions());
+        self::assertSame([], $captured);
     }
 
     /**
@@ -483,7 +617,7 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
         );
     }
 
-    private function seedBoundUserWithAccount(?\DateTimeImmutable $financeLockBefore): void
+    private function seedBoundUserWithAccount(?\DateTimeImmutable $financeLockBefore, bool $aiIntakeSelected = false): void
     {
         $em = $this->em();
 
@@ -532,6 +666,11 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
 
         $binding = new ClientBinding(Uuid::uuid4()->toString(), $company, $bot, $telegramUser);
         $binding->setMoneyAccount($account);
+        if ($aiIntakeSelected) {
+            $binding->setActorUserId((string) $owner->getId());
+            $binding->select(true);
+            $binding->selectPaymentIntake();
+        }
         $em->persist($binding);
 
         $em->flush();
@@ -539,16 +678,19 @@ final class TelegramWebhookCashTransactionTest extends WebTestCaseBase
 
     private function postUpdate(KernelBrowser $client, string $text): void
     {
-        $payload = [
-            'update_id' => 1001,
-            'message' => [
-                'message_id' => 55,
-                'date' => 1718000000,
-                'chat' => ['id' => self::CHAT_ID],
-                'from' => ['id' => (int) self::TG_USER_ID, 'first_name' => 'Test'],
-                'text' => $text,
-            ],
-        ];
+        $this->postRaw($client, ['message' => [
+            'message_id' => 55,
+            'date' => 1718000000,
+            'chat' => ['id' => self::CHAT_ID],
+            'from' => ['id' => (int) self::TG_USER_ID, 'first_name' => 'Test'],
+            'text' => $text,
+        ]]);
+    }
+
+    /** @param array<string, mixed> $update */
+    private function postRaw(KernelBrowser $client, array $update): void
+    {
+        $payload = ['update_id' => 1001] + $update;
 
         $client->request(
             'POST',

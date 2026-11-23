@@ -4547,10 +4547,17 @@ Canonical source41/semantic12 и human-reviewed additions hash-pinned; pending
 updates и auto-disable не реализованы. Расписание — `docker/cron/app.cron`,
 ночной контур включается отдельно `AI_SERVICE_EVAL_ENABLED`.
 
-Новый Telegram ИИ-разбор доступен по admin grant; ручные исправления, Confirm и доставка
-существующих черновиков не требуют ИИ-доступа при действующих финансовых правах.
-Recovery принимает UUID или `--all`: grants + незавершённые Telegram-доставки +
-недоставленные Cash-события Confirm; без grant восстанавливается только доставка.
+Telegram-бот от ИИ-разбора отключён: текст операции всегда разбирает
+`CreateTelegramCashTransactionAction` регулярками (сумма — первое число,
+направление — знак или слово) и сразу пишет в ДДС выбранной кассы. Доступ
+компании к ИИ (admin grant) и `ClientBinding::paymentIntakeSelected` бот не
+учитывает; команд `/draft` и `/cancel` у бота нет. Сообщение, ставшее
+черновиком PaymentIntake раньше (`hasPaymentIntakeSource`), повторно в ДДС не
+пишется. Кнопки `pi:` старых черновиков отвечают «разбор отключён» и черновик
+не меняют; правка сообщения (`edited_message`) игнорируется. Recovery
+(`app:telegram:recover-payment-intake`, UUID или `--all`) и воркер
+`async_payment_intake` дорабатывают только существующие Telegram-сессии и
+Cash-события Confirm; новых сессий бот не создаёт.
 
 `CashFacade` предоставляет request/get/amend/confirm/cancel сценарии черновика
 через DTO `Application/DTO/PaymentIntake`. Компания и пользователь приходят из
@@ -4568,9 +4575,7 @@ identity bytes, другие каналы используют собствен�
 авторизованный PaymentIntakeDraftView или null.
 `CashFacade::openPaymentIntakeDraftIds(companyId, actorUserId): list<string>`
 возвращает до 200 новейших незавершённых черновиков строго этого actor после
-проверки финансового доступа. Telegram фильтрует их по своей binding/chat и
-показывает до 20 вариантов. `/draft` открывает текущий разбор, `/cancel`
-отменяет незавершённый черновик; при нескольких требуется явный выбор.
+проверки финансового доступа (Telegram-бот этот метод больше не вызывает).
 Отмена инвалидирует poll generation и durable pending intent, закрывает
 доставку и редактирование. Уже начатый HTTP может завершиться, но его
 финализация не публикует следующий шаг отменённой цепочки.
@@ -6147,7 +6152,7 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 | Транспорт | Воркер (`messenger:consume`) | Что идёт |
 |---|---|---|
 | `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad, задачи ai-service кроме parse_payment_message (`SubmitAiTaskMessage`), проверка платежей ЮKassa (`ApplyYooKassaPaymentMessage`) |
-| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake`; prod: `site-messenger-worker-payment-intake` (постоянный запуск) | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Worker `messenger:consume async_payment_intake` работает постоянно; cron использует `app:telegram:recover-payment-intake --all` |
+| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake`; prod: `site-messenger-worker-payment-intake` (постоянный запуск) | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Worker `messenger:consume async_payment_intake` работает постоянно; cron использует `app:telegram:recover-payment-intake --all`. Бот новых сессий не создаёт (ИИ-разбор от бота отключён) |
 | `async_pipeline` | `async_pipeline` | Локальная DB-обработка: Process*-сообщения Marketplace, Ads raw, нормализация inventory, auto-rules, ImportProducts |
 | `async_wb_finance` | `async_wb_finance` | `SyncWbFinancialReportDayMessage` (retry до 20 раз) |
 | `async_ads` | `async_ads` | Ozon Performance polling (`LoadOzonAdStatisticsRangeMessage`, `FetchOzonAdStatisticsMessage`, `RequestOzonAdBatchMessage`) |
@@ -6197,6 +6202,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.243 | 2026-11-23 | Telegram: ИИ-разбор платежей отключён от бота — операции из текста только регулярками, кнопки `pi:` отвечают «разбор отключён», правка сообщения игнорируется; ночной eval выключен переменной репозитория `vars.AI_SERVICE_EVAL_ENABLED=false` (вне кода, применяется деплоем) |
 | 2.242 | 2026-11-23 | MarketplaceAnalytics: снимок дня (`SnapshotCalculationPolicy`) — себестоимость = цена × (продано − возвращено), как ОПиУ; день только с возвратами — отрицательная; API юнит-экономики и портфеля исправляются через сумму снимков, старые снимки — `app:marketplace-analytics:recalc-snapshots` |
 | 2.241 | 2026-11-23 | MarketplaceAnalytics: «Юнит-экономика» (`UnitExtendedQuery`) и карточки (`WidgetSummaryQuery`) вычитают себестоимость возвращённых единиц, как ОПиУ (`return_cost_price`); `ListingReturnAggregateDTO::costPriceTotal`; себестоимость единицы — по проданным |
 | 2.240 | 2026-11-23 | Marketplace/WB: шаблон затрат по умолчанию — `wb_loyalty_discount_compensation` → `OPEX_WH_COMPENSATION` («Компенсации МП», СМ3), как `ozon_compensation`; маппинги существующих компаний меняются в UI |

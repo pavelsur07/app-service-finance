@@ -6878,12 +6878,6 @@ parameters:
 			path: src/Telegram/Controller/TelegramWebhookController.php
 
 		-
-			message: '#^Method App\\Telegram\\Controller\\TelegramWebhookController\:\:handleTextMessage\(\) has parameter \$message with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Telegram/Controller/TelegramWebhookController.php
-
-		-
 			message: '#^Method App\\Telegram\\Controller\\TelegramWebhookController\:\:handleTextMessage\(\) has parameter \$update with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
