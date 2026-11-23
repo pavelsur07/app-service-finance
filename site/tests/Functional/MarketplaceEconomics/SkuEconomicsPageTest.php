@@ -76,9 +76,13 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         }
         // итог кабинета: 1450 − 30 нераспределённой подписки
         self::assertMatchesRegularExpression('/1\s420,00/u', $totals->last()->text());
+        // без сравнения с прошлым периодом: в ячейке прибыли одна сумма, стандартная ширина
+        self::assertCount(0, $crawler->filter('[data-economics-table] tbody td[data-column] p'));
+        self::assertStringNotContainsString('Сравнение с', (string) $client->getResponse()->getContent());
 
-        $client->request('GET', self::URL, ['from' => '2026-11-10', 'to' => '2026-11-18', 'alloc' => '0']);
+        $withoutAllocation = $client->request('GET', self::URL, ['from' => '2026-11-10', 'to' => '2026-11-18', 'alloc' => '0']);
         self::assertStringNotContainsString('СМ3', (string) $client->getResponse()->getContent());
+        self::assertCount(0, $withoutAllocation->filter('[data-economics-table] tbody td[data-column="md2"] p'));
 
         $client->request('GET', self::URL, ['from' => '2026-11-10', 'to' => '2026-11-18', 'format' => 'xlsx']);
         self::assertResponseIsSuccessful();
