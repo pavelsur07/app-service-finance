@@ -128,6 +128,33 @@ final class SnapshotCalculationPolicyTest extends TestCase
         $this->assertSame('0.00', $cb->commission);
     }
 
+    /** Ozon хранит возврат комиссии положительной суммой с operation_type='storno' — это уменьшение затраты. */
+    public function testStornoCostReducesCategoryInsteadOfAddingToIt(): void
+    {
+        $this->marketplaceFacade->method('getSalesForListingAndDate')->willReturn([$this->makeMinimalSale()]);
+        $this->marketplaceFacade->method('getReturnsForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getCostPriceForListing')->willReturn('100.00');
+        $this->marketplaceFacade->method('getOrdersForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getAdvertisingCostsForListingAndDate')->willReturn([]);
+
+        $cost = fn (string $amount, string $operationType): CostData => new CostData(
+            marketplace: MarketplaceType::OZON,
+            categoryCode: 'ozon_sale_commission',
+            amount: $amount,
+            costDate: $this->date,
+            categoryId: 'ozon_sale_commission',
+            operationType: $operationType,
+        );
+        $this->marketplaceFacade->method('getCostsForListingAndDate')
+            ->willReturn([$cost('100.00', 'charge'), $cost('30.00', 'storno')]);
+        $this->costMappingResolver->method('resolve')->willReturn(UnitEconomyCostType::COMMISSION);
+        $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
+
+        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'ozon');
+
+        $this->assertSame('70.00', CostBreakdown::fromArray($snapshot->getCostBreakdown())->commission);
+    }
+
     public function testAdvertisingDetailsFilledFromAdvertisingCostDTO(): void
     {
         $sale = $this->makeMinimalSale();
