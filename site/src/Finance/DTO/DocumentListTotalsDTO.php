@@ -45,8 +45,8 @@ final readonly class DocumentListTotalsDTO
 
     /**
      * Итог из двух агрегатов списка: обычные документы уже просуммированы запросом по валютам,
-     * marketplace_pl — вклады по (документ, статья, природа), уже приведённые к знаку
-     * регистра ОПиУ вызывающим: списание −X и сторно +X взаимно гасятся внутри статьи.
+     * marketplace_pl — вклады по природе, уже приведённые вызывающим к знаку регистра ОПиУ
+     * (доход amount, расход −amount; итог может быть отрицательным).
      *
      * @param list<array{currency: string, documents: int|string, operations: int|string, incomeTotal: string|null, expenseTotal: string|null}> $plain
      * @param list<array{currency: string, bucket: string, amount: string}> $marketplace

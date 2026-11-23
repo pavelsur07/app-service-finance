@@ -12,11 +12,9 @@ use App\Finance\Enum\PlNature;
 /**
  * Доход и расход документа так, как их считает регистр ОПиУ (PLRegisterUpdater): операция
  * без статьи не входит; природа — flow статьи, у статьи без flow — знак суммы. Обычный
- * документ — модуль каждой операции. marketplace_pl хранит списание со знаком «−», сторно —
- * «+»: суммы статьи складываются со знаком, модуль берётся от итога статьи.
- *
- * Вклад каждой операции — для строк операций в списке: у marketplace_pl знак операции
- * приведён к знаку итога статьи, чтобы строки складывались в итог документа.
+ * документ — модуль каждой операции. Строка marketplace_pl — значение для отчёта (доход +,
+ * расход −, сторно — обратный знак той же статьи): вклад в расход — −amount, в доход — amount,
+ * без модуля, поэтому итог статьи бывает отрицательным (сторно перевесило начисления).
  */
 final readonly class DocumentPlContribution
 {
@@ -36,46 +34,15 @@ final readonly class DocumentPlContribution
      */
     public function forDocument(Document $document): array
     {
-        $isMarketplace = DocumentType::MARKETPLACE_PL === $document->getType();
-        /** @var list<array{operation: DocumentOperation, nature: PlNature, amount: string, key: string}> $counted */
-        $counted = [];
-        /** @var array<string, string> $categorySums */
-        $categorySums = [];
-
-        foreach ($document->getOperations() as $operation) {
-            $category = $operation->getPlCategory();
-            if (null === $category) {
-                continue;
-            }
-
-            $nature = $this->natureResolver->forOperation($operation);
-            if (null === $nature) {
-                continue;
-            }
-
-            $amount = bcadd($operation->getAmount(), '0', 2);
-            $key = $nature->value.'|'.$category->getId();
-            $categorySums[$key] = bcadd($categorySums[$key] ?? '0', $amount, 2);
-            $counted[] = ['operation' => $operation, 'nature' => $nature, 'amount' => $amount, 'key' => $key];
-        }
-
         $totals = [PlNature::INCOME->value => '0.00', PlNature::EXPENSE->value => '0.00'];
         $operations = [];
-        foreach ($counted as $row) {
-            if ($isMarketplace) {
-                $contribution = self::isNegative($categorySums[$row['key']]) ? self::negate($row['amount']) : $row['amount'];
-            } else {
-                $contribution = self::abs($row['amount']);
-                $totals[$row['nature']->value] = bcadd($totals[$row['nature']->value], $contribution, 2);
+        foreach ($document->getOperations() as $operation) {
+            $contribution = $this->forOperation($operation);
+            if (null === $contribution) {
+                continue;
             }
-            $operations[(string) $row['operation']->getId()] = ['nature' => $row['nature']->value, 'amount' => $contribution];
-        }
-
-        if ($isMarketplace) {
-            foreach ($categorySums as $key => $sum) {
-                $nature = explode('|', $key, 2)[0];
-                $totals[$nature] = bcadd($totals[$nature], self::abs($sum), 2);
-            }
+            $totals[$contribution['nature']] = bcadd($totals[$contribution['nature']], $contribution['amount'], 2);
+            $operations[(string) $operation->getId()] = ['nature' => $contribution['nature'], 'amount' => $contribution['amount']];
         }
 
         return [
@@ -88,21 +55,15 @@ final readonly class DocumentPlContribution
     }
 
     /**
-     * Вклад строки вкладки «Операции». Обычный документ — модуль операции; marketplace_pl —
-     * со знаком: если полная сумма операций той же статьи и природы в документе
-     * отрицательна (списания), вклад = −amount, иначе amount. Ключ суммы —
-     * «documentId|categoryId|INCOME|EXPENSE» (DocumentOperationRepository::marketplaceBucketSums).
-     * Без статьи или с нулевой суммой у статьи без потока — null: в итог не входит.
-     *
-     * @param array<string, string> $marketplaceBucketSums
+     * Вклад строки: обычный документ — модуль операции; marketplace_pl — amount в доход,
+     * −amount в расход. Без статьи или с нулевой суммой у статьи без потока — null.
      *
      * @return array{nature: string, amount: string, currency: string}|null
      */
-    public function forOperation(DocumentOperation $operation, array $marketplaceBucketSums): ?array
+    public function forOperation(DocumentOperation $operation): ?array
     {
-        $category = $operation->getPlCategory();
         $document = $operation->getDocument();
-        if (null === $category || null === $document) {
+        if (null === $operation->getPlCategory() || null === $document) {
             return null;
         }
 
@@ -112,18 +73,24 @@ final readonly class DocumentPlContribution
         }
 
         $amount = bcadd($operation->getAmount(), '0', 2);
-        if (DocumentType::MARKETPLACE_PL === $document->getType()) {
-            $sum = $marketplaceBucketSums[sprintf('%s|%s|%s', $document->getId(), $category->getId(), $nature->value)] ?? $amount;
-            $contribution = self::isNegative($sum) ? self::negate($amount) : $amount;
-        } else {
-            $contribution = self::abs($amount);
-        }
 
         return [
             'nature' => $nature->value,
-            'amount' => $contribution,
+            'amount' => self::contribution($document->getType(), $nature, $amount),
             'currency' => $document->getCashTransaction()?->getCurrency() ?? 'RUB',
         ];
+    }
+
+    /**
+     * Вклад суммы строки в доход или расход её природы — общее правило для регистра и итогов.
+     */
+    public static function contribution(DocumentType $type, PlNature $nature, string $amount): string
+    {
+        if (DocumentType::MARKETPLACE_PL !== $type) {
+            return self::abs($amount);
+        }
+
+        return PlNature::EXPENSE === $nature ? self::negate($amount) : $amount;
     }
 
     private static function isNegative(string $value): bool

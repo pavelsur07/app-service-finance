@@ -13,7 +13,6 @@ use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Entity\PLDailyTotal;
 use App\Finance\Enum\DocumentStatus;
-use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PlNature;
 use App\Finance\Repository\DocumentRepository;
 use App\Finance\Repository\PLDailyTotalRepository;
@@ -135,8 +134,6 @@ final class PLRegisterUpdater
      *         category: PLCategory,
      *         income: float,
      *         expense: float,
-     *         mpIncomeSigned: float,
-     *         mpExpenseSigned: float,
      *       }>,
      *     }>,
      *   }>,
@@ -220,29 +217,12 @@ final class PLRegisterUpdater
                         'category' => $category,
                         'income' => 0.0,
                         'expense' => 0.0,
-                        'mpIncomeSigned' => 0.0,
-                        'mpExpenseSigned' => 0.0,
                     ];
                 }
 
-                $rawAmount = (float) $operation->getAmount();
-
-                // marketplace_pl смешивает два соглашения о знаке в одном
-                // потоке: COGS/PROMO/OPEX (charge=-X, storno=+X) и REV_*_RETURNS
-                // (всегда +X). Накапливаем сумму со знаком, abs возьмём после
-                // агрегации всех операций категории за день — иначе REV_SPP_RETURNS
-                // с +X уйдёт в expense=-X и упрётся в CHECK chk_pl_daily_totals_amounts.
-                if (DocumentType::MARKETPLACE_PL === $document->getType()) {
-                    if (PlNature::INCOME === $nature) {
-                        $result[$dateKey]['projects'][$projectKey]['responsibilityCenters'][$responsibilityCenterKey]['categories'][$categoryKey]['mpIncomeSigned'] += $rawAmount;
-                    } else {
-                        $result[$dateKey]['projects'][$projectKey]['responsibilityCenters'][$responsibilityCenterKey]['categories'][$categoryKey]['mpExpenseSigned'] += $rawAmount;
-                    }
-
-                    continue;
-                }
-
-                $amount = abs($rawAmount);
+                // Обычный документ — модуль суммы; marketplace_pl — значение для отчёта со знаком,
+                // итог статьи за день может быть отрицательным (сторно перевесило начисления).
+                $amount = (float) DocumentPlContribution::contribution($document->getType(), $nature, bcadd($operation->getAmount(), '0', 2));
 
                 if (PlNature::INCOME === $nature) {
                     $result[$dateKey]['projects'][$projectKey]['responsibilityCenters'][$responsibilityCenterKey]['categories'][$categoryKey]['income'] += $amount;
@@ -266,8 +246,6 @@ final class PLRegisterUpdater
      *         category: PLCategory,
      *         income: float,
      *         expense: float,
-     *         mpIncomeSigned: float,
-     *         mpExpenseSigned: float,
      *       }>,
      *     }>,
      *   }>,
@@ -287,8 +265,8 @@ final class PLRegisterUpdater
 
                 foreach ($projectData['responsibilityCenters'] as $responsibilityCenterData) {
                     foreach ($responsibilityCenterData['categories'] as $categoryData) {
-                        $income = $categoryData['income'] + abs($categoryData['mpIncomeSigned']);
-                        $expense = $categoryData['expense'] + abs($categoryData['mpExpenseSigned']);
+                        $income = $categoryData['income'];
+                        $expense = $categoryData['expense'];
 
                         if (0.0 === $income && 0.0 === $expense) {
                             continue;

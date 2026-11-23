@@ -30,8 +30,8 @@ use Ramsey\Uuid\Uuid;
  * Δ = 2 × |положительные операции| по EXPENSE-категориям с storno.
  *
  * Тесты фиксируют:
- *  - для marketplace_pl используется знаковая семантика (charge -X / storno +X
- *    / sale +X / return -X);
+ *  - строка marketplace_pl — значение для отчёта: доход +, расход −, сторно — обратный
+ *    знак той же статьи; итог статьи может быть отрицательным (23.11);
  *  - для legacy типов (CASHFLOW_EXPENSE, TAXES, LOANS, PAYROLL и др.)
  *    сохраняется old-school abs()-семантика (amount всегда положительный,
  *    направление = категория.flow).
@@ -124,15 +124,14 @@ final class PLRegisterUpdaterStornoSymmetryTest extends IntegrationTestCase
         self::assertSame('0.00', $row['amount_expense']);
     }
 
-    public function testMarketplacePlPositiveExpenseCategory(): void
+    public function testMarketplacePlStornoExceedingChargesGivesNegativeExpense(): void
     {
-        // REV_SPP_RETURNS-аналог: marketplace_pl + EXPENSE-категория, но операция
-        // приходит с положительным amount (is_negative=false в потоке storno-бакетов).
-        // До фикса инверсия per-operation давала expense=-12509.17 → SQLSTATE 23514
-        // на CHECK chk_pl_daily_totals_amounts. Сейчас abs() после агрегации.
-        $category = $this->createCategory('REV_SPP_RETURNS', PLFlow::EXPENSE);
+        // Регрессия 23.11: сторно 1 000 больше удержаний 500 — расход статьи −500, а не +500.
+        $category = $this->createCategory('OPEX_WH_MP_DEDUCTIONS', PLFlow::EXPENSE);
         $document = $this->createDocument(DocumentType::MARKETPLACE_PL, '2026-03-22');
-        $this->addOperation($document, $category, '12509.17');
+        $this->addOperation($document, $category, '-400.00');
+        $this->addOperation($document, $category, '-100.00');
+        $this->addOperation($document, $category, '1000.00');
 
         $this->em->persist($document);
         $this->em->flush();
@@ -142,7 +141,25 @@ final class PLRegisterUpdaterStornoSymmetryTest extends IntegrationTestCase
         $row = $this->fetchTotal($category);
 
         self::assertSame('0.00', $row['amount_income']);
-        self::assertEqualsWithDelta(12509.17, (float) $row['amount_expense'], 0.005);
+        self::assertSame('-500.00', $row['amount_expense']);
+    }
+
+    public function testMarketplacePlClawbackOnIncomeCategoryGivesNegativeIncome(): void
+    {
+        // Маркетплейс забрал компенсацию: −X на статье дохода — доход −X, а не +X.
+        $category = $this->createCategory('OPEX_WH_COMPENSATION', PLFlow::INCOME);
+        $document = $this->createDocument(DocumentType::MARKETPLACE_PL, '2026-03-23');
+        $this->addOperation($document, $category, '-1800.00');
+
+        $this->em->persist($document);
+        $this->em->flush();
+
+        $this->updater->updateForDocument($document);
+
+        $row = $this->fetchTotal($category);
+
+        self::assertSame('-1800.00', $row['amount_income']);
+        self::assertSame('0.00', $row['amount_expense']);
     }
 
     public function testNetReportValueMatchesDocumentOperationsSumForMarketplace(): void

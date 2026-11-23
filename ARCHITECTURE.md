@@ -378,7 +378,7 @@
 - Вкладка документов (`DocumentRepository::findByCompany()` / `summarizeByCompany()`): условия на операции — `EXISTS`, документ гидрируется со всеми операциями; направление, статья и сумма — условия на одну и ту же операцию.
 - Вкладка операций (`DocumentOperationRepository::paginateForList()` / `summarizeForList()` / `marketplaceBucketSums()` / `countByDocuments()`): компания — через join документа (`IDENTITY(d.company)`), удалённые документы не входят; проект, ЦФО и контрагент — значения операции, иначе документа (как в `PLRegisterUpdater`); направление — природа операции (flow статьи, у `NONE` — знак суммы). Fetch-join только связей «к одному»: `d.operations` не присоединяется.
 - Справочники обеих вкладок (статья, контрагент, проект, основание ДДС) присоединяются с условием `IDENTITY(x.company) = :companyId`: FK компанию не несут, испорченная ссылка на справочник чужой компании гидрируется пустой — чужое название не показывается, не ищется и не входит в итог (как в JSON-выгрузке; тест `testForeignReferenceNamesDoNotLeakOnEitherTab`).
-- Деньги строк и итога — правила регистра ОПиУ: `DocumentPlContribution::forDocument()` (строка документа) и `::forOperation()` (строка операции). Обычный документ — модуль операции; `marketplace_pl` — со знаком суммы найденных операций той же статьи и природы в документе, поэтому сумма строк равна итогу. Итог — `DocumentListTotalsDTO::fromAggregates()` по валютам (основание ДДС без пересчёта, иначе RUB).
+- Деньги строк и итога — правила регистра ОПиУ: `DocumentPlContribution::forDocument()` (строка документа) и `::forOperation()` (строка операции). Обычный документ — модуль операции; `marketplace_pl` — значение для отчёта: в доход `amount`, в расход `−amount` (`DocumentPlContribution::contribution()`), итог статьи бывает отрицательным; сумма строк равна итогу. Итог — `DocumentListTotalsDTO::fromAggregates()` по валютам (основание ДДС без пересчёта, иначе RUB).
 
 ### Finance: переход из отчёта ДДС в «Транзакции ДДС»
 
@@ -1949,9 +1949,13 @@ isPLRegisterConsistent(string $companyId, \DateTimeImmutable $from, \DateTimeImm
 // - Для документов с type=marketplace_pl используется ЗНАКОВАЯ семантика:
 //     отрицательная сумма = расход (charge),
 //     положительная сумма = доход или сторно (storno) расхода.
-//   PLRegisterUpdater::aggregateDocuments() уважает эту семантику:
+//   PLRegisterUpdater::aggregateDocuments() уважает эту семантику без модуля:
 //     nature == INCOME  → income  += signedAmount
 //     nature == EXPENSE → expense += -signedAmount
+//   income/expense статьи за день могут быть отрицательными (сторно больше
+//   начислений, маркетплейс забрал компенсацию) — CHECK ≥ 0 снят.
+//   Поток revenue: знак строки — по природе статьи (±|amount|), is_negative
+//   маппинга продаж на знак не влияет; поток costs — знак is_negative/сторно.
 // - Для остальных типов документов (CASHFLOW_*, TAXES, LOANS, PAYROLL и др.)
 //   сохраняется legacy-семантика: amount всегда >= 0, направление
 //   (income/expense) определяется по category.flow через nature, и в
@@ -6193,6 +6197,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.238 | 2026-11-23 | Finance: строка `marketplace_pl` — значение для отчёта (доход +, расход −) во всех расчётах: регистр, итог документа и итоги списков без модуля, расход/доход статьи за день может быть отрицательным (CHECK `chk_pl_daily_totals_amounts` снят, миграция `Version20261123120000` нормализует строки потока revenue); `createPLDocument` ставит знак строк revenue по природе статьи; `DocumentOperationRepository::marketplaceBucketSums()` удалён; разовая команда ремонта дерева ОПиУ из 2.89 удалена после применения |
 | 2.237 | 2026-11-23 | MarketplaceOperations/Economics: уровни по шаблону ОПиУ — хранение, упаковка партнёрами и материалы, утилизация → СМ3 (`overhead`, хранение без SKU по-прежнему по остатку); подписки и Premium → СМ2 (без SKU — по выручке своим видом); `RULES_VERSION` `economics-5`, refresh пересчитает дни сам |
 | 2.236 | 2026-11-22 | MarketplaceWb/Ozon: справочность в `canon_minor`/`total_minor` дня — по итоговому виду (сид или решение по коду), не только по виду компонента; удержание «WB Продвижение» (`ads_settlement` из сида) больше не даёт ложное расхождение гейта «канон ≠ перевод» по воскресеньям; `RULES_VERSION` `wb-sales-report-3` — дни WB переводятся заново |
 | 2.235 | 2026-11-21 | MarketplaceEconomics: логистика до покупателя без SKU разносится по отгруженным штукам (`sales_qty_share`), `RULES_VERSION` `economics-4`; режим «Не разносить» в R1/R2 исключает строки разнесения (затраты без SKU — в «Нераспределено»); пояснение метода в R1 |
