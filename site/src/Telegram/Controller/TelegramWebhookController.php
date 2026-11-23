@@ -11,7 +11,7 @@ use App\Shared\Domain\Exception\UserFacingException;
 use App\Shared\Service\Storage\ObjectStorageInterface;
 use App\Telegram\Application\CreateTelegramCashTransactionAction;
 use App\Telegram\Application\DTO\CreateTelegramCashTransactionCommand;
-use App\Telegram\Application\TelegramBindingAccess;
+use App\Telegram\Application\TelegramBindingAction;
 use App\Telegram\Entity\ClientBinding;
 use App\Telegram\Entity\ImportJob;
 use App\Telegram\Entity\ReportSubscription;
@@ -53,7 +53,7 @@ final class TelegramWebhookController extends AbstractController
         private readonly LoggerInterface $telegramLogger,
         private readonly CreateTelegramCashTransactionAction $createTelegramCashTransactionAction,
         private readonly ObjectStorageInterface $storage,
-        private readonly TelegramBindingAccess $bindingAccess,
+        private readonly TelegramBindingAction $bindingAccess,
         private readonly string $telegramWebhookSecret = '',
         private readonly string $telegramApiBaseUrl = 'https://api.telegram.org',
     ) {

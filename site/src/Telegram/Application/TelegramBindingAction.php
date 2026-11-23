@@ -10,7 +10,7 @@ use App\Telegram\Entity\ClientBinding;
 use Doctrine\ORM\EntityManagerInterface;
 
 /** Выбор кассы и право записи/чтения Telegram-привязки по правам её пользователя в компании. */
-final readonly class TelegramBindingAccess
+final readonly class TelegramBindingAction
 {
     public function __construct(private EntityManagerInterface $em, private CompanyFacade $companies)
     {

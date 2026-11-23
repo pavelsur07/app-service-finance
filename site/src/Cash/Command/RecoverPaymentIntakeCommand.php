@@ -5,36 +5,35 @@ declare(strict_types=1);
 namespace App\Cash\Command;
 
 use App\Cash\Application\PaymentIntake\PaymentIntakeAction;
-use Ramsey\Uuid\Uuid;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-#[AsCommand(name: 'app:cash:recover-payment-intake', description: 'Повторяет долговечные заявки разбора и уведомления об изменении ДДС компании')]
+/** Cron: событие после commit подтверждения MCP-черновика могло не уйти — отправляем повторно. */
+#[AsCommand(name: 'app:cash:recover-payment-intake', description: 'Повторно отправляет уведомления об изменении ДДС после подтверждения черновиков')]
 final class RecoverPaymentIntakeCommand extends Command
 {
-    public function __construct(private readonly PaymentIntakeAction $action)
+    public function __construct(private readonly PaymentIntakeAction $action, private readonly LoggerInterface $logger)
     {
         parent::__construct();
     }
 
-    protected function configure(): void
-    {
-        $this->addArgument('company-id', InputArgument::REQUIRED, 'UUID компании');
-    }
-
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $companyId = $input->getArgument('company-id');
-        if (!\is_string($companyId) || !Uuid::isValid($companyId)) {
-            $output->writeln('<error>Укажите UUID компании.</error>');
-
-            return Command::INVALID;
+        $recovered = 0;
+        $failed = 0;
+        foreach ($this->action->pendingEventCompanyIds() as $companyId) {
+            try {
+                $recovered += $this->action->recoverEvents($companyId, true);
+            } catch (\Throwable $exception) {
+                ++$failed;
+                $this->logger->error('Payment draft cash event recovery failed.', ['companyId' => $companyId, 'exception' => $exception]);
+            }
         }
-        $output->writeln(sprintf('Восстановлено заявок: %d', $this->action->recover($companyId)));
+        $output->writeln(sprintf('Отправлено событий: %d, компаний со сбоем: %d', $recovered, $failed));
 
-        return Command::SUCCESS;
+        return 0 === $failed ? Command::SUCCESS : Command::FAILURE;
     }
 }

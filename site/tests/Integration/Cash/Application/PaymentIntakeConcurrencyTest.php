@@ -25,16 +25,6 @@ use Symfony\Component\Process\Process;
 
 final class PaymentIntakeConcurrencyTest extends IntegrationTestCase
 {
-    public function testTwoSimultaneousConfirmationsReturnOneStableTransactionSet(): void
-    {
-        $this->race('confirm');
-    }
-
-    public function testAmendAndConfirmCannotBothApplyTheSameRevision(): void
-    {
-        $this->race('amend');
-    }
-
     public function testMcpRequestsCreateOneDraftForAConnectionAndExternalId(): void
     {
         $this->race('mcp-create');
@@ -45,7 +35,7 @@ final class PaymentIntakeConcurrencyTest extends IntegrationTestCase
         $this->race('mcp-confirm');
     }
 
-    private function race(string $secondOperation): void
+    private function race(string $operation): void
     {
         // Separate physical connection commits the fixture: an uncommitted DAMA
         // INSERT would itself block readers and falsely prove the application lock.
@@ -62,19 +52,11 @@ final class PaymentIntakeConcurrencyTest extends IntegrationTestCase
         $account->setOpeningBalanceDate(new \DateTimeImmutable('today'));
         $project = new ProjectDirection(Uuid::uuid7()->toString(), $company, 'Общий', ProjectDirection::CODE_GENERAL);
         $center = new FinancialResponsibilityCenter($companyId, FinancialResponsibilityCenter::CODE_GENERAL, FinancialResponsibilityCenter::NAME_GENERAL);
-        $draft = new PaymentIntakeDraft($companyId, (string) $user->getId(), (string) $account->getId(), 'race/'.Uuid::uuid7()->toString(), 'original', 'оплата 100', new \DateTimeImmutable('today'), 'Europe/Moscow', 'RUB');
-        $taskId = Uuid::uuid7()->toString();
-        $draft->queue($taskId);
-        $draft->acceptResult($taskId, ['intent' => 'payments', 'items' => [['ref' => 'p1', 'amount' => '100.00', 'currency' => 'RUB', 'date' => (new \DateTimeImmutable('today'))->format('Y-m-d'), 'direction' => 'outflow', 'execution_status' => 'paid', 'description' => 'Race', 'text_evidence' => 'оплата 100', 'amount_evidence' => '100', 'category_id' => null, 'project_id' => null, 'cfo_id' => null, 'questions' => []]], 'questions' => [], 'target_ref' => null]);
-        $itemId = $draft->getItems()[0]['id'];
-        $draft->amend(1, [$itemId => ['paid_confirmed' => true]]);
         $connectionId = Uuid::uuid7()->toString();
-        if ('mcp-confirm' === $secondOperation) {
-            $draft = PaymentIntakeDraft::fromMcp(new CreateMcpCashDraft($companyId, (string) $user->getId(), $connectionId, 'payment-race', (string) $account->getId(), new \DateTimeImmutable('today'), CashDirection::OUTFLOW, '100.00'), 'RUB', 'test', new \DateTimeImmutable());
-        }
+        $draft = PaymentIntakeDraft::fromMcp(new CreateMcpCashDraft($companyId, (string) $user->getId(), $connectionId, 'payment-race', (string) $account->getId(), new \DateTimeImmutable('today'), CashDirection::OUTFLOW, '100.00'), 'RUB', 'test', new \DateTimeImmutable());
         $revision = $draft->getRevision();
         $entities = [$user, $company, $account, $project, $center, new FinancialResponsibilityCenterProject($companyId, $project, $center)];
-        if ('mcp-create' !== $secondOperation) {
+        if ('mcp-create' !== $operation) {
             $entities[] = $draft;
         }
         foreach ($entities as $entity) {
@@ -86,15 +68,14 @@ final class PaymentIntakeConcurrencyTest extends IntegrationTestCase
         try {
             $this->connection->beginTransaction();
             $locked = true;
-            if ('mcp-create' === $secondOperation) {
+            if ('mcp-create' === $operation) {
                 $this->connection->executeQuery('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['mcp:'.$companyId.':'.$connectionId.':payment-race']);
             } else {
                 self::getContainer()->get(PaymentIntakeDraftRepository::class)->getForCompany($companyId, $draft->getId(), true);
             }
-            $firstOperation = str_starts_with($secondOperation, 'mcp-') ? $secondOperation : 'confirm';
-            foreach ([$firstOperation, $secondOperation] as $operation) {
+            for ($i = 0; $i < 2; ++$i) {
                 $name = 'intake_race_'.Uuid::uuid7()->toString();
-                $process = new Process([\PHP_BINARY, 'tests/Fixtures/Cash/payment-intake-race.php'], (string) self::getContainer()->getParameter('kernel.project_dir'), ['INTAKE_REVISION' => (string) $revision, 'INTAKE_RACE_NAME' => $name, 'INTAKE_RACE_OPERATION' => $operation, 'INTAKE_COMPANY' => $companyId, 'INTAKE_ACTOR' => (string) $user->getId(), 'INTAKE_DRAFT' => $draft->getId(), 'INTAKE_ITEM' => $itemId, 'INTAKE_CONNECTION' => $connectionId, 'INTAKE_ACCOUNT' => (string) $account->getId()], null, 30);
+                $process = new Process([\PHP_BINARY, 'tests/Fixtures/Cash/payment-intake-race.php'], (string) self::getContainer()->getParameter('kernel.project_dir'), ['INTAKE_REVISION' => (string) $revision, 'INTAKE_RACE_NAME' => $name, 'INTAKE_RACE_OPERATION' => $operation, 'INTAKE_COMPANY' => $companyId, 'INTAKE_ACTOR' => (string) $user->getId(), 'INTAKE_DRAFT' => $draft->getId(), 'INTAKE_CONNECTION' => $connectionId, 'INTAKE_ACCOUNT' => (string) $account->getId()], null, 30);
                 $process->start();
                 $processes[] = $process;
                 self::assertTrue($process->waitUntil(static fn (string $type, string $out): bool => str_contains($out, "ready\n")), $process->getErrorOutput());
@@ -117,20 +98,15 @@ final class PaymentIntakeConcurrencyTest extends IntegrationTestCase
                 $outputs[] = json_decode(end($lines), true, 512, \JSON_THROW_ON_ERROR);
             }
             $count = (int) $seed->fetchOne('SELECT count(*) FROM cash_transaction WHERE company_id=?', [$companyId]);
-            if ('mcp-create' === $secondOperation) {
+            if ('mcp-create' === $operation) {
                 self::assertSame('awaiting_confirmation', $outputs[0]['status']);
                 self::assertSame($outputs[0], $outputs[1]);
                 self::assertSame(1, (int) $seed->fetchOne('SELECT count(*) FROM cash_payment_intake_draft WHERE company_id=?', [$companyId]));
                 self::assertSame(0, $count);
-            } elseif (\in_array($secondOperation, ['confirm', 'mcp-confirm'], true)) {
+            } else {
                 self::assertSame('confirmed', $outputs[0]['status']);
                 self::assertSame($outputs[0], $outputs[1]);
                 self::assertSame(1, $count);
-            } else {
-                $statuses = array_column($outputs, 'status');
-                self::assertContains('rejected', $statuses);
-                self::assertCount(1, array_filter($statuses, static fn (string $status): bool => 'rejected' !== $status));
-                self::assertSame(\in_array('confirmed', $statuses, true) ? 1 : 0, $count);
             }
         } finally {
             if ($locked) {
