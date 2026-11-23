@@ -28,11 +28,6 @@
         {{ ui.money(attribute(m, column.value)) }}
     {%- endif -%}
 {% endmacro %}
-{% macro delta(current, previous) %}
-    {%- if previous != 0 -%}
-        <p class="text-secondary small mb-0">{{ (current - previous)|vf_minor(2)|vf_amount(2, null, true) }}{% if previous > 0 %} · {{ ((current - previous) * 100 / previous)|vf_number(1) }} %{% endif %}</p>
-    {%- endif -%}
-{% endmacro %}
 
 {% block content %}
     {% import _self as ui %}
@@ -71,7 +66,6 @@
     {% for column in columns %}
         {% set groups = groups|merge({(column.group): (groups[column.group] ?? [])|merge([column.id])}) %}
     {% endfor %}
-    {% set profit = allocated ? 'full' : 'md2' %}
 
     <div class="vf-page-head">
         <div class="vf-page-head__title"><h1>Экономика SKU</h1></div>
@@ -177,7 +171,6 @@
             {% endif %}
             <p class="text-secondary small mb-0">
                 Суммы в ₽.
-                Сравнение с {{ report.previousFrom|date('d.m.Y') }} – {{ report.previousTo|date('d.m.Y') }}.
                 Дней в витрине: {{ report.days|vf_number }}.
                 {% if report.daysWithoutCostPrice > 0 %}Дней с продажами без себестоимости: {{ report.daysWithoutCostPrice|vf_number }} — себестоимость там 0.{% endif %}
                 НДС к уплате — с выручки с СПП по налоговому профилю компании на каждый месяц; уровни СМ — без НДС, проценты — от выручки до СПП.
@@ -244,7 +237,6 @@
                             {% for column in columns %}
                                 <td class="text-end" data-column="{{ column.id }}">
                                     {{ ui.cell(m, column) }}
-                                    {% if column.id == profit %}{{ ui.delta(attribute(m, column.value), attribute(row.previous, column.value)) }}{% endif %}
                                 </td>
                             {% endfor %}
                         </tr>
@@ -262,7 +254,6 @@
                             {% for column in columns %}
                                 <td class="text-end" data-column="{{ column.id }}">
                                     {{ ui.cell(m, column) }}
-                                    {% if label starts with 'Итого' and column.id == profit %}{{ ui.delta(attribute(m, column.value), attribute(report.previousTotal, column.value)) }}{% endif %}
                                 </td>
                             {% endfor %}
                         </tr>
