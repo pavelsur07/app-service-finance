@@ -86,13 +86,14 @@ export interface UnitExtendedTotals {
 
 /**
  * Затраты маркетплейса без привязки к товару (хранение, акции, подписки…) — строка
- * «Не распределено по товарам» перед «Итого»; уже входят в totals. null — фильтр по
- * тегам или таких затрат нет. Реклама сюда не входит: она в колонке «Реклама» из статистики.
+ * «Не распределено по товарам» перед «Итого»; уже входят в totals.
+ * null — фильтр по тегам или таких затрат нет.
  */
 export interface UnallocatedCosts {
     commission: number;
     logistics: number;
     otherCosts: number;
+    adSpend: number;
     totalCosts: number;
     profit: number;
     allCostsBreakdown: CostGroupBreakdown[];

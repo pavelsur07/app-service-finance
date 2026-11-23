@@ -1,0 +1,152 @@
+{% extends 'base.html.twig' %}
+{% block title %}Воронка продаж{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    {{ vite_entry_link_tags('marketplace_economics') }}
+{% endblock %}
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('marketplace_economics') }}
+{% endblock %}
+
+{% macro stage(row, key) -%}
+    {%- set value = row.values[key] -%}
+    {%- if value is null -%}<span class="text-secondary">нет данных</span>
+    {%- elseif key == 'revenue_minor' -%}{{ value|vf_minor(2)|vf_amount(2) }}
+    {%- else -%}{{ value|vf_number }}{%- endif -%}
+{%- endmacro %}
+{% macro conversion(row, from, to) -%}
+    {%- set value = row.conversion(from, to) -%}
+    {%- if value is not null %}<p class="text-secondary small mb-0">{{ value|vf_number(1) }} %</p>{% endif -%}
+{%- endmacro %}
+
+{% block content %}
+    {% import _self as ui %}
+    {% set params = app.request.query.all %}
+    {% set channels = constant('App\\MarketplaceFunnel\\Application\\DTO\\FunnelReport::CHANNELS') %}
+    {% set sources = constant('App\\MarketplaceFunnel\\Application\\DTO\\FunnelReport::SOURCES') %}
+    {# ступень, подпись, от какой ступени считается конверсия #}
+    {% set stages = [
+        {key: 'impressions', label: 'Показы', base: null},
+        {key: 'card_views', label: 'Переходы в карточку', base: 'impressions'},
+        {key: 'cart_adds', label: 'В корзину', base: 'card_views'},
+        {key: 'orders', label: 'Заказы', base: 'cart_adds'},
+        {key: 'revenue_minor', label: 'Выручка заказов, ₽', base: null},
+        {key: 'buyouts', label: 'Выкупы', base: 'orders'},
+        {key: 'cancels', label: 'Отмены', base: 'orders'},
+        {key: 'returns', label: 'Возвраты', base: null},
+    ] %}
+
+    <div class="vf-page-head">
+        <div class="vf-page-head__title"><h1>Воронка продаж</h1></div>
+    </div>
+    <div class="card mb-3">
+        <form method="get" class="card-body row g-3 align-items-end">
+            <div class="col-12 col-sm-6 col-lg-auto">
+                <label class="form-label" for="mfn-from">С даты</label>
+                <input class="form-control" id="mfn-from" type="date" name="from" required value="{{ from }}">
+            </div>
+            <div class="col-12 col-sm-6 col-lg-auto">
+                <label class="form-label" for="mfn-to">По дату</label>
+                <input class="form-control" id="mfn-to" type="date" name="to" required value="{{ to }}">
+            </div>
+            {% if report and report.channels|length > 1 %}
+                <div class="col-12 col-sm-6 col-lg-auto">
+                    <label class="form-label" for="mfn-channel">Маркетплейс</label>
+                    <select class="form-select" id="mfn-channel" name="channel">
+                        <option value="">Все</option>
+                        {% for value in report.channels %}
+                            <option value="{{ value }}" {{ value == channel ? 'selected' }}>{{ channels[value] ?? value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+            {% if report and 'search' in report.sources %}
+                <div class="col-12 col-sm-6 col-lg-auto">
+                    <label class="form-label" for="mfn-source">Источник</label>
+                    <select class="form-select" id="mfn-source" name="source">
+                        {% for value, label in sources %}
+                            <option value="{{ value }}" {{ value == source ? 'selected' }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+            <div class="col-12 col-sm-6 col-lg-auto">
+                <label class="form-label" for="mfn-q">Поиск</label>
+                <input class="form-control" id="mfn-q" type="search" name="q" value="{{ search }}" placeholder="SKU, артикул, название">
+            </div>
+            <input type="hidden" name="sort" value="{{ sort }}">
+            <input type="hidden" name="dir" value="{{ desc ? 'desc' : 'asc' }}">
+            <div class="col-12 col-lg-auto d-flex flex-wrap gap-2">
+                <button class="btn btn-primary">Показать</button>
+                {% if report and report.rows is not empty %}
+                    <a class="btn" href="{{ path('marketplace_funnel', params|merge({format: 'xlsx', page: null})) }}">Скачать xlsx</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    {% if error %}
+        <div class="mb-3">
+            <div class="alert alert-danger" role="alert"><div class="d-block"><p class="mb-0">{{ error }}</p></div></div>
+        </div>
+    {% elseif report.days == 0 %}
+        <div class="mb-3">
+            <div class="alert alert-info" role="status"><div class="d-block"><p class="mb-0">Данных воронки за период нет: маркетплейс ещё не отдал эти дни либо кабинет не подключён.</p></div></div>
+        </div>
+    {% else %}
+        <div class="mb-3">
+            <p class="text-secondary small mb-0">
+                Кабинето-дней с данными: {{ (report.days - report.unavailableDays)|vf_number }}.
+                {% if report.unavailableDays > 0 %}{{ report.unavailableDays|vf_number }} дн. без данных: маркетплейс не отдаёт воронку по тарифу кабинета.{% endif %}
+                Проценты под числом — конверсия из предыдущей ступени. У WB нет общих показов и возвратов: первая ступень — переходы в карточку, поэтому в «Итого» показы и возвраты — только Ozon.
+                Выкупы и отмены относятся к дню заказа и дозревают.
+                {% if report.source == 'search' %}Из поиска — только WB с подпиской «Джем»: переходы в карточку, корзины и заказы; это часть общих переходов, не отдельные продажи.{% endif %}
+            </p>
+        </div>
+        <section class="card mb-3 me-table-card" data-economics-table>
+            <div class="me-table-scroll" data-economics-scroll tabindex="0" role="region" aria-label="Воронка продаж">
+            <table class="table table-vcenter card-table me-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Товар</th>
+                        {% for stage in stages %}
+                            <th scope="col" class="text-end"{% if sort == stage.key %} aria-sort="{{ desc ? 'descending' : 'ascending' }}"{% endif %}>
+                                <a href="{{ path('marketplace_funnel', params|merge({sort: stage.key, dir: sort == stage.key and desc ? 'asc' : 'desc', page: null})) }}">{{ stage.label }}</a>
+                            </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in pager.currentPageResults %}
+                        <tr data-funnel-row>
+                            <td>
+                                {% if report.channels|length > 1 %}<span class="badge bg-secondary-lt">{{ channels[row.channel] ?? row.channel }}</span>{% endif %}
+                                {{ row.sku }}
+                                <p class="text-secondary small mb-0">{{ row.title ?? row.supplierSku ?? '' }}</p>
+                            </td>
+                            {% for stage in stages %}
+                                <td class="text-end" data-stage="{{ stage.key }}">{{ ui.stage(row, stage.key) }}{% if stage.base %}{{ ui.conversion(row, stage.base, stage.key) }}{% endif %}</td>
+                            {% endfor %}
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td class="text-center text-secondary py-5" colspan="{{ stages|length + 1 }}">Нет товаров с данными воронки за период.</td>
+                        </tr>
+                    {% endfor %}
+                    <tr class="me-totals" data-funnel-total>
+                        <td class="fw-semibold">{{ search ? 'Итого по найденным' : 'Итого' }}</td>
+                        {% for stage in stages %}
+                            <td class="text-end" data-stage="{{ stage.key }}">{{ ui.stage(report.total, stage.key) }}</td>
+                        {% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+        </section>
+        <div class="card card-body mt-3">
+            {% include 'partials/_pagination.html.twig' with {pager: pager} only %}
+        </div>
+    {% endif %}
+{% endblock %}

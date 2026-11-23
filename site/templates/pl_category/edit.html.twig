@@ -129,6 +129,7 @@
                             {label: 'Доходы', pane: 'tab-income', active: true},
                             {label: 'Расходы', pane: 'tab-expense'},
                             {label: 'Расчётные', pane: 'tab-calculated'},
+                            {label: 'Налоги', pane: 'tab-taxes'},
                         ]} only %}
                         <div class="card-body">
                             <div class="tab-content">
@@ -157,6 +158,17 @@
                                     {% else %}
                                         <p class="text-secondary small mb-0">Нет доступных переменных расходов.</p>
                                     {% endif %}
+                                </div>
+                                <div class="tab-pane" id="tab-taxes">
+                                    {# Имена — App\Finance\Report\PlFormulaVariables::NAMES. #}
+                                    <div class="d-flex flex-column gap-2">
+                                        {% for code, label in {VAT_RATE: 'Ставка НДС, %', TAX_RATE: 'Ставка налога УСН / АУСН, %'} %}
+                                            <button type="button" class="pl-category-variable btn btn-outline-secondary justify-content-between" data-insert-code="{{ code }}" data-insert-target="#{{ form.formula.vars.id }}">
+                                                <span class="pl-category-variable-name text-truncate text-start" title="{{ label }}">{{ label }}</span><span class="pl-category-variable-code badge bg-secondary-lt ms-2 font-monospace small fw-semibold flex-shrink-0 text-nowrap">{{ code }}</span>
+                                            </button>
+                                        {% endfor %}
+                                    </div>
+                                    <p class="text-secondary small mt-3 mb-0">Действующие ставки из налогового профиля компании на конец периода отчёта. Пример: REV_TOTAL * TAX_RATE / 100.</p>
                                 </div>
                                 <div class="tab-pane" id="tab-calculated">
                                     {% if calculated_variables is not empty %}

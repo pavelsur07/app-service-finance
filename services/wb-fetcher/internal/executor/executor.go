@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pavelsur07/app-service-finance/services/shared/fetchkit/apierr"
@@ -21,11 +22,51 @@ import (
 // ResourceDaily — детальный отчёт о реализации за день МСК (period_key YYYY-MM-DD).
 const ResourceDaily = "wb.finance.sales-report.daily"
 
+// ResourceAds — реклама за день МСК: списания кампаний и их статистика (одна страница).
+const ResourceAds = "wb.ads.daily"
+
+// IsAdsResource — ресурс семейства рекламы: свой слот кабинета, свой ключ доступа.
+func IsAdsResource(resource string) bool { return strings.HasPrefix(resource, "wb.ads.") }
+
+// ResourceFunnel — воронка продаж по карточкам за день МСК (одна страница):
+// переходы в карточку, корзины, заказы, выкупы (docs/tasks/marketplace-funnel/TASK.md).
+const ResourceFunnel = "wb.analytics.funnel"
+
+// ownAccess — ресурс со своей категорией доступа токена (продвижение,
+// аналитика): отказ 401/403 — пауза только этой задачи, финансы кабинета идут.
+func ownAccess(resource string) bool {
+	return IsAdsResource(resource) || resource == ResourceFunnel || resource == ResourceSearch
+}
+
+// ResourceSearch — поиск по карточкам за день МСК (одна страница): видимость,
+// позиция, переходы, корзины и заказы из поиска; у WB — только с «Джемом»,
+// без него день — служебная страница wb.SearchUnavailablePage.
+const ResourceSearch = "wb.analytics.search"
+
+// FunnelSource — день воронки (wb.Analytics).
+type FunnelSource interface {
+	FunnelDay(ctx context.Context, ref, token, day string) (wb.FunnelDay, error)
+	SearchDay(ctx context.Context, ref, token, day string) (wb.FunnelDay, error)
+}
+
+// AdsSource — день рекламы (wb.Ads).
+type AdsSource interface {
+	Day(ctx context.Context, ref, token, day string) (wb.AdsDay, error)
+}
+
 // DefaultMaxPages — предел страниц периода: 250 × 20 000 строк (5 млн) —
 // заведомо больше реального отчёта; превышение — зацикливание курсора, а не данные.
 const DefaultMaxPages = 250
 
 var errTooManyPages = errors.New("executor: page limit exceeded")
+
+// errSearchRefused — WB отказал в поиске дню, у которого уже есть ревизия с
+// данными (подписка закончилась): данные не затираются служебной страницей.
+var errSearchRefused = errors.New("executor: wb refused search for a day that already has data")
+
+func unavailableHash(status int) string {
+	return fetch.ContentHash([]string{fetch.SHA256Hex(wb.SearchUnavailablePage(status))})
+}
 
 // Report — страница отчёта (wb.Client).
 type Report interface {
@@ -65,7 +106,21 @@ type Executor struct {
 	core   *fetch.Executor[connections.Cabinet]
 	cfg    Config
 	report Report
+	ads    AdsSource
+	funnel FunnelSource
 	now    func() time.Time
+}
+
+// WithFunnel — источник воронки; без него задачи wb.analytics.funnel — неизвестный ресурс.
+func (e *Executor) WithFunnel(f FunnelSource) *Executor {
+	e.funnel = f
+	return e
+}
+
+// WithAds — источник рекламы; без него задачи wb.ads.daily — неизвестный ресурс.
+func (e *Executor) WithAds(ads AdsSource) *Executor {
+	e.ads = ads
+	return e
 }
 
 func New(cfg Config, tasks fetch.TaskStore, raw fetch.RawStore, report Report, refresher fetch.Refresher, logger *slog.Logger,
@@ -91,6 +146,30 @@ func (e *Executor) Run(ctx context.Context, task store.Task, cabinet connections
 // Fetch — fetch.Adapter.
 func (e *Executor) Fetch(ctx context.Context, run *fetch.Run, cab connections.Cabinet) error {
 	resource := run.Task.ResourceType
+	if resource == ResourceAds && e.ads != nil {
+		return e.dayPage(ctx, run, cab, func(day string) ([]byte, slog.Attr, error) {
+			page, err := e.ads.Day(ctx, cab.Ref, cab.Token.Reveal(), day)
+			return page.Body, slog.Int("campaigns", page.Campaigns), err
+		})
+	}
+	if resource == ResourceFunnel && e.funnel != nil {
+		return e.dayPage(ctx, run, cab, func(day string) ([]byte, slog.Attr, error) {
+			page, err := e.funnel.FunnelDay(ctx, cab.Ref, cab.Token.Reveal(), day)
+			return page.Body, slog.Int("products", page.Products), err
+		})
+	}
+	if resource == ResourceSearch && e.funnel != nil {
+		return e.dayPage(ctx, run, cab, func(day string) ([]byte, slog.Attr, error) {
+			page, err := e.funnel.SearchDay(ctx, cab.Ref, cab.Token.Reveal(), day)
+			if status := wb.SearchUnavailable(err); status != 0 {
+				if h := run.Task.ContentHash; h != "" && h != unavailableHash(http.StatusPaymentRequired) && h != unavailableHash(http.StatusForbidden) {
+					return nil, slog.Attr{}, errSearchRefused
+				}
+				return wb.SearchUnavailablePage(status), slog.Int("unavailable_status", status), nil
+			}
+			return page.Body, slog.Int("products", page.Products), err
+		})
+	}
 	if resource != ResourceDaily && resource != ResourceWeekly {
 		return fmt.Errorf("%w: %q", fetch.ErrUnknownResource, resource)
 	}
@@ -113,6 +192,33 @@ func (e *Executor) Fetch(ctx context.Context, run *fetch.Run, cab connections.Ca
 		return fmt.Errorf("%w: %q", fetch.ErrBadPeriod, run.Task.PeriodKey)
 	}
 	return e.pages(ctx, run, cab, wb.PeriodDaily, day.Format(time.DateOnly), day.Format(time.DateOnly), time.Time{})
+}
+
+// dayPage — день ресурса одной страницей (реклама, воронка): load собирает
+// страницу дня и счётчик для журнала.
+func (e *Executor) dayPage(ctx context.Context, run *fetch.Run, cab connections.Cabinet, load func(day string) ([]byte, slog.Attr, error)) error {
+	if cab.Token == "" {
+		return fetch.ErrNoCredentials
+	}
+	if !cab.Supports(run.Task.ResourceType) {
+		return fetch.ErrResourceNotEnabled
+	}
+	if len(run.Hashes) > 0 {
+		return nil // страница сохранена прошлой попыткой, не записан только итог
+	}
+	day, err := time.Parse(time.DateOnly, run.Task.PeriodKey)
+	if err != nil {
+		return fmt.Errorf("%w: %q", fetch.ErrBadPeriod, run.Task.PeriodKey)
+	}
+	body, count, err := load(day.Format(time.DateOnly))
+	if err != nil {
+		return err
+	}
+	if err := run.Store(ctx, fetch.Page{No: run.NextPage, Body: body, ContentType: "application/json"}); err != nil {
+		return err
+	}
+	run.Log.Info("day page read", slog.String("stage", "fetch"), count)
+	return nil
 }
 
 // pages — с курсора задачи до страницы короче limit; каждая страница с
@@ -172,14 +278,29 @@ func (e *Executor) Classify(c *fetch.Classification) (store.Outcome, bool) {
 			label = "symfony_quota_unavailable"
 		}
 		return store.Outcome{Status: store.StatusPending, Label: label, ErrorClass: label, KeepCursor: true, NextRunAt: qe.Until}, true
+	case ownAccess(c.Task.ResourceType) && isAuth(c.Err):
+		// Токен без доступа к продвижению или аналитике: пауза только этой задаче, финансы кабинета идут дальше.
+		pause := e.cfg.AuthRetryPause
+		if c.Task.LastErrorClass == string(apierr.ClassAuth) {
+			pause = e.cfg.AuthSuspend
+			c.Log.Error("wb api rejected cabinet token again, ads task paused", slog.String("stage", "fetch"))
+		}
+		return store.Outcome{Status: store.StatusPending, Label: string(apierr.ClassAuth), ErrorClass: string(apierr.ClassAuth), NextRunAt: c.Now.Add(pause)}, true
+	case errors.Is(c.Err, errSearchRefused):
+		return store.Outcome{Status: store.StatusFailedPermanent, Label: "search_refused", ErrorClass: "search_refused", NextRunAt: c.Now}, true
 	case errors.Is(c.Err, errTooManyPages):
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "too_many_pages", ErrorClass: "too_many_pages", NextRunAt: c.Now}, true
 	}
 	return store.Outcome{}, false
 }
 
-// ResumesConnection — успех снимает паузу кабинета после 401.
-func (e *Executor) ResumesConnection(string) bool { return true }
+// ResumesConnection — успех отчёта снимает паузу кабинета после 401; реклама и аналитика — другой доступ токена.
+func (e *Executor) ResumesConnection(resource string) bool { return !ownAccess(resource) }
+
+func isAuth(err error) bool {
+	var apiErr *apierr.APIError
+	return errors.As(err, &apiErr) && apiErr.Class == apierr.ClassAuth
+}
 
 // LogLevel — квота Symfony не отвечает — WARN (повтор сам, но долгий отказ
 // останавливает загрузку); остальное — уровни ядра.

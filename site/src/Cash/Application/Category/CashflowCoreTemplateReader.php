@@ -18,13 +18,21 @@ use Symfony\Component\Yaml\Yaml;
  */
 final readonly class CashflowCoreTemplateReader
 {
-    public const VERSION = 1;
+    public const VERSION = 2;
     public const SECTIONS = [
         CashflowCategory::CODE_OPERATING,
         CashflowCategory::CODE_FINANCING,
         CashflowCategory::CODE_INVESTING,
     ];
-    private const NODE_KEYS = ['name', 'description', 'direction', 'children'];
+    private const NODE_KEYS = ['code', 'name', 'description', 'direction', 'children'];
+    /** Префикс кода по секции деятельности; дальше _IN или _OUT по направлению. */
+    private const CODE_PREFIX = [
+        CashflowCategory::CODE_OPERATING => 'OP',
+        CashflowCategory::CODE_FINANCING => 'FIN',
+        CashflowCategory::CODE_INVESTING => 'INV',
+    ];
+    private const CODE_PATTERN = '/^(OP|FIN|INV)_(IN|OUT)(_[A-Z0-9_]+)?$/';
+    private const MAX_CODE_LENGTH = 64;
     private const MAX_LEVEL = 3;
     private const MAX_NAME_LENGTH = 255;
     private const MAX_DESCRIPTION_LENGTH = 500;
@@ -68,6 +76,7 @@ final readonly class CashflowCoreTemplateReader
         }
 
         $result = [];
+        $codes = [];
         foreach ($sections as $code => $items) {
             if (!\in_array($code, self::SECTIONS, true)) {
                 throw new CashflowCoreTemplateException(sprintf('sections.%s: ожидается одна из групп %s.', (string) $code, implode(', ', self::SECTIONS)));
@@ -75,7 +84,7 @@ final readonly class CashflowCoreTemplateReader
             if (!\is_array($items) || [] === $items || !array_is_list($items)) {
                 throw new CashflowCoreTemplateException(sprintf('sections.%s: список узлов пуст или не является списком.', $code));
             }
-            $result[$code] = $this->nodes($items, null, 1, 'sections.'.$code);
+            $result[$code] = $this->nodes($items, null, 1, 'sections.'.$code, $code, $codes);
         }
 
         return $result;
@@ -83,10 +92,11 @@ final readonly class CashflowCoreTemplateReader
 
     /**
      * @param list<mixed> $items
+     * @param array<string, true> $codes коды всего файла — уникальность
      *
      * @return list<CashflowCoreTemplateNode>
      */
-    private function nodes(array $items, ?PaymentPlanType $parentDirection, int $level, string $path): array
+    private function nodes(array $items, ?PaymentPlanType $parentDirection, int $level, string $path, string $section, array &$codes): array
     {
         if ([] !== $items && $level > self::MAX_LEVEL) {
             throw new CashflowCoreTemplateException(sprintf('%s: глубина больше %d уровней.', $path, self::MAX_LEVEL));
@@ -132,16 +142,42 @@ final readonly class CashflowCoreTemplateReader
                 throw new CashflowCoreTemplateException(sprintf('%s (%s): у статьи обязательно описание.', $nodePath, $name));
             }
 
+            $code = $this->code($item, $section, $direction, $codes, $nodePath, $name);
+
             $nodes[] = new CashflowCoreTemplateNode(
+                code: $code,
                 name: $name,
                 description: $description,
                 direction: $direction,
                 sort: ($index + 1) * 10,
-                children: $this->nodes($children, $direction, $level + 1, $nodePath.'.children'),
+                children: $this->nodes($children, $direction, $level + 1, $nodePath.'.children', $section, $codes),
             );
         }
 
         return $nodes;
+    }
+
+    /**
+     * @param array<mixed> $item
+     * @param array<string, true> $codes
+     */
+    private function code(array $item, string $section, PaymentPlanType $direction, array &$codes, string $nodePath, string $name): string
+    {
+        $code = $item['code'] ?? null;
+        if (!\is_string($code) || mb_strlen($code) > self::MAX_CODE_LENGTH || 1 !== preg_match(self::CODE_PATTERN, $code)) {
+            throw new CashflowCoreTemplateException(sprintf('%s (%s): code обязателен, формат {OP|FIN|INV}_{IN|OUT}[_SLUG], до %d символов.', $nodePath, $name, self::MAX_CODE_LENGTH));
+        }
+
+        $prefix = self::CODE_PREFIX[$section].(PaymentPlanType::INFLOW === $direction ? '_IN' : '_OUT');
+        if ($code !== $prefix && !str_starts_with($code, $prefix.'_')) {
+            throw new CashflowCoreTemplateException(sprintf('%s (%s): code должен начинаться с %s — секция и направление узла.', $nodePath, $name, $prefix));
+        }
+        if (isset($codes[$code])) {
+            throw new CashflowCoreTemplateException(sprintf('%s (%s): code %s повторяется в шаблоне.', $nodePath, $name, $code));
+        }
+        $codes[$code] = true;
+
+        return $code;
     }
 
     /**

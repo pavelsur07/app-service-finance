@@ -67,7 +67,9 @@ final readonly class SnapshotCalculationPolicy
 
         $totalCostPrice = null;
         if (null !== $costPrice) {
-            $totalCostPrice = bcmul($costPrice, (string) $salesQuantity, 2);
+            // Возвращённые единицы возвращают себестоимость, как в ОПиУ (sale − return_cost_price);
+            // день только с возвратами — отрицательная себестоимость.
+            $totalCostPrice = bcmul($costPrice, (string) ($salesQuantity - $returnsQuantity), 2);
         } else {
             $flags = $flags->addFlag(DataQualityFlag::COST_PRICE_MISSING);
         }
@@ -83,7 +85,11 @@ final readonly class SnapshotCalculationPolicy
             if ($type->isAdvertising()) {
                 continue;
             }
-            $costMap[$type->value] = bcadd($costMap[$type->value] ?? '0.00', $costDTO->amount, 2);
+            // сторно (возврат комиссии и т.п.) хранится положительной суммой — уменьшает затрату, как в ListingCostAggregateQuery
+            $amount = 'storno' === $costDTO->operationType
+                ? bcmul(ltrim($costDTO->amount, '-'), '-1', 2)
+                : $costDTO->amount;
+            $costMap[$type->value] = bcadd($costMap[$type->value] ?? '0.00', $amount, 2);
         }
 
         // 5. Advertising

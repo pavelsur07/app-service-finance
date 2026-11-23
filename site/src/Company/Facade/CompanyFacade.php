@@ -18,6 +18,9 @@ use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Repository\UserRepository;
+use App\Company\Security\AccessLevel;
+use App\Company\Security\Module;
+use App\Company\Security\ModuleAccessResolver;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -35,6 +38,7 @@ final class CompanyFacade
         private readonly CompanyMemberRepository $companyMemberRepository,
         private readonly ProjectDirectionRepository $projectDirectionRepository,
         private readonly UserRepository $userRepository,
+        private readonly ModuleAccessResolver $moduleAccess,
     ) {
     }
 
@@ -221,6 +225,24 @@ final class CompanyFacade
     {
         return Uuid::isValid($companyId) && Uuid::isValid($userId)
             && $this->repository->isAccessibleByUser($companyId, $userId);
+    }
+
+    /**
+     * Право пользователя на модуль компании без HTTP-сессии (фоновые задачи от имени пользователя):
+     * владелец либо активный участник с уровнем не ниже $level. Компания, помеченная к удалению, недоступна.
+     */
+    public function userHasModuleAccess(string $companyId, string $userId, Module $module, AccessLevel $level): bool
+    {
+        if (!Uuid::isValid($companyId) || !Uuid::isValid($userId)) {
+            return false;
+        }
+        $company = $this->repository->findById($companyId);
+        $user = $this->userRepository->find($userId);
+        if (null === $company || !$user instanceof User) {
+            return false;
+        }
+
+        return $this->moduleAccess->allowsForCompany($user, $company, $this->companyMemberRepository->findActiveOneByCompanyAndUser($company, $user), $module, $level);
     }
 
     /**

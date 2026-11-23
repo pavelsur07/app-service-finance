@@ -47,8 +47,22 @@ final class PLCategoryNewControllerTest extends WebTestCaseBase
         self::assertCount(0, $crawler->filter('input[id$="_isVisible"]'));
         self::assertSame(['INCOME_CODE'], $crawler->filter('#tab-income .pl-category-variable')->each(static fn ($node) => $node->attr('data-insert-code')));
 
+        self::assertSame(
+            \App\Finance\Report\PlFormulaVariables::NAMES,
+            $crawler->filter('#tab-taxes .pl-category-variable')->each(static fn ($node) => $node->attr('data-insert-code')),
+        );
+
+        // Имя переменной ставки зарезервировано: статью с таким кодом создать нельзя.
         $form = $crawler->filter('#pl-category-edit-form')->form();
-        $form[$crawler->filter('input[id$="_name"]')->attr('name')] = 'Created category';
+        $form[(string) $crawler->filter('input[id$="_name"]')->attr('name')] = 'Reserved code category';
+        $form[(string) $crawler->filter('input[id$="_code"]')->attr('name')] = ' tax_rate ';
+        $client->submit($form);
+        self::assertStringContainsString('зарезервирован', (string) $client->getResponse()->getContent());
+        self::assertNull($this->em()->getRepository(PLCategory::class)->findOneBy(['company' => $company, 'name' => 'Reserved code category']));
+
+        $crawler = $client->request('GET', '/pl-categories/new');
+        $form = $crawler->filter('#pl-category-edit-form')->form();
+        $form[(string) $crawler->filter('input[id$="_name"]')->attr('name')] = 'Created category';
         $client->submit($form);
 
         self::assertResponseRedirects('/pl-categories/');

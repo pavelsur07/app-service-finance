@@ -73,7 +73,8 @@ final class ApplyCashflowCoreTemplateAction
                 ->setDescription($node->description)
                 ->setOperationType($node->direction)
                 ->setSort($node->sort)
-                ->setParent($parent);
+                ->setParent($parent)
+                ->assignGroupCode($node->code);
             $category->syncFlowKindWithParent();
             $this->entityManager->persist($category);
             ++$created;

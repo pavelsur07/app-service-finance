@@ -94,7 +94,11 @@ Symfony обращается к сервисам по внутренней се�
 | витрина `data_coverage`, экран «Сервисы» | общей витрины нет; витрина покрытия сервисов `service_coverage_*` (ozon-fetcher, wb-fetcher; обновление cron каждые 10 минут, страница с вкладкой на сервис); экрана «Сервисы» нет |
 | circuit breaker, `trace_id` между Symfony и сервисом | circuit breaker нет; `X-Trace-Id` шлют клиенты ozon-fetcher и ai-service |
 | токен на направление | ozon-fetcher: «сервис → Symfony» — `INTERNAL_AUTH_TOKEN`, «Symfony → сервис» — `SERVICE_API_TOKEN` (секрет `OZON_FETCHER_API_TOKEN`); ai-service: только «Symfony → сервис» — `AI_SERVICE_API_TOKEN` (сервис в Symfony не ходит) |
-| сервис только во внутренней сети, свой GlitchTip, переключатель, bootstrap БД в деплое | **есть** (ozon-fetcher, PR #2706–#2713); ai-service — переключатель `AI_SERVICE_ENABLED` + allowlist компаний, в прод не выведен |
+| сервис только во внутренней сети, свой GlitchTip, переключатель, bootstrap БД в деплое | **есть** (ozon-fetcher, PR #2706–#2713); ai-service — постоянные API/business worker, доступ компаний через `ai_company_access`; nightly — отдельный профиль `ai-service-eval` |
+
+У ozon-fetcher, wb-fetcher и ai-service временный rollout завершён: production
+запуск постоянный, SourceFacts принимает все действительные подключения, ИИ-доступ
+компаний выдаёт администратор. Dev-профиль `services` сохранён.
 
 Не выдавать целевое за существующее. Новый код со сервисами пишется по §2;
 существующий ozon-fetcher приводится к нему отдельной задачей.

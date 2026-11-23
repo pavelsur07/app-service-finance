@@ -18,6 +18,7 @@ const (
 	PriorityYesterday = 10
 	PriorityWeek      = 7
 	PriorityTail      = 5
+	PriorityHistory   = 1
 )
 
 // KindDailyTail — суточное перечитывание вчера и хвоста: WB дописывает строки
@@ -34,15 +35,53 @@ const RefreshWeeks = 3
 // DefaultTailDays — дней перед вчера в окне загрузки и перечитывания.
 const DefaultTailDays = 14
 
+// DailyHistoryDays — дней дневного отчёта до вчера включительно, загружаемых однократно: новый
+// контур считает ОПиУ и экономику за прошлые месяцы, окна перечитывания для этого мало.
+const DailyHistoryDays = 90
+
 // DefaultDailyStart — с этого часа МСК грузится отчёт за вчера: ночью WB его
 // ещё не опубликовал (Symfony — 03:10), пустой ответ закрыл бы день до завтра.
 const DefaultDailyStart = 4 * time.Hour
 
+// KindAdsTail — суточное перечитывание рекламы за вчера и AdsRefreshDays: списания
+// WB проводит с задержкой.
+const KindAdsTail = "wb_ads_tail"
+
+// AdsHistoryDays — дней рекламы, загружаемых однократно (окно сверки и ночной перезагрузки
+// нового контура); AdsRefreshDays — из них перечитываются каждые сутки.
+const (
+	AdsHistoryDays = 45
+	AdsRefreshDays = 7
+)
+
+// KindFunnelTail — суточное перечитывание воронки: выкупы и отмены WB пишет на
+// день заказа, поэтому прошедшие дни меняются.
+const KindFunnelTail = "wb_funnel_tail"
+
+// FunnelDays — дней воронки до вчера включительно: загружаются и перечитываются
+// каждые сутки (запрос на день — до 1000 карточек). Глубже — только после
+// живой проверки метода (docs/tasks/marketplace-funnel/TASK.md, этап 1).
+const FunnelDays = 30
+
+// KindSearchTail — суточное перечитывание хвоста поиска.
+const KindSearchTail = "wb_search_tail"
+
+// SearchDays — дней поиска до вчера включительно, загружаемых один раз;
+// SearchRefreshDays — из них перечитываются каждые сутки: вчерашний день WB
+// досчитывает, а кабинету без «Джема» перечитывание заменит служебную страницу
+// данными, когда подписка появится. Прошлые дни поиска не меняются (выкупов в
+// нём нет), поэтому хвост короче, чем у воронки.
+const (
+	SearchDays        = 30
+	SearchRefreshDays = 7
+)
+
 // Config — параметры окна.
 type Config struct {
-	Location   *time.Location // Europe/Moscow
-	TailDays   int            // дней перед вчера
-	DailyStart time.Duration  // смещение от полуночи МСК для вчера и перечитывания
+	Location    *time.Location // Europe/Moscow
+	TailDays    int            // дней перед вчера
+	HistoryDays int            // дней до вчера включительно, загружаемых один раз; 0 — только окно
+	DailyStart  time.Duration  // смещение от полуночи МСК для вчера и перечитывания
 }
 
 func DefaultConfig(loc *time.Location) Config {
@@ -82,6 +121,46 @@ func Build(now time.Time, cabinets []connections.Cabinet, cfg Config) schedule.P
 				}
 				plan.Ensure = append(plan.Ensure, ensure)
 				tail.Specs = append(tail.Specs, store.TaskSpec{TaskKey: k, Priority: ensure.Priority, Refresh: true, RunAt: start})
+			}
+			for i := days + 1; i < cfg.HistoryDays; i++ {
+				k := key(cab.Ref, executor.ResourceDaily, yesterday.AddDate(0, 0, -i).Format(time.DateOnly))
+				plan.Ensure = append(plan.Ensure, store.TaskSpec{TaskKey: k, Priority: PriorityHistory, RunAt: now})
+			}
+			plan.Refreshes = append(plan.Refreshes, tail)
+		}
+		if cab.Supports(executor.ResourceAds) {
+			tail := schedule.Refresh{Kind: KindAdsTail, RunDate: runDate, ConnectionRef: cab.Ref}
+			for i := 0; i < AdsHistoryDays; i++ {
+				k := key(cab.Ref, executor.ResourceAds, yesterday.AddDate(0, 0, -i).Format(time.DateOnly))
+				ensure := store.TaskSpec{TaskKey: k, Priority: PriorityTail, RunAt: now}
+				if i == 0 {
+					ensure.Priority, ensure.RunAt = PriorityYesterday, start
+				}
+				plan.Ensure = append(plan.Ensure, ensure)
+				if i <= AdsRefreshDays {
+					tail.Specs = append(tail.Specs, store.TaskSpec{TaskKey: k, Priority: ensure.Priority, Refresh: true, RunAt: start})
+				}
+			}
+			plan.Refreshes = append(plan.Refreshes, tail)
+		}
+		if cab.Supports(executor.ResourceFunnel) {
+			tail := schedule.Refresh{Kind: KindFunnelTail, RunDate: runDate, ConnectionRef: cab.Ref}
+			for i := 0; i < FunnelDays; i++ {
+				// Ниже отчёта и рекламы: воронка делит с отчётом слот кабинета.
+				k := key(cab.Ref, executor.ResourceFunnel, yesterday.AddDate(0, 0, -i).Format(time.DateOnly))
+				plan.Ensure = append(plan.Ensure, store.TaskSpec{TaskKey: k, Priority: PriorityHistory, RunAt: start})
+				tail.Specs = append(tail.Specs, store.TaskSpec{TaskKey: k, Priority: PriorityHistory, Refresh: true, RunAt: start})
+			}
+			plan.Refreshes = append(plan.Refreshes, tail)
+		}
+		if cab.Supports(executor.ResourceSearch) {
+			tail := schedule.Refresh{Kind: KindSearchTail, RunDate: runDate, ConnectionRef: cab.Ref}
+			for i := 0; i < SearchDays; i++ {
+				k := key(cab.Ref, executor.ResourceSearch, yesterday.AddDate(0, 0, -i).Format(time.DateOnly))
+				plan.Ensure = append(plan.Ensure, store.TaskSpec{TaskKey: k, Priority: PriorityHistory, RunAt: start})
+				if i < SearchRefreshDays {
+					tail.Specs = append(tail.Specs, store.TaskSpec{TaskKey: k, Priority: PriorityHistory, Refresh: true, RunAt: start})
+				}
 			}
 			plan.Refreshes = append(plan.Refreshes, tail)
 		}

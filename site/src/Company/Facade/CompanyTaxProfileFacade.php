@@ -20,6 +20,6 @@ final class CompanyTaxProfileFacade implements CompanyTaxProfileFacadeInterface
 
         return null === $profile
             ? null
-            : new CompanyTaxProfileDTO($profile->getTaxRegime(), $profile->getVatMode(), $profile->getValidFrom());
+            : new CompanyTaxProfileDTO($profile->getTaxRegime(), $profile->getVatMode(), $profile->getValidFrom(), $profile->getTaxRatePercent());
     }
 }

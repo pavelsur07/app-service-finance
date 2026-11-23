@@ -83,6 +83,7 @@ final class CreateAccountActionTest extends TestCase
             $this->createMock(CompanyMemberRepository::class),
             $this->createMock(ProjectDirectionRepository::class),
             $this->createMock(UserRepository::class),
+            (new \ReflectionClass(\App\Company\Security\ModuleAccessResolver::class))->newInstanceWithoutConstructor(),
         );
         $action = new CreateAccountAction($companyFacade);
 

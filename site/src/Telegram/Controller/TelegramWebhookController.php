@@ -1385,6 +1385,7 @@ final class TelegramWebhookController extends AbstractController
             'keyboard' => [
                 ['📊 Отчёты', '💼 Выбрать кассу'],
                 ['➕ Добавить операцию', '📥 Загрузить выписку'],
+                ['📋 Текущий черновик', '🛑 Остановить разбор'],
                 ['⚙️ Помощь'],
             ],
             'resize_keyboard' => true,

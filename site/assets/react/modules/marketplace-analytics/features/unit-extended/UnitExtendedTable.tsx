@@ -101,7 +101,7 @@ const HEADERS: { field: SortField; label: React.ReactNode; align?: string; toolt
     { field: 'stockCapitalRub', label: <>Остаток на МП<br />FBO/FBS/RFBS</>, align: 'text-end' },
     { field: 'commission', label: 'Комиссия', align: 'text-end' },
     { field: 'commissionAverageRub', label: 'Ком. сред.', align: 'text-end' },
-    { field: 'adSpend', label: 'РР', align: 'text-end', tooltip: 'Рекламные расходы' },
+    { field: 'adSpend', label: 'Реклама', align: 'text-end', tooltip: 'Рекламные расходы' },
     { field: 'cacRub', label: 'CAC,р', align: 'text-end' },
     { field: 'drrPercent', label: 'ДРР(п) %', align: 'text-end', tooltip: 'Доля рекламных расходов от продаж' },
     { field: 'logistics', label: 'Логистика', align: 'text-end' },
@@ -654,7 +654,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                         <td className="text-end">{'—'}</td>
                                         <td className="text-end">{formatMoney(unallocated.commission)}</td>
                                         <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{'—'}</td>
+                                        <td className="text-end">{formatMoney(unallocated.adSpend, 2)}</td>
                                         <td className="text-end">{'—'}</td>
                                         <td className="text-end">{'—'}</td>
                                         <td className="text-end">{formatMoney(unallocated.logistics)}</td>
@@ -674,6 +674,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                                 className={`btn btn-sm ${isUnallocatedExpanded ? 'btn-primary' : 'btn-ghost-secondary'} p-1`}
                                                 onClick={() => handleExpandToggle(UNALLOCATED_KEY, 'all')}
                                                 title="Показать затраты по категориям"
+                                                aria-expanded={isUnallocatedExpanded}
                                             >
                                                 <i className="ti ti-list-details" />
                                             </button>

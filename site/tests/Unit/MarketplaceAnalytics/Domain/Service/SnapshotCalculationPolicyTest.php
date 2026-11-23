@@ -6,6 +6,7 @@ namespace App\Tests\Unit\MarketplaceAnalytics\Domain\Service;
 
 use App\Marketplace\DTO\AdvertisingCostDTO;
 use App\Marketplace\DTO\CostData;
+use App\Marketplace\DTO\ReturnData;
 use App\Marketplace\DTO\SaleData;
 use App\Marketplace\Enum\AdvertisingType;
 use App\Marketplace\Enum\MarketplaceType;
@@ -128,6 +129,57 @@ final class SnapshotCalculationPolicyTest extends TestCase
         $this->assertSame('0.00', $cb->commission);
     }
 
+    /** Ozon хранит возврат комиссии положительной суммой с operation_type='storno' — это уменьшение затраты. */
+    public function testStornoCostReducesCategoryInsteadOfAddingToIt(): void
+    {
+        $this->marketplaceFacade->method('getSalesForListingAndDate')->willReturn([$this->makeMinimalSale()]);
+        $this->marketplaceFacade->method('getReturnsForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getCostPriceForListing')->willReturn('100.00');
+        $this->marketplaceFacade->method('getOrdersForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getAdvertisingCostsForListingAndDate')->willReturn([]);
+
+        $cost = fn (string $amount, string $operationType): CostData => new CostData(
+            marketplace: MarketplaceType::OZON,
+            categoryCode: 'ozon_sale_commission',
+            amount: $amount,
+            costDate: $this->date,
+            categoryId: 'ozon_sale_commission',
+            operationType: $operationType,
+        );
+        $this->marketplaceFacade->method('getCostsForListingAndDate')
+            ->willReturn([$cost('100.00', 'charge'), $cost('30.00', 'storno')]);
+        $this->costMappingResolver->method('resolve')->willReturn(UnitEconomyCostType::COMMISSION);
+        $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
+
+        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'ozon');
+
+        $this->assertSame('70.00', CostBreakdown::fromArray($snapshot->getCostBreakdown())->commission);
+    }
+
+    /** День только с возвратом комиссии: нетто по категории отрицательное, пересчёт не падает. */
+    public function testStornoExceedingChargesGivesNegativeCategory(): void
+    {
+        $this->marketplaceFacade->method('getSalesForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getReturnsForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getCostPriceForListing')->willReturn('100.00');
+        $this->marketplaceFacade->method('getOrdersForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getAdvertisingCostsForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getCostsForListingAndDate')->willReturn([new CostData(
+            marketplace: MarketplaceType::OZON,
+            categoryCode: 'ozon_sale_commission',
+            amount: '30.00',
+            costDate: $this->date,
+            categoryId: 'ozon_sale_commission',
+            operationType: 'storno',
+        )]);
+        $this->costMappingResolver->method('resolve')->willReturn(UnitEconomyCostType::COMMISSION);
+        $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
+
+        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'ozon');
+
+        $this->assertSame('-30.00', CostBreakdown::fromArray($snapshot->getCostBreakdown())->commission);
+    }
+
     public function testAdvertisingDetailsFilledFromAdvertisingCostDTO(): void
     {
         $sale = $this->makeMinimalSale();
@@ -232,6 +284,33 @@ final class SnapshotCalculationPolicyTest extends TestCase
         // costPrice=100.00, salesQuantity=3 → totalCostPrice=300.00
         $this->assertSame('300.00', $snapshot->getTotalCostPrice());
         $this->assertSame(3, $snapshot->getSalesQuantity());
+    }
+
+    /**
+     * Регрессия 23.11: возврат вычитал выручку, а себестоимость возвращённых единиц оставалась
+     * в расходах. Как в ОПиУ (sale_cost_price − return_cost_price): себестоимость дня — по
+     * проданным минус возвращённые единицы; день только с возвратами даёт отрицательную себестоимость.
+     */
+    public function testReturnedUnitsGiveBackTheirCostPrice(): void
+    {
+        $this->marketplaceFacade->method('getSalesForListingAndDate')->willReturnOnConsecutiveCalls(
+            [new SaleData(MarketplaceType::WILDBERRIES, 'ord-1', $this->date, 'SKU-1', 3, '500.00', '1500.00')],
+            [],
+        );
+        $this->marketplaceFacade->method('getReturnsForListingAndDate')->willReturn([
+            new ReturnData(MarketplaceType::WILDBERRIES, 'SKU-1', $this->date, 1, '500.00', null),
+        ]);
+        $this->marketplaceFacade->method('getCostPriceForListing')->willReturn('100.00');
+        $this->marketplaceFacade->method('getCostsForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getOrdersForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getAdvertisingCostsForListingAndDate')->willReturn([]);
+        $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
+
+        $withSales = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'wildberries');
+        $onlyReturn = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'wildberries');
+
+        $this->assertSame('200.00', $withSales->getTotalCostPrice());
+        $this->assertSame('-100.00', $onlyReturn->getTotalCostPrice());
     }
 
     public function testUsesInventoryHistoryInsteadOfStaleRawCostPrice(): void

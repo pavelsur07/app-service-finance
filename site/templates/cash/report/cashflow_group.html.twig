@@ -1,0 +1,91 @@
+{% extends 'base.html.twig' %}
+{% block title %}ДДС группы{% endblock %}
+
+{% macro money(value, currency=null) %}{{ value|vf_amount(2, null, false, currency) }}{% endmacro %}
+{% import _self as m %}
+
+{% block body %}
+    {% embed 'partials/_page_header.html.twig' with {title: 'Консолидированный ДДС группы'} %}
+        {% block actions %}
+            <a href="{{ path('report_cashflow_index') }}" class="btn btn-outline-secondary">Отчёт ДДС компании</a>
+        {% endblock %}
+    {% endembed %}
+    <div class="container-xl mt-3">
+        {% if report is null %}
+            <div class="card">
+                <div class="card-body">
+                    Компания «{{ companyName }}» не входит в группу консолидации. Группу задаёт владелец в настройках
+                    головной компании, блок «Консолидация».
+                </div>
+            </div>
+        {% else %}
+            {% set period = {from: report.from|date('Y-m-d'), to: report.to|date('Y-m-d')} %}
+            <form method="get" class="d-flex flex-wrap gap-2 align-items-end mb-3">
+                <label class="form-label mb-0">С
+                    <input type="date" name="from" value="{{ period.from }}" class="form-control">
+                </label>
+                <label class="form-label mb-0">По
+                    <input type="date" name="to" value="{{ period.to }}" class="form-control">
+                </label>
+                <button type="submit" class="btn btn-primary">Показать</button>
+                <a href="{{ path('report_cashflow_group_export', period) }}" class="btn btn-outline-secondary">
+                    <i class="ti ti-download" aria-hidden="true"></i> Excel
+                </a>
+            </form>
+
+            {% if report.companiesWithoutInn is not empty %}
+                <div class="alert alert-warning" data-test="group-report-inn-warning">
+                    Не заполнен ИНН: {{ report.companiesWithoutInn|join(', ') }}. Платежи этим компаниям не распознаются
+                    как внутригрупповые и попадают в итог. ИНН задаётся в настройках компании.
+                </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-sm table-vcenter card-table" data-test="group-report">
+                        <thead>
+                        <tr>
+                            <th>Статья, RUB</th>
+                            {% for name in report.companies %}<th class="text-end">{{ name }}</th>{% endfor %}
+                            <th class="text-end" title="Платежи между компаниями группы — по ИНН контрагента">Внутригрупповые</th>
+                            <th class="text-end">Итого по группе</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for line in [...report.lines, report.unmatched] %}
+                            <tr class="{{ line.section ? 'fw-bold' : '' }}">
+                                <td style="padding-left: {{ 0.5 + (line.level - 1) * 1.25 }}rem">{{ line.name }}</td>
+                                {% for amount in line.amounts %}<td class="text-end text-nowrap">{{ m.money(amount) }}</td>{% endfor %}
+                                <td class="text-end text-nowrap text-secondary">{{ m.money(line.intragroup) }}</td>
+                                <td class="text-end text-nowrap">{{ m.money(line.total) }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                        <tfoot>
+                        <tr class="fw-bold">
+                            <td>{{ report.totals.name }}</td>
+                            {% for amount in report.totals.amounts %}<td class="text-end text-nowrap">{{ m.money(amount) }}</td>{% endfor %}
+                            <td class="text-end text-nowrap">{{ m.money(report.totals.intragroup) }}</td>
+                            <td class="text-end text-nowrap">{{ m.money(report.totals.total) }}</td>
+                        </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <p class="text-secondary small mt-2">
+                Строки — статьи головной компании. Подстатьи компаний сворачиваются к статье группы с тем же кодом;
+                статьи без кода — в строке «Не сопоставлено». «Итого по группе» — сумма компаний минус внутригрупповые.
+            </p>
+
+            {% for currency, amounts in report.otherCurrencies %}
+                <div class="card mt-3">
+                    <div class="card-header"><h3 class="card-title">Другая валюта: {{ currency }} — в таблицу выше не входит</h3></div>
+                    <table class="table table-sm card-table">
+                        <tr>{% for name in report.companies %}<th class="text-end">{{ name }}</th>{% endfor %}</tr>
+                        <tr>{% for amount in amounts %}<td class="text-end">{{ m.money(amount, currency) }}</td>{% endfor %}</tr>
+                    </table>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+{% endblock %}

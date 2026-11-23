@@ -2,7 +2,7 @@
 
 # Инварианты скрипта деплоя в .github/workflows/deploy.yml; production не вызывается.
 #
-# 1. Внутри `ssh … << 'EOF'` удалённый bash читает команды из stdin. Любой
+# 1. В SSH heredoc удалённый bash читает команды из stdin. Любой
 #    `docker compose run|exec` без своего перенаправления stdin выедает остаток
 #    скрипта: с 17.10.2026 `run -T ozon-fetcher -migrate` обрывал деплой перед [5/5].
 # 2. async_sync обновляется до PHP-FPM, остальные Messenger workers —
@@ -23,7 +23,7 @@ fail() {
 # Логические команды внутри ssh-heredoc: продолжения строк через «\» склеены.
 heredoc_commands() {
     awk '
-        /ssh .*<< *'\''EOF'\''/ { inside = 1; next }
+        /(ssh .*|cat )<< *'\''EOF'\''/ { inside = 1; next }
         inside && /^[[:space:]]*EOF[[:space:]]*$/ { inside = 0; next }
         inside {
             line = $0
@@ -80,4 +80,4 @@ if [[ $failures -gt 0 ]]; then
     exit 1
 fi
 
-printf 'OK: %d команд run/exec в ssh-heredoc, async_sync до FPM; остальные воркеры в [4/5]: %s\n' "$checked" "$(echo $workers)"
+printf 'OK: %d команд run/exec в ssh-heredoc, async_sync до FPM; все остальные воркеры в [4/5]: %s\n' "$checked" "$(echo $workers)"

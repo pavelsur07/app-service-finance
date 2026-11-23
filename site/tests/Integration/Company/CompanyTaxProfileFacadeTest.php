@@ -8,6 +8,7 @@ use App\Company\Application\SaveCompanyTaxProfileAction;
 use App\Company\Enum\TaxRegime;
 use App\Company\Enum\VatMode;
 use App\Company\Facade\CompanyTaxProfileFacadeInterface;
+use App\Company\Repository\CompanyTaxProfileRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyTaxProfileBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -73,6 +74,39 @@ final class CompanyTaxProfileFacadeTest extends IntegrationTestCase
         $this->em->flush();
 
         self::assertNull($this->facade()->taxProfileOn(self::COMPANY_ID, new \DateTimeImmutable('2026-05-10')));
+    }
+
+    public function testEffectiveProfilesCanBeReadForSeveralCompanies(): void
+    {
+        $this->persistProfiles();
+        $owner = UserBuilder::aUser()->withIndex(2)->build();
+        $withInitialProfile = CompanyBuilder::aCompany()->withIndex(2)->withOwner($owner)->build();
+        $withFutureProfile = CompanyBuilder::aCompany()->withIndex(3)->withOwner($owner)->build();
+        $withInitialProfileId = (string) $withInitialProfile->getId();
+        $withFutureProfileId = (string) $withFutureProfile->getId();
+        $this->em->persist($owner);
+        $this->em->persist($withInitialProfile);
+        $this->em->persist($withFutureProfile);
+        $this->em->persist(CompanyTaxProfileBuilder::aProfile()->forCompany($withInitialProfileId)->with(TaxRegime::OSNO, VatMode::GENERAL)->build());
+        $this->em->persist(CompanyTaxProfileBuilder::aProfile()->withId('0193cccc-0000-7000-8000-0000000000a4')->forCompany($withFutureProfileId)->validFrom('2026-04-01')->build());
+        $this->em->flush();
+        $this->em->clear();
+
+        $repository = self::getContainer()->get(CompanyTaxProfileRepository::class);
+        $date = new \DateTimeImmutable('2026-03-01 05:00:00', new \DateTimeZone('Asia/Vladivostok'));
+        $queries = self::getContainer()->get('doctrine.debug_data_holder');
+        $queries->reset();
+
+        $profiles = $repository->findEffectiveForCompanies([self::COMPANY_ID, $withInitialProfileId, $withFutureProfileId], $date);
+        self::assertCount(1, $queries->getData()['default'] ?? []);
+        self::assertCount(2, $profiles);
+        self::assertSame(VatMode::USN_5, $profiles[self::COMPANY_ID]->getVatMode());
+        self::assertSame(VatMode::GENERAL, $profiles[$withInitialProfileId]->getVatMode());
+        self::assertSame([], $repository->findEffectiveForCompanies([$withFutureProfileId], $date));
+
+        $queries->reset();
+        self::assertSame([], $repository->findEffectiveForCompanies([], $date));
+        self::assertSame([], $queries->getData());
     }
 
     /**

@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace App\Company\Controller;
 
+use App\Company\Application\ProjectDirection\DeleteProjectDirectionAction;
+use App\Company\Application\ProjectDirection\SaveProjectDirectionAction;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Form\ProjectDirectionType;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Service\ActiveCompanyService;
-use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\Extension\Core\Type\HiddenType;
+use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
@@ -35,7 +40,7 @@ class ProjectDirectionController extends AbstractController
     }
 
     #[Route('/new', name: 'project_direction_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em, ActiveCompanyService $companyService, ProjectDirectionRepository $repo): Response
+    public function new(Request $request, ActiveCompanyService $companyService, ProjectDirectionRepository $repo, SaveProjectDirectionAction $save): Response
     {
         $company = $companyService->getActiveCompany();
 
@@ -45,28 +50,25 @@ class ProjectDirectionController extends AbstractController
         }
 
         $parents = $repo->findTreeByCompany($company);
-        $nextSortByParent = $this->buildNextSortByParent($parents);
-        $direction = (new ProjectDirection(Uuid::uuid4()->toString(), $company, ''))
+        $nextSortByParent = $this->buildNextSortByParent(array_values($parents));
+        $direction = (new ProjectDirection(Uuid::uuid7()->toString(), $company, ''))
             ->setSort($nextSortByParent['']);
         $form = $this->createForm(ProjectDirectionType::class, $direction, [
             'parents' => $parents,
         ]);
         $form->handleRequest($request);
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($direction);
-            $em->flush();
-
+        if ($this->saveForm($form, $direction, $save, true)) {
             return $this->redirectToRoute('project_direction_index');
         }
 
         return $this->render('project_direction/new.html.twig', [
-            'form' => $form->createView(),
+            'form' => $form,
             'next_sort_by_parent' => $nextSortByParent,
         ]);
     }
 
-    #[Route('/{id}/edit', name: 'project_direction_edit', methods: ['GET', 'POST'])]
-    public function edit(ProjectDirection $direction, Request $request, EntityManagerInterface $em, ActiveCompanyService $companyService, ProjectDirectionRepository $repo): Response
+    #[Route('/{id}/edit', name: 'project_direction_edit', requirements: ['id' => '(?i:'.Requirement::UID_RFC4122.')'], methods: ['GET', 'POST'])]
+    public function edit(string $id, Request $request, ActiveCompanyService $companyService, ProjectDirectionRepository $repo, SaveProjectDirectionAction $save): Response
     {
         $company = $companyService->getActiveCompany();
 
@@ -75,61 +77,74 @@ class ProjectDirectionController extends AbstractController
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
 
-        if ($direction->getCompany() !== $company) {
-            throw $this->createNotFoundException();
-        }
-        $parents = $repo->findTreeByCompany($company);
-        $excluded = $repo->collectSelfAndDescendants($direction);
-        $excludedIdsMap = array_flip(array_map(static fn (ProjectDirection $direction) => (string) $direction->getId(), $excluded));
-        $parentsFiltered = array_values(array_filter(
-            $parents,
-            static fn (ProjectDirection $parent) => !isset($excludedIdsMap[(string) $parent->getId()])
-        ));
-        $form = $this->createForm(ProjectDirectionType::class, $direction, [
-            'parents' => $parentsFiltered,
-        ]);
-        $form->handleRequest($request);
-        if ($form->isSubmitted() && $form->isValid()) {
-            $parent = $direction->getParent();
-            if ($parent && isset($excludedIdsMap[(string) $parent->getId()])) {
-                $this->addFlash('danger', 'Нельзя выбрать родителем текущий элемент или его потомка (цикл).');
-
-                return $this->render('project_direction/edit.html.twig', [
-                    'form' => $form->createView(),
-                    'item' => $direction,
-                ]);
+        $id = strtolower($id);
+        $companyId = (string) $company->getId();
+        // Сначала ревизия, чтобы форма с более ранними данными не получила новый номер.
+        $revision = $request->isMethod('GET') ? $repo->getDirectoryRevision($companyId) : null;
+        $direction = $repo->findOneByIdAndCompanyId($id, $companyId) ?? throw $this->createNotFoundException();
+        $excludedIds = [$id => true];
+        $parents = [];
+        foreach ($repo->findTreeByCompany($company) as $candidate) {
+            $parentId = $candidate->getParent()?->getId();
+            $candidateId = (string) $candidate->getId();
+            if (isset($excludedIds[$candidateId]) || (null !== $parentId && isset($excludedIds[$parentId]))) {
+                $excludedIds[$candidateId] = true;
+            } else {
+                $parents[] = $candidate;
             }
-            $em->flush();
-
+        }
+        $draft = clone $direction;
+        $form = $this->createForm(ProjectDirectionType::class, $draft, [
+            'parents' => $parents,
+        ])->add('revision', HiddenType::class, ['mapped' => false, 'data' => $revision]);
+        $form->handleRequest($request);
+        if ($this->saveForm($form, $draft, $save, false)) {
             return $this->redirectToRoute('project_direction_index');
         }
 
         return $this->render('project_direction/edit.html.twig', [
-            'form' => $form->createView(),
-            'item' => $direction,
+            'form' => $form,
         ]);
     }
 
-    #[Route('/{id}/delete', name: 'project_direction_delete', methods: ['POST'])]
+    #[Route('/{id}/delete', name: 'project_direction_delete', requirements: ['id' => '(?i:'.Requirement::UID_RFC4122.')'], methods: ['POST'])]
     #[IsGranted(ModuleAccess::FINANCE_WRITE)]
-    public function delete(ProjectDirection $direction, Request $request, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
+    public function delete(string $id, Request $request, ActiveCompanyService $companyService, ProjectDirectionRepository $repo, DeleteProjectDirectionAction $delete): Response
     {
-        $company = $companyService->getActiveCompany();
-        if ($direction->getCompany() !== $company) {
+        $companyId = (string) $companyService->getActiveCompany()->getId();
+        $id = strtolower($id);
+        if (null === $repo->findOneByIdAndCompanyId($id, $companyId)) {
             throw $this->createNotFoundException();
         }
-        if ($this->isCsrfTokenValid('delete'.$direction->getId(), $request->request->get('_token'))) {
-            if ($direction->isSystem()) {
-                $this->addFlash('danger', 'Системный проект нельзя удалить.');
-
-                return $this->redirectToRoute('project_direction_index');
+        if ($this->isCsrfTokenValid('delete'.$id, $request->request->getString('_token'))) {
+            try {
+                if (!$delete($companyId, $id)) {
+                    throw $this->createNotFoundException();
+                }
+            } catch (\DomainException $e) {
+                $this->addFlash('danger', $e->getMessage());
             }
-
-            $em->remove($direction);
-            $em->flush();
         }
 
         return $this->redirectToRoute('project_direction_index');
+    }
+
+    /** @param FormInterface<ProjectDirection> $form */
+    private function saveForm(FormInterface $form, ProjectDirection $draft, SaveProjectDirectionAction $save, bool $create): bool
+    {
+        if (!$form->isSubmitted() || !$form->isValid()) {
+            return false;
+        }
+
+        $revision = $create ? null : $form->get('revision')->getData();
+        $error = $save($draft, $create, \is_string($revision) && '' !== $revision ? $revision : null);
+        if (null === $error) {
+            return true;
+        }
+        $field = null === $error['field'] ? $form : $form->get($error['field']);
+        $field->addError(new FormError($error['message']));
+
+        return false;
     }
 
     /**
@@ -148,11 +163,11 @@ class ProjectDirectionController extends AbstractController
         }
 
         $nextSortByParent = [
-            '' => ($maxSortByParent[''] ?? 0) + self::SORT_STEP,
+            '' => min(ProjectDirection::MAX_SORT, ($maxSortByParent[''] ?? 0) + self::SORT_STEP),
         ];
         foreach ($directions as $direction) {
             $id = (string) $direction->getId();
-            $nextSortByParent[$id] = ($maxSortByParent[$id] ?? 0) + self::SORT_STEP;
+            $nextSortByParent[$id] = min(ProjectDirection::MAX_SORT, ($maxSortByParent[$id] ?? 0) + self::SORT_STEP);
         }
 
         return $nextSortByParent;

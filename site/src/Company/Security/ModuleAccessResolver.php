@@ -45,6 +45,25 @@ final class ModuleAccessResolver implements ResetInterface
         return $level->atLeast($required);
     }
 
+    public function allowsForCompany(User $user, Company $company, ?CompanyMember $membership, Module $module, AccessLevel $required): bool
+    {
+        if (AccessLevel::NONE === $required || $company->isDeletionRequested()) {
+            return false;
+        }
+        if ($this->isOwner($user, $company)) {
+            return true;
+        }
+        if (null === $membership
+            || $membership->getCompany()->getId() !== $company->getId()
+            || $membership->getUser()->getId() !== $user->getId()
+            || CompanyMember::STATUS_ACTIVE !== $membership->getStatus()
+        ) {
+            return false;
+        }
+
+        return ($this->membershipLevels($company, $membership)[$module->value] ?? AccessLevel::NONE)->atLeast($required);
+    }
+
     public function reset(): void
     {
         $this->levels = null;
@@ -75,7 +94,9 @@ final class ModuleAccessResolver implements ResetInterface
             return $this->levels;
         }
 
-        $levels = $this->computeLevels($user, $company);
+        $levels = $this->isOwner($user, $company)
+            ? $this->allModules(AccessLevel::WRITE)
+            : $this->membershipLevels($company, $this->activeCompanyService->getActiveMembership());
 
         $this->levelsUser = $user;
         $this->levelsCompanyId = $companyId;
@@ -83,19 +104,16 @@ final class ModuleAccessResolver implements ResetInterface
         return $this->levels = $levels;
     }
 
-    /**
-     * @return array<string, AccessLevel>
-     */
-    private function computeLevels(User $user, Company $company): array
+    private function isOwner(User $user, Company $company): bool
     {
-        // Владелец компании — полный доступ независимо от членства и шаблона.
-        // Сравнение по id, а не по идентичности объектов (разные инстансы одного User).
-        $owner = $company->getUser();
-        if (null !== $owner && null !== $owner->getId() && $owner->getId() === $user->getId()) {
-            return $this->allModules(AccessLevel::WRITE);
-        }
+        $ownerId = $company->getUser()?->getId();
 
-        $membership = $this->activeCompanyService->getActiveMembership();
+        return null !== $ownerId && $ownerId === $user->getId();
+    }
+
+    /** @return array<string, AccessLevel> */
+    private function membershipLevels(Company $company, ?CompanyMember $membership): array
+    {
         if (null === $membership) {
             return [];
         }

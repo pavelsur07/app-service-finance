@@ -1,5 +1,43 @@
 # source-fact-envelope — CHANGELOG
 
+## v1.5.0 (2026-11-19) — новый ресурс поиска WB, форма не менялась
+
+- `wb-fetcher` публикует `wb.analytics.search`: запись = карточка в поиске за день
+  (`{"nmId","openCard","addToCart","orders","visibility","avgPosition"}` — значения дня, показателя
+  нет — `null`), ключ `wb:analytics.search:{nmId}`. День, который WB не отдал по тарифу кабинета (нет
+  подписки «Джем»), — одна запись `wb:analytics.search:unavailable` (`{"unavailable":true,"status"}`).
+- Схема envelope не менялась.
+
+## v1.4.0 (2026-11-18) — новые ресурсы воронки, форма не менялась
+
+- `ozon-fetcher` публикует `ozon.analytics.funnel`: запись = строка SKU дня как в ответе Ozon
+  (`{"dimensions","metrics"}`, метрики по порядку запроса сервиса), ключ `ozon:analytics.funnel:{sku}`.
+  День, который Ozon не отдал по тарифу кабинета, — одна запись `ozon:analytics.funnel:unavailable`.
+- `wb-fetcher` публикует `wb.analytics.funnel`: запись = воронка карточки за день
+  (`{"product":{"nmId"},"statistic":{"selected"}}`, остальные поля карточки не передаются),
+  ключ `wb:analytics.funnel:{nmId}`.
+- Схема envelope не менялась.
+
+## v1.3.0 (2026-11-15) — новый ресурс, форма не менялась
+
+- `wb.ads.daily` (wb-fetcher): реклама WB за день, запись — кампания (списания `upd` и её
+  строка `fullstats`), ключ — `advertId` (задача `marketplace-profit-pipeline`, этап 8.4).
+
+## v1.2.0 (2026-11-14) — новый ресурс, форма не менялась
+
+- `wb.finance.sales-report.daily` (wb-fetcher): дневной отчёт о продажах WB,
+  запись — строка отчёта как есть, ключ — `rrdId` (задача
+  `marketplace-profit-pipeline`, этап 8.1). Стабильность `rrdId` между
+  перечитываниями дня проверяется на проде; если не подтвердится — ключ от
+  содержимого (v1.3). `.weekly` не публикуется.
+
+## v1.1.0 (2026-11-14) — новый ресурс, форма не менялась
+
+- `ozon.ads.statistics` (ozon-fetcher): дневной отчёт статистики Performance,
+  запись — строка «кампания × SKU» как в CSV. Расход по SKU для канона
+  (задача `marketplace-profit-pipeline`, этап 6). Хвост `ozon.ads.statistics.tail`
+  не публикуется.
+
 ## v1.0.0 (2026-11-13) — утверждён, действует
 
 Решение Владельца 13.11.2026 (задача `docs/tasks/marketplace-profit-pipeline`,

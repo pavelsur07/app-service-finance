@@ -1,0 +1,384 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Integration\Cash\Command;
+
+use App\Cash\Application\Category\EnsureCashflowSystemCategoriesAction;
+use App\Cash\Application\Category\ReplaceUnusedCashflowTreeWithCoreAction;
+use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Transaction\CashCategorySuggestion;
+use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Exception\CashflowCoreTemplateException;
+use App\Company\Entity\Company;
+use App\Tests\Builders\Cash\CashCategorySuggestionBuilder;
+use App\Tests\Builders\Cash\MoneyAccountBuilder;
+use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\Kernel\IntegrationTestCase;
+use Ramsey\Uuid\Uuid;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
+
+final class ApplyCashflowCoreToCompanyCommandTest extends IntegrationTestCase
+{
+    /** Узлов в core.yaml v1: 7 групп и 30 статей. */
+    private const CORE_NODES = 37;
+
+    public function testDryRunPrintsPlanAndChangesNothing(): void
+    {
+        $company = $this->companyWithOldTree();
+
+        $tester = $this->runCommand($company);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        self::assertStringContainsString('Дивиденды выплаченные', $tester->getDisplay());
+        self::assertStringContainsString('Режим просмотра', $tester->getDisplay());
+        self::assertSame(['Дивиденды выплаченные', 'Проценты полученные'], $this->regularNames($company));
+    }
+
+    public function testExecuteReplacesUnusedTreeWithCore(): void
+    {
+        $company = $this->companyWithOldTree();
+        $other = $this->companyWithOldTree();
+        $interest = $this->category($company, 'Проценты полученные');
+        $suggestion = $this->suggestion($company, $interest);
+
+        $tester = $this->runCommand($company, ['--execute' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        $names = $this->regularNames($company);
+        self::assertCount(self::CORE_NODES, $names);
+        self::assertNotContains('Дивиденды выплаченные', $names);
+        self::assertContains('Поступления от покупателей', $names);
+        self::assertSame(self::CORE_NODES, $this->codedCount($company));
+        self::assertSame('stale', $this->db()->fetchOne('SELECT status FROM cash_category_suggestion WHERE id = ?', [$suggestion->getId()]));
+        self::assertSame(['Дивиденды выплаченные', 'Проценты полученные'], $this->regularNames($other), 'Чужая компания не тронута.');
+        self::assertSame(1, (int) $this->db()->fetchOne('SELECT COUNT(*) FROM cash_transaction WHERE company_id = ?', [$company->getId()]));
+    }
+
+    /** «Нет ответа» на старом дереве ИИ иначе не переспросит: замена ядром переоткрывает операцию. */
+    public function testExecuteReopensNoAnswerOnOldTree(): void
+    {
+        $company = $this->companyWithOldTree();
+        $other = $this->companyWithOldTree();
+        $noAnswer = $this->noAnswer($company);
+        $foreign = $this->noAnswer($other);
+
+        $tester = $this->runCommand($company, ['--execute' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        self::assertSame(['stale', 'category_tree_replaced'], array_values((array) $this->db()->fetchAssociative('SELECT status, error_code FROM cash_category_suggestion WHERE id = ?', [$noAnswer->getId()])));
+        self::assertSame('no_answer', $this->db()->fetchOne('SELECT status FROM cash_category_suggestion WHERE id = ?', [$foreign->getId()]), 'чужая компания не тронута');
+    }
+
+    /** Пользователь отклонил подсказку после плана: решение не перезаписывается в stale. */
+    public function testSuggestionDismissedAfterPlanKeepsUserDecision(): void
+    {
+        $company = $this->companyWithOldTree();
+        $suggestion = $this->suggestion($company, $this->category($company, 'Проценты полученные'));
+        $action = self::getContainer()->get(ReplaceUnusedCashflowTreeWithCoreAction::class);
+        self::assertSame(1, $action->plan((string) $company->getId())->staleSuggestions);
+
+        $this->db()->executeStatement("UPDATE cash_category_suggestion SET status = 'dismissed' WHERE id = ?", [$suggestion->getId()]);
+        $this->em->wrapInTransaction(fn (): int => $action((string) $company->getId()));
+
+        self::assertSame('dismissed', $this->db()->fetchOne('SELECT status FROM cash_category_suggestion WHERE id = ?', [$suggestion->getId()]));
+        self::assertCount(self::CORE_NODES, $this->regularNames($company));
+    }
+
+    /** Статья появилась после выборки удаляемых: ядро не создаётся — откат целиком. */
+    public function testCategoryCreatedConcurrentlyRollsBackEverything(): void
+    {
+        $company = $this->companyWithOldTree();
+        $suggestion = $this->suggestion($company, $this->category($company, 'Проценты полученные'));
+        $parentId = $this->db()->fetchOne("SELECT id FROM cashflow_categories WHERE company_id = ? AND system_code = 'CF_OP'", [$company->getId()]);
+        // Flush №1 — системные статьи, №2 — удаление старого дерева; статья появляется после него.
+        $listener = new class($this->db(), (string) $company->getId(), (string) $parentId) {
+            private int $flushes = 0;
+
+            public function __construct(private \Doctrine\DBAL\Connection $db, private string $companyId, private string $parentId)
+            {
+            }
+
+            public function postFlush(): void
+            {
+                if (2 !== ++$this->flushes) {
+                    return;
+                }
+                $this->db->executeStatement(
+                    "INSERT INTO cashflow_categories (id, company_id, parent_id, name, status, sort, flow_kind, is_system, allow_pl_document) VALUES (?, ?, ?, 'Параллельная', 'active', 0, 'OPERATING', false, false)",
+                    [Uuid::uuid7()->toString(), $this->companyId, $this->parentId],
+                );
+            }
+        };
+        $action = self::getContainer()->get(ReplaceUnusedCashflowTreeWithCoreAction::class);
+        $action->plan((string) $company->getId());
+        $this->em->getEventManager()->addEventListener(\Doctrine\ORM\Events::postFlush, $listener);
+        try {
+            $this->em->wrapInTransaction(fn (): int => $action((string) $company->getId()));
+            self::fail('Ожидался отказ: ядро не создано.');
+        } catch (CashflowCoreTemplateException) {
+        } finally {
+            $this->em->getEventManager()->removeEventListener(\Doctrine\ORM\Events::postFlush, $listener);
+        }
+
+        self::assertSame(['Дивиденды выплаченные', 'Проценты полученные'], $this->regularNames($company));
+        self::assertSame('suggested', $this->db()->fetchOne('SELECT status FROM cash_category_suggestion WHERE id = ?', [$suggestion->getId()]));
+    }
+
+    /** Задача ИИ ещё не ответила: её ответ мог бы сослаться на удалённую статью — отказ. */
+    public function testPendingAiRequestRefuses(): void
+    {
+        $company = $this->companyWithOldTree();
+        $pending = CashCategorySuggestionBuilder::aSuggestion()
+            ->withId(Uuid::uuid4()->toString())
+            ->withCompanyId((string) $company->getId())
+            ->withTransactionId((string) $this->transaction($company)->getId())
+            ->withTaskId(Uuid::uuid4()->toString())
+            ->build();
+        $this->em->persist($pending);
+        $this->em->flush();
+
+        $tester = $this->runCommand($company, ['--execute' => true]);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('ИИ', $tester->getDisplay());
+        self::assertSame(['Дивиденды выплаченные', 'Проценты полученные'], $this->regularNames($company));
+    }
+
+    public function testNestedUnusedTreeIsRemovedFromLeaves(): void
+    {
+        $company = $this->companyWithOldTree();
+        $group = $this->category($company, 'Дивиденды выплаченные');
+        $child = (new CashflowCategory(Uuid::uuid7()->toString(), $company))->setName('Вложенная')->setParent($group);
+        $grandchild = (new CashflowCategory(Uuid::uuid7()->toString(), $company))->setName('Ещё глубже')->setParent($child);
+        $this->em->persist($child);
+        $this->em->persist($grandchild);
+        $this->em->flush();
+
+        $tester = $this->runCommand($company, ['--execute' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        self::assertCount(self::CORE_NODES, $this->regularNames($company));
+    }
+
+    public function testUsedCategoryRefusesAndKeepsTree(): void
+    {
+        $company = $this->companyWithOldTree();
+        $this->transaction($company)->setCashflowCategory($this->category($company, 'Дивиденды выплаченные'));
+        $this->em->flush();
+
+        $tester = $this->runCommand($company, ['--execute' => true]);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('Дивиденды выплаченные', $tester->getDisplay());
+        self::assertSame(['Дивиденды выплаченные', 'Проценты полученные'], $this->regularNames($company));
+    }
+
+    public function testRepeatedExecuteIsNoOp(): void
+    {
+        $company = $this->companyWithOldTree();
+        $this->runCommand($company, ['--execute' => true]);
+        $ids = $this->regularIds($company);
+
+        $tester = $this->runCommand($company, ['--execute' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        self::assertStringContainsString('уже применено', $tester->getDisplay());
+        self::assertSame($ids, $this->regularIds($company));
+    }
+
+    /** Компания с ядром до кодов (прод: Максимедиа, Информ-ТВ, Телегис) получает коды той же командой. */
+    public function testCoreTreeWithoutCodesGetsCodes(): void
+    {
+        $company = $this->companyWithOldTree();
+        $this->runCommand($company, ['--execute' => true]);
+        $ids = $this->regularIds($company);
+        $this->db()->executeStatement('UPDATE cashflow_categories SET group_code = NULL WHERE company_id = ?', [$company->getId()]);
+        $this->em->clear();
+
+        $dryRun = $this->runCommand($company);
+        self::assertStringContainsString('Будет проставлено кодов: 37', $dryRun->getDisplay());
+        self::assertSame(0, $this->codedCount($company), 'Без --execute коды не пишутся.');
+
+        $tester = $this->runCommand($company, ['--execute' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        self::assertSame(self::CORE_NODES, $this->codedCount($company));
+        self::assertSame($ids, $this->regularIds($company), 'Статьи те же, дерево не пересоздано.');
+        self::assertSame('OP_IN_CUSTOMERS', $this->db()->fetchOne("SELECT group_code FROM cashflow_categories WHERE company_id = ? AND name = 'Поступления от покупателей'", [$company->getId()]));
+
+        $again = $this->runCommand($company, ['--execute' => true]);
+        self::assertStringContainsString('уже применено', $again->getDisplay());
+    }
+
+    /** Статью перенесли после плана: код не уходит перенесённой статье по устаревшему пути. */
+    public function testCategoryMovedAfterPlanDoesNotGetStaleCode(): void
+    {
+        $company = $this->companyWithOldTree();
+        $this->runCommand($company, ['--execute' => true]);
+        $this->db()->executeStatement('UPDATE cashflow_categories SET group_code = NULL WHERE company_id = ?', [$company->getId()]);
+        $this->em->clear();
+        $action = self::getContainer()->get(ReplaceUnusedCashflowTreeWithCoreAction::class);
+        self::assertTrue($action->plan((string) $company->getId())->alreadyApplied);
+
+        $finOut = $this->db()->fetchOne("SELECT c.id FROM cashflow_categories c JOIN cashflow_categories p ON p.id = c.parent_id WHERE c.company_id = ? AND c.name = 'Выплаты' AND p.system_code = 'CF_FIN'", [$company->getId()]);
+        $this->db()->executeStatement("UPDATE cashflow_categories SET parent_id = ? WHERE company_id = ? AND name = 'Аренда'", [$finOut, $company->getId()]);
+        $this->em->wrapInTransaction(fn (): int => $action((string) $company->getId()));
+
+        $section = $this->db()->fetchOne(
+            "SELECT gp.system_code FROM cashflow_categories c JOIN cashflow_categories p ON p.id = c.parent_id JOIN cashflow_categories gp ON gp.id = p.parent_id WHERE c.company_id = ? AND c.group_code = 'OP_OUT_RENT'",
+            [$company->getId()],
+        );
+        self::assertContains($section, [false, 'CF_OP'], 'OP_OUT_RENT не может стоять на статье в финансовой деятельности.');
+    }
+
+    public function testCompanyWithoutRegularCategoriesGetsCore(): void
+    {
+        $company = $this->company();
+
+        $tester = $this->runCommand($company, ['--execute' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        self::assertCount(self::CORE_NODES, $this->regularNames($company));
+        self::assertSame(7, (int) $this->db()->fetchOne('SELECT COUNT(*) FROM cashflow_categories WHERE company_id = ? AND is_system', [$company->getId()]));
+    }
+
+    public function testUnknownCompanyFails(): void
+    {
+        self::assertSame(Command::FAILURE, $this->tester()->execute(['companyId' => Uuid::uuid4()->toString(), '--execute' => true]));
+    }
+
+    /** @param array<string, mixed> $options */
+    private function runCommand(Company $company, array $options = []): CommandTester
+    {
+        $tester = $this->tester();
+        $tester->execute(['companyId' => (string) $company->getId()] + $options);
+
+        return $tester;
+    }
+
+    private function tester(): CommandTester
+    {
+        \assert(null !== self::$kernel);
+
+        return new CommandTester((new Application(self::$kernel))->find('app:cash:cashflow-core:apply'));
+    }
+
+    /** Старое дерево как у Максимедиа: системные группы и статьи под финансовой и инвестиционной. */
+    private function companyWithOldTree(): Company
+    {
+        $company = $this->company();
+        self::getContainer()->get(EnsureCashflowSystemCategoriesAction::class)((string) $company->getId());
+        foreach ([CashflowCategory::CODE_FINANCING => 'Дивиденды выплаченные', CashflowCategory::CODE_INVESTING => 'Проценты полученные'] as $code => $name) {
+            $parent = $this->em->getRepository(CashflowCategory::class)->findOneBy(['company' => $company, 'systemCode' => $code]);
+            \assert($parent instanceof CashflowCategory);
+            $category = (new CashflowCategory(Uuid::uuid7()->toString(), $company))->setName($name)->setParent($parent);
+            $category->syncFlowKindWithParent();
+            $this->em->persist($category);
+        }
+        $this->em->flush();
+
+        return $company;
+    }
+
+    private function suggestion(Company $company, CashflowCategory $category): CashCategorySuggestion
+    {
+        $suggestion = CashCategorySuggestionBuilder::aSuggestion()
+            ->withId(Uuid::uuid4()->toString())
+            ->withCompanyId((string) $company->getId())
+            ->withTransactionId((string) $this->transaction($company)->getId())
+            ->withTaskId(Uuid::uuid4()->toString())
+            ->suggesting((string) $category->getId())
+            ->build();
+        $this->em->persist($suggestion);
+        $this->em->flush();
+
+        return $suggestion;
+    }
+
+    private function noAnswer(Company $company): CashCategorySuggestion
+    {
+        $suggestion = CashCategorySuggestionBuilder::aSuggestion()
+            ->withId(Uuid::uuid4()->toString())
+            ->withCompanyId((string) $company->getId())
+            ->withTransactionId((string) $this->transaction($company)->getId())
+            ->withTaskId(Uuid::uuid4()->toString())
+            ->suggesting(null)
+            ->build();
+        $this->em->persist($suggestion);
+        $this->em->flush();
+
+        return $suggestion;
+    }
+
+    private function category(Company $company, string $name): CashflowCategory
+    {
+        $category = $this->em->getRepository(CashflowCategory::class)->findOneBy(['company' => $company, 'name' => $name]);
+        \assert($category instanceof CashflowCategory);
+
+        return $category;
+    }
+
+    /** @return list<string> */
+    private function regularNames(Company $company): array
+    {
+        return $this->db()->fetchFirstColumn('SELECT name FROM cashflow_categories WHERE company_id = ? AND NOT is_system ORDER BY name', [$company->getId()]);
+    }
+
+    private function codedCount(Company $company): int
+    {
+        return (int) $this->db()->fetchOne('SELECT COUNT(*) FROM cashflow_categories WHERE company_id = ? AND group_code IS NOT NULL', [$company->getId()]);
+    }
+
+    /** @return list<string> */
+    private function regularIds(Company $company): array
+    {
+        return $this->db()->fetchFirstColumn('SELECT id FROM cashflow_categories WHERE company_id = ? AND NOT is_system ORDER BY id', [$company->getId()]);
+    }
+
+    private function db(): \Doctrine\DBAL\Connection
+    {
+        return $this->em->getConnection();
+    }
+
+    private function company(): Company
+    {
+        $owner = UserBuilder::aUser()
+            ->withId(Uuid::uuid4()->toString())
+            ->withEmail(sprintf('user+%s@example.test', Uuid::uuid4()->toString()))
+            ->build();
+        $company = CompanyBuilder::aCompany()
+            ->withId(Uuid::uuid4()->toString())
+            ->withOwner($owner)
+            ->build();
+        $this->em->persist($owner);
+        $this->em->persist($company);
+        $this->em->flush();
+
+        return $company;
+    }
+
+    private function transaction(Company $company): CashTransaction
+    {
+        $account = $this->em->getRepository(MoneyAccount::class)->findOneBy(['company' => $company]);
+        if (null === $account) {
+            $account = MoneyAccountBuilder::aMoneyAccount()
+                ->withId(Uuid::uuid4()->toString())
+                ->forCompany($company)
+                ->build();
+            $this->em->persist($account);
+            $this->em->flush();
+        }
+
+        $transaction = new CashTransaction(Uuid::uuid4()->toString(), $company, $account, CashDirection::OUTFLOW, '1000.00', 'RUB', new \DateTimeImmutable('2026-01-15'));
+        $this->em->persist($transaction);
+        $this->em->flush();
+
+        return $transaction;
+    }
+}

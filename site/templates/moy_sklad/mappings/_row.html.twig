@@ -1,0 +1,73 @@
+{#
+  Строка таблицы маппинга: не выше двух линий, доказательства — в раскрывающейся строке ниже.
+  Одна текстовая кнопка (Выбрать/Изменить/Просмотр), «Подробнее» — стрелкой у названия, «История» — в меню «⋯».
+  Parameters: listing (ListingMetaDTO), state (ListingMappingState — живая связь),
+  diagnostic (MappingDiagnosticRow|null — строка последней диагностики), routeParams, canWrite, isLast,
+  selectable — чекбокс для «Принять выбранные» у предложения без текущей связи.
+#}
+{% set rowParams = routeParams|merge({listingId: listing.id}) %}
+{% set title = listing.title ?? listing.sku %}
+{% set detailsId = 'mapping-evidence-' ~ listing.id %}
+<tr data-listing-id="{{ listing.id }}"{% if diagnostic %} data-diagnostic-listing-id="{{ listing.id }}"{% endif %}{% if not listing.isActive %} class="vf-row-muted"{% endif %}>
+    <td>
+        <div class="vf-mapping-table__name">
+            {% if selectable|default(false) and diagnostic and diagnostic.decision.status.value == 'ready' and state.revision == 0 %}
+                <input type="checkbox" class="form-check-input m-0 mt-2 flex-shrink-0" form="bulk-selected" name="listingIds[]" value="{{ listing.id }}" aria-label="Выбрать предложение для {{ title }}">
+            {% endif %}
+            {% if diagnostic %}
+                <button type="button" class="btn btn-sm btn-icon btn-ghost-secondary vf-mapping-table__toggle collapsed" data-bs-toggle="collapse" data-bs-target="#{{ detailsId }}" aria-expanded="false" aria-controls="{{ detailsId }}" aria-label="Подробнее: доказательства и кандидаты" title="Подробнее"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+            {% endif %}
+            <div class="vf-mapping-table__text">
+                <div class="text-truncate vf-strong" title="{{ title }}">{{ title }}</div>
+                <div class="vf-sub text-truncate"><span class="font-monospace">{{ listing.sku }}</span>{% if listing.size %} · {{ listing.size }}{% endif %}{% if not listing.isActive %} · <span class="badge bg-secondary-lt">Неактивен</span>{% endif %}</div>
+            </div>
+        </div>
+    </td>
+    <td class="text-truncate font-monospace" title="{{ listing.supplierSku }}">{{ listing.supplierSku ?? '—' }}</td>
+    <td>
+        {% if state.target %}
+            <div data-mapping-target>
+                <div class="text-truncate" title="{{ state.target.name }}">{{ state.target.name }}</div>
+                <div class="vf-sub text-truncate">{{ state.target.typeLabel }} · <span class="font-monospace">{{ state.target.article ?? state.target.code ?? '—' }}</span></div>
+            </div>
+        {% elseif diagnostic and diagnostic.decision.target %}
+            <div class="text-secondary" data-mapping-proposal>
+                <div class="text-truncate" title="{{ diagnostic.decision.target.name }}"><i class="ti ti-sparkles me-1" aria-hidden="true"></i>Предложение: {{ diagnostic.decision.target.name }}</div>
+                <div class="vf-sub text-truncate">{{ diagnostic.decision.target.typeLabel }} · <span class="font-monospace">{{ diagnostic.decision.target.article ?? diagnostic.decision.target.code ?? '—' }}</span></div>
+            </div>
+        {% else %}
+            <span class="text-secondary">—</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if state.status == 'needs_review' %}
+            <span class="vf-ops-badge-warn" data-mapping-status>{{ state.statusLabel }}</span>
+        {% else %}
+            <span class="badge vf-status {{ state.status == 'mapped' ? 'bg-success-lt' : 'bg-secondary-lt' }}" data-mapping-status>{{ state.statusLabel }}</span>
+        {% endif %}
+        {% if diagnostic and state.status != 'mapped' %}
+            <div class="vf-sub text-truncate" title="{{ diagnostic.decision.reason }}" data-mapping-reason>{{ diagnostic.decision.reason }}</div>
+        {% elseif state.status == 'needs_review' %}
+            <div class="vf-sub text-truncate" title="{{ state.reasonLabel }}" data-mapping-reason>{{ state.reasonLabel }}</div>
+        {% endif %}
+    </td>
+    <td class="text-end text-nowrap">
+        <a class="btn btn-sm" href="{{ path('moysklad_listing_mapping_edit', rowParams) }}">{{ canWrite ? (state.status == 'mapped' ? 'Изменить' : 'Выбрать') : 'Просмотр' }}</a>
+        {% if state.revision > 0 %}
+            <div class="dropdown d-inline-block position-static{{ isLast ? ' dropup' : '' }}">
+                <button type="button" class="btn btn-sm btn-icon btn-ghost-secondary" data-bs-toggle="dropdown" aria-haspopup="menu" aria-expanded="false" aria-label="Ещё действия"><i class="ti ti-dots-vertical" aria-hidden="true"></i></button>
+                <div class="dropdown-menu dropdown-menu-end">
+                    <a class="dropdown-item" href="{{ path('moysklad_listing_mapping_history', rowParams) }}"><i class="ti ti-history me-2" aria-hidden="true"></i>История связи</a>
+                </div>
+            </div>
+        {% endif %}
+    </td>
+</tr>
+{% if diagnostic %}
+    <tr class="collapse vf-mapping-table__details" id="{{ detailsId }}">
+        <td colspan="5">
+            {% if diagnostic.reasonLabels %}<div class="mb-2">{% for reason in diagnostic.reasonLabels %}<span class="badge bg-secondary-lt me-1">{{ reason }}</span>{% endfor %}</div>{% endif %}
+            {% include 'moy_sklad/mappings/_evidence.html.twig' with {source: diagnostic.source, decision: diagnostic.decision, barcodes: diagnostic.barcodes, sourceQuantities: diagnostic.sourceQuantities} only %}
+        </td>
+    </tr>
+{% endif %}

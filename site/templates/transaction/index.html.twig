@@ -14,7 +14,7 @@
 {% block content %}
 {# Рефакторинг по эталону docs/design-system/screens/Operations.dc.html; отчёт — docs/plan/ds-operations-dds.md. #}
 {% set query = app.request.query.all %}
-{% set filterKeys = ['dateFrom', 'dateTo', 'accountId', 'categoryId', 'counterpartyId', 'direction', 'currency', 'amountMin', 'amountMax', 'q'] %}
+{% set filterKeys = ['dateFrom', 'dateTo', 'accountId', 'categoryId', 'counterpartyId', 'direction', 'currency', 'amountMin', 'amountMax', 'q', 'includeChildren', 'projectIds', 'centerIds'] %}
 {% set hasFilters = filters|filter((v, k) => k in filterKeys and v is not null)|length > 0 %}
 {% set totalFound = pager.nbResults %}
 
@@ -29,7 +29,14 @@
 {% endif %}
 {% if filters.categoryId %}
     {% set category = categories|filter(c => c.id == filters.categoryId)|first %}
-    {% set applied = applied|merge([{label: 'Статья: ' ~ (category ? category.name : filters.categoryId), keys: ['categoryId']}]) %}
+    {% set applied = applied|merge([{label: 'Статья: ' ~ (category ? category.name : filters.categoryId) ~ (filters.includeChildren ? ' и вложенные' : ''), keys: ['categoryId', 'includeChildren']}]) %}
+{% endif %}
+{# Проекты и ЦФО приходят только переходом из отчёта ДДС — уже раскрытым списком. #}
+{% if filters.projectIds %}
+    {% set applied = applied|merge([{label: 'Проекты: ' ~ filters.projectIds|split(',')|length, keys: ['projectIds']}]) %}
+{% endif %}
+{% if filters.centerIds %}
+    {% set applied = applied|merge([{label: 'ЦФО: ' ~ filters.centerIds|split(',')|length, keys: ['centerIds']}]) %}
 {% endif %}
 {% if filters.counterpartyId %}
     {% set counterparty = counterparties|filter(c => c.id == filters.counterpartyId)|first %}
@@ -62,6 +69,9 @@
         <p class="vf-ops-head__lead">Все движения денег по счетам и кассам: загружайте выписки, разносите операции по статьям и формируйте ОПиУ.</p>
     </div>
     <div class="btn-list d-print-none">
+        {% if is_granted('module.finance.write') %}
+            <a href="{{ path('cash_mcp_draft_index') }}" class="btn">Черновики MCP</a>
+        {% endif %}
         <a href="{{ path('cash_transaction_export', query) }}"
            class="btn"
            data-testid="btn-export-xls">

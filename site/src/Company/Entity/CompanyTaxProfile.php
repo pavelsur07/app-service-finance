@@ -37,6 +37,10 @@ class CompanyTaxProfile
     #[ORM\Column(name: 'valid_from', type: 'date_immutable', nullable: true)]
     private ?\DateTimeImmutable $validFrom;
 
+    /** Ставка налога режима (УСН, АУСН), %; null — не задана. Переменная TAX_RATE формул ОПиУ. */
+    #[ORM\Column(name: 'tax_rate_percent', type: 'decimal', precision: 5, scale: 2, nullable: true)]
+    private ?string $taxRatePercent;
+
     #[ORM\Column(name: 'created_at', type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -50,6 +54,7 @@ class CompanyTaxProfile
         ?\DateTimeImmutable $validFrom,
         \DateTimeImmutable $now,
         ?string $id = null,
+        ?string $taxRatePercent = null,
     ) {
         Assert::uuid($companyId);
         if (null !== $id) {
@@ -62,6 +67,7 @@ class CompanyTaxProfile
         $this->taxRegime = $taxRegime;
         $this->vatMode = $vatMode;
         $this->validFrom = self::normalizeValidFrom($validFrom);
+        $this->taxRatePercent = self::normalizeTaxRate($taxRatePercent);
         $this->createdAt = $now;
         $this->updatedAt = $now;
     }
@@ -81,15 +87,32 @@ class CompanyTaxProfile
         return new \DateTimeImmutable($validFrom->format('Y-m-d'));
     }
 
-    public function change(TaxRegime $taxRegime, VatMode $vatMode, \DateTimeImmutable $now): void
+    /**
+     * Ставка налога в хранимом виде: два знака после запятой, 0…100; null — не задана.
+     */
+    public static function normalizeTaxRate(?string $taxRatePercent): ?string
+    {
+        if (null === $taxRatePercent) {
+            return null;
+        }
+        if (!is_numeric($taxRatePercent) || (float) $taxRatePercent < 0 || (float) $taxRatePercent > 100) {
+            throw InvalidCompanyTaxProfileException::taxRateOutOfRange();
+        }
+
+        return number_format((float) $taxRatePercent, 2, '.', '');
+    }
+
+    public function change(TaxRegime $taxRegime, VatMode $vatMode, ?string $taxRatePercent, \DateTimeImmutable $now): void
     {
         self::assertAllowed($taxRegime, $vatMode);
-        if ($taxRegime === $this->taxRegime && $vatMode === $this->vatMode) {
+        $taxRatePercent = self::normalizeTaxRate($taxRatePercent);
+        if ($taxRegime === $this->taxRegime && $vatMode === $this->vatMode && $taxRatePercent === $this->taxRatePercent) {
             return;
         }
 
         $this->taxRegime = $taxRegime;
         $this->vatMode = $vatMode;
+        $this->taxRatePercent = $taxRatePercent;
         $this->updatedAt = $now;
     }
 
@@ -116,6 +139,11 @@ class CompanyTaxProfile
     public function getValidFrom(): ?\DateTimeImmutable
     {
         return $this->validFrom;
+    }
+
+    public function getTaxRatePercent(): ?string
+    {
+        return $this->taxRatePercent;
     }
 
     public function getUpdatedAt(): \DateTimeImmutable

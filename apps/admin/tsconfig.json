@@ -25,14 +25,15 @@
       "vitest": ["./node_modules/vitest"],
       "msw": ["./node_modules/msw/lib/core"],
       "msw/node": ["./node_modules/msw/lib/node"]
-    }
+    },
+    "resolveJsonModule": true
   },
   "include": [
     "src",
     "tests",
     "*.config.ts",
     "../../site/packages/api/src",
-    "../../site/packages/ui/src",
-    "../../site/packages/api/testing"
+    "../../site/packages/api/testing",
+    "../packages/ds/src"
   ]
 }

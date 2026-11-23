@@ -26,7 +26,7 @@ final readonly class CounterpartyDisplayNameFormatter
      * Версия правил: поднимать при любом изменении результата format() — пересчёт
      * (app:counterparty:refresh-display-names) обработает все авто-названия заново.
      */
-    public const RULES_VERSION = 2;
+    public const RULES_VERSION = 3;
 
     /**
      * Вариант написания => [каноническая ОПФ, только префиксом]. Порядок — от длинных к коротким:
@@ -95,6 +95,8 @@ final readonly class CounterpartyDisplayNameFormatter
     {
         // Удвоенные кавычки CSV: «ООО ""Ромашка""».
         $name = str_replace('""', '"', self::collapse($rawName));
+        // v3: ИНН и запятая перед названием — так пишет выписку банк («7700000000, ООО "Ромашка"»).
+        $name = (string) preg_replace('/^\d{10}(?:\d{2})?\s*,\s*(?=\S)/u', '', $name);
         $fromBankString = str_contains($name, '//');
         // Голый 20-значный счёт вырезается только в банковской строке. В обычной — только счёт с
         // подписью целиком в конце или в начале строки (stripLabelledAccount); иначе длинное число
@@ -462,7 +464,8 @@ final readonly class CounterpartyDisplayNameFormatter
             return false;
         }
 
-        return 1 === preg_match('/^\p{Cyrillic}+(?:-\p{Cyrillic}+)*\s+\p{Cyrillic}+\s+\p{Cyrillic}*(?:вич|вна|ична|инична)(?:\s+(?:оглы|кызы|улы|гызы))?$/iu', $value)
+        // v3: «Б. Имя Отчество» — банк маскирует фамилию получателя до инициала.
+        return 1 === preg_match('/^(?:\p{Cyrillic}+(?:-\p{Cyrillic}+)*|\p{Cyrillic}\.)\s+\p{Cyrillic}+\s+\p{Cyrillic}*(?:вич|вна|ична|инична)(?:\s+(?:оглы|кызы|улы|гызы))?$/iu', $value)
             || 1 === preg_match('/^\p{Cyrillic}+(?:-\p{Cyrillic}+)*\s+\p{Cyrillic}\.\s*\p{Cyrillic}\.$/u', $value)
             || 1 === preg_match('/^\p{Cyrillic}+(?:-\p{Cyrillic}+)*\s+\p{Cyrillic}+\s+\p{Cyrillic}+\s+(?:оглы|кызы|улы|гызы)$/iu', $value);
     }

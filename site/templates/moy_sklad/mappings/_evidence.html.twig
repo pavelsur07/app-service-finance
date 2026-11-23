@@ -1,0 +1,26 @@
+{# Parameters: source, decision, barcodes, sourceQuantities. #}
+<div class="text-break" data-mapping-evidence>
+    <div>{{ decision.reason }}</div>
+    <div class="text-secondary">Артикул листинга: {{ source.supplierSku ?? '—' }} · Размер: {{ source.size ?? '—' }}</div>
+    {% for rule in decision.ruleLabels %}<div class="text-secondary">{{ rule }}</div>{% endfor %}
+    <div class="text-secondary">Количество в названии листинга: {{ sourceQuantities ? sourceQuantities|join(', ') : 'неизвестно' }}</div>
+    <div class="text-secondary">Штрихкоды листинга: {{ barcodes ? barcodes|join(', ') : 'не указаны' }}</div>
+    {% if decision.candidates %}
+        <details class="mt-2">
+            <summary>Кандидаты: {{ decision.candidates|length|vf_number }}</summary>
+            <ul class="mb-0">
+                {% for candidate in decision.candidates %}
+                    {% set target = candidate.target %}
+                    <li class="text-break">
+                        {{ target.typeLabel }}: {{ target.name }}{% if not target.selectable %} <span class="badge bg-warning-lt">{{ target.reason == 'requires_variant' ? 'Нужна модификация' : 'Недоступна / архив' }}</span>{% endif %}
+                        <div class="text-secondary">Артикул: {{ target.article ?? '—' }} · Код: {{ target.code ?? '—' }}</div>
+                        {% if candidate.parentArticle %}<div class="text-secondary">Артикул родителя: {{ candidate.parentArticle }}</div>{% endif %}
+                        <div class="text-secondary">Количество в названии: {{ target.pieceQuantities ? target.pieceQuantities|join(', ') : 'неизвестно' }}</div>
+                        <div class="text-secondary">Штрихкоды: {{ target.barcodes is null ? 'ещё не загружены' : (target.barcodes ? target.barcodes|join(', ') : 'нет') }}</div>
+                        {% for characteristic in target.characteristics %}<div class="text-secondary">{{ characteristic.name }}: {{ characteristic.value }}</div>{% endfor %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </details>
+    {% endif %}
+</div>

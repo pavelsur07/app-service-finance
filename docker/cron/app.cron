@@ -358,17 +358,52 @@
 */10 * * * * cd /app && php bin/console app:service-gateway:coverage:refresh --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
 # Факты из сервисов (модуль SourceFacts, source-fact-envelope v1): забор пачек ozon-fetcher каждые 15 минут.
-# Выключено (SOURCE_FACTS_COMPANIES пуст) — exit 0. Сервис недоступен — WARNING и exit 0; нарушение контракта
+# Сервис недоступен — WARNING и exit 0; нарушение контракта
 # списка пачек — ERROR и exit 1. Гейт 09:10 МСК: пачки в карантине или поток без применённых пачек > 36 ч —
 # ERROR и exit 1 (docs/workflow/health-gates.md).
 */15 * * * * cd /app && php bin/console app:source-facts:pull --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 10 9 * * * cd /app && php bin/console app:source-facts:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
-# ai-service (docs/maintenance/ai-service-prod.md). Выключено (AI_SERVICE_ENABLED, адрес, токен) —
+# Переводчик Ozon (модуль MarketplaceOzon): начисления by-day из sf_fact → канон mo_operation, через 5 минут
+# после забора фактов. Раз в сутки (--relink) — ещё и дни с операциями без листинга. Сбой дня — ERROR в конце
+# прогона, exit 1. Гейт 09:20 МСК: код без решения в карантине > 24 ч или непереведённый день — ERROR и exit 1.
+5-59/15 * * * * cd /app && php bin/console app:marketplace-ozon:translate --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+57 6 * * * cd /app && php bin/console app:marketplace-ozon:translate --relink --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+20 9 * * * cd /app && php bin/console app:marketplace-ozon:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Переводчик WB (модуль MarketplaceWb): дневной отчёт о продажах и реклама из sf_fact →
+# канон mo_operation, все кабинеты. Гейт 09:25 МСК — как у Ozon.
+7-59/15 * * * * cd /app && php bin/console app:marketplace-wb:translate --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+58 6 * * * cd /app && php bin/console app:marketplace-wb:translate --relink --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+25 9 * * * cd /app && php bin/console app:marketplace-wb:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Воронка продаж (модуль MarketplaceFunnel): факты воронки Ozon и WB из sf_fact → mfn_row, все кабинеты.
+# Гейт 09:43 МСК (после перевода 09:39, до забора фактов 09:45): непереведённый день или строки таблицы расходятся с переведённым — ERROR и exit 1.
+9-59/15 * * * * cd /app && php bin/console app:marketplace-funnel:translate --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+43 9 * * * cd /app && php bin/console app:marketplace-funnel:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# Витрина экономики SKU (модуль MarketplaceEconomics): дни, заменённые в каноне, — через 5 минут после перевода.
+# Ночью (--recent=45, после --relink переводчика) — все дни за 45 суток: себестоимость и реклама легаси меняются
+# без отметки в каноне. Сбой дня — ERROR в конце прогона, exit 1. Гейт 09:30 МСК: Σ витрины дня ≠ Σ канона или
+# заменённый день не пересчитан > 60 мин — ERROR и exit 1.
+10-59/15 * * * * cd /app && php bin/console app:marketplace-economics:refresh --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+15 7 * * * cd /app && php bin/console app:marketplace-economics:refresh --recent=45 --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+30 9 * * * cd /app && php bin/console app:marketplace-economics:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+# Отчёт R3 «Неделя» по понедельникам 09:00 МСК — после ночного пересчёта витрины: сводка и xlsx за прошлую неделю
+# владельцу на почту и в Telegram. Включение — ECONOMICS_WEEKLY_REPORT_COMPANIES; журнал me_weekly_report не даёт
+# второй отправки, сбой канала снимает отметку — ручной повтор дошлёт. Сбой компании — ERROR, exit 1.
+0 9 * * 1 cd /app && php bin/console app:marketplace-economics:weekly-report --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+# Правила «вид операции → статья ОПиУ» (модуль MarketplacePlProjection): preset-правила компаний нового контура
+# приводятся к шаблону платформы и дереву статей компании. Правила custom не трогает; в ОПиУ ничего не пишет.
+40 * * * * cd /app && php bin/console app:marketplace-pl-projection:sync-template --all --execute --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# ai-service (docs/maintenance/ai-service-prod.md). Без адреса или токена —
 # обе команды выходят с 0, ничего не делая. Импорт результатов: сервис недоступен — WARNING и exit 0,
 # нарушение контракта — ERROR и exit 1. Подсказки статей ДДС — все подключённые в админке компании (запуск пишется в ai_run),
 # сначала автоприменение по флагу компании; сбой компании — ERROR и exit 1, остальные идут дальше.
 */5 * * * * cd /app && php bin/console app:ai-service:import-results --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+# Recovery всех компаний: grants, незавершённые сессии и события Confirm; сбой → exit 1, без Confirm.
+*/5 * * * * cd /app && php bin/console app:telegram:recover-payment-intake --all --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 25 * * * * cd /app && php bin/console app:cash:ai-categorize --all-enabled --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 # Гейт «тишины» ИИ (docs/workflow/health-gates.md): компания без запуска > 3 ч или половина результатов failed — ERROR и exit 1.
 50 * * * * cd /app && php bin/console app:ai-service:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
@@ -379,7 +414,18 @@
 */5 * * * * cd /app && php bin/console app:ai-service:quality:pull --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 45 * * * * cd /app && php bin/console app:ai-service:quality:health-check --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# МойСклад: страховка пакетов принятия предложений — переотправка queued/running без heartbeat > 10 мин.
+*/10 * * * * cd /app && php bin/console app:moysklad:mapping-bulk:requeue --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
+# МойСклад: автоприменение однозначных предложений там, где его включили в «Параметрах».
+# После ночной загрузки каталогов маркетплейсов (Ozon 03:40); один пакет в сутки на подключение и маркетплейс.
+30 5 * * * cd /app && php bin/console app:moysklad:mapping-auto-apply --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Dead man's switch: пинг heartbeat-монитора GlitchTip. Молчание → монитор сам заводит issue.
 # Отдельно от почтовой пробы: ловит смерть supercronic/контейнера, т.е. немоту ВСЕХ кронов.
 # Пустой GLITCHTIP_SCHEDULER_HEARTBEAT_URL = выключено. wget, а не curl: busybox есть в alpine всегда.
 */30 * * * * [ -n "$GLITCHTIP_SCHEDULER_HEARTBEAT_URL" ] && wget -qO /dev/null --timeout=10 "$GLITCHTIP_SCHEDULER_HEARTBEAT_URL" || true
+
+# МойСклад: пересчёт устаревших отчётов диагностики маппинга (синхронизации, ручные связи, настройки).
+# Только чтение и dispatch; повтор для тех же данных попадает в тот же runId.
+*/5 * * * * cd /app && php bin/console app:moysklad:mapping-diagnostics:refresh --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2

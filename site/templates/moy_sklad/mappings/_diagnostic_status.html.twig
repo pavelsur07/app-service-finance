@@ -1,0 +1,22 @@
+{#
+  Состояние диагностики, требующее внимания, — одной плашкой; тексты видны целиком.
+  Отчёт пересчитывается сам (docs/tasks/moysklad-diagnostics-auto/plan.md): «устарел» показывается, только если
+  пересчёт поставить не удалось. «Проверено …» — в строке итогов таблицы (index).
+  Parameters: report (MappingDiagnosticPage), queued (bool — пересчёт поставлен этим запросом).
+#}
+{% set running = report.latestRun and report.latestRun.status == 'running' %}
+{% set failed = not running and not queued and report.latestRun and report.latestRun.status == 'failed' %}
+{% set stale = not running and not queued and not failed and (report.stale or (report.latestRun and report.latestRun.status == 'stale')) %}
+<div data-mapping-diagnostics>
+    {% if running or queued or failed or stale %}
+        <div class="alert {{ failed or stale ? 'alert-warning' : 'alert-info' }} py-2 mb-3" role="status">
+            {% if running %}
+                <div data-diagnostic-running>Обновляем отчёт: {{ report.latestRun.processed|vf_number }} из {{ report.latestRun.total|vf_number }}. Страница обновится сама.</div>
+            {% elseif queued %}
+                <div data-diagnostic-running>Данные изменились — обновляем отчёт. Страница обновится сама.</div>
+            {% endif %}
+            {% if failed %}<div data-diagnostic-error>Проверка не завершилась из-за технической ошибки. Показан последний завершённый отчёт — повторим автоматически в течение часа или нажмите «Проверить заново».</div>{% endif %}
+            {% if stale %}<div data-diagnostic-stale>Каталог или связи изменились после проверки — отчёт обновится автоматически в течение нескольких минут.</div>{% endif %}
+        </div>
+    {% endif %}
+</div>

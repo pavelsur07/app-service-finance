@@ -74,12 +74,12 @@ final readonly class ImportAiResultsAction
 
             $handled = [];
             foreach ($page->items as $result) {
-                $consumer = $this->consumerFor($result);
-                if (null === $consumer) {
+                $consumers = $this->consumersFor($result);
+                if ([] === $consumers) {
                     $unhandledByType[$result->taskType] = ($unhandledByType[$result->taskType] ?? 0) + 1;
                     continue;
                 }
-                $failure = $this->consume($consumer, $result);
+                $failure = $this->consume($consumers, $result);
                 if (null === $failure) {
                     $handled[] = $result->taskId;
                     if (null === $this->cost($result)) {
@@ -127,11 +127,11 @@ final readonly class ImportAiResultsAction
 
     public function importResult(AiTaskResult $result): bool
     {
-        $consumer = $this->consumerFor($result);
-        if (null === $consumer) {
+        $consumers = $this->consumersFor($result);
+        if ([] === $consumers) {
             return false;
         }
-        $failure = $this->consume($consumer, $result);
+        $failure = $this->consume($consumers, $result);
         if (null !== $failure) {
             $this->logger->error('AI single result consumer failed; left unacknowledged.', [
                 'companyId' => $result->companyId,
@@ -147,14 +147,20 @@ final readonly class ImportAiResultsAction
     }
 
     /**
+     * Все потребители task_type — в одной транзакции: каждый берёт только свои задачи.
+     *
+     * @param non-empty-list<AiTaskResultConsumerInterface> $consumers
+     *
      * @return string|null класс исключения потребителя; null — результат принят
      */
-    private function consume(AiTaskResultConsumerInterface $consumer, AiTaskResult $result): ?string
+    private function consume(array $consumers, AiTaskResult $result): ?string
     {
         $em = $this->entityManager();
         try {
-            $em->wrapInTransaction(function () use ($consumer, $result, $em): void {
-                $consumer->consume($result);
+            $em->wrapInTransaction(function () use ($consumers, $result, $em): void {
+                foreach ($consumers as $consumer) {
+                    $consumer->consume($result);
+                }
                 $this->recordUsage($em, $result);
             });
 
@@ -257,14 +263,16 @@ final readonly class ImportAiResultsAction
         }
     }
 
-    private function consumerFor(AiTaskResult $result): ?AiTaskResultConsumerInterface
+    /** @return list<AiTaskResultConsumerInterface> */
+    private function consumersFor(AiTaskResult $result): array
     {
+        $found = [];
         foreach ($this->consumers as $consumer) {
             if ($consumer->supports($result->taskType)) {
-                return $consumer;
+                $found[] = $consumer;
             }
         }
 
-        return null;
+        return $found;
     }
 }

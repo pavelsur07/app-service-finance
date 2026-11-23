@@ -60,6 +60,9 @@ final readonly class CashCategorySuggestionApplier
      */
     public function apply(string $companyId, string $suggestionId, ?string $userId, \DateTimeImmutable $now): ?Outcome
     {
+        // Дерево раньше подсказки: загрузка дерева держит статьи и переоткрывает подсказки, а здесь
+        // подсказка держится до проверки статьи (FK разбивки) — разный порядок дал бы взаимоблокировку.
+        $this->categories->lockTree($companyId);
         $suggestion = $this->suggestions->findOneForCompanyForUpdate($companyId, $suggestionId);
         if (null === $suggestion || CashCategorySuggestionStatus::SUGGESTED !== $suggestion->getStatus()) {
             if (null === $userId) {

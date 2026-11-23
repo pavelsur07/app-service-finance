@@ -21,7 +21,7 @@
   `connection:<id>`), сервис ведёт лимитер по ней. `seller.api_key` — токен.
 - Токен, который не расшифровался или пуст, — кабинет не выдаётся.
 - `resource_types`: `wb.finance.sales-report.daily`,
-  `wb.finance.sales-report.weekly` — компаниям из `wb_fetcher.finance_companies`
+  `wb.finance.sales-report.weekly`, `wb.ads.daily` — компаниям из `wb_fetcher.finance_companies`
   (`['*']` — всем, `[]` — никому); остальным — `[]`.
 
 ## Реализация в Symfony
@@ -48,7 +48,8 @@
   `ozon.stocks` — компаниям `ozon_fetcher.stocks_companies`;
   `ozon.prices` — компаниям `ozon_fetcher.snapshots_companies`, `ozon.stocks.warehouses` — им же,
   если выдан `ozon.stocks`; `ozon.analytics.queries`, `ozon.analytics.queries.details` — компаниям
-  `ozon_fetcher.search_analytics_companies`, если выдан `ozon.stocks`; `ozon.returns` — компаниям
+  `ozon_fetcher.search_analytics_companies`, если выдан `ozon.stocks`; `ozon.analytics.funnel` — им же
+  без условия; `ozon.returns` — компаниям
   `ozon_fetcher.returns_companies`; `ozon.actions`, `ozon.supplies`, `ozon.clusters` — компаниям
   `ozon_fetcher.reference_companies`;
   performance → `ozon.ads.campaigns`, `ozon.ads.expense`, `ozon.ads.daily` — компаниям

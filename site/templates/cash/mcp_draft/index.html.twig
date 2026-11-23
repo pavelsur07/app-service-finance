@@ -1,0 +1,29 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Черновики MCP{% endblock %}
+
+{% block content %}
+    <section aria-labelledby="mcp-draft-title">
+        <a href="{{ path('cash_transaction_index') }}">К операциям ДДС</a>
+        <h1 id="mcp-draft-title" class="mt-3">Черновики MCP</h1>
+        <nav class="nav nav-tabs mb-3" aria-label="Состояние черновиков">
+            <a class="nav-link{{ closed ? '' : ' active' }}" href="{{ path('cash_mcp_draft_index') }}"{% if not closed %} aria-current="page"{% endif %}>На проверке</a>
+            <a class="nav-link{{ closed ? ' active' : '' }}" href="{{ path('cash_mcp_draft_index', {status: 'closed'}) }}"{% if closed %} aria-current="page"{% endif %}>Завершённые</a>
+        </nav>
+        {% if drafts is empty %}
+            <p class="text-secondary">{{ closed ? 'Нет завершённых черновиков.' : 'Нет черновиков, ожидающих подтверждения.' }}</p>
+        {% else %}
+            <div class="list-group">
+                {% for draft in drafts %}
+                    <a class="list-group-item list-group-item-action text-break" href="{{ path('cash_mcp_draft_show', {id: draft.id}) }}">
+                        {{ draft.externalId }}
+                        <span class="text-secondary ms-2">{{ draft.receivedAt|date('d.m.Y H:i') }}</span>
+                    </a>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% if before %}
+            <a class="btn mt-3" href="{{ path('cash_mcp_draft_index', {before: before, status: closed ? 'closed' : 'open'}) }}">Следующая страница</a>
+        {% endif %}
+    </section>
+{% endblock %}

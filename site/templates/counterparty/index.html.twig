@@ -35,6 +35,12 @@
         <p class="vf-page-head__lead">Организации, ИП и физические лица, с которыми проводятся операции.</p>
     </div>
     <div class="btn-list d-print-none">
+        {% if is_granted('module.finance.write') %}
+            <a href="{{ path('counterparty_normalize_preview') }}" class="btn btn-outline-secondary" data-test="counterparty-normalize">
+                <i class="ti ti-wand me-1" aria-hidden="true"></i>
+                Нормализовать названия
+            </a>
+        {% endif %}
         <a href="{{ path('counterparty_new') }}" class="btn btn-primary">
             <i class="ti ti-plus me-1" aria-hidden="true"></i>
             Добавить контрагента

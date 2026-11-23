@@ -1,10 +1,12 @@
-{% extends '_layout/app.html.twig' %}
+{% extends '_layout/legacy.html.twig' %}
 {% block title %}Операция не выполнена{% endblock %}
-{% block body %}
-<section class="card">
-    <h1 class="wz-title">Операция не выполнена</h1>
+{% block content %}
+<main class="vf-balance" data-balance-root>
+<section class="card"><div class="card-body">
+    <h1 class="page-title">Операция не выполнена</h1>
     <p role="alert">{{ message }}</p>
     <p>Исправьте данные и отправьте форму повторно.</p>
-    <a class="btn btn-md btn-primary" href="{{ path('balance_index') }}">Вернуться в баланс</a>
-</section>
+    <a class="btn btn-primary" href="{{ path('balance_index') }}">Вернуться в баланс</a>
+</div></section>
+</main>
 {% endblock %}

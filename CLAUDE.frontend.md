@@ -266,14 +266,38 @@ import * as Icons from '@tabler/icons-react';
 - `docs/plan/ds-legacy-tabler-audit.md` — решения по DS и расхождения с поручением.
 - `site/screens/README.md` — матрица реализации макетов.
 
+## Дизайн-система в apps (ДС v3.4, 2026-11-15)
+
+Для `apps/account` и `apps/admin` эталон визуала — ДС v3.4: `docs/design-system/v3/`
+(листы `sheets/DS-*.html`, токены `tokens/ds-v3.tokens.json`, каркас
+`screens/App-Layout.html`). План и этапы — `docs/plan/ds-v3.md`. Правила этого файла
+про `site/` (Tabler, `assets/styles/kit`, листы `sheets/*.dc.html`) к apps не применяются,
+и наоборот: работа по ДС v3.4 `site/` не трогает.
+- Визуал apps — только из пакета `apps/packages/ds` (`@vashfindir/ds`): токены
+  (`--ds-*`, генерируются из JSON), стили, React-компоненты, `formatMoney`. CSS из
+  `site/assets` в apps не импортировать.
+- Tailwind v4 в apps — полностью; тема только на токенах ДС (`v3/tailwind/app.css`),
+  палитра Tailwind по умолчанию отключена, `bg-[#…]` запрещён. Компоненты — в пакете,
+  в приложениях Tailwind — раскладка и утилиты.
+- Главная кнопка — navy; красный бренда — только логотип и промо; ошибки и
+  деструктивные действия — оранжевый. Тёмная тема отложена: `[data-theme="dark"]` и
+  `prefers-color-scheme: dark` в CSS apps не добавлять.
+- Нет листа для случая — ближайшее решение из компонентов пакета и `TODO(ds)`; новый
+  компонент — только с экраном в продукте (Decision 45).
+
 ## Самостоятельные frontend-приложения (2026-11-11)
 
 `apps/account/` и `apps/admin/` — React 19 SPA, локальная подготовка интерфейсов.
 Правила выше про React 18, отсутствие typecheck и список установленных библиотек
 относятся к `site/`. Новые приложения имеют независимые npm lock-файлы,
 строгий typecheck, ESLint/Prettier, Vitest/MSW и Playwright. Команды и границы:
-`apps/README.md`. Общие UI/API исходники — `site/packages/` (внутри старого
-Docker build context); токены/CSS по-прежнему в `assets/styles/kit/`.
+`apps/README.md`. Общий API и временные UI JS wrappers — `site/packages/`.
+Apps используют `apps/packages/ds` (`@vashfindir/ds`): v3.4 токены `--ds-*`,
+Tailwind v4/preflight, локальный Manrope. CSS из `site/assets/styles/kit/` и
+`@vashfindir/ui/styles.css` в apps не импортировать. App CSS entry импортирует
+DS styles и сканирует только свой src; shared DS добавляет компоненты.
+Команды typecheck/lint/test/build включают пакет; prebuild проверяет generated
+токены. Старые Button/EmptyState wrappers заменяются отдельным Stage 3.
 Старые API/Button/cn импорты совместимы; только старый API-адаптер перенаправляет
 на `/login`. Account/admin используют same-origin Symfony session API с отдельными host-only
 сессиями. Оркестрация находится в приложениях; shared API не делает redirect.

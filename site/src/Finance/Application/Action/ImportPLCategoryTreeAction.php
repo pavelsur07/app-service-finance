@@ -16,6 +16,7 @@ use App\Finance\Application\Service\PLCategoryNameSimilarity;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Exception\PLImportPreviewOutdatedException;
 use App\Finance\Exception\PLTreeWouldDuplicateException;
+use App\Finance\Report\PlFormulaVariables;
 use App\Finance\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -334,6 +335,8 @@ final class ImportPLCategoryTreeAction
         }
 
         $known += $sourceCodes;
+        // Переменные налоговых ставок — не статьи, но в формулах законны.
+        $known += array_fill_keys(PlFormulaVariables::NAMES, true);
 
         // Известные коды вымарываются из формулы целиком до токенизации.
         // Иначе не разделить два смысла дефиса: «NET-PROFIT» может быть кодом
@@ -353,7 +356,7 @@ final class ImportPLCategoryTreeAction
 
         $unresolved = [];
         foreach ($formulas as $formula) {
-            $rest = [] !== $maskPatterns ? (string) preg_replace($maskPatterns, ' ', $formula) : $formula;
+            $rest = (string) preg_replace($maskPatterns, ' ', $formula);
 
             preg_match_all('/[\p{Lu}\p{N}_]{1,64}/u', $rest, $matches);
             foreach ($matches[0] as $token) {

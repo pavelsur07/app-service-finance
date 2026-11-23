@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cash\MessageHandler;
 
+use App\Cash\Application\AutoRule\ApplyAutoRuleToTransactionAction;
 use App\Cash\Application\DTO\CashTransactionAutoRuleMatchResult;
 use App\Cash\Application\Service\AutoRule\AutoRuleDispatchGuard;
+use App\Cash\Application\Service\AutoRule\CashAutoRuleConflictRecorder;
 use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleProvenanceResolver;
 use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleService;
 use App\Cash\Application\Service\Category\CashflowSystemCategoryService;
@@ -19,6 +21,7 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleApplyMode;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleSkipReason;
+use App\Cash\Infrastructure\Query\CashAutoRuleQualityQuery;
 use App\Cash\Message\ApplyAutoRulesForTransaction;
 use App\Cash\MessageHandler\ApplyAutoRulesForTransactionHandler;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -69,6 +72,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             $logger,
+            self::getContainer()->get(CashAutoRuleConflictRecorder::class),
         );
 
         $handler(new ApplyAutoRulesForTransaction(
@@ -111,6 +115,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             new NullLogger(),
+            self::getContainer()->get(CashAutoRuleConflictRecorder::class),
         );
 
         $handler(new ApplyAutoRulesForTransaction(
@@ -154,14 +159,20 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             new NullLogger(),
+            self::getContainer()->get(CashAutoRuleConflictRecorder::class),
         );
 
+        $quality = self::getContainer()->get(CashAutoRuleQualityQuery::class);
+        self::assertNull($quality->observedSince((string) $company->getId()));
         $handler(new ApplyAutoRulesForTransaction(
             $firstTransaction->getId() ?? '',
             $company->getId() ?? '',
             new \DateTimeImmutable('2024-01-01T00:00:00+00:00'),
         ));
 
+        $firstObservation = $quality->observedSince((string) $company->getId());
+        self::assertNotNull($firstObservation);
+        self::assertNull($quality->observedSince(Uuid::uuid7()->toString()));
         $firstReloaded = $transactionRepository->find($firstTransaction->getId());
         self::assertInstanceOf(CashTransaction::class, $firstReloaded);
         self::assertNotNull($firstReloaded->getCashflowCategory());
@@ -183,6 +194,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             new \DateTimeImmutable('2024-01-01T00:01:00+00:00'),
         ));
 
+        self::assertEquals($firstObservation, $quality->observedSince((string) $company->getId()));
         $secondReloaded = $transactionRepository->find($secondTransaction->getId());
         self::assertInstanceOf(CashTransaction::class, $secondReloaded);
 
@@ -247,6 +259,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             $logger,
+            self::getContainer()->get(CashAutoRuleConflictRecorder::class),
         );
         $correlationId = Uuid::uuid7()->toString();
 
@@ -323,6 +336,13 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         }
         $this->em->flush();
 
+        $manual = self::getContainer()->get(ApplyAutoRuleToTransactionAction::class);
+        $manual((string) $company->getId(), (string) $transaction->getId(), '');
+        self::assertSame(2, (int) $this->connection->fetchOne(
+            'SELECT count(*) FROM cash_auto_rule_category_conflict WHERE company_id = ? AND transaction_id = ?',
+            [$company->getId(), $transaction->getId()],
+        ));
+
         $handler = new ApplyAutoRulesForTransactionHandler(
             $this->em,
             self::getContainer()->get(CashTransactionRepository::class),
@@ -332,6 +352,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             new NullLogger(),
+            self::getContainer()->get(CashAutoRuleConflictRecorder::class),
         );
 
         $handler(new ApplyAutoRulesForTransaction(
@@ -345,6 +366,13 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         self::assertSame(CashflowCategory::CODE_UNALLOCATED, $reloaded->getCashflowCategory()?->getCode());
         self::assertNull($reloaded->getProjectDirection());
         self::assertNull($reloaded->getResponsibilityCenterId());
+
+        $handler(new ApplyAutoRulesForTransaction((string) $transaction->getId(), (string) $company->getId(), new \DateTimeImmutable()));
+        $rows = $this->connection->fetchFirstColumn(
+            'SELECT rule_id FROM cash_auto_rule_category_conflict WHERE company_id = ? AND transaction_id = ? AND revision = 1 ORDER BY rule_id',
+            [$company->getId(), $transaction->getId()],
+        );
+        self::assertEqualsCanonicalizing([$firstRule->getId(), $secondRule->getId()], $rows);
     }
 
     public function testAppliesCompletePairOnceWithAuditProvenance(): void
@@ -385,6 +413,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             new NullLogger(),
+            self::getContainer()->get(CashAutoRuleConflictRecorder::class),
         );
         $correlationId = Uuid::uuid7()->toString();
 
@@ -468,6 +497,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             new NullLogger(),
+            self::getContainer()->get(CashAutoRuleConflictRecorder::class),
         );
         $handler(new ApplyAutoRulesForTransaction(
             (string) $transaction->getId(),
@@ -546,6 +576,7 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
             self::getContainer()->get(AutoRuleDispatchGuard::class),
             self::getContainer()->get(CashTransactionAutoRuleProvenanceResolver::class),
             new NullLogger(),
+            self::getContainer()->get(CashAutoRuleConflictRecorder::class),
         );
         $handler(new ApplyAutoRulesForTransaction(
             (string) $transaction->getId(),

@@ -1,0 +1,35 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Подключение MCP{% endblock %}
+
+{% block body %}
+    <div class="card" data-mcp-consent>
+        <div class="card-body">
+            <h1 class="card-title">Подключение MCP</h1>
+            <p>Клиент {{ clientId }} запрашивает доступ к данным выбранной компании.</p>
+            <ul>
+                {% for label in scopeLabels %}
+                    <li>{{ label }}</li>
+                {% endfor %}
+            </ul>
+            <form method="post">
+                <input type="hidden" name="_token" value="{{ csrf_token(tokenId) }}">
+                {% if companies is empty %}
+                    <p>Нет компаний, которым можно предоставить эти разрешения.</p>
+                {% else %}
+                    <div class="mb-3">
+                        <label class="form-label" for="mcp-company">Компания</label>
+                        <select class="form-select" name="companyId" id="mcp-company" required>
+                            <option value="">Выберите компанию</option>
+                            {% for company in companies %}
+                                <option value="{{ company.id }}">{{ company.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" type="submit" name="decision" value="approve">Разрешить доступ</button>
+                {% endif %}
+                <button class="btn btn-outline-secondary" type="submit" name="decision" value="deny" formnovalidate>Отклонить</button>
+            </form>
+        </div>
+    </div>
+{% endblock %}

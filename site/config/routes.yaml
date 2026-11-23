@@ -161,6 +161,42 @@ marketplace_admin_controllers:
         namespace: App\Marketplace\Controller\Admin
     type: attribute
 
+marketplace_ozon_admin_controllers:
+    resource:
+        path: ../src/MarketplaceOzon/Controller/Admin/
+        namespace: App\MarketplaceOzon\Controller\Admin
+    type: attribute
+
+marketplace_wb_admin_controllers:
+    resource:
+        path: ../src/MarketplaceWb/Controller/Admin/
+        namespace: App\MarketplaceWb\Controller\Admin
+    type: attribute
+
+marketplace_economics_controllers:
+    resource:
+        path: ../src/MarketplaceEconomics/Controller/
+        namespace: App\MarketplaceEconomics\Controller
+    type: attribute
+
+marketplace_funnel_controllers:
+    resource:
+        path: ../src/MarketplaceFunnel/Controller/
+        namespace: App\MarketplaceFunnel\Controller
+    type: attribute
+
+marketplace_quality_controllers:
+    resource:
+        path: ../src/MarketplaceQuality/Controller/
+        namespace: App\MarketplaceQuality\Controller
+    type: attribute
+
+marketplace_pl_projection_controllers:
+    resource:
+        path: ../src/MarketplacePlProjection/Controller/
+        namespace: App\MarketplacePlProjection\Controller
+    type: attribute
+
 api_management_controllers:
     resource:
         path: ../src/Api/Controller/
@@ -171,4 +207,10 @@ settlement_controllers:
     resource:
         path: ../src/Settlement/Controller/
         namespace: App\Settlement\Controller
+    type: attribute
+
+mcp_controllers:
+    resource:
+        path: ../src/Mcp/Controller/
+        namespace: App\Mcp\Controller
     type: attribute

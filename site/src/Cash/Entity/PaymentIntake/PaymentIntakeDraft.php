@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Entity\PaymentIntake;
 
+use App\Cash\Application\DTO\PaymentIntake\CreateMcpCashDraft;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\PaymentIntake\PaymentIntakeDraftRepository;
 use Doctrine\DBAL\Types\Types;
@@ -13,6 +14,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: PaymentIntakeDraftRepository::class)]
 #[ORM\Table(name: 'cash_payment_intake_draft')]
+#[ORM\UniqueConstraint(name: 'uniq_payment_intake_mcp_external', columns: ['company_id', 'mcp_connection_id', 'mcp_external_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_payment_intake_source', columns: ['source_key'])]
 #[ORM\Index(name: 'idx_payment_intake_company_status', columns: ['company_id', 'status'])]
 #[ORM\Index(name: 'idx_payment_intake_task', columns: ['company_id', 'task_id'])]
@@ -75,6 +77,13 @@ class PaymentIntakeDraft
     #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $lastEnqueuedAt = null;
 
+    #[ORM\Column(type: Types::GUID, nullable: true)]
+    private ?string $mcpConnectionId = null;
+    #[ORM\Column(length: 128, nullable: true)]
+    private ?string $mcpExternalId = null;
+    #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $confirmedAt = null;
+
     public function __construct(string $companyId, string $actorUserId, string $moneyAccountId, string $sourceKey, string $sourceRevision, string $text, \DateTimeImmutable $receivedAt, string $timezone, string $currency)
     {
         Assert::uuid($companyId);
@@ -95,6 +104,63 @@ class PaymentIntakeDraft
         $this->receivedAt = $receivedAt;
         $this->timezone = $timezone;
         $this->currency = $currency;
+    }
+
+    public static function fromMcp(CreateMcpCashDraft $command, string $currency, string $fingerprint, \DateTimeImmutable $receivedAt): self
+    {
+        $draft = new self($command->companyId, $command->actorUserId, $command->moneyAccountId, 'mcp:'.Uuid::uuid7()->toString(), $fingerprint, 'MCP', $receivedAt, 'UTC', $currency);
+        $draft->mcpConnectionId = strtolower($command->connectionId);
+        $draft->mcpExternalId = $command->externalId;
+        $draft->dispatchPending = false;
+        $draft->status = 'needs_clarification';
+        $draft->items = [[
+            'id' => Uuid::uuid7()->toString(),
+            'transaction_id' => Uuid::uuid7()->toString(),
+            'date' => $command->date->format('Y-m-d'),
+            'direction' => strtolower($command->direction->value),
+            'amount' => $command->amount,
+            'currency' => $currency,
+            'category_id' => null === $command->categoryId ? null : strtolower($command->categoryId),
+            'description' => $command->description,
+            'project_id' => null,
+            'cfo_id' => null,
+            'paid_confirmed' => false,
+            'execution_status' => 'unknown',
+            'questions' => [],
+            'provenance' => ['amount' => 'mcp', 'date' => 'mcp', 'direction' => 'mcp'],
+        ]];
+
+        return $draft;
+    }
+
+    public function isMcp(): bool
+    {
+        return null !== $this->mcpConnectionId;
+    }
+
+    public function getMcpConnectionId(): ?string
+    {
+        return $this->mcpConnectionId;
+    }
+
+    public function getMcpExternalId(): ?string
+    {
+        return $this->mcpExternalId;
+    }
+
+    public function getConfirmedAt(): ?\DateTimeImmutable
+    {
+        return $this->confirmedAt;
+    }
+
+    public function confirmMcpPayment(int $expectedRevision, \DateTimeImmutable $confirmedAt): void
+    {
+        $this->assertMutable($expectedRevision);
+        Assert::true($this->isMcp());
+        $this->items[0]['paid_confirmed'] = true;
+        $this->items[0]['execution_status'] = 'paid';
+        $this->items[0]['provenance']['execution_status'] = 'user';
+        $this->confirmedAt = $confirmedAt;
     }
 
     /** @param array<string, mixed> $payload */
@@ -385,6 +451,11 @@ class PaymentIntakeDraft
         $this->assertMutable($expectedRevision);
         if (!\in_array($this->status, ['ready', 'needs_clarification'], true) || [] !== $this->questions || [] === $itemIds || \count($itemIds) !== \count(array_unique($itemIds))) {
             throw new \DomainException('Сначала ответьте на вопросы и выберите платежи.');
+        }
+        foreach ($this->items as $item) {
+            if (!($item['excluded'] ?? false) && !\in_array($item['id'], $itemIds, true)) {
+                throw new \DomainException('Выберите все неисключённые платежи или явно исключите оставшиеся строки.');
+            }
         }
         $selected = [];
         foreach ($itemIds as $id) {

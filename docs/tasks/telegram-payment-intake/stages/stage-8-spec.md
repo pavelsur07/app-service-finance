@@ -71,23 +71,23 @@ Parser принимает wire v1 из services/_contracts/ai-eval-run/v1/schema
 
 ## Приёмка (тесты до кода)
 
-- [ ] Client передаёт token/trace/idempotency, корректные endpoint и таймауты.
-- [ ] Parser проверяет реальные wire fixtures; поддельный passed и неизвестные
+- [x] Client передаёт token/trace/idempotency, корректные endpoint и таймауты.
+- [x] Parser проверяет реальные wire fixtures; поддельный passed и неизвестные
       значения отклоняются; body/token не попадают в логи.
-- [ ] Повтор request и конкурентный запуск оставляют одну дневную запись;
+- [x] Повтор request и конкурентный запуск оставляют одну дневную запись;
       потерянный POST-ответ повторяется с теми же UUID/key, canonical id принимается.
-- [ ] Pull идемпотентен, не затирает новый день старым ответом, сохраняет текущий
+- [x] Pull идемпотентен, не затирает новый день старым ответом, сохраняет текущий
       fingerprint и время контакта; временная недоступность не создаёт passed.
-- [ ] Health покрывает все terminal states, missing/pending/stale/version change,
+- [x] Health покрывает все terminal states, missing/pending/stale/version change,
       MSK boundary и первое включение; не зависит от наличия компаний.
-- [ ] Повтор инцидента даёт один ERROR; успешный следующий run даёт recovery INFO.
-- [ ] Disabled mode не обращается к модели/сервису; Cash не меняется.
-- [ ] Doctrine up/down/up и ORM/schema parity проверены локально.
-- [ ] Compose имеет отдельный bounded worker того же образа, без ingress и новых
+- [x] Повтор инцидента даёт один ERROR; успешный следующий run даёт recovery INFO.
+- [x] Disabled mode не обращается к модели/сервису; Cash не меняется.
+- [x] Doctrine up/down/up и ORM/schema parity проверены локально.
+- [x] Compose имеет отдельный bounded worker того же образа, без ingress и новых
       секретов, с выключенным по умолчанию флагом и grace period не менее 960 с.
-- [ ] Deploy применяет миграции до старта eval-worker; выключение останавливает его.
-- [ ] Обновлены runbook, добавление эталонов, stage report и release request.
-- [ ] Пройдены module checks и однократные полные handoff gates; независимое
+- [x] Deploy применяет миграции до старта eval-worker; выключение останавливает его.
+- [x] Обновлены runbook, добавление эталонов, stage report и release request.
+- [x] Пройдены module checks и однократные полные handoff gates; независимое
       финальное внутреннее и обязательное внешнее ревью закрыты.
 
 До выпуска нет живого nightly run и нет пятого старого root-SSH benchmark.

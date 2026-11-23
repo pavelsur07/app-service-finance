@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Wildberries\CostCalculator;
 
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Wildberries\Infrastructure\Normalizer\WbSalesReportRowNormalizer;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -45,17 +46,17 @@ class WbLoyaltyDiscountCalculator implements CostCalculatorInterface
 
         $saleDate = $this->normalizer->operationDate($item);
 
-        // Привязываем к товару только если listing найден
-        $product = $listing?->getProduct();
-
         return [
             [
                 'category_code' => 'wb_loyalty_discount_compensation',
                 'amount' => (string) abs($cashbackDiscount),
+                // WB возвращает продавцу скидку покупателю — доход, как в финотчёте (addIncome)
+                // и в каноне (compensation, +); отрицательная сумма — удержание обратно.
+                'operation_type' => $cashbackDiscount > 0 ? MarketplaceCostOperationType::STORNO : MarketplaceCostOperationType::CHARGE,
                 'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => 'Компенсация скидки по программе лояльности WB',
-                'product' => $product,
+                'product' => null, // товар процессоры берут из $listing, ключ не читается
             ],
         ];
     }

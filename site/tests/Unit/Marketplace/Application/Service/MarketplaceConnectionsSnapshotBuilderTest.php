@@ -195,6 +195,7 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
 
         foreach ($this->build($rows, [], [], [], $all)['connections'] as $cabinet) {
             self::assertNotContains('ozon.analytics.queries', $cabinet['resource_types'], 'по умолчанию — никому');
+            self::assertNotContains('ozon.analytics.funnel', $cabinet['resource_types']);
         }
 
         $with = array_column($this->build($rows, [], [], [], $all, [], [], [], $all)['connections'], 'resource_types', 'company_id');
@@ -202,11 +203,16 @@ final class MarketplaceConnectionsSnapshotBuilderTest extends TestCase
             ...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES,
             ...MarketplaceConnectionsSnapshotBuilder::STOCKS_RESOURCE_TYPES,
             ...MarketplaceConnectionsSnapshotBuilder::SEARCH_ANALYTICS_RESOURCE_TYPES,
+            MarketplaceConnectionsSnapshotBuilder::FUNNEL_RESOURCE_TYPE,
         ], $with[self::COMPANY_A]);
         self::assertSame([], $with[self::COMPANY_B], 'без ключа seller нет');
 
         $withoutStocks = array_column($this->build($rows, [], [], [], [], [], [], [], $all)['connections'], 'resource_types', 'company_id');
-        self::assertSame(MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, $withoutStocks[self::COMPANY_A], 'без снимка остатков нет SKU');
+        self::assertSame(
+            [...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, MarketplaceConnectionsSnapshotBuilder::FUNNEL_RESOURCE_TYPE],
+            $withoutStocks[self::COMPANY_A],
+            'поиску нужны SKU снимка остатков, воронке — нет',
+        );
     }
 
     public function testReturnsOnlyForListedCompaniesWithSellerKey(): void

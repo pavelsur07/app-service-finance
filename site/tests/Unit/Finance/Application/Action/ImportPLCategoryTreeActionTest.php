@@ -628,8 +628,8 @@ final class ImportPLCategoryTreeActionTest extends TestCase
         $revenue = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Выручка')->withCode('REVENUE')->build();
         $margin = PLCategoryBuilder::aPLCategory()->forCompany($source)->withName('Маржа')->withCode('MARGIN')->build();
         // REVENUE приезжает вместе с формулой, COGS уже есть в целевой компании,
-        // OLD_METRIC не существует нигде, 100 — не код.
-        $margin->setFormula('(REVENUE - COGS) / OLD_METRIC * 100');
+        // OLD_METRIC не существует нигде, 100 — не код, TAX_RATE — переменная ставки, а не статья.
+        $margin->setFormula('(REVENUE - COGS) / OLD_METRIC * 100 - REVENUE * TAX_RATE / 100');
 
         $plCategoryRepository = $this->plCategoryRepositoryMock();
         $plCategoryRepository->method('findBy')->willReturnCallback(

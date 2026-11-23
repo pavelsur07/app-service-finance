@@ -145,7 +145,7 @@ test('login is keyboard accessible and prevents duplicate pending submissions', 
   await page.keyboard.type('password');
   await page.keyboard.press('Enter');
   await expect(
-    page.getByRole('button', { name: 'Войти', exact: true }),
+    page.getByRole('button', { name: 'Входим…', exact: true }),
   ).toBeDisabled();
   await expect.poll(() => submissions).toBe(1);
   finish?.();

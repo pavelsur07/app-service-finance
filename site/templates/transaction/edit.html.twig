@@ -10,7 +10,7 @@
 {% set isDeleted = tx.deleted %}
 {# Источник: код банка BankSync (alfa) — выписка; file/telegram — импорт; 1С-выписка пишет externalId без importSource. #}
 {% set importSource = tx.importSource %}
-{% set sourceLabels = {file: 'Импорт из файла', telegram: 'Telegram'} %}
+{% set sourceLabels = {file: 'Импорт из файла', telegram: 'Telegram', mcp: 'MCP'} %}
 {% if importSource is null %}
     {% set fromBank = tx.externalId is not null %}
     {% set sourceName = fromBank ? 'Банковская выписка (1С)' : 'Вручную' %}

@@ -10,23 +10,44 @@ use App\ServiceGateway\Application\DTO\SourceFactBatchesPage;
 use App\ServiceGateway\Application\DTO\SourceFactPage;
 use App\ServiceGateway\Exception\ServiceUnavailableException;
 use App\ServiceGateway\Infrastructure\Client\SourceFactsClientInterface;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 final readonly class SourceFactsGatewayFacade implements SourceFactsGatewayFacadeInterface
 {
     /** Ресурсы, которые сервисы публикуют фактами (белые списки сервисов — `facts.Resources`). */
     private const RESOURCES = [
-        'ozon-fetcher' => ['ozon.finance.accrual-by-day'],
+        'ozon-fetcher' => ['ozon.finance.accrual-by-day', 'ozon.ads.statistics', 'ozon.analytics.funnel'],
+        'wb-fetcher' => ['wb.finance.sales-report.daily', 'wb.ads.daily', 'wb.analytics.funnel', 'wb.analytics.search'],
     ];
 
+    /** @var array<string, SourceFactsClientInterface> сервис → клиент */
+    private array $clients;
+
+    /**
+     * @param iterable<SourceFactsClientInterface> $clients
+     */
     public function __construct(
-        private SourceFactsClientInterface $ozonFetcher,
+        #[AutowireIterator('app.source_facts_client')]
+        iterable $clients,
         private MarketplaceFacade $marketplace,
     ) {
+        $map = [];
+        foreach ($clients as $client) {
+            $map[$client->service()] = $client;
+        }
+        $this->clients = $map;
     }
 
     public function sources(): array
     {
-        return $this->ozonFetcher->isEnabled() ? self::RESOURCES : [];
+        $sources = [];
+        foreach ($this->clients as $service => $client) {
+            if ($client->isEnabled() && isset(self::RESOURCES[$service])) {
+                $sources[$service] = self::RESOURCES[$service];
+            }
+        }
+
+        return $sources;
     }
 
     public function batches(string $service, string $resourceType, ?string $after, int $limit): SourceFactBatchesPage
@@ -37,7 +58,7 @@ final readonly class SourceFactsGatewayFacade implements SourceFactsGatewayFacad
         }
         // connection_ref — id подключения; компанию из ответа сервиса на веру не берём.
         $companies = [];
-        foreach ($this->marketplace->getActiveOzonSellerConnections() as $connection) {
+        foreach ([...$this->marketplace->getActiveOzonSellerConnections(), ...$this->marketplace->getActiveWbSellerConnections()] as $connection) {
             $companies[strtolower($connection['connectionId'])] = strtolower($connection['companyId']);
         }
 
@@ -62,11 +83,6 @@ final readonly class SourceFactsGatewayFacade implements SourceFactsGatewayFacad
 
     private function client(string $service): SourceFactsClientInterface
     {
-        // ponytail: один сервис; второй (wb-fetcher) — тегированный список клиентов, как у покрытия.
-        if ($service !== $this->ozonFetcher->service()) {
-            throw ServiceUnavailableException::notConfigured($service);
-        }
-
-        return $this->ozonFetcher;
+        return $this->clients[$service] ?? throw ServiceUnavailableException::notConfigured($service);
     }
 }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
-use App\Cash\Application\AutoRule\SaveCashTransactionAutoRuleAction;
 use App\Cash\Application\Service\AutoRule\CashTransactionAutoRuleTargetValidator;
 use App\Cash\Form\Transaction\CashTransactionAutoRuleType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
@@ -16,7 +15,6 @@ use App\Company\Security\ModuleAccess;
 use App\Shared\Audit\AuditContextProvider;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -35,7 +33,6 @@ final class CashAutoRuleEditController extends AbstractController
         private readonly \App\Cash\Http\CashAutoRulePage $page,
         private readonly FinancialResponsibilityCenterFacade $responsibilityCenterFacade,
         private readonly CashTransactionAutoRuleTargetValidator $targetValidator,
-        private readonly SaveCashTransactionAutoRuleAction $save,
         private readonly AuditContextProvider $auditContextProvider,
     ) {
     }
@@ -48,10 +45,12 @@ final class CashAutoRuleEditController extends AbstractController
             $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
         }
         $companyId = (string) $company->getId();
-        $rule = $this->repo->findOneByIdAndCompanyId($id, (string) $company->getId());
-        if (!$rule) {
+        $original = $this->repo->findOneByIdAndCompanyId($id, (string) $company->getId());
+        if (!$original) {
             throw $this->createNotFoundException();
         }
+        $rule = $original->editableDraft();
+        $actorId = $this->auditContextProvider->getActorUserId();
         $categories = $this->categoryRepo->findTreeByCompany($company);
         $moneyAccounts = $this->moneyAccountRepo->findBy(['company' => $company], ['name' => 'ASC']);
         $projectDirections = $this->companyFacade->listProjectDirectionEntities((string) $company->getId(), treeOrder: false);
@@ -60,16 +59,11 @@ final class CashAutoRuleEditController extends AbstractController
         $form = $this->createForm(CashTransactionAutoRuleType::class, $rule, ['categories' => $categories, 'company_id' => $companyId, 'moneyAccounts' => $moneyAccounts, 'projectDirections' => $projectDirections, 'responsibilityCenterChoices' => $this->page->getResponsibilityCenterChoices($this->responsibilityCenterFacade, $companyId, $currentResponsibilityCenterId)]);
         $form->handleRequest($request);
         $this->page->validatePairTarget($form, $this->targetValidator, $companyId, $currentProjectDirectionId, $currentResponsibilityCenterId, $rule);
-        if ($form->isSubmitted() && $form->isValid()) {
-            try {
-                ($this->save)($rule, $this->auditContextProvider->getActorUserId(), $currentProjectDirectionId, $currentResponsibilityCenterId);
-
-                return $this->redirectToRoute('cash_transaction_auto_rule_index');
-            } catch (\DomainException $exception) {
-                $form->addError(new FormError($exception->getMessage()));
-            }
+        $result = $this->page->processForm($form, $request, $rule, $original, $actorId);
+        if ($result['saved']) {
+            return $this->redirectToRoute('cash_transaction_auto_rule_index');
         }
 
-        return $this->render('cash_transaction_auto_rule/edit.html.twig', ['form' => $form->createView(), 'item' => $rule]);
+        return $this->render('cash_transaction_auto_rule/edit.html.twig', $result + ['draftId' => $rule->getId(), 'form' => $form->createView(), 'item' => $rule]);
     }
 }

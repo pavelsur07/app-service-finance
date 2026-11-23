@@ -17,6 +17,8 @@ final readonly class VariantSnapshot
         public array $characteristics,
         public bool $archived,
         public \DateTimeImmutable $sourceUpdatedAt,
+        /** @var list<string>|null */
+        public ?array $barcodes = null,
     ) {
     }
 }

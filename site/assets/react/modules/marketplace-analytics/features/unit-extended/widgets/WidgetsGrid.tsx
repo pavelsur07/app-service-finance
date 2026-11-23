@@ -1,5 +1,7 @@
 import React from 'react';
+import { formatMoney } from '@/react/shared/format/number';
 import type { CostGroupBreakdown } from '../unitExtended.types';
+import OrderAdsDetailPanel from './OrderAdsDetailPanel';
 import WidgetCard from './WidgetCard';
 import WidgetDetailPanel from './WidgetDetailPanel';
 import { WIDGETS, WIDGET_KEY_TO_GROUPS } from './widgetsConfig';
@@ -74,7 +76,8 @@ const WidgetsGrid: React.FC<WidgetsGridProps> = ({
         <>
             <div className="row row-cards mb-3">
                 {WIDGETS.map((config) => {
-                    const isExpandable = Boolean(WIDGET_KEY_TO_GROUPS[config.key]);
+                    const hasOrderAds = config.key === 'ads' && Boolean(current.orderAds);
+                    const isExpandable = hasOrderAds || Boolean(WIDGET_KEY_TO_GROUPS[config.key]);
                     const isExpanded = expandedKey === config.key;
                     return (
                         <div key={config.key} className="col-sm-6 col-lg-3">
@@ -84,6 +87,10 @@ const WidgetsGrid: React.FC<WidgetsGridProps> = ({
                                 previous={previous}
                                 isExpanded={isExpanded}
                                 isExpandable={isExpandable}
+                                allocationNote={hasOrderAds && current.orderAds && current.orderAds.unlinked !== 0
+                                    ? `Оплата за заказ Ozon без привязки к товарам — ${formatMoney(current.orderAds.unlinked, 2)}`
+                                    : undefined}
+                                detailLabel={hasOrderAds ? 'Расшифровка' : undefined}
                                 onToggle={onToggle}
                             />
                         </div>
@@ -95,6 +102,9 @@ const WidgetsGrid: React.FC<WidgetsGridProps> = ({
                 <div className="mb-3">
                     <WidgetDetailPanel groups={expandedGroups} />
                 </div>
+            )}
+            {expandedKey === 'ads' && current.orderAds && (
+                <OrderAdsDetailPanel report={current.orderAds} from={summary.period.from} to={summary.period.to} />
             )}
         </>
     );

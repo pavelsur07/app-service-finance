@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Application\DTO\CashAutoRuleQualityCounts;
+use App\Cash\Application\DTO\CashAutoRuleQualityPeriod;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Entity\Transaction\CashTransactionAutoRule;
+use App\Cash\Enum\Transaction\CashAutoRuleQualityMetric;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
+use App\Cash\Infrastructure\Query\CashAutoRuleQualityQuery;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Company\Facade\FinancialResponsibilityCenterFacade;
@@ -28,6 +33,7 @@ final class CashAutoRuleIndexController extends AbstractController
 
     public function __construct(
         private readonly ActiveCompanyService $companyService,
+        private readonly CashAutoRuleQualityQuery $quality,
         private readonly CashflowCategoryRepository $categoryRepo,
         private readonly CashTransactionAutoRuleRepository $repo,
         private readonly \App\Cash\Http\CashAutoRulePage $page,
@@ -69,6 +75,13 @@ final class CashAutoRuleIndexController extends AbstractController
         $searchValue = trim((string) $request->query->get('q', ''));
         $pager = $this->repo->paginateByCompany($company, $actionFilter, $operationTypeFilter, $categoryFilter, '' === $searchValue ? null : $searchValue, $isActiveFilter, max(1, (int) $request->query->get('page', 1)), self::LIST_PER_PAGE);
         $items = iterator_to_array($pager->getCurrentPageResults());
+        $period = CashAutoRuleQualityPeriod::fromStrings($request->query->getString('from'), $request->query->getString('to'));
+        $ruleIds = array_map(static fn (CashTransactionAutoRule $rule): string => (string) $rule->getId(), $items);
+        $counts = $this->quality->summarize($companyId, array_values($ruleIds), $period);
+        foreach ($items as $item) {
+            $counts[$item->getId()][$item->getRevision()] ??= new CashAutoRuleQualityCounts();
+            krsort($counts[$item->getId()]);
+        }
         $hasAnyRule = $this->repo->countByCompany($company) > 0;
         $actionOptions = array_map(static fn (CashTransactionAutoRuleAction $action) => ['value' => $action->value, 'label' => match ($action) {
             CashTransactionAutoRuleAction::FILL => 'Безопасно заполнить пустые поля',
@@ -81,6 +94,28 @@ final class CashAutoRuleIndexController extends AbstractController
         }], [CashTransactionAutoRuleOperationType::OUTFLOW, CashTransactionAutoRuleOperationType::INFLOW, CashTransactionAutoRuleOperationType::ANY]);
         $categoryOptions = array_map(static fn (CashflowCategory $category) => ['id' => $category->getId(), 'label' => trim(str_repeat('—', $category->getLevel() - 1).' '.$category->getName())], $categories);
 
-        return $this->render('cash_transaction_auto_rule/index.html.twig', ['items' => $items, 'pager' => $pager, 'hasAnyRule' => $hasAnyRule, 'categories' => $categories, 'actionOptions' => $actionOptions, 'operationOptions' => $operationOptions, 'categoryOptions' => $categoryOptions, 'statusOptions' => [['value' => self::STATUS_ACTIVE, 'label' => 'Активные'], ['value' => self::STATUS_DISABLED, 'label' => 'Отключённые'], ['value' => self::STATUS_ALL, 'label' => 'Все']], 'responsibilityCenterLabels' => array_flip($this->page->getResponsibilityCenterChoices($this->responsibilityCenterFacade, $companyId)), 'filters' => ['category' => $categoryValue, 'action' => $actionValue, 'operationType' => $operationTypeValue, 'status' => $statusValue, 'q' => $searchValue]]);
+        return $this->render('cash_transaction_auto_rule/index.html.twig', [
+            'items' => $items,
+            'qualityCounts' => $counts,
+            'qualityPeriod' => $period,
+            'qualityMetrics' => CashAutoRuleQualityMetric::cases(),
+            'observedSince' => $this->quality->observedSince($companyId),
+            'pager' => $pager,
+            'hasAnyRule' => $hasAnyRule,
+            'categories' => $categories,
+            'actionOptions' => $actionOptions,
+            'operationOptions' => $operationOptions,
+            'categoryOptions' => $categoryOptions,
+            'statusOptions' => [
+                ['value' => self::STATUS_ACTIVE, 'label' => 'Активные'],
+                ['value' => self::STATUS_DISABLED, 'label' => 'Отключённые'],
+                ['value' => self::STATUS_ALL, 'label' => 'Все'],
+            ],
+            'responsibilityCenterLabels' => array_flip($this->page->getResponsibilityCenterChoices($this->responsibilityCenterFacade, $companyId)),
+            'filters' => [
+                'category' => $categoryValue, 'action' => $actionValue, 'operationType' => $operationTypeValue,
+                'status' => $statusValue, 'q' => $searchValue, 'from' => $period->from->format('Y-m-d'), 'to' => $period->to->format('Y-m-d'),
+            ],
+        ]);
     }
 }

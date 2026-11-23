@@ -1,0 +1,1 @@
+Source: docs/design-system/v3/screens/Login.html at PR #3022 / 92698d36a. Original screen nodes only, transform removed for 1:1 CSS pixels. Google Fonts links replaced by the same local Manrope variable font. Reference differences from the specification table (mobile heading24/cookie40) intentionally retained in image; product follows table28/32.

@@ -62,6 +62,20 @@ final readonly class MarketplaceAdsFacade
     }
 
     /**
+     * @param list<string>|null $listingIds
+     *
+     * @return array{linked: float, estimated: float}
+     */
+    public function getOzonPayPerOrderAttribution(
+        string $companyId,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        ?array $listingIds = null,
+    ): array {
+        return $this->adSpendByListingQuery->getOzonPayPerOrderAttribution($companyId, $from, $to, $listingIds);
+    }
+
+    /**
      * РР с разрезом по листингам за период.
      *
      * Для построения строк отчётов с колонкой РР по листингу.

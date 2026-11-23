@@ -1,0 +1,31 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Подключения MCP{% endblock %}
+
+{% block body %}
+    <div class="card" data-mcp-connections>
+        <div class="card-body">
+            <h1 class="card-title">Подключения MCP</h1>
+            {% if connections is empty %}
+                <p>Активных подключений нет.</p>
+            {% else %}
+                <ul class="list-group list-group-flush">
+                    {% for connection in connections %}
+                        <li class="list-group-item d-flex flex-wrap gap-3 align-items-center justify-content-between" data-mcp-connection="{{ connection.id }}">
+                            <div>
+                                <strong>{{ connection.clientId }}</strong>
+                                <div>{{ companies[connection.companyId]|default('Компания недоступна') }}</div>
+                                <div class="text-secondary">Действует до {{ connection.expiresAt|date('d.m.Y H:i') }}</div>
+                                <div>{{ connection.scopes|join(', ') }}</div>
+                            </div>
+                            <form method="post" action="{{ path('mcp_user_connection_revoke', {id: connection.id}) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('mcp-revoke-' ~ connection.id) }}">
+                                <button class="btn btn-outline-danger" type="submit">Отозвать</button>
+                            </form>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

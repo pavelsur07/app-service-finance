@@ -23,6 +23,7 @@ final readonly class CashTransactionAutoRulePreviewResult
      * @param list<array{key: string, label: string, matched: int, wouldChange: int, conflicts: int, skipped: int}> $byCategory
      * @param list<array{key: string, label: string, matched: int, wouldChange: int, conflicts: int, skipped: int}> $byProject
      * @param list<array{key: string, label: string, matched: int, wouldChange: int, conflicts: int, skipped: int}> $byResponsibilityCenter
+     * @param array<string, int> $activeVersions
      * @param array<string, string> $responsibilityCenterLabels
      */
     public function __construct(
@@ -35,6 +36,8 @@ final readonly class CashTransactionAutoRulePreviewResult
         public array $byProject,
         public array $byResponsibilityCenter = [],
         public array $responsibilityCenterLabels = [],
+        public array $activeVersions = [],
+        public CashAutoRulePreviewImpact $impact = new CashAutoRulePreviewImpact(),
     ) {
     }
 }

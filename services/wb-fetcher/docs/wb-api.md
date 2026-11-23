@@ -56,6 +56,59 @@
 - Заголовки ответа: `X-Ratelimit-Limit: 1`, `X-Ratelimit-Remaining: 0` — лимит тот же,
   1 запрос/мин, общий с дневным.
 
+## Поиск по карточкам (`wb.analytics.search`)
+
+`POST https://seller-analytics-api.wildberries.ru/api/v2/search-report/table/details`, лимит 3 запроса
+в минуту на продавца. Задача `docs/tasks/marketplace-funnel/TASK.md`, этап 3. **Живым запросом не
+проверено** — форма по OpenAPI-спецификации WB от 18.11.2026.
+
+- **Доступ.** По документации — только с подпиской «Джем». Прод 18.11.2026: одному кабинету из трёх
+  метод ответил, двум отказал; форму отказа агент не видел (журналы сервиса недоступны). В
+  спецификации — 402 `payment required` и 403 `Authorization error`: оба кода — «нет подписки»
+  (`wb.SearchUnavailable`; воронка тем же токеном работает, поэтому 403 — не категория токена). День
+  — `done` со служебной страницей `{"schema", "unavailable": true, "status"}`, код отказа уходит в
+  факт. День, у которого уже есть данные, отказом не затирается — `search_refused`
+  (`failed_permanent`). 400 и любой другой отказ — `failed_permanent` без повторов.
+- **Запрос:** `{"currentPeriod": {"start": "D", "end": "D"}, "orderBy": {"field": "openCard",
+  "mode": "desc"}, "positionCluster": "all", "includeSubstitutedSKUs": true, "includeSearchTexts":
+  true, "limit": 1000, "offset": N}` — все карточки продавца за день, без фильтров.
+- **Ответ:** `{"data": {"products": [{"nmId", "avgPosition": {"current"}, "openCard": {"current"},
+  "addToCart": {"current"}, "orders": {"current"}, "visibility": {"current"}, …}], "currency"}}`.
+- **Страница raw:** одна на день — `{"schema": "wb-search-daily-v1", "currency", "products": […]}`,
+  карточки как прислал WB, по возрастанию `nmId`.
+- **Объём:** `planner.SearchDays` (30) дней до вчера один раз, `planner.SearchRefreshDays` (7)
+  последних — раз в сутки: вчерашний день WB досчитывает, прошлые дни поиска не меняются.
+- **Факты:** запись — карточка: `nmId` и `current` показателей `openCard`, `addToCart`, `orders`,
+  `visibility`, `avgPosition`; динамика, рейтинг, цена и название не передаются.
+- Топ поисковых запросов по карточке (`product/search-texts`) не грузится: запрос на каждую
+  карточку, смысл есть только у кабинетов с «Джемом».
+
+## Воронка продаж (`wb.analytics.funnel`)
+
+`POST https://seller-analytics-api.wildberries.ru/api/analytics/v3/sales-funnel/products`, токен
+кабинета с категорией «Аналитика»; подписка «Джем» не нужна. Задача
+`docs/tasks/marketplace-funnel/TASK.md`, этап 1. **Живым запросом не проверено** — форма по
+OpenAPI-спецификации WB от 18.11.2026.
+
+- **Запрос:** `{"selectedPeriod": {"start": "D", "end": "D"}, "limit": 1000, "offset": N}` — все
+  карточки продавца за день. Что метод принимает период в один день — гипотеза; отказ придёт как
+  400 → `failed_permanent`. Запасной метод — `…/products/history` (20 карточек, последняя неделя).
+- **Ответ:** `{"data": {"products": [{"product": {"nmId", "vendorCode", …}, "statistic":
+  {"selected": {"openCount", "cartCount", "orderCount", "orderSum", "buyoutCount", "buyoutSum",
+  "cancelCount", "cancelSum", "addToWishlist", "conversions", …}, "past", "comparison"}}],
+  "currency"}}`. Общих показов в воронке WB нет — первая ступень `openCount`.
+- **Страница raw:** одна на день — `{"schema": "wb-funnel-daily-v1", "currency", "products": […]}`,
+  карточки как прислал WB, по возрастанию `nmId` (одинаковый день → `unchanged`).
+- **Проверка:** нет `data.products`, карточка без `nmId`, повтор `nmId` между страницами —
+  `invalid_response`.
+- **Доступ:** 401/403 (токен без «Аналитики») — пауза только этой задачи, как у рекламы; отчёт
+  кабинета идёт дальше.
+- **Лимит:** 3 запроса в минуту на продавца (персональный токен) — сервис держит запрос в 20 с.
+  Базовый токен — 2 запроса в час: 30 дней перечитывания на нём не пройдут (429, шторм лимита).
+- **Данные:** WB обновляет отчёт раз в 2 часа; выкупы, отмены и возвраты записывает на день заказа.
+- **Расписание:** 30 дней до вчера — загрузка и перечитывание раз в сутки с 04:00 МСК, приоритет
+  ниже отчёта (общий слот кабинета). Глубина API — 365 дней; догон глубже — после живой проверки.
+
 ## Статусы → классы ошибок сервиса
 
 | Ответ | Класс | Исход задачи |

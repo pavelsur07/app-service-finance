@@ -8,6 +8,7 @@ use App\Cash\Application\Category\DeleteCashflowCategoryAction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Exception\CashflowCategoryInUseException;
 use App\Cash\Infrastructure\Query\CashflowCategoryUsageQuery;
+use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Tests\Builders\Cash\CashflowCategoryBuilder;
 use App\Tests\Builders\Cash\CashTransactionBuilder;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
@@ -36,7 +37,7 @@ final class DeleteCashflowCategoryActionTest extends IntegrationTestCase
 
         $staleConnection = $this->createStub(Connection::class);
         $staleConnection->method('fetchAllAssociative')->willReturn([]);
-        $delete = new DeleteCashflowCategoryAction($this->em, new CashflowCategoryUsageQuery($staleConnection));
+        $delete = new DeleteCashflowCategoryAction($this->em, new CashflowCategoryUsageQuery($staleConnection), self::getContainer()->get(CashflowCategoryRepository::class));
 
         $this->expectException(CashflowCategoryInUseException::class);
         $delete($category);
@@ -67,5 +68,30 @@ final class DeleteCashflowCategoryActionTest extends IntegrationTestCase
 
         self::assertTrue($this->em->isOpen());
         self::assertNotNull($this->em->find(CashflowCategory::class, $category->getId()));
+    }
+
+    /**
+     * Форма загрузила статью без кода, команда ядра затем проставила код: удаление по устаревшему
+     * состоянию отклоняется — код перечитывается под FOR UPDATE.
+     */
+    public function testRefusesCategoryThatGotGroupCodeAfterLoading(): void
+    {
+        $user = UserBuilder::aUser()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $category = CashflowCategoryBuilder::aCashflowCategory()->withCompany($company)->withName('Аренда')->build();
+        foreach ([$user, $company, $category] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+        $this->em->getConnection()->executeStatement("UPDATE cashflow_categories SET group_code = 'OP_OUT_RENT' WHERE id = ?", [$category->getId()]);
+
+        try {
+            self::getContainer()->get(DeleteCashflowCategoryAction::class)($category);
+            self::fail('Ожидался отказ: статья стала статьёй базового дерева.');
+        } catch (\DomainException $exception) {
+            self::assertStringContainsString('базового дерева', $exception->getMessage());
+        }
+
+        self::assertSame(1, (int) $this->em->getConnection()->fetchOne('SELECT COUNT(*) FROM cashflow_categories WHERE id = ?', [$category->getId()]));
     }
 }

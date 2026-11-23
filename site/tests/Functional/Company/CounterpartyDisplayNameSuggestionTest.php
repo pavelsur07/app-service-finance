@@ -79,6 +79,81 @@ final class CounterpartyDisplayNameSuggestionTest extends WebTestCaseBase
         self::assertCount(1, $crawler->filter('.vf-name-suggest'));
     }
 
+    public function testNormalizeAllPreviewsThenAppliesOnlyOwnAutoNames(): void
+    {
+        // Given: сырое, ручное, нераспознанное — и такое же сырое у чужой компании
+        $client = static::createClient();
+        [$owner, $company] = $this->createCompany($client, 961);
+        [, $foreignCompany] = $this->createCompany($client, 962);
+        $rawId = $this->createCounterparty($company, 'ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ "РОМАШКА"');
+        $manualId = $this->createCounterparty($company, 'ООО "Ландыш"');
+        $this->createCounterparty($company, 'Ozon');
+        $foreignId = $this->createCounterparty($foreignCompany, 'ООО "Чужая"');
+        $this->em()->flush();
+        $this->em()->getConnection()->executeStatement(
+            'UPDATE "counterparty" SET display_name = :name, display_name_source = :source WHERE id = :id',
+            ['name' => 'Ландыш вручную', 'source' => 'manual', 'id' => $manualId],
+        );
+        $this->login($client, $owner, $company);
+
+        // When: кнопка в списке ведёт на предпросмотр
+        $crawler = $client->request('GET', '/counterparties/');
+        $crawler = $client->click($crawler->filter('[data-test="counterparty-normalize"]')->link());
+
+        // Then: «было → станет», в базе ничего
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('ООО «РОМАШКА»', $crawler->filter('[data-test="normalize-changes"]')->text());
+        self::assertStringNotContainsString('Чужая', $crawler->filter('[data-test="normalize-changes"]')->text());
+        self::assertNull($this->displayName($rawId));
+
+        // When: «Применить»
+        $client->submit($crawler->filter('form[data-test="normalize-apply"]')->form());
+
+        // Then
+        self::assertResponseRedirects('/counterparties/');
+        self::assertStringContainsString('Обновлено названий: 1', $this->flashes($client->followRedirect()));
+        self::assertSame('ООО «РОМАШКА»', $this->displayName($rawId));
+        self::assertSame('Ландыш вручную', $this->displayName($manualId));
+        self::assertNull($this->displayName($foreignId));
+
+        // When: повтор
+        $crawler = $client->request('GET', '/counterparties/display-names/normalize');
+
+        // Then
+        self::assertSelectorExists('[data-test="normalize-empty"]');
+        self::assertCount(0, $crawler->filter('form[data-test="normalize-apply"]'));
+    }
+
+    public function testNormalizeAllRequiresWriteAndCsrf(): void
+    {
+        // Given
+        $client = static::createClient();
+        [$company, $reader] = $this->seedMember(963, ['finance' => 'read']);
+        $id = $this->createCounterparty($company, 'ООО "Ромашка"');
+        $this->em()->flush();
+        $this->login($client, $reader, $company);
+
+        // Then: без права записи — ни кнопки, ни страниц
+        $crawler = $client->request('GET', '/counterparties/');
+        self::assertCount(0, $crawler->filter('[data-test="counterparty-normalize"]'));
+        $client->request('GET', '/counterparties/display-names/normalize');
+        self::assertResponseStatusCodeSame(403);
+        $client->request('POST', '/counterparties/display-names/normalize', ['_token' => $this->csrfToken($client, 'normalize_display_names'.$company->getId())]);
+        self::assertResponseStatusCodeSame(403);
+        self::assertNull($this->displayName($id));
+
+        // When: владелец с поддельным токеном
+        [$owner, $own] = $this->createCompany($client, 964);
+        $ownId = $this->createCounterparty($own, 'ООО "Ромашка"');
+        $this->em()->flush();
+        $this->login($client, $owner, $own);
+        $client->request('POST', '/counterparties/display-names/normalize', ['_token' => 'forged']);
+
+        // Then
+        self::assertResponseRedirects('/counterparties/display-names/normalize');
+        self::assertNull($this->displayName($ownId));
+    }
+
     public function testInvalidCsrfChangesNothing(): void
     {
         // Given

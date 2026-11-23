@@ -139,7 +139,8 @@ final class RepairOzonRealizationOctoberB57d7682CommandTest extends IntegrationT
         self::assertSame($beforeDaily, $this->connection->fetchAllAssociative($dailySql, [self::COMPANY]));
         self::assertSame($beforeCosts, $this->connection->fetchAllAssociative($costsSql, [self::COMPANY]));
         self::assertSame($beforeCfo, $this->connection->fetchOne("SELECT responsibility_center_id FROM documents WHERE company_id = ? AND source='marketplace_ozon' AND stream='revenue'", [self::COMPANY]));
-        self::assertSame(['COGS_PRODUCT_REV' => '-8.00', 'REV_NOT_SPP' => '30.00', 'REV_SPP_RETURNS' => '-2.00', 'REV_SPP_SALES' => '5007.00'], $this->report());
+        // себестоимость продажи −5 и сторно затрат +3 одной статьи: −2 (раньше модуль суммы давал −8)
+        self::assertSame(['COGS_PRODUCT_REV' => '-2.00', 'REV_NOT_SPP' => '30.00', 'REV_SPP_RETURNS' => '-2.00', 'REV_SPP_SALES' => '5007.00'], $this->report());
     }
 
     public function testRepairRejectsLosingAnExistingDocumentCfo(): void

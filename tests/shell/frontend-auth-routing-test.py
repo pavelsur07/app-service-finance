@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Public SPA API boundary and required actual-backend release gate."""
 from pathlib import Path
+import os
+import re
+import subprocess
+import tempfile
+import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,11 +33,114 @@ class AuthRoutingTest(unittest.TestCase):
     def test_real_backend_suite_is_a_required_deploy_gate(self):
         workflow = (ROOT / '.github/workflows/deploy.yml').read_text()
         self.assertIn('    spa-auth-e2e:', workflow)
-        gate = workflow.split('    schema-ready:', 1)[1].split('    deploy:', 1)[0]
+        gate = workflow.split('    release-manifest:', 1)[1].split('    production:', 1)[0]
         self.assertIn('spa-auth-e2e', gate)
-        self.assertIn("needs['spa-auth-e2e'].result == 'success'", gate)
-        for mode in ('dev', 'preview', 'production'):
-            self.assertIn(f'make front-auth-e2e MODE={mode}', workflow)
+        self.assertIn("needs.spa-auth-e2e.result == 'success'", gate)
+        production = workflow.split('    production:', 1)[1].split('        steps:', 1)[0]
+        self.assertIn('needs: release-manifest', production)
+        self.assertIn("needs.release-manifest.result == 'success'", production)
+
+    def test_every_mode_runs_as_its_own_parallel_leg(self):
+        job = self.workflow().split('    spa-auth-e2e:\n', 1)[1].split('    build-and-push:', 1)[0]
+        self.assertIn('mode: [dev, preview, production]', job)
+        self.assertIn('fail-fast: false', job)
+        self.assertIn('make front-auth-e2e MODE=${{ matrix.mode }}', job)
+
+    def test_job_is_gated_by_the_dedicated_output(self):
+        job = self.workflow().split('    spa-auth-e2e:\n', 1)[1].split('        steps:', 1)[0]
+        self.assertIn("needs.changes.outputs.auth_e2e == 'true'", job)
+        self.assertNotIn('needs.changes.outputs.backend', job)
+
+    def test_pull_request_filter_covers_the_backend_the_suite_exercises(self):
+        block = self.workflow().split('                      auth_e2e:\n', 1)[1].split('                      landing:', 1)[0]
+        for path in ('site/src/Shared/Controller/Spa/**', 'site/src/**/Controller/Api/**',
+                     'site/src/**/Security/**', 'site/src/Company/Entity/**', 'site/config/**',
+                     'site/src/Shared/Infrastructure/Http/**', 'site/src/Shared/Api/**',
+                     'site/src/Company/Api/**', 'site/src/Admin/Api/**', 'site/templates/security/**',
+                     'site/migrations/**', 'site/docker/**', 'site/tests/Support/Spa/**',
+                     'site/composer.lock'):
+            self.assertIn(f"- '{path}'", block)
+        # Путь вне `backend` не поднимет dev-image, и job молча пропустится.
+        backend = self.workflow().split('                      backend:\n', 1)[1].split('                      frontend:', 1)[0]
+        covered = [p.replace('**', '') for p in re.findall(r"- '([^']+)'", backend)]
+        for path in re.findall(r"- '([^']+)'", block):
+            self.assertTrue(any(path.startswith(prefix) for prefix in covered), path)
+
+    def test_release_reuse_knows_every_leg_by_name(self):
+        job = self.workflow().split('    spa-auth-e2e:\n', 1)[1].split('        steps:', 1)[0]
+        name = re.search(r'name: (.+) \(\$\{\{ matrix\.mode \}\}\)', job)[1]
+        modes = re.search(r'mode: \[(.+)\]', job)[1].split(', ')
+        bundle = (ROOT / 'site/bin/release-bundle.py').read_text()
+        for mode in modes:
+            self.assertIn(f"'{name} ({mode})'", bundle)
+        self.assertEqual(bundle.count(f"'{name} ("), len(modes))
+
+    def test_suite_is_skipped_only_on_pull_requests_outside_its_scope(self):
+        cases = [
+            # event, ref, changed filters, dispatch action, reuse -> auth_e2e
+            ('pull_request', 'refs/pull/1/merge', {'backend'}, '', 'false', 'false'),
+            ('pull_request', 'refs/pull/1/merge', {'backend', 'auth_e2e'}, '', 'false', 'true'),
+            ('pull_request', 'refs/pull/1/merge', {'spa'}, '', 'false', 'true'),
+            ('pull_request', 'refs/pull/1/merge', {'landing'}, '', 'false', 'false'),
+            ('push', 'refs/heads/master', {'backend'}, '', 'false', 'true'),
+            ('push', 'refs/heads/master', {'landing'}, '', 'false', 'true'),
+            ('push', 'refs/heads/master', set(), '', 'false', 'false'),
+            ('workflow_dispatch', 'refs/heads/master', set(), 'none', 'false', 'false'),
+            ('workflow_dispatch', 'refs/heads/master', set(), 'release', 'false', 'true'),
+            ('workflow_dispatch', 'refs/heads/master', set(), 'deploy', 'false', 'true'),
+            ('workflow_dispatch', 'refs/heads/master', set(), 'migrations', 'false', 'true'),
+            ('push', 'refs/heads/master', {'backend'}, '', 'true', 'false'),
+            ('workflow_dispatch', 'refs/heads/master', set(), 'release', 'true', 'false'),
+        ]
+        for event, ref, changed, action, reuse, expected in cases:
+            with self.subTest(event=event, changed=sorted(changed), action=action, reuse=reuse):
+                outputs = self.run_matrix_step(event, ref, changed, action, reuse)
+                self.assertEqual(outputs['auth_e2e'], expected)
+                # Release manifest требует success этого job'а — он обязан идти со сборкой backend.
+                if event != 'pull_request' and outputs['backend'] == 'true':
+                    self.assertEqual(outputs['auth_e2e'], 'true')
+
+    def test_stand_preparation_is_cached_without_skipping_builds(self):
+        job = self.workflow().split('    spa-auth-e2e:\n', 1)[1].split('    build-and-push:', 1)[0]
+        cache = job.split('              id: node-modules\n', 1)[1].split('            - ', 1)[0]
+        # npm ci и yarn install ставят ровно эти каталоги; ключ обязан меняться с каждым lock-файлом.
+        for directory, lock in (('apps/account', 'package-lock.json'), ('apps/admin', 'package-lock.json'),
+                                ('apps/packages/ds', 'package-lock.json'), ('site', 'yarn.lock')):
+            self.assertTrue((ROOT / directory / lock).is_file())
+            self.assertIn(f'{directory}/node_modules\n', cache)
+            self.assertIn(f"'{directory}/{lock}'", cache)
+        self.assertIn("'docker-compose.frontend*.yml'", cache)  # версия node-образа
+        install = job.split("steps.node-modules.outputs.cache-hit != 'true'", 1)[1].split('            - name:', 1)[0]
+        guarded, always = install.split('                  fi\n', 1)
+        self.assertIn('make front-install', guarded)
+        self.assertIn('yarn install --frozen-lockfile', guarded)
+        self.assertNotIn('yarn build', guarded)
+        self.assertIn('yarn build', always)
+        # Слои php-fpm — из кэша сборки; до e2e возвращаем builder, который кладёт образы в docker.
+        self.assertIn('cache-from: type=gha,scope=site-php-fpm-dev', job)
+        self.assertIn('tags: app-service-finance-site-php-fpm:latest', job)
+        self.assertNotIn('build site-php-fpm', job)
+        self.assertLess(job.index('docker buildx use default'), job.index('make front-auth-e2e'))
+
+    def workflow(self):
+        return (ROOT / '.github/workflows/deploy.yml').read_text()
+
+    def run_matrix_step(self, event, ref, changed, action, reuse):
+        step = self.workflow().split('              id: matrix\n', 1)[1].split('              run: |\n', 1)[1]
+        lines = []
+        for line in step.splitlines():
+            if line.strip() and not line.startswith(' ' * 18):
+                break
+            lines.append(line)
+        script = re.sub(r"\$\{\{ steps\.f\.outputs\.(\w+) \}\}",
+                        lambda m: 'true' if m[1] in changed else ('' if event == 'workflow_dispatch' else 'false'),
+                        textwrap.dedent('\n'.join(lines)))
+        self.assertNotIn('${{', script)
+        with tempfile.NamedTemporaryFile('r') as out:
+            env = dict(os.environ, GITHUB_EVENT_NAME=event, GITHUB_REF=ref, GITHUB_OUTPUT=out.name,
+                       PRODUCTION_ACTION=action, REUSE_RELEASE=reuse)
+            subprocess.run(['bash', '-euo', 'pipefail', '-c', script], env=env, check=True)
+            return dict(line.split('=', 1) for line in out.read().splitlines())
 
 if __name__ == '__main__':
     unittest.main()

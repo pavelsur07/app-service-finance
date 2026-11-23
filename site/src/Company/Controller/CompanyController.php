@@ -15,10 +15,14 @@ use App\Company\Form\CompanyTaxProfileType;
 use App\Company\Form\CompanyType;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyTaxProfileRepository;
+use App\Company\Repository\ConsolidationMembershipRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Pagerfanta;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,17 +33,34 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/company')]
 class CompanyController extends AbstractController
 {
+    private const PER_PAGE = 20;
+
     #[Route('/', name: 'company_index', methods: ['GET'])]
-    public function index(CompanyRepository $companyRepository): Response
-    {
+    public function index(
+        Request $request,
+        CompanyRepository $companyRepository,
+        CompanyTaxProfileRepository $taxProfileRepository,
+        ClockInterface $clock,
+    ): Response {
         $user = $this->getUser();
         if (!$user instanceof User) {
             throw $this->createAccessDeniedException();
         }
 
-        // Только свои компании; помеченные к удалению — отдельным блоком с восстановлением.
+        $page = filter_var($request->query->all()['page'] ?? '1', \FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 1;
+        /** @var Pagerfanta<Company> $pager */
+        $pager = new Pagerfanta(new QueryAdapter($companyRepository->createOwnedActiveQueryBuilder($user), false));
+        $pager->setMaxPerPage(self::PER_PAGE);
+        $pager->setCurrentPage(min($page, $pager->getNbPages()));
+        $companies = iterator_to_array($pager->getCurrentPageResults(), false);
+
         return $this->render('company/index.html.twig', [
-            'companies' => $companyRepository->findActiveByUser($user),
+            'companies' => $companies,
+            'pager' => $pager,
+            'taxProfiles' => $taxProfileRepository->findEffectiveForCompanies(
+                array_map(static fn (Company $company): string => (string) $company->getId(), $companies),
+                $clock->now(),
+            ),
             'deletionRequested' => $companyRepository->findDeletionRequestedByUser($user),
         ]);
     }
@@ -55,6 +76,10 @@ class CompanyController extends AbstractController
         }
 
         $request->getSession()->set('active_company_id', $company->getId());
+
+        if ('company_edit' === ($request->request->all()['returnTo'] ?? null)) {
+            return $this->redirectToRoute('company_edit', ['id' => $company->getId()]);
+        }
 
         $referer = $request->headers->get('referer');
 
@@ -88,7 +113,7 @@ class CompanyController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            /** @var array{taxRegime: ?TaxRegime, vatMode: ?VatMode} $taxProfile */
+            /** @var array{taxRegime: ?TaxRegime, vatMode: ?VatMode, taxRatePercent: ?string} $taxProfile */
             $taxProfile = $form->get('taxProfile')->getData();
 
             // Подписчики события (Balance) ищут данные через SQL, поэтому им нужен flush до события.
@@ -97,7 +122,7 @@ class CompanyController extends AbstractController
                 $companyOwnerMembershipCreator->persistCompanyWithOwnerMembership($company, $user);
                 // Начальный налоговый профиль; форма пропускает только оба поля или ни одного.
                 if (null !== $taxProfile['taxRegime'] && null !== $taxProfile['vatMode']) {
-                    $taxProfileWriter->upsert((string) $company->getId(), $taxProfile['taxRegime'], $taxProfile['vatMode'], null);
+                    $taxProfileWriter->upsert((string) $company->getId(), $taxProfile['taxRegime'], $taxProfile['vatMode'], null, $taxProfile['taxRatePercent']);
                 }
                 $em->flush();
                 $eventDispatcher->dispatch(new CompanyCreatedEvent((string) $company->getId(), $company->getBusinessProfile()));
@@ -131,6 +156,7 @@ class CompanyController extends AbstractController
         Request $request,
         CompanyRepository $companyRepository,
         CompanyTaxProfileRepository $taxProfileRepository,
+        ConsolidationMembershipRepository $consolidationRepository,
         EntityManagerInterface $em,
         LoggerInterface $logger,
     ): Response {
@@ -150,19 +176,28 @@ class CompanyController extends AbstractController
             if ($company->getBusinessProfile() !== $profileBefore) {
                 $logger->info('Company business profile changed', ['companyId' => $id, 'from' => $profileBefore->value, 'to' => $company->getBusinessProfile()->value]);
             }
+            $this->addFlash('success', 'Настройки компании сохранены.');
 
-            return $this->redirectToRoute('company_index');
+            return $this->redirectToRoute('company_edit', ['id' => $id, '_fragment' => 'company']);
         }
 
         $taxProfileForm = $this->createForm(CompanyTaxProfileType::class, null, [
             'action' => $this->generateUrl('company_tax_profile_save', ['id' => $id]),
         ]);
 
+        $cabinet = $companyRepository->findByUserId((string) $company->getUser()?->getId());
+        $cabinetNames = [];
+        foreach ($cabinet as $cabinetCompany) {
+            $cabinetNames[(string) $cabinetCompany->getId()] = (string) $cabinetCompany->getName();
+        }
+
         return $this->render('company/edit.html.twig', [
             'form' => $form->createView(),
             'company' => $company,
             'taxProfiles' => $taxProfileRepository->findByCompany($id),
             'taxProfileForm' => $taxProfileForm->createView(),
+            'cabinetNames' => $cabinetNames,
+            'consolidation' => $consolidationRepository->findByCompanies(array_keys($cabinetNames)),
         ]);
     }
 }

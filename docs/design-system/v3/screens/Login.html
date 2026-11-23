@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вход · Ваш Финдир</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* ================================================================
+     ТОКЕНЫ v3.0 — три слоя
+     1. PRIMITIVES  — палитра и сырые шкалы. Компоненты их НЕ используют.
+     2. SEMANTIC    — роли (text / bg / border / feedback / brand).
+                      Только этот слой переопределяется темой.
+     3. COMPONENT   — привязка роли к компоненту (button / input / card …).
+     Имена v2.6 сохранены: semantic-слой = прежние --text-*, --bg-*, …
+     Устаревшие имена — в блоке DEPRECATED ALIASES в конце, удаление в v4.
+     ================================================================ */
+
+  /* ============ 1. PRIMITIVES ============ */
+
+  /* Gray (холодный slate, шаги неравномерны — повторяют реальные значения v2.6) */
+  --gray-0:   #FFFFFF;
+  --gray-25:  #FAFAFB;
+  --gray-50:  #F8F8FA;
+  --gray-75:  #F5F5F7;
+  --gray-90:  #EFEFF2;
+  --gray-100: #F1F1F4;
+  --gray-150: #E3E4E8;
+  --gray-200: #D4D6DC;
+  --gray-300: #C4C7CE;
+  --gray-400: #9EA2AB;
+  --gray-450: #8A8E98;   /* ≥3:1 на белом и на --gray-75 — граница полей ввода */
+  --gray-500: #6A6E79;   /* 4.7:1 на --gray-75 — третичный текст */
+  --gray-600: #585D68;   /* «Вторичный текст» варианта A, 6.6:1 */
+  --gray-800: #23262F;
+  --gray-900: #0B1020;   /* «Текст» — синий из логотипа, 18.9:1 */
+
+  /* Blue (brand) */
+  --blue-25:  #F4F8FF;
+  --blue-50:  #EEF3FE;
+  --blue-100: #DBE6FF;
+  --blue-200: #C7D7FB;
+  --blue-400: #6E89C6;
+  --blue-600: #1A56DB;
+  --blue-700: #1E40AF;
+  --blue-800: #1A3E9C;
+
+  /* Green */
+  --green-50:  #ECFDF5;
+  --green-100: #D1FAE5;
+  --green-500: #10B981;
+  --green-700: #047857;
+
+  /* Red */
+  --red-50:  #FEF2F2;
+  --red-200: #FECACA;
+  --red-500: #EF4444;
+  --red-700: #B91C1C;
+  --red-800: #991B1B;
+
+  /* Amber */
+  --amber-50:  #FFFBEB;
+  --amber-200: #FDE68A;
+  --amber-400: #FBBF24;
+  --amber-500: #F59E0B;
+  --amber-800: #92400E;
+  --amber-900: #78350F;
+
+  /* Orange / Violet / Cyan / Sky */
+  --orange-50:  #FFF7ED;
+  --orange-100: #FFE4CC;
+  --orange-500: #F97316;
+  --orange-700: #C2410C;
+  --violet-50:  #F5F3FF;
+  --violet-100: #E9E5FF;
+  --violet-500: #8B5CF6;
+  --violet-700: #6D28D9;
+  --cyan-500:   #06B6D4;
+  --sky-500:    #0EA5E9;
+
+  /* Navy — синий из логотипа: интерактив, выбор, фокус */
+  --navy-25:  #F3F4F8;
+  --navy-50:  #EEF0F5;
+  --navy-100: #DEE2EB;
+  --navy-200: #C5CBD8;
+  --navy-400: #8E9BBB;
+  --navy-700: #1E2A44;   /* primary-кнопка: белый текст 14.3:1 */
+  --navy-800: #141B2E;
+  --navy-900: #0B1020;
+
+  /* Crimson — красный из логотипа: только CTA */
+  --crimson-50:  #FDECEE;
+  --crimson-100: #F9D2D7;
+  --crimson-600: #B00020;   /* белый текст 7.3:1 */
+  --crimson-700: #8C0019;   /* hover, 9.9:1 */
+  --crimson-800: #6E0014;
+
+  /* Green (рост) / Yellow (warning) / Orange-200 */
+  --green-brand-50:  #EAF6F0;
+  --green-brand-100: #CBEADB;
+  --green-brand-500: #16A06A;
+  --green-brand-700: #0E7A4F;   /* «Рост», 5.4:1 */
+  --yellow-50:  #FFF8E1;
+  --yellow-500: #F5B400;
+  --yellow-800: #8A5A00;
+  --yellow-900: #6B4500;
+  --orange-200: #FED7AA;
+  --orange-800: #9A3412;
+
+  /* Alpha (оверлеи, блики, тени) */
+  --alpha-white-10: rgba(255,255,255,0.10);
+  --alpha-white-15: rgba(255,255,255,0.15);
+  --alpha-white-40: rgba(255,255,255,0.40);
+  --alpha-white-55: rgba(255,255,255,0.55);
+  --alpha-white-70: rgba(255,255,255,0.70);
+  --alpha-white-80: rgba(255,255,255,0.80);
+  --alpha-ink-04:   rgba(15,23,42,0.04);
+  --alpha-ink-06:   rgba(15,23,42,0.06);
+  --alpha-ink-10:   rgba(15,23,42,0.10);
+  --alpha-ink-14:   rgba(15,23,42,0.14);
+  --alpha-ink-20:   rgba(15,23,42,0.20);
+  --alpha-blue-0:   rgba(26,86,219,0);
+  --alpha-blue-12:  rgba(26,86,219,0.12);
+  --alpha-blue-16:  rgba(26,86,219,0.16);
+  --alpha-blue-25:  rgba(26,86,219,0.25);
+  --alpha-navy-0:   rgba(30,42,68,0);
+  --alpha-navy-14:  rgba(30,42,68,0.14);
+  --alpha-navy-25:  rgba(30,42,68,0.25);
+  --alpha-crimson-25: rgba(176,0,32,0.25);
+  --alpha-orange-14:  rgba(194,65,12,0.14);
+  --alpha-orange-22:  rgba(194,65,12,0.22);
+
+  /* Type scale — 10 целых ступеней вместо 25 значений (в т.ч. дробных) v2.6 */
+  --fs-2xs: 10px;   /* только: инициалы в аватаре, mono-подписи токенов */
+  --fs-xs:  11px;   /* uppercase-заголовки таблиц, card-head, мета */
+  --fs-sm:  12px;   /* лейблы полей, chip, вторичный текст */
+  --fs-md:  13px;   /* BODY: строки таблиц, значения полей, кнопки */
+  --fs-lg:  14px;   /* sidebar main, subtotal, money 14 */
+  --fs-xl:  16px;   /* заголовок модалки и карточки, money 16 */
+  --fs-2xl: 18px;   /* заголовок drawer */
+  --fs-3xl: 22px;   /* KPI compact, заголовок раздела документации */
+  --fs-4xl: 28px;   /* KPI hero, заголовок страницы */
+  --fs-5xl: 32px;   /* display — только обложка документации */
+
+  --fw-regular:   400;
+  --fw-medium:    500;
+  --fw-semibold:  600;
+  --fw-bold:      700;
+  --fw-extrabold: 800;   /* только логотип и бренд-метки */
+
+  --lh-tight: 1.2;
+  --lh-snug:  1.35;
+  --lh-base:  1.5;
+
+  --ls-tight:  -0.02em;
+  --ls-normal: 0;
+  --ls-caps:   0.05em;
+
+  /* Spacing — база 4px + полушаги для плотного UI */
+  --s-0:   0;
+  --s-0_5: 2px;
+  --s-1:   4px;
+  --s-1_5: 6px;
+  --s-2:   8px;
+  --s-2_5: 10px;
+  --s-3:   12px;
+  --s-3_5: 14px;
+  --s-4:   16px;
+  --s-5:   20px;
+  --s-6:   24px;
+  --s-7:   32px;
+  --s-8:   40px;
+  --s-9:   48px;
+  --s-10:  64px;
+
+  /* Radius — шкала по ролям */
+  --r-xs: 2px;     /* прогресс-бары, мини-метки */
+  --r-sm: 4px;     /* chips, badges */
+  --r-md: 6px;     /* inputs, buttons, nav items */
+  --r-lg: 8px;     /* cards, sections, menus */
+  --r-xl: 12px;    /* modals */
+  --r-pill: 999px;
+  --r-circle: 50%;
+
+  /* Motion */
+  --dur-fast: 120ms;    /* hover, focus, цвет */
+  --dur-base: 160ms;    /* раскрытие, сдвиг */
+  --dur-slow: 240ms;    /* drawer, side modal */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit:     cubic-bezier(0.4, 0, 1, 1);
+
+  /* Z-index — именованные слои вместо магических чисел */
+  --z-raised:   1;
+  --z-sticky:   10;
+  --z-header:   30;
+  --z-dropdown: 50;
+  --z-overlay:  100;
+  --z-toast:    200;
+
+  /* ============ 2. SEMANTIC ============ */
+  /* (переопределяется в [data-theme="dark"]) */
+
+  /* Brand · вариант A «Фирменный красный»
+     primary = navy: ссылки, активные табы, чекбоксы, фокус, выбранные строки.
+     accent  = crimson: только бренд-моменты (логотип, промо, лендинг) — НЕ кнопки продукта.
+     Красный в финансах = «минус» / «опасность»,
+     поэтому снижение и ошибки — оранжевые (--danger-*), а не красные. */
+  --color-accent:        var(--crimson-600);
+  --color-accent-hover:  var(--crimson-700);
+  --color-accent-active: var(--crimson-800);
+  --color-accent-tint:   var(--crimson-50);
+  --color-primary:           var(--navy-700);
+  --color-primary-hover:     var(--navy-900);
+  --color-primary-active:    var(--navy-900);
+  --color-primary-tint:      var(--navy-50);
+  --color-primary-border:    var(--navy-200);
+  --color-primary-selection: var(--navy-100);
+
+  /* Text */
+  --text-strong:    var(--gray-900);
+  --text-secondary: var(--gray-600);
+  --text-tertiary:  var(--gray-500);   /* было #64748B — 4.4:1 на фоне страницы */
+  --text-muted:     var(--gray-500);   /* было #8B95A7 — 2.8:1, не проходило AA */
+  --text-disabled:  var(--gray-400);   /* disabled освобождён от требований контраста */
+  --text-faint:     var(--gray-300);   /* только декор: разделители «·», плейсхолдер-иконки */
+  --text-inverse:   var(--gray-0);
+  --neutral-tint-text: var(--gray-600);
+
+  /* Borders */
+  --border:        var(--gray-150);
+  --border-soft:   var(--gray-100);
+  --border-hover:  var(--gray-200);
+  --border-strong: var(--gray-450);    /* интерактивные границы, ≥3:1 */
+  --highlight-bg:   var(--amber-200);  /* совпадение в поиске */
+  --highlight-text: var(--text-strong);
+  --border-dark:   var(--gray-800);
+
+  /* Backgrounds */
+  --bg-page:         var(--gray-75);
+  --bg-card:         var(--gray-0);
+  --bg-subtle:       var(--gray-50);
+  --bg-subtle-hover: var(--gray-90);
+  --bg-row-hover:    var(--gray-25);
+  --bg-row-selected: var(--navy-25);
+  --bg-dark:         var(--gray-900);
+  --bg-hero-tint:    rgba(11, 18, 32, 0.05);
+  --report-head-meta: var(--navy-400);
+
+  /* Feedback */
+  --success-bg:     var(--green-brand-50);
+  --success-border: var(--green-brand-100);
+  --success-text:   var(--green-brand-700);
+  --success-dot:    var(--green-brand-500);
+
+  --danger-bg:         var(--orange-50);
+  --danger-border:     var(--orange-200);
+  --danger-text:       var(--orange-700);
+  --danger-text-hover: var(--orange-800);
+  --danger-dot:        var(--orange-500);
+
+  --warning-bg:         var(--yellow-50);
+  --warning-border:     var(--amber-200);
+  --warning-text:       var(--yellow-800);
+  --warning-text-hover: var(--yellow-900);
+  --warning-dot:        var(--yellow-500);
+
+  /* Info — отдельная роль (в v3.1 info-алерты брали --color-primary) */
+  --info-bg:     var(--blue-50);
+  --info-border: var(--blue-100);
+  --info-text:   var(--blue-700);
+  --info-dot:    var(--blue-600);
+
+  /* Sparkline */
+  --spark-fill-start: var(--alpha-navy-14);
+  --spark-fill-end:   var(--alpha-navy-0);
+
+  /* Focus / glow */
+  --focus-ring-color:    var(--color-primary);
+  --focus-ring-primary:  var(--alpha-navy-25);
+  --focus-ring-input:    var(--alpha-navy-14);
+  --focus-ring-danger:   var(--alpha-orange-14);
+  --shadow-primary-glow: rgba(11,16,32,0.18);
+  --shadow-danger-glow:  var(--alpha-orange-22);
+  --shadow-warning-glow: rgba(146, 64, 14, 0.22);
+
+  /* Categories */
+  --cat-revenue:   var(--green-500);
+  --cat-marketing: var(--amber-500);
+  --cat-services:  var(--cyan-500);
+  --cat-payroll:   var(--violet-500);
+  --cat-tax:       var(--red-500);
+  --cat-software:  var(--sky-500);
+
+  /* Banks — фирменные цвета, константы (не тематизируются) */
+  --bank-tinkoff: #FFDD2D;        --bank-tinkoff-fg: #0B1220;
+  --bank-sber:    #1A9F29;        --bank-sber-fg:    #FFFFFF;
+  --bank-alfa:    #EF3124;        --bank-alfa-fg:    #FFFFFF;
+  --bank-tochka:  #6132D6;        --bank-tochka-fg:  #FFFFFF;
+  --bank-mts:     #EF4444;        --bank-mts-fg:     #FFFFFF;
+  --bank-yookassa:#7B61FF;        --bank-yookassa-fg:#FFFFFF;
+
+  /* Marketplaces — фирменные цвета, константы */
+  --mp-ozon:       #005BFF;       --mp-ozon-fg:       #FFFFFF;
+  --mp-wb:         #CB11AB;       --mp-wb-fg:         #FFFFFF;
+  --mp-yamarket:   #FFCC00;       --mp-yamarket-fg:   #0B1220;
+  --mp-megamarket: #21A038;       --mp-megamarket-fg: #FFFFFF;
+
+  /* Source badges */
+  --src-api-bg:    var(--blue-50);    --src-api-text:    var(--blue-700);    --src-api-border:    var(--blue-100);
+  --src-manual-bg: var(--gray-75);    --src-manual-text: var(--gray-600);    --src-manual-border: var(--gray-150);
+  --src-bot-bg:    var(--violet-50);  --src-bot-text:    var(--violet-700);  --src-bot-border:    var(--violet-100);
+  --src-xls-bg:    var(--green-50);   --src-xls-text:    var(--green-700);   --src-xls-border:    var(--green-100);
+  --src-1c-bg:     var(--orange-50);  --src-1c-text:     var(--orange-700);  --src-1c-border:     var(--orange-100);
+
+  /* Typography roles (font shorthand: weight size/line-height family) */
+  --font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  --type-caps:      var(--fw-bold) var(--fs-xs)/var(--lh-snug) var(--font-family);
+  --type-label:     var(--fw-semibold) var(--fs-sm)/var(--lh-snug) var(--font-family);
+  --type-body:      var(--fw-regular) var(--fs-md)/var(--lh-base) var(--font-family);
+  --type-body-strong: var(--fw-semibold) var(--fs-md)/var(--lh-base) var(--font-family);
+  --type-title-sm:  var(--fw-bold) var(--fs-xl)/var(--lh-tight) var(--font-family);
+  --type-title:     var(--fw-bold) var(--fs-2xl)/var(--lh-tight) var(--font-family);
+  --type-kpi:       var(--fw-bold) var(--fs-3xl)/var(--lh-tight) var(--font-family);
+  --type-hero:      var(--fw-bold) var(--fs-4xl)/var(--lh-tight) var(--font-family);
+
+  /* Shadows */
+  --shadow-sm:         0 1px 2px var(--alpha-ink-06);
+  --shadow-card-hover: 0 4px 12px var(--alpha-ink-04);
+  --shadow-primary:    0 1px 0 var(--alpha-white-15) inset, 0 4px 10px var(--shadow-primary-glow);
+  --shadow-menu:       0 16px 36px var(--alpha-ink-14), 0 2px 8px var(--alpha-ink-06);
+  --shadow-modal:      0 24px 60px rgba(11,18,32,0.28), 0 4px 12px rgba(11,18,32,0.08);
+  --shadow-drawer:     -20px 0 60px rgba(11,18,32,0.22);
+  --shadow-inset-hl:   0 1px 0 var(--alpha-white-40) inset;
+  --ring-focus:        0 0 0 3px var(--input-focus-ring);
+  --ring-error:        0 0 0 3px var(--input-error-ring);
+
+  /* Grid & breakpoints (документация; в @media нужны литералы или @custom-media на сборке) */
+  --grid-columns: 12;
+  --grid-gutter: var(--s-5);
+  --bp-sm: 768px;
+  --bp-md: 960px;
+  --bp-lg: 1280px;
+  --bp-xl: 1440px;
+
+  /* ============ 3. COMPONENT ============ */
+
+  /* Layout */
+  --card-padding: var(--s-4) var(--s-5);
+  --modal-width-compact: 440px;
+  --modal-width-standard: 520px;
+  --modal-width-l: 640px;
+  --drawer-width: 680px;
+  --backdrop-opacity: 0.45;
+  --backdrop-blur: 6px;
+
+  --avatar-sm: 24px;
+  --avatar-md: 32px;
+  --avatar-lg: 40px;
+
+  --app-header-height: 60px;
+  --app-header-bg:     var(--bg-card);
+  --app-header-border: var(--border);
+  --app-sidebar-width: 264px;
+
+  --toggle-w: 42px;
+  --toggle-h: 24px;
+  --toggle-knob: 20px;
+  --control-h: 38px;
+  --control-h-sm: 32px;
+  --input-icon-slot: 36px;     /* место под иконку внутри поля: поиск, суффикс, глаз пароля, стрелка select */
+  --sb-indent: 28px;           /* отступ вложенного пункта sidebar = иконка 16 + gap 12 */
+  --app-header-gutter: 28px;   /* боковой отступ контента AppHeader */
+
+  /* ABC × ABC */
+  --abc-star-bg:        var(--success-bg);
+  --abc-star-text:      var(--success-text);
+  --abc-attention-bg:   var(--warning-bg);
+  --abc-attention-text: var(--warning-text);
+  --abc-mid-bg:         var(--bg-subtle);
+  --abc-mid-text:       var(--text-strong);
+  --abc-weak-bg:        var(--bg-page);
+  --abc-weak-text:      var(--text-tertiary);
+  --abc-tail-bg:        var(--danger-bg);
+  --abc-tail-text:      var(--danger-text);
+
+  /* Buttons */
+  --button-primary-bg:           var(--color-primary);   /* Decision 44: navy, не красный */
+  --button-primary-bg-hover:     var(--navy-800);
+  --button-primary-bg-active:    var(--navy-900);
+  --button-primary-text:         var(--text-inverse);
+  --button-secondary-bg:         var(--bg-card);
+  --button-secondary-bg-hover:   var(--bg-page);
+  --button-secondary-border:     var(--border);
+  --button-secondary-border-hover: var(--border-hover);
+  --button-secondary-text:       var(--text-strong);
+  --button-ghost-bg:             transparent;   /* v2.6: использовался, но не был объявлен */
+  --button-ghost-text:           var(--text-secondary);
+  --button-ghost-bg-hover:       var(--bg-page);
+
+  /* Inputs */
+  --input-bg:           var(--bg-card);
+  --input-border:       var(--border-strong);  /* Decision 33: ≥3:1 */
+  --input-border-disabled: var(--border);
+  --input-bg-disabled:  var(--bg-subtle);
+  --input-border-hover: var(--text-tertiary);
+  --toggle-off-bg:      var(--border-strong);   /* выключенный toggle тоже ≥3:1 */
+  --input-border-focus: var(--color-primary);
+  --input-border-error: var(--danger-dot);
+  --input-text:         var(--text-strong);
+  --input-placeholder:  var(--text-muted);
+  --input-focus-ring:   var(--focus-ring-input);
+  --input-error-ring:   var(--focus-ring-danger);
+
+  /* Cards */
+  --card-bg:     var(--bg-card);
+  --card-border: var(--border);
+  --card-shadow: var(--shadow-sm);
+
+  /* Form messages */
+  --form-error-text:    var(--danger-text);
+  --form-helper-text:   var(--text-muted);
+  --form-label-text:    var(--text-tertiary);
+  --form-required-mark: var(--danger-dot);
+
+  /* Status pills */
+  --status-success-bg:   var(--success-bg);
+  --status-success-text: var(--success-text);
+  --status-success-dot:  var(--success-dot);
+  --status-danger-bg:    var(--danger-bg);
+  --status-danger-text:  var(--danger-text);
+  --status-danger-dot:   var(--danger-dot);
+  --status-warning-bg:   var(--warning-bg);
+  --status-warning-text: var(--warning-text);
+  --status-warning-dot:  var(--warning-dot);
+  --status-neutral-bg:   var(--bg-page);
+  --status-neutral-text: var(--neutral-tint-text);
+  --status-neutral-dot:  var(--text-disabled);
+
+  /* ============ DEPRECATED ALIASES (v2.6 → v3.0, удаление в v4) ============ */
+  --font-9_5:  var(--fs-xs);
+  --font-10_5: var(--fs-xs);
+  --font-11:   var(--fs-xs);
+  --font-11_5: var(--fs-sm);
+  --font-12:   var(--fs-sm);
+  --font-12_5: var(--fs-md);
+  --font-13:   var(--fs-md);
+  --font-13_5: var(--fs-lg);
+  --font-14:   var(--fs-lg);
+  --r-1: var(--r-sm);
+  --r-2: var(--r-md);   /* было 5px */
+  --r-3: var(--r-md);
+  --r-4: var(--r-lg);
+}
+
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-family); font-size: var(--fs-md); line-height: var(--lh-base); color: var(--text-strong);
+  background: var(--bg-subtle); -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+:where(a, button, input, [tabindex]:not([tabindex="-1"])):focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* ============ Документ листа ============ */
+.doc { max-width: 1240px; margin: 0 auto; padding: var(--s-9) var(--s-6) var(--s-10); }
+.doc-h1 { font: var(--type-hero); letter-spacing: var(--ls-tight); margin: 0; }
+.doc-sub { margin: var(--s-2) 0 0; color: var(--text-secondary); max-width: 72ch; }
+.doc-meta { margin-top: var(--s-3); font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-tertiary); }
+.doc-h2 { font: var(--type-title); letter-spacing: var(--ls-tight); margin: var(--s-9) 0 var(--s-1); }
+.doc-h2-sub { margin: 0 0 var(--s-4); color: var(--text-tertiary); max-width: 80ch; }
+.frame { border: 1px solid var(--border); border-radius: var(--r-xl); background: var(--bg-card); overflow: hidden; box-shadow: var(--shadow-sm); }
+.frame-cap { display: flex; gap: var(--s-2); align-items: center; padding: var(--s-2_5) var(--s-4); border-bottom: 1px solid var(--border-soft);
+  font: var(--type-caps); text-transform: uppercase; letter-spacing: var(--ls-caps); color: var(--text-tertiary); background: var(--bg-card); }
+.frame-cap code { font-family: var(--font-mono); text-transform: none; letter-spacing: 0; font-weight: var(--fw-medium); color: var(--text-secondary); }
+.scaled { position: relative; overflow: hidden; }
+.scaled > .screen { transform-origin: 0 0; position: absolute; left: 0; top: 0; overflow: hidden; }
+.screen > .cookie { position: absolute; left: 0; right: 0; bottom: 0; } /* в продукте — sticky bottom:0 */
+.states { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: var(--s-5); }
+.state { background: var(--bg-page); padding: var(--s-6) var(--s-4); display: flex; justify-content: center; flex: 1; align-items: flex-start; }
+.states .frame, .row2 .frame { display: flex; flex-direction: column; }
+.spec { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); background: var(--bg-card); }
+.spec th { text-align: left; font: var(--type-caps); text-transform: uppercase; letter-spacing: var(--ls-caps); color: var(--text-tertiary);
+  padding: var(--s-2_5) var(--s-4); border-bottom: 1px solid var(--border); }
+.spec td { padding: var(--s-2_5) var(--s-4); border-bottom: 1px solid var(--border-soft); vertical-align: top; color: var(--text-secondary); }
+.spec td:first-child { color: var(--text-strong); font-weight: var(--fw-semibold); white-space: nowrap; }
+.spec code { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-strong); }
+.row2 { display: grid; grid-template-columns: 1fr 392px; gap: var(--s-5); align-items: start; }
+
+/* ============ Экран входа ============ */
+.screen { width: 1440px; height: 900px; background: var(--bg-page); display: flex; flex-direction: column; position: relative; }
+.screen--mobile { width: 390px; height: 844px; }
+.auth-head { display: flex; align-items: center; justify-content: space-between; padding: var(--s-5) var(--s-8); }
+.auth-head .logo { display: inline-flex; border-radius: var(--r-sm); }
+.auth-head .logo svg { display: block; height: 32px; width: auto; }
+.auth-head-aside { font-size: var(--fs-md); color: var(--text-secondary); }
+.auth-main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: var(--s-4) var(--s-4) var(--s-8); }
+.auth-foot { padding: var(--s-6) var(--s-8) var(--s-5); text-align: center; }
+
+.auth-card { width: 100%; max-width: 440px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: 0 1px 2px var(--alpha-ink-04), 0 8px 24px var(--alpha-ink-04); padding: 36px 40px 32px; }
+.auth-card--wide { max-width: 520px; }
+.auth-title { font: var(--type-hero); letter-spacing: var(--ls-tight); text-align: center; margin: 0; }
+.auth-sub { text-align: center; color: var(--text-tertiary); font-size: var(--fs-lg); margin: var(--s-2) 0 var(--s-7); }
+.auth-form { display: flex; flex-direction: column; gap: var(--s-5); }
+
+.f-label-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--s-1_5); }
+.f-label { font: var(--type-label); font-size: var(--fs-md); color: var(--text-strong); }
+.f-input { width: 100%; height: 40px; padding: 0 var(--s-3); font: inherit; font-size: var(--fs-lg); color: var(--text-strong);
+  background: var(--input-bg); border: 1px solid var(--input-border); border-radius: var(--r-md); transition: border-color var(--dur-fast); }
+.f-input::placeholder { color: var(--text-muted); }
+.f-input:hover { border-color: var(--input-border-hover); }
+.f-input:focus-visible, .f-input.is-focus { outline: none; border-color: var(--input-border-focus); box-shadow: var(--ring-focus); }
+.f-input.is-error { border-color: var(--input-border-error); box-shadow: inset 0 0 0 1px var(--input-border-error); }
+.f-input.is-error.is-focus { box-shadow: inset 0 0 0 1px var(--input-border-error), var(--ring-error); }
+.f-input:disabled { background: var(--input-bg-disabled); border-color: var(--input-border-disabled); color: var(--text-disabled); }
+.f-wrap { position: relative; }
+.f-wrap .f-input { padding-right: 44px; }
+.f-eye { position: absolute; right: var(--s-1); top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--text-tertiary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.f-eye:hover { color: var(--text-strong); background: var(--bg-subtle); }
+.f-error { display: flex; gap: var(--s-1_5); align-items: flex-start; margin-top: var(--s-1_5); font-size: var(--fs-sm); color: var(--form-error-text); }
+.f-error svg { flex-shrink: 0; margin-top: 1px; }
+
+.check { display: inline-flex; align-items: center; gap: var(--s-2); font-size: var(--fs-md); color: var(--text-strong); cursor: pointer; user-select: none; }
+.check input { width: 18px; height: 18px; margin: 0; accent-color: var(--color-primary); }
+
+.link { color: var(--color-primary); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px;
+  text-decoration-color: var(--color-primary-border); border-radius: var(--r-xs); }
+.link:hover { color: var(--color-primary-hover); text-decoration-color: currentColor; }
+.link--standalone { font-weight: var(--fw-semibold); text-decoration: none; }
+.link--standalone:hover { text-decoration: underline; }
+.link--muted { color: inherit; text-decoration-color: var(--border-hover); }
+.link--muted:hover { color: var(--text-strong); }
+.link-sm { font-size: var(--fs-sm); }
+
+.btn-cta { width: 100%; height: 44px; border: 1px solid var(--button-primary-bg); border-radius: var(--r-md); background: var(--button-primary-bg);
+  color: var(--button-primary-text); font: inherit; font-size: var(--fs-lg); font-weight: var(--fw-bold); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2); box-shadow: var(--shadow-primary);
+  transition: background var(--dur-fast), border-color var(--dur-fast); }
+.btn-cta:hover { background: var(--button-primary-bg-hover); border-color: var(--button-primary-bg-hover); }
+.btn-cta[aria-busy="true"] { cursor: progress; opacity: .85; }
+.btn-cta:disabled:not([aria-busy="true"]) { background: var(--bg-subtle); border-color: var(--border); color: var(--text-disabled); box-shadow: none; }
+.spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--alpha-white-40); border-top-color: #fff; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; border-top-color: var(--alpha-white-70); } }
+
+.alert { display: flex; gap: var(--s-2_5); align-items: flex-start; padding: var(--s-3) var(--s-3_5); border-radius: var(--r-md); border: 1px solid;
+  font-size: var(--fs-md); line-height: var(--lh-snug); margin-bottom: var(--s-5); }
+.alert svg { flex-shrink: 0; margin-top: 1px; }
+.alert b { font-weight: var(--fw-bold); }
+.alert--danger { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger-text); }
+.alert--info { background: var(--info-bg); border-color: var(--info-border); color: var(--info-text); }
+.alert--danger .alert-body, .alert--info .alert-body { color: var(--text-strong); }
+
+.legal-line { margin: var(--s-4) 0 0; text-align: center; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-tertiary); }
+.divider { height: 1px; background: var(--border-soft); margin: var(--s-6) 0 var(--s-5); }
+.switch { text-align: center; font-size: var(--fs-md); color: var(--text-secondary); margin: 0; }
+
+.foot-docs { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-1) var(--s-4); font-size: var(--fs-md); color: var(--text-tertiary); }
+.foot-company { max-width: 760px; margin: var(--s-4) auto 0; text-align: left; }
+.foot-company > summary { cursor: pointer; text-align: center; list-style: none; font: var(--type-caps); text-transform: uppercase; letter-spacing: var(--ls-caps); color: var(--text-tertiary); border-radius: var(--r-xs); }
+.foot-company > summary::-webkit-details-marker { display: none; }
+.foot-company > summary::after { content: " ▾"; }
+.foot-company[open] > summary::after { content: " ▴"; }
+.foot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2) var(--s-7); margin-top: var(--s-3); }
+.foot-grid dt { font: var(--type-caps); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: var(--ls-caps); color: var(--text-tertiary); }
+.foot-grid dd { margin: 2px 0 0; font-size: var(--fs-md); color: var(--text-secondary); }
+.foot-note { margin: var(--s-3) auto 0; max-width: 760px; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.foot-copy { margin-top: var(--s-2); font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+.cookie { position: sticky; bottom: 0; display: flex; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-8);
+  background: var(--bg-card); border-top: 1px solid var(--border); box-shadow: 0 -4px 16px var(--alpha-ink-06); font-size: var(--fs-md); color: var(--text-secondary); }
+.cookie p { margin: 0; flex: 1; }
+.btn-sm { height: 32px; padding: 0 var(--s-3); border-radius: var(--r-md); font: inherit; font-size: var(--fs-md); font-weight: var(--fw-semibold); cursor: pointer; border: 1px solid; white-space: nowrap; }
+.btn-sm--secondary { background: var(--bg-card); border-color: var(--border); color: var(--text-strong); }
+.btn-sm--primary { background: var(--button-primary-bg); border-color: var(--button-primary-bg); color: var(--button-primary-text); }
+
+/* Выбор компании */
+.co-list { list-style: none; margin: 0 0 var(--s-5); padding: 0; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+.co-item + .co-item { border-top: 1px solid var(--border-soft); }
+.co-item label { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-3_5); cursor: pointer; }
+.co-item label:hover { background: var(--bg-row-hover); }
+.co-item input { width: 18px; height: 18px; margin: 0; accent-color: var(--color-primary); }
+.co-item.is-checked label { background: var(--bg-row-selected); }
+.co-av { width: 32px; height: 32px; border-radius: var(--r-md); display: inline-flex; align-items: center; justify-content: center; font-size: var(--fs-xs); font-weight: var(--fw-bold);
+  background: var(--color-primary-tint); color: var(--color-primary); flex-shrink: 0; }
+.co-name { font-weight: var(--fw-semibold); }
+.co-meta { font-size: var(--fs-sm); color: var(--text-tertiary); margin-top: 1px; }
+.co-role { margin-left: auto; font-size: var(--fs-xs); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: var(--ls-caps); color: var(--neutral-tint-text);
+  background: var(--bg-subtle); border-radius: var(--r-sm); padding: 2px var(--s-1_5); }
+.co-search { margin-bottom: var(--s-3); }
+
+/* Мобильный */
+.screen--mobile .auth-head { padding: var(--s-4) var(--s-5); }
+.screen--mobile .auth-head-aside { font-size: var(--fs-sm); }
+.screen--mobile .auth-main { padding: 0; }
+.screen--mobile .auth-card { border-radius: 0; border-left: 0; border-right: 0; box-shadow: none; padding: var(--s-6) var(--s-5); max-width: none; }
+.screen--mobile .auth-title { font-size: 24px; line-height: 30px; }
+.screen--mobile .auth-sub { margin-bottom: var(--s-6); }
+.screen--mobile .cookie { flex-direction: column; align-items: stretch; padding: var(--s-3) var(--s-4); gap: var(--s-2_5); }
+.screen--mobile .cookie .btns { display: flex; flex-direction: column; gap: var(--s-2); }
+.screen--mobile .cookie .btn-sm { width: 100%; height: 40px; }
+
+@media (max-width: 1100px) { .row2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="doc">
+  <h1 class="doc-h1">Вход в кабинет</h1>
+  <p class="doc-sub">Экран входа <code>apps/account</code> (и <code>apps/admin</code> с другим заголовком) по ДС v3.4. Тексты, поведение и юридический блок — из <code>docs/design-system/AUTH-SPEC.md</code>; визуал — токены v3.4: Manrope, кнопка navy, ошибки оранжевые, красный — только в знаке логотипа.</p>
+  <div class="doc-meta">ДС «Ваш Финдир» v3.4 · лист Auth · Login · 16.11.2026</div>
+
+  <h2 class="doc-h2">Экран · 1440</h2>
+  <p class="doc-h2-sub">Шапка с логотипом и переходом к регистрации, карточка 440 по центру, юридический подвал, баннер cookie до выбора. Масштаб — по ширине колонки.</p>
+  <div class="frame">
+    <div class="frame-cap">Desktop · 1440 × 900 · по умолчанию</div>
+    <div class="scaled" id="desk" style="height:675px">
+      <div class="screen" style="transform:scale(.75)">
+        <header class="auth-head">
+          <a class="logo" href="#" aria-label="Ваш Финдир — на главную"><svg xmlns="http://www.w3.org/2000/svg" width="145" height="32" viewBox="0 0 145 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b00020"/><path d="M7.13 20.73H11.12C13.25 20.73 14.37 19.61 14.37 18.12C14.37 16.71 13.37 15.88 12.3 15.83V15.73C13.27 15.51 14 14.82 14 13.7C14 12.28 12.95 11.27 10.88 11.27H7.13ZM9.06 19.13V16.57H10.79C11.76 16.57 12.38 17.14 12.38 17.93C12.38 18.65 11.87 19.13 10.74 19.13ZM9.06 15.24V12.85H10.63C11.54 12.85 12.04 13.32 12.04 14.01C12.04 14.77 11.42 15.24 10.59 15.24ZM19.34 21.28H21.26V20.07C23.71 19.87 25.13 18.34 25.13 16C25.13 13.65 23.71 12.12 21.26 11.92V10.71H19.34V11.92C16.89 12.12 15.47 13.65 15.47 16C15.47 18.34 16.89 19.87 19.34 20.07ZM21.26 13.53C22.6 13.71 23.23 14.53 23.23 16C23.23 17.46 22.6 18.28 21.26 18.46ZM19.34 18.46C18.01 18.28 17.37 17.46 17.37 16C17.37 14.53 18.01 13.71 19.34 13.53Z" fill="#fff"/><path d="M43.05 21.82H47.97C50.59 21.82 51.97 20.45 51.97 18.61C51.97 16.88 50.73 15.85 49.42 15.78V15.67C50.62 15.4 51.52 14.55 51.52 13.17C51.52 11.43 50.23 10.18 47.67 10.18H43.05ZM45.44 19.86V16.7H47.56C48.76 16.7 49.52 17.4 49.52 18.38C49.52 19.26 48.9 19.86 47.5 19.86ZM45.44 15.07V12.12H47.37C48.48 12.12 49.1 12.7 49.1 13.55C49.1 14.49 48.34 15.07 47.32 15.07ZM56.02 21.99C57.31 21.99 58.16 21.42 58.58 20.61H58.66V21.82H60.88V15.93C60.88 13.82 59.05 12.97 57.17 12.97C55.22 12.97 53.81 13.84 53.37 15.36L55.52 15.71C55.7 15.15 56.26 14.71 57.16 14.71C58.04 14.71 58.53 15.13 58.53 15.87V15.91C58.53 16.48 57.91 16.54 56.41 16.69C54.7 16.86 53.12 17.42 53.12 19.37C53.12 21.1 54.36 21.99 56.02 21.99ZM56.69 20.34C55.91 20.34 55.37 19.99 55.37 19.31C55.37 18.61 55.95 18.27 56.81 18.14C57.33 18.07 58.26 17.95 58.55 17.75V18.69C58.55 19.61 57.78 20.34 56.69 20.34ZM62.88 13.08V21.82H74.63V13.08H72.29V19.96H69.88V13.08H67.63V19.96H65.22V13.08ZM84.92 22.5H87.29V21C90.3 20.76 92.05 18.88 92.05 16C92.05 13.11 90.3 11.22 87.29 10.98V9.49H84.92V10.98C81.91 11.22 80.16 13.11 80.16 16C80.16 18.88 81.91 20.76 84.92 21ZM87.29 12.96C88.94 13.18 89.71 14.19 89.71 16C89.71 17.8 88.94 18.81 87.29 19.03ZM84.92 19.03C83.28 18.81 82.5 17.8 82.5 16C82.5 14.19 83.28 13.18 84.92 12.96ZM101.76 21.82V13.08H99.73L96.2 18.2H96.13V13.08H93.79V21.82H95.77L99.34 16.68H99.41V21.82ZM106.09 13.08H103.75V21.82H106.09V18.38H109.37V21.82H111.72V13.08H109.37V16.51H106.09ZM112.99 24.37H115.28V21.82H120.7V24.37H122.94V19.95H121.59V13.08H114.98L114.74 15.99C114.6 17.75 114.42 19.44 113.66 19.95H112.99ZM116.02 19.95C116.54 19.14 116.75 17.86 116.88 15.99L116.96 14.91H119.38V19.95ZM132.37 21.82V13.08H130.34L126.8 18.2H126.74V13.08H124.4V21.82H126.38L129.95 16.68H130.02V21.82ZM134.36 25.08H136.7V20.42H136.77C137.1 21.12 137.82 21.96 139.25 21.96C141.27 21.96 142.8 20.37 142.8 17.46C142.8 14.48 141.2 12.97 139.27 12.97C137.78 12.97 137.09 13.86 136.77 14.55H136.66V13.08H134.36ZM138.53 20.08C137.34 20.08 136.65 19.03 136.65 17.46C136.65 15.87 137.33 14.85 138.53 14.85C139.76 14.85 140.41 15.93 140.41 17.46C140.41 19 139.75 20.08 138.53 20.08Z" fill="#0b1020"/></svg></a>
+          <div class="auth-head-aside">Нет аккаунта? <a class="link link--standalone" href="#">Создать</a></div>
+        </header>
+        <main class="auth-main">
+          <section class="auth-card" aria-labelledby="d-title">
+            <h1 class="auth-title" id="d-title">Вход</h1>
+            <p class="auth-sub">Клиентский кабинет «Ваш Финдир»</p>
+            
+            <form class="auth-form" novalidate>
+              <div>
+                <div class="f-label-row"><label class="f-label" for="d-email">Email</label></div>
+                <input class="f-input" id="d-email" name="email" type="email" autocomplete="username" placeholder="name@company.ru" value="">
+                
+              </div>
+              <div>
+                <div class="f-label-row"><label class="f-label" for="d-pw">Пароль</label><a class="link link--standalone link-sm" href="#">Забыли пароль?</a></div>
+                <div class="f-wrap">
+                  <input class="f-input" id="d-pw" name="password" type="password" autocomplete="current-password" value="">
+                  <button class="f-eye" type="button" data-eye aria-controls="d-pw" aria-pressed="false" aria-label="Показать пароль"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                </div>
+                
+              </div>
+              <label class="check"><input type="checkbox" name="remember" checked> Запомнить меня</label>
+              <button class="btn-cta" type="submit">Войти</button>
+            </form>
+            <p class="legal-line">Входя в сервис, вы подтверждаете, что ознакомились с <a class="link link--muted" href="#" target="_blank" rel="noopener">Пользовательским соглашением</a> и <a class="link link--muted" href="#" target="_blank" rel="noopener">Политикой конфиденциальности</a>.</p>
+            <div class="divider" role="presentation"></div>
+            <p class="switch">Ещё нет аккаунта? <a class="link link--standalone" href="#">Создать — 7 дней бесплатно</a></p>
+          </section>
+        </main>
+        <footer class="auth-foot">
+          <nav class="foot-docs" aria-label="Документы">
+            <a class="link link--muted" href="#" target="_blank" rel="noopener">Публичная оферта</a>
+            <a class="link link--muted" href="#" target="_blank" rel="noopener">Пользовательское соглашение</a>
+            <a class="link link--muted" href="#" target="_blank" rel="noopener">Политика конфиденциальности</a>
+            <a class="link link--muted" href="#" target="_blank" rel="noopener">Обработка персональных данных</a>
+            <a class="link link--muted" href="#" target="_blank" rel="noopener">Политика cookie</a>
+          </nav>
+          <details class="foot-company">
+            <summary>Сведения о компании</summary>
+            <dl class="foot-grid">
+              <div><dt>Правообладатель и оператор ПДн</dt><dd>— из конфигурации —</dd></div>
+              <div><dt>ИНН / КПП · ОГРН</dt><dd>— из конфигурации —</dd></div>
+            </dl>
+          </details>
+          <p class="foot-note">Персональные данные граждан РФ обрабатываются и хранятся на серверах в России. Сервис не является финансовой или налоговой консультацией.</p>
+          <div class="foot-copy">© 2026 — организация из конфигурации. Все права защищены.</div>
+        </footer>
+        <div class="cookie" role="region" aria-label="Файлы cookie">
+          <p>Мы используем cookie: необходимые — для входа и безопасности, аналитические — чтобы улучшать сервис. <a class="link" href="#" target="_blank" rel="noopener">Политика cookie</a></p>
+          <div class="btns"><button class="btn-sm btn-sm--secondary" type="button">Только необходимые</button> <button class="btn-sm btn-sm--primary" type="button">Принять все</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="doc-h2">Состояния формы</h2>
+  <p class="doc-h2-sub">Меняется только карточка. Ошибки полей — после первой отправки (email — ещё и после ухода из поля), фокус — на первое невалидное поле.</p>
+  <div class="states">
+    <div class="frame"><div class="frame-cap">Ошибки полей</div><div class="state"><section class="auth-card" aria-labelledby="v-title">
+            <h1 class="auth-title" id="v-title">Вход</h1>
+            <p class="auth-sub">Клиентский кабинет «Ваш Финдир»</p>
+            
+            <form class="auth-form" novalidate>
+              <div>
+                <div class="f-label-row"><label class="f-label" for="v-email">Email</label></div>
+                <input class="f-input is-error is-focus" id="v-email" name="email" type="email" autocomplete="username" placeholder="name@company.ru" value="ivanov@company" aria-invalid="true" aria-describedby="v-email-err">
+                <div class="f-error" id="v-email-err"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg><span>Проверьте адрес: нужен формат name@company.ru</span></div>
+              </div>
+              <div>
+                <div class="f-label-row"><label class="f-label" for="v-pw">Пароль</label><a class="link link--standalone link-sm" href="#">Забыли пароль?</a></div>
+                <div class="f-wrap">
+                  <input class="f-input is-error" id="v-pw" name="password" type="password" autocomplete="current-password" value="" aria-invalid="true" aria-describedby="v-pw-err">
+                  <button class="f-eye" type="button" data-eye aria-controls="v-pw" aria-pressed="false" aria-label="Показать пароль"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                </div>
+                <div class="f-error" id="v-pw-err"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg><span>Введите пароль</span></div>
+              </div>
+              <label class="check"><input type="checkbox" name="remember" checked> Запомнить меня</label>
+              <button class="btn-cta" type="submit">Войти</button>
+            </form>
+            <p class="legal-line">Входя в сервис, вы подтверждаете, что ознакомились с <a class="link link--muted" href="#" target="_blank" rel="noopener">Пользовательским соглашением</a> и <a class="link link--muted" href="#" target="_blank" rel="noopener">Политикой конфиденциальности</a>.</p>
+            <div class="divider" role="presentation"></div>
+            <p class="switch">Ещё нет аккаунта? <a class="link link--standalone" href="#">Создать — 7 дней бесплатно</a></p>
+          </section></div></div>
+    <div class="frame"><div class="frame-cap">Неверный email или пароль</div><div class="state"><section class="auth-card" aria-labelledby="b-title">
+            <h1 class="auth-title" id="b-title">Вход</h1>
+            <p class="auth-sub">Клиентский кабинет «Ваш Финдир»</p>
+            <div class="alert alert--danger" role="alert"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg><div class="alert-body"><b>Неверный email или пароль.</b> Проверьте раскладку и Caps Lock или <a class="link" href="#">восстановите пароль</a>.</div></div>
+            <form class="auth-form" novalidate>
+              <div>
+                <div class="f-label-row"><label class="f-label" for="b-email">Email</label></div>
+                <input class="f-input" id="b-email" name="email" type="email" autocomplete="username" placeholder="name@company.ru" value="ivanov@company.ru">
+                
+              </div>
+              <div>
+                <div class="f-label-row"><label class="f-label" for="b-pw">Пароль</label><a class="link link--standalone link-sm" href="#">Забыли пароль?</a></div>
+                <div class="f-wrap">
+                  <input class="f-input is-focus" id="b-pw" name="password" type="password" autocomplete="current-password" value="">
+                  <button class="f-eye" type="button" data-eye aria-controls="b-pw" aria-pressed="false" aria-label="Показать пароль"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                </div>
+                
+              </div>
+              <label class="check"><input type="checkbox" name="remember" checked> Запомнить меня</label>
+              <button class="btn-cta" type="submit">Войти</button>
+            </form>
+            <p class="legal-line">Входя в сервис, вы подтверждаете, что ознакомились с <a class="link link--muted" href="#" target="_blank" rel="noopener">Пользовательским соглашением</a> и <a class="link link--muted" href="#" target="_blank" rel="noopener">Политикой конфиденциальности</a>.</p>
+            <div class="divider" role="presentation"></div>
+            <p class="switch">Ещё нет аккаунта? <a class="link link--standalone" href="#">Создать — 7 дней бесплатно</a></p>
+          </section></div></div>
+    <div class="frame"><div class="frame-cap">Отправка · <code>aria-busy</code></div><div class="state"><section class="auth-card" aria-labelledby="s-title">
+            <h1 class="auth-title" id="s-title">Вход</h1>
+            <p class="auth-sub">Клиентский кабинет «Ваш Финдир»</p>
+            
+            <form class="auth-form" novalidate>
+              <div>
+                <div class="f-label-row"><label class="f-label" for="s-email">Email</label></div>
+                <input class="f-input" id="s-email" name="email" type="email" autocomplete="username" placeholder="name@company.ru" value="ivanov@company.ru" disabled>
+                
+              </div>
+              <div>
+                <div class="f-label-row"><label class="f-label" for="s-pw">Пароль</label><a class="link link--standalone link-sm" href="#">Забыли пароль?</a></div>
+                <div class="f-wrap">
+                  <input class="f-input" id="s-pw" name="password" type="password" autocomplete="current-password" value="password1" disabled>
+                  <button class="f-eye" type="button" data-eye aria-controls="s-pw" aria-pressed="false" aria-label="Показать пароль" disabled><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                </div>
+                
+              </div>
+              <label class="check"><input type="checkbox" name="remember" checked disabled> Запомнить меня</label>
+              <button class="btn-cta" type="submit" aria-busy="true"><span class="spin" aria-hidden="true"></span>Входим…</button>
+            </form>
+            <p class="legal-line">Входя в сервис, вы подтверждаете, что ознакомились с <a class="link link--muted" href="#" target="_blank" rel="noopener">Пользовательским соглашением</a> и <a class="link link--muted" href="#" target="_blank" rel="noopener">Политикой конфиденциальности</a>.</p>
+            <div class="divider" role="presentation"></div>
+            <p class="switch">Ещё нет аккаунта? <a class="link link--standalone" href="#">Создать — 7 дней бесплатно</a></p>
+          </section></div></div>
+    <div class="frame"><div class="frame-cap">Сессия истекла · возврат на <code>returnTo</code></div><div class="state"><section class="auth-card" aria-labelledby="e-title">
+            <h1 class="auth-title" id="e-title">Вход</h1>
+            <p class="auth-sub">Клиентский кабинет «Ваш Финдир»</p>
+            <div class="alert alert--info" role="status"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5v.01"/></svg><div class="alert-body">Сессия истекла. Войдите снова — вернём вас на ту же страницу.</div></div>
+            <form class="auth-form" novalidate>
+              <div>
+                <div class="f-label-row"><label class="f-label" for="e-email">Email</label></div>
+                <input class="f-input" id="e-email" name="email" type="email" autocomplete="username" placeholder="name@company.ru" value="ivanov@company.ru">
+                
+              </div>
+              <div>
+                <div class="f-label-row"><label class="f-label" for="e-pw">Пароль</label><a class="link link--standalone link-sm" href="#">Забыли пароль?</a></div>
+                <div class="f-wrap">
+                  <input class="f-input is-focus" id="e-pw" name="password" type="password" autocomplete="current-password" value="">
+                  <button class="f-eye" type="button" data-eye aria-controls="e-pw" aria-pressed="false" aria-label="Показать пароль"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                </div>
+                
+              </div>
+              <label class="check"><input type="checkbox" name="remember" checked> Запомнить меня</label>
+              <button class="btn-cta" type="submit">Войти</button>
+            </form>
+            <p class="legal-line">Входя в сервис, вы подтверждаете, что ознакомились с <a class="link link--muted" href="#" target="_blank" rel="noopener">Пользовательским соглашением</a> и <a class="link link--muted" href="#" target="_blank" rel="noopener">Политикой конфиденциальности</a>.</p>
+            <div class="divider" role="presentation"></div>
+            <p class="switch">Ещё нет аккаунта? <a class="link link--standalone" href="#">Создать — 7 дней бесплатно</a></p>
+          </section></div></div>
+  </div>
+
+  <h2 class="doc-h2">После входа · выбор компании</h2>
+  <p class="doc-h2-sub">Показывается, только если у пользователя больше одной компании; с одной — сразу в кабинет. Поиск — от 8 компаний, пагинация — как в <code>CompanyPicker</code>.</p>
+  <div class="row2">
+    <div class="frame"><div class="frame-cap">Выбор компании · карточка 520</div><div class="state"><section class="auth-card auth-card--wide" aria-labelledby="co-title">
+            <h1 class="auth-title" id="co-title">Выберите компанию</h1>
+            <p class="auth-sub">Вы — сотрудник нескольких компаний. Переключиться можно в любой момент в боковом меню.</p>
+            <form novalidate>
+              <fieldset style="border:0;margin:0;padding:0"><legend class="sr-only">Компания</legend>
+              <ul class="co-list"><li class="co-item is-checked"><label><input type="radio" name="company" value="0" checked>
+              <span class="co-av" aria-hidden="true">РБ</span><span><span class="co-name">ООО «Ромашка-Бэст»</span><span class="co-meta" style="display:block">ИНН 7723812931</span></span>
+              <span class="co-role">Главбух</span></label></li><li class="co-item"><label><input type="radio" name="company" value="1">
+              <span class="co-av" aria-hidden="true">ПЛ</span><span><span class="co-name">ИП Петров Л. А.</span><span class="co-meta" style="display:block">ИНН 772345678901</span></span>
+              <span class="co-role">Финдир</span></label></li><li class="co-item"><label><input type="radio" name="company" value="2">
+              <span class="co-av" aria-hidden="true">ШК</span><span><span class="co-name">ООО «ШарКомпани»</span><span class="co-meta" style="display:block">ИНН 5012094556</span></span>
+              <span class="co-role">Наблюдатель</span></label></li></ul></fieldset>
+              <button class="btn-cta" type="submit">Продолжить</button>
+            </form>
+            <p class="switch" style="margin-top:var(--s-4)">Не та учётная запись? <a class="link link--standalone" href="#">Выйти</a></p>
+          </section></div></div>
+    <div class="frame"><div class="frame-cap">Mobile · 390 × 844 · с баннером cookie</div>
+      <div class="scaled" style="height:844px; background:var(--bg-page)">
+        <div class="screen screen--mobile">
+          <header class="auth-head">
+          <a class="logo" href="#" aria-label="Ваш Финдир — на главную"><svg xmlns="http://www.w3.org/2000/svg" width="145" height="32" viewBox="0 0 145 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#b00020"/><path d="M7.13 20.73H11.12C13.25 20.73 14.37 19.61 14.37 18.12C14.37 16.71 13.37 15.88 12.3 15.83V15.73C13.27 15.51 14 14.82 14 13.7C14 12.28 12.95 11.27 10.88 11.27H7.13ZM9.06 19.13V16.57H10.79C11.76 16.57 12.38 17.14 12.38 17.93C12.38 18.65 11.87 19.13 10.74 19.13ZM9.06 15.24V12.85H10.63C11.54 12.85 12.04 13.32 12.04 14.01C12.04 14.77 11.42 15.24 10.59 15.24ZM19.34 21.28H21.26V20.07C23.71 19.87 25.13 18.34 25.13 16C25.13 13.65 23.71 12.12 21.26 11.92V10.71H19.34V11.92C16.89 12.12 15.47 13.65 15.47 16C15.47 18.34 16.89 19.87 19.34 20.07ZM21.26 13.53C22.6 13.71 23.23 14.53 23.23 16C23.23 17.46 22.6 18.28 21.26 18.46ZM19.34 18.46C18.01 18.28 17.37 17.46 17.37 16C17.37 14.53 18.01 13.71 19.34 13.53Z" fill="#fff"/><path d="M43.05 21.82H47.97C50.59 21.82 51.97 20.45 51.97 18.61C51.97 16.88 50.73 15.85 49.42 15.78V15.67C50.62 15.4 51.52 14.55 51.52 13.17C51.52 11.43 50.23 10.18 47.67 10.18H43.05ZM45.44 19.86V16.7H47.56C48.76 16.7 49.52 17.4 49.52 18.38C49.52 19.26 48.9 19.86 47.5 19.86ZM45.44 15.07V12.12H47.37C48.48 12.12 49.1 12.7 49.1 13.55C49.1 14.49 48.34 15.07 47.32 15.07ZM56.02 21.99C57.31 21.99 58.16 21.42 58.58 20.61H58.66V21.82H60.88V15.93C60.88 13.82 59.05 12.97 57.17 12.97C55.22 12.97 53.81 13.84 53.37 15.36L55.52 15.71C55.7 15.15 56.26 14.71 57.16 14.71C58.04 14.71 58.53 15.13 58.53 15.87V15.91C58.53 16.48 57.91 16.54 56.41 16.69C54.7 16.86 53.12 17.42 53.12 19.37C53.12 21.1 54.36 21.99 56.02 21.99ZM56.69 20.34C55.91 20.34 55.37 19.99 55.37 19.31C55.37 18.61 55.95 18.27 56.81 18.14C57.33 18.07 58.26 17.95 58.55 17.75V18.69C58.55 19.61 57.78 20.34 56.69 20.34ZM62.88 13.08V21.82H74.63V13.08H72.29V19.96H69.88V13.08H67.63V19.96H65.22V13.08ZM84.92 22.5H87.29V21C90.3 20.76 92.05 18.88 92.05 16C92.05 13.11 90.3 11.22 87.29 10.98V9.49H84.92V10.98C81.91 11.22 80.16 13.11 80.16 16C80.16 18.88 81.91 20.76 84.92 21ZM87.29 12.96C88.94 13.18 89.71 14.19 89.71 16C89.71 17.8 88.94 18.81 87.29 19.03ZM84.92 19.03C83.28 18.81 82.5 17.8 82.5 16C82.5 14.19 83.28 13.18 84.92 12.96ZM101.76 21.82V13.08H99.73L96.2 18.2H96.13V13.08H93.79V21.82H95.77L99.34 16.68H99.41V21.82ZM106.09 13.08H103.75V21.82H106.09V18.38H109.37V21.82H111.72V13.08H109.37V16.51H106.09ZM112.99 24.37H115.28V21.82H120.7V24.37H122.94V19.95H121.59V13.08H114.98L114.74 15.99C114.6 17.75 114.42 19.44 113.66 19.95H112.99ZM116.02 19.95C116.54 19.14 116.75 17.86 116.88 15.99L116.96 14.91H119.38V19.95ZM132.37 21.82V13.08H130.34L126.8 18.2H126.74V13.08H124.4V21.82H126.38L129.95 16.68H130.02V21.82ZM134.36 25.08H136.7V20.42H136.77C137.1 21.12 137.82 21.96 139.25 21.96C141.27 21.96 142.8 20.37 142.8 17.46C142.8 14.48 141.2 12.97 139.27 12.97C137.78 12.97 137.09 13.86 136.77 14.55H136.66V13.08H134.36ZM138.53 20.08C137.34 20.08 136.65 19.03 136.65 17.46C136.65 15.87 137.33 14.85 138.53 14.85C139.76 14.85 140.41 15.93 140.41 17.46C140.41 19 139.75 20.08 138.53 20.08Z" fill="#0b1020"/></svg></a>
+          <div class="auth-head-aside">Нет аккаунта? <a class="link link--standalone" href="#">Создать</a></div>
+        </header>
+          <main class="auth-main"><section class="auth-card" aria-labelledby="m-title">
+            <h1 class="auth-title" id="m-title">Вход</h1>
+            <p class="auth-sub">Клиентский кабинет «Ваш Финдир»</p>
+            
+            <form class="auth-form" novalidate>
+              <div>
+                <div class="f-label-row"><label class="f-label" for="m-email">Email</label></div>
+                <input class="f-input" id="m-email" name="email" type="email" autocomplete="username" placeholder="name@company.ru" value="">
+                
+              </div>
+              <div>
+                <div class="f-label-row"><label class="f-label" for="m-pw">Пароль</label><a class="link link--standalone link-sm" href="#">Забыли пароль?</a></div>
+                <div class="f-wrap">
+                  <input class="f-input" id="m-pw" name="password" type="password" autocomplete="current-password" value="">
+                  <button class="f-eye" type="button" data-eye aria-controls="m-pw" aria-pressed="false" aria-label="Показать пароль"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                </div>
+                
+              </div>
+              <label class="check"><input type="checkbox" name="remember" checked> Запомнить меня</label>
+              <button class="btn-cta" type="submit">Войти</button>
+            </form>
+            <p class="legal-line">Входя в сервис, вы подтверждаете, что ознакомились с <a class="link link--muted" href="#" target="_blank" rel="noopener">Пользовательским соглашением</a> и <a class="link link--muted" href="#" target="_blank" rel="noopener">Политикой конфиденциальности</a>.</p>
+            <div class="divider" role="presentation"></div>
+            <p class="switch">Ещё нет аккаунта? <a class="link link--standalone" href="#">Создать — 7 дней бесплатно</a></p>
+          </section></main>
+          <div class="cookie" role="region" aria-label="Файлы cookie">
+          <p>Мы используем cookie: необходимые — для входа и безопасности, аналитические — чтобы улучшать сервис. <a class="link" href="#" target="_blank" rel="noopener">Политика cookie</a></p>
+          <div class="btns"><button class="btn-sm btn-sm--secondary" type="button">Только необходимые</button> <button class="btn-sm btn-sm--primary" type="button">Принять все</button></div>
+        </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="doc-h2">Спецификация</h2>
+  <div class="frame">
+    <table class="spec">
+      <thead><tr><th>Элемент</th><th>Правило</th></tr></thead>
+      <tbody>
+        <tr><td>Страница</td><td>Фон <code>--bg-page</code>; колонка шапка → карточка → подвал, минимум на высоту окна. Шапка: логотип <code>logo-full.svg</code> 32px слева (ссылка на главную, <code>aria-label="Ваш Финдир — на главную"</code>), справа «Нет аккаунта? Создать». Отступы шапки 20×40, ≤560 — 16×20.</td></tr>
+        <tr><td>Карточка</td><td>440 (выбор компании — 520), белая, граница <code>--border</code>, <code>--r-lg</code>, padding 36×40×32. ≤560 — на всю ширину без скругления, боковых границ и тени, padding 24×20.</td></tr>
+        <tr><td>Заголовок</td><td>«Вход», <code>--type-hero</code> 28/34, по центру; подзаголовок 14px <code>--text-tertiary</code>. В <code>apps/admin</code> — «Вход для сотрудников», без ссылки на регистрацию.</td></tr>
+        <tr><td>Email</td><td><code>type=email</code>, <code>autocomplete=username</code>, placeholder <code>name@company.ru</code>; ошибки «Укажите email» / «Проверьте адрес: нужен формат name@company.ru».</td></tr>
+        <tr><td>Пароль</td><td><code>autocomplete=current-password</code>; кнопка-«глаз» 32×32, <code>aria-pressed</code>, подпись «Показать пароль / Скрыть пароль»; справа от метки — «Забыли пароль?» (<code>.link--standalone</code>, 12px); ошибка «Введите пароль».</td></tr>
+        <tr><td>Поле</td><td>Высота 40, текст 14px, граница <code>--input-border</code> (3:1); фокус — граница navy + <code>--ring-focus</code>; ошибка — оранжевая рамка 2px (<code>--input-border-error</code>) и текст ошибки с иконкой, связанный <code>aria-describedby</code>; метка всегда в <code>&lt;label&gt;</code>.</td></tr>
+        <tr><td>Запомнить меня</td><td>Чекбокс 18px, включён по умолчанию.</td></tr>
+        <tr><td>Кнопка</td><td>«Войти», 44px, на всю ширину, primary (navy). При отправке — спиннер + «Входим…», <code>aria-busy="true"</code>, поля блокируются. Спиннер 0,8 с, при <code>prefers-reduced-motion</code> не вращается.</td></tr>
+        <tr><td>Неверный вход</td><td>Плашка <code>Alert tone=danger</code> над формой, <code>role=alert</code>: «<b>Неверный email или пароль.</b> Проверьте раскладку и Caps Lock или восстановите пароль.» Не уточнять, что именно неверно. Пароль после ошибки очищается, фокус — в поле пароля.</td></tr>
+        <tr><td>Сессия истекла</td><td><code>Alert tone=info</code>: «Сессия истекла. Войдите снова — вернём вас на ту же страницу.»; email подставлен, фокус в поле пароля; после входа — <code>returnTo</code> (только внутренний путь, <code>safeReturnPath</code>).</td></tr>
+        <tr><td>Юр. строка</td><td>Под кнопкой, 12/18, <code>--text-tertiary</code>, по центру; ссылки — серые подчёркнутые, открываются в новой вкладке (<code>rel=noopener</code>).</td></tr>
+        <tr><td>Подвал</td><td>Документы (offer · terms · privacy · personal-data · cookies) строкой; «Сведения о компании» — свёрнутый блок, 2 колонки (≤560 — 1); реквизиты — из конфигурации, пустые строки реестров скрываются; оговорка про хранение ПДн в РФ; копирайт.</td></tr>
+        <tr><td>Cookie</td><td>Закреплён снизу до выбора; «Только необходимые» (secondary) и «Принять все» (primary), 32px; ≤560 — кнопки на всю ширину. Аналитика не загружается до «Принять все». <code>role=region</code>, <code>aria-label="Файлы cookie"</code>.</td></tr>
+        <tr><td>Выбор компании</td><td>Список-радио (аватар-инициалы, название, ИНН, роль), выбранная строка — <code>--bg-row-selected</code>; «Продолжить» неактивна, пока ничего не выбрано; «Выйти» — ссылка под кнопкой. Последняя использованная компания выбрана по умолчанию.</td></tr>
+        <tr><td>Цвета</td><td>Красный <code>#B00020</code> — только знак логотипа. Ошибки — <code>--danger-*</code> (оранжевый), info — <code>--info-*</code>, кнопки — navy.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+// Масштаб макета 1440 по ширине рамки
+(function(){ var w=document.getElementById('desk'); if(!w) return; var sc=w.firstElementChild;
+  function fit(){ var k=w.clientWidth/1440; sc.style.transform='scale('+k+')'; w.style.height=(900*k)+'px'; }
+  fit(); addEventListener('resize', fit); })();
+// Демо: показать/скрыть пароль
+document.querySelectorAll('[data-eye]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var input = document.getElementById(b.getAttribute('aria-controls'));
+    var on = b.getAttribute('aria-pressed') !== 'true';
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.setAttribute('aria-label', on ? 'Скрыть пароль' : 'Показать пароль');
+    if (input) input.type = on ? 'text' : 'password';
+  });
+});
+document.querySelectorAll('form').forEach(function (f) { f.addEventListener('submit', function (e) { e.preventDefault(); }); });
+</script>
+</body>
+</html>

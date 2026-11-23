@@ -54,6 +54,50 @@ final class PullSourceFactsActionTest extends IntegrationTestCase
         $this->connectionRef = $connection->getId();
     }
 
+    public function testPullWithoutScopeAcceptsTwoCompaniesIndependently(): void
+    {
+        $owner = UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail('second-sf@example.test')->build();
+        $company = CompanyBuilder::aCompany()->withId(Uuid::uuid7()->toString())->withOwner($owner)->build();
+        $connection = new MarketplaceConnection(Uuid::uuid7()->toString(), $company, MarketplaceType::OZON);
+        $connection->setClientId('second-client');
+        $connection->setApiKey('test-key');
+        foreach ([$owner, $company, $connection] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+        $this->service->enqueue($this->connectionRef, self::DAY, 1, [[['k:first', ['v' => 1]]]]);
+        $this->service->enqueue($connection->getId(), self::DAY, 1, [[['k:second', ['v' => 2]]]]);
+        $marketplace = self::getContainer()->get(MarketplaceFacade::class);
+        $action = new PullSourceFactsAction(new SourceFactsGatewayFacade([$this->service], $marketplace), $this->store(), $this->connection, new Logger('test', [$this->logs]));
+
+        self::assertSame(2, $action()->applied);
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM sf_fact WHERE company_id = ?', [$company->getId()]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM sf_fact WHERE company_id = ?', [$this->companyId]));
+        self::assertCount(2, $this->service->acked);
+        self::assertSame(0, $action()->received);
+        self::assertSame(2, $this->counts()['facts']);
+    }
+
+    public function testAcceptsWbFactsForWbCabinet(): void
+    {
+        $company = $this->em->find(\App\Company\Entity\Company::class, $this->companyId);
+        self::assertNotNull($company);
+        $wbConnection = new MarketplaceConnection(Uuid::uuid7()->toString(), $company, MarketplaceType::WILDBERRIES);
+        $wbConnection->setApiKey('wb-key');
+        $this->em->persist($wbConnection);
+        $this->em->flush();
+        $wb = new FakeSourceFactsClient('wb-fetcher', 'wb.finance.sales-report.daily');
+        $wb->enqueue($wbConnection->getId(), self::DAY, 1, [[['wb:sales-report.daily:101', ['rrdId' => 101]]], []]);
+
+        ($this->action([$wb]))();
+
+        self::assertCount(1, $wb->acked, 'кабинет WB сопоставлен с компанией, пачка принята');
+        self::assertSame(1, (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM sf_fact WHERE company_id = ? AND resource_type = 'wb.finance.sales-report.daily'",
+            [$this->companyId],
+        ));
+    }
+
     public function testAppliesBatchAndRepeatedDeliveryChangesNothing(): void
     {
         $batchId = $this->service->enqueue($this->connectionRef, self::DAY, 1, [
@@ -147,7 +191,7 @@ final class PullSourceFactsActionTest extends IntegrationTestCase
         self::assertCount(1, $this->errors());
         self::assertSame(2, (int) $this->connection->fetchOne('SELECT min(attempts) FROM sf_batch WHERE status = :s', ['s' => 'quarantined']));
 
-        $gate = new CommandTester(new SourceFactsHealthCheckCommand($this->action(), $this->store(), $this->clock, new Logger('test', [$this->logs])));
+        $gate = new CommandTester(new SourceFactsHealthCheckCommand($this->store(), $this->clock, new Logger('test', [$this->logs])));
         self::assertSame(Command::FAILURE, $gate->execute([]));
         self::assertStringContainsString('2 quarantined, 0 stale streams', $gate->getDisplay());
 
@@ -172,25 +216,11 @@ final class PullSourceFactsActionTest extends IntegrationTestCase
         self::assertSame(['facts' => 0, 'periods' => 0, 'batches' => 0], $this->counts());
     }
 
-    public function testCompanyOutsideAllowlistIsSkippedAndEmptyListDisablesPull(): void
-    {
-        $this->service->enqueue($this->connectionRef, self::DAY, 1, [[['k:1', ['v' => 1]]]]);
-
-        $result = ($this->action(Uuid::uuid7()->toString()))();
-
-        self::assertSame([1, 1], [$result->received, $result->skipped]);
-        self::assertSame([], $this->service->acked);
-        self::assertSame(0, $this->counts()['batches']);
-        self::assertFalse($this->action('')->isEnabled());
-        self::assertTrue($this->action(' '.strtoupper($this->companyId).' ')->isEnabled());
-        self::assertSame(1, ($this->action(' '.strtoupper($this->companyId).' '))()->applied);
-    }
-
     public function testGateIsGreenWhenFreshAndRedWhenStreamIsStale(): void
     {
         $this->service->enqueue($this->connectionRef, self::DAY, 1, [[['k:1', ['v' => 1]]]]);
         ($this->action())();
-        $gate = new CommandTester(new SourceFactsHealthCheckCommand($this->action(), $this->store(), $this->clock, new Logger('test', [$this->logs])));
+        $gate = new CommandTester(new SourceFactsHealthCheckCommand($this->store(), $this->clock, new Logger('test', [$this->logs])));
 
         self::assertSame(Command::SUCCESS, $gate->execute([]));
 
@@ -198,22 +228,19 @@ final class PullSourceFactsActionTest extends IntegrationTestCase
         self::assertSame(Command::FAILURE, $gate->execute([]));
         self::assertStringContainsString('0 quarantined, 1 stale streams', $gate->getDisplay());
         self::assertSame([$this->companyId], $this->errors()[0]->context['companyIds']);
-
-        $disabled = new CommandTester(new SourceFactsHealthCheckCommand($this->action(''), $this->store(), $this->clock, new Logger('test', [$this->logs])));
-        self::assertSame(Command::SUCCESS, $disabled->execute([]));
     }
 
-    private function action(string $companies = PullSourceFactsAction::ALL_COMPANIES): PullSourceFactsAction
+    /** @param list<FakeSourceFactsClient> $extra */
+    private function action(array $extra = []): PullSourceFactsAction
     {
         /** @var MarketplaceFacade $marketplace */
         $marketplace = self::getContainer()->get(MarketplaceFacade::class);
 
         return new PullSourceFactsAction(
-            new SourceFactsGatewayFacade($this->service, $marketplace),
+            new SourceFactsGatewayFacade([$this->service, ...$extra], $marketplace),
             $this->store(),
             $this->connection,
             new Logger('test', [$this->logs]),
-            $companies,
         );
     }
 

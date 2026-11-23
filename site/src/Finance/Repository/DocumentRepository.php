@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Finance\Repository;
 
+use App\Finance\Application\Service\DocumentPlContribution;
 use App\Finance\DTO\DocumentListDTO;
 use App\Finance\DTO\DocumentListTotalsDTO;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLFlow;
+use App\Finance\Enum\PlNature;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\Query\Expr\Join;
 use Doctrine\ORM\QueryBuilder;
@@ -66,9 +68,8 @@ class DocumentRepository extends ServiceEntityRepository
      * расход и результат — отдельно по валютам (документ из операции ДДС переносит её сумму
      * без пересчёта; ручной — в рублях). Правила — как у регистра ОПиУ и DocumentPlContribution:
      * операция без статьи не входит; природа — flow статьи, у статьи NONE — знак суммы;
-     * обычный документ — модуль каждой операции; marketplace_pl (списание «−», сторно «+») —
-     * модуль суммы статьи. Регистр сворачивает marketplace_pl по дню, проекту и ЦФО, здесь —
-     * по документу: итог списка — сумма строк, которые видит пользователь.
+     * обычный документ — модуль каждой операции; marketplace_pl — значение для отчёта
+     * (доход +, расход −): в доход amount, в расход −amount, без модуля.
      *
      * Компания — отдельным параметром: ограничение берётся из него, а не из DTO.
      */
@@ -103,9 +104,7 @@ class DocumentRepository extends ServiceEntityRepository
             ->innerJoin('sumOp.category', 'sumCategory', Join::WITH, 'IDENTITY(sumCategory.company) = :companyId')
             ->andWhere('d.type = :marketplace')
             ->andWhere(sprintf('(%s OR %s)', $isIncome, $isExpense))
-            ->groupBy('d.id')
-            ->addGroupBy('sumCategory.id')
-            ->addGroupBy('bucket')
+            ->groupBy('bucket')
             ->addGroupBy('currency')
             ->setParameter('income', PLFlow::INCOME)
             ->setParameter('expense', PLFlow::EXPENSE)
@@ -114,11 +113,10 @@ class DocumentRepository extends ServiceEntityRepository
             ->getQuery()
             ->getScalarResult();
 
-        // Документ входит со всеми операциями, поэтому сумма статьи здесь полная: вклад — её модуль.
         $marketplace = array_map(static fn (array $row): array => [
             'currency' => $row['currency'],
             'bucket' => $row['bucket'],
-            'amount' => -1 === bccomp((string) $row['signedTotal'], '0', 2) ? bcmul((string) $row['signedTotal'], '-1', 2) : bcadd((string) $row['signedTotal'], '0', 2),
+            'amount' => DocumentPlContribution::contribution(DocumentType::MARKETPLACE_PL, PlNature::from($row['bucket']), (string) $row['signedTotal']),
         ], $marketplace);
 
         return DocumentListTotalsDTO::fromAggregates($plain, $marketplace);

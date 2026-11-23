@@ -36,7 +36,9 @@ final class ModuleBoundaryRules
         'Marketplace',
         'MarketplaceAds',
         'MarketplaceAnalytics',
+        'MarketplaceOperations',
         'Settlement',
+        'SourceFacts',
     ];
 
     /**
@@ -348,6 +350,246 @@ final class ModuleBoundaryRules
                 'SourceFacts хранит записи источника как есть: разбор — в переводчике канала, '
                 .'компанию по подключению определяет фасад ServiceGateway.',
             );
+    }
+
+    /**
+     * `MarketplaceOperations` — канон нового контура (`docs/tasks/marketplace-profit-pipeline/DATA.md`
+     * §4–§6, §9): ниже канона от канала остаётся только строка `channel`. Модуль не знает
+     * переводчиков каналов, легаси маркетплейсов, приём фактов и учёт — их знание сделало бы
+     * канон ещё одним `Marketplace`. Запись мимо фасада закрывает список MODULES_WITH_FACADE.
+     * На момент добавления ссылок нет — гейт зелёный с первого дня.
+     */
+    public function test_marketplace_operations_knows_no_channels(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplaceOperations'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceEconomics'),
+                Selector::inNamespace('App\MarketplaceWb'),
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\SourceFacts'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->because(
+                'канон одинаков для всех каналов: правила Ozon и WB — в переводчиках, '
+                .'статьи ОПиУ — в проекции, исходные записи — в SourceFacts.',
+            );
+    }
+
+    /**
+     * `MarketplaceOzon` — переводчик Ozon нового контура (`DATA.md` §4, §6): факты читает через фасад
+     * `SourceFacts`, пишет только через фасад канона, листинги — через фасад `Marketplace`, ИИ — через
+     * фасад `ServiceGateway`. Легаси
+     * маркетплейсов (`Ingestion`, `MarketplaceAds`, внутренности `Marketplace`), WB и учёт ему
+     * недоступны: иначе переводчик снова срастается со старым разбором.
+     */
+    public function test_marketplace_ozon_uses_only_facades(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplaceOzon'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceWb'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\Inventory'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->excluding(Selector::inNamespace('App\Marketplace\Facade'))
+            ->because(
+                'переводчик Ozon знает только фасады: факты — SourceFacts, канон — MarketplaceOperations, '
+                .'листинги — Marketplace\\Facade; разбор легаси и учёт ему не нужны.',
+            );
+    }
+
+    /**
+     * `MarketplaceFunnel` — таблица воронки продаж: факты берёт только из фасада `SourceFacts`;
+     * переводчики денег, канон, легаси и учёт ему недоступны.
+     */
+    public function test_marketplace_funnel_stays_out_of_money_and_legacy(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplaceFunnel'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceWb'),
+                Selector::inNamespace('App\MarketplaceOperations'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->excluding(Selector::inNamespace('App\Marketplace\Facade'))
+            ->because('воронка — не деньги: в экономику и ОПиУ она не подмешивается, факты приходят из SourceFacts, названия товаров — из Marketplace\\Facade.');
+    }
+
+    /**
+     * `MarketplaceWb` — переводчик WB нового контура (этап 8.3): как `MarketplaceOzon` — только фасады
+     * `SourceFacts`, канона и `Marketplace`; переводчик Ozon, легаси WB и учёт ему недоступны.
+     */
+    public function test_marketplace_wb_uses_only_facades(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplaceWb'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\Inventory'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->excluding(Selector::inNamespace('App\Marketplace\Facade'))
+            ->because(
+                'переводчик WB знает только фасады: факты — SourceFacts, канон — MarketplaceOperations, '
+                .'листинги — Marketplace\\Facade; переводчик Ozon и разбор легаси WB ему не нужны.',
+            );
+    }
+
+    /**
+     * `MarketplaceEconomics` — витрина экономики SKU (`DATA.md` §4, §6): канон читает через фасад
+     * `MarketplaceOperations`, себестоимость и листинги — через фасад `Marketplace`, рекламу (временно,
+     * до этапа 6) — через фасад `MarketplaceAds`, остатки — через фасад `Inventory`. Правила каналов
+     * (переводчики), исходные факты и учёт ей недоступны: экономика считается только из канона.
+     */
+    public function test_marketplace_economics_reads_canon_only(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplaceEconomics'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceWb'),
+                Selector::inNamespace('App\SourceFacts'),
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\Inventory'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->excluding(
+                Selector::inNamespace('App\Marketplace\Facade'),
+                Selector::inNamespace('App\Marketplace\Enum'),
+                Selector::inNamespace('App\MarketplaceAds\Facade'),
+                Selector::inNamespace('App\Inventory\Facade'),
+                Selector::inNamespace('App\Inventory\Application\DTO'),
+            )
+            ->because(
+                'экономика считается из канона: операции — MarketplaceOperations, себестоимость — Marketplace\\Facade, '
+                .'реклама — MarketplaceAds\\Facade (до этапа 6), остатки — Inventory\\Facade; переводчики и факты ей не нужны.',
+            );
+    }
+
+    /**
+     * `MarketplaceQuality` — экран R10 (`stages/stage-7.md` §7.3): сводит звенья нового контура и только
+     * читает их фасады. Внутренности модулей контура и легаси ему недоступны.
+     */
+    public function test_marketplace_quality_reads_facades_only(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplaceQuality'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\SourceFacts'),
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceWb'),
+                Selector::inNamespace('App\MarketplaceOperations'),
+                Selector::inNamespace('App\MarketplaceEconomics'),
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->excluding(
+                Selector::inNamespace('App\SourceFacts\Facade'),
+                Selector::inNamespace('App\SourceFacts\Application\DTO'),
+                Selector::inNamespace('App\MarketplaceOzon\Facade'),
+                Selector::inNamespace('App\MarketplaceOzon\Application\DTO'),
+                Selector::inNamespace('App\MarketplaceWb\Facade'),
+                Selector::inNamespace('App\MarketplaceWb\Application\DTO'),
+                Selector::inNamespace('App\MarketplaceOperations\Facade'),
+                Selector::inNamespace('App\MarketplaceOperations\Application\DTO'),
+                Selector::inNamespace('App\MarketplaceEconomics\Facade'),
+                Selector::inNamespace('App\MarketplaceEconomics\Application\DTO'),
+            )
+            ->because('экран качества только сводит звенья контура: каждое читается через свой фасад.');
+    }
+
+    /**
+     * `MarketplacePlProjection` — ОПиУ маркетплейсов из канона (`docs/tasks/marketplace-pl-projection`):
+     * статьи читает через фасад `Finance`, виды — из `MarketplaceOperations`. В ОПиУ не пишет.
+     */
+    public function test_marketplace_pl_projection_reads_facades_only(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\MarketplacePlProjection'))
+            ->shouldNot()
+            ->dependOn()
+            ->classes(
+                Selector::inNamespace('App\SourceFacts'),
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceWb'),
+                Selector::inNamespace('App\MarketplaceEconomics'),
+                Selector::inNamespace('App\MarketplaceQuality'),
+                Selector::inNamespace('App\Marketplace'),
+                Selector::inNamespace('App\MarketplaceAds'),
+                Selector::inNamespace('App\MarketplaceAnalytics'),
+                Selector::inNamespace('App\Ingestion'),
+                Selector::inNamespace('App\Finance'),
+                Selector::inNamespace('App\Cash'),
+            )
+            ->excluding(
+                Selector::inNamespace('App\Finance\Facade'),
+                Selector::inNamespace('App\Finance\DTO'),
+                Selector::inNamespace('App\Finance\Application\DTO'),
+                Selector::inNamespace('App\Finance\Enum'),
+                Selector::inNamespace('App\Marketplace\Facade'),
+                Selector::inNamespace('App\MarketplaceEconomics\Facade'),
+                Selector::inNamespace('App\MarketplaceEconomics\Application\DTO'),
+            )
+            ->because('проекция ОПиУ считается из канона и правил компании; статьи — через фасад Finance, текущий расчёт для сравнения — через фасад Marketplace, себестоимость — через фасад MarketplaceEconomics.');
+    }
+
+    /** Канон, переводчики и экономика SKU о маппинге на ОПиУ не знают (`DATA.md` §9.3). */
+    public function test_pipeline_does_not_know_pl_projection(): Rule
+    {
+        return PHPat::rule()
+            ->classes(
+                Selector::inNamespace('App\SourceFacts'),
+                Selector::inNamespace('App\MarketplaceOperations'),
+                Selector::inNamespace('App\MarketplaceOzon'),
+                Selector::inNamespace('App\MarketplaceWb'),
+                Selector::inNamespace('App\MarketplaceEconomics'),
+            )
+            ->shouldNot()
+            ->dependOn()
+            ->classes(Selector::inNamespace('App\MarketplacePlProjection'))
+            ->because('маппинг на ОПиУ — забота только MarketplacePlProjection.');
     }
 
     public function test_legacy_zone_stays_empty(): Rule

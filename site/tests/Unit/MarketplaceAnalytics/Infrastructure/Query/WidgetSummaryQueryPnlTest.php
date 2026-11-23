@@ -10,6 +10,8 @@ use App\Marketplace\Facade\CostCategoryCatalogFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
+use App\MarketplaceAnalytics\Application\Service\OzonOrderAdCoverage;
+use App\MarketplaceAnalytics\Infrastructure\Query\OzonOrderAdAccrualQuery;
 use App\MarketplaceAnalytics\Infrastructure\Query\WidgetSummaryQuery;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
@@ -32,7 +34,15 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $this->adsFacade = $this->mockObject(MarketplaceAdsFacade::class);
         $this->connection = $this->createMock(Connection::class);
         $this->groupResolver = new MarketplaceCostAnalyticsGroupResolver(new CostCategoryCatalogFacade());
-        $this->query = new WidgetSummaryQuery($this->facade, $this->asAdsFacade($this->adsFacade), $this->connection, $this->groupResolver);
+        $adsFacade = $this->asAdsFacade($this->adsFacade);
+        $this->query = new WidgetSummaryQuery(
+            $this->facade,
+            $adsFacade,
+            $this->connection,
+            $this->groupResolver,
+            new OzonOrderAdAccrualQuery($this->connection),
+            new OzonOrderAdCoverage($adsFacade),
+        );
     }
 
     public function testReturnsNegativeReturnsTotal(): void
@@ -120,6 +130,24 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         self::assertSame(-1000.0, $result['costPriceTotal']);
         self::assertSame(-1200.0, $result['totalCosts']);
         self::assertSame(2600.0, $result['profit']);
+    }
+
+    public function testReturnedUnitsGiveBackTheirCostPrice(): void
+    {
+        // Регрессия 23.11: карточки = «Итого» отчёта, себестоимость возврата вычитается из себестоимости.
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l1', 'Товар', 'SKU1', 'ozon', '5000.00', 10, '1000.00', 10),
+        ]);
+        $this->stubReturns([
+            new ListingReturnAggregateDTO('l1', '200.00', 1, '100.00'),
+        ]);
+        $this->stubCostRows([]);
+
+        $result = $this->executeSummary();
+
+        self::assertSame(-900.0, $result['costPriceTotal']);
+        // profit = 5000 − 200 − 900 = 3900
+        self::assertSame(3900.0, $result['profit']);
     }
 
     public function testMarginPercentCalculation(): void
@@ -452,7 +480,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         [$sql, $params] = $this->captureCostQuery(null);
 
         self::assertNotNull($sql);
-        self::assertStringNotContainsString('listing_id', $sql);
+        self::assertStringNotContainsString('c.listing_id IN', $sql);
         self::assertArrayNotHasKey('listingIds', $params);
     }
 
@@ -573,6 +601,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
     {
         foreach ($rows as &$row) {
             $row['marketplace'] = $row['marketplace'] ?? 'ozon';
+            $row['has_listing'] = false;
         }
         unset($row);
         $this->stubCostQuery(static fn (): array => $rows);

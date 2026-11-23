@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Transaction;
 
-use App\Cash\Application\AutoRule\ChangeCashTransactionAutoRuleActivityAction;
+use App\Cash\Application\AutoRule\DisableCashTransactionAutoRuleAction;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Company\Security\ModuleAccess;
 use App\Shared\Audit\AuditContextProvider;
@@ -22,7 +22,7 @@ final class CashAutoRuleDisableController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $companyService,
         private readonly CashTransactionAutoRuleRepository $repo,
-        private readonly ChangeCashTransactionAutoRuleActivityAction $changeActivity,
+        private readonly DisableCashTransactionAutoRuleAction $disable,
         private readonly AuditContextProvider $auditContextProvider,
     ) {
     }
@@ -37,7 +37,7 @@ final class CashAutoRuleDisableController extends AbstractController
             throw $this->createNotFoundException();
         }
         if ($this->isCsrfTokenValid('disable'.$rule->getId(), (string) $request->request->get('_token'))) {
-            ($this->changeActivity)($rule, false, $this->auditContextProvider->getActorUserId());
+            ($this->disable)($rule, $this->auditContextProvider->getActorUserId());
         }
 
         return $this->redirectToRoute('cash_transaction_auto_rule_index');

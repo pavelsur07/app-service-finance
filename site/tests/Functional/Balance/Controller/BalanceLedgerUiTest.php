@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Balance\Controller;
 
+use App\Balance\Entity\BalanceOperation;
+use App\Balance\Entity\BalanceOperationLine;
 use App\Balance\Enum\BalanceCategoryType;
+use App\Balance\Enum\BalanceDirection;
+use App\Balance\Enum\BalanceOperationKind;
 use App\Company\Entity\Company;
 use App\Company\Entity\CompanyRole;
 use App\Tests\Builders\Balance\BalanceAccessGrantBuilder;
 use App\Tests\Builders\Balance\BalanceAccountBuilder;
+use App\Tests\Builders\Balance\BalanceAuditEventBuilder;
 use App\Tests\Builders\Balance\BalanceCategoryBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\CompanyMemberBuilder;
@@ -19,6 +24,235 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
 final class BalanceLedgerUiTest extends WebTestCaseBase
 {
+    public function testAllScreensUseLegacyShellAndHighlightTheirSection(): void
+    {
+        $client = static::createClient();
+        $companyId = $this->loginOwner($client);
+        $this->configure($client);
+        [$asset, $passive] = $this->accounts($companyId);
+        $this->postDocument($client, 'opening', '2026-08-01', [[$asset, 'increase', '100.00'], [$passive, 'increase', '100.00']]);
+        $this->postDocument($client, 'operation', '2026-08-02', [[$asset, 'increase', '10.00'], [$passive, 'increase', '10.00']]);
+        $documentId = (string) $this->em()->getConnection()->fetchOne('SELECT id FROM balance_operations WHERE company_id=? AND kind=?', [$companyId, 'operation']);
+        $articleId = (string) $this->em()->getConnection()->fetchOne('SELECT article_id FROM balance_accounts WHERE company_id=? AND id=?', [$companyId, $asset]);
+        // Выбранный пользователем новый интерфейс не меняет оболочку Баланса.
+        $client->getCookieJar()->set(new \Symfony\Component\BrowserKit\Cookie('ui_mode', 'app'));
+        foreach ([
+            '/balance/' => 'Баланс',
+            '/balance/accounts' => 'Счета',
+            '/balance/accounts/new' => 'Счета',
+            '/balance/accounts/'.$asset.'/edit' => 'Счета',
+            '/balance/accounts/'.$asset.'/card' => 'Счета',
+            '/balance/accounts/'.$asset.'/target' => 'Счета',
+            '/balance/journal' => 'Документы',
+            '/balance/documents/new' => 'Документы',
+            '/balance/documents/'.$documentId => 'Документы',
+            '/balance/documents/'.$documentId.'/reverse' => 'Документы',
+            '/balance/statement' => 'Движения',
+            '/balance/compare' => 'Сравнение',
+            '/balance/periods' => 'Периоды',
+            '/balance/setup' => 'Настройка',
+            '/balance/access' => 'Права',
+            '/balance/structure/' => 'Статьи',
+            '/balance/structure/new' => 'Статьи',
+            '/balance/structure/'.$articleId.'/edit' => 'Статьи',
+            '/balance/articles/'.$articleId.'/card' => 'Статьи',
+            '/balance/history/account/'.$asset => 'Счета',
+            '/balance/history/article/'.$articleId => 'Статьи',
+            '/balance/history/operation/'.$documentId => 'Документы',
+        ] as $path => $section) {
+            $client->request('GET', $path);
+            self::assertResponseIsSuccessful($path);
+            self::assertSelectorExists('html[data-ui-mode="legacy"]', $path);
+            self::assertSelectorExists('main[data-balance-root]', $path);
+            self::assertSelectorExists('#sidebar-menu.d-lg-flex:not(.d-flex)', $path);
+            self::assertSelectorTextSame('[data-balance-nav] [aria-current="page"]', $section, $path);
+            if ('Документы' === $section) {
+                self::assertSelectorTextSame('#navbar-balance .active', 'Документы', $path);
+            }
+            if ('Статьи' === $section) {
+                self::assertSelectorNotExists('#navbar-balance a[href="/balance/structure/"]');
+                self::assertSelectorExists('aside a.active[href="/balance/structure/"]', $path);
+            }
+        }
+        $client->request('GET', '/balance/?date=2026-02-30');
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorExists('html[data-ui-mode="legacy"]');
+        self::assertSelectorExists('main[data-balance-root] [role="alert"]');
+    }
+
+    public function testDateFiltersKeepTheirPurpose(): void
+    {
+        $client = static::createClient();
+        $this->loginOwner($client);
+        $client->request('GET', '/balance/?date=2026-08-15');
+        self::assertInputValueSame('date', '2026-08-15');
+        self::assertSelectorNotExists('input[name="from"]');
+        self::assertSelectorNotExists('[data-period-presets]');
+        $client->request('GET', '/balance/compare?from=2026-08-15&to=2026-08-01');
+        self::assertResponseIsSuccessful();
+        self::assertInputValueSame('from', '2026-08-15');
+        self::assertInputValueSame('to', '2026-08-01');
+        self::assertSelectorTextSame('label[for="balance-from"]', 'Первая дата');
+        self::assertSelectorTextSame('label[for="balance-to"]', 'Вторая дата');
+        self::assertSelectorNotExists('[data-period-presets]');
+        foreach (['/balance/statement', '/balance/journal'] as $path) {
+            $client->request('GET', $path.'?from=2026-08-01&to=2026-08-31');
+            self::assertResponseIsSuccessful();
+            self::assertInputValueSame('from', '2026-08-01');
+            self::assertInputValueSame('to', '2026-08-31');
+            self::assertSelectorExists('[data-period-presets] button[type="button"][data-period-from][data-period-to]');
+        }
+    }
+
+    public function testCardAndHistoryPaginationKeepsRouteIdsAndFilters(): void
+    {
+        $client = static::createClient();
+        $companyId = $this->loginOwner($client);
+        $this->configure($client);
+        [$asset, $passive] = $this->accounts($companyId);
+        $this->postDocument($client, 'opening', '2026-08-01', [[$asset, 'increase', '100.00'], [$passive, 'increase', '100.00']]);
+        $this->postDocument($client, 'operation', '2026-08-02', [[$asset, 'increase', '10.00'], [$passive, 'increase', '10.00']]);
+        $this->postDocument($client, 'operation', '2026-08-03', [[$asset, 'increase', '20.00'], [$passive, 'increase', '20.00']]);
+        $articleId = (string) $this->em()->getConnection()->fetchOne('SELECT article_id FROM balance_accounts WHERE company_id=? AND id=?', [$companyId, $asset]);
+        foreach (['/balance/accounts/'.$asset.'/card', '/balance/articles/'.$articleId.'/card'] as $path) {
+            $client->request('GET', $path.'?from=2026-08-01&to=2026-08-31&limit=1');
+            self::assertResponseIsSuccessful();
+            self::assertSelectorExists('.table-responsive .table');
+            $next = $client->getCrawler()->filter('[data-balance-root] a[aria-label="Вперёд"]')->link();
+            self::assertSame($path, parse_url($next->getUri(), \PHP_URL_PATH));
+            parse_str((string) parse_url($next->getUri(), \PHP_URL_QUERY), $query);
+            self::assertSame(['from' => '2026-08-01', 'to' => '2026-08-31', 'limit' => '1', 'page' => '2'], $query);
+            $client->click($next);
+            self::assertResponseIsSuccessful();
+            self::assertSelectorTextContains('[data-balance-root]', 'Документ operation');
+            self::assertInputValueSame('from', '2026-08-01');
+            self::assertSelectorExists('[data-period-presets]');
+        }
+        for ($i = 0; $i < 51; ++$i) {
+            $this->em()->persist(BalanceAuditEventBuilder::aBalanceAuditEvent()->withCompanyId($companyId)->withObjectId($asset)->build());
+        }
+        $this->em()->flush();
+        $path = '/balance/history/account/'.$asset;
+        $client->request('GET', $path.'?from=2026-08-01&to=2026-08-31');
+        self::assertResponseIsSuccessful();
+        $next = $client->getCrawler()->filter('[data-balance-root] a[aria-label="Вперёд"]')->link();
+        self::assertSame($path, parse_url($next->getUri(), \PHP_URL_PATH));
+        parse_str((string) parse_url($next->getUri(), \PHP_URL_QUERY), $query);
+        self::assertSame(['from' => '2026-08-01', 'to' => '2026-08-31', 'page' => '2'], $query);
+        $client->click($next);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('[data-balance-root]', 'Показано с 51');
+    }
+
+    public function testBootstrapFormsAndDeleteConfirmationPreserveCsrfAndVersion(): void
+    {
+        $client = static::createClient();
+        $companyId = $this->loginOwner($client);
+        $this->configure($client);
+        $this->accounts($companyId);
+        $client->request('GET', '/balance/accounts/new');
+        self::assertSelectorExists('input.form-control[name="balance_account[name]"]');
+        self::assertSelectorExists('select.form-select[name="balance_account[articleId]"]');
+        self::assertSelectorExists('.form-check-input[name="balance_account[allowNegative]"]');
+        self::assertSelectorTextContains('.form-text', 'После первого движения');
+        $client->request('GET', '/balance/documents/new');
+        $client->submitForm('Сохранить черновик', ['balance_document[reason]' => 'Удаляемый черновик']);
+        $client->followRedirect();
+        self::assertResponseIsSuccessful();
+        $trigger = $client->getCrawler()->filter('button[data-confirm-submit="Удалить черновик"]');
+        self::assertCount(1, $trigger);
+        self::assertSame('#balance-confirm', $trigger->attr('data-bs-target'));
+        $action = $trigger->attr('data-confirm-action');
+        self::assertNotNull($action);
+        $token = $trigger->attr('data-confirm-token');
+        self::assertNotEmpty($token);
+        $fields = json_decode((string) $trigger->attr('data-confirm-fields'), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertIsArray($fields);
+        self::assertSame(1, $fields['version']);
+        self::assertSelectorExists('#balance-confirm[data-confirm-modal] [data-confirm-submit][disabled]');
+        // В браузере эти параметры переносит готовый confirm_modal.js.
+        $this->submitConfirmTrigger($client, $trigger);
+        self::assertResponseRedirects('/balance/journal');
+        self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_operations WHERE company_id=?', [$companyId]));
+    }
+
+    public function testOwnerCanReversePostedDocumentThroughForm(): void
+    {
+        $client = static::createClient();
+        $companyId = $this->loginOwner($client);
+        $this->configure($client);
+        [$asset, $passive] = $this->accounts($companyId);
+        $this->postDocument($client, 'opening', '2026-08-01', [[$asset, 'increase', '100.00'], [$passive, 'increase', '100.00']]);
+        $this->postDocument($client, 'operation', '2026-08-02', [[$asset, 'increase', '10.00'], [$passive, 'increase', '10.00']]);
+        $documentId = (string) $this->em()->getConnection()->fetchOne('SELECT id FROM balance_operations WHERE company_id=? AND kind=?', [$companyId, 'operation']);
+        $client->request('GET', '/balance/documents/'.$documentId.'/reverse');
+        self::assertSelectorExists('textarea.form-control[name="balance_reversal[reason]"]');
+        $client->submitForm('Провести сторно', ['balance_reversal[date]' => '2026-08-03', 'balance_reversal[reason]' => 'Исправление документа']);
+        self::assertResponseRedirects();
+        $client->followRedirect();
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('[data-balance-root]', 'Исходный документ');
+        $client->request('GET', '/balance/documents/'.$documentId);
+        self::assertSelectorTextContains('.badge.bg-warning-lt', 'Сторнирован');
+        self::assertSame('10000', (string) $this->em()->getConnection()->fetchOne('SELECT balance FROM balance_account_states WHERE company_id=? AND account_id=?', [$companyId, $asset]));
+    }
+
+    public function testOwnerCanEditAccountAndSaveMemberPermissions(): void
+    {
+        $client = static::createClient();
+        $companyId = $this->loginOwner($client);
+        [$asset] = $this->accounts($companyId);
+        $client->request('GET', '/balance/accounts/'.$asset.'/edit');
+        $client->submitForm('Сохранить', ['balance_account[name]' => 'Измененный счет']);
+        self::assertResponseRedirects('/balance/accounts');
+        self::assertSame('Измененный счет', $this->em()->getConnection()->fetchOne('SELECT name FROM balance_accounts WHERE company_id=? AND id=?', [$companyId, $asset]));
+        $company = $this->em()->find(Company::class, $companyId);
+        self::assertInstanceOf(Company::class, $company);
+        $user = UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail('balance-writer@example.test')->build();
+        $role = new CompanyRole(Uuid::uuid7()->toString(), 'Финансы', ['finance' => 'write'], $company);
+        $member = CompanyMemberBuilder::aMember()->withCompany($company)->withUser($user)->withAccessRole($role)->build();
+        foreach ([$user, $role, $member] as $entity) {
+            $this->em()->persist($entity);
+        }
+        $this->em()->flush();
+        $client->request('GET', '/balance/access');
+        self::assertSelectorExists('input.form-check-input[name="balance_grant[prepare]"]');
+        $client->submitForm('Сохранить права', ['balance_grant[userId]' => $user->getId(), 'balance_grant[prepare]' => true, 'balance_grant[post]' => true]);
+        self::assertResponseRedirects('/balance/access');
+        $client->followRedirect();
+        self::assertSelectorTextContains('tbody', 'Да');
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
+        $client->request('GET', '/balance/documents/new');
+        self::assertResponseRedirects('/balance/setup');
+        $client->request('GET', '/balance/access');
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testJournalPaginationPreservesEveryFilter(): void
+    {
+        $client = static::createClient();
+        $companyId = $this->loginOwner($client);
+        [$asset] = $this->accounts($companyId);
+        $authorId = (string) $this->em()->getConnection()->fetchOne('SELECT user_id FROM companies WHERE id=?', [$companyId]);
+        for ($i = 1; $i <= 51; ++$i) {
+            $document = new BalanceOperation($companyId, (string) $i, BalanceOperationKind::OPERATION, new \DateTimeImmutable('2026-08-10'), $authorId, 'pagination-'.$i, hash('sha256', (string) $i), 'Фильтруемый документ');
+            $this->em()->persist($document);
+            $this->em()->persist(new BalanceOperationLine($companyId, $document->getId(), $asset, BalanceDirection::INCREASE, '100'));
+        }
+        $this->em()->flush();
+        $filters = ['from' => '2026-08-01', 'to' => '2026-08-31', 'search' => 'Фильтруемый', 'status' => 'draft', 'kind' => 'operation', 'author_id' => $authorId, 'account_id' => $asset];
+        $client->request('GET', '/balance/journal?'.http_build_query($filters));
+        self::assertResponseIsSuccessful();
+        $next = $client->getCrawler()->filter('[data-balance-root] a[aria-label="Вперёд"]')->link();
+        parse_str((string) parse_url($next->getUri(), \PHP_URL_QUERY), $query);
+        self::assertSame($filters + ['page' => '2'], $query);
+        $client->click($next);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('tbody', 'Фильтруемый документ');
+        self::assertSelectorTextContains('[data-balance-root]', 'Показано с 51');
+    }
+
     public function testGrantTableDisplaysReopeningPermission(): void
     {
         $client = static::createClient();
@@ -144,7 +378,7 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         $values['balance_category_form']['_token'] = 'invalid';
         $client->request('POST', '/balance/structure/new', $values);
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('.field-helper.error');
+        self::assertSelectorExists('[data-balance-root] .alert-danger');
         self::assertSame(0, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_articles WHERE company_id=?', [$companyId]));
     }
 
@@ -288,6 +522,8 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('main', 'Черновик для проверки доступа');
         self::assertSelectorNotExists('form[action$="/post"]');
+        self::assertSelectorNotExists('[data-balance-nav] a[href="/balance/setup"]');
+        self::assertSelectorNotExists('[data-balance-nav] a[href="/balance/access"]');
         $client->request('GET', '/balance/documents/new');
         self::assertResponseStatusCodeSame(403);
         $client->request('GET', '/balance/periods');
@@ -309,7 +545,7 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         }
         $client->request('GET', '/balance/accounts/'.$accountId.'/target');
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('h1', 'Основной счет');
+        self::assertSelectorTextContains('[data-balance-root] h1', 'Основной счет');
         self::assertInputValueSame('balance_target[target]', '123.45');
     }
 
@@ -335,29 +571,29 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         $crawler = $client->request('GET', '/balance/journal');
         self::assertResponseIsSuccessful();
         self::assertSame('10.08.2026', trim($crawler->filter('tbody tr')->first()->filter('td')->eq(1)->text()));
-        self::assertSelectorTextSame('tbody .status.status--success', 'Проведен');
-        self::assertSelectorTextSame('.page-tab.is-active', 'Документы');
+        self::assertSelectorTextSame('tbody .badge.bg-success-lt', 'Проведен');
+        self::assertSelectorTextSame('[data-balance-nav] [aria-current="page"]', 'Документы');
 
         $crawler = $client->request('GET', '/balance/accounts');
-        self::assertSelectorTextSame('thead th.t-cell--right', 'Остаток, ₽');
-        self::assertSelectorTextSame('.page-tab.is-active', 'Счета');
-        // Девять разделов владельца: шесть вкладок видны, остальные — в «Ещё».
-        self::assertCount(6, $crawler->filter('.page-tabs-scroll .page-tab'));
-        self::assertSame(['Периоды', 'Настройка', 'Права'], $crawler->filter('.page-tabs-menu a')->each(static fn ($a): string => trim($a->text())));
+        self::assertSelectorTextSame('thead th.text-end', 'Остаток, ₽');
+        self::assertSelectorTextSame('[data-balance-nav] [aria-current="page"]', 'Счета');
+        // Девять разделов владельца: пять вкладок видны, остальные — в «Ещё».
+        self::assertCount(5, $crawler->filter('[data-balance-nav] .nav-link:not(.dropdown-toggle)'));
+        self::assertSame(['Сравнение', 'Периоды', 'Настройка', 'Права'], $crawler->filter('[data-balance-nav] .dropdown-menu a')->each(static fn ($a): string => trim($a->text())));
 
         $client->request('GET', '/balance/accounts/'.$asset.'/card?from=2026-08-01&to=2026-08-31');
-        self::assertSelectorTextSame('.page-tab.is-active', 'Счета');
+        self::assertSelectorTextSame('[data-balance-nav] [aria-current="page"]', 'Счета');
         // Список движений: знак у изменения — U+2212 у уменьшения, плюс у увеличения.
-        self::assertSelectorTextSame('tbody td.t-cell--right', "\u{2212}1\u{00A0}500,00");
+        self::assertSelectorTextSame('tbody td.text-end', "\u{2212}1\u{00A0}500,00");
 
         $client->request('GET', '/balance/periods');
-        self::assertSelectorTextSame('.page-tabs-more summary.is-active', 'Периоды');
+        self::assertSelectorTextSame('[data-balance-nav] .dropdown-toggle.active', 'Периоды');
 
         // Баланс — до копейки, без сокращения.
         $crawler = $client->request('GET', '/balance/?date=2026-08-31');
-        self::assertSame("98\u{00A0}500,00\u{00A0}₽", trim($crawler->filter('.kpi-value')->first()->text()));
-        self::assertSelectorNotExists('.money--error');
-        self::assertSelectorTextSame('.kpi-meta', 'Актив и пассив равны');
+        self::assertSame("98\u{00A0}500,00\u{00A0}₽", trim($crawler->filter('[data-balance-value]')->first()->text()));
+        self::assertSelectorNotExists('[data-balance-value].text-danger');
+        self::assertSelectorTextSame('[data-balance-explanation]', 'Актив и пассив равны');
     }
 
     public function testMismatchIsRedToTheKopeckWithExplanation(): void
@@ -377,9 +613,9 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         $kpi = $crawler->filter('[data-balance-mismatch="true"]');
         self::assertCount(1, $kpi);
-        self::assertStringContainsString('kpi--accent-danger', (string) $kpi->attr('class'));
-        self::assertSame("0,40\u{00A0}₽", trim($kpi->filter('.kpi-value.money--error')->text()));
-        self::assertStringContainsString("Актив больше пассива на 0,40\u{00A0}₽", $kpi->filter('.kpi-meta.money--error')->text());
+        self::assertStringContainsString('border-danger', (string) $kpi->attr('class'));
+        self::assertSame("0,40\u{00A0}₽", trim($kpi->filter('[data-balance-value].text-danger')->text()));
+        self::assertStringContainsString("Актив больше пассива на 0,40\u{00A0}₽", $kpi->filter('[data-balance-explanation].text-danger')->text());
     }
 
     /**

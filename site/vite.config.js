@@ -31,6 +31,7 @@ export default defineConfig({
                 auth: "./assets/pages/auth.js",
                 admin_shell: "./assets/styles/pages/admin-shell.css",
                 vf_custom_classes: "./assets/styles/vf-custom-classes.css",
+                marketplace_economics: "./assets/pages/marketplace_economics.js",
                 marketplace_coverage: "./assets/styles/pages/marketplace-coverage.css",
                 dashboard: "./assets/react/_legacy/dashboard_started.tsx", // Точка ./ обязательна!
                 finance_balance_dynamics: "./assets/react/_legacy/finance-balance-dynamics-page.tsx",

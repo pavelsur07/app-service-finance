@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type ViteDevServer, type PreviewServer } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 function reserveBackendPaths(server: ViteDevServer | PreviewServer) {
   server.middlewares.use((request, response, next) => {
@@ -19,8 +20,10 @@ function reserveBackendPaths(server: ViteDevServer | PreviewServer) {
 }
 
 export default defineConfig({
+  publicDir: fileURLToPath(new URL('../packages/ds/public', import.meta.url)),
   plugins: [
     react(),
+    tailwindcss(),
     {
       name: 'spa-backend-boundary',
       configureServer: reserveBackendPaths,
@@ -53,7 +56,7 @@ export default defineConfig({
       allow: [
         fileURLToPath(new URL('.', import.meta.url)),
         fileURLToPath(new URL('../../site/packages', import.meta.url)),
-        fileURLToPath(new URL('../../site/assets/styles', import.meta.url)),
+        fileURLToPath(new URL('../packages/ds', import.meta.url)),
       ],
     },
   },

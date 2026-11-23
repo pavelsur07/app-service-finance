@@ -37,3 +37,9 @@
 .table.cf-table .cf-toggle { cursor: pointer; }
 
 /* TODO(ds): без токена — px-значений 4 (размеры колонок, отступы, шрифты; перенос 1:1, замена на токены --vf-space-N, --vf-size-N и цветовые --vf- — DS-проходом, когда токены для них появятся). */
+
+/* Сумма статьи — переход в «Транзакции ДДС» двойным кликом: вид суммы, а не ссылки. */
+.table.cf-table td.cf-drill { cursor: pointer; }
+.table.cf-table .cf-drill-link { color: inherit; text-decoration: none; }
+.table.cf-table td.cf-drill:hover .cf-drill-link,
+.table.cf-table .cf-drill-link:focus-visible { text-decoration: underline; }

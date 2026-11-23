@@ -27,7 +27,7 @@ final class WbConnectionsSnapshotBuilderTest extends TestCase
         self::assertSame(['client_id' => self::WB_A, 'api_key' => 'wb-token'], $cabinet['credentials']['seller']);
         self::assertNull($cabinet['credentials']['performance']);
         self::assertSame(WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES, $cabinet['resource_types']);
-        self::assertSame(['wb.finance.sales-report.daily', 'wb.finance.sales-report.weekly'], $cabinet['resource_types']);
+        self::assertSame(['wb.finance.sales-report.daily', 'wb.finance.sales-report.weekly', 'wb.ads.daily', 'wb.analytics.funnel', 'wb.analytics.search'], $cabinet['resource_types']);
         self::assertSame((new \DateTimeImmutable('2026-10-05 10:00:00'))->format(\DateTimeInterface::ATOM), $cabinet['updated_at']);
     }
 

@@ -1,0 +1,574 @@
+[
+  {
+    "app": "account",
+    "width": 1440,
+    "texts": [
+      {
+        "selector": ".ds-auth-title",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(11, 16, 32)",
+        "width": "358px",
+        "height": "34px",
+        "contrast": 18.933
+      },
+      {
+        "selector": ".ds-auth-subtitle",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(106, 110, 121)",
+        "width": "358px",
+        "height": "20px",
+        "contrast": 5.098
+      },
+      {
+        "selector": ".form-label",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(11, 16, 32)",
+        "width": "32px",
+        "height": "18.1875px",
+        "contrast": 18.933
+      },
+      {
+        "selector": ".ds-auth-legal",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(106, 110, 121)",
+        "width": "358px",
+        "height": "54px",
+        "contrast": 5.098
+      },
+      {
+        "selector": ".ds-auth-note",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(245, 245, 247)",
+        "border": "rgb(106, 110, 121)",
+        "width": "760px",
+        "height": "36px",
+        "contrast": 4.682
+      },
+      {
+        "selector": ".ds-auth-copyright",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(245, 245, 247)",
+        "border": "rgb(106, 110, 121)",
+        "width": "1360px",
+        "height": "18px",
+        "contrast": 4.682
+      },
+      {
+        "selector": ".ds-auth-documents span",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(245, 245, 247)",
+        "border": "rgb(106, 110, 121)",
+        "width": "117px",
+        "height": "20px",
+        "contrast": 4.682
+      },
+      {
+        "selector": ".ds-auth-cookie p",
+        "foreground": "rgb(88, 93, 104)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(88, 93, 104)",
+        "width": "1060px",
+        "height": "20px",
+        "contrast": 6.603
+      },
+      {
+        "selector": ".ds-auth-cookie button",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(227, 228, 232)",
+        "width": "163px",
+        "height": "32px",
+        "contrast": 18.933
+      },
+      {
+        "selector": "button[type=submit]",
+        "foreground": "rgb(255, 255, 255)",
+        "background": "rgb(30, 42, 68)",
+        "border": "rgb(30, 42, 68)",
+        "width": "358px",
+        "height": "44px",
+        "contrast": 14.287
+      },
+      {
+        "selector": "input[name=email]",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(138, 142, 152)",
+        "width": "358px",
+        "height": "40px",
+        "contrast": 18.933,
+        "borderContrast": 3.28
+      }
+    ],
+    "focus": [
+      {
+        "tag": "A",
+        "name": "Ваш Финдир — на главную",
+        "outline": "2px"
+      },
+      {
+        "tag": "INPUT",
+        "name": "email",
+        "outline": "2px"
+      },
+      {
+        "tag": "INPUT",
+        "name": "password",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Показать пароль",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Войти",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Только необходимые",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Принять все",
+        "outline": "2px"
+      }
+    ]
+  },
+  {
+    "app": "account",
+    "width": 390,
+    "texts": [
+      {
+        "selector": ".ds-auth-title",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(11, 16, 32)",
+        "width": "350px",
+        "height": "34px",
+        "contrast": 18.933
+      },
+      {
+        "selector": ".ds-auth-subtitle",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(106, 110, 121)",
+        "width": "350px",
+        "height": "20px",
+        "contrast": 5.098
+      },
+      {
+        "selector": ".form-label",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(11, 16, 32)",
+        "width": "32px",
+        "height": "18.1875px",
+        "contrast": 18.933
+      },
+      {
+        "selector": ".ds-auth-legal",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(106, 110, 121)",
+        "width": "350px",
+        "height": "54px",
+        "contrast": 5.098
+      },
+      {
+        "selector": ".ds-auth-note",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(245, 245, 247)",
+        "border": "rgb(106, 110, 121)",
+        "width": "350px",
+        "height": "54px",
+        "contrast": 4.682
+      },
+      {
+        "selector": ".ds-auth-copyright",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(245, 245, 247)",
+        "border": "rgb(106, 110, 121)",
+        "width": "350px",
+        "height": "18px",
+        "contrast": 4.682
+      },
+      {
+        "selector": ".ds-auth-documents span",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(245, 245, 247)",
+        "border": "rgb(106, 110, 121)",
+        "width": "117px",
+        "height": "20px",
+        "contrast": 4.682
+      },
+      {
+        "selector": ".ds-auth-cookie p",
+        "foreground": "rgb(88, 93, 104)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(88, 93, 104)",
+        "width": "358px",
+        "height": "40px",
+        "contrast": 6.603
+      },
+      {
+        "selector": ".ds-auth-cookie button",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(227, 228, 232)",
+        "width": "358px",
+        "height": "32px",
+        "contrast": 18.933
+      },
+      {
+        "selector": "button[type=submit]",
+        "foreground": "rgb(255, 255, 255)",
+        "background": "rgb(30, 42, 68)",
+        "border": "rgb(30, 42, 68)",
+        "width": "350px",
+        "height": "44px",
+        "contrast": 14.287
+      },
+      {
+        "selector": "input[name=email]",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(138, 142, 152)",
+        "width": "350px",
+        "height": "40px",
+        "contrast": 18.933,
+        "borderContrast": 3.28
+      }
+    ],
+    "focus": [
+      {
+        "tag": "A",
+        "name": "Ваш Финдир — на главную",
+        "outline": "2px"
+      },
+      {
+        "tag": "INPUT",
+        "name": "email",
+        "outline": "2px"
+      },
+      {
+        "tag": "INPUT",
+        "name": "password",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Показать пароль",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Войти",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Только необходимые",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Принять все",
+        "outline": "2px"
+      }
+    ]
+  },
+  {
+    "app": "admin",
+    "width": 1440,
+    "texts": [
+      {
+        "selector": ".ds-auth-title",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(11, 16, 32)",
+        "width": "358px",
+        "height": "34px",
+        "contrast": 18.933
+      },
+      {
+        "selector": ".ds-auth-subtitle",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(106, 110, 121)",
+        "width": "358px",
+        "height": "20px",
+        "contrast": 5.098
+      },
+      {
+        "selector": ".form-label",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(11, 16, 32)",
+        "width": "32px",
+        "height": "18.1875px",
+        "contrast": 18.933
+      },
+      {
+        "selector": ".ds-auth-legal",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(106, 110, 121)",
+        "width": "358px",
+        "height": "54px",
+        "contrast": 5.098
+      },
+      {
+        "selector": ".ds-auth-note",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(245, 245, 247)",
+        "border": "rgb(106, 110, 121)",
+        "width": "760px",
+        "height": "36px",
+        "contrast": 4.682
+      },
+      {
+        "selector": ".ds-auth-copyright",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(245, 245, 247)",
+        "border": "rgb(106, 110, 121)",
+        "width": "1360px",
+        "height": "18px",
+        "contrast": 4.682
+      },
+      {
+        "selector": ".ds-auth-documents span",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(245, 245, 247)",
+        "border": "rgb(106, 110, 121)",
+        "width": "117px",
+        "height": "20px",
+        "contrast": 4.682
+      },
+      {
+        "selector": ".ds-auth-cookie p",
+        "foreground": "rgb(88, 93, 104)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(88, 93, 104)",
+        "width": "1060px",
+        "height": "20px",
+        "contrast": 6.603
+      },
+      {
+        "selector": ".ds-auth-cookie button",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(227, 228, 232)",
+        "width": "163px",
+        "height": "32px",
+        "contrast": 18.933
+      },
+      {
+        "selector": "button[type=submit]",
+        "foreground": "rgb(255, 255, 255)",
+        "background": "rgb(30, 42, 68)",
+        "border": "rgb(30, 42, 68)",
+        "width": "358px",
+        "height": "44px",
+        "contrast": 14.287
+      },
+      {
+        "selector": "input[name=email]",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(138, 142, 152)",
+        "width": "358px",
+        "height": "40px",
+        "contrast": 18.933,
+        "borderContrast": 3.28
+      }
+    ],
+    "focus": [
+      {
+        "tag": "A",
+        "name": "Ваш Финдир — на главную",
+        "outline": "2px"
+      },
+      {
+        "tag": "INPUT",
+        "name": "email",
+        "outline": "2px"
+      },
+      {
+        "tag": "INPUT",
+        "name": "password",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Показать пароль",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Войти",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Только необходимые",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Принять все",
+        "outline": "2px"
+      }
+    ]
+  },
+  {
+    "app": "admin",
+    "width": 390,
+    "texts": [
+      {
+        "selector": ".ds-auth-title",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(11, 16, 32)",
+        "width": "350px",
+        "height": "34px",
+        "contrast": 18.933
+      },
+      {
+        "selector": ".ds-auth-subtitle",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(106, 110, 121)",
+        "width": "350px",
+        "height": "20px",
+        "contrast": 5.098
+      },
+      {
+        "selector": ".form-label",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(11, 16, 32)",
+        "width": "32px",
+        "height": "18.1875px",
+        "contrast": 18.933
+      },
+      {
+        "selector": ".ds-auth-legal",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(106, 110, 121)",
+        "width": "350px",
+        "height": "54px",
+        "contrast": 5.098
+      },
+      {
+        "selector": ".ds-auth-note",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(245, 245, 247)",
+        "border": "rgb(106, 110, 121)",
+        "width": "350px",
+        "height": "54px",
+        "contrast": 4.682
+      },
+      {
+        "selector": ".ds-auth-copyright",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(245, 245, 247)",
+        "border": "rgb(106, 110, 121)",
+        "width": "350px",
+        "height": "18px",
+        "contrast": 4.682
+      },
+      {
+        "selector": ".ds-auth-documents span",
+        "foreground": "rgb(106, 110, 121)",
+        "background": "rgb(245, 245, 247)",
+        "border": "rgb(106, 110, 121)",
+        "width": "117px",
+        "height": "20px",
+        "contrast": 4.682
+      },
+      {
+        "selector": ".ds-auth-cookie p",
+        "foreground": "rgb(88, 93, 104)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(88, 93, 104)",
+        "width": "358px",
+        "height": "40px",
+        "contrast": 6.603
+      },
+      {
+        "selector": ".ds-auth-cookie button",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(227, 228, 232)",
+        "width": "358px",
+        "height": "32px",
+        "contrast": 18.933
+      },
+      {
+        "selector": "button[type=submit]",
+        "foreground": "rgb(255, 255, 255)",
+        "background": "rgb(30, 42, 68)",
+        "border": "rgb(30, 42, 68)",
+        "width": "350px",
+        "height": "44px",
+        "contrast": 14.287
+      },
+      {
+        "selector": "input[name=email]",
+        "foreground": "rgb(11, 16, 32)",
+        "background": "rgb(255, 255, 255)",
+        "border": "rgb(138, 142, 152)",
+        "width": "350px",
+        "height": "40px",
+        "contrast": 18.933,
+        "borderContrast": 3.28
+      }
+    ],
+    "focus": [
+      {
+        "tag": "A",
+        "name": "Ваш Финдир — на главную",
+        "outline": "2px"
+      },
+      {
+        "tag": "INPUT",
+        "name": "email",
+        "outline": "2px"
+      },
+      {
+        "tag": "INPUT",
+        "name": "password",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Показать пароль",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Войти",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Только необходимые",
+        "outline": "2px"
+      },
+      {
+        "tag": "BUTTON",
+        "name": "Принять все",
+        "outline": "2px"
+      }
+    ]
+  }
+]

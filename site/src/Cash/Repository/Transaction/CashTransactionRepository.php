@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Cash\Repository\Transaction;
 
+use App\Cash\Application\DTO\CashTransactionFilters;
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\LockMode;
+use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -208,27 +211,44 @@ class CashTransactionRepository extends ServiceEntityRepository
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
     ): iterable {
-        $query = $this->createQueryBuilder('t')
-            ->andWhere('t.company = :company')
-            ->andWhere('t.deletedAt IS NULL')
-            ->andWhere('t.occurredAt >= :from')
-            ->andWhere('t.occurredAt <= :to')
-            ->setParameter('company', $company)
-            ->setParameter('from', $from->setTime(0, 0, 0))
-            ->setParameter('to', $to->setTime(23, 59, 59))
-            ->innerJoin('t.moneyAccount', 'moneyAccount')
-            ->addSelect('moneyAccount')
-            ->leftJoin('t.counterparty', 'counterparty')
-            ->addSelect('counterparty')
-            ->leftJoin('t.cashflowCategory', 'cashflowCategory')
-            ->addSelect('cashflowCategory')
-            ->leftJoin('t.projectDirection', 'projectDirection')
-            ->addSelect('projectDirection')
-            ->orderBy('t.occurredAt', \SortDirection::Descending)
-            ->getQuery();
-        $query->setHint(Query::HINT_READ_ONLY, true);
+        $em = $this->getEntityManager();
+        // Предпросмотр читает всю историю периода. Своя identity map позволяет освобождать
+        // операции и их связи порциями, сохраняя управляемые объекты формы и текущих правил.
+        $reader = new EntityManager($em->getConnection(), $em->getConfiguration());
+        $params = ['company' => $company->getId(), 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')];
+        $cursor = '';
+        do {
+            $page = $reader->getConnection()->fetchAllAssociative(
+                'SELECT occurred_at, id FROM cash_transaction WHERE company_id = :company AND deleted_at IS NULL
+                 AND occurred_at BETWEEN :from AND :to '.$cursor.' ORDER BY occurred_at DESC, id DESC LIMIT 100',
+                $params,
+            );
+            if ([] === $page) {
+                return;
+            }
 
-        return $query->toIterable();
+            $query = $reader->createQueryBuilder()
+                ->select('t', 'account', 'party', 'category', 'project', 'split', 'company')
+                ->from(CashTransaction::class, 't')
+                ->innerJoin('t.company', 'company')
+                ->innerJoin('t.moneyAccount', 'account')
+                ->leftJoin('t.counterparty', 'party')
+                ->leftJoin('t.cashflowCategory', 'category')
+                ->leftJoin('t.projectDirection', 'project')
+                ->leftJoin('t.splits', 'split')
+                ->where('company.id = :company AND t.id IN (:ids) AND t.deletedAt IS NULL')
+                ->setParameter('company', $company->getId())
+                ->setParameter('ids', array_column($page, 'id'))
+                ->orderBy('t.occurredAt', \SortDirection::Descending)
+                ->addOrderBy('t.id', \SortDirection::Descending)
+                ->getQuery();
+            yield from $query->getResult();
+            $reader->clear();
+            $last = $page[array_key_last($page)];
+            $params['lastDate'] = $last['occurred_at'];
+            $params['lastId'] = $last['id'];
+            $cursor = 'AND (occurred_at, id) < (:lastDate, :lastId)';
+        } while (100 === count($page));
     }
 
     public function maxUpdatedAtForCompany(Company $company): ?\DateTimeImmutable
@@ -531,7 +551,7 @@ SQL,
             // Фильтр из createFilteredQueryBuilder отбирает транзакции, а здесь строки
             // ещё и присоединены: без этого ограничения выгрузка по одной категории
             // вернула бы и остальные строки разбитой транзакции.
-            $qb->andWhere('split.cashflowCategory = :cat');
+            $qb->andWhere('split.cashflowCategory IN (:cat)');
         }
 
         return $qb
@@ -602,8 +622,19 @@ SQL,
         if ($filters['categoryId'] ?? null) {
             // Фильтр по строкам разбивки: транзакция попадает в выдачу, если её содержит
             // хотя бы одна строка, и показывается суммой именно этой строки.
-            $qb->andWhere('EXISTS (SELECT 1 FROM App\\Cash\\Entity\\Transaction\\CashTransactionSplit fs WHERE fs.cashTransaction = t AND fs.cashflowCategory = :cat)')
-                ->setParameter('cat', $filters['categoryId']);
+            $categoryIds = '1' === ($filters['includeChildren'] ?? null)
+                ? $this->categoryWithDescendantIds($company, $filters['categoryId'])
+                : [$filters['categoryId']];
+            $qb->andWhere('EXISTS (SELECT 1 FROM App\\Cash\\Entity\\Transaction\\CashTransactionSplit fs WHERE fs.cashTransaction = t AND fs.cashflowCategory IN (:cat))')
+                ->setParameter('cat', $categoryIds);
+        }
+        if ($filters['projectIds'] ?? null) {
+            $qb->andWhere('IDENTITY(t.projectDirection) IN (:projectIds)')
+                ->setParameter('projectIds', CashTransactionFilters::uuidList($filters['projectIds']));
+        }
+        if ($filters['centerIds'] ?? null) {
+            $qb->andWhere('t.responsibilityCenterId IN (:centerIds)')
+                ->setParameter('centerIds', CashTransactionFilters::uuidList($filters['centerIds']));
         }
         if ($filters['counterpartyId'] ?? null) {
             $qb->andWhere('t.counterparty = :cp')->setParameter('cp', $filters['counterpartyId']);
@@ -625,5 +656,42 @@ SQL,
         }
 
         return $qb;
+    }
+
+    /**
+     * Статья и все её потомки внутри компании; чужая статья поддерева не даёт.
+     *
+     * @return list<string>
+     */
+    private function categoryWithDescendantIds(Company $company, string $categoryId): array
+    {
+        /** @var list<array{id: string, parentId: string|null}> $rows */
+        $rows = $this->getEntityManager()->createQueryBuilder()
+            ->select('c.id AS id', 'IDENTITY(c.parent) AS parentId')
+            ->from(CashflowCategory::class, 'c')
+            ->where('c.company = :company')
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->getArrayResult();
+
+        $children = [];
+        foreach ($rows as $row) {
+            if (null !== $row['parentId']) {
+                $children[(string) $row['parentId']][] = (string) $row['id'];
+            }
+        }
+
+        $ids = [$categoryId];
+        $seen = [$categoryId => true];
+        for ($i = 0; $i < \count($ids); ++$i) {
+            foreach ($children[$ids[$i]] ?? [] as $childId) {
+                if (!isset($seen[$childId])) {
+                    $seen[$childId] = true;
+                    $ids[] = $childId;
+                }
+            }
+        }
+
+        return $ids;
     }
 }

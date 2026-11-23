@@ -172,3 +172,20 @@ func TestReferenceSnapshotsTodayFrom0500(t *testing.T) {
 	none := Build(at("2026-10-24 01:00"), []connections.Cabinet{seller("a", allFinance...)}, DefaultConfig(msk))
 	assert.Empty(t, periods(none.Ensure, executor.ResourceActions))
 }
+
+func TestFunnelBackfillAndTail(t *testing.T) {
+	p := Build(at("2026-11-18 12:00"), []connections.Cabinet{seller("a", executor.ResourceFunnel)}, DefaultConfig(msk))
+
+	days := periods(p.Ensure, executor.ResourceFunnel)
+	require.Len(t, days, FunnelDepthDays)
+	assert.Equal(t, "2026-10-19", days[0], "догон не глубже FunnelDepthDays")
+	assert.Equal(t, "2026-11-17", days[len(days)-1], "вчера; сегодня — день неполный")
+	tail := refresh(p, KindFunnelTail)
+	require.NotNil(t, tail)
+	assert.Len(t, tail.Specs, FunnelTailDays, "отмены и возвраты Ozon пишет на день заказа")
+	assert.Equal(t, "2026-11-17", tail.Specs[0].PeriodKey)
+
+	none := Build(at("2026-11-18 12:00"), []connections.Cabinet{seller("a", allFinance...)}, DefaultConfig(msk))
+	assert.Empty(t, periods(none.Ensure, executor.ResourceFunnel))
+	assert.Nil(t, refresh(none, KindFunnelTail))
+}

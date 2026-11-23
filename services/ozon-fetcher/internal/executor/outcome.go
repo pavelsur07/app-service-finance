@@ -104,6 +104,12 @@ func (e *Executor) Classify(c *fetch.Classification) (store.Outcome, bool) {
 		log.Error("stored stocks page is not readable", slog.String("stage", "fetch"), slog.String("error", err.Error()))
 		return store.Outcome{Status: store.StatusFailedPermanent, Label: "stocks_raw_invalid", ErrorClass: "stocks_raw_invalid", NextRunAt: now}, true
 	}
+	if errors.Is(err, errFunnelRestart) {
+		return c.Retryable("funnel_restart", false), true
+	}
+	if errors.Is(err, errFunnelRefused) {
+		return store.Outcome{Status: store.StatusFailedPermanent, Label: "funnel_refused", ErrorClass: "funnel_refused", NextRunAt: now}, true
+	}
 	if errors.Is(err, errReturnsRestart) {
 		return c.Retryable("returns_restart", false), true
 	}

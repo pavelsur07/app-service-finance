@@ -1,0 +1,269 @@
+{% extends 'base.html.twig' %}
+{% block title %}Экономика SKU{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    {{ vite_entry_link_tags('marketplace_economics') }}
+{% endblock %}
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('marketplace_economics') }}
+{% endblock %}
+
+{% macro money(minor) %}{{ minor|vf_minor(2)|vf_amount(2) }}{% endmacro %}
+{% macro pct(value) %}{{ value is null ? '—' : value|vf_number(1) ~ ' %' }}{% endmacro %}
+{% macro skuValue(value) %}
+    {% if value is not empty %}
+        <span class="me-sku-value text-truncate" title="{{ value }}">{{ value }}</span>
+    {% endif %}
+{% endmacro %}
+{% macro cell(m, column) %}
+    {%- import _self as ui -%}
+    {%- set kind = column.kind ?? 'money' -%}
+    {%- if kind == 'share' -%}
+        {{ ui.pct(m.percentOfRevenue(attribute(m, column.value))) }}
+    {%- elseif kind == 'percent' -%}
+        {{ ui.pct(attribute(m, column.value)) }}
+    {%- else -%}
+        {{ ui.money(attribute(m, column.value)) }}
+    {%- endif -%}
+{% endmacro %}
+
+{% block content %}
+    {% import _self as ui %}
+    {% set params = app.request.query.all %}
+    {# value — метод/поле SkuMetrics; kind: money — ₽, share — % от выручки до СПП, percent — уже %;
+       group — верхняя строка шапки, short — подпись под группой, label — полное название (title, «Колонки») #}
+    {% set columns = [
+        {id: 'revenue', value: 'revenue', group: 'Выручка', short: 'до СПП', label: 'Выручка, ₽', sort: 'revenue', required: true},
+        {id: 'revenueWithSpp', value: 'revenueWithSpp', group: 'Выручка', short: 'с СПП', label: 'Выручка с СПП, ₽'},
+        {id: 'spp', value: 'spp', group: 'Выручка', short: 'СПП', label: 'СПП, ₽'},
+        {id: 'vat', value: 'vat', group: 'Выручка', short: 'НДС', label: 'НДС к уплате, ₽'},
+        {id: 'revenueNet', value: 'revenueNet', group: 'Выручка', short: 'без НДС', label: 'Выручка без НДС, ₽'},
+        {id: 'costPrice', value: 'costPrice', group: 'Товар', short: 'Себест.', label: 'Себестоимость, ₽'},
+        {id: 'gross', value: 'gross', group: 'Товар', short: 'Выр. − себест.', label: 'Выручка без НДС − себестоимость, ₽', sort: 'gross'},
+        {id: 'commission', value: 'commission', group: 'Расходы МП', short: 'Комиссия', label: 'Комиссия, ₽'},
+        {id: 'logisticsTo', value: 'logisticsTo', group: 'Расходы МП', short: 'Лог. туда', label: 'Логистика туда, ₽'},
+        {id: 'logisticsBack', value: 'logisticsBack', group: 'Расходы МП', short: 'Лог. обр.', label: 'Логистика обратно, ₽'},
+        {id: 'acquiring', value: 'acquiring', group: 'Расходы МП', short: 'Эквайр.', label: 'Эквайринг, ₽'},
+        {id: 'otherMd1', value: 'otherMd1', group: 'Расходы МП', short: 'Прочие', label: 'Прочие СМ1, ₽'},
+        {id: 'md1', value: 'md1', group: 'СМ1', short: '₽', label: 'СМ1, ₽', sort: 'md1', required: true},
+        {id: 'md1Pct', value: 'md1', group: 'СМ1', short: '%', label: 'СМ1, %', kind: 'share'},
+        {id: 'ads', value: 'ads', group: 'Реклама', short: '₽', label: 'Реклама, ₽', sort: 'ads'},
+        {id: 'drr', value: 'drr', group: 'Реклама', short: 'ДРР %', label: 'ДРР, %', kind: 'percent'},
+        {id: 'md2', value: 'md2', group: 'СМ2', short: '₽', label: 'СМ2, ₽', sort: 'md2', required: true},
+        {id: 'md2Pct', value: 'md2', group: 'СМ2', short: '%', label: 'СМ2, %', kind: 'share', required: not allocated},
+    ] %}
+    {% if allocated %}
+        {% set columns = columns|merge([
+            {id: 'overhead', value: 'overhead', group: 'Склад и пр. МП', short: '₽', label: 'Склад и прочие МП, ₽'},
+            {id: 'full', value: 'full', group: 'СМ3', short: '₽', label: 'СМ3, ₽', sort: 'full', required: true},
+            {id: 'fullPct', value: 'full', group: 'СМ3', short: '%', label: 'СМ3, %', kind: 'share', required: true},
+        ]) %}
+    {% endif %}
+    {# колонки группы идут подряд: группа → id её колонок, порядок — порядок columns #}
+    {% set groups = {} %}
+    {% for column in columns %}
+        {% set groups = groups|merge({(column.group): (groups[column.group] ?? [])|merge([column.id])}) %}
+    {% endfor %}
+
+    <div class="vf-page-head">
+        <div class="vf-page-head__title"><h1>Экономика SKU</h1></div>
+        <a class="btn" href="{{ path('marketplace_analytics_unit_extended_index') }}">Открыть прежний отчёт</a>
+    </div>
+    <div class="card mb-3">
+        <div class="card-header">
+            <nav aria-label="Отчёт">
+                {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
+                    {label: 'По SKU', href: path('marketplace_economics_sku', params), active: true},
+                    {label: 'Динамика', href: path('marketplace_economics_dynamics', params|merge({sort: null, dir: null, page: null, limit: null})), active: false},
+                    {label: 'ОПиУ', href: path('marketplace_pl_projection'), active: false},
+                    {label: 'Качество данных', href: path('marketplace_economics_quality'), active: false},
+                ]} only %}
+            </nav>
+        </div>
+
+        <form method="get" class="card-body row g-3 align-items-end">
+            <div class="col-12 col-sm-6 col-lg-auto">
+                <label class="form-label" for="me-from">С даты</label>
+                <input class="form-control" id="me-from" type="date" name="from" required value="{{ from }}">
+            </div>
+            <div class="col-12 col-sm-6 col-lg-auto">
+                <label class="form-label" for="me-to">По дату</label>
+                <input class="form-control" id="me-to" type="date" name="to" required value="{{ to }}">
+            </div>
+            {% if report and report.channels|length > 1 %}
+                <div class="col-12 col-sm-6 col-lg-auto">
+                    <label class="form-label" for="me-channel">Канал</label>
+                    <select class="form-select" id="me-channel" name="channel">
+                        <option value="">Все каналы</option>
+                        {% for value in report.channels %}
+                            <option value="{{ value }}" {{ value == channel ? 'selected' }}>{{ constant('App\\MarketplaceEconomics\\Application\\DTO\\SkuEconomicsFilter::CHANNELS')[value] ?? value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+            {% if report and report.connections|length > 1 %}
+                <div class="col-12 col-sm-6 col-lg-auto">
+                    <label class="form-label" for="me-connection">Кабинет</label>
+                    <select class="form-select" id="me-connection" name="connection">
+                        <option value="">Все кабинеты</option>
+                        {% for ref in report.connections %}
+                            <option value="{{ ref }}" {{ ref == connection ? 'selected' }}>{{ ref }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+            {% if allTags is not empty %}
+                <div class="col-12 col-sm-6 col-lg-auto">
+                    <label class="form-label" for="me-tags">Теги</label>
+                    <select class="form-select" id="me-tags" name="tags[]" multiple size="1">
+                        {% for tag in allTags %}
+                            <option value="{{ tag.id }}" {{ tag.id in tagIds ? 'selected' }}>{{ tag.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+            <div class="col-12 col-sm-6 col-lg-auto">
+                <label class="form-label" for="me-q">Поиск</label>
+                <input class="form-control" id="me-q" type="search" name="q" value="{{ search }}" placeholder="SKU, артикул, название">
+            </div>
+            <div class="col-12 col-sm-6 col-lg-auto">
+                <label class="form-label" for="me-alloc">Затраты без товара</label>
+                <select class="form-select" id="me-alloc" name="alloc">
+                    <option value="1" {{ allocated ? 'selected' }}>Разнести на товары</option>
+                    <option value="0" {{ not allocated ? 'selected' }}>Не разносить</option>
+                </select>
+            </div>
+            <input type="hidden" name="sort" value="{{ sort }}">
+            <input type="hidden" name="dir" value="{{ desc ? 'desc' : 'asc' }}">
+            <div class="col-12 col-lg-auto d-flex flex-wrap gap-2">
+                <button class="btn btn-primary">Показать</button>
+                {% if report and report.hasData %}
+                    <a class="btn" href="{{ path('marketplace_economics_sku', params|merge({format: 'xlsx', page: null})) }}">Скачать xlsx</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    {% if error %}
+        <div class="mb-3">
+            <div class="alert alert-danger" role="alert"><div class="d-block"><p class="mb-0">{{ error }}</p></div></div>
+        </div>
+    {% elseif not report.hasData %}
+        <div class="mb-3">
+            <div class="alert alert-info" role="status"><div class="d-block"><p class="mb-0">Кабинеты компании ещё не переведены на новый контур данных. Пока пользуйтесь <a href="{{ path('marketplace_analytics_unit_extended_index') }}">прежним отчётом</a>.</p></div></div>
+        </div>
+    {% else %}
+        <div class="mb-3" data-economics-note>
+            {% if allocated %}
+                <p class="small mb-1"><strong>Затраты без товара разнесены на товары.</strong>
+                    Маркетплейс списал их с кабинета без указания товара, поэтому отчёт делит их так:
+                    drop-off и последняя миля — по проданным штукам; хранение — по остаткам на дату;
+                    прочие затраты СМ1 (эквайринг, комиссия без товара) — по выручке;
+                    реклама — по рекламной статистике товара; подписки, штрафы и прочие расходы кабинета — по выручке,
+                    в колонке «Склад и пр. МП». В строке «Нераспределено» — то, что разделить не на что (дни без продаж).</p>
+            {% else %}
+                <p class="small mb-1"><strong>Затраты без товара не разнесены.</strong>
+                    У товаров — только свои затраты, которые маркетплейс указал по товару.
+                    Затраты без товара (drop-off, хранение, реклама без товара, подписки) — в строке «Нераспределено»;
+                    итог кабинета тот же, что и при разнесении.</p>
+            {% endif %}
+            <p class="text-secondary small mb-0">
+                Суммы в ₽.
+                Дней в витрине: {{ report.days|vf_number }}.
+                {% if report.daysWithoutCostPrice > 0 %}Дней с продажами без себестоимости: {{ report.daysWithoutCostPrice|vf_number }} — себестоимость там 0.{% endif %}
+                НДС к уплате — с выручки с СПП по налоговому профилю компании на каждый месяц; уровни СМ — без НДС, проценты — от выручки до СПП.
+                Реклама по SKU — по долям прежнего отчёта рекламы; за последние 2 дня — предварительно.
+            </p>
+        </div>
+        <section class="card mb-3 me-table-card" data-economics-table>
+            <div class="me-table-toolbar">
+                <details class="dropdown me-columns" data-economics-columns>
+                    <summary class="btn btn-icon" title="Настроить колонки">
+                        <i class="ti ti-settings" aria-hidden="true"></i>
+                        <span class="visually-hidden">Настроить колонки</span>
+                    </summary>
+                    <fieldset class="dropdown-menu dropdown-menu-end show me-columns__menu">
+                        <legend class="dropdown-header">Отображаемые колонки</legend>
+                        {% for column in columns %}
+                            <label class="dropdown-item form-check">
+                                <input class="form-check-input" type="checkbox" value="{{ column.id }}" checked{{ column.required ?? false ? ' disabled' }}>
+                                <span class="form-check-label">{{ column.label }}</span>
+                            </label>
+                        {% endfor %}
+                    </fieldset>
+                </details>
+            </div>
+            <div class="me-table-scroll" data-economics-scroll tabindex="0" role="region" aria-label="Экономика SKU">
+            <table class="table table-vcenter card-table me-table me-sku-table">
+                <thead>
+                    <tr>
+                        <th class="me-sku-code" scope="col" rowspan="2">SKU</th>
+                        <th class="me-sku-name" scope="col" rowspan="2">Наименование</th>
+                        <th class="text-end me-col-qty" scope="col" rowspan="2" title="Продано, шт.">
+                            <a href="{{ path('marketplace_economics_sku', params|merge({sort: 'sales', dir: sort == 'sales' and desc ? 'asc' : 'desc', page: null})) }}">Прод., шт</a>
+                        </th>
+                        {% for group, ids in groups %}
+                            <th class="me-col-group text-center" scope="colgroup" colspan="{{ ids|length }}" data-columns="{{ ids|join(' ') }}">{{ group }}</th>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        {% for column in columns %}
+                            <th class="text-end{{ (column.kind ?? 'money') == 'money' ? '' : ' me-col-pct' }}" scope="col" data-column="{{ column.id }}" title="{{ column.label }}">
+                                {% if column.sort is defined %}
+                                    <a href="{{ path('marketplace_economics_sku', params|merge({sort: column.sort, dir: sort == column.sort and desc ? 'asc' : 'desc', page: null})) }}">{{ column.short }}</a>
+                                {% else %}
+                                    {{ column.short }}
+                                {% endif %}
+                            </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in pager.currentPageResults %}
+                        {% set m = row.current %}
+                        <tr>
+                            <td class="me-sku-code">
+                                <div class="d-flex align-items-center gap-1">
+                                    {% if report.channels|length > 1 and row.channel %}<span class="badge bg-secondary-lt" data-channel="{{ row.channel }}">{{ constant('App\\MarketplaceEconomics\\Application\\DTO\\SkuEconomicsFilter::CHANNELS')[row.channel] ?? row.channel }}</span>{% endif %}
+                                    <div class="text-secondary small me-sku-code-value">{{ ui.skuValue(row.sku) }}</div>
+                                </div>
+                            </td>
+                            <td class="me-sku-name">
+                                {{ ui.skuValue(row.title is not empty ? row.title : row.supplierSku) }}
+                            </td>
+                            <td class="text-end">{{ m.salesQty|vf_number }}{% if m.returnsQty %}<p class="text-secondary small mb-0">возвр. {{ m.returnsQty|vf_number }}</p>{% endif %}</td>
+                            {% for column in columns %}
+                                <td class="text-end" data-column="{{ column.id }}">
+                                    {{ ui.cell(m, column) }}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td class="text-secondary py-5" colspan="{{ columns|length + 3 }}">
+                                <span class="me-sku-empty d-inline-block">Нет продаж и затрат по SKU за период.</span>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% for label, m in report.unallocated is not null ? {'Нераспределено': report.unallocated, 'Итого': report.total} : {'Итого по выбранным': report.total} %}
+                        <tr class="me-totals">
+                            <td class="me-sku-summary fw-semibold" colspan="2">{{ label }}</td>
+                            <td class="text-end">{{ m.salesQty|vf_number }}</td>
+                            {% for column in columns %}
+                                <td class="text-end" data-column="{{ column.id }}">
+                                    {{ ui.cell(m, column) }}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </section>
+        <div class="card card-body mt-3">
+            {% include 'partials/_pagination.html.twig' with {pager: pager} only %}
+        </div>
+    {% endif %}
+{% endblock %}

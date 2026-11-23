@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Cash\Service\Vat;
 
 use App\Cash\Application\Service\Transaction\Vat\VatPolicy;
-use App\Cash\Application\Service\Transaction\Vat\VatRates;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Enum\TaxRegime;
 use App\Company\Enum\VatMode;
@@ -43,7 +42,7 @@ final class VatPolicyTest extends TestCase
     ): void {
         $profiles = $this->profiles(static fn (): ?VatMode => $vatMode);
 
-        $rate = (new VatPolicy(new VatRates(), $profiles))->decideForCash(CompanyBuilder::DEFAULT_COMPANY_ID, $direction, new \DateTimeImmutable($occurredOn));
+        $rate = (new VatPolicy($profiles))->decideForCash(CompanyBuilder::DEFAULT_COMPANY_ID, $direction, new \DateTimeImmutable($occurredOn));
 
         self::assertSame($expectedRate, $rate);
     }
@@ -52,7 +51,7 @@ final class VatPolicyTest extends TestCase
     {
         // Без НДС до марта 2026, УСН 5% с марта: ставка зависит от даты операции, а не от текущего режима.
         $profiles = $this->profiles(static fn (\DateTimeImmutable $date): VatMode => $date->format('Y-m') >= '2026-03' ? VatMode::USN_5 : VatMode::EXEMPT);
-        $policy = new VatPolicy(new VatRates(), $profiles);
+        $policy = new VatPolicy($profiles);
 
         self::assertNull($policy->decideForCash(CompanyBuilder::DEFAULT_COMPANY_ID, CashDirection::OUTFLOW, new \DateTimeImmutable('2026-02-28')));
         self::assertSame(5, $policy->decideForCash(CompanyBuilder::DEFAULT_COMPANY_ID, CashDirection::OUTFLOW, new \DateTimeImmutable('2026-03-01')));
@@ -64,7 +63,7 @@ final class VatPolicyTest extends TestCase
             self::fail('профиль не нужен для поступления');
         });
 
-        self::assertNull((new VatPolicy(new VatRates(), $profiles))->decideForCash(CompanyBuilder::DEFAULT_COMPANY_ID, CashDirection::INFLOW, new \DateTimeImmutable('2026-03-10')));
+        self::assertNull((new VatPolicy($profiles))->decideForCash(CompanyBuilder::DEFAULT_COMPANY_ID, CashDirection::INFLOW, new \DateTimeImmutable('2026-03-10')));
     }
 
     /**
@@ -86,7 +85,16 @@ final class VatPolicyTest extends TestCase
     #[DataProvider('generalRateProvider')]
     public function testGeneralRateSwitchesOnCalendarDate(string $at, int $expected): void
     {
-        self::assertSame($expected, (new VatRates())->generalRateOn(new \DateTimeImmutable($at)));
+        self::assertSame($expected, VatMode::GENERAL->ratePercentOn(new \DateTimeImmutable($at)));
+    }
+
+    public function testReducedAndExemptRatesDoNotDependOnDate(): void
+    {
+        $date = new \DateTimeImmutable('2026-03-10');
+
+        self::assertSame(0, VatMode::EXEMPT->ratePercentOn($date));
+        self::assertSame(5, VatMode::USN_5->ratePercentOn($date));
+        self::assertSame(7, VatMode::USN_7->ratePercentOn($date));
     }
 
     /**

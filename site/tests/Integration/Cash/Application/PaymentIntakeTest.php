@@ -52,6 +52,119 @@ final class PaymentIntakeTest extends IntegrationTestCase
     /** @var list<string> */
     private array $failingDraftIds = [];
 
+    public function testCommonReplyAmendsSelectedRowsAtomicallyAndReplayIsInert(): void
+    {
+        $draft = $this->request();
+        $this->deliverResult($draft->taskId, count: 3);
+        $draft = $this->get($draft);
+        $draft = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$draft->items[2]['id'] => ['excluded' => true]]));
+        $key = 'telegram:common-reply-200';
+        $changed = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, replyIdempotencyKey: $key, commonText: 'все оплачены и у всех дата оплаты 14.10.26'));
+        self::assertSame($draft->revision + 1, $changed->revision);
+        self::assertSame('2026-10-14', $changed->items[0]['date']);
+        self::assertSame('2026-10-14', $changed->items[1]['date']);
+        self::assertSame($draft->items[2]['date'], $changed->items[2]['date']);
+        self::assertSame(0, $this->ledgerCount());
+        try {
+            $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $changed->revision, replyIdempotencyKey: $key, commonText: 'дата 2026-10-15'));
+            self::fail('Replay must be rejected.');
+        } catch (\DomainException $exception) {
+            self::assertStringContainsString('уже обработан', $exception->getMessage());
+        }
+        self::assertSame($changed->revision, $this->get($draft)->revision);
+        self::assertCount(1, $this->requests);
+    }
+
+    public function testCommonReplyWithUnknownProjectRollsBackAllFieldsAndReceipt(): void
+    {
+        $draft = $this->ready();
+        try {
+            $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, replyIdempotencyKey: 'invalid-common', commonText: 'дата 2026-10-14; проект Неизвестный'));
+            self::fail('Unknown company choice must reject the whole batch.');
+        } catch (\DomainException $exception) {
+            self::assertStringContainsString('не найдено', $exception->getMessage());
+        }
+        self::assertSame($draft->revision, (int) $this->connection->fetchOne('SELECT revision FROM cash_payment_intake_draft WHERE id=?', [$draft->id]));
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM cash_payment_intake_reply_receipt'));
+        self::assertSame(0, $this->ledgerCount());
+    }
+
+    public function testExplicitListDateSurvivesConsumerInsteadOfMessageDateDefault(): void
+    {
+        $draft = $this->request(text: "дата всех платежей ниже 14.10.26\n1. оплатил 100");
+        $this->deliverResult($draft->taskId);
+        $current = $this->get($draft);
+        self::assertSame('2026-10-14', $current->items[0]['date']);
+        self::assertNotSame('message_date_default', $current->items[0]['provenance']['date'] ?? null);
+        self::assertFalse($current->items[0]['paid_confirmed']);
+        self::assertSame(0, $this->ledgerCount());
+    }
+
+    public function testUnknownHeaderCanBeCorrectedAndExplicitlyConfirmed(): void
+    {
+        $draft = $this->request(text: "проект Неизвестный\n1. оплатил 100");
+        $this->deliverResult($draft->taskId);
+        $draft = $this->get($draft);
+        self::assertNotEmpty($draft->questions);
+        self::assertNull($draft->items[0]['project_id']);
+        $draft = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, commonText: 'проект Общий; ЦФО Общий'));
+        self::assertSame([], $draft->questions);
+        $draft = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, commonText: 'все оплачены со средств компании'));
+        self::assertTrue($draft->items[0]['paid_confirmed']);
+        $this->action->confirm(new ConfirmPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$draft->items[0]['id']]));
+        self::assertSame(1, $this->ledgerCount());
+    }
+
+    public function testHeaderErrorCannotBeDismissedWithoutCorrectingItsFields(): void
+    {
+        $draft = $this->request(text: "проект Неизвестный\n1. оплатил 100");
+        $this->deliverResult($draft->taskId);
+        $draft = $this->get($draft);
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('исправьте неприменённые общие реквизиты');
+        $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, questions: []));
+    }
+
+    public function testKnownHeaderProjectWithoutCenterIsNotReplacedByGeneralProject(): void
+    {
+        $project = new ProjectDirection(Uuid::uuid7()->toString(), $this->company, 'КС Тест');
+        $this->em->persist($project);
+        $this->em->flush();
+        $draft = $this->request(text: "проект КС Тест\n1. оплатил 100");
+        $this->deliverResult($draft->taskId);
+        $draft = $this->get($draft);
+        self::assertSame($project->getId(), $draft->items[0]['project_id']);
+        self::assertNull($draft->items[0]['cfo_id']);
+        self::assertNotEmpty($draft->items[0]['questions']);
+    }
+
+    public function testBatchPaymentApprovalKeepsUnknownFinancialQuestionsUnconfirmed(): void
+    {
+        $draft = $this->request();
+        $item = $this->candidate();
+        $item['questions'] = ['Оплатил своими деньгами. Нужен возврат?'];
+        $this->deliverResult($draft->taskId, output: ['intent' => 'payments', 'items' => [$item], 'questions' => [], 'target_ref' => null]);
+        $draft = $this->get($draft);
+        $draft = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, commonText: 'все оплачены со средств компании'));
+        self::assertSame($item['questions'], $draft->items[0]['questions']);
+        self::assertFalse($draft->items[0]['paid_confirmed']);
+        self::assertSame(0, $this->ledgerCount());
+    }
+
+    public function testFailedCancellationCannotCommitItsCommandReceipt(): void
+    {
+        $draft = $this->ready();
+        $this->connection->executeStatement("ALTER TABLE cash_payment_intake_draft ADD CONSTRAINT intake_test_reject_cancel CHECK (status <> 'cancelled')");
+        try {
+            $this->action->cancel($this->companyId(), $this->actorId(), $draft->id, $draft->revision, 'cancel-rollback');
+            self::fail('Cancellation must fail with the injected database constraint.');
+        } catch (\Doctrine\DBAL\Exception\DriverException $exception) {
+            self::assertSame('23514', $exception->getSQLState());
+        }
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM cash_payment_intake_reply_receipt'));
+        self::assertSame('needs_clarification', $this->connection->fetchOne('SELECT status FROM cash_payment_intake_draft WHERE id=?', [$draft->id]));
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -234,6 +347,56 @@ final class PaymentIntakeTest extends IntegrationTestCase
         self::assertSame($first->transactionIds, $second->transactionIds);
         self::assertSame(1, $this->ledgerCount());
         self::assertSame('100.00', $this->connection->fetchOne('SELECT amount FROM cash_transaction WHERE id=?', [$first->transactionIds[0]]));
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('remainderSelectionCases')]
+    public function testConfirmationRequiresExplicitDecisionForEveryRow(bool $excludeOther): void
+    {
+        $draft = $this->request();
+        $this->deliverResult($draft->taskId, count: 2);
+        $draft = $this->get($draft);
+        $patch = [$draft->items[0]['id'] => ['paid_confirmed' => true]];
+        if ($excludeOther) {
+            $patch[$draft->items[1]['id']] = ['excluded' => true];
+        }
+        $draft = $this->action->amend(new AmendPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, $patch));
+        $command = new ConfirmPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$draft->items[0]['id']]);
+        if (!$excludeOther) {
+            try {
+                $this->action->confirm($command);
+                self::fail('Unselected rows must be explicitly excluded before closing the draft.');
+            } catch (\DomainException $error) {
+                self::assertStringContainsString('исключите', $error->getMessage());
+            }
+            self::assertSame(0, $this->ledgerCount());
+            self::assertNotSame('confirmed', $this->connection->fetchOne('SELECT status FROM cash_payment_intake_draft WHERE id = ? AND company_id = ?', [$draft->id, $this->companyId()]));
+
+            return;
+        }
+        $result = $this->action->confirm($command);
+        self::assertSame('confirmed', $this->get($draft)->status);
+        self::assertCount(1, $result->transactionIds);
+        self::assertSame($result->transactionIds, $this->action->confirm($command)->transactionIds);
+        self::assertSame(1, $this->ledgerCount());
+    }
+
+    /** @return iterable<string, array{bool}> */
+    public static function remainderSelectionCases(): iterable
+    {
+        yield 'unselected active row blocks every write' => [false];
+        yield 'explicitly excluded row permits idempotent confirmation' => [true];
+    }
+
+    public function testGenericSourceConfirmationUsesNeutralLedgerNamespace(): void
+    {
+        $draft = $this->action->request($this->sourceCommand('web/form/payment-1'));
+        $this->deliverResult($draft->taskId);
+        $draft = $this->approve($this->get($draft));
+        $command = new ConfirmPaymentIntakeDraftCommand($this->companyId(), $this->actorId(), $draft->id, $draft->revision, [$draft->items[0]['id']]);
+        $result = $this->action->confirm($command);
+        self::assertSame('payment_intake', $this->connection->fetchOne('SELECT import_source FROM cash_transaction WHERE id = ? AND company_id = ?', [$result->transactionIds[0], $this->companyId()]));
+        self::assertSame($result->transactionIds, $this->action->confirm($command)->transactionIds);
+        self::assertSame(1, $this->ledgerCount());
     }
 
     public function testResultReplayAndStaleAttemptCannotReplaceRows(): void
@@ -793,7 +956,7 @@ final class PaymentIntakeTest extends IntegrationTestCase
     private function buildAction(?\Symfony\Contracts\EventDispatcher\EventDispatcherInterface $events = null): void
     {
         $c = self::getContainer();
-        $this->action = new PaymentIntakeAction($this->em, $c->get(PaymentIntakeDraftRepository::class), $c->get(CompanyFacade::class), $c->get(FinancialResponsibilityCenterFacade::class), $c->get(CashTransactionService::class), $c->get(CashTransactionResponsibilityCenterResolver::class), $c->get(CashCategorizationQuery::class), $this->ai, $c->get(AddCashTransactionAction::class), $events ?? $c->get('event_dispatcher'), new \Psr\Log\NullLogger(), $c->get(\App\Cash\Infrastructure\Query\PaymentIntakeDuplicateQuery::class), $this->clock, $c->get(\App\Cash\Repository\PaymentIntake\PaymentIntakeReplyReceiptRepository::class), $c->get(\App\Cash\Application\Service\AiCategorization\CashCategorizationPayloadMapper::class));
+        $this->action = new PaymentIntakeAction($this->em, $c->get(PaymentIntakeDraftRepository::class), $c->get(CompanyFacade::class), $c->get(FinancialResponsibilityCenterFacade::class), $c->get(CashTransactionService::class), $c->get(CashTransactionResponsibilityCenterResolver::class), $c->get(CashCategorizationQuery::class), $this->ai, $c->get(AddCashTransactionAction::class), $events ?? $c->get('event_dispatcher'), new \Psr\Log\NullLogger(), $c->get(\App\Cash\Infrastructure\Query\PaymentIntakeDuplicateQuery::class), $this->clock, $c->get(\App\Cash\Repository\PaymentIntake\PaymentIntakeReplyReceiptRepository::class), $c->get(\App\Cash\Application\Service\AiCategorization\CashCategorizationPayloadMapper::class), $c->get(\App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository::class), $c->get(\App\Cash\Repository\Transaction\CashflowCategoryRepository::class));
     }
 
     private function request(string $messageId = '3', string $text = 'оплатил 100'): PaymentIntakeDraftView

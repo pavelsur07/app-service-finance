@@ -1,0 +1,199 @@
+/* Только R1/R2/R10. Внешний вид таблиц — как unit-extended, токены легаси. */
+.me-table-card {
+    min-width: 0;
+}
+.me-table-scroll {
+    overflow-x: auto;
+    width: 100%;
+}
+.me-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
+    margin: 0;
+}
+.me-table th,
+.me-table td {
+    white-space: nowrap;
+}
+.me-table:where(:not(.me-sku-table)) th:first-child,
+.me-table:where(:not(.me-sku-table)) td:first-child {
+    position: sticky;
+    left: 0;
+    min-width: 140px;
+    max-width: 240px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    background: var(--tblr-bg-surface);
+    border-right: 1px solid var(--vf-border);
+    z-index: 1;
+}
+.me-table:where(:not(.me-sku-table)) thead th:first-child {
+    background: var(--vf-navy-50);
+    z-index: 3;
+}
+.me-sku-table {
+    --me-sku-width: 140px;
+    --me-name-width: 240px;
+}
+.me-sku-table :is(.me-sku-code, .me-sku-name, .me-sku-summary) {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+}
+.me-sku-table td:is(.me-sku-code, .me-sku-name) {
+    background: var(--tblr-bg-surface);
+}
+.me-sku-table th:is(.me-sku-code, .me-sku-name) {
+    z-index: 3;
+}
+.me-sku-table .me-sku-code {
+    width: var(--me-sku-width);
+    min-width: var(--me-sku-width);
+    max-width: var(--me-sku-width);
+}
+.me-sku-table .me-sku-name {
+    left: var(--me-sku-offset, var(--me-sku-width));
+    width: var(--me-name-width);
+    min-width: var(--me-name-width);
+    max-width: var(--me-name-width);
+}
+.me-sku-table :is(.me-sku-name, .me-sku-summary) {
+    border-right: 1px solid var(--vf-border);
+}
+/* двухуровневая шапка: подписи переносятся (до двух строк), числа — нет; ширина по самому длинному числу */
+.me-sku-table thead th {
+    vertical-align: bottom;
+}
+.me-sku-table thead th:is([data-column], .me-col-qty) {
+    white-space: normal;
+    min-width: 112px;
+}
+.me-sku-table thead th:is(.me-col-pct, .me-col-qty) {
+    min-width: 72px;
+}
+.me-sku-table .me-col-group {
+    border-left: 1px solid var(--vf-border);
+    border-bottom: 1px solid var(--vf-border);
+}
+.me-sku-table td {
+    font-variant-numeric: tabular-nums;
+}
+.me-sku-code-value {
+    min-width: 0;
+}
+.me-sku-value,
+.me-sku-table summary {
+    display: block;
+}
+.me-sku-table summary {
+    cursor: pointer;
+}
+.me-sku-table details[open] .me-sku-value {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.me-sku-empty {
+    position: sticky;
+    left: var(--vf-space-2);
+    max-width: calc(100vw - 4 * var(--vf-space-4));
+    white-space: normal;
+}
+.me-table tbody tr:hover td {
+    background: var(--tblr-bg-surface-secondary);
+}
+.me-table .me-totals td {
+    background: var(--tblr-bg-surface-secondary);
+    border-top: 1px solid var(--vf-border-strong);
+    font-size: var(--vf-size-md);
+    font-weight: var(--vf-weight-semibold);
+}
+.me-fixed-header {
+    position: fixed;
+    top: 0;
+    overflow: hidden;
+    z-index: 1030;
+    background: var(--tblr-bg-surface);
+    border-bottom: 1px solid var(--vf-border-strong);
+}
+.me-fixed-header .me-table {
+    table-layout: fixed;
+    min-width: 0;
+}
+.me-floating-scroll {
+    position: fixed;
+    bottom: 0;
+    height: 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    z-index: 1030;
+    background: var(--tblr-bg-surface);
+    border-top: 1px solid var(--vf-border);
+}
+.me-floating-scroll > div {
+    height: 1px;
+}
+.me-fixed-header[hidden],
+.me-floating-scroll[hidden] {
+    display: none;
+}
+@media (max-width: 575px) {
+    .me-sku-table {
+        --me-sku-width: 84px;
+        --me-name-width: 116px;
+    }
+    .me-sku-table > :is(thead, tbody) > tr > :is(.me-sku-code, .me-sku-name, .me-sku-summary) {
+        padding-inline: var(--vf-space-2);
+    }
+}
+@media print {
+    .me-fixed-header,
+    .me-floating-scroll {
+        display: none;
+    }
+    .me-table-scroll {
+        overflow: visible;
+    }
+}
+.me-columns {
+    position: relative;
+}
+.me-columns > summary {
+    position: relative;
+    list-style: none;
+}
+.me-columns > summary::-webkit-details-marker {
+    display: none;
+}
+/* Настройка колонок — шестерёнка в правом верхнем углу таблицы */
+.me-table-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    padding: .5rem .75rem;
+    border-bottom: var(--tblr-border-width) solid var(--tblr-border-color);
+}
+/* часть колонок скрыта — точка на шестерёнке */
+.me-columns--filtered > summary::after {
+    content: "";
+    position: absolute;
+    top: .25rem;
+    right: .25rem;
+    width: .5rem;
+    height: .5rem;
+    border-radius: 50%;
+    background: var(--tblr-primary);
+}
+.me-columns__menu {
+    right: 0;
+    left: auto;
+    z-index: 1030;
+    max-height: 60vh;
+    overflow-y: auto;
+    min-width: 280px;
+    margin: 0;
+}
+.me-columns__menu .dropdown-item {
+    gap: .5rem;
+    padding-left: 2.25rem;
+}

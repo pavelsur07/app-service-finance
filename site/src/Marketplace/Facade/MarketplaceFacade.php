@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Facade;
 
+use App\Marketplace\Application\DTO\ListingsFilter;
 use App\Marketplace\Application\RecordConnectionAuthResultAction;
 use App\Marketplace\DTO\ActiveListingDTO;
 use App\Marketplace\DTO\AdvertisingCostDTO;
 use App\Marketplace\DTO\CostData;
+use App\Marketplace\DTO\ListingMetaPageDTO;
 use App\Marketplace\DTO\OrderDTO;
 use App\Marketplace\DTO\ReturnData;
 use App\Marketplace\DTO\SaleData;
@@ -20,6 +22,7 @@ use App\Marketplace\Infrastructure\Query\ListingMetaQuery;
 use App\Marketplace\Infrastructure\Query\ListingReturnAggregateQuery;
 use App\Marketplace\Infrastructure\Query\ListingSalesAggregateQuery;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
+use App\Marketplace\Infrastructure\Query\MarketplaceListingsQuery;
 use App\Marketplace\Inventory\CostPriceResolverInterface;
 use App\Marketplace\Inventory\Infrastructure\Query\CostPriceByListingsOnDateQuery;
 use App\Marketplace\Ozon\Infrastructure\Query\ActiveOzonConnectionsQuery;
@@ -54,6 +57,7 @@ final readonly class MarketplaceFacade
         private RecordConnectionAuthResultAction $recordConnectionAuthResultAction,
         private BrokenConnectionsQuery $brokenConnectionsQuery,
         private CostPriceByListingsOnDateQuery $costPriceByListingsOnDateQuery,
+        private MarketplaceListingsQuery $listingsQuery,
     ) {
     }
 
@@ -501,7 +505,7 @@ final readonly class MarketplaceFacade
      *
      * @param string[] $marketplaceSkus
      *
-     * @return array<string, list<array{id: string, parentSku: string}>> parentSku => listings
+     * @return array<string, list<array{id: string, parentSku: string, size: string}>> parentSku => listings (size — WB `techSize`, `UNKNOWN` без размера)
      */
     public function findListingsByMarketplaceSkus(
         string $companyId,
@@ -513,7 +517,7 @@ final readonly class MarketplaceFacade
         }
 
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT l.id, l.marketplace_sku AS parent_sku
+            'SELECT l.id, l.marketplace_sku AS parent_sku, l.size
              FROM marketplace_listings l
              WHERE l.company_id = :companyId
                AND l.marketplace = :marketplace
@@ -531,6 +535,7 @@ final readonly class MarketplaceFacade
             $result[$row['parent_sku']][] = [
                 'id' => $row['id'],
                 'parentSku' => $row['parent_sku'],
+                'size' => (string) $row['size'],
             ];
         }
 
@@ -688,6 +693,88 @@ final readonly class MarketplaceFacade
         return $this->listingMetaQuery->findByIds($companyId, $listingIds);
     }
 
+    public function getExternalMappingSourceVersion(string $companyId, string $marketplace): \App\Marketplace\DTO\ExternalMappingSourceVersion
+    {
+        Assert::uuid($companyId);
+        Assert::inArray($marketplace, ['ozon', 'wildberries']);
+        $row = $this->connection->fetchAssociative(<<<'SQL'
+            SELECT COUNT(*) AS total, md5(COALESCE(string_agg(md5(jsonb_build_array(l.id, l.marketplace_sku, l.supplier_sku,
+                l.name, l.size, l.is_active, l.marketplace_variant_id,
+                (SELECT jsonb_agg(b.barcode ORDER BY b.barcode COLLATE "C") FROM marketplace_listing_barcodes b
+                    WHERE b.company_id=l.company_id AND b.listing_id=l.id AND b.marketplace=l.marketplace))::text), '' ORDER BY l.id), '')) AS fingerprint
+            FROM marketplace_listings l WHERE l.company_id=:company AND l.marketplace=:marketplace
+            SQL, ['company' => $companyId, 'marketplace' => $marketplace]);
+
+        Assert::isArray($row);
+
+        return new \App\Marketplace\DTO\ExternalMappingSourceVersion((string) $row['fingerprint'], (int) $row['total']);
+    }
+
+    /** @return list<\App\Marketplace\DTO\ListingMetaDTO> Keyset scan; ID order is stable under concurrent inserts. */
+    public function getListingsAfterForExternalMapping(string $companyId, string $marketplace, ?string $afterId, int $limit = 100): array
+    {
+        Assert::uuid($companyId);
+        Assert::inArray($marketplace, ['ozon', 'wildberries']);
+        Assert::range($limit, 1, 100);
+        if (null !== $afterId) {
+            Assert::uuid($afterId);
+        }
+        $ids = $this->connection->fetchFirstColumn('SELECT id FROM marketplace_listings WHERE company_id=:company AND marketplace=:marketplace
+            AND (CAST(:after AS UUID) IS NULL OR id>CAST(:after AS UUID)) ORDER BY id LIMIT '.$limit,
+            ['company' => $companyId, 'marketplace' => $marketplace, 'after' => $afterId]);
+        $metadata = $this->listingMetaQuery->findByIds($companyId, $ids);
+        $items = [];
+        foreach ($ids as $id) {
+            if (isset($metadata[$id])) {
+                $items[] = $metadata[$id];
+            }
+        }
+
+        return $items;
+    }
+
+    /** Holds listing FOR UPDATE and existing barcodes FOR SHARE until caller commit; prevents barcode inserts, transfers and deletes. Returns fresh DBAL metadata. */
+    public function lockListingMetaForExternalMapping(string $companyId, string $listingId): ?\App\Marketplace\DTO\ListingMetaDTO
+    {
+        return $this->listingMetaQuery->lockForExternalMapping($companyId, $listingId);
+    }
+
+    public function paginateListingsForExternalMapping(
+        string $companyId,
+        ?string $marketplace,
+        ?string $search,
+        int $page = 1,
+        int $perPage = 25,
+    ): ListingMetaPageDTO {
+        Assert::uuid($companyId);
+        Assert::greaterThanEq($page, 1);
+        Assert::range($perPage, 1, 100);
+        $type = null === $marketplace ? null : MarketplaceType::tryFrom($marketplace);
+        Assert::true(null === $marketplace || null !== $type, 'Unknown marketplace.');
+        $search = null === $search ? null : trim($search);
+        $search = '' === $search ? null : $search;
+        Assert::lessThanEq(mb_strlen($search ?? ''), 100);
+        $pager = $this->listingsQuery->paginate($companyId, new ListingsFilter(marketplace: $type, search: $search), 1, $perPage);
+        $total = $pager->getNbResults();
+        if ($page > max(1, $pager->getNbPages())) {
+            return new ListingMetaPageDTO([], $page, $perPage, $total);
+        }
+        $pager->setCurrentPage($page);
+        $ids = [];
+        foreach ($pager->getCurrentPageResults() as $listing) {
+            $ids[] = $listing->getId();
+        }
+        $metadata = $this->listingMetaQuery->findByIds($companyId, $ids);
+        $items = [];
+        foreach ($ids as $id) {
+            if (isset($metadata[$id])) {
+                $items[] = $metadata[$id];
+            }
+        }
+
+        return new ListingMetaPageDTO($items, $page, $perPage, $total);
+    }
+
     /**
      * Пакетно резолвит listingId в productId для заданной компании.
      *
@@ -715,6 +802,62 @@ final readonly class MarketplaceFacade
         Assert::allUuid($listingIds);
 
         return $this->listingRepository->findListingToProductMap($companyId, $listingIds);
+    }
+
+    /**
+     * Листинги других площадок компании с теми же штрихкодами (точное совпадение строки).
+     *
+     * @param list<string> $barcodes
+     *
+     * @return array<string,list<string>> barcode => listing IDs, только площадки кроме $excludeMarketplace
+     */
+    public function getListingIdsByBarcodes(string $companyId, array $barcodes, string $excludeMarketplace): array
+    {
+        Assert::uuid($companyId);
+        Assert::maxCount($barcodes, 5000);
+        if ([] === $barcodes) {
+            return [];
+        }
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT b.barcode, b.listing_id FROM marketplace_listing_barcodes b
+             WHERE b.company_id=:company AND b.marketplace<>:marketplace AND b.barcode IN (:barcodes) ORDER BY b.barcode COLLATE "C", b.listing_id',
+            ['company' => $companyId, 'marketplace' => $excludeMarketplace, 'barcodes' => array_values(array_unique($barcodes))], ['barcodes' => ArrayParameterType::STRING],
+        );
+        $result = [];
+        foreach ($rows as $row) {
+            $result[(string) $row['barcode']][] = (string) $row['listing_id'];
+        }
+
+        return $result;
+    }
+
+    /** @param list<string> $listingIds
+     * @return array<string,list<string>> listingId => all exact barcode strings; missing/foreign IDs omitted
+     */
+    public function getListingBarcodesByIds(string $companyId, array $listingIds): array
+    {
+        Assert::uuid($companyId);
+        Assert::maxCount($listingIds, 100);
+        Assert::allUuid($listingIds);
+        if ([] === $listingIds) {
+            return [];
+        }
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT l.id, b.barcode FROM marketplace_listings l
+             LEFT JOIN marketplace_listing_barcodes b ON b.listing_id=l.id AND b.company_id=l.company_id AND b.marketplace=l.marketplace
+             WHERE l.company_id=:company AND l.id IN (:ids) ORDER BY l.id, b.barcode COLLATE "C"',
+            ['company' => $companyId, 'ids' => $listingIds], ['ids' => ArrayParameterType::STRING],
+        );
+        $result = [];
+        foreach ($rows as $row) {
+            $id = (string) $row['id'];
+            $result[$id] ??= [];
+            if (null !== $row['barcode']) {
+                $result[$id][] = (string) $row['barcode'];
+            }
+        }
+
+        return $result;
     }
 
     /**

@@ -11,6 +11,7 @@ _PREPARABLE = frozenset(
         "date_ambiguous",
         "date_question",
         "direction_contradiction",
+        "direction_unanchored",
         "direction_ambiguous",
         "direction_question",
         "category_direction",
@@ -57,7 +58,7 @@ def prepare_output(inp: PaymentInput, out: PaymentOutput, ctx: CheckContext) -> 
             row.date = None
             if not _question(row.questions, "Уточните дату этого платежа."):
                 return out
-        if failed & {"direction_contradiction", "direction_ambiguous", "direction_question"}:
+        if failed & {"direction_contradiction", "direction_unanchored", "direction_ambiguous", "direction_question"}:
             row.direction = None
             if not _question(row.questions, "Уточните направление: приход или расход?"):
                 return out

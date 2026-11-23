@@ -12,6 +12,7 @@
 | Модуль | Назначение | companyId паттерн |
 |---|---|---|
 | `Cash` | Денежные счета, транзакции, импорт выписок (файл, 1С, контракт для банков), план платежей | `Company $company` (legacy) |
+| `Mcp` | Внешний пользовательский MCP, согласия OAuth и инструменты ДДС через CashFacade | `string $companyId` |
 | `BankSync` | Подключения к API банков (Альфа), загрузка выписки в ДДС через `CashFacade` | `string $companyId` ✅ |
 | `Marketplace` | **Легаси с 13.11.2026**, кроме листингов. WB/Ozon: продажи, возвраты, расходы, закрытие месяца. Развивается только работа с листингами (`MarketplaceListing`, баркоды, теги, связка с товаром) и себестоимость по датам (`MarketplaceInventoryCostPrice`) | смешанный |
 | `Catalog` | Товары, штрихкоды, закупочные цены | смешанный (`Product` ещё на `Company $company`) |
@@ -320,6 +321,7 @@
 - Импорт всегда идёт в активную компанию; из файла не читается ни идентификатор компании, ни идентификаторы категорий. Ограничения читателя: 1 МБ, 1000 узлов, 5 уровней, уникальность `code` внутри файла (иначе нарушается `uniq_plcat_company_code` уже в середине транзакции).
 - Удаление статьи ОПиУ (`DeletePLCategoryAction`): `pl_daily_totals` статьи переносятся в «Без категории»; удаление отклоняется (`Finance\Exception\PLCategoryInUseException`), если `Finance\Infrastructure\Query\PLCategoryUsageQuery` находит вложенные статьи, операции документов (в т. ч. удалённых), статьи ДДС, кредиты (проценты/комиссия) или правила разнесения продаж маркетплейсов; FK-отказ в гонке — то же исключение. Экран показывает причину заранее в диалоге `partials/_confirm_modal` (режим `data-confirm-blocked`, `pl_category/_delete_trigger.html.twig`) со ссылкой-выходом на каждую причину (`data-confirm-links`): документы и удалённые документы со статьёй (`/documents/deleted?category=`), связанные статьи ДДС и кредиты поимённо (`PLCategoryUsage::$cashflowCategoryRefs`, `$loanRefs`; больше трёх — список), правила продаж маркетплейсов, из карточки — список статей.
 - Режимы импорта из файла и из компании: по умолчанию «только добавить» (`ImportPLCategoryTreeCommand::$updateExisting = false`) — совпавшие статьи не меняются и служат родителями новым; перезапись совпавших — только по отметке «Также обновить существующие статьи» в предпросмотре. Предпросмотр считает оба режима; у обновляемой строки `ImportPLCategoryTreeRow::$changes` — список `ImportPLCategoryTreeFieldChange` (поле, было, станет, `affectsReport` — родитель, код, тип, движение, вес, формула, порядок расчёта). Применение передаёт `expectedFingerprint` выбранного режима (`ImportPLCategoryTreeResult::$fingerprint` — хеш всего, что импорт запишет: поля источника, место в дереве и текущие значения обновляемых полей); другой план к моменту применения — `Finance\Exception\PLImportPreviewOutdatedException` (наследник `\DomainException`), ничего не меняется. Шаблон и статьи маркетплейса — режим `onlyCreate`, без отпечатка.
+- Переменные формул — `Finance\Report\PlFormulaVariables`: `VAT_RATE` (ставка НДС по `VatMode::ratePercentOn()`) и `TAX_RATE` (`CompanyTaxProfileDTO::$taxRatePercent`), обе в процентах, из налогового профиля на последний день периода отчёта (`PlReportPeriod::$to`; профиль меняется с 1-го числа, для месяца точно). Если ставки в месяцах периода различаются (квартал, год, «Итого» через смену профиля), денежные статьи (`PLValueFormat::MONEY`), чья формула читает переменную напрямую или через неденежные статьи (`TAX_PCT = TAX_RATE`), считаются помесячно и складываются — итог равен сумме месячных колонок, зависящие от них статьи берут сложенное значение; проценты и коэффициенты остаются по ставке конца периода (`PlReportCalculator::sumByMonthsIfRateChanges()`). Расчёт на заранее посчитанных фактах (`withFacts()`: предпросмотр ОПиУ по тегам и проектам, бюджет) по месяцам не раскладывается — сумма колонки от периода не зависит; там переменная берётся по ставке конца переданного периода. Пример: `REV_TOTAL * TAX_RATE / 100`. Профиль читается, только если переменная есть в формуле; незаданная ставка (нет профиля, пустая ставка налога, калькулятор собран без `PlFormulaVariables`) — 0 и предупреждение в `PlReportResult::$warnings`. Имена зарезервированы: переменная выигрывает у статьи с тем же кодом, форма статьи такой код отклоняет, импорт дерева не считает их неизвестными кодами; в форме статьи — вкладка «Налоги» палитры переменных.
 - Формулы переносятся как есть. `ImportPLCategoryTreeResult::$unresolvedFormulaCodes` — предупреждение о токенах формул, которых не будет в целевой компании после импорта; это эвристика на токенах, парсера формул в проекте нет.
 - Базовый шаблон дерева — по профилю бизнеса компании: реестр `finance.pl_templates` (`config/services.yaml`), файлы `config/finance/pl_templates/<profile>.json` (формат v1 + `profile`, `templateVersion`; `DefaultPLCategoryTreeProvider::nodes(BusinessProfile)`): коды статей совпадают с `pl_code` шаблонов маппинга маркетплейсов, согласие держит `DefaultPLCategoryTreeProviderTest`. Применяется экраном импорта («Базовый шаблон ОПиУ») или `app:finance:pl-tree:apply-default <companyId> [--execute]` (печатает `create`/`similar`/`skip` и итог `create N, keep existing M, similar S; company roots recognized K of R`) в режиме `ImportPLCategoryTreeCommand::$onlyCreate`: совпавшие по коду категории не меняются и служат родителями новым; если в шаблоне статья — подытог без формулы (сумма потомков), а у компании совпавшая по коду статья так не считается (строка ввода, KPI, подытог с формулой — `PlReportCalculator` потомков не суммирует), импорт отказывает: новые статьи под ней выпали бы из итогов.
 - Происхождение дерева — `Finance\Entity\PLTemplateApplication` (`pl_template_applications`): каждое применение стартового шаблона, создавшее статьи (профиль, `templateVersion`, сколько создано, источник `onboarding|screen|command`). Единый путь — `ApplyDefaultPLTemplateAction(companyId, dryRun, source, ?profile)`: импорт в режиме `onlyCreate` и запись одной транзакцией; экран, команда и `EnsureDefaultPLTreeAction` вызывают его. Происхождение — последняя запись (`PLTemplateApplicationRepository::findLatestByCompanyId()`); шаблон другого профиля к непустому дереву с происхождением не применяется (`PLTemplateProfileMismatchException`), проверка повторяется под `pg_advisory_xact_lock` по компании; пустое дерево собирается любым шаблоном. У компаний без записи (созданы до учёта) проверки нет. Экран импорта показывает происхождение.
@@ -376,7 +378,14 @@
 - Вкладка документов (`DocumentRepository::findByCompany()` / `summarizeByCompany()`): условия на операции — `EXISTS`, документ гидрируется со всеми операциями; направление, статья и сумма — условия на одну и ту же операцию.
 - Вкладка операций (`DocumentOperationRepository::paginateForList()` / `summarizeForList()` / `marketplaceBucketSums()` / `countByDocuments()`): компания — через join документа (`IDENTITY(d.company)`), удалённые документы не входят; проект, ЦФО и контрагент — значения операции, иначе документа (как в `PLRegisterUpdater`); направление — природа операции (flow статьи, у `NONE` — знак суммы). Fetch-join только связей «к одному»: `d.operations` не присоединяется.
 - Справочники обеих вкладок (статья, контрагент, проект, основание ДДС) присоединяются с условием `IDENTITY(x.company) = :companyId`: FK компанию не несут, испорченная ссылка на справочник чужой компании гидрируется пустой — чужое название не показывается, не ищется и не входит в итог (как в JSON-выгрузке; тест `testForeignReferenceNamesDoNotLeakOnEitherTab`).
-- Деньги строк и итога — правила регистра ОПиУ: `DocumentPlContribution::forDocument()` (строка документа) и `::forOperation()` (строка операции). Обычный документ — модуль операции; `marketplace_pl` — со знаком суммы найденных операций той же статьи и природы в документе, поэтому сумма строк равна итогу. Итог — `DocumentListTotalsDTO::fromAggregates()` по валютам (основание ДДС без пересчёта, иначе RUB).
+- Деньги строк и итога — правила регистра ОПиУ: `DocumentPlContribution::forDocument()` (строка документа) и `::forOperation()` (строка операции). Обычный документ — модуль операции; `marketplace_pl` — значение для отчёта: в доход `amount`, в расход `−amount` (`DocumentPlContribution::contribution()`), итог статьи бывает отрицательным; сумма строк равна итогу. Итог — `DocumentListTotalsDTO::fromAggregates()` по валютам (основание ДДС без пересчёта, иначе RUB).
+
+### Finance: переход из отчёта ДДС в «Транзакции ДДС»
+
+- Ненулевая сумма статьи в отчёте ДДС (`report_cashflow_index`, макрос `render_category`) — ссылка на `cash_transaction_index` с фильтрами ячейки: `categoryId`, `includeChildren=1` (только у статьи с вложенными), `dateFrom`/`dateTo` — границы колонки, обрезанные периодом отчёта, `currency` — валюта таблицы. JS отчёта (`assets/pages/cashflow_report.js`) открывает ссылку двойным кликом по ячейке, одиночный клик мышью гасит; клавиатура, касание, Ctrl/Cmd и средняя кнопка — как у обычной ссылки.
+- База ссылки — `drilldown` в payload `CashflowReportBuilder::build()`: `projectIds` (уже раскрытые дочерние направления) и `centerIds` (в том числе legacy `responsibilityCenterId`), только когда фильтр отчёта активен; `null` в режиме сверки с дашбордом — там отчёт исключает переводы и технические статьи, список так не фильтрует, и ссылок нет. Сальдо ссылок не имеет.
+- Фильтры списка (`CashTransactionFilters`, общие для экрана и экспорта): `includeChildren=1` — `categoryId` вместе с поддеревом статьи своей компании (`CashTransactionRepository::categoryWithDescendantIds()`); `projectIds`/`centerIds` — UUID через запятую, `IN` по `t.projectDirection`/`t.responsibilityCenterId`; невалидный UUID — flash и redirect. Списки строкой, а не `[]`: контракт фильтров — `array<string, string|null>`.
+- Список показывает полную сумму операции: у операции с разбивкой по нескольким статьям строка больше доли в ячейке, набор операций при этом совпадает.
 
 ### Finance: responsibility-center fact-schema expansion
 
@@ -441,10 +450,10 @@
 ### ServiceGateway: ai-service
 
 ТЗ — `docs/tasks/ai/TZ_AI_service_VashFinDir.md`; сервис — `services/ai-service`
-(Python, в прод не выведен); контракт — `services/_contracts/ai-task/v1`.
+(Python, постоянные API и business worker); контракт — `services/_contracts/ai-task/v1`.
 
-- Доступ — `AiServiceAccess`: `AI_SERVICE_ENABLED`, `AI_SERVICE_BASE_URL`,
-  `AI_SERVICE_API_TOKEN` (направление «Symfony → сервис») — общий выключатель; любое
+- Доступ — `AiServiceAccess`: `AI_SERVICE_BASE_URL`,
+  `AI_SERVICE_API_TOKEN` (направление «Symfony → сервис») — настройка подключения; любое
   пустое значение — выключено для всех. Компания получает ИИ, только если подключена
   администратором: строка в `ai_company_access` (unique `company_id`), переключатель «ИИ» у
   кабинета в `/admin/users` → `POST /admin/ai/companies/{companyId}/access` →
@@ -485,6 +494,9 @@
   своей транзакции. `taskIdFor(companyId, taskType, idempotencyKey): string` —
   тот же `task_id` без постановки: потребитель записывает его в своей транзакции
   до `requestTask`. `isEnabledForCompany(companyId): bool`.
+- `AiTaskFacadeInterface::PLATFORM_COMPANY_ID` — компания платформы для задач по общим данным
+  (справочник кодов маркетплейсов): включена вместе с сервисом, без строки в `ai_company_access`;
+  расход в `ai_usage` под этим id входит только в общий лимит, бюджет клиентов не трогает.
 - `SubmitAiTaskMessage` → `async_sync` по умолчанию; `parse_payment_message`
   получает TransportNamesStamp `async_payment_intake` (3 повтора с задержкой
   2 секунды). `SubmitAiTaskHandler` — `POST /internal/tasks`
@@ -509,7 +521,9 @@
   по каждому виду — один агрегированный ERROR за прогон.
 - Потребитель — `AiTaskResultConsumerInterface` (тег
   `app.service_gateway.ai_task_result_consumer`): `supports(taskType)`,
-  `consume(AiTaskResult)`; только `persist()`, транзакцией владеет импорт.
+  `consume(AiTaskResult)`; только `persist()`, транзакцией владеет импорт. Потребителей одного task_type
+  может быть несколько (`marketplace_source_type_draft` — переводчики Ozon и WB): вызываются все в одной
+  транзакции, каждый игнорирует чужие задачи; расход записывается один раз.
   Вход `AiTaskResult` — DTO (`status` — `AiResultStatus`: `accepted`,
   `needs_review`, `rejected`, `failed`; `checks` — `list<AiCheck>`; `output` —
   массив по контракту задачи). Сейчас — `EchoAiTaskResultConsumer` (только лог)
@@ -522,12 +536,15 @@
 ### ServiceGateway: канал фактов
 
 Контракт — `services/_contracts/source-fact-envelope/v1` (pull + ack). Клиент —
-`SourceFactsHttpClient` (сейчас один сервис: ozon-fetcher, `OZON_FETCHER_BASE_URL`/`_API_TOKEN`).
+`SourceFactsHttpClient`, по экземпляру на сервис с тегом `app.source_facts_client`
+(`services.yaml`): ozon-fetcher (`OZON_FETCHER_BASE_URL`/`_API_TOKEN`), wb-fetcher
+(`WB_FETCHER_BASE_URL`/`_API_TOKEN`). Клиент без базового URL в `sources()` не попадает.
 
-- `SourceFactsGatewayFacadeInterface`: `sources()` (сервис → публикуемые ресурсы; сейчас
-  `ozon.finance.accrual-by-day`), `batches()`, `page()`, `ack()`. Данных не меняет и не коммитит.
+- `SourceFactsGatewayFacadeInterface`: `sources()` (сервис → публикуемые ресурсы:
+  `ozon.finance.accrual-by-day`, `ozon.ads.statistics`, `ozon.analytics.funnel`, `wb.finance.sales-report.daily`,
+  `wb.ads.daily`, `wb.analytics.funnel`), `batches()`, `page()`, `ack()`. Данных не меняет и не коммитит.
 - Компанию пачки определяет фасад по `connection_ref` из активных подключений
-  (`MarketplaceFacade::getActiveOzonSellerConnections()`); подключения нет — `companyId = null`.
+  (`getActiveOzonSellerConnections()` ∪ `getActiveWbSellerConnections()`); подключения нет — `companyId = null`.
 - Страница отдаётся телом ответа как есть (`SourceFactPage::body`), проверенным по контракту:
   числа источника не проходят через `float` PHP. 404 и 502 страницы — `ContractViolationException`
   (повтор бесполезен), остальные не-200 и транспорт — `ServiceUnavailableException`.
@@ -560,11 +577,307 @@
   или ответ страницы не по контракту — `quarantined`: пачка **не** подтверждается и приходит снова;
   `error` в журнал — один на прогон и только о новых пачках. Сервис недоступен — прогон прерван,
   WARNING, повтор по расписанию.
-- Включение — `SOURCE_FACTS_COMPANIES` (окружение scheduler): UUID компаний через запятую, `*` — все,
-  пусто — выключено. Пачки компаний вне списка остаются в очереди сервиса.
+- Приём охватывает все действительные подключения, без rollout-списка компаний.
+
 - Гейт `app:source-facts:health-check` (cron 09:10 МСК): пачки в карантине или поток
   (кабинет × ресурс) без применённых пачек дольше 36 ч — `error`, exit 1.
-- Фасада чтения нет: появится вместе с первым потребителем (переводчик `MarketplaceOzon`).
+- `SourceFactsFacadeInterface` (только чтение, для переводчиков каналов): `periods(resourceType,
+  ?companyId)` — периоды с текущей ревизией, всех компаний (переводчик, гейт) или одной (экран R10); `activeFacts(companyId, connectionRef, resourceType,
+  periodKey)` — действующие записи периода (`SourceFactRecord`: `source_key`, `payload`). Модуль в
+  `MODULES_WITH_FACADE`: внутренние слои закрыты.
+
+### MarketplaceOperations: канон операций маркетплейсов
+
+Второй модуль нового контура (`docs/tasks/marketplace-profit-pipeline/DATA.md` §5, §9).
+
+**Устав.** Причина изменений — общая модель операций всех каналов. Модуль хранит операции, которые
+пишут переводчики каналов, и проверяет их вход. В модуле не должно быть: правил Ozon / WB, разбора
+исходных записей, статей ОПиУ и проектов, себестоимости, агрегатов и отчётов. От канала остаётся
+строка `channel` (гейт `ModuleBoundaryRules::test_marketplace_operations_knows_no_channels`); запись
+только через фасад (модуль в `MODULES_WITH_FACADE`).
+
+| Таблица | Что | Ключ |
+|---|---|---|
+| `mo_operation` | операция: `channel`, `connection_ref`, `operation_date`, `listing_id` (пусто — без SKU), `source_type` (код маркетплейса как есть), `kind`, `amount_minor` + `currency`, `quantity`, `source_refs` jsonb, `rules_version`, `allocation_key` | `id` UUID v7; индекс `(company_id, channel, connection_ref, operation_date)` |
+| `mo_dirty_window` | день кабинета заменён после последнего пересчёта витрины | `(company_id, channel, connection_ref, operation_date)` |
+
+- Вид — enum `OperationKind` с уровнем `CascadeLevel` (`revenue` / `md1` / `md2` / `overhead` /
+  `info`). Сверка с кабинетом — по `source_type`, экономика — по `kind`. Сторно — тот же вид и
+  `source_type` с обратным знаком.
+- `MarketplaceOperationsFacadeInterface::replaceDay(DayOperations): int` — замена дня кабинета
+  целиком: `pg_advisory_xact_lock` дня → `DELETE` дня → `INSERT` порциями по 500 → отметка
+  `mo_dirty_window`. **Коммитит вызывающий** (Action / Handler переводчика); без активной транзакции —
+  `\LogicException`. Блокировка одна на вызов; переводчик, который заменяет несколько дней в одной
+  транзакции, берёт их по возрастанию даты.
+- Чтение для витрины: `dirtyDays(limit, ?markedBefore)` и `days(from, to)` — списки `DayWindow`
+  (`@companyScopeExempt`, cron); `takeDay(DayWindow): list<OperationRecord>` — та же блокировка дня, что у
+  `replaceDay`, операции и снятие отметки `mo_dirty_window`. **Коммитит вызывающий** (команда витрины);
+  без транзакции — `\LogicException`; откат вызывающего возвращает отметку.
+- Проекция ОПиУ: `plSums(companyId, from, to, ?channel): list<CanonPlSum>` — Σ по (канал, кабинет, день, вид, код источника), все виды; начисления и списания ключа — отдельными строками; `companyIds()` — компании с операциями (cron). Только чтение.
+- Сверки: `daySums(channel, from, to, ?companyId): list<CanonDaySum>` — Σ канона по (компания, кабинет,
+  день) без видов уровня «справочно»; без компании — гейт переводчика (`@companyScopeExempt`), с компанией —
+  экран R10. Только чтение.
+
+### MarketplaceOzon: переводчик Ozon
+
+Третий модуль нового контура (`docs/tasks/marketplace-profit-pipeline/DATA.md` §4, §9; этап 4).
+
+**Устав.** Причина изменений — Ozon (форма начислений, справочник типов). Модуль переводит
+начисления by-day из `SourceFacts` в канон. В модуле не должно быть: правил WB, статей ОПиУ,
+экономики и отчётов, обращений к API Ozon, зависимости от легаси (`Ingestion`, `MarketplaceAds`,
+внутренности `Marketplace`). Зависимости — только фасады `SourceFacts`, `MarketplaceOperations`,
+`Marketplace` (листинги) (гейт `ModuleBoundaryRules::test_marketplace_ozon_uses_only_facades`).
+
+| Таблица | Что | Ключ |
+|---|---|---|
+| `moz_source_type` | решение по коду Ozon: `kind` или `pending` (ждёт администратора), название, где встретился впервые, черновик ИИ | `source_type` |
+| `moz_day` | переведённый день: ревизия фактов, ревизия статистики рекламы (`ads_revision`, 0 — не было), версия правил, `total_minor` (Σ `total_amount`) = `canon_minor` + `quarantine_minor`, операции без листинга | `(company_id, connection_ref, operation_date)` |
+| `moz_quarantine` | компоненты с кодом без решения: сумма, число строк, до 20 ссылок на факты | `(company_id, connection_ref, operation_date, source_type)` |
+
+- Коды: `ozon:field:{sale_amount|bonus|coinvestment|sale_commission}` (вид задаёт переводчик:
+  `sale`/`return` по знаку, `spp`, `coinvestment`, `commission`), `ozon:service:{type_id}` (вид —
+  `moz_source_type`, иначе `OzonAccrualTypeSeed`), `ozon:unexplained` — остаток, который разбор не
+  объяснил (всегда карантин). `bonus` и `coinvestment` — справочно, в итог дня не входят.
+- `app:marketplace-ozon:translate` (cron `*/15`, со сдвигом 5 мин после приёма фактов; `--relink` раз
+  в сутки) — точка входа и владелец транзакций: день — одна транзакция, `TranslateOzonDayAction` →
+  `replaceDay` (блокировка дня — внутри) + карантин + `moz_day`. День переводится, если ревизия
+  фактов или статистики рекламы того же дня выросла, сменилась `RULES_VERSION`, по коду его карантина
+  принято решение или (`--relink`) есть операции без листинга.
+- CPC кабинета (`ads_cpc` без SKU, by-day тип 41) разносится по листингам пропорционально расходу SKU
+  из фактов `ozon.ads.statistics` того же дня (`AdsStatisticsShares`, наибольший остаток, Σ дня не
+  меняется, `allocation_key = ads_statistics_share`). SKU без листинга и день без статистики — доля
+  остаётся без SKU. Дата статистики = дата начисления CPC (сверка Вумджой, 14.11).
+- Оплата за заказ (`ads_pay_per_order` без SKU, тип 54) — по проданным штукам SKU того же дня
+  (`sales_qty_share`); нет продаж — без SKU. Сбой дня не останавливает остальные; один `error` на прогон.
+- Гейт `app:marketplace-ozon:health-check` (cron 09:20 МСК): код без решения в карантине дольше 24 ч;
+  день с фактами не переведён; за 45 дней Σ канона дня ≠ `moz_day.canon_minor` (сумма расхождения в
+  рублях); последний день фактов кабинета старше D−2 — `error`, exit 1.
+- `MarketplaceOzonFacadeInterface::dayStates(companyId, from, to): list<OzonDayState>` — переведённые дни
+  (ревизия, актуальность правил, `total` / `canon` / `quarantine`) для экрана R10. Только чтение.
+- Новый код без вида: в конце прогона перевода `RequestOzonSourceTypeDraftsAction` ставит задачу ИИ
+  `marketplace_source_type_draft` (ai-task v1.3) от `PLATFORM_COMPANY_ID`: данные общие, подключение
+  компаний к ИИ не учитывается; номер задачи — в `ai_draft` до постановки, ключ повтора — сам код;
+  сервис выключен или недоступен — запрос не ставится и повторяется следующим прогоном. Ответ принимает
+  `OzonSourceTypeDraftConsumer` (внутри транзакции импорта ServiceGateway).
+- Решение — администратор платформы на `/admin/marketplace/ozon-source-types` (`ROLE_ADMIN`, вне карты
+  модулей компании): вид из `OperationKind`, название; `ConfirmOzonSourceTypeAction` — один `UPDATE` только
+  для кода без решения. Дни карантина с этим кодом переводит следующий прогон.
+
+### MarketplaceWb: переводчик WB
+
+Модуль нового контура (этап 8.3, `stages/stage-8.md`), устроен как `MarketplaceOzon`.
+
+**Устав.** Причина изменений — WB (поля детального отчёта, причины удержаний). Модуль переводит строки
+`wb.finance.sales-report.daily` и кампании `wb.ads.daily` из `SourceFacts` в канон (канал `wildberries`). В модуле не должно быть:
+правил Ozon, статей ОПиУ, экономики, обращений к API WB, зависимости от легаси WB (`Marketplace/Wildberries`,
+`Ingestion`, `MarketplaceAds`). Зависимости — только фасады `SourceFacts`, `MarketplaceOperations`,
+`Marketplace` (листинги) (гейт `ModuleBoundaryRules::test_marketplace_wb_uses_only_facades`).
+
+| Таблица | Что | Ключ |
+|---|---|---|
+| `mwb_source_type` | решение по коду WB: `kind` или `pending`, название, где встретился впервые (`ai_draft` — черновик ИИ) | `source_type` |
+| `mwb_day` | переведённый день: ревизия фактов отчёта и рекламы (`ads_revision`, 0 — без рекламы), версия правил, `total_minor` (Σ компонентов без справочных) = `canon_minor` + `quarantine_minor`, операции без листинга | `(company_id, connection_ref, operation_date)` |
+| `mwb_quarantine` | компоненты с кодом без решения: сумма, число строк, до 20 ссылок на факты | `(company_id, connection_ref, operation_date, source_type)` |
+
+- Правила строки — `SalesReportTranslator` (таблица в `stage-8.md`, 8.3): `wb:field:*` и `wb:calc:*` — вид
+  задаёт переводчик или `WbSourceTypeSeed`; `wb:deduction:{причина}` (без номера документа и месяца) и
+  `wb:payout:{операция}` — справочник или решение администратора. Знаки — как в источнике; итог строки без
+  справочных = `±forPay` + поля затрат. Справочно (`CascadeLevel::INFO`): `spp`, `ads_settlement`.
+- Листинг — `nmId` + `techSize` (`findListingsByMarketplaceSkus` отдаёт `size`; размеры сравниваются без
+  регистра и кириллических двойников латиницы); у `nmId` один листинг — он. Размера в строке нет (возмещение
+  логистики, реклама по nmId) — сумма остаётся на артикуле: по его размерам пропорционально проданным за день
+  штукам, без продаж — поровну (ключ `wb_size_sales_share`, у рекламы — `ads_statistics_share`). Известный
+  размер без листинга — операция без SKU (`unresolved`).
+- Реклама — `AdsDayTranslator`: кампания дня → `ads_cpc` = −Σ `expenses[].updSum`, по nmId пропорционально
+  Σ `statistics…nms[].sum` (наибольший остаток, ключ `ads_statistics_share`), нет весов — без SKU; nmId с
+  несколькими листингами — по размерам, как строка без размера. Код `wb:ads:campaign`. Удержание «WB Продвижение» в отчёте — справочное
+  (`ads_settlement`), иначе реклама дважды. Справочность итогов дня — по итоговому виду (сид, решение), не по виду компонента. Новая ревизия рекламы дня — день переводится заново.
+- `app:marketplace-wb:translate` (cron `7-59/15`, `--relink` 06:58) — точка входа и владелец транзакций:
+  день — одна транзакция, `TranslateWbDayAction` → `replaceDay` + карантин + `mwb_day`. Все кабинеты WB
+  с фактами, без переключателя.
+- Гейт `app:marketplace-wb:health-check` (cron 09:25 МСК): то же, что у Ozon (карантин > 24 ч, непереведённый
+  день, канон ≠ перевод за 45 дней, кабинет старше D−2), по всем кабинетам.
+- Решение — `/admin/marketplace/wb-source-types` (`ROLE_ADMIN`), `ConfirmWbSourceTypeAction` — один `UPDATE`
+  только для кода без решения. Черновик ИИ — `RequestWbSourceTypeDraftsAction` в конце прогона перевода
+  (задача `marketplace_source_type_draft`, канал `wb`, от компании платформы, ключ повтора — код; как у Ozon),
+  ответ — `WbSourceTypeDraftConsumer` → `mwb_source_type.ai_draft`; экран показывает черновик и выбирает его
+  вид заранее (вид из `WbSourceTypeSeed::SUGGESTED` важнее).
+- `MarketplaceWbFacadeInterface::dayStates(companyId, from, to): list<WbDayState>` — переведённые дни
+  (ревизия фактов отчёта, актуальность правил, `total` / `canon` / `quarantine`) для экрана R10. Только чтение.
+
+### MarketplaceFunnel: таблица воронки продаж
+
+Модуль задачи `docs/tasks/marketplace-funnel` (этап 5).
+
+**Устав.** Причина изменений — ступени воронки маркетплейсов (показы, переходы в карточку, корзины,
+заказы, выкупы). Модуль переводит факты `ozon.analytics.funnel`, `wb.analytics.funnel` и `wb.analytics.search` из `SourceFacts`
+в дневную таблицу. В модуле не должно быть: денег канона, статей ОПиУ, экономики SKU, листингов,
+обращений к API маркетплейсов. Зависимости — фасады `SourceFacts` и `Marketplace` (названия листингов) (гейт
+`ModuleBoundaryRules::test_marketplace_funnel_stays_out_of_money_and_legacy`).
+
+| Таблица | Что | Ключ |
+|---|---|---|
+| `mfn_day` | переведённый день источника кабинета: `channel`, `source`, ревизия фактов, версия правил, `available` (false — маркетплейс не отдал день по тарифу: «нет данных»), `row_count`, `control_sum` (Σ всех ступеней строк дня) | `(company_id, channel, connection_ref, operation_date, source)` |
+| `mfn_row` | воронка товара за день: `marketplace_sku` (SKU Ozon, nmId WB), `source` (`total` — вся воронка, `search` — переходы из поиска WB; `search` — часть `total`, не слагаемое), `impressions`, `impressions_search`, `card_views`, `cart_adds`, `orders`, `revenue_minor`, `buyouts`, `cancels`, `returns`; ступень без данных — NULL | `(company_id, channel, connection_ref, operation_date, marketplace_sku, source)` |
+
+- Ozon — `OzonFunnelTranslator`: метрики по порядку запроса сервиса (`ozon.FunnelMetrics`, 14 штук);
+  другое число метрик — день не переводится. Запись `ozon:analytics.funnel:unavailable` — день без строк,
+  `available = false`.
+- WB — `WbFunnelTranslator`: `statistic.selected`; ступень без поля — NULL; общих показов и возвратов нет (NULL), первая ступень —
+  `card_views` (`openCount`).
+- Поиск WB — `WbSearchTranslator`: источник `search`, ступени `card_views` (`openCard`), `cart_adds`
+  (`addToCart`), `orders`; остальные — NULL. Запись `wb:analytics.search:unavailable` (нет подписки «Джем») —
+  день без строк, `available = false`. Видимость и средняя позиция остаются в фактах.
+- `app:marketplace-funnel:translate` (cron `9-59/15`) — точка входа и владелец транзакций: день источника — одна
+  транзакция, замена целиком под `pg_advisory_xact_lock` дня (`FunnelStore::replaceDay`). Переводится день
+  с новой ревизией фактов или другой версией правил (`FunnelRow::RULES_VERSION`). Все кабинеты с фактами.
+- Гейт `app:marketplace-funnel:health-check` (cron 09:43 МСК): день с фактами не переведён; строки
+  `mfn_row` дня расходятся с `mfn_day` (число строк, контрольная сумма).
+- Товар хранится идентификатором маркетплейса: строка без листинга не отбрасывается, листинг находит читатель.
+- Экран R9 `/marketplace/funnel` (`FunnelController`, доступ `module.marketplace.read`, `?format=xlsx`):
+  `FunnelReportQuery` (всегда с `companyId`) суммирует ступени по товарам за период, `FunnelReportBuilder`
+  подставляет названия листингов (`Marketplace\Facade`), считает итог и сортирует. Ступень без данных —
+  «нет данных», не ноль; дни `available = false` показаны числом в пояснении.
+  Фильтр `source` (`FunnelReport::SOURCES`) выбирает источник строк и дней; виден компании, у которой
+  есть дни поиска. Источники не складываются: без фильтра — только `total`.
+
+### MarketplaceEconomics: витрина экономики SKU
+
+Четвёртый модуль нового контура (`docs/tasks/marketplace-profit-pipeline/DATA.md` §4; этап 5).
+
+**Устав.** Причина изменений — показатели и отчёты экономики SKU. Модуль строит витрину кабинет × день ×
+листинг × показатель из канона и считает уровни каскада. В модуле не должно быть: правил каналов
+(переводчики), исходных фактов, статей ОПиУ, обращений к провайдерам, правок легаси. Зависимости —
+только фасады `MarketplaceOperations` (канон), `Marketplace` (себестоимость на дату), `MarketplaceAds`
+(доли рекламы SKU — временно, до этапа 6), `Inventory` (остатки), `Company` (налоговый профиль —
+ставка НДС) (гейт
+`ModuleBoundaryRules::test_marketplace_economics_reads_canon_only`). Легаси-экран
+`/marketplace-analytics/unit-extended` работает параллельно и от модуля не зависит.
+
+| Таблица | Что | Ключ |
+|---|---|---|
+| `me_day_line` | строка витрины: `listing_id` (пусто — без SKU), `measure` (вид канона или `cost_price` / `ads_allocated` / `storage_share` / `overhead_share`), `level` (`revenue` / `cost_price` / `md1` / `md2` / `overhead` / `info`), `amount_minor`, `quantity`, `allocation_key` | `id`; индекс `(company_id, operation_date)` |
+| `me_weekly_report` | отметка отправки недельного отчёта: `delivery` (`email` / `telegram`), `sent_at` | `(company_id, week_start, delivery)` |
+| `me_day` | пересчитанный день: `canon_minor` (Σ канона без справочных), `unallocated_minor`, `cost_price_minor`, листингов без себестоимости, версия правил | `(company_id, channel, connection_ref, operation_date)` |
+
+- Расчёт дня — `DayEconomicsCalculator` (чистая функция): себестоимость = (продано − возвращено) × цена на
+  дату (D5); реклама без SKU из канона — каждый вид по долям SKU в статистике легаси своего вида (клики —
+  `legacy_clicks_share`, оплата за заказ — `legacy_order_share`; нет статистики — без SKU); хранение без
+  SKU — по остатку на дату (`stock_share`), без остатков — по выручке, уровень СМ1; логистика до покупателя
+  без SKU (`logistics_to*`) — по отгруженным штукам (`sales_qty_share`), нет штук — по выручке; прочие прямые
+  (СМ1) без SKU — по выручке SKU за день (`revenue_share`, D3); прямые — на СМ1 с `measure` своего вида (у SKU —
+  та же статья и уровень, что в итоге кабинета); общие без SKU — по выручке на «общие». Разнесение — пара строк (доля на SKU и обратная без SKU), поэтому
+  Σ строк без `cost_price`/`info` = `canon_minor`, строки без SKU — нераспределённое.
+- R1/R2 «Не разносить» (`alloc=0`, `SkuEconomicsFilter::$allocated = false`) — запрос без строк с
+  `allocation_key` (пары разнесения дают 0): у SKU только свои затраты, затраты без SKU — в «Нераспределено»,
+  итог кабинета тот же.
+- `app:marketplace-economics:refresh` (cron `*/15` со сдвигом 5 мин после перевода; `--recent=45` ночью;
+  `--from/--to` вручную; дни с прежней `RULES_VERSION` пересчитываются сами) — точка входа и владелец транзакций: день — одна транзакция,
+  `RefreshEconomicsDayAction` → `takeDay` (блокировка дня канона, снятие отметки) → замена дня витрины
+  под `pg_advisory_xact_lock` `me:…`. Порядок блокировок — день канона раньше дня витрины.
+- Гейт `app:marketplace-economics:health-check` (cron 09:30 МСК): Σ витрины дня ≠ Σ канона или заменённый
+  день не пересчитан дольше 60 мин — `error`, exit 1.
+- Отчёт R1 «Экономика SKU» — `GET /marketplace/economics` (`SkuEconomicsController`, новый слой
+  `_layout/app.html.twig`, серверный Twig; `?format=xlsx` — та же выборка файлом; доступ
+  `MARKETPLACE_READ`): период ≤ 366 дней (иначе 422), канал (`?channel=ozon|wildberries`, фильтр виден при двух
+  каналах, метка канала у SKU и колонка «Канал» в xlsx), кабинет, теги, поиск, сортировка, «с разнесением /
+  без», Pagerfanta ≤ 200. `SkuEconomicsReportBuilder` — свод `me_day_line` за период и прошлый период той же
+  длины (`SkuEconomicsQuery`), уровни — `SkuMetrics`. Без фильтра итог = кабинет (SKU + нераспределённое);
+  с тегами или поиском — Σ строк. Нет витрины — пустое состояние со ссылкой на легаси-экран.
+- Каскад `SkuMetrics` (как ОПиУ шаблона маркетплейса): выручка (до СПП) → выручка с СПП = выручка − СПП −
+  соинвестирование (`ads_settlement` в СПП не входит) → НДС к уплате = выручка с СПП × ставка / (100 + ставка)
+  → выручка без НДС → СМ1 / СМ2 / СМ3 от выручки без НДС; проценты и ДРР — от выручки до СПП. Ставка —
+  `VatRatesByMonth`: `CompanyTaxProfileFacadeInterface::taxProfileOn()` на первый день каждого месяца периода,
+  `VatMode::ratePercentOn()`; `SkuEconomicsQuery` считает НДС в SQL (`numeric`, без float) с округлением по
+  листингу × дню и сворачивает в ключ (листинг / шаг) — итоги R1 и R2 совпадают при любом шаге. Нет профиля или
+  «без НДС» — 0. Уровни с НДС общие для R1, R2, xlsx (с ДРР) и R3 (в письме — «СМ — за вычетом НДС»).
+- Колонки R1: обязательные — SKU, наименование, продано, выручка, СМ1, СМ2, СМ3 (с разнесением) и % итогового
+  уровня; остальные скрываются окном «Колонки» (`data-economics-columns`), скрытые хранятся в `localStorage`
+  браузера (`marketplace-economics:hidden-columns`) и применяются только к необязательным колонкам текущего
+  вида (с разнесением / без), новые колонки видны по умолчанию; xlsx — все колонки.
+- Отчёт R2 «Динамика» — `GET /marketplace/economics/dynamics` (`EconomicsDynamicsController`, вкладка рядом с
+  R1, те же фильтры + шаг день / неделя / месяц, `?format=xlsx`): `EconomicsDynamicsReportBuilder` —
+  `SkuEconomicsQuery::byStep` (`date_trunc`, неделя с понедельника), все шаги периода (пустые — нули, края
+  обрезаны периодом), график — встроенный SVG. Набор SKU при тегах или поиске берётся из R1 за тот же
+  период, поэтому итог R2 = итог R1.
+- Гейт витрины дополнительно: за 7 дней Σ |нераспределённого| > 1 % затрат компании — `error`.
+- `MarketplaceEconomicsFacadeInterface::costPrice(companyId, from, to, ?channel): EconomicsCostPrice` — себестоимость проданного за период (Σ `me_day.cost_price_minor`, ≤ 0) и число дней с проданным без цены; потребитель — проекция ОПиУ.
+- `MarketplaceEconomicsFacadeInterface::daySums(companyId, from, to): list<EconomicsDaySum>` — Σ строк
+  витрины дня (без себестоимости и справочных), нераспределённое и затраты для экрана R10. Только чтение.
+- Отчёт R3 «Неделя» — `app:marketplace-economics:weekly-report` (cron `0 9 * * 1` МСК; `--week`, `--company`,
+  `--dry-run`): за прошлую неделю R1 (`SkuEconomicsReportBuilder`, с разнесением) → сводка
+  `WeeklyEconomicsSummary` (итог против прошлой недели, топ-5 роста и падения СМ2 — SKU с меткой канала, SKU в
+  минусе, ДРР > 20 %, при двух каналах — выручка и СМ2 каждого = R1 с фильтром канала)
+  и xlsx R1 владельцу компании на почту (`NotificationRouter`, синхронно) и привязанным пользователям в
+  Telegram (`TelegramFacadeInterface::sendDocumentToCompany`). Включение — `ECONOMICS_WEEKLY_REPORT_COMPANIES`
+  (UUID через запятую, `*` — все, пусто — выключено). Журнал `me_weekly_report` (ключ
+  `(company_id, week_start, delivery)`): отметка `INSERT … ON CONFLICT DO NOTHING` до отправки, сбой или
+  0 получателей — отметка снимается; повтор прогона дошлёт только неотправленное. Транзакций нет.
+
+### MarketplaceQuality: экран R10 «Качество данных»
+
+Пятый модуль нового контура (`docs/tasks/marketplace-profit-pipeline/stages/stage-7.md` §7.3).
+
+**Устав.** Причина изменений — сводка качества данных по звеньям «факты → перевод → канон → витрина».
+Таблиц и записи нет. Зависимости — только фасады и DTO контрактов `SourceFacts`, `MarketplaceOzon`, `MarketplaceWb`,
+`MarketplaceOperations`, `MarketplaceEconomics` (PHPat `test_marketplace_quality_reads_facades_only`).
+
+- `GET /marketplace/economics/quality` (`DataQualityController`, вкладка рядом с R1/R2, активная компания,
+  `ROLE_COMPANY_USER`, модуль `MARKETPLACE`): окно 45 дней до вчера. `DataQualityReportBuilder` — по кабинету
+  последние дни фактов / перевода / витрины, дней не переведено, Σ фактов (по переводчику: `SourceFacts`
+  payload не читает), карантина, канона, витрины и доля нераспределённого; список дней с расхождением по
+  звеньям (не переведён, карантин, перевод ≠ канон, канон ≠ витрина). Каналы Ozon и WB — каждый со своим
+  переводчиком, ресурсом фактов (WB — отчёт о продажах) и каноном канала. Гейты — в модулях звеньев.
+
+### MarketplacePlProjection: ОПиУ маркетплейсов из канона
+
+Шестой модуль нового контура (`docs/tasks/marketplace-pl-projection`).
+
+**Устав.** Причина изменений — правила «операция канона → статья ОПиУ компании» и проекция ОПиУ по дням.
+В документы ОПиУ, `pl_daily_totals` и закрытие месяца модуль **не пишет**: ОПиУ ведёт легаси. Зависимости —
+`Finance\Facade` / `DTO` / `Enum` (статьи) и виды `MarketplaceOperations` (PHPat
+`test_marketplace_pl_projection_reads_facades_only`); канон, переводчики и экономика SKU модуль не знают
+(`test_pipeline_does_not_know_pl_projection`).
+
+- `mpp_rule` (сущность-схема `ProjectionRule`, запись — `Infrastructure\Query\RuleStore`, DBAL): ключ — вид
+  `kind` (для всех каналов или с `channel`) либо код источника `source_type` канала (вид пуст; форму держит
+  CHECK `chk_mpp_rule_key`); `valid_from` — с какого дня действует (базовое — `Rule::BASE_DATE`);
+  `pl_category_id = NULL` — «исключено из ОПиУ»; `origin` — `RuleOrigin` `preset` / `custom`;
+  `template_version` — версия шаблона, записавшая `preset`. Unique
+  `(company_id, kind, channel, source_type, valid_from) NULLS NOT DISTINCT`.
+- Подбор — `Domain\RuleResolver::resolve(rules, kind, channel, sourceType, day): ?Rule`: среди действующих на
+  день — код источника → вид × канал → вид, при равной точности — более поздний `valid_from`; `null` —
+  правила нет («не сопоставлено»).
+- Шаблон платформы — `Domain\MappingTemplate` (`VERSION`, `rules(): list<TemplateRule>`): код статьи
+  стандартного дерева на каждый `OperationKind` (справочные виды — «исключено») и исключения по каналу и
+  коду. Новый вид канона без строки шаблона роняет `MappingTemplateTest`. Правка шаблона — поднять `VERSION`.
+  Шаблон повторяет базовый маппинг легаси (`default_cost_mapping.yaml`): услуга Ozon, которую легаси ведёт
+  не в статью своего вида, — исключение по коду источника; паритет держит `TemplateLegacyParityTest`.
+- `Application\Action\SyncTemplateAction(companyId, execute): TemplateSyncPlan` — приводит базовые `preset`
+  к шаблону по кодам листов (`LEAF_INPUT`) дерева компании; ключ с `custom` не трогает; статьи нет — правила
+  нет; `preset` вне шаблона удаляется. Транзакцией владеет Action, блокировка —
+  `pg_advisory_xact_lock('mpp_rule:{companyId}')`. Консоль —
+  `app:marketplace-pl-projection:sync-template --company-id=… | --all [--execute]` (без `--execute` — план;
+  `--all` — компании с операциями канона); cron `40 * * * *` — `--all --execute`.
+- Проекция — `Application\Service\ProjectionBuilder::build(companyId, from, to, ?channel): ProjectionReport`:
+  `MarketplaceOperationsFacadeInterface::plSums()` (Σ канона по каналу, кабинету, дню, виду и коду источника)
+  × правило на день. Считается при чтении, ничего не хранит. Строка `ProjectionLine` — канал × вид × код ×
+  `ProjectionStatus` (`mapped` / `excluded` — правило без статьи / `unmapped` — правила нет) × статья;
+  Σ канона = Σ трёх статусов. `ProjectionReport::amountsByCategory()` — рубли в знаке строки документа
+  `marketplace_pl`, вход `FinanceFacade::calculatePlPreview()`.
+- Расчётные строки (`ProjectionReport::$derivedByCategory`, в тождество канона не входят), статья — по коду
+  листа в дереве компании: «Продажи с СПП» `REV_SPP_SALES` = продажи − СПП и соинвестирование продаж,
+  «Возвраты с СПП» `REV_SPP_RETURNS` — то же по возвратам (`ProjectionBuilder::revenueWithSpp()`); себестоимость
+  `COGS_PRODUCT_REV` = `MarketplaceEconomicsFacadeInterface::costPrice()` — проданное за вычетом возвратов одной
+  суммой, «Себестоимость возвратов» отдельно не выделяется. Нет статьи с кодом или у части проданного нет
+  цены — предупреждение на экране.
+- Экран — `GET /marketplace/economics/pl` (`marketplace_pl_projection`, `PlProjectionController`, вкладка «ОПиУ»,
+  модуль `MARKETPLACE`): `from`, `to` (по умолчанию текущий месяц, МСК; не длиннее 366 дней), `channel`.
+  Колонки дерева — новый расчёт, текущий (`Marketplace\Facade\LegacyPlPreviewFacadeInterface::amountsByCategory()` —
+  «Итого» предпросмотра ОПиУ легаси) и разница; ниже — «не сопоставлено» и «исключено» по видам и кодам.
+  Таблица повторяет дерево статей компании до границы — строки с кодом `CM3` и следующей `CM3K`
+  (`Application\Service\TreeCut`), пустые строки на месте (`hide_empty=1` — скрыть); статьи ниже границы с
+  суммой — блок «Ниже СМ3»; кода `CM3` в дереве нет — дерево целиком.
 
 ### Marketplace: WB financial report sync status (дневной статус)
 
@@ -1386,6 +1699,50 @@ PostgreSQL выдаёт номер из `companies_public_id_seq` (INTEGER, на
 остаются прежними. Пропуски последовательности допустимы, удалённые номера не выдаются
 повторно; после публикации номеров откат только forward-fix.
 
+### Справочник проектов (`Company`)
+
+`ProjectDirection` хранит необязательные `code` (до 15 символов, верхний
+регистр, `[A-Z][A-Z0-9_]{0,14}`) и многострочное `description` (до 300
+символов). Заполненный код уникален внутри компании. `systemCode` определяет
+системный проект и сохраняется при его редактировании.
+
+JSON v1 содержит `version`, `companyId`, `projects` с полями `id`, `name`,
+`code`, `description`, `sort`, `parentId`. Импорт обновляет проекты по UUID,
+добавляет новые UUID из файла и сохраняет отсутствующие в файле проекты.
+Внешние ссылки, правила выбора проекта по умолчанию и связи с ЦФО сохраняются.
+
+Создание, редактирование, удаление и подтверждение импорта берут одну
+транзакционную advisory-блокировку `project_directions:<companyId>`.
+Успешная запись меняет `companies.project_direction_revision` в той же
+транзакции. Предпросмотр читает ревизию и строки одним SQL-снимком.
+Подтверждение сравнивает ревизию под блокировкой и повторяет проверку
+итогового дерева до первой записи. Форма редактирования передаёт ревизию
+открытого справочника. При конфликте правки сохраняются в форме для сверки.
+
+`GET /project-directions/export` требует `finance.read`. Предпросмотр на
+`/project-directions/import` и подтверждение на
+`POST /project-directions/import/confirm` требуют `finance.write`; оба POST
+проверяют CSRF. Redis хранит проверенные поля JSON и ревизию до 15 минут.
+Для каждой сессии, пользователя и компании действует последний успешный
+предпросмотр. Подтверждение забирает его один раз. Перед декодированием
+проверяется сложность структуры JSON. При массовых ошибках показаны первые 100.
+
+Экран `GET /project-directions/copy` и оба POST (`copy/preview`,
+`copy/confirm`) требуют `finance.write` в активной компании. Оба POST
+проверяют CSRF и `finance.read` в источнике. Одноразовый предпросмотр
+хранится в Redis 15 минут с привязкой к пользователю, сессии и паре компаний.
+
+Межкомпанийное копирование сохраняет в `project_direction_copy_mappings`
+одну запись на пару (проект источника, компания-получатель). Внешние ключи
+связывают её с обоими проектами и удаляют соответствие при удалении любого
+из них. Системные проекты сопоставляются по `systemCode`. Запись добавляет
+только новые проекты и связи, сохраняя поля и родителей существующих проектов.
+
+`CopyProjectDirectionsAction` берёт блокировки обоих справочников в порядке
+UUID. Подтверждение сравнивает обе ревизии, заново строит план и проверяет
+коды и дерево. Пакетная запись проектов, соответствий и новой ревизии
+получателя выполняется в одной транзакции.
+
 ### Справочник контрагентов (`Company`)
 
 `CounterpartyFacade` (`src/Company/Facade/CounterpartyFacade.php`) — единственная точка
@@ -1483,12 +1840,16 @@ setManualDisplayName(string $name): void  // правка пользовател
 // CounterpartyDisplayNameSuggestion
 
 // src/Company/Application/RefreshCounterpartyDisplayNamesAction.php
-// Пересчёт по всем компаниям: CounterpartyDisplayNameBacklogQuery (скалярные порции по id,
-// кросс-компанийный, только CLI) + CounterpartyDisplayNameWriter::writeAutoIfUnchanged()
-// — условный UPDATE (name не изменился, источник не manual): параллельная правка
-// пользователя не перезаписывается. updatedAt не меняется; идемпотентно.
+// Пересчёт: CounterpartyDisplayNameBacklogQuery (скалярные порции по id; companyId = null — все
+// компании, только CLI; companyId — одна компания) + CounterpartyDisplayNameWriter::writeAutoIfUnchanged()
+// — условный UPDATE (name не изменился, источник не manual, версия правил ещё не текущая):
+// параллельная правка пользователя не перезаписывается, параллельный повтор не пишет дважды.
+// updatedAt не меняется; идемпотентно. Транзакции нет: каждый UPDATE независим (autocommit),
+// обрыв посередине оставляет согласованное состояние, повтор дописывает остаток.
 // CLI: app:counterparty:refresh-display-names [--dry-run] [--samples=50, только с --dry-run]
-__invoke(bool $dryRun, int $sampleLimit = 50): CounterpartyDisplayNameRefreshResult
+// Кнопка «Нормализовать названия» в списке: Preview/ApplyCounterpartyNormalizeController
+// (FINANCE_WRITE, активная компания; предпросмотр — dry-run, «Применить» — запись)
+__invoke(bool $dryRun, int $sampleLimit = 50, ?string $companyId = null): CounterpartyDisplayNameRefreshResult
 
 // src/Company/Infrastructure/Query/CounterpartySearchQuery.php — DBAL, скаляры
 // Цифры → префикс по inn; иначе nameCore префикс + similarity(nameCore) > 0.3.
@@ -1588,9 +1949,13 @@ isPLRegisterConsistent(string $companyId, \DateTimeImmutable $from, \DateTimeImm
 // - Для документов с type=marketplace_pl используется ЗНАКОВАЯ семантика:
 //     отрицательная сумма = расход (charge),
 //     положительная сумма = доход или сторно (storno) расхода.
-//   PLRegisterUpdater::aggregateDocuments() уважает эту семантику:
+//   PLRegisterUpdater::aggregateDocuments() уважает эту семантику без модуля:
 //     nature == INCOME  → income  += signedAmount
 //     nature == EXPENSE → expense += -signedAmount
+//   income/expense статьи за день могут быть отрицательными (сторно больше
+//   начислений, маркетплейс забрал компенсацию) — CHECK ≥ 0 снят.
+//   Поток revenue: знак строки — по природе статьи (±|amount|), is_negative
+//   маппинга продаж на знак не влияет; поток costs — знак is_negative/сторно.
 // - Для остальных типов документов (CASHFLOW_*, TAXES, LOANS, PAYROLL и др.)
 //   сохраняется legacy-семантика: amount всегда >= 0, направление
 //   (income/expense) определяется по category.flow через nature, и в
@@ -1795,16 +2160,23 @@ manage — только владелец. Новые права автомати
 транзакцию и берет company FOR SHARE, согласованную с существующим PESSIMISTIC_WRITE
 операций изменения членства и ролей. Запросы с неверными идентификаторами закрыты.
 
+`CompanyFacade::userHasModuleAccess(string $companyId, string $userId, Module $module, AccessLevel $level): bool`
+— право пользователя на модуль без HTTP-сессии (фоновые задачи от имени пользователя): владелец или
+активный участник через `ModuleAccessResolver::allowsForCompany`. Неверные/чужие ID → false.
+
 > **Остальные Facade** добавлять сюда по мере реализации модулей.
 
 ### Cash transaction auto-rule governance
 
 - `CashTransactionAutoRule` is company-owned and has an immutable company, a Doctrine-managed optimistic-lock `revision`, lifecycle timestamps, and nullable user IDs for create/update/disable actors.
-- Rules are disable-only: an inactive rule cannot be re-enabled or physically deleted through the Cash auto-rule UI.
+- Создание, изменение и повторное включение проходят через предпросмотр и подтверждение с правом записи финансов. Форма сравнивает действующий набор с предложенным на одних и тех же операциях. До подтверждения обработчик использует прежние правила. Подпись связывает компанию, пользователя, UUID правила, условия, назначаемые поля, приоритет и версии. При сохранении сервер сверяет снимок под блокировкой, повтор определяет по записи аудита. Отключение и удаление остаются отдельными действиями.
+- Условие назначения платежа поддерживает `CONTAINS`, `NOT_CONTAINS` и `EQUAL`; регистр и е/ё нормализуются одинаково. Пустое назначение не удовлетворяет ни одному из трёх операторов.
 - One matcher is shared by preview, manual apply, and the worker. It resolves category, project, ЦФО, and counterparty by the same priority, specificity (condition count plus a direction constraint), and immutable-rule-ID ordering. Project and ЦФО winners are then applied as one validated pair; category and counterparty remain independent.
 - Exact conditions may additionally match a company-owned money account, currency, import-source identifier, transfer flag, and normalized document type. Money accounts use a foreign-key identity and are restricted to the rule company. Missing import lineage is represented explicitly by `__MISSING__`; it is not treated as an empty condition value. Existing source data is not normalized or backfilled by the rule module.
 - The authenticated company-scoped preview is read-only and always models the `safe` application plan; it does not predict `replace_auto_assigned` changes. It uses one active-pair snapshot, limits only displayed rows, and calculates full-period counts plus independent month, currency, resulting-category, resulting-project, and resulting-ЦФО breakdowns.
 - The authenticated rule-candidate report is also read-only and company-scoped. It inspects the last 180 days, accepts only the latest user-confirmed category assignment, requires at least five samples across three operation dates with 100% category consistency, and proposes one exact condition signal at a time. It returns at most 100 category-only candidates and never creates rules, dispatches work, or changes historical transactions.
+- Из кандидата форма получает проверенные в компании направление, сигнал и целевую статью. Для запроса `cash_rule_phrase/v1` через ServiceGateway нужны действующий ИИ-доступ и бюджет. Модель получает обезличенные примеры одного контрагента. Cash проверяет предложенную фразу на ручных назначениях, показывает совпадения с целевой и другими статьями и открывает общий процесс подтверждения.
+- В списке правил статистика за период сгруппирована по версиям. Источник назначений и ручных исправлений — аудит поля статьи, период определяется по моменту назначения. Для каждой компании первое фактическое применение открывает период наблюдения. Неоднозначные совпадения старых событий в пределах одной секунды не засчитываются как исправления; новые события аудита имеют микросекундную точность. Конфликт статьи записывается при реальном применении один раз на компанию, правило, версию и операцию. Для конфликта период определяется по первому наблюдению. Счётчик и список операций используют общий запрос.
 - A category/counterparty conflict skips only its field. A project or ЦФО conflict blocks both paired changes. Existing custom pairs are preserved, the exact `PROJECT_GENERAL × CFO_GENERAL` pair is an eligible placeholder, incomplete/unavailable pairs fail closed, `CF_UNALLOC` remains empty for category filling, and null rule targets never clear transaction fields.
 - Range processing has two explicit modes. `safe` preserves the existing fill-only behavior. `replace_auto_assigned` may additionally replace an assigned category or the complete project×ЦФО pair only when the latest same-company field audit proves that the current value was assigned by an auto rule and still equals that audit's `after` value. A later manual audit, unknown provenance, conflicting same-second audit, or a manually owned half of the pair fails closed and preserves the complete pair. Counterparties are never force-replaced, and a missing current winner never clears an old value.
 - Each actual auto-rule mutation persists one `AuditLog` for the `CashTransaction` in the same flush. Its diff contains a range/transaction correlation UUID, apply mode, per-field rule ID/revision, and changed field before/after IDs; descriptions, INNs, and bank payloads are excluded. User-launched range work also propagates the initiating user ID to the audit record.
@@ -1864,7 +2236,8 @@ manage — только владелец. Новые права автомати
   (`CompanyTaxProfileFacadeInterface::taxProfileOn()`): нет профиля и «без НДС» —
   без НДС, УСН 5% / 7% — фиксированная ставка, общие ставки — общая ставка на
   дату операции.
-- Общая ставка — `VatRates::generalRateOn()`: 18% до 2019, 20% с 01.01.2019,
+- Ставка режима — `Company\Enum\VatMode::ratePercentOn(date)` (общий источник для
+  Cash и переменной `VAT_RATE` формул ОПиУ); общая ставка: 18% до 2019, 20% с 01.01.2019,
   22% с 01.01.2026; граница по календарной дате операции в её часовом поясе.
   Сохранённые операции при смене справочника не пересчитываются.
 
@@ -1943,6 +2316,11 @@ manage — только владелец. Новые права автомати
   `TaxRegime::allowedVatModes()`, проверяются в конструкторе и `change()`.
   Unique `(company_id, valid_from) NULLS NOT DISTINCT` и CHECK «1-е число» — в
   миграции `Version20261101120000`. Подвид УСН не хранится.
+- `taxRatePercent` (`tax_rate_percent NUMERIC(5,2) NULL`, CHECK 0…100,
+  `Version20261117210000`) — ставка налога режима (УСН 6/15, АУСН 8/20), вводит
+  владелец; необязательна при любом режиме, `null` — не задана. Отдаётся в
+  `CompanyTaxProfileDTO::$taxRatePercent`, читает переменная `TAX_RATE` формул ОПиУ.
+  Повторное сохранение того же месяца заменяет период целиком, включая ставку.
 - Профиль на дату — последний датированный с `validFrom ≤ календарной даты`
   (в часовом поясе переданной даты), иначе начальный, иначе `null`.
 - `CompanyTaxProfileFacadeInterface::taxProfileOn(string $companyId,
@@ -1961,6 +2339,31 @@ manage — только владелец. Новые права автомати
   (сочетания вне старого enum — `NULL`).
 - Откат миграции (`DROP TABLE`) возвращает состояние до неё, но теряет периоды,
   сохранённые после деплоя; `tax_system` к тому времени устаревает.
+
+### Company: группа консолидации (`company_consolidation_member`)
+
+- Одна таблица: `company_id` PK, `head_company_id`, `created_at`. FK обоих столбцов на
+  `companies` с `ON DELETE CASCADE` — в миграции `Version20261117150000`. У головной компании
+  своя строка, в которой `head_company_id = company_id`. PK держит инварианты: компания входит
+  не больше чем в одну группу, головная не участник чужой группы, участник не головная.
+- `ConsolidationGroupFacadeInterface`:
+  - `headOf(string $companyId): ?string` — головная компания группы (для головной — она сама,
+    вне группы — `null`);
+  - `members(string $headCompanyId): list<string>` — все компании группы, головная первой;
+    пусто, если компания не головная.
+  - `lockedHeadOf(string $companyId): ?string` — то же, что `headOf()`, но из БД и под
+    блокировкой кабинета владельца до конца транзакции вызывающего; брать первой, до блокировок
+    своего модуля.
+  - `headsOf(list<string> $companyIds): array<string, string>` — головные одним запросом
+    (ночная проверка): companyId => headCompanyId в порядке входа, вне группы — нет ключа.
+  Дерево ДДС головной компании — эталон группы (задача `cashflow-group-chart`).
+- Запись: `ConfigureConsolidationGroupAction(headCompanyId, ownerUserId, enabled, memberIds)` —
+  транзакцией владеет сам, под `pg_advisory_xact_lock(hashtextextended(
+  'company_consolidation:'||ownerUserId))`. Выключение удаляет группу целиком, включение
+  заменяет состав. Головная компания и участники — только компании этого владельца. Отказ —
+  `InvalidConsolidationGroupException`, данные не меняются. Меняет только владелец, в блоке
+  «Консолидация» настроек компании (`POST /company/{id}/consolidation`). Участнику блок
+  показывает его группу без формы.
 
 ### Billing: тарифы и оплаченный период (`billing_*`)
 
@@ -2390,10 +2793,113 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 |---|---|---|
 | Company (`CompanyOwnerMembershipCreator`, до события) | участник-владелец, проект «Общий» (`PROJECT_GENERAL`), ЦФО «Общий» (`CFO_GENERAL`) и их связь | — |
 | Cash `EnsureCashflowSystemCategoriesOnCompanyCreated` | 7 системных статей ДДС | по `system_code` |
-| Cash `ApplyCashflowCoreTemplateOnCompanyCreated` (priority −10, после системных) | ядро ДДС `config/cash/cashflow_templates/core.yaml`: 7 групп и 30 статей с направлением и описанием «что входит и почему» с пометкой «ОПиУ — напрямую, в …» или «ОПиУ — не попадает»; связи с ОПиУ не ставит; одно на все профили; backfill не применяет | нет ни одной несистемной статьи ДДС |
+| Cash `ApplyCashflowCoreTemplateOnCompanyCreated` (priority −10, после системных) | ядро ДДС `config/cash/cashflow_templates/core.yaml` (v2): 7 групп и 30 статей с кодом консолидации (`group_code`), направлением и описанием «что входит и почему» с пометкой «ОПиУ — напрямую, в …» или «ОПиУ — не попадает»; связи с ОПиУ не ставит; одно на все профили; backfill не применяет | нет ни одной несистемной статьи ДДС |
 | Cash `EnsureDefaultMoneyAccountsOnCompanyCreated` | «Основной счет» BANK RUB, касса «Основная» CASH RUB | нет ни одного денежного счёта |
 | Finance `ApplyDefaultPLTreeOnCompanyCreated` | дерево ОПиУ шаблона профиля (`config/finance/pl_templates/`) | нет ни одной статьи ОПиУ |
 | Balance `SeedBalanceStructureOnCompanyCreated` | книга (не инициализирована), статьи и учётные счета шаблона профиля (`config/balance/templates/`) | статьи — нет статей; счета — нет ни одного счёта |
+
+Существующей компании ядро ДДС ставит `app:cash:cashflow-core:apply <companyId> [--execute]`
+(`ReplaceUnusedCashflowTreeWithCoreAction`): без `--execute` печатает план; с `--execute`
+команда владеет транзакцией (`wrapInTransaction`, `pg_advisory_xact_lock(hashtext(companyId))` —
+тот же ключ, что у `CashflowCategoryStructureMigrator`). Внутри: системные статьи (идемпотентно),
+открытые ИИ-подсказки на удаляемые статьи → `stale`, удаление несистемных статей (с листьев),
+ядро. Если хоть на одну несистемную статью ссылается операция (в т. ч. удалённая), разбивка,
+платёжный календарь или правило, а также пока подсказки ИИ ждут ответа (`requested`: ответ на
+старый список статей сослался бы на удалённую), команда отказывает и данные не меняет. Открытые
+подсказки берутся `FOR UPDATE`; если ядро создано не полностью (статью завели параллельно),
+транзакция откатывается. Если дерево уже совпадает с ядром по путям названий, команда не
+пересоздаёт его, а только проставляет `group_code` статьям без кода. Статья с кодом блокирует замену.
+
+**Код консолидации `cashflow_categories.group_code`** (`varchar(64) NULL`, unique
+`(company_id, group_code)`) — ключ, по которому статьи разных компаний сводятся в
+консолидированный ДДС (задача `cashflow-group-chart`). Коды ядра заданы в `core.yaml`
+(`{OP|FIN|INV}_{IN|OUT}[_SLUG]`, проверяет `CashflowCoreTemplateReader`, утверждены в
+`docs/tasks/cashflow-group-chart/chart.md`) и не меняются. `CashflowCategory::assignGroupCode()`
+назначает код один раз. Статью с кодом нельзя удалить (`assertCanDelete`, `PreRemove`) и
+перенести (`setParent`); в форме правки поле «Родитель» скрыто (`lock_parent`), переименовать
+можно. `DeleteCashflowCategoryAction` берёт блокировку дерева компании (`lockTree()`) и перепроверяет
+код по строке под `FOR UPDATE` (`CashflowCategoryRepository::lockStoredPlacement()`,
+`wrapInTransaction`): форма могла загрузить статью до того, как ей проставили код. `SaveCashflowCategoryAction` владеет транзакцией соединения
+(`Connection::transactional()`, не `wrapInTransaction()` — тот сделал бы `flush()` изменённой формой
+статьи и при отказе): `lockTreePlacements()` берёт `pg_advisory_xact_lock(hashtext(companyId))` (ключ
+загрузки из JSON и синхронизации эталона) и читает родителя и код всех статей компании; по ним с
+новым местом статьи перепроверяются: статья и родитель не удалены, цикл, глубина до 5 уровней с
+потомками, уникальность кода, вид деятельности нового корня по базе равен вычисленному формой, а при
+смене вида деятельности — состав поддерева по базе равен поддереву в памяти;
+затем `lockStoredPlacement()` — код консолидации. Отказ — строкой из транзакции до записи, затем
+`DomainException` (flash); EntityManager остаётся открытым. Команда берёт дерево компании
+`lockTreeByCompany()` (FOR UPDATE + refresh) после advisory lock. Ставят код онбординг (`ApplyCashflowCoreTemplateAction`), `app:cash:cashflow-core:apply` и
+синхронизация с эталоном группы.
+
+**Синхронизация с эталоном группы** — `SyncCashflowGroupChartAction` и команда
+`app:cash:group-chart:sync <companyId> [--execute]` (без `--execute` — план, `plan()` только
+читает). Эталон участника группы (`ConsolidationGroupFacadeInterface::headOf() ≠ сама`) —
+несистемные статьи головной компании; статьи головной без кода получают `group_code` = свой id.
+Эталон головной компании и компании вне группы — `core.yaml`. Для каждого узла эталона, от
+родителей к детям:
+- статья с тем же кодом уже есть — ничего не меняется;
+- одна статья без кода с тем же названием (регистр, «ё», знаки) в ветке привязанного родителя —
+  получает код;
+- две и больше, другое действующее направление (с наследованием от предков) или глубина больше
+  5 уровней — конфликт: узел и его дети пропускаются;
+- нет ни одной — статья создаётся. Обычная корневая статья головной создаётся корнем со своим
+  `flowKind`; одноимённый корень участника с другим видом деятельности — конфликт.
+Ничего не удаляется, не переименовывается и не переносится. Транзакцией владеет команда
+(`wrapInTransaction`). Порядок блокировок: первой — блокировка кабинета владельца через
+`ConsolidationGroupFacadeInterface::lockedHeadOf()` (та же, что у `ConfigureConsolidationGroupAction`;
+состав читается из БД и не меняется до commit), затем `pg_advisory_xact_lock(hashtext(...))`
+головной компании, потом компании (источник раньше производных; ключ тот же, что у
+`CashflowCategoryStructureMigrator`), затем `lockTreeByCompany()` обеих. Применение с
+изменениями пишется в журнал `cashflow_group_chart_applications` (миграция
+`Version20261117180000`): `source` (`core`/`head`), `head_company_id`, счётчики привязанных,
+созданных, конфликтов и кодов головной компании.
+
+Экран «Эталон группы» — `GET /cashflow-categories/group-chart` (активная компания, ссылка со
+страницы статей ДДС): эталон, план `plan()`, «Не сопоставлено» (несистемные статьи без кода,
+`CashflowGroupChartSyncPlan::unmatched`) с выбором свободного кода эталона (`freeCodes`).
+«Применить план» — `POST …/group-chart/apply` (`ApplyCashflowGroupChartAction` владеет
+транзакцией вокруг той же синхронизации). Ручная привязка — `POST /cashflow-categories/{id}/group-code`:
+`BindCashflowCategoryGroupCodeAction` владеет транзакцией, внутри `SyncCashflowGroupChartAction::bind()`
+под теми же блокировками; только ставит код, дерево не перестраивает. Отказ (статья не своя или
+системная, уже с кодом, кода нет в эталоне или он занят, другое действующее направление или вид
+деятельности) — значением из транзакции до записи, затем `CashflowGroupChartBindingException` (flash).
+Привязка к статье головной без кода ставит коды головной, как синхронизация. Запись — FINANCE_WRITE.
+Ночная проверка `app:directories:integrity-check`: `CheckCashflowGroupChartDrift` для компаний групп
+(`headsOf`) делает `plan()` и при расхождении (привязать, создать, конфликты, статьи без кода)
+пишет справочную строку `ДДС-группа` — на exit code не влияет; компании вне групп не проверяются.
+
+**Загрузка дерева из JSON** — `GET|POST /cashflow-categories/import` (выбор файла и предпросмотр,
+ничего не пишет) и `POST /cashflow-categories/import/apply`; POST обоих — FINANCE_WRITE (на
+смешанном маршруте — рантайм-гейт в теле). Формат файла —
+выгрузка `GET /cashflow-categories/export/json`. План строит `CashflowCategoryImportPlanner`
+(только читает): статья с `id` компании обновляется; без `id` или с UUID, которого нет ни у одной
+компании, — создаётся (с этим `id`: он же ключ повтора); `id` статьи другой компании
+(`CashflowCategoryRepository::findIdsOutsideCompany()`) или не UUID — отказ (принятый риск: по
+известному UUID видно, есть ли он у другой компании; перебором uuid7 не найти); конфликт первичного
+ключа при одновременном создании того же id в двух компаниях — отказ «Форма устарела», не 500;
+родителя задаёт вложенность `children`, у статьи верхнего уровня — `parentId`; поля, которого нет
+в файле, и статьи, которых нет в файле, загрузка не меняет и ничего не удаляет. Вид деятельности
+читается только у корня, потомкам проставляется производным. Любая ошибка (системная статья,
+перенос статьи с `group_code` или смена её `operationType`, глубина больше 5, цикл, дубль кода, чужая статья ОПиУ) отклоняет
+файл целиком. `ImportCashflowCategoryTreeAction` владеет транзакцией (`wrapInTransaction`):
+`pg_advisory_xact_lock(hashtext(companyId))` (ключ тот же, что у синхронизации эталона), затем
+`lockTreeByCompany()`, пересчёт плана и сверка отпечатка с показанным в предпросмотре — при
+расхождении отказ значением из транзакции до записи. Меняющиеся коды освобождаются промежуточным
+`flush()` в той же транзакции. Ключ повтора — ID новых статей (UUIDv7), выданные предпросмотром и
+возвращаемые формой: повторная отправка находит статьи созданными и ничего не пишет.
+
+**Консолидированный ДДС группы** — `GET /finance/reports/cashflow/group?from=&to=` (по умолчанию —
+текущий месяц) и `…/group/export.xlsx`, ссылка «ДДС группы» на странице отчёта ДДС. Группа активной
+компании (`headOf`, `members` — головная первой). `BuildCashflowGroupReport` (только чтение): суммы
+`CashflowGroupReportQuery` (один SQL по компаниям группы, охват как у `listCashflowReportRows`: строки
+разбивки не удалённых транзакций, дата в периоде, знак по направлению) сворачиваются к ключу статьи —
+ближайший предок с `group_code`; операция прямо на системной статье — `sys:<systemCode>` (секция);
+статья без кода под системной и код, которого нет в дереве головной, — «Не сопоставлено». Строки —
+дерево головной компании, суммы с подстатьями; колонки — компании, «Внутригрупповые» (ИНН
+контрагента = ИНН другой компании группы, `companies.inn`), «Итого по группе» = сумма компаний минус
+внутригрупповые. Только RUB, другие валюты — отдельно по компаниям; компании без ИНН перечисляются
+предупреждением. Деньги — bcmath. Доступ (`CashflowGroupReportRequest`): владелец всех компаний
+группы, иначе 403; компания вне группы — пояснение. DTO: `CashflowGroupReport`, `CashflowGroupReportLine`.
 
 Компании, созданные до онбординга, дозаполняет `app:company:onboarding-backfill
 [--company=<uuid>] [--execute --expected-count=N] [-v]` (`BackfillCompanyOnboardingAction`):
@@ -2483,7 +2989,15 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
 - Entity `CashCategorySuggestion`: компания, операция, `task_id`, статус
   `CashCategorySuggestionStatus` (`requested` → `suggested` / `no_answer` /
   `failed` / `stale`; `suggested` → `accepted` / `dismissed` / `auto_applied` /
-  `stale`), статья,
+  `stale`; `no_answer` и `suggested` у операции, ещё ждущей статью, → `stale` одним UPDATE
+  `CashCategorySuggestionRepository::reopenAfterTreeChange()` после смены дерева статей — ответ выбран
+  из старого дерева, операция снова кандидат (`suggested` у разнесённой человеком операции — решение
+  правкой, история точности, не трогается): при замене
+  ядром `ReplaceUnusedCashflowTreeWithCoreAction` (`category_tree_replaced`), при загрузке из JSON
+  `ImportCashflowCategoryTreeAction` (`category_tree_imported`, в транзакции загрузки) и командой
+  `app:cash:ai-suggestions:reopen-no-answer <companyId> [--execute]` (`reopened`; имя прежнее ради
+  wrapper codex-console); принятие и автоприменение (`CashCategorySuggestionApplier`) сначала берут
+  блокировку дерева компании, потом подсказку), статья,
   уверенность `decimal(5,4)`, вердикт, модель, версия промпта, кто и когда решил.
   Unique (`task_id`, `transaction_id`); частичный unique
   `uniq_cash_category_suggestion_open` — не больше одной открытой
@@ -2690,8 +3204,22 @@ ai-service `categorize_transactions`, контракт `ai-task/v1` `categorize_
 - Cash не зависит от `App\Analytics` — гейт `test_cash_does_not_depend_on_analytics`
   (`site/tests/Architecture/ModuleBoundaryRules.php`).
 
+### Пользовательский MCP (`src/Mcp`)
+
+- `/mcp` использует отдельный stateless firewall и OAuth Authorization Code с PKCE S256. Выдача согласия и отзыв подключений проходят в обычной сессии кабинета. Внешние вызовы используют только bearer-токен, выданный для канонического ресурса `/mcp`.
+- Пользователь выбирает одну собственную компанию при выдаче согласия. Запросы фильтруются актуальными финансовыми правами и статусом подписки. При `NONE` доступ закрыт. Разрешение на черновики выдаётся отдельно. Отзыв применяется к подключению, его access и refresh токенам.
+- MCP-каталог публикует `list_reference_items`, `list_cash_transactions` и `create_cash_draft` по схемам `site/contracts/mcp/v1`. Инструменты работают через DTO Cash и CashFacade. Сессии старой ревизии протокола и лимиты хранятся в Redis. Современная ревизия проверяет полномочия на каждом вызове.
+- Черновик связывает компанию, владельца, подключение и внешний ID. Подтверждение из раздела ДДС создаёт фактическую операцию с `importSource=mcp`. Повтор создания сверяется с исходными параметрами и возвращает прежний ID и текущий статус.
+- В аудит канала `mcp` передаются ID вызова, ID подключения, код результата и длительность. Настройка стенда и клиентов описана в [инструкции](docs/tasks/mcp-cash/oauth.md).
+
 ### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
 ```php
+// Постраничные справочники Cash для внешних клиентов. Ключ — UUID последней строки.
+listExternalAccounts(string $companyId, ?string $search, ?string $afterId, int $fetchLimit): array
+listExternalCategories(string $companyId, ?string $search, ?string $afterId, int $fetchLimit): array
+// Фактические операции с полным распределением, исключая удалённые. Курсор по дате и ID.
+listExternalTransactions(string $companyId, DateTimeImmutable $from, DateTimeImmutable $to, ?string $accountId, ?string $categoryId, ?CashDirection $direction, ?array $after, int $fetchLimit): array
+
 // Загрузка банковской выписки (вызывает BankSync; раздел «BankSync → Cash: загрузка выписки»)
 // Чтение: активный денежный счёт компании по id — цель загрузки привязанного счёта банка; иначе null
 getStatementImportAccount(string $companyId, string $moneyAccountId): ?StatementImportAccount
@@ -2711,6 +3239,9 @@ finishStatementImportLog(string $companyId, string $importLogId, StatementImport
 abandonStatementImportLog(string $importLogId): void
 // Строки дня → ДДС и пересчёт остатков; только внутри транзакции вызывающего, коммитит он
 importBankStatementDay(string $companyId, string $moneyAccountId, string $source, BankStatementDayInput $day): BankStatementDayResult
+
+// Черновик MCP, без проводки и разбора текста. Доверенный контекст предоставляет MCP.
+createMcpCashDraft(CreateMcpCashDraft $command): McpCashDraftResult
 
 // Создать ДДС-транзакцию из внешнего модуля (идемпотентно для внешних источников)
 createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionResult
@@ -2932,6 +3463,11 @@ getAdSpendByListingForPeriod(
     ?string $marketplace = null,
     ?AdSpendKind $kind = null,
 ): array
+
+// Оплата за заказ Ozon с привязкой к действующим листингам компании, с опциональным фильтром.
+// estimated входит в linked и содержит расходы, распределённые по продажам.
+// @return array{linked: float, estimated: float}
+getOzonPayPerOrderAttribution(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?array $listingIds = null): array
 ```
 
 ### `MarketplaceAnalyticsFacade` (`src/MarketplaceAnalytics/Facade/MarketplaceAnalyticsFacade.php`)
@@ -2962,6 +3498,14 @@ deleteCostMapping(string $companyId, string $mappingId): void
 // Переназначить статью юнит-экономики для маппинга (API только, UI кнопки нет)
 // Выбрасывает DomainException если маппинг не найден
 remapCostMapping(string $companyId, string $mappingId, UnitEconomyCostType $newType): UnitEconomyCostMapping
+```
+
+### `LegacyPlPreviewFacadeInterface` (`src/Marketplace/Facade/LegacyPlPreviewFacade.php`)
+```php
+// Что текущий расчёт отнёс бы на статьи ОПиУ за период («Итого» предпросмотра ОПиУ), в знаке строки
+// документа marketplace_pl. Только чтение; потребитель — MarketplacePlProjection (колонка сравнения).
+// @return array<string, string> plCategoryId → сумма
+amountsByCategory(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $marketplace = null): array
 ```
 
 ### `ListingTagFacade` (`src/Marketplace/Facade/ListingTagFacade.php`)
@@ -3012,6 +3556,11 @@ wbCostCategoryGroups(): array
 
 ### `MarketplaceFacade` (`src/Marketplace/Facade/MarketplaceFacade.php`)
 ```php
+// Постраничный read-контракт для внешнего маппинга (без фильтра по Catalog product).
+// Включает неактивные листинги; page >= 1, perPage 1..100, search до 100 символов.
+// Страница за концом: пустые items при сохранённом totalItems.
+paginateListingsForExternalMapping(string $companyId, ?string $marketplace, ?string $search, int $page = 1, int $perPage = 25): ListingMetaPageDTO
+
 // Состояние аутентификации подключения. Точка входа для модуля Ingestion:
 // обработчик синхронизации узнаёт про 401/403 первым, но сущности чужого
 // модуля не трогает. Возвращают true, когда состояние ТОЛЬКО ЧТО
@@ -3916,6 +4465,16 @@ buildQueryBuilder(
 
 ---
 
+## Telegram: фасад для других модулей
+
+`App\Telegram\Facade\TelegramFacadeInterface` (реализация `TelegramFacade`):
+
+- `sendDocumentToCompany(companyId, path, fileName, caption): array{sent, failed}` — файл (multipart
+  `sendDocument`, подпись ≤ 1024 символов) каждому пользователю с активной привязкой
+  `client_bindings` к компании у активного бота. Нет бота или привязок — `0/0`. HTTP вызывается вне
+  транзакций, данных не пишет; сбой одного получателя — `warning` и `failed`, остальным отправляется.
+  Потребитель — недельный отчёт `MarketplaceEconomics`.
+
 ## Telegram → Cash: контракт интеграции
 
 ### PaymentIntake: текстовые черновики
@@ -3985,17 +4544,20 @@ Canonical source41/semantic12 и human-reviewed additions hash-pinned; pending
 не регистрируется, expected fields не передаются модели. Обычный runtime/wheel
 не читает docs или исходники контрактов checkout. Набор с неизвестной суммой
 может хранить amountnull с вопросом и проверяемым anchor. Auto gold/model/prompt
-updates и auto-disable не реализованы. Ночной scheduler ещё не подключён.
+updates и auto-disable не реализованы. Расписание — `docker/cron/app.cron`,
+ночной контур включается отдельно `AI_SERVICE_EVAL_ENABLED`.
 
 Telegram-бот от ИИ-разбора отключён: текст операции всегда разбирает
 `CreateTelegramCashTransactionAction` регулярками (сумма — первое число,
 направление — знак или слово) и сразу пишет в ДДС выбранной кассы. Доступ
-компании к ИИ и `ClientBinding::paymentIntakeSelected` бот не учитывает.
-Сообщение, ставшее черновиком PaymentIntake раньше (`hasPaymentIntakeSource`),
-повторно в ДДС не пишется. Кнопки `pi:` старых черновиков отвечают «разбор
-отключён» и черновик не меняют; правка сообщения (`edited_message`)
-игнорируется. Telegram-доставка карточек (`RefreshPaymentIntakeMessage`,
-`RecoverPaymentIntakeDeliveryCommand`) новых сессий не получает.
+компании к ИИ (admin grant) и `ClientBinding::paymentIntakeSelected` бот не
+учитывает; команд `/draft` и `/cancel` у бота нет. Сообщение, ставшее
+черновиком PaymentIntake раньше (`hasPaymentIntakeSource`), повторно в ДДС не
+пишется. Кнопки `pi:` старых черновиков отвечают «разбор отключён» и черновик
+не меняют; правка сообщения (`edited_message`) игнорируется. Recovery
+(`app:telegram:recover-payment-intake`, UUID или `--all`) и воркер
+`async_payment_intake` дорабатывают только существующие Telegram-сессии и
+Cash-события Confirm; новых сессий бот не создаёт.
 
 `CashFacade` предоставляет request/get/amend/confirm/cancel сценарии черновика
 через DTO `Application/DTO/PaymentIntake`. Компания и пользователь приходят из
@@ -4011,6 +4573,17 @@ identity bytes, другие каналы используют собствен�
 
 `CashFacade::findPaymentIntakeDraftBySource(sourceKey, actorUserId)` возвращает
 авторизованный PaymentIntakeDraftView или null.
+`CashFacade::openPaymentIntakeDraftIds(companyId, actorUserId): list<string>`
+возвращает до 200 новейших незавершённых черновиков строго этого actor после
+проверки финансового доступа (Telegram-бот этот метод больше не вызывает).
+Отмена инвалидирует poll generation и durable pending intent, закрывает
+доставку и редактирование. Уже начатый HTTP может завершиться, но его
+финализация не публикует следующий шаг отменённой цепочки.
+Текстовая команда отмены передаёт reply key в `cancelPaymentIntakeDraft`:
+receipt и отмена фиксируются атомарно. `rememberPaymentIntakeReply(companyId,
+actorUserId, draftId, replyKey): void` сохраняет только identity запроса меню
+выбора без изменения платежей. Повтор старой команды или меню не отменяет
+следующий/оставшийся черновик; используется тот же global reply guard.
 `CashFacade::hasPaymentIntakeSource(sourceKey, ?replyIdempotencyKey=null): bool` возвращает
 только глобальный признак владения исходным сообщением или обработанным reply,
 без данных компании. Reply key передаётся адаптером явно; Telegram сохраняет
@@ -4020,6 +4593,35 @@ session и закрывает legacy fallback. `AmendPaymentIntakeDraftCommand` 
 `PaymentIntakeReplyReceipt` (UUIDv7, глобально уникальный SHA256 reply key).
 Повтор reply не изменяет другую выбранную строку/черновик. Receipt связан FK
 с Cash draft с ON DELETE CASCADE; исходный sourceRevision при reply не меняется.
+`AmendPaymentIntakeDraftCommand::commonText` задаёт отдельное атомарное общее
+уточнение: дата (ISO, ДД.ММ.ГГГГ, ДД.ММ.ГГ с годом 2000–2099), проект/ЦФО по
+точному однозначному имени, направление, валюта, факт оплаты, отдельные платежи.
+Применяется к неисключённым строкам под блокировкой Cash. Receipt общей правки
+использует draft ID в item_id (UUID-маркер общей цели); прежние receipt строк
+не меняются. Нераспознанная часть/конфликт отклоняют всё действие. Обычное
+«все оплачены» не подтверждает источник денег компании и не разрешает вопросы
+личных средств/компенсаций. Старые ручные правки сохраняют защиту от модели.
+Cash consumer распознаёт явные заголовки до первой нумерованной строки списка;
+дата/направление/проект/ЦФО заполняют только неизвестные поля, конкретная строка
+имеет приоритет. Справочники проверяются по снимку и повторно при сохранении.
+Неотвеченные финансовые вопросы остаются. Reply на сводку меняет весь пакет;
+однозначное общее уточнение без reply требует единственного открытого черновика.
+Автоматически снимаются только точные известные простые вопросы полей и
+собственные типизированные по полю сообщения об ошибках заголовка. Свободный
+финансовый вопрос не разрешается совпадением ключевого слова. Ошибку заголовка
+нельзя скрыть общей кнопкой: требуется исправление соответствующих реквизитов.
+Пакетное «Подтвердить оплату» подтверждает факт оплаты выбранных строк только
+после разрешения их вопросов. Неизвестные финансовые вопросы не снимаются этой
+кнопкой; такие строки остаются без paid_confirmed и требуют отдельного решения.
+
+Доставка Telegram отправляет общие вопросы и компактную сводку (по пять строк
+на страницу); подробности и следующие страницы открываются по callback без LLM.
+Суммы считаются десятичными строками отдельно по валюте и направлению, только
+для неисключённых строк с известными суммой/направлением. Детали длинной строки
+постраничны без потери вопросов; основная кнопка расположена отдельным рядом.
+ID синхронных карточек также регистрируются для последующих reply. Сводка
+содержит видимую revision: ответ ей имеет общий scope независимо от ранее
+выбранной строки и отклоняется, если сводка устарела.
 
 Telegram-привязка нового сценария содержит actual actorUserId приложения,
 перенесённый из ссылки авторизованного инициатора; старые null-привязки требуют
@@ -4038,8 +4640,15 @@ Consumer PaymentIntake только меняет текущую revision/attempt
 существующая таблица Messenger, queue_name=payment_intake, auto_setup=false,
 retry 2 секунды). `AiTaskFacade::requestTask` только для parse_payment_message
 ставит TransportNamesStamp этого транспорта; остальные типы сохраняют routing.
-Webhook не ждёт модель и не спит. Production worker нового транспорта требует
-именованного одобрения и запуска до включения пилота; код не меняет prod workers.
+Webhook не ждёт модель и не спит. Production worker
+`site-messenger-worker-payment-intake` работает без профиля и стартует в шаге [4/5].
+Cron каждые 5 минут вызывает одну команду `app:telegram:recover-payment-intake --all`:
+Cash recovery только с grant, доставка прежних результатов и событий Confirm — без grant.
+Ошибки Cash и Telegram не прерывают остальные каналы/компании; общий exit ненулевой.
+Старый вызов с UUID и `--skip-cash-recovery` сохраняется для отдельных диагностик.
+Маршрут `parse_payment_message` — single `deepseek/deepseek-flash`; маршруты
+категоризации и source-type draft сохраняют свои fallback. Ночной fingerprint
+меняется с конфигом, завершённый run текущей даты не переигрывается.
 Состояние доставки
 Telegram хранится отдельно от факта сохранения операций. Недоставка ответа
 не запускает сохранение повторно. Каждая новая необходимость доставки меняет
@@ -4057,6 +4666,15 @@ pagination и изоляцией ошибок. Не получивший рез�
 
 Legacy-путь ниже остаётся отдельным контрактом для прежнего сценария; outage
 нового сценария не должен молча переводить запрос в парсер первой цифры.
+
+Восстановление событий Confirm: `CashFacade::pendingPaymentIntakeEventCompanyIds()`
+возвращает только технические IDs компаний с `cash_event_pending`.
+`recoverPaymentIntakeEvents(companyId): int` доставляет существующие
+`CashTransactionsChanged` порциями по 100 без ИИ-доступа и новых платежей;
+подтверждение доставки коммитит `PaymentIntakeAction`. Опциональный `failOnError=true`
+в обоих Cash recovery методах сообщает о сбое автоматической команде; интерактивный
+Confirm сохраняет доставку с повтором без исключения. Telegram recovery включает
+эти компании даже без grant/сессии, чтобы сбой после Confirm не терял инвалидацию.
 
 ### Legacy: одна операция из сообщения
 
@@ -4829,7 +5447,8 @@ query: owner или ACTIVE membership, без deletionRequestedAt, DISTINCT, nam
   остатков по складам (`ozon.stocks.warehouses`, только вместе с `ozon.stocks`) — компаниям
   `ozon_fetcher.snapshots_companies`, поисковая аналитика (`ozon.analytics.queries`,
   `ozon.analytics.queries.details`, только вместе с `ozon.stocks`) — компаниям
-  `ozon_fetcher.search_analytics_companies`, возвраты (`ozon.returns`) — компаниям
+  `ozon_fetcher.search_analytics_companies`, воронка продаж (`ozon.analytics.funnel`) — им же без условия
+  остатков, возвраты (`ozon.returns`) — компаниям
   `ozon_fetcher.returns_companies`, снимки акций, поставок и кластеров (`ozon.actions`, `ozon.supplies`,
   `ozon.clusters`) — компаниям `ozon_fetcher.reference_companies`; ресурсы
   рекламы performance (`ozon.ads.campaigns`, `ozon.ads.expense`, `ozon.ads.daily`) — компаниям
@@ -4872,7 +5491,7 @@ Login throttling: 5 попыток / 15 мин (`security.yaml`, firewall `main`
 | `ModuleAccess` | Константы атрибутов `module.<group>.read|write` + `parse()` |
 | `ModuleAccessMap` | Карта FQCN/namespace-префиксов контроллеров → `Module`; побеждает самый длинный префикс |
 | `ModuleAccessVoter` | Голосует по `module.*`, делегирует резолверу |
-| `ModuleAccessResolver` | Уровни текущего пользователя; мемоизация на запрос по паре (user, company), `ResetInterface` |
+| `ModuleAccessResolver` | Уровни текущего пользователя; мемоизация на запрос по паре (user, company), `ResetInterface`; `allowsForCompany()` применяет те же правила к явной компании и её членству |
 | `ModuleAccessSubscriber` | **Read-гейт fail-closed** на `kernel.controller`: неклассифицированный контроллер без `#[PublicAccess]` → 403 |
 | `PublicAccess` (attribute) | Снимает модульный гейт с класса или метода |
 | `SystemCompanyRoles` | 5 системных шаблонов с фиксированными UUID (те же значения вставляет миграция) |
@@ -5427,6 +6046,9 @@ config/
 | `app:marketplace:wb-financial-reports:sync --mode=daily --max-days=1` | `10 3 * * *` | Ежедневное планирование WB financial sync за вчерашний день (date-based команда); задачи — `SyncWbFinancialReportDayMessage` → `async_wb_finance` |
 | `app:marketplace:wb-financial-reports:orchestrate --refresh-days-back=14` | `20 3-23 * * *` | Почасовой (с 03:20 до 23:20, 21 прогон в сутки) safe planner: current-month daily/retry/missing/empty recovery, затем rolling refresh последних 14 дней; не больше одной задачи на подключение за прогон |
 | `app:marketplace:wb-costs:unrecognized-check --days-back=14` | `40 6 * * *` | Read-only гейт: нераспознанные операции затрат WB за 14 дней у активных seller-подключений (`WbUnrecognizedCostsQuery` по `unprocessed_cost_types`); exit 1 — новый тип операции, один агрегированный `error`. Документы старше окна не краснят гейт |
+| `app:moysklad:mapping-bulk:requeue` | `*/10 * * * *` | Переотправка пакетов принятия предложений МойСклад без heartbeat >10 мин; повтор безопасен |
+| `app:moysklad:mapping-diagnostics:refresh` | `*/5 * * * *` | Пересчёт отсутствующих или устаревших отчётов диагностики маппинга МойСклад по активным подключениям; только чтение и dispatch, повтор — тот же runId |
+| `app:moysklad:mapping-auto-apply` | `30 5 * * *` | Пакет однозначных предложений МойСклад для подключений с включённым автоприменением; один в сутки |
 | `app:marketplace:cost-pl-mapping:sync-default` | `35 4 * * *`, `45 6 * * *` | Частичный базовый маппинг затрат в ОПиУ по шаблону для всех активных SELLER-подключений (ozon, wildberries) — до пересборки 04:45, чтобы новые категории ночи попали в ОПиУ утром. Ручные и отключённые правила не трогает. Повтор в 06:45 — перед гейтом, чтобы категории утренних загрузок не краснили его |
 | `app:marketplace:cost-pl-mapping:unmapped-check` | `50 6 * * *` | Read-only гейт: затраты текущего и прошлого месяца без документа ОПиУ, у категории которых нет решения по ОПиУ (`WITHOUT_PL_DECISION`); Ozon — только распознанные коды. exit 1 + один агрегированный `error`; зеленеет, как только статья назначена |
 | `app:marketplace:month-preliminary-rebuild` | `45 4 * * *` | Ежедневная пересборка предварительного ОПиУ за текущий месяц для всех активных подключений; вручную `--company-id --marketplace --month=YYYY-MM --stage [--execute]` — один этап за любой месяц, синхронно, без `--execute` только preflight |
@@ -5468,10 +6090,21 @@ config/
 | `app:ingestion:ozon-performance:daily-load --window=month-to-date` | `25 7 * * *` | Планирование Ozon Performance ingestion с начала месяца до вчерашнего дня; HTTP-загрузка выполняется `ingest_fetch` worker'ом |
 | `app:marketplace-ads:ozon-search-promo:sync` | `30 8 * * *` | Оплата за заказ Ozon из загруженных отчётов по заказам — в рекламную статистику по SKU, месяц вчерашнего дня |
 | **Инфраструктура** | | |
-| `app:source-facts:pull` | `*/15 * * * *` | Забор пачек фактов из ozon-fetcher (`source-fact-envelope` v1) в `sf_*`, ack после commit; выключено без `SOURCE_FACTS_COMPANIES`; недоступен — WARNING; нарушение контракта списка — ERROR |
+| `app:source-facts:pull` | `*/15 * * * *` | Забор пачек фактов из ozon-fetcher (`source-fact-envelope` v1) в `sf_*`, ack после commit; недоступен — WARNING; нарушение контракта списка — ERROR |
 | `app:source-facts:health-check` | `10 9 * * *` | Гейт приёма фактов: карантин или поток без применённых пачек > 36 ч — ERROR, exit 1 |
+| `app:marketplace-ozon:translate` | `5-59/15 * * * *` | Перевод начислений Ozon by-day из `sf_fact` в канон `mo_operation`; день — транзакция; сбой дня — ERROR в конце прогона |
+| `app:marketplace-ozon:translate --relink` | `57 6 * * *` | То же + повторный перевод дней с операциями без листинга (листинг появился после перевода) |
+| `app:marketplace-economics:refresh` | `10-59/15 * * * *` | Пересчёт витрины экономики SKU по дням, заменённым в каноне; день — транзакция; сбой дня — ERROR в конце прогона |
+| `app:marketplace-economics:refresh --recent=45` | `15 7 * * *` | То же + все дни с операциями за 45 суток (себестоимость и реклама легаси меняются без отметки в каноне) |
+| `app:marketplace-pl-projection:sync-template --all --execute` | `40 * * * *` | preset-правила «вид операции → статья ОПиУ» компаний с операциями канона — по шаблону платформы; custom не трогает; в ОПиУ не пишет |
+| `app:marketplace-economics:health-check` | `30 9 * * *` | Гейт витрины: Σ витрины дня ≠ Σ канона, заменённый день не пересчитан > 60 мин или нераспределённое за 7 дней > 1 % затрат — ERROR, exit 1 |
+| `app:marketplace-economics:weekly-report` | `0 9 * * 1` | Отчёт R3 «Неделя»: сводка и xlsx за прошлую неделю владельцу (почта) и в Telegram; `ECONOMICS_WEEKLY_REPORT_COMPANIES`; сбой компании — ERROR, exit 1 |
+| `app:marketplace-wb:translate` | `7-59/15 * * * *` | Перевод дневного отчёта WB из `sf_fact` в канон (все кабинеты); `--relink` — `58 6 * * *` |
+| `app:marketplace-wb:health-check` | `25 9 * * *` | Гейт переводчика WB — как у Ozon, только по включённым компаниям |
+| `app:marketplace-ozon:health-check` | `20 9 * * *` | Гейт переводчика Ozon: код без решения в карантине > 24 ч, непереведённый день, канон ≠ перевод за 45 дней или кабинет отстал больше D−2 — ERROR, exit 1 |
 | `app:service-gateway:coverage:refresh` | `*/10 * * * *` | Витрина покрытия ozon-fetcher из `GET /internal/coverage` (ServiceGateway); недоступен — WARNING, витрина прежняя; нарушение контракта — ERROR |
-| `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (`AI_SERVICE_ENABLED`, адрес, токен) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
+| `app:ai-service:import-results` | `*/5 * * * *` | Импорт результатов ai-service курсором с ack (ServiceGateway → потребители, напр. Cash); выключено (нет адреса или токена) — exit 0; недоступен — WARNING; нарушение контракта — ERROR |
+| `app:telegram:recover-payment-intake --all` | `*/5 * * * *` | Grants, pending Telegram delivery и события Confirm; каналы/компании независимы, сбой → exit 1; без grant только доставка, без Confirm |
 | `app:cash:ai-categorize --all-enabled` | `25 * * * *` | Компании allowlist ai-service с операциями за 90 дней: автоприменение по флагу компании, затем постановка ИИ-подсказок статей ДДС; сбой компании — ERROR, остальные идут дальше |
 | `app:storage:healthcheck` | `*/5 * * * *` | Синтетическая проверка объектного хранилища (write→read→delete); сбой → `error` → GlitchTip |
 | `app:billing:expiry-reminders` | `0 10 * * *` | Напоминания владельцам об окончании оплаты (7/3/1/0 дней, пробный — 3/0) → `async_sync`; отправленные пропускает, дубль отсекает handler (`billing_expiry_reminders`); сбой постановки — exit 1 + один `error`, повторный запуск безопасен |
@@ -5519,7 +6152,7 @@ The production PHP-FPM image and its opcache configuration are unchanged.
 | Транспорт | Воркер (`messenger:consume`) | Что идёт |
 |---|---|---|
 | `async_sync` | `async_sync` | Внешние HTTP: Ozon accrual/realization/catalog, inventory-загрузка, Cash-импорты, e-mail, MoySklad, задачи ai-service кроме parse_payment_message (`SubmitAiTaskMessage`), проверка платежей ЮKassa (`ApplyYooKassaPaymentMessage`) |
-| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake` (profile payment-intake); production worker требует отдельного одобрения | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Бот новых сессий не создаёт (ИИ-разбор от бота отключён) |
+| `async_payment_intake` | dev: `site-php-cli-worker-payment-intake`; prod: `site-messenger-worker-payment-intake` (постоянный запуск) | Интерактивная постановка parse_payment_message и poll/card delivery. 3 повтора по 2 секунды. Worker `messenger:consume async_payment_intake` работает постоянно; cron использует `app:telegram:recover-payment-intake --all`. Бот новых сессий не создаёт (ИИ-разбор от бота отключён) |
 | `async_pipeline` | `async_pipeline` | Локальная DB-обработка: Process*-сообщения Marketplace, Ads raw, нормализация inventory, auto-rules, ImportProducts |
 | `async_wb_finance` | `async_wb_finance` | `SyncWbFinancialReportDayMessage` (retry до 20 раз) |
 | `async_ads` | `async_ads` | Ozon Performance polling (`LoadOzonAdStatisticsRangeMessage`, `FetchOzonAdStatisticsMessage`, `RequestOzonAdBatchMessage`) |
@@ -5569,7 +6202,79 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.171 | 2026-11-23 | Telegram: ИИ-разбор платежей отключён от бота — операции из текста только регулярками; env `TELEGRAM_PAYMENT_INTAKE_ENABLED` удалена; ночной eval выключен переменной репозитория `vars.AI_SERVICE_EVAL_ENABLED=false` (вне кода, применяется деплоем) |
+| 2.243 | 2026-11-23 | Telegram: ИИ-разбор платежей отключён от бота — операции из текста только регулярками, кнопки `pi:` отвечают «разбор отключён», правка сообщения игнорируется; ночной eval выключен переменной репозитория `vars.AI_SERVICE_EVAL_ENABLED=false` (вне кода, применяется деплоем) |
+| 2.242 | 2026-11-23 | MarketplaceAnalytics: снимок дня (`SnapshotCalculationPolicy`) — себестоимость = цена × (продано − возвращено), как ОПиУ; день только с возвратами — отрицательная; API юнит-экономики и портфеля исправляются через сумму снимков, старые снимки — `app:marketplace-analytics:recalc-snapshots` |
+| 2.241 | 2026-11-23 | MarketplaceAnalytics: «Юнит-экономика» (`UnitExtendedQuery`) и карточки (`WidgetSummaryQuery`) вычитают себестоимость возвращённых единиц, как ОПиУ (`return_cost_price`); `ListingReturnAggregateDTO::costPriceTotal`; себестоимость единицы — по проданным |
+| 2.240 | 2026-11-23 | Marketplace/WB: шаблон затрат по умолчанию — `wb_loyalty_discount_compensation` → `OPEX_WH_COMPENSATION` («Компенсации МП», СМ3), как `ozon_compensation`; маппинги существующих компаний меняются в UI |
+| 2.239 | 2026-11-23 | Marketplace/WB: «Компенсация скидки по программе лояльности» — сторно (доход), как в финотчёте и каноне; MarketplaceOperations: баллы за отзывы и за чат, бонусы продавца — СМ2; MarketplaceWb: `wb:field:rebillLogisticCost` — `storage` (миграция `Version20261123150000`, подсказка экрана кодов), `SalesReportTranslator::RULES_VERSION` `wb-sales-report-4`; `RULES_VERSION` экономики `economics-6` — дни переводятся и пересчитываются сами |
+| 2.238 | 2026-11-23 | Finance: строка `marketplace_pl` — значение для отчёта (доход +, расход −) во всех расчётах: регистр, итог документа и итоги списков без модуля, расход/доход статьи за день может быть отрицательным (CHECK `chk_pl_daily_totals_amounts` снят, миграция `Version20261123120000` нормализует строки потока revenue); `createPLDocument` ставит знак строк revenue по природе статьи; `DocumentOperationRepository::marketplaceBucketSums()` удалён; разовая команда ремонта дерева ОПиУ из 2.89 удалена после применения |
+| 2.237 | 2026-11-23 | MarketplaceOperations/Economics: уровни по шаблону ОПиУ — хранение, упаковка партнёрами и материалы, утилизация → СМ3 (`overhead`, хранение без SKU по-прежнему по остатку); подписки и Premium → СМ2 (без SKU — по выручке своим видом); `RULES_VERSION` `economics-5`, refresh пересчитает дни сам |
+| 2.236 | 2026-11-22 | MarketplaceWb/Ozon: справочность в `canon_minor`/`total_minor` дня — по итоговому виду (сид или решение по коду), не только по виду компонента; удержание «WB Продвижение» (`ads_settlement` из сида) больше не даёт ложное расхождение гейта «канон ≠ перевод» по воскресеньям; `RULES_VERSION` `wb-sales-report-3` — дни WB переводятся заново |
+| 2.235 | 2026-11-21 | MarketplaceEconomics: логистика до покупателя без SKU разносится по отгруженным штукам (`sales_qty_share`), `RULES_VERSION` `economics-4`; режим «Не разносить» в R1/R2 исключает строки разнесения (затраты без SKU — в «Нераспределено»); пояснение метода в R1 |
+| 2.234 | 2026-11-21 | MarketplaceEconomics: прямые затраты и хранение без SKU разносятся на SKU на уровне СМ1 своим видом (раньше — в «Склад и прочие МП»): «Нераспределено» R1 больше не показывает −X в СМ1 и +X в общих; `RULES_VERSION` `economics-3`, refresh пересчитает дни сам |
+| 2.233 | 2026-11-21 | MarketplaceEconomics: R1 — «Выручка с СПП», «НДС к уплате», «Выручка без НДС», «СМ1, %», «СМ2, %», «СМ3, %», окно выбора колонок; СМ1–СМ3 за вычетом НДС (ставка из налогового профиля по месяцам, `VatRatesByMonth`) в R1, R2, xlsx и R3; удержание WB за рекламу больше не попадает в «СПП» |
+| 2.232 | 2026-11-21 | MoySklad: автомаппинг identity_package_v3 — правила `linked_barcode` (штрихкод связанного листинга другой площадки), `article_size`, `name_size` (только вручную), статус `BARCODE_CONFLICT`, приоритет уже связанной позиции; `MarketplaceFacade::getListingIdsByBarcodes` |
+| 2.231 | 2026-11-21 | MoySklad: отчёт диагностики маппинга пересчитывается сам — при открытии устаревшего отчёта, после пакета/отмены и cron `app:moysklad:mapping-diagnostics:refresh` (*/5); автообновление страницы, кнопка «Проверить заново» |
+| 2.230 | 2026-11-21 | MoySklad: пакетное принятие предложений маппинга (весь отчёт или отмеченные строки), отмена пакета, ежедневное автоприменение; удалён подбор по странице (preview/Redis pool `cache.moysklad_automatic_mapping`); `CompanyFacade::userHasModuleAccess` |
+| 2.229 | 2026-11-20 | Finance/Cash: сумма статьи в отчёте ДДС ведёт в «Транзакции ДДС» с фильтрами ячейки (двойной клик); фильтры списка `includeChildren`, `projectIds`, `centerIds` |
+| 2.228 | 2026-11-19 | Company: кнопка «Нормализовать названия» в списке контрагентов — предпросмотр и применение правил по активной компании (`RefreshCounterpartyDisplayNamesAction` с `companyId`) |
+| 2.227 | 2026-11-19 | Company: правила отображаемого названия контрагента v3 — ИНН с запятой перед названием, маскированное ФИО «Б. Имя Отчество» |
+| 2.226 | 2026-11-19 | Cash: после смены дерева ДДС (замена ядром, загрузка JSON, разовая команда) переоткрываются и показанные без решения подсказки ИИ, не только «нет ответа» |
+| 2.225 | 2026-11-19 | Cash: загрузка статей ДДС из JSON создаёт статью с `id` из файла, если такого нет ни у одной компании; `id` статьи другой компании — отказ |
+| 2.224 | 2026-11-19 | Cash: сохранение и удаление статьи ДДС под блокировкой дерева компании; форма перепроверяет по базе удаление статьи и родителя, цикл, глубину, код и вид деятельности; загрузка из JSON не меняет `operationType` системных статей и статей с `group_code` |
+| 2.223 | 2026-11-19 | Company: предпросмотр и копирование проектов между компаниями, миграция `Version20261119140000` |
+| 2.222 | 2026-11-19 | Cash: загрузка изменённого дерева статей ДДС из JSON с предпросмотром (`ImportCashflowCategoryTreeAction`, `CashflowCategoryImportPlanner`, `/cashflow-categories/import`), кнопки JSON на странице статей — дропдаун |
+| 2.221 | 2026-11-19 | Company: код и описание проектов, JSON v1, ревизия и блокировка записи справочника; миграция `Version20261119130000` |
+| 2.220 | 2026-11-19 | MarketplaceFunnel: поиск WB — факты `wb.analytics.search` (`WbSearchTranslator`), источник `search` в `mfn_row`, `mfn_day.source` в ключе (`Version20261119120000`), фильтр «Источник» на экране R9; ServiceGateway: `wb.analytics.search` — ежедневный ресурс покрытия и ресурс фактов `wb-fetcher`; задача `marketplace-funnel`, этап 3, часть 2 |
+| 2.219 | 2026-11-18 | Marketplace / ServiceGateway: ресурс поиска по карточкам WB `wb.analytics.search` в `WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES`, строка «Поиск по карточкам» в покрытии; только сырьё, фактами не публикуется; задача `marketplace-funnel`, этап 3 |
+| 2.218 | 2026-11-18 | MarketplaceFunnel: экран R9 «Воронка продаж» `/marketplace/funnel` (товар × ступени, конверсии, xlsx), модуль в карте доступа `ModuleAccessMap`, пункт меню; задача `marketplace-funnel`, этап 6 |
+| 2.217 | 2026-11-18 | MarketplaceFunnel: новый модуль — таблица воронки продаж (`mfn_day`, `mfn_row`, `Version20261118120000`), `app:marketplace-funnel:translate` (`9-59/15`) и гейт `app:marketplace-funnel:health-check` (09:43); сервисы публикуют фактами `ozon.analytics.funnel` и `wb.analytics.funnel`; задача `marketplace-funnel`, этап 5 |
+| 2.216 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж WB `wb.analytics.funnel` в `WbConnectionsSnapshotBuilder::FINANCE_RESOURCE_TYPES`, строка «Воронка по карточкам» в покрытии; задача `marketplace-funnel`, этап 1 |
+| 2.215 | 2026-11-18 | Marketplace / ServiceGateway: ресурс воронки продаж `ozon.analytics.funnel` (`MarketplaceConnectionsSnapshotBuilder::FUNNEL_RESOURCE_TYPE`, список `ozon_fetcher.search_analytics_companies`), строка «Воронка по товарам» в покрытии; задача `marketplace-funnel`, этап 4 |
+| 2.214 | 2026-11-18 | Finance: переменные формул ОПиУ `VAT_RATE` / `TAX_RATE` (`PlFormulaVariables`); Company: `CompanyTaxProfile::$taxRatePercent`, `VatMode::ratePercentOn()` вместо `Cash\…\VatRates`; задача `pl-formula-tax-variables` |
+| 2.213 | 2026-11-17 | Cash: предпросмотр и подтверждение автоправил, исключения по назначению, кандидаты с задачей `cash_rule_phrase/v1` и статистика по версиям. |
+| 2.212 | 2026-11-18 | Cash: «нет ответа» ИИ переоткрывается при замене дерева ДДС ядром и командой `app:cash:ai-suggestions:reopen-no-answer`; задача `ai-no-answer-reopen` |
+| 2.211 | 2026-11-17 | Cash: консолидированный отчёт ДДС группы — `BuildCashflowGroupReport`, `CashflowGroupReportQuery`, xlsx; задача `cashflow-group-chart`, этап 4 |
+| 2.210 | 2026-11-17 | Cash: экран «Эталон группы» (план, «Применить», ручная привязка), `BindCashflowCategoryGroupCodeAction`, ночная строка `ДДС-группа` в `app:directories:integrity-check`; Company: `ConsolidationGroupFacadeInterface::headsOf()`; задача `cashflow-group-chart`, этап 3 |
+| 2.209 | 2026-11-17 | Cash: синхронизация дерева ДДС с эталоном группы — `SyncCashflowGroupChartAction`, `app:cash:group-chart:sync`, журнал `cashflow_group_chart_applications` (миграция `Version20261117180000`), задача `cashflow-group-chart`, этап 2 |
+| 2.208 | 2026-11-17 | Company: группа консолидации `company_consolidation_member` (миграция `Version20261117150000`), `ConsolidationGroupFacadeInterface`, `ConfigureConsolidationGroupAction`, блок «Консолидация» в настройках компании (задача `cashflow-group-chart`, этап 1b) |
+| 2.207 | 2026-11-17 | Cash: `cashflow_categories.group_code` (миграция `Version20261117120000`) — код консолидации; `core.yaml` v2 с кодами, защита удаления и переноса статьи с кодом, `app:cash:cashflow-core:apply` проставляет коды дереву ядра (задача `cashflow-group-chart`, этап 1) |
+| 2.206 | 2026-11-17 | Cash: `app:cash:cashflow-core:apply` — ядро ДДС для существующей компании вместо неиспользуемых статей (`ReplaceUnusedCashflowTreeWithCoreAction`, `CashCategorySuggestionRepository::findSuggestedForCategories()`), задача `cashflow-group-chart`, этап 0a |
+| 2.205 | 2026-11-16 | MarketplacePlProjection: экран «ОПиУ» повторяет дерево статей компании до СМ3 (`TreeCut`, граница по коду `CM3`), пустые строки на месте, статьи ниже — блок «Ниже СМ3» |
+| 2.204 | 2026-11-16 | MarketplacePlProjection: расчётные строки экрана «ОПиУ» — «Выручка с СПП» (продажи − СПП − соинвестирование) и себестоимость из витрины (`MarketplaceEconomicsFacadeInterface::costPrice()`); `plSums()` делит ключ по знаку суммы |
+| 2.203 | 2026-11-16 | MarketplacePlProjection (этап 3–4): проекция ОПиУ из канона при чтении (`ProjectionBuilder`, без хранимой таблицы), экран `/marketplace/economics/pl` — новый расчёт рядом с текущим; `MarketplaceOperationsFacadeInterface::plSums()`, `companyIds()`; `LegacyPlPreviewFacadeInterface`; cron `sync-template --all` |
+| 2.202 | 2026-11-16 | MarketplacePlProjection (этап 2): `MappingTemplate` v2 — 6 исключений Ozon по коду источника, шаблон равен базовому маппингу легаси; `TemplateLegacyParityTest` |
+| 2.201 | 2026-11-16 | MarketplacePlProjection (этап 1): новый модуль, `mpp_rule` — правила компании «вид канона / код источника → статья ОПиУ» с датой действия и происхождением `preset`/`custom`, `RuleResolver`, шаблон платформы `MappingTemplate` v1, `app:marketplace-pl-projection:sync-template`; в ОПиУ не пишет |
+| 2.200 | 2026-11-15 | MoySklad: автомаппинг25 листингов Ozon/WB в legacy UI, exact article/explicit size, immutable Redis preview, guarded per-row apply, CAS/replay и audit |
+| 2.199 | 2026-11-15 | MarketplaceWb: строка с артикулом без размера (возмещение логистики, реклама) остаётся на артикуле — по размерам по продажам дня (`wb_size_sales_share`), а не без SKU по всему кабинету; размеры без учёта кириллических двойников; `RULES_VERSION` `wb-sales-report-2` — все дни переводятся заново |
+| 2.198 | 2026-11-15 | ServiceGateway: ключ повтора задачи ИИ вне печатного ASCII или длиннее 200 символов уходит в сервис хешем `sha256:…` (заголовок `Idempotency-Key` искажал кириллицу — 422), `task_id` — от исходного ключа; MarketplaceOzon/MarketplaceWb: запрос черновика без ответа дольше часа повторяется |
+| 2.197 | 2026-11-15 | MarketplaceWb: черновики ИИ для кодов WB (этап 8.3b) — `RequestWbSourceTypeDraftsAction`, `WbSourceTypeDraftConsumer`, колонка черновика на экране кодов; ServiceGateway: результат ИИ получают все потребители его task_type |
+| 2.196 | 2026-11-15 | Отчёты нового контура по двум каналам (этап 8.5): фильтр канала в R1/R2, метка канала у SKU и в xlsx, строки каналов в R3; R10 сверяет WB со своим каналом — фасад `MarketplaceWbFacadeInterface::dayStates` |
+| 2.195 | 2026-11-15 | MoySklad: отдельные legacy-вкладки Ozon/Wildberries, выбор подключения, локальный поиск, ручное назначение/снятие связи и история; READ/WRITE, CSRF, CAS и bounded-пагинация |
+| 2.194 | 2026-11-15 | MoySklad: CAS/idempotent Action назначения и снятия связи, блокировки против гонок/импорта вариантов, bounded current/history и локальные подсказки |
+| 2.193 | 2026-11-15 | MoySklad: tenant-scoped ревизии связей листингов с product/variant, set/clear, requestId и snapshots; Catalog/Finance не меняются |
+| 2.192 | 2026-11-15 | Marketplace: постраничный DTO-контракт внешнего маппинга; ListingMetaDTO содержит isActive/marketplaceVariantId с общей нормализацией size через ListingMetaQuery |
+| 2.191 | 2026-11-15 | MarketplaceWb: переключатель `MARKETPLACE_WB_COMPANIES` снят — переводчик и гейт работают по всем кабинетам WB (решение Владельца 15.11) |
+| 2.190 | 2026-11-15 | MarketplaceWb: реклама WB из фактов `wb.ads.daily` (wb-fetcher, upd + fullstats) — `ads_cpc` по SKU, `mwb_day.ads_revision` (`Version20261115120000`); `wb.ads.daily` в снимке кабинетов WB и в белом списке фактов шлюза (этап 8.4) |
+| 2.189 | 2026-11-15 | MarketplaceWb: новый модуль — переводчик дневного отчёта WB в канон (`mwb_source_type`, `mwb_day`, `mwb_quarantine`, `Version20261115090000`), `app:marketplace-wb:translate` (`MARKETPLACE_WB_COMPANIES`) и гейт 09:25, экран `/admin/marketplace/wb-source-types`; `OperationKind::ADS_SETTLEMENT` (справочно); `findListingsByMarketplaceSkus` отдаёт `size` (этап 8.3) |
+| 2.188 | 2026-11-14 | Канал фактов WB (этап 8.1–8.2): wb-fetcher публикует `wb.finance.sales-report.daily` (запись = строка отчёта, ключ `wb:sales-report.daily:{rrdId}`, backfill загруженных дней при старте); `SourceFactsGatewayFacade` — клиенты по тегу `app.source_facts_client`, кабинеты Ozon ∪ WB |
+| 2.187 | 2026-11-14 | Сверки нового контура (этап 7): гейт Ozon — перевод = канон за 45 дней и отставание кабинета; гейт витрины — доля нераспределённого > 1 %; новый модуль `MarketplaceQuality` — экран R10 `/marketplace/economics/quality`; фасады чтения `MarketplaceOzonFacadeInterface::dayStates`, `MarketplaceEconomicsFacadeInterface::daySums`, `MarketplaceOperationsFacadeInterface::daySums`, `SourceFactsFacadeInterface::periods(…, ?companyId)` |
+| 2.186 | 2026-11-14 | Telegram PaymentIntake: company pilot allowlist, guards ввода/доставки/отзыва, профилированный worker и независимый scoped recovery; parse route single DeepSeek; финансовые правила и общие AI grants без изменений |
+| 2.185 | 2026-11-14 | MarketplaceEconomics: отчёт R3 «Неделя» — `app:marketplace-economics:weekly-report` (понедельник 09:00), журнал `me_weekly_report` (`Version20261114230000`), `ECONOMICS_WEEKLY_REPORT_COMPANIES`; Telegram: фасад `TelegramFacadeInterface::sendDocumentToCompany` (этап 6.5) |
+| 2.184 | 2026-11-14 | MarketplaceOperations: вид `mp_other_deductions` «Прочие удержания МП» (уровень «общие») — код Ozon 7 и разовые удержания без своего вида |
+| 2.183 | 2026-11-14 | MarketplaceOzon: комиссия — поле `commission` (нет — `sale_commission`), как в легаси; `ozon:unexplained` (10 начислений) обнуляется, `RULES_VERSION` `ozon-by-day-3` |
+| 2.182 | 2026-11-14 | MarketplaceOzon: оплата за заказ (тип 54) без SKU делится по проданным штукам SKU за день (`sales_qty_share`), `RULES_VERSION` `ozon-by-day-2` (этап 6.1b упрощённо) |
+| 2.181 | 2026-11-14 | MarketplaceEconomics: подписи R1/R2/xlsx по терминам проекта — СМ1 / СМ2 / СМ3 (шаблон ОПиУ `pl_templates/marketplace.json`), «Выручка − себестоимость», «Склад и прочие МП»; расчёт не менялся |
+| 2.180 | 2026-11-14 | MarketplaceOperations: вид `compensation` (компенсации маркетплейса, уровень «общие», +) — коды Ozon 10 и 25 можно подтвердить на экране кодов |
+| 2.179 | 2026-11-14 | MarketplaceEconomics: отчёт R2 «Динамика» `/marketplace/economics/dynamics` (+ xlsx), вкладки R1/R2; легаси не меняется (этап 6.4 `marketplace-profit-pipeline`) |
+| 2.178 | 2026-11-14 | MarketplaceOzon: CPC разносится по SKU из статистики Performance (`ozon.ads.statistics`, ozon-fetcher публикует фактами, `source-fact-envelope` v1.1.0), `moz_day.ads_revision` (`Version20261114180000`); день переводится заново при новой статистике (этап 6.1–6.2 `marketplace-profit-pipeline`) |
+| 2.177 | 2026-11-14 | MarketplaceEconomics: реклама разносится по долям статистики своего вида (клики / оплата за заказ), `RULES_VERSION` `economics-2`; refresh сам пересчитывает дни прежней версии правил; итог сверки 5.3 — `stages/stage-5.md` |
+| 2.176 | 2026-11-14 | MarketplaceEconomics: отчёт R1 «Экономика SKU» `/marketplace/economics` (+ xlsx) на новом слое, пункты меню в обоих интерфейсах; легаси `unit-extended` не меняется (этап 5.2 `marketplace-profit-pipeline`) |
+| 2.175 | 2026-11-14 | MarketplaceEconomics: новый модуль — витрина экономики SKU (`me_day_line`, `me_day`, `Version20261114120000`), `app:marketplace-economics:refresh` (`*/15`, `--recent=45` 07:15) и гейт `app:marketplace-economics:health-check` (09:30); MarketplaceOperations: чтение `dirtyDays` / `days` / `takeDay`; PHPat — витрина знает только фасады (задача `marketplace-profit-pipeline`, этап 5.1) |
+| 2.174 | 2026-11-14 | ServiceGateway: `AiTaskFacadeInterface::PLATFORM_COMPANY_ID` — задачи по общим данным без подключения компании к ИИ; черновик кода Ozon ставится от платформы (этап 4.3 `marketplace-profit-pipeline`) |
+| 2.173 | 2026-11-14 | MarketplaceOzon: черновик ИИ для нового кода (`marketplace_source_type_draft`, ai-task v1.3, `RequestOzonSourceTypeDraftsAction`, `OzonSourceTypeDraftConsumer`) и экран администратора `/admin/marketplace/ozon-source-types`; `OperationKind::label()` (этап 4.3 `marketplace-profit-pipeline`) |
+| 2.172 | 2026-11-14 | MarketplaceOzon: новый модуль — переводчик начислений Ozon by-day в канон (`moz_source_type`, `moz_day`, `moz_quarantine`, `Version20261114035239`), `app:marketplace-ozon:translate` (`*/15`, `--relink` 06:57) и гейт `app:marketplace-ozon:health-check` (09:20); SourceFacts: фасад чтения `SourceFactsFacadeInterface`, модуль в `MODULES_WITH_FACADE`; PHPat — переводчик знает только фасады (задача `marketplace-profit-pipeline`, этап 4) |
+| 2.171 | 2026-11-13 | MarketplaceOperations: новый модуль — канон операций маркетплейсов (`mo_operation`, `mo_dirty_window`, `Version20261113175117`), `MarketplaceOperationsFacadeInterface::replaceDay`, enum `OperationKind` / `CascadeLevel`; PHPat — канон не знает каналов (задача `marketplace-profit-pipeline`, этап 3) |
 | 2.170 | 2026-11-13 | SourceFacts: новый модуль — приём фактов из сервисов (`sf_batch`, `sf_period`, `sf_fact`, `Version20261113130402`), `app:source-facts:pull` (cron `*/15`) и гейт `app:source-facts:health-check` (09:10); ServiceGateway: `SourceFactsGatewayFacadeInterface`, клиент `source-fact-envelope` v1; ozon-fetcher публикует `ozon.finance.accrual-by-day`; PHPat — `SourceFacts` не знает каналов и учёта (задача `marketplace-profit-pipeline`, этап 2) |
 | 2.169 | 2026-11-13 | `Ingestion`, `Marketplace` (кроме листингов) и `MarketplaceAds` объявлены легаси — ADR 2026-11-13 |
 | 2.168 | 2026-11-12 | Inventory: поставки Ozon в пути — `StockStatus::InSupply`, `app:inventory:ozon-supplies-sync` (cron 05:50) из снимка `ozon.supplies` ozon-fetcher (`GET /internal/snapshots/latest`, контракт `service-snapshot` v1); отчёт «Остатки» — колонка «В поставке», поставки не входят в остаток (задача `docs/tasks/ozon-supplies-in-transit`) |
@@ -5858,6 +6563,116 @@ Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/defa
 
 ## MoySklad: подключение и проверка доступа
 
+`ProductSnapshot` / `VariantSnapshot` и сущности каталога хранят `barcodes`:
+`null` — не загружено, `[]` — загружен пустой список; значения строковые,
+без изменения регистра и ведущих нулей. Формат JSON API: список одноэлементных
+объектов ean8/ean13/code128/gtin/upc.
+`MarketplaceFacade::getListingBarcodesByIds(companyId, listingIds)` принимает
+до100 ID, возвращает listingId → list<string>, чужие ID исключены.
+`MarketplaceFacade::getListingIdsByBarcodes(companyId, barcodes≤5000, excludeMarketplace)` —
+листинги других площадок компании с теми же штрихкодами: barcode → list<listingId>.
+`MappingSettingsQuery::get(companyId, connectionId, marketplace)` возвращает
+`MappingSettings(wbTrailingW, version)`; preset по умолчанию выключен.
+Настройки изолированы составным ключом company/connection/marketplace.
+
+
+Автомаппинг identity_package_v3 использует `AutomaticListingMappingPolicy`. Правила по силе
+(меньше — сильнее): 1 `exact_barcode`; 2 `linked_barcode` — штрихкод листинга совпал со
+штрихкодом листинга другой площадки, уже связанного с позицией; 3 `direct_article`,
+`parent_article_size` (размер по явно выбранному ID характеристики), `exact_code`,
+`wb_article_alias`; 4 `article_size` — article позиции = article листинга + `-`/`_`/пробел +
+размер; 5 `name_size` — у позиций без модификаций с тем же article размер — первый токен в
+скобках названия. Размер нормализуется: регистр, пробелы, кириллица, совпадающая по начертанию
+с латиницей (`CYRILLIC_AS_LATIN`). Собственный штрихкод решает сам; при уровне 2 любая другая
+найденная позиция — AMBIGUOUS; при 3–5 несколько позиций — AMBIGUOUS, если ровно одна не
+связана уже с каким-либо листингом (`linkedElsewhere`, приоритет связанной). Штрихкоды есть у
+листинга и позиции и не пересекаются → `BARCODE_CONFLICT` (артикул не перебивает). Одна позиция
+может быть целью многих листингов разных площадок. `name_size` предлагается, но принимается
+только отмеченными строками: «Принять все» (scope report) и автоприменение (cabinet) его
+пропускают (`AutomaticMappingDecision::requiresManualAcceptance`). Признаки linked* в JSON решения
+не пишутся. Комплектация проверяется для выбранной позиции.
+Нормализуется только краевой ASCII whitespace, регистр/нули/NBSP сохраняются.
+`AutomaticMappingCandidatesQuery` одним scoped SQL получает максимум50 целей
+на листинг (до100 листингов); truncation, неразрешимые размеры и спорная комплектация запрещают READY.
+Архивные дубли участвуют в неоднозначности, parent с детьми не является leaf.
+`AutomaticMappingPreviewQuery` обрабатывает только текущие25 листингов через
+MarketplaceFacade; существующие ревизии, включая clear, не предлагаются.
+`MappingCharacteristicsQuery` выдаёт по20 непрозрачных ID из локального JSONB.
+Никакой записи и внешнего HTTP в этих Query нет.
+Guard (`AutomaticMappingGuard`) фиксирует версию `identity_package_v3`, source/candidate
+fingerprints, выбранный opaque characteristic ID и previewId (для пакета — его id).
+Guarded order writer'а: connection
+FOR SHARE → mapping advisory → accepted replay → catalog try-lock → source
+FOR UPDATE + barcodes FOR SHARE через MarketplaceFacade → recompute policy/candidates → target lock
+→ append/flush/commit. Общий `MoySkladCatalogLock` использует прежний session
+ключ `moysklad-catalog`/connectionId в SyncCatalogAction и writer; освобождение
+во внешнем finally после wrapInTransaction, занятость409 без закрытия EM.
+Facade `lockListingMetaForExternalMapping(companyId, listingId)` блокирует родительский listing FOR UPDATE (защита FK INSERT) и существующие barcodes FOR SHARE (защита transfer/delete), требует
+caller transaction, возвращает свежий DBAL DTO, не Entity из identity map.
+Audit listing_snapshot.autoMapping хранит origin/preview/rule/fingerprint/
+characteristic/matchedRules. Replay проверяет полный payload и guard прежде
+новой валидации каталога, поэтому не восстанавливает последующий manual clear.
+SyncCatalogAction сначала берёт отдельный session import-intent lock
+`moysklad-catalog-sync`/connectionId: другой настоящий import→skip без retry.
+Затем shared catalog lock; его занятость auto writer→существующий `temporary`
+и штатный Handler retry. Оба lock освобождаются finally; duplicate-sync
+контракт и текст UI сохранены. Auto
+source/target lock wait ограничен LOCAL lock_timeout2s. Manual snapshot не
+наследует autoMapping прежней ревизии при отсутствующем source.
+Массовое принятие предложений — раздел «MoySklad: пакеты принятия предложений».
+
+
+Legacy UI маппинга размещён в `templates/moy_sklad/mappings/` под общим
+`moy_sklad/layout.html.twig`: отдельные вкладки Ozon и Wildberries используют
+Tabler и существующие partials вкладок, пагинации и подтверждения. Нового
+React/Vite entry нет. `/moy-sklad/mappings/{ozon|wildberries}` показывает
+пустое состояние, перенаправляет в единственное подключение либо предлагает
+выбор подключения с пагинацией по 20. Внутри подключения
+`/moy-sklad/connections/{connectionId}/mappings/{marketplace}` выводит 25
+листингов, локальный поиск до 100 символов и batched текущие связи.
+`/{listingId}/edit` обслуживает GET/POST назначения и снятия, а
+`/{listingId}/history` — историю по 20 ревизий. Вкладки сохраняют подключение.
+
+Чтение требует `MARKETPLACE_READ`, изменение — `MARKETPLACE_WRITE`, активная
+компания определяется сервером. POST сначала проверяет ручной CSRF, затем
+`MoySkladListingMappingType` с явным набором ChoiceType: подсказки, текущая
+страница поиска и сохранённая позиция. Чужая/неизвестная позиция возвращает
+404, своя вне показанных вариантов — 422; CAS-конфликт — 409, успех — 303.
+Поиск и переходы страниц сохраняют expectedRevision/requestId формы. Снятие
+связи имеет отдельную форму без target и noscript fallback; удалённый листинг
+доступен по сохранённому snapshot для истории и снятия связи.
+
+Хранение внешнего маппинга — `MoySkladListingMappingRevision`, отдельная от
+Catalog история в `moysklad_listing_mapping_revisions`. Ключ связи:
+companyId/connectionId/listingId, порядок — revision, операции set/clear.
+SET содержит ровно один внешний UUID product/variant своего подключения;
+CLEAR — без цели. Составные FK, unique revision/requestId и CHECK защищают
+tenant и форму записи. Ревизия хранит expectedRevision, actorUserId, время UTC
+и серверные снимки листинга/цели. Repository только append/tenant lookup,
+без flush; текущая связь — последняя revision, не изменяемая строка.
+Миграция Version20261115153000 создаёт пустую таблицу; down отказывает,
+если история не пуста.
+
+`ChangeListingMappingAction(ChangeListingMappingCommand): ListingMappingState`
+владеет wrapInTransaction и append ревизии. UUID/CAS/requestId проверяются до
+записи, accepted request возвращает прежнюю ревизию. Порядок блокировок:
+connection FOR SHARE → advisory xact mapping key → product FOR UPDATE либо
+variant parent FOR SHARE → variant FOR SHARE. Сильный lock product исключает
+одновременный INSERT дочерней модификации до commit. No-op не пишет ревизию;
+stale CAS и reuse requestId с другим payload дают доменный конфликт.
+Новая цель требует активного привязанного подключения и completed курсоров
+product/variant; временный HTTP-check failure не отменяет локальный каталог.
+CLEAR доступен при выключенном подключении и отсутствующем исходном листинге,
+но только по своей существующей истории.
+
+`MoySkladCatalogTargetsQuery` читает локальные product/variant и родителей:
+поиск/подсказки 20 строк, точный trim(article) без смены регистра и ведущих нулей,
+никакого автоматического назначения. `findMany` использует UUID IN по типам,
+а не поиск по строковой конкатенации UUID. `MoySkladListingMappingsQuery`
+возвращает current batch до 100 IDs и history по 20; metadata листингов читает
+через MarketplaceFacade. Архив/появление вариантов/потеря листинга меняют
+вычисленный статус на needs_review, а не историю или Catalog mapping.
+
 Legacy Twig/Tabler UI: `/moy-sklad/connections`, права `MARKETPLACE_READ/WRITE`.
 `MoySkladConnection` сохраняет неизменяемый `companyId`, nullable глобально уникальный
 `accountId`, зашифрованные access/refresh payloads (Shared EncryptedPayload),
@@ -6091,3 +6906,100 @@ SettlementUiQuery возвращает scoped own entities/readonly position DTO
 движений, формы имеют подписанный preview50позиций и полный scoped choice set.
 Doc detail показывает текущий свободный остаток и связь обеих сторон погашения.
 Все money HTML значения — точные строки через vf_money/vf_amount.
+
+### MoySklad: identity/package mapping v2
+
+`AutomaticListingMappingPolicy` объединяет direct_article, parent_article_size,
+exact_code, wb_article_alias и exact_barcode. Только WB preset удаляет один
+конечный W/w; регистр/нули не меняются. `forListings(companyId, connectionId,
+listings<=100, barcodeMap, wbTrailingW)` получает bounded union кандидатов,
+включая архивные; `AutomaticMappingDecision` хранит кандидатов и matchedRules.
+`identity_package_v2` fingerprint включает source name/barcodes/settings;
+Guard также содержит fingerprint полного решения/кандидатов. Writer повторяет
+выбор внутри существующих блокировок и проверяет оба fingerprint. Настройки
+меняются только под exclusive connection lock, конфликтующим с writer SHARE.
+`quantities()` извлекает явно указанные целые шт/шт./штук/штуки/штука;
+неизвестное количество не равно одному; разные/неоднозначные запрещают READY.
+`moysklad_mapping_package_reviews` хранит actor/time и отдельные source/target
+fingerprints, scoped company/connection/listing/revision. Ручной спорный SET
+требует явного подтверждения и актуального packageReviewFingerprint. Повторное
+подтверждение текущей связи не создаёт новую ревизию назначения. Query сверяет
+подтверждения с текущими данными и показывает package_review, сохраняя target.
+
+### MoySklad: диагностика кабинета
+
+`DiagnoseMappingsMessage(companyId, connectionId, marketplace, runId,
+sizeCharacteristicId)` идёт в существующий async_pipeline. Постановка сообщения
+не меняет БД; Handler создаёт run. Один delivery обходит keyset listing ID
+пакетами <=100; результаты, счётчики и cursor коммитятся вместе. Повтор delivery
+продолжает cursor, unique(company,run,listing) исключает дубли. Session advisory
+lock диагностики сериализует одинаковый scope, не блокируя импорт каталога.
+Ошибка сохраняется после rollback отдельно; retry возобновляет тот же run.
+`moysklad_mapping_diagnostic_runs/rows` хранят время, версию правил/настроек,
+input fingerprint, прогресс/счётчики и ограниченные кандидаты каждой строки.
+`MarketplaceFacade::getListingsAfterForExternalMapping(companyId, marketplace,
+afterId, limit<=100)` — стабильный keyset, возвращает list<ListingMetaDTO>.
+`getExternalMappingSourceVersion(companyId, marketplace)` возвращает
+ExternalMappingSourceVersion(fingerprint,total) по источникам и barcode sets.
+`MappingDiagnosticsQuery::inputVersion` объединяет этот fingerprint с каталогом,
+готовностью подключения, настройками, ревизиями и подтверждениями. Сверка идёт
+при инициализации, перед публикацией завершённого отчёта и при его чтении.
+Между пакетами используется сохранённый total; версия правил проверяется всегда. Изменения во время
+расчёта → stale run, который не заменяет предыдущий completed. Незавершённый
+или failed run также не заменяет его. `page` выдаёт по25 сохранённых строк с
+фильтрами status/reason/manualReview; причины — MappingDiagnosticReason.
+`AutomaticMappingPreviewQuery::evaluate` — единый evaluator preview/diagnosis;
+SQL отчёта фильтрует сохранённые причины, не повторяет правила сопоставления.
+При completed сохраняются подробные строки только этого отчёта внутри scope;
+старые headers остаются для audit, потерявшие partial rows failed/running
+запуски становятся stale и не могут возобновить старый cursor. Stale run удаляет
+свои строки, не затрагивая последний completed. При уже running POST не ставит
+ещё один запуск; конфликт параметров существующего runId не ретраится.
+Автопересчёт: `MappingDiagnosticsRefresher::refreshIfStale(companyId, connectionId,
+marketplace)` ставит запуск, если подключение активно и completed-отчёта нет (при
+листингах > 0) или его input fingerprint не совпадает с текущим. runId = UUIDv5(scope,
+характеристика последнего completed, fingerprint, id последнего completed) — повтор для тех
+же данных попадает в тот же run; тот же failed повторяется не чаще раза в час, running
+старше часа переотправляется с тем же runId (resume cursor). Вызывают: страница маппинга
+при устаревшем/отсутствующем отчёте, конец пакета и отмены (после commit),
+`app:moysklad:mapping-diagnostics:refresh` (*/5). Пока идёт расчёт или пакет, страница
+перезагружается сама (`assets/pages/moysklad_mappings.js`); кнопка — «Проверить заново».
+
+### MoySklad: пакеты принятия предложений
+
+`moysklad_mapping_bulk_jobs` / `_items` (DBAL, `MoySkladSchemaExtension`), один активный пакет
+или отмена на company/connection/marketplace под `pg_advisory_xact_lock(ms-mapping-bulk)`.
+- Запуск: POST `moysklad_mapping_bulk_start` (READ+WRITE+CSRF, scope `report` | `selected` ≤100),
+  id пакета — скрытый UUIDv7 формы; повтор с тем же id → тот же пакет и повторный dispatch, другой scope → 422.
+  `StartMappingBulkJobAction` снимает строки READY последнего completed отчёта в items (отчёт stale → отказ,
+  чужие/не-READY выбранные ID → 422), коммитит и отправляет `ApplyMappingBulkJobMessage` → `async_pipeline`.
+- `ApplyMappingBulkJobHandler`: session `pg_try_advisory_lock` на пакет; фазы claim → порции по100 → finalize.
+  Каждая строка — свежий evaluator и существующий writer с guard, requestId = UUIDv5(пакет, листинг);
+  итог строки и счётчики пакета — одной транзакцией. Изменилось → skipped, `ListingMappingException` → conflict,
+  технический сбой → failed и остановка пакета. Scope `cabinet` (только автоприменение) идёт keyset по
+  листингам без отчёта, items пишутся по ходу.
+- Отмена: POST `moysklad_mapping_bulk_undo` → `UndoMappingBulkJobMessage`; CLEAR только если текущая
+  ревизия — созданная пакетом SET, requestId = UUIDv5(пакет, листинг, undo); снятые не предлагаются снова.
+- `app:moysklad:mapping-bulk:requeue` (*/10) переотправляет пакеты/отмены без heartbeat >10 мин.
+- Автоприменение: `moysklad_mapping_auto_apply` (opt-in в «Параметрах», POST `moysklad_mapping_auto_apply`),
+  `app:moysklad:mapping-auto-apply` 05:30 создаёт пакет `cabinet` с id = UUIDv5(scope, дата МСК) от имени
+  включившего; без его MARKETPLACE WRITE (`CompanyFacade::userHasModuleAccess`) пакет не создаётся.
+- Отчёт пакета: GET `moysklad_mapping_bulk_show`, по25 строк, фильтр по итогу.
+
+### MoySklad: legacy UI качества сопоставления
+
+Scoped POST moysklad_mapping_settings требует MARKETPLACE_READ+WRITE и CSRF;
+ChangeMappingSettingsAction меняет WB preset под connection FOR UPDATE,
+повтор без изменения значения сохраняет version. Scoped POST
+moysklad_mapping_diagnostics_refresh требует READ+WRITE+CSRF и отправляет scalar
+DiagnoseMappingsMessage с UUID запроса. UI показывает время/прогресс, последний
+completed, stale/failed/empty и status/reason/manualReview filters по25 строк.
+Назначение из отчёта — только пакетом (см. ниже) или вручную по строке.
+Evidence partial показывает основания, количества в названиях, артикулы,
+коды, штрихкоды и конкурентов. Ручной поиск поддерживает точный штрихкод.
+Manual SET передаёт явный checkbox и fingerprints показанных источника/целей;
+изменившаяся спорная связь требует нового подтверждения. После POST redirect
+перечитывает свежий ListingMappingState, включая package review.
+Legacy pagination принимает optional pageParam (default page) для независимых
+diagnostic/main pagers. Версии назначений/подтверждений учитываются по всему
+подключению, чтобы изменение marketplace листинга не скрыло старую ревизию.

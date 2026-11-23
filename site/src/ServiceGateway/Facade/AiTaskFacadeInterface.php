@@ -14,6 +14,13 @@ use App\ServiceGateway\Application\DTO\AiCompanyOverview;
 interface AiTaskFacadeInterface
 {
     /**
+     * Компания платформы — для задач по общим данным (справочник кодов маркетплейсов): не зависит
+     * от подключения компаний к ИИ, нужен только общий выключатель; расход идёт в общий лимит, не
+     * в бюджет клиента.
+     */
+    public const PLATFORM_COMPANY_ID = '00000000-0000-7000-8000-000000000001';
+
+    /**
      * Ставит задачу в очередь `async_sync`. Ничего не пишет в БД и не коммитит.
      *
      * Ключ повтора задаёт вызывающий (например, id записи-источника): повтор с тем же
@@ -56,7 +63,7 @@ interface AiTaskFacadeInterface
      */
     public function connectedCompanyIds(): array;
 
-    /** Общий выключатель `AI_SERVICE_ENABLED` с адресом и токеном. */
+    /** Настроены адрес и токен сервиса. */
     public function isServiceEnabled(): bool;
 
     /**

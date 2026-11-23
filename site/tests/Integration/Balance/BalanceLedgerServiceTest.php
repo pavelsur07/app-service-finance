@@ -528,6 +528,7 @@ final class BalanceLedgerServiceTest extends IntegrationTestCase
             self::getContainer()->get(CompanyMemberRepository::class),
             self::getContainer()->get(ProjectDirectionRepository::class),
             self::getContainer()->get(UserRepository::class),
+            (new \ReflectionClass(\App\Company\Security\ModuleAccessResolver::class))->newInstanceWithoutConstructor(),
         );
 
         return new BalanceAccess($security, $facade, $connection, $active);

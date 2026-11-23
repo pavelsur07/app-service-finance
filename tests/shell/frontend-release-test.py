@@ -46,7 +46,8 @@ class FrontendReleaseTest(unittest.TestCase):
         for kwargs in [dict(flags=('spa',), event='push'),
                        dict(flags=('backend',), event='push'),
                        dict(event='workflow_dispatch', action='deploy'),
-                       dict(event='workflow_dispatch', action='migrations')]:
+                       dict(event='workflow_dispatch', action='migrations'),
+                       dict(event='workflow_dispatch', action='release')]:
             with self.subTest(**kwargs):
                 values, matrix = self.matrix(**kwargs)
                 self.assertEqual(values.get('spa'), 'true')
@@ -71,6 +72,7 @@ class FrontendReleaseTest(unittest.TestCase):
         self.assertIsNotNone(match, 'SPA path filter is required')
         patterns = re.findall(r"^\s*- '([^']+)'", match[1], re.M)
         for path in ['apps/account/src/main.tsx', 'apps/admin/package-lock.json',
+                     'apps/packages/ds/src/styles.css', 'apps/packages/ds/tokens/ds-v3.tokens.json',
                      'site/packages/ui/src/Button.tsx', 'site/packages/api/src/index.ts',
                      'site/assets/styles/kit/tokens/colors.css', 'docker/frontend/nginx.conf',
                      'bin/frontend-production-test.sh', '.github/workflows/deploy.yml']:
@@ -82,27 +84,27 @@ class FrontendReleaseTest(unittest.TestCase):
         self.assertIn("'site/packages/**'", frontend[1])
 
     def test_static_image_published_only_after_browser_smoke(self):
-        build = self.workflow.split('    build-and-push:', 1)[1].split('    schema-ready:', 1)[0]
+        build = self.workflow.split('    build-and-push:', 1)[1].split('    release-manifest:', 1)[0]
         self.assertIn("push: ${{ github.event_name != 'pull_request' && matrix.frontend_app == '' }}", build)
         self.assertLess(build.index('Browser smoke of the actual nginx image'),
                         build.index('Publish verified SPA image'))
         self.assertIn('docker push "$IMAGE_SHA"', build)
 
     def test_browser_failure_blocks_release_and_new_services_wait_for_health(self):
-        build = self.workflow.split('    build-and-push:', 1)[1].split('    schema-ready:', 1)[0]
+        build = self.workflow.split('    build-and-push:', 1)[1].split('    release-manifest:', 1)[0]
         self.assertIn('spa-checks', build)
         self.assertIn("needs['spa-checks'].result != 'failure'", build)
         self.assertIn('bin/frontend-production-test.sh', build)
         self.assertIn('load:', build)
         self.assertIn('frontend_app', build)
         commands = self.workflow.replace('\\\n', ' ')
-        pull = re.search(r'^\s*docker compose -f docker-compose.prod.yml pull land site[^\n]+', commands, re.M)
+        pull = re.search(r'^\s*docker compose -f docker-compose.prod.yml -f compose.digest.json pull land site[^\n]+', commands, re.M)
         self.assertIsNotNone(pull)
         for app in ['account', 'admin']:
             self.assertRegex(pull[0], rf'\b{app}\b')
-        up = re.search(r'^\s*docker compose -f docker-compose.prod.yml up -d --no-deps --wait account admin\s*$', commands, re.M)
+        up = re.search(r'^\s*docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --wait account admin\s*$', commands, re.M)
         self.assertIsNotNone(up, 'Both new static services must pass health before deploy completion')
-        self.assertLess(up.start(), commands.index('up -d --remove-orphans'))
+        self.assertLess(up.start(), commands.index('up -d --no-deps --remove-orphans'))
         workers = commands.index('up -d --no-deps site-php-cli site-messenger-worker-pipeline')
         self.assertLess(workers, up.start(), 'New placeholders must not interrupt backend/worker rollout')
 

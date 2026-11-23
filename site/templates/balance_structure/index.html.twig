@@ -1,59 +1,56 @@
 {% extends 'balance/layout.html.twig' %}
+{% import 'balance/_macros.html.twig' as ui %}
 {% block balance_content %}
-    <div class="wz-head">
-        <h1 class="wz-title">Статьи баланса<span class="wz-sub">Четыре уровня внутри сторон Актив и Пассив. Счета находятся в конечных статьях.</span>
+    <div class="vf-page-head">
+        <h1 class="page-title d-block">Статьи баланса<span class="d-block text-secondary fs-5 fw-normal mt-1">Четыре уровня внутри сторон Актив и Пассив. Счета находятся в конечных статьях.</span>
         </h1>
         {% if permissions.manage %}
-            <div class="wz-head-actions">
-                <a class="btn btn-md btn-primary" href="{{ path('balance_structure_new') }}">Создать статью</a>
+            <div class="btn-list">
+                <a class="btn btn-primary" href="{{ path('balance_structure_new') }}">Создать статью</a>
             </div>
         {% endif %}
     </div>
-    <section class="card report-scroll">
-        <table class="t-table">
+    <section class="card vf-card mb-4"><div class="card-body">
+        <div class="table-responsive"><table class="table table-vcenter vf-table">
             <thead>
                 <tr>
                     <th>Статья</th>
                     <th>Тип</th>
                     <th>Назначение</th>
-                    <th class="t-cell--right">Действия</th>
+                    <th class="text-end text-nowrap">Действия</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in items %}
                     <tr>
-                        <td class="t-tree{{ item.level == 1 ? ' t-tree--root' : '' }}" style="--lvl: {{ item.level - 1 }}">
+                        <td class="balance-tree" data-level="{{ item.level }}">
                             <a href="{{ path('balance_article_card', {id: item.id}) }}">{{ item.name }}</a>
-                            {% if item.is_archived %} <span class="status status--neutral">В архиве</span>{% endif %}
-                            <p class="t-sub">{{ item.code }}</p>
+                            {% if item.is_archived %} <span class="badge bg-secondary-lt">В архиве</span>{% endif %}
+                            <p class="text-secondary small mb-0">{{ item.code }}</p>
                         </td>
                         <td>{{ item.type == 'asset' ? 'Актив' : 'Пассив' }}</td>
                         <td>{{ item.kind == 'group' ? 'Группа' : 'Конечная статья' }}</td>
                         <td>
                             {% if permissions.manage %}
-                                <div class="t-actions">
-                                    <a class="btn btn-sm btn-secondary" href="{{ path('balance_structure_edit', {id: item.id}) }}">Изменить</a>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <a class="btn btn-sm btn-outline-secondary" href="{{ path('balance_structure_edit', {id: item.id}) }}">Изменить</a>
                                     <form method="post" action="{{ path('balance_structure_move') }}">
                                         <input type="hidden" name="_token" value="{{ csrf_token('category_move_' ~ item.id) }}">
                                         <input type="hidden" name="category_id" value="{{ item.id }}">
-                                        <button class="btn btn-sm btn-secondary" name="direction" value="up" aria-label="Поднять {{ item.name }}">↑</button>
-                                        <button class="btn btn-sm btn-secondary" name="direction" value="down" aria-label="Опустить {{ item.name }}">↓</button>
+                                        <button class="btn btn-sm btn-outline-secondary" name="direction" value="up" aria-label="Поднять {{ item.name }}">↑</button>
+                                        <button class="btn btn-sm btn-outline-secondary" name="direction" value="down" aria-label="Опустить {{ item.name }}">↓</button>
                                     </form>
-                                    <form method="post" action="{{ path('balance_structure_archive', {id: item.id}) }}">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('category_archive_' ~ item.id) }}">
-                                        <input type="hidden" name="archive" value="{{ item.is_archived ? '0' : '1' }}">
-                                        <button class="btn btn-sm btn-secondary">{{ item.is_archived ? 'Вернуть из архива' : 'Архивировать' }}</button>
-                                    </form>
+                                    {{ ui.confirm(path('balance_structure_archive', {id: item.id}), csrf_token('category_archive_' ~ item.id), item.is_archived ? 'Вернуть из архива' : 'Архивировать', 'История и остатки сохранятся.', {archive: item.is_archived ? '0' : '1'}, false) }}
                                 </div>
                             {% endif %}
                         </td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td class="t-empty" colspan="4">Структура еще не создана.</td>
+                        <td class="text-center text-secondary py-5" colspan="4">Структура еще не создана.</td>
                     </tr>
                 {% endfor %}
             </tbody>
-        </table>
-    </section>
+        </table></div>
+    </div></section>
 {% endblock %}

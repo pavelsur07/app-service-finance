@@ -62,7 +62,7 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
             taskId: $taskId,
             taskType: $taskType,
             companyId: $companyId,
-            idempotencyKey: $idempotencyKey,
+            idempotencyKey: self::wireKey($idempotencyKey),
             requestedBy: $requestedByUserId ?? 'system',
             traceId: Uuid::uuid7()->toString(),
             createdAt: $this->clock->now()->format(\DATE_RFC3339),
@@ -71,6 +71,16 @@ final readonly class AiTaskFacade implements AiTaskFacadeInterface
         $this->logger->info('AI task requested.', ['companyId' => $companyId, 'taskType' => $taskType, 'taskId' => $taskId]);
 
         return $taskId;
+    }
+
+    /**
+     * Ключ повтора уходит и в заголовок `Idempotency-Key`: не-ASCII (коды WB по-русски) там искажается, и сервис
+     * отвечает 422 `idempotency_key_mismatch`; контракт ограничивает ключ 200 символами. Такой ключ — хешем;
+     * `task_id` считается от исходного ключа, поэтому ответ находит свою строку.
+     */
+    private static function wireKey(string $key): string
+    {
+        return 1 === preg_match('/^[\x21-\x7e](?:[\x20-\x7e]{0,198}[\x21-\x7e])?$/D', $key) ? $key : 'sha256:'.hash('sha256', $key);
     }
 
     public function taskIdFor(string $companyId, string $taskType, string $idempotencyKey): string

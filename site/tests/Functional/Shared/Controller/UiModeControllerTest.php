@@ -14,7 +14,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class UiModeControllerTest extends WebTestCaseBase
 {
-    public function testAdminCanSwitchModeAndKeepSameOriginLocation(): void
+    public function testRetiredModeRequestKeepsSameOriginLocationAndSetsLegacyCookie(): void
     {
         $client = static::createClient();
         $admin = UserBuilder::aUser()
@@ -24,17 +24,18 @@ final class UiModeControllerTest extends WebTestCaseBase
         $this->em()->persist($admin);
         $this->em()->flush();
         $client->loginUser($admin);
+        $token = $this->csrfToken($client, 'ui_mode_switch', 'https://localhost/');
         $client->setServerParameter('HTTPS', 'on');
-        $crawler = $client->request('GET', '/company/');
-        self::assertResponseIsSuccessful();
-        $form = $crawler->selectButton('Новый')->form();
         $client->setServerParameter('HTTP_REFERER', 'https://localhost/finance/cashflow?period=month');
 
-        $client->submit($form);
+        $client->request('POST', '/settings/ui-mode', [
+            '_token' => $token,
+            'mode' => UiModeResolver::APP,
+        ]);
 
         self::assertResponseRedirects('/finance/cashflow?period=month', Response::HTTP_SEE_OTHER);
         $cookie = $this->uiModeCookie($client->getResponse()->headers->getCookies());
-        self::assertSame(UiModeResolver::APP, $cookie->getValue());
+        self::assertSame(UiModeResolver::LEGACY, $cookie->getValue());
         self::assertSame('/', $cookie->getPath());
         self::assertTrue($cookie->isSecure());
         self::assertTrue($cookie->isHttpOnly());
@@ -108,7 +109,7 @@ final class UiModeControllerTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
-    public function testLegacyCookieSelectsAppButtonForUser(): void
+    public function testRetiredThemeCookieCannotSelectAppModeForUser(): void
     {
         $client = static::createClient();
         $user = UserBuilder::aUser()
@@ -120,16 +121,14 @@ final class UiModeControllerTest extends WebTestCaseBase
         $client->loginUser($user);
         $client->getCookieJar()->set(new BrowserCookie('ui_theme', 'vf'));
 
-        $crawler = $client->request('GET', '/company/');
+        $client->request('GET', '/company/');
 
         self::assertResponseIsSuccessful();
-        self::assertSame(
-            'Новый',
-            trim($crawler->filter('.ui-mode-switch button[aria-pressed="true"]')->text()),
-        );
+        self::assertSelectorExists('html[data-ui-mode="legacy"]');
+        self::assertSelectorNotExists('.ui-mode-switch');
     }
 
-    public function testUserCanSwitchMode(): void
+    public function testRetiredUserModeRequestSetsLegacyCookie(): void
     {
         $client = static::createClient();
         $user = UserBuilder::aUser()
@@ -147,7 +146,7 @@ final class UiModeControllerTest extends WebTestCaseBase
 
         self::assertResponseRedirects('/', Response::HTTP_SEE_OTHER);
         self::assertSame(
-            UiModeResolver::APP,
+            UiModeResolver::LEGACY,
             $this->uiModeCookie($client->getResponse()->headers->getCookies())->getValue(),
         );
     }

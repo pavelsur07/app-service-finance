@@ -113,7 +113,7 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
         $client->request('POST', '/balance/structure/new', $values);
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('.field-helper.error');
+        self::assertSelectorExists('[data-balance-root] .invalid-feedback');
         self::assertSame(0, $this->em()->getRepository(BalanceCategory::class)->count([
             'companyId' => $company->getId(),
         ]));
@@ -237,6 +237,6 @@ final class BalanceStructureControllerTest extends WebTestCaseBase
         $client->loginUser($user);
         $client->request('GET', '/balance/structure/');
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('h1.wz-title', 'Статьи баланса');
+        self::assertSelectorTextContains('[data-balance-root] h1.page-title', 'Статьи баланса');
     }
 }

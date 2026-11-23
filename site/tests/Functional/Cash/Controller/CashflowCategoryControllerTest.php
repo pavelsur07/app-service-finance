@@ -289,6 +289,56 @@ final class CashflowCategoryControllerTest extends WebTestCaseBase
         self::assertNull($trigger->attr('data-confirm-link-href'));
     }
 
+    public function testDeletingCategoryWithGroupCodeKeepsItAndShowsReason(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->persistCompany();
+        $category = $this->category('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1', $company, 'Аренда');
+        $category->assignGroupCode('OP_OUT_RENT');
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $client->request('POST', '/cashflow-categories/'.$category->getId().'/delete', [
+            '_token' => $this->deleteToken($client, (string) $category->getId()),
+        ]);
+
+        self::assertResponseRedirects('/cashflow-categories/');
+        $client->followRedirect();
+        self::assertSelectorTextContains('body', 'базового дерева');
+        $this->em()->clear();
+        self::assertNotNull($this->em()->find(CashflowCategory::class, $category->getId()));
+    }
+
+    public function testCategoryWithGroupCodeCanBeRenamedButNotMoved(): void
+    {
+        $client = static::createClient();
+        [$user, $company] = $this->persistCompany();
+        $parent = $this->category('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2', $company, 'Выплаты');
+        $category = $this->category('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee3', $company, 'Аренда', $parent);
+        $category->assignGroupCode('OP_OUT_RENT');
+        $this->em()->flush();
+
+        $client->loginUser($user);
+        $this->setClientSessionValue($client, 'active_company_id', $company->getId());
+        $crawler = $client->request('GET', '/cashflow-categories/'.$category->getId().'/edit');
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(0, $crawler->filter('select[id$="_parent"]'), 'Статью базового дерева не переносят.');
+        $form = $crawler->filter('#cashflow-category-edit-form')->form();
+        $form['cashflow_category[name]'] = 'Аренда офиса';
+        $client->submit($form);
+
+        self::assertResponseRedirects('/cashflow-categories/');
+        $this->em()->clear();
+        $saved = $this->em()->find(CashflowCategory::class, $category->getId());
+        self::assertInstanceOf(CashflowCategory::class, $saved);
+        self::assertSame('Аренда офиса', $saved->getName());
+        self::assertSame($parent->getId(), $saved->getParent()?->getId());
+        self::assertSame('OP_OUT_RENT', $saved->getGroupCode());
+    }
+
     /** @return array{User, Company} */
     private function persistCompany(): array
     {

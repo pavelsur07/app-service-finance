@@ -12,8 +12,15 @@ tasks:
   categorize_transactions:
     mode: single
     models: [stub/categorize]
+  marketplace_source_type_draft:
+    mode: single
+    models: [stub/source-type-draft]
 
   # Review-only intake; production model selection/live evaluation is pending.
   parse_payment_message:
     mode: single
     models: [stub/payment-intake]
+
+  cash_rule_phrase:
+    mode: single
+    models: [stub/cash-rule-phrase]

@@ -19,3 +19,9 @@ framework:
             # WB finance throttling зависит от общего cache.rate_limiter pool.
             cache.rate_limiter:
                 adapter: cache.adapter.redis
+
+            cache.project_direction_import:
+                adapter: cache.adapter.redis
+
+            cache.mcp_sessions:
+                adapter: cache.adapter.redis

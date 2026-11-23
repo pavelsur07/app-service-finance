@@ -75,10 +75,10 @@ final class ExceptionLogLevelTest extends WebTestCaseBase
         // Кнопка удаления живёт на странице редактирования статьи.
         $crawler = $client->request('GET', '/balance/structure/'.$groupId.'/edit');
         self::assertResponseIsSuccessful();
-        $form = $crawler->filter('form[action="/balance/structure/'.$groupId.'/delete"]');
-        self::assertCount(1, $form, 'Для группы со статьями должна быть форма удаления.');
+        $trigger = $crawler->filter('button[data-confirm-action="/balance/structure/'.$groupId.'/delete"]');
+        self::assertCount(1, $trigger, 'Для группы со статьями должно быть подтверждение удаления.');
 
-        $client->submit($form->form());
+        $this->submitConfirmTrigger($client, $trigger);
 
         // Клиент перезагружает ядро перед каждым запросом, кроме первого: обработчик берём из
         // контейнера, обслужившего именно этот запрос, иначе он не увидит его записей.

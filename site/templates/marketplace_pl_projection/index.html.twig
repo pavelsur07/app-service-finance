@@ -1,0 +1,183 @@
+{% extends 'base.html.twig' %}
+{% block title %}ОПиУ маркетплейсов — новый расчёт{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    {{ vite_entry_link_tags('marketplace_economics') }}
+{% endblock %}
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('marketplace_economics') }}
+{% endblock %}
+
+{% macro money(minor) %}{{ minor|vf_minor(2)|vf_amount(2) }}{% endmacro %}
+
+{% block content %}
+    {% import _self as ui %}
+    {% import 'marketplace/pl_preview/_macros.html.twig' as pl %}
+
+    <div class="vf-page-head">
+        <div class="vf-page-head__title"><h1>Экономика маркетплейсов</h1></div>
+    </div>
+    <div class="card mb-3">
+        <div class="card-header">
+            <nav aria-label="Отчёт">
+                {% include 'partials/_tabs.html.twig' with {class: 'card-header-tabs', tabs: [
+                    {label: 'По SKU', href: path('marketplace_economics_sku'), active: false},
+                    {label: 'Динамика', href: path('marketplace_economics_dynamics'), active: false},
+                    {label: 'ОПиУ', href: path('marketplace_pl_projection'), active: true},
+                    {label: 'Качество данных', href: path('marketplace_economics_quality'), active: false},
+                ]} only %}
+            </nav>
+        </div>
+        <form method="get" class="card-body row g-3 align-items-end">
+            <div class="col-12 col-sm-6 col-lg-auto">
+                <label class="form-label" for="pp-from">С даты</label>
+                <input class="form-control" id="pp-from" type="date" name="from" required value="{{ from|date('Y-m-d') }}">
+            </div>
+            <div class="col-12 col-sm-6 col-lg-auto">
+                <label class="form-label" for="pp-to">По дату</label>
+                <input class="form-control" id="pp-to" type="date" name="to" required value="{{ to|date('Y-m-d') }}">
+            </div>
+            <div class="col-12 col-sm-6 col-lg-auto">
+                <label class="form-label" for="pp-channel">Канал</label>
+                <select class="form-select" id="pp-channel" name="channel">
+                    <option value="">Все каналы</option>
+                    {% for value, label in channels %}
+                        <option value="{{ value }}" {{ value == channel ? 'selected' }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-auto">
+                <label class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" name="hide_empty" value="1" {{ hideEmpty ? 'checked' }}>
+                    <span class="form-check-label">Скрыть пустые строки</span>
+                </label>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-auto">
+                <button class="btn btn-primary" type="submit">Показать</button>
+            </div>
+        </form>
+    </div>
+
+    {% if periodError %}
+        <div class="alert alert-warning" role="alert">{{ periodError }}</div>
+    {% endif %}
+    {% for warning in warnings %}
+        <div class="alert alert-warning" role="alert">{{ warning }}</div>
+    {% endfor %}
+    {% if unplaced is not empty %}
+        <div class="alert alert-warning" role="alert" data-pl-unplaced>
+            Часть сумм ведёт на статью, которой нет в дереве компании или которая не принимает суммы:
+            {% for item in unplaced %}{{ item.categoryName ?? item.categoryId }}{{ not loop.last ? ', ' }}{% endfor %}.
+        </div>
+    {% endif %}
+
+    {% if daysWithoutCostPrice > 0 %}
+        <div class="alert alert-warning" role="alert" data-pl-no-cost>
+            Себестоимость неполная: в {{ daysWithoutCostPrice }} дн. периода у части проданных товаров не задана себестоимость.
+        </div>
+    {% endif %}
+    {% if missingDerivedCodes is not empty %}
+        <div class="alert alert-warning" role="alert" data-pl-missing-codes>
+            В дереве статей компании нет статей с кодами {{ missingDerivedCodes|join(', ') }} — выручка с СПП или себестоимость не показаны.
+        </div>
+    {% endif %}
+
+    <p class="text-secondary small">
+        «Новый расчёт» — операции маркетплейсов по правилам «вид операции → статья». «Текущий расчёт» — то, что сейчас
+        попадает в ОПиУ. Новый расчёт в ОПиУ не записывается. «Выручка с СПП» — справочно: продажи за вычетом скидки
+        маркетплейса. Себестоимость — проданное за вычетом возвратов одной суммой в «Себестоимости продаж».
+    </p>
+
+    {% if hasTree and not boundaryFound %}
+        <div class="alert alert-info" role="alert" data-pl-no-boundary>
+            В дереве статей компании нет строки с кодом {{ constant('App\\MarketplacePlProjection\\Application\\Service\\TreeCut::BOUNDARY') }} — показано дерево целиком.
+        </div>
+    {% endif %}
+
+    {% set visible = hideEmpty ? rows|filter(r => (r.values.new ?? 0) != 0 or (r.values.legacy ?? 0) != 0) : rows %}
+    <section class="card mb-3 me-table-card" data-economics-table>
+        <div class="me-table-scroll" data-economics-scroll tabindex="0" role="region" aria-label="ОПиУ маркетплейсов">
+        <table class="table table-vcenter card-table me-table" data-pl-projection>
+            <thead>
+                <tr>
+                    <th>Статья</th>
+                    <th class="text-end">Новый расчёт</th>
+                    <th class="text-end">Текущий расчёт</th>
+                    <th class="text-end">Разница</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in visible %}
+                    {% set new = row.values.new ?? 0 %}
+                    {% set legacy = row.values.legacy ?? 0 %}
+                    <tr data-row-code="{{ row.code }}"{{ row.type.value != 'LEAF_INPUT' ? ' class="fw-bold"' }}>
+                        <td style="padding-left: {{ 12 + (row.level - 1) * 20 }}px;">{{ row.name }}</td>
+                        {{ pl.cell(new, row.format, 'text-end') }}
+                        {{ pl.cell(legacy, row.format, 'text-end') }}
+                        {% if row.format.value == 'MONEY' %}
+                            {{ pl.cell(new - legacy, row.format, 'text-end' ~ ((new - legacy)|abs >= 0.005 ? ' text-danger')) }}
+                        {% else %}
+                            <td></td>
+                        {% endif %}
+                    </tr>
+                {% else %}
+                    <tr><td colspan="4" class="text-secondary">{{ hasTree ? 'За период нет сумм.' : 'У компании нет дерева статей ОПиУ.' }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </section>
+
+    {% if below is not empty %}
+        <section class="card mb-3" data-pl-below>
+            <div class="card-header"><h2 class="card-title">Ниже СМ3</h2></div>
+            <div class="card-body pb-0 text-secondary small">Статьи ниже СМ3, на которые попали суммы маркетплейсов. В таблицу выше они не входят.</div>
+            <table class="table table-vcenter card-table">
+                <thead><tr><th>Статья</th><th class="text-end">Новый расчёт</th><th class="text-end">Текущий расчёт</th><th class="text-end">Разница</th></tr></thead>
+                <tbody>
+                    {% for row in below %}
+                        {% set new = row.values.new ?? 0 %}
+                        {% set legacy = row.values.legacy ?? 0 %}
+                        <tr data-row-code="{{ row.code }}">
+                            <td>{{ row.name }}</td>
+                            {{ pl.cell(new, row.format, 'text-end') }}
+                            {{ pl.cell(legacy, row.format, 'text-end') }}
+                            {{ pl.cell(new - legacy, row.format, 'text-end' ~ ((new - legacy)|abs >= 0.005 ? ' text-danger')) }}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    {% endif %}
+
+    <section class="card card-body mb-3" data-pl-identity>
+        <h2 class="card-title">Куда ушли операции</h2>
+        <p class="mb-0">
+            Всего операций за период: {{ ui.money(canonMinor) }} ₽. На статьи ОПиУ: {{ ui.money(mappedMinor) }} ₽;
+            исключено из ОПиУ: {{ ui.money(excludedMinor) }} ₽; не сопоставлено: {{ ui.money(unmappedMinor) }} ₽.
+        </p>
+    </section>
+
+    {% for title, lines in {'Не сопоставлено — правила нет': unmapped, 'Исключено из ОПиУ': excluded} %}
+        {% if lines is not empty %}
+            <section class="card mb-3" data-pl-lines="{{ loop.first ? 'unmapped' : 'excluded' }}">
+                <div class="card-header"><h2 class="card-title">{{ title }}</h2></div>
+                <table class="table table-vcenter card-table">
+                    <thead><tr><th>Канал</th><th>Вид операции</th><th>Код маркетплейса</th><th class="text-end">Сумма, ₽</th></tr></thead>
+                    <tbody>
+                        {% for line in lines %}
+                            <tr>
+                                <td>{{ channels[line.channel] ?? line.channel }}</td>
+                                <td>{{ line.kind.label }}</td>
+                                <td>{{ line.sourceType }}</td>
+                                <td class="text-end">{{ ui.money(line.amountMinor) }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+        {% endif %}
+    {% endfor %}
+{% endblock %}

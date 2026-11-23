@@ -17,6 +17,7 @@ MASK = re.compile(r"\[(?:PERSON|PHONE|EMAIL|CARD|ACCOUNT|INN)_\d+\]")
 CLAUSE_BREAK = re.compile(r"[\n;!?]|,(?![0-9])|\.(?=\s*[А-ЯЁA-Z])")
 PAID_OUT = r"(?:отдал[аи]?|оплатил[аи]?|оплачивал[аи]?|заплатил[аи]?|перев[её]л[аи]?|выплатил[аи]?)"
 PAID = PAID_OUT + r"|получил[аи]?|купил[аи]?|потратил[аи]?|вн[её]с(?:ла)?|скинул[аи]?|закинул[аи]?"
+PLANNED_OUT = r"(?:оплачу|заплачу|оплатить)"
 MONTHS = dict(
     zip(
         (
@@ -150,7 +151,7 @@ def _occurrence_errors(inp: PaymentInput, item: PaymentItem, start: int, end: in
     own_sign = re.match(r"\s*([+−-])", evidence or "")
     sign_value = own_sign[1] if own_sign else sign[1] if sign else None
     inflow = bool(re.search(r"\b(?:плюс|приход|получил[аи]?)\b", clause, re.IGNORECASE))
-    outflow = bool(re.search(r"\b" + PAID_OUT + r"\b", clause, re.IGNORECASE))
+    outflow = bool(re.search(r"\b(?:" + PAID_OUT + "|" + PLANNED_OUT + r")\b", clause, re.IGNORECASE))
     expected_direction: str | None
     if sign_value:
         expected_direction = "inflow" if sign_value == "+" else "outflow"
@@ -170,6 +171,8 @@ def _occurrence_errors(inp: PaymentInput, item: PaymentItem, start: int, end: in
         and item.direction != expected_direction
     ):
         errors.add("direction_contradiction")
+    if item.direction is not None and sign_value is None and not inflow and not outflow:
+        errors.add("direction_unanchored")
     reference = reference_date(inp)
     anchored_dates = _dates(clause, reference, start - left, end - left)
     if len(anchored_dates) > 1:
@@ -181,7 +184,7 @@ def _occurrence_errors(inp: PaymentInput, item: PaymentItem, start: int, end: in
         errors.add("date_unanchored")
     if item.execution_status == "paid":
         paid = re.search(r"\b(?:" + PAID + r")\b", clause, re.IGNORECASE)
-        future = re.search(r"\b(?:завтра|послезавтра|оплачу|заплачу|оплатить|планирую)\b", clause, re.IGNORECASE)
+        future = re.search(r"\b(?:завтра|послезавтра|" + PLANNED_OUT + r"|планирую)\b", clause, re.IGNORECASE)
         negated = re.search(r"\bне\s+(?:\w+\s+){0,2}(?:" + PAID + ")", clause, re.IGNORECASE)
         if paid is None or future is not None or negated is not None:
             errors.add("paid_unanchored")

@@ -77,10 +77,14 @@ class CashflowCategoryType extends AbstractType
         }
 
         if (!$options['protected_system_fields']) {
+            $builder->add('sort', IntegerType::class, [
+                'label' => 'Сортировка',
+            ]);
+        }
+
+        // Статью базового дерева (с кодом консолидации) не переносят: сущность это запрещает.
+        if (!$options['protected_system_fields'] && !$options['lock_parent']) {
             $builder
-                ->add('sort', IntegerType::class, [
-                    'label' => 'Сортировка',
-                ])
                 ->add('parent', EntityType::class, [
                     'class' => CashflowCategory::class,
                     'choices' => $options['parents'],
@@ -125,6 +129,7 @@ class CashflowCategoryType extends AbstractType
             'plCategories' => [],
             'allow_flow_kind_edit' => false,
             'protected_system_fields' => false,
+            'lock_parent' => false,
         ]);
     }
 }

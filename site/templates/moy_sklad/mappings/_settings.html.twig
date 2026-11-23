@@ -1,0 +1,76 @@
+{#
+  «Параметры сопоставления»: одна характеристика размера (URL sizeCharacteristicId — её берут и диагностика,
+), алиас W для WB, автоприменение, правила автосопоставления.
+  Parameters: marketplace, connectionId, companyId, settings (MappingSettings), canWrite, choices (list{id,name}),
+  selected (?string), charQ, charPage (MappingCharacteristicPage), keep (GET-параметры таблицы),
+  autoApply ({enabled, sizeCharacteristicId}|null).
+#}
+{% set charParams = {connectionId: connectionId, marketplace: marketplace, char_q: charQ, sizeCharacteristicId: selected ?? ''}|merge(keep) %}
+{# Открыта сразу, пока идёт поиск характеристики: Bootstrap 5.3 показывает .offcanvas.show при загрузке. #}
+<div class="offcanvas offcanvas-end vf-ops-filters{% if charQ != '' or charPage.page > 1 %} show{% endif %}" tabindex="-1" id="mapping-settings" aria-labelledby="mapping-settings-title" data-mapping-settings>
+    <div class="offcanvas-header">
+        <h2 class="offcanvas-title" id="mapping-settings-title">Параметры сопоставления</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Закрыть"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div class="d-flex flex-column gap-4 p-4">
+            <div>
+                <form method="get" data-mapping-characteristic>
+                    {% for k, v in keep %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+                    <label for="mapping-characteristic-search" class="form-label">Характеристика размера МойСклад</label>
+                    <div class="input-group mb-2">
+                        <input id="mapping-characteristic-search" class="form-control" type="search" name="char_q" value="{{ charQ }}" maxlength="100" placeholder="Поиск характеристики">
+                        <button class="btn" type="submit">Найти</button>
+                    </div>
+                    <div class="input-group">
+                        <select name="sizeCharacteristicId" class="form-select" aria-label="Характеристика размера">
+                            <option value="">Без правила размера</option>
+                            {% for characteristic in choices %}<option value="{{ characteristic.id }}"{% if selected == characteristic.id %} selected{% endif %}>{{ characteristic.name }} · {{ characteristic.id }}</option>{% endfor %}
+                        </select>
+                        <button class="btn btn-primary" type="submit">Применить</button>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        {% if charPage.page > 1 %}<a class="btn btn-sm btn-ghost-secondary" href="{{ path('moysklad_listing_mappings', charParams|merge({char_page: charPage.page - 1})) }}">Предыдущие характеристики</a>{% endif %}
+                        {% if charPage.page * charPage.perPage < charPage.totalItems %}<a class="btn btn-sm btn-ghost-secondary" href="{{ path('moysklad_listing_mappings', charParams|merge({char_page: charPage.page + 1})) }}">Следующие характеристики</a>{% endif %}
+                    </div>
+                    <p class="form-hint mt-2">Нужна, чтобы проверять размер при выборе модификации. Действует на диагностику и принятие предложений.</p>
+                </form>
+                {% if marketplace == 'wildberries' %}
+                    <hr class="my-3">
+                    {% if canWrite %}
+                        <form method="post" action="{{ path('moysklad_mapping_settings', {connectionId: connectionId}) }}" data-wb-alias-settings>
+                            <input type="hidden" name="_token" value="{{ csrf_token('moysklad_mapping_settings' ~ companyId ~ connectionId) }}">
+                            <label class="form-check"><input type="checkbox" name="enabled" value="1" class="form-check-input"{% if settings.wbTrailingW %} checked{% endif %}><span class="form-check-label">Убирать один конечный W/w при поиске артикула WB</span></label>
+                            <p class="form-hint">Только для этой компании, подключения и Wildberries. Существующие связи сохраняются.</p>
+                            <button type="submit" class="btn btn-sm">Сохранить</button>
+                        </form>
+                    {% else %}
+                        <p class="mb-0">Удаление конечного W/w: {{ settings.wbTrailingW ? 'включено' : 'выключено' }}.</p>
+                    {% endif %}
+                {% endif %}
+                <hr class="my-3">
+                {% set auto = autoApply ?? null %}
+                {% if canWrite %}
+                    <form method="post" action="{{ path('moysklad_mapping_auto_apply', {connectionId: connectionId, marketplace: marketplace}) }}" data-auto-apply-settings>
+                        <input type="hidden" name="_token" value="{{ csrf_token('moysklad_mapping_auto_apply' ~ companyId ~ connectionId ~ marketplace) }}">
+                        <input type="hidden" name="sizeCharacteristicId" value="{{ selected ?? '' }}">
+                        <label class="form-check"><input type="checkbox" name="enabled" value="1" class="form-check-input"{% if auto and auto.enabled %} checked{% endif %}><span class="form-check-label">Принимать однозначные предложения автоматически</span></label>
+                        <p class="form-hint">Каждый день в 05:30 — только точные совпадения, как «Принять все предложения». Действует от вашего имени и с выбранной выше характеристикой размера; каждый запуск — отдельный пакет, его можно отменить.</p>
+                        <button type="submit" class="btn btn-sm">Сохранить</button>
+                    </form>
+                {% else %}
+                    <p class="mb-0">Автоприменение: {{ auto and auto.enabled ? 'включено' : 'выключено' }}.</p>
+                {% endif %}
+            </div>
+            <div>
+                <div class="form-label">Как ищется соответствие</div>
+                <ul class="small text-secondary mb-0 ps-3">
+                    <li>Точный артикул, код позиции, алиас WB или штрихкод; регистр и ведущие нули учитываются.</li>
+                    <li>Артикул родителя проверяется вместе с размером — нужна характеристика размера.</li>
+                    <li>Комплектация сверяется по количеству штук в названиях.</li>
+                    <li>Существующие и снятые вручную связи не меняются.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

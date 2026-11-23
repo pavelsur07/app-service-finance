@@ -2,7 +2,8 @@
 
 Модели: `echo` — возвращает {"text": <содержимое блока данных>}; `categorize` —
 детерминированная эвристика для categorize_transactions (локальный e2e и прогон evals
-без сети, не модель); `fail` — всегда повторяемая ошибка; `invalid` — ответ не JSON.
+без сети, не модель); `source-type-draft` — вид самого похожего по словам примера для
+marketplace_source_type_draft; `fail` — всегда повторяемая ошибка; `invalid` — ответ не JSON.
 """
 
 import json
@@ -32,6 +33,11 @@ class StubAdapter:
                         "questions": ["Тестовый адаптер: разбор моделью не выполнялся."],
                     }
                 )
+            case "cash-rule-phrase":
+                samples = json.loads(extract_data_block(request.user))["examples"]
+                text = json.dumps({"phrase": _phrase(samples)}, ensure_ascii=False)
+            case "source-type-draft":
+                text = json.dumps(_source_type_draft(json.loads(extract_data_block(request.user))), ensure_ascii=False)
             case "invalid":
                 text = "не JSON"
             case "fail":
@@ -57,3 +63,43 @@ def _categorize(data: dict[str, Any]) -> dict[str, Any]:
                 break
         items.append({"operation_id": op["id"], "category_id": found, "confidence": 0.9 if found else 0.0})
     return {"items": items}
+
+
+def _source_type_draft(data: dict[str, Any]) -> dict[str, Any]:
+    """Вид примера с наибольшим числом общих основ слов в названии; без совпадений — новый вид."""
+
+    def stems(text: str) -> set[str]:
+        return {w[:5] for w in re.findall(r"[а-яёa-z]{4,}", text.lower())}
+
+    own = stems(data["name"])
+    best = max(data["examples"], key=lambda e: len(own & stems(e["name"])), default=None)
+    if best is not None and own & stems(best["name"]):
+        return {
+            "kind": best["kind"],
+            "new_kind": None,
+            "title": data["name"],
+            "reason": f"как {best['source_type']}",
+            "confidence": 0.9,
+        }
+    return {
+        "kind": None,
+        "new_kind": {"code": "other", "title": data["name"], "level": "overhead"},
+        "title": data["name"],
+        "reason": "похожих кодов нет",
+        "confidence": 0.3,
+    }
+
+
+def _phrase(samples: list[dict[str, Any]]) -> str | None:
+    """Локальный режим: повторяющиеся слова сравниваются с отрицательными примерами."""
+    positive: dict[str, int] = {}
+    negative: set[str] = set()
+    for sample in samples:
+        words = {word for word in sample["text"].split() if word not in {"#", "за", "по", "от", "и", "в", "оплата"}}
+        if sample["target"]:
+            for word in words:
+                positive[word] = positive.get(word, 0) + 1
+        else:
+            negative.update(words)
+    options = (word for word, count in positive.items() if count >= 2 and word not in negative)
+    return max(options, key=lambda word: (positive[word], len(word), word), default=None)

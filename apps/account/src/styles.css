@@ -1,0 +1,6 @@
+@import '@vashfindir/ds/styles.css';
+
+/* Only this app's UI; no tests, legacy site or sibling application. */
+@source './';
+@source not './**/*.test.ts';
+@source not './**/*.test.tsx';

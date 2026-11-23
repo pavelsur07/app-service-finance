@@ -17,6 +17,7 @@ use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
+use App\MarketplaceAnalytics\Application\Service\OzonOrderAdCoverage;
 use App\MarketplaceAnalytics\Domain\Service\AbcClassificationPolicy;
 use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
 use DG\BypassFinals;
@@ -86,6 +87,7 @@ final class UnitExtendedQueryTest extends TestCase
             new MarketplaceCostAnalyticsGroupResolver(new CostCategoryCatalogFacade()),
             $this->listingTagFacade,
             new AbcClassificationPolicy(),
+            new OzonOrderAdCoverage($this->adsFacade),
         );
 
         $this->listingTagFacade->method('list')->willReturn([]);
@@ -201,6 +203,30 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertNull($row['stockCapitalRub']);
     }
 
+    public function testReturnedUnitsGiveBackTheirCostPrice(): void
+    {
+        // Регрессия 23.11: возврат вычитал выручку, а себестоимость возвращённых единиц оставалась
+        // в расходах. Как в ОПиУ (sale_cost_price − return_cost_price) и «Экономике SKU».
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-1', 'Товар', 'SKU-1', 'ozon', '1000.00', 5, '300.00', 5),
+        ]);
+        $this->stubReturns([
+            new ListingReturnAggregateDTO('l-1', '200.00', 1, '60.00'),
+        ]);
+
+        $result = $this->execute();
+        $row = $this->findRow($result['items'], 'l-1');
+
+        self::assertNotNull($row);
+        self::assertSame(240.0, $row['costPriceTotal']);
+        // Себестоимость единицы — по проданным единицам, возврат её не меняет.
+        self::assertSame(60.0, $row['costPriceUnit']);
+        // profit = 1000 − 200 − (300 − 60) = 560
+        self::assertSame(560.0, $row['profit']);
+        self::assertSame(240.0, $result['totals']['costPriceTotal']);
+        self::assertSame(560.0, $result['totals']['profit']);
+    }
+
     public function testTagFilterNarrowsItemsAndTotals(): void
     {
         $this->stubSales([
@@ -269,13 +295,15 @@ final class UnitExtendedQueryTest extends TestCase
         $row = $result['unallocated'];
         self::assertNotNull($row);
         self::assertSame(30.0, $row['commission']);
-        self::assertSame(200.0, $row['otherCosts']);
+        self::assertSame(0.0, $row['otherCosts']);
+        self::assertSame(200.0, $row['adSpend']);
         self::assertSame(230.0, $row['totalCosts']);
         self::assertSame(-230.0, $row['profit']);
 
-        // Итого = листинги + строка: комиссия 100 + 30, прочие 200.
+        // Итого = листинги + строка: комиссия 100 + 30, реклама 200.
         self::assertSame(130.0, $result['totals']['commission']);
-        self::assertSame(200.0, $result['totals']['otherCosts']);
+        self::assertSame(0.0, $result['totals']['otherCosts']);
+        self::assertSame(200.0, $result['totals']['adSpend']);
         self::assertSame(330.0, $result['totals']['totalCosts']);
         // profit = 1000 − 300 − 130 − 200 = 370; прибыль строк 700 + (−230) + … сходится.
         self::assertSame(370.0, $result['totals']['profit']);

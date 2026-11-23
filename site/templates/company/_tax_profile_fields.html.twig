@@ -1,10 +1,11 @@
 {# Поля CompanyTaxProfileType; варианты НДС фильтруются по выбранному режиму (assets/tax_profile_fields.js; сочетание проверяет и сервер). #}
-{% set col = tax_form.validFrom is defined ? 4 : 6 %}
+{% set col = tax_form.validFrom is defined ? 3 : 4 %}
 <div class="row g-2" data-tax-profile-fields data-matrix="{{ tax_vat_matrix()|json_encode|e('html_attr') }}">
     <div class="col-md-{{ col }}">{{ form_row(tax_form.taxRegime) }}</div>
     <div class="col-md-{{ col }}">{{ form_row(tax_form.vatMode) }}</div>
+    <div class="col-md-{{ col }}">{{ form_row(tax_form.taxRatePercent) }}</div>
     {% if tax_form.validFrom is defined %}
-        <div class="col-md-4">{{ form_row(tax_form.validFrom, {type: 'month'}) }}</div>
+        <div class="col-md-3">{{ form_row(tax_form.validFrom, {type: 'month'}) }}</div>
     {% endif %}
 </div>
 {{ form_errors(tax_form) }}

@@ -79,7 +79,7 @@ final class MarketplaceConnectionsControllerTest extends WebTestCaseBase
         self::assertSame(['client_id' => 'seller-client-a', 'api_key' => 'seller-key-a'], $cabinet['credentials']['seller']);
         self::assertSame(['client_id' => 'perf-client-a', 'client_secret' => 'perf-secret-a'], $cabinet['credentials']['performance']);
         // Отправления — всем кабинетам с ключом seller (`ozon_fetcher.orders_companies: ['*']`).
-        self::assertSame([...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::ORDERS_RESOURCE_TYPES, MarketplaceConnectionsSnapshotBuilder::ACCRUAL_POSTINGS_RESOURCE_TYPE, ...MarketplaceConnectionsSnapshotBuilder::PRODUCTS_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::STOCKS_RESOURCE_TYPES, MarketplaceConnectionsSnapshotBuilder::PRICES_RESOURCE_TYPE, MarketplaceConnectionsSnapshotBuilder::WAREHOUSE_STOCKS_RESOURCE_TYPE, ...MarketplaceConnectionsSnapshotBuilder::SEARCH_ANALYTICS_RESOURCE_TYPES, MarketplaceConnectionsSnapshotBuilder::RETURNS_RESOURCE_TYPE, ...MarketplaceConnectionsSnapshotBuilder::REFERENCE_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::ADS_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::ADS_REPORTS_RESOURCE_TYPES], $cabinet['resource_types']);
+        self::assertSame([...MarketplaceConnectionsSnapshotBuilder::SELLER_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::ORDERS_RESOURCE_TYPES, MarketplaceConnectionsSnapshotBuilder::ACCRUAL_POSTINGS_RESOURCE_TYPE, ...MarketplaceConnectionsSnapshotBuilder::PRODUCTS_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::STOCKS_RESOURCE_TYPES, MarketplaceConnectionsSnapshotBuilder::PRICES_RESOURCE_TYPE, MarketplaceConnectionsSnapshotBuilder::WAREHOUSE_STOCKS_RESOURCE_TYPE, ...MarketplaceConnectionsSnapshotBuilder::SEARCH_ANALYTICS_RESOURCE_TYPES, MarketplaceConnectionsSnapshotBuilder::FUNNEL_RESOURCE_TYPE, MarketplaceConnectionsSnapshotBuilder::RETURNS_RESOURCE_TYPE, ...MarketplaceConnectionsSnapshotBuilder::REFERENCE_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::ADS_RESOURCE_TYPES, ...MarketplaceConnectionsSnapshotBuilder::ADS_REPORTS_RESOURCE_TYPES], $cabinet['resource_types']);
         self::assertNotFalse(\DateTimeImmutable::createFromFormat(\DateTimeInterface::ATOM, (string) $cabinet['updated_at']));
 
         self::assertSame(['client_id' => 'legacy-client', 'api_key' => 'legacy-plain-key'], $byRef[self::SELLER_LEGACY]['credentials']['seller']);
@@ -132,7 +132,7 @@ final class MarketplaceConnectionsControllerTest extends WebTestCaseBase
         self::assertNull($cabinet['credentials']['performance']);
         // `wb_fetcher.finance_companies: ['*']` — оба ресурса каждому кабинету; кабинеты
         // ограничивает allowlist сервиса (docs/maintenance/wb-fetcher-prod.md).
-        self::assertSame(['wb.finance.sales-report.daily', 'wb.finance.sales-report.weekly'], $cabinet['resource_types']);
+        self::assertSame(['wb.finance.sales-report.daily', 'wb.finance.sales-report.weekly', 'wb.ads.daily', 'wb.analytics.funnel', 'wb.analytics.search'], $cabinet['resource_types']);
 
         foreach ($logs->getRecords() as $record) {
             self::assertStringNotContainsString('wb-token-never-logged', $record->message.json_encode($record->context, \JSON_PARTIAL_OUTPUT_ON_ERROR));

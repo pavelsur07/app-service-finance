@@ -12,6 +12,7 @@ use App\Finance\Engine\TopoSort;
 use App\Finance\Engine\ValueFormatter;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PLValueFormat;
 use App\Finance\Facts\FactsProviderInterface;
 use App\Finance\Formula\Evaluator;
 use App\Finance\Formula\Parser;
@@ -29,6 +30,9 @@ final class PlReportCalculator
         private readonly DependencyExtractor $deps = new DependencyExtractor(),
         private readonly TopoSort $topo = new TopoSort(),
         private readonly ValueFormatter $fmt = new ValueFormatter(),
+        private readonly ?PlFormulaVariables $variables = null,
+        // false — факты заданы суммой колонки и от периода не зависят (withFacts): по месяцам их не разложить.
+        private readonly bool $factsFollowPeriod = true,
     ) {
     }
 
@@ -43,6 +47,9 @@ final class PlReportCalculator
         ProjectDirection|array|null $projectDirection = null,
         string|array|null $responsibilityCenterId = null,
     ): PlReportResult {
+        /** @var ProjectDirection|list<ProjectDirection>|null $projectDirection */
+        /** @var string|list<string>|null $responsibilityCenterId */
+        /** @var list<PLCategory> $all */
         $all = $this->categories->findBy(['company' => $company], ['parent' => 'ASC', 'sortOrder' => 'ASC']);
         $displayOrder = $this->orderByTree($all);
         /** @var array<string,PLCategory> $byId */
@@ -54,14 +61,21 @@ final class PlReportCalculator
         $astById = [];
         $g = new Graph();
         $warnings = [];
+        /** @var list<array{string, string}> $variableUses [имя переменной, название статьи] */
+        $variableUses = [];
+        /** @var array<string, true> $readsRate статьи, чья формула читает переменную ставки */
+        $readsRate = [];
+        /** @var array<string, list<string>> $formulaDeps id статьи => id статей из её формулы */
+        $formulaDeps = [];
 
         foreach ($all as $cat) {
-            $g->addNode($cat->getId());
+            $catId = (string) $cat->getId();
+            $g->addNode($catId);
             $formula = trim((string) ($cat->getFormula() ?? ''));
 
             if (PLCategoryType::SUBTOTAL === $cat->getType() && '' === $formula) {
                 foreach ($cat->getChildren() as $child) {
-                    $g->addEdge($child->getId(), $cat->getId());
+                    $g->addEdge((string) $child->getId(), $catId);
                 }
                 continue;
             }
@@ -70,11 +84,17 @@ final class PlReportCalculator
                 try {
                     $tokens = $this->tokenizer->tokenize($formula);
                     $ast = $this->parser->parse($tokens);
-                    $astById[$cat->getId()] = $ast;
+                    $astById[$catId] = $ast;
                     foreach ($this->deps->extract($ast) as $code) {
+                        if (PlFormulaVariables::isVariable($code)) {
+                            $variableUses[] = [strtoupper($code), $cat->getName()];
+                            $readsRate[$catId] = true;
+                            continue;
+                        }
                         $depCat = $this->findByCode($all, $code);
                         if ($depCat) {
-                            $g->addEdge($depCat->getId(), $cat->getId());
+                            $g->addEdge((string) $depCat->getId(), $catId);
+                            $formulaDeps[$catId][] = (string) $depCat->getId();
                         } else {
                             $warnings[] = "Unknown code `$code` in formula of `{$cat->getName()}`";
                         }
@@ -87,8 +107,47 @@ final class PlReportCalculator
 
         $order = $this->topo->sort($g, $byId);
 
+        // Профиль читается, только если переменная есть хотя бы в одной формуле.
+        $variableValues = [] === $variableUses ? [] : ($this->variables?->values((string) $company->getId(), $period) ?? []);
+        foreach ($variableUses as [$variable, $categoryName]) {
+            if (null === ($variableValues[$variable] ?? null)) {
+                $warnings[] = "Переменная $variable в формуле «{$categoryName}»: ставка не задана в налоговом профиле компании, принято 0";
+            }
+        }
+
+        // Ставка доходит до статьи и через промежуточные неденежные статьи (TAX = REV * TAX_PCT / 100,
+        // где TAX_PCT = TAX_RATE). Через денежную не идёт: та уже сложена по месяцам, сумма линейна.
+        do {
+            $grew = false;
+            foreach ($formulaDeps as $id => $depIds) {
+                if (isset($readsRate[$id])) {
+                    continue;
+                }
+                foreach ($depIds as $depId) {
+                    if (isset($readsRate[$depId]) && PLValueFormat::MONEY !== $byId[$depId]->getFormat()) {
+                        $readsRate[$id] = $grew = true;
+                        break;
+                    }
+                }
+            }
+        } while ($grew);
+        $moneyVariableIds = array_values(array_filter(
+            array_keys($readsRate),
+            static fn (string $id): bool => PLValueFormat::MONEY === $byId[$id]->getFormat(),
+        ));
+
+        $monthlySums = $this->sumByMonthsIfRateChanges($company, $period, $moneyVariableIds, $projectDirection, $responsibilityCenterId, $warnings);
+
         $values = [];
-        $env = new class($values, $all, $company, $period, $projectDirection, $responsibilityCenterId, $this->facts, $warnings) implements \App\Finance\Formula\Env {
+        $env = new class($values, $all, $company, $period, $projectDirection, $responsibilityCenterId, $this->facts, $warnings, $variableValues) implements \App\Finance\Formula\Env {
+            /**
+             * @param array<string, float> $values
+             * @param list<PLCategory> $all
+             * @param ProjectDirection|list<ProjectDirection>|null $projectDirection
+             * @param string|list<string>|null $responsibilityCenterId
+             * @param list<string> $warnings
+             * @param array<string, ?float> $variableValues
+             */
             public function __construct(
                 public array &$values,
                 private array $all,
@@ -97,12 +156,16 @@ final class PlReportCalculator
                 private ProjectDirection|array|null $projectDirection,
                 private string|array|null $responsibilityCenterId,
                 private FactsProviderInterface $facts,
-                private array &$warnings,
+                private array &$warnings, // @phpstan-ignore property.onlyWritten (ссылка на список предупреждений расчёта)
+                private array $variableValues,
             ) {
             }
 
             public function get(string $code): float
             {
+                if (PlFormulaVariables::isVariable($code)) {
+                    return (float) ($this->variableValues[strtoupper($code)] ?? 0.0);
+                }
                 foreach ($this->all as $c) {
                     if ($c->getCode() && strtoupper($c->getCode()) === strtoupper($code)) {
                         $v = $this->values[$c->getId()] ?? $this->facts->value(
@@ -130,6 +193,10 @@ final class PlReportCalculator
         foreach ($order as $id) {
             /** @var PLCategory $c */
             $c = $byId[$id];
+            if (isset($monthlySums[$id])) {
+                $values[$id] = $monthlySums[$id];
+                continue;
+            }
             $t = $c->getType();
             $val = 0.0;
 
@@ -168,7 +235,7 @@ final class PlReportCalculator
             $parent = $c->getParent();
             $depthById[$c->getId()] = null === $parent ? 1 : ($depthById[$parent->getId()] ?? 0) + 1;
             $rows[] = new PlComputedRow(
-                id: $c->getId(),
+                id: (string) $c->getId(),
                 code: $c->getCode(),
                 name: $c->getName(),
                 level: $depthById[$c->getId()],
@@ -182,6 +249,67 @@ final class PlReportCalculator
         return new PlReportResult($period, $rows, array_values(array_unique($warnings)));
     }
 
+    /**
+     * Ставка менялась внутри периода: денежные статьи с переменной ставки считаются помесячно и
+     * складываются — итог периода совпадает с суммой месячных колонок. Профиль меняется с 1-го числа,
+     * поэтому месяц — точная единица. Проценты и коэффициенты не складываются: они остаются по ставке
+     * конца периода. Расчёт на заранее посчитанных фактах (withFacts — предпросмотр, бюджет) не
+     * раскладывается: сумма колонки одна на любой период, там действует ставка конца периода.
+     *
+     * @param list<string> $categoryIds
+     * @param ProjectDirection|list<ProjectDirection>|null $projectDirection
+     * @param string|list<string>|null $responsibilityCenterId
+     * @param list<string> $warnings
+     *
+     * @return array<string, float> сумма по id статьи; пусто — ставка в периоде одна
+     */
+    private function sumByMonthsIfRateChanges(
+        Company $company,
+        PlReportPeriod $period,
+        array $categoryIds,
+        ProjectDirection|array|null $projectDirection,
+        string|array|null $responsibilityCenterId,
+        array &$warnings,
+    ): array {
+        if (null === $this->variables || !$this->factsFollowPeriod || [] === $categoryIds) {
+            return [];
+        }
+
+        $months = [];
+        for ($start = $period->from->modify('first day of this month'); $start <= $period->to; $start = $start->modify('first day of next month')) {
+            $months[] = PlReportPeriod::forRange(max($start, $period->from), min($start->modify('last day of this month'), $period->to));
+        }
+        if (\count($months) < 2) {
+            return [];
+        }
+
+        // ponytail: профиль читается на каждый месяц периода; кэшировать периоды профиля,
+        // если отчёты за многолетние диапазоны станут медленными.
+        $companyId = (string) $company->getId();
+        $rates = array_map(fn (PlReportPeriod $month): array => $this->variables->values($companyId, $month), $months);
+        if (1 === \count(array_unique($rates, \SORT_REGULAR))) {
+            return [];
+        }
+
+        $sums = array_fill_keys($categoryIds, 0.0);
+        foreach ($months as $month) {
+            $result = $this->calculate($company, $month, $projectDirection, $responsibilityCenterId);
+            foreach ($result->rows as $row) {
+                if (isset($sums[$row->id])) {
+                    $sums[$row->id] += $row->rawValue;
+                }
+            }
+            array_push($warnings, ...$result->warnings);
+        }
+
+        return $sums;
+    }
+
+    /**
+     * @param list<PLCategory> $all
+     *
+     * @return list<PLCategory>
+     */
     private function orderByTree(array $all): array
     {
         $childrenByParent = [];
@@ -220,6 +348,9 @@ final class PlReportCalculator
         return $out;
     }
 
+    /**
+     * @param list<PLCategory> $all
+     */
     private function findByCode(array $all, string $code): ?PLCategory
     {
         foreach ($all as $c) {
@@ -237,6 +368,6 @@ final class PlReportCalculator
      */
     public function withFacts(FactsProviderInterface $facts): self
     {
-        return new self($this->categories, $facts, $this->tokenizer, $this->parser, $this->evaluator, $this->deps, $this->topo, $this->fmt);
+        return new self($this->categories, $facts, $this->tokenizer, $this->parser, $this->evaluator, $this->deps, $this->topo, $this->fmt, $this->variables, false);
     }
 }

@@ -1,33 +1,39 @@
-{% extends '_layout/app.html.twig' %}
+{% extends '_layout/legacy.html.twig' %}
 {% set app_nav_active = 'balance' %}
 {% set app_breadcrumb = 'Управленческий баланс' %}
 {% set currency = book.currency|default('RUB') %}
 {% block title %}Управленческий баланс{% endblock %}
+{# Вкладки разделов (DS-Tabs): вложенные страницы подсвечивают свой раздел. #}
+{% set route = app.request.attributes.get('_route') %}
+{% set balanceSection = {
+    balance_index: 'balance_index',
+    balance_structure_index: 'balance_structure_index', balance_structure_new: 'balance_structure_index', balance_structure_edit: 'balance_structure_index', balance_article_card: 'balance_structure_index',
+    balance_accounts: 'balance_accounts', balance_account_new: 'balance_accounts', balance_account_edit: 'balance_accounts', balance_account_card: 'balance_accounts', balance_account_target: 'balance_accounts',
+    balance_journal: 'balance_journal', balance_document: 'balance_journal', balance_document_new: 'balance_journal', balance_document_reverse: 'balance_journal',
+    balance_statement: 'balance_statement',
+    balance_compare: 'balance_compare',
+    balance_periods: 'balance_periods',
+    balance_setup: 'balance_setup',
+    balance_access: 'balance_access',
+}[route]|default(null) %}
+{% if route == 'balance_audit' %}
+    {% set balanceSection = {article: 'balance_structure_index', account: 'balance_accounts', operation: 'balance_journal', period: 'balance_periods', book: 'balance_setup', access: 'balance_access'}[app.request.attributes.get('type')]|default('balance_index') %}
+{% endif %}
 {% block content %}
-    {# Вкладки разделов (DS-Tabs): вложенные страницы подсвечивают свой раздел. #}
-    {% set route = app.request.attributes.get('_route') %}
-    {% set section = {
-        balance_index: 'balance_index',
-        balance_structure_index: 'balance_structure_index', balance_structure_new: 'balance_structure_index', balance_structure_edit: 'balance_structure_index', balance_article_card: 'balance_structure_index',
-        balance_accounts: 'balance_accounts', balance_account_new: 'balance_accounts', balance_account_edit: 'balance_accounts', balance_account_card: 'balance_accounts', balance_account_target: 'balance_accounts',
-        balance_journal: 'balance_journal', balance_document: 'balance_journal', balance_document_new: 'balance_journal', balance_document_reverse: 'balance_journal',
-        balance_statement: 'balance_statement',
-        balance_compare: 'balance_compare',
-        balance_periods: 'balance_periods',
-        balance_setup: 'balance_setup',
-        balance_access: 'balance_access',
-    }[route]|default(null) %}
-    {% set sections = {'balance_index': 'Баланс', 'balance_structure_index': 'Статьи', 'balance_accounts': 'Счета', 'balance_journal': 'Документы', 'balance_statement': 'Движения', 'balance_compare': 'Сравнение', 'balance_periods': 'Периоды'} %}
-    {% if permissions.manage %}
-        {% set sections = sections|merge({'balance_setup': 'Настройка', 'balance_access': 'Права'}) %}
-    {% endif %}
-    {% set tabs = [] %}
-    {% for tab_route, label in sections %}
-        {% set tabs = tabs|merge([{label: label, href: path(tab_route), active: tab_route == section}]) %}
-    {% endfor %}
-    <div class="wz-row">
-        {% include 'app/_ui/_tabs.html.twig' with {tabs: tabs, label: 'Разделы баланса'} only %}
-    </div>
-    {% block balance_content %}
-    {% endblock %}
+    <main class="vf-balance" data-balance-root>
+        {% set sections = {'balance_index': 'Баланс', 'balance_structure_index': 'Статьи', 'balance_accounts': 'Счета', 'balance_journal': 'Документы', 'balance_statement': 'Движения', 'balance_compare': 'Сравнение', 'balance_periods': 'Периоды'} %}
+        {% if permissions.manage %}
+            {% set sections = sections|merge({'balance_setup': 'Настройка', 'balance_access': 'Права'}) %}
+        {% endif %}
+        {% set tabs = [] %}
+        {% for tab_route, label in sections %}
+            {% set tabs = tabs|merge([{label: label, href: path(tab_route), active: tab_route == balanceSection}]) %}
+        {% endfor %}
+        <nav class="mb-4" aria-label="Разделы баланса" data-balance-nav>
+            {% include 'partials/_tabs.html.twig' with {tabs: tabs} only %}
+        </nav>
+        {% block balance_content %}
+        {% endblock %}
+        {% include 'partials/_confirm_modal.html.twig' with {id: 'balance-confirm'} only %}
+    </main>
 {% endblock %}

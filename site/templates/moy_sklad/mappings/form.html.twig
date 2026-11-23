@@ -1,0 +1,84 @@
+{% extends 'moy_sklad/layout.html.twig' %}
+
+{% block title %}МойСклад — Связь листинга {{ providerName }}{% endblock %}
+{% block integration_title %}Связь листинга {{ providerName }}{% endblock %}
+
+{% block integration_content %}
+    <section class="card" data-moysklad-mapping-form>
+        <div class="card-body">
+            <h2 class="card-title text-break">{{ source ? source.title ?? source.sku : state.listingSnapshot.title|default('Листинг недоступен') }}</h2>
+            <p class="text-secondary">{{ connection.name }} · {{ state.statusLabel }}</p>
+            {% if not source %}<div class="alert alert-info" data-listing-unavailable>Листинг недоступен. Сохранённую историю можно посмотреть, связь — снять.</div>{% endif %}
+            {% if source %}
+                <dl class="row">
+                    <dt class="col-sm-4">SKU маркетплейса</dt><dd class="col-sm-8 text-break">{{ source.sku }}</dd>
+                    <dt class="col-sm-4">Артикул продавца</dt><dd class="col-sm-8 text-break">{{ source.supplierSku ?? '—' }}</dd>
+                    <dt class="col-sm-4">Размер</dt><dd class="col-sm-8">{{ source.size ?? '—' }}</dd>
+                    {% if source.marketplaceVariantId %}<dt class="col-sm-4">Вариант маркетплейса</dt><dd class="col-sm-8">{{ source.marketplaceVariantId }}</dd>{% endif %}
+                </dl>
+            {% endif %}
+            {% if state.target %}<p>Текущая позиция: <strong>{{ state.target.name }}</strong> · {{ state.target.article ?? state.target.code ?? '—' }}</p>{% endif %}
+            {% if state.status == 'needs_review' %}<p class="text-secondary">{{ state.reasonLabel }}</p>{% endif %}
+            <p class="text-secondary">Последняя загрузка товаров: {{ productSync and productSync.lastCompletedAt ? productSync.lastCompletedAt|date('d.m.Y H:i') : 'Ещё не выполнялась' }}. Модификаций: {{ variantSync and variantSync.lastCompletedAt ? variantSync.lastCompletedAt|date('d.m.Y H:i') : 'Ещё не выполнялась' }}.</p>
+            {% if not catalogReady %}<div class="alert alert-info" data-catalog-not-ready>Для назначения связи включите подключение и загрузите товары и модификации. <a href="{{ path('moysklad_connections_index') }}">Подключения</a></div>{% endif %}
+            {{ form_errors(setForm) }}
+            {{ form_errors(clearForm) }}
+            {{ form_errors(setForm.expectedRevision) }}
+            {{ form_errors(setForm.requestId) }}
+            {{ form_errors(clearForm.expectedRevision) }}
+            {{ form_errors(clearForm.requestId) }}
+            {% if canSet %}
+                <form method="get" class="mb-3">
+                    <label for="mapping-target-search" class="form-label">Найти в МойСклад по названию, коду, артикулу или точному штрихкоду</label>
+                    <div class="input-group"><input id="mapping-target-search" class="form-control" name="q" type="search" value="{{ q }}" maxlength="100"><button type="submit" class="btn">Найти</button></div>
+                    <input type="hidden" name="expectedRevision" value="{{ formExpectedRevision }}">
+                    <input type="hidden" name="requestId" value="{{ formRequestId }}">
+                    <div class="form-hint">Введите от двух символов. Подсказки по точному артикулу требуют вашего подтверждения.</div>
+                </form>
+                {% if suggestions.totalItems > 20 %}<p class="text-secondary">Найдено больше 20 совпадений артикула. Уточните поиск по названию или коду.</p>{% endif %}
+                {{ form_start(setForm, {action: path('moysklad_listing_mapping_edit', routeParams), attr: {'data-set-mapping-form': ''}}) }}
+                    <input type="hidden" name="_token" value="{{ csrfToken }}">
+                    <input type="hidden" name="q" value="{{ q }}">
+                    <input type="hidden" name="page" value="{{ searchPage.page }}">
+                    <p class="text-secondary">Количество в названии листинга: {{ sourceQuantities ? sourceQuantities|join(', ') : 'неизвестно' }}. Штрихкоды: {{ sourceBarcodes ? sourceBarcodes|join(', ') : 'не указаны' }}.</p>
+                    {{ form_row(setForm.target) }}
+                    {{ form_row(setForm.packageReviewConfirmed) }}
+                    <p class="form-hint">Для позиций с пометкой «Проверить комплектацию» требуется явное подтверждение. Изменение исходных данных потребует новой проверки.</p>
+                    {% if choices|length == 0 %}<p class="text-secondary">Подходящих позиций пока нет. Уточните поиск или загрузите каталог.</p>{% endif %}
+                    <button class="btn btn-primary" type="submit" data-save-mapping{% if choices|length == 0 %} disabled{% endif %}>Сохранить связь</button>
+                {{ form_end(setForm) }}
+                <div class="mt-3">
+                    {% include 'partials/_pagination.html.twig' with {page: searchPage.page, total: searchPage.totalItems, perPage: searchPage.perPage, route: 'moysklad_listing_mapping_edit', params: routeParams|merge({q: q, expectedRevision: formExpectedRevision, requestId: formRequestId})} only %}
+                </div>
+            {% endif %}
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <a class="btn" href="{{ path('moysklad_listing_mapping_edit', routeParams) }}">Обновить состояние</a>
+                <a class="btn" href="{{ path('moysklad_listing_mapping_history', routeParams) }}">История</a>
+                {% if canClear %}
+                    <button class="btn" type="button" data-bs-toggle="modal" data-bs-target="#mapping-clear-confirm"
+                        data-confirm-action="{{ path('moysklad_listing_mapping_edit', routeParams) }}" data-confirm-token="{{ csrfToken }}"
+                        data-confirm-fields="{{ {operation: 'clear', expectedRevision: formExpectedRevision, requestId: clearRequestId, q: q, page: searchPage.page}|json_encode|e('html_attr') }}"
+                        data-confirm-title="Снять связь?" data-confirm-body="История назначений сохранится." data-confirm-submit="Снять связь">Снять связь</button>
+                {% endif %}
+            </div>
+            {% if canClear %}
+                <noscript>
+                    <p class="mt-3">Подтвердите снятие связи. История назначений сохранится.</p>
+                    {{ form_start(clearForm, {action: path('moysklad_listing_mapping_edit', routeParams)}) }}
+                        <input type="hidden" name="_token" value="{{ csrfToken }}">
+                        <input type="hidden" name="q" value="{{ q }}">
+                        <input type="hidden" name="page" value="{{ searchPage.page }}">
+                        {{ form_widget(clearForm.operation, {id: 'clear-operation'}) }}
+                        {{ form_widget(clearForm.expectedRevision, {id: 'clear-expected-revision'}) }}
+                        {{ form_widget(clearForm.requestId, {id: 'clear-request-id'}) }}
+                        <button class="btn" type="submit">Подтверждаю снятие связи</button>
+                    {{ form_end(clearForm) }}
+                </noscript>
+            {% endif %}
+        </div>
+    </section>
+{% endblock %}
+
+{% block modals %}
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'mapping-clear-confirm'} only %}
+{% endblock %}

@@ -1,0 +1,79 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\MarketplaceOperations\Facade;
+
+use App\MarketplaceOperations\Application\DTO\CanonDaySum;
+use App\MarketplaceOperations\Application\DTO\CanonPlSum;
+use App\MarketplaceOperations\Application\DTO\DayOperations;
+use App\MarketplaceOperations\Application\DTO\DayWindow;
+use App\MarketplaceOperations\Application\DTO\OperationRecord;
+
+interface MarketplaceOperationsFacadeInterface
+{
+    /**
+     * Заменяет операции дня кабинета целиком и отмечает день грязным для витрины.
+     * Транзакцией владеет вызывающий (Action / Handler переводчика); без активной
+     * транзакции — `\LogicException`. Повтор с тем же входом даёт тот же набор строк.
+     *
+     * @return int число записанных операций
+     */
+    public function replaceDay(DayOperations $day): int;
+
+    /**
+     * Дни, заменённые после последнего пересчёта витрины, старые первыми; `$markedBefore` — только
+     * отмеченные раньше этого момента (гейт отставания).
+     *
+     * @companyScopeExempt витрина обходит все компании (cron)
+     *
+     * @return list<DayWindow>
+     */
+    public function dirtyDays(int $limit, ?\DateTimeImmutable $markedBefore = null): array;
+
+    /**
+     * Дни с операциями в окне дат (ночной пересчёт витрины).
+     *
+     * @companyScopeExempt витрина обходит все компании (cron)
+     *
+     * @return list<DayWindow>
+     */
+    public function days(\DateTimeImmutable $from, \DateTimeImmutable $to): array;
+
+    /**
+     * Σ канона по (компания, кабинет, день) канала без справочных видов — сверка с переводчиком (гейт)
+     * и экран качества данных (с `$companyId`). Только чтение.
+     *
+     * @companyScopeExempt без `$companyId` — системный гейт по всем компаниям
+     *
+     * @return list<CanonDaySum>
+     */
+    public function daySums(string $channel, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $companyId = null): array;
+
+    /**
+     * Σ канона компании по (канал, кабинет, день, вид, код источника) за период, все виды включая
+     * справочные; `$channel` — только один канал. Начисления (≥ 0) и списания (< 0) одного ключа —
+     * отдельными строками: по знаку СПП различаются продажа и возврат. Только чтение.
+     *
+     * @return list<CanonPlSum>
+     */
+    public function plSums(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $channel = null): array;
+
+    /**
+     * Компании, у которых есть операции канона.
+     *
+     * @companyScopeExempt обход всех компаний контура (cron)
+     *
+     * @return list<string>
+     */
+    public function companyIds(): array;
+
+    /**
+     * Забрать день для пересчёта витрины: блокировка дня (та же, что у `replaceDay`), операции и
+     * снятие отметки «грязный». Транзакцией владеет вызывающий: замена дня переводчиком ждёт его
+     * commit и снова отметит день; откат вызывающего вернёт отметку. Без транзакции — `\LogicException`.
+     *
+     * @return list<OperationRecord>
+     */
+    public function takeDay(DayWindow $day): array;
+}

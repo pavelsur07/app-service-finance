@@ -1,0 +1,25 @@
+{
+    "channel": "ozon",
+    "source_type": "ozon:service:12",
+    "name": "Кросс-докинг",
+    "sign": "debit",
+    "kinds": [
+        {
+            "code": "logistics_to",
+            "level": "md1",
+            "title": "Логистика до покупателя"
+        },
+        {
+            "code": "storage",
+            "level": "md1",
+            "title": "Хранение"
+        }
+    ],
+    "examples": [
+        {
+            "source_type": "ozon:service:32",
+            "name": "Логистика",
+            "kind": "logistics_to"
+        }
+    ]
+}

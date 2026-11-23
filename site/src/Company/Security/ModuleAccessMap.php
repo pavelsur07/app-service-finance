@@ -8,7 +8,10 @@ use App\Billing\Controller\Client\CompanyTariffController;
 use App\Billing\Controller\Client\StartCheckoutController;
 use App\Company\Controller\Api\CounterpartySearchController;
 use App\Company\Controller\CompanyController;
+use App\Company\Controller\Consolidation\SaveConsolidationGroupController;
 use App\Company\Controller\Counterparty\ApplyCounterpartyDisplayNameController;
+use App\Company\Controller\Counterparty\ApplyCounterpartyNormalizeController;
+use App\Company\Controller\Counterparty\PreviewCounterpartyNormalizeController;
 use App\Company\Controller\Counterparty\ResetCounterpartyDisplayNameController;
 use App\Company\Controller\CounterpartyController;
 use App\Company\Controller\Deletion\DeleteCompanyController;
@@ -38,6 +41,8 @@ final class ModuleAccessMap
         CounterpartyController::class => Module::FINANCE,
         ApplyCounterpartyDisplayNameController::class => Module::FINANCE,
         ResetCounterpartyDisplayNameController::class => Module::FINANCE,
+        PreviewCounterpartyNormalizeController::class => Module::FINANCE,
+        ApplyCounterpartyNormalizeController::class => Module::FINANCE,
         FinancialResponsibilityCenterController::class => Module::FINANCE,
         ProjectDirectionController::class => Module::FINANCE,
     ];
@@ -61,11 +66,16 @@ final class ModuleAccessMap
         'App\\Marketplace\\' => Module::MARKETPLACE,
         'App\\MarketplaceAds\\' => Module::MARKETPLACE,
         'App\\MarketplaceAnalytics\\' => Module::MARKETPLACE,
+        'App\\MarketplaceEconomics\\' => Module::MARKETPLACE,
+        'App\\MarketplaceQuality\\' => Module::MARKETPLACE,
+        'App\\MarketplaceFunnel\\' => Module::MARKETPLACE,
+        'App\\MarketplacePlProjection\\' => Module::MARKETPLACE,
         'App\\Inventory\\' => Module::MARKETPLACE,
         'App\\Ingestion\\' => Module::MARKETPLACE,
         'App\\MoySklad\\' => Module::MARKETPLACE,
         'App\\Deals\\' => Module::DEALS,
         'App\\Catalog\\' => Module::CATALOG,
+        'App\\Company\\Controller\\ProjectDirection\\' => Module::FINANCE,
         'App\\Company\\Controller\\' => Module::ADMIN,
         'App\\Billing\\' => Module::ADMIN,
         'App\\Telegram\\' => Module::ADMIN,
@@ -86,6 +96,7 @@ final class ModuleAccessMap
         CompanyController::class,   // список/создание/переключение компаний; работает и без активной компании, свои owner-проверки
         DeleteCompanyController::class,  // удаление компании: работает и без активной компании, владельца сверяет Action
         RestoreCompanyController::class, // восстановление помеченной к удалению компании — она не бывает активной
+        SaveConsolidationGroupController::class, // группа консолидации своей компании: владельца и CSRF сверяет сам, активная компания ни при чём
         HomeRedirectController::class, // роутер лендинга «/», доступен любому участнику; сам проверяет права через is_granted
         CompanyTariffController::class, // тариф и оплата активного кабинета (только чтение) — любому участнику; историю оплат видит владелец
         StartCheckoutController::class, // онлайн-оплата тарифа активного кабинета — сам проверяет владельца
@@ -116,6 +127,8 @@ final class ModuleAccessMap
         'App\\Marketplace\\Controller\\Admin\\', // маппинг-админка под ROLE_ADMIN, без контекста компании
         'App\\Billing\\Controller\\Admin\\',     // /admin/billing/*, ROLE_ADMIN, тариф любого кабинета
         'App\\ServiceGateway\\Controller\\Admin\\', // /admin/services/*, ROLE_ADMIN, сводки сервисов без компаний
+        'App\\MarketplaceOzon\\Controller\\Admin\\', // /admin/marketplace/ozon-source-types, ROLE_ADMIN, справочник кодов платформы
+        'App\\MarketplaceWb\\Controller\\Admin\\', // /admin/marketplace/wb-source-types, ROLE_ADMIN, справочник кодов платформы
         'App\\MarketplaceAds\\Controller\\Api\\Admin\\', // ROLE_SUPER_ADMIN на классе; mark-failed — свой MARKETPLACE_WRITE
     ];
 

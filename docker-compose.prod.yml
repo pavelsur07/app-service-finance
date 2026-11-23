@@ -58,9 +58,7 @@ x-php-env: &php-env
     # См. docs/architecture/marketplace-audit/09-m1-diagnostics.md.
     MARKETPLACE_PERF_DIAGNOSTICS: ${MARKETPLACE_PERF_DIAGNOSTICS:-1}
     # ─── ai-service (docs/maintenance/ai-service-prod.md) ───
-    # Выключено, пока не заданы AI_SERVICE_ENABLED=true и токен; компании подключает администратор
-    # (/admin/users, таблица ai_company_access). Задачи ставит воркер async_sync, результаты забирает cron (scheduler).
-    AI_SERVICE_ENABLED: ${AI_SERVICE_ENABLED:-false}
+    # Доступ компаний — админка (/admin/users, ai_company_access); результаты забирает cron.
     AI_SERVICE_EVAL_ENABLED: ${AI_SERVICE_EVAL_ENABLED:-false}
     AI_SERVICE_BASE_URL: http://ai-service:8080
     AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
@@ -272,6 +270,11 @@ services:
         logging: *default-logging
         environment:
             <<: *php-env
+            MCP_OAUTH_ORIGIN: ${MCP_OAUTH_ORIGIN:-}
+            MCP_OAUTH_CLIENTS: ${MCP_OAUTH_CLIENTS:-}
+            MCP_OAUTH_PRIVATE_KEY: ${MCP_OAUTH_PRIVATE_KEY:-}
+            MCP_OAUTH_PUBLIC_KEY: ${MCP_OAUTH_PUBLIC_KEY:-}
+            MCP_OAUTH_ENCRYPTION_KEY: ${MCP_OAUTH_ENCRYPTION_KEY:-}
         networks:
             - default
         depends_on:
@@ -476,6 +479,36 @@ services:
                 reservations:
                     memory: 64M
 
+    site-messenger-worker-payment-intake:
+        image: ghcr.io/pavelsur07/site-php-cli:${IMAGE_TAG:-latest}
+        container_name: site-messenger-worker-payment-intake
+        restart: unless-stopped
+        logging: *default-logging
+        command: php bin/console messenger:consume async_payment_intake -vv --time-limit=3600 --memory-limit=160M --no-interaction
+        environment:
+            <<: *php-env
+        networks:
+            - default
+        depends_on:
+            site-postgres:
+                condition: service_healthy
+            site-redis:
+                condition: service_healthy
+        volumes:
+            - ${ALFA_SECRETS_DIR:-./alfa-secrets}:/app/var/secrets/alfa:ro
+            - site_storage:/app/var/storage
+            - site_company_storage:/app/var/storage/companies
+            - site_var_log:/app/var/log
+        stop_grace_period: 60s
+        healthcheck:
+            disable: true
+        deploy:
+            resources:
+                limits:
+                    memory: 256M
+                reservations:
+                    memory: 64M
+
     site-postgres:
         image: postgres:15-alpine
         container_name: symfony-postgres
@@ -571,14 +604,14 @@ services:
             # Пустой токен — обновление выключено (exit 0).
             OZON_FETCHER_BASE_URL: http://ozon-fetcher:8080
             OZON_FETCHER_API_TOKEN: ${OZON_FETCHER_API_TOKEN:-}
-            # Приём фактов из сервисов (cron app:source-facts:pull, модуль SourceFacts): UUID компаний
-            # через запятую, * — все, пусто — выключено. GitHub variable SOURCE_FACTS_COMPANIES + деплой.
-            SOURCE_FACTS_COMPANIES: ${SOURCE_FACTS_COMPANIES:-}
+            # SourceFacts принимает все действительные подключения.
+            # Недельный отчёт экономики SKU (cron app:marketplace-economics:weekly-report): UUID через запятую,
+            # * — все, пусто — выключено. GitHub variable ECONOMICS_WEEKLY_REPORT_COMPANIES + деплой.
+            ECONOMICS_WEEKLY_REPORT_COMPANIES: ${ECONOMICS_WEEKLY_REPORT_COMPANIES:-}
             # Витрина покрытия wb-fetcher (вкладка Wildberries), токен «Symfony → сервис».
             WB_FETCHER_BASE_URL: http://wb-fetcher:8080
             WB_FETCHER_API_TOKEN: ${WB_FETCHER_API_TOKEN:-}
             # ai-service: cron импорта результатов и подсказок статей (как в x-php-env).
-            AI_SERVICE_ENABLED: ${AI_SERVICE_ENABLED:-false}
             AI_SERVICE_EVAL_ENABLED: ${AI_SERVICE_EVAL_ENABLED:-false}
             AI_SERVICE_BASE_URL: http://ai-service:8080
             AI_SERVICE_API_TOKEN: ${AI_SERVICE_API_TOKEN:-}
@@ -639,14 +672,11 @@ services:
                 reservations:
                     memory: 256M
 
-    # Загрузка финансовых данных Ozon (services/ozon-fetcher). Профиль: контейнер
-    # не стартует, пока деплой не включит его переменной OZON_FETCHER_ENABLED=true
-    # (`up -d --remove-orphans` поднимает все сервисы без профиля).
+    # Загрузка финансовых данных Ozon: постоянный сервис, миграции до запуска.
     # Без ingress: только сеть default. См. docs/maintenance/ozon-fetcher-prod.md.
     ozon-fetcher:
         image: ghcr.io/pavelsur07/ozon-fetcher:${IMAGE_TAG:-latest}
         container_name: ozon-fetcher
-        profiles: ["ozon-fetcher"]
         restart: always
         logging: *default-logging
         environment:
@@ -691,13 +721,11 @@ services:
                     memory: 64M
 
     # Финансовые отчёты Wildberries (services/wb-fetcher, docs/tasks/wb-fetcher-finance).
-    # Профиль: не стартует, пока деплой не включит его переменной WB_FETCHER_ENABLED=true.
     # Без ingress: только сеть default. S3 — бакет и ключи ozon-fetcher, префикс wb/.
     # См. docs/maintenance/wb-fetcher-prod.md.
     wb-fetcher:
         image: ghcr.io/pavelsur07/wb-fetcher:${IMAGE_TAG:-latest}
         container_name: wb-fetcher
-        profiles: ["wb-fetcher"]
         restart: always
         logging: *default-logging
         environment:
@@ -740,13 +768,11 @@ services:
                     memory: 64M
 
 
-    # ИИ-задачи (services/ai-service): API и воркер. Профиль: не стартуют, пока деплой не включит
-    # их переменной AI_SERVICE_ENABLED=true. Без ingress: только сеть default, Symfony ходит по
+    # ИИ-задачи: API и business worker работают постоянно во внутренней сети.
     # http://ai-service:8080 с AI_SERVICE_API_TOKEN. См. docs/maintenance/ai-service-prod.md.
     ai-service:
         image: ghcr.io/pavelsur07/ai-service:${IMAGE_TAG:-latest}
         container_name: ai-service
-        profiles: ["ai-service"]
         command: ["api"]
         restart: always
         logging: *default-logging
@@ -782,7 +808,6 @@ services:
     ai-service-worker:
         image: ghcr.io/pavelsur07/ai-service:${IMAGE_TAG:-latest}
         container_name: ai-service-worker
-        profiles: ["ai-service"]
         command: ["worker"]
         restart: always
         logging: *default-logging
@@ -808,7 +833,7 @@ services:
     ai-service-eval-worker:
         image: ghcr.io/pavelsur07/ai-service:${IMAGE_TAG:-latest}
         container_name: ai-service-eval-worker
-        profiles: ["ai-service"]
+        profiles: ["ai-service-eval"]
         command: ["eval-worker"]
         restart: on-failure
         logging: *default-logging

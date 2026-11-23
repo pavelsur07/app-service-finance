@@ -215,3 +215,69 @@ func keys(m map[string]store.TaskSpec) []string {
 	}
 	return out
 }
+
+func TestAdsCabinetLoadsHistoryOnceAndRefreshesLastWeek(t *testing.T) {
+	cab := connections.Cabinet{Ref: "wb-1", ResourceTypes: []string{executor.ResourceAds}}
+
+	plan := Build(at("2026-11-15 03:00"), []connections.Cabinet{cab}, DefaultConfig(msk))
+
+	require.Len(t, plan.Ensure, AdsHistoryDays)
+	assert.Equal(t, executor.ResourceAds, plan.Ensure[0].ResourceType)
+	assert.Equal(t, "2026-11-14", plan.Ensure[0].PeriodKey)
+	assert.Equal(t, PriorityYesterday, plan.Ensure[0].Priority)
+	assert.Equal(t, at("2026-11-15 04:00"), plan.Ensure[0].RunAt, "вчера — после публикации")
+	assert.Equal(t, "2026-10-01", plan.Ensure[AdsHistoryDays-1].PeriodKey)
+	require.Len(t, plan.Refreshes, 1)
+	assert.Equal(t, KindAdsTail, plan.Refreshes[0].Kind)
+	assert.Len(t, plan.Refreshes[0].Specs, AdsRefreshDays+1, "вчера и неделя до него")
+}
+
+func TestHistoryDaysAreLoadedOnceBelowTailAndNeverRefreshed(t *testing.T) {
+	cfg := DefaultConfig(msk)
+	cfg.HistoryDays = DailyHistoryDays
+	now := at("2026-11-16 12:00")
+	plan := Build(now, []connections.Cabinet{daily("wb-1")}, cfg)
+
+	require.Len(t, plan.Ensure, DailyHistoryDays, "вчера + хвост + история")
+	oldest := plan.Ensure[len(plan.Ensure)-1]
+	assert.Equal(t, "2026-08-18", oldest.PeriodKey)
+	assert.Equal(t, PriorityHistory, oldest.Priority, "история не задерживает вчера и хвост")
+	assert.Equal(t, now, oldest.RunAt)
+	assert.False(t, oldest.Refresh)
+	assert.Equal(t, PriorityTail, plan.Ensure[14].Priority, "хвост — прежним приоритетом")
+	assert.Len(t, plan.Refreshes[0].Specs, 15, "история не перечитывается")
+}
+
+func TestFunnelCabinetLoadsAndRefreshesThirtyDaysBelowReport(t *testing.T) {
+	cab := connections.Cabinet{Ref: "wb-1", ResourceTypes: []string{executor.ResourceFunnel}}
+
+	plan := Build(at("2026-11-18 03:00"), []connections.Cabinet{cab}, DefaultConfig(msk))
+
+	require.Len(t, plan.Ensure, FunnelDays)
+	assert.Equal(t, executor.ResourceFunnel, plan.Ensure[0].ResourceType)
+	assert.Equal(t, "2026-11-17", plan.Ensure[0].PeriodKey, "вчера; сегодня — день неполный")
+	assert.Equal(t, "2026-10-19", plan.Ensure[FunnelDays-1].PeriodKey)
+	assert.Equal(t, at("2026-11-18 04:00"), plan.Ensure[0].RunAt)
+	assert.Less(t, plan.Ensure[0].Priority, PriorityTail, "воронка не опережает отчёт в слоте кабинета")
+	require.Len(t, plan.Refreshes, 1)
+	assert.Equal(t, KindFunnelTail, plan.Refreshes[0].Kind)
+	assert.Len(t, plan.Refreshes[0].Specs, FunnelDays, "выкупы и отмены WB пишет на день заказа")
+	assert.True(t, plan.Refreshes[0].Specs[0].Refresh)
+}
+
+func TestSearchCabinetGetsThirtyDaysAndRefreshesLastWeek(t *testing.T) {
+	cab := connections.Cabinet{Ref: "wb-1", ResourceTypes: []string{executor.ResourceSearch}}
+
+	plan := Build(at("2026-11-19 15:00"), []connections.Cabinet{cab}, DefaultConfig(msk))
+
+	require.Len(t, plan.Ensure, SearchDays)
+	assert.Equal(t, executor.ResourceSearch, plan.Ensure[0].ResourceType)
+	assert.Equal(t, "2026-11-18", plan.Ensure[0].PeriodKey)
+	assert.Equal(t, "2026-10-20", plan.Ensure[SearchDays-1].PeriodKey)
+	assert.Equal(t, PriorityHistory, plan.Ensure[0].Priority)
+	require.Len(t, plan.Refreshes, 1)
+	assert.Equal(t, KindSearchTail, plan.Refreshes[0].Kind)
+	require.Len(t, plan.Refreshes[0].Specs, SearchRefreshDays, "прошлые дни поиска не меняются — перечитывается только хвост")
+	assert.Equal(t, "2026-11-12", plan.Refreshes[0].Specs[SearchRefreshDays-1].PeriodKey)
+	assert.True(t, plan.Refreshes[0].Specs[0].Refresh)
+}

@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DS-Decisions · ДС «Ваш Финдир» v3.4</title>
+<!--
+  Лист дизайн-системы «Ваш Финдир» v3.4 — Решения и история.
+  Источник: UI Kit v3.4 (канвас Claude Design, страница ui-kit-v3.0), сгенерировано 15.11.2026.
+  Обычный HTML: открывается в браузере. Значения — из ds-kit.css (токены в :root) и разметки.
+  Не править вручную: изменения вносятся в UI Kit и перегенерируются.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="ds-kit.css">
+</head>
+<body>
+<main class="main">
+<h1 class="page-h1">DS-Decisions</h1>
+<p class="page-sub">Все решения дизайн-системы (действующие и архив) и changelog.</p>
+<div class="page-meta">ДС «Ваш Финдир» v3.4 · 15.11.2026 · все листы: <a href="../README.md">README</a></div>
+<section id="decisions">
+<h2 class="section-h">01 — Decisions</h2>
+<p class="section-sub">Решения по всем расхождениям из аудита. Каждое решение — одна строка с обоснованием. <code class="code-inline">PROPOSED</code> — требует подтверждения.</p>
+<div class="cb">
+<div class="decision-item">
+<div class="decision-num">1</div>
+<div class="decision-body">
+<div class="decision-title">Card padding</div>
+<div class="decision-value">16px 20px</div>
+<div class="decision-why">Компромисс между плотными KPI и просторными drawer-секциями; не теряет содержимое мелких карточек и не выглядит «дёшево» в крупных.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">2</div>
+<div class="decision-body">
+<div class="decision-title">KPI value size</div>
+<div class="decision-value">22px (compact) · 28px (hero)</div>
+<div class="decision-why">Две шкалы: 22 — для рядов виджетов, 28 — для одиночного hero-метрика (общий баланс, главный остаток). 26 удалён.</div>
+</div>
+</div>
+
+<div class="decision-item">
+<div class="decision-num">4</div>
+<div class="decision-body">
+<div class="decision-title">Drawer width</div>
+<div class="decision-value">680px</div>
+<div class="decision-why">Достаточно для двухколоночных форм (split-операции, parent + child fields); 640 ужимает.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">5</div>
+<div class="decision-body">
+<div class="decision-title">Backdrop</div>
+<div class="decision-value">opacity 0.45 · blur 6px</div>
+<div class="decision-why">Среднее затемнение, мягкий blur — модалки читаемы, контекст за ними различим.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">6</div>
+<div class="decision-body">
+<div class="decision-title">Avatar / initial sizes</div>
+<div class="decision-value">sm 24 · md 32 · lg 40</div>
+<div class="decision-why">Шаг кратный 8. Прежние 28/30/34 убраны — нет смысла, разница неразличима.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">7</div>
+<div class="decision-body">
+<div class="decision-title">Direction indicator</div>
+<div class="decision-value">colored dot + знак суммы</div>
+<div class="decision-why">Минимум визуального шума, не конкурирует со status-пилюлями. Знак направления передаётся самой суммой (+/−).</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">8</div>
+<div class="decision-body">
+<div class="decision-title">Status</div>
+<div class="decision-value">pill с точкой (везде)</div>
+<div class="decision-why">Пилюля заметнее dot+text, лучше для accessibility (форма + цвет). Sync-статусы на счетах тоже теперь pill.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">9</div>
+<div class="decision-body">
+<div class="decision-title">Money — знак минуса</div>
+<div class="decision-value">U+2212 (−) · везде</div>
+<div class="decision-why">Типографически правильный, ширина совпадает с +. Hyphen-minus запрещён в формате сумм.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">10</div>
+<div class="decision-body">
+<div class="decision-title">Money — миллионы</div>
+<div class="decision-value">М (короткая запись)</div>
+<div class="decision-why">В таблицах и на осях графиков: компактнее «млн», вписывается в узкие колонки. В описаниях допустимо «млн ₽».</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">11</div>
+<div class="decision-body">
+<div class="decision-title">Money — цвет</div>
+<div class="decision-value">цвет только для дельт</div>
+<div class="decision-why">Балансы — всегда тёмные (нейтральные). Зелёный/красный — только для %-дельт, сумм поступлений/расходов и signed transactions. Остаток на конец периода — НЕ цветной.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">12</div>
+<div class="decision-body">
+<div class="decision-title">Tint chip</div>
+<div class="decision-value">именованные токены</div>
+<div class="decision-why">Никакой математики с opacity — каждый тип чипа имеет свой набор переменных (--src-api-bg, --status-success-bg, …). Предсказуемо, не зависит от подложки.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">13</div>
+<div class="decision-body">
+<div class="decision-title">Drawer padding</div>
+<div class="decision-value">24px со всех сторон (--s-6) · footer 16px 24px</div>
+<div class="decision-why">v3.1: 28px нет в шкале. 24px совпадает с модалкой, разница в 4px глазом не читается, а исключение пришлось бы помнить. Шапка и тело drawer — единый отступ.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">14</div>
+<div class="decision-body">
+<div class="decision-title">Tabular numerals</div>
+<div class="decision-value">для всех числовых контекстов · задано на контейнерах</div>
+<div class="decision-why">v3.1: подтверждено. Правило висит на .t-table, .report, .coverage, .kpi, .acc-card, .money и наследуется — не нужно помнить о нём в каждом компоненте. Manrope содержит OpenType-фичу tnum (проверено по файлу шрифта), свойство реально работает.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">15</div>
+<div class="decision-body">
+<div class="decision-title">Icon color rule</div>
+<div class="decision-value">currentColor inheritance · semantic роль на пункте</div>
+<div class="decision-why">Иконки внутри компонентов наследуют currentColor. Цветом окрашивается ВЕСЬ пункт по семантической роли (default · primary · danger), не иконка отдельно. Эмодзи-иконки запрещены.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">16</div>
+<div class="decision-body">
+<div class="decision-title">Toast vs Alert</div>
+<div class="decision-value">Toast — результат действия, auto-dismiss 4s · Alert — контекст, не исчезает сам</div>
+<div class="decision-why">Toast подтверждает то, что только что сделал пользователь. Alert — статус системы или окружения, не привязан к моментному действию. Не путать роли — Alert не должен «всплывать», а Toast не должен жить на странице постоянно.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">17</div>
+<div class="decision-body">
+<div class="decision-title">Confirmation Dialog</div>
+<div class="decision-value">обязателен для destructive/irreversible действий</div>
+<div class="decision-why">Удаление, архивирование, отмена операции, закрытие без сохранения — всегда через .mdl--compact + confirm-*. Primary-кнопка окрашивается по риску: danger-solid (удалить), warning-solid (отменить операцию), primary (закрыть без сохранения).</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">18</div>
+<div class="decision-body">
+<div class="decision-title">Feedback icon rule</div>
+<div class="decision-value">SVG 16px · currentColor · нейтральные пиктограммы</div>
+<div class="decision-why">Иконки в Toast, Alert, Confirmation — стандартные пиктограммы (info, warning, check, x). Цвет задаётся семантикой родительского компонента через currentColor. Никаких эмодзи и фирменных иллюстраций.</div>
+</div>
+</div>
+
+<div class="decision-item">
+<div class="decision-num">20</div>
+<div class="decision-body">
+<div class="decision-title">Запрет на семантическую контрабанду токенов</div>
+<div class="decision-value">semantic токены — только по своей семантике</div>
+<div class="decision-why">success / danger / warning принадлежат feedback-семантике: статус, направление денег, валидация. Аналитические классификаторы (ABC × ABC, скоринг, рейтинги) используют ОТДЕЛЬНЫЙ набор токенов (--abc-*, --score-* и т.д.), который под капотом может алиаситься на feedback, но компоненты об этом не знают. При ребрендинге классификатор и фидбек редактируются независимо.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">21</div>
+<div class="decision-body">
+<div class="decision-title">Totals row обязателен для аналитических таблиц</div>
+<div class="decision-value">.t-row--totals — последняя строка таблицы с числовыми колонками</div>
+<div class="decision-why">Суммы, проценты-взвешенные (margin = profit/revenue, ROI = profit/costs), счётчик строк — обязательны. Без totals пользователь скроллит до конца и сам считает. Per-unit метрики («Себест. ед.», unit-цены) — прочерк, их складывать бессмысленно. Sticky-bottom — желателен, но не обязателен.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">22</div>
+<div class="decision-body">
+<div class="decision-title">Именование новых компонентов — BEM</div>
+<div class="decision-value">Новые компоненты: <code class="code-inline">.component</code>, <code class="code-inline">.component--modifier</code>, <code class="code-inline">.component__element</code>. Старые Tabler-style (<code class="code-inline">.btn-primary</code>, <code class="code-inline">.kpi-label</code>) — не переименовываем.</div>
+<div class="decision-why">Файл содержит две конвенции: Tabler-style (до v1.5) и BEM (v1.5+). Переименование старого — breaking-change для legacy-шаблонов. Новые компоненты пишем в BEM для консистентности с v1.5+. Со временем legacy естественно уйдёт при миграции модулей.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">23</div>
+<div class="decision-body">
+<div class="decision-title">INPUT-WRAP — базовый паттерн input с prefix/suffix</div>
+<div class="decision-value"><code class="code-inline">.input-wrap</code> + <code class="code-inline">.prefix</code> / <code class="code-inline">.suffix</code> — канонический примитив для любых фиксированных префиксов/суффиксов (₽, %, .ru, ИНН). <code class="code-inline">.password-field</code> и <code class="code-inline">.search-field</code> — специализации того же паттерна с фиксированной иконкой вместо API prefix/suffix.</div>
+<div class="decision-why">Фактически классы были в CSS с v1.x, но не были задокументированы: без demo, без nav-ссылки — формально «не в UI Kit». Команда переизобретала то же самое локально. v2.3 выводит примитив в публичный канон. v3.4: поиск и пароль — тот же .input-wrap с .input-icon / .input-action; .search-field и .password-field удалены.</div>
+</div>
+</div>
+
+<div class="decision-item">
+<div class="decision-num">25</div>
+<div class="decision-body">
+<div class="decision-title">CARD-HEAD — заголовок секции в карточке</div>
+<div class="decision-value"><code class="code-inline">.card-head</code> — 11px uppercase 700, tracking 0.05em, <code class="code-inline">--text-tertiary</code>, отбивка <code class="code-inline">--s-3</code>. Вариант B — <code class="code-inline">.card--flush</code> для таблиц edge-to-edge (шапка получает <code class="code-inline">--card-padding</code> + разделитель 1px).</div>
+<div class="decision-why">Заголовки секций внутри карточек были инлайн-стилями в демо. Вынесены в компонент — единый вид и один способ верстки.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">26</div>
+<div class="decision-body">
+<div class="decision-title">PAGE SCAFFOLD — ритм контента workzone (<code class="code-inline">.wz-*</code>)</div>
+<div class="decision-value">Семейство <code class="code-inline">.wz-head</code> / <code class="code-inline">.wz-title</code> / <code class="code-inline">.wz-row</code> — вертикальный ритм в <code class="code-inline">.app-workzone</code>. Заголовок 28px/700, отбивка <code class="code-inline">--s-5</code>; gap в ряду <code class="code-inline">--s-4</code>, между рядами <code class="code-inline">--s-5</code>; перенос ряда при &lt;200px на карточку.</div>
+<div class="decision-why">Ритм страницы верстался инлайн-отступами вразнобой. Канонизирован из <code class="code-inline">admin-shell.css</code> (миграция /admin/*).</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">27</div>
+<div class="decision-body">
+<div class="decision-title">Modal vs drawer для форм — потолок 520 / drawer 680</div>
+<div class="decision-value">Форма — в модалке до 8 полей (S 440 / M 520). Шире формы или &gt; 8 полей — drawer 680, не широкая модалка. L/XL модалки — только для контента (таблица, визард, сравнение).</div>
+<div class="decision-why">Широкая модалка под длинную форму рвёт зрительный поток и хуже читается, чем полноразмерный drawer. Границу зафиксировали, чтобы не плодить 640-модалки под формы.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">28</div>
+<div class="decision-body">
+<div class="decision-title">MODAL SIZES — шкала S/M/L/XL</div>
+<div class="decision-value">S 440 · M 520 · L 640 (v3.4: XL и side-модалка удалены — широкий и длинный контент уходит в drawer 680)</div>
+<div class="decision-why">Размеры модалок были разовыми инлайн-max-width. Свёрнуты в четыре именованных ступени — предсказуемый выбор под сценарий.</div>
+</div>
+</div>
+
+
+        <div class="decision-item">
+          <div class="decision-num">31</div>
+          <div class="decision-body">
+            <div class="decision-title">Трёхслойная система токенов</div>
+            <div class="decision-value">primitives → semantic → component</div>
+            <div class="decision-why">Развитие Decision 19. Палитра вынесена в примитивы (<code class="code-inline">--gray-*</code>, <code class="code-inline">--blue-*</code>…), прежние имена стали semantic-слоем и ссылаются на примитивы. Компоненты не используют примитивы и hex. Тема меняет только semantic.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">32</div>
+          <div class="decision-body">
+            <div class="decision-title">Контраст вторичного текста — WCAG AA</div>
+            <div class="decision-value">--text-tertiary #5E6E84 · --text-muted = tertiary</div>
+            <div class="decision-why">v2.6: muted #8B95A7 давал 2.8:1 на фоне страницы, tertiary — 4.4:1; оба ниже 4.5:1. Muted использовался для helper-текста и плейсхолдеров — читаемость критична. Два уровня вторичного текста сведены в один; иерархию дают размер и вес.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">33</div>
+          <div class="decision-body">
+            <div class="decision-title">Граница полей ввода ≥ 3:1</div>
+            <div class="decision-value">input · select · textarea · toggle off → --border-strong · hover --text-tertiary · disabled --border + --bg-subtle</div>
+            <div class="decision-why">WCAG 1.4.11: граница интерактивного элемента — минимум 3:1. В v2.6 поле было 1.18:1 и на белом почти не читалось. Карточки и разделители остаются мягкими (#E8ECF3) — они декоративны. v3.1: подтверждено; в v3.0 select и textarea по ошибке остались на мягкой границе — выровнены. Disabled освобождён от требования и уходит в мягкую границу, чтобы отличаться от активного поля.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">34</div>
+          <div class="decision-body">
+            <div class="decision-title">Шкала шрифтов — 9 целых ступеней</div>
+            <div class="decision-value">11 · 12 · 13 · 14 · 16 · 18 · 22 · 28 (+10 для инициалов)</div>
+            <div class="decision-why">v2.6: 25 разных font-size, из них 6 дробных (9.5, 10.5, 11.5, 12.5, 13.5). Дробные пиксели рендерятся по-разному в браузерах и неразличимы глазом. Плюс ролевые шорткаты <code class="code-inline">--type-*</code>.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">35</div>
+          <div class="decision-body">
+            <div class="decision-title">Spacing и radius — только токены</div>
+            <div class="decision-value">полушаги --s-0_5 … --s-3_5 · --r-xs … --r-xl</div>
+            <div class="decision-why">В v2.6 252 из 341 отступа были сырыми px. Полушаги 2/6/10/14 добавлены как токены (реально используются). 3/5/7/9px сведены к шагу. Radius 5px убран.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">36</div>
+          <div class="decision-body">
+            <div class="decision-title">Focus-visible для всех интерактивных элементов</div>
+            <div class="decision-value">outline 2px --focus-ring-color · offset 2px</div>
+            <div class="decision-why">В v2.6 кольцо фокуса было только у полей. Кнопки, табы, chip, ссылки — без индикации при работе с клавиатуры (WCAG 2.4.7).</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">37</div>
+          <div class="decision-body">
+            <div class="decision-title">Motion и z-index — именованные токены</div>
+            <div class="decision-value">--dur-fast/base/slow · --z-raised … --z-toast</div>
+            <div class="decision-why">Убирает магические числа и даёт единое управление анимацией и слоями.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">38</div>
+          <div class="decision-body">
+            <div class="decision-title">Тёмная тема — beta, только в ките <span class="decision-tag">BETA</span></div>
+            <div class="decision-value">Системная / Светлая / Тёмная · по умолчанию prefers-color-scheme · явный выбор важнее</div>
+            <div class="decision-why">В продукт — только когда в его CSS не останется hex (иначе тема будет «рваной»). Правила: уровень поверхности передаётся светлотой фона, а не тенью; палитра графиков — отдельный набор под тёмный фон; фирменные цвета банков и маркетплейсов — константы. Перед релизом — визуальный аудит экранов продукта.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">39</div>
+          <div class="decision-body">
+            <div class="decision-title">Компоненты сгруппированы по назначению</div>
+            <div class="decision-value">Действия · Поля · Выбор · Данные · Таблицы · Навигация · Оверлеи · Обратная связь · Каркас</div>
+            <div class="decision-why">В v2.6 порядок был хронологическим (блок «v1.5 — Global chrome» внутри Components, App Shell числился в Patterns, но лежал в Components).</div>
+          </div>
+        </div>
+        
+        <div class="decision-item">
+          <div class="decision-num">41</div>
+          <div class="decision-body">
+            <div class="decision-title">Геометрия компонентов — именованные токены</div>
+            <div class="decision-value">--control-h 38 · --input-icon-slot 36 · --sb-indent 28 · --app-header-gutter 28</div>
+            <div class="decision-why">Размеры, завязанные на иконки и контролы, не обязаны попадать в шкалу отступов, но должны иметь имя: видно, откуда число и что изменится. Слоты под иконку в поиске, суффиксе, пароле, select и пикере сведены к одному значению (было 34 / 36 / 38).</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">42</div>
+          <div class="decision-body">
+            <div class="decision-title">Подсветка совпадений в поиске</div>
+            <div class="decision-value">&lt;mark&gt; / .hl · --highlight-bg · --highlight-text</div>
+            <div class="decision-why">Браузерный жёлтый не тематизируется и в тёмной теме даёт кричащее пятно. Токен — amber-200 в светлой, полупрозрачный amber в тёмной.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">43</div>
+          <div class="decision-body">
+            <div class="decision-title">Цветовая схема «Фирменный красный» (вариант A)</div>
+            <div class="decision-value">текст и интерактив — navy #0B1020 / #1E2A44 · кнопки — navy #1E2A44 · crimson #B00020 — только бренд · рост #0E7A4F · снижение и ошибки #C2410C · нейтрали #F5F5F7 / #E3E4E8</div>
+            <div class="decision-why">Цвета логотипа становятся цветами продукта. Красный в рабочем интерфейсе не используется (см. Decision 44): в финансовом продукте он читается как «минус» и «опасность». Поэтому снижение, ошибки и деструктивные действия — оранжевые, предупреждения — жёлтые, info — отдельная синяя роль. Фокус — navy, чтобы не путаться с ошибкой. Фон страницы #F5F5F7, карточки белые: в приложении поверхность и фон меняются местами относительно сайта, иначе карточки на белом фоне не читаются.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">44</div>
+          <div class="decision-body">
+            <div class="decision-title">Primary-кнопка — navy, красный — только бренд</div>
+            <div class="decision-value">.btn-primary #1E2A44 → hover #141B2E → active #0B1020 · тёмная тема: светлая кнопка #DDE3F0 с тёмным текстом</div>
+            <div class="decision-why">v3.2 сделал все главные кнопки красными, и интерфейс стал выглядеть тревожно: красный — общепринятый сигнал ошибки и опасного действия, а в финансах ещё и «минуса». Практика продуктовых систем (Stripe, Linear, Carbon, Atlassian): яркий бренд-цвет в рабочем UI дозируется, главное действие — спокойный тёмный или фирменный нейтральный цвет. Красный остаётся токеном <code class="code-inline">--color-accent</code> для логотипа, промо и лендинга. На сайте маркетинговая CTA может быть красной — там одна кнопка на экран, а не десятки.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">45</div>
+          <div class="decision-body">
+            <div class="decision-title">Ревизия кита: только то, что нужно продукту</div>
+            <div class="decision-value">удалены 10 элементов · 6 объединены · документация сокращена</div>
+            <div class="decision-why">Кит сверен с экранами продукта (app-service-finance). Удалены дубли (интерактивные модалки, паттерны Row dropdown и .field), вторая правая панель (side modal), Modal XL без сценария, внутренний админ-компонент Coverage matrix, лишние варианты KPI, Marketplace badge и Heavy table. Объединены: поиск и пароль → «Поле с дополнением», Header button → Button (.btn-icon), Breadcrumbs → AppHeader, Direction → Money, табы пикеров → Tabs. Правило: новый компонент попадает в кит, только если у него есть экран в продукте и он не собирается из существующих.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">46</div>
+          <div class="decision-body">
+            <div class="decision-title">Пагинация — компонент кита</div>
+            <div class="decision-value">.t-pagination (вместо стандартной пагинации Tabler)</div>
+            <div class="decision-why">Разработка ведётся на Tailwind, Tabler-пагинация теряет смысл. Компонент кита уже построен на токенах и поддерживает тёмную тему.</div>
+          </div>
+        </div>
+        <div class="decision-item">
+          <div class="decision-num">47</div>
+          <div class="decision-body">
+            <div class="decision-title">Ссылки: три вида и граница со кнопкой</div>
+            <div class="decision-value">.link (в тексте, подчёркнута) · .link--standalone (вне текста, подчёркивание по hover) · .link--muted (служебная)</div>
+            <div class="decision-why">В v3.3 ссылка была одним жирным подчёркнутым стилем и в ките стояла в ряду кнопок — выглядела чужеродно. Ссылка — навигация, кнопка — действие; ссылка не ставится в ряд кнопок как равная. Вес ссылки в тексте наследуется, подчёркивание обязательно (цвет не единственный признак).</div>
+          </div>
+        </div>
+        <details class="dec-archive">
+          <summary>Архив решений — исполнены или заменены · 6</summary>
+<div class="decision-item">
+<div class="decision-num">3</div>
+<div class="decision-body">
+<div class="decision-title">Border color</div>
+<div class="decision-value">#E8ECF3</div>
+<div class="decision-why">Используется чаще, мягче по тону; #E2E8F0 удалён. Inputs и cards теперь единая линия.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">19</div>
+<div class="decision-body">
+<div class="decision-title">Двухуровневая система токенов</div>
+<div class="decision-value">raw tokens + semantic tokens</div>
+<div class="decision-why">Raw (--color-primary, --bg-card) — палитра. Semantic (--button-primary-bg, --card-bg) — связь с компонентом. Тёмная тема и ребрендинг затрагивают только raw, semantic остаются неизменными. Сейчас компоненты используют raw напрямую — миграция на semantic поэтапная.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">24</div>
+<div class="decision-body">
+<div class="decision-title">DEPRECATION: <code class="code-inline">.field</code> / <code class="code-inline">.field-label</code> → <code class="code-inline">.form-field</code> / <code class="code-inline">.form-label</code></div>
+<div class="decision-value"><code class="code-inline">.field</code> и <code class="code-inline">.field-label</code> помечены @deprecated в v2.3 и будут удалены в v3.0. Новые компоненты используют <code class="code-inline">.form-field</code> / <code class="code-inline">.form-label</code>.</div>
+<div class="decision-why">Два одинаковых по назначению layout-примитива (v1.x <code class="code-inline">.field</code> и v2.2 <code class="code-inline">.form-field</code>) — путаница «что выбрать». Оставляем старые рабочими, чтобы legacy-шаблоны не сломались — но все demo переведены на новый примитив как единственный образец.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">29</div>
+<div class="decision-body">
+<div class="decision-title">SIDE MODAL — full-height сайд-шит (<code class="code-inline">.mdl--side</code>)</div>
+<div class="decision-value"><code class="code-inline">.mdl--side</code> — модалка, док справа во всю высоту: <code class="code-inline">position:fixed</code>, <code class="code-inline">height:100vh</code>, <code class="code-inline">.mdl-body</code> — единственная скролл-зона (flex:1), head/foot sticky, slide-in <code class="code-inline">mdl-slide-in</code>, тень <code class="code-inline">--shadow-drawer</code>.</div>
+<div class="decision-why">Для длинных форм и мастеров в именно модальном (blocking) сценарии, когда M/L тесны. Пересекается с drawer 680 — не плодить оба на одном экране.</div>
+</div>
+</div>
+<div class="decision-item">
+<div class="decision-num">30</div>
+<div class="decision-body">
+<div class="decision-title">Form-field интервал — только в блочном потоке (bugfix)</div>
+<div class="decision-value">Правило <code class="code-inline">.form-field + .form-field { margin-top: --s-3 }</code> сброшено в gap-контейнерах: <code class="code-inline">.row-2col</code> / <code class="code-inline">.row-3col</code> / <code class="code-inline">.form-grid</code> / <code class="code-inline">.demo</code>. Там интервал даёт <code class="code-inline">gap</code>.</div>
+<div class="decision-why">Стек-хелпер протекал в grid-строки: первый элемент без margin, второй — с margin 12px → правая колонка съезжала вниз. Интервал в grid обеспечивает только <code class="code-inline">gap</code>.</div>
+</div>
+</div>
+<div class="decision-item">
+          <div class="decision-num">40</div>
+          <div class="decision-body">
+            <div class="decision-title">Decision 24 исполнен: .field / .field-label удалены</div>
+            <div class="decision-value">.form-field / .form-label</div>
+            <div class="decision-why">Классы не использовались в разметке кита. .field-helper остаётся.</div>
+          </div>
+        </div>
+        </details>
+</div>
+</section><section id="changelog">
+<h2 class="section-h">Changelog</h2>
+<div class="cb">
+        <div class="cl-version">v3.4 — 15 ноября 2026</div>
+        <div class="cl-summary">✂️ Ревизия: в ките остаётся только то, что нужно продукту (Decision 45). Пагинация — компонент кита (Decision 46).</div>
+        <ul class="cl-list">
+          <li>🗑 Удалены: «Интерактивные модалки», паттерны «Row dropdown» и «Form field (.field)», Side modal (<code class="code-inline">.mdl--side</code>), Modal XL (<code class="code-inline">.mdl--xl</code>, токен <code class="code-inline">--modal-width-xl</code>), Coverage matrix (<code class="code-inline">.coverage</code>, <code class="code-inline">.cov-*</code>), Heavy table 2.6 и 2.7 (<code class="code-inline">.t-scrollbar</code>), KPI с акцентной полосой, шкала размеров и Full badge у Marketplace badge.</li>
+          <li>🔗 «Поле с дополнением»: <code class="code-inline">.search-field</code> и <code class="code-inline">.password-field</code> → <code class="code-inline">.input-wrap</code> + <code class="code-inline">.input-icon</code> / <code class="code-inline">.input-action</code>, модификаторы <code class="code-inline">.input--icon</code> / <code class="code-inline">.input--action</code>.</li>
+          <li>🔗 Header button → Button: <code class="code-inline">.h-btn</code> → <code class="code-inline">.btn.btn-md.btn-secondary</code>, <code class="code-inline">.h-btn--icon</code> → <code class="code-inline">.btn-icon</code>. Высота 36 вместо 34.</li>
+          <li>🔗 Breadcrumbs → внутрь AppHeader; Direction и «Сумма + пояснение» → Money; заголовок секции drawer → Drawer; сообщения auth-форм → Inline Alert.</li>
+          <li>🔗 Табы в пикерах — канонические <code class="code-inline">.tabs</code> вместо <code class="code-inline">.picker-tab</code>.</li>
+          <li>🗂 App Shell и Page scaffold перенесены в Patterns. EntityPicker и TreePicker — по одному примеру + таблица отличий.</li>
+          <li>🗂 Decisions 3, 19, 24, 29, 30, 40 — в архив; 23 и 28 обновлены. Changelog: на виду три последние версии.</li>
+          <li>➕ Компонент <b>Link</b>: <code class="code-inline">.link</code> / <code class="code-inline">.link--standalone</code> / <code class="code-inline">.link--muted</code>, правило «ссылка — навигация, кнопка — действие» (Decision 47). В Focus ссылка показана внутри текста, а не в ряду кнопок.</li>
+          <li>📄 Удалена дублирующая страница <code class="code-inline">uploads/ui-kit-v2.6.html</code>; v2.6 оставлена как архив.</li>
+        </ul>
+      </div>
+
+      <div class="cb">
+        <div class="cl-version">v3.3 — 14 ноября 2026</div>
+        <div class="cl-summary">🔵 Главная кнопка — navy вместо красного (Decision 44). Красный остаётся бренд-токеном, в рабочем интерфейсе не используется.</div>
+        <ul class="cl-list">
+          <li>🔵 <code class="code-inline">--button-primary-bg</code> → <code class="code-inline">--color-primary</code> (#1E2A44), hover <code class="code-inline">--navy-800</code> #141B2E, active #0B1020. Тень кнопки — нейтральная вместо красного свечения.</li>
+          <li>🌗 Тёмная тема: primary-кнопка светлая (#DDE3F0) с тёмным текстом — тёмно-синяя кнопка на тёмном фоне не видна.</li>
+          <li>🎨 <code class="code-inline">--color-accent</code> (#B00020) — только логотип, промо, лендинг.</li>
+        <li>🎯 Блок <b>Focus</b> переделан в формат остальных компонентов: объяснение назначения, статичные примеры всех типов элементов, живая проверка. <code class="code-inline">.is-focus</code> приведён к тому же виду, что <code class="code-inline">:focus-visible</code> (было полупрозрачное кольцо 3px без отступа — два разных стиля фокуса в одном ките).</li>
+          <li>🧹 Подпись <code class="code-inline">--shadow-primary</code> обновлена под navy.</li>
+          <li>➕ <code class="code-inline">.link</code> — стиль текстовой ссылки (navy, подчёркивание с отступом 3px); раньше ссылки были браузерно-синими.</li>
+        </ul>
+      </div>
+
+      <div class="cb">
+        <div class="cl-version">v3.2 — 14 ноября 2026</div>
+        <div class="cl-summary">🎨 Цветовая схема «Фирменный красный»: navy + crimson из логотипа. Компоненты не правились — поменялись только примитивы и semantic-токены (Decision 43).</div>
+        <ul class="cl-list">
+          <li>🎨 Нейтрали: slate → нейтральный серый (<code class="code-inline">--gray-*</code>): фон #F5F5F7, граница #E3E4E8, текст #0B1020, вторичный #585D68, третичный #6A6E79 (4.7:1), граница полей #8A8E98 (3:1).</li>
+          <li>🎨 Новые примитивы <code class="code-inline">--navy-*</code>, <code class="code-inline">--crimson-*</code>, <code class="code-inline">--green-brand-*</code>, <code class="code-inline">--yellow-*</code>.</li>
+          <li>🎨 <code class="code-inline">--color-primary</code> → navy #1E2A44. Новый <code class="code-inline">--color-accent</code> (#B00020 / hover #8C0019) — на нём только <code class="code-inline">.btn-primary</code>.</li>
+          <li>🎨 <code class="code-inline">--success-*</code> → #0E7A4F; <code class="code-inline">--danger-*</code> → оранжевый #C2410C; <code class="code-inline">--warning-*</code> → жёлтый #8A5A00 / #F5B400.</li>
+          <li>➕ Роль <code class="code-inline">--info-*</code>: <code class="code-inline">.alert--info</code> и <code class="code-inline">.toast--info</code> переведены на неё (раньше брали primary). <code class="code-inline">--spark-fill-*</code> для sparkline вместо примитивов <code class="code-inline">--alpha-blue-*</code>.</li>
+          <li>🌗 Тёмная тема обновлена под схему: primary #A9B8DA, accent #FF6B7D, кнопка остаётся #B00020.</li>
+          <li>🖼 Логотип в навигации — navy #0B1020, как на макете.</li>
+        </ul>
+      </div>
+
+      <details class="cl-archive"><summary>Ранние версии · 23 (v3.1 и старше)</summary>
+<div class="cb">
+        <div class="cl-version">v3.1 — 12 ноября 2026</div>
+        <div class="cl-summary">✅ Подтверждены Decisions 13, 14, 33. 🌗 Тема по умолчанию — как в системе. 📐 Геометрия и подсветка — токены.</div>
+        <ul class="cl-list">
+          <li>✅ <b>Decision 33</b>: граница ≥3:1 распространена на <code class="code-inline">.select</code>, <code class="code-inline">.textarea</code> и выключенный <code class="code-inline">.toggle</code> (в v3.0 была только у <code class="code-inline">.input</code>). Добавлен hover у <code class="code-inline">.input</code>. Disabled — <code class="code-inline">--input-border-disabled</code> + <code class="code-inline">--input-bg-disabled</code>.</li>
+          <li>✅ <b>Decision 13</b>: drawer — 24px (head и body), footer 16/24.</li>
+          <li>✅ <b>Decision 14</b>: tabular-nums на контейнерах числовых компонентов; поддержка tnum в Manrope проверена.</li>
+          <li>🌗 <b>Decision 38</b>: переключатель Системная / Светлая / Тёмная; без выбора тема следует <code class="code-inline">prefers-color-scheme</code>. Статус — beta, только в ките.</li>
+          <li>📐 <b>Decision 41</b>: <code class="code-inline">--input-icon-slot</code>, <code class="code-inline">--sb-indent</code>, <code class="code-inline">--app-header-gutter</code>; высота полей — <code class="code-inline">--control-h</code>.</li>
+          <li>🎨 <b>Decision 42</b>: <code class="code-inline">--highlight-bg</code> / <code class="code-inline">--highlight-text</code> для <code class="code-inline">&lt;mark&gt;</code>.</li>
+        </ul>
+      </div>
+
+      <div class="cb">
+        <div class="cl-version">v3.0 — 12 ноября 2026</div>
+        <div class="cl-summary">🏗 Трёхслойные токены, ♿ контраст AA и focus-visible, 📐 шкалы шрифтов/отступов/радиусов, 🌗 тёмная тема (beta), 🗂 компоненты по категориям. Совместимость с v2.6 — через алиасы.</div>
+        <ul class="cl-list">
+          <li>🏗 <b>Primitives</b> (<code class="code-inline">--gray-*</code>, <code class="code-inline">--blue-*</code>, <code class="code-inline">--green-*</code>, <code class="code-inline">--red-*</code>, <code class="code-inline">--amber-*</code>, <code class="code-inline">--orange-*</code>, <code class="code-inline">--violet-*</code>, <code class="code-inline">--alpha-*</code>). Semantic-токены ссылаются на них. Decision 31.</li>
+          <li>♿ <b>--text-tertiary</b> #64748B → #5E6E84, <b>--text-muted</b> #8B95A7 → = tertiary. Decision 32.</li>
+          <li>♿ <b>--input-border</b> → <code class="code-inline">--border-strong</code> (3:1). PROPOSED, Decision 33. Откат — одна строка: <code class="code-inline">--input-border: var(--border)</code>.</li>
+          <li>♿ Глобальное правило <code class="code-inline">:focus-visible</code>. Decision 36.</li>
+          <li>📐 <b>Типографика</b>: 25 значений → 9 ступеней <code class="code-inline">--fs-2xs…--fs-5xl</code>, веса <code class="code-inline">--fw-*</code>, интерлиньяж <code class="code-inline">--lh-*</code>, шорткаты <code class="code-inline">--type-*</code>. Все font-size в CSS и разметке переведены на токены. Decision 34.</li>
+          <li>📐 <b>Spacing</b>: +<code class="code-inline">--s-0_5 / 1_5 / 2_5 / 3_5 / 9 / 10</code>; сырые px в padding/margin/gap заменены токенами. <b>Radius</b>: <code class="code-inline">--r-xs / sm / md / lg / xl</code>. Decision 35.</li>
+          <li>📐 <b>Motion</b> <code class="code-inline">--dur-* / --ease-*</code>, <b>z-index</b> <code class="code-inline">--z-*</code>. Decision 37.</li>
+          <li>🌗 <b>[data-theme="dark"]</b> + переключатель в навигации. Decision 38.</li>
+          <li>🗂 Components разбиты на 9 категорий, удалён хронологический блок «v1.5». Decision 39.</li>
+          <li>🧹 Удалены: дубль блока grid/breakpoints в <code class="code-inline">:root</code>, повторяющиеся правила <code class="code-inline">.grid-*</code> / <code class="code-inline">.bp-*</code>, <code class="code-inline">.field</code> / <code class="code-inline">.field-label</code> (Decision 40). Объявлен недостающий <code class="code-inline">--button-ghost-bg</code>. <code class="code-inline">--src-manual-border</code> #E2E8F0 (удалён Decision 3) → <code class="code-inline">--border</code>.</li>
+          <li>🎨 Свотчи цветов теперь рендерятся из токенов, а не из hex — показывают актуальную тему.</li>
+        </ul>
+        <table class="tok-table" style="margin-top:var(--s-3)"><thead><tr><th>v2.6</th><th>v3.0</th><th>Статус</th></tr></thead><tbody>
+          <tr><td><code>--font-9_5 … --font-14</code></td><td><code>--fs-xs … --fs-lg</code></td><td>алиас до v4</td></tr>
+          <tr><td><code>--r-1 / --r-2 / --r-3 / --r-4</code></td><td><code>--r-sm / --r-md / --r-md / --r-lg</code></td><td>алиас до v4 · r-2 5→6px</td></tr>
+          <tr><td><code>--text-muted</code></td><td><code>--text-tertiary</code></td><td>значения совпадают</td></tr>
+          <tr><td><code>0 0 0 3px var(--input-focus-ring)</code></td><td><code>--ring-focus</code></td><td>новый токен</td></tr>
+          <tr><td>hex в компонентах</td><td>semantic-токены</td><td>запрещено (stylelint)</td></tr>
+        </tbody></table>
+      </div>
+
+      <div class="cb">
+<div class="cl-version">v2.6 — 22 июля 2026</div>
+<div class="cl-summary">➕ CARD-HEAD, PAGE SCAFFOLD (wz-*), MODAL S/M/L/XL + side modal, правило modal-vs-drawer. 🐛 FORM-FIELD перекос в grid.</div>
+<ul class="cl-list">
+<li>🐛 <b>FIX: перекос form-field в grid</b> — <code class="code-inline">.form-field + .form-field { margin-top }</code> (стек-хелпер) протекал в grid-контейнеры: первый элемент грид-строки без margin, второй — с margin 12px → правая колонка смещена вниз (+ двойной интервал в <code class="code-inline">.demo--column</code>). Сброшен в <code class="code-inline">.row-2col</code> / <code class="code-inline">.row-3col</code> / <code class="code-inline">.form-grid</code> / <code class="code-inline">.demo</code> — там интервал даёт <code class="code-inline">gap</code>. <b>Decision 30</b>.</li>
+<li>➕ <b>CARD-HEAD</b> (<code class="code-inline">.card-head</code>) — заголовок секции внутри карточки (был инлайн-стилями в демо). Вариант A — 11px uppercase, отбивка <code class="code-inline">--s-3</code>; вариант B — <code class="code-inline">.card--flush</code> для таблицы edge-to-edge (шапка с <code class="code-inline">--card-padding</code> + разделитель). <b>Decision 25</b>.</li>
+<li>➕ <b>PAGE SCAFFOLD</b> (<code class="code-inline">.wz-head</code> / <code class="code-inline">.wz-title</code> / <code class="code-inline">.wz-row</code>) — вертикальный ритм контента в <code class="code-inline">.app-workzone</code>, канонизирован из <code class="code-inline">admin-shell.css</code>. Заголовок 28px/700 · отбивка s-5 · gap в ряду s-4 · между рядами s-5 · перенос при &lt;200px. Demo-секция <code class="code-inline">#page-scaffold</code>. <b>Decision 26</b>.</li>
+<li>📐 <b>Decision 27</b>: потолок модалки-формы — 520 (до 8 полей). Шире / &gt; 8 полей — drawer 680. Широкая модалка — только для контента.</li>
+<li>➕ <b>MODAL SIZES S/M/L/XL</b> (<code class="code-inline">.mdl--compact</code> 440 · <code class="code-inline">.mdl</code>/<code class="code-inline">.mdl--m</code> 520 · <code class="code-inline">.mdl--l</code> 640 · <code class="code-inline">.mdl--xl</code> 800). Best practices: <code class="code-inline">max-width: min(&lt;токен&gt;, calc(100vw − --s-8))</code> — не шире вьюпорта; <code class="code-inline">.mdl-body</code> — <code class="code-inline">max-height: min(70vh, 640px)</code> + <code class="code-inline">overflow-y:auto</code>, head/foot sticky. L/XL — для контента (таблица, визард, сравнение), не для форм. <b>Decision 28</b>.</li>
+<li>➕ <b>SIDE MODAL</b> (<code class="code-inline">.mdl--side</code>) — full-height модалка, док справа. fixed к краю, <code class="code-inline">height:100vh</code>, <code class="code-inline">.mdl-body</code> — единственная скролл-зона (flex:1), head/foot sticky, slide-in <code class="code-inline">mdl-slide-in</code> из-за края, тень <code class="code-inline">--shadow-drawer</code>. Для длинных форм/мастеров в модальном сценарии. <b>Decision 29</b>.</li>
+<li>➕ <b>Доводка перед разбором</b> — Decisions 25–30 добавлены в <code class="code-inline">#decisions</code> (были битые ссылки из changelog); маркеры <code class="code-inline">CARD-HEAD</code> и <code class="code-inline">PAGE-SCAFFOLD</code> (layout — отдельный, не уедет в card/modal при разборе); nav-якоря демо <code class="code-inline">#card-head</code> / <code class="code-inline">#page-scaffold</code> / <code class="code-inline">#modal-sizes</code> / <code class="code-inline">#side-modal</code>.</li>
+<li>📐 Version bump v2.5 → v2.6 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>. (<code class="code-inline">uikit.css</code> отстаёт на v2.3 — синк отдельной задачей.)</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v2.5 — 9 июля 2026</div>
+<div class="cl-summary">🔧 APP-SHELL: workzone-scroll модель. 🔧 <code class="code-inline">--s-8</code> восстановлен в шкале.</div>
+<ul class="cl-list">
+<li>🔧 <b>APP-SHELL scroll model</b>: root/body фиксированы (<code class="code-inline">height:100%</code>, <code class="code-inline">overflow:hidden</code>), скроллится <code class="code-inline">.app-workzone</code> (<code class="code-inline">overflow:auto</code> + <code class="code-inline">min-height:0</code>). <code class="code-inline">html:has(&gt; body &gt; .app)</code> / <code class="code-inline">body:has(&gt; .app)</code> управляют scrollbar-gutter — header flush до края.</li>
+<li>🔧 <code class="code-inline">--s-8</code> (40px) восстановлен в шкале (используется в проде: login, app-shell). Шкала <code class="code-inline">--s-1</code> … <code class="code-inline">--s-8</code>.</li>
+<li>📐 Version bump v2.4.1 → v2.5 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>.</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v2.4.1 — 9 июля 2026</div>
+<div class="cl-summary">➕ AppShell sidebar-footer получил кнопку выхода. ✂️ .me-name обрезается ellipsis.</div>
+<ul class="cl-list">
+<li>➕ Кнопка «Выйти» (<code class="code-inline">.settings</code> + logout-icon) в <code class="code-inline">.sb-foot</code> каркаса AppShell.</li>
+<li>✂️ <code class="code-inline">.sb-foot .me-name</code> теперь truncate с <code class="code-inline">text-overflow: ellipsis</code> при длинном имени.</li>
+<li>📐 Version bump v2.4 → v2.4.1 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>.</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v2.4 — 8 июля 2026</div>
+<div class="cl-summary">➕ APP-SHELL — каркас страниц приложения (header + sidebar + рабочая зона).</div>
+<ul class="cl-list">
+<li>➕ <b>APP-SHELL</b> (<code class="code-inline">.app</code>, <code class="code-inline">.app-body</code>, <code class="code-inline">.app-sidebar</code>, <code class="code-inline">.app-workzone</code>) — внешний каркас страницы. Компонует существующие <code class="code-inline">.app-header</code> + <code class="code-inline">.sb</code> + рабочую зону; сами эти компоненты не изменены.</li>
+<li>➕ Токен <code class="code-inline">--app-sidebar-width: 264px</code>. Hardcode-пиксели каркаса заменены на токены (<code class="code-inline">--app-sidebar-width</code>, <code class="code-inline">--app-header-height</code>, <code class="code-inline">--s-6</code> / <code class="code-inline">--s-7</code>).</li>
+<li>➕ Demo-секция <code class="code-inline">#app-shell</code> + nav-ссылка в разделе Patterns.</li>
+<li>📐 Version bump v2.3 → v2.4 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>.</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v2.3 — 5 июля 2026</div>
+<div class="cl-summary">➕ INPUT-WRAP задокументирован как публичный примитив. ⚠️ .field / .field-label deprecated.</div>
+<ul class="cl-list">
+<li>➕ <b>INPUT-WRAP</b> (<code class="code-inline">.input-wrap</code>, <code class="code-inline">.prefix</code>, <code class="code-inline">.suffix</code>, <code class="code-inline">.input--prefix</code>, <code class="code-inline">.input--suffix</code>) — задокументирован как публичный примитив: отдельный маркер в CSS, demo-секция, nav-ссылка.</li>
+<li>⚠️ <code class="code-inline">.field</code> и <code class="code-inline">.field-label</code> помечены <code class="code-inline">@deprecated v2.3 → v3.0</code>. Все demo переведены на <code class="code-inline">.form-field</code> / <code class="code-inline">.form-label</code>.</li>
+<li>📐 <b>Decision 23</b>: <code class="code-inline">.input-wrap</code> — базовый паттерн, <code class="code-inline">.password-field</code> и <code class="code-inline">.search-field</code> — его специализации.</li>
+<li>📐 <b>Decision 24</b>: deprecation-политика для <code class="code-inline">.field</code>.</li>
+<li>📐 Version bump v2.2 → v2.3 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>.</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v2.2 — 5 июля 2026</div>
+<div class="cl-summary">➕ Form-field примитив: вертикальная обёртка «подпись + поле». Активированы semantic-токены form-label.</div>
+<ul class="cl-list">
+<li>➕ <b>FORM-FIELD</b> (<code class="code-inline">.form-field</code>, <code class="code-inline">.form-label</code>) — вертикальная обёртка «подпись + поле». Промежуток 5px внутри, <code class="code-inline">var(--s-3)</code> между соседними полями.</li>
+<li>🧹 Semantic-токены <code class="code-inline">--form-label-text</code> и <code class="code-inline">--form-required-mark</code> активированы: были объявлены в <code class="code-inline">:root</code> с v2.0, но не использовались. Теперь оживают в <code class="code-inline">.form-label</code>.</li>
+<li>📐 Version bump v2.1 → v2.2 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>.</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v2.1 — 3 июля 2026</div>
+<div class="cl-summary">🧹 Финальная чистка перед разбивкой: 4 semantic-токена подключены, 3 удалены, повторяющиеся layout-inline вынесены в utility-классы. Без изменений API компонентов.</div>
+<ul class="cl-list">
+<li>🔗 <code class="code-inline">--backdrop-opacity</code> + <code class="code-inline">--backdrop-blur</code> подключены в <code class="code-inline">.dlg::backdrop</code>. Раньше жили как декларация без потребителя.</li>
+<li>🔗 <code class="code-inline">--button-secondary-border-hover</code> подключён в <code class="code-inline">.btn-secondary:hover</code> (вместо raw <code class="code-inline">--border-hover</code>).</li>
+<li>🔗 <code class="code-inline">--input-border-error</code> подключён в <code class="code-inline">.input.is-error</code> / <code class="code-inline">.input-error</code> / <code class="code-inline">.textarea.is-error</code> + добавлен <code class="code-inline">.select.is-error</code> для полноты.</li>
+<li>🧹 Удалены: <code class="code-inline">--drawer-width</code> (компонента Drawer как отдельного не существует). <code class="code-inline">--font-9</code> в файле никогда не жил — путаница со скобками; актуален <code class="code-inline">--font-9_5</code>.</li>
+<li>➕ <code class="code-inline">--bg-hero-tint: rgba(11,18,32,0.05)</code> + модификатор <code class="code-inline">.demo--hero</code>. 9 inline-фонов в модальных демо заменены на класс.</li>
+<li>➕ Utility-классы для повторяющегося layout-inline: <code class="code-inline">.u-w-28</code>, <code class="code-inline">.u-w-32</code>, <code class="code-inline">.u-p-0</code>, <code class="code-inline">.u-pl-4</code>, <code class="code-inline">.u-min-w-200</code>, <code class="code-inline">.u-min-w-220</code>. Заменено ~34 inline-стилей.</li>
+<li>📐 Version bump v2.0 → v2.1 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>.</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v2.0 — 3 июля 2026</div>
+<div class="cl-summary">Major bump: подключён семантический слой токенов к компонентам, зафиксирована политика именования (BEM для новых компонентов, Tabler-style у legacy). A11y-минимум и чистка инлайн-стилей в демо.</div>
+<ul class="cl-list">
+<li>🔗 <b>Semantic adoption</b>: <code class="code-inline">.btn-primary/--secondary/--ghost</code> → <code class="code-inline">--button-*</code>; <code class="code-inline">.input</code>, <code class="code-inline">.textarea</code>, <code class="code-inline">.select</code> → <code class="code-inline">--input-*</code>; <code class="code-inline">.status--*</code> → <code class="code-inline">--status-*</code>. Раньше 59 из 167 семантических токенов были мёртвыми (35%) — Decision 19 стал реальностью, не декларацией.</li>
+<li>🧹 <b>Inline cleanup</b>: hex/RGBA в демо вытеснены классами — <code class="code-inline">.chip__count</code>, <code class="code-inline">.r-row--income/--expenses/--projects</code>, <code class="code-inline">.money-card--dark</code>, <code class="code-inline">.cb-note</code>. Инлайн-стили в storybook остались только для swatch/type-row/spacing/radius/shadow (демонстрация шкал).</li>
+<li>🧹 <b>.is-focus mock</b> расширен для <code class="code-inline">.input</code>, <code class="code-inline">.textarea</code>, <code class="code-inline">.select</code> — как <code class="code-inline">.is-hover</code>/<code class="code-inline">.is-active</code>. Демо больше не хардкодит <code class="code-inline">box-shadow</code> инлайном.</li>
+<li>♿ <b>A11y minimum</b>: <code class="code-inline">:focus</code> → <code class="code-inline">:focus-visible</code> на <code class="code-inline">.input</code>, <code class="code-inline">.textarea</code>, <code class="code-inline">.select</code>, <code class="code-inline">.picker-search input</code>. Демо ошибок помечены <code class="code-inline">aria-invalid="true"</code> + <code class="code-inline">aria-describedby</code>. Глобальный <code class="code-inline">@media (prefers-reduced-motion: reduce)</code> нейтрализует transitions/animations.</li>
+<li>📐 <b>Decision 22</b>: политика именования зафиксирована — новые компоненты BEM, legacy Tabler-style не переименовываем.</li>
+<li>🧹 <b>Dead tokens</b>: удалены <code class="code-inline">--font-15/17/22/28</code>, <code class="code-inline">--cat-financial/--cat-returns</code>, alias <code class="code-inline">--neutral-tint-bg</code> (заменён на <code class="code-inline">--bg-page</code> в компонентах), layout-токены <code class="code-inline">--card-padding-block</code>, <code class="code-inline">--drawer-padding-body</code>.</li>
+<li>📐 Version bump v1.9.2 → v2.0 в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code>, <code class="code-inline">.page-meta</code>.</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v1.9.2 — 29 июня 2026</div>
+<div class="cl-summary">Select: нативный браузерный popup приведён к светлой теме + primary-подсветке; демо рекомендует <code class="code-inline">.select-popup</code> как основной паттерн.</div>
+<ul class="cl-list">
+<li>🎨 <code class="code-inline">.select</code>: добавлены <code class="code-inline">color-scheme: light</code> и <code class="code-inline">accent-color: var(--color-primary)</code> — нативный popup перестаёт зависеть от системной dark-темы и подсвечивает выбранную строку primary вместо OS-серого/оранжевого.</li>
+<li>🎨 <code class="code-inline">.select option</code> и <code class="code-inline">.select option:disabled</code> — фон <code class="code-inline">--bg-card</code>, текст <code class="code-inline">--text-strong</code> / <code class="code-inline">--text-muted</code>. Honored в Firefox; в Chromium как fallback к accent-color.</li>
+<li>🎨 В демо <code class="code-inline">#select</code> «Default (38)» теперь триггер-кнопка <code class="code-inline">.select</code>, открывающая <code class="code-inline">.select-popup</code>. Нативный <code class="code-inline">&lt;select&gt;</code> оставлен только для «Sm-фильтра» и «Disabled». Добавлена явная заметка «когда <code class="code-inline">&lt;select&gt;</code>, а когда <code class="code-inline">.select-popup</code>».</li>
+<li>📐 Без новых токенов: переиспользованы <code class="code-inline">--color-primary</code>, <code class="code-inline">--bg-card</code>, <code class="code-inline">--text-strong</code>, <code class="code-inline">--text-muted</code>.</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v1.9.1 — 29 июня 2026</div>
+<div class="cl-summary">Select popup: визуально приведён к общему языку дропдаунов (<code class="code-inline">.menu</code> + <code class="code-inline">.picker-item</code>). Hex/радиусов из воздуха больше нет.</div>
+<ul class="cl-list">
+<li>🎨 <code class="code-inline">.select-popup</code>: <code class="code-inline">border-radius: 7px</code> (как у <code class="code-inline">.menu</code>), <code class="code-inline">box-shadow: var(--shadow-menu)</code> вместо <code class="code-inline">--shadow-modal</code>, внутренний <code class="code-inline">padding: 5px</code>, <code class="code-inline">min-width: 240px</code>.</li>
+<li>🎨 <code class="code-inline">.select-option</code>: <code class="code-inline">border-radius: var(--r-2)</code>, <code class="code-inline">padding: 8px 10px</code>, <code class="code-inline">font-weight: 500</code>, hover на <code class="code-inline">--bg-page</code> (вместо <code class="code-inline">--bg-row-hover</code>).</li>
+<li>🎨 <code class="code-inline">.select-option.is-selected</code>: фон <code class="code-inline">--bg-row-selected</code>, текст остаётся <code class="code-inline">--text-strong</code>, чек-иконка в <code class="code-inline">--color-primary</code>. Раньше был сплошной тёмный фон + инверсный текст — не соответствовал дропдаунам кита.</li>
+<li>➕ <code class="code-inline">.select-check</code> — слот для чек-иконки справа от опции (как <code class="code-inline">.picker-item .check</code>).</li>
+<li>🎨 <code class="code-inline">.select-optgroup-label</code>: 1px-разделитель между группами (<code class="code-inline">--border-soft</code>), отступы выровнены под опции.</li>
+<li>📐 Никаких новых токенов или hex: повторно использованы <code class="code-inline">--bg-card</code>, <code class="code-inline">--border</code>, <code class="code-inline">--border-soft</code>, <code class="code-inline">--bg-page</code>, <code class="code-inline">--bg-row-selected</code>, <code class="code-inline">--shadow-menu</code>, <code class="code-inline">--r-2</code>, <code class="code-inline">--color-primary</code>.</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v1.9 — 29 июня 2026</div>
+<div class="cl-summary">Чистка структуры перед разбивкой на файлы + расширение Inputs-семейства (для миграции Login/Register).</div>
+<ul class="cl-list">
+<li>➕ <b>Textarea</b> (<code class="code-inline">.textarea</code>) — новый компонент, отдельный от <code class="code-inline">textarea.input</code>. Состояния: default · hover · focus · error · disabled.</li>
+<li>➕ <b>Radio</b> (<code class="code-inline">.radio</code>, <code class="code-inline">.radio-label</code>, <code class="code-inline">.radio-group</code>, <code class="code-inline">.radio-group--inline</code>) — нативный radio с <code class="code-inline">accent-color</code>. Колоночная и строчная компоновка.</li>
+<li>➕ <b>Password input</b> (<code class="code-inline">.password-field</code>, <code class="code-inline">.password-toggle</code>) — поле пароля с кнопкой показать/скрыть.</li>
+<li>➕ <b>Search input</b> (<code class="code-inline">.search-field</code>, <code class="code-inline">.search-icon</code>, <code class="code-inline">.search-clear</code>) — поиск с лупой слева и очисткой справа (через <code class="code-inline">.has-value</code>).</li>
+<li>🎨 <b>Select</b> расширен открытым состоянием: <code class="code-inline">.select-popup</code>, <code class="code-inline">.select-option</code> (+ <code class="code-inline">.is-selected</code>, <code class="code-inline">.is-disabled</code>), <code class="code-inline">.select-optgroup-label</code>. Демо открытого списка с группами.</li>
+<li>🧹 <code class="code-inline">.btn-danger-solid</code>, <code class="code-inline">.btn-warning-solid</code> — перенесены из <code class="code-inline">CONFIRMATION-DIALOG</code> в <code class="code-inline">BUTTON</code> как варианты кнопки.</li>
+<li>🧹 Расширения Table (<code class="code-inline">.t-sort-th</code>, <code class="code-inline">.t-row--totals</code> и компания, <code class="code-inline">.t-pagination</code>) — перенесены из <code class="code-inline">HEADER-BUTTON</code> в <code class="code-inline">TABLE</code>.</li>
+<li>➕ Выделены отдельные блоки <code class="code-inline">ACCOUNT-CARD</code> и <code class="code-inline">ROW-FORM-FIELD</code> — извлечены из <code class="code-inline">MODAL</code>.</li>
+<li>🧹 Маркер <code class="code-inline">MISC patterns</code> удалён: правила <code class="code-inline">.code-inline</code>, <code class="code-inline">.decision-*</code>, <code class="code-inline">.row-2col</code>, <code class="code-inline">.row-3col</code> перенесены в Storybook shell (рядом с <code class="code-inline">.cb</code>, <code class="code-inline">.demo</code>, <code class="code-inline">.swatch</code>).</li>
+<li>🧹 Удалён многострочный CSS-комментарий <code class="code-inline">v1.5 — Global chrome &amp; analytical-table primitives</code> — был сборным разделителем, не маркером.</li>
+<li>📐 В навигации появилась подгруппа <b>Forms</b> (<code class="code-inline">.nav-subsection</code>): Input, Textarea, Select, Search input, Password input, Checkbox, Radio, Toggle.</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v1.8 — 29 июня 2026</div>
+<div class="cl-summary">KPI accent: вариант размещения StatusPill в шапке карточки.</div>
+<ul class="cl-list">
+<li>➕ <b>KPI head</b> (<code class="code-inline">.kpi-head</code>) — flex-обёртка над <code class="code-inline">.kpi-label</code> для размещения <code class="code-inline">.status</code> справа. Метка обрезается по <code class="code-inline">ellipsis</code>, пилюля не сжимается.</li>
+<li>📐 Существующие варианты <code class="code-inline">.kpi--accent-*</code> и <code class="code-inline">.kpi-units</code> не изменены — <code class="code-inline">.kpi-head</code> опционален и встаёт на место одиночного <code class="code-inline">.kpi-label</code>.</li>
+<li>📐 Никаких новых токенов — повторно используются <code class="code-inline">.status--success/--danger/--warning/--pending/--neutral</code>.</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v1.7 — 29 июня 2026</div>
+<div class="cl-summary">KPI card: акцентная полоса слева + значение в единицах. Дополняет существующие варианты.</div>
+<ul class="cl-list">
+<li>➕ <b>KPI accent</b> (<code class="code-inline">.kpi--accent-success</code>, <code class="code-inline">.kpi--accent-danger</code>, <code class="code-inline">.kpi--accent-warning</code>, <code class="code-inline">.kpi--accent-primary</code>) — 3px цветная полоса слева, цвет из токенов <code class="code-inline">--success-dot</code>, <code class="code-inline">--danger-dot</code>, <code class="code-inline">--warning-dot</code>, <code class="code-inline">--color-primary</code>. <code class="code-inline">padding-left</code> уменьшен на 2px, чтобы текст не сдвигался.</li>
+<li>➕ <b>KPI units</b> (<code class="code-inline">.kpi-units</code>) — строка количества операций между <code class="code-inline">.kpi-value</code> и <code class="code-inline">.kpi-meta</code>. Число <code class="code-inline">&lt;b&gt;</code> — <code class="code-inline">--text-strong</code>, единица измерения — <code class="code-inline">--text-tertiary</code>, tabular-nums.</li>
+<li>📐 Существующие варианты <code class="code-inline">.kpi</code> и <code class="code-inline">.kpi--dark</code> не изменены — добавлено рядом в том же блоке <code class="code-inline">KPI</code>.</li>
+<li>📐 Никаких новых hex-токенов — повторно используются существующие semantic.</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v1.6 — 29 июня 2026</div>
+<div class="cl-summary">Чистка структуры монолита перед разбивкой по файлам. Без поведенческих изменений UI.</div>
+<ul class="cl-list">
+<li>➕ <b>Checkbox</b> (<code class="code-inline">.checkbox</code>, <code class="code-inline">.checkbox-label</code>) — оформлен как отдельный компонент, вынесен из общей корзины</li>
+<li>➕ <b>Select</b> (<code class="code-inline">.select</code>, <code class="code-inline">.select--sm</code>) — оформлен как отдельный компонент</li>
+<li>🧹 Удалён сборный блок <code class="code-inline">EXTENSIONS</code>: правила разнесены по существующим компонентам</li>
+<li>🧹 <code class="code-inline">.tab .count--dot</code>, <code class="code-inline">.tabs-meta</code>, <code class="code-inline">.tabs-row</code> — перенесены в блок <code class="code-inline">TAB</code></li>
+<li>🧹 <code class="code-inline">.sb-item .badge--danger/--warning/--success</code> — перенесены в блок <code class="code-inline">SIDEBAR</code></li>
+<li>🧹 <code class="code-inline">.t-cell--dot</code> (+ <code class="code-inline">.ddot</code>, <code class="code-inline">.mono</code>) — перенесён в блок <code class="code-inline">TABLE</code></li>
+<li>🧹 <code class="code-inline">.confirm-kv</code> — перенесён в блок <code class="code-inline">CONFIRMATION-DIALOG</code></li>
+<li>🧹 <code class="code-inline">.dlg</code>, <code class="code-inline">.dlg::backdrop</code> — перенесены в новый блок <code class="code-inline">MODAL</code></li>
+<li>🧹 Три маркера расширений Table (sort header / totals row / pagination) слиты в один блок <code class="code-inline">TABLE</code></li>
+<li>🧹 Маркер <code class="code-inline">EntityPicker / TreePicker shared</code> разделён на два: <code class="code-inline">ENTITY-PICKER</code> и <code class="code-inline">TREE-PICKER</code></li>
+<li>📐 Имена всех маркеров приведены к формату <code class="code-inline">NAME</code> (UPPERCASE через дефис, единственное число, без скобок и слешей): <code class="code-inline">BUTTON</code>, <code class="code-inline">INPUT</code>, <code class="code-inline">TAB</code>, <code class="code-inline">BADGE</code>, <code class="code-inline">MARKETPLACE-BADGE</code>, <code class="code-inline">STATUS-PILL</code>, <code class="code-inline">DROPDOWN-MENU</code>, <code class="code-inline">COVERAGE-MATRIX</code>, <code class="code-inline">REPORT</code>, <code class="code-inline">DIRECTION</code>, <code class="code-inline">SIDEBAR</code>, <code class="code-inline">TAGS</code>, <code class="code-inline">ALERT</code>, <code class="code-inline">CONFIRMATION-DIALOG</code>, <code class="code-inline">APP-HEADER</code>, <code class="code-inline">BREADCRUMBS</code>, <code class="code-inline">HEADER-BUTTON</code>, <code class="code-inline">ABC-PILL</code>, <code class="code-inline">HEAVY-TABLE</code></li>
+<li>🎨 Хардкод белого цвета в правилах компонентов заменён на токен <code class="code-inline">var(--text-inverse)</code> — 10 мест (<code class="code-inline">.btn-primary</code>, <code class="code-inline">.avatar</code>, <code class="code-inline">.kpi--dark</code>, <code class="code-inline">.picker-item.is-selected .check</code>, <code class="code-inline">.tree-node.is-selected .tn-check</code>, <code class="code-inline">.btn-danger-solid</code>, <code class="code-inline">.btn-warning-solid</code>, <code class="code-inline">.nav-logo</code>, <code class="code-inline">.sb-logo .mark</code>)</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v1.5 — 28 июня 2026</div>
+<div class="cl-summary">Global chrome + табличные примитивы. AppHeader на всех страницах; обязательная totals-строка; --abc-* токены.</div>
+<ul class="cl-list">
+<li><b>AppHeader</b> (<code class="code-inline">.app-header</code>) — 60px-сетка с лого-блоком 264px, breadcrumbs, action-слотом. Сайдбар sticky от top:60px</li>
+<li><b>Breadcrumbs</b> (<code class="code-inline">.crumbs</code>) — chevron-разделители, последний элемент <code class="code-inline">.crumb-current</code></li>
+<li><b>Header button</b> (<code class="code-inline">.h-btn / .h-btn--icon</code>) — 34px кнопки для слота действий шапки. Иконочный вариант с .dot-индикатором</li>
+<li><b>Table sort header</b> (<code class="code-inline">.t-sort-th</code>) — двух-стрелочный индикатор + primary-tint для активной сортировки</li>
+<li><b>Table totals row</b> (<code class="code-inline">.t-row--totals</code>) — обязательная последняя строка; bg --bg-subtle; 2px-strong top</li>
+<li><b>Table pagination</b> (<code class="code-inline">.t-pagination</code>) — prev/next + номера + эллипсис</li>
+<li><b>ABC × ABC pill</b> (<code class="code-inline">.abc-pill</code>) — 5 вариантов: star / attention / mid / weak / tail</li>
+<li><b>Pattern: Heavy analytical table</b> (<code class="code-inline">#heavy-table</code>) — архитектура тяжёлой аналитической таблицы с 7 живыми демо: <code class="code-inline">.t-tier1</code>, <code class="code-inline">.t-expand-btn</code>, <code class="code-inline">.t-profit-bar</code>, <code class="code-inline">.t-breakdown</code>, <code class="code-inline">.cols-popover</code>, <code class="code-inline">.t-scrollbar</code> + ABC фильтр на .tabs</li>
+<li>Новые токены: <code class="code-inline">--app-header-height</code>, <code class="code-inline">--app-header-bg</code>, <code class="code-inline">--app-header-border</code>, набор <code class="code-inline">--abc-*</code></li>
+<li><b>Decision 20</b>: запрет на семантическую контрабанду токенов (success ≠ ABC-A)</li>
+<li><b>Decision 21</b>: <code class="code-inline">.t-row--totals</code> обязателен для аналитических таблиц</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v1.4 — 27 июня 2026</div>
+<div class="cl-summary">Audit fixes: токенизация хардкод-цветов, семантический слой токенов, чистка дублей.</div>
+<ul class="cl-list">
+<li>Исправлен битый HTML (<code class="code-inline">&lt;/section&gt; --&gt;</code>)</li>
+<li>Версии в <code class="code-inline">&lt;title&gt;</code>, <code class="code-inline">.nav-version</code> и <code class="code-inline">.page-meta</code> синхронизированы с changelog</li>
+<li>Все hex-хардкоды компонентов вынесены в токены: <code class="code-inline">--color-primary-active</code>, <code class="code-inline">--border-hover</code>, <code class="code-inline">--border-dark</code>, <code class="code-inline">--bg-subtle-hover</code>, <code class="code-inline">--danger-text-hover</code>, <code class="code-inline">--warning-text-hover</code></li>
+<li>RGBA brand-цвета → семантические токены: <code class="code-inline">--focus-ring-primary</code>, <code class="code-inline">--focus-ring-input</code>, <code class="code-inline">--focus-ring-danger</code>, <code class="code-inline">--shadow-primary-glow</code>, <code class="code-inline">--shadow-danger-glow</code>, <code class="code-inline">--shadow-warning-glow</code></li>
+<li>Семантический слой токенов: <code class="code-inline">--button-*</code>, <code class="code-inline">--input-*</code>, <code class="code-inline">--card-*</code>, <code class="code-inline">--form-*</code>, <code class="code-inline">--status-*</code> (задел под тёмную тему / ребрендинг)</li>
+<li>Decision 19: двухуровневая система токенов (raw + semantic)</li>
+<li><code class="code-inline">--neutral-tint-bg</code> стал алиасом <code class="code-inline">--bg-page</code> (был дубль hex)</li>
+<li>Шрифт Manrope перенесён из <code class="code-inline">@import</code> в <code class="code-inline">&lt;link rel="preconnect"&gt;</code>/<code class="code-inline">&lt;link rel="stylesheet"&gt;</code> в <code class="code-inline">&lt;head&gt;</code> — устранена блокировка рендера</li>
+<li>Inline-стили в блоках Changelog заменены на классы <code class="code-inline">.cl-version</code>, <code class="code-inline">.cl-summary</code>, <code class="code-inline">.cl-list</code></li>
+<li>Дочистка: оставшиеся хардкоды <code class="code-inline">#94A3B8</code> и <code class="code-inline">#6E89C6</code> заменены на токены (<code class="code-inline">--text-disabled</code>, новый <code class="code-inline">--report-head-meta</code>)</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v1.3 — 26 июня 2026</div>
+<div class="cl-summary">Component: Report (period grid). Канонический грид для Отчёта ДДС и аналогов.</div>
+<ul class="cl-list">
+<li><b>Report</b> (<code class="code-inline">.report · .r-row · .r-cell</code>) — грид-отчёт за периоды с залипающей первой колонкой, иерархией со сворачиванием, двумя значениями в ячейке (сумма + Δ%) и колонкой итога</li>
+<li>6 row-вариантов: <code class="code-inline">--head</code>, <code class="code-inline">--balance</code> (остатки), <code class="code-inline">--section</code> (раздел), <code class="code-inline">--net</code> (подытог), <code class="code-inline">--grand</code> (итоговый), <code class="code-inline">--closing</code> (тёмный hero-финал)</li>
+<li>Конфиг через CSS-переменные: <code class="code-inline">--r-periods</code> (кол-во колонок), <code class="code-inline">--r-label-w</code> / <code class="code-inline">--r-total-w</code>, <code class="code-inline">--r-accent</code> на строке раздела</li>
+<li>Delta-чипы переиспользуют существующий <code class="code-inline">.delta</code>; быстрый выбор формата — <code class="code-inline">.tabs/.tab</code>; период и проект — <code class="code-inline">.chip--filter</code></li>
+<li>Без новых hex-токенов: <code class="code-inline">--bg-subtle</code> · <code class="code-inline">--bg-row-hover</code> · <code class="code-inline">--bg-dark</code> · <code class="code-inline">--color-primary-tint</code></li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v1.2 — 25 июня 2026</div>
+<div class="cl-summary">Feedback layer: Toast, Alert, Confirmation, Form messages.</div>
+<ul class="cl-list">
+<li><b>Toast</b> (<code class="code-inline">.toast</code>) — 4 семантики (success/danger/warning/info), top-right стек, auto-dismiss 4s, action-кнопка и close</li>
+<li><b>Inline Alert</b> (<code class="code-inline">.alert</code>) — 4 семантики, без shadow, с опц. action/link/close. 4 примера в контексте</li>
+<li><b>Confirmation Dialog</b> (<code class="code-inline">.mdl--compact + .confirm-*</code>) — 3 варианта: destructive (Удалить), warning (Прервать), neutral (Закрыть без сохранения)</li>
+<li><b>Auth form messages</b> (Patterns) — Inline Alert над полями: danger/success/info примеры</li>
+<li>Decisions 16–18: правила Toast vs Alert · Confirmation для destructive · Feedback icon rule</li>
+<li>Без новых hex-токенов — переиспользованы существующие semantic (success/danger/warning/primary-tint)</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v1.1.1 — 24 июня 2026</div>
+<div class="cl-summary">Icon color rule unified.</div>
+<ul class="cl-list">
+<li>Зафиксировано: иконки наследуют <code class="code-inline">currentColor</code>. Цветом окрашивается весь пункт по семантической роли.</li>
+<li><b>Patterns → Row dropdown</b>: эмодзи заменены на SVG-иконки, идентичные Components/Dropdown menu</li>
+<li><b>Components → Dropdown menu</b>: inline-стиль <code class="code-inline">color:#1E40AF</code> на «Создать ОПиУ» заменён на класс <code class="code-inline">.is-primary</code></li>
+<li>Убрано принудительное окрашивание <code class="code-inline">.menu-item svg { color: var(--text-secondary) }</code> — теперь иконки следуют цвету пункта</li>
+<li>Добавлен класс <code class="code-inline">.menu-item.is-primary</code> с правильным hover-фоном</li>
+<li>Декоративные эмодзи убраны из nav и заголовка Money</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v1.1 — 24 июня 2026</div>
+<div class="cl-summary">Компоненты навигации, выбора и теги. Заполнены заглушки Modal/Drawer.</div>
+<ul class="cl-list">
+<li><b>Sidebar</b> — 264px с workspace switcher, группами, sub-пунктами, footer с юзером</li>
+<li><b>EntityPicker</b> — универсальный плоский пикер (3 инстанса: контрагент/проект/компания)</li>
+<li><b>TreePicker</b> — иерархический (2 инстанса: Категория ДДС с агрегатами / Статья ОПиУ без)</li>
+<li><b>Tags</b> — нейтральные чипы + autosuggest с опцией «Создать»</li>
+<li><b>Modal / Drawer</b> заглушки заменены на реальный контент (EntityPicker в модалке, форма редактирования в drawer)</li>
+<li>Боковая навигация артефакта обновлена — 4 новых пункта</li>
+</ul>
+</div>
+<div class="cb">
+<div class="cl-version">v1.0 — 24 июня 2026</div>
+<div class="cl-summary">Первый канон. Зафиксированы все базовые токены и компоненты.</div>
+<ul class="cl-list">
+<li>Card padding унифицирован: <b>16px 20px</b></li>
+<li>KPI value: две шкалы <b>22 (compact)</b> / <b>28 (hero)</b></li>
+<li>Border: единый <b>#E8ECF3</b></li>
+<li>Drawer width: <b>680px</b></li>
+<li>Backdrop: <b>opacity 0.45 · blur 6px</b></li>
+<li>Avatar: <b>24 / 32 / 40</b> (sm/md/lg)</li>
+<li>Direction indicator: <b>colored dot</b></li>
+<li>Status: <b>pill с точкой</b> (везде)</li>
+<li>Money: <b>U+2212 для минуса</b>, <b>«М» вместо «млн»</b>, <b>цвет только для дельт и signed transactions</b></li>
+<li>Tint chip: <b>именованные токены</b></li>
+<li>Drawer padding 24px · tabular-nums на всех числовых контейнерах (подтверждено в v3.1)</li>
+</ul>
+</div>
+</details>
+</section>
+</main>
+</body>
+</html>

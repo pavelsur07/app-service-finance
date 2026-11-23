@@ -15,6 +15,8 @@ final readonly class ProductSnapshot
         public int $variantsCount,
         public bool $archived,
         public \DateTimeImmutable $sourceUpdatedAt,
+        /** @var list<string>|null */
+        public ?array $barcodes = null,
     ) {
     }
 }

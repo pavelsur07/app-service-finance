@@ -82,6 +82,70 @@ final class ProjectDirectionControllerTest extends WebTestCaseBase
         self::assertSame('30', trim($rootRow->filter('td')->eq(1)->text()));
     }
 
+    public function testFormsSaveFullLengthFieldsAndValidateNormalizedCodeWithinCompany(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->createCompany($client, 824);
+        [$otherOwner, $otherCompany] = $this->createCompany($client, 825);
+        $client->loginUser($owner);
+        $companyId = (string) $company->getId();
+        $this->setClientSessionValue($client, 'active_company_id', $companyId);
+
+        $description = str_repeat('я', 149)."\n".str_repeat('я', 150);
+        $code = 'Abc_12345678901';
+        $fields = [
+            'project_direction[name]' => 'Проект с кодом',
+            'project_direction[code]' => ' '.$code.' ',
+            'project_direction[description]' => str_replace("\n", "\r\n", $description),
+        ];
+        $client->request('GET', '/project-directions/new');
+        $client->submitForm('Сохранить', $fields);
+        self::assertResponseRedirects('/project-directions/');
+
+        /** @var ProjectDirectionRepository $repository */
+        $repository = $client->getContainer()->get(ProjectDirectionRepository::class);
+        $row = array_values(array_filter($repository->readDirectory($companyId)['projects'], static fn (array $row) => 'Проект с кодом' === $row['name']))[0];
+        self::assertSame(strtoupper($code), $row['code']);
+        self::assertSame($description, $row['description']);
+        $client->followRedirect();
+        self::assertSelectorTextContains('thead', 'Код');
+        self::assertSelectorTextContains('tbody', strtoupper($code));
+
+        $editUrl = '/project-directions/'.strtoupper($row['id']).'/edit';
+        $client->request('GET', $editUrl);
+        $client->submitForm('Сохранить', [
+            'project_direction[code]' => $code.'x',
+            'project_direction[description]' => $description.'я',
+        ]);
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorTextContains('body', 'Описание должно содержать до 300 символов.');
+        self::assertSelectorTextContains('body', 'Код должен начинаться с латинской буквы');
+        self::assertSame($row, $repository->readDirectory($companyId)['projects'][$row['id']]);
+
+        $client->request('GET', $editUrl);
+        $client->submitForm('Сохранить', [
+            'project_direction[code]' => ' edited ',
+            'project_direction[description]' => "Текст\nсо второй строкой",
+        ]);
+        self::assertResponseRedirects('/project-directions/');
+        $client->request('GET', $editUrl);
+        self::assertInputValueSame('project_direction[code]', 'EDITED');
+        self::assertFormValue('form[name="project_direction"]', 'project_direction[description]', "Текст\nсо второй строкой");
+
+        $client->request('GET', '/project-directions/new');
+        $client->submitForm('Сохранить', array_replace($fields, ['project_direction[code]' => ' edited ']));
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorTextContains('body', 'Этот код уже используется в справочнике.');
+
+        $client->loginUser($otherOwner);
+        $this->setClientSessionValue($client, 'active_company_id', (string) $otherCompany->getId());
+        $client->request('GET', $editUrl);
+        self::assertResponseStatusCodeSame(404);
+        $client->request('GET', '/project-directions/new');
+        $client->submitForm('Сохранить', array_replace($fields, ['project_direction[code]' => 'edited']));
+        self::assertResponseRedirects('/project-directions/');
+    }
+
     /**
      * @return array{User, Company}
      */

@@ -6,6 +6,9 @@ namespace App\Tests\Integration\Cash\Service\Transaction;
 
 use App\Cash\Application\AddCashTransactionAction;
 use App\Cash\Application\DTO\CashTransactionDTO;
+use App\Cash\Application\DTO\CashTransactionSplitInput;
+use App\Cash\Application\DTO\CashTransactionSplitsInput;
+use App\Cash\Application\Transaction\SaveCashTransactionSplitsAction;
 use App\Cash\Application\Transaction\UpdateCashTransactionAction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
@@ -13,6 +16,7 @@ use App\Cash\Entity\Transaction\CashTransactionSplit;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionSplitSource;
+use App\Cash\Infrastructure\Query\CashTransactionAutoRuleCandidateQuery;
 use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\FinancialResponsibilityCenter;
@@ -20,9 +24,14 @@ use App\Company\Entity\FinancialResponsibilityCenterProject;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Enum\CounterpartyType;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\CounterpartyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 
 final class CashTransactionServiceTest extends IntegrationTestCase
 {
@@ -35,6 +44,59 @@ final class CashTransactionServiceTest extends IntegrationTestCase
 
         $this->addTransaction = self::getContainer()->get(AddCashTransactionAction::class);
         $this->updateTransaction = self::getContainer()->get(UpdateCashTransactionAction::class);
+    }
+
+    public function testPhraseHistoryUsesManualCreationAndLatestSplitConfirmation(): void
+    {
+        $fixture = $this->tenantSafetyFixture();
+        $company = $fixture['company'];
+        $party = CounterpartyBuilder::aCounterparty()->withCompany($company)->build();
+        $this->em->persist($party);
+        $category = $this->extraCategory($company);
+        $other = $this->extraCategory($company);
+        $dto = $this->tenantSafetyDto((string) $company->getId(), (string) $fixture['account']->getId());
+        $dto->occurredAt = new \DateTimeImmutable('today');
+        $dto->cashflowCategoryId = $category->getId();
+        $dto->counterpartyId = $party->getId();
+        $dto->description = 'Лицензии по договору';
+
+        $imported = ($this->addTransaction)($dto);
+        $importedSplit = $imported->getSplits()->first();
+        self::assertInstanceOf(CashTransactionSplit::class, $importedSplit);
+        $importedSplit->changeSource(CashTransactionSplitSource::IMPORT);
+        $this->em->flush();
+        $history = self::getContainer()->get(CashTransactionAutoRuleCandidateQuery::class);
+        $ids = static fn () => array_column(iterator_to_array($history->phraseHistory($dto->companyId, $dto->counterpartyId, $dto->direction->value)), 'id');
+        self::assertSame([], $ids());
+
+        $requests = self::getContainer()->get(RequestStack::class);
+        $tokens = self::getContainer()->get(TokenStorageInterface::class);
+        $requests->push(new Request());
+        $user = $company->getUser();
+        self::assertNotNull($user);
+        $tokens->setToken(new UsernamePasswordToken($user, 'main', ['ROLE_USER']));
+        try {
+            $manual = ($this->addTransaction)($dto);
+            $manualSplit = $manual->getSplits()->first();
+            self::assertInstanceOf(CashTransactionSplit::class, $manualSplit);
+            self::assertSame(CashTransactionSplitSource::MANUAL, $manualSplit->getSource());
+            self::assertSame($user->getId(), $this->connection->fetchOne("SELECT actor_user_id FROM audit_log WHERE company_id = ? AND entity_id = ? AND action = 'CREATE'", [$dto->companyId, $manual->getId()]));
+            self::assertSame([$manual->getId()], $ids(), 'При ручном создании выбор статьи подтверждают CREATE и единственная строка manual.');
+            $saveSplits = self::getContainer()->get(SaveCashTransactionSplitsAction::class);
+            $row = new CashTransactionSplitInput();
+            $row->cashflowCategoryId = $category->getId();
+            $row->amount = $dto->amount;
+            $input = new CashTransactionSplitsInput();
+            $input->rows = [$row];
+            $saveSplits($imported, $input);
+            self::assertEqualsCanonicalizing([$manual->getId(), $imported->getId()], $ids(), 'Подтверждение импортированной статьи создаёт только split-аудит.');
+        } finally {
+            $tokens->setToken(null);
+            $requests->pop();
+        }
+        $row->cashflowCategoryId = $other->getId();
+        $saveSplits($manual, $input);
+        self::assertSame([$imported->getId()], $ids(), 'Позднейшее изменение статьи системой отменяет исходное ручное подтверждение.');
     }
 
     public function testAddPersistsAllFields(): void

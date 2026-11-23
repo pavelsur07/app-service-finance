@@ -421,6 +421,49 @@ case "$cmd" in
     done
     if [ "$seen_company" -ne 1 ]; then echo "--company is required for $cmd" >&2; exit 2; fi
     ;;
+  app:cash:cashflow-core:apply)
+    # Базовое дерево ДДС (core.yaml) для одной существующей компании
+    # (docs/tasks/cashflow-group-chart/stages/stage-0a-core-for-existing.md). Без --execute —
+    # read-only план; с --execute удаляет только несистемные статьи без ссылок и создаёт
+    # ядро; если статья используется, команда отказывает. Запуск с --execute — одобрение Владельца.
+    # UUID компании позиционный и обязателен.
+    seen_company=0
+    for arg in "$@"; do
+      if   [[ "$arg" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] && [ "$seen_company" -eq 0 ]; then seen_company=1
+      elif [ "$arg" = "--execute" ] || [ "$arg" = "--no-interaction" ] || [ "$arg" = "-n" ]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    if [ "$seen_company" -ne 1 ]; then echo "companyId is required for $cmd" >&2; exit 2; fi
+    ;;
+  app:cash:ai-suggestions:reopen-no-answer)
+    # Переоткрыть ИИ-подсказки «нет ответа» компании после смены дерева ДДС
+    # (docs/tasks/ai-no-answer-reopen/TASK.md). Без --execute — только счёт; с --execute
+    # подсказки становятся stale и операции попадают в часовой app:cash:ai-categorize (платно, копейки).
+    # Запуск с --execute — одобрение Владельца. UUID компании позиционный и обязателен.
+    seen_company=0
+    for arg in "$@"; do
+      if   [[ "$arg" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] && [ "$seen_company" -eq 0 ]; then seen_company=1
+      elif [ "$arg" = "--execute" ] || [ "$arg" = "--no-interaction" ] || [ "$arg" = "-n" ]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    if [ "$seen_company" -ne 1 ]; then echo "companyId is required for $cmd" >&2; exit 2; fi
+    ;;
+  app:cash:group-chart:sync)
+    # Синхронизация дерева ДДС компании с эталоном группы
+    # (docs/tasks/cashflow-group-chart/stages/stage-2.md). Без --execute — read-only план;
+    # с --execute привязывает статьи по коду и названию и создаёт недостающие, ничего не удаляет.
+    # Запуск с --execute — одобрение Владельца. UUID компании позиционный и обязателен.
+    seen_company=0
+    for arg in "$@"; do
+      if   [[ "$arg" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] && [ "$seen_company" -eq 0 ]; then seen_company=1
+      elif [ "$arg" = "--execute" ] || [ "$arg" = "--no-interaction" ] || [ "$arg" = "-n" ]; then :
+      else echo "Argument not allowed for $cmd: $arg" >&2; exit 2
+      fi
+    done
+    if [ "$seen_company" -ne 1 ]; then echo "companyId is required for $cmd" >&2; exit 2; fi
+    ;;
   *) echo "Command not allowed: $cmd" >&2; exit 2 ;;
 esac
 
@@ -482,9 +525,18 @@ if [ -z "$project_dir" ] || [ -z "$config_file" ]; then
 fi
 cd "$project_dir"
 
+# Метка перечисляет файлы через запятую: с #3042 деплой поднимает контейнеры с
+# `-f docker-compose.prod.yml -f compose.digest.json` (digest закрепляет образ релиза).
+# Каждый файл — отдельный -f, иначе compose ищет один файл с запятой в имени.
+compose_files=()
+IFS=',' read -ra config_files <<< "$config_file"
+for f in "${config_files[@]}"; do
+    compose_files+=(-f "$f")
+done
+
 # memory_limit не переопределяем. Тяжёлую работу делают подпроцессы, которые
 # стартуют как новый php и читают php.ini (1024M) — родительский `php -d` на них
 # не распространяется, поэтому прежний `-d memory_limit=512M` ограничивал только
 # оркестратор. Потолок задаёт cgroup контейнера: 1536M.
-exec docker compose -f "$config_file" run --rm --no-deps -T "$RUN_SERVICE" \
+exec docker compose "${compose_files[@]}" run --rm --no-deps -T "$RUN_SERVICE" \
     bin/console "$cmd" "$@"

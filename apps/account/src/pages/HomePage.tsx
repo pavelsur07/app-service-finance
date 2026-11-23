@@ -1,16 +1,16 @@
 import { CompanyPicker } from '../shared/session/CompanyPicker';
-import { EmptyState } from '@vashfindir/ui';
+import { EmptyState, PageHeader } from '@vashfindir/ds';
 
 export function HomePage() {
   return (
     <>
-      <div className="wz-head">
-        <h1 className="wz-title">Клиентский кабинет</h1>
+      <PageHeader title="Клиентский кабинет" />
+      <div className="grid gap-4">
+        <CompanyPicker />
+        <EmptyState title="Раздел находится в разработке">
+          Рабочие разделы появятся на следующих этапах.
+        </EmptyState>
       </div>
-      <CompanyPicker />
-      <EmptyState title="Раздел находится в разработке">
-        Рабочие разделы появятся на следующих этапах.
-      </EmptyState>
     </>
   );
 }

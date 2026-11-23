@@ -77,4 +77,29 @@ final class SaveCashflowCategoryActionTest extends IntegrationTestCase
             ['parentId' => $parent->getId(), 'childId' => $child->getId()],
         ));
     }
+
+    /** Форма загрузила статью без кода, затем ей проставили код: перенос по устаревшему состоянию отклоняется. */
+    public function testRefusesMovingCategoryThatGotGroupCodeAfterLoading(): void
+    {
+        $user = UserBuilder::aUser()->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->build();
+        $outflows = (new CashflowCategory('33333333-3333-4333-8333-333333333333', $company))->setName('Выплаты');
+        $other = (new CashflowCategory('44444444-4444-4444-8444-444444444444', $company))->setName('Другая');
+        $rent = (new CashflowCategory('55555555-5555-4555-8555-555555555555', $company))->setName('Аренда')->setParent($outflows);
+        foreach ([$user, $company, $outflows, $other, $rent] as $entity) {
+            $this->em->persist($entity);
+        }
+        $this->em->flush();
+        $this->em->getConnection()->executeStatement("UPDATE cashflow_categories SET group_code = 'OP_OUT_RENT' WHERE id = ?", [$rent->getId()]);
+
+        $rent->setParent($other);
+        try {
+            self::getContainer()->get(SaveCashflowCategoryAction::class)($rent);
+            self::fail('Ожидался отказ: статья стала статьёй базового дерева.');
+        } catch (\DomainException $exception) {
+            self::assertStringContainsString('базового дерева', $exception->getMessage());
+        }
+
+        self::assertSame($outflows->getId(), $this->em->getConnection()->fetchOne('SELECT parent_id FROM cashflow_categories WHERE id = ?', [$rent->getId()]));
+    }
 }

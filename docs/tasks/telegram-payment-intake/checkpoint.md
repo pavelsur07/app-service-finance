@@ -1,3 +1,92 @@
+# Актуальный checkpoint — handoff
+
+Каноническая копия /tmp/vf-payment-intake-release-dc96632b (detached).
+Remote docs/telegram-payment-intake-examples, PR2985 base master.
+Код c3a38a5e57d15e78160fb6a81ff9afef8075942c: полный CI43589885600 SUCCESS.
+Stage8DONE, fresh internal B0/I3fixed -> REVIEW_GREEN; external Claude medium
+round1 REVIEW_GREEN,B0/I0/M4addressed. Source/gold/pack не менялись после проверки.
+Последний локальный PHPmodule380/2067,Pyth6031skip/eval91skip,style0/4240,
+focusedStanNoerrors. Локальные full137 не GREEN, все полные gates подтвердил CI.
+
+Дальше: commit/push итоговых документов, latest-head CI (код неизменен),
+обновить PR body через REST (gh pr edit ломается из-за projectCards), Ready,
+единственный запрос release: merge+триDoctrineмиграции+Python0002+nightflag/
+worker/cron+deploy. Bot pilot остаётся0 и отдельно не принят. Никакого merge,
+prod writes или paid benchmark до соответствующего согласования.
+
+Оригинальный checkout41174124f с owner AGENTS/CLAUDE и чужими untracked не трогать.
+Formal review artifacts: originalroot/site/var/payment-intake-review/final-external.
+Node active state: originalroot/site/var/payment-intake-review/nightly-stage-state.json.
+
+---
+
+# Release checkpoint — финальная приёмка
+
+Рабочая копия /tmp/vf-payment-intake-release-dc96632b (detached);
+remote ветка docs/telegram-payment-intake-examples, PR2985 Draft/master.
+Оригинальный checkout41174124f и owner AGENTS/CLAUDE не трогать.
+Masterd12987ad совместилиmerge337269f72, обе nightly/weekly config сохранены.
+CI43588394992: единственный failedgatePHPDoc alignment. Причина: focused CS
+был ошибочно запущен с.distconfig вместо active.php. Исправлено; canonical
+composer cs:check иcs:strict-types теперь0/4240PASS. Другие результаты CI
+проверять по точномуSHA, не объявлять failedrunGREEN.
+
+Полный independent internal review B0/I3fixed -> INTERNALREVIEW_GREEN.
+FormalClaude medium round1 прочитал16426lines, markerREVIEW_GREEN, B0/I0/M4.
+Артефакты final-external в ignored root/site/var/payment-intake-review.
+MINORs закрыты: neutral ledger sourcepayment_intake; правильный caller-owned
+transactiondoc; pilotprecondition businessworker+обеcompany-scopedrecoverycron
+документирован; explicitRefreshперезапускаетpollgenerationбезновогоAIparse.
+RED2FAIL→GREEN2tests12assert. НовыхB/I послеselfreviewнет.
+
+Последний PHPmodule380tests2067assertPASS (Gateway/Cash/Telegram/schema),
+focusedStan6filesNoerrors. Fullstyleactiveconfig0/4240PASS. Pythonпосле3I:
+603PASS1skip,eval9PASS1skip,Ruff121/mypy68PASS. Goldsource41/semantic12/reviewed
+packнеизменены. БолеераннийfullCI43585432214SUCCESSatab6—исторический.
+
+Дальше: pushMINORfix+этазапись, дождатьсяCIточногоновогокода; закрытьStage8/
+handoff/PRdescription,docscommit/push,latestCI,Ready,singlecombinedreleaseask
+(3Doctrine+Python0002+nightlyflag/worker/cron+merge/deploy). Не спрашивать о
+рутинныхcommit/push/review. Businessbotpilotпока0иотдельнонепринят.
+No prod mutations/new paid benchmarks; четыре старых прохода закрыты.
+
+---
+
+# Актуальный handoff checkpoint
+
+Каноническая рабочая копия: /tmp/vf-payment-intake-handoff-41174124 (detached).
+Ветка на GitHub: docs/telegram-payment-intake-examples, DraftPR2985.
+Исходный checkout /home/deploy/projects/app-service-finance остаётся41174124f:
+owner AGENTS.md/CLAUDE.md и чужие файлы не трогать, не reset/stash/checkout.
+
+Master3cb72b37d интегрирован mergecommitab6c3ace5,5конфликтов разрешеныаддитивно.
+CI43585432214 SUCCESS наab6: все static/unit/integration/3functional/Python/style/
+API/emptyDB/SPA gates зелёные; prod migration/deploy skipped. Ранее локальные
+fullStan/fulltest и отдельноintegration завершались137приRAM/swap pressure,
+не GREEN. Точечные и CI проверки это не скрывают.
+
+Свежий full-task reviewer gpt-6-astra прочитал весь847KBdiff/17130строк:
+B0/I3 (unanchored direction; manual direction reply; partialConfirm losing rows).
+Все3исправлены, reviewerпроверилдельту и вернул INTERNAL REVIEW_GREEN.
+Не путать с ещё не проведённым formal external Claude review.
+
+Последние факты после исправлений: Python603PASS1skip,eval9PASS1skip,
+Ruff121/mypy68PASS; PHPmodule378tests2055assertPASS; focusedStan4filesNoerrors,
+CS4filesPASS. 7 целевых регрессий57assertPASS, исходныйRED4FAIL доказан.
+Sem-010 и runtime source41/semantic12/curated pack не менялись: явные будущие
+оплачу/заплачу/оплатить якорят только outflow/planned, не paid.
+Offline verifier short-1 теперь воздерживается от unsupported direction/category;
+исходное запрещённое предложение оставлено отдельным negative vectorN25.
+Никакой подгонки source/semantic gold или нового live benchmark.
+
+Дальше: commit/push9файловfix+checkpoint, CIновогоHEAD, formal external medium
+one round от3cb72b37d по полному cleaned diff в этой worktree. После green/fixes:
+закрыть stage8/handoff/runbook/PR description, commit/push docs, Ready PR,
+единственный release request с3Doctrineмиграциями+Python0002+nightlyflag/worker/
+scheduler. До согласования no merge/deploy/prod mutation. Telegrambusinessflag0.
+
+---
+
 # Текущий checkpoint — PaymentIntake
 
 **Дата:** 14 ноября 2026. **Этап:** 8 / интеграция client, витрины и runtime wiring.

@@ -90,6 +90,18 @@ final class DefaultCostMappingYamlProviderTest extends TestCase
         }
     }
 
+    public function testWbLoyaltyDiscountCompensationGoesToMarketplaceCompensations(): void
+    {
+        // 23.11 Владелец: компенсация WB — «Компенсации МП» (СМ3), как ozon_compensation, а не продвижение.
+        $rule = (new DefaultCostMappingYamlProvider(self::DEFAULT_CONFIG_PATH))
+            ->getForMarketplace(MarketplaceType::WILDBERRIES)
+            ->getByCostCode('wb_loyalty_discount_compensation');
+
+        self::assertNotNull($rule);
+        self::assertSame('OPEX_WH_COMPENSATION', $rule->getPlCode());
+        self::assertTrue($rule->isIncludeInPl());
+    }
+
     public function testDuplicateCostCodeThrowsException(): void
     {
         $provider = new DefaultCostMappingYamlProvider(self::FIXTURES_DIR.'/invalid_duplicate_cost_code.yaml');

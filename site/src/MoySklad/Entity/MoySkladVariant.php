@@ -45,6 +45,10 @@ class MoySkladVariant
     #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
     private ?string $article;
 
+    /** @var list<string>|null */
+    #[ORM\Column(type: Types::JSONB, nullable: true)]
+    private ?array $barcodes = null;
+
     /** @var list<array{id: string, name: string, value: string}> */
     #[ORM\Column(type: Types::JSONB)]
     private array $characteristics;
@@ -81,7 +85,7 @@ class MoySkladVariant
         $changed = $this->productExternalId !== strtolower($snapshot->productExternalId) || $this->name !== $snapshot->name
             || $this->externalCode !== $snapshot->externalCode || $this->code !== $snapshot->code
             || $this->article !== $snapshot->article || $this->characteristics !== $snapshot->characteristics
-            || $this->archived !== $snapshot->archived || $this->sourceUpdatedAt != $snapshot->sourceUpdatedAt;
+            || $this->archived !== $snapshot->archived || $this->barcodes !== $snapshot->barcodes || $this->sourceUpdatedAt != $snapshot->sourceUpdatedAt;
         $this->replaceSnapshot($snapshot, $loadedAt);
 
         return $changed;
@@ -94,10 +98,17 @@ class MoySkladVariant
         $this->externalCode = $snapshot->externalCode;
         $this->code = $snapshot->code;
         $this->article = $snapshot->article;
+        $this->barcodes = $snapshot->barcodes;
         $this->characteristics = $snapshot->characteristics;
         $this->archived = $snapshot->archived;
         $this->sourceUpdatedAt = $snapshot->sourceUpdatedAt;
         $this->loadedAt = $loadedAt;
+    }
+
+    /** @return list<string>|null */
+    public function getBarcodes(): ?array
+    {
+        return $this->barcodes;
     }
 
     public function getExternalId(): string

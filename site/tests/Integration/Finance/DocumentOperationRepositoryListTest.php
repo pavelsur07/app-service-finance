@@ -155,14 +155,12 @@ final class DocumentOperationRepositoryListTest extends IntegrationTestCase
         self::assertSame('110.00', $totals->expense);
 
         $rows = $this->rows();
-        $documentIds = array_values(array_unique(array_map(static fn (DocumentOperation $op): string => (string) $op->getDocument()?->getId(), $rows)));
-        $sums = $this->repository->marketplaceBucketSums($this->companyId(), $documentIds);
         $contribution = self::getContainer()->get(DocumentPlContribution::class);
 
         $byNature = ['INCOME' => '0.00', 'EXPENSE' => '0.00'];
         $amounts = [];
         foreach ($rows as $operation) {
-            $row = $contribution->forOperation($operation, $sums);
+            $row = $contribution->forOperation($operation);
             self::assertNotNull($row);
             $byNature[$row['nature']] = bcadd($byNature[$row['nature']], $row['amount'], 2);
             $amounts[] = $row['amount'];
@@ -175,10 +173,10 @@ final class DocumentOperationRepositoryListTest extends IntegrationTestCase
     }
 
     /**
-     * Фильтр оставил одно сторно (+200) статьи, где итог — списание (−800): сторно уменьшает
-     * расход, как в регистре и на странице документа, а не становится расходом.
+     * Фильтр оставил одно сторно (+200): значение строки в знаке отчёта, сторно уменьшает
+     * расход (−200), как в регистре и на странице документа, а не становится расходом.
      */
-    public function testFilteredStornoKeepsSignOfWholeCategory(): void
+    public function testFilteredStornoKeepsItsSign(): void
     {
         $this->persistDocument('MP', type: DocumentType::MARKETPLACE_PL, operations: [
             [$this->rent, '-1000.00'],
@@ -192,8 +190,7 @@ final class DocumentOperationRepositoryListTest extends IntegrationTestCase
 
         $rows = $this->rows(amountTo: '500');
         self::assertCount(1, $rows);
-        $sums = $this->repository->marketplaceBucketSums($this->companyId(), [(string) $rows[0]->getDocument()?->getId()]);
-        $row = self::getContainer()->get(DocumentPlContribution::class)->forOperation($rows[0], $sums);
+        $row = self::getContainer()->get(DocumentPlContribution::class)->forOperation($rows[0]);
         self::assertSame(['nature' => 'EXPENSE', 'amount' => '-200.00', 'currency' => 'RUB'], $row);
     }
 
@@ -258,8 +255,6 @@ final class DocumentOperationRepositoryListTest extends IntegrationTestCase
             self::assertSame('0.00', $totals->income, $label);
             self::assertSame([], $totals->others(), $label);
         }
-
-        self::assertSame([], $this->repository->marketplaceBucketSums($this->companyId(), [(string) $foreign->getId()]));
     }
 
     /**

@@ -1,14 +1,14 @@
-import { EmptyState } from '@vashfindir/ui';
+import { EmptyState, PageHeader } from '@vashfindir/ds';
 
 export function HomePage() {
   return (
     <>
-      <div className="wz-head">
-        <h1 className="wz-title">Административный интерфейс</h1>
+      <PageHeader title="Административный интерфейс" />
+      <div className="grid gap-4">
+        <EmptyState title="Раздел находится в разработке">
+          Рабочие разделы появятся на следующих этапах.
+        </EmptyState>
       </div>
-      <EmptyState title="Раздел находится в разработке">
-        Рабочие разделы появятся на следующих этапах.
-      </EmptyState>
     </>
   );
 }

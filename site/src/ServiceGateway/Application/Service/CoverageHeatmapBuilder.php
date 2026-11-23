@@ -62,6 +62,7 @@ final readonly class CoverageHeatmapBuilder
         'ozon.prices' => ['Цены: снимок 05:00', self::STEP_DAY],
         'ozon.analytics.queries' => ['Поиск: сводка по товарам', self::STEP_DAY],
         'ozon.analytics.queries.details' => ['Поиск: запросы по товарам', self::STEP_DAY],
+        'ozon.analytics.funnel' => ['Воронка по товарам', self::STEP_DAY],
         'ozon.returns' => ['Возвраты', self::STEP_DAY],
         'ozon.actions' => ['Акции: снимок 05:00', self::STEP_DAY],
         'ozon.supplies' => ['Поставки в пути: снимок 05:00', self::STEP_DAY],
@@ -71,6 +72,8 @@ final readonly class CoverageHeatmapBuilder
         'ozon.ads.daily' => ['Реклама: статистика по дням', self::STEP_DAY],
         'ozon.ads.statistics' => ['Реклама: отчёт по товарам', self::STEP_DAY],
         'ozon.ads.statistics.tail' => ['Реклама: отчёт, хвост 14 дней', self::STEP_DAY],
+        'wb.analytics.funnel' => ['Воронка по карточкам', self::STEP_DAY],
+        'wb.analytics.search' => ['Поиск по карточкам', self::STEP_DAY],
     ];
 
     private const STATUS_LABELS = [
