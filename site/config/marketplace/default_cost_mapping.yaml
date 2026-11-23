@@ -458,8 +458,9 @@ marketplaces:
         pl_code: PROMO_INTERNAL
         include_in_pl: true
       - cost_code: wb_loyalty_discount_compensation
-        pl_code: PROMO_INTERNAL
+        pl_code: OPEX_WH_COMPENSATION
         include_in_pl: true
+        note: "WB возвращает скидку покупателю — доход, «Компенсации МП» (СМ3), как ozon_compensation"
       - cost_code: wb_avans_za_uslugu_bally_za_otzyvy
         pl_code: PROMO_INTERNAL
         include_in_pl: true
