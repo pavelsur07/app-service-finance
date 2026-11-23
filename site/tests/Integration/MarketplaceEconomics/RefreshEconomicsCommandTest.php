@@ -67,9 +67,9 @@ final class RefreshEconomicsCommandTest extends IntegrationTestCase
         // 2 × 1000 − 2 × 150 − 50 хранения; себестоимость 2 × 300 / 1 × 350
         self::assertSame(['canon_minor' => 165000, 'unallocated_minor' => 0, 'cost_price_minor' => -60000, 'without_cost_price' => 0], $days['2026-11-09']);
         self::assertSame(-35000, $days['2026-11-10']['cost_price_minor']);
-        // хранение без SKU (остатков нет) разнесено по выручке на единственный SKU — в СМ1, как в итоге кабинета
+        // хранение без SKU (остатков нет) разнесено по выручке на единственный SKU — в СМ3, как в итоге кабинета
         self::assertSame(-5000, (int) $this->connection->fetchOne(
-            "SELECT amount_minor FROM me_day_line WHERE company_id = ? AND operation_date = '2026-11-09' AND listing_id = ? AND measure = 'storage_share' AND level = 'md1'",
+            "SELECT amount_minor FROM me_day_line WHERE company_id = ? AND operation_date = '2026-11-09' AND listing_id = ? AND measure = 'storage_share' AND level = 'overhead'",
             [$this->companyId, $this->listingId],
         ));
 
