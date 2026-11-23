@@ -58,7 +58,12 @@ Doctrine-миграция: удалить Telegram-черновики (`source_k
 `DROP` сессий, ответов, `ai_quality_*`, колонки `payment_intake_selected` и
 ИИ-колонок черновика (`task_id`, `attempt`, `task_revision`, `dispatch_pending`,
 `last_enqueued_at`, `error_code`, `payload`, `questions`); `down()` —
-`throwIrreversibleMigrationException`. ai-service `0003_drop_eval_runs.sql`.
+`throwIrreversibleMigrationException`. `UserDeletionService` и его тест — без
+удалённых таблиц. ai-service `0003`: DROP `ai_eval_*` и удаление строк
+`ai_task`/`ai_result`/`ai_trace` с `task_type='parse_payment_message'` (без
+потребителя неподтверждённый результат давал бы ERROR импорта каждые 5 минут;
+роль `codex_ro` БД `ai_service` не читает, проверено косвенно: все 7 черновиков
+результат получили).
 Entity `PaymentIntakeSession`, `AiQualityMonitor`, `AiQualityRun`, поле
 `ClientBinding::paymentIntakeSelected`, ИИ-поля черновика.
 
@@ -74,6 +79,7 @@ Entity `PaymentIntakeSession`, `AiQualityMonitor`, `AiQualityRun`, поле
 - [ ] Гейты: PHPStan (baseline только −), CS, strict_types, полный phpunit,
       ai-service ruff/mypy/pytest, `make test-release-pipeline test-deploy-workflow`.
 - [ ] После деплоя A: воркер payment-intake и eval-worker не запущены, cron
-      без ошибок, MCP-страница открывается; удалена `vars.AI_SERVICE_EVAL_ENABLED`.
+      без ошибок, MCP-страница открывается; удалена `vars.AI_SERVICE_EVAL_ENABLED`;
+      в GlitchTip нет «AI results without a consumer».
 - [ ] После release B: таблиц нет, `cash_payment_intake_draft` = 0 строк
       Telegram, MCP-черновики целы, `schema_migrations` ai-service содержит 0003.
