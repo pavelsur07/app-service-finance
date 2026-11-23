@@ -114,6 +114,7 @@ final readonly class WidgetSummaryQuery
 
         foreach ($returns as $ret) {
             $returnsTotal -= (float) $ret->returnsTotal;
+            $costPriceTotal += (float) $ret->costPriceTotal;
         }
 
         // Costs — плоский список категорий (без листингов).
