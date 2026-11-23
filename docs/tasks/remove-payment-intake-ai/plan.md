@@ -24,7 +24,7 @@
    ночного eval в Symfony (`AiQuality*`) и ai-service (eval-worker, eval API,
    store); задачи `parse_payment_message`, её evals и контрактов.
 2. Повторная отправка `CashTransactionsChanged` после confirm MCP-черновика
-   сохранена: cron `app:cash:recover-payment-intake --all` вместо Telegram-команды.
+   сохранена: cron `app:cash:recover-payment-intake` вместо Telegram-команды.
 3. Схема: удалены `telegram_payment_intake_session`,
    `cash_payment_intake_reply_receipt`, `ai_quality_monitor`, `ai_quality_run`,
    `client_bindings.payment_intake_selected`, ИИ-колонки черновика; Telegram-
@@ -46,8 +46,8 @@ Release выполняет миграции до выката кода: удал
 
 | Stage | Что | Риск |
 |---|---|---|
-| 1 | Telegram: доставка, presenter, poll, message+handler, recovery-команда, транспорт и воркер, guard `hasPaymentIntakeSource`, `TelegramPaymentIntakeSource`, кнопки `pi:` и меню черновика; переименование `PaymentIntakeTelegramAction` → `TelegramBindingAccess` | HIGH-LOCAL (Messenger, workers) |
-| 2 | Cash: ИИ-половина `PaymentIntakeAction`/`CashFacade`/entity/repository, `PaymentIntakeResultConsumer`, `PaymentIntakeCommonFields`, reply receipts; `app:cash:recover-payment-intake --all` только события; cron; `AiTaskFacade` без отдельного транспорта | HIGH-LOCAL (финансовый путь MCP-confirm) |
+| 1 | Telegram: доставка, presenter, poll, message+handler, recovery-команда, транспорт и воркер, guard `hasPaymentIntakeSource`, `TelegramPaymentIntakeSource`, кнопки `pi:` и меню черновика; переименование `PaymentIntakeTelegramAction` → `TelegramBindingAction` | HIGH-LOCAL (Messenger, workers) |
+| 2 | Cash: ИИ-половина `PaymentIntakeAction`/`CashFacade`/entity/repository, `PaymentIntakeResultConsumer`, `PaymentIntakeCommonFields`, reply receipts; `app:cash:recover-payment-intake` только события; cron; `AiTaskFacade` без отдельного транспорта | HIGH-LOCAL (финансовый путь MCP-confirm) |
 | 3 | Ночной eval Symfony: `AiQuality*`, eval-клиент/парсер/DTO, cron, compose, deploy, release-bundle, shell-тесты, env | HIGH-LOCAL (CI/CD) |
 | 4 | ai-service: `parse_payment_message`, evals payment_intake, eval-worker/API/store/настройки, routes, stub, контракты | MEDIUM |
 | 5 | Документация: `ARCHITECTURE.md`, maintenance-доки | LOW |
@@ -67,7 +67,7 @@ Entity `PaymentIntakeSession`, `AiQualityMonitor`, `AiQualityRun`, поле
 - [ ] Тесты MCP-черновиков зелёные без изменений смысла (`McpCashDraftTest`,
       `McpCashDraftPageTest`, `McpCashToolsTest`, MCP-часть concurrency).
 - [ ] Тест: залипшее событие MCP-confirm переотправляет
-      `app:cash:recover-payment-intake --all`.
+      `app:cash:recover-payment-intake`.
 - [ ] Бот: операции регулярками, кнопки `pi:` больше не обрабатываются особо.
 - [ ] `git grep parse_payment_message|AiQuality|async_payment_intake|eval-worker|AI_SERVICE_EVAL`
       пуст вне docs/tasks и миграций.
