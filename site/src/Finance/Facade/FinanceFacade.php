@@ -27,6 +27,7 @@ use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLCategoryType;
 use App\Finance\Enum\PLDocumentSource;
 use App\Finance\Enum\PLDocumentStream;
+use App\Finance\Enum\PlNature;
 use App\Finance\Exception\PLCategoryCodeAssignmentException;
 use App\Finance\Infrastructure\Provider\DefaultPLCategoryTreeProvider;
 use App\Finance\Infrastructure\Query\PlFactMonthlyAmountsQuery;
@@ -145,13 +146,29 @@ final class FinanceFacade
             $periodTo,
         );
 
-        // Трансформируем PLEntryDTO[] → CreatePLDocumentOperationCommand[]
+        // Строка marketplace_pl — значение для отчёта: доход +, расход −. Затраты уже в этом знаке
+        // (is_negative маппинга затрат и сторно). Этап выручки — по природе статьи: флаг
+        // is_negative маппинга продаж противоречив, величина строки всегда в природе статьи.
+        $natures = [];
+        if (PLDocumentStream::REVENUE === $stream) {
+            $ids = array_values(array_unique(array_map(static fn ($e): string => (string) $e->plCategoryId, $entries)));
+            /** @var list<PLCategory> $categories */
+            $categories = $this->plCategoryRepository->findBy(['id' => $ids, 'company' => $companyId]);
+            foreach ($categories as $category) {
+                $natures[(string) $category->getId()] = $category->nature();
+            }
+        }
+
         // Проект строки: берём из PLEntryDTO.projectId, fallback — проект документа
         $operations = [];
         foreach ($entries as $entry) {
             $amount = $entry->amount;
+            $nature = $natures[$entry->plCategoryId] ?? null;
 
-            if ($entry->isNegative) {
+            if (null !== $nature) {
+                $magnitude = ltrim(bcadd($amount, '0', 2), '-');
+                $amount = PlNature::EXPENSE === $nature ? bcmul($magnitude, '-1', 2) : $magnitude;
+            } elseif ($entry->isNegative) {
                 $amount = bcmul($amount, '-1', 2);
             }
 

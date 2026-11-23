@@ -61,13 +61,29 @@ final class DocumentPlContributionTest extends TestCase
         self::assertSame(['100.00', '-20.00'], array_column($expense, 'amount'));
     }
 
-    public function testMarketplaceReturnsWithPositiveSignStayPositive(): void
+    public function testMarketplaceStornoExceedingChargesGivesNegativeExpense(): void
     {
-        // REV_*_RETURNS приходят всегда «+X»: модуль итога статьи, вклад строки — как есть.
-        $result = $this->service()->forDocument($this->document(DocumentType::MARKETPLACE_PL, [['EXPENSE', '40.00']]));
+        // Регрессия 23.11: сторно больше начислений — расход статьи отрицательный, а не доход.
+        $result = $this->service()->forDocument($this->document(DocumentType::MARKETPLACE_PL, [
+            ['EXPENSE', '-400.00'],
+            ['EXPENSE', '-100.00'],
+            ['EXPENSE', '1000.00'],
+        ]));
 
-        self::assertSame('40.00', $result['expense']);
-        self::assertSame('40.00', array_values($result['operations'])[0]['amount']);
+        self::assertSame('0.00', $result['income']);
+        self::assertSame('-500.00', $result['expense']);
+        self::assertSame('500.00', $result['result']);
+        self::assertSame(['400.00', '100.00', '-1000.00'], array_column(array_values($result['operations']), 'amount'));
+    }
+
+    public function testMarketplaceClawbackOnIncomeCategoryGivesNegativeIncome(): void
+    {
+        // Маркетплейс забрал компенсацию (−X на статье дохода): доход отрицательный, а не +X.
+        $result = $this->service()->forDocument($this->document(DocumentType::MARKETPLACE_PL, [['INCOME', '-1800.00']]));
+
+        self::assertSame('-1800.00', $result['income']);
+        self::assertSame('0.00', $result['expense']);
+        self::assertSame('-1800.00', array_values($result['operations'])[0]['amount']);
     }
 
     public function testListedOperationOfPlainDocumentTakesModulus(): void
@@ -75,26 +91,22 @@ final class DocumentPlContributionTest extends TestCase
         $operations = $this->document(DocumentType::OTHER, [['EXPENSE', '-30.00'], ['NONE', '-5.00'], [null, '9.00'], ['NONE', '0.00']])->getOperations()->toArray();
         $service = $this->service();
 
-        self::assertSame(['nature' => 'EXPENSE', 'amount' => '30.00', 'currency' => 'RUB'], $service->forOperation($operations[0], []));
-        self::assertSame(['nature' => 'EXPENSE', 'amount' => '5.00', 'currency' => 'RUB'], $service->forOperation($operations[1], []));
-        self::assertNull($service->forOperation($operations[2], []), 'Без статьи — не в итоге.');
-        self::assertNull($service->forOperation($operations[3], []), 'Нулевая операция без flow не имеет природы.');
+        self::assertSame(['nature' => 'EXPENSE', 'amount' => '30.00', 'currency' => 'RUB'], $service->forOperation($operations[0]));
+        self::assertSame(['nature' => 'EXPENSE', 'amount' => '5.00', 'currency' => 'RUB'], $service->forOperation($operations[1]));
+        self::assertNull($service->forOperation($operations[2]), 'Без статьи — не в итоге.');
+        self::assertNull($service->forOperation($operations[3]), 'Нулевая операция без flow не имеет природы.');
     }
 
-    public function testListedMarketplaceOperationTakesSignOfItsBucketSum(): void
+    public function testListedMarketplaceOperationTakesItsOwnSignBySide(): void
     {
-        $document = $this->document(DocumentType::MARKETPLACE_PL, [['EXPENSE', '-100.00'], ['EXPENSE', '20.00']]);
-        [$charge, $storno] = $document->getOperations()->toArray();
-        $key = sprintf('%s|%s|EXPENSE', $document->getId(), $charge->getPlCategory()?->getId());
+        $document = $this->document(DocumentType::MARKETPLACE_PL, [['EXPENSE', '-100.00'], ['EXPENSE', '20.00'], ['INCOME', '-5.00']]);
+        [$charge, $storno, $clawback] = $document->getOperations()->toArray();
         $service = $this->service();
 
-        // Сумма статьи −80: списание входит как 100, сторно — как −20.
-        self::assertSame('100.00', $service->forOperation($charge, [$key => '-80.00'])['amount'] ?? null);
-        self::assertSame('-20.00', $service->forOperation($storno, [$key => '-80.00'])['amount'] ?? null);
-        // Сумма статьи положительна (возвраты «+X»): как есть.
-        self::assertSame('20.00', $service->forOperation($storno, [$key => '20.00'])['amount'] ?? null);
-        // Суммы нет (документ вне выборки сумм) — по знаку самой операции.
-        self::assertSame('100.00', $service->forOperation($charge, [])['amount'] ?? null);
+        // Значение строки уже в знаке отчёта: расход — с обратным знаком, доход — как есть.
+        self::assertSame('100.00', $service->forOperation($charge)['amount'] ?? null);
+        self::assertSame('-20.00', $service->forOperation($storno)['amount'] ?? null);
+        self::assertSame('-5.00', $service->forOperation($clawback)['amount'] ?? null);
     }
 
     /**
