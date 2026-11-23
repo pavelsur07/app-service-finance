@@ -22,17 +22,11 @@ final readonly class CostBreakdown
         public string $acceptance,
         public string $other,
     ) {
-        Assert::greaterThanEq((float) $logisticsTo, 0.0);
-        Assert::greaterThanEq((float) $logisticsBack, 0.0);
-        Assert::greaterThanEq((float) $storage, 0.0);
+        // Нерекламные категории — нетто за день: сторно (возврат комиссии и т.п.) может превысить начисления,
+        // тогда сумма отрицательная. Реклама приходит без сторно.
         Assert::greaterThanEq((float) $advertisingCpc, 0.0);
         Assert::greaterThanEq((float) $advertisingOther, 0.0);
         Assert::greaterThanEq((float) $advertisingExternal, 0.0);
-        Assert::greaterThanEq((float) $commission, 0.0);
-        Assert::greaterThanEq((float) $acquiring, 0.0);
-        Assert::greaterThanEq((float) $penalties, 0.0);
-        Assert::greaterThanEq((float) $acceptance, 0.0);
-        Assert::greaterThanEq((float) $other, 0.0);
     }
 
     public function total(): string
