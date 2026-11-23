@@ -125,27 +125,6 @@ final readonly class ImportAiResultsAction
         );
     }
 
-    public function importResult(AiTaskResult $result): bool
-    {
-        $consumers = $this->consumersFor($result);
-        if ([] === $consumers) {
-            return false;
-        }
-        $failure = $this->consume($consumers, $result);
-        if (null !== $failure) {
-            $this->logger->error('AI single result consumer failed; left unacknowledged.', [
-                'companyId' => $result->companyId,
-                'taskId' => $result->taskId,
-                'exceptionClass' => $failure,
-            ]);
-
-            return false;
-        }
-        $this->client->ack([$result->taskId]);
-
-        return true;
-    }
-
     /**
      * Все потребители task_type — в одной транзакции: каждый берёт только свои задачи.
      *

@@ -28,16 +28,17 @@ final class ImportAiResultsActionTest extends TestCase
     private bool $transactionFinished = false;
     private bool $commitFails = false;
 
-    public function testSingleResultCommitsBeforeAcknowledging(): void
+    public function testResultCommitsBeforeAcknowledging(): void
     {
-        $client = new ImportPagesClient([]);
+        $client = new ImportPagesClient([new AiResultsPage([self::aiResult('t1', 'echo')], null)]);
         $consumer = new ImportRecordingConsumer('echo');
         $action = $this->action($client, [$consumer], new TestHandler());
         $client->beforeAck = function (): void {
             self::assertTrue($this->transactionFinished, 'Ack must follow the transaction commit.');
         };
 
-        self::assertTrue($action->importResult(self::aiResult('t1', 'echo')));
+        $action();
+
         self::assertSame(['t1'], $consumer->taskIds);
         self::assertSame([['t1']], $client->acks);
         self::assertCount(1, $this->usage);
@@ -46,35 +47,15 @@ final class ImportAiResultsActionTest extends TestCase
     public function testEveryConsumerOfTaskTypeGetsTheResult(): void
     {
         // переводчики Ozon и WB принимают один task_type: каждый берёт только свои задачи
-        $client = new ImportPagesClient([]);
+        $client = new ImportPagesClient([new AiResultsPage([self::aiResult('t1', 'draft')], null)]);
         $ozon = new ImportRecordingConsumer('draft');
         $wb = new ImportRecordingConsumer('draft');
 
-        self::assertTrue($this->action($client, [$ozon, $wb], new TestHandler())->importResult(self::aiResult('t1', 'draft')));
+        $this->action($client, [$ozon, $wb], new TestHandler())();
+
         self::assertSame([['t1'], ['t1']], [$ozon->taskIds, $wb->taskIds]);
+        self::assertSame([['t1']], $client->acks);
         self::assertCount(1, $this->usage, 'расход записан один раз');
-    }
-
-    public function testSingleResultIsNotAcknowledgedAfterConsumerFailure(): void
-    {
-        $client = new ImportPagesClient([]);
-        $consumer = new ImportRecordingConsumer('echo', failTaskIds: ['t1']);
-        $logs = new TestHandler();
-
-        self::assertFalse($this->action($client, [$consumer], $logs)->importResult(self::aiResult('t1', 'echo')));
-        self::assertSame([], $client->acks);
-        self::assertSame([], $this->usage);
-        self::assertTrue($logs->hasErrorThatContains('AI single result consumer failed'));
-    }
-
-    public function testSingleResultIsNotAcknowledgedWhenCommitFails(): void
-    {
-        $this->commitFails = true;
-        $client = new ImportPagesClient([]);
-
-        self::assertFalse($this->action($client, [new ImportRecordingConsumer('echo')], new TestHandler())->importResult(self::aiResult('t1', 'echo')));
-        self::assertFalse($this->transactionFinished);
-        self::assertSame([], $client->acks);
     }
 
     public function testHandsResultsToConsumersAndAcksOnlyHandledPerPage(): void
