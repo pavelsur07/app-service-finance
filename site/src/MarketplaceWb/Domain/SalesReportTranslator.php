@@ -17,7 +17,7 @@ use App\Shared\Domain\ValueObject\Money;
 final class SalesReportTranslator
 {
     /** Меняется вместе с правилами: дни с другой версией переводятся заново. */
-    public const RULES_VERSION = 'wb-sales-report-3';
+    public const RULES_VERSION = 'wb-sales-report-4';
     /** В строке отчёта нет `techSize`. */
     public const UNKNOWN_SIZE = 'UNKNOWN';
 

@@ -25,7 +25,8 @@ final class WbSourceTypeSeed
 
     /** Предложение для экрана кодов (одобрено Владельцем 15.11): выбрано в форме, решение — за администратором. */
     public const SUGGESTED = [
-        'wb:field:rebillLogisticCost' => OperationKind::LOGISTICS_TO,
+        // 23.11 Владелец: складские операции — «Хранение» (СМ3), как в ОПиУ
+        'wb:field:rebillLogisticCost' => OperationKind::STORAGE,
         'wb:field:paidAcceptance' => OperationKind::STORAGE,
         'wb:field:ppvzReward' => OperationKind::LOGISTICS_TO_LAST_MILE,
         'wb:field:cashbackCommissionChange' => OperationKind::PROMO_SELLER_BONUS,
