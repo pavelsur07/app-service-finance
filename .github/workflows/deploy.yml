@@ -1122,7 +1122,6 @@ jobs:
                   WB_FETCHER_CONNECTION_ALLOWLIST: ${{ vars.WB_FETCHER_CONNECTION_ALLOWLIST }}
                   AI_SERVICE_API_TOKEN: ${{ secrets.AI_SERVICE_API_TOKEN }}
                   AI_SERVICE_DB_PASSWORD: ${{ secrets.AI_SERVICE_DB_PASSWORD }}
-                  AI_SERVICE_EVAL_ENABLED: ${{ vars.AI_SERVICE_EVAL_ENABLED }}
                   AI_GATEWAY_TOKEN: ${{ secrets.AI_GATEWAY_TOKEN }}
                   ALFA_TLS_CERT_PATH: ${{ secrets.ALFA_TLS_CERT_PATH }}
                   ALFA_TLS_KEY_PATH: ${{ secrets.ALFA_TLS_KEY_PATH }}
@@ -1177,11 +1176,6 @@ jobs:
                     *[!A-Za-z0-9,_-]*)
                       echo "❌ WB_FETCHER_CONNECTION_ALLOWLIST: разрешены A-Za-z0-9,_-"
                       exit 1 ;;
-                  esac
-                  # Ночная проверка качества: не-секретный флаг, по умолчанию выключен.
-                  case "$AI_SERVICE_EVAL_ENABLED" in
-                    ''|true|false) ;;
-                    *) echo "❌ AI_SERVICE_EVAL_ENABLED: true, false или пусто"; exit 1 ;;
                   esac
                   # Недельный отчёт экономики SKU: UUID компаний через запятую или *.
                   case "$ECONOMICS_WEEKLY_REPORT_COMPANIES" in
@@ -1286,8 +1280,6 @@ jobs:
                     export WB_FETCHER_DB_PASSWORD='${{ secrets.WB_FETCHER_DB_PASSWORD }}'
                     export WB_FETCHER_CONNECTION_ALLOWLIST='${{ vars.WB_FETCHER_CONNECTION_ALLOWLIST }}'
                     export WB_FETCHER_SENTRY_DSN='${{ secrets.WB_FETCHER_SENTRY_DSN }}'
-                    # ai-service работает постоянно; отдельный nightly флаг остаётся выключенным по умолчанию.
-                    export AI_SERVICE_EVAL_ENABLED='${{ vars.AI_SERVICE_EVAL_ENABLED }}'
                     export AI_SERVICE_API_TOKEN='${{ secrets.AI_SERVICE_API_TOKEN }}'
                     export AI_SERVICE_DB_PASSWORD='${{ secrets.AI_SERVICE_DB_PASSWORD }}'
                     # Провайдеры ИИ — через шлюз ai.vashfindir.ru: на app только его токен.
@@ -1397,20 +1389,12 @@ jobs:
                     fi
                     # Идемпотентно: роль, пароль из секрета, БД (docker/ai-service/db-bootstrap.sql).
                     docker compose -f docker-compose.prod.yml -f compose.digest.json pull ai-service ai-service-worker
-                    if [ "$AI_SERVICE_EVAL_ENABLED" = "true" ]; then
-                      docker compose -f docker-compose.prod.yml -f compose.digest.json --profile ai-service-eval pull ai-service-eval-worker
-                    else
-                      docker compose -f docker-compose.prod.yml -f compose.digest.json --profile ai-service-eval stop ai-service-eval-worker
-                    fi
                     # Проверки 2 и 4 (docs/tasks/ai/gateway/plan.md): /models через шлюз с токеном → 200,
                     # без токена → 401; бесплатно. Провал — до запуска воркера.
                     docker compose -f docker-compose.prod.yml -f compose.digest.json run --rm --no-deps -T ai-service gateway-check < /dev/null
                     # --wait — только API: у воркера healthcheck выключен, и `up --wait` на нём падает.
                     docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps --wait ai-service
                     docker compose -f docker-compose.prod.yml -f compose.digest.json up -d --no-deps ai-service-worker
-                    if [ "$AI_SERVICE_EVAL_ENABLED" = "true" ]; then
-                      docker compose -f docker-compose.prod.yml -f compose.digest.json --profile ai-service-eval up -d --no-deps ai-service-eval-worker
-                    fi
                     echo "✅ ai-service healthy"
 
                     echo "🐳 Обновляем account/admin SPA"
@@ -1434,9 +1418,6 @@ jobs:
                     for container in ai-service-worker scheduler traefik; do
                       [[ $(docker inspect --format '{{.State.Status}}' "$container" < /dev/null) == running ]]
                     done
-                    if [[ $AI_SERVICE_EVAL_ENABLED == true ]]; then
-                      [[ $(docker inspect --format '{{.State.Status}}' ai-service-eval-worker < /dev/null) == running ]]
-                    fi
                     for container in symfony-postgres site-redis; do
                       [[ $(docker inspect --format '{{.State.Health.Status}}' "$container" < /dev/null) == healthy ]]
                     done

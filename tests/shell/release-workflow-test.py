@@ -105,9 +105,7 @@ os.execv(Path(__file__).with_name('docker-stub'), sys.argv)
                 env[name] = key_values.get(source[1], '')
         values = {'secrets.SERVER_DIR': str(self.root), 'github.sha': fixture.SHA,
                   'github.run_id': '42', 'github.run_attempt': '1', 'github.event_name': event,
-                  'steps.installed.outputs.sha': fixture.OLD, 'inputs.production_action': action,
-                  'vars.AI_SERVICE_EVAL_ENABLED': 'false'}
-        values['vars.AI_SERVICE_EVAL_ENABLED'] = extra.pop('EVAL_ENABLED', 'false')
+                  'steps.installed.outputs.sha': fixture.OLD, 'inputs.production_action': action}
         env.update(extra)
         script = re.sub(r'\$\{\{\s*(.*?)\s*\}\}',
                         lambda m: values.get(m[1], 'synthetic-test-' + 'a' * 32), script)
@@ -140,11 +138,6 @@ os.execv(Path(__file__).with_name('docker-stub'), sys.argv)
         self.assertNotEqual(result.returncode, 0)
         self.assertTrue((self.root / 'current/old-config').exists())
         self.assertFalse(any('up' in c for c in calls))
-
-    def test_enabled_nightly_worker_must_be_running_before_release_success(self):
-        result, _ = self.run_workflow(EVAL_ENABLED='true', EXITED_CONTAINER='ai-service-eval-worker')
-        self.assertNotEqual(result.returncode, 0)
-        self.assertFalse((self.root / 'shared/release-last-success').exists())
 
     def test_actual_push_never_runs_any_migration(self):
         result, calls = self.run_workflow(action='', event='push')
