@@ -79,7 +79,7 @@ Entity `PaymentIntakeSession`, `AiQualityMonitor`, `AiQualityRun`, поле
       пуст вне docs/tasks и миграций.
 - [ ] Гейты: PHPStan (baseline только −), CS, strict_types, полный phpunit,
       ai-service ruff/mypy/pytest, `make test-release-pipeline test-deploy-workflow`.
-- [ ] После деплоя A: воркер payment-intake и eval-worker не запущены, cron
+- [x] После деплоя A (24.11): воркер payment-intake и eval-worker не запущены, cron
       без ошибок, MCP-страница открывается; удалена `vars.AI_SERVICE_EVAL_ENABLED`;
       в GlitchTip нет «AI results without a consumer».
 - [ ] После release B: таблиц нет, `cash_payment_intake_draft` = 0 строк

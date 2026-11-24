@@ -6020,6 +6020,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.245 | 2026-11-24 | Миграция удаления ИИ-разбора: нет таблиц `telegram_payment_intake_session`, `cash_payment_intake_reply_receipt`, `ai_quality_monitor`, `ai_quality_run`, колонки `client_bindings.payment_intake_selected` и ИИ-колонок `cash_payment_intake_draft`; Telegram-черновики удалены. ai-service `0003`: нет `ai_eval_*` и строк `parse_payment_message` |
 | 2.244 | 2026-11-23 | Удалён код ИИ-разбора платежей: Telegram-доставка, сессии и транспорт `async_payment_intake`; ИИ-половина черновиков Cash (остались MCP); `AiTaskResultFacade`; ночной eval (`app:ai-service:quality:*`, eval-worker, `AI_SERVICE_EVAL_*`); задача `parse_payment_message` и контракты `ai-parse-payment-message`, `ai-eval-run`. Переотправку событий подтверждения ведёт `app:cash:recover-payment-intake` без аргументов. Таблицы удаляет отдельная миграция |
 | 2.243 | 2026-11-23 | Telegram: ИИ-разбор платежей отключён от бота — операции из текста только регулярками, кнопки `pi:` отвечают «разбор отключён», правка сообщения игнорируется; ночной eval выключен переменной репозитория `vars.AI_SERVICE_EVAL_ENABLED=false` (вне кода, применяется деплоем) |
 | 2.242 | 2026-11-23 | MarketplaceAnalytics: снимок дня (`SnapshotCalculationPolicy`) — себестоимость = цена × (продано − возвращено), как ОПиУ; день только с возвратами — отрицательная; API юнит-экономики и портфеля исправляются через сумму снимков, старые снимки — `app:marketplace-analytics:recalc-snapshots` |
