@@ -93,8 +93,26 @@ final class AutomaticListingMappingPolicyTest extends TestCase
         yield 'ambiguous source package' => [['title' => 'Набор 2 шт + 3 шт', 'rows' => [['name' => 'Товар']], 'status' => 'package_review']];
         yield 'ambiguous target package' => [['rows' => [['name' => 'Набор 2 шт + 3 шт']], 'status' => 'package_review']];
         yield 'same pack repeated is not ambiguous' => [['title' => 'Набор 3 шт / 3 штуки', 'rows' => [['name' => 'Товар 3 штук']], 'status' => 'ready']];
-        yield 'unknown package is not one' => [['title' => 'Набор 3 шт', 'status' => 'ready']];
-        yield 'decimal is not integer quantity' => [['title' => 'Вес 1.5 шт', 'rows' => [['name' => 'Товар 2 шт']], 'status' => 'ready']];
+        // Штуки только с одной стороны: «10 штук» против позиции без количества, «1 шт для компл.» против товара.
+        yield 'pieces only in listing' => [['title' => 'Набор 3 шт', 'status' => 'package_review']];
+        yield 'pieces only in target' => [['rows' => [['name' => '1шт для компл. Товар']], 'status' => 'package_review']];
+        yield 'no pieces on both sides' => [['title' => 'Набор', 'rows' => [['name' => 'Товар']], 'status' => 'ready']];
+        yield 'decimal is not integer quantity' => [['title' => 'Вес 1.5 шт', 'rows' => [['name' => 'Товар']], 'status' => 'ready']];
+        // Объём и вес: расходятся, только если указаны с обеих сторон и ни одно значение не совпало.
+        yield 'volume mismatch' => [['title' => 'Средство 80мл', 'rows' => [['name' => 'Средство 50 мл']], 'status' => 'package_review']];
+        yield 'mass mismatch' => [['title' => 'Порошок 500г', 'rows' => [['name' => 'Порошок 200 гр']], 'status' => 'package_review']];
+        yield 'litres equal millilitres' => [['title' => 'Жидкость 1 литр', 'rows' => [['name' => 'Жидкость 1000 мл']], 'status' => 'ready']];
+        yield 'kilograms equal grams with comma' => [['title' => 'Соль 0,5 кг', 'rows' => [['name' => 'Соль 500 г']], 'status' => 'ready']];
+        yield 'one common measure is enough' => [['title' => 'Набор 500 г (2 по 250 г)', 'rows' => [['name' => 'Набор 500г']], 'status' => 'ready']];
+        yield 'measure only on one side is unknown' => [['title' => 'Гремучая смесь 40 тестобрикетов', 'rows' => [['name' => 'Гремучая смесь 500 г']], 'status' => 'ready']];
+        yield 'volume and mass are not compared' => [['title' => 'Средство 100 мл', 'rows' => [['name' => 'Средство 100 г']], 'status' => 'ready']];
+        yield 'thousands separator is one number' => [['title' => 'Вода 1 000 мл', 'rows' => [['name' => 'Вода 1000 мл']], 'status' => 'ready']];
+        yield 'decimal litres equal millilitres' => [['title' => 'Средство 0.25 л', 'rows' => [['name' => 'Средство 250 мл']], 'status' => 'ready']];
+        yield 'full words are measures' => [['title' => 'Порошок 500 грамм', 'rows' => [['name' => 'Порошок 1 килограмм']], 'status' => 'package_review']];
+        yield 'latin units are measures' => [['title' => 'Крем 50 ml', 'rows' => [['name' => 'Крем 30 мл']], 'status' => 'package_review']];
+        yield 'single l with dot is litre' => [['title' => 'Бак 5 л.', 'rows' => [['name' => 'Бак 3 л']], 'status' => 'package_review']];
+        yield 'years are not litres' => [['title' => 'Гарантия 5 лет', 'rows' => [['name' => 'Гарантия 3 л']], 'status' => 'ready']];
+        yield 'unit inside word is not measure' => [['title' => 'Модель 5глянец', 'rows' => [['name' => 'Модель 7 г']], 'status' => 'ready']];
         yield 'simple exact article' => [['status' => 'ready']];
         yield 'missing source article' => [['article' => null, 'status' => 'no_article']];
         yield 'blank source article' => [['article' => " \t\r\n\v\f ", 'status' => 'no_article']];

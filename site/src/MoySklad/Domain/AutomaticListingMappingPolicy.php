@@ -54,7 +54,7 @@ final readonly class AutomaticListingMappingPolicy
         return self::normalizeKey(substr($article, 0, -1));
     }
 
-    /** @return list<string> Explicit integer piece quantities only; absence is unknown. */
+    /** @return list<string> Explicit integer piece quantities only; one-sided absence is checked by packageNeedsReview(). */
     public static function quantities(?string $name): array
     {
         preg_match_all('/(?<![\pL\pN.,])([0-9]+)\s*(?:штук|штуки|штука|шт\.?)(?!\pL)/iu', $name ?? '', $matches);
@@ -64,12 +64,46 @@ final readonly class AutomaticListingMappingPolicy
         return $values;
     }
 
+    /**
+     * Штуки: разные, несколько или указаны только с одной стороны («10 штук» против позиции без количества,
+     * «1шт для компл.» против товара). Объём и вес: указаны с обеих сторон и ни одно значение не совпало.
+     */
     public static function packageNeedsReview(?string $sourceName, ?string $targetName): bool
     {
         $source = self::quantities($sourceName);
         $target = self::quantities($targetName);
+        if (count($source) > 1 || count($target) > 1 || $source !== $target) {
+            return true;
+        }
+        $sourceMeasures = self::measures($sourceName);
+        $targetMeasures = self::measures($targetName);
+        foreach ($sourceMeasures as $dimension => $values) {
+            if ([] !== $values && [] !== $targetMeasures[$dimension] && [] === array_intersect($values, $targetMeasures[$dimension])) {
+                return true;
+            }
+        }
 
-        return count($source) > 1 || count($target) > 1 || ([] !== $source && [] !== $target && $source !== $target);
+        return false;
+    }
+
+    /** @return array{volume:list<string>,mass:list<string>} Миллилитры и граммы; отсутствие — неизвестно. */
+    public static function measures(?string $name): array
+    {
+        // Число с разделителем тысяч («1 000») — одно число, иначе «000 мл» читалось бы как 0.
+        preg_match_all('/(?<![\pL\pN.,])([0-9]{1,3}(?:[ \x{00A0}][0-9]{3})+|[0-9]+)((?:[.,][0-9]+)?)\s*'
+            .'(миллилитр(?:а|ов)?|мл|ml|литр(?:а|ов|ы)?|л|l|килограмм(?:а|ов)?|кг|kg|грамм(?:а|ов)?|гр|г|g)(?!\pL)/iu',
+            $name ?? '', $matches, \PREG_SET_ORDER);
+        $measures = ['volume' => [], 'mass' => []];
+        foreach ($matches as [, $integer, $fraction, $unit]) {
+            $unit = mb_strtolower($unit);
+            $mass = 1 === preg_match('/^(?:кг|kg|килограмм|гр|г|g|грамм)/u', $unit);
+            $base = 1 === preg_match('/^(?:мл|ml|миллилитр|гр|г|g|грамм)/u', $unit);
+            $value = (float) (preg_replace('/\D/u', '', $integer).str_replace(',', '.', $fraction)) * ($base ? 1 : 1000);
+            // Строка, а не float: array_intersect сравнивает строками, 0,5 кг = 500 г без хвоста погрешности.
+            $measures[$mass ? 'mass' : 'volume'][] = rtrim(rtrim(sprintf('%.3F', $value), '0'), '.');
+        }
+
+        return $measures;
     }
 
     /** Кириллица, которая пишется как латиница (М/M, Х/X …), регистр и пробелы — без словарей под компанию. */

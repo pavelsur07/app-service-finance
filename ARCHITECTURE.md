@@ -6020,6 +6020,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.246 | 2026-11-24 | MoySklad: автомаппинг identity_package_v4 — комплектация спорна, если штуки указаны только с одной стороны или объём/вес с обеих сторон не совпадает |
 | 2.245 | 2026-11-24 | Миграция удаления ИИ-разбора: нет таблиц `telegram_payment_intake_session`, `cash_payment_intake_reply_receipt`, `ai_quality_monitor`, `ai_quality_run`, колонки `client_bindings.payment_intake_selected` и ИИ-колонок `cash_payment_intake_draft`; Telegram-черновики удалены. ai-service `0003`: нет `ai_eval_*` и строк `parse_payment_message` |
 | 2.244 | 2026-11-23 | Удалён код ИИ-разбора платежей: Telegram-доставка, сессии и транспорт `async_payment_intake`; ИИ-половина черновиков Cash (остались MCP); `AiTaskResultFacade`; ночной eval (`app:ai-service:quality:*`, eval-worker, `AI_SERVICE_EVAL_*`); задача `parse_payment_message` и контракты `ai-parse-payment-message`, `ai-eval-run`. Переотправку событий подтверждения ведёт `app:cash:recover-payment-intake` без аргументов. Таблицы удаляет отдельная миграция |
 | 2.243 | 2026-11-23 | Telegram: ИИ-разбор платежей отключён от бота — операции из текста только регулярками, кнопки `pi:` отвечают «разбор отключён», правка сообщения игнорируется; ночной eval выключен переменной репозитория `vars.AI_SERVICE_EVAL_ENABLED=false` (вне кода, применяется деплоем) |
@@ -6396,7 +6397,7 @@ Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/defa
 Настройки изолированы составным ключом company/connection/marketplace.
 
 
-Автомаппинг identity_package_v3 использует `AutomaticListingMappingPolicy`. Правила по силе
+Автомаппинг identity_package_v4 использует `AutomaticListingMappingPolicy`. Правила по силе
 (меньше — сильнее): 1 `exact_barcode`; 2 `linked_barcode` — штрихкод листинга совпал со
 штрихкодом листинга другой площадки, уже связанного с позицией; 3 `direct_article`,
 `parent_article_size` (размер по явно выбранному ID характеристики), `exact_code`,
@@ -6410,7 +6411,9 @@ Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/defa
 может быть целью многих листингов разных площадок. `name_size` предлагается, но принимается
 только отмеченными строками: «Принять все» (scope report) и автоприменение (cabinet) его
 пропускают (`AutomaticMappingDecision::requiresManualAcceptance`). Признаки linked* в JSON решения
-не пишутся. Комплектация проверяется для выбранной позиции.
+не пишутся. Комплектация проверяется для выбранной позиции (`packageNeedsReview`): штуки в названиях
+разные, несколько или указаны только с одной стороны; объём (мл/л) или вес (г/кг) указан с обеих
+сторон и ни одно значение не совпало. Отсутствие количества или меры с обеих сторон — не расхождение.
 Нормализуется только краевой ASCII whitespace, регистр/нули/NBSP сохраняются.
 `AutomaticMappingCandidatesQuery` одним scoped SQL получает максимум50 целей
 на листинг (до100 листингов); truncation, неразрешимые размеры и спорная комплектация запрещают READY.
@@ -6419,7 +6422,7 @@ Public ID schema diff caveat: DBAL introspects `nextval()` as autoincrement/defa
 MarketplaceFacade; существующие ревизии, включая clear, не предлагаются.
 `MappingCharacteristicsQuery` выдаёт по20 непрозрачных ID из локального JSONB.
 Никакой записи и внешнего HTTP в этих Query нет.
-Guard (`AutomaticMappingGuard`) фиксирует версию `identity_package_v3`, source/candidate
+Guard (`AutomaticMappingGuard`) фиксирует версию `identity_package_v4`, source/candidate
 fingerprints, выбранный opaque characteristic ID и previewId (для пакета — его id).
 Guarded order writer'а: connection
 FOR SHARE → mapping advisory → accepted replay → catalog try-lock → source
