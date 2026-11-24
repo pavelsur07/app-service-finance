@@ -2,8 +2,6 @@
 
 API и business worker запускаются каждым штатным deployment. URL и токен обязательны
 для Symfony; доступ компаний выдаёт администратор через `/admin/users` без deploy.
-Nightly worker — отдельный профиль `ai-service-eval`; только `AI_SERVICE_EVAL_ENABLED=true`
-включает его. При false/пустом значении deployment явно останавливает eval-worker.
 
 Включение — отдельные решения Владельца (`AGENTS.md` §3.3, ТЗ §12): провайдеры
 и ключи, бюджет, компании.

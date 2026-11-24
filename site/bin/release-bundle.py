@@ -17,9 +17,8 @@ SERVICES = {'traefik': 'traefik', 'land': 'land-nginx', 'account': 'account-ngin
             'admin': 'admin-nginx', 'site': 'site-nginx', 'site-php-fpm': 'site-php-fpm',
             'site-php-cli': 'site-php-cli', 'site-postgres': 'postgres', 'site-redis': 'redis',
             'scheduler': 'site-php-cli', 'ozon-fetcher': 'ozon-fetcher', 'wb-fetcher': 'wb-fetcher',
-            'ai-service': 'ai-service', 'ai-service-worker': 'ai-service',
-            'ai-service-eval-worker': 'ai-service'}
-for worker in ('sync', 'pipeline', 'wb-finance', 'ads', 'payment-intake'):
+            'ai-service': 'ai-service', 'ai-service-worker': 'ai-service'}
+for worker in ('sync', 'pipeline', 'wb-finance', 'ads'):
     SERVICES[f'site-messenger-worker-{worker}'] = 'site-php-cli'
 GATES = {'🧪 Unit tests', '🎨 PHP code style', '🔬 Static analysis',
          '🧪 Integration tests 1/3', '🧪 Integration tests 2/3', '🧪 Integration tests 3/3',

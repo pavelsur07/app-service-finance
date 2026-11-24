@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace App\Cash\Entity\PaymentIntake;
 
-use App\Cash\Repository\PaymentIntake\PaymentIntakeReplyReceiptRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
 
 /** UUIDv7 receipt with a globally unique SHA256 channel reply identity. */
-#[ORM\Entity(repositoryClass: PaymentIntakeReplyReceiptRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(name: 'cash_payment_intake_reply_receipt')]
 #[ORM\UniqueConstraint(name: 'uniq_payment_intake_reply_key', columns: ['reply_key'])]
 #[ORM\Index(name: 'idx_payment_intake_reply_company', columns: ['company_id'])]

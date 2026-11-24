@@ -98,16 +98,6 @@ class ClientBinding
         $this->actorUserId = $actorUserId;
     }
 
-    public function isPaymentIntakeSelected(): bool
-    {
-        return $this->paymentIntakeSelected;
-    }
-
-    public function selectPaymentIntake(): void
-    {
-        $this->paymentIntakeSelected = true;
-    }
-
     public function isSelected(): bool
     {
         return $this->selected;

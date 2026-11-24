@@ -35,11 +35,8 @@ def test_repository_routes_go_through_gateway() -> None:
     assert_via_gateway(load_routing(ROUTES_FILE, env={}), GATEWAY)
 
 
-def test_payment_intake_pilot_is_deepseek_only_and_other_routes_keep_fallback() -> None:
+def test_business_routes_keep_gpt_fallback() -> None:
     routing = load_routing(ROUTES_FILE, env={})
-    intake = routing.routes["parse_payment_message"]
-    assert intake.mode is Mode.SINGLE
-    assert [ref.key for ref in intake.models] == ["deepseek/deepseek-flash"]
     for task in ["categorize_transactions", "marketplace_source_type_draft"]:
         route = routing.routes[task]
         assert route.mode is Mode.FALLBACK

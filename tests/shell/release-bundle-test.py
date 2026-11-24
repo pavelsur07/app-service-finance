@@ -182,7 +182,7 @@ else:
         result, _ = self.resolve()
         self.assertEqual(result.returncode, 0, result.stderr)
         compose = json.loads((self.root / 'bundle/compose.digest.json').read_text())
-        self.assertEqual(len(compose['services']), 20)
+        self.assertEqual(len(compose['services']), 18)
         for value in compose['services'].values():
             self.assertRegex(value['image'], r'@sha256:[0-9a-f]{64}$')
         self.assertEqual(compose['services']['scheduler']['image'],

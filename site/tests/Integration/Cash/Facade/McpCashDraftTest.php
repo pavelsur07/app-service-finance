@@ -6,6 +6,8 @@ namespace App\Tests\Integration\Cash\Facade;
 
 use App\Cash\Application\DTO\PaymentIntake\CreateMcpCashDraft;
 use App\Cash\Application\PaymentIntake\PaymentIntakeAction;
+use App\Cash\Command\RecoverPaymentIntakeCommand;
+use App\Cash\Domain\Event\CashTransactionsChanged;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Accounts\MoneyAccountType;
@@ -21,8 +23,14 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\ORM\EntityManagerInterface;
+use Monolog\Handler\TestHandler;
+use Monolog\Level;
+use Monolog\Logger;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
 
 final class McpCashDraftTest extends IntegrationTestCase
 {
@@ -39,7 +47,6 @@ final class McpCashDraftTest extends IntegrationTestCase
         self::assertSame($draft->draftId, $cash->createMcpCashDraft($this->input($companyId, $actorId, $connectionId, $accountId, currency: 'RUB'))->draftId);
         self::assertSame(0, $this->countFacts($companyId));
         self::assertSame($balanceBefore, $this->connection->fetchOne('SELECT current_balance FROM money_account WHERE id = ?', [$accountId]));
-        self::assertSame([], $cash->openPaymentIntakeDraftIds($companyId, $actorId));
         self::assertSame([$draft->draftId], array_column($intake->listMcpDrafts($companyId, $actorId, null, false), 'id'));
         $stored = $intake->getMcpDraft($companyId, $actorId, $draft->draftId);
         self::assertSame('payment-42', $stored->mcpExternalId);
@@ -63,6 +70,52 @@ final class McpCashDraftTest extends IntegrationTestCase
         ], $this->connection->fetchAssociative('SELECT amount, import_source, external_id FROM cash_transaction WHERE id = ?', [$result->transactionIds[0]]));
         self::assertSame('confirmed', $cash->createMcpCashDraft($this->input($companyId, $actorId, $connectionId, $accountId))->status);
         self::assertNotNull($intake->getMcpDraft($companyId, $actorId, $draft->draftId)->confirmedAt);
+    }
+
+    /** Событие после commit подтверждения не дошло — cron-команда переотправляет его без повторной записи ДДС. */
+    public function testRecoverCommandRedeliversLostConfirmationEvent(): void
+    {
+        [$company, $actorId, $accountId] = $this->fixture();
+        $companyId = (string) $company->getId();
+        $intake = self::getContainer()->get(PaymentIntakeAction::class);
+        $draft = self::getContainer()->get(CashFacade::class)->createMcpCashDraft($this->input($companyId, $actorId, Uuid::uuid7()->toString(), $accountId));
+        $stored = $intake->getMcpDraft($companyId, $actorId, $draft->draftId);
+        $intake->confirmMcp($companyId, $actorId, $draft->draftId, $stored->revision, true);
+        $this->connection->executeStatement('UPDATE cash_payment_intake_draft SET cash_event_pending = true WHERE id = ?', [$draft->draftId]);
+        $events = new \ArrayObject();
+        self::getContainer()->get('event_dispatcher')->addListener(CashTransactionsChanged::class, static function () use ($events): void {
+            $events->append(1);
+        });
+
+        $tester = new CommandTester(self::getContainer()->get(RecoverPaymentIntakeCommand::class));
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertCount(1, $events);
+        self::assertFalse((bool) $this->connection->fetchOne('SELECT cash_event_pending FROM cash_payment_intake_draft WHERE id = ?', [$draft->draftId]));
+        self::assertSame(1, $this->countFacts($companyId));
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertCount(1, $events, 'Повтор без залипших событий ничего не отправляет.');
+    }
+
+    /** Сбой отправки: флаг остаётся для следующего запуска, команда сообщает один агрегированный ERROR и exit 1. */
+    public function testRecoverCommandFailureKeepsEventPendingAndReportsOnce(): void
+    {
+        [$company, $actorId, $accountId] = $this->fixture();
+        $companyId = (string) $company->getId();
+        $intake = self::getContainer()->get(PaymentIntakeAction::class);
+        $draft = self::getContainer()->get(CashFacade::class)->createMcpCashDraft($this->input($companyId, $actorId, Uuid::uuid7()->toString(), $accountId));
+        $intake->confirmMcp($companyId, $actorId, $draft->draftId, $intake->getMcpDraft($companyId, $actorId, $draft->draftId)->revision, true);
+        $this->connection->executeStatement('UPDATE cash_payment_intake_draft SET cash_event_pending = true WHERE id = ?', [$draft->draftId]);
+        self::getContainer()->get('event_dispatcher')->addListener(CashTransactionsChanged::class, static function (): void {
+            throw new \RuntimeException('transport down');
+        });
+        $logs = new TestHandler();
+        $command = new RecoverPaymentIntakeCommand($intake, self::getContainer()->get(EntityManagerInterface::class), new Logger('test', [$logs]));
+
+        self::assertSame(Command::FAILURE, (new CommandTester($command))->execute([]));
+        self::assertTrue((bool) $this->connection->fetchOne('SELECT cash_event_pending FROM cash_payment_intake_draft WHERE id = ?', [$draft->draftId]));
+        self::assertCount(1, array_filter($logs->getRecords(), static fn ($record): bool => Level::Error === $record->level));
+        self::assertTrue($logs->hasErrorThatContains('cash event recovery failed'));
     }
 
     public function testConflictingReplayLeavesOriginalDraftAndNoFact(): void

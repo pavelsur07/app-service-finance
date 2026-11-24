@@ -13,7 +13,7 @@ use App\Tests\Builders\Company\UserBuilder;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
-final class PaymentIntakeBindingTest extends TestCase
+final class ClientBindingSelectionTest extends TestCase
 {
     public function testBindingKeepsActualActorAndCanSelectCompany(): void
     {

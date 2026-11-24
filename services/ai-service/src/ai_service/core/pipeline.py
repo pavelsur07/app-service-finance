@@ -1,4 +1,4 @@
-"""Общий pipeline задачи: prepare → generate → parse → prepare_output → verify → decide → finalize (ТЗ §5).
+"""Общий pipeline задачи: prepare → generate → parse → verify → decide → finalize (ТЗ §5).
 
 Ни одна задача не обходит проверки: шаги заданы здесь, задача поставляет только
 схемы, промпт, необязательную подготовку вывода и свои проверки. Запись результата и трассы — у worker'а.
@@ -108,19 +108,6 @@ class Pipeline:
         usage_out = sum(c.output_tokens for c in calls)
 
         context = CheckContext(company_id=company_id, task_type=spec.task_type)
-        prepare_output = spec.prepare_output
-        if output is not None and prepare_output is not None:
-            original = output.model_dump(mode="json")
-            try:
-                prepared = prepare_output(masked_input, output, context)
-                output = spec.output_model.model_validate(prepared.model_dump(mode="json", warnings=False))
-            except ValidationError as error:
-                parse_error = f"prepared output: {error.error_count()} validation error(s)"
-                trace["output_prepare_failed"] = True
-                output = None
-                log.warning("prepared_output_invalid", task_type=spec.task_type, errors=error.error_count())
-            else:
-                trace["output_prepared"] = output.model_dump(mode="json") != original
 
         if output is None:
             checks = [CheckResult(SCHEMA_CHECK, False, Severity.BLOCK, parse_error)]

@@ -6,10 +6,7 @@ namespace App\Cash\Application\DTO\PaymentIntake;
 
 final readonly class PaymentIntakeDraftView
 {
-    /**
-     * @param list<array<string, mixed>> $items
-     * @param list<string> $questions
-     */
+    /** @param list<array<string, mixed>> $items */
     public function __construct(
         public string $id,
         public string $companyId,
@@ -17,10 +14,7 @@ final readonly class PaymentIntakeDraftView
         public string $moneyAccountId,
         public int $revision,
         public string $status,
-        public ?string $taskId,
         public array $items,
-        public array $questions,
-        public ?string $errorCode,
         public ?string $mcpExternalId = null,
         public ?\DateTimeImmutable $confirmedAt = null,
         public ?string $confirmedTransactionId = null,
