@@ -69,18 +69,26 @@ Entity `PaymentIntakeSession`, `AiQualityMonitor`, `AiQualityRun`, поле
 
 ## Чек-лист приёмки
 
-- [ ] Тесты MCP-черновиков зелёные без изменений смысла (`McpCashDraftTest`,
+- [x] Тесты MCP-черновиков зелёные без изменений смысла (`McpCashDraftTest`,
       `McpCashDraftPageTest`, `McpCashToolsTest`, MCP-часть concurrency).
-- [ ] Тест: залипшее событие MCP-confirm переотправляет
+- [x] Тест: залипшее событие MCP-confirm переотправляет
       `app:cash:recover-payment-intake`.
-- [ ] Бот: операции регулярками; кнопки `pi:` старых карточек только отвечают
+- [x] Бот: операции регулярками; кнопки `pi:` старых карточек только отвечают
       «разбор отключён» (решение #3119), черновик и ДДС не меняют.
-- [ ] `git grep parse_payment_message|AiQuality|async_payment_intake|eval-worker|AI_SERVICE_EVAL`
+- [x] `git grep parse_payment_message|AiQuality|async_payment_intake|eval-worker|AI_SERVICE_EVAL`
       пуст вне docs/tasks и миграций.
-- [ ] Гейты: PHPStan (baseline только −), CS, strict_types, полный phpunit,
+- [x] Гейты: PHPStan (baseline только −), CS, strict_types, полный phpunit,
       ai-service ruff/mypy/pytest, `make test-release-pipeline test-deploy-workflow`.
 - [x] После деплоя A (24.11): воркер payment-intake и eval-worker не запущены, cron
       без ошибок, MCP-страница открывается; удалена `vars.AI_SERVICE_EVAL_ENABLED`;
       в GlitchTip нет «AI results without a consumer».
-- [ ] После release B: таблиц нет, `cash_payment_intake_draft` = 0 строк
+- [x] После release B (24.11, #3121): таблиц нет, `cash_payment_intake_draft` = 0 строк
       Telegram, MCP-черновики целы, `schema_migrations` ai-service содержит 0003.
+
+## Итог
+
+Задача закрыта 24.11.2026: #3119 (бот на регулярках), #3120 (код), #3121
+(необратимая миграция, бэкап release 45340760522). После release: удалённых
+таблиц и колонок нет, Telegram-черновиков 0, MCP-черновики и ДДС `mcp` без
+изменений (0/0), ai-service `0003` применена (лог release), новых событий в
+GlitchTip нет.
