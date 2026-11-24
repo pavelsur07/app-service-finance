@@ -60,9 +60,6 @@ class ClientBinding
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $selected = false;
 
-    #[ORM\Column(type: 'boolean', options: ['default' => false])]
-    private bool $paymentIntakeSelected = false;
-
     // Дата создания записи
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;

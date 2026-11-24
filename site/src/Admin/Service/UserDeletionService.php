@@ -68,7 +68,6 @@ final class UserDeletionService
         $this->deleteFromTables(
             [
                 'payment_plan_match',
-                'telegram_payment_intake_session',
                 'cash_payment_intake_draft',
                 'cash_transaction',
                 'money_account_daily_balance',

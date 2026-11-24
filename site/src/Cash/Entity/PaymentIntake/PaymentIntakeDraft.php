@@ -16,7 +16,6 @@ use Webmozart\Assert\Assert;
 #[ORM\UniqueConstraint(name: 'uniq_payment_intake_mcp_external', columns: ['company_id', 'mcp_connection_id', 'mcp_external_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_payment_intake_source', columns: ['source_key'])]
 #[ORM\Index(name: 'idx_payment_intake_company_status', columns: ['company_id', 'status'])]
-#[ORM\Index(name: 'idx_payment_intake_task', columns: ['company_id', 'task_id'])]
 class PaymentIntakeDraft
 {
     #[ORM\Id]
@@ -42,23 +41,11 @@ class PaymentIntakeDraft
     private string $currency;
     #[ORM\Column]
     private int $revision = 1;
-    #[ORM\Column]
-    private int $attempt = 1;
-    #[ORM\Column]
-    private int $taskRevision = 1;
     #[ORM\Column(length: 24)]
     private string $status = 'pending';
-    #[ORM\Column(type: Types::GUID, nullable: true)]
-    private ?string $taskId = null;
     /** @var list<array<string, mixed>> */
     #[ORM\Column(type: Types::JSONB)]
     private array $items = [];
-    /** @var list<string> */
-    #[ORM\Column(type: Types::JSONB)]
-    private array $questions = [];
-    /** @var array<string, mixed> */
-    #[ORM\Column(type: Types::JSONB)]
-    private array $payload = [];
     /** @var list<string> */
     #[ORM\Column(type: Types::JSONB)]
     private array $transactionIds = [];
@@ -67,14 +54,8 @@ class PaymentIntakeDraft
     private array $confirmedItemIds = [];
     #[ORM\Column(nullable: true)]
     private ?int $confirmedRevision = null;
-    #[ORM\Column(length: 64, nullable: true)]
-    private ?string $errorCode = null;
-    #[ORM\Column]
-    private bool $dispatchPending = true;
     #[ORM\Column]
     private bool $cashEventPending = false;
-    #[ORM\Column(type: Types::DATETIMETZ_IMMUTABLE, nullable: true)]
-    private ?\DateTimeImmutable $lastEnqueuedAt = null;
 
     #[ORM\Column(type: Types::GUID, nullable: true)]
     private ?string $mcpConnectionId = null;
@@ -110,7 +91,6 @@ class PaymentIntakeDraft
         $draft = new self($command->companyId, $command->actorUserId, $command->moneyAccountId, 'mcp:'.Uuid::uuid7()->toString(), $fingerprint, 'MCP', $receivedAt, 'UTC', $currency);
         $draft->mcpConnectionId = strtolower($command->connectionId);
         $draft->mcpExternalId = $command->externalId;
-        $draft->dispatchPending = false;
         $draft->status = 'needs_clarification';
         $draft->items = [[
             'id' => Uuid::uuid7()->toString(),
@@ -170,7 +150,7 @@ class PaymentIntakeDraft
     public function selectedForConfirmation(int $expectedRevision, array $itemIds): array
     {
         $this->assertMutable($expectedRevision);
-        if (!\in_array($this->status, ['ready', 'needs_clarification'], true) || [] !== $this->questions || [] === $itemIds || \count($itemIds) !== \count(array_unique($itemIds))) {
+        if (!\in_array($this->status, ['ready', 'needs_clarification'], true) || [] === $itemIds || \count($itemIds) !== \count(array_unique($itemIds))) {
             throw new \DomainException('Сначала ответьте на вопросы и выберите платежи.');
         }
         foreach ($this->items as $item) {
@@ -202,8 +182,6 @@ class PaymentIntakeDraft
         $this->confirmedItemIds = $itemIds;
         $this->transactionIds = $transactionIds;
         $this->status = 'confirmed';
-        $this->payload = [];
-        $this->dispatchPending = false;
         $this->cashEventPending = true;
     }
 
@@ -224,8 +202,6 @@ class PaymentIntakeDraft
         }
         $this->assertMutable($expectedRevision);
         $this->status = 'cancelled';
-        $this->payload = [];
-        $this->dispatchPending = false;
     }
 
     private function assertMutable(int $expectedRevision): void

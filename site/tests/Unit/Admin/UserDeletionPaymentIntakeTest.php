@@ -34,7 +34,7 @@ final class UserDeletionPaymentIntakeTest extends TestCase
 
         (new UserDeletionService($connection, $em))->deleteUser($user);
 
-        foreach (['cash_payment_intake_draft', 'telegram_payment_intake_session'] as $table) {
+        foreach (['cash_payment_intake_draft'] as $table) {
             $matching = array_values(array_filter($queries, static fn (array $query): bool => str_contains($query[0], 'DELETE FROM "'.$table.'"')));
             self::assertCount(1, $matching, $table);
             self::assertSame(['company_ids' => [$company->getId()]], $matching[0][1]);

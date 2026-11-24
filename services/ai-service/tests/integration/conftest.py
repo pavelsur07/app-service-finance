@@ -26,10 +26,7 @@ def dsn() -> str:
 @pytest.fixture
 def conn(dsn: str) -> Iterator[psycopg.Connection[Any]]:
     with psycopg.connect(dsn, autocommit=True) as c:
-        c.execute(
-            "DROP TABLE IF EXISTS ai_eval_call, ai_eval_budget, ai_eval_run, "
-            "ai_trace, ai_result, ai_task, schema_migrations CASCADE"
-        )
+        c.execute("DROP TABLE IF EXISTS ai_trace, ai_result, ai_task, schema_migrations CASCADE")
         migrate(dsn, MIGRATIONS)
         yield c
 
