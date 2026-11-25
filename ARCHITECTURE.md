@@ -1128,6 +1128,14 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
 - Фильтр по тегу выполняется через список id из `ListingTagAssignmentRepository` (`listingIdsByTags()` / `taggedListingIds()`) и `IN` / `NOT IN` в DQL: таблица связей не замаплена. Известное ограничение — рассчитано на тысячи листингов компании (на проде максимум 636 на 19.10.2026); при десятках тысяч переносить фильтр в SQL.
 - Назначение `POST /api/marketplace/listings/tags/assign` (`MARKETPLACE_WRITE`): тело `{listingIds: [uuid…] (до 500) | filter: {…}, tagId | name}` — ровно одно из `listingIds` / `filter` (оба → 422 `listing_selection_required`, ни одного → 422 `listing_ids_required`). Режим `filter`: листинги находит `matchingIds()`, больше 5000 → 422 `filter_too_broad` без создания тега и связей. Ответ `{tagId, tagName, matched, assigned}`: `matched` — выбрано листингов компании, `assigned` — создано связей.
 
+### Marketplace: категории листингов
+
+- Entity: `MarketplaceListingCategory` (таблица `marketplace_listing_categories`): `id` (UUID v7), `companyId`, `name` (до 50), `slug` = `mb_strtolower(trim(name))`, `createdAt`; unique `(company_id, slug)`. FK на `companies` нет, как у тегов: при удалении компании таблицу чистить явно, после листингов.
+- У листинга **не больше одной** категории: `marketplace_listings.category_id` (FK `ON DELETE RESTRICT`, индекс `idx_marketplace_listing_category`) и `category_source` (`ListingCategorySource`: `manual` | `rule`; оба NULL или оба заданы). В отличие от тегов, суммы по категориям складываются в итог.
+- Запись массовая, через DBAL `ListingCategoryAssignmentQuery` (область компании в каждом SQL). `AssignListingCategoryAction`: ровно одно из списка id или `ListingsFilter` (больше 5000 → `ListingFilterTooBroadException` без изменений); `categoryId = null` снимает категорию; строки с той же категорией и источником не трогаются (`changed = 0` при повторе); все порции — одна транзакция Action. Ручное назначение пишет `manual`; `rule` зарезервирован для правил по категориям площадок (этап 4 задачи `docs/tasks/marketplace-listing-categories`).
+- `Create`/`Rename` — конфликт slug → `ListingCategoryNameConflictException` (и на `UniqueConstraintViolation` при гонке). `DeleteListingCategoryAction` удаляет только неиспользуемую категорию (`ListingCategoryInUseException` с числом листингов); гонку закрывает FK `RESTRICT`.
+- Кросс-модульное чтение — `ListingCategoryFacadeInterface`. Категория — измерение при чтении: витрины (`me_day_line` и др.) её не хранят, переназначение не требует пересчёта.
+
 ### Marketplace: исправление двойного учёта Ozon в настройках
 
 `POST /marketplace/pl-mappings/ozon/repair` — только active company, MARKETPLACE_WRITE,
@@ -3525,6 +3533,20 @@ remapCostMapping(string $companyId, string $mappingId, UnitEconomyCostType $newT
 // @return array<string, string> plCategoryId → сумма
 amountsByCategory(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $marketplace = null): array
 ```
+
+### `ListingCategoryFacadeInterface` (`src/Marketplace/Facade/ListingCategoryFacadeInterface.php`)
+```php
+// Справочник категорий листингов компании, по имени
+// @return list<ListingCategoryDTO> {id, name}
+list(string $companyId): array
+
+// Категории по набору листингов одним запросом (порциями по 5000).
+// Листинги без категории и чужой компании в ответ не попадают.
+// @param list<string> $listingIds
+// @return array<string, string> listingId → categoryId
+categoriesForListings(string $companyId, array $listingIds): array
+```
+Только чтение, ничего не коммитит. Реализация — `ListingCategoryFacade`.
 
 ### `ListingTagFacade` (`src/Marketplace/Facade/ListingTagFacade.php`)
 ```php
@@ -6042,6 +6064,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.249 | 2026-11-25 | Marketplace: категории листингов — `marketplace_listing_categories`, `marketplace_listings.category_id`/`category_source`, Actions назначения и справочника, `ListingCategoryFacadeInterface` |
 | 2.248 | 2026-11-25 | Balance: типовой справочник счетов — шаблоны версии 4 (28 счетов, статья `INV_FULFILLMENT`), `SyncStandardChartAction` вместо `EnsureBalanceAccountsAction` добирает недостающее по коду у всех компаний лениво; `BalanceFacade::ensureStandardChart()` |
 | 2.247 | 2026-11-24 | MoySklad: склады → счета Баланса — страница «Склады», ежедневная оценка по себестоимости (`ValueStoreStocksMessage`, cron 23:30 и requeue */15), установка остатка счёта от имени автора; `BalanceFacade`: `getPostingAccounts`, `getBookStatus`, `canPostFromSource`, `setAccountBalanceFromSource` |
 | 2.246 | 2026-11-24 | MoySklad: автомаппинг identity_package_v4 — комплектация спорна, если штуки указаны только с одной стороны или объём/вес с обеих сторон не совпадает |

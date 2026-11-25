@@ -6,6 +6,7 @@ namespace App\Marketplace\Entity;
 
 use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
+use App\Marketplace\Enum\ListingCategorySource;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use Doctrine\ORM\Mapping as ORM;
@@ -16,6 +17,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(columns: ['company_id', 'marketplace'], name: 'idx_company_marketplace')]
 #[ORM\Index(columns: ['marketplace', 'marketplace_sku'], name: 'idx_marketplace_sku')]
 #[ORM\Index(columns: ['company_id', 'marketplace', 'supplier_sku'], name: 'idx_marketplace_listing_company_supplier_sku')]
+#[ORM\Index(columns: ['category_id'], name: 'idx_marketplace_listing_category')]
 #[ORM\UniqueConstraint(
     name: 'uniq_company_marketplace_sku_size',
     columns: ['company_id', 'marketplace', 'marketplace_sku', 'size']
@@ -89,6 +91,17 @@ class MarketplaceListing
      */
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $lastSeenAt = null;
+
+    /**
+     * Категория — уровень аналитики, не больше одной на листинг. Пишется массово
+     * через ListingCategoryAssignmentQuery (DBAL), здесь только маппинг и чтение.
+     */
+    #[ORM\ManyToOne(targetEntity: MarketplaceListingCategory::class)]
+    #[ORM\JoinColumn(name: 'category_id', nullable: true, onDelete: 'RESTRICT')]
+    private ?MarketplaceListingCategory $category = null;
+
+    #[ORM\Column(name: 'category_source', length: 16, nullable: true, enumType: ListingCategorySource::class)]
+    private ?ListingCategorySource $categorySource = null;
 
     public function __construct(string $id, Company $company, ?Product $product, MarketplaceType $marketplace)
     {
@@ -302,5 +315,15 @@ class MarketplaceListing
     public function onPreUpdate(): void
     {
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getCategory(): ?MarketplaceListingCategory
+    {
+        return $this->category;
+    }
+
+    public function getCategorySource(): ?ListingCategorySource
+    {
+        return $this->categorySource;
     }
 }
