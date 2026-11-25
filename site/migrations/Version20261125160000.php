@@ -30,9 +30,9 @@ final class Version20261125160000 extends AbstractMigration
             )
             SQL);
         $this->addSql('CREATE INDEX idx_cash_intragroup_decision_company ON cash_intragroup_decision (company_id)');
-        $this->addSql('CREATE UNIQUE INDEX uniq_cash_intragroup_decision_legs ON cash_intragroup_decision (type, outflow_transaction_id, inflow_transaction_id)');
-        $this->addSql("CREATE UNIQUE INDEX uniq_cash_intragroup_pair_out ON cash_intragroup_decision (outflow_transaction_id) WHERE type = 'PAIR'");
-        $this->addSql("CREATE UNIQUE INDEX uniq_cash_intragroup_pair_in ON cash_intragroup_decision (inflow_transaction_id) WHERE type = 'PAIR'");
+        $this->addSql('CREATE UNIQUE INDEX uniq_cash_intragroup_decision_legs ON cash_intragroup_decision (company_id, type, outflow_transaction_id, inflow_transaction_id)');
+        $this->addSql("CREATE UNIQUE INDEX uniq_cash_intragroup_pair_out ON cash_intragroup_decision (company_id, outflow_transaction_id) WHERE type = 'PAIR'");
+        $this->addSql("CREATE UNIQUE INDEX uniq_cash_intragroup_pair_in ON cash_intragroup_decision (company_id, inflow_transaction_id) WHERE type = 'PAIR'");
     }
 
     public function down(Schema $schema): void

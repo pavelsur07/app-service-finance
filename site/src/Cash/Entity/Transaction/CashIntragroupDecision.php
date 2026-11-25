@@ -14,9 +14,9 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity(repositoryClass: CashIntragroupDecisionRepository::class)]
 #[ORM\Table(name: 'cash_intragroup_decision')]
 #[ORM\Index(name: 'idx_cash_intragroup_decision_company', columns: ['company_id'])]
-#[ORM\UniqueConstraint(name: 'uniq_cash_intragroup_decision_legs', columns: ['type', 'outflow_transaction_id', 'inflow_transaction_id'])]
-#[ORM\UniqueConstraint(name: 'uniq_cash_intragroup_pair_out', columns: ['outflow_transaction_id'], options: ['where' => "((type)::text = 'PAIR'::text)"])]
-#[ORM\UniqueConstraint(name: 'uniq_cash_intragroup_pair_in', columns: ['inflow_transaction_id'], options: ['where' => "((type)::text = 'PAIR'::text)"])]
+#[ORM\UniqueConstraint(name: 'uniq_cash_intragroup_decision_legs', columns: ['company_id', 'type', 'outflow_transaction_id', 'inflow_transaction_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_cash_intragroup_pair_out', columns: ['company_id', 'outflow_transaction_id'], options: ['where' => "((type)::text = 'PAIR'::text)"])]
+#[ORM\UniqueConstraint(name: 'uniq_cash_intragroup_pair_in', columns: ['company_id', 'inflow_transaction_id'], options: ['where' => "((type)::text = 'PAIR'::text)"])]
 class CashIntragroupDecision
 {
     public function __construct(

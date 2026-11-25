@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Cash\Application;
 
 use App\Cash\Application\Report\BuildCashflowReconciliation;
+use App\Cash\Application\Report\IntragroupDecisionAction;
 use App\Cash\Application\Report\IntragroupGroupAccess;
 use App\Cash\Entity\Transaction\CashIntragroupDecision;
 use App\Cash\Enum\Transaction\IntragroupDecisionType;
+use App\Company\Application\ConfigureConsolidationGroupAction;
 use App\Tests\Fixtures\Cash\IntragroupReportFixture;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
@@ -16,6 +18,56 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 final class IntragroupDecisionReportTest extends IntegrationTestCase
 {
     use IntragroupReportFixture;
+
+    public function testSwitchingHeadKeepsEachGroupsOwnDecisionForTheSameTransactions(): void
+    {
+        $this->createGroupFixture();
+        $this->fillMissingInns();
+        $this->addTransaction(1, '0001', '2026-11-12', '-100.00', 'ООО "Бета"', 'OP_OUT_OTHER');
+        $this->addTransaction(2, '0003', '2026-11-10', '100.00', 'ООО "Альфа"', 'OP_IN_OTHER');
+        $this->em->flush();
+        $alpha = (string) $this->companies['Альфа']->getId();
+        $beta = (string) $this->companies['Бета']->getId();
+        $gamma = (string) $this->companies['Гамма']->getId();
+        $owner = (string) $this->companies['Альфа']->getUser()?->getId();
+        $out = self::transactionId(1);
+        $in = self::transactionId(2);
+        $oldDecision = Uuid::uuid7()->toString();
+        $newDecision = Uuid::uuid7()->toString();
+        $save = self::getContainer()->get(IntragroupDecisionAction::class);
+        $configure = self::getContainer()->get(ConfigureConsolidationGroupAction::class);
+
+        $save->save($beta, $owner, $oldDecision, IntragroupDecisionType::PAIR, $out, $in);
+        self::assertSame([$out => $oldDecision], $this->report()->reconciliation->manualDecisionIds);
+
+        $configure($alpha, $owner, false, []);
+        $configure($gamma, $owner, true, [$alpha, $beta]);
+        $newGroup = $this->report();
+        self::assertSame($gamma, $newGroup->headCompanyId);
+        self::assertSame([], $newGroup->reconciliation->manualDecisionIds);
+        self::assertSame([], $newGroup->reconciliation->unpairDecisions);
+        self::assertSame([], $newGroup->reconciliation->staleDecisions);
+        self::assertEqualsCanonicalizing([$out, $in], array_keys($newGroup->reconciliation->unpaired));
+        self::assertSame('0.00', array_column($newGroup->lines, 'elimination', 'key')['OP_IN_OTHER']);
+        $save->save($beta, $owner, $newDecision, IntragroupDecisionType::PAIR, $out, $in);
+        $paired = $this->report()->reconciliation;
+        self::assertSame([$out => $newDecision], $paired->manualDecisionIds);
+        self::assertSame([$out => $in], $paired->pairs);
+        self::assertSame([], $paired->staleDecisions);
+
+        $configure($gamma, $owner, false, []);
+        $configure($alpha, $owner, true, [$beta, $gamma]);
+        $restored = $this->report();
+        self::assertSame($alpha, $restored->headCompanyId);
+        self::assertSame([$out => $oldDecision], $restored->reconciliation->manualDecisionIds);
+        self::assertSame([$out => $in], $restored->reconciliation->pairs);
+        self::assertSame([], $restored->reconciliation->staleDecisions);
+        self::assertSame('-100.00', array_column($restored->lines, 'elimination', 'key')['OP_IN_OTHER']);
+        self::assertEquals([$alpha => $oldDecision, $gamma => $newDecision], $this->connection->fetchAllKeyValue(
+            "SELECT company_id, id FROM cash_intragroup_decision WHERE outflow_transaction_id = ? AND inflow_transaction_id = ? AND type = 'PAIR'",
+            [$out, $in],
+        ));
+    }
 
     public function testManualDecisionReservesItsLegOutsideWindowAndBecomesStaleWhenAmountChanges(): void
     {
