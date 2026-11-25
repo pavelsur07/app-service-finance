@@ -54,25 +54,11 @@ final readonly class CashflowGroupReportXlsxWriter
                 ++$row;
             }
             $companies = array_values($report->companies);
-            self::labels($sheet, $row++, ['Статья', ...$companies, 'Элиминация', 'Итого по группе'], true);
-            foreach ([...$report->lines, $report->unmatched, $report->totals] as $line) {
-                $this->writeLine($sheet, $row++, $report, $line);
+            if (null === $report->periods) {
+                $row = $this->writeCompanies($sheet, $row, $report);
+            } else {
+                $row = $this->writePeriods($sheet, $row, $report);
             }
-            self::labels($sheet, $row++, ['Сверка', 'Операций в периоде', 'Сумма, RUB'], true);
-            $rec = $report->reconciliation;
-            foreach ([
-                ['Деньги в пути (пара за границей периода)', \count($rec->inTransit), $rec->transitNet],
-                ['Без пары', \count($rec->unpaired), $rec->unpairedNet],
-                ['Итого без несопоставленных', null, $report->withoutUnpaired],
-            ] as [$label, $count, $amount]) {
-                self::labels($sheet, $row, [$label]);
-                if (null !== $count) {
-                    $sheet->setCellValue('B'.$row, $count);
-                }
-                self::money($sheet->getCell('C'.$row), $amount);
-                ++$row;
-            }
-            $sheet->getStyle('C'.($row - 1))->getFont()->setBold(true);
             foreach ($report->otherCurrencies as $currency => $amounts) {
                 ++$row;
                 self::labels($sheet, $row++, ['Другая валюта: '.$currency, ...$companies], true);
@@ -82,7 +68,7 @@ final readonly class CashflowGroupReportXlsxWriter
                 }
                 ++$row;
             }
-            if ([] !== $rec->inTransit) {
+            if ([] !== $report->reconciliation->inTransit) {
                 $this->writeTransit($book->createSheet()->setTitle('Деньги в пути'), $report);
             }
             (new Xlsx($book))->save($outputPath);
@@ -94,9 +80,100 @@ final readonly class CashflowGroupReportXlsxWriter
         }
     }
 
+    private function writeCompanies(Worksheet $sheet, int $row, CashflowGroupReport $report): int
+    {
+        self::labels($sheet, $row++, ['Статья', ...array_values($report->companies), 'Элиминация', 'Итого по группе'], true);
+        foreach ([...$report->lines, $report->unmatched, $report->totals] as $line) {
+            $this->writeLine($sheet, $row++, $report, $line);
+        }
+        self::labels($sheet, $row++, ['Сверка', 'Операций в периоде', 'Сумма, RUB'], true);
+        $rec = $report->reconciliation;
+        foreach ([
+            ['Деньги в пути (пара за границей периода)', \count($rec->inTransit), $rec->transitNet],
+            ['Без пары', \count($rec->unpaired), $rec->unpairedNet],
+            ['Итого без несопоставленных', null, $report->withoutUnpaired],
+        ] as [$label, $count, $amount]) {
+            self::labels($sheet, $row, [$label]);
+            if (null !== $count) {
+                $sheet->setCellValue('B'.$row, $count);
+            }
+            self::money($sheet->getCell('C'.$row), $amount);
+            ++$row;
+        }
+        $sheet->getStyle('C'.($row - 1))->getFont()->setBold(true);
+
+        return $row;
+    }
+
+    private function writePeriods(Worksheet $sheet, int $row, CashflowGroupReport $report): int
+    {
+        $periods = $report->periods;
+        \assert(null !== $periods);
+        $totalIndex = 2 + \count($periods->columns);
+        $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($totalIndex))->setWidth(22);
+        self::labels($sheet, $row, ['Статья', ...array_column($periods->columns, 'label'), 'Итого за период'], true);
+        foreach ($periods->columns as $index => $column) {
+            $coordinate = Coordinate::stringFromColumnIndex($index + 2);
+            $sheet->getColumnDimension($coordinate)->setWidth(22);
+            $this->link($sheet->getCell($coordinate.$row), $column->from, $column->to, ['view' => 'companies'], 'report_cashflow_group');
+        }
+        $this->link($sheet->getCell([$totalIndex, $row]), $report->from, $report->to, ['view' => 'companies'], 'report_cashflow_group');
+        ++$row;
+        foreach ([...$report->lines, $report->unmatched] as $line) {
+            self::labels($sheet, $row, [self::lineLabel($line)], $line->section);
+            foreach ($periods->columns as $index => $column) {
+                $cell = $sheet->getCell([$index + 2, $row]);
+                self::money($cell, $column->amounts[$line->key]);
+                $this->link($cell, $column->from, $column->to, ['view' => 'companies'], 'report_cashflow_group');
+            }
+            $totalCell = $sheet->getCell([$totalIndex, $row]);
+            self::money($totalCell, $line->total);
+            $this->link($totalCell, $report->from, $report->to, ['view' => 'companies'], 'report_cashflow_group');
+            ++$row;
+        }
+        $summaryRow = $row;
+        foreach (['Остаток на начало', 'Изменение', 'Остаток на конец', 'Деньги в пути', 'Без пары', 'Итого без несопоставленных'] as $label) {
+            self::labels($sheet, $row++, [$label], true);
+        }
+        foreach ($periods->columns as $index => $column) {
+            $this->writeBalanceColumn($sheet, $index + 2, $summaryRow, $column->from, $column->to, [
+                $column->opening, $column->amounts[$report->totals->key], $column->closing,
+                $column->transitNet, $column->unpairedNet, $column->withoutUnpaired,
+            ]);
+        }
+        $this->writeBalanceColumn($sheet, $totalIndex, $summaryRow, $report->from, $report->to, [
+            $periods->opening, $report->totals->total, $periods->closing,
+            $report->reconciliation->transitNet, $report->reconciliation->unpairedNet, $report->withoutUnpaired,
+        ]);
+        if ($periods->crossPairCount > 0) {
+            self::labels($sheet, $row, ['Пары между периодами']);
+            $this->link($sheet->getCell('A'.$row), $report->from, $report->to, ['_fragment' => 'pairs']);
+            $sheet->setCellValue('B'.$row, $periods->crossPairCount);
+            self::money($sheet->getCell('C'.$row), $periods->crossPairAmount);
+            ++$row;
+        }
+
+        return $row;
+    }
+
+    /** @param list<string> $amounts */
+    private function writeBalanceColumn(Worksheet $sheet, int $column, int $row, \DateTimeImmutable $from, \DateTimeImmutable $to, array $amounts): void
+    {
+        foreach ($amounts as $offset => $amount) {
+            self::money($sheet->getCell([$column, $row + $offset]), $amount);
+        }
+        $this->link($sheet->getCell([$column, $row + 3]), $from, $to, ['_fragment' => 'in-transit']);
+        $this->link($sheet->getCell([$column, $row + 4]), $from, $to, ['_fragment' => 'unpaired']);
+    }
+
+    private static function lineLabel(CashflowGroupReportLine $line): string
+    {
+        return str_repeat('    ', $line->level - 1).$line->name.($line->hasUnpaired ? ' ⚠' : '');
+    }
+
     private function writeLine(Worksheet $sheet, int $row, CashflowGroupReport $report, CashflowGroupReportLine $line): void
     {
-        self::labels($sheet, $row, [str_repeat('    ', $line->level - 1).$line->name.($line->hasUnpaired ? ' ⚠' : '')]);
+        self::labels($sheet, $row, [self::lineLabel($line)]);
         $amounts = [...array_values($line->amounts), $line->elimination, $line->total];
         foreach ($amounts as $index => $amount) {
             self::money($sheet->getCell([$index + 2, $row]), $amount);
@@ -105,7 +182,7 @@ final readonly class CashflowGroupReportXlsxWriter
             $sheet->getStyle('A'.$row.':'.Coordinate::stringFromColumnIndex(1 + \count($amounts)).$row)->getFont()->setBold(true);
         }
         if ([] !== $line->pairIds) {
-            $this->link($sheet->getCell([\count($amounts), $row]), $report, ['row' => $line->key, '_fragment' => 'pairs']);
+            $this->link($sheet->getCell([\count($amounts), $row]), $report->from, $report->to, ['row' => $line->key, '_fragment' => 'pairs']);
         }
     }
 
@@ -127,20 +204,20 @@ final readonly class CashflowGroupReportXlsxWriter
             $outDate = $out->occurredAt->format('Y-m-d');
             $outInPeriod = $first <= $outDate && $outDate <= $last;
             self::money($sheet->getCell('G'.$row), $outInPeriod ? $out->amount->negate()->toDecimalString() : $in->amount->toDecimalString());
-            $this->link($sheet->getCell(($outInPeriod ? 'F' : 'C').$row), $report, ['operation' => $outInPeriod ? $inId : $outId, '_fragment' => 'operation']);
+            $this->link($sheet->getCell(($outInPeriod ? 'F' : 'C').$row), $report->from, $report->to, ['operation' => $outInPeriod ? $inId : $outId, '_fragment' => 'operation']);
             ++$row;
         }
     }
 
     /** @param array<string, string> $parameters */
-    private function link(Cell $cell, CashflowGroupReport $report, array $parameters): void
+    private function link(Cell $cell, \DateTimeImmutable $from, \DateTimeImmutable $to, array $parameters, string $route = 'report_cashflow_group_reconciliation'): void
     {
         if (null === $this->urls) {
             return;
         }
-        $url = $this->urls->generate('report_cashflow_group_reconciliation', [
-            'from' => $report->from->format('Y-m-d'),
-            'to' => $report->to->format('Y-m-d'),
+        $url = $this->urls->generate($route, [
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->format('Y-m-d'),
             ...$parameters,
         ], UrlGeneratorInterface::ABSOLUTE_URL);
         $cell->getHyperlink()->setUrl($url);

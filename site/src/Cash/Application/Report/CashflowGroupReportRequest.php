@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Application\Report;
 
+use App\Cash\Application\DTO\CashflowGroupRangeTooLarge;
 use App\Cash\Application\DTO\CashflowGroupReport;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
@@ -20,17 +21,16 @@ final readonly class CashflowGroupReportRequest
 {
     public function __construct(
         private BuildCashflowGroupReport $build,
-        private IntragroupGroupAccess $access,
         private ClockInterface $clock,
     ) {
     }
 
     /**
-     * @return CashflowGroupReport|null null — активная компания вне группы
+     * @return ($reconciliation is true ? CashflowGroupReport|null : CashflowGroupReport|CashflowGroupRangeTooLarge|null) null — активная компания вне группы
      *
      * @throws AccessDeniedException пользователь не владелец какой-то компании группы
      */
-    public function __invoke(Request $request, Company $activeCompany, User $user): ?CashflowGroupReport
+    public function __invoke(Request $request, Company $activeCompany, User $user, bool $reconciliation = false): CashflowGroupReport|CashflowGroupRangeTooLarge|null
     {
         $today = $this->clock->now();
         $from = self::date($request->query->getString('from')) ?? $today->modify('first day of this month');
@@ -39,13 +39,19 @@ final readonly class CashflowGroupReportRequest
             [$from, $to] = [$to, $from];
         }
 
-        $report = ($this->build)((string) $activeCompany->getId(), $from->setTime(0, 0), $to->setTime(0, 0));
-        if (null === $report) {
-            return null;
-        }
-        $this->access->assertOwner(array_keys($report->companies), (string) $user->getId());
+        $group = $reconciliation || 'companies' === $request->query->getString('view') ? null : self::group($request);
 
-        return $report;
+        return ($this->build)(
+            (string) $activeCompany->getId(), $from->setTime(0, 0), $to->setTime(0, 0),
+            $group, (string) $user->getId(),
+        );
+    }
+
+    public static function group(Request $request): string
+    {
+        $group = $request->query->getString('group');
+
+        return \in_array($group, ['week', 'quarter', 'year'], true) ? $group : 'month';
     }
 
     private static function date(string $value): ?\DateTimeImmutable

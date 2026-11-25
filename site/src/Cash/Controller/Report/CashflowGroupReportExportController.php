@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Cash\Controller\Report;
 
+use App\Cash\Application\DTO\CashflowGroupRangeTooLarge;
 use App\Cash\Application\Report\CashflowGroupReportRequest;
 use App\Cash\Infrastructure\Export\CashflowGroupReportXlsxWriter;
 use App\Company\Entity\User;
@@ -31,9 +32,17 @@ final class CashflowGroupReportExportController extends AbstractController
     {
         $user = $this->getUser();
         \assert($user instanceof User);
-        $report = ($this->report)($request, $this->companyService->getActiveCompany(), $user);
+        $company = $this->companyService->getActiveCompany();
+        $report = ($this->report)($request, $company, $user);
         if (null === $report) {
             return $this->redirectToRoute('report_cashflow_group');
+        }
+
+        if ($report instanceof CashflowGroupRangeTooLarge) {
+            return $this->render('cash/report/cashflow_group.html.twig', [
+                'report' => null, 'oversized' => $report, 'companyName' => $company->getName(),
+                'selectedGroup' => $report->requestedGroup,
+            ]);
         }
 
         $file = tempnam(sys_get_temp_dir(), 'cashflow_group_');

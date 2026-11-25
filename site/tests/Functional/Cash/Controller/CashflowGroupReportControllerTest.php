@@ -17,6 +17,7 @@ use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Fixtures\Cash\IntragroupReportFixture;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Doctrine\ORM\EntityManagerInterface;
+use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 
@@ -59,7 +60,7 @@ final class CashflowGroupReportControllerTest extends WebTestCaseBase
         $this->client->loginUser($this->owner);
         $this->setClientSessionValue($this->client, 'active_company_id', self::MEMBER);
 
-        $crawler = $this->client->request('GET', '/finance/reports/cashflow/group?from=2026-11-01&to=2026-11-30');
+        $crawler = $this->client->request('GET', '/finance/reports/cashflow/group?from=2026-11-01&to=2026-11-30&view=companies');
 
         self::assertResponseIsSuccessful();
         $head = $crawler->filter('[data-test="group-report"] thead')->text();
@@ -72,7 +73,7 @@ final class CashflowGroupReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('Нет активных счетов', $crawler->filter('[data-test="group-report-accounts"]')->text());
         self::assertSame('/finance/reports/cashflow/group/reconciliation?from=2026-11-01&to=2026-11-30', $crawler->selectLink('Сверка')->attr('href'));
 
-        $this->client->request('GET', '/finance/reports/cashflow/group/export.xlsx?from=2026-11-01&to=2026-11-30');
+        $this->client->request('GET', '/finance/reports/cashflow/group/export.xlsx?from=2026-11-01&to=2026-11-30&view=companies');
 
         self::assertResponseIsSuccessful();
         self::assertResponseHeaderSame('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -96,7 +97,7 @@ final class CashflowGroupReportControllerTest extends WebTestCaseBase
 
         $period = '?from=2026-11-01&to=2026-11-30';
         $reconciliation = '/finance/reports/cashflow/group/reconciliation'.$period;
-        $page = $this->client->request('GET', '/finance/reports/cashflow/group'.$period);
+        $page = $this->client->request('GET', '/finance/reports/cashflow/group'.$period.'&view=companies');
         self::assertResponseIsSuccessful();
 
         $income = $page->filter('[data-row-key="OP_IN_OTHER"]');
@@ -117,6 +118,31 @@ final class CashflowGroupReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('12.11.2026', $accounts->text());
         self::assertStringContainsString('Отстаёт', $accounts->text());
         self::assertStringNotContainsString('40802810000000000001', $accounts->text());
+    }
+
+    public function testExportUsesSelectedViewAndDefaultsToCalendarMonths(): void
+    {
+        $this->client->loginUser($this->owner);
+        $this->setClientSessionValue($this->client, 'active_company_id', self::MEMBER);
+        $url = '/finance/reports/cashflow/group/export.xlsx?from=2026-10-01&to=2026-12-31';
+        $path = tempnam(sys_get_temp_dir(), 'group_view_test_');
+        self::assertNotFalse($path);
+        try {
+            foreach (['' => '10.2026', '&view=periods&group=quarter' => '4 кв. 2026', '&view=companies' => 'Элиминация'] as $query => $expectedHeader) {
+                $this->client->request('GET', $url.$query);
+                self::assertResponseIsSuccessful();
+                file_put_contents($path, $this->client->getInternalResponse()->getContent());
+                $book = (new Xlsx())->load($path);
+                try {
+                    $cells = array_merge(...$book->getSheet(0)->toArray());
+                    self::assertContains($expectedHeader, $cells);
+                } finally {
+                    $book->disconnectWorksheets();
+                }
+            }
+        } finally {
+            unlink($path);
+        }
     }
 
     public function testCompanyOutsideGroupExplains(): void

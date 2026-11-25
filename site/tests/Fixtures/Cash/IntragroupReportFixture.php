@@ -142,6 +142,21 @@ trait IntragroupReportFixture
         $this->em->flush();
     }
 
+    private function loadPeriodTransactions(): void
+    {
+        $this->loadNovemberTransactions();
+        $this->fillMissingInns();
+        foreach ($this->accounts as $account) {
+            $account->setOpeningBalance('0.00');
+            $account->setOpeningBalanceDate(new \DateTimeImmutable('2026-10-01'));
+        }
+        $this->addTransaction(34, '0002', '2026-11-30', '-40000', 'ООО "Бета"', 'OP_OUT_OTHER');
+        $this->addTransaction(35, '0003', '2026-12-02', '40000', 'ООО "Альфа"', 'OP_IN_OTHER');
+        $this->addTransaction(36, '0004', '2026-12-03', '5000', 'Внешний', 'OP_IN_CUSTOMERS');
+        $this->addTransaction(37, '0001', '2026-10-15', '10000', 'Внешний', 'OP_IN_CUSTOMERS');
+        $this->em->flush();
+    }
+
     private function addTransaction(int $number, string $account, string $date, string $signedAmount, string $card, string $code): void
     {
         $moneyAccount = $this->accounts[$account];
@@ -170,10 +185,10 @@ trait IntragroupReportFixture
         $this->em->flush();
     }
 
-    private function report(string $from = '2026-11-01', string $to = '2026-11-18'): CashflowGroupReport
+    private function report(string $from = '2026-11-01', string $to = '2026-11-18', ?string $group = null): CashflowGroupReport
     {
-        $report = self::getContainer()->get(BuildCashflowGroupReport::class)((string) $this->companies['Альфа']->getId(), new \DateTimeImmutable($from), new \DateTimeImmutable($to));
-        self::assertNotNull($report);
+        $report = self::getContainer()->get(BuildCashflowGroupReport::class)((string) $this->companies['Альфа']->getId(), new \DateTimeImmutable($from), new \DateTimeImmutable($to), $group);
+        self::assertInstanceOf(CashflowGroupReport::class, $report);
 
         return $report;
     }

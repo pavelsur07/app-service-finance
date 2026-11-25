@@ -29,6 +29,7 @@ final readonly class CashflowGroupReport
         public array $accounts,
         public string $withoutUnpaired,
         private array $companyInns,
+        public ?CashflowGroupPeriods $periods = null,
     ) {
     }
 

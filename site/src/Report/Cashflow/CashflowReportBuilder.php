@@ -15,6 +15,7 @@ use App\Cash\Facade\CashFacade;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Repository\ProjectDirectionRepository;
+use App\Shared\Service\ReportPeriodCalendar;
 
 final class CashflowReportBuilder
 {
@@ -35,7 +36,7 @@ final class CashflowReportBuilder
         $from = $params->from;
         $to = $params->to;
 
-        $periods = $this->buildPeriods($from, $to, $group);
+        $periods = ReportPeriodCalendar::periods($from, $to, $group);
         $periodCount = count($periods);
 
         $companyId = (string) $company->getId();
@@ -524,52 +525,6 @@ final class CashflowReportBuilder
         }
 
         return $tree;
-    }
-
-    private function buildPeriods(\DateTimeImmutable $from, \DateTimeImmutable $to, string $group): array
-    {
-        $periods = [];
-        $current = $from;
-        while ($current <= $to) {
-            switch ($group) {
-                case 'day':
-                    $start = $current->setTime(0, 0);
-                    $end = $current->setTime(23, 59, 59);
-                    $label = $current->format('d.m.Y');
-                    $current = $current->modify('+1 day');
-                    break;
-                case 'week':
-                    $start = $current->setTime(0, 0);
-                    $end = min($start->modify('+6 days')->setTime(23, 59, 59), $to->setTime(23, 59, 59));
-                    $label = $start->format('d.m').'-'.$end->format('d.m');
-                    $current = $end->modify('+1 day')->setTime(0, 0);
-                    break;
-                case 'quarter':
-                    $startMonth = (int) $current->format('n');
-                    $startMonth = (int) floor(($startMonth - 1) / 3) * 3 + 1;
-                    $start = new \DateTimeImmutable($current->format('Y').'-'.sprintf('%02d', $startMonth).'-01 00:00:00');
-                    $end = min($start->modify('+3 months -1 day')->setTime(23, 59, 59), $to->setTime(23, 59, 59));
-                    $label = 'Q'.(((int) (($startMonth - 1) / 3)) + 1).' '.$start->format('Y');
-                    $current = $end->modify('+1 day')->setTime(0, 0);
-                    break;
-                case 'year':
-                    $start = new \DateTimeImmutable($current->format('Y-01-01 00:00:00'));
-                    $end = min($start->modify('+1 year -1 day')->setTime(23, 59, 59), $to->setTime(23, 59, 59));
-                    $label = $start->format('Y');
-                    $current = $end->modify('+1 day')->setTime(0, 0);
-                    break;
-                case 'month':
-                default:
-                    $start = new \DateTimeImmutable($current->format('Y-m-01 00:00:00'));
-                    $end = min($start->modify('+1 month -1 day')->setTime(23, 59, 59), $to->setTime(23, 59, 59));
-                    $label = $start->format('m.Y');
-                    $current = $end->modify('+1 day')->setTime(0, 0);
-                    break;
-            }
-            $periods[] = ['label' => $label, 'start' => $start, 'end' => $end];
-        }
-
-        return $periods;
     }
 
     private function findPeriodIndex(array $periods, \DateTimeInterface $date): ?int

@@ -12,6 +12,7 @@ final readonly class CashflowGroupReportAmount
         public string $categoryId,
         public string $currency,
         public string $amount,
+        public ?string $periodStart = null,
     ) {
     }
 }
