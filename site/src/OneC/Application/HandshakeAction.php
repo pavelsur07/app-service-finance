@@ -1,0 +1,84 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\OneC\Application;
+
+use App\Company\Facade\CompanyFacade;
+use App\OneC\Entity\OneCConnection;
+use Doctrine\DBAL\LockMode;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Clock\ClockInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+
+final readonly class HandshakeAction
+{
+    public function __construct(
+        private EntityManagerInterface $em,
+        private ConfigurationSupport $support,
+        private CompanyFacade $companies,
+        private ClockInterface $clock,
+        private RateLimiterFactory $onecHandshakeLimiter,
+    ) {
+    }
+
+    /** @return array<string, mixed> */
+    public function __invoke(#[\SensitiveParameter] string $token, string $json): array
+    {
+        return $this->em->wrapInTransaction(function () use ($token, $json): array {
+            $connection = $this->em->createQueryBuilder()
+                ->select('c')->from(OneCConnection::class, 'c')
+                ->where('c.tokenHash = :hash')->setParameter('hash', hash('sha256', $token))
+                ->getQuery()->setLockMode(LockMode::PESSIMISTIC_WRITE)->getOneOrNullResult();
+            if (!$connection instanceof OneCConnection) {
+                throw new \DomainException('Неверный токен подключения.', 401);
+            }
+            if ('disabled' === $connection->status) {
+                throw new \DomainException('Подключение отключено.', 403);
+            }
+            if (!$this->onecHandshakeLimiter->create($connection->id)->consume()->isAccepted()) {
+                throw new \DomainException('Повторите рукопожатие через минуту.', 429);
+            }
+            $snapshot = HandshakeSnapshot::parse($json);
+            $now = $this->clock->now();
+            $support = $this->support->evaluate($snapshot);
+            $connection->handshake($snapshot->baseId, $snapshot->versions, 'unsupported' !== $support['level'], $now);
+            $this->em->flush();
+            $organizations = $this->syncOrganizations($connection, $snapshot);
+
+            return [
+                'connection_id' => $connection->id,
+                'status' => $connection->status,
+                'server_time' => $now->format(\DATE_ATOM),
+                'support' => $support,
+                'organizations' => $organizations,
+                'messages' => [],
+            ];
+        });
+    }
+
+    /** @return list<array{guid: string, mapped: bool, company_name: ?string}> */
+    private function syncOrganizations(OneCConnection $connection, HandshakeSnapshot $snapshot): array
+    {
+        $db = $this->em->getConnection();
+        $db->executeStatement('UPDATE onec_organization SET present = FALSE WHERE connection_id = ? AND present', [$connection->id]);
+        $rows = $db->fetchAllAssociative(<<<'SQL'
+            INSERT INTO onec_organization (connection_id, guid, name, inn, kpp, present, enabled)
+            SELECT :id, guid, name, inn, kpp, TRUE, FALSE FROM jsonb_to_recordset(CAST(:organizations AS jsonb))
+                AS org(guid uuid, name text, inn text, kpp text)
+            ON CONFLICT (connection_id, guid) DO UPDATE SET
+                name = EXCLUDED.name, inn = EXCLUDED.inn, kpp = EXCLUDED.kpp, present = TRUE
+            RETURNING guid, company_id
+            SQL, ['id' => $connection->id, 'organizations' => json_encode($snapshot->organizations, \JSON_THROW_ON_ERROR)]);
+        $names = [];
+        if ([] !== array_filter(array_column($rows, 'company_id'))) {
+            $names = $this->companies->activeOwnedCompanyNames($connection->ownerId);
+        }
+
+        return array_map(static function (array $row) use ($names): array {
+            $name = $names[$row['company_id']] ?? null;
+
+            return ['guid' => (string) $row['guid'], 'mapped' => null !== $name, 'company_name' => $name];
+        }, $rows);
+    }
+}

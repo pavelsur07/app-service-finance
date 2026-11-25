@@ -4,6 +4,10 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    onec.bp30_config_name: 'БухгалтерияПредприятия'
+    # Конкретные нижние границы назначаются после проверки релизов на реальных базах.
+    onec.minimum_config_version: ''
+    onec.minimum_processor_version: ''
     env(SPA_ACCOUNT_HOST): 'account.vashfindir.ru'
     env(SPA_ADMIN_HOST): 'admin.vashfindir.ru'
     # Стартовые шаблоны онбординга по профилю бизнеса (App\Company\Enum\BusinessProfile).

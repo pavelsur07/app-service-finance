@@ -23,6 +23,12 @@ doctrine:
             Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
         auto_mapping: true
         mappings:
+            OneC:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/OneC/Entity'
+                prefix: 'App\OneC\Entity'
+                alias: OneC
             Api:
                 type: attribute
                 is_bundle: false

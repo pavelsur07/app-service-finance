@@ -43,8 +43,9 @@ final readonly class EventScrubber
         $request = $event->getRequest();
         $url = $request['url'] ?? null;
         $path = \is_string($url) ? parse_url($url, \PHP_URL_PATH) : null;
-        $sensitiveMcpRequest = \is_string($path) && McpRequestPath::containsSensitiveData($path);
-        if ($sensitiveMcpRequest) {
+        $sensitiveRequest = \is_string($path) && (McpRequestPath::containsSensitiveData($path)
+            || str_starts_with($path, '/api/onec/v1/') || '/onec/connections/new' === $path);
+        if ($sensitiveRequest) {
             unset($request['data'], $request['query_string'], $request['cookies'], $request['env']);
             $request['url'] = substr($url, 0, strcspn($url, '?#'));
             if (\is_array($request['headers'] ?? null)) {
@@ -55,7 +56,7 @@ final readonly class EventScrubber
                 );
             }
         }
-        $event->setExtra($sensitiveMcpRequest ? [] : $this->scrubArray($event->getExtra()));
+        $event->setExtra($sensitiveRequest ? [] : $this->scrubArray($event->getExtra()));
         $event->setTags($this->scrubTags($event->getTags()));
 
         if ([] !== $request) {

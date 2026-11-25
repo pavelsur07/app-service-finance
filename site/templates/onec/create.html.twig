@@ -1,0 +1,25 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Подключение 1С{% endblock %}
+
+{% block content %}
+    {% include 'partials/_page_header.html.twig' with {title: 'Подключение 1С:Бухгалтерии 3.0', container: false} only %}
+    <section class="card"><div class="card-body">
+        {% if secret %}
+            <p>Вставьте адрес рукопожатия и токен в обработку ВФ_Обмен. Токен показан один раз.</p>
+            <dl>
+                <dt>Адрес рукопожатия</dt><dd><code>{{ url('onec_handshake') }}</code></dd>
+                <dt>Токен</dt><dd><code data-onec-token>{{ secret }}</code></dd>
+            </dl>
+        {% else %}
+            <form method="post">
+                <input type="hidden" name="request_id" value="{{ requestId }}">
+                <input type="hidden" name="_token" value="{{ csrf_token(tokenId) }}">
+                <label class="form-label" for="onec-name">Название подключения</label>
+                <input class="form-control mb-3" id="onec-name" name="name" maxlength="255" required>
+                {% if invalidName %}<p class="text-danger" role="alert">Введите название длиной от 1 до 255 символов.</p>{% endif %}
+                <button class="btn btn-primary" type="submit">Создать подключение</button>
+            </form>
+        {% endif %}
+    </div></section>
+{% endblock %}

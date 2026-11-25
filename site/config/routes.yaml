@@ -214,3 +214,9 @@ mcp_controllers:
         path: ../src/Mcp/Controller/
         namespace: App\Mcp\Controller
     type: attribute
+
+onec_controllers:
+    resource:
+        path: ../src/OneC/Controller/
+        namespace: App\OneC\Controller
+    type: attribute

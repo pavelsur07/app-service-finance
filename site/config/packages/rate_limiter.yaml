@@ -64,3 +64,7 @@ framework:
             limit: 20
             interval: '1 minute'
             cache_pool: cache.rate_limiter
+        onec_handshake:
+            policy: fixed_window
+            limit: 60
+            interval: '1 minute'
