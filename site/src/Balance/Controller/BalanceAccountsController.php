@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Balance\Controller;
 
+use App\Balance\Application\EnsureBalanceStructureAction;
 use App\Balance\Exception\BalanceLedgerException;
 use App\Balance\Infrastructure\Query\LedgerQuery;
 use App\Balance\Security\BalanceAccess;
@@ -23,6 +24,7 @@ final class BalanceAccountsController extends AbstractController
         private readonly ActiveCompanyService $activeCompany,
         private readonly BalanceAccess $access,
         private readonly LedgerQuery $query,
+        private readonly EnsureBalanceStructureAction $ensureStructure,
     ) {
     }
 
@@ -34,6 +36,7 @@ final class BalanceAccountsController extends AbstractController
             throw $this->createAccessDeniedException();
         }
         $this->access->actor($companyId);
+        ($this->ensureStructure)($companyId); // структура и типовой справочник счетов, как на главной Баланса
         $limit = $request->query->getInt('limit', 50);
         if ($limit < 1 || $limit > 200) {
             throw new BalanceLedgerException('Количество строк должно быть от 1 до 200.');
