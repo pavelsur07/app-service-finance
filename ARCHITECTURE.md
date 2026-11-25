@@ -2130,8 +2130,8 @@ setAccountBalanceFromSource(string $companyId, string $actorId, string $accountI
 компании (форма `CompanyController::new` и `CreateCompanyOwnerAccountAction`) после flush внутри
 транзакции.
 `seedDefaultStructure()` остаётся для ручного восстановления. Компании, созданные до сида, получают
-структуру лениво: `EnsureBalanceStructureAction` вызывается в `BalanceController` и
-`BalanceStructureController` после проверки прав, сначала дешёвая проверка (нет статей и книга
+структуру лениво: `EnsureBalanceStructureAction` вызывается в `BalanceController`,
+`BalanceAccountsController` и `BalanceStructureController` после проверки прав, сначала дешёвая проверка (нет статей и книга
 не инициализирована), потом системный сид (`system_seed`) и справочник; у компании со структурой —
 только `SyncStandardChartAction` (после отметки версии — один запрос). `BalanceFacade::ensureStandardChart()`
 делает то же для чужих модулей (страница «Склады» МойСклад при финансовом доступе), коммитит сам. Бэкфилл для компаний без структуры —

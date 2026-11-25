@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Balance\Controller;
 
+use App\Balance\Application\SeedBalanceStructureAction;
 use App\Balance\Entity\BalanceOperation;
 use App\Balance\Entity\BalanceOperationLine;
 use App\Balance\Enum\BalanceCategoryType;
@@ -298,6 +299,18 @@ final class BalanceLedgerUiTest extends WebTestCaseBase
         $client->request('GET', '/balance/');
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('main', 'Учет не начат');
+    }
+
+    public function testAccountsPageAddsStandardChartForExistingStructure(): void
+    {
+        $client = static::createClient();
+        $companyId = $this->loginOwner($client);
+        self::assertTrue(self::getContainer()->get(SeedBalanceStructureAction::class)($companyId));
+
+        $client->request('GET', '/balance/accounts');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('main', 'Склады фулфилмента');
+        self::assertSame(28, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_accounts WHERE company_id=?', [$companyId]));
     }
 
     public function testReadScreensRenderWithoutAnyAccounts(): void
