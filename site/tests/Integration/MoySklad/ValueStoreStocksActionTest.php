@@ -234,6 +234,17 @@ final class ValueStoreStocksActionTest extends IntegrationTestCase
         self::assertSame('54017', $this->connection->fetchOne('SELECT target_minor::text FROM moysklad_store_balance_postings WHERE company_id = ?', [self::COMPANY]));
     }
 
+    public function testInactiveConnectionIsNotPosted(): void
+    {
+        $this->enable();
+        ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT);
+        $this->connection->delete('moysklad_store_balance_postings', ['company_id' => self::COMPANY]);
+        $this->connection->update('moysklad_connections', ['is_active' => 'false'], ['id' => self::CONNECTION]);
+
+        self::assertSame('skipped', ($this->action([]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT));
+        self::assertSame(0, $this->counts()['postings']);
+    }
+
     public function testDisabledWritingOnlyValues(): void
     {
         self::assertSame('valued', ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT));

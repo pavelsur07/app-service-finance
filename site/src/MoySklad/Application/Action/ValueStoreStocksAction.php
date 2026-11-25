@@ -27,8 +27,8 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
  *    (себестоимость — на момент первой оценки), повтор после сбоя фазы 1–2 заменяет строки;
  * 3. статус `posting`, затем по каждому назначенному счёту — `BalanceFacade::setAccountBalanceFromSource`
  *    (транзакция Баланса), итог счёта-дня — отдельной записью. Ключ запроса = (подключение, счёт, снимок):
- *    повтор → тот же документ. Снимок старше уже проводимого пропускается (`superseded`): проводка —
- *    корректировка на дату, опоздавший снимок сдвинул бы более свежий остаток.
+ *    повтор → тот же документ. Проводится только последний completed-снимок подключения, остальные —
+ *    `superseded`: проводка — корректировка на дату, опоздавший снимок сдвинул бы более свежий остаток.
  */
 final readonly class ValueStoreStocksAction
 {
@@ -196,12 +196,14 @@ final readonly class ValueStoreStocksAction
         if (false === $settings || !$settings['enabled'] || null === $settings['counter_account_id']) {
             return ['status' => 'valued', 'reason' => null];
         }
-        // Проведённые итоги — источник истины «более свежий снимок уже в Балансе» (статус прогона меняется повторами).
-        $newer = $this->db->fetchOne("SELECT 1 FROM moysklad_store_balance_postings p
-            JOIN moysklad_stock_snapshots n ON n.company_id = p.company_id AND n.connection_id = p.connection_id AND n.id = p.snapshot_id
-            JOIN moysklad_stock_snapshots c ON c.company_id = p.company_id AND c.connection_id = p.connection_id AND c.id = ?
-            WHERE p.company_id = ? AND p.connection_id = ? AND p.snapshot_id <> c.id AND p.status IN ('posted', 'unchanged')
-              AND (n.started_at, n.id) > (c.started_at, c.id) LIMIT 1", [$snapshotId, $companyId, $connectionId]);
+        if (false === $this->db->fetchOne('SELECT 1 FROM moysklad_connections WHERE company_id = ? AND id = ? AND is_active', [$companyId, $connectionId])) {
+            return ['status' => 'skipped', 'reason' => 'auth'];
+        }
+        // Проводится только последний completed-снимок подключения: проводка — корректировка на дату, и более
+        // старый снимок сдвинул бы свежий остаток. Не зависит от итогов проводок и статусов прогонов.
+        $newer = $this->db->fetchOne("SELECT 1 FROM moysklad_stock_snapshots n
+            JOIN moysklad_stock_snapshots c ON c.company_id = n.company_id AND c.connection_id = n.connection_id AND c.id = ?
+            WHERE n.company_id = ? AND n.connection_id = ? AND n.status = 'completed' AND (n.started_at, n.id) > (c.started_at, c.id) LIMIT 1", [$snapshotId, $companyId, $connectionId]);
         if (false !== $newer) {
             return ['status' => 'skipped', 'reason' => 'superseded'];
         }

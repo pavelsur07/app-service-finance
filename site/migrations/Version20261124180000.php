@@ -57,6 +57,7 @@ final class Version20261124180000 extends AbstractMigration
                 PRIMARY KEY (company_id, snapshot_id, store_external_id)
             )
             SQL);
+        $this->addSql('CREATE INDEX idx_ms_store_valuations_store ON moysklad_store_valuations (company_id, connection_id, store_external_id)');
         $this->addSql('ALTER TABLE moysklad_store_valuations ADD CONSTRAINT fk_ms_store_valuations_run FOREIGN KEY (company_id, snapshot_id) REFERENCES moysklad_store_balance_runs (company_id, snapshot_id) ON DELETE RESTRICT NOT DEFERRABLE');
         $this->addSql('ALTER TABLE moysklad_store_valuations ADD CONSTRAINT fk_ms_store_valuations_store FOREIGN KEY (company_id, connection_id, store_external_id) REFERENCES moysklad_stores (company_id, connection_id, external_id) ON DELETE RESTRICT NOT DEFERRABLE');
 
@@ -69,6 +70,7 @@ final class Version20261124180000 extends AbstractMigration
                 PRIMARY KEY (company_id, connection_id, valuation_date, balance_account_id)
             )
             SQL);
+        $this->addSql('CREATE INDEX idx_ms_store_balance_postings_run ON moysklad_store_balance_postings (company_id, snapshot_id)');
         $this->addSql('ALTER TABLE moysklad_store_balance_postings ADD CONSTRAINT fk_ms_store_balance_postings_run FOREIGN KEY (company_id, snapshot_id) REFERENCES moysklad_store_balance_runs (company_id, snapshot_id) ON DELETE RESTRICT NOT DEFERRABLE');
     }
 

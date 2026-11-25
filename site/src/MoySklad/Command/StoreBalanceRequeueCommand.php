@@ -36,7 +36,8 @@ final class StoreBalanceRequeueCommand extends Command
             WHERE EXISTS (SELECT 1 FROM moysklad_store_balance_links k WHERE k.company_id = latest.company_id AND k.connection_id = latest.connection_id AND NOT k.excluded)
               AND latest.completed_at < :stale
               AND (r.snapshot_id IS NULL OR (r.attempts < 6 AND COALESCE(r.finished_at, r.created_at) < :stale
-                   AND (r.status IN ('valuing', 'posting', 'partial') OR (r.status = 'failed' AND r.error_reason IN ('temporary', 'rate_limited')))))
+                   AND (r.status IN ('valuing', 'posting', 'partial')
+                   OR (r.status = 'valued' AND EXISTS (SELECT 1 FROM moysklad_store_balance_settings st WHERE st.company_id = r.company_id AND st.connection_id = r.connection_id AND st.enabled)) OR (r.status = 'failed' AND r.error_reason IN ('temporary', 'rate_limited')))))
             ORDER BY latest.company_id, latest.connection_id", [
             'since' => $now->modify('-2 days')->format('Y-m-d H:i:s.v'),
             'stale' => $now->modify('-30 minutes')->format('Y-m-d H:i:s.v'),

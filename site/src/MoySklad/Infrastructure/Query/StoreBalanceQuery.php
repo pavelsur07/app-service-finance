@@ -45,8 +45,9 @@ final readonly class StoreBalanceQuery
     /** @return array{snapshotId: string, date: string, status: string, errorReason: ?string, finishedAt: ?string}|null */
     public function latestRun(string $companyId, string $connectionId): ?array
     {
-        $row = $this->db->fetchAssociative('SELECT snapshot_id, valuation_date, status, error_reason, finished_at FROM moysklad_store_balance_runs
-            WHERE company_id = ? AND connection_id = ? ORDER BY created_at DESC, snapshot_id DESC LIMIT 1', [$companyId, $connectionId]);
+        $row = $this->db->fetchAssociative('SELECT r.snapshot_id, r.valuation_date, r.status, r.error_reason, r.finished_at FROM moysklad_store_balance_runs r
+            JOIN moysklad_stock_snapshots s ON s.company_id = r.company_id AND s.connection_id = r.connection_id AND s.id = r.snapshot_id
+            WHERE r.company_id = ? AND r.connection_id = ? ORDER BY s.started_at DESC, s.id DESC LIMIT 1', [$companyId, $connectionId]);
 
         return false === $row ? null : ['snapshotId' => (string) $row['snapshot_id'], 'date' => (string) $row['valuation_date'], 'status' => (string) $row['status'],
             'errorReason' => null === $row['error_reason'] ? null : (string) $row['error_reason'], 'finishedAt' => null === $row['finished_at'] ? null : (string) $row['finished_at']];
@@ -55,8 +56,10 @@ final readonly class StoreBalanceQuery
     /** Последняя оценённая версия — её суммы показываются, даже если более новый прогон упал. */
     public function latestValuedSnapshot(string $companyId, string $connectionId): ?string
     {
-        $id = $this->db->fetchOne("SELECT snapshot_id FROM moysklad_store_balance_runs WHERE company_id = ? AND connection_id = ? AND status <> 'valuing' AND status <> 'failed'
-            ORDER BY created_at DESC, snapshot_id DESC LIMIT 1", [$companyId, $connectionId]);
+        $id = $this->db->fetchOne("SELECT r.snapshot_id FROM moysklad_store_balance_runs r
+            JOIN moysklad_stock_snapshots s ON s.company_id = r.company_id AND s.connection_id = r.connection_id AND s.id = r.snapshot_id
+            WHERE r.company_id = ? AND r.connection_id = ? AND r.status <> 'valuing' AND r.status <> 'failed'
+            ORDER BY s.started_at DESC, s.id DESC LIMIT 1", [$companyId, $connectionId]);
 
         return false === $id ? null : (string) $id;
     }

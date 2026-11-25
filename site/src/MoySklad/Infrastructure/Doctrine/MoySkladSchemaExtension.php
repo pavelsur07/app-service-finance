@@ -189,6 +189,7 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
         $valuations->addColumn('unpriced_positions', 'integer', ['default' => 0]);
         $valuations->addColumn('missing_positions', 'integer', ['default' => 0]);
         $valuations->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'snapshot_id', 'store_external_id')->create());
+        $valuations->addIndex(['company_id', 'connection_id', 'store_external_id'], 'idx_ms_store_valuations_store');
         $valuations->addForeignKeyConstraint('moysklad_store_balance_runs', ['company_id', 'snapshot_id'], ['company_id', 'snapshot_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_store_valuations_run');
         $valuations->addForeignKeyConstraint('moysklad_stores', ['company_id', 'connection_id', 'store_external_id'], ['company_id', 'connection_id', 'external_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_store_valuations_store');
 
@@ -203,6 +204,7 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
         $postings->addColumn('operation_id', 'guid', ['notnull' => false]);
         $postings->addColumn('updated_at', 'datetime_immutable_utc_ms', ['precision' => 3]);
         $postings->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'connection_id', 'valuation_date', 'balance_account_id')->create());
+        $postings->addIndex(['company_id', 'snapshot_id'], 'idx_ms_store_balance_postings_run');
         $postings->addForeignKeyConstraint('moysklad_store_balance_runs', ['company_id', 'snapshot_id'], ['company_id', 'snapshot_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_store_balance_postings_run');
     }
 }
