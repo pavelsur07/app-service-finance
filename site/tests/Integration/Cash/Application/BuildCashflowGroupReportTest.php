@@ -38,6 +38,7 @@ final class BuildCashflowGroupReportTest extends IntegrationTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->connection->executeStatement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
         $this->owner = UserBuilder::aUser()->withId(Uuid::uuid4()->toString())->withEmail('report-'.Uuid::uuid4()->toString().'@example.test')->build();
         $this->em->persist($this->owner);
         $this->em->flush();
@@ -70,17 +71,30 @@ final class BuildCashflowGroupReportTest extends IntegrationTestCase
         $h = (string) $this->head->getId();
         $m = (string) $this->member->getId();
         self::assertSame([$h => 'Головная', $m => 'Дочерняя'], $report->companies, 'головная первой');
-        $this->assertLine($report, 'OP_IN_CUSTOMERS', [$h => '1000.00', $m => '0.00'], '1000.00', '0.00');
-        $this->assertLine($report, 'OP_OUT_SUPPLIERS', [$h => '0.00', $m => '-1000.00'], '-1000.00', '0.00');
+        $this->assertLine($report, 'OP_IN_CUSTOMERS', [$h => '1000.00', $m => '0.00'], '-1000.00', '0.00');
+        $this->assertLine($report, 'OP_OUT_SUPPLIERS', [$h => '0.00', $m => '-1000.00'], '1000.00', '0.00');
         $this->assertLine($report, 'OP_OUT_RENT', [$h => '0.00', $m => '-300.00'], '0.00', '-300.00');
-        $this->assertLine($report, 'OP_OUT', [$h => '0.00', $m => '-1300.00'], '-1000.00', '-300.00');
+        $this->assertLine($report, 'OP_OUT', [$h => '0.00', $m => '-1300.00'], '1000.00', '-300.00');
         self::assertSame([$h => '0.00', $m => '-50.00'], $report->unmatched->amounts, '«Своё» без кода — «Не сопоставлено»');
         self::assertSame('-50.00', $report->unmatched->total);
         self::assertSame([$h => '1000.00', $m => '-1350.00'], $report->totals->amounts);
-        self::assertSame('0.00', $report->totals->intragroup);
+        self::assertSame('0.00', $report->totals->elimination);
         self::assertSame('-350.00', $report->totals->total);
         self::assertSame(['USD' => [$h => '0.00', $m => '70.00']], $report->otherCurrencies);
         self::assertSame([], $report->companiesWithoutInn);
+    }
+
+    public function testOneSidedIntragroupPaymentStaysInTheGroupTotal(): void
+    {
+        $this->transaction($this->head, 'OP_OUT_SUPPLIERS', CashDirection::OUTFLOW, '90.01', self::MEMBER_INN);
+        $this->transaction($this->member, 'OP_IN_CUSTOMERS', CashDirection::INFLOW, '90.00', self::HEAD_INN);
+        $report = $this->report($this->head);
+        self::assertSame('-0.01', $report->totals->total);
+        self::assertSame('0.00', $report->totals->elimination);
+        self::assertTrue($this->line($report, 'OP_OUT')->hasUnpaired);
+        self::assertSame('-0.01', $report->reconciliation->unpairedNet);
+        self::assertCount(2, $report->reconciliation->unpaired);
+        self::assertTrue($report->reconciliation->balanced);
     }
 
     public function testUncodedSubcategoryOfHeadDoesNotDoubleParent(): void
@@ -104,10 +118,10 @@ final class BuildCashflowGroupReportTest extends IntegrationTestCase
 
         $report = $this->report($this->head);
 
-        self::assertSame('0.00', $report->totals->intragroup);
+        self::assertSame('0.00', $report->totals->elimination);
         self::assertSame('0.00', $report->totals->total, 'обе встречные операции исключены');
-        self::assertSame('100.00', $this->line($report, 'OP_IN_CUSTOMERS')->intragroup);
-        self::assertSame('-100.00', $this->line($report, 'OP_OUT_SUPPLIERS')->intragroup);
+        self::assertSame('-100.00', $this->line($report, 'OP_IN_CUSTOMERS')->elimination);
+        self::assertSame('100.00', $this->line($report, 'OP_OUT_SUPPLIERS')->elimination);
     }
 
     public function testCompanyColumnEqualsItsCashflowReport(): void
@@ -129,6 +143,16 @@ final class BuildCashflowGroupReportTest extends IntegrationTestCase
         self::assertSame($expected, $report->totals->amounts[(string) $this->member->getId()]);
     }
 
+    public function testReportUsesCalendarDatesWithTimeInTheRequest(): void
+    {
+        $this->transaction($this->head, 'OP_OUT_OTHER', CashDirection::OUTFLOW, '10.00', self::MEMBER_INN, date: '2026-11-01');
+        $this->transaction($this->member, 'OP_IN_OTHER', CashDirection::INFLOW, '10.00', self::HEAD_INN, date: '2026-11-02');
+        $report = self::getContainer()->get(BuildCashflowGroupReport::class)((string) $this->head->getId(), new \DateTimeImmutable('2026-11-01 12:00'), new \DateTimeImmutable('2026-11-02 12:00'));
+        self::assertNotNull($report);
+        self::assertCount(1, $report->reconciliation->pairs);
+        self::assertSame([], $report->reconciliation->inTransit);
+    }
+
     public function testWarnsAboutCompaniesWithoutInn(): void
     {
         $this->db()->executeStatement('UPDATE companies SET inn = NULL WHERE id = ?', [$this->member->getId()]);
@@ -142,11 +166,11 @@ final class BuildCashflowGroupReportTest extends IntegrationTestCase
     }
 
     /** @param array<string, string> $amounts */
-    private function assertLine(CashflowGroupReport $report, string $key, array $amounts, string $intragroup, string $total): void
+    private function assertLine(CashflowGroupReport $report, string $key, array $amounts, string $elimination, string $total): void
     {
         $line = $this->line($report, $key);
         self::assertSame($amounts, $line->amounts, $key);
-        self::assertSame($intragroup, $line->intragroup, $key);
+        self::assertSame($elimination, $line->elimination, $key);
         self::assertSame($total, $line->total, $key);
     }
 

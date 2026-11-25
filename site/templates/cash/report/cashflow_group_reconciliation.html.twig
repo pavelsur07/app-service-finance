@@ -1,0 +1,88 @@
+{% extends 'base.html.twig' %}
+{% import 'cash/report/cashflow_group_reconciliation/_macros.html.twig' as ui %}
+{% block title %}Сверка внутригрупповых операций{% endblock %}
+
+{% block body %}
+    {% embed 'partials/_page_header.html.twig' with {title: 'Сверка внутригрупповых операций'} %}
+        {% block actions %}
+            <a href="{{ path('report_cashflow_group', period|default({})) }}" class="btn btn-outline-secondary">К отчёту ДДС группы</a>
+        {% endblock %}
+    {% endembed %}
+    <div class="container-xl mt-3" data-test="group-reconciliation">
+        {% if report is null %}
+            <div class="alert alert-info">Компания «{{ companyName }}» не входит в группу консолидации. Группу можно задать в настройках головной компании.</div>
+        {% else %}
+            {% set rec = report.reconciliation %}
+            {% set canWrite = is_granted(constant('App\\Company\\Security\\ModuleAccess::FINANCE_WRITE')) %}
+            {% set token = canWrite ? csrf_token('cashflow-group' ~ report.headCompanyId) : '' %}
+            <form method="get" class="d-flex flex-wrap gap-2 align-items-end mb-3" action="{{ path('report_cashflow_group_reconciliation') }}">
+                <label class="form-label mb-0">С
+                    <input class="form-control" type="date" name="from" value="{{ period.from }}">
+                </label>
+                <label class="form-label mb-0">По
+                    <input class="form-control" type="date" name="to" value="{{ period.to }}">
+                </label>
+                <button class="btn btn-primary" type="submit">Показать</button>
+            </form>
+
+            {% if selectedOperation %}
+                <section class="card mb-3" id="operation">
+                    <h3 class="card-header">{{ selectedOperation.direction.value == 'INFLOW' ? 'Поступление' : 'Выплата' }}</h3>
+                    <div class="card-body">{{ ui.operation(selectedOperation, report.companies, period) }}</div>
+                </section>
+            {% endif %}
+
+            <section class="card mb-3" id="control">
+                <div class="card-header">
+                    <h3 class="card-title">Контроль оборотов</h3>
+                    {% if rec.balanced %}<span class="ms-auto text-secondary">Сверка сошлась</span>{% endif %}
+                </div>
+                <div class="card-body">
+                    {% if not rec.balanced %}
+                        <div class="alert alert-danger" role="alert">Контроль не сошёлся. Разница поступлений и выплат расходится с суммой операций без пары и денег в пути.</div>
+                    {% endif %}
+                    <dl class="row mb-0">
+                        <dt class="col-sm-7">Внутригрупповые поступления</dt><dd class="col-sm-5">{{ rec.income|vf_money(2, 'RUB') }}</dd>
+                        <dt class="col-sm-7">Внутригрупповые выплаты</dt><dd class="col-sm-5">{{ rec.expense|vf_money(2, 'RUB') }}</dd>
+                        <dt class="col-sm-7">Разница поступлений и выплат</dt><dd class="col-sm-5">{{ difference|vf_money(2, 'RUB') }}</dd>
+                        <dt class="col-sm-7"><a href="#unpaired">Без пары</a></dt><dd class="col-sm-5">{{ rec.unpairedNet|vf_money(2, 'RUB') }}</dd>
+                        <dt class="col-sm-7"><a href="#in-transit">Деньги в пути</a></dt><dd class="col-sm-5">{{ rec.transitNet|vf_money(2, 'RUB') }}</dd>
+                        <dt class="col-sm-7">Без пары и в пути, всего</dt><dd class="col-sm-5">{{ explainedNet|vf_money(2, 'RUB') }}</dd>
+                    </dl>
+                </div>
+            </section>
+
+            {% include 'cash/report/cashflow_group_reconciliation/_pairs.html.twig' with {pairs: shownPairs, transit: false, selectedRow: selectedRow, report: report, period: period, canWrite: canWrite, token: token, formIds: formIds} only %}
+            {% include 'cash/report/cashflow_group_reconciliation/_pairs.html.twig' with {pairs: rec.inTransit, transit: true, selectedRow: null, report: report, period: period, canWrite: canWrite, token: token, formIds: formIds} only %}
+            {% include 'cash/report/cashflow_group_reconciliation/_unpaired.html.twig' with {report: report, period: period, selected: selected, choices: choices, canWrite: canWrite, token: token, formIds: formIds} only %}
+
+            <section class="card mb-3" id="candidates">
+                <div class="card-header"><h3 class="card-title">Кандидаты на ИНН</h3></div>
+                {% if candidates %}
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead><tr><th>Компания</th><th>Контрагент</th><th>Предлагаемый ИНН</th><th>Владелец ИНН</th><th>Операций</th>{% if canWrite %}<th></th>{% endif %}</tr></thead>
+                            <tbody>
+                            {% for candidate in candidates %}
+                                <tr>
+                                    <td>{{ report.companies[candidate.companyId] }}</td>
+                                    <td>{{ candidate.name }}</td>
+                                    <td>{{ candidate.inn }}</td>
+                                    <td>{{ report.companies[candidate.peerCompanyId] }}</td>
+                                    <td>{{ candidate.operationCount }}</td>
+                                    {% if canWrite %}
+                                        <td>{{ ui.post('report_cashflow_group_assign_inn', {companyId: candidate.companyId, counterpartyId: candidate.counterpartyId, peerCompanyId: candidate.peerCompanyId, expectedInn: candidate.inn}, 'Проставить ИНН', period, token) }}</td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="card-body text-secondary mb-0">Кандидатов на ИНН нет.</p>
+                {% endif %}
+            </section>
+            {% include 'cash/report/cashflow_group_reconciliation/_decisions.html.twig' with {report: report, canWrite: canWrite, period: period, token: token} only %}
+        {% endif %}
+    </div>
+{% endblock %}

@@ -151,3 +151,6 @@ services:
     # MarketplaceAnalytics: integration-тест отчёта «Оборачиваемость» берёт Query из контейнера.
     App\MarketplaceAnalytics\Infrastructure\Query\StockTurnoverQuery:
         public: true
+
+    App\Cash\Application\Report\IntragroupDecisionAction:
+        public: true

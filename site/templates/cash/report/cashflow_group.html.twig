@@ -1,7 +1,24 @@
 {% extends 'base.html.twig' %}
 {% block title %}ДДС группы{% endblock %}
 
-{% macro money(value, currency=null) %}{{ value|vf_amount(2, null, false, currency) }}{% endmacro %}
+{% macro reportRow(line, period) %}
+    <tr data-row-key="{{ line.key }}" class="{{ line.section ? 'fw-bold' : '' }}">
+        <th scope="row" class="ps-{{ min(5, line.level + 1) }} {{ line.section ? 'fw-bold' : 'fw-normal' }}">
+            {{ line.name }}
+            {% if line.hasUnpaired %}<span role="img" aria-label="Есть операции без пары" title="Есть операции без пары">⚠</span>{% endif %}
+        </th>
+        {% for amount in line.amounts %}<td class="text-end text-nowrap">{{ amount|vf_amount }}</td>{% endfor %}
+        <td class="text-end text-nowrap">
+            {% if line.pairIds is not empty %}
+                <a href="{{ path('report_cashflow_group_reconciliation', period|merge({row: line.key})) }}"
+                   aria-label="{{ line.elimination|vf_money(2, 'RUB') }}, пары по строке «{{ line.name }}»">{{ line.elimination|vf_amount(2, null, true) }}</a>
+            {% else %}
+                {{ line.elimination|vf_amount(2, null, true) }}
+            {% endif %}
+        </td>
+        <td class="text-end text-nowrap">{{ line.total|vf_amount }}</td>
+    </tr>
+{% endmacro %}
 {% import _self as m %}
 
 {% block body %}
@@ -20,6 +37,7 @@
             </div>
         {% else %}
             {% set period = {from: report.from|date('Y-m-d'), to: report.to|date('Y-m-d')} %}
+            {% set reconciliationUrl = path('report_cashflow_group_reconciliation', period) %}
             <form method="get" class="d-flex flex-wrap gap-2 align-items-end mb-3">
                 <label class="form-label mb-0">С
                     <input type="date" name="from" value="{{ period.from }}" class="form-control">
@@ -28,6 +46,7 @@
                     <input type="date" name="to" value="{{ period.to }}" class="form-control">
                 </label>
                 <button type="submit" class="btn btn-primary">Показать</button>
+                <a href="{{ reconciliationUrl }}" class="btn btn-outline-primary">Сверка</a>
                 <a href="{{ path('report_cashflow_group_export', period) }}" class="btn btn-outline-secondary">
                     <i class="ti ti-download" aria-hidden="true"></i> Excel
                 </a>
@@ -40,6 +59,30 @@
                 </div>
             {% endif %}
 
+            <div class="card mb-3" data-test="group-report-accounts">
+                <div class="card-header"><h2 class="card-title">Данные по счетам</h2></div>
+                {% if report.accounts is empty %}
+                    <div class="card-body text-secondary">Нет активных счетов в RUB.</div>
+                {% else %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-vcenter card-table">
+                            <thead><tr><th scope="col">Счёт</th><th scope="col">Последняя операция</th></tr></thead>
+                            <tbody>
+                            {% for account in report.accounts %}
+                                <tr>
+                                    <td>{{ report.companies[account.companyId] }} · {{ account.label }}</td>
+                                    <td class="text-nowrap">
+                                        {{ account.lastDate ? account.lastDate|date('d.m.Y') : 'Нет операций' }}
+                                        {% if account.lagging %}<span class="badge bg-yellow-lt">Отстаёт</span>{% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            </div>
+
             <div class="card">
                 <div class="table-responsive">
                     <table class="table table-sm table-vcenter card-table" data-test="group-report">
@@ -47,34 +90,46 @@
                         <tr>
                             <th>Статья, RUB</th>
                             {% for name in report.companies %}<th class="text-end">{{ name }}</th>{% endfor %}
-                            <th class="text-end" title="Платежи между компаниями группы — по ИНН контрагента">Внутригрупповые</th>
+                            <th class="text-end" title="Обороты сверенных пар с обеими операциями в периоде">Элиминация</th>
                             <th class="text-end">Итого по группе</th>
                         </tr>
                         </thead>
                         <tbody>
                         {% for line in [...report.lines, report.unmatched] %}
-                            <tr class="{{ line.section ? 'fw-bold' : '' }}">
-                                <td style="padding-left: {{ 0.5 + (line.level - 1) * 1.25 }}rem">{{ line.name }}</td>
-                                {% for amount in line.amounts %}<td class="text-end text-nowrap">{{ m.money(amount) }}</td>{% endfor %}
-                                <td class="text-end text-nowrap text-secondary">{{ m.money(line.intragroup) }}</td>
-                                <td class="text-end text-nowrap">{{ m.money(line.total) }}</td>
-                            </tr>
+                            {{ m.reportRow(line, period) }}
                         {% endfor %}
                         </tbody>
                         <tfoot>
-                        <tr class="fw-bold">
-                            <td>{{ report.totals.name }}</td>
-                            {% for amount in report.totals.amounts %}<td class="text-end text-nowrap">{{ m.money(amount) }}</td>{% endfor %}
-                            <td class="text-end text-nowrap">{{ m.money(report.totals.intragroup) }}</td>
-                            <td class="text-end text-nowrap">{{ m.money(report.totals.total) }}</td>
+                        {{ m.reportRow(report.totals, period) }}
+                        {% set labelColumns = report.companies|length + 2 %}
+                        <tr data-test="group-report-transit">
+                            <th scope="row" colspan="{{ labelColumns }}">
+                                {% if report.reconciliation.inTransit is not empty %}
+                                    <a href="{{ reconciliationUrl }}#in-transit">Деньги в пути (пара за границей периода)</a>
+                                {% else %}
+                                    Деньги в пути (пара за границей периода)
+                                {% endif %}
+                            </th>
+                            <td class="text-end text-nowrap">{{ report.reconciliation.transitNet|vf_amount }}</td>
+                        </tr>
+                        <tr data-test="group-report-unpaired">
+                            <th scope="row" colspan="{{ labelColumns }}">
+                                <a href="{{ reconciliationUrl }}#unpaired">Без пары</a>
+                                <span class="text-secondary">(операций: {{ report.reconciliation.unpaired|length|vf_number }})</span>
+                            </th>
+                            <td class="text-end text-nowrap">{{ report.reconciliation.unpairedNet|vf_amount }}</td>
+                        </tr>
+                        <tr data-test="group-report-without-unpaired" class="fw-bold">
+                            <th scope="row" colspan="{{ labelColumns }}">Итого без несопоставленных</th>
+                            <td class="text-end text-nowrap">{{ report.withoutUnpaired|vf_amount }}</td>
                         </tr>
                         </tfoot>
                     </table>
                 </div>
             </div>
             <p class="text-secondary small mt-2">
-                Строки — статьи головной компании. Подстатьи компаний сворачиваются к статье группы с тем же кодом;
-                статьи без кода — в строке «Не сопоставлено». «Итого по группе» — сумма компаний минус внутригрупповые.
+                Строки соответствуют статьям головной компании. Обороты по статьям без кода группы входят в строку
+                «Не сопоставлено». Деньги в пути и операции без пары остаются в итоге по группе.
             </p>
 
             {% for currency, amounts in report.otherCurrencies %}
@@ -82,7 +137,7 @@
                     <div class="card-header"><h3 class="card-title">Другая валюта: {{ currency }} — в таблицу выше не входит</h3></div>
                     <table class="table table-sm card-table">
                         <tr>{% for name in report.companies %}<th class="text-end">{{ name }}</th>{% endfor %}</tr>
-                        <tr>{% for amount in amounts %}<td class="text-end">{{ m.money(amount, currency) }}</td>{% endfor %}</tr>
+                        <tr>{% for amount in amounts %}<td class="text-end">{{ amount|vf_amount(2, null, false, currency) }}</td>{% endfor %}</tr>
                     </table>
                 </div>
             {% endfor %}
