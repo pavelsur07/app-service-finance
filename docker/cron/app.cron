@@ -411,6 +411,12 @@
 # МойСклад: страховка пакетов принятия предложений — переотправка queued/running без heartbeat > 10 мин.
 */10 * * * * cd /app && php bin/console app:moysklad:mapping-bulk:requeue --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
 
+# МойСклад: склады → Баланс. Снимок остатков на конец дня для подключений с включённой записью;
+# после снимка — оценка по себестоимости и установка остатков счетов (ValueStoreStocksMessage).
+30 23 * * * cd /app && php bin/console app:moysklad:store-balance:daily --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+# Страховка: потерянная постановка оценки, зависший прогон, временный сбой — повтор через 30 мин (до 6 попыток).
+*/15 * * * * cd /app && php bin/console app:moysklad:store-balance:requeue --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # МойСклад: автоприменение однозначных предложений там, где его включили в «Параметрах».
 # После ночной загрузки каталогов маркетплейсов (Ozon 03:40); один пакет в сутки на подключение и маркетплейс.
 30 5 * * * cd /app && php bin/console app:moysklad:mapping-auto-apply --no-interaction --quiet >> /proc/1/fd/1 2>> /proc/1/fd/2
