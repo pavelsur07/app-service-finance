@@ -81,7 +81,7 @@
 
         {# Правила: категория площадки (Ozon — категория и тип, WB — предмет) → категория компании.
            Применяются сразу и после каждой загрузки каталога; ручное назначение не перезаписывают. #}
-        {% macro rule_form(key, categories, token, selected = null, label = 'Назначить правилом') %}
+        {% macro rule_form(key, categories, token, selected=null, label='Назначить правилом') %}
             <form method="post" action="{{ path('marketplace_listing_categories_rule_save') }}" class="d-flex gap-2">
                 <input type="hidden" name="_token" value="{{ token }}">
                 <input type="hidden" name="sourceKey" value="{{ key }}">
