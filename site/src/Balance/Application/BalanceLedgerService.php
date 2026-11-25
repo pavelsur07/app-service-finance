@@ -199,6 +199,57 @@ SQL, ['company' => $companyId, 'maximum' => (string) \PHP_INT_MAX, 'minimum' => 
     }
 
     /**
+     * Установить остаток счёта на дату из фонового источника (остатки складов и т. п.) от имени автора без HTTP-сессии.
+     * Разница проводится корректировкой со вторым, корреспондирующим счётом. Повтор с тем же ключом возвращает
+     * исходный документ; совпавший остаток не проводится (null).
+     */
+    public function postDelegatedTargetBalance(string $companyId, string $actorId, string $accountId, string $counterAccountId, string $date, string $targetMinor, string $reason, string $requestKey): ?string
+    {
+        if (1 !== preg_match('/^-?(?:0|[1-9]\d{0,18})$/D', $targetMinor)) {
+            throw new BalanceLedgerException('Некорректная сумма остатка.');
+        }
+
+        return $this->connection->transactional(function () use ($companyId, $actorId, $accountId, $counterAccountId, $date, $targetMinor, $reason, $requestKey): ?string {
+            $this->access->lockForDelegatedMutation($companyId, $actorId, 'post');
+            $this->access->lockForDelegatedMutation($companyId, $actorId, 'prepare');
+            $book = $this->connection->fetchAssociative('SELECT id, currency, start_date, initialized, version, next_document_number, next_posting_sequence FROM balance_books WHERE company_id = :company FOR UPDATE', ['company' => $companyId]);
+            if (false === $book) {
+                throw new BalanceLedgerException('Сначала настройте учет баланса.');
+            }
+            if (!$book['initialized']) {
+                throw new BalanceLedgerException('Сначала проведите начальные остатки.');
+            }
+            $existing = $this->connection->fetchOne('SELECT id FROM balance_operations WHERE company_id = :company AND request_key = :key', ['company' => $companyId, 'key' => $requestKey]);
+            if (false !== $existing) {
+                $this->postLocked($companyId, $actorId, (string) $existing, $book, 1);
+
+                return (string) $existing;
+            }
+            if ($accountId === $counterAccountId) {
+                throw new BalanceLedgerException('Корреспондирующий счет должен отличаться от целевого.');
+            }
+            $account = $this->account($companyId, $accountId);
+            $counter = $this->account($companyId, $counterAccountId);
+            LedgerAmount::date($date);
+            $current = (string) $this->connection->fetchOne("SELECT COALESCE(SUM(CASE WHEN l.direction = 'increase' THEN l.amount ELSE -l.amount END), 0) FROM balance_operation_lines l JOIN balance_operations o ON o.id = l.operation_id AND o.company_id = l.company_id WHERE l.company_id = :company AND l.account_id = :account AND o.status = 'posted' AND o.operation_date <= :date", ['company' => $companyId, 'account' => $accountId, 'date' => $date]);
+            $delta = bcsub($targetMinor, $current, 0);
+            if ('0' === $delta) {
+                return null;
+            }
+            // Стороны равны: целевой счёт меняется на Δ; тот же знак стороны у корр. счёта — обратное направление.
+            $targetIncreases = !str_starts_with($delta, '-');
+            $counterIncreases = $account['type'] === $counter['type'] ? !$targetIncreases : $targetIncreases;
+            $currency = (string) $book['currency'];
+            $counterLine = ['accountId' => $counterAccountId, 'direction' => $counterIncreases ? 'increase' : 'decrease', 'amount' => LedgerAmount::decimal(ltrim($delta, '-'), $currency)];
+            $target = (str_starts_with($targetMinor, '-') ? '-' : '').LedgerAmount::decimal(ltrim($targetMinor, '-'), $currency);
+            $id = $this->targetDraftLocked($companyId, $actorId, $book, $requestKey, $accountId, $date, $target, $reason, (int) $book['version'], [$counterLine]);
+            $this->postLocked($companyId, $actorId, $id, $book, 1);
+
+            return $id;
+        });
+    }
+
+    /**
      * @param array<string, mixed> $book
      * @param list<array{accountId: string, direction: string, amount: string}> $otherLines
      */

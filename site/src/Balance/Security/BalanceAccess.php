@@ -56,6 +56,29 @@ final class BalanceAccess
         $this->assertPermission($companyId, $actorId, $permission, $rights);
     }
 
+    /**
+     * Фоновая запись от имени сохранённого автора (cron, очередь): сессии нет, поэтому права автора
+     * читаются свежими под блокировкой. Вызывать внутри транзакции мутации до блокировки книги.
+     */
+    public function lockForDelegatedMutation(string $companyId, string $actorId, string $permission): void
+    {
+        $this->assertPermission($companyId, $actorId, $permission, $this->companies->financialAccess($companyId, $actorId, true));
+    }
+
+    /** Есть ли у пользователя право фоновой проводки (подготовить и провести) — без сессии, без блокировки. */
+    public function allowsDelegatedPosting(string $companyId, string $actorId): bool
+    {
+        $rights = $this->companies->financialAccess($companyId, $actorId);
+        try {
+            $this->assertPermission($companyId, $actorId, 'prepare', $rights);
+            $this->assertPermission($companyId, $actorId, 'post', $rights);
+        } catch (AccessDeniedException) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function require(string $companyId, string $actorId, string $permission): void
     {
         $user = $this->security->getUser();

@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Balance\Facade;
 
+use App\Balance\Application\BalanceLedgerService;
+use App\Balance\Application\DTO\BalanceBookStatus;
+use App\Balance\Application\DTO\BalancePostingAccount;
 use App\Balance\Application\SeedBalanceStructureAction;
 use App\Balance\Infrastructure\Query\BalanceReportQuery;
+use App\Balance\Infrastructure\Query\LedgerQuery;
 use App\Balance\ReadModel\BalanceReport;
 use App\Balance\Repository\BalanceCategoryRepositoryInterface;
+use App\Balance\Security\BalanceAccess;
 
 final readonly class BalanceFacade
 {
@@ -15,6 +20,9 @@ final readonly class BalanceFacade
         private BalanceCategoryRepositoryInterface $balanceCategoryRepository,
         private BalanceReportQuery $balanceReportQuery,
         private SeedBalanceStructureAction $seedBalanceStructureAction,
+        private LedgerQuery $ledgerQuery,
+        private BalanceLedgerService $ledger,
+        private BalanceAccess $access,
     ) {
     }
 
@@ -77,5 +85,61 @@ final readonly class BalanceFacade
     public function getReportForCompany(string $companyId, \DateTimeImmutable $date): BalanceReport
     {
         return $this->balanceReportQuery->buildForCompanyAndDate($companyId, $date);
+    }
+
+    /** @return list<BalancePostingAccount> неархивные счета, у которых ни одна статья цепочки не в архиве */
+    public function getPostingAccounts(string $companyId): array
+    {
+        $articles = [];
+        foreach ($this->ledgerQuery->articles($companyId) as $article) {
+            $articles[(string) $article['id']] = $article;
+        }
+        $path = static function (string $id) use ($articles): ?string {
+            $names = [];
+            for ($current = $articles[$id] ?? null; null !== $current; $current = null === $current['parent_id'] ? null : ($articles[(string) $current['parent_id']] ?? null)) {
+                if ($current['is_archived']) {
+                    return null;
+                }
+                array_unshift($names, (string) $current['name']);
+            }
+
+            return [] === $names ? null : implode(' / ', $names);
+        };
+        $result = [];
+        foreach ($this->ledgerQuery->accounts($companyId) as $account) {
+            $articlePath = $account['is_archived'] ? null : $path((string) $account['article_id']);
+            if (null !== $articlePath) {
+                $result[] = new BalancePostingAccount((string) $account['id'], (string) $account['code'], (string) $account['name'], $articlePath, 'asset' === $account['type']);
+            }
+        }
+
+        return $result;
+    }
+
+    public function getBookStatus(string $companyId): BalanceBookStatus
+    {
+        $book = $this->ledgerQuery->book($companyId);
+
+        return null === $book
+            ? new BalanceBookStatus(null, null, false)
+            : new BalanceBookStatus(null === $book['currency'] ? null : (string) $book['currency'], null === $book['start_date'] ? null : (string) $book['start_date'], (bool) $book['initialized']);
+    }
+
+    /** Может ли пользователь быть автором фоновых проводок (права «подготовить» и «провести»). */
+    public function canPostFromSource(string $companyId, string $userId): bool
+    {
+        return $this->access->allowsDelegatedPosting($companyId, $userId);
+    }
+
+    /**
+     * Установить остаток счёта на дату от имени автора из фонового источника. Транзакцией владеет Баланс
+     * (книга под блокировкой). Возвращает id документа или null, если остаток уже такой.
+     *
+     * @throws \App\Balance\Exception\BalanceLedgerException книга не начата, период закрыт, счёт архивный…
+     * @throws \Symfony\Component\Security\Core\Exception\AccessDeniedException у автора нет права проводить
+     */
+    public function setAccountBalanceFromSource(string $companyId, string $actorId, string $accountId, string $counterAccountId, \DateTimeImmutable $date, string $targetMinor, string $reason, string $requestKey): ?string
+    {
+        return $this->ledger->postDelegatedTargetBalance($companyId, $actorId, $accountId, $counterAccountId, $date->format('Y-m-d'), $targetMinor, $reason, $requestKey);
     }
 }
