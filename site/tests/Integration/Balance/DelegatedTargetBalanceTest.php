@@ -165,6 +165,13 @@ final class DelegatedTargetBalanceTest extends IntegrationTestCase
         self::assertSame('draft', $this->connection->fetchOne('SELECT status FROM balance_operations WHERE company_id = ? AND request_key = ?', [$this->companyId, 'k-draft']));
     }
 
+    public function testPassiveTargetIsRejected(): void
+    {
+        $this->opening();
+        $this->expectException(BalanceLedgerException::class);
+        $this->post('equity', 'money', '2025-01-05', '3000000', 'k-passive');
+    }
+
     public function testSessionPathsStillRequireSession(): void
     {
         $this->expectException(AccessDeniedException::class);

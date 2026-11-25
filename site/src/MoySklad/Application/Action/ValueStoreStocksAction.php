@@ -145,13 +145,19 @@ final readonly class ValueStoreStocksAction
             WHERE l.company_id = ? AND l.connection_id = ? AND l.snapshot_id = ? AND NOT s.archived', [$companyId, $connectionId, $snapshotId]);
         foreach ($lines as $line) {
             $store = (string) $line['store_external_id'];
-            $stores[$store] ??= ['quantity' => '0', 'amount' => '0', 'unpriced' => 0];
+            $stores[$store] ??= ['quantity' => '0', 'amount' => '0', 'unpriced' => 0, 'missing' => 0];
             $stock = (string) $line['stock'];
             if (0 === bccomp($stock, '0', 10)) {
                 continue;
             }
             $key = null !== $line['variant_external_id'] ? 'variant:'.$line['variant_external_id'] : 'product:'.$line['product_external_id'];
-            $price = $prices[$key] ?? '0';
+            if (!isset($prices[$key])) {
+                // Нет строки в отчёте себестоимости — оценка неполная, счёт склада не проводится.
+                ++$stores[$store]['missing'];
+                $stores[$store]['quantity'] = bcadd($stores[$store]['quantity'], $stock, 10);
+                continue;
+            }
+            $price = $prices[$key];
             $stores[$store]['quantity'] = bcadd($stores[$store]['quantity'], $stock, 10);
             $stores[$store]['amount'] = bcadd($stores[$store]['amount'], self::amountMinor($stock, $price), 0);
             if (0 === bccomp($price, '0', 10)) {
@@ -161,7 +167,7 @@ final readonly class ValueStoreStocksAction
         $this->db->executeStatement('DELETE FROM moysklad_store_valuations WHERE company_id = ? AND snapshot_id = ?', [$companyId, $snapshotId]);
         foreach ($stores as $store => $value) {
             $this->db->insert('moysklad_store_valuations', ['company_id' => $companyId, 'connection_id' => $connectionId, 'snapshot_id' => $snapshotId, 'store_external_id' => $store,
-                'valuation_date' => $date, 'quantity' => $value['quantity'], 'amount_minor' => $value['amount'], 'unpriced_positions' => $value['unpriced']]);
+                'valuation_date' => $date, 'quantity' => $value['quantity'], 'amount_minor' => $value['amount'], 'unpriced_positions' => $value['unpriced'], 'missing_positions' => $value['missing']]);
         }
         $this->db->executeStatement("UPDATE moysklad_store_balance_runs SET status = 'valued' WHERE company_id = ? AND snapshot_id = ?", [$companyId, $snapshotId]);
     }
@@ -190,24 +196,36 @@ final readonly class ValueStoreStocksAction
         if (false === $settings || !$settings['enabled'] || null === $settings['counter_account_id']) {
             return ['status' => 'valued', 'reason' => null];
         }
-        $newer = $this->db->fetchOne("SELECT 1 FROM moysklad_store_balance_runs r
-            JOIN moysklad_stock_snapshots n ON n.company_id = r.company_id AND n.connection_id = r.connection_id AND n.id = r.snapshot_id
-            JOIN moysklad_stock_snapshots c ON c.company_id = r.company_id AND c.connection_id = r.connection_id AND c.id = ?
-            WHERE r.company_id = ? AND r.connection_id = ? AND r.snapshot_id <> c.id AND r.status IN ('posting', 'posted', 'partial')
+        // Проведённые итоги — источник истины «более свежий снимок уже в Балансе» (статус прогона меняется повторами).
+        $newer = $this->db->fetchOne("SELECT 1 FROM moysklad_store_balance_postings p
+            JOIN moysklad_stock_snapshots n ON n.company_id = p.company_id AND n.connection_id = p.connection_id AND n.id = p.snapshot_id
+            JOIN moysklad_stock_snapshots c ON c.company_id = p.company_id AND c.connection_id = p.connection_id AND c.id = ?
+            WHERE p.company_id = ? AND p.connection_id = ? AND p.snapshot_id <> c.id AND p.status IN ('posted', 'unchanged')
               AND (n.started_at, n.id) > (c.started_at, c.id) LIMIT 1", [$snapshotId, $companyId, $connectionId]);
         if (false !== $newer) {
             return ['status' => 'skipped', 'reason' => 'superseded'];
         }
         $this->db->executeStatement("UPDATE moysklad_store_balance_runs SET status = 'posting' WHERE company_id = ? AND snapshot_id = ?", [$companyId, $snapshotId]);
-        $targets = $this->db->fetchAllKeyValue('SELECT k.balance_account_id, COALESCE(SUM(v.amount_minor), 0)::text
+        $targets = $this->db->fetchAllKeyValue('SELECT k.balance_account_id, CASE WHEN COALESCE(SUM(v.missing_positions), 0) > 0 THEN NULL ELSE COALESCE(SUM(v.amount_minor), 0)::text END
             FROM moysklad_store_balance_links k
             JOIN moysklad_stores s ON s.company_id = k.company_id AND s.connection_id = k.connection_id AND s.external_id = k.store_external_id AND NOT s.archived
             LEFT JOIN moysklad_store_valuations v ON v.company_id = k.company_id AND v.snapshot_id = ? AND v.store_external_id = k.store_external_id
             WHERE k.company_id = ? AND k.connection_id = ? AND NOT k.excluded AND k.balance_account_id IS NOT NULL
             GROUP BY k.balance_account_id ORDER BY k.balance_account_id', [$snapshotId, $companyId, $connectionId]);
+        // Счета, по которым этот снимок уже дал итог, повтор не трогает: цель фиксируется первой попыткой.
+        $done = $this->db->fetchFirstColumn("SELECT balance_account_id FROM moysklad_store_balance_postings WHERE company_id = ? AND connection_id = ? AND snapshot_id = ? AND status IN ('posted', 'unchanged')", [$companyId, $connectionId, $snapshotId]);
         $failed = 0;
         foreach ($targets as $accountId => $target) {
             $accountId = (string) $accountId;
+            if (in_array($accountId, $done, true)) {
+                continue;
+            }
+            if (null === $target) {
+                ++$failed;
+                $this->record($companyId, $connectionId, $snapshotId, $date, $accountId, '0', 'skipped', 'Нет себестоимости части товаров в отчёте МойСклад — остаток не проведён.', null);
+                continue;
+            }
+            $target = (string) $target;
             $key = Uuid::uuid5(Uuid::NAMESPACE_URL, 'moysklad-store-balance:'.implode('|', [$companyId, $connectionId, $accountId, $snapshotId]))->toString();
             try {
                 $operationId = $this->balance->setAccountBalanceFromSource($companyId, (string) $settings['actor_user_id'], $accountId, (string) $settings['counter_account_id'], $date, $target, self::CURRENCY, self::REASON, $key);
@@ -215,7 +233,7 @@ final readonly class ValueStoreStocksAction
             } catch (AccessDeniedException) {
                 $this->logger->warning('MoySklad store balance skipped: author lost Balance posting rights.', ['companyId' => $companyId, 'connectionId' => $connectionId, 'reason' => 'actor_forbidden']);
                 foreach ($targets as $skipped => $skippedTarget) {
-                    $this->record($companyId, $connectionId, $snapshotId, $date, (string) $skipped, $skippedTarget, 'skipped', 'У автора записи нет права проводить в Балансе.', null, false);
+                    $this->record($companyId, $connectionId, $snapshotId, $date, (string) $skipped, (string) ($skippedTarget ?? '0'), 'skipped', 'У автора записи нет права проводить в Балансе.', null, false);
                 }
 
                 return ['status' => 'skipped', 'reason' => 'actor_forbidden'];

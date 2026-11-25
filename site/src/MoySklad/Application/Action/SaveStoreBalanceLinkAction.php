@@ -33,9 +33,6 @@ final readonly class SaveStoreBalanceLinkAction
         if (null === $store || $store->isArchived()) {
             throw new StoreBalanceException('store_not_found', 'Склад не найден.');
         }
-        if (!$this->balance->canPostFromSource($companyId, $actorUserId)) {
-            throw new StoreBalanceException('actor_forbidden', 'Назначать счета Баланса складам может пользователь с правом проводить документы в Балансе.');
-        }
         if ($excluded) {
             $balanceAccountId = null;
         } elseif (null !== $balanceAccountId && !$this->isAssetAccount($companyId, $balanceAccountId)) {
@@ -45,6 +42,9 @@ final readonly class SaveStoreBalanceLinkAction
         $key = [$companyId, $connectionId, $store->getExternalId()];
         $this->db->transactional(function () use ($companyId, $connectionId, $balanceAccountId, $excluded, $actorUserId, $key): void {
             self::lockCompany($this->db, $companyId);
+            if (!$this->balance->canPostFromSource($companyId, $actorUserId)) {
+                throw new StoreBalanceException('actor_forbidden', 'Назначать счета Баланса складам может пользователь с правом проводить документы в Балансе.');
+            }
             if (null === $balanceAccountId && !$excluded) {
                 $this->db->executeStatement('DELETE FROM moysklad_store_balance_links WHERE company_id = ? AND connection_id = ? AND store_external_id = ?', $key);
 

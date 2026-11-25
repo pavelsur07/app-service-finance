@@ -35,11 +35,11 @@ final readonly class SaveStoreBalanceSettingsAction
         if ($enabled && null === $counterAccountId) {
             throw new StoreBalanceException('counter_required', 'Выберите корреспондирующий счёт для изменения остатков.');
         }
-        if (!$this->balance->canPostFromSource($companyId, $actorUserId)) {
-            throw new StoreBalanceException('actor_forbidden', 'Менять запись в Баланс может пользователь с правом проводить документы в Балансе.');
-        }
         $this->db->transactional(function () use ($companyId, $connectionId, $counterAccountId, $enabled, $actorUserId): void {
             SaveStoreBalanceLinkAction::lockCompany($this->db, $companyId);
+            if (!$this->balance->canPostFromSource($companyId, $actorUserId)) {
+                throw new StoreBalanceException('actor_forbidden', 'Менять запись в Баланс может пользователь с правом проводить документы в Балансе.');
+            }
             if (null !== $counterAccountId && false !== $this->db->fetchOne('SELECT 1 FROM moysklad_store_balance_links WHERE company_id = ? AND balance_account_id = ? LIMIT 1', [$companyId, $counterAccountId])) {
                 throw new StoreBalanceException('account_is_store', 'Этот счёт назначен складу — корреспондирующим он быть не может.');
             }

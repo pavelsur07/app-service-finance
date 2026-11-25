@@ -53,6 +53,7 @@ final class Version20261124180000 extends AbstractMigration
                 company_id UUID NOT NULL, connection_id UUID NOT NULL, snapshot_id UUID NOT NULL, store_external_id UUID NOT NULL,
                 valuation_date DATE NOT NULL, quantity NUMERIC(30, 10) NOT NULL, amount_minor BIGINT NOT NULL,
                 unpriced_positions INT DEFAULT 0 NOT NULL,
+                missing_positions INT DEFAULT 0 NOT NULL,
                 PRIMARY KEY (company_id, snapshot_id, store_external_id)
             )
             SQL);

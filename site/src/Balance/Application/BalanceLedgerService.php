@@ -242,6 +242,9 @@ SQL, ['company' => $companyId, 'maximum' => (string) \PHP_INT_MAX, 'minimum' => 
             }
             $account = $this->account($companyId, $accountId);
             $counter = $this->account($companyId, $counterAccountId);
+            if ('asset' !== $account['type']) {
+                throw new BalanceLedgerException('Остаток из источника устанавливается только на счёт актива.');
+            }
             LedgerAmount::date($date);
             $current = (string) $this->connection->fetchOne("SELECT COALESCE(SUM(CASE WHEN l.direction = 'increase' THEN l.amount ELSE -l.amount END), 0) FROM balance_operation_lines l JOIN balance_operations o ON o.id = l.operation_id AND o.company_id = l.company_id WHERE l.company_id = :company AND l.account_id = :account AND o.status = 'posted' AND o.operation_date <= :date", ['company' => $companyId, 'account' => $accountId, 'date' => $date]);
             $delta = bcsub($targetMinor, $current, 0);

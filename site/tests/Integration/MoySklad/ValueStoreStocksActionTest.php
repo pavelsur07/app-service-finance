@@ -195,6 +195,45 @@ final class ValueStoreStocksActionTest extends IntegrationTestCase
         self::assertSame(1, $this->counts()['operations']);
     }
 
+    public function testOlderSnapshotStaysSupersededAfterDisableReplayAndEnable(): void
+    {
+        $this->enable();
+        $this->snapshot(self::SNAPSHOT_2, '2025-01-05T21:40:00Z', [[$this->storeA, 'product', $this->product, '4']]);
+        ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT_2);
+        $this->connection->update('moysklad_store_balance_settings', ['enabled' => 'false'], ['company_id' => self::COMPANY]);
+        self::assertSame('valued', ($this->action([]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT_2));
+        $this->connection->update('moysklad_store_balance_settings', ['enabled' => 'true'], ['company_id' => self::COMPANY]);
+
+        self::assertSame('skipped', ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT));
+        self::assertSame('61733', $this->balance('stock'));
+    }
+
+    public function testMissingCostRowBlocksAccountInsteadOfZeroing(): void
+    {
+        $this->enable();
+        ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT);
+        $this->snapshot(self::SNAPSHOT_2, '2025-01-05T21:40:00Z', [[$this->storeA, 'product', $this->product, '4']]);
+        $operations = $this->counts()['operations'];
+
+        self::assertSame('partial', ($this->action([new MockResponse('{"meta":{"size":0,"limit":1000,"offset":0},"rows":[]}')]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT_2));
+        self::assertSame(['skipped'], $this->connection->fetchFirstColumn('SELECT status FROM moysklad_store_balance_postings WHERE company_id = ? AND snapshot_id = ?', [self::COMPANY, self::SNAPSHOT_2]));
+        self::assertSame($operations, $this->counts()['operations']);
+        self::assertSame('54017', $this->balance('stock'));
+    }
+
+    public function testReplayKeepsTargetFixedByFirstAttempt(): void
+    {
+        $this->enable();
+        ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT);
+        $this->connection->delete('moysklad_store_balance_links', ['company_id' => self::COMPANY, 'store_external_id' => $this->storeB]);
+        $rows = $this->counts();
+
+        ($this->action([]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT);
+        self::assertSame($rows, $this->counts());
+        self::assertSame('54017', $this->balance('stock'));
+        self::assertSame('54017', $this->connection->fetchOne('SELECT target_minor::text FROM moysklad_store_balance_postings WHERE company_id = ?', [self::COMPANY]));
+    }
+
     public function testDisabledWritingOnlyValues(): void
     {
         self::assertSame('valued', ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT));

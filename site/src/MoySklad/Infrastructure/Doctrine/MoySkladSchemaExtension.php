@@ -187,6 +187,7 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
         $valuations->addColumn('quantity', 'decimal', ['precision' => 30, 'scale' => 10]);
         $valuations->addColumn('amount_minor', 'bigint');
         $valuations->addColumn('unpriced_positions', 'integer', ['default' => 0]);
+        $valuations->addColumn('missing_positions', 'integer', ['default' => 0]);
         $valuations->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'snapshot_id', 'store_external_id')->create());
         $valuations->addForeignKeyConstraint('moysklad_store_balance_runs', ['company_id', 'snapshot_id'], ['company_id', 'snapshot_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_store_valuations_run');
         $valuations->addForeignKeyConstraint('moysklad_stores', ['company_id', 'connection_id', 'store_external_id'], ['company_id', 'connection_id', 'external_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_store_valuations_store');

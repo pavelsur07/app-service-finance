@@ -2090,10 +2090,11 @@ setAccountBalanceFromSource(string $companyId, string $actorId, string $accountI
 
 Установка остатка из внешнего источника (`setAccountBalanceFromSource`, сейчас — склады МойСклад):
 без HTTP-сессии, права автора (`prepare` + `post`) читаются свежими под блокировкой
-(`BalanceAccess::lockForDelegatedMutation`); книга не начата, валюта книги ≠ `currency`, совпадение счетов, закрытый период —
+(`BalanceAccess::lockForDelegatedMutation`, повторно после блокировки книги); целевой счёт не актив, книга не начата,
+валюта книги ≠ `currency`, совпадение счетов, закрытый период —
 `BalanceLedgerException`, нет прав — `AccessDeniedException`. Δ = цель − остаток на дату, вторая строка —
 корреспондирующий счёт (та же сторона — обратное направление, другая — то же); Δ = 0 → `null`.
-Повтор с тем же `requestKey` возвращает тот же документ. Коммитит сам Facade (своя транзакция Баланса),
+Повтор с тем же `requestKey` возвращает ту же проведённую корректировку; черновик или документ другого вида под ключом — ошибка. Коммитит сам Facade (своя транзакция Баланса),
 вызывающий не держит открытую транзакцию.
 
 `BalanceReport`: `getRoots()` (каждая `BalanceRowView` имеет точный `amountMinor`),
@@ -6840,8 +6841,9 @@ marketplace)` ставит запуск, если подключение акт�
   1) себестоимость единиц `report/stock/all?groupBy=variant&filter=stockMode=all` (нет `price` →
   `forbidden`, run `failed`); 2) одной транзакцией заменяет `moysklad_store_valuations` снимка
   (`amount_minor` = Σ round(stock × price) половина от нуля, `unpriced_positions`), дата — МСК начала снимка;
-  оценённый снимок повтором не переоценивается;
-  3) если запись включена — снимок старше уже проводимого → `skipped: superseded`; иначе статус `posting` и по
+  позиция без строки в отчёте — `missing_positions`, счёт с ней не проводится (явная цена 0 — `unpriced_positions`);
+  оценённый снимок повтором не переоценивается, а счета, уже получившие итог этого снимка, не перепроводятся;
+  3) если запись включена — есть итог `posted|unchanged` более свежего снимка → `skipped: superseded`; иначе статус `posting` и по
   каждому счёту сумма складов → `BalanceFacade::setAccountBalanceFromSource` (RUB, ключ UUIDv5(компания,
   подключение, счёт, снимок)), итог счёта-дня — `moysklad_store_balance_postings`
   (`posted|unchanged|skipped|failed`, причина). Нет прав у автора → весь прогон `skipped`, проведённый

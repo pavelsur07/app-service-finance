@@ -99,6 +99,7 @@
                             </td>
                             <td class="text-end">
                                 {{ store.amountMinor|vf_minor|vf_amount }}
+                                {% if store.missing > 0 %}<div class="text-danger small">Нет в отчёте себестоимости: {{ store.missing|vf_number }} поз. — счёт не проводится</div>{% endif %}
                                 {% if store.unpriced > 0 %}<div class="text-warning small">Без себестоимости: {{ store.unpriced|vf_number }} поз.</div>{% endif %}
                             </td>
                         </tr>

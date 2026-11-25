@@ -13,11 +13,11 @@ final readonly class StoreBalanceQuery
     {
     }
 
-    /** @return list<array{externalId: string, name: string, pathName: string, accountId: ?string, excluded: bool, quantity: ?string, amountMinor: ?string, unpriced: int}> */
+    /** @return list<array{externalId: string, name: string, pathName: string, accountId: ?string, excluded: bool, quantity: ?string, amountMinor: ?string, unpriced: int, missing: int}> */
     public function stores(string $companyId, string $connectionId, ?string $snapshotId): array
     {
         $rows = $this->db->fetchAllAssociative('SELECT s.external_id, s.name, s.path_name, k.balance_account_id, COALESCE(k.excluded, FALSE) AS excluded,
-                v.quantity::text AS quantity, v.amount_minor::text AS amount_minor, COALESCE(v.unpriced_positions, 0) AS unpriced
+                v.quantity::text AS quantity, v.amount_minor::text AS amount_minor, COALESCE(v.unpriced_positions, 0) AS unpriced, COALESCE(v.missing_positions, 0) AS missing
             FROM moysklad_stores s
             LEFT JOIN moysklad_store_balance_links k ON k.company_id = s.company_id AND k.connection_id = s.connection_id AND k.store_external_id = s.external_id
             LEFT JOIN moysklad_store_valuations v ON v.company_id = s.company_id AND v.snapshot_id = ? AND v.store_external_id = s.external_id
@@ -28,7 +28,7 @@ final readonly class StoreBalanceQuery
             'externalId' => (string) $row['external_id'], 'name' => (string) $row['name'], 'pathName' => (string) $row['path_name'],
             'accountId' => null === $row['balance_account_id'] ? null : (string) $row['balance_account_id'], 'excluded' => (bool) $row['excluded'],
             'quantity' => null === $row['quantity'] ? null : (string) $row['quantity'], 'amountMinor' => null === $row['amount_minor'] ? null : (string) $row['amount_minor'],
-            'unpriced' => (int) $row['unpriced'],
+            'unpriced' => (int) $row['unpriced'], 'missing' => (int) $row['missing'],
         ], $rows);
     }
 
