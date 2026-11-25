@@ -37,6 +37,7 @@ final class ModuleAccessMap
      * @var array<string, Module>
      */
     private const EXACT = [
+        \App\OneC\Controller\CreateConnectionController::class => Module::ADMIN,
         // Контрагенты, ЦФО и направления проектов живут в App\Company, но относятся к финансам.
         CounterpartyController::class => Module::FINANCE,
         ApplyCounterpartyDisplayNameController::class => Module::FINANCE,

@@ -118,6 +118,17 @@ final class EventScrubberTest extends TestCase
         ], $event->getRequest());
     }
 
+    public function testOneCHandshakeOmitsRawBodyAndCredentials(): void
+    {
+        $event = Event::createEvent();
+        $event->setRequest(['url' => 'https://example.test/api/onec/v1/handshake', 'data' => '{"organizations":[]}', 'headers' => ['Authorization' => ['Bearer sample']]]);
+        $event->setExtra(['arguments' => ['body' => 'sample']]);
+        (new EventScrubber())($event);
+        self::assertArrayNotHasKey('data', $event->getRequest());
+        self::assertSame(self::REDACTED, $event->getRequest()['headers']['Authorization']);
+        self::assertSame([], $event->getExtra());
+    }
+
     public function testReturnsSameEventInstanceAndNeverDrops(): void
     {
         $event = Event::createEvent();
