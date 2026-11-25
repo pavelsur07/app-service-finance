@@ -1,6 +1,6 @@
 {#
-  Панель массового тега для выбранных листингов (показывает модуль listings_index.js).
-  Параметры: all_tags, filter_params, filter_summary, pager, max_filter_match.
+  Панель массовых действий для выбранных листингов — тег и категория (показывает модуль listings_index.js).
+  Параметры: all_tags, all_categories, filter_params, filter_summary, pager, max_filter_match.
 #}
 <div class="card-body border-bottom py-2 d-none" id="bulk-tag-panel" data-bulk-tag-panel
      data-all-tags="{{ all_tags|json_encode|e('html_attr') }}"
@@ -33,6 +33,17 @@
                    aria-label="Тег для выбранных листингов">
             <div class="suggest d-none" data-bulk-tag-suggest></div>
         </div>
+        {# Категория: выбор пункта сразу назначает её выбранным листингам («все N» — через диалог). #}
+        <select class="form-select form-select-sm w-auto" data-bulk-category aria-label="Категория для выбранных листингов">
+            <option value="">Категория…</option>
+            {% for category in all_categories %}
+                <option value="{{ category.id }}">{{ category.name }}</option>
+            {% endfor %}
+            <option value="none">Снять категорию</option>
+        </select>
+        {% if all_categories is empty %}
+            <a href="{{ path('marketplace_listing_categories_manage') }}" class="small">Создать категории</a>
+        {% endif %}
         {# Скрытый триггер диалога «присвоить всем по фильтру»: тексты подставляет модуль. #}
         <button type="button" hidden data-bulk-assign-trigger
                 data-bs-target="#listings-confirm"

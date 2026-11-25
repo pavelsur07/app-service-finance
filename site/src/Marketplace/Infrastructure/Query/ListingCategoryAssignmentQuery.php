@@ -79,6 +79,21 @@ final readonly class ListingCategoryAssignmentQuery
     }
 
     /**
+     * @return array<string, int> categoryId → число листингов
+     */
+    public function countsByCategory(string $companyId): array
+    {
+        /** @var array<string, int|string> $rows */
+        $rows = $this->connection->fetchAllKeyValue(
+            'SELECT category_id, COUNT(*) FROM marketplace_listings
+              WHERE company_id = :companyId AND category_id IS NOT NULL GROUP BY category_id',
+            ['companyId' => $companyId],
+        );
+
+        return array_map('intval', $rows);
+    }
+
+    /**
      * @param list<string> $listingIds
      *
      * @return array<string, string> listingId → categoryId; листинги без категории не попадают

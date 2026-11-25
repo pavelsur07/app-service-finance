@@ -6,6 +6,7 @@ namespace App\Marketplace\Controller;
 
 use App\Marketplace\Application\AssignListingTagAction;
 use App\Marketplace\Application\DTO\ListingsFilter;
+use App\Marketplace\DTO\ListingCategoryDTO;
 use App\Marketplace\DTO\ListingTagDTO;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\JobType;
@@ -13,6 +14,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\ListingTagAssignmentRepository;
 use App\Marketplace\Infrastructure\Query\MarketplaceListingsQuery;
 use App\Marketplace\Repository\MarketplaceJobLogRepository;
+use App\Marketplace\Repository\MarketplaceListingCategoryRepository;
 use App\Marketplace\Repository\MarketplaceListingTagRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -33,6 +35,7 @@ class MarketplaceListingsController extends AbstractController
         private readonly ListingTagAssignmentRepository $tagAssignments,
         private readonly MarketplaceListingTagRepository $tagRepository,
         private readonly MarketplaceJobLogRepository $jobLogRepository,
+        private readonly MarketplaceListingCategoryRepository $categoryRepository,
     ) {
     }
 
@@ -60,6 +63,10 @@ class MarketplaceListingsController extends AbstractController
             'all_tags' => array_map(
                 static fn (ListingTagDTO $tag): array => $tag->toArray(),
                 $this->tagRepository->listForCompany($companyId),
+            ),
+            'all_categories' => array_map(
+                static fn (ListingCategoryDTO $category): array => ['id' => $category->id, 'name' => $category->name],
+                $this->categoryRepository->listForCompany($companyId),
             ),
             'listings_filter' => $listingsFilter,
             'filter_params' => $filterParams,

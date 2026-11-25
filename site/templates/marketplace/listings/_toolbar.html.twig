@@ -1,6 +1,6 @@
 {#
   Шапка реестра: обновление каталога Ozon и его последний прогон, управление тегами, фильтры (привязка, маркетплейс, тег, поиск).
-  Параметры: ozon_catalog_last_run, filter, available_marketplaces, marketplace, all_tags, listings_filter.
+  Параметры: ozon_catalog_last_run, filter, available_marketplaces, marketplace, all_tags, all_categories, listings_filter.
 #}
 <form method="post" action="{{ path('marketplace_listings_sync_ozon_catalog') }}" class="d-inline">
     <input type="hidden" name="_token"
@@ -53,6 +53,13 @@
         <option value="none" {{ listings_filter.withoutTags ? 'selected' : '' }}>Без тегов</option>
         {% for tag in all_tags %}
             <option value="{{ tag.id }}" {{ listings_filter.tagId == tag.id ? 'selected' : '' }}>{{ tag.name }}</option>
+        {% endfor %}
+    </select>
+    <select class="form-select w-auto" name="category" aria-label="Категория" data-autosubmit>
+        <option value="">Все категории</option>
+        <option value="none" {{ listings_filter.withoutCategory ? 'selected' : '' }}>Без категории</option>
+        {% for category in all_categories %}
+            <option value="{{ category.id }}" {{ listings_filter.categoryId == category.id ? 'selected' : '' }}>{{ category.name }}</option>
         {% endfor %}
     </select>
     <div class="input-icon">

@@ -98,6 +98,12 @@ final class MarketplaceListingsQuery
             }
         }
 
+        if (null !== $filter->categoryId) {
+            $qb->andWhere('IDENTITY(l.category) = :categoryId')->setParameter('categoryId', $filter->categoryId);
+        } elseif ($filter->withoutCategory) {
+            $qb->andWhere('l.category IS NULL');
+        }
+
         return $qb;
     }
 }
