@@ -71,7 +71,7 @@
                                     <td>{{ report.companies[candidate.peerCompanyId] }}</td>
                                     <td>{{ candidate.operationCount }}</td>
                                     {% if canWrite %}
-                                        <td>{{ ui.post('report_cashflow_group_assign_inn', {companyId: candidate.companyId, counterpartyId: candidate.counterpartyId, peerCompanyId: candidate.peerCompanyId}, 'Проставить ИНН', period, token) }}</td>
+                                        <td>{{ ui.post('report_cashflow_group_assign_inn', {companyId: candidate.companyId, counterpartyId: candidate.counterpartyId, peerCompanyId: candidate.peerCompanyId, expectedInn: candidate.inn}, 'Проставить ИНН', period, token) }}</td>
                                     {% endif %}
                                 </tr>
                             {% endfor %}

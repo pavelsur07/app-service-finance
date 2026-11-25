@@ -26,7 +26,7 @@ final readonly class AssignIntragroupInnController
     {
         return $this->form->handle($request, $user, 'ИНН контрагента сохранён.', function (string $activeId, string $userId, string $head) use ($request): void {
             $fields = $request->request;
-            ($this->action)($activeId, $userId, $fields->getString('companyId'), $fields->getString('counterpartyId'), $fields->getString('peerCompanyId'), $head);
+            ($this->action)($activeId, $userId, $fields->getString('companyId'), $fields->getString('counterpartyId'), $fields->getString('peerCompanyId'), $fields->getString('expectedInn'), $head);
         });
     }
 }

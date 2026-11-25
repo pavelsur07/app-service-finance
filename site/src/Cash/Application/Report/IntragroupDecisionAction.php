@@ -89,7 +89,7 @@ final readonly class IntragroupDecisionAction
         });
     }
 
-    private function assertLegsAvailable(string $head, string $outflowId, string $inflowId, ?string $expectedHead = null): void
+    private function assertLegsAvailable(string $head, string $outflowId, string $inflowId): void
     {
         foreach ($this->decisions->forGroup($head) as $decision) {
             if (IntragroupDecisionType::PAIR === $decision->getType()

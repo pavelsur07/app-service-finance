@@ -76,14 +76,15 @@ trait IntragroupReportFixture
     private function removeCommittedGroupFixture(): void
     {
         $ids = array_values(array_map(static fn (Company $c): string => (string) $c->getId(), $this->companies));
-        $this->connection->transactional(function () use ($ids): void {
+        $connection = $this->em->getConnection();
+        $connection->transactional(function () use ($connection, $ids): void {
             foreach (['cash_intragroup_decision', 'cash_transaction', 'money_account', 'counterparty', 'cashflow_categories', 'company_consolidation_member'] as $table) {
-                $this->connection->executeStatement('DELETE FROM '.$table.' WHERE company_id IN (?)', [$ids], [ArrayParameterType::STRING]);
+                $connection->executeStatement('DELETE FROM '.$table.' WHERE company_id IN (?)', [$ids], [ArrayParameterType::STRING]);
             }
-            $this->connection->executeStatement('DELETE FROM companies WHERE id IN (?)', [$ids], [ArrayParameterType::STRING]);
+            $connection->executeStatement('DELETE FROM companies WHERE id IN (?)', [$ids], [ArrayParameterType::STRING]);
             $owner = $this->companies['Альфа']->getUser();
             self::assertNotNull($owner);
-            $this->connection->executeStatement('DELETE FROM "user" WHERE id = ?', [$owner->getId()]);
+            $connection->executeStatement('DELETE FROM "user" WHERE id = ?', [$owner->getId()]);
         });
     }
 

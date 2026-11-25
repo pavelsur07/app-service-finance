@@ -43,11 +43,23 @@ final class CashflowGroupReconciliationPageTest extends WebTestCaseBase
         $forms = $page->filter('#candidates form');
         self::assertCount(4, $forms);
         $values = $forms->first()->form()->getValues();
-        foreach (['companyId', 'counterpartyId', 'peerCompanyId', '_token'] as $field) {
+        foreach (['companyId', 'counterpartyId', 'peerCompanyId', 'expectedInn', '_token'] as $field) {
             self::assertNotEmpty($values[$field]);
         }
         self::assertStringContainsString('ООО «Альфа»', $page->filter('#candidates')->text());
         self::assertStringContainsString('7700000011', $page->filter('#candidates')->text());
+    }
+
+    public function testChangedPeerInnRequiresNewConfirmation(): void
+    {
+        $this->loadNovemberTransactions();
+        $form = $this->open()->filter('#candidates form')->first()->form();
+        $fields = $form->getValues();
+        $this->connection->executeStatement('UPDATE companies SET inn = ? WHERE id = ?', ['7700000088', $fields['peerCompanyId']]);
+        $this->client->submit($form);
+        $after = $this->client->followRedirect();
+        self::assertStringContainsString('Предложение ИНН устарело', $after->text());
+        self::assertEmpty($this->connection->fetchOne('SELECT inn FROM counterparty WHERE id = ?', [$fields['counterpartyId']]));
     }
 
     public function testPeriodHintsAmountsAndManualMatchingFormAcrossPeriodBoundary(): void

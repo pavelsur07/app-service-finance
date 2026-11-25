@@ -47,7 +47,7 @@ final class IntragroupWriteControllerTest extends WebTestCaseBase
         $this->addTransaction(352, '0003', '2026-11-17', '150000', 'ООО "Альфа"', 'OP_IN_OTHER');
         $this->em->flush();
         $card = $this->cards['Бета']['ООО "Альфа"']->getId();
-        $args = ['companyId' => $this->companies['Бета']->getId(), 'counterpartyId' => $card, 'peerCompanyId' => $this->companies['Альфа']->getId()];
+        $args = ['companyId' => $this->companies['Бета']->getId(), 'counterpartyId' => $card, 'peerCompanyId' => $this->companies['Альфа']->getId(), 'expectedInn' => '7700000011'];
         $this->post('inn', $args);
         self::assertResponseRedirects(self::PATH.self::PERIOD);
         $this->post('inn', $args);

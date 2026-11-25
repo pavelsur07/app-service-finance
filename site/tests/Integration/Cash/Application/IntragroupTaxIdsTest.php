@@ -72,10 +72,10 @@ final class IntragroupTaxIdsTest extends IntegrationTestCase
         self::assertSame(0, $proposals[$cards[2]->getId()]->operationCount);
         self::assertSame('770000003333', $proposals[$cards[0]->getId()]->inn);
         foreach ($proposals as $proposal) {
-            $this->assign($taxIds, $proposal->companyId, $proposal->counterpartyId, $proposal->peerCompanyId);
+            $this->assign($taxIds, $proposal->companyId, $proposal->counterpartyId, $proposal->peerCompanyId, $proposal->inn);
             $this->connection->executeStatement('UPDATE counterparty SET updated_at = ? WHERE id = ?', ['2026-01-01 01:02:03', $proposal->counterpartyId]);
             $changed = $this->connection->fetchOne('SELECT updated_at FROM counterparty WHERE id = ?', [$proposal->counterpartyId]);
-            $this->assign($taxIds, $proposal->companyId, $proposal->counterpartyId, $proposal->peerCompanyId);
+            $this->assign($taxIds, $proposal->companyId, $proposal->counterpartyId, $proposal->peerCompanyId, $proposal->inn);
             self::assertSame($changed, $this->connection->fetchOne('SELECT updated_at FROM counterparty WHERE id = ?', [$proposal->counterpartyId]));
             self::assertSame($proposal->inn, $this->connection->fetchOne('SELECT inn FROM counterparty WHERE id = ?', [$proposal->counterpartyId]));
         }
@@ -116,7 +116,7 @@ final class IntragroupTaxIdsTest extends IntegrationTestCase
         $this->connection->executeStatement('UPDATE counterparty SET inn = ? WHERE id = ?', ['7700000088', $card->getId()]);
         $this->expectException(\DomainException::class);
         try {
-            $this->assign($taxIds, (string) $this->member->getId(), $card->getId(), (string) $this->head->getId());
+            $this->assign($taxIds, (string) $this->member->getId(), $card->getId(), (string) $this->head->getId(), '7700000011');
         } finally {
             self::assertSame('7700000088', $this->connection->fetchOne('SELECT inn FROM counterparty WHERE id = ?', [$card->getId()]));
         }
@@ -133,14 +133,14 @@ final class IntragroupTaxIdsTest extends IntegrationTestCase
         return [(string) $this->head->getId(), (string) $this->member->getId(), (string) $this->third->getId()];
     }
 
-    private function assign(IntragroupTaxIds $taxIds, string $companyId, string $cardId, string $peerId): void
+    private function assign(IntragroupTaxIds $taxIds, string $companyId, string $cardId, string $peerId, string $expectedInn): void
     {
         $container = self::getContainer();
         $action = new AssignIntragroupTaxIdAction(
             $this->em, new IntragroupGroupAccess($container->get(ConsolidationGroupFacadeInterface::class), $container->get(CompanyFacade::class)),
             $taxIds, $container->get(CounterpartyFacade::class),
         );
-        $action((string) $this->head->getId(), (string) $this->owner->getId(), $companyId, $cardId, $peerId);
+        $action((string) $this->head->getId(), (string) $this->owner->getId(), $companyId, $cardId, $peerId, $expectedInn);
     }
 
     private function company(string $name, string $inn): Company
