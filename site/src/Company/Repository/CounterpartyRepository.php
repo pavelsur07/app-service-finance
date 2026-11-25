@@ -8,6 +8,8 @@ use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Enum\CounterpartyType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\LockMode;
+use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -109,16 +111,20 @@ class CounterpartyRepository extends ServiceEntityRepository
     /**
      * Один контрагент строго в рамках компании.
      */
-    public function findOneByIdAndCompany(string $id, string $companyId): ?Counterparty
+    public function findOneByIdAndCompany(string $id, string $companyId, bool $forUpdate = false): ?Counterparty
     {
-        return $this->createQueryBuilder('c')
+        $query = $this->createQueryBuilder('c')
             ->andWhere('c.id = :id')
             ->setParameter('id', $id)
             ->andWhere('c.company = :companyId')
             ->setParameter('companyId', $companyId)
             ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+            ->getQuery();
+        if ($forUpdate) {
+            $query->setLockMode(LockMode::PESSIMISTIC_WRITE)->setHint(Query::HINT_REFRESH, true);
+        }
+
+        return $query->getOneOrNullResult();
     }
 
     public function findOneByInn(string $companyId, string $inn, ?string $exceptId = null): ?Counterparty

@@ -1,0 +1,19 @@
+{% macro operation(tx, companies, period, link=false) %}
+    <div>{{ companies[tx.companyId] }} · {{ tx.accountLabel }}</div>
+    {% if link %}
+        <a href="{{ path('report_cashflow_group_reconciliation', period|merge({operation: tx.id})) }}#operation">{{ tx.occurredAt|date('d.m.Y') }}</a>
+    {% else %}
+        {{ tx.occurredAt|date('d.m.Y') }}
+    {% endif %}
+    · <span class="text-nowrap">{{ tx.amount.toDecimalString|vf_money(2, 'RUB') }}</span>
+{% endmacro %}
+
+{% macro post(route, fields, label, period, token) %}
+    <form method="post" action="{{ path(route, period) }}">
+        <input type="hidden" name="_token" value="{{ token }}">
+        {% for name, value in fields %}
+            <input type="hidden" name="{{ name }}" value="{{ value }}">
+        {% endfor %}
+        <button type="submit" class="btn btn-sm btn-outline-secondary">{{ label }}</button>
+    </form>
+{% endmacro %}

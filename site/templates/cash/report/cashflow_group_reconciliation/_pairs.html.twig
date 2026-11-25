@@ -1,0 +1,51 @@
+{# Пары одного списка. transit указывает, что в период попала лишь одна сторона. #}
+{% import 'cash/report/cashflow_group_reconciliation/_macros.html.twig' as ui %}
+<section class="card mb-3" id="{{ transit ? 'in-transit' : 'pairs' }}">
+    <div class="card-header">
+        <h3 class="card-title">{{ transit ? 'Деньги в пути (пара за границей периода)' : 'Сверенные пары' }}{% if selectedRow %} · {{ selectedRow.name }}{% endif %}</h3>
+        {% if selectedRow %}
+            <a class="ms-auto" href="{{ path('report_cashflow_group_reconciliation', period) }}#pairs">Все пары</a>
+        {% endif %}
+    </div>
+    {% if pairs %}
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+                <thead><tr><th>Выплата</th><th>Поступление</th><th>Сопоставление</th>{% if canWrite %}<th></th>{% endif %}</tr></thead>
+                <tbody>
+                {% for outId, inId in pairs %}
+                    {% set out = report.reconciliation.transactions[outId] %}
+                    {% set incoming = report.reconciliation.transactions[inId] %}
+                    {% set manualId = report.reconciliation.manualDecisionIds[outId]|default(null) %}
+                    <tr>
+                        {% for tx in [out, incoming] %}
+                            <td>
+                                {{ ui.operation(tx, report.companies, period, true) }}
+                                {% if transit and (tx.occurredAt|date('Y-m-d') < period.from or tx.occurredAt|date('Y-m-d') > period.to) %}
+                                    <div class="text-secondary small">За границей периода</div>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                        <td>
+                            {{ manualId ? 'Вручную' : 'Автоматически' }}
+                            {% if manualId and out.occurredAt != incoming.occurredAt %}
+                                <div class="text-warning small">{{ incoming.occurredAt < out.occurredAt ? 'Поступление раньше выплаты' : 'Даты операций различаются' }}</div>
+                            {% endif %}
+                        </td>
+                        {% if canWrite %}
+                            <td>
+                                {% if manualId %}
+                                    {{ ui.post('report_cashflow_group_remove', {id: manualId}, 'Разъединить', period, token) }}
+                                {% else %}
+                                    {{ ui.post('report_cashflow_group_decide', {id: formIds[outId], type: 'UNPAIR', outflowId: outId, inflowId: inId}, 'Разъединить', period, token) }}
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="card-body text-secondary mb-0">{{ transit ? 'Денег в пути нет.' : 'Сверенных пар нет.' }}</p>
+    {% endif %}
+</section>
