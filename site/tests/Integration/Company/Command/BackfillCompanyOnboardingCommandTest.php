@@ -37,7 +37,7 @@ final class BackfillCompanyOnboardingCommandTest extends IntegrationTestCase
         self::assertSame(Command::SUCCESS, $tester->execute([], ['verbosity' => OutputInterface::VERBOSITY_VERBOSE]));
 
         $display = $tester->getDisplay();
-        self::assertStringContainsString((string) $bare->getId().' balance_accounts=2, balance_structure=1, billing_trial=1, money_accounts=2, pl_categories=72', $display);
+        self::assertStringContainsString((string) $bare->getId().' balance_accounts=28, balance_structure=1, billing_trial=1, money_accounts=2, pl_categories=72', $display);
         self::assertStringNotContainsString((string) $complete->getId(), $display);
         self::assertSame($before, $this->counts((string) $bare->getId()));
     }
@@ -75,8 +75,8 @@ final class BackfillCompanyOnboardingCommandTest extends IntegrationTestCase
         self::assertSame(Command::SUCCESS, $tester->execute(['--company' => $configuredId, '--execute' => true, '--expected-count' => '1']));
         self::assertStringContainsString('Дозаполнено компаний: 1.', $tester->getDisplay());
 
-        self::assertSame(['money' => 2, 'pl' => 72, 'balance_articles' => 33, 'balance_accounts' => 2, 'billing' => 1], $this->counts($bare));
-        self::assertSame(['money' => 2, 'pl' => 1, 'balance_articles' => 33, 'balance_accounts' => 1, 'billing' => 1], $this->counts($configuredId));
+        self::assertSame(['money' => 2, 'pl' => 72, 'balance_articles' => 34, 'balance_accounts' => 28, 'billing' => 1], $this->counts($bare));
+        self::assertSame(['money' => 2, 'pl' => 1, 'balance_articles' => 34, 'balance_accounts' => 29, 'billing' => 1], $this->counts($configuredId));
         self::assertSame('base:true', $this->connection->fetchOne("SELECT t.code || ':' || s.is_trial FROM billing_company_subscriptions s JOIN billing_tariffs t ON t.id = s.tariff_id WHERE s.company_id = ?", [$bare]));
         self::assertSame(['bank:Основной счет', 'cash:Основная'], $this->connection->fetchFirstColumn("SELECT type || ':' || name FROM money_account WHERE company_id=? ORDER BY type", [$configuredId]));
 

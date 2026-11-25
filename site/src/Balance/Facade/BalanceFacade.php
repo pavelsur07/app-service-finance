@@ -7,6 +7,7 @@ namespace App\Balance\Facade;
 use App\Balance\Application\BalanceLedgerService;
 use App\Balance\Application\DTO\BalanceBookStatus;
 use App\Balance\Application\DTO\BalancePostingAccount;
+use App\Balance\Application\EnsureBalanceStructureAction;
 use App\Balance\Application\SeedBalanceStructureAction;
 use App\Balance\Infrastructure\Query\BalanceReportQuery;
 use App\Balance\Infrastructure\Query\LedgerQuery;
@@ -23,6 +24,7 @@ final readonly class BalanceFacade
         private LedgerQuery $ledgerQuery,
         private BalanceLedgerService $ledger,
         private BalanceAccess $access,
+        private EnsureBalanceStructureAction $ensureStructure,
     ) {
     }
 
@@ -32,6 +34,15 @@ final readonly class BalanceFacade
     public function seedDefaultStructure(string $companyId): bool
     {
         return ($this->seedBalanceStructureAction)($companyId);
+    }
+
+    /**
+     * Структура и типовой справочник счетов, если их ещё нет (системный сид, однократно на версию шаблона).
+     * Права чтения проверяет вызывающий; коммитит сам Facade.
+     */
+    public function ensureStandardChart(string $companyId): void
+    {
+        ($this->ensureStructure)($companyId);
     }
 
     /**

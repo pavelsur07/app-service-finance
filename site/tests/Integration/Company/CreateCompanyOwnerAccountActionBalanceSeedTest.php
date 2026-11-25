@@ -22,16 +22,16 @@ final class CreateCompanyOwnerAccountActionBalanceSeedTest extends IntegrationTe
             ->__invoke($user, 'plain-password', 'Seed Co', false);
 
         $codes = $this->connection->fetchFirstColumn('SELECT code FROM balance_articles WHERE company_id=?', [(string) $company->getId()]);
-        self::assertCount(33, $codes);
+        self::assertCount(34, $codes);
         foreach (['MONEY', 'CASH_BANK', 'CASH_PAYMENT_SYSTEMS', 'AR_MARKETPLACES', 'INV_MARKETPLACE', 'TAX_RECEIVABLE', 'EQUITY', 'LONG_LOANS'] as $code) {
             self::assertContains($code, $codes);
         }
         // Аудит сида называет шаблон (профиль) и его версию.
         $changes = $this->connection->fetchFirstColumn("SELECT changes::text FROM balance_audit_events WHERE company_id=? AND object_type='book' AND action='system_seed'", [(string) $company->getId()]);
         self::assertCount(1, $changes);
-        self::assertEquals(['template' => 'MARKETPLACE', 'version' => 3], json_decode((string) $changes[0], true, 512, \JSON_THROW_ON_ERROR));
-        // Базовые учётные счета шаблона — с записью аудита на каждый.
-        self::assertSame(['ACC_MAIN_BANK', 'ACC_MAIN_REGISTER'], $this->connection->fetchFirstColumn('SELECT code FROM balance_accounts WHERE company_id=? ORDER BY code', [(string) $company->getId()]));
-        self::assertSame(2, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id=? AND object_type='account' AND action='system_seed'", [(string) $company->getId()]));
+        self::assertEquals(['template' => 'MARKETPLACE', 'version' => 4], json_decode((string) $changes[0], true, 512, \JSON_THROW_ON_ERROR));
+        // Типовой справочник счетов — с записью аудита на каждый.
+        self::assertCount(28, $this->connection->fetchFirstColumn('SELECT code FROM balance_accounts WHERE company_id=? ORDER BY code', [(string) $company->getId()]));
+        self::assertSame(28, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id=? AND object_type='account' AND action='system_seed'", [(string) $company->getId()]));
     }
 }

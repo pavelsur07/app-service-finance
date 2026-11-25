@@ -2109,19 +2109,22 @@ setAccountBalanceFromSource(string $companyId, string $actorId, string $accountI
 явно, остальные пути (ленивый сид, `seedDefaultStructure()`, `app:balance:seed-missing-structure`)
 берут его через `CompanyFacade::getBusinessProfile()`; аудит сида пишет
 `{template, version}`. Универсальный шаблон — тот же без `AR_MARKETPLACES` и `INV_MARKETPLACE`. Маркетплейсный шаблон
-(версия 3 — 33 узла, три уровня, под продавца на маркетплейсах: деньги по видам счетов, расчёты с
-маркетплейсами, склады, налоги, кредиты; `code` — стабильный контракт статьи, порядок задаёт
-позиция, id в файле нет; компании со структурой версии 1 не меняются; у конечной статьи —
-необязательный список `accounts: [{code, name, allow_negative}]`, в шаблоне два счёта:
-`ACC_MAIN_BANK` «Расчётный счёт (основной)» на `CASH_BANK` и `ACC_MAIN_REGISTER` «Касса (основная)»
-на `CASH_REGISTER`),
+(версия 4 — 34 узла, три уровня, под продавца на маркетплейсах: деньги по видам счетов, расчёты с
+маркетплейсами, склады, в т. ч. `INV_FULFILLMENT` «Склады ФФ (фулфилмент)», налоги, кредиты; `code` —
+стабильный контракт статьи, порядок задаёт позиция, id в файле нет; у конечной статьи — список
+`accounts: [{code, name, allow_negative}]`: типовой справочник счетов — счёт у каждой конечной статьи,
+28 счетов `ACC_*` (универсальный — 24, без счетов маркетплейсов); минус разрешён у `ACC_AR_OZON`,
+`ACC_AR_WB`, `ACC_RETAINED`, `ACC_INV_ADJUSTMENT` — корреспондирующий счёт оценки складов МойСклад),
 читается и проверяется `BalanceStructureTemplateReader` (глубина ≤ 4, уникальные `code` статей и
 отдельно счетов, `article` без `children`, `accounts` только у `article`, сторона наследуется от
-родителя), статьи применяет `SeedBalanceStructureAction` (идемпотентно), счета —
-`EnsureBalanceAccountsAction`: только компании без единого учётного счёта, под блокировкой книги,
-запись как у ручного создания (счёт, нулевое `balance_account_states`, аудит `system_seed`);
-статья отсутствует, архивна или не конечная — счёт пропускается с одним warning. Книга не
-инициализируется. Оба запускает слушатель
+родителя), статьи применяет `SeedBalanceStructureAction` (идемпотентно, только пустой компании),
+справочник — `SyncStandardChartAction`: у компании со структурой под блокировкой книги добирает
+недостающие по `code` конечные статьи (под существующей группой той же стороны и глубины < 4, после
+предыдущей статьи шаблона; группы не воссоздаются) и счета по шаблону, которым дерево засеяно (аудит сида,
+иначе текущий профиль); существующие статьи и счета, включая счёт пользователя с типовым кодом, не
+меняются; нет совместимого родителя или статья в архиве — пропуск с одним warning. Однократно на версию шаблона: отметка `balance_audit_events` (book, `chart_sync`,
+`{template, version, created}`) — удалённое пользователем не возвращается. Запись как у ручного создания
+(нулевое `balance_account_states`, аудит `system_seed`); книга не инициализируется. Оба запускает слушатель
 `Balance\EventListener\SeedBalanceStructureOnCompanyCreated` на событии
 `App\Company\Event\CompanyCreatedEvent(companyId, businessProfile)` — его диспатчат оба пути создания
 компании (форма `CompanyController::new` и `CreateCompanyOwnerAccountAction`) после flush внутри
@@ -2129,7 +2132,9 @@ setAccountBalanceFromSource(string $companyId, string $actorId, string $accountI
 `seedDefaultStructure()` остаётся для ручного восстановления. Компании, созданные до сида, получают
 структуру лениво: `EnsureBalanceStructureAction` вызывается в `BalanceController` и
 `BalanceStructureController` после проверки прав, сначала дешёвая проверка (нет статей и книга
-не инициализирована), потом системный сид (`system_seed`) и, если структура создана сейчас, базовые счета шаблона. Бэкфилл для компаний без структуры —
+не инициализирована), потом системный сид (`system_seed`) и справочник; у компании со структурой —
+только `SyncStandardChartAction` (после отметки версии — один запрос). `BalanceFacade::ensureStandardChart()`
+делает то же для чужих модулей (страница «Склады» МойСклад при финансовом доступе), коммитит сам. Бэкфилл для компаний без структуры —
 `app:balance:seed-missing-structure` (`SeedMissingBalanceStructuresAction`): по умолчанию dry-run,
 запись только с `--execute --expected-count=<из dry-run>`; кандидат — компания без статей и с
 неинициализированной книгой; останов на первой ошибке, повторный запуск продолжает.
@@ -6037,6 +6042,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.248 | 2026-11-25 | Balance: типовой справочник счетов — шаблоны версии 4 (28 счетов, статья `INV_FULFILLMENT`), `SyncStandardChartAction` вместо `EnsureBalanceAccountsAction` добирает недостающее по коду у всех компаний лениво; `BalanceFacade::ensureStandardChart()` |
 | 2.247 | 2026-11-24 | MoySklad: склады → счета Баланса — страница «Склады», ежедневная оценка по себестоимости (`ValueStoreStocksMessage`, cron 23:30 и requeue */15), установка остатка счёта от имени автора; `BalanceFacade`: `getPostingAccounts`, `getBookStatus`, `canPostFromSource`, `setAccountBalanceFromSource` |
 | 2.246 | 2026-11-24 | MoySklad: автомаппинг identity_package_v4 — комплектация спорна, если штуки указаны только с одной стороны или объём/вес с обеих сторон не совпадает |
 | 2.245 | 2026-11-24 | Миграция удаления ИИ-разбора: нет таблиц `telegram_payment_intake_session`, `cash_payment_intake_reply_receipt`, `ai_quality_monitor`, `ai_quality_run`, колонки `client_bindings.payment_intake_selected` и ИИ-колонок `cash_payment_intake_draft`; Telegram-черновики удалены. ai-service `0003`: нет `ai_eval_*` и строк `parse_payment_message` |

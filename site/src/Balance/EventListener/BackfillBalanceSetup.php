@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Balance\EventListener;
 
-use App\Balance\Application\EnsureBalanceAccountsAction;
 use App\Balance\Application\EnsureBalanceStructureAction;
+use App\Balance\Application\SyncStandardChartAction;
 use App\Balance\Infrastructure\Query\CompaniesWithoutBalanceStructureQuery;
 use App\Company\Event\CompanyOnboardingBackfillEvent;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
@@ -20,7 +20,7 @@ final readonly class BackfillBalanceSetup
     public function __construct(
         private CompaniesWithoutBalanceStructureQuery $missingStructure,
         private EnsureBalanceStructureAction $structure,
-        private EnsureBalanceAccountsAction $accounts,
+        private SyncStandardChartAction $accounts,
     ) {
     }
 
@@ -37,6 +37,6 @@ final readonly class BackfillBalanceSetup
             return;
         }
 
-        $event->report('balance_accounts', ($this->accounts)($event->companyId, dryRun: !$event->execute, profile: $event->businessProfile));
+        $event->report('balance_chart', ($this->accounts)($event->companyId, dryRun: !$event->execute, profile: $event->businessProfile));
     }
 }

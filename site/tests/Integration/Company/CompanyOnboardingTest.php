@@ -32,8 +32,8 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         // Ядро ДДС: группы:статьи, статьи с описанием, статьи с направлением, связи с ОПиУ, узлы с group_code.
         'cashflow_core' => '7:30:30:30:0:37',
         'pl_categories' => 72,
-        'balance_articles' => 33,
-        'balance_accounts' => 'ACC_MAIN_BANK, ACC_MAIN_REGISTER',
+        'balance_articles' => 34,
+        'balance_accounts' => 'ACC_ACQUIRING, ACC_ADVANCES_PAID, ACC_ADVANCES_RECEIVED, ACC_AP_OTHER, ACC_AP_SUPPLIERS, ACC_AR_BUYERS, ACC_AR_OTHER, ACC_AR_OZON, ACC_AR_WB, ACC_CONTRIBUTED, ACC_FIXED_ASSETS, ACC_INTANGIBLES, ACC_INV_ADJUSTMENT, ACC_INV_FF, ACC_INV_OZON, ACC_INV_TRANSIT, ACC_INV_WAREHOUSE, ACC_INV_WB, ACC_LOANS_GIVEN, ACC_LONG_LOANS, ACC_LONG_OTHER, ACC_MAIN_BANK, ACC_MAIN_REGISTER, ACC_PAYROLL, ACC_RETAINED, ACC_SHORT_LOANS, ACC_TAX_PAYABLE, ACC_VAT_RECEIVABLE',
         'billing' => 'base:true:14',
     ];
 
@@ -49,7 +49,7 @@ final class CompanyOnboardingTest extends IntegrationTestCase
         $company = (self::getContainer()->get(CreateCompanyOwnerAccountAction::class))($this->newUser(), 'plain-password', 'Universal Setup Co', false, BusinessProfile::UNIVERSAL);
         $companyId = (string) $company->getId();
 
-        self::assertSame(array_merge(self::FULL_SETUP, ['pl_categories' => 43, 'balance_articles' => 31]), $this->onboardingOf($companyId));
+        self::assertSame(array_merge(self::FULL_SETUP, ['pl_categories' => 43, 'balance_articles' => 32, 'balance_accounts' => 'ACC_ACQUIRING, ACC_ADVANCES_PAID, ACC_ADVANCES_RECEIVED, ACC_AP_OTHER, ACC_AP_SUPPLIERS, ACC_AR_BUYERS, ACC_AR_OTHER, ACC_CONTRIBUTED, ACC_FIXED_ASSETS, ACC_INTANGIBLES, ACC_INV_ADJUSTMENT, ACC_INV_FF, ACC_INV_TRANSIT, ACC_INV_WAREHOUSE, ACC_LOANS_GIVEN, ACC_LONG_LOANS, ACC_LONG_OTHER, ACC_MAIN_BANK, ACC_MAIN_REGISTER, ACC_PAYROLL, ACC_RETAINED, ACC_SHORT_LOANS, ACC_TAX_PAYABLE, ACC_VAT_RECEIVABLE']), $this->onboardingOf($companyId));
         // Ни одной статьи маркетплейса: ни в ОПиУ, ни в Балансе.
         self::assertSame([], $this->connection->fetchFirstColumn(
             "SELECT code FROM pl_categories WHERE company_id = ? AND (code LIKE '%SPP%' OR code LIKE 'COGS_MP%' OR code ~ '^CM[0-9]' OR code LIKE 'PRODUCT_INFRA%' OR code LIKE 'OPEX_WH%' OR code LIKE 'PROMO%')",

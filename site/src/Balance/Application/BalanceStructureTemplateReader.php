@@ -20,7 +20,7 @@ use Symfony\Component\Yaml\Yaml;
  */
 final readonly class BalanceStructureTemplateReader
 {
-    public const VERSION = 3;
+    public const VERSION = 4;
     private const MAX_LEVEL = 4;
     private const MAX_NODES = 200;
     private const MAX_NAME_LENGTH = 255;

@@ -18,7 +18,7 @@ final readonly class EnsureBalanceStructureAction
     public function __construct(
         private CompaniesWithoutBalanceStructureQuery $missing,
         private SeedBalanceStructureAction $seed,
-        private EnsureBalanceAccountsAction $accounts,
+        private SyncStandardChartAction $accounts,
         private Connection $db,
     ) {
     }
@@ -32,6 +32,9 @@ final readonly class EnsureBalanceStructureAction
     public function __invoke(string $companyId, ?BusinessProfile $profile = null): bool
     {
         if ([] === ($this->missing)([$companyId])) {
+            // Структура есть — добрать типовой справочник счетов (однократно на версию шаблона, дальше — один запрос).
+            ($this->accounts)($companyId, profile: $profile);
+
             return false;
         }
 

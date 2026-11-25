@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Balance\Application;
 
 use App\Balance\Application\EnsureBalanceStructureAction;
+use App\Balance\Application\SeedBalanceStructureAction;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -18,11 +19,21 @@ final class EnsureBalanceStructureActionTest extends IntegrationTestCase
         $ensure = self::getContainer()->get(EnsureBalanceStructureAction::class);
 
         self::assertTrue($ensure($companyId));
-        self::assertSame(33, $this->articleCount($companyId));
+        self::assertSame(34, $this->articleCount($companyId));
         self::assertFalse($ensure($companyId));
-        self::assertSame(33, $this->articleCount($companyId));
+        self::assertSame(34, $this->articleCount($companyId));
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM balance_audit_events WHERE company_id=? AND object_type='book' AND action='system_seed'", [$companyId]));
-        self::assertSame(['ACC_MAIN_BANK', 'ACC_MAIN_REGISTER'], $this->connection->fetchFirstColumn('SELECT code FROM balance_accounts WHERE company_id=? ORDER BY code', [$companyId]));
+        self::assertCount(28, $this->connection->fetchFirstColumn('SELECT code FROM balance_accounts WHERE company_id=? ORDER BY code', [$companyId]));
+    }
+
+    public function testExistingStructureWithoutAccountsGetsStandardChartLazily(): void
+    {
+        $companyId = $this->createCompany();
+        self::assertTrue(self::getContainer()->get(SeedBalanceStructureAction::class)($companyId));
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM balance_accounts WHERE company_id=?', [$companyId]));
+
+        self::assertFalse(self::getContainer()->get(EnsureBalanceStructureAction::class)($companyId));
+        self::assertSame(28, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM balance_accounts WHERE company_id=?', [$companyId]));
     }
 
     public function testDoesNotTouchCompanyWithInitializedBook(): void
