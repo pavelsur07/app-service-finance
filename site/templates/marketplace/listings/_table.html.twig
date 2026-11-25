@@ -1,4 +1,4 @@
-{# Таблица листингов с привязкой к товару и тегами, пагинация. Параметры: pager, tags_by_listing, filter_params. #}
+{# Таблица листингов с привязкой к товару, категорией и тегами, пагинация. Параметры: pager, tags_by_listing, filter_params. #}
 <div class="table-responsive">
     <table class="table card-table table-vcenter">
         <thead>
@@ -14,6 +14,7 @@
             <th>Размер</th>
             <th class="text-end">Цена, ₽</th>
             <th>Товар</th>
+            <th>Категория</th>
             <th>Теги</th>
             <th class="w-1"></th>
         </tr>
@@ -65,6 +66,9 @@
                             Привязать
                         </button>
                     {% endif %}
+                </td>
+                <td data-listing-category>
+                    {% if listing.category %}{{ listing.category.name }}{% else %}<span class="text-muted">—</span>{% endif %}
                 </td>
                 <td class="listing-tags" data-listing-id="{{ listing.id }}">
                     <div class="d-flex flex-wrap gap-1">

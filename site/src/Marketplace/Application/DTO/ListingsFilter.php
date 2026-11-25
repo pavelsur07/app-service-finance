@@ -17,6 +17,7 @@ final readonly class ListingsFilter
 {
     public const SEARCH_MAX_LENGTH = 100;
     public const TAG_NONE = 'none';
+    public const CATEGORY_NONE = 'none';
 
     private const FILTER_MAPPED = 'mapped';
     private const FILTER_UNMAPPED = 'unmapped';
@@ -28,6 +29,8 @@ final readonly class ListingsFilter
         public ?string $search = null,
         public ?string $tagId = null,
         public bool $withoutTags = false,
+        public ?string $categoryId = null,
+        public bool $withoutCategory = false,
     ) {
     }
 
@@ -44,6 +47,7 @@ final readonly class ListingsFilter
 
         $search = trim($string('q'));
         $tag = $string('tag');
+        $category = $string('category');
 
         return new self(
             mapped: self::mappedFromString($string('filter')),
@@ -51,6 +55,8 @@ final readonly class ListingsFilter
             search: '' === $search ? null : trim(mb_substr($search, 0, self::SEARCH_MAX_LENGTH)),
             tagId: Uuid::isValid($tag) ? $tag : null,
             withoutTags: self::TAG_NONE === $tag,
+            categoryId: Uuid::isValid($category) ? $category : null,
+            withoutCategory: self::CATEGORY_NONE === $category,
         );
     }
 
@@ -86,12 +92,19 @@ final readonly class ListingsFilter
             throw self::invalid('filter.tag: uuid тега или none.');
         }
 
+        $category = self::optionalString($data, 'category') ?? '';
+        if ('' !== $category && self::CATEGORY_NONE !== $category && !Uuid::isValid($category)) {
+            throw self::invalid('filter.category: uuid категории или none.');
+        }
+
         return new self(
             mapped: self::mappedFromString($filter),
             marketplace: $marketplace,
             search: '' === $search ? null : $search,
             tagId: '' !== $tag && self::TAG_NONE !== $tag ? $tag : null,
             withoutTags: self::TAG_NONE === $tag,
+            categoryId: '' !== $category && self::CATEGORY_NONE !== $category ? $category : null,
+            withoutCategory: self::CATEGORY_NONE === $category,
         );
     }
 
@@ -122,6 +135,11 @@ final readonly class ListingsFilter
         } elseif (null !== $this->tagId) {
             $params['tag'] = $this->tagId;
         }
+        if ($this->withoutCategory) {
+            $params['category'] = self::CATEGORY_NONE;
+        } elseif (null !== $this->categoryId) {
+            $params['category'] = $this->categoryId;
+        }
 
         return $params;
     }
@@ -132,7 +150,9 @@ final readonly class ListingsFilter
             && null === $this->marketplace
             && null === $this->search
             && null === $this->tagId
-            && !$this->withoutTags;
+            && !$this->withoutTags
+            && null === $this->categoryId
+            && !$this->withoutCategory;
     }
 
     private static function mappedFromString(string $filter): ?bool

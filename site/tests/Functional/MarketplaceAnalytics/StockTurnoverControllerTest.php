@@ -180,7 +180,7 @@ final class StockTurnoverControllerTest extends WebTestCaseBase
         $crawler = $client->request('GET', '/inventory/stocks');
         self::assertResponseIsSuccessful();
         $labels = $crawler->filter('.card-header-tabs a')->each(static fn (Crawler $a): string => trim($a->text()));
-        self::assertSame(['Листинг', 'Остатки', 'Оборачиваемость', 'Себестоимость', 'Теги'], $labels);
+        self::assertSame(['Листинг', 'Остатки', 'Оборачиваемость', 'Себестоимость', 'Теги', 'Категории'], $labels);
         self::assertCount(1, $crawler->filter('.card-header-tabs a[href="'.self::URL.'"]'));
 
         $crawler = $client->request('GET', self::URL);

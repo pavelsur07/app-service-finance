@@ -7,7 +7,8 @@
          data-products-url="{{ path('api_products_list') }}"
          data-map-url="{{ path('api_marketplace_listing_map', {listingId: '00000000-0000-0000-0000-000000000000'}) }}"
          data-assign-url="{{ path('api_marketplace_listing_tags_assign') }}"
-         data-detach-url="{{ path('api_marketplace_listing_tags_detach') }}">
+         data-detach-url="{{ path('api_marketplace_listing_tags_detach') }}"
+         data-category-assign-url="{{ path('api_marketplace_listing_categories_assign') }}">
 
         <div class="card">
             <div class="card-header d-flex align-items-center gap-3 flex-wrap">
@@ -22,6 +23,7 @@
                     available_marketplaces: available_marketplaces,
                     marketplace: marketplace,
                     all_tags: all_tags,
+                    all_categories: all_categories,
                     listings_filter: listings_filter,
                 } only %}
             </div>
@@ -45,6 +47,13 @@
             {% elseif listings_filter.tagId is not null %}
                 {% for tag in all_tags|filter(t => t.id == listings_filter.tagId) %}
                     {% set filter_summary_parts = filter_summary_parts|merge(['тег «' ~ tag.name ~ '»']) %}
+                {% endfor %}
+            {% endif %}
+            {% if listings_filter.withoutCategory %}
+                {% set filter_summary_parts = filter_summary_parts|merge(['без категории']) %}
+            {% elseif listings_filter.categoryId is not null %}
+                {% for category in all_categories|filter(c => c.id == listings_filter.categoryId) %}
+                    {% set filter_summary_parts = filter_summary_parts|merge(['категория «' ~ category.name ~ '»']) %}
                 {% endfor %}
             {% endif %}
             {% set filter_summary = filter_summary_parts is empty ? 'все листинги' : filter_summary_parts|join(', ') %}
@@ -78,6 +87,7 @@
                    по нему, а не по тексту в поле поиска, изменённому без Enter. #}
                 {% include 'marketplace/listings/_bulk_tag_panel.html.twig' with {
                     all_tags: all_tags,
+                    all_categories: all_categories,
                     filter_params: filter_params,
                     filter_summary: filter_summary,
                     pager: pager,
