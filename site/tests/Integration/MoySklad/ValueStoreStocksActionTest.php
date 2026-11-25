@@ -180,6 +180,21 @@ final class ValueStoreStocksActionTest extends IntegrationTestCase
         self::assertEquals([new ValueStoreStocksMessage(self::COMPANY, self::CONNECTION, self::SNAPSHOT)], $sent);
     }
 
+    public function testShiftedCostReportIsRetriedNotValued(): void
+    {
+        $this->enable();
+        $page = fn (int $offset): MockResponse => new MockResponse('{"meta":{"size":2,"limit":1,"offset":'.$offset.'},"rows":['
+            .'{"meta":{"type":"product","href":"https://api.moysklad.ru/api/remap/1.2/entity/product/'.$this->product.'"},"price":100}]}');
+        try {
+            ($this->action([$page(0), $page(1)]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT);
+            self::fail('Duplicate row across pages must fail the pass.');
+        } catch (StockSyncException $error) {
+            self::assertSame('temporary', $error->category);
+        }
+        self::assertSame([], $this->valuations());
+        self::assertSame(1, $this->counts()['operations']);
+    }
+
     public function testDisabledWritingOnlyValues(): void
     {
         self::assertSame('valued', ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT));

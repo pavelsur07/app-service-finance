@@ -150,6 +150,21 @@ final class DelegatedTargetBalanceTest extends IntegrationTestCase
         self::assertSame($operations, $this->operations());
     }
 
+    public function testForeignDraftUnderSameKeyIsNotPosted(): void
+    {
+        $this->opening();
+        $this->sessionLedger->saveDraft($this->companyId, $this->actorId, 'k-draft', 'operation', '2025-01-05', 'Ручной черновик', [
+            ['accountId' => $this->accounts['money'], 'direction' => 'decrease', 'amount' => '10'],
+            ['accountId' => $this->accounts['stock'], 'direction' => 'increase', 'amount' => '10'],
+        ]);
+        try {
+            $this->post('stock', 'equity', '2025-01-05', '3000000', 'k-draft');
+            self::fail('Draft under the same key must not be posted by the integration.');
+        } catch (BalanceLedgerException) {
+        }
+        self::assertSame('draft', $this->connection->fetchOne('SELECT status FROM balance_operations WHERE company_id = ? AND request_key = ?', [$this->companyId, 'k-draft']));
+    }
+
     public function testSessionPathsStillRequireSession(): void
     {
         $this->expectException(AccessDeniedException::class);

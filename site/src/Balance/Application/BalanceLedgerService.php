@@ -11,6 +11,7 @@ use App\Shared\Domain\ValueObject\Money;
 use Doctrine\DBAL\Connection;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Intl\Currencies;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 /** All financial mutations serialize on the company's book and commit atomically. */
 final readonly class BalanceLedgerService
@@ -219,14 +220,22 @@ SQL, ['company' => $companyId, 'maximum' => (string) \PHP_INT_MAX, 'minimum' => 
             if (!$book['initialized']) {
                 throw new BalanceLedgerException('Сначала проведите начальные остатки.');
             }
+            // Повторно под книгой: отзыв права, закоммиченный пока воркер ждал FOR UPDATE, должен остановить проводку.
+            if (!$this->access->allowsDelegatedPosting($companyId, $actorId)) {
+                throw new AccessDeniedException('Недостаточно прав для учета баланса.');
+            }
             if ((string) $book['currency'] !== $currency) {
                 throw new BalanceLedgerException(sprintf('Валюта Баланса %s не совпадает с валютой источника %s.', (string) $book['currency'], $currency));
             }
-            $existing = $this->connection->fetchOne('SELECT id FROM balance_operations WHERE company_id = :company AND request_key = :key', ['company' => $companyId, 'key' => $requestKey]);
+            // Повтор: ключ уже дал проведённую корректировку → тот же документ. Черновик или документ другого
+            // вида под этим ключом не проводится от имени автора интеграции.
+            $existing = $this->connection->fetchAssociative('SELECT id, status, kind FROM balance_operations WHERE company_id = :company AND request_key = :key', ['company' => $companyId, 'key' => $requestKey]);
             if (false !== $existing) {
-                $this->postLocked($companyId, $actorId, (string) $existing, $book, 1);
+                if ('posted' !== $existing['status'] || 'correction' !== $existing['kind']) {
+                    throw new BalanceLedgerException('Ключ запроса занят другим документом.');
+                }
 
-                return (string) $existing;
+                return (string) $existing['id'];
             }
             if ($accountId === $counterAccountId) {
                 throw new BalanceLedgerException('Корреспондирующий счет должен отличаться от целевого.');

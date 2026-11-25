@@ -66,8 +66,9 @@ final readonly class ValueStoreStocksAction
             $valued = in_array($previous, ['valued', 'posting', 'posted', 'partial', 'skipped'], true);
             $this->db->executeStatement('INSERT INTO moysklad_store_balance_runs (company_id, connection_id, snapshot_id, valuation_date, status, attempts, created_at)
                 VALUES (?, ?, ?, ?, ?, 1, ?) ON CONFLICT (company_id, snapshot_id)
-                DO UPDATE SET status = EXCLUDED.status, error_reason = NULL, finished_at = NULL, attempts = moysklad_store_balance_runs.attempts + 1',
-                [$companyId, $connectionId, $snapshotId, $date, $valued ? 'valued' : 'valuing', $this->now()]);
+                DO UPDATE SET status = CASE WHEN ? THEN moysklad_store_balance_runs.status ELSE EXCLUDED.status END,
+                    error_reason = NULL, finished_at = NULL, attempts = moysklad_store_balance_runs.attempts + 1',
+                [$companyId, $connectionId, $snapshotId, $date, $valued ? 'valued' : 'valuing', $this->now(), $valued ? 'true' : 'false']);
             if (!$valued) {
                 try {
                     $prices = $this->prices($companyId, $connectionId);
@@ -123,7 +124,11 @@ final readonly class ValueStoreStocksAction
             }
             $expected = $page->size;
             foreach ($page->rows as $row) {
-                $prices[$row->assortmentType.':'.$row->assortmentExternalId] = $row->priceMinor;
+                $key = $row->assortmentType.':'.$row->assortmentExternalId;
+                if (isset($prices[$key])) {
+                    throw new StockSyncException('temporary'); // отчёт сдвинулся между страницами — загрузить заново
+                }
+                $prices[$key] = $row->priceMinor;
             }
             $offset += $page->limit;
         } while ($offset < $expected);
@@ -161,8 +166,25 @@ final readonly class ValueStoreStocksAction
         $this->db->executeStatement("UPDATE moysklad_store_balance_runs SET status = 'valued' WHERE company_id = ? AND snapshot_id = ?", [$companyId, $snapshotId]);
     }
 
-    /** @return array{status: string, reason: ?string} */
+    /**
+     * Фаза проводки под company-lock назначений и настроек (тот же ключ, что `SaveStoreBalanceLinkAction::lockCompany`):
+     * выключение или смена корр. счёта не смешивается с идущей проводкой. HTTP в этой фазе нет.
+     *
+     * @return array{status: string, reason: ?string}
+     */
     private function post(string $companyId, string $connectionId, string $snapshotId, \DateTimeImmutable $date): array
+    {
+        $lock = ['moysklad-store-balance-accounts', $companyId];
+        $this->db->fetchOne('SELECT pg_advisory_lock(hashtext(?), hashtext(?))', $lock);
+        try {
+            return $this->postLocked($companyId, $connectionId, $snapshotId, $date);
+        } finally {
+            $this->db->fetchOne('SELECT pg_advisory_unlock(hashtext(?), hashtext(?))', $lock);
+        }
+    }
+
+    /** @return array{status: string, reason: ?string} */
+    private function postLocked(string $companyId, string $connectionId, string $snapshotId, \DateTimeImmutable $date): array
     {
         $settings = $this->db->fetchAssociative('SELECT enabled, counter_account_id, actor_user_id FROM moysklad_store_balance_settings WHERE company_id = ? AND connection_id = ?', [$companyId, $connectionId]);
         if (false === $settings || !$settings['enabled'] || null === $settings['counter_account_id']) {
