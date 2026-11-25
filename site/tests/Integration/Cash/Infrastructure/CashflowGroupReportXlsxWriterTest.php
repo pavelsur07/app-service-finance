@@ -69,7 +69,8 @@ final class CashflowGroupReportXlsxWriterTest extends IntegrationTestCase
             $companies = '/finance/reports/cashflow/group?from=2026-11-01&to=2026-11-30&view=companies';
             $reconciliation = '/finance/reports/cashflow/group/reconciliation?from=2026-11-01&to=2026-11-30';
             self::assertStringEndsWith($companies, $sheet->getCell('C'.$rows['Статья'])->getHyperlink()->getUrl());
-            self::assertStringEndsWith($companies, $sheet->getCell('C'.$rows['Прочие поступления ⚠'])->getHyperlink()->getUrl());
+            // Одна ссылка на заголовок и две на сверку в каждой колонке, плюс общая пара.
+            self::assertCount(4 * 3 + 1, $sheet->getHyperlinkCollection());
             self::assertStringEndsWith($reconciliation.'#unpaired', $sheet->getCell('C'.$rows['Без пары'])->getHyperlink()->getUrl());
             self::assertStringEndsWith($reconciliation.'#in-transit', $sheet->getCell('C'.$rows['Деньги в пути'])->getHyperlink()->getUrl());
         });

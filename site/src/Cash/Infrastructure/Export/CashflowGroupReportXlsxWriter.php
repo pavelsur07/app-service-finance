@@ -122,13 +122,9 @@ final readonly class CashflowGroupReportXlsxWriter
         foreach ([...$report->lines, $report->unmatched] as $line) {
             self::labels($sheet, $row, [self::lineLabel($line)], $line->section);
             foreach ($periods->columns as $index => $column) {
-                $cell = $sheet->getCell([$index + 2, $row]);
-                self::money($cell, $column->amounts[$line->key]);
-                $this->link($cell, $column->from, $column->to, ['view' => 'companies'], 'report_cashflow_group');
+                self::money($sheet->getCell([$index + 2, $row]), $column->amounts[$line->key]);
             }
-            $totalCell = $sheet->getCell([$totalIndex, $row]);
-            self::money($totalCell, $line->total);
-            $this->link($totalCell, $report->from, $report->to, ['view' => 'companies'], 'report_cashflow_group');
+            self::money($sheet->getCell([$totalIndex, $row]), $line->total);
             ++$row;
         }
         $summaryRow = $row;
