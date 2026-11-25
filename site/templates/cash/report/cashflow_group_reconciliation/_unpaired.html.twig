@@ -1,0 +1,68 @@
+{# report, period и выбранная операция selected с её проверенными вариантами choices. #}
+{% import 'cash/report/cashflow_group_reconciliation/_macros.html.twig' as ui %}
+<section class="card mb-3" id="unpaired">
+    <div class="card-header"><h3 class="card-title">Без пары ({{ report.reconciliation.unpaired|length }})</h3></div>
+    {% if report.reconciliation.unpaired %}
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+                <thead><tr><th>Операция</th><th>Направление</th><th>Данные встречной компании</th>{% if canWrite %}<th></th>{% endif %}</tr></thead>
+                <tbody>
+                {% for tx in report.reconciliation.unpaired %}
+                    <tr>
+                        <td>{{ ui.operation(tx, report.companies, period, true) }}</td>
+                        <td>{{ tx.direction.value == 'INFLOW' ? 'Поступление' : 'Выплата' }}</td>
+                        <td>
+                            {% for account in report.missingDataHints(tx) %}
+                                <div>{{ report.companies[account.companyId] }} · {{ account.label }} — данные по {{ account.lastDate|date('d.m') }}</div>
+                            {% else %}
+                                —
+                            {% endfor %}
+                        </td>
+                        {% if canWrite %}
+                            <td>
+                                {% if report.reconciliation.requiresDecisionRemoval(tx.id) %}
+                                    <a href="#stale-decisions">Сначала удалите устаревшее решение</a>
+                                {% else %}
+                                    <a href="{{ path('report_cashflow_group_reconciliation', period|merge({match: tx.id})) }}#match">Сопоставить вручную</a>
+                                {% endif %}
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="card-body text-secondary mb-0">Операций без пары нет.</p>
+    {% endif %}
+</section>
+
+{% if canWrite and selected and not report.reconciliation.requiresDecisionRemoval(selected.id) %}
+    <section class="card mb-3" id="match">
+        <div class="card-header"><h3 class="card-title">Сопоставить вручную</h3></div>
+        <div class="card-body">
+            {% set isInflow = selected.direction.value == 'INFLOW' %}
+            <p>{{ isInflow ? 'Поступление' : 'Выплата' }}</p>
+            {{ ui.operation(selected, report.companies, period) }}
+            {% if choices %}
+                <form method="post" action="{{ path('report_cashflow_group_decide', period) }}" class="mt-3">
+                    <input type="hidden" name="_token" value="{{ token }}">
+                    <input type="hidden" name="id" value="{{ formIds[selected.id] }}">
+                    <input type="hidden" name="type" value="PAIR">
+                    <input type="hidden" name="{{ isInflow ? 'inflowId' : 'outflowId' }}" value="{{ selected.id }}">
+                    <label class="form-label" for="counterleg">{{ isInflow ? 'Встречная выплата' : 'Встречное поступление' }}</label>
+                    <select class="form-select mb-3" id="counterleg" name="{{ isInflow ? 'outflowId' : 'inflowId' }}" required>
+                        <option value="">Выберите операцию</option>
+                        {% for tx in choices %}
+                            {% set earlierInflow = isInflow ? selected.occurredAt < tx.occurredAt : tx.occurredAt < selected.occurredAt %}
+                            <option value="{{ tx.id }}">{{ tx.occurredAt|date('d.m.Y') }} · {{ report.companies[tx.companyId] }} · {{ tx.accountLabel }} · {{ tx.amount.toDecimalString|vf_money(2, 'RUB') }}{% if selected.occurredAt != tx.occurredAt %} — {{ earlierInflow ? 'поступление раньше выплаты' : 'даты операций различаются' }}{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <button class="btn btn-primary" type="submit">Сопоставить</button>
+                </form>
+            {% else %}
+                <p class="text-secondary mt-3 mb-0">За 15 дней до и после операции нет свободной встречной операции с той же суммой.</p>
+            {% endif %}
+        </div>
+    </section>
+{% endif %}

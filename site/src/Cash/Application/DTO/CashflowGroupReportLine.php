@@ -27,9 +27,4 @@ final readonly class CashflowGroupReportLine
         public array $pairIds,
     ) {
     }
-
-    public function getIntragroup(): string
-    {
-        return bcsub('0.00', $this->elimination, 2);
-    }
 }

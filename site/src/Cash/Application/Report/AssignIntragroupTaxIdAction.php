@@ -19,10 +19,10 @@ final readonly class AssignIntragroupTaxIdAction
     ) {
     }
 
-    public function __invoke(string $activeCompanyId, string $userId, string $companyId, string $counterpartyId, string $peerCompanyId): void
+    public function __invoke(string $activeCompanyId, string $userId, string $companyId, string $counterpartyId, string $peerCompanyId, ?string $expectedHead = null): void
     {
-        $this->em->wrapInTransaction(function () use ($activeCompanyId, $userId, $companyId, $counterpartyId, $peerCompanyId): void {
-            $members = $this->access->lockedMembers($activeCompanyId, $userId);
+        $this->em->wrapInTransaction(function () use ($activeCompanyId, $userId, $companyId, $counterpartyId, $peerCompanyId, $expectedHead): void {
+            $members = $this->access->lockedMembers($activeCompanyId, $userId, $expectedHead);
             if (!\in_array($companyId, $members, true) || !\in_array($peerCompanyId, $members, true) || !Uuid::isValid($counterpartyId)) {
                 throw new IntragroupDecisionException('Контрагент и встречная компания должны входить в выбранную группу.');
             }

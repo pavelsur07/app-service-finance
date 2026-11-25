@@ -1,0 +1,33 @@
+{# Ранее разъединённые пары и устаревшие решения группы. У устаревшего решения одна или обе операции могут отсутствовать. #}
+{% import 'cash/report/cashflow_group_reconciliation/_macros.html.twig' as ui %}
+{% for key, decisions in {'unpair-decisions': report.reconciliation.unpairDecisions, 'stale-decisions': report.reconciliation.staleDecisions} %}
+    {% if decisions %}
+        <section class="card mb-3" id="{{ key }}">
+            <div class="card-header"><h3 class="card-title">{{ key == 'stale-decisions' ? 'Устаревшие решения' : 'Разъединённые автопары' }}</h3></div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <thead><tr><th>Решение</th><th>Выплата</th><th>Поступление</th>{% if canWrite %}<th></th>{% endif %}</tr></thead>
+                    <tbody>
+                    {% for decision in decisions %}
+                        <tr>
+                            <td>{{ decision.type.value == 'PAIR' ? 'Ручная пара' : 'Разъединение' }}<div class="text-secondary">{{ decision.createdAt|date('d.m.Y H:i') }}</div></td>
+                            {% for leg in [decision.outflowTransactionId, decision.inflowTransactionId] %}
+                                <td>
+                                    {% if report.reconciliation.transactions[leg] is defined %}
+                                        {{ ui.operation(report.reconciliation.transactions[leg], report.companies, period) }}
+                                    {% else %}
+                                        Операция недоступна для сверки
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                            {% if canWrite %}
+                                <td>{{ ui.post('report_cashflow_group_remove', {id: decision.id}, 'Удалить решение', period, token) }}</td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    {% endif %}
+{% endfor %}

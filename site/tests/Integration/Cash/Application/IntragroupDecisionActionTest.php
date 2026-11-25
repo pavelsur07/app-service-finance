@@ -216,6 +216,22 @@ final class IntragroupDecisionActionTest extends IntegrationTestCase
         $this->save($id, IntragroupDecisionType::PAIR, 1, 19);
     }
 
+    public function testDecisionRequiresTheSameGroupHeadAsTheVerifiedForm(): void
+    {
+        $id = Uuid::uuid7()->toString();
+        $previousHead = (string) $this->companies['Гамма']->getId();
+
+        $this->expectException(AccessDeniedException::class);
+        try {
+            self::getContainer()->get(IntragroupDecisionAction::class)->save(
+                $this->active, $this->userId, $id, IntragroupDecisionType::PAIR,
+                self::transactionId(1), self::transactionId(19), expectedHead: $previousHead,
+            );
+        } finally {
+            self::assertFalse($this->connection->fetchOne('SELECT id FROM cash_intragroup_decision WHERE id = ?', [$id]));
+        }
+    }
+
     public function testMemberWhoDoesNotOwnAllCompaniesCannotRemoveDecision(): void
     {
         $id = Uuid::uuid7()->toString();

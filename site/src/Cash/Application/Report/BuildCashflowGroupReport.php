@@ -9,12 +9,12 @@ use App\Cash\Application\DTO\CashflowGroupReportLine;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Infrastructure\Query\CashflowGroupReportQuery;
+use App\Cash\Infrastructure\Query\CashflowGroupSnapshot;
 use App\Cash\Infrastructure\Query\CashIntragroupQuery;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Facade\ConsolidationGroupFacadeInterface;
-use Doctrine\DBAL\Connection;
 
 /**
  * Консолидированный отчёт ДДС группы компании за период, только чтение. Строки — статьи эталона
@@ -36,29 +36,14 @@ final readonly class BuildCashflowGroupReport
         private CashflowGroupReportQuery $query,
         private BuildCashflowReconciliation $reconcile,
         private CashIntragroupQuery $intragroupQuery,
-        private Connection $connection,
+        private CashflowGroupSnapshot $snapshot,
     ) {
     }
 
     /** null — компания не входит в группу консолидации. */
     public function __invoke(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): ?CashflowGroupReport
     {
-        // Обороты, решения и разбивки должны отражать один и тот же импорт.
-        $native = $this->connection->getNativeConnection();
-        if ($this->connection->isTransactionActive() || ($native instanceof \PDO && $native->inTransaction())) {
-            $isolation = $this->connection->fetchOne('SHOW transaction_isolation');
-            if (!\in_array($isolation, ['repeatable read', 'serializable'], true)) {
-                throw new \LogicException('Для консолидированного отчёта нужна транзакция REPEATABLE READ или SERIALIZABLE.');
-            }
-
-            return $this->build($companyId, $from, $to);
-        }
-
-        return $this->connection->transactional(function () use ($companyId, $from, $to): ?CashflowGroupReport {
-            $this->connection->executeStatement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
-
-            return $this->build($companyId, $from, $to);
-        });
+        return $this->snapshot->read(fn (): ?CashflowGroupReport => $this->build($companyId, $from, $to));
     }
 
     private function build(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): ?CashflowGroupReport

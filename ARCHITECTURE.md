@@ -2958,6 +2958,8 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 нормализованное название или префикс из 10/12 цифр другой компании. Двусмысленное совпадение
 пропускается. Удаление решения адресуется UUID и головной компанией, повтор безопасен.
 
+Экран сверки `GET …/group/reconciliation` использует тот же период и снимок. Ссылки раскрывают пары конкретной статьи, операцию в пути и дату встречной операции. Формы `POST …/reconciliation/decision`, `…/remove` и `…/inn` требуют FINANCE_WRITE, владения всей группой и CSRF для текущей головы. Action повторно проверяет голову под блокировкой, затем контроллер возвращает 303 на сверку за прежний период.
+
 Компании, созданные до онбординга, дозаполняет `app:company:onboarding-backfill
 [--company=<uuid>] [--execute --expected-count=N] [-v]` (`BackfillCompanyOnboardingAction`):
 по каждой компании диспатчит `CompanyOnboardingBackfillEvent(companyId, businessProfile, execute)`; подписчики
@@ -6095,6 +6097,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.250 | 2026-11-25 | Cash: сверка внутригрупповых операций, подписанная элиминация пар в ДДС и XLSX, ручные решения в пределах головной компании и актуальность счетов |
 | 2.249 | 2026-11-25 | Marketplace: категории листингов — `marketplace_listing_categories`, `marketplace_listings.category_id`/`category_source`, Actions назначения и справочника, `ListingCategoryFacadeInterface` |
 | 2.248 | 2026-11-25 | Balance: типовой справочник счетов — шаблоны версии 4 (28 счетов, статья `INV_FULFILLMENT`), `SyncStandardChartAction` вместо `EnsureBalanceAccountsAction` добирает недостающее по коду у всех компаний лениво; `BalanceFacade::ensureStandardChart()` |
 | 2.247 | 2026-11-24 | MoySklad: склады → счета Баланса — страница «Склады», ежедневная оценка по себестоимости (`ValueStoreStocksMessage`, cron 23:30 и requeue */15), установка остатка счёта от имени автора; `BalanceFacade`: `getPostingAccounts`, `getBookStatus`, `canPostFromSource`, `setAccountBalanceFromSource` |

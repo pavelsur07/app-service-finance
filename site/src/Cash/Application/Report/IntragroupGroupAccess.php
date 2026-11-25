@@ -15,9 +15,12 @@ final readonly class IntragroupGroupAccess
     }
 
     /** @return non-empty-list<string> головная первой; вызывается в транзакции до остальных блокировок */
-    public function lockedMembers(string $activeCompanyId, string $userId): array
+    public function lockedMembers(string $activeCompanyId, string $userId, ?string $expectedHead = null): array
     {
         $head = $this->groups->lockedHeadOf($activeCompanyId);
+        if (null !== $expectedHead && $expectedHead !== $head) {
+            throw new AccessDeniedException('Группа консолидации изменилась. Обновите сверку.');
+        }
         $members = null === $head ? [] : $this->groups->members($head);
         if ([] === $members || $head !== $members[0] || !\in_array($activeCompanyId, $members, true)) {
             throw new AccessDeniedException('Компания вне группы консолидации.');

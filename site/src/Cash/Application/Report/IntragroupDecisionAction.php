@@ -27,14 +27,14 @@ final readonly class IntragroupDecisionAction
     ) {
     }
 
-    public function save(string $activeCompanyId, string $userId, string $id, IntragroupDecisionType $type, string $outflowId, string $inflowId): void
+    public function save(string $activeCompanyId, string $userId, string $id, IntragroupDecisionType $type, string $outflowId, string $inflowId, ?string $expectedHead = null): void
     {
         $id = strtolower($id);
         $outflowId = strtolower($outflowId);
         $inflowId = strtolower($inflowId);
         try {
-            $this->em->wrapInTransaction(function () use ($activeCompanyId, $userId, $id, $type, $outflowId, $inflowId): void {
-                $members = $this->access->lockedMembers($activeCompanyId, $userId);
+            $this->em->wrapInTransaction(function () use ($activeCompanyId, $userId, $id, $type, $outflowId, $inflowId, $expectedHead): void {
+                $members = $this->access->lockedMembers($activeCompanyId, $userId, $expectedHead);
                 if (!UuidV7::isValid($id) || !Uuid::isValid($outflowId) || !Uuid::isValid($inflowId) || $outflowId === $inflowId) {
                     throw new IntragroupDecisionException('Неверный идентификатор решения или операций.');
                 }
@@ -75,10 +75,10 @@ final readonly class IntragroupDecisionAction
         }
     }
 
-    public function remove(string $activeCompanyId, string $userId, string $id): void
+    public function remove(string $activeCompanyId, string $userId, string $id, ?string $expectedHead = null): void
     {
-        $this->em->wrapInTransaction(function () use ($activeCompanyId, $userId, $id): void {
-            $members = $this->access->lockedMembers($activeCompanyId, $userId);
+        $this->em->wrapInTransaction(function () use ($activeCompanyId, $userId, $id, $expectedHead): void {
+            $members = $this->access->lockedMembers($activeCompanyId, $userId, $expectedHead);
             if (!UuidV7::isValid($id)) {
                 throw new IntragroupDecisionException('Неверный идентификатор решения.');
             }
@@ -89,7 +89,7 @@ final readonly class IntragroupDecisionAction
         });
     }
 
-    private function assertLegsAvailable(string $head, string $outflowId, string $inflowId): void
+    private function assertLegsAvailable(string $head, string $outflowId, string $inflowId, ?string $expectedHead = null): void
     {
         foreach ($this->decisions->forGroup($head) as $decision) {
             if (IntragroupDecisionType::PAIR === $decision->getType()
