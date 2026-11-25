@@ -1,0 +1,68 @@
+{% macro reportRow(line, period) %}
+    <tr data-row-key="{{ line.key }}" class="{{ line.section ? 'fw-bold' : '' }}">
+        <th scope="row" class="ps-{{ min(5, line.level + 1) }} {{ line.section ? 'fw-bold' : 'fw-normal' }}">
+            {{ line.name }}
+            {% if line.hasUnpaired %}<span role="img" aria-label="Есть операции без пары" title="Есть операции без пары">⚠</span>{% endif %}
+        </th>
+        {% for amount in line.amounts %}<td class="text-end text-nowrap">{{ amount|vf_amount }}</td>{% endfor %}
+        <td class="text-end text-nowrap">
+            {% if line.pairIds is not empty %}
+                <a href="{{ path('report_cashflow_group_reconciliation', period|merge({row: line.key})) }}"
+                   aria-label="{{ line.elimination|vf_money(2, 'RUB') }}, пары по строке «{{ line.name }}»">{{ line.elimination|vf_amount(2, null, true) }}</a>
+            {% else %}
+                {{ line.elimination|vf_amount(2, null, true) }}
+            {% endif %}
+        </td>
+        <td class="text-end text-nowrap">{{ line.total|vf_amount }}</td>
+    </tr>
+{% endmacro %}
+{% import _self as m %}
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm table-vcenter card-table" data-test="group-report">
+            <thead>
+            <tr>
+                <th>Статья, RUB</th>
+                {% for name in report.companies %}<th class="text-end">{{ name }}</th>{% endfor %}
+                <th class="text-end" title="Обороты сверенных пар с обеими операциями в периоде">Элиминация</th>
+                <th class="text-end">Итого по группе</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for line in [...report.lines, report.unmatched] %}
+                {{ m.reportRow(line, period) }}
+            {% endfor %}
+            </tbody>
+            <tfoot>
+            {{ m.reportRow(report.totals, period) }}
+            {% set labelColumns = report.companies|length + 2 %}
+            <tr data-test="group-report-transit">
+                <th scope="row" colspan="{{ labelColumns }}">
+                    {% if report.reconciliation.inTransit is not empty %}
+                        <a href="{{ reconciliationUrl }}#in-transit">Деньги в пути (пара за границей периода)</a>
+                    {% else %}
+                        Деньги в пути (пара за границей периода)
+                    {% endif %}
+                </th>
+                <td class="text-end text-nowrap">{{ report.reconciliation.transitNet|vf_amount }}</td>
+            </tr>
+            <tr data-test="group-report-unpaired">
+                <th scope="row" colspan="{{ labelColumns }}">
+                    <a href="{{ reconciliationUrl }}#unpaired">Без пары</a>
+                    <span class="text-secondary">(операций: {{ report.reconciliation.unpaired|length|vf_number }})</span>
+                </th>
+                <td class="text-end text-nowrap">{{ report.reconciliation.unpairedNet|vf_amount }}</td>
+            </tr>
+            <tr data-test="group-report-without-unpaired" class="fw-bold">
+                <th scope="row" colspan="{{ labelColumns }}">Итого без несопоставленных</th>
+                <td class="text-end text-nowrap">{{ report.withoutUnpaired|vf_amount }}</td>
+            </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+<p class="text-secondary small mt-2">
+    Строки соответствуют статьям головной компании. Обороты по статьям без кода группы входят в строку
+    «Не сопоставлено». Деньги в пути и операции без пары остаются в итоге по группе.
+</p>

@@ -268,13 +268,15 @@ final readonly class CashReportQuery
      * последней строки до него, но не раньше даты открытия счёта; иначе входящий
      * остаток самого счёта. Один запрос вместо двух на счёт, по строке на счёт.
      *
+     * @param non-empty-list<string> $companyIds
      * @param list<MoneyAccount> $accounts
      *
      * @return list<MoneyAccountOpeningBalance>
      */
-    public function listOpeningBalancesAtDate(string $companyId, \DateTimeImmutable $date, array $accounts): array
+    public function listOpeningBalancesAtDate(array $companyIds, \DateTimeImmutable $date, array $accounts): array
     {
-        Assert::uuid($companyId);
+        Assert::notEmpty($companyIds);
+        Assert::allUuid($companyIds);
         if ([] === $accounts) {
             return [];
         }
@@ -285,15 +287,16 @@ final readonly class CashReportQuery
             ->select('b', 'a')
             ->from(MoneyAccountDailyBalance::class, 'b')
             ->innerJoin('b.moneyAccount', 'a')
-            ->where('b.company = :company')
+            ->where('a.company IN (:companyIds)')
+            ->andWhere('b.company = a.company')
             ->andWhere('a.id IN (:accountIds)')
             // Только последняя подходящая строка счёта — без истории регистра целиком.
             ->andWhere(sprintf(
-                'b.date = (SELECT MAX(b2.date) FROM %s b2 WHERE b2.moneyAccount = a AND b2.company = :company'
+                'b.date = (SELECT MAX(b2.date) FROM %s b2 WHERE b2.moneyAccount = a AND b2.company = a.company'
                 .' AND (b2.date = :date OR (b2.date < :date AND b2.date >= a.openingBalanceDate)))',
                 MoneyAccountDailyBalance::class,
             ))
-            ->setParameter('company', $companyId)
+            ->setParameter('companyIds', $companyIds)
             ->setParameter('accountIds', array_map(static fn (MoneyAccount $a): string => (string) $a->getId(), $accounts))
             ->setParameter('date', $date)
             ->orderBy('a.id', \SortDirection::Ascending)

@@ -1,0 +1,84 @@
+{% set periods = report.periods %}
+{% set calendar = periods.calendar %}
+{% set links = [] %}
+{% for column in periods.columns %}
+    {% set dates = {from: column.from|date('Y-m-d'), to: column.to|date('Y-m-d')} %}
+    {% set links = links|merge([{
+        companies: path('report_cashflow_group', dates|merge({view: 'companies', group: selectedGroup})),
+        reconciliation: path('report_cashflow_group_reconciliation', dates)
+    }]) %}
+{% endfor %}
+{% set fullCompanies = path('report_cashflow_group', period|merge({view: 'companies', group: selectedGroup})) %}
+{% set fullReconciliation = path('report_cashflow_group_reconciliation', period) %}
+{% if calendar.group != calendar.requestedGroup %}
+    <div class="alert alert-info" data-test="group-period-coarsened">
+        При шаге «{{ groups[calendar.requestedGroup] }}» получилось бы больше 36 колонок. Показан шаг «{{ groups[calendar.group] }}».
+    </div>
+{% endif %}
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm table-vcenter card-table" data-test="group-period-report">
+            <thead>
+                <tr>
+                    <th scope="col">Статья, RUB</th>
+                    {% for column in periods.columns %}
+                        <th scope="col" class="text-end text-nowrap">
+                            <a href="{{ links[loop.index0].companies }}">{{ column.label }}</a>
+                        </th>
+                    {% endfor %}
+                    <th scope="col" class="text-end text-nowrap"><a href="{{ fullCompanies }}">Итого за период</a></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for line in [...report.lines, report.unmatched] %}
+                    <tr data-row-key="{{ line.key }}" class="{{ line.section ? 'fw-bold' : '' }}">
+                        <th scope="row" class="ps-{{ min(5, line.level + 1) }} {{ line.section ? 'fw-bold' : 'fw-normal' }}">
+                            {{ line.name }}
+                            {% if line.hasUnpaired %}<span role="img" aria-label="Есть операции без пары" title="Есть операции без пары">⚠</span>{% endif %}
+                        </th>
+                        {% for column in periods.columns %}
+                            <td class="text-end text-nowrap">
+                                <a href="{{ links[loop.index0].companies }}">{{ column.amounts[line.key]|vf_amount }}</a>
+                            </td>
+                        {% endfor %}
+                        <td class="text-end text-nowrap"><a href="{{ fullCompanies }}">{{ line.total|vf_amount }}</a></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                {% set summaries = {
+                    open: ['Остаток на начало', periods.columns|map(c => c.opening), periods.opening],
+                    total: ['Изменение', periods.columns|map(c => c.amounts.total), report.totals.total],
+                    close: ['Остаток на конец', periods.columns|map(c => c.closing), periods.closing],
+                    transit: ['Деньги в пути', periods.columns|map(c => c.transitNet), report.reconciliation.transitNet, '#in-transit'],
+                    unpaired: ['Без пары', periods.columns|map(c => c.unpairedNet), report.reconciliation.unpairedNet, '#unpaired'],
+                    'without-unpaired': ['Итого без несопоставленных', periods.columns|map(c => c.withoutUnpaired), report.withoutUnpaired]
+                } %}
+                {% for key, row in summaries %}
+                    <tr data-row-key="{{ key }}">
+                        <th scope="row">{{ row[0] }}</th>
+                        {% for amount in row[1] %}
+                            <td class="text-end text-nowrap">
+                                {% if row[3] is defined %}
+                                    <a href="{{ links[loop.index0].reconciliation }}{{ row[3] }}">{{ amount|vf_amount }}</a>
+                                {% else %}
+                                    {{ amount|vf_amount }}
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                        <td class="text-end text-nowrap">
+                            {% if row[3] is defined %}
+                                <a href="{{ fullReconciliation }}{{ row[3] }}">{{ row[2]|vf_amount }}</a>
+                            {% else %}
+                                {{ row[2]|vf_amount }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% if periods.crossPairCount %}
+    <p class="mt-2"><a href="{{ fullReconciliation }}#pairs">Пары между периодами: {{ periods.crossPairCount }}, {{ periods.crossPairAmount|vf_money(2, 'RUB') }}</a></p>
+{% endif %}

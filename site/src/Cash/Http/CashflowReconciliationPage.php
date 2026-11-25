@@ -33,7 +33,7 @@ final readonly class CashflowReconciliationPage
     /** @return array<string, mixed> */
     private function load(Request $request, Company $company, User $user): array
     {
-        $report = ($this->reportRequest)($request, $company, $user);
+        $report = ($this->reportRequest)($request, $company, $user, reconciliation: true);
         $base = ['report' => $report, 'companyName' => $company->getName()];
         if (null === $report) {
             return $base;

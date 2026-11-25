@@ -2951,6 +2951,10 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 перечисляются предупреждением. Доступ (`CashflowGroupReportRequest`): владелец всех компаний
 группы, иначе 403; компания вне группы — пояснение. DTO: `CashflowGroupReport`, `CashflowGroupReportLine`.
 
+Страница и XLSX принимают `view=periods|companies`. По умолчанию открывается вид по периодам с шагом `month`. На странице заголовки и суммы статей ведут к виду по компаниям за даты колонки. Строки сверки ведут к спискам за те же даты.
+
+Для вида по периодам `BuildCashflowGroupReport` принимает шаг week/month/quarter/year; без шага возвращает разрез по компаниям. В одном снимке `CashflowGroupReportQuery` агрегирует обороты по календарному периоду, компании, категории и валюте. `CashflowGroupPeriodProjection` распределяет уже сопоставленные ноги по колонкам. Внутри колонки элиминируется только полная пара. Итог всего диапазона учитывает обе ноги независимо от границ колонок. `CashFacade::getGroupReportOpeningBalances` выбирает RUB-счета всей группы, включая архивные. Общий с ДДС компании запрос регистра читает входящие остатки за одно обращение для всего списка счетов. Изменения баланса накапливаются в точных десятичных суммах. Основание недели для группы — понедельник, крайние колонки обрезаются по диапазону. При превышении 36 колонок шаг укрупняется вплоть до года. Диапазон свыше 36 календарных лет возвращает CashflowGroupRangeTooLarge сразу после проверки владельца, до чтения движений и счетов. В этом случае HTML и прямая ссылка экспорта возвращают HTTP 200 с формой выбора диапазона. В XLSX обоих видов точно представимые суммы записываются числами, остальные сохраняются точным десятичным текстом.
+
 `CashIntragroupDecision` хранит в `cash_intragroup_decision` UUIDv7 формы, головную компанию,
 тип `IntragroupDecisionType` (PAIR/UNPAIR), ID выплаты/поступления, автора и время. Три уникальности включают company_id головной компании:
 по каждой ноге PAIR и по (company_id, type, outflow_transaction_id, inflow_transaction_id).
@@ -3409,6 +3413,7 @@ listCashflowReportRows(string $companyId, \DateTimeImmutable $from, \DateTimeImm
 // Входящий остаток каждого счёта на начало дня: строка регистра за день, иначе последняя
 // до него (не раньше открытия счёта), иначе входящий остаток счёта. С $currency — счета валюты по названию
 getReportOpeningBalances(string $companyId, \DateTimeImmutable $date, ?string $currency = null): list<MoneyAccountOpeningBalance>
+getGroupReportOpeningBalances(non-empty-list<string> $companyIds, \DateTimeImmutable $date, string $currency): list<MoneyAccountOpeningBalance>
 ```
 
 DTO `MoneyAccountSummary`, `MoneyAccountDailyBalanceRow`, `CashStatementLine`, `CashflowCategoryNode`,
@@ -6106,6 +6111,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.254 | 2026-11-25 | Cash: консолидированный ДДС по неделям, месяцам, кварталам и годам, остатки, межпериодные пары, детализация по компаниям и XLSX |
 | 2.253 | 2026-11-25 | Marketplace: правила категорий листингов по категории площадки — `marketplace_listing_category_rules`, `category_key` в `marketplace_data` Ozon/WB, применение при загрузке каталога |
 | 2.252 | 2026-11-25 | Cash: сверка внутригрупповых операций, элиминация со знаком пар в ДДС и XLSX, ручные решения в пределах головной компании и актуальность счетов |
 | 2.251 | 2026-11-25 | MarketplaceEconomics: R1 по категориям листингов — фильтр `category`, режим `group=category`, xlsx с колонкой «Категория» |

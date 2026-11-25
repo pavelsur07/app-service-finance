@@ -1,0 +1,30 @@
+{% if report.companiesWithoutInn is not empty %}
+    <div class="alert alert-warning" data-test="group-report-inn-warning">
+        Не заполнен ИНН: {{ report.companiesWithoutInn|join(', ') }}. Платежи этим компаниям не распознаются
+        как внутригрупповые и попадают в итог. ИНН задаётся в настройках компании.
+    </div>
+{% endif %}
+
+<div class="card mb-3" data-test="group-report-accounts">
+    <div class="card-header"><h2 class="card-title">Данные по счетам</h2></div>
+    {% if report.accounts is empty %}
+        <div class="card-body text-secondary">Нет активных счетов в RUB.</div>
+    {% else %}
+        <div class="table-responsive">
+            <table class="table table-sm table-vcenter card-table">
+                <thead><tr><th scope="col">Счёт</th><th scope="col">Последняя операция</th></tr></thead>
+                <tbody>
+                {% for account in report.accounts %}
+                    <tr>
+                        <td>{{ report.companies[account.companyId] }} · {{ account.label }}</td>
+                        <td class="text-nowrap">
+                            {{ account.lastDate ? account.lastDate|date('d.m.Y') : 'Нет операций' }}
+                            {% if account.lagging %}<span class="badge bg-yellow-lt">Отстаёт</span>{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Cash\Application\Report;
 
+use App\Cash\Application\DTO\CashflowGroupRangeTooLarge;
 use App\Cash\Application\DTO\CashflowGroupReport;
 use App\Cash\Application\DTO\CashflowGroupReportLine;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Facade\CashFacade;
 use App\Cash\Infrastructure\Query\CashflowGroupReportQuery;
 use App\Cash\Infrastructure\Query\CashflowGroupSnapshot;
 use App\Cash\Infrastructure\Query\CashIntragroupQuery;
@@ -37,28 +39,53 @@ final readonly class BuildCashflowGroupReport
         private BuildCashflowReconciliation $reconcile,
         private CashIntragroupQuery $intragroupQuery,
         private CashflowGroupSnapshot $snapshot,
+        private CashFacade $cash,
+        private IntragroupGroupAccess $access,
     ) {
     }
 
-    /** null — компания не входит в группу консолидации. */
-    public function __invoke(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): ?CashflowGroupReport
+    /**
+     * null — компания не входит в группу консолидации.
+     *
+     * @return ($group is null ? CashflowGroupReport|null : CashflowGroupReport|CashflowGroupRangeTooLarge|null)
+     */
+    public function __invoke(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to, ?string $group = null, ?string $ownerId = null): CashflowGroupReport|CashflowGroupRangeTooLarge|null
     {
-        return $this->snapshot->read(fn (): ?CashflowGroupReport => $this->build($companyId, $from, $to));
+        return $this->snapshot->read(function () use ($companyId, $from, $to, $group, $ownerId): CashflowGroupReport|CashflowGroupRangeTooLarge|null {
+            $head = $this->groups->headOf($companyId);
+            if (null === $head) {
+                return null;
+            }
+            $ids = $this->groups->members($head);
+            if ([] === $ids || $ids[0] !== $head || !\in_array($companyId, $ids, true)) {
+                throw new \DomainException('Нарушен состав группы консолидации.');
+            }
+            if (null !== $ownerId) {
+                $this->access->assertOwner($ids, $ownerId);
+            }
+            $projection = null;
+            if (null !== $group) {
+                $calendar = CashflowGroupCalendar::forRange($from, $to, $group);
+                if ($calendar->tooLarge) {
+                    return new CashflowGroupRangeTooLarge($from, $to, $calendar->requestedGroup);
+                }
+                $projection = new CashflowGroupPeriodProjection($calendar);
+            }
+
+            return $this->build($ids, $from, $to, $projection);
+        });
     }
 
-    private function build(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): ?CashflowGroupReport
+    /** @param non-empty-list<string> $ids головная компания первой */
+    private function build(array $ids, \DateTimeImmutable $from, \DateTimeImmutable $to, ?CashflowGroupPeriodProjection $projection): CashflowGroupReport
     {
-        $head = $this->groups->headOf($companyId);
-        if (null === $head) {
-            return null;
-        }
-
+        $head = $ids[0];
         /** @var array<string, Company> $companies */
         $companies = [];
         $names = [];
         $withoutInn = [];
         $companyInns = [];
-        foreach ($this->groups->members($head) as $id) {
+        foreach ($ids as $id) {
             $company = $this->companyFacade->findById($id) ?? throw new \DomainException(sprintf('Компания группы %s не найдена.', $id));
             $companies[$id] = $company;
             $names[$id] = (string) $company->getName();
@@ -72,21 +99,21 @@ final readonly class BuildCashflowGroupReport
 
         /** @var array<string, string> $keyOf categoryId => ключ строки отчёта */
         $keyOf = [];
-        foreach ($companies as $company) {
+        $roots = [];
+        foreach ($companies as $id => $company) {
             foreach ($this->categories->findTreeByCompany($company) as $category) {
+                if ($id === $head && null === $category->getParent()) {
+                    $roots[] = $category;
+                }
                 $keyOf[(string) $category->getId()] = self::key($category);
             }
         }
 
-        $ids = array_keys($companies);
-        if ([] === $ids || $ids[0] !== $head) {
-            throw new \DomainException('Нарушен состав группы консолидации.');
-        }
         $reconciliation = ($this->reconcile)($ids, $from, $to);
         /** @var array<string, CashflowGroupSubtotal> $own */
         $own = [];
         $otherCurrencies = [];
-        foreach (($this->query)(array_keys($companies), $from, $to) as $amount) {
+        foreach (($this->query)($ids, $from, $to, $projection?->calendar->group) as $amount) {
             if (self::CURRENCY !== $amount->currency) {
                 $otherCurrencies[$amount->currency] ??= $zero;
                 $otherCurrencies[$amount->currency][$amount->companyId] = bcadd($otherCurrencies[$amount->currency][$amount->companyId], $amount->amount, 2);
@@ -95,8 +122,12 @@ final readonly class BuildCashflowGroupReport
             $key = $keyOf[$amount->categoryId] ?? self::UNMATCHED;
             $own[$key] ??= new CashflowGroupSubtotal($zero);
             $own[$key]->amounts[$amount->companyId] = bcadd($own[$key]->amounts[$amount->companyId], $amount->amount, 2);
+            if (null !== $amount->periodStart) {
+                $projection?->addAmount($key, $amount->periodStart, $amount->amount);
+            }
         }
         foreach ($reconciliation->pairs as $outId => $inId) {
+            $bucket = $projection?->pairBucket($reconciliation->transactions[$outId], $reconciliation->transactions[$inId]);
             foreach ([$outId, $inId] as $id) {
                 $tx = $reconciliation->transactions[$id];
                 foreach ($tx->splits as $categoryId => $amount) {
@@ -104,11 +135,16 @@ final readonly class BuildCashflowGroupReport
                     $own[$key] ??= new CashflowGroupSubtotal($zero);
                     $row = $own[$key];
                     $row->pairIds[$outId] = true;
-                    $row->elimination = CashDirection::OUTFLOW === $tx->direction ? bcadd($row->elimination, $amount, 2) : bcsub($row->elimination, $amount, 2);
+                    $reversal = CashDirection::OUTFLOW === $tx->direction ? $amount : bcsub('0', $amount, 2);
+                    $row->elimination = bcadd($row->elimination, $reversal, 2);
+                    if (null !== $bucket) {
+                        $projection->addAmount($key, $bucket, $reversal);
+                    }
                 }
             }
         }
         foreach ($reconciliation->unpaired as $tx) {
+            $projection?->addUnpaired($tx);
             foreach (array_keys($tx->splits) as $categoryId) {
                 $key = $keyOf[$categoryId] ?? self::UNMATCHED;
                 $own[$key] ??= new CashflowGroupSubtotal($zero);
@@ -116,11 +152,55 @@ final readonly class BuildCashflowGroupReport
             }
         }
 
+        usort($roots, static fn (CashflowCategory $a, CashflowCategory $b): int => [$a->getSort(), $a->getName()] <=> [$b->getSort(), $b->getName()]);
+        [$lines, $unmatched, $totals] = $this->treeRows($roots, $own, $zero);
+        $periods = null;
+        if (null !== $projection) {
+            $firstDay = $from->format('Y-m-d');
+            $lastDay = $to->format('Y-m-d');
+            foreach ($reconciliation->inTransit as $outId => $inId) {
+                $out = $reconciliation->transactions[$outId];
+                $day = $out->occurredAt->format('Y-m-d');
+                $projection->addTransit($day >= $firstDay && $day <= $lastDay ? $out : $reconciliation->transactions[$inId]);
+            }
+            $opening = '0.00';
+            foreach ($this->cash->getGroupReportOpeningBalances($ids, $from, self::CURRENCY) as $account) {
+                $opening = bcadd($opening, $account->openingBalance, 2);
+            }
+            [$periodRows, $periodUnmatched, $periodTotal] = $this->treeRows($roots, $projection->own, $projection->zero);
+            $periods = $projection->result([...$periodRows, $periodUnmatched, $periodTotal], $opening, $totals->total);
+        }
+
+        return new CashflowGroupReport(
+            $head,
+            $from,
+            $to,
+            $names,
+            $lines,
+            $unmatched,
+            $totals,
+            $otherCurrencies,
+            $withoutInn,
+            $reconciliation,
+            $this->intragroupQuery->accounts($ids),
+            bcsub($totals->total, $reconciliation->unpairedNet, 2),
+            $companyInns,
+            $periods,
+        );
+    }
+
+    /**
+     * @param list<CashflowCategory> $roots
+     * @param array<string, CashflowGroupSubtotal> $own
+     * @param array<string, string> $zero
+     *
+     * @return array{list<CashflowGroupReportLine>, CashflowGroupReportLine, CashflowGroupReportLine}
+     */
+    private function treeRows(array $roots, array $own, array $zero): array
+    {
         $lines = [];
         $shown = [];
         $grand = new CashflowGroupSubtotal($zero);
-        $roots = array_values(array_filter($this->categories->findTreeByCompany($companies[$head]), static fn (CashflowCategory $c): bool => null === $c->getParent()));
-        usort($roots, static fn (CashflowCategory $a, CashflowCategory $b): int => [$a->getSort(), $a->getName()] <=> [$b->getSort(), $b->getName()]);
         foreach ($roots as $root) {
             $grand->include($this->visit($root, 1, $lines, $shown, $own, $zero));
         }
@@ -131,21 +211,7 @@ final readonly class BuildCashflowGroupReport
         $grand->include($unmatched);
         $totals = $grand->line(self::TOTAL, 'Итого', 1, false);
 
-        return new CashflowGroupReport(
-            $head,
-            $from,
-            $to,
-            $names,
-            array_values($lines),
-            $unmatched->line(self::UNMATCHED, 'Не сопоставлено', 1, false),
-            $totals,
-            $otherCurrencies,
-            $withoutInn,
-            $reconciliation,
-            $this->intragroupQuery->accounts($ids),
-            bcsub($totals->total, $reconciliation->unpairedNet, 2),
-            $companyInns,
-        );
+        return [array_values($lines), $unmatched->line(self::UNMATCHED, 'Не сопоставлено', 1, false), $totals];
     }
 
     /**
