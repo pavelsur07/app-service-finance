@@ -71,6 +71,14 @@ final class OzonProductCatalogNormalizerTest extends TestCase
         self::assertFalse($items[0]->marketplaceData['is_archived']);
     }
 
+    public function testMarketplaceDataCarriesCategoryKey(): void
+    {
+        $items = (new OzonProductCatalogNormalizer())->normalize($this->fixture());
+
+        self::assertSame(93144, $items[0]->marketplaceData['type_id']);
+        self::assertSame('ozon:200000933:93144', $items[0]->marketplaceData['category_key']);
+    }
+
     public function testItemWithoutAnySkuIsSkipped(): void
     {
         $items = (new OzonProductCatalogNormalizer())->normalize([

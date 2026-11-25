@@ -204,6 +204,51 @@ final class ListingCategoriesTest extends WebTestCaseBase
         self::assertSelectorTextContains('[data-testid="listings-found"]', 'без категории');
     }
 
+    public function testRuleFromUnmatchedKeyAssignsListings(): void
+    {
+        $client = static::createClient();
+        [$owner, $company, $listings] = $this->seedCompany(3);
+        $listings[0]->setMarketplaceData(['category_key' => 'wb:69', 'subject_name' => 'Платья']);
+        $listings[1]->setMarketplaceData(['category_key' => 'wb:69', 'subject_name' => 'Платья']);
+        $listings[2]->setMarketplaceData(['category_key' => 'ozon:1:2']);
+        $this->em()->flush();
+        $dresses = $this->seedCategory(self::COMPANY_ID, 'Платья');
+        $this->login($client, $owner, $company);
+
+        $crawler = $client->request('GET', self::MANAGE_URL);
+        self::assertSame(['wb:69', 'ozon:1:2'], $crawler->filter('[data-unmatched-key]')->each(static fn ($r): string => (string) $r->attr('data-unmatched-key')));
+        self::assertSelectorTextContains('[data-unmatched-key="wb:69"]', 'Платья');
+
+        $token = $this->csrfToken($client, self::TOKEN_ID, self::MANAGE_URL);
+        $client->request('POST', self::MANAGE_URL.'/rules', ['sourceKey' => 'wb:69', 'categoryId' => $dresses, '_token' => $token]);
+        self::assertResponseRedirects(self::MANAGE_URL);
+        self::assertSame(2, (int) $this->fetchOne("SELECT COUNT(*) FROM marketplace_listings WHERE category_id = ? AND category_source = 'rule'", [$dresses]));
+
+        $crawler = $client->followRedirect();
+        self::assertSame(['ozon:1:2'], $crawler->filter('[data-unmatched-key]')->each(static fn ($r): string => (string) $r->attr('data-unmatched-key')));
+        self::assertSelectorTextContains('[data-rule-key="wb:69"]', '2');
+    }
+
+    public function testRuleRejectsForeignCategoryBadKeyAndCsrf(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompany(0);
+        $this->seedForeignCompany();
+        $foreign = $this->seedCategory(self::OTHER_COMPANY_ID, 'Чужая');
+        $mine = $this->seedCategory(self::COMPANY_ID, 'Платья');
+        $this->login($client, $owner, $company);
+        $token = $this->csrfToken($client, self::TOKEN_ID, self::MANAGE_URL);
+
+        $client->request('POST', self::MANAGE_URL.'/rules', ['sourceKey' => 'wb:69', 'categoryId' => $foreign, '_token' => $token]);
+        self::assertResponseStatusCodeSame(404);
+        $client->request('POST', self::MANAGE_URL.'/rules', ['sourceKey' => 'wb:abc', 'categoryId' => $mine, '_token' => $token]);
+        self::assertResponseRedirects(self::MANAGE_URL);
+        $client->request('POST', self::MANAGE_URL.'/rules', ['sourceKey' => 'wb:69', 'categoryId' => $mine, '_token' => 'bad']);
+        self::assertResponseStatusCodeSame(403);
+
+        self::assertSame(0, (int) $this->fetchOne('SELECT COUNT(*) FROM marketplace_listing_category_rules', []));
+    }
+
     /**
      * @return array{User, Company, list<MarketplaceListing>}
      */

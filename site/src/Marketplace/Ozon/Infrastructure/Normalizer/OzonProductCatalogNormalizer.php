@@ -172,6 +172,8 @@ final class OzonProductCatalogNormalizer
 
         $primaryImage = $item['primary_image'] ?? [];
         $primaryImage = is_array($primaryImage) ? ($primaryImage[0] ?? null) : $primaryImage;
+        $categoryId = is_int($item['description_category_id'] ?? null) ? $item['description_category_id'] : null;
+        $typeId = is_int($item['type_id'] ?? null) ? $item['type_id'] : null;
 
         return array_filter([
             'price' => $this->nullableString($item['price'] ?? null),
@@ -182,9 +184,10 @@ final class OzonProductCatalogNormalizer
             'status_name' => $this->nullableString($statuses['status_name'] ?? null),
             'is_archived' => (bool) ($item['is_archived'] ?? false),
             'primary_image' => $this->nullableString($primaryImage),
-            'description_category_id' => isset($item['description_category_id']) && is_int($item['description_category_id'])
-                ? $item['description_category_id']
-                : null,
+            'description_category_id' => $categoryId,
+            'type_id' => $typeId,
+            // Ключ правила категорий (ListingCategoryRule).
+            'category_key' => null !== $categoryId && null !== $typeId ? sprintf('ozon:%d:%d', $categoryId, $typeId) : null,
         ], static fn (mixed $value): bool => null !== $value);
     }
 

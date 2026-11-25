@@ -9,6 +9,7 @@ use App\Ingestion\Facade\RawStorageFacade;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\ListingCategoryRuleQuery;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
 use App\Marketplace\Ozon\Application\Action\RefreshOzonListingCatalogAction;
 use App\Marketplace\Ozon\Exception\OzonCatalogApiException;
@@ -19,6 +20,7 @@ use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
+use App\Tests\Builders\Marketplace\MarketplaceListingCategoryBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -43,6 +45,26 @@ final class RefreshOzonListingCatalogActionTest extends IntegrationTestCase
         self::assertSame(2, $result->listingsUpserted);
         self::assertSame('Тестовый товар с двумя источниками', $this->listingName($company, self::PRIMARY_SKU));
         self::assertSame('Тестовый товар с одним источником', $this->listingName($company, self::SECOND_PRODUCT_SKU));
+    }
+
+    public function testCatalogLoadAppliesCategoryRuleToNewListings(): void
+    {
+        $company = $this->seedCompany(62);
+        $this->seedConnection($company, 62);
+        $category = MarketplaceListingCategoryBuilder::aCategory()->forCompanyId((string) $company->getId())->withName('Платья')->build();
+        $this->em->persist($category);
+        $this->em->flush();
+        (new ListingCategoryRuleQuery($this->connection))->upsert((string) $company->getId(), 'ozon:200000933:93144', $category->getId());
+
+        $this->action()((string) $company->getId(), $this->connectionId(62));
+
+        self::assertSame(
+            [$category->getId().'/rule'],
+            $this->connection->fetchFirstColumn(
+                "SELECT category_id || '/' || category_source FROM marketplace_listings WHERE company_id = ? AND marketplace_sku = ?",
+                [$company->getId(), self::PRIMARY_SKU],
+            ),
+        );
     }
 
     /**
@@ -516,6 +538,7 @@ final class RefreshOzonListingCatalogActionTest extends IntegrationTestCase
             new OzonListingCatalogUpsertQuery($this->connection),
             $container->get(RawStorageFacade::class),
             $logger,
+            new ListingCategoryRuleQuery($this->connection),
         );
     }
 
