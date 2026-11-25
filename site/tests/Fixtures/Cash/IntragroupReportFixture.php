@@ -19,6 +19,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\ConsolidationMembershipBuilder;
 use App\Tests\Builders\Company\CounterpartyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use Doctrine\DBAL\ArrayParameterType;
 use Ramsey\Uuid\Uuid;
 
 /** Обезличенная группа и нумерация операций из cashflow-group-intragroup/TASK.md. */
@@ -70,6 +71,20 @@ trait IntragroupReportFixture
             $this->addCard($company, 'Внешний', '7700000099');
         }
         $this->em->flush();
+    }
+
+    private function removeCommittedGroupFixture(): void
+    {
+        $ids = array_values(array_map(static fn (Company $c): string => (string) $c->getId(), $this->companies));
+        $this->connection->transactional(function () use ($ids): void {
+            foreach (['cash_intragroup_decision', 'cash_transaction', 'money_account', 'counterparty', 'cashflow_categories', 'company_consolidation_member'] as $table) {
+                $this->connection->executeStatement('DELETE FROM '.$table.' WHERE company_id IN (?)', [$ids], [ArrayParameterType::STRING]);
+            }
+            $this->connection->executeStatement('DELETE FROM companies WHERE id IN (?)', [$ids], [ArrayParameterType::STRING]);
+            $owner = $this->companies['Альфа']->getUser();
+            self::assertNotNull($owner);
+            $this->connection->executeStatement('DELETE FROM "user" WHERE id = ?', [$owner->getId()]);
+        });
     }
 
     private function addCard(string $company, string $name, ?string $inn): void

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Company\Facade;
 
+use App\Company\Domain\Service\CounterpartyNameNormalizer;
 use App\Company\Domain\ValueObject\CounterpartyName;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
@@ -36,7 +37,42 @@ final class CounterpartyFacade
     public function __construct(
         private readonly CounterpartyRepository $repository,
         private readonly EntityManagerInterface $entityManager,
+        private readonly CounterpartyNameNormalizer $normalizer = new CounterpartyNameNormalizer(),
     ) {
+    }
+
+    /** @return array{core: string, legalFormHint: ?string} */
+    public function normalizedNameParts(string $name): array
+    {
+        $normalized = $this->normalizer->normalize($name);
+
+        return ['core' => $normalized->core, 'legalFormHint' => $normalized->legalFormHint];
+    }
+
+    /**
+     * Записать предложенный ИНН только в ту же карточку с тем же названием.
+     * Вызывающий проверяет состав группы и владеет транзакцией и flush.
+     */
+    public function assignMissingInn(string $companyId, string $counterpartyId, string $expectedName, string $inn): bool
+    {
+        if (!$this->entityManager->getConnection()->isTransactionActive()) {
+            throw new \LogicException('Проставление ИНН требует транзакции.');
+        }
+        if (1 !== preg_match('/^[0-9]{10}([0-9]{2})?$/D', $inn)) {
+            return false;
+        }
+
+        $counterparty = $this->repository->findOneByIdAndCompany($counterpartyId, $companyId, forUpdate: true);
+        if (null === $counterparty || $counterparty->getName() !== $expectedName) {
+            return false;
+        }
+        $currentInn = trim((string) $counterparty->getInn());
+        if ('' !== $currentInn) {
+            return $inn === $currentInn;
+        }
+        $counterparty->assignTaxIds($inn, $counterparty->getKpp());
+
+        return true;
     }
 
     /**

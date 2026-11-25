@@ -22,4 +22,12 @@ final readonly class IntragroupTransaction
         public array $splits = [],
     ) {
     }
+
+    public function isReciprocalWith(self $other): bool
+    {
+        return $this->companyId !== $other->companyId
+            && $this->direction !== $other->direction
+            && null !== $this->companyInn && $this->companyInn === $other->counterpartyInn
+            && null !== $other->companyInn && $other->companyInn === $this->counterpartyInn;
+    }
 }

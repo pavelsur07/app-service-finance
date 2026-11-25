@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Cash\Application;
 
 use App\Cash\Application\Report\BuildCashflowGroupReport;
-use App\Company\Entity\Company;
 use App\Tests\Fixtures\Cash\IntragroupReportFixture;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
-use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\DriverManager;
 use Ramsey\Uuid\Uuid;
 
@@ -62,16 +60,7 @@ final class CashflowGroupReportSnapshotTest extends IntegrationTestCase
             self::assertSame('-125.25', $next['OP_OUT_MARKETING']->amounts[$companyId]);
         } finally {
             $writer->close();
-            $ids = array_values(array_map(static fn (Company $c): string => (string) $c->getId(), $this->companies));
-            $this->connection->transactional(function () use ($ids): void {
-                foreach (['cash_transaction', 'money_account', 'counterparty', 'cashflow_categories', 'company_consolidation_member'] as $table) {
-                    $this->connection->executeStatement('DELETE FROM '.$table.' WHERE company_id IN (?)', [$ids], [ArrayParameterType::STRING]);
-                }
-                $this->connection->executeStatement('DELETE FROM companies WHERE id IN (?)', [$ids], [ArrayParameterType::STRING]);
-                $owner = $this->companies['Альфа']->getUser();
-                self::assertNotNull($owner);
-                $this->connection->executeStatement('DELETE FROM "user" WHERE id = ?', [$owner->getId()]);
-            });
+            $this->removeCommittedGroupFixture();
         }
     }
 }

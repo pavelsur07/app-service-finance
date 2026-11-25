@@ -72,11 +72,13 @@ final readonly class BuildCashflowGroupReport
         $companies = [];
         $names = [];
         $withoutInn = [];
+        $companyInns = [];
         foreach ($this->groups->members($head) as $id) {
             $company = $this->companyFacade->findById($id) ?? throw new \DomainException(sprintf('Компания группы %s не найдена.', $id));
             $companies[$id] = $company;
             $names[$id] = (string) $company->getName();
             $inn = trim((string) $company->getInn());
+            $companyInns[$id] = $inn;
             if ('' === $inn) {
                 $withoutInn[] = $names[$id];
             }
@@ -92,6 +94,9 @@ final readonly class BuildCashflowGroupReport
         }
 
         $ids = array_keys($companies);
+        if ([] === $ids || $ids[0] !== $head) {
+            throw new \DomainException('Нарушен состав группы консолидации.');
+        }
         $reconciliation = ($this->reconcile)($ids, $from, $to);
         /** @var array<string, CashflowGroupSubtotal> $own */
         $own = [];
@@ -154,6 +159,7 @@ final readonly class BuildCashflowGroupReport
             $reconciliation,
             $this->intragroupQuery->accounts($ids),
             bcsub($totals->total, $reconciliation->unpairedNet, 2),
+            $companyInns,
         );
     }
 

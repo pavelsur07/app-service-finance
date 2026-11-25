@@ -73,6 +73,10 @@ final class CashflowGroupReconciliationTest extends IntegrationTestCase
             self::assertStringContainsString('****'.$suffix, $account->label);
             self::assertStringNotContainsString('4080281000000000', $account->label);
         }
+        foreach ([22, 23] as $number) {
+            $hints = $report->missingDataHints($report->reconciliation->unpaired[self::transactionId($number)]);
+            self::assertSame(['ВТБ ****0001'], array_column($hints, 'label'));
+        }
         $this->addTransaction(34, '0001', '2026-11-13', '-2600000', 'ООО "Бета"', 'OP_OUT_OTHER');
         $this->em->flush();
         $updated = $this->report()->reconciliation;

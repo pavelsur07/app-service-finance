@@ -1762,6 +1762,13 @@ UUID. Подтверждение сравнивает обе ревизии, з�
 // label() и data-name пикера — по shownName() = displayName ?? name
 getSelectable(string $companyId, ?string $keepId = null, bool $includeArchived = false): array
 
+// Ключ сопоставления карточки по тем же правилам, что у CounterpartyNameNormalizer.
+normalizedNameParts(string $name): array // core, legalFormHint
+// Блокирует и перечитывает карточку компании. Совпавший ИНН допускает повтор;
+// чужой ИНН или изменённое название возвращают false. КПП сохраняется.
+// Транзакция и flush — в AssignIntragroupTaxIdAction.
+assignMissingInn(string $companyId, string $counterpartyId, string $expectedName, string $inn): bool
+
 // Контрагент строго в рамках компании — для форм, которым нужна сама сущность.
 findEntityByIdAndCompany(string $counterpartyId, string $companyId): ?Counterparty
 
@@ -2934,6 +2941,21 @@ flush внутри `wrapInTransaction`: сбой любого подписчик
 транзакция вызывающего должна иметь изоляцию REPEATABLE READ или SERIALIZABLE. Другие валюты сохраняются отдельно по компаниям. Компании без ИНН
 перечисляются предупреждением. Доступ (`CashflowGroupReportRequest`): владелец всех компаний
 группы, иначе 403; компания вне группы — пояснение. DTO: `CashflowGroupReport`, `CashflowGroupReportLine`.
+
+`CashIntragroupDecision` хранит в `cash_intragroup_decision` UUIDv7 формы, головную компанию,
+тип `IntragroupDecisionType` (PAIR/UNPAIR), ID выплаты/поступления, автора и время. Две частичные
+уникальности по ногам PAIR и уникальность (type, outflow_transaction_id, inflow_transaction_id)
+защищают от дублей. При удалении операции решение сохраняется для разбора. Эффективные PAIR
+резервируют обе ноги до автоматического подбора независимо от дат. UNPAIR запрещает только
+одно сочетание. Если изменились направление, валюты, принадлежность, идентификация или равенство
+сумм, недействительное решение не действует. Его можно удалить в сверке. Для ручной пары
+даты могут идти в обратном порядке, суммы обязаны совпасть до копейки. Варианты ручного выбора
+ограничены свободными встречными операциями ±15 дней с равной суммой.
+`IntragroupDecisionAction` и `AssignIntragroupTaxIdAction` владеют транзакцией и commit.
+Первая блокировка — кабинет через lockedHeadOf(), затем права владельца и строки компаний
+в порядке ID, затем операции или карточка. Предложение ИНН проверяется при записи:
+нормализованное название или префикс из 10/12 цифр другой компании. Двусмысленное совпадение
+пропускается. Удаление решения адресуется UUID и головной компанией, повтор безопасен.
 
 Компании, созданные до онбординга, дозаполняет `app:company:onboarding-backfill
 [--company=<uuid>] [--execute --expected-count=N] [-v]` (`BackfillCompanyOnboardingAction`):

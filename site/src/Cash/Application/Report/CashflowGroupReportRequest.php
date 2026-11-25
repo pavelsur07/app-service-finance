@@ -7,7 +7,6 @@ namespace App\Cash\Application\Report;
 use App\Cash\Application\DTO\CashflowGroupReport;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Company\Facade\CompanyFacade;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
@@ -21,7 +20,7 @@ final readonly class CashflowGroupReportRequest
 {
     public function __construct(
         private BuildCashflowGroupReport $build,
-        private CompanyFacade $companies,
+        private IntragroupGroupAccess $access,
         private ClockInterface $clock,
     ) {
     }
@@ -44,11 +43,7 @@ final readonly class CashflowGroupReportRequest
         if (null === $report) {
             return null;
         }
-        foreach (array_keys($report->companies) as $companyId) {
-            if ($this->companies->findById($companyId)?->getUser()?->getId() !== $user->getId()) {
-                throw new AccessDeniedException('Консолидированный отчёт доступен владельцу всех компаний группы.');
-            }
-        }
+        $this->access->assertOwner(array_keys($report->companies), (string) $user->getId());
 
         return $report;
     }

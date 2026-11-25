@@ -11,6 +11,13 @@ final class IntragroupMatcher
 {
     private const MAX_DAYS = 5;
 
+    public static function acceptsDates(\DateTimeImmutable $outflow, \DateTimeImmutable $inflow): bool
+    {
+        $day = $inflow->format('Y-m-d');
+
+        return $day >= $outflow->format('Y-m-d') && $day <= $outflow->modify('+'.self::MAX_DAYS.' days')->format('Y-m-d');
+    }
+
     /**
      * @param list<IntragroupTransaction> $transactions операции одной группы, свободные от ручных пар
      * @param array<string, array<string, true>> $rejected запрещённые сочетания outflowId => [inflowId => true]

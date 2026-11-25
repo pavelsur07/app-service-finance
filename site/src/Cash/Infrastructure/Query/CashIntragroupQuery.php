@@ -27,7 +27,42 @@ final readonly class CashIntragroupQuery
      *
      * @return array<string, IntragroupTransaction> по id транзакции
      */
-    public function transactions(array $companyIds, \DateTimeImmutable $from, \DateTimeImmutable $to, array $extraIds = []): array
+    public function transactions(array $companyIds, \DateTimeImmutable $from, \DateTimeImmutable $to, array $extraIds = [], bool $includeDecisions = false): array
+    {
+        return $this->readTransactions($companyIds, $from, $to, $extraIds, $includeDecisions);
+    }
+
+    /**
+     * @param list<string> $companyIds участники группы под блокировкой кабинета
+     * @param list<string> $ids ноги решения
+     *
+     * @return array<string, IntragroupTransaction>
+     */
+    public function lockedTransactions(array $companyIds, array $ids): array
+    {
+        if (!$this->connection->isTransactionActive()) {
+            throw new \LogicException('Блокировка операций сверки требует транзакции.');
+        }
+        Assert::notEmpty($companyIds);
+        Assert::allUuid($companyIds);
+        Assert::allUuid($ids);
+        /** @var list<string> $locked */
+        $locked = $this->connection->fetchFirstColumn(
+            'SELECT id FROM cash_transaction WHERE company_id IN (:companyIds) AND id IN (:ids) ORDER BY id FOR UPDATE',
+            ['companyIds' => $companyIds, 'ids' => $ids],
+            ['companyIds' => ArrayParameterType::STRING, 'ids' => ArrayParameterType::STRING],
+        );
+
+        return $this->readTransactions($companyIds, null, null, $locked);
+    }
+
+    /**
+     * @param list<string> $companyIds
+     * @param list<string> $extraIds
+     *
+     * @return array<string, IntragroupTransaction>
+     */
+    private function readTransactions(array $companyIds, ?\DateTimeImmutable $from, ?\DateTimeImmutable $to, array $extraIds, bool $includeDecisions = false): array
     {
         Assert::notEmpty($companyIds);
         Assert::allUuid($companyIds);
@@ -51,7 +86,12 @@ final readonly class CashIntragroupQuery
                     HAVING count(*) > 0
                 ) parts ON true
                 WHERE t.company_id IN (:companyIds) AND t.deleted_at IS NULL AND t.currency = 'RUB'
-                  AND (t.occurred_at BETWEEN :from AND :to OR t.id IN (:extraIds))
+                  AND (t.occurred_at BETWEEN :from AND :to OR t.id IN (:extraIds)
+                       OR t.id IN (
+                           SELECT outflow_transaction_id FROM cash_intragroup_decision WHERE company_id = :decisionHead
+                           UNION ALL
+                           SELECT inflow_transaction_id FROM cash_intragroup_decision WHERE company_id = :decisionHead
+                       ))
                   AND trim(cp.inn) <> ''
                   AND EXISTS (
                       SELECT 1 FROM companies peer
@@ -59,7 +99,7 @@ final readonly class CashIntragroupQuery
                   )
                 ORDER BY t.occurred_at, t.id
                 SQL,
-            ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d'), 'companyIds' => $companyIds, 'extraIds' => $extraIds],
+            ['from' => $from?->format('Y-m-d'), 'to' => $to?->format('Y-m-d'), 'companyIds' => $companyIds, 'extraIds' => $extraIds, 'decisionHead' => $includeDecisions ? $companyIds[0] : null],
             ['companyIds' => ArrayParameterType::STRING, 'extraIds' => ArrayParameterType::STRING],
         );
 
