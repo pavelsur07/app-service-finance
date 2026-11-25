@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\ListingCategoryRuleQuery;
 use App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
@@ -28,6 +29,7 @@ final readonly class RefreshWbListingCatalogAction
         private WbBarcodeUpsertQuery $barcodeUpsertQuery,
         private LoggerInterface $logger,
         private ConnectionApiKeyCodec $connectionApiKeyCodec,
+        private ListingCategoryRuleQuery $categoryRules,
     ) {
     }
 
@@ -87,6 +89,14 @@ final readonly class RefreshWbListingCatalogAction
                     $listing->setName($variant['title']);
                 }
                 $listing->setIsActive($variant['isActive']);
+                if (null !== $variant['subjectId']) {
+                    $listing->setMarketplaceData([
+                        ...$listing->getMarketplaceData() ?? [],
+                        'subject_id' => $variant['subjectId'],
+                        'subject_name' => $variant['subjectName'],
+                        'category_key' => 'wb:'.$variant['subjectId'],
+                    ]);
+                }
                 $resolved[] = [$listing, $variant['barcodes']];
             }
 
@@ -96,6 +106,7 @@ final readonly class RefreshWbListingCatalogAction
                     $this->barcodeUpsertQuery->upsertForListing($company->getId(), $listing->getId(), $barcode);
                 }
             }
+            $this->categoryRules->apply((string) $company->getId());
 
             return count($resolved);
         });
@@ -127,7 +138,7 @@ final readonly class RefreshWbListingCatalogAction
      * @param list<array<string, mixed>> $activeCards
      * @param list<array<string, mixed>> $trashCards
      *
-     * @return list<array{nmId: string, chrtId: string, size: string, vendorCode: string, brand: string, subjectName: string, title: string, barcodes: list<string>, isActive: bool}>
+     * @return list<array{nmId: string, chrtId: string, size: string, vendorCode: string, brand: string, subjectName: string, title: string, barcodes: list<string>, isActive: bool, subjectId: ?int}>
      */
     private function normalizeVariants(array $activeCards, array $trashCards): array
     {
@@ -183,6 +194,7 @@ final readonly class RefreshWbListingCatalogAction
                         'title' => trim((string) ($card['title'] ?? '')),
                         'barcodes' => $barcodes,
                         'isActive' => $isActive,
+                        'subjectId' => is_int($card['subjectID'] ?? null) && $card['subjectID'] > 0 ? $card['subjectID'] : null,
                     ];
                 }
             }

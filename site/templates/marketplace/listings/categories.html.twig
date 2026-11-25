@@ -78,6 +78,86 @@
                 </div>
             {% endif %}
         </div>
+
+        {# Правила: категория площадки (Ozon — категория и тип, WB — предмет) → категория компании.
+           Применяются сразу и после каждой загрузки каталога; ручное назначение не перезаписывают. #}
+        {% macro rule_form(key, categories, token, selected = null, label = 'Назначить правилом') %}
+            <form method="post" action="{{ path('marketplace_listing_categories_rule_save') }}" class="d-flex gap-2">
+                <input type="hidden" name="_token" value="{{ token }}">
+                <input type="hidden" name="sourceKey" value="{{ key }}">
+                <select class="form-select form-select-sm u-max-w-320 u-min-w-16r" name="categoryId" required aria-label="Категория для {{ key }}">
+                    <option value="">Выберите категорию</option>
+                    {% for category in categories %}
+                        <option value="{{ category.id }}" {{ category.id == selected ? 'selected' }}>{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-primary">{{ label }}</button>
+            </form>
+        {% endmacro %}
+
+        {% if categories is not empty and unmatched is not empty %}
+            <h4 class="mt-4">Категории площадок без вашей категории</h4>
+            <p class="text-secondary small">
+                Правило назначит категорию всем листингам с этой категорией площадки — сейчас и после каждой загрузки каталога.
+                Ручное назначение в реестре правило не меняет.
+            </p>
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter">
+                        <thead>
+                        <tr>
+                            <th>Категория площадки</th>
+                            <th>Примеры листингов</th>
+                            <th class="text-end w-1">Листингов</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for row in unmatched %}
+                            <tr data-unmatched-key="{{ row.sourceKey }}">
+                                <td>
+                                    {{ row.marketplace == 'wildberries' ? 'WB' : 'Ozon' }} · {{ row.subjectName ?? row.sourceKey }}
+                                    {% if row.subjectName %}<div class="text-secondary small">{{ row.sourceKey }}</div>{% endif %}
+                                </td>
+                                <td class="text-secondary small">{{ row.examples|join('; ') }}</td>
+                                <td class="text-end">{{ row.listingsCount|vf_number }}</td>
+                                <td>{{ _self.rule_form(row.sourceKey, categories, token) }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if rules is not empty %}
+            <h4 class="mt-4">Правила</h4>
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter">
+                        <thead>
+                        <tr>
+                            <th>Категория площадки</th>
+                            <th class="text-end w-1">Листингов</th>
+                            <th>Категория</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for rule in rules %}
+                            <tr data-rule-key="{{ rule.sourceKey }}">
+                                <td>
+                                    {{ rule.marketplace == 'wildberries' ? 'WB' : 'Ozon' }} · {{ rule.subjectName ?? rule.sourceKey }}
+                                    {% if rule.subjectName %}<div class="text-secondary small">{{ rule.sourceKey }}</div>{% endif %}
+                                </td>
+                                <td class="text-end">{{ rule.listingsCount|vf_number }}</td>
+                                <td>{{ _self.rule_form(rule.sourceKey, categories, token, rule.categoryId, 'Заменить') }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
     </div>
 {% endblock %}
 

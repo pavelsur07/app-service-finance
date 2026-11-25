@@ -10,6 +10,7 @@ use App\Ingestion\Enum\IngestSource;
 use App\Ingestion\Facade\RawStorageFacade;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\ListingCategoryRuleQuery;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
 use App\Marketplace\Ozon\Application\DTO\OzonCatalogItemDTO;
 use App\Marketplace\Ozon\Application\DTO\OzonCatalogSyncResultDTO;
@@ -57,6 +58,7 @@ final readonly class RefreshOzonListingCatalogAction
         private OzonListingCatalogUpsertQuery $upsertQuery,
         private RawStorageFacade $rawStorageFacade,
         private LoggerInterface $logger,
+        private ListingCategoryRuleQuery $categoryRules,
     ) {
     }
 
@@ -365,6 +367,9 @@ final readonly class RefreshOzonListingCatalogAction
                 );
             }
         }
+
+        // Правила категорий — в той же транзакции чанка: новый листинг не остаётся без категории.
+        $this->categoryRules->apply($companyId);
 
         return $upserted;
     }
