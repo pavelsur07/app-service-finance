@@ -109,11 +109,14 @@ final class CompanyCreateFlowTest extends WebTestCaseBase
         // Базовое дерево ОПиУ создаёт Finance по CompanyCreatedEvent.
         self::assertSame(72, $em->getRepository(PLCategory::class)->count(['company' => $company]));
 
-        // Базовые учётные счета Баланса — на статьях банка и кассы.
-        self::assertSame(['CASH_BANK:ACC_MAIN_BANK', 'CASH_REGISTER:ACC_MAIN_REGISTER'], $em->getConnection()->fetchFirstColumn(
+        // Типовой справочник счетов Баланса — счёт у каждой конечной статьи.
+        $accounts = $em->getConnection()->fetchFirstColumn(
             "SELECT ar.code || ':' || a.code FROM balance_accounts a JOIN balance_articles ar ON ar.id = a.article_id WHERE a.company_id = ? ORDER BY a.code",
             [(string) $company->getId()],
-        ));
+        );
+        self::assertCount(28, $accounts);
+        self::assertContains('CASH_BANK:ACC_MAIN_BANK', $accounts);
+        self::assertContains('INV_FULFILLMENT:ACC_INV_FF', $accounts);
     }
 
     public function testInvalidMinimumBalanceShowsValidationError(): void
