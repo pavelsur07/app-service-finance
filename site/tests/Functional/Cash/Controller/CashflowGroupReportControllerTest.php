@@ -32,6 +32,7 @@ final class CashflowGroupReportControllerTest extends WebTestCaseBase
     {
         parent::setUp();
         $this->client = static::createClient();
+        $this->em()->getConnection()->executeStatement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
         $this->owner = UserBuilder::aUser()->asCompanyOwner()->build();
         $this->em()->persist($this->owner);
         foreach ([self::HEAD => 'Головная', self::MEMBER => 'Дочерняя', self::ALONE => 'Одиночка'] as $id => $name) {

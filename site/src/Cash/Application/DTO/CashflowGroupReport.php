@@ -11,6 +11,7 @@ final readonly class CashflowGroupReport
      * @param array<string, string> $companies companyId => название, головная первой
      * @param list<CashflowGroupReportLine> $lines статьи эталона в порядке дерева головной
      * @param array<string, array<string, string>> $otherCurrencies валюта => companyId => сумма
+     * @param list<CashflowAccountStatus> $accounts
      * @param list<string> $companiesWithoutInn названия: их обороты внутригрупповыми не распознать
      */
     public function __construct(
@@ -23,6 +24,9 @@ final readonly class CashflowGroupReport
         public CashflowGroupReportLine $totals,
         public array $otherCurrencies,
         public array $companiesWithoutInn,
+        public CashflowReconciliation $reconciliation,
+        public array $accounts,
+        public string $withoutUnpaired,
     ) {
     }
 }

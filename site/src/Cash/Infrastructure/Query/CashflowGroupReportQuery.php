@@ -30,18 +30,17 @@ final readonly class CashflowGroupReportQuery
         Assert::notEmpty($companyIds);
         Assert::allUuid($companyIds);
 
-        /** @var list<array{company_id: string, category_id: string, currency: string, counterparty_inn: string|null, amount: string}> $rows */
+        /** @var list<array{company_id: string, category_id: string, currency: string, amount: string}> $rows */
         $rows = $this->em->getConnection()->fetchAllAssociative(
             <<<'SQL'
-                SELECT t.company_id, s.cashflow_category_id AS category_id, t.currency, cp.inn AS counterparty_inn,
+                SELECT t.company_id, s.cashflow_category_id AS category_id, t.currency,
                        SUM(CASE WHEN t.direction = 'OUTFLOW' THEN -ABS(s.amount) ELSE ABS(s.amount) END) AS amount
                 FROM cash_transaction t
                 JOIN cash_transaction_split s ON s.cash_transaction_id = t.id
-                LEFT JOIN counterparty cp ON cp.id = t.counterparty_id
                 WHERE t.company_id IN (:companyIds)
                   AND t.occurred_at BETWEEN :from AND :to
                   AND t.deleted_at IS NULL
-                GROUP BY t.company_id, s.cashflow_category_id, t.currency, cp.inn
+                GROUP BY t.company_id, s.cashflow_category_id, t.currency
                 SQL,
             [
                 'companyIds' => $companyIds,
@@ -55,7 +54,6 @@ final readonly class CashflowGroupReportQuery
             (string) $row['company_id'],
             (string) $row['category_id'],
             $row['currency'],
-            null === $row['counterparty_inn'] || '' === trim($row['counterparty_inn']) ? null : trim($row['counterparty_inn']),
             bcadd((string) $row['amount'], '0', 2),
         ), $rows);
     }

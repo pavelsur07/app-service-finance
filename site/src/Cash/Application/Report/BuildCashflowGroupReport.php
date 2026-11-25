@@ -7,18 +7,21 @@ namespace App\Cash\Application\Report;
 use App\Cash\Application\DTO\CashflowGroupReport;
 use App\Cash\Application\DTO\CashflowGroupReportLine;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Infrastructure\Query\CashflowGroupReportQuery;
+use App\Cash\Infrastructure\Query\CashIntragroupQuery;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Facade\ConsolidationGroupFacadeInterface;
+use Doctrine\DBAL\Connection;
 
 /**
  * Консолидированный отчёт ДДС группы компании за период, только чтение. Строки — статьи эталона
  * (дерево головной компании): сумма статьи компании сворачивается к ближайшей статье с кодом
  * (`group_code`); операция прямо на системной статье — в её секцию; статья без кода до системной
  * или код, которого нет в эталоне, — «Не сопоставлено». Внутригрупповая операция — ИНН контрагента
- * равен ИНН другой компании группы: показывается отдельно и вычитается из итога. Только RUB.
+ * равен ИНН другой компании группы. Элиминируются обе ноги сверенной пары в периоде. Только RUB.
  */
 final readonly class BuildCashflowGroupReport
 {
@@ -31,11 +34,34 @@ final readonly class BuildCashflowGroupReport
         private CompanyFacade $companyFacade,
         private CashflowCategoryRepository $categories,
         private CashflowGroupReportQuery $query,
+        private BuildCashflowReconciliation $reconcile,
+        private CashIntragroupQuery $intragroupQuery,
+        private Connection $connection,
     ) {
     }
 
     /** null — компания не входит в группу консолидации. */
     public function __invoke(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): ?CashflowGroupReport
+    {
+        // Обороты, решения и разбивки должны отражать один и тот же импорт.
+        $native = $this->connection->getNativeConnection();
+        if ($this->connection->isTransactionActive() || ($native instanceof \PDO && $native->inTransaction())) {
+            $isolation = $this->connection->fetchOne('SHOW transaction_isolation');
+            if (!\in_array($isolation, ['repeatable read', 'serializable'], true)) {
+                throw new \LogicException('Для консолидированного отчёта нужна транзакция REPEATABLE READ или SERIALIZABLE.');
+            }
+
+            return $this->build($companyId, $from, $to);
+        }
+
+        return $this->connection->transactional(function () use ($companyId, $from, $to): ?CashflowGroupReport {
+            $this->connection->executeStatement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+
+            return $this->build($companyId, $from, $to);
+        });
+    }
+
+    private function build(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): ?CashflowGroupReport
     {
         $head = $this->groups->headOf($companyId);
         if (null === $head) {
@@ -45,8 +71,6 @@ final readonly class BuildCashflowGroupReport
         /** @var array<string, Company> $companies */
         $companies = [];
         $names = [];
-        /** @var array<string, list<string>> $innOwners ИНН => компании группы с этим ИНН */
-        $innOwners = [];
         $withoutInn = [];
         foreach ($this->groups->members($head) as $id) {
             $company = $this->companyFacade->findById($id) ?? throw new \DomainException(sprintf('Компания группы %s не найдена.', $id));
@@ -55,9 +79,6 @@ final readonly class BuildCashflowGroupReport
             $inn = trim((string) $company->getInn());
             if ('' === $inn) {
                 $withoutInn[] = $names[$id];
-            } else {
-                // ИНН не уникален между компаниями: храним всех владельцев.
-                $innOwners[$inn][] = $id;
             }
         }
         $zero = array_fill_keys(array_keys($companies), '0.00');
@@ -70,10 +91,10 @@ final readonly class BuildCashflowGroupReport
             }
         }
 
-        /** @var array<string, array<string, string>> $own ключ => companyId => сумма (без подстатей) */
+        $ids = array_keys($companies);
+        $reconciliation = ($this->reconcile)($ids, $from, $to);
+        /** @var array<string, CashflowGroupSubtotal> $own */
         $own = [];
-        /** @var array<string, string> $ownIntragroup */
-        $ownIntragroup = [];
         $otherCurrencies = [];
         foreach (($this->query)(array_keys($companies), $from, $to) as $amount) {
             if (self::CURRENCY !== $amount->currency) {
@@ -82,36 +103,43 @@ final readonly class BuildCashflowGroupReport
                 continue;
             }
             $key = $keyOf[$amount->categoryId] ?? self::UNMATCHED;
-            $own[$key] ??= $zero;
-            $own[$key][$amount->companyId] = bcadd($own[$key][$amount->companyId], $amount->amount, 2);
-            $owners = null === $amount->counterpartyInn ? [] : ($innOwners[$amount->counterpartyInn] ?? []);
-            if ([] !== array_diff($owners, [$amount->companyId])) {
-                $ownIntragroup[$key] = bcadd($ownIntragroup[$key] ?? '0.00', $amount->amount, 2);
+            $own[$key] ??= new CashflowGroupSubtotal($zero);
+            $own[$key]->amounts[$amount->companyId] = bcadd($own[$key]->amounts[$amount->companyId], $amount->amount, 2);
+        }
+        foreach ($reconciliation->pairs as $outId => $inId) {
+            foreach ([$outId, $inId] as $id) {
+                $tx = $reconciliation->transactions[$id];
+                foreach ($tx->splits as $categoryId => $amount) {
+                    $key = $keyOf[$categoryId] ?? self::UNMATCHED;
+                    $own[$key] ??= new CashflowGroupSubtotal($zero);
+                    $row = $own[$key];
+                    $row->pairIds[$outId] = true;
+                    $row->elimination = CashDirection::OUTFLOW === $tx->direction ? bcadd($row->elimination, $amount, 2) : bcsub($row->elimination, $amount, 2);
+                }
+            }
+        }
+        foreach ($reconciliation->unpaired as $tx) {
+            foreach (array_keys($tx->splits) as $categoryId) {
+                $key = $keyOf[$categoryId] ?? self::UNMATCHED;
+                $own[$key] ??= new CashflowGroupSubtotal($zero);
+                $own[$key]->hasUnpaired = true;
             }
         }
 
         $lines = [];
         $shown = [];
-        $grand = $zero;
-        $grandIntragroup = '0.00';
+        $grand = new CashflowGroupSubtotal($zero);
         $roots = array_values(array_filter($this->categories->findTreeByCompany($companies[$head]), static fn (CashflowCategory $c): bool => null === $c->getParent()));
         usort($roots, static fn (CashflowCategory $a, CashflowCategory $b): int => [$a->getSort(), $a->getName()] <=> [$b->getSort(), $b->getName()]);
         foreach ($roots as $root) {
-            [$sum, $intragroup] = $this->visit($root, 1, $lines, $shown, $own, $ownIntragroup, $zero);
-            $grand = self::add($grand, $sum);
-            $grandIntragroup = bcadd($grandIntragroup, $intragroup, 2);
+            $grand->include($this->visit($root, 1, $lines, $shown, $own, $zero));
         }
-
-        $unmatched = $zero;
-        $unmatchedIntragroup = '0.00';
-        foreach ($own as $key => $amounts) {
-            if (!isset($shown[$key])) {
-                $unmatched = self::add($unmatched, $amounts);
-                $unmatchedIntragroup = bcadd($unmatchedIntragroup, $ownIntragroup[$key] ?? '0.00', 2);
-            }
+        $unmatched = new CashflowGroupSubtotal($zero);
+        foreach (array_diff_key($own, $shown) as $subtotal) {
+            $unmatched->include($subtotal);
         }
-        $grand = self::add($grand, $unmatched);
-        $grandIntragroup = bcadd($grandIntragroup, $unmatchedIntragroup, 2);
+        $grand->include($unmatched);
+        $totals = $grand->line(self::TOTAL, 'Итого', 1, false);
 
         return new CashflowGroupReport(
             $head,
@@ -119,10 +147,13 @@ final readonly class BuildCashflowGroupReport
             $to,
             $names,
             array_values($lines),
-            self::line(self::UNMATCHED, 'Не сопоставлено', 1, false, $unmatched, $unmatchedIntragroup),
-            self::line(self::TOTAL, 'Итого', 1, false, $grand, $grandIntragroup),
+            $unmatched->line(self::UNMATCHED, 'Не сопоставлено', 1, false),
+            $totals,
             $otherCurrencies,
             $withoutInn,
+            $reconciliation,
+            $this->intragroupQuery->accounts($ids),
+            bcsub($totals->total, $reconciliation->unpairedNet, 2),
         );
     }
 
@@ -132,37 +163,28 @@ final readonly class BuildCashflowGroupReport
      *
      * @param array<int, CashflowGroupReportLine> $lines
      * @param array<string, true> $shown
-     * @param array<string, array<string, string>> $own
-     * @param array<string, string> $ownIntragroup
+     * @param array<string, CashflowGroupSubtotal> $own
      * @param array<string, string> $zero
-     *
-     * @return array{array<string, string>, string} суммы с подстатьями и внутригрупповые
      */
-    private function visit(CashflowCategory $category, int $level, array &$lines, array &$shown, array $own, array $ownIntragroup, array $zero): array
+    private function visit(CashflowCategory $category, int $level, array &$lines, array &$shown, array $own, array $zero): CashflowGroupSubtotal
     {
         // Строка — только по собственному коду или системной статье: ключ предка не наследуется,
         // иначе подстатья головной без кода повторно взяла бы сумму родителя.
         $key = $category->getGroupCode() ?? ($category->isSystem() && null !== $category->getSystemCode() ? 'sys:'.$category->getSystemCode() : null);
-        $hasLine = null !== $key;
+        $subtotal = null !== $key && isset($own[$key]) ? clone $own[$key] : new CashflowGroupSubtotal($zero);
         $position = \count($lines);
-        if ($hasLine) {
+        if (null !== $key) {
             $shown[$key] = true;
-            $lines[] = self::line($key, '', $level, false, $zero, '0.00');
+            $lines[] = $subtotal->line($key, $category->getName(), $level, $category->isSystem());
         }
-
-        $sum = $hasLine ? ($own[$key] ?? $zero) : $zero;
-        $intragroup = $hasLine ? ($ownIntragroup[$key] ?? '0.00') : '0.00';
         foreach ($category->getChildren() as $child) {
-            [$childSum, $childIntragroup] = $this->visit($child, $hasLine ? $level + 1 : $level, $lines, $shown, $own, $ownIntragroup, $zero);
-            $sum = self::add($sum, $childSum);
-            $intragroup = bcadd($intragroup, $childIntragroup, 2);
+            $subtotal->include($this->visit($child, null !== $key ? $level + 1 : $level, $lines, $shown, $own, $zero));
+        }
+        if (null !== $key) {
+            $lines[$position] = $subtotal->line($key, $category->getName(), $level, $category->isSystem());
         }
 
-        if ($hasLine) {
-            $lines[$position] = self::line($key, $category->getName(), $level, $category->isSystem(), $sum, $intragroup);
-        }
-
-        return [$sum, $intragroup];
+        return $subtotal;
     }
 
     /** Ключ строки для статьи компании. */
@@ -179,31 +201,5 @@ final readonly class BuildCashflowGroupReport
         }
 
         return self::UNMATCHED;
-    }
-
-    /** @param array<string, string> $amounts */
-    private static function line(string $key, string $name, int $level, bool $section, array $amounts, string $intragroup): CashflowGroupReportLine
-    {
-        $sum = '0.00';
-        foreach ($amounts as $amount) {
-            $sum = bcadd($sum, $amount, 2);
-        }
-
-        return new CashflowGroupReportLine($key, $name, $level, $section, $amounts, $intragroup, bcsub($sum, $intragroup, 2));
-    }
-
-    /**
-     * @param array<string, string> $a
-     * @param array<string, string> $b
-     *
-     * @return array<string, string>
-     */
-    private static function add(array $a, array $b): array
-    {
-        foreach ($b as $id => $amount) {
-            $a[$id] = bcadd($a[$id] ?? '0.00', $amount, 2);
-        }
-
-        return $a;
     }
 }
