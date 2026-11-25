@@ -2085,12 +2085,12 @@ getPostingAccounts(string $companyId): array
 getBookStatus(string $companyId): BalanceBookStatus
 canPostFromSource(string $companyId, string $userId): bool
 setAccountBalanceFromSource(string $companyId, string $actorId, string $accountId, string $counterAccountId,
-    \DateTimeImmutable $date, string $targetMinor, string $reason, string $requestKey): ?string
+    \DateTimeImmutable $date, string $targetMinor, string $currency, string $reason, string $requestKey): ?string
 ```
 
 Установка остатка из внешнего источника (`setAccountBalanceFromSource`, сейчас — склады МойСклад):
 без HTTP-сессии, права автора (`prepare` + `post`) читаются свежими под блокировкой
-(`BalanceAccess::lockForDelegatedMutation`); книга не начата, совпадение счетов, закрытый период —
+(`BalanceAccess::lockForDelegatedMutation`); книга не начата, валюта книги ≠ `currency`, совпадение счетов, закрытый период —
 `BalanceLedgerException`, нет прав — `AccessDeniedException`. Δ = цель − остаток на дату, вторая строка —
 корреспондирующий счёт (та же сторона — обратное направление, другая — то же); Δ = 0 → `null`.
 Повтор с тем же `requestKey` возвращает тот же документ. Коммитит сам Facade (своя транзакция Баланса),
@@ -5883,7 +5883,7 @@ config/
 | `app:moysklad:mapping-diagnostics:refresh` | `*/5 * * * *` | Пересчёт отсутствующих или устаревших отчётов диагностики маппинга МойСклад по активным подключениям; только чтение и dispatch, повтор — тот же runId |
 | `app:moysklad:mapping-auto-apply` | `30 5 * * *` | Пакет однозначных предложений МойСклад для подключений с включённым автоприменением; один в сутки |
 | `app:moysklad:store-balance:daily` | `30 23 * * *` | `SyncStockSnapshotMessage` для подключений с включённой записью складов в Баланс; оценку и проводку ставит снимок |
-| `app:moysklad:store-balance:requeue` | `*/15 * * * *` | Повтор оценки складов: последний completed-снимок за 2 дня без прогона, зависший `valuing`, `partial`, временный сбой старше 30 мин; до 6 попыток |
+| `app:moysklad:store-balance:requeue` | `*/15 * * * *` | Повтор оценки складов: последний completed-снимок за 2 дня без прогона, зависший `valuing`/`posting`, `partial`, временный сбой старше 30 мин; до 6 попыток |
 | `app:marketplace:cost-pl-mapping:sync-default` | `35 4 * * *`, `45 6 * * *` | Частичный базовый маппинг затрат в ОПиУ по шаблону для всех активных SELLER-подключений (ozon, wildberries) — до пересборки 04:45, чтобы новые категории ночи попали в ОПиУ утром. Ручные и отключённые правила не трогает. Повтор в 06:45 — перед гейтом, чтобы категории утренних загрузок не краснили его |
 | `app:marketplace:cost-pl-mapping:unmapped-check` | `50 6 * * *` | Read-only гейт: затраты текущего и прошлого месяца без документа ОПиУ, у категории которых нет решения по ОПиУ (`WITHOUT_PL_DECISION`); Ozon — только распознанные коды. exit 1 + один агрегированный `error`; зеленеет, как только статья назначена |
 | `app:marketplace:month-preliminary-rebuild` | `45 4 * * *` | Ежедневная пересборка предварительного ОПиУ за текущий месяц для всех активных подключений; вручную `--company-id --marketplace --month=YYYY-MM --stage [--execute]` — один этап за любой месяц, синхронно, без `--execute` только preflight |
@@ -6830,18 +6830,22 @@ marketplace)` ставит запуск, если подключение акт�
 
 Страница `moysklad_stores` (`/moy-sklad/connections/{id}/stores`, READ; POST — READ+WRITE+CSRF):
 складу назначается счёт актива Баланса или «не учитывать» (`moysklad_store_balance_links`,
-`SaveStoreBalanceLinkAction`, счёт проверяется через `BalanceFacade::getPostingAccounts`);
+`SaveStoreBalanceLinkAction`, счёт проверяется через `BalanceFacade::getPostingAccounts`; счёт — одного
+подключения и не корреспондирующий, проверка под company advisory-lock);
 настройки подключения — корреспондирующий счёт, включено, автор (`moysklad_store_balance_settings`,
-`SaveStoreBalanceSettingsAction`: включение требует корр. счёт и `canPostFromSource` автора).
+`SaveStoreBalanceSettingsAction`: включение требует корр. счёт). Назначения и настройки меняет только
+пользователь с `canPostFromSource`; без финансового доступа на чтение счета и суммы Баланса не показываются.
 - После completed-снимка `SyncStockSnapshotHandler` отправляет `ValueStoreStocksMessage` → `async_sync`
   (HTTP к МойСклад). `ValueStoreStocksAction` под session advisory-lock подключения, фазы:
   1) себестоимость единиц `report/stock/all?groupBy=variant&filter=stockMode=all` (нет `price` →
   `forbidden`, run `failed`); 2) одной транзакцией заменяет `moysklad_store_valuations` снимка
   (`amount_minor` = Σ round(stock × price) половина от нуля, `unpriced_positions`), дата — МСК начала снимка;
-  3) если запись включена — по каждому счёту сумма складов → `BalanceFacade::setAccountBalanceFromSource`
-  (ключ UUIDv5(компания, подключение, счёт, дата, цель)), итог счёта-дня — `moysklad_store_balance_postings`
+  оценённый снимок повтором не переоценивается;
+  3) если запись включена — снимок старше уже проводимого → `skipped: superseded`; иначе статус `posting` и по
+  каждому счёту сумма складов → `BalanceFacade::setAccountBalanceFromSource` (RUB, ключ UUIDv5(компания,
+  подключение, счёт, снимок)), итог счёта-дня — `moysklad_store_balance_postings`
   (`posted|unchanged|skipped|failed`, причина). Нет прав у автора → весь прогон `skipped`, проведённый
-  итог дня не затирается. Статус прогона — `moysklad_store_balance_runs` (`valuing|valued|posted|partial|skipped|failed`).
+  итог дня не затирается. Статус прогона — `moysklad_store_balance_runs` (`valuing|valued|posting|posted|partial|skipped|failed`).
 - Handler повторяет `rate_limited`/`temporary` с задержкой до 3 раз; потерю dispatch и зависания
   закрывает `app:moysklad:store-balance:requeue`.
 - Порядок блокировок: advisory подключения (оценка) → транзакция Баланса (company → book) на каждый счёт.
