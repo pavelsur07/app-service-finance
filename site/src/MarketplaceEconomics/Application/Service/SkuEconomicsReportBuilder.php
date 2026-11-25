@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\MarketplaceEconomics\Application\Service;
 
+use App\Marketplace\Facade\ListingCategoryFacadeInterface;
 use App\Marketplace\Facade\ListingTagFacade;
 use App\Marketplace\Facade\MarketplaceFacade;
+use App\MarketplaceEconomics\Application\DTO\SkuEconomicsCategoryGroup;
 use App\MarketplaceEconomics\Application\DTO\SkuEconomicsFilter;
 use App\MarketplaceEconomics\Application\DTO\SkuEconomicsReport;
 use App\MarketplaceEconomics\Application\DTO\SkuEconomicsRow;
@@ -13,8 +15,9 @@ use App\MarketplaceEconomics\Domain\SkuMetrics;
 use App\MarketplaceEconomics\Infrastructure\Query\SkuEconomicsQuery;
 
 /**
- * Отчёт R1 из витрины: текущий и прошлый период той же длины, названия листингов, фильтр по тегам
- * и поиску, сортировка. Итог без фильтра = кабинет (SKU + нераспределённое); с фильтром — Σ строк.
+ * Отчёт R1 из витрины: текущий и прошлый период той же длины, названия листингов, фильтр по тегам,
+ * категории и поиску, сортировка. Итог без фильтра = кабинет (SKU + нераспределённое); с фильтром — Σ строк.
+ * Режим «По категориям» группирует те же строки по категории листинга (определяется при чтении).
  */
 final readonly class SkuEconomicsReportBuilder
 {
@@ -22,6 +25,7 @@ final readonly class SkuEconomicsReportBuilder
         private SkuEconomicsQuery $query,
         private MarketplaceFacade $marketplace,
         private ListingTagFacade $tags,
+        private ListingCategoryFacadeInterface $categories,
         private VatRatesByMonth $vatRates,
     ) {
     }
@@ -42,12 +46,17 @@ final readonly class SkuEconomicsReportBuilder
         $meta = $this->marketplace->getListingsMetaByIds($companyId, array_map('strval', $listingIds));
         $tagged = [] === $filter->tagIds ? null : array_flip($this->tags->listingIdsByTags($companyId, $filter->tagIds));
         $needle = mb_strtolower(trim($filter->search));
+        $needCategories = null !== $filter->category || $filter->byCategory;
+        $categoryOf = $needCategories ? $this->categories->categoriesForListings($companyId, array_map('strval', $listingIds)) : [];
 
         $rows = [];
         foreach ($current as $listingId => $metrics) {
             $listingId = (string) $listingId;
             $item = $meta[$listingId] ?? null;
             if (null !== $tagged && !isset($tagged[$listingId])) {
+                continue;
+            }
+            if (null !== $filter->category && (SkuEconomicsFilter::CATEGORY_NONE === $filter->category ? isset($categoryOf[$listingId]) : ($categoryOf[$listingId] ?? null) !== $filter->category)) {
                 continue;
             }
             if ('' !== $needle && !str_contains(mb_strtolower(implode(' ', [$item?->sku, $item?->title, $item?->supplierSku])), $needle)) {
@@ -83,11 +92,64 @@ final readonly class SkuEconomicsReportBuilder
         }
 
         $coverage = $this->query->coverage($companyId, $filter->from, $filter->to);
+        $groups = $filter->byCategory ? $this->groups($companyId, $rows, $categoryOf, $value, $filter->desc) : null;
+        $share = null;
+        if (null !== $groups) {
+            $all = array_sum(array_map(static fn (SkuEconomicsRow $r): int => $r->current->revenue, $rows));
+            $categorized = array_sum(array_map(static fn (SkuEconomicsCategoryGroup $g): int => null === $g->categoryId ? 0 : $g->current->revenue, $groups));
+            $share = 0 === $all ? null : round($categorized * 100 / $all, 1);
+        }
 
         return new SkuEconomicsReport(
             $filter->from, $filter->to, $previousFrom, $previousTo, $rows,
             $filter->filtersListings() ? null : $unallocated,
             $total, $previousTotal, $coverage['connections'], $coverage['days'], $coverage['daysWithoutCostPrice'], $coverage['channels'],
+            $groups, $share,
         );
+    }
+
+    /**
+     * Строки (уже отсортированные) раскладываются по категориям; группы сортируются по той же
+     * колонке, «Без категории» — последней. Показатели группы — сумма строк, проценты считает SkuMetrics.
+     *
+     * @param list<SkuEconomicsRow> $rows
+     * @param array<string, string> $categoryOf listingId → categoryId
+     * @param callable(SkuMetrics): int $value
+     *
+     * @return list<SkuEconomicsCategoryGroup>
+     */
+    private function groups(string $companyId, array $rows, array $categoryOf, callable $value, bool $desc): array
+    {
+        $names = [];
+        foreach ($this->categories->list($companyId) as $category) {
+            $names[$category->id] = $category->name;
+        }
+
+        /** @var array<string, array{current: SkuMetrics, previous: SkuMetrics, rows: list<SkuEconomicsRow>}> $buckets */
+        $buckets = [];
+        foreach ($rows as $row) {
+            $key = $categoryOf[$row->listingId] ?? '';
+            $buckets[$key] ??= ['current' => new SkuMetrics(), 'previous' => new SkuMetrics(), 'rows' => []];
+            $buckets[$key]['current']->merge($row->current);
+            $buckets[$key]['previous']->merge($row->previous);
+            $buckets[$key]['rows'][] = $row;
+        }
+
+        $groups = [];
+        foreach ($buckets as $key => $bucket) {
+            $key = (string) $key;
+            $groups[] = new SkuEconomicsCategoryGroup(
+                '' === $key ? null : $key,
+                '' === $key ? 'Без категории' : ($names[$key] ?? 'Без категории'),
+                $bucket['current'],
+                $bucket['previous'],
+                $bucket['rows'],
+            );
+        }
+        usort($groups, static fn (SkuEconomicsCategoryGroup $a, SkuEconomicsCategoryGroup $b): int => (null === $a->categoryId) <=> (null === $b->categoryId)
+            ?: ($desc ? -1 : 1) * ($value($a->current) <=> $value($b->current))
+            ?: strcmp($a->name, $b->name));
+
+        return $groups;
     }
 }

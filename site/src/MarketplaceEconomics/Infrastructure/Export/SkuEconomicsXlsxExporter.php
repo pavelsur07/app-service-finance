@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceEconomics\Infrastructure\Export;
 
 use App\MarketplaceEconomics\Application\DTO\EconomicsDynamicsReport;
+use App\MarketplaceEconomics\Application\DTO\SkuEconomicsCategoryGroup;
 use App\MarketplaceEconomics\Application\DTO\SkuEconomicsFilter;
 use App\MarketplaceEconomics\Application\DTO\SkuEconomicsReport;
 use App\MarketplaceEconomics\Domain\SkuMetrics;
@@ -36,14 +37,24 @@ final readonly class SkuEconomicsXlsxExporter
         $writer->openToFile($path);
         try {
             $writer->addRow(new Row([Cell::fromValue(sprintf('Экономика SKU · %s – %s', $report->from->format('d.m.Y'), $report->to->format('d.m.Y')))]));
-            $writer->addRow(new Row(array_map(static fn (string $h): Cell => Cell::fromValue($h), self::header($allocated))));
-            foreach ($report->rows as $row) {
-                $writer->addRow($this->row([$row->sku, (string) $row->title, SkuEconomicsFilter::CHANNELS[(string) $row->channel] ?? ''], $row->current, $allocated));
+            // По категориям — первая колонка «Категория», листинги по группам; групповых подытогов нет,
+            // чтобы сумма столбца в Excel не задваивалась.
+            $byCategory = null !== $report->groups;
+            $lead = $byCategory ? ['Категория'] : [];
+            $blank = $byCategory ? [''] : [];
+            $writer->addRow(new Row(array_map(static fn (string $h): Cell => Cell::fromValue($h), [...$lead, ...self::header($allocated)])));
+            $sections = $byCategory
+                ? array_map(static fn (SkuEconomicsCategoryGroup $g): array => [[$g->name], $g->rows], $report->groups)
+                : [[[], $report->rows]];
+            foreach ($sections as [$prefix, $rows]) {
+                foreach ($rows as $row) {
+                    $writer->addRow($this->row([...$prefix, $row->sku, (string) $row->title, SkuEconomicsFilter::CHANNELS[(string) $row->channel] ?? ''], $row->current, $allocated));
+                }
             }
             if (null !== $report->unallocated) {
-                $writer->addRow($this->row(['Нераспределено', '', ''], $report->unallocated, $allocated));
+                $writer->addRow($this->row(['Нераспределено', ...$blank, '', ''], $report->unallocated, $allocated));
             }
-            $writer->addRow($this->row(['Итого', '', ''], $report->total, $allocated));
+            $writer->addRow($this->row(['Итого', ...$blank, '', ''], $report->total, $allocated));
         } finally {
             $writer->close();
         }

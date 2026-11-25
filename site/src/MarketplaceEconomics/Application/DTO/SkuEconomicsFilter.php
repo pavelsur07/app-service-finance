@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceEconomics\Application\DTO;
 
 use App\MarketplaceEconomics\Exception\InvalidEconomicsPeriodException;
+use Ramsey\Uuid\Uuid;
 
 final readonly class SkuEconomicsFilter
 {
@@ -12,6 +13,8 @@ final readonly class SkuEconomicsFilter
     public const SORTS = ['revenue', 'gross', 'md1', 'md2', 'full', 'ads', 'sales'];
     /** Каналы канона (`MarketplaceType::value`) и их подписи в отчётах. */
     public const CHANNELS = ['ozon' => 'Ozon', 'wildberries' => 'WB'];
+    /** Значение фильтра категории «листинги без категории». */
+    public const CATEGORY_NONE = 'none';
 
     /**
      * @param list<string> $tagIds
@@ -27,7 +30,14 @@ final readonly class SkuEconomicsFilter
         public ?string $channel = null,
         /** false — «Без разнесения»: без строк разнесения витрины, затраты без SKU остаются в «Нераспределено». */
         public bool $allocated = true,
+        /** uuid категории листинга, `none` — без категории, null — все. */
+        public ?string $category = null,
+        /** true — строки отчёта сгруппированы по категориям листингов. */
+        public bool $byCategory = false,
     ) {
+        if (null !== $category && self::CATEGORY_NONE !== $category && !Uuid::isValid($category)) {
+            throw new InvalidEconomicsPeriodException('Неизвестная категория.');
+        }
         if (null !== $channel && !isset(self::CHANNELS[$channel])) {
             throw new InvalidEconomicsPeriodException('Неизвестный канал.');
         }
@@ -41,6 +51,6 @@ final readonly class SkuEconomicsFilter
 
     public function filtersListings(): bool
     {
-        return [] !== $this->tagIds || '' !== $this->search;
+        return [] !== $this->tagIds || '' !== $this->search || null !== $this->category;
     }
 }

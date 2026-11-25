@@ -124,6 +124,25 @@
                     </select>
                 </div>
             {% endif %}
+            {% if allCategories is not empty %}
+                <div class="col-12 col-sm-6 col-lg-auto">
+                    <label class="form-label" for="me-category">Категория</label>
+                    <select class="form-select" id="me-category" name="category">
+                        <option value="">Все категории</option>
+                        <option value="none" {{ category == 'none' ? 'selected' }}>Без категории</option>
+                        {% for item in allCategories %}
+                            <option value="{{ item.id }}" {{ item.id == category ? 'selected' }}>{{ item.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-auto">
+                    <label class="form-label" for="me-group">Группировка</label>
+                    <select class="form-select" id="me-group" name="group">
+                        <option value="">По SKU</option>
+                        <option value="category" {{ byCategory ? 'selected' }}>По категориям</option>
+                    </select>
+                </div>
+            {% endif %}
             <div class="col-12 col-sm-6 col-lg-auto">
                 <label class="form-label" for="me-q">Поиск</label>
                 <input class="form-control" id="me-q" type="search" name="q" value="{{ search }}" placeholder="SKU, артикул, название">
@@ -176,6 +195,13 @@
                 НДС к уплате — с выручки с СПП по налоговому профилю компании на каждый месяц; уровни СМ — без НДС, проценты — от выручки до СПП.
                 Реклама по SKU — по долям прежнего отчёта рекламы; за последние 2 дня — предварительно.
             </p>
+            {% if report.groups is not null %}
+                <p class="text-secondary small mb-0">
+                    По категориям листингов: у листинга одна категория, поэтому суммы категорий складываются в итог.
+                    Доля выручки с категорией: {{ report.categorizedRevenueShare is null ? '—' : report.categorizedRevenueShare|vf_number(1) ~ ' %' }}.
+                    Назначить категории — в <a href="{{ path('marketplace_listings_index', {category: 'none'}) }}">реестре листингов</a>.
+                </p>
+            {% endif %}
         </div>
         <section class="card mb-3 me-table-card" data-economics-table>
             <div class="me-table-toolbar">
@@ -199,8 +225,12 @@
             <table class="table table-vcenter card-table me-table me-sku-table">
                 <thead>
                     <tr>
-                        <th class="me-sku-code" scope="col" rowspan="2">SKU</th>
-                        <th class="me-sku-name" scope="col" rowspan="2">Наименование</th>
+                        {% if report.groups is not null %}
+                            <th class="me-sku-name" scope="col" rowspan="2" colspan="2">Категория</th>
+                        {% else %}
+                            <th class="me-sku-code" scope="col" rowspan="2">SKU</th>
+                            <th class="me-sku-name" scope="col" rowspan="2">Наименование</th>
+                        {% endif %}
                         <th class="text-end me-col-qty" scope="col" rowspan="2" title="Продано, шт.">
                             <a href="{{ path('marketplace_economics_sku', params|merge({sort: 'sales', dir: sort == 'sales' and desc ? 'asc' : 'desc', page: null})) }}">Прод., шт</a>
                         </th>
@@ -221,6 +251,22 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% for group in report.groups ?? [] %}
+                        {% set m = group.current %}
+                        <tr data-category-group="{{ group.categoryId ?? 'none' }}">
+                            <td class="me-sku-name fw-semibold" colspan="2">
+                                <a href="{{ path('marketplace_economics_sku', params|merge({group: null, category: group.categoryId ?? 'none', page: null})) }}"
+                                   title="Показать листинги категории">{{ group.name }}</a>
+                                <span class="text-secondary small">· {{ group.rows|length|vf_number }}</span>
+                            </td>
+                            <td class="text-end">{{ m.salesQty|vf_number }}{% if m.returnsQty %}<p class="text-secondary small mb-0">возвр. {{ m.returnsQty|vf_number }}</p>{% endif %}</td>
+                            {% for column in columns %}
+                                <td class="text-end" data-column="{{ column.id }}">
+                                    {{ ui.cell(m, column) }}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
                     {% for row in pager.currentPageResults %}
                         {% set m = row.current %}
                         <tr>
@@ -241,11 +287,13 @@
                             {% endfor %}
                         </tr>
                     {% else %}
+                        {% if report.groups is null or report.groups is empty %}
                         <tr>
                             <td class="text-secondary py-5" colspan="{{ columns|length + 3 }}">
                                 <span class="me-sku-empty d-inline-block">Нет продаж и затрат по SKU за период.</span>
                             </td>
                         </tr>
+                        {% endif %}
                     {% endfor %}
                     {% for label, m in report.unallocated is not null ? {'Нераспределено': report.unallocated, 'Итого': report.total} : {'Итого по выбранным': report.total} %}
                         <tr class="me-totals">
@@ -262,8 +310,10 @@
             </table>
             </div>
         </section>
-        <div class="card card-body mt-3">
-            {% include 'partials/_pagination.html.twig' with {pager: pager} only %}
-        </div>
+        {% if report.groups is null %}
+            <div class="card card-body mt-3">
+                {% include 'partials/_pagination.html.twig' with {pager: pager} only %}
+            </div>
+        {% endif %}
     {% endif %}
 {% endblock %}
