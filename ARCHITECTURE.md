@@ -781,7 +781,13 @@
   каналах, метка канала у SKU и колонка «Канал» в xlsx), кабинет, теги, поиск, сортировка, «с разнесением /
   без», Pagerfanta ≤ 200. `SkuEconomicsReportBuilder` — свод `me_day_line` за период и прошлый период той же
   длины (`SkuEconomicsQuery`), уровни — `SkuMetrics`. Без фильтра итог = кабинет (SKU + нераспределённое);
-  с тегами или поиском — Σ строк. Нет витрины — пустое состояние со ссылкой на легаси-экран.
+  с тегами, категорией или поиском — Σ строк. Нет витрины — пустое состояние со ссылкой на легаси-экран.
+- Категории листингов в R1: фильтр `?category=<uuid>|none` и `?group=category` («По категориям»). Категория
+  берётся при чтении через `ListingCategoryFacadeInterface::categoriesForListings()` — витрина и запрос не
+  меняются. Группа (`SkuEconomicsCategoryGroup`) — `SkuMetrics::merge()` строк, проценты из сумм; группы по
+  выбранной сортировке, «Без категории» последней; без пагинации, название — ссылка на R1 с фильтром категории.
+  Без фильтров Σ групп + «Нераспределено» = итог кабинета. В пояснении — доля выручки строк с категорией.
+  xlsx в этом режиме — первая колонка «Категория», строки листингов по группам, без групповых подытогов.
 - Каскад `SkuMetrics` (как ОПиУ шаблона маркетплейса): выручка (до СПП) → выручка с СПП = выручка − СПП −
   соинвестирование (`ads_settlement` в СПП не входит) → НДС к уплате = выручка с СПП × ставка / (100 + ставка)
   → выручка без НДС → СМ1 / СМ2 / СМ3 от выручки без НДС; проценты и ДРР — от выручки до СПП. Ставка —
@@ -1134,6 +1140,8 @@ Pipeline: `app:marketplace:ozon-listing-catalog:sync` (cron `40 3 * * *`, либ
 - У листинга **не больше одной** категории: `marketplace_listings.category_id` (FK `ON DELETE RESTRICT`, индекс `idx_marketplace_listing_category`) и `category_source` (`ListingCategorySource`: `manual` | `rule`; оба NULL или оба заданы). В отличие от тегов, суммы по категориям складываются в итог.
 - Запись массовая, через DBAL `ListingCategoryAssignmentQuery` (область компании в каждом SQL). `AssignListingCategoryAction`: ровно одно из списка id или `ListingsFilter` (больше 5000 → `ListingFilterTooBroadException` без изменений); `categoryId = null` снимает категорию; строки с той же категорией и источником не трогаются (`changed = 0` при повторе); все порции — одна транзакция Action. Ручное назначение пишет `manual`; `rule` зарезервирован для правил по категориям площадок (этап 4 задачи `docs/tasks/marketplace-listing-categories`).
 - `Create`/`Rename` — конфликт slug → `ListingCategoryNameConflictException` (и на `UniqueConstraintViolation` при гонке). `DeleteListingCategoryAction` удаляет только неиспользуемую категорию (`ListingCategoryInUseException` с числом листингов); гонку закрывает FK `RESTRICT`.
+- UI: вкладка «Категории» `/marketplace/listings/categories` (`ListingCategoriesManageController`, число листингов — `countsByCategory()`); создание, переименование и удаление — обычные POST-формы (`/create`, `/{categoryId}/rename`, `/{categoryId}/delete`, CSRF `listing_categories`, `MARKETPLACE_WRITE`, flash; чужая категория → 404). Удаление используемой — `_confirm_modal` в blocked-режиме со ссылкой на реестр по категории.
+- Реестр `/marketplace/listings`: колонка «Категория», фильтр `category=<uuid>|none` (`ListingsFilter::categoryId` / `withoutCategory`, тот же параметр в `filter` тела API), выбор категории в панели массовых действий. `POST /api/marketplace/listings/categories/assign` (`MARKETPLACE_WRITE`): `{listingIds (до 500) | filter, categoryId: uuid|null}` → `{matched, changed, categoryName}`; 422 `category_id_required` / `category_id_invalid` / `listing_selection_required` / `listing_ids_required` / `filter_invalid` / `filter_too_broad`, 404 `category_not_found`.
 - Кросс-модульное чтение — `ListingCategoryFacadeInterface`. Категория — измерение при чтении: витрины (`me_day_line` и др.) её не хранят, переназначение не требует пересчёта.
 
 ### Marketplace: исправление двойного учёта Ozon в настройках
@@ -6097,7 +6105,9 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
-| 2.250 | 2026-11-25 | Cash: сверка внутригрупповых операций, подписанная элиминация пар в ДДС и XLSX, ручные решения в пределах головной компании и актуальность счетов |
+| 2.252 | 2026-11-25 | Cash: сверка внутригрупповых операций, элиминация со знаком пар в ДДС и XLSX, ручные решения в пределах головной компании и актуальность счетов |
+| 2.251 | 2026-11-25 | MarketplaceEconomics: R1 по категориям листингов — фильтр `category`, режим `group=category`, xlsx с колонкой «Категория» |
+| 2.250 | 2026-11-25 | Marketplace: категории листингов в UI — вкладка «Категории», фильтр и колонка реестра, `POST /api/marketplace/listings/categories/assign` |
 | 2.249 | 2026-11-25 | Marketplace: категории листингов — `marketplace_listing_categories`, `marketplace_listings.category_id`/`category_source`, Actions назначения и справочника, `ListingCategoryFacadeInterface` |
 | 2.248 | 2026-11-25 | Balance: типовой справочник счетов — шаблоны версии 4 (28 счетов, статья `INV_FULFILLMENT`), `SyncStandardChartAction` вместо `EnsureBalanceAccountsAction` добирает недостающее по коду у всех компаний лениво; `BalanceFacade::ensureStandardChart()` |
 | 2.247 | 2026-11-24 | MoySklad: склады → счета Баланса — страница «Склады», ежедневная оценка по себестоимости (`ValueStoreStocksMessage`, cron 23:30 и requeue */15), установка остатка счёта от имени автора; `BalanceFacade`: `getPostingAccounts`, `getBookStatus`, `canPostFromSource`, `setAccountBalanceFromSource` |

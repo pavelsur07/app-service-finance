@@ -28,6 +28,10 @@ final readonly class SkuEconomicsReport
         public int $days,
         public int $daysWithoutCostPrice,
         public array $channels = [],
+        /** @var list<SkuEconomicsCategoryGroup>|null null — режим «По SKU» */
+        public ?array $groups = null,
+        /** Доля выручки строк с категорией, % — только в режиме «По категориям». */
+        public ?float $categorizedRevenueShare = null,
     ) {
     }
 

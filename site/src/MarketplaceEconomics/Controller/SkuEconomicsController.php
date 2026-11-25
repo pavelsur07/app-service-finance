@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceEconomics\Controller;
 
+use App\Marketplace\Facade\ListingCategoryFacadeInterface;
 use App\Marketplace\Facade\ListingTagFacade;
 use App\MarketplaceEconomics\Application\DTO\SkuEconomicsFilter;
 use App\MarketplaceEconomics\Application\Service\SkuEconomicsReportBuilder;
@@ -31,6 +32,7 @@ final class SkuEconomicsController extends AbstractController
         private readonly SkuEconomicsReportBuilder $reports,
         private readonly SkuEconomicsXlsxExporter $exporter,
         private readonly ListingTagFacade $tags,
+        private readonly ListingCategoryFacadeInterface $categories,
         private readonly ClockInterface $clock,
     ) {
     }
@@ -54,6 +56,9 @@ final class SkuEconomicsController extends AbstractController
             'desc' => 'asc' !== $query->get('dir'),
             'allocated' => '0' !== $query->get('alloc'),
             'allTags' => $this->tags->list($companyId),
+            'category' => (string) $query->get('category', ''),
+            'byCategory' => 'category' === $query->get('group'),
+            'allCategories' => $this->categories->list($companyId),
             'report' => null,
             'pager' => null,
             'error' => null,
@@ -67,15 +72,17 @@ final class SkuEconomicsController extends AbstractController
             $filter = new SkuEconomicsFilter(
                 $this->date($from), $this->date($to), '' === $view['connection'] ? null : $view['connection'],
                 $view['tagIds'], $view['search'], $view['sort'], $view['desc'], '' === $view['channel'] ? null : $view['channel'], $view['allocated'],
+                '' === $view['category'] ? null : $view['category'], $view['byCategory'],
             );
             $report = $this->reports->build($companyId, $filter);
             if ('xlsx' === $query->get('format')) {
                 return $this->exporter->response($report, $view['allocated']);
             }
-            $pager = new Pagerfanta(new ArrayAdapter($report->rows));
+            // По категориям — все группы на одной странице: их немного, листинги — по ссылке группы.
+            $pager = new Pagerfanta(new ArrayAdapter($view['byCategory'] ? [] : $report->rows));
             $pager->setMaxPerPage($limit);
             $page = $query->getInt('page', 1);
-            if ($page < 1 || $page > $pager->getNbPages()) {
+            if (!$view['byCategory'] && ($page < 1 || $page > $pager->getNbPages())) {
                 throw new InvalidEconomicsPeriodException('Запрошенная страница не существует.');
             }
             $pager->setCurrentPage($page);

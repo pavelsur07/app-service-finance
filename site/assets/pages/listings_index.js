@@ -1,7 +1,7 @@
 /**
  * Реестр листингов (templates/marketplace/listings/index.html.twig): фильтры «применяются сразу»,
  * привязка листинга к товару (модал со списком товаров из API), массовое назначение тега
- * выбранным строкам или всем по фильтру (через _confirm_modal) и снятие тега.
+ * и категории выбранным строкам или всем по фильтру (через _confirm_modal), снятие тега.
  * Адреса API — на корне [data-listings-index]; данные API — только textContent.
  */
 import { apiFetch } from '../api/client';
@@ -22,6 +22,15 @@ const resultText = (data) => {
   }
   let text = `Тег «${data.tagName}»: назначен ${formatCount(data.assigned)} ${listingsDative(data.assigned)}`;
   if (already > 0) text += `, у ${formatCount(already)} уже был`;
+  return `${text}.`;
+};
+
+const categoryResultText = (data) => {
+  const already = data.matched - data.changed;
+  const verb = data.categoryName === null ? 'Категория снята' : `Категория «${data.categoryName}» назначена`;
+  if (data.changed === 0) return `Ничего не изменилось: у всех ${formatCount(data.matched)} ${listingsGenitive(data.matched)} уже так.`;
+  let text = `${verb}: ${formatCount(data.changed)} ${listingsDative(data.changed)}`;
+  if (already > 0) text += `, у ${formatCount(already)} уже так`;
   return `${text}.`;
 };
 
@@ -160,7 +169,10 @@ const initTags = (root) => {
 
   // page — отмеченные строки страницы; filter — все листинги по применённому фильтру.
   let scope = 'page';
-  let pendingTagRef = null;
+  // Действие, ждущее подтверждения «всем по фильтру»: адрес, тело без filter и текст итога.
+  let pending = null;
+  const categoryAssignUrl = root.dataset.categoryAssignUrl;
+  const categorySelect = panel.querySelector('[data-bulk-category]');
 
   const selectedIds = () => rowBoxes.filter((cb) => cb.checked).map((cb) => cb.value);
   const allOnPageChecked = () => rowBoxes.length > 0 && rowBoxes.every((cb) => cb.checked);
@@ -187,19 +199,20 @@ const initTags = (root) => {
       return null;
     }
   };
-  const finishAssign = (data) => {
-    rememberFlash(resultText(data));
+  const finish = (text) => {
+    rememberFlash(text);
     reloadFromFirstPage();
   };
 
   // Назначение всем по фильтру — через диалог подтверждения; JSON-запрос шлёт модуль по confirm:submit,
   // форма диалога не отправляется.
-  const openFilterConfirm = (tagRef, tagLabel) => {
-    pendingTagRef = tagRef;
+  const openFilterConfirm = (action, title, what, submitLabel = 'Присвоить') => {
+    pending = action;
     Object.assign(confirmTrigger.dataset, {
-      confirmAction: assignUrl,
-      confirmTitle: `Присвоить тег «${tagLabel}» ${formatCount(nbResults)} ${listingsDative(nbResults)}?`,
-      confirmBody: `Выборка: ${panel.dataset.filterSummary}. Тег получат все листинги по этому фильтру, а не только строки текущей страницы.`,
+      confirmAction: action.url,
+      confirmSubmit: submitLabel,
+      confirmTitle: title,
+      confirmBody: `Выборка: ${panel.dataset.filterSummary}. ${what} все листинги по этому фильтру, а не только строки текущей страницы.`,
     });
     bootstrapModal()?.getOrCreateInstance(confirmModal).show(confirmTrigger);
   };
@@ -207,9 +220,9 @@ const initTags = (root) => {
     event.preventDefault();
     const submit = confirmModal.querySelector('[data-confirm-submit]');
     submit.disabled = true;
-    const data = await post(assignUrl, { filter: appliedFilter, ...pendingTagRef });
+    const data = await post(pending.url, { filter: appliedFilter, ...pending.body });
     if (data) {
-      finishAssign(data);
+      finish(pending.text(data));
       return;
     }
     bootstrapModal()?.getOrCreateInstance(confirmModal).hide();
@@ -219,14 +232,46 @@ const initTags = (root) => {
   const assignTag = async (tagRef, tagLabel) => {
     hideSuggest();
     if (scope === 'filter') {
-      openFilterConfirm(tagRef, tagLabel);
+      openFilterConfirm(
+        { url: assignUrl, body: tagRef, text: resultText },
+        `Присвоить тег «${tagLabel}» ${formatCount(nbResults)} ${listingsDative(nbResults)}?`,
+        'Тег получат',
+      );
       return;
     }
     const listingIds = selectedIds();
     if (listingIds.length === 0) return;
     const data = await post(assignUrl, { listingIds, ...tagRef });
-    if (data) finishAssign(data);
+    if (data) finish(resultText(data));
   };
+
+  const assignCategory = async (categoryId, label) => {
+    const body = { categoryId };
+    if (scope === 'filter') {
+      const title = categoryId === null
+        ? `Снять категорию у ${formatCount(nbResults)} ${listingsGenitive(nbResults)}?`
+        : `Назначить категорию «${label}» ${formatCount(nbResults)} ${listingsDative(nbResults)}?`;
+      openFilterConfirm(
+        { url: categoryAssignUrl, body, text: categoryResultText },
+        title,
+        categoryId === null ? 'Категорию потеряют' : 'Категорию получат',
+        categoryId === null ? 'Снять' : 'Назначить',
+      );
+      return;
+    }
+    const listingIds = selectedIds();
+    if (listingIds.length === 0) return;
+    const data = await post(categoryAssignUrl, { listingIds, ...body });
+    if (data) finish(categoryResultText(data));
+  };
+
+  categorySelect?.addEventListener('change', () => {
+    const { value } = categorySelect;
+    const label = categorySelect.selectedOptions[0]?.textContent ?? '';
+    categorySelect.value = '';
+    if (value === '') return;
+    assignCategory(value === 'none' ? null : value, label);
+  });
 
   const renderSuggest = () => {
     const raw = tagInput.value.trim();

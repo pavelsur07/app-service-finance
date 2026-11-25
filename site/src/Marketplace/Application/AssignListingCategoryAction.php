@@ -42,9 +42,9 @@ final class AssignListingCategoryAction
             throw new \InvalidArgumentException('Pass exactly one of listingIds or filter.');
         }
 
-        if (null !== $categoryId && null === $this->categories->findById($companyId, $categoryId)) {
-            throw new ListingCategoryNotFoundException($categoryId);
-        }
+        $category = null === $categoryId
+            ? null
+            : ($this->categories->findById($companyId, $categoryId) ?? throw new ListingCategoryNotFoundException($categoryId));
 
         if (null !== $filter) {
             $listingIds = $this->listingsQuery->matchingIds($companyId, $filter, $this->maxFilterMatch + 1);
@@ -67,6 +67,6 @@ final class AssignListingCategoryAction
             return $changed;
         });
 
-        return new ListingCategoryAssignResult($matched, $changed);
+        return new ListingCategoryAssignResult($matched, $changed, $category?->getName());
     }
 }
