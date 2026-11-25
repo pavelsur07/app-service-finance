@@ -35,12 +35,18 @@ final readonly class SaveStoreBalanceSettingsAction
         if ($enabled && null === $counterAccountId) {
             throw new StoreBalanceException('counter_required', 'Выберите корреспондирующий счёт для изменения остатков.');
         }
-        if ($enabled && !$this->balance->canPostFromSource($companyId, $actorUserId)) {
-            throw new StoreBalanceException('actor_forbidden', 'Включить запись может пользователь с правом проводить документы в Балансе.');
+        if (!$this->balance->canPostFromSource($companyId, $actorUserId)) {
+            throw new StoreBalanceException('actor_forbidden', 'Менять запись в Баланс может пользователь с правом проводить документы в Балансе.');
         }
-        $this->db->executeStatement('INSERT INTO moysklad_store_balance_settings (company_id, connection_id, counter_account_id, enabled, actor_user_id, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (company_id, connection_id)
-            DO UPDATE SET counter_account_id = EXCLUDED.counter_account_id, enabled = EXCLUDED.enabled, actor_user_id = EXCLUDED.actor_user_id, updated_at = EXCLUDED.updated_at',
-            [$companyId, $connectionId, $counterAccountId, $enabled ? 'true' : 'false', $actorUserId, $this->clock->now()->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s.v')]);
+        $this->db->transactional(function () use ($companyId, $connectionId, $counterAccountId, $enabled, $actorUserId): void {
+            SaveStoreBalanceLinkAction::lockCompany($this->db, $companyId);
+            if (null !== $counterAccountId && false !== $this->db->fetchOne('SELECT 1 FROM moysklad_store_balance_links WHERE company_id = ? AND balance_account_id = ? LIMIT 1', [$companyId, $counterAccountId])) {
+                throw new StoreBalanceException('account_is_store', 'Этот счёт назначен складу — корреспондирующим он быть не может.');
+            }
+            $this->db->executeStatement('INSERT INTO moysklad_store_balance_settings (company_id, connection_id, counter_account_id, enabled, actor_user_id, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (company_id, connection_id)
+                DO UPDATE SET counter_account_id = EXCLUDED.counter_account_id, enabled = EXCLUDED.enabled, actor_user_id = EXCLUDED.actor_user_id, updated_at = EXCLUDED.updated_at',
+                [$companyId, $connectionId, $counterAccountId, $enabled ? 'true' : 'false', $actorUserId, $this->clock->now()->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s.v')]);
+        });
     }
 }

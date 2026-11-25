@@ -114,6 +114,53 @@ final class StoreBalanceSetupTest extends IntegrationTestCase
         self::assertFalse((bool) $this->connection->fetchOne('SELECT enabled FROM moysklad_store_balance_settings WHERE company_id = ?', [self::COMPANY]));
     }
 
+    public function testOnlyBalancePosterCanAssignAccounts(): void
+    {
+        $stranger = UserBuilder::aUser()->withId(Uuid::uuid7()->toString())->withEmail(Uuid::uuid7()->toString().'@example.test')->build();
+        $this->em->persist($stranger);
+        $this->em->flush();
+        try {
+            (self::getContainer()->get(SaveStoreBalanceLinkAction::class))(self::COMPANY, self::CONNECTION, $this->store, $this->accounts['stock'], false, (string) $stranger->getId());
+            self::fail('Marketplace writer without Balance rights must not assign accounts.');
+        } catch (StoreBalanceException $error) {
+            self::assertSame('actor_forbidden', $error->reason);
+        }
+        self::assertSame([], $this->links());
+    }
+
+    public function testAccountBelongsToOneConnectionAndIsNotCounter(): void
+    {
+        $second = MoySkladConnectionBuilder::aConnection()->withIndex(2)->build()->setName('Второй кабинет');
+        $this->em->persist($second);
+        $this->em->flush();
+        $secondStore = MoySkladStoreBuilder::aStore()->withIndex(9)->withTenant(self::COMPANY, $second->getId())->build();
+        $this->em->persist($secondStore);
+        $this->em->flush();
+        $this->link($this->accounts['stock']);
+        try {
+            (self::getContainer()->get(SaveStoreBalanceLinkAction::class))(self::COMPANY, $second->getId(), $secondStore->getExternalId(), $this->accounts['stock'], false, $this->owner);
+            self::fail('Account of another connection must be rejected.');
+        } catch (StoreBalanceException $error) {
+            self::assertSame('account_taken', $error->reason);
+        }
+
+        $settings = self::getContainer()->get(SaveStoreBalanceSettingsAction::class);
+        try {
+            $settings(self::COMPANY, self::CONNECTION, $this->accounts['stock'], false, $this->owner);
+            self::fail('Store account cannot be the counter account.');
+        } catch (StoreBalanceException $error) {
+            self::assertSame('account_is_store', $error->reason);
+        }
+        $money = $this->account(self::COMPANY, 'asset', 'Расчётный счёт');
+        $settings(self::COMPANY, $second->getId(), $money, false, $this->owner);
+        try {
+            $this->link($money);
+            self::fail('Counter account cannot hold a store.');
+        } catch (StoreBalanceException $error) {
+            self::assertSame('account_is_counter', $error->reason);
+        }
+    }
+
     private function link(?string $account, bool $excluded = false): void
     {
         (self::getContainer()->get(SaveStoreBalanceLinkAction::class))(self::COMPANY, self::CONNECTION, $this->store, $account, $excluded, $this->owner);

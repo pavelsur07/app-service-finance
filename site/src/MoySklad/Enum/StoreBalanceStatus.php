@@ -9,6 +9,7 @@ enum StoreBalanceStatus: string
 {
     case VALUING = 'valuing';
     case VALUED = 'valued';
+    case POSTING = 'posting';
     case POSTED = 'posted';
     case UNCHANGED = 'unchanged';
     case PARTIAL = 'partial';
@@ -20,6 +21,7 @@ enum StoreBalanceStatus: string
         return match ($this) {
             self::VALUING => 'Считается',
             self::VALUED => 'Оценено, запись в Баланс выключена',
+            self::POSTING => 'Проводится',
             self::POSTED => 'Проведено в Баланс',
             self::UNCHANGED => 'Остаток не изменился',
             self::PARTIAL => 'Проведено частично',
@@ -32,7 +34,7 @@ enum StoreBalanceStatus: string
     {
         return match ($this) {
             self::POSTED, self::UNCHANGED => 'success',
-            self::VALUING, self::VALUED => 'secondary',
+            self::VALUING, self::VALUED, self::POSTING => 'secondary',
             self::PARTIAL, self::SKIPPED => 'warning',
             self::FAILED => 'danger',
         };
@@ -46,6 +48,7 @@ enum StoreBalanceStatus: string
             'auth' => 'Подключение МойСклад не авторизовано.',
             'rate_limited', 'temporary' => 'МойСклад временно недоступен, повтор автоматически.',
             'actor_forbidden' => 'У автора записи нет права проводить в Балансе.',
+            'superseded' => 'Есть более свежий снимок — этот не проводится.',
             default => 'Ответ МойСклад не распознан.',
         };
     }

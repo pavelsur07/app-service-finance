@@ -10,6 +10,8 @@ use App\Balance\Security\BalanceAccess;
 use App\Company\Facade\CompanyFacade;
 use App\MoySklad\Application\Action\ValueStoreStocksAction;
 use App\MoySklad\Application\StockReportPageParser;
+use App\MoySklad\Command\StoreBalanceDailyCommand;
+use App\MoySklad\Command\StoreBalanceRequeueCommand;
 use App\MoySklad\Entity\MoySkladStockSnapshot;
 use App\MoySklad\Entity\MoySkladStockSnapshotLine;
 use App\MoySklad\Enum\ConnectionCheckStatus;
@@ -17,6 +19,8 @@ use App\MoySklad\Exception\StockSyncException;
 use App\MoySklad\Infrastructure\Api\MoySkladClient;
 use App\MoySklad\Infrastructure\Repository\MoySkladConnectionWriteRepository;
 use App\MoySklad\Infrastructure\Security\ConnectionTokenCodec;
+use App\MoySklad\Message\SyncStockSnapshotMessage;
+use App\MoySklad\Message\ValueStoreStocksMessage;
 use App\Shared\Service\ActiveCompanyService;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -29,8 +33,11 @@ use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Clock\MockClock;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /** Оценка складов по себестоимости и установка остатка счёта Баланса. */
 final class ValueStoreStocksActionTest extends IntegrationTestCase
@@ -38,6 +45,8 @@ final class ValueStoreStocksActionTest extends IntegrationTestCase
     private const COMPANY = MoySkladConnectionBuilder::DEFAULT_COMPANY_ID;
     private const CONNECTION = MoySkladConnectionBuilder::DEFAULT_ID;
     private const SNAPSHOT = '0193f000-0000-7000-8000-000000000001';
+    private const SNAPSHOT_2 = '0193f000-0000-7000-8000-000000000002';
+    private const SNAPSHOT_3 = '0193f000-0000-7000-8000-000000000003';
     private string $owner;
     private string $product;
     private string $variant;
@@ -59,8 +68,7 @@ final class ValueStoreStocksActionTest extends IntegrationTestCase
         $variant = MoySkladVariantBuilder::aVariant()->forProduct($product)->build();
         $storeA = MoySkladStoreBuilder::aStore()->withIndex(1)->build();
         $storeB = MoySkladStoreBuilder::aStore()->withIndex(2)->build();
-        $snapshot = new MoySkladStockSnapshot(self::SNAPSHOT, self::COMPANY, self::CONNECTION, new \DateTimeImmutable('2025-01-05T21:30:00Z'));
-        foreach ([$user, $company, $connection, $product, $variant, $storeA, $storeB, $snapshot] as $entity) {
+        foreach ([$user, $company, $connection, $product, $variant, $storeA, $storeB] as $entity) {
             $this->em->persist($entity);
         }
         $this->em->flush();
@@ -69,11 +77,7 @@ final class ValueStoreStocksActionTest extends IntegrationTestCase
         $this->variant = $variant->getExternalId();
         $this->storeA = $storeA->getExternalId();
         $this->storeB = $storeB->getExternalId();
-        $this->line($this->storeA, 'product', $this->product, '2');
-        $this->line($this->storeA, 'variant', $this->variant, '3');
-        $this->line($this->storeB, 'product', $this->product, '1.5');
-        $snapshot->complete(new \DateTimeImmutable('2025-01-05T21:31:00Z'));
-        $this->em->flush();
+        $this->snapshot(self::SNAPSHOT, '2025-01-05T21:30:00Z', [[$this->storeA, 'product', $this->product, '2'], [$this->storeA, 'variant', $this->variant, '3'], [$this->storeB, 'product', $this->product, '1.5']]);
 
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($user);
@@ -115,6 +119,65 @@ final class ValueStoreStocksActionTest extends IntegrationTestCase
         self::assertSame($rows, $this->counts());
         self::assertSame('54017', $this->balance('stock'));
         self::assertSame(2, (int) $this->connection->fetchOne('SELECT attempts FROM moysklad_store_balance_runs WHERE company_id = ? AND snapshot_id = ?', [self::COMPANY, self::SNAPSHOT]));
+    }
+
+    public function testReplayDoesNotRevalueWithNewCost(): void
+    {
+        $this->enable();
+        ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT);
+        $rows = $this->counts();
+
+        // Повтор того же снимка после смены себестоимости в МойСклад: HTTP не нужен, суммы прежние.
+        self::assertSame('posted', ($this->action([]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT));
+        self::assertSame($rows, $this->counts());
+        self::assertSame('54017', $this->balance('stock'));
+    }
+
+    public function testSameDaySequenceReturnsToEarlierTarget(): void
+    {
+        $this->enable();
+        ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT);
+        $this->snapshot(self::SNAPSHOT_2, '2025-01-05T21:40:00Z', [[$this->storeA, 'product', $this->product, '4']]);
+        ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT_2);
+        self::assertSame('61733', $this->balance('stock'));
+        $this->snapshot(self::SNAPSHOT_3, '2025-01-05T21:50:00Z', [[$this->storeA, 'product', $this->product, '2'], [$this->storeB, 'product', $this->product, '1.5']]);
+
+        self::assertSame('posted', ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT_3));
+        self::assertSame('54017', $this->balance('stock'));
+    }
+
+    public function testOlderSnapshotDoesNotOverrideNewer(): void
+    {
+        $this->enable();
+        $this->snapshot(self::SNAPSHOT_2, '2025-01-05T21:40:00Z', [[$this->storeA, 'product', $this->product, '4']]);
+        ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT_2);
+        $operations = $this->counts()['operations'];
+
+        self::assertSame('skipped', ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT));
+        self::assertSame('superseded', $this->connection->fetchOne('SELECT error_reason FROM moysklad_store_balance_runs WHERE company_id = ? AND snapshot_id = ?', [self::COMPANY, self::SNAPSHOT]));
+        self::assertSame($operations, $this->counts()['operations']);
+        self::assertSame('61733', $this->balance('stock'));
+    }
+
+    public function testDailyAndRequeueCommandsPickEnabledAndInterruptedRuns(): void
+    {
+        $this->enable();
+        $sent = [];
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static function (object $message) use (&$sent): Envelope {
+            $sent[] = $message;
+
+            return new Envelope($message);
+        });
+        (new CommandTester(new StoreBalanceDailyCommand($this->connection, $bus)))->execute([]);
+        self::assertEquals([new SyncStockSnapshotMessage(self::COMPANY, self::CONNECTION)], $sent);
+
+        // Воркер упал между оценкой и проводкой: прогон остался в posting без finished_at.
+        $this->connection->insert('moysklad_store_balance_runs', ['company_id' => self::COMPANY, 'connection_id' => self::CONNECTION, 'snapshot_id' => self::SNAPSHOT,
+            'valuation_date' => '2025-01-06', 'status' => 'posting', 'attempts' => 1, 'created_at' => '2025-01-05 21:40:00']);
+        $sent = [];
+        (new CommandTester(new StoreBalanceRequeueCommand($this->connection, $bus, new MockClock('2025-01-06 10:00:00', 'UTC'))))->execute([]);
+        self::assertEquals([new ValueStoreStocksMessage(self::COMPANY, self::CONNECTION, self::SNAPSHOT)], $sent);
     }
 
     public function testDisabledWritingOnlyValues(): void
@@ -182,9 +245,18 @@ final class ValueStoreStocksActionTest extends IntegrationTestCase
             new MockClock('2025-01-05 21:40:00'), new NullLogger());
     }
 
-    private function line(string $store, string $type, string $assortment, string $stock): void
+    /** @param list<array{string, string, string, string}> $lines склад, тип, ассортимент, остаток */
+    private function snapshot(string $id, string $startedAt, array $lines): void
     {
-        $this->em->persist(new MoySkladStockSnapshotLine(Uuid::uuid7()->toString(), self::COMPANY, self::CONNECTION, self::SNAPSHOT, $store, $type, $assortment, $stock, '0', '0'));
+        $started = new \DateTimeImmutable($startedAt);
+        $snapshot = new MoySkladStockSnapshot($id, self::COMPANY, self::CONNECTION, $started);
+        $this->em->persist($snapshot);
+        $this->em->flush();
+        foreach ($lines as [$store, $type, $assortment, $stock]) {
+            $this->em->persist(new MoySkladStockSnapshotLine(Uuid::uuid7()->toString(), self::COMPANY, self::CONNECTION, $id, $store, $type, $assortment, $stock, '0', '0'));
+        }
+        $this->em->flush();
+        $snapshot->complete($started->modify('+1 minute'));
         $this->em->flush();
     }
 

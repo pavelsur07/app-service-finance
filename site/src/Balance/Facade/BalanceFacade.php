@@ -135,11 +135,11 @@ final readonly class BalanceFacade
      * Установить остаток счёта на дату от имени автора из фонового источника. Транзакцией владеет Баланс
      * (книга под блокировкой). Возвращает id документа или null, если остаток уже такой.
      *
-     * @throws \App\Balance\Exception\BalanceLedgerException книга не начата, период закрыт, счёт архивный…
+     * @throws \App\Balance\Exception\BalanceLedgerException книга не начата, валюта книги не та, период закрыт, счёт архивный…
      * @throws \Symfony\Component\Security\Core\Exception\AccessDeniedException у автора нет права проводить
      */
-    public function setAccountBalanceFromSource(string $companyId, string $actorId, string $accountId, string $counterAccountId, \DateTimeImmutable $date, string $targetMinor, string $reason, string $requestKey): ?string
+    public function setAccountBalanceFromSource(string $companyId, string $actorId, string $accountId, string $counterAccountId, \DateTimeImmutable $date, string $targetMinor, string $currency, string $reason, string $requestKey): ?string
     {
-        return $this->ledger->postDelegatedTargetBalance($companyId, $actorId, $accountId, $counterAccountId, $date->format('Y-m-d'), $targetMinor, $reason, $requestKey);
+        return $this->ledger->postDelegatedTargetBalance($companyId, $actorId, $accountId, $counterAccountId, $date->format('Y-m-d'), $targetMinor, $currency, $reason, $requestKey);
     }
 }

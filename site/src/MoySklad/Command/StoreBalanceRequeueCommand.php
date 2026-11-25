@@ -15,7 +15,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Страховка оценки складов: последний completed-снимок подключения с назначениями без прогона (потерян dispatch),
- * зависший `valuing` или временный сбой/частичная проводка старше 30 минут — повторная постановка (до 6 попыток).
+ * зависший `valuing`/`posting` (воркер упал между фазами) или временный сбой/частичная проводка старше 30 минут — повторная постановка (до 6 попыток).
  */
 #[AsCommand(name: 'app:moysklad:store-balance:requeue', description: 'Повторная постановка оценки складов МойСклад и проводки в Баланс.')]
 final class StoreBalanceRequeueCommand extends Command
@@ -36,7 +36,7 @@ final class StoreBalanceRequeueCommand extends Command
             WHERE EXISTS (SELECT 1 FROM moysklad_store_balance_links k WHERE k.company_id = latest.company_id AND k.connection_id = latest.connection_id AND NOT k.excluded)
               AND latest.completed_at < :stale
               AND (r.snapshot_id IS NULL OR (r.attempts < 6 AND COALESCE(r.finished_at, r.created_at) < :stale
-                   AND (r.status = 'valuing' OR r.status = 'partial' OR (r.status = 'failed' AND r.error_reason IN ('temporary', 'rate_limited')))))
+                   AND (r.status IN ('valuing', 'posting', 'partial') OR (r.status = 'failed' AND r.error_reason IN ('temporary', 'rate_limited')))))
             ORDER BY latest.company_id, latest.connection_id", [
             'since' => $now->modify('-2 days')->format('Y-m-d H:i:s.v'),
             'stale' => $now->modify('-30 minutes')->format('Y-m-d H:i:s.v'),

@@ -1,7 +1,7 @@
 {% extends 'moy_sklad/layout.html.twig' %}
 
 {% set storesConnectionId = connection.id %}
-{% set canWrite = is_granted('module.marketplace.write') %}
+{% set canWrite = is_granted('module.marketplace.write') and financeRead %}
 
 {% block integration_title %}Склады{% endblock %}
 
@@ -13,6 +13,9 @@
     <div class="card mb-3" data-store-balance-settings>
         <div class="card-header"><h2 class="card-title">Запись в Баланс</h2></div>
         <div class="card-body">
+            {% if not financeRead %}
+                <p class="text-secondary mb-0" data-store-balance-no-finance>Счета Баланса видны пользователям с доступом к финансам компании.</p>
+            {% else %}
             {% if not book.initialized %}
                 <div class="alert alert-warning" role="alert" data-store-balance-book-not-started>
                     Учёт в Балансе не начат: остатки складов считаются, но в Баланс не проводятся. <a href="{{ path('balance_index') }}">Открыть Баланс</a>
@@ -48,6 +51,7 @@
                 </p>
             {% else %}
                 <p class="mt-3 mb-0 text-secondary">Оценки ещё не было: она запускается после загрузки остатков, когда хотя бы одному складу назначен счёт.</p>
+            {% endif %}
             {% endif %}
         </div>
     </div>
@@ -86,10 +90,12 @@
                                     </form>
                                 {% elseif store.excluded %}
                                     Не учитывать
+                                {% elseif not financeRead %}
+                                    {{ store.accountId ? 'Назначен' : '—' }}
                                 {% else %}
                                     {{ store.accountId and accountsById[store.accountId] is defined ? accountsById[store.accountId].label : '—' }}
                                 {% endif %}
-                                {% if store.accountId and accountsById[store.accountId] is not defined %}<div class="text-danger small">Счёт в архиве или удалён — выберите другой.</div>{% endif %}
+                                {% if financeRead and store.accountId and accountsById[store.accountId] is not defined %}<div class="text-danger small">Счёт в архиве или удалён — выберите другой.</div>{% endif %}
                             </td>
                             <td class="text-end">
                                 {{ store.amountMinor|vf_minor|vf_amount }}

@@ -23,13 +23,18 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
  *
  * Фазы (каждая идемпотентна, прогон под session advisory-lock подключения):
  * 1. себестоимость единиц — `report/stock/all`, HTTP вне транзакции;
- * 2. оценка складов снимка — одной транзакцией, повтор заменяет строки;
- * 3. по каждому назначенному счёту — `BalanceFacade::setAccountBalanceFromSource` (транзакция Баланса),
- *    итог счёта-дня — отдельной записью. Ключ запроса = (подключение, счёт, дата, цель): повтор → тот же документ.
+ * 2. оценка складов снимка — одной транзакцией; оценённый снимок повтором не переоценивается
+ *    (себестоимость — на момент первой оценки), повтор после сбоя фазы 1–2 заменяет строки;
+ * 3. статус `posting`, затем по каждому назначенному счёту — `BalanceFacade::setAccountBalanceFromSource`
+ *    (транзакция Баланса), итог счёта-дня — отдельной записью. Ключ запроса = (подключение, счёт, снимок):
+ *    повтор → тот же документ. Снимок старше уже проводимого пропускается (`superseded`): проводка —
+ *    корректировка на дату, опоздавший снимок сдвинул бы более свежий остаток.
  */
 final readonly class ValueStoreStocksAction
 {
     public const REASON = 'Остатки складов МойСклад по себестоимости';
+    /** Себестоимость МойСклад — в копейках рубля. */
+    public const CURRENCY = 'RUB';
     private const LIMIT = 1000;
 
     public function __construct(
@@ -57,17 +62,21 @@ final readonly class ValueStoreStocksAction
         }
         try {
             $date = (new \DateTimeImmutable((string) $snapshot['started_at'], new \DateTimeZone('UTC')))->setTimezone(new \DateTimeZone('Europe/Moscow'))->format('Y-m-d');
-            $this->db->executeStatement("INSERT INTO moysklad_store_balance_runs (company_id, connection_id, snapshot_id, valuation_date, status, attempts, created_at)
-                VALUES (?, ?, ?, ?, 'valuing', 1, ?) ON CONFLICT (company_id, snapshot_id)
-                DO UPDATE SET status = 'valuing', error_reason = NULL, finished_at = NULL, attempts = moysklad_store_balance_runs.attempts + 1",
-                [$companyId, $connectionId, $snapshotId, $date, $this->now()]);
-            try {
-                $prices = $this->prices($companyId, $connectionId);
-            } catch (StockSyncException $error) {
-                $this->finish($companyId, $snapshotId, 'failed', $error->category);
-                throw $error;
+            $previous = $this->db->fetchOne('SELECT status FROM moysklad_store_balance_runs WHERE company_id = ? AND snapshot_id = ?', [$companyId, $snapshotId]);
+            $valued = in_array($previous, ['valued', 'posting', 'posted', 'partial', 'skipped'], true);
+            $this->db->executeStatement('INSERT INTO moysklad_store_balance_runs (company_id, connection_id, snapshot_id, valuation_date, status, attempts, created_at)
+                VALUES (?, ?, ?, ?, ?, 1, ?) ON CONFLICT (company_id, snapshot_id)
+                DO UPDATE SET status = EXCLUDED.status, error_reason = NULL, finished_at = NULL, attempts = moysklad_store_balance_runs.attempts + 1',
+                [$companyId, $connectionId, $snapshotId, $date, $valued ? 'valued' : 'valuing', $this->now()]);
+            if (!$valued) {
+                try {
+                    $prices = $this->prices($companyId, $connectionId);
+                } catch (StockSyncException $error) {
+                    $this->finish($companyId, $snapshotId, 'failed', $error->category);
+                    throw $error;
+                }
+                $this->db->transactional(fn () => $this->writeValuations($companyId, $connectionId, $snapshotId, $date, $prices));
             }
-            $this->db->transactional(fn () => $this->writeValuations($companyId, $connectionId, $snapshotId, $date, $prices));
 
             $status = $this->post($companyId, $connectionId, $snapshotId, new \DateTimeImmutable($date));
             $this->finish($companyId, $snapshotId, $status['status'], $status['reason']);
@@ -159,6 +168,15 @@ final readonly class ValueStoreStocksAction
         if (false === $settings || !$settings['enabled'] || null === $settings['counter_account_id']) {
             return ['status' => 'valued', 'reason' => null];
         }
+        $newer = $this->db->fetchOne("SELECT 1 FROM moysklad_store_balance_runs r
+            JOIN moysklad_stock_snapshots n ON n.company_id = r.company_id AND n.connection_id = r.connection_id AND n.id = r.snapshot_id
+            JOIN moysklad_stock_snapshots c ON c.company_id = r.company_id AND c.connection_id = r.connection_id AND c.id = ?
+            WHERE r.company_id = ? AND r.connection_id = ? AND r.snapshot_id <> c.id AND r.status IN ('posting', 'posted', 'partial')
+              AND (n.started_at, n.id) > (c.started_at, c.id) LIMIT 1", [$snapshotId, $companyId, $connectionId]);
+        if (false !== $newer) {
+            return ['status' => 'skipped', 'reason' => 'superseded'];
+        }
+        $this->db->executeStatement("UPDATE moysklad_store_balance_runs SET status = 'posting' WHERE company_id = ? AND snapshot_id = ?", [$companyId, $snapshotId]);
         $targets = $this->db->fetchAllKeyValue('SELECT k.balance_account_id, COALESCE(SUM(v.amount_minor), 0)::text
             FROM moysklad_store_balance_links k
             JOIN moysklad_stores s ON s.company_id = k.company_id AND s.connection_id = k.connection_id AND s.external_id = k.store_external_id AND NOT s.archived
@@ -168,9 +186,9 @@ final readonly class ValueStoreStocksAction
         $failed = 0;
         foreach ($targets as $accountId => $target) {
             $accountId = (string) $accountId;
-            $key = Uuid::uuid5(Uuid::NAMESPACE_URL, 'moysklad-store-balance:'.implode('|', [$companyId, $connectionId, $accountId, $date->format('Y-m-d'), $target]))->toString();
+            $key = Uuid::uuid5(Uuid::NAMESPACE_URL, 'moysklad-store-balance:'.implode('|', [$companyId, $connectionId, $accountId, $snapshotId]))->toString();
             try {
-                $operationId = $this->balance->setAccountBalanceFromSource($companyId, (string) $settings['actor_user_id'], $accountId, (string) $settings['counter_account_id'], $date, $target, self::REASON, $key);
+                $operationId = $this->balance->setAccountBalanceFromSource($companyId, (string) $settings['actor_user_id'], $accountId, (string) $settings['counter_account_id'], $date, $target, self::CURRENCY, self::REASON, $key);
                 $this->record($companyId, $connectionId, $snapshotId, $date, $accountId, $target, null === $operationId ? 'unchanged' : 'posted', null, $operationId);
             } catch (AccessDeniedException) {
                 $this->logger->warning('MoySklad store balance skipped: author lost Balance posting rights.', ['companyId' => $companyId, 'connectionId' => $connectionId, 'reason' => 'actor_forbidden']);

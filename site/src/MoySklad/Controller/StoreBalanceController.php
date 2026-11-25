@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\MoySklad\Controller;
 
 use App\Balance\Facade\BalanceFacade;
+use App\Company\Entity\User;
+use App\Company\Facade\CompanyFacade;
 use App\Company\Security\ModuleAccess;
 use App\MoySklad\Enum\StoreBalanceStatus;
 use App\MoySklad\Infrastructure\Query\MoySkladConnectionsQuery;
@@ -42,13 +44,16 @@ final class StoreBalanceController extends AbstractController
 
     #[Route('/moy-sklad/connections/{connectionId}/stores', name: 'moysklad_stores', requirements: ['connectionId' => Requirement::UUID], methods: ['GET'])]
     public function __invoke(string $connectionId, Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionWriteRepository $connections,
-        StoreBalanceQuery $query, BalanceFacade $balance): Response
+        StoreBalanceQuery $query, BalanceFacade $balance, CompanyFacade $companies): Response
     {
         $connectionId = strtolower($connectionId);
         $companyId = (string) $activeCompany->getActiveCompany()->getId();
         $connection = $connections->findByIdAndCompanyId($connectionId, $companyId) ?? throw $this->createNotFoundException();
         $unassignedOnly = 'unassigned' === $request->query->get('filter');
-        $accounts = $balance->getPostingAccounts($companyId);
+        $user = $this->getUser();
+        // План счетов и суммы Баланса — только при финансовом доступе; без него страница показывает склады и оценку.
+        $financeRead = $user instanceof User && null !== $user->getId() && $companies->financialAccess($companyId, $user->getId())['read'];
+        $accounts = $financeRead ? $balance->getPostingAccounts($companyId) : [];
         $accountsById = [];
         foreach ($accounts as $account) {
             $accountsById[$account->id] = $account;
@@ -62,7 +67,10 @@ final class StoreBalanceController extends AbstractController
             }
         }
         $stores = $unassignedOnly ? array_values(array_filter($allStores, static fn (array $store): bool => null === $store['accountId'] && !$store['excluded'])) : $allStores;
-        $postings = $query->latestPostings($companyId, $connectionId);
+        $postings = $financeRead ? $query->latestPostings($companyId, $connectionId) : [];
+        if (!$financeRead) {
+            $totals = [];
+        }
 
         return $this->render('moy_sklad/stores/index.html.twig', [
             'connection' => $connection,
@@ -75,7 +83,8 @@ final class StoreBalanceController extends AbstractController
             'totals' => $totals,
             'postings' => array_map(static fn (array $posting): array => $posting + ['label' => StoreBalanceStatus::from($posting['status'])->label(), 'tone' => StoreBalanceStatus::from($posting['status'])->tone()], $postings),
             'run' => null === $run ? null : $run + ['label' => StoreBalanceStatus::from($run['status'])->label(), 'tone' => StoreBalanceStatus::from($run['status'])->tone(), 'error' => StoreBalanceStatus::errorLabel($run['errorReason'])],
-            'settings' => $query->settings($companyId, $connectionId),
+            'settings' => $financeRead ? $query->settings($companyId, $connectionId) : null,
+            'financeRead' => $financeRead,
             'book' => $balance->getBookStatus($companyId),
             'csrfId' => self::csrfId($companyId, $connectionId),
         ]);

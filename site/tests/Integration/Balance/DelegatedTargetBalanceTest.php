@@ -118,7 +118,7 @@ final class DelegatedTargetBalanceTest extends IntegrationTestCase
         $operations = $this->operations();
 
         try {
-            $this->backgroundLedger->postDelegatedTargetBalance($this->companyId, (string) $stranger->getId(), $this->accounts['stock'], $this->accounts['equity'], '2025-01-05', '3000000', 'Остатки складов', 'k-stranger');
+            $this->backgroundLedger->postDelegatedTargetBalance($this->companyId, (string) $stranger->getId(), $this->accounts['stock'], $this->accounts['equity'], '2025-01-05', '3000000', 'RUB', 'Остатки складов', 'k-stranger');
             self::fail('Actor without rights must not post.');
         } catch (AccessDeniedException) {
         }
@@ -138,6 +138,18 @@ final class DelegatedTargetBalanceTest extends IntegrationTestCase
         $this->post('stock', 'stock', '2025-01-05', '3000000', 'k1');
     }
 
+    public function testSourceCurrencyMustMatchBook(): void
+    {
+        $this->opening();
+        $operations = $this->operations();
+        try {
+            $this->backgroundLedger->postDelegatedTargetBalance($this->companyId, $this->actorId, $this->accounts['stock'], $this->accounts['equity'], '2025-01-05', '3000000', 'USD', 'Остатки складов', 'k-usd');
+            self::fail('Currency mismatch must be rejected.');
+        } catch (BalanceLedgerException) {
+        }
+        self::assertSame($operations, $this->operations());
+    }
+
     public function testSessionPathsStillRequireSession(): void
     {
         $this->expectException(AccessDeniedException::class);
@@ -146,7 +158,7 @@ final class DelegatedTargetBalanceTest extends IntegrationTestCase
 
     private function post(string $account, string $counter, string $date, string $targetMinor, string $key): ?string
     {
-        return $this->backgroundLedger->postDelegatedTargetBalance($this->companyId, $this->actorId, $this->accounts[$account], $this->accounts[$counter], $date, $targetMinor, 'Остатки складов', $key);
+        return $this->backgroundLedger->postDelegatedTargetBalance($this->companyId, $this->actorId, $this->accounts[$account], $this->accounts[$counter], $date, $targetMinor, 'RUB', 'Остатки складов', $key);
     }
 
     private function opening(): void

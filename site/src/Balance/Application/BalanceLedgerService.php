@@ -203,13 +203,13 @@ SQL, ['company' => $companyId, 'maximum' => (string) \PHP_INT_MAX, 'minimum' => 
      * Разница проводится корректировкой со вторым, корреспондирующим счётом. Повтор с тем же ключом возвращает
      * исходный документ; совпавший остаток не проводится (null).
      */
-    public function postDelegatedTargetBalance(string $companyId, string $actorId, string $accountId, string $counterAccountId, string $date, string $targetMinor, string $reason, string $requestKey): ?string
+    public function postDelegatedTargetBalance(string $companyId, string $actorId, string $accountId, string $counterAccountId, string $date, string $targetMinor, string $currency, string $reason, string $requestKey): ?string
     {
         if (1 !== preg_match('/^-?(?:0|[1-9]\d{0,18})$/D', $targetMinor)) {
             throw new BalanceLedgerException('Некорректная сумма остатка.');
         }
 
-        return $this->connection->transactional(function () use ($companyId, $actorId, $accountId, $counterAccountId, $date, $targetMinor, $reason, $requestKey): ?string {
+        return $this->connection->transactional(function () use ($companyId, $actorId, $accountId, $counterAccountId, $date, $targetMinor, $currency, $reason, $requestKey): ?string {
             $this->access->lockForDelegatedMutation($companyId, $actorId, 'post');
             $this->access->lockForDelegatedMutation($companyId, $actorId, 'prepare');
             $book = $this->connection->fetchAssociative('SELECT id, currency, start_date, initialized, version, next_document_number, next_posting_sequence FROM balance_books WHERE company_id = :company FOR UPDATE', ['company' => $companyId]);
@@ -218,6 +218,9 @@ SQL, ['company' => $companyId, 'maximum' => (string) \PHP_INT_MAX, 'minimum' => 
             }
             if (!$book['initialized']) {
                 throw new BalanceLedgerException('Сначала проведите начальные остатки.');
+            }
+            if ((string) $book['currency'] !== $currency) {
+                throw new BalanceLedgerException(sprintf('Валюта Баланса %s не совпадает с валютой источника %s.', (string) $book['currency'], $currency));
             }
             $existing = $this->connection->fetchOne('SELECT id FROM balance_operations WHERE company_id = :company AND request_key = :key', ['company' => $companyId, 'key' => $requestKey]);
             if (false !== $existing) {
@@ -239,7 +242,6 @@ SQL, ['company' => $companyId, 'maximum' => (string) \PHP_INT_MAX, 'minimum' => 
             // Стороны равны: целевой счёт меняется на Δ; тот же знак стороны у корр. счёта — обратное направление.
             $targetIncreases = !str_starts_with($delta, '-');
             $counterIncreases = $account['type'] === $counter['type'] ? !$targetIncreases : $targetIncreases;
-            $currency = (string) $book['currency'];
             $counterLine = ['accountId' => $counterAccountId, 'direction' => $counterIncreases ? 'increase' : 'decrease', 'amount' => LedgerAmount::decimal(ltrim($delta, '-'), $currency)];
             $target = (str_starts_with($targetMinor, '-') ? '-' : '').LedgerAmount::decimal(ltrim($targetMinor, '-'), $currency);
             $id = $this->targetDraftLocked($companyId, $actorId, $book, $requestKey, $accountId, $date, $target, $reason, (int) $book['version'], [$counterLine]);
