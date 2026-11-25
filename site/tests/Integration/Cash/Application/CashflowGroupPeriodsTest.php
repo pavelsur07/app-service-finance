@@ -151,6 +151,24 @@ final class CashflowGroupPeriodsTest extends IntegrationTestCase
         $build((string) $company->getId(), $from, $to, 'week', Uuid::uuid7()->toString());
     }
 
+    public function testOpeningBalancesUseOneRegisterReadForBothTwoAndThreeCompanies(): void
+    {
+        $this->accounts['0004']->setOpeningBalance('123.45');
+        $this->em->flush();
+        $queries = self::getContainer()->get('doctrine.debug_data_holder');
+        foreach ([3 => '123.45', 2 => '0.00'] as $size => $expected) {
+            if (2 === $size) {
+                $this->em->getConnection()->delete('company_consolidation_member', ['company_id' => (string) $this->companies['Гамма']->getId()]);
+            }
+            $queries->reset();
+            $report = $this->report('2026-10-01', '2026-12-31', 'month');
+            self::assertCount($size, $report->companies);
+            self::assertSame($expected, $report->periods?->opening);
+            $sql = array_column($queries->getData()['default'], 'sql');
+            self::assertCount(1, array_filter($sql, static fn (string $query): bool => str_contains($query, 'FROM money_account_daily_balance')));
+        }
+    }
+
     public function testQueryCountIsIndependentOfNumberOfColumns(): void
     {
         $queries = self::getContainer()->get('doctrine.debug_data_holder');

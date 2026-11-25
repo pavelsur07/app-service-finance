@@ -706,7 +706,19 @@ final readonly class CashFacade
             ? $this->moneyAccountRepository->findByFilters($company, null, [$currency], null, null, ['name' => \SortDirection::Ascending])
             : $this->moneyAccountRepository->findBy(['company' => $company]);
 
-        return $this->reportQuery->listOpeningBalancesAtDate($companyId, $date, array_values($accounts));
+        return $this->reportQuery->listOpeningBalancesAtDate([$companyId], $date, array_values($accounts));
+    }
+
+    /**
+     * @param non-empty-list<string> $companyIds участники авторизованной группы в снимке отчёта
+     *
+     * @return list<MoneyAccountOpeningBalance>
+     */
+    public function getGroupReportOpeningBalances(array $companyIds, \DateTimeImmutable $date, string $currency): array
+    {
+        $accounts = $this->moneyAccountRepository->findBy(['company' => $companyIds, 'currency' => $currency]);
+
+        return $this->reportQuery->listOpeningBalancesAtDate($companyIds, $date, $accounts);
     }
 
     private function findExistingByImport(CreateCashTransactionCommand $command): ?CashTransaction

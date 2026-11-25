@@ -164,10 +164,8 @@ final readonly class BuildCashflowGroupReport
                 $projection->addTransit($day >= $firstDay && $day <= $lastDay ? $out : $reconciliation->transactions[$inId]);
             }
             $opening = '0.00';
-            foreach ($ids as $id) {
-                foreach ($this->cash->getReportOpeningBalances($id, $from, self::CURRENCY) as $account) {
-                    $opening = bcadd($opening, $account->openingBalance, 2);
-                }
+            foreach ($this->cash->getGroupReportOpeningBalances($ids, $from, self::CURRENCY) as $account) {
+                $opening = bcadd($opening, $account->openingBalance, 2);
             }
             [$periodRows, $periodUnmatched, $periodTotal] = $this->treeRows($roots, $projection->own, $projection->zero);
             $periods = $projection->result([...$periodRows, $periodUnmatched, $periodTotal], $opening, $totals->total);
