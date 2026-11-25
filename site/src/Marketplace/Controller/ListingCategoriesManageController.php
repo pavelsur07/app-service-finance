@@ -6,6 +6,7 @@ namespace App\Marketplace\Controller;
 
 use App\Marketplace\DTO\ListingCategoryDTO;
 use App\Marketplace\Infrastructure\Query\ListingCategoryAssignmentQuery;
+use App\Marketplace\Infrastructure\Query\ListingCategoryRuleQuery;
 use App\Marketplace\Repository\MarketplaceListingCategoryRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,6 +21,7 @@ final class ListingCategoriesManageController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly MarketplaceListingCategoryRepository $categories,
         private readonly ListingCategoryAssignmentQuery $assignments,
+        private readonly ListingCategoryRuleQuery $rules,
     ) {
     }
 
@@ -38,6 +40,8 @@ final class ListingCategoriesManageController extends AbstractController
                 ],
                 $this->categories->listForCompany($companyId),
             ),
+            'unmatched' => $this->rules->unmatched($companyId),
+            'rules' => $this->rules->rules($companyId),
             'active_tab' => 'listings_categories',
         ]);
     }

@@ -94,6 +94,7 @@ final class RefreshWbListingCatalogActionTest extends TestCase
             $barcodeQuery,
             new NullLogger(),
             new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class)),
+            new \App\Marketplace\Infrastructure\Query\ListingCategoryRuleQuery($this->createMock(Connection::class)),
         );
 
         self::assertSame(1, $action($company->getId(), $connection->getId()));
@@ -136,6 +137,7 @@ final class RefreshWbListingCatalogActionTest extends TestCase
             new WbBarcodeUpsertQuery($this->createMock(Connection::class)),
             new NullLogger(),
             new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class)),
+            new \App\Marketplace\Infrastructure\Query\ListingCategoryRuleQuery($this->createMock(Connection::class)),
         );
 
         $this->expectException(\DomainException::class);
@@ -204,6 +206,7 @@ final class RefreshWbListingCatalogActionTest extends TestCase
             new WbBarcodeUpsertQuery($this->createMock(Connection::class)),
             new NullLogger(),
             new \App\Marketplace\Infrastructure\Security\ConnectionApiKeyCodec($this->createMock(\App\Shared\Security\Contract\FieldEncryptionServiceInterface::class)),
+            new \App\Marketplace\Infrastructure\Query\ListingCategoryRuleQuery($this->createMock(Connection::class)),
         );
 
         $this->expectException(\RuntimeException::class);
