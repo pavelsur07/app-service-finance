@@ -59,6 +59,9 @@ final class StoreBalanceController extends AbstractController
         $user = $this->getUser();
         // План счетов и суммы Баланса — только при финансовом доступе; без него страница показывает склады и оценку.
         $financeRead = $user instanceof User && null !== $user->getId() && $companies->financialAccess($companyId, $user->getId())['read'];
+        if ($financeRead) {
+            $balance->ensureStandardChart($companyId); // типовые счета Баланса — чтобы складам было что назначить
+        }
         $accounts = $financeRead ? $balance->getPostingAccounts($companyId) : [];
         $accountsById = [];
         foreach ($accounts as $account) {

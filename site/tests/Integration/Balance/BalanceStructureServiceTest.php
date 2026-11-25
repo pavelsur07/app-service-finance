@@ -67,7 +67,7 @@ final class BalanceStructureServiceTest extends IntegrationTestCase
         $rows = $this->connection->fetchAllAssociative('SELECT a.code, p.code AS parent_code, a.type, a.kind, a.sort_order FROM balance_articles a LEFT JOIN balance_articles p ON p.id=a.parent_id AND p.company_id=a.company_id WHERE a.company_id=? ORDER BY a.code', [$this->companyId]);
         $byCode = array_column($rows, null, 'code');
 
-        self::assertCount(33, $rows);
+        self::assertCount(34, $rows);
         self::assertNull($byCode['CURRENT_ASSETS']['parent_code']);
         self::assertSame('MONEY', $byCode['CASH_BANK']['parent_code']);
         self::assertSame('CURRENT_ASSETS', $byCode['MONEY']['parent_code']);

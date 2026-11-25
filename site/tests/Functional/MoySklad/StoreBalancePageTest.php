@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\MoySklad;
 
+use App\Balance\Application\SeedBalanceStructureAction;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MoySklad\MoySkladStoreBuilder;
@@ -42,6 +43,20 @@ final class StoreBalancePageTest extends WebTestCaseBase
 
         $client->request('POST', $form->getUri(), ['target' => $accounts['stock'], '_token' => 'bad']);
         self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testOpeningPageAddsStandardChartForExistingStructure(): void
+    {
+        [$client, $connectionId, $store] = $this->seed();
+        $companyId = (string) $this->em()->getConnection()->fetchOne('SELECT company_id FROM moysklad_connections WHERE id = ?', [$connectionId]);
+        $this->em()->getConnection()->executeStatement('DELETE FROM balance_accounts WHERE company_id = ?', [$companyId]);
+        $this->em()->getConnection()->executeStatement('DELETE FROM balance_articles WHERE company_id = ?', [$companyId]);
+        self::assertTrue(self::getContainer()->get(SeedBalanceStructureAction::class)($companyId));
+
+        $client->request('GET', '/moy-sklad/connections/'.$connectionId.'/stores');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('[data-store="'.$store.'"] select[name="target"]', 'Склады фулфилмента');
+        self::assertSame(28, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_accounts WHERE company_id = ?', [$companyId]));
     }
 
     public function testSettingsRequireCounterAccountAndSaveForOwner(): void

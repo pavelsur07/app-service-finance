@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Balance\EventListener;
 
-use App\Balance\Application\EnsureBalanceAccountsAction;
 use App\Balance\Application\SeedBalanceStructureAction;
+use App\Balance\Application\SyncStandardChartAction;
 use App\Company\Event\CompanyCreatedEvent;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 
@@ -18,7 +18,7 @@ final readonly class SeedBalanceStructureOnCompanyCreated
 {
     public function __construct(
         private SeedBalanceStructureAction $seed,
-        private EnsureBalanceAccountsAction $accounts,
+        private SyncStandardChartAction $accounts,
     ) {
     }
 
