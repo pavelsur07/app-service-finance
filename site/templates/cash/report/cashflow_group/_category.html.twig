@@ -1,0 +1,6 @@
+{% import 'report/cashflow/_macros.html.twig' as cashflow %}
+<th scope="row" class="ps-{{ min(5, line.level + 1) }} {{ line.section ? 'fw-bold' : 'fw-normal' }}">
+    {% if hasChildren %}{{ cashflow.category_toggle(line.name) }}{% endif %}
+    {{ line.name }}
+    {% if line.hasUnpaired %}<span role="img" aria-label="Есть операции без пары" title="Есть операции без пары">⚠</span>{% endif %}
+</th>

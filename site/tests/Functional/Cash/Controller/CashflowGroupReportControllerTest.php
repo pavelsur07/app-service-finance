@@ -82,6 +82,26 @@ final class CashflowGroupReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('2026-11-01_2026-11-30.xlsx', (string) $this->client->getResponse()->headers->get('Content-Disposition'));
     }
 
+    public function testAccountsAndCategoryBranchesStartCollapsedInBothViews(): void
+    {
+        $this->client->loginUser($this->owner);
+        $this->setClientSessionValue($this->client, 'active_company_id', self::MEMBER);
+
+        foreach (['periods', 'companies'] as $view) {
+            $page = $this->client->request('GET', '/finance/reports/cashflow/group?view='.$view);
+            self::assertResponseIsSuccessful();
+            $accounts = $page->filter('details[data-test="group-report-accounts"]:not([open])');
+            self::assertCount(1, $accounts);
+            self::assertSame('Данные по счетам', $accounts->filter('summary')->text());
+            $table = $page->filter('[data-cashflow-report]');
+            self::assertCount(1, $table->filter('tr[data-row-key="sys:CF_OP"]:not([hidden]) button[aria-expanded="false"]'));
+            self::assertCount(1, $table->filter('tr[data-row-key="OP_IN_CUSTOMERS"][hidden]'));
+            self::assertCount(0, $table->filter('tr[data-row-key="OP_IN_CUSTOMERS"] button'));
+            self::assertCount(1, $table->filter('tr[data-row-key="unmatched"]:not([hidden])'));
+            self::assertCount(0, $table->filter('tfoot [hidden], tfoot button'));
+        }
+    }
+
     public function testDefaultPeriodsShowBalancesAndNovemberLinks(): void
     {
         $this->em = $this->em();

@@ -1,9 +1,6 @@
-{% macro reportRow(line, period) %}
-    <tr data-row-key="{{ line.key }}" class="{{ line.section ? 'fw-bold' : '' }}">
-        <th scope="row" class="ps-{{ min(5, line.level + 1) }} {{ line.section ? 'fw-bold' : 'fw-normal' }}">
-            {{ line.name }}
-            {% if line.hasUnpaired %}<span role="img" aria-label="Есть операции без пары" title="Есть операции без пары">⚠</span>{% endif %}
-        </th>
+{% macro reportRow(line, period, hasChildren=false) %}
+    <tr data-row-key="{{ line.key }}" data-level="{{ line.level }}"{% if line.level > 1 %} hidden{% endif %} class="{{ line.section ? 'fw-bold' : '' }}">
+        {% include 'cash/report/cashflow_group/_category.html.twig' with {line: line, hasChildren: hasChildren} only %}
         {% for amount in line.amounts %}<td class="text-end text-nowrap">{{ amount|vf_amount }}</td>{% endfor %}
         <td class="text-end text-nowrap">
             {% if line.pairIds is not empty %}
@@ -20,7 +17,7 @@
 
 <div class="card">
     <div class="table-responsive">
-        <table class="table table-sm table-vcenter card-table" data-test="group-report">
+        <table class="table table-sm table-vcenter card-table" data-cashflow-report data-test="group-report">
             <thead>
             <tr>
                 <th>Статья, RUB</th>
@@ -30,8 +27,9 @@
             </tr>
             </thead>
             <tbody>
-            {% for line in [...report.lines, report.unmatched] %}
-                {{ m.reportRow(line, period) }}
+            {% set lines = [...report.lines, report.unmatched] %}
+            {% for line in lines %}
+                {{ m.reportRow(line, period, (lines[loop.index].level ?? 0) > line.level) }}
             {% endfor %}
             </tbody>
             <tfoot>

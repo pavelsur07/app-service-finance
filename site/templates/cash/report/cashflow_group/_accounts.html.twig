@@ -5,8 +5,8 @@
     </div>
 {% endif %}
 
-<div class="card mb-3" data-test="group-report-accounts">
-    <div class="card-header"><h2 class="card-title">Данные по счетам</h2></div>
+<details class="card mb-3" data-test="group-report-accounts">
+    <summary class="card-body card-title m-0 py-3">Данные по счетам</summary>
     {% if report.accounts is empty %}
         <div class="card-body text-secondary">Нет активных счетов в RUB.</div>
     {% else %}
@@ -27,4 +27,4 @@
             </table>
         </div>
     {% endif %}
-</div>
+</details>
