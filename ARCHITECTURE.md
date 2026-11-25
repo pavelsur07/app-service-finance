@@ -2080,7 +2080,21 @@ assignPlCategoryCode(string $companyId, string $categoryId, string $code): bool
 getCategoriesForCompany(string $companyId): array
 getReportForCompany(string $companyId, \DateTimeImmutable $date): BalanceReport
 seedDefaultStructure(string $companyId): bool
+/** @return list<BalancePostingAccount> неархивные счета с неархивной цепочкой статей */
+getPostingAccounts(string $companyId): array
+getBookStatus(string $companyId): BalanceBookStatus
+canPostFromSource(string $companyId, string $userId): bool
+setAccountBalanceFromSource(string $companyId, string $actorId, string $accountId, string $counterAccountId,
+    \DateTimeImmutable $date, string $targetMinor, string $reason, string $requestKey): ?string
 ```
+
+Установка остатка из внешнего источника (`setAccountBalanceFromSource`, сейчас — склады МойСклад):
+без HTTP-сессии, права автора (`prepare` + `post`) читаются свежими под блокировкой
+(`BalanceAccess::lockForDelegatedMutation`); книга не начата, совпадение счетов, закрытый период —
+`BalanceLedgerException`, нет прав — `AccessDeniedException`. Δ = цель − остаток на дату, вторая строка —
+корреспондирующий счёт (та же сторона — обратное направление, другая — то же); Δ = 0 → `null`.
+Повтор с тем же `requestKey` возвращает тот же документ. Коммитит сам Facade (своя транзакция Баланса),
+вызывающий не держит открытую транзакцию.
 
 `BalanceReport`: `getRoots()` (каждая `BalanceRowView` имеет точный `amountMinor`),
 `getCurrency()`, `isInitialized()`, `getAssetMinor()`, `getPassiveMinor()`,
@@ -5868,6 +5882,8 @@ config/
 | `app:moysklad:mapping-bulk:requeue` | `*/10 * * * *` | Переотправка пакетов принятия предложений МойСклад без heartbeat >10 мин; повтор безопасен |
 | `app:moysklad:mapping-diagnostics:refresh` | `*/5 * * * *` | Пересчёт отсутствующих или устаревших отчётов диагностики маппинга МойСклад по активным подключениям; только чтение и dispatch, повтор — тот же runId |
 | `app:moysklad:mapping-auto-apply` | `30 5 * * *` | Пакет однозначных предложений МойСклад для подключений с включённым автоприменением; один в сутки |
+| `app:moysklad:store-balance:daily` | `30 23 * * *` | `SyncStockSnapshotMessage` для подключений с включённой записью складов в Баланс; оценку и проводку ставит снимок |
+| `app:moysklad:store-balance:requeue` | `*/15 * * * *` | Повтор оценки складов: последний completed-снимок за 2 дня без прогона, зависший `valuing`, `partial`, временный сбой старше 30 мин; до 6 попыток |
 | `app:marketplace:cost-pl-mapping:sync-default` | `35 4 * * *`, `45 6 * * *` | Частичный базовый маппинг затрат в ОПиУ по шаблону для всех активных SELLER-подключений (ozon, wildberries) — до пересборки 04:45, чтобы новые категории ночи попали в ОПиУ утром. Ручные и отключённые правила не трогает. Повтор в 06:45 — перед гейтом, чтобы категории утренних загрузок не краснили его |
 | `app:marketplace:cost-pl-mapping:unmapped-check` | `50 6 * * *` | Read-only гейт: затраты текущего и прошлого месяца без документа ОПиУ, у категории которых нет решения по ОПиУ (`WITHOUT_PL_DECISION`); Ozon — только распознанные коды. exit 1 + один агрегированный `error`; зеленеет, как только статья назначена |
 | `app:marketplace:month-preliminary-rebuild` | `45 4 * * *` | Ежедневная пересборка предварительного ОПиУ за текущий месяц для всех активных подключений; вручную `--company-id --marketplace --month=YYYY-MM --stage [--execute]` — один этап за любой месяц, синхронно, без `--execute` только preflight |
@@ -6020,6 +6036,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.247 | 2026-11-24 | MoySklad: склады → счета Баланса — страница «Склады», ежедневная оценка по себестоимости (`ValueStoreStocksMessage`, cron 23:30 и requeue */15), установка остатка счёта от имени автора; `BalanceFacade`: `getPostingAccounts`, `getBookStatus`, `canPostFromSource`, `setAccountBalanceFromSource` |
 | 2.246 | 2026-11-24 | MoySklad: автомаппинг identity_package_v4 — комплектация спорна, если штуки указаны только с одной стороны или объём/вес с обеих сторон не совпадает |
 | 2.245 | 2026-11-24 | Миграция удаления ИИ-разбора: нет таблиц `telegram_payment_intake_session`, `cash_payment_intake_reply_receipt`, `ai_quality_monitor`, `ai_quality_run`, колонки `client_bindings.payment_intake_selected` и ИИ-колонок `cash_payment_intake_draft`; Telegram-черновики удалены. ai-service `0003`: нет `ai_eval_*` и строк `parse_payment_message` |
 | 2.244 | 2026-11-23 | Удалён код ИИ-разбора платежей: Telegram-доставка, сессии и транспорт `async_payment_intake`; ИИ-половина черновиков Cash (остались MCP); `AiTaskResultFacade`; ночной eval (`app:ai-service:quality:*`, eval-worker, `AI_SERVICE_EVAL_*`); задача `parse_payment_message` и контракты `ai-parse-payment-message`, `ai-eval-run`. Переотправку событий подтверждения ведёт `app:cash:recover-payment-intake` без аргументов. Таблицы удаляет отдельная миграция |
@@ -6808,6 +6825,26 @@ marketplace)` ставит запуск, если подключение акт�
   `app:moysklad:mapping-auto-apply` 05:30 создаёт пакет `cabinet` с id = UUIDv5(scope, дата МСК) от имени
   включившего; без его MARKETPLACE WRITE (`CompanyFacade::userHasModuleAccess`) пакет не создаётся.
 - Отчёт пакета: GET `moysklad_mapping_bulk_show`, по25 строк, фильтр по итогу.
+
+### MoySklad: склады → счета Баланса
+
+Страница `moysklad_stores` (`/moy-sklad/connections/{id}/stores`, READ; POST — READ+WRITE+CSRF):
+складу назначается счёт актива Баланса или «не учитывать» (`moysklad_store_balance_links`,
+`SaveStoreBalanceLinkAction`, счёт проверяется через `BalanceFacade::getPostingAccounts`);
+настройки подключения — корреспондирующий счёт, включено, автор (`moysklad_store_balance_settings`,
+`SaveStoreBalanceSettingsAction`: включение требует корр. счёт и `canPostFromSource` автора).
+- После completed-снимка `SyncStockSnapshotHandler` отправляет `ValueStoreStocksMessage` → `async_sync`
+  (HTTP к МойСклад). `ValueStoreStocksAction` под session advisory-lock подключения, фазы:
+  1) себестоимость единиц `report/stock/all?groupBy=variant&filter=stockMode=all` (нет `price` →
+  `forbidden`, run `failed`); 2) одной транзакцией заменяет `moysklad_store_valuations` снимка
+  (`amount_minor` = Σ round(stock × price) половина от нуля, `unpriced_positions`), дата — МСК начала снимка;
+  3) если запись включена — по каждому счёту сумма складов → `BalanceFacade::setAccountBalanceFromSource`
+  (ключ UUIDv5(компания, подключение, счёт, дата, цель)), итог счёта-дня — `moysklad_store_balance_postings`
+  (`posted|unchanged|skipped|failed`, причина). Нет прав у автора → весь прогон `skipped`, проведённый
+  итог дня не затирается. Статус прогона — `moysklad_store_balance_runs` (`valuing|valued|posted|partial|skipped|failed`).
+- Handler повторяет `rate_limited`/`temporary` с задержкой до 3 раз; потерю dispatch и зависания
+  закрывает `app:moysklad:store-balance:requeue`.
+- Порядок блокировок: advisory подключения (оценка) → транзакция Баланса (company → book) на каждый счёт.
 
 ### MoySklad: legacy UI качества сопоставления
 
