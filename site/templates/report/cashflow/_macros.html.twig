@@ -4,16 +4,20 @@
     {{ value|vf_amount(2, value > 0 ? 'income' : null) }}
 {% endmacro %}
 
+{% macro category_toggle(name) %}
+    <button type="button" class="cf-toggle border-0 bg-transparent p-0 text-reset" aria-label="{{ name }}" aria-expanded="false">▶</button>
+{% endmacro %}
+
 {# drill: {base, periods, from}; base = null — суммы без ссылок. Ссылка ведёт в «Транзакции ДДС»
    с фильтрами ячейки; JS отчёта открывает её двойным кликом. #}
 {% macro render_category(cat, totals, currency, periodCount, parentId, drill) %}
 {% set hasChildren = cat.children|length > 0 %}
 {% set hidden = cat.level >= 2 %}
-<tr data-id="{{ cat.id }}" data-parent="{{ parentId }}" data-level="{{ cat.level }}"{% if hidden %} style="display:none"{% endif %}>
+<tr data-id="{{ cat.id }}" data-parent="{{ parentId }}" data-level="{{ cat.level }}"{% if hidden %} hidden{% endif %}>
     <td style="padding-left: {{ (cat.level - 1) * 20 }}px;">
         <div class="d-flex align-items-center">
             {%- if hasChildren -%}
-                <span class="cf-toggle" data-target="{{ cat.id }}">&#9654;</span>
+                {{ _self.category_toggle(cat.name) }}
             {%- else -%}
                 <span class="cf-toggle-spacer"></span>
             {%- endif -%}

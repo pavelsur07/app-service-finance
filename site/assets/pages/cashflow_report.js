@@ -1,7 +1,6 @@
 /**
- * Отчёт ДДС (templates/report/cashflow.html.twig): кнопка .cf-toggle статьи раскрывает прямых потомков
- * (tr[data-parent]), повторный клик сворачивает всю ветку. Состояние — символ кнопки ▶/▼.
- * Корень — [data-cashflow-report].
+ * Кнопка .cf-toggle раскрывает прямых потомков статьи. Строки обоих отчётов идут
+ * в порядке обхода дерева, data-level указывает глубину. Сворачивание закрывает всю ветку.
  *
  * Сумма статьи — ссылка a[data-cf-drill] в «Транзакции ДДС» с фильтрами ячейки. Открывается двойным
  * кликом по ячейке; одиночный клик мышью гасится, чтобы сумму можно было выделить. Клавиатура (Enter),
@@ -10,21 +9,21 @@
 const COLLAPSED = '▶';
 const EXPANDED = '▼';
 
-const showDirectChildren = (parentId) => {
-  document.querySelectorAll(`tr[data-parent="${parentId}"]`).forEach((row) => {
-    row.style.display = '';
-    const toggle = row.querySelector('.cf-toggle');
-    if (toggle) toggle.textContent = COLLAPSED;
-  });
+const setExpanded = (button, expanded) => {
+  button.setAttribute('aria-expanded', String(expanded));
+  button.textContent = expanded ? EXPANDED : COLLAPSED;
 };
 
-const hideDescendants = (parentId) => {
-  document.querySelectorAll(`tr[data-parent="${parentId}"]`).forEach((row) => {
-    row.style.display = 'none';
-    const toggle = row.querySelector('.cf-toggle');
-    if (toggle) toggle.textContent = COLLAPSED;
-    hideDescendants(row.getAttribute('data-id'));
-  });
+const setBranchExpanded = (parent, expand) => {
+  const level = Number(parent.dataset.level);
+  setExpanded(parent.querySelector('.cf-toggle'), expand);
+  for (let row = parent.nextElementSibling; row && Number(row.dataset.level) > level; row = row.nextElementSibling) {
+    row.hidden = !expand || Number(row.dataset.level) !== level + 1;
+    if (!expand) {
+      const childButton = row.querySelector('.cf-toggle');
+      if (childButton) setExpanded(childButton, false);
+    }
+  }
 };
 
 const isPlainMouseClick = (event) => event.button === 0 && event.detail > 0
@@ -43,18 +42,18 @@ const initDrilldown = (table) => {
 };
 
 export function initCashflowReport() {
-  if (!document.querySelector('[data-cashflow-report]')) return;
-  document.querySelectorAll('[data-cashflow-report]').forEach(initDrilldown);
-  document.querySelectorAll('.cf-toggle').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const parentId = btn.getAttribute('data-target');
-      if (btn.textContent.trim() === EXPANDED) {
-        btn.textContent = COLLAPSED;
-        hideDescendants(parentId);
-      } else {
-        btn.textContent = EXPANDED;
-        showDirectChildren(parentId);
-      }
+  document.querySelectorAll('[data-cashflow-report]').forEach((table) => {
+    initDrilldown(table);
+    table.addEventListener('click', (event) => {
+      const button = event.target.closest('.cf-toggle');
+      if (!button) return;
+      const parent = button.closest('tr');
+      const expand = button.getAttribute('aria-expanded') !== 'true';
+      // В ДДС компании одна статья повторяется в таблицах разных валют.
+      const rows = parent.dataset.id
+        ? document.querySelectorAll(`[data-cashflow-report] tr[data-id="${CSS.escape(parent.dataset.id)}"]`)
+        : [parent];
+      rows.forEach((row) => setBranchExpanded(row, expand));
     });
   });
 }

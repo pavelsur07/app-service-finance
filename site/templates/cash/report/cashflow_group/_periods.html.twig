@@ -17,7 +17,7 @@
 {% endif %}
 <div class="card">
     <div class="table-responsive">
-        <table class="table table-sm table-vcenter card-table" data-test="group-period-report">
+        <table class="table table-sm table-vcenter card-table" data-cashflow-report data-test="group-period-report">
             <thead>
                 <tr>
                     <th scope="col">Статья, RUB</th>
@@ -30,12 +30,10 @@
                 </tr>
             </thead>
             <tbody>
-                {% for line in [...report.lines, report.unmatched] %}
-                    <tr data-row-key="{{ line.key }}" class="{{ line.section ? 'fw-bold' : '' }}">
-                        <th scope="row" class="ps-{{ min(5, line.level + 1) }} {{ line.section ? 'fw-bold' : 'fw-normal' }}">
-                            {{ line.name }}
-                            {% if line.hasUnpaired %}<span role="img" aria-label="Есть операции без пары" title="Есть операции без пары">⚠</span>{% endif %}
-                        </th>
+                {% set lines = [...report.lines, report.unmatched] %}
+                {% for line in lines %}
+                    <tr data-row-key="{{ line.key }}" data-level="{{ line.level }}"{% if line.level > 1 %} hidden{% endif %} class="{{ line.section ? 'fw-bold' : '' }}">
+                        {% include 'cash/report/cashflow_group/_category.html.twig' with {line: line, hasChildren: (lines[loop.index].level ?? 0) > line.level} only %}
                         {% for column in periods.columns %}
                             <td class="text-end text-nowrap">
                                 <a href="{{ links[loop.index0].companies }}">{{ column.amounts[line.key]|vf_amount }}</a>
