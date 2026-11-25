@@ -245,7 +245,19 @@ SQL, ['company' => $companyId, 'maximum' => (string) \PHP_INT_MAX, 'minimum' => 
             if ('asset' !== $account['type']) {
                 throw new BalanceLedgerException('Остаток из источника устанавливается только на счёт актива.');
             }
+            // Те же проверки, что при проведении, — до раннего выхода Δ = 0, чтобы «не изменилось» не скрывало пропуск.
             LedgerAmount::date($date);
+            foreach ([$account, $counter] as $checked) {
+                if ($checked['is_archived'] || $checked['article_archived']) {
+                    throw new BalanceLedgerException(sprintf('Счет «%s» в архиве.', (string) $checked['name']));
+                }
+            }
+            if ($date > (new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow')))->format('Y-m-d') || $date < $book['start_date']) {
+                throw new BalanceLedgerException('Дата проведения должна быть между началом учета и сегодняшним днем.');
+            }
+            if ($this->connection->fetchOne('SELECT 1 FROM balance_periods WHERE company_id = :company AND month = :month AND is_closed = TRUE', ['company' => $companyId, 'month' => substr($date, 0, 7).'-01'])) {
+                throw new BalanceLedgerException('Период закрыт. Проведите корректировку в открытом периоде.', 409);
+            }
             $current = (string) $this->connection->fetchOne("SELECT COALESCE(SUM(CASE WHEN l.direction = 'increase' THEN l.amount ELSE -l.amount END), 0) FROM balance_operation_lines l JOIN balance_operations o ON o.id = l.operation_id AND o.company_id = l.company_id WHERE l.company_id = :company AND l.account_id = :account AND o.status = 'posted' AND o.operation_date <= :date", ['company' => $companyId, 'account' => $accountId, 'date' => $date]);
             $delta = bcsub($targetMinor, $current, 0);
             if ('0' === $delta) {

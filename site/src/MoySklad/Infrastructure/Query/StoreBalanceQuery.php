@@ -53,15 +53,19 @@ final readonly class StoreBalanceQuery
             'errorReason' => null === $row['error_reason'] ? null : (string) $row['error_reason'], 'finishedAt' => null === $row['finished_at'] ? null : (string) $row['finished_at']];
     }
 
-    /** Последняя оценённая версия — её суммы показываются, даже если более новый прогон упал. */
-    public function latestValuedSnapshot(string $companyId, string $connectionId): ?string
+    /**
+     * Последняя оценённая версия — её суммы показываются, даже если более новый прогон упал.
+     *
+     * @return array{snapshotId: string, date: string}|null
+     */
+    public function latestValuedSnapshot(string $companyId, string $connectionId): ?array
     {
-        $id = $this->db->fetchOne("SELECT r.snapshot_id FROM moysklad_store_balance_runs r
+        $row = $this->db->fetchAssociative("SELECT r.snapshot_id, r.valuation_date FROM moysklad_store_balance_runs r
             JOIN moysklad_stock_snapshots s ON s.company_id = r.company_id AND s.connection_id = r.connection_id AND s.id = r.snapshot_id
             WHERE r.company_id = ? AND r.connection_id = ? AND r.status <> 'valuing' AND r.status <> 'failed'
             ORDER BY s.started_at DESC, s.id DESC LIMIT 1", [$companyId, $connectionId]);
 
-        return false === $id ? null : (string) $id;
+        return false === $row ? null : ['snapshotId' => (string) $row['snapshot_id'], 'date' => (string) $row['valuation_date']];
     }
 
     /** @return array<string, array{date: string, targetMinor: string, status: string, reason: ?string}> счёт → итог последнего дня */

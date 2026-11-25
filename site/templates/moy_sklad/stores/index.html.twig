@@ -46,7 +46,7 @@
             </form>
             {% if run %}
                 <p class="mt-3 mb-0" data-store-balance-run>
-                    Последняя оценка на {{ run.date|date('d.m.Y') }}: <span class="badge bg-{{ run.tone }}-lt">{{ run.label }}</span>
+                    Последняя попытка оценки, снимок на {{ run.date|date('d.m.Y') }}: <span class="badge bg-{{ run.tone }}-lt">{{ run.label }}</span>
                     {% if run.error %}<span class="text-danger">{{ run.error }}</span>{% endif %}
                 </p>
             {% else %}
@@ -65,7 +65,7 @@
         <div class="table-responsive">
             <table class="table table-vcenter card-table" data-store-balance-table>
                 <thead>
-                    <tr><th>Склад</th><th>Счёт Баланса</th><th class="text-end">Остаток по себестоимости</th></tr>
+                    <tr><th>Склад</th><th>Счёт Баланса</th><th class="text-end" data-store-balance-valued-date>Остаток по себестоимости{% if valuedDate %} на {{ valuedDate|date('d.m.Y') }}{% endif %}</th></tr>
                 </thead>
                 <tbody>
                     {% for store in stores %}

@@ -245,6 +245,21 @@ final class ValueStoreStocksActionTest extends IntegrationTestCase
         self::assertSame(0, $this->counts()['postings']);
     }
 
+    public function testReplayAfterCrashUsesTargetFixedBeforeBalanceCommit(): void
+    {
+        $this->enable();
+        ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT);
+        // Падение между коммитом Баланса и записью итога: строка осталась «posting» с исходной целью; склад B отвязали.
+        $this->connection->update('moysklad_store_balance_postings', ['status' => 'posting', 'operation_id' => null], ['company_id' => self::COMPANY]);
+        $this->connection->delete('moysklad_store_balance_links', ['company_id' => self::COMPANY, 'store_external_id' => $this->storeB]);
+        $operations = $this->counts()['operations'];
+
+        self::assertSame('posted', ($this->action([]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT));
+        self::assertSame(['54017', 'posted'], array_values($this->connection->fetchAssociative('SELECT target_minor::text, status FROM moysklad_store_balance_postings WHERE company_id = ?', [self::COMPANY]) ?: []));
+        self::assertSame($operations, $this->counts()['operations']);
+        self::assertSame('54017', $this->balance('stock'));
+    }
+
     public function testDisabledWritingOnlyValues(): void
     {
         self::assertSame('valued', ($this->action([$this->costs()]))(self::COMPANY, self::CONNECTION, self::SNAPSHOT));

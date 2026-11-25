@@ -22,7 +22,7 @@
                 {% endfor %}
             </div>
             <div class="card-footer">
-                {% if pickerRoute|default(null) != 'moysklad_stores' %}{% include 'partials/_pagination.html.twig' with {pager: pager, route: 'moysklad_mapping_entry', params: {marketplace: mappingMarketplace}} only %}{% endif %}
+                {% if pickerRoute|default(null) == 'moysklad_stores' %}{% include 'partials/_pagination.html.twig' with {pager: pager, route: 'moysklad_stores_entry', params: {}} only %}{% else %}{% include 'partials/_pagination.html.twig' with {pager: pager, route: 'moysklad_mapping_entry', params: {marketplace: mappingMarketplace}} only %}{% endif %}
             </div>
         </div>
     {% endif %}

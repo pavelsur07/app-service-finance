@@ -216,6 +216,8 @@ final readonly class ValueStoreStocksAction
             GROUP BY k.balance_account_id ORDER BY k.balance_account_id', [$snapshotId, $companyId, $connectionId]);
         // Счета, по которым этот снимок уже дал итог, повтор не трогает: цель фиксируется первой попыткой.
         $done = $this->db->fetchFirstColumn("SELECT balance_account_id FROM moysklad_store_balance_postings WHERE company_id = ? AND connection_id = ? AND snapshot_id = ? AND status IN ('posted', 'unchanged')", [$companyId, $connectionId, $snapshotId]);
+        // Цель, записанная перед вызовом Баланса: после падения между коммитом Баланса и итогом повтор берёт её же.
+        $pending = $this->db->fetchAllKeyValue("SELECT balance_account_id, target_minor::text FROM moysklad_store_balance_postings WHERE company_id = ? AND connection_id = ? AND snapshot_id = ? AND status = 'posting'", [$companyId, $connectionId, $snapshotId]);
         $failed = 0;
         foreach ($targets as $accountId => $target) {
             $accountId = (string) $accountId;
@@ -227,7 +229,13 @@ final readonly class ValueStoreStocksAction
                 $this->record($companyId, $connectionId, $snapshotId, $date, $accountId, '0', 'skipped', 'Нет себестоимости части товаров в отчёте МойСклад — остаток не проведён.', null);
                 continue;
             }
-            $target = (string) $target;
+            $target = (string) ($pending[$accountId] ?? $target);
+            if (false !== $this->db->fetchOne("SELECT 1 FROM moysklad_store_balance_postings WHERE company_id = ? AND balance_account_id = ? AND valuation_date > ? AND status IN ('posted', 'unchanged') LIMIT 1", [$companyId, $accountId, $date->format('Y-m-d')])) {
+                // Счёт переназначали: более поздний остаток уже установлен другим подключением.
+                $this->record($companyId, $connectionId, $snapshotId, $date, $accountId, $target, 'skipped', 'Остаток счёта уже установлен на более позднюю дату.', null);
+                continue;
+            }
+            $this->record($companyId, $connectionId, $snapshotId, $date, $accountId, $target, 'posting', null, null);
             $key = Uuid::uuid5(Uuid::NAMESPACE_URL, 'moysklad-store-balance:'.implode('|', [$companyId, $connectionId, $accountId, $snapshotId]))->toString();
             try {
                 $operationId = $this->balance->setAccountBalanceFromSource($companyId, (string) $settings['actor_user_id'], $accountId, (string) $settings['counter_account_id'], $date, $target, self::CURRENCY, self::REASON, $key);

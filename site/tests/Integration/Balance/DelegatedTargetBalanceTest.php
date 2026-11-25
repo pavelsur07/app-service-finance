@@ -165,6 +165,17 @@ final class DelegatedTargetBalanceTest extends IntegrationTestCase
         self::assertSame('draft', $this->connection->fetchOne('SELECT status FROM balance_operations WHERE company_id = ? AND request_key = ?', [$this->companyId, 'k-draft']));
     }
 
+    public function testUnchangedTargetInClosedPeriodIsReportedNotHidden(): void
+    {
+        $this->opening();
+        $this->post('stock', 'equity', '2025-01-05', '3000000', 'k1');
+        $this->connection->insert('balance_periods', ['id' => Uuid::uuid7()->toString(), 'company_id' => $this->companyId, 'month' => '2025-01-01', 'is_closed' => 'true',
+            'changed_by' => $this->actorId, 'reason' => 'Закрыт', 'changed_at' => '2025-02-01 00:00:00']);
+
+        $this->expectException(BalanceLedgerException::class);
+        $this->post('stock', 'equity', '2025-01-06', '3000000', 'k2');
+    }
+
     public function testPassiveTargetIsRejected(): void
     {
         $this->opening();

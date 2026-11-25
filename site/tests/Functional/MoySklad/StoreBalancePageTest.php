@@ -27,6 +27,9 @@ final class StoreBalancePageTest extends WebTestCaseBase
         self::assertSelectorExists('[data-store="'.$store.'"] select[name="target"] option[value="'.$accounts['stock'].'"]');
         self::assertSelectorNotExists('[data-store="'.$store.'"] select[name="target"] option[value="'.$accounts['equity'].'"]', 'Склад держится только на активе.');
         self::assertSelectorTextContains('[data-moysklad-tabs] [aria-current="page"]', 'Склады');
+        $client->request('GET', '/moy-sklad/stores');
+        self::assertResponseRedirects($url);
+        $client->request('GET', $url);
 
         $form = $client->getCrawler()->filter('[data-store="'.$store.'"] form')->form();
         $client->request('POST', $form->getUri(), array_replace($form->getPhpValues(), ['target' => $accounts['stock']]));

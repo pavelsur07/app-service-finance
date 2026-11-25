@@ -14,10 +14,12 @@ use App\MoySklad\Infrastructure\Query\StoreBalanceQuery;
 use App\MoySklad\Infrastructure\Repository\MoySkladConnectionWriteRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Exception\OutOfRangeCurrentPageException;
 use Pagerfanta\Pagerfanta;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Requirement\Requirement;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -31,10 +33,14 @@ final class StoreBalanceController extends AbstractController
     }
 
     #[Route('/moy-sklad/stores', name: 'moysklad_stores_entry', methods: ['GET'])]
-    public function entry(ActiveCompanyService $activeCompany, MoySkladConnectionsQuery $query): Response
+    public function entry(Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionsQuery $query): Response
     {
         $companyId = (string) $activeCompany->getActiveCompany()->getId();
-        $pager = Pagerfanta::createForCurrentPageWithMaxPerPage(new QueryAdapter($query->forCompany($companyId)), 1, 20);
+        try {
+            $pager = Pagerfanta::createForCurrentPageWithMaxPerPage(new QueryAdapter($query->forCompany($companyId)), max(1, $request->query->getInt('page', 1)), 20);
+        } catch (OutOfRangeCurrentPageException) {
+            throw new UnprocessableEntityHttpException('Страница не существует.');
+        }
         if (1 === $pager->getNbResults()) {
             return $this->redirectToRoute('moysklad_stores', ['connectionId' => iterator_to_array($pager->getCurrentPageResults())[0]->getId()]);
         }
@@ -59,7 +65,8 @@ final class StoreBalanceController extends AbstractController
             $accountsById[$account->id] = $account;
         }
         $run = $query->latestRun($companyId, $connectionId);
-        $allStores = $query->stores($companyId, $connectionId, $query->latestValuedSnapshot($companyId, $connectionId));
+        $valued = $query->latestValuedSnapshot($companyId, $connectionId);
+        $allStores = $query->stores($companyId, $connectionId, $valued['snapshotId'] ?? null);
         $totals = [];
         foreach ($allStores as $store) {
             if (null !== $store['accountId']) {
@@ -85,6 +92,7 @@ final class StoreBalanceController extends AbstractController
             'run' => null === $run ? null : $run + ['label' => StoreBalanceStatus::from($run['status'])->label(), 'tone' => StoreBalanceStatus::from($run['status'])->tone(), 'error' => StoreBalanceStatus::errorLabel($run['errorReason'])],
             'settings' => $financeRead ? $query->settings($companyId, $connectionId) : null,
             'financeRead' => $financeRead,
+            'valuedDate' => $valued['date'] ?? null,
             'book' => $balance->getBookStatus($companyId),
             'csrfId' => self::csrfId($companyId, $connectionId),
         ]);
