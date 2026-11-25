@@ -28,7 +28,7 @@
 | Ozon: в метаданных листинга хранится `description_category_id`, без названия и без `type_id` | `OzonProductCatalogNormalizer.php:185` |
 | WB: хранится `subjectName`, без `subjectID` | `RefreshWbListingCatalogAction.php:182` |
 
-## Решения (рекомендация; ждут подтверждения Владельца)
+## Решения (подтверждены Владельцем 25.11.2026)
 
 | # | Вопрос | Рекомендация | Почему |
 |---|---|---|---|
