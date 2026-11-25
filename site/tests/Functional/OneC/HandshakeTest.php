@@ -88,10 +88,10 @@ final class HandshakeTest extends WebTestCaseBase
     public function testTokenCannotBeReadAgainAndCreatingRequiresOwnerAndCsrf(): void
     {
         [$client, $token, $companyId] = $this->createConnection();
-        $client->request('GET', '/onec/connections/new');
+        $form = $client->request('GET', '/onec/connections/new');
         self::assertResponseIsSuccessful();
         self::assertStringNotContainsString($token, (string) $client->getResponse()->getContent());
-        $client->request('POST', '/onec/connections/new', ['_token' => 'invalid', 'name' => 'Ещё одна база']);
+        $client->request('POST', '/onec/connections/new', ['_token' => 'invalid', 'request_id' => $form->filter('[name=request_id]')->attr('value'), 'name' => 'Ещё одна база']);
         self::assertResponseStatusCodeSame(403);
         $company = $this->em()->find(\App\Company\Entity\Company::class, $companyId);
         self::assertNotNull($company);
@@ -132,6 +132,8 @@ final class HandshakeTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(413);
         $client->jsonRequest('POST', $url, $body, ['HTTP_AUTHORIZATION' => 'Bearer '.str_repeat('0', 64)]);
         self::assertResponseStatusCodeSame(401);
+        $client->jsonRequest('POST', $url, $body + ['extra' => array_fill(0, 65537, 0)], $headers);
+        self::assertResponseStatusCodeSame(413);
         $body['organizations'][0]['inn'] = '123456789012';
         $client->jsonRequest('POST', $url, $body, $headers);
         self::assertResponseIsSuccessful();

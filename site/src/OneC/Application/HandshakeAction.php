@@ -25,21 +25,31 @@ final readonly class HandshakeAction
     /** @return array<string, mixed> */
     public function __invoke(#[\SensitiveParameter] string $token, string $json): array
     {
-        return $this->em->wrapInTransaction(function () use ($token, $json): array {
+        $hash = hash('sha256', $token);
+        $credentials = $this->em->getConnection()->fetchAssociative('SELECT id, status FROM onec_connection WHERE token_hash = ?', [$hash]);
+        if (false === $credentials) {
+            throw new \DomainException('Неверный токен подключения.', 401);
+        }
+        if ('disabled' === $credentials['status']) {
+            throw new \DomainException('Подключение отключено.', 403);
+        }
+        if (!$this->onecHandshakeLimiter->create($credentials['id'])->consume()->isAccepted()) {
+            throw new \DomainException('Повторите рукопожатие через минуту.', 429);
+        }
+        $snapshot = HandshakeSnapshot::parse($json);
+
+        // Во время разбора токен могли отозвать или перевыпустить.
+        return $this->em->wrapInTransaction(function () use ($hash, $snapshot): array {
             $connection = $this->em->createQueryBuilder()
                 ->select('c')->from(OneCConnection::class, 'c')
-                ->where('c.tokenHash = :hash')->setParameter('hash', hash('sha256', $token))
-                ->getQuery()->setLockMode(LockMode::PESSIMISTIC_WRITE)->getOneOrNullResult();
+                ->where('c.tokenHash = :hash')->setParameter('hash', $hash)
+                ->getQuery()->setHint(\Doctrine\ORM\Query::HINT_REFRESH, true)->setLockMode(LockMode::PESSIMISTIC_WRITE)->getOneOrNullResult();
             if (!$connection instanceof OneCConnection) {
                 throw new \DomainException('Неверный токен подключения.', 401);
             }
             if ('disabled' === $connection->status) {
                 throw new \DomainException('Подключение отключено.', 403);
             }
-            if (!$this->onecHandshakeLimiter->create($connection->id)->consume()->isAccepted()) {
-                throw new \DomainException('Повторите рукопожатие через минуту.', 429);
-            }
-            $snapshot = HandshakeSnapshot::parse($json);
             $now = $this->clock->now();
             $support = $this->support->evaluate($snapshot);
             $connection->handshake($snapshot->baseId, $snapshot->versions, 'unsupported' !== $support['level'], $now);

@@ -22,6 +22,17 @@ final class ConfigurationSupportTest extends TestCase
         yield 'другая конфигурация' => ['УправлениеТорговлей', '3.0.100', '1.2', 'unsupported'];
     }
 
+    public function testSeparatorsAndEscapedQuotesInAnExtensionStringDoNotCountAsStructure(): void
+    {
+        $baseId = Uuid::uuid7()->toString();
+        $json = json_encode([
+            'base_id' => $baseId, 'config_name' => 'БухгалтерияПредприятия', 'config_version' => '3.0',
+            'platform_version' => '8.3', 'processor_version' => '1', 'organizations' => [],
+            'extension' => str_repeat('"{[,,,\\', 20000),
+        ], \JSON_THROW_ON_ERROR);
+        self::assertSame($baseId, HandshakeSnapshot::parse($json)->baseId);
+    }
+
     #[DataProvider('versions')]
     public function testSupport(string $name, string $version, string $processor, string $expected): void
     {

@@ -18,6 +18,7 @@ final readonly class HandshakeSnapshot
 
     public static function parse(string $json): self
     {
+        self::limitStructure($json);
         $data = json_decode($json, false, 64, \JSON_THROW_ON_ERROR);
         if (!$data instanceof \stdClass || !\is_array($data->organizations ?? null)) {
             throw new \InvalidArgumentException('Передайте полный список организаций.');
@@ -52,6 +53,33 @@ final readonly class HandshakeSnapshot
         }
 
         return new self($baseId, $versions, array_values($organizations));
+    }
+
+    /**
+     * Ограничиваем число элементов до создания PHP-массивов. Знаки внутри
+     * строк, включая экранированные кавычки, к структуре JSON не относятся.
+     */
+    private static function limitStructure(string $json): void
+    {
+        $remaining = 65536;
+        $length = \strlen($json);
+        if ($length <= $remaining) {
+            return;
+        }
+        $inString = false;
+        for ($offset = 0; $offset < $length; ++$offset) {
+            $offset += strcspn($json, $inString ? '"\\' : '"{[,', $offset);
+            if ($offset >= $length) {
+                break;
+            }
+            if ('"' === $json[$offset]) {
+                $inString = !$inString;
+            } elseif ($inString) {
+                ++$offset;
+            } elseif (--$remaining < 0) {
+                throw new \DomainException('Слишком много элементов JSON в рукопожатии.', 413);
+            }
+        }
     }
 
     private static function uuid(mixed $value): string
