@@ -21,11 +21,13 @@
         </div>
         {% set mappingId = mappingConnectionId|default(connection.id|default(null)) %}
         {% set mappingProvider = mappingMarketplace|default(null) %}
+        {% set storesActive = storesConnectionId|default(null) is not null or pickerRoute|default(null) == 'moysklad_stores' %}
         <nav class="vf-seg mb-3" data-moysklad-tabs aria-label="Разделы МойСклад">
             {% for tab in [
-                {label: 'Подключения', href: path('moysklad_connections_index'), active: mappingProvider is null},
+                {label: 'Подключения', href: path('moysklad_connections_index'), active: mappingProvider is null and not storesActive},
                 {label: 'Маппинг Ozon', href: mappingId ? path('moysklad_listing_mappings', {connectionId: mappingId, marketplace: 'ozon'}) : path('moysklad_mapping_entry', {marketplace: 'ozon'}), active: mappingProvider == 'ozon'},
                 {label: 'Маппинг Wildberries', href: mappingId ? path('moysklad_listing_mappings', {connectionId: mappingId, marketplace: 'wildberries'}) : path('moysklad_mapping_entry', {marketplace: 'wildberries'}), active: mappingProvider == 'wildberries'},
+                {label: 'Склады', href: mappingId ? path('moysklad_stores', {connectionId: mappingId}) : path('moysklad_stores_entry'), active: storesActive},
             ] %}
                 <a href="{{ tab.href }}"{% if tab.active %} class="active" aria-current="page"{% endif %}>{{ tab.label }}</a>
             {% endfor %}
