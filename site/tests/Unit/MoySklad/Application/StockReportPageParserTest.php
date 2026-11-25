@@ -31,6 +31,39 @@ final class StockReportPageParserTest extends TestCase
         self::assertSame('4.125', $rows[1]->levels[0]->stock);
     }
 
+    public function testParsesStockCostRowsKeepingFractionalKopecks(): void
+    {
+        $json = '{"meta":{"href":"x","size":3,"limit":1000,"offset":0},"rows":['
+            .'{"meta":{"type":"product","href":"https://api.moysklad.ru/api/remap/1.2/entity/product/00000000-0000-4000-8000-0000000000AA?expand=supplier"},"price":15433.3333,"stock":2},'
+            .'{"meta":{"type":"variant","href":"https://api.moysklad.ru/api/remap/1.2/entity/variant/00000000-0000-4000-8000-0000000000bb"},"price":0,"stock":0},'
+            .'{"meta":{"type":"service","href":"https://api.moysklad.ru/api/remap/1.2/entity/service/00000000-0000-4000-8000-0000000000cc"},"price":100}]}';
+
+        $page = (new StockReportPageParser())->parseCosts($json);
+
+        self::assertSame(3, $page->size);
+        self::assertCount(2, $page->rows);
+        self::assertSame(['product', '00000000-0000-4000-8000-0000000000aa', '15433.3333'], [$page->rows[0]->assortmentType, $page->rows[0]->assortmentExternalId, $page->rows[0]->priceMinor]);
+        self::assertSame(['variant', '00000000-0000-4000-8000-0000000000bb', '0'], [$page->rows[1]->assortmentType, $page->rows[1]->assortmentExternalId, $page->rows[1]->priceMinor]);
+    }
+
+    public function testMissingCostMeansNoCostPermission(): void
+    {
+        $json = '{"meta":{"size":1,"limit":1000,"offset":0},"rows":[{"meta":{"type":"product","href":"https://api.moysklad.ru/api/remap/1.2/entity/product/00000000-0000-4000-8000-000000000001"},"stock":2}]}';
+
+        try {
+            (new StockReportPageParser())->parseCosts($json);
+            self::fail('Missing price must be reported.');
+        } catch (StockSyncException $error) {
+            self::assertSame('forbidden', $error->category);
+        }
+    }
+
+    public function testCostPageWithWrongRowCountIsInvalid(): void
+    {
+        $this->expectException(StockSyncException::class);
+        (new StockReportPageParser())->parseCosts('{"meta":{"size":2,"limit":1000,"offset":0},"rows":[]}');
+    }
+
     #[DataProvider('sanitizedLiveReport')]
     public function testParsesSanitizedLiveReportWithExpandedAssortmentHref(string $fixture, int $offset, string $firstAssortmentId): void
     {

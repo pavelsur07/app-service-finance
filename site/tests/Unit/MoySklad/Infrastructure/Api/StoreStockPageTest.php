@@ -52,6 +52,34 @@ final class StoreStockPageTest extends TestCase
         self::assertSame($body, (new MoySkladClient($http, 'https://example.test/api/remap/1.2'))->fetchStockReportPage('test-secret', 0));
     }
 
+    public function testRequestsStockCostReportPage(): void
+    {
+        $body = '{"meta":{"size":0,"limit":1000,"offset":2000},"rows":[]}';
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use ($body): MockResponse {
+            self::assertSame('GET', $method);
+            self::assertSame('https://example.test/api/remap/1.2/report/stock/all?limit=1000&offset=2000&groupBy=variant&filter=stockMode%3Dall', $url);
+            self::assertContains('Authorization: Bearer test-secret', $options['normalized_headers']['authorization']);
+            self::assertSame(0, $options['max_redirects']);
+
+            return new MockResponse($body);
+        });
+
+        self::assertSame($body, (new MoySkladClient($http, 'https://example.test/api/remap/1.2'))->fetchStockCostPage('test-secret', 2000));
+    }
+
+    public function testStockCostRateLimitKeepsRetryAfter(): void
+    {
+        $http = new MockHttpClient(new MockResponse('', ['http_code' => 429, 'response_headers' => ['X-Lognex-Retry-After' => '1500']]));
+
+        try {
+            (new MoySkladClient($http, 'https://example.test/api/remap/1.2'))->fetchStockCostPage('test-secret', 0);
+            self::fail('429 must be classified.');
+        } catch (StockSyncException $error) {
+            self::assertSame('rate_limited', $error->category);
+            self::assertSame(1500, $error->retryAfterMs);
+        }
+    }
+
     #[DataProvider('httpFailures')]
     public function testClassifiesStockHttpFailures(int $status, string $category): void
     {

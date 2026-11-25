@@ -15,14 +15,14 @@
         <div class="card" data-moysklad-connection-picker>
             <div class="list-group list-group-flush">
                 {% for item in pager.currentPageResults %}
-                    <a class="list-group-item list-group-item-action d-flex justify-content-between gap-3" href="{{ path('moysklad_listing_mappings', {connectionId: item.id, marketplace: mappingMarketplace}) }}">
+                    <a class="list-group-item list-group-item-action d-flex justify-content-between gap-3" href="{{ pickerRoute|default(null) == 'moysklad_stores' ? path('moysklad_stores', {connectionId: item.id}) : path('moysklad_listing_mappings', {connectionId: item.id, marketplace: mappingMarketplace}) }}">
                         <span class="text-break">{{ item.name }}</span>
                         {% if not item.isActive %}<span class="badge bg-secondary-lt">Отключено</span>{% endif %}
                     </a>
                 {% endfor %}
             </div>
             <div class="card-footer">
-                {% include 'partials/_pagination.html.twig' with {pager: pager, route: 'moysklad_mapping_entry', params: {marketplace: mappingMarketplace}} only %}
+                {% if pickerRoute|default(null) == 'moysklad_stores' %}{% include 'partials/_pagination.html.twig' with {pager: pager, route: 'moysklad_stores_entry', params: {}} only %}{% else %}{% include 'partials/_pagination.html.twig' with {pager: pager, route: 'moysklad_mapping_entry', params: {marketplace: mappingMarketplace}} only %}{% endif %}
             </div>
         </div>
     {% endif %}

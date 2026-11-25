@@ -6,6 +6,7 @@ namespace App\MoySklad\Application;
 
 use App\MoySklad\Application\DTO\ParsedPage;
 use App\MoySklad\Domain\StockAssortmentSnapshot;
+use App\MoySklad\Domain\StockCostSnapshot;
 use App\MoySklad\Domain\StockLevelSnapshot;
 use App\MoySklad\Exception\StockSyncException;
 use Ramsey\Uuid\Uuid;
@@ -17,7 +18,7 @@ final class StockReportPageParser
     {
         $decimalMarker = '__moysklad_decimal_'.bin2hex(random_bytes(16));
         try {
-            $page = json_decode($this->preserveMetricLexemes($json, $decimalMarker), true, 512, \JSON_THROW_ON_ERROR);
+            $page = json_decode($this->preserveMetricLexemes($json, $decimalMarker, ['"stock"', '"reserve"', '"inTransit"']), true, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
             throw new StockSyncException('invalid_response');
         }
@@ -75,6 +76,48 @@ final class StockReportPageParser
         }
 
         return new ParsedPage($size, $limit, $offset, $snapshots);
+    }
+
+    /**
+     * Отчёт `report/stock/all`: только себестоимость единицы. Нет `price` — у токена нет права видеть себестоимость.
+     *
+     * @return ParsedPage<StockCostSnapshot>
+     */
+    public function parseCosts(string $json): ParsedPage
+    {
+        $decimalMarker = '__moysklad_decimal_'.bin2hex(random_bytes(16));
+        try {
+            $page = json_decode($this->preserveMetricLexemes($json, $decimalMarker, ['"price"']), true, 512, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            throw new StockSyncException('invalid_response');
+        }
+        $meta = is_array($page) ? ($page['meta'] ?? null) : null;
+        $rows = is_array($page) ? ($page['rows'] ?? null) : null;
+        $size = is_array($meta) ? ($meta['size'] ?? null) : null;
+        $limit = is_array($meta) ? ($meta['limit'] ?? null) : null;
+        $offset = is_array($meta) ? ($meta['offset'] ?? null) : null;
+        if (!is_array($rows) || !array_is_list($rows) || !is_int($size) || $size < 0 || !is_int($limit) || $limit < 1 || $limit > 1000
+            || !is_int($offset) || $offset < 0 || $offset > $size || count($rows) !== max(0, min($limit, $size - $offset))) {
+            throw new StockSyncException('invalid_response');
+        }
+        $costs = [];
+        foreach ($rows as $row) {
+            $type = is_array($row) && is_array($row['meta'] ?? null) ? ($row['meta']['type'] ?? null) : null;
+            if (!in_array($type, ['product', 'variant'], true)) {
+                continue; // услуги и комплекты в снимок остатков не попадают
+            }
+            [$type, $externalId] = $this->identity($row['meta'], ['product', 'variant']);
+            if (!array_key_exists('price', $row)) {
+                throw new StockSyncException('forbidden');
+            }
+            $price = $this->decimal($row['price'], $decimalMarker);
+            if (str_starts_with($price, '-')) {
+                throw new StockSyncException('invalid_response');
+            }
+            $costs[] = new StockCostSnapshot($type, $externalId, $price);
+        }
+
+        return new ParsedPage($size, $limit, $offset, $costs);
     }
 
     /** @param list<string> $allowedTypes
@@ -147,7 +190,8 @@ final class StockReportPageParser
         return '-' === $match['sign'] ? '-'.$normalized : $normalized;
     }
 
-    private function preserveMetricLexemes(string $json, string $marker): string
+    /** @param list<string> $tokens */
+    private function preserveMetricLexemes(string $json, string $marker, array $tokens): string
     {
         $result = '';
         $length = strlen($json);
@@ -171,7 +215,7 @@ final class StockReportPageParser
             }
             $token = substr($json, $start, $offset - $start);
             $result .= $token;
-            if (!in_array($token, ['"stock"', '"reserve"', '"inTransit"'], true)) {
+            if (!in_array($token, $tokens, true)) {
                 continue;
             }
 

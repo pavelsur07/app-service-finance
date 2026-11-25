@@ -7,6 +7,7 @@ namespace App\MoySklad\MessageHandler;
 use App\MoySklad\Application\Action\SyncStockSnapshotAction;
 use App\MoySklad\Exception\StockSyncException;
 use App\MoySklad\Message\SyncStockSnapshotMessage;
+use App\MoySklad\Message\ValueStoreStocksMessage;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -34,6 +35,10 @@ final readonly class SyncStockSnapshotHandler
         try {
             $snapshotId = ($this->action)($message->companyId, $message->connectionId);
             $outcome = null === $snapshotId ? 'skipped' : 'succeeded';
+            if (null !== $snapshotId) {
+                // Снимок уже закоммичен; потерю этого dispatch закрывает app:moysklad:store-balance:requeue.
+                $this->bus->dispatch(new ValueStoreStocksMessage($message->companyId, $message->connectionId, $snapshotId));
+            }
         } catch (StockSyncException $error) {
             $runId = $error->runId;
             $category = $error->category;

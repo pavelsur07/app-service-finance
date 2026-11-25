@@ -132,6 +132,17 @@ final readonly class MoySkladClient
 
     public function fetchStockReportPage(#[\SensitiveParameter] string $token, int $offset, int $limit = 1000): string
     {
+        return $this->fetchStockPage($token, 'bystore', $offset, $limit);
+    }
+
+    /** Отчёт «Остатки» по всем складам: `price` — себестоимость единицы в копейках (нужно право «Видеть себестоимость»). */
+    public function fetchStockCostPage(#[\SensitiveParameter] string $token, int $offset, int $limit = 1000): string
+    {
+        return $this->fetchStockPage($token, 'all', $offset, $limit);
+    }
+
+    private function fetchStockPage(#[\SensitiveParameter] string $token, string $report, int $offset, int $limit): string
+    {
         if (strlen($token) > 8192 || 1 !== preg_match('/^[\x21-\x7E]+$/D', $token)) {
             throw new StockSyncException('auth');
         }
@@ -142,7 +153,7 @@ final readonly class MoySkladClient
         $httpClient = $this->httpClient instanceof RetryableHttpClient
             ? $this->httpClient->withOptions(['max_retries' => 0])
             : $this->httpClient;
-        $url = rtrim($this->baseUrl, '/').'/report/stock/bystore';
+        $url = rtrim($this->baseUrl, '/').'/report/stock/'.$report;
         $query = http_build_query([
             'limit' => $limit,
             'offset' => $offset,

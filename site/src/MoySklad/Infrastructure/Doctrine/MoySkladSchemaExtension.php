@@ -124,6 +124,7 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
         $auto->addColumn('updated_at', 'datetime_immutable_utc_ms', ['precision' => 3]);
         $auto->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'connection_id', 'marketplace')->create());
         $auto->addForeignKeyConstraint('moysklad_connections', ['company_id', 'connection_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_ms_auto_apply_connection');
+        $this->storeBalance($schema);
         $schema->getTable('moysklad_listing_mapping_revisions')->addForeignKeyConstraint('moysklad_connections', ['company_id', 'connection_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_ms_mapping_connection');
         $schema->getTable('moysklad_listing_mapping_revisions')->addForeignKeyConstraint('moysklad_products', ['company_id', 'connection_id', 'product_external_id'], ['company_id', 'connection_id', 'external_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_mapping_product');
         $schema->getTable('moysklad_listing_mapping_revisions')->addForeignKeyConstraint('moysklad_variants', ['company_id', 'connection_id', 'variant_external_id'], ['company_id', 'connection_id', 'external_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_mapping_variant');
@@ -139,5 +140,71 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
         $schema->getTable('moysklad_sync_cursors')->addForeignKeyConstraint('moysklad_connections', ['company_id', 'connection_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_moysklad_sync_cursors_connection');
         $schema->getTable('moysklad_stock_snapshots')->addForeignKeyConstraint('moysklad_connections', ['company_id', 'connection_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_moysklad_stock_snapshots_connection');
         $schema->getTable('moysklad_sync_runs')->addForeignKeyConstraint('moysklad_connections', ['company_id', 'connection_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_moysklad_sync_runs_connection');
+    }
+
+    /** Склады → счета Баланса: назначения, настройки записи, оценка снимка и проводки по счёту-дню. */
+    private function storeBalance(Schema $schema): void
+    {
+        $settings = $schema->createTable('moysklad_store_balance_settings');
+        foreach (['company_id', 'connection_id', 'actor_user_id'] as $column) {
+            $settings->addColumn($column, 'guid');
+        }
+        $settings->addColumn('counter_account_id', 'guid', ['notnull' => false]);
+        $settings->addColumn('enabled', 'boolean', ['default' => false]);
+        $settings->addColumn('updated_at', 'datetime_immutable_utc_ms', ['precision' => 3]);
+        $settings->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'connection_id')->create());
+        $settings->addForeignKeyConstraint('moysklad_connections', ['company_id', 'connection_id'], ['company_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_ms_store_balance_settings_connection');
+
+        $links = $schema->createTable('moysklad_store_balance_links');
+        foreach (['company_id', 'connection_id', 'store_external_id', 'actor_user_id'] as $column) {
+            $links->addColumn($column, 'guid');
+        }
+        $links->addColumn('balance_account_id', 'guid', ['notnull' => false]);
+        $links->addColumn('excluded', 'boolean', ['default' => false]);
+        $links->addColumn('updated_at', 'datetime_immutable_utc_ms', ['precision' => 3]);
+        $links->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'connection_id', 'store_external_id')->create());
+        $links->addForeignKeyConstraint('moysklad_stores', ['company_id', 'connection_id', 'store_external_id'], ['company_id', 'connection_id', 'external_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_store_balance_links_store');
+
+        $runs = $schema->createTable('moysklad_store_balance_runs');
+        foreach (['company_id', 'connection_id', 'snapshot_id'] as $column) {
+            $runs->addColumn($column, 'guid');
+        }
+        $runs->addColumn('valuation_date', 'date_immutable');
+        $runs->addColumn('status', 'string', ['length' => 16]);
+        $runs->addColumn('error_reason', 'string', ['length' => 64, 'notnull' => false]);
+        $runs->addColumn('attempts', 'integer', ['default' => 0]);
+        $runs->addColumn('created_at', 'datetime_immutable_utc_ms', ['precision' => 3]);
+        $runs->addColumn('finished_at', 'datetime_immutable_utc_ms', ['precision' => 3, 'notnull' => false]);
+        $runs->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'snapshot_id')->create());
+        $runs->addIndex(['company_id', 'connection_id', 'valuation_date'], 'idx_ms_store_balance_runs_date');
+        $runs->addForeignKeyConstraint('moysklad_stock_snapshots', ['company_id', 'connection_id', 'snapshot_id'], ['company_id', 'connection_id', 'id'], ['onDelete' => 'RESTRICT'], 'fk_ms_store_balance_runs_snapshot');
+
+        $valuations = $schema->createTable('moysklad_store_valuations');
+        foreach (['company_id', 'connection_id', 'snapshot_id', 'store_external_id'] as $column) {
+            $valuations->addColumn($column, 'guid');
+        }
+        $valuations->addColumn('valuation_date', 'date_immutable');
+        $valuations->addColumn('quantity', 'decimal', ['precision' => 30, 'scale' => 10]);
+        $valuations->addColumn('amount_minor', 'bigint');
+        $valuations->addColumn('unpriced_positions', 'integer', ['default' => 0]);
+        $valuations->addColumn('missing_positions', 'integer', ['default' => 0]);
+        $valuations->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'snapshot_id', 'store_external_id')->create());
+        $valuations->addIndex(['company_id', 'connection_id', 'store_external_id'], 'idx_ms_store_valuations_store');
+        $valuations->addForeignKeyConstraint('moysklad_store_balance_runs', ['company_id', 'snapshot_id'], ['company_id', 'snapshot_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_store_valuations_run');
+        $valuations->addForeignKeyConstraint('moysklad_stores', ['company_id', 'connection_id', 'store_external_id'], ['company_id', 'connection_id', 'external_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_store_valuations_store');
+
+        $postings = $schema->createTable('moysklad_store_balance_postings');
+        foreach (['company_id', 'connection_id', 'balance_account_id', 'snapshot_id'] as $column) {
+            $postings->addColumn($column, 'guid');
+        }
+        $postings->addColumn('valuation_date', 'date_immutable');
+        $postings->addColumn('target_minor', 'bigint');
+        $postings->addColumn('status', 'string', ['length' => 16]);
+        $postings->addColumn('reason', 'string', ['length' => 255, 'notnull' => false]);
+        $postings->addColumn('operation_id', 'guid', ['notnull' => false]);
+        $postings->addColumn('updated_at', 'datetime_immutable_utc_ms', ['precision' => 3]);
+        $postings->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'connection_id', 'valuation_date', 'balance_account_id')->create());
+        $postings->addIndex(['company_id', 'snapshot_id'], 'idx_ms_store_balance_postings_run');
+        $postings->addForeignKeyConstraint('moysklad_store_balance_runs', ['company_id', 'snapshot_id'], ['company_id', 'snapshot_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_store_balance_postings_run');
     }
 }
