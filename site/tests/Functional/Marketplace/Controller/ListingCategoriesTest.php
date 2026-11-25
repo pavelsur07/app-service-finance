@@ -59,6 +59,24 @@ final class ListingCategoriesTest extends WebTestCaseBase
         self::assertSelectorExists('[data-testid="listing-categories"] input[value="Платья и сарафаны"]');
     }
 
+    public function testPageUsesDesignSystemLayout(): void
+    {
+        $client = static::createClient();
+        [$owner, $company] = $this->seedCompany(0);
+        $this->login($client, $owner, $company);
+
+        $client->request('GET', self::MANAGE_URL);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextSame('.vf-page-head h1', 'Категории листингов');
+        self::assertSelectorTextSame('.vf-card > .card-header .nav-link.active', 'Категории');
+        self::assertSelectorTextContains('.vf-card .vf-empty__title', 'Категорий пока нет');
+        self::assertSelectorTextSame('.dropdown-item.active', 'Товары и остатки');
+
+        $this->seedCategory(self::COMPANY_ID, 'Платья');
+        $client->request('GET', self::MANAGE_URL);
+        self::assertSelectorExists('.vf-card table.vf-table input[value="Платья"]');
+    }
+
     public function testInvalidCsrfChangesNothing(): void
     {
         $client = static::createClient();
