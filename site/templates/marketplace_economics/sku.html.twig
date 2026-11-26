@@ -10,6 +10,16 @@
     {{ vite_entry_script_tags('marketplace_economics') }}
 {% endblock %}
 
+{% macro day(value) %}{{ value matches '/^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$/' ? value|date('d.m.Y') : (value ?: '…') }}{% endmacro %}
+{% macro hidden(params) %}
+    {% for k, v in params %}
+        {% if v is iterable %}
+            {% for item in v %}<input type="hidden" name="{{ k }}[]" value="{{ item }}">{% endfor %}
+        {% else %}
+            <input type="hidden" name="{{ k }}" value="{{ v }}">
+        {% endif %}
+    {% endfor %}
+{% endmacro %}
 {% macro money(minor) %}{{ minor|vf_minor(2)|vf_amount(2) }}{% endmacro %}
 {% macro pct(value) %}{{ value is null ? '—' : value|vf_number(1) ~ ' %' }}{% endmacro %}
 {% macro skuValue(value) %}
@@ -83,15 +93,57 @@
             </nav>
         </div>
 
-        <form method="get" class="card-body row g-3 align-items-end">
-            <div class="col-12 col-sm-6 col-lg-auto">
-                <label class="form-label" for="me-from">С даты</label>
-                <input class="form-control" id="me-from" type="date" name="from" required value="{{ from }}">
+        {# Период — как в «Unit — Экономика» и «Транзакциях ДДС»: пресеты DS и одно окно «Дата с / по». #}
+        {% set periodParams = params|filter((v, k) => k not in ['from', 'to', 'page', 'format']) %}
+        {% set presetsHtml %}{% include 'partials/_period_presets.html.twig' with {
+            route: 'marketplace_economics_sku',
+            params: periodParams,
+            from_param: 'from',
+            to_param: 'to',
+            current_from: from,
+            current_to: to,
+            class: 'vf-seg',
+        } only %}{% endset %}
+        {% set rangeLabel = ui.day(from) ~ ' — ' ~ ui.day(to) %}
+        <div class="card-body d-flex flex-wrap align-items-center gap-3 pb-0">
+            {{ presetsHtml }}
+            <div class="dropdown">
+                <button type="button"
+                        class="btn vf-ops-range{{ 'aria-current="true"' not in (presetsHtml ~ '') ? ' active' : '' }}"
+                        id="me-period"
+                        data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside"
+                        data-bs-offset="0,6"
+                        aria-haspopup="dialog"
+                        aria-expanded="false"
+                        aria-label="Выбрать период: {{ rangeLabel }}">
+                    <i class="ti ti-calendar" aria-hidden="true"></i>
+                    {{ rangeLabel }}
+                </button>
+                <div class="dropdown-menu vf-ops-pop vf-period-pop" role="dialog" aria-labelledby="me-period">
+                    <form method="get" action="{{ path('marketplace_economics_sku') }}">
+                        {{ ui.hidden(periodParams) }}
+                        <div class="vf-ops-pop__body vf-ops-pop__pair">
+                            <div>
+                                <label class="form-label" for="me-from">Дата с</label>
+                                <input class="form-control" id="me-from" type="date" name="from" required value="{{ from }}">
+                            </div>
+                            <div>
+                                <label class="form-label" for="me-to">Дата по</label>
+                                <input class="form-control" id="me-to" type="date" name="to" required value="{{ to }}">
+                            </div>
+                        </div>
+                        <div class="vf-ops-pop__footer">
+                            <button type="submit" class="btn btn-primary btn-sm">Применить</button>
+                        </div>
+                    </form>
+                </div>
             </div>
-            <div class="col-12 col-sm-6 col-lg-auto">
-                <label class="form-label" for="me-to">По дату</label>
-                <input class="form-control" id="me-to" type="date" name="to" required value="{{ to }}">
-            </div>
+        </div>
+
+        <form method="get" class="card-body row g-3 align-items-end" data-economics-filters>
+            <input type="hidden" name="from" value="{{ from }}">
+            <input type="hidden" name="to" value="{{ to }}">
             {% if report and report.channels|length > 1 %}
                 <div class="col-12 col-sm-6 col-lg-auto">
                     <label class="form-label" for="me-channel">Канал</label>
