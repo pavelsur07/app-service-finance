@@ -234,6 +234,9 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         $crawler = $client->request('GET', self::URL, ['from' => '2026-11-10', 'to' => '2026-11-18', 'q' => 'SKU-991', 'page' => '1']);
         self::assertResponseIsSuccessful();
         self::assertSelectorNotExists('.vf-seg a.active');
+        // Соседние .card-body в Tabler разделены border-top; у формы .row он съезжал на пресеты полосой.
+        self::assertSelectorNotExists('.card-body + .card-body');
+        self::assertSelectorExists('.card-body > form[data-economics-filters].row');
         self::assertSelectorTextContains('.vf-ops-range.active', '10.11.2026 — 18.11.2026');
         self::assertSelectorExists('.vf-period-pop form input[type="date"][name="from"][value="2026-11-10"]');
         self::assertSelectorExists('.vf-period-pop form input[type="date"][name="to"][value="2026-11-18"]');

@@ -105,7 +105,9 @@
             class: 'vf-seg',
         } only %}{% endset %}
         {% set rangeLabel = ui.day(from) ~ ' — ' ~ ui.day(to) %}
-        <div class="card-body d-flex flex-wrap align-items-center gap-3 pb-0">
+        {# Период и фильтры — в одном .card-body: соседние .card-body Tabler делит border-top. #}
+        <div class="card-body">
+        <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
             {{ presetsHtml }}
             <div class="dropdown">
                 <button type="button"
@@ -141,7 +143,7 @@
             </div>
         </div>
 
-        <form method="get" class="card-body row g-3 align-items-end" data-economics-filters>
+        <form method="get" class="row g-3 align-items-end" data-economics-filters>
             <input type="hidden" name="from" value="{{ from }}">
             <input type="hidden" name="to" value="{{ to }}">
             {% if report and report.channels|length > 1 %}
@@ -215,6 +217,7 @@
                 {% endif %}
             </div>
         </form>
+        </div>
     </div>
 
     {% if error %}
