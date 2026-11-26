@@ -73,4 +73,8 @@ class OneCPackage
 
     #[ORM\Column]
     public private(set) \DateTimeImmutable $receivedAt;
+
+    /** Начало чтения в 1С; NULL у частей, принятых до обязательного snapshot_at. */
+    #[ORM\Column(type: 'datetimetz_immutable', nullable: true)]
+    public private(set) ?\DateTimeImmutable $snapshotAt;
 }

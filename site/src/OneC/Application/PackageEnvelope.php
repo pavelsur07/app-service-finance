@@ -30,6 +30,7 @@ final readonly class PackageEnvelope
         public bool $includeOpenOutsidePeriod,
         public int $part,
         public int $partsTotal,
+        public \DateTimeImmutable $snapshotAt,
         public array $warnings,
         public int $documentCount,
     ) {
@@ -65,6 +66,7 @@ final readonly class PackageEnvelope
         if (!\is_int($part) || !\is_int($total) || $part < 1 || $part > $total || $total > self::MAX_PARTS) {
             throw self::invalid('Номер части — целое от 1 до parts_total, частей не больше 10 000.');
         }
+        $snapshotAt = self::snapshotAt($data->snapshot_at ?? null);
         if (!\is_bool($data->include_open_outside_period ?? null)) {
             throw self::invalid('include_open_outside_period — true или false.');
         }
@@ -87,6 +89,7 @@ final readonly class PackageEnvelope
             $data->include_open_outside_period,
             $part,
             $total,
+            $snapshotAt,
             self::warnings($warnings),
             \count($documents),
         );
@@ -125,6 +128,18 @@ final readonly class PackageEnvelope
         }
 
         return $value;
+    }
+
+    /** RFC 3339 со смещением, до секунды; хранится в UTC. */
+    private static function snapshotAt(mixed $value): \DateTimeImmutable
+    {
+        $date = \is_string($value) && 1 === preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/D', $value)
+            ? \DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:sP', $value) : false;
+        if (false === $date || $date->format('Y-m-d\TH:i:s') !== substr($value, 0, 19)) {
+            throw self::invalid('snapshot_at — время начала чтения в формате ГГГГ-ММ-ДДTчч:мм:сс+чч:мм.');
+        }
+
+        return $date->setTimezone(new \DateTimeZone('UTC'));
     }
 
     private static function invalid(string $message): OneCApiException

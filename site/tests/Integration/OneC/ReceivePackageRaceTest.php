@@ -127,7 +127,7 @@ final class ReceivePackageRaceTest extends PostgresResetTestCase
     {
         return json_encode([
             'package_id' => $packageId, 'base_id' => $this->baseId, 'kind' => 'invoices', 'processor_version' => '1.0',
-            'period_from' => '2026-11-01', 'period_to' => '2026-11-30', 'include_open_outside_period' => false,
+            'period_from' => '2026-11-01', 'period_to' => '2026-11-30', 'include_open_outside_period' => false, 'snapshot_at' => '2026-11-20T09:00:00+03:00',
             'part' => 1, 'parts_total' => 1, 'warnings' => [], 'documents' => [],
         ], \JSON_THROW_ON_ERROR);
     }
