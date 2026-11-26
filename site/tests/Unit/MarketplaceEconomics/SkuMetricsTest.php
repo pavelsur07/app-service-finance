@@ -52,7 +52,7 @@ final class SkuMetricsTest extends TestCase
         $m->add('sale', L::REVENUE, 30000, 3);
         $m->add('return', L::REVENUE, -10000, 1);
         $m->add('cost_price', L::COST_PRICE, -16000, 2);
-        $m->add('logistics_to', L::MD1, -510, 0);
+        $m->add('logistics_to', L::MD1, -511, 0);
         $m->add('logistics_back', L::MD1, -91, 0);
         $m->add('ads_cpc', L::MD2, -703, 0);
         $m->add('ads_settlement', L::INFO, -703, 0);
@@ -67,7 +67,7 @@ final class SkuMetricsTest extends TestCase
         self::assertSame(-400, $other->cacPerUnit());
         $m->merge($other);
         self::assertSame(5333, $m->costPricePerUnit());
-        self::assertSame(200, $m->logisticsPerUnit());
+        self::assertSame(201, $m->logisticsPerUnit());
         self::assertSame(101, $m->cacPerUnit());
     }
 
@@ -80,6 +80,16 @@ final class SkuMetricsTest extends TestCase
         self::assertNull($m->costPricePerUnit());
         self::assertNull($m->logisticsPerUnit());
         self::assertNull($m->cacPerUnit());
+    }
+
+    public function testReturnsFromEarlierSalesKeepTheSignedDenominator(): void
+    {
+        $m = new SkuMetrics();
+        $m->add('sale', L::REVENUE, 10000, 1);
+        $m->add('return', L::REVENUE, -30000, 3);
+        $m->add('logistics_back', L::MD1, -500, 0);
+
+        self::assertSame(-250, $m->logisticsPerUnit());
     }
 
     public function testMergeAddsVat(): void
