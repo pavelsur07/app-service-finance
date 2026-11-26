@@ -6,6 +6,7 @@
   "period_from": "2026-11-01",
   "period_to": "2026-11-30",
   "include_open_outside_period": true,
+  "open_outside_period_months": 12,
   "snapshot_at": "2026-11-26T10:15:00+03:00",
   "part": 1,
   "parts_total": 1,

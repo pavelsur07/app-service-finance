@@ -55,13 +55,20 @@ final class PackagesTest extends WebTestCaseBase
         $second = $this->body($baseId, ['package_id' => $package['package_id'], 'part' => 2]);
         $this->send($client, $token, $second);
         self::assertResponseIsSuccessful();
-        foreach ([['parts_total' => 3], ['snapshot_at' => '2026-11-20T09:00:01+03:00']] as $override) {
-            $mismatch = $this->body($baseId, array_replace(['package_id' => $package['package_id'], 'part' => 3, 'parts_total' => 3], $override));
-            $this->send($client, $token, $mismatch);
-            self::assertResponseStatusCodeSame(409, json_encode($override, \JSON_THROW_ON_ERROR));
-            self::assertSame('package_conflict', $this->error($client));
-            self::assertFalse($storage->exists(\dirname($row['storage_path']).'/3-'.hash('sha256', $mismatch).'.json.gz'));
-        }
+        $mismatch = $this->body($baseId, ['package_id' => $package['package_id'], 'part' => 3, 'parts_total' => 3]);
+        $this->send($client, $token, $mismatch);
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame('package_conflict', $this->error($client));
+        self::assertFalse($storage->exists(\dirname($row['storage_path']).'/3-'.hash('sha256', $mismatch).'.json.gz'));
+
+        // Отличается только snapshot_at.
+        $other = Uuid::uuid7()->toString();
+        $this->send($client, $token, $this->body($baseId, ['package_id' => $other]));
+        self::assertResponseIsSuccessful();
+        $this->send($client, $token, $this->body($baseId, ['package_id' => $other, 'part' => 2, 'snapshot_at' => '2026-11-20T09:00:01+03:00']));
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame('package_conflict', $this->error($client));
+        self::assertSame(1, $db->fetchOne('SELECT COUNT(*) FROM onec_package WHERE package_id = ?', [$other]));
     }
 
     public function testEnvelopeIsValidated(): void
@@ -85,6 +92,8 @@ final class PackagesTest extends WebTestCaseBase
             ['snapshot_at' => '2026-11-20 09:00:00'],
             ['snapshot_at' => '2026-11-20T09:00:00'],
             ['snapshot_at' => '2026-02-30T09:00:00+03:00'],
+            ['snapshot_at' => '2026-11-20T09:00:00+03:99'],
+            ['snapshot_at' => '2026-11-20T09:00:00+24:00'],
             ['snapshot_at' => (new \DateTimeImmutable('+2 days'))->format(\DATE_ATOM)],
         ] as $override) {
             $this->send($client, $token, $this->body($baseId, $override));

@@ -133,7 +133,7 @@ final readonly class PackageEnvelope
     /** RFC 3339 со смещением, до секунды; хранится в UTC. */
     private static function snapshotAt(mixed $value): \DateTimeImmutable
     {
-        $date = \is_string($value) && 1 === preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/D', $value)
+        $date = \is_string($value) && 1 === preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/D', $value)
             ? \DateTimeImmutable::createFromFormat('!Y-m-d\TH:i:sP', $value) : false;
         if (false === $date || $date->format('Y-m-d\TH:i:s') !== substr($value, 0, 19)) {
             throw self::invalid('snapshot_at — время начала чтения в формате ГГГГ-ММ-ДДTчч:мм:сс+чч:мм.');
