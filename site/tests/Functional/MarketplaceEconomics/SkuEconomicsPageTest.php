@@ -52,7 +52,7 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         self::assertSame('Прод., шт', $headers->eq(2)->text());
         self::assertSame('Продано, шт.', $headers->eq(2)->attr('title'));
         $groups = $crawler->filter('[data-economics-table] thead th.me-col-group');
-        self::assertSame(['Выручка', 'Товар', 'Расходы МП', 'СМ1', 'Реклама', 'СМ2', 'Склад и пр. МП', 'СМ3'], $groups->each(static fn ($th): string => $th->text()));
+        self::assertSame(['Выручка', 'Товар', 'Расходы МП', 'СМ1', 'Реклама', 'СМ2', 'Склад и пр. МП', 'СМ3', 'На единицу'], $groups->each(static fn ($th): string => $th->text()));
         self::assertSame('5', $groups->first()->attr('colspan'));
         self::assertSame('revenue revenueWithSpp spp vat revenueNet', $groups->first()->attr('data-columns'));
         $gross = $crawler->filter('[data-economics-table] thead th[data-column="gross"]');

@@ -71,6 +71,11 @@
             {id: 'fullPct', value: 'full', group: 'СМ3', short: '%', label: 'СМ3, %', kind: 'share', required: true},
         ]) %}
     {% endif %}
+    {% set columns = columns|merge([
+        {id: 'costPricePerUnit', value: 'costPricePerUnit', group: 'На единицу', short: 'Себест./ед.', label: 'Средняя себестоимость единицы, ₽'},
+        {id: 'logisticsPerUnit', value: 'logisticsPerUnit', group: 'На единицу', short: 'Логист./ед.', label: 'Доставка туда и обратно на единицу, ₽'},
+        {id: 'cacPerUnit', value: 'cacPerUnit', group: 'На единицу', short: 'CAC/ед.', label: 'Расходы на рекламу на единицу, ₽'},
+    ]) %}
     {# колонки группы идут подряд: группа → id её колонок, порядок — порядок columns #}
     {% set groups = {} %}
     {% for column in columns %}
@@ -244,7 +249,7 @@
                     итог кабинета тот же, что и при разнесении.</p>
             {% endif %}
             <p class="text-secondary small mb-0">
-                Суммы в ₽.
+                Суммы в ₽. Расходы на единицу рассчитаны по количеству продаж за вычетом возвратов.
                 Дней в витрине: {{ report.days|vf_number }}.
                 {% if report.daysWithoutCostPrice > 0 %}Дней с продажами без себестоимости: {{ report.daysWithoutCostPrice|vf_number }} — себестоимость там 0.{% endif %}
                 НДС к уплате — с выручки с СПП по налоговому профилю компании на каждый месяц; уровни СМ — без НДС, проценты — от выручки до СПП.

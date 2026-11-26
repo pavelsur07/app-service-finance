@@ -85,8 +85,22 @@ final class SkuEconomicsByCategoryTest extends WebTestCaseBase
     public function testXlsxByCategoryHasCategoryColumnAndSameTotal(): void
     {
         $client = static::createClient();
-        [$owner] = $this->seed();
+        [$owner, $category, $ozonId, $wbId] = $this->seed();
+        $this->line('ozon', $ozonId, 'return', 'revenue', -100000, 1);
+        $this->line('ozon', $ozonId, 'logistics_back', 'md1', -900);
+        $this->line('wildberries', $wbId, 'cost_price', 'cost_price', -12000, 2);
+        $this->line('wildberries', $wbId, 'logistics_to', 'md1', -2100);
+        $this->line('wildberries', $wbId, 'ads_cpc', 'md2', -1800);
         $this->login($client, $owner);
+
+        $columns = ['costPricePerUnit', 'logisticsPerUnit', 'cacPerUnit'];
+        $byCategory = $client->request('GET', self::URL, self::PERIOD + ['group' => 'category']);
+        $group = $byCategory->filter(sprintf('tr[data-category-group="%s"]', $category));
+        self::assertSame(['60,00', '15,00', '9,00'], array_map(fn (string $col): string => $this->cell($group, $col), $columns));
+
+        $bySku = $client->request('GET', self::URL, self::PERIOD + ['alloc' => '0']);
+        $returned = $bySku->filter('tbody tr')->reduce(static fn (Crawler $row): bool => str_contains($row->text(), 'OZ-1'));
+        self::assertSame(['—', '—', '—'], array_map(fn (string $col): string => $this->cell($returned, $col), $columns));
 
         $client->request('GET', self::URL, self::PERIOD + ['group' => 'category', 'format' => 'xlsx']);
         self::assertResponseIsSuccessful();
@@ -118,11 +132,19 @@ final class SkuEconomicsByCategoryTest extends WebTestCaseBase
         self::assertIsInt($revenue);
         $last = array_pop($body);
         self::assertNotNull($last);
-        self::assertEqualsWithDelta(3500.0, $last[$revenue] ?? null, 0.001);
+        self::assertEqualsWithDelta(2500.0, $last[$revenue] ?? null, 0.001);
+        $returnedRows = array_values(array_filter($body, static fn (array $row): bool => 'OZ-1' === $row[1]));
+        self::assertCount(1, $returnedRows);
+        foreach (['Себест./ед., ₽' => 40, 'Логист./ед., ₽' => 10, 'CAC/ед., ₽' => 6] as $header => $expected) {
+            $index = array_search($header, $rows[1], true);
+            self::assertIsInt($index);
+            self::assertSame($expected, $last[$index]);
+            self::assertSame('', $returnedRows[0][$index]);
+        }
     }
 
     /**
-     * @return array{User, string}
+     * @return array{User, string, string, string}
      */
     private function seed(): array
     {
@@ -157,7 +179,7 @@ final class SkuEconomicsByCategoryTest extends WebTestCaseBase
         $this->day('ozon');
         $this->day('wildberries');
 
-        return [$owner, $dresses->getId()];
+        return [$owner, $dresses->getId(), $ozon->getId(), $wb->getId()];
     }
 
     private function listing(Company $company, MarketplaceType $type, string $sku, string $name): MarketplaceListing
