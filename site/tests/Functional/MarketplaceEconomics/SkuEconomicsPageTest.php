@@ -223,6 +223,36 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         self::assertSame('/marketplace/economics/quality', $crawler->filter('nav[aria-label="Отчёт"] a')->last()->attr('href'));
     }
 
+    public function testPeriodPresetsAndRangePickerKeepOtherFilters(): void
+    {
+        $client = static::createClient();
+        [$owner] = $this->seed();
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
+        $this->day('2026-11-10');
+
+        $crawler = $client->request('GET', self::URL, ['from' => '2026-11-10', 'to' => '2026-11-18', 'q' => 'SKU-991', 'page' => '1']);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists('.vf-seg a.active');
+        self::assertSelectorTextContains('.vf-ops-range.active', '10.11.2026 — 18.11.2026');
+        self::assertSelectorExists('.vf-period-pop form input[type="date"][name="from"][value="2026-11-10"]');
+        self::assertSelectorExists('.vf-period-pop form input[type="date"][name="to"][value="2026-11-18"]');
+        self::assertSelectorExists('.vf-period-pop form input[type="hidden"][name="q"][value="SKU-991"]');
+        self::assertSelectorExists('[data-economics-filters] input[type="hidden"][name="from"][value="2026-11-10"]');
+        self::assertSelectorExists('[data-economics-filters] input[type="hidden"][name="to"][value="2026-11-18"]');
+
+        $yesterday = (new \DateTimeImmutable('yesterday'))->format('Y-m-d');
+        $href = (string) $crawler->filter('.vf-seg a')->first()->attr('href');
+        self::assertSame('Вчера', $crawler->filter('.vf-seg a')->first()->text());
+        parse_str((string) parse_url($href, \PHP_URL_QUERY), $query);
+        self::assertSame(['q' => 'SKU-991', 'from' => $yesterday, 'to' => $yesterday], $query);
+
+        $client->request('GET', $href);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.vf-seg a.active[aria-current="true"]', 'Вчера');
+        self::assertSelectorNotExists('.vf-ops-range.active');
+    }
+
     public function testSortingPaginationAndCompanyIsolation(): void
     {
         $client = static::createClient();

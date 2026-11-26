@@ -7,6 +7,7 @@
 
   Ссылки-сегменты, работают без JS: пресет — переход на route с dateFrom/dateTo поверх params;
   активный — тот, чей период совпадает с current_from/current_to (строки Y-m-d).
+  Имена параметров — from_param/to_param (по умолчанию dateFrom/dateTo).
     {% include 'partials/_period_presets.html.twig' with {route: 'x', params: {…}, current_from: '…', current_to: '…', class: '…'} only %}
 #}
 {% set today = date('today') %}
@@ -25,7 +26,7 @@
             {% set preset_from = preset.from|date('Y-m-d') %}
             {% set preset_to = preset.to|date('Y-m-d') %}
             {% set active = preset_from == (current_from ?? null) and preset_to == (current_to ?? null) %}
-            <a href="{{ path(route, (params ?? {})|merge({dateFrom: preset_from, dateTo: preset_to})) }}"
+            <a href="{{ path(route, (params ?? {})|merge({(from_param ?? 'dateFrom'): preset_from, (to_param ?? 'dateTo'): preset_to})) }}"
                title="{{ preset.from|date('d.m.Y') }} — {{ preset.to|date('d.m.Y') }}"
                {% if active %}class="active" aria-current="true"{% endif %}>{{ preset.label }}</a>
         {% endfor %}
