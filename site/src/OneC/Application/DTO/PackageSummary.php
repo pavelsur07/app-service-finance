@@ -8,7 +8,7 @@ namespace App\OneC\Application\DTO;
 final readonly class PackageSummary
 {
     /**
-     * @param list<PackagePart> $parts
+     * @param list<PackagePart> $parts первые части выгрузки для ссылок на сырьё
      * @param list<string> $warnings
      */
     public function __construct(
@@ -17,13 +17,9 @@ final readonly class PackageSummary
         public string $periodFrom,
         public string $periodTo,
         public int $partsTotal,
+        public int $partsReceived,
         public array $parts,
         public array $warnings,
     ) {
-    }
-
-    public function partsReceived(): int
-    {
-        return \count($this->parts);
     }
 }

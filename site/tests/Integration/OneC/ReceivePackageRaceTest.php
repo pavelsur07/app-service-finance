@@ -76,7 +76,7 @@ final class ReceivePackageRaceTest extends PostgresResetTestCase
         $child->start();
         self::assertTrue($child->waitUntil(static fn (string $type, string $out): bool => str_contains($out, "ready\n")), $child->getErrorOutput());
 
-        $result = self::getContainer()->get(ReceivePackageAction::class)($this->token, $body);
+        $result = self::getContainer()->get(ReceivePackageAction::class)($this->token, static fn (): string => $body);
 
         self::assertSame(0, $child->wait(), $child->getErrorOutput());
         self::assertSame(['accepted' => true, 'package_id' => $packageId, 'part' => 1, 'status' => 'stored', 'duplicate' => true], $result);
@@ -90,7 +90,7 @@ final class ReceivePackageRaceTest extends PostgresResetTestCase
         $body = $this->body($packageId);
         $this->competitor($packageId, hash('sha256', $body));
 
-        $result = self::getContainer()->get(ReceivePackageAction::class)($this->token, $body);
+        $result = self::getContainer()->get(ReceivePackageAction::class)($this->token, static fn (): string => $body);
 
         self::assertSame(['accepted' => true, 'package_id' => $packageId, 'part' => 1, 'status' => 'stored', 'duplicate' => true], $result);
         self::assertTrue($this->em->isOpen());
@@ -103,7 +103,7 @@ final class ReceivePackageRaceTest extends PostgresResetTestCase
         $this->competitor($packageId, str_repeat('a', 64));
 
         try {
-            self::getContainer()->get(ReceivePackageAction::class)($this->token, $this->body($packageId));
+            self::getContainer()->get(ReceivePackageAction::class)($this->token, fn (): string => $this->body($packageId));
             self::fail('Ожидался конфликт пакета.');
         } catch (OneCApiException $e) {
             self::assertSame(409, $e->status);

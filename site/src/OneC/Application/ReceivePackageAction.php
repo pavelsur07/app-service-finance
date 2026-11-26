@@ -25,8 +25,12 @@ final readonly class ReceivePackageAction
     ) {
     }
 
-    /** @return array{accepted: true, package_id: string, part: int, status: string, duplicate: bool} */
-    public function __invoke(#[\SensitiveParameter] string $token, string $body): array
+    /**
+     * @param callable(): string $readBody читает тело только после проверки токена и лимита
+     *
+     * @return array{accepted: true, package_id: string, part: int, status: string, duplicate: bool}
+     */
+    public function __invoke(#[\SensitiveParameter] string $token, callable $readBody): array
     {
         $db = $this->em->getConnection();
         $tokenHash = hash('sha256', $token);
@@ -37,6 +41,7 @@ final readonly class ReceivePackageAction
         if (!$this->onecPackagesLimiter->create($connection['id'])->consume()->isAccepted()) {
             throw new OneCApiException(429, 'rate_limited', 'Повторите отправку через минуту.');
         }
+        $body = $readBody();
         $envelope = PackageEnvelope::parse($body);
         self::assertAccepts($connection, $envelope);
         $sha256 = hash('sha256', $body);
@@ -44,6 +49,8 @@ final readonly class ReceivePackageAction
         if (null !== $existing) {
             return self::repeat($existing, $sha256, $envelope);
         }
+        // До записи объекта, чтобы отклонённая часть не оставила сырья; повторно — под блокировкой.
+        $this->assertSiblings($connection['id'], $envelope);
 
         // Объект пишется до строки и вне транзакции: путь детерминирован, гонка
         // повторов перезаписывает те же байты.
@@ -59,14 +66,7 @@ final readonly class ReceivePackageAction
                 throw new OneCApiException(401, 'invalid_token', 'Неверный токен подключения.');
             }
             self::assertAccepts($locked, $envelope);
-            $sibling = $db->fetchAssociative(
-                'SELECT kind, period_from, period_to, include_open_outside_period, parts_total FROM onec_package WHERE connection_id = ? AND package_id = ? AND part <> ? LIMIT 1',
-                [$connection['id'], $envelope->packageId, $envelope->part],
-            );
-            if (false !== $sibling && [$sibling['kind'], $sibling['period_from'], $sibling['period_to'], (bool) $sibling['include_open_outside_period'], (int) $sibling['parts_total']]
-                !== [$envelope->kind, $envelope->periodFrom, $envelope->periodTo, $envelope->includeOpenOutsidePeriod, $envelope->partsTotal]) {
-                throw self::conflict();
-            }
+            $this->assertSiblings($connection['id'], $envelope);
             $now = $this->clock->now()->format('Y-m-d H:i:s');
             $id = $db->fetchOne(<<<'SQL'
                 INSERT INTO onec_package (id, connection_id, package_id, part, parts_total, kind, period_from, period_to,
@@ -110,6 +110,19 @@ final readonly class ReceivePackageAction
         }
         if ('connected' !== $connection['status']) {
             throw new OneCApiException(409, 'base_conflict', 'Сначала выполните рукопожатие.');
+        }
+    }
+
+    /** Части одной выгрузки совпадают по оболочке. */
+    private function assertSiblings(string $connectionId, PackageEnvelope $envelope): void
+    {
+        $sibling = $this->em->getConnection()->fetchAssociative(
+            'SELECT kind, period_from, period_to, include_open_outside_period, parts_total FROM onec_package WHERE connection_id = ? AND package_id = ? AND part <> ? LIMIT 1',
+            [$connectionId, $envelope->packageId, $envelope->part],
+        );
+        if (false !== $sibling && [$sibling['kind'], $sibling['period_from'], $sibling['period_to'], (bool) $sibling['include_open_outside_period'], (int) $sibling['parts_total']]
+            !== [$envelope->kind, $envelope->periodFrom, $envelope->periodTo, $envelope->includeOpenOutsidePeriod, $envelope->partsTotal]) {
+            throw self::conflict();
         }
     }
 

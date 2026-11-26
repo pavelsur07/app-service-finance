@@ -58,6 +58,7 @@ final class PackagesTest extends WebTestCaseBase
         $this->send($client, $token, $mismatch);
         self::assertResponseStatusCodeSame(409);
         self::assertSame('package_conflict', $this->error($client));
+        self::assertFalse($storage->exists(\dirname($row['storage_path']).'/3-'.hash('sha256', $mismatch).'.json.gz'));
     }
 
     public function testEnvelopeIsValidated(): void
@@ -73,6 +74,10 @@ final class PackagesTest extends WebTestCaseBase
             ['documents' => null],
             ['documents' => array_fill(0, 501, [])],
             ['include_open_outside_period' => 'yes'],
+            ['parts_total' => 10001],
+            ['parts_total' => 3000000000],
+            ['period_from' => "2026-11-01\0"],
+            ['warnings' => ["\0"]],
         ] as $override) {
             $this->send($client, $token, $this->body($baseId, $override));
             self::assertResponseStatusCodeSame(422, json_encode($override, \JSON_THROW_ON_ERROR));
@@ -82,6 +87,10 @@ final class PackagesTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(422);
         $client->request('POST', self::URL, server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token], content: str_repeat(' ', 10 * 1024 * 1024 + 1));
         self::assertResponseStatusCodeSame(413);
+        $this->send($client, $token, $this->body($baseId, ['unknown_field' => array_fill(0, 200001, 0)]));
+        self::assertResponseStatusCodeSame(413);
+        $this->send($client, str_repeat('0', 64), str_repeat(' ', 10 * 1024 * 1024 + 1));
+        self::assertResponseStatusCodeSame(401);
         self::assertSame(0, $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM onec_package p JOIN onec_connection c ON c.id = p.connection_id WHERE c.base_id = ?', [$baseId]));
     }
 

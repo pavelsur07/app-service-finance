@@ -18,7 +18,10 @@ use Ramsey\Uuid\Uuid;
  */
 final readonly class ConnectionQuery
 {
-    private const MAX_PACKAGES = 50;
+    private const MAX_PACKAGES = 20;
+    private const MAX_PARTS_SHOWN = 100;
+    private const MAX_WARNINGS_SHOWN = 20;
+    private const MAX_WARNING_LENGTH = 500;
 
     public function __construct(private EntityManagerInterface $em)
     {
@@ -48,34 +51,46 @@ final readonly class ConnectionQuery
     }
 
     /**
-     * Последние выгрузки со всеми их частями.
+     * Последние выгрузки: число частей считает SQL, частей и предупреждений
+     * в выборке не больше MAX_PARTS_SHOWN / MAX_WARNINGS_SHOWN на выгрузку.
      *
      * @return list<PackageSummary>
      */
     public function packages(OneCConnection $connection): array
     {
-        $rows = $this->em->getConnection()->fetchAllAssociative(
-            'SELECT id, package_id, part, parts_total, kind, period_from, period_to, warnings, document_count, byte_size, received_at
-             FROM onec_package WHERE connection_id = ? AND package_id IN (
-                 SELECT package_id FROM onec_package WHERE connection_id = ? GROUP BY package_id ORDER BY MAX(received_at) DESC LIMIT '.self::MAX_PACKAGES.'
-             ) ORDER BY received_at DESC, part',
-            [$connection->id, $connection->id],
+        $db = $this->em->getConnection();
+        $recent = 'SELECT package_id FROM onec_package WHERE connection_id = :c GROUP BY package_id ORDER BY MAX(received_at) DESC LIMIT '.self::MAX_PACKAGES;
+        $rows = $db->fetchAllAssociative(
+            'SELECT id, package_id, part, parts_total, kind, period_from, period_to, document_count, byte_size, received_at, received
+             FROM (SELECT id, package_id, part, parts_total, kind, period_from, period_to, document_count, byte_size, received_at,
+                     ROW_NUMBER() OVER (PARTITION BY package_id ORDER BY part) AS n, COUNT(*) OVER (PARTITION BY package_id) AS received
+                   FROM onec_package WHERE connection_id = :c AND package_id IN ('.$recent.')) p
+             WHERE n <= '.self::MAX_PARTS_SHOWN.' ORDER BY received_at DESC, part',
+            ['c' => $connection->id],
         );
+        $warnings = [];
+        foreach ($db->fetchAllAssociative(
+            'SELECT package_id, warning FROM (
+                 SELECT p.package_id, left(CASE jsonb_typeof(w) WHEN \'string\' THEN w #>> \'{}\' ELSE w::text END, '.self::MAX_WARNING_LENGTH.') AS warning,
+                     ROW_NUMBER() OVER (PARTITION BY p.package_id ORDER BY p.part) AS n
+                 FROM onec_package p CROSS JOIN LATERAL jsonb_array_elements(p.warnings) w
+                 WHERE p.connection_id = :c AND p.package_id IN ('.$recent.')) x
+             WHERE n <= '.self::MAX_WARNINGS_SHOWN,
+            ['c' => $connection->id],
+        ) as $row) {
+            $warnings[$row['package_id']][$row['warning']] = true;
+        }
         $groups = [];
         foreach ($rows as $row) {
-            $group = $groups[$row['package_id']] ??= ['row' => $row, 'parts' => [], 'warnings' => []];
-            $group['parts'][] = new PackagePart($row['id'], $row['part'], $row['document_count'], $row['byte_size'], new \DateTimeImmutable($row['received_at']));
-            foreach (json_decode($row['warnings'], true, flags: \JSON_THROW_ON_ERROR) as $warning) {
-                $group['warnings'][] = \is_string($warning) ? $warning : json_encode($warning, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
-            }
-            $groups[$row['package_id']] = $group;
+            $groups[$row['package_id']] ??= ['row' => $row, 'parts' => []];
+            $groups[$row['package_id']]['parts'][] = new PackagePart($row['id'], $row['part'], $row['document_count'], $row['byte_size'], new \DateTimeImmutable($row['received_at']));
         }
 
-        return array_values(array_map(static function (array $group): PackageSummary {
+        return array_values(array_map(static function (array $group) use ($warnings): PackageSummary {
             $row = $group['row'];
             usort($group['parts'], static fn (PackagePart $a, PackagePart $b): int => $a->part <=> $b->part);
 
-            return new PackageSummary($row['package_id'], $row['kind'], $row['period_from'], $row['period_to'], $row['parts_total'], $group['parts'], array_values(array_unique($group['warnings'])));
+            return new PackageSummary($row['package_id'], $row['kind'], $row['period_from'], $row['period_to'], $row['parts_total'], $row['received'], $group['parts'], array_keys($warnings[$row['package_id']] ?? []));
         }, $groups));
     }
 
