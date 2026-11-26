@@ -5,8 +5,23 @@
     </div>
 {% endif %}
 
-<details class="card mb-3" data-test="group-report-accounts">
-    <summary class="card-body card-title m-0 py-3">Данные по счетам</summary>
+{% import 'document/_list_macros.html.twig' as ui %}
+{% set accountsTotal = report.accounts|length %}
+{% set laggingTotal = report.accounts|filter(a => a.lagging)|length %}
+{# Отстающие счета — повод заглянуть: тогда блок открыт сразу. Шеврон, сводка и «Показать/Скрыть» — vf-disclosure. #}
+<details class="card vf-disclosure mb-3" data-test="group-report-accounts"{% if laggingTotal > 0 %} open{% endif %}>
+    <summary class="vf-disclosure__summary">
+        <i class="ti ti-chevron-right vf-disclosure__chevron" aria-hidden="true"></i>
+        <span class="vf-disclosure__title">Данные по счетам</span>
+        <span class="vf-disclosure__meta" data-accounts-count>{{ accountsTotal > 0 ? accountsTotal ~ ' ' ~ ui.plural(accountsTotal, 'счёт', 'счёта', 'счетов') : 'нет счетов' }}</span>
+        {% if laggingTotal > 0 %}
+            <span class="badge bg-yellow-lt" data-accounts-lagging>{{ laggingTotal }} {{ ui.plural(laggingTotal, 'отстаёт', 'отстают', 'отстают') }}</span>
+        {% endif %}
+        <span class="vf-disclosure__action" aria-hidden="true">
+            <span class="vf-disclosure__action-show">Показать</span>
+            <span class="vf-disclosure__action-hide">Скрыть</span>
+        </span>
+    </summary>
     {% if report.accounts is empty %}
         <div class="card-body text-secondary">Нет активных счетов в RUB.</div>
     {% else %}

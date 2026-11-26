@@ -92,7 +92,12 @@ final class CashflowGroupReportControllerTest extends WebTestCaseBase
             self::assertResponseIsSuccessful();
             $accounts = $page->filter('details[data-test="group-report-accounts"]:not([open])');
             self::assertCount(1, $accounts);
-            self::assertSame('Данные по счетам', $accounts->filter('summary')->text());
+            $summary = $accounts->filter('summary');
+            self::assertStringContainsString('Данные по счетам', $summary->text());
+            self::assertSame('нет счетов', $summary->filter('[data-accounts-count]')->text());
+            self::assertCount(0, $summary->filter('[data-accounts-lagging]'));
+            self::assertCount(1, $summary->filter('.vf-disclosure__chevron'));
+            self::assertStringContainsString('Показать', $summary->text());
             $table = $page->filter('[data-cashflow-report]');
             self::assertCount(1, $table->filter('tr[data-row-key="sys:CF_OP"]:not([hidden]) button[aria-expanded="false"]'));
             self::assertCount(1, $table->filter('tr[data-row-key="OP_IN_CUSTOMERS"][hidden]'));
@@ -285,6 +290,9 @@ final class CashflowGroupReportControllerTest extends WebTestCaseBase
         self::assertStringContainsString('12.11.2026', $accounts->text());
         self::assertStringContainsString('Отстаёт', $accounts->text());
         self::assertStringNotContainsString('40802810000000000001', $accounts->text());
+        self::assertCount(1, $page->filter('details[data-test="group-report-accounts"][open]'), 'есть отстающий счёт — блок открыт');
+        self::assertMatchesRegularExpression('/^\\d+ сч(ёт|ёта|етов)$/u', $accounts->filter('summary [data-accounts-count]')->text());
+        self::assertMatchesRegularExpression('/^\\d+ отста(ёт|ют)$/u', $accounts->filter('summary [data-accounts-lagging]')->text());
     }
 
     public function testExportUsesSelectedViewAndDefaultsToCalendarMonths(): void
