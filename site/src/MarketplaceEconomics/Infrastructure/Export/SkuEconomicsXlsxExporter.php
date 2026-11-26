@@ -42,19 +42,19 @@ final readonly class SkuEconomicsXlsxExporter
             $byCategory = null !== $report->groups;
             $lead = $byCategory ? ['Категория'] : [];
             $blank = $byCategory ? [''] : [];
-            $writer->addRow(new Row(array_map(static fn (string $h): Cell => Cell::fromValue($h), [...$lead, ...self::header($allocated)])));
+            $writer->addRow(Row::fromValues([...$lead, ...self::header($allocated), 'Себест./ед., ₽', 'Логист./ед., ₽', 'CAC/ед., ₽']));
             $sections = $byCategory
                 ? array_map(static fn (SkuEconomicsCategoryGroup $g): array => [[$g->name], $g->rows], $report->groups)
                 : [[[], $report->rows]];
             foreach ($sections as [$prefix, $rows]) {
                 foreach ($rows as $row) {
-                    $writer->addRow($this->row([...$prefix, $row->sku, (string) $row->title, SkuEconomicsFilter::CHANNELS[(string) $row->channel] ?? ''], $row->current, $allocated));
+                    $writer->addRow($this->skuRow([...$prefix, $row->sku, (string) $row->title, SkuEconomicsFilter::CHANNELS[(string) $row->channel] ?? ''], $row->current, $allocated));
                 }
             }
             if (null !== $report->unallocated) {
-                $writer->addRow($this->row(['Нераспределено', ...$blank, '', ''], $report->unallocated, $allocated));
+                $writer->addRow($this->skuRow(['Нераспределено', ...$blank, '', ''], $report->unallocated, $allocated));
             }
-            $writer->addRow($this->row(['Итого', ...$blank, '', ''], $report->total, $allocated));
+            $writer->addRow($this->skuRow(['Итого', ...$blank, '', ''], $report->total, $allocated));
         } finally {
             $writer->close();
         }
@@ -93,6 +93,17 @@ final readonly class SkuEconomicsXlsxExporter
             'Комиссия', 'Логистика туда', 'Логистика обратно', 'Эквайринг', 'Прочие СМ1', 'СМ1', 'СМ1, %', 'Реклама', 'ДРР, %', 'СМ2', 'СМ2, %'];
 
         return $allocated ? [...$columns, 'Склад и прочие МП', 'СМ3', 'СМ3, %', 'СПП (справочно)'] : [...$columns, 'СПП (справочно)'];
+    }
+
+    /** @param list<string> $label первые колонки строки */
+    private function skuRow(array $label, SkuMetrics $metrics, bool $allocated): Row
+    {
+        $row = $this->row($label, $metrics, $allocated);
+        foreach ([$metrics->costPricePerUnit(), $metrics->logisticsPerUnit(), $metrics->cacPerUnit()] as $minor) {
+            $row->addCell(Cell::fromValue(null === $minor ? null : $minor / 100));
+        }
+
+        return $row;
     }
 
     /** @param list<string> $label первые колонки строки */

@@ -46,6 +46,52 @@ final class SkuMetricsTest extends TestCase
         self::assertSame([56.0, 51.0, 5.0], [$m->percentOfRevenue($m->md1()), $m->percentOfRevenue($m->md2()), $m->drr()]);
     }
 
+    public function testPerUnitCostsUseNetUnitsAndRoundAfterAggregation(): void
+    {
+        $m = new SkuMetrics();
+        $m->add('sale', L::REVENUE, 30000, 3);
+        $m->add('return', L::REVENUE, -10000, 1);
+        $m->add('cost_price', L::COST_PRICE, -16000, 2);
+        $m->add('logistics_to', L::MD1, -511, 0);
+        $m->add('logistics_back', L::MD1, -91, 0);
+        $m->add('ads_cpc', L::MD2, -703, 0);
+        $m->add('ads_settlement', L::INFO, -703, 0);
+
+        self::assertSame(8000, $m->costPricePerUnit());
+        self::assertSame(301, $m->logisticsPerUnit());
+        self::assertSame(352, $m->cacPerUnit());
+
+        $other = new SkuMetrics();
+        $other->add('sale', L::REVENUE, 1000, 1);
+        $other->add('ads_pay_per_order', L::MD2, 400, 0);
+        self::assertSame(-400, $other->cacPerUnit());
+        $m->merge($other);
+        self::assertSame(5333, $m->costPricePerUnit());
+        self::assertSame(201, $m->logisticsPerUnit());
+        self::assertSame(101, $m->cacPerUnit());
+    }
+
+    public function testFullyReturnedSalesHaveNoPerUnitCosts(): void
+    {
+        $m = new SkuMetrics();
+        $m->add('sale', L::REVENUE, 10000, 1);
+        $m->add('return', L::REVENUE, -10000, 1);
+        $m->add('logistics_back', L::MD1, -500, 0);
+        self::assertNull($m->costPricePerUnit());
+        self::assertNull($m->logisticsPerUnit());
+        self::assertNull($m->cacPerUnit());
+    }
+
+    public function testReturnsFromEarlierSalesKeepTheSignedDenominator(): void
+    {
+        $m = new SkuMetrics();
+        $m->add('sale', L::REVENUE, 10000, 1);
+        $m->add('return', L::REVENUE, -30000, 3);
+        $m->add('logistics_back', L::MD1, -500, 0);
+
+        self::assertSame(-250, $m->logisticsPerUnit());
+    }
+
     public function testMergeAddsVat(): void
     {
         $a = new SkuMetrics();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceEconomics\Domain;
 
 use App\MarketplaceOperations\Enum\OperationKind;
+use App\Shared\Domain\ValueObject\Money;
 
 /**
  * Показатели SKU (или кабинета) за период, копейки со знаком канона: выручка «+», затраты «−».
@@ -97,6 +98,29 @@ final class SkuMetrics
     public function percentOfRevenue(int $amount): ?float
     {
         return $this->revenue > 0 ? round($amount * 100 / $this->revenue, 1) : null;
+    }
+
+    public function costPricePerUnit(): ?int
+    {
+        return $this->costPerNetUnit($this->costPrice);
+    }
+
+    public function logisticsPerUnit(): ?int
+    {
+        return $this->costPerNetUnit($this->logisticsTo + $this->logisticsBack);
+    }
+
+    public function cacPerUnit(): ?int
+    {
+        return $this->costPerNetUnit($this->ads);
+    }
+
+    /** Расход на единицу в копейках: в каноне расход имеет отрицательный знак. */
+    private function costPerNetUnit(int $signedCost): ?int
+    {
+        $quantity = $this->salesQty - $this->returnsQty;
+
+        return 0 === $quantity ? null : Money::fromMinor($signedCost, 'RUB')->multiplyByRatio('-1', (string) $quantity)->amountMinor();
     }
 
     /** ДРР, % — реклама к выручке. */
