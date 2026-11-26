@@ -68,3 +68,7 @@ framework:
             policy: fixed_window
             limit: 60
             interval: '1 minute'
+        onec_packages:
+            policy: fixed_window
+            limit: 120
+            interval: '1 minute'

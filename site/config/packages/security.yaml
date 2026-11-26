@@ -24,8 +24,8 @@ security:
             custom_authenticators:
                 - App\Shared\Security\Internal\InternalServiceAuthenticator
             entry_point: App\Shared\Security\Internal\InternalServiceAuthenticator
-        onec_handshake:
-            pattern: ^/api/onec/v1/handshake$
+        onec_api:
+            pattern: ^/api/onec/v1/(handshake|packages)$
             stateless: true
         external_api:
             pattern: ^/api/external/v1/
@@ -108,7 +108,7 @@ security:
     # Easy way to control access for large sections of your site
     # Note: Only the *first* access control that matches will be used
     access_control:
-        - { path: '^/api/onec/v1/handshake$', roles: PUBLIC_ACCESS, methods: [POST] }
+        - { path: '^/api/onec/v1/(handshake|packages)$', roles: PUBLIC_ACCESS, methods: [POST] }
         - { path: '^/api/(account|admin)/v1/auth/(csrf|login)$', roles: PUBLIC_ACCESS }
         - { path: '^/api/admin/v1/', roles: ROLE_ADMIN }
         - { path: '^/api/account/v1/', roles: ROLE_USER }
