@@ -27,13 +27,14 @@ final class PackagesTest extends WebTestCaseBase
         self::assertSame(['accepted' => true, 'package_id' => $package['package_id'], 'part' => 1, 'status' => 'stored', 'duplicate' => false], $first);
 
         $db = $this->em()->getConnection();
-        $row = $db->fetchAssociative('SELECT storage_path, sha256, byte_size, document_count, parts_total, warnings FROM onec_package WHERE package_id = ?', [$package['package_id']]);
+        $row = $db->fetchAssociative('SELECT storage_path, sha256, byte_size, document_count, parts_total, warnings, snapshot_at FROM onec_package WHERE package_id = ?', [$package['package_id']]);
         self::assertIsArray($row);
         self::assertSame(hash('sha256', $body), $row['sha256']);
         self::assertSame(\strlen($body), $row['byte_size']);
         self::assertSame(1, $row['document_count']);
         self::assertSame(2, $row['parts_total']);
         self::assertSame(['Документ не найден'], json_decode($row['warnings'], true));
+        self::assertTrue($db->fetchOne("SELECT snapshot_at = TIMESTAMPTZ '2026-11-20 06:00:00+00' FROM onec_package WHERE package_id = ?", [$package['package_id']]));
         self::assertStringStartsWith('onec/', $row['storage_path']);
         $storage = static::getContainer()->get(ObjectStorageInterface::class);
         self::assertSame($body, gzdecode($storage->read($row['storage_path'])));
@@ -54,11 +55,13 @@ final class PackagesTest extends WebTestCaseBase
         $second = $this->body($baseId, ['package_id' => $package['package_id'], 'part' => 2]);
         $this->send($client, $token, $second);
         self::assertResponseIsSuccessful();
-        $mismatch = $this->body($baseId, ['package_id' => $package['package_id'], 'part' => 3, 'parts_total' => 3]);
-        $this->send($client, $token, $mismatch);
-        self::assertResponseStatusCodeSame(409);
-        self::assertSame('package_conflict', $this->error($client));
-        self::assertFalse($storage->exists(\dirname($row['storage_path']).'/3-'.hash('sha256', $mismatch).'.json.gz'));
+        foreach ([['parts_total' => 3], ['snapshot_at' => '2026-11-20T09:00:01+03:00']] as $override) {
+            $mismatch = $this->body($baseId, array_replace(['package_id' => $package['package_id'], 'part' => 3, 'parts_total' => 3], $override));
+            $this->send($client, $token, $mismatch);
+            self::assertResponseStatusCodeSame(409, json_encode($override, \JSON_THROW_ON_ERROR));
+            self::assertSame('package_conflict', $this->error($client));
+            self::assertFalse($storage->exists(\dirname($row['storage_path']).'/3-'.hash('sha256', $mismatch).'.json.gz'));
+        }
     }
 
     public function testEnvelopeIsValidated(): void
@@ -78,6 +81,11 @@ final class PackagesTest extends WebTestCaseBase
             ['parts_total' => 3000000000],
             ['period_from' => "2026-11-01\0"],
             ['warnings' => ["\0"]],
+            ['snapshot_at' => null],
+            ['snapshot_at' => '2026-11-20 09:00:00'],
+            ['snapshot_at' => '2026-11-20T09:00:00'],
+            ['snapshot_at' => '2026-02-30T09:00:00+03:00'],
+            ['snapshot_at' => (new \DateTimeImmutable('+2 days'))->format(\DATE_ATOM)],
         ] as $override) {
             $this->send($client, $token, $this->body($baseId, $override));
             self::assertResponseStatusCodeSame(422, json_encode($override, \JSON_THROW_ON_ERROR));
@@ -199,6 +207,7 @@ final class PackagesTest extends WebTestCaseBase
             'include_open_outside_period' => true,
             'part' => 1,
             'parts_total' => 2,
+            'snapshot_at' => '2026-11-20T09:00:00+03:00',
             'warnings' => ['Документ не найден'],
             'documents' => [['guid' => Uuid::uuid4()->toString(), 'type' => 'customer_invoice', 'amount' => '100.00']],
             'unknown_field' => 'игнорируется',

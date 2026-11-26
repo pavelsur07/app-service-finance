@@ -13,6 +13,9 @@ use Symfony\Component\RateLimiter\RateLimiterFactory;
 
 final readonly class HandshakeAction
 {
+    /** Глубина выгрузки открытых счетов вне периода, контракт v1 «Открытые счета вне периода». */
+    public const OPEN_OUTSIDE_PERIOD_MONTHS = 12;
+
     public function __construct(
         private EntityManagerInterface $em,
         private ConfigurationSupport $support,
@@ -63,6 +66,7 @@ final readonly class HandshakeAction
                 'support' => $support,
                 'organizations' => $organizations,
                 'messages' => [],
+                'settings' => ['open_outside_period_months' => self::OPEN_OUTSIDE_PERIOD_MONTHS],
             ];
         });
     }

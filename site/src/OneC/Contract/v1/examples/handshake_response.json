@@ -2,7 +2,19 @@
   "connection_id": "01949708-b318-75a3-a4f6-aa776cba619a",
   "status": "connected",
   "server_time": "2026-11-25T12:00:00+00:00",
-  "support": {"level": "supported", "message": "Поддерживаемая редакция БП 3.0."},
-  "organizations": [{"guid": "23c15967-e31e-49bb-afa7-8441c7784b63", "mapped": false, "company_name": null}],
-  "messages": []
+  "support": {
+    "level": "supported",
+    "message": "Поддерживаемая редакция БП 3.0."
+  },
+  "organizations": [
+    {
+      "guid": "23c15967-e31e-49bb-afa7-8441c7784b63",
+      "mapped": false,
+      "company_name": null
+    }
+  ],
+  "messages": [],
+  "settings": {
+    "open_outside_period_months": 12
+  }
 }

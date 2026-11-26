@@ -43,6 +43,10 @@ final readonly class ReceivePackageAction
         }
         $body = $readBody();
         $envelope = PackageEnvelope::parse($body);
+        // Снимок «из будущего» навсегда выиграл бы у последующих выгрузок.
+        if ($envelope->snapshotAt > $this->clock->now()->modify('+1 day')) {
+            throw new OneCApiException(422, 'invalid_package', 'snapshot_at позже текущего времени больше чем на сутки: проверьте часы рабочей станции.');
+        }
         self::assertAccepts($connection, $envelope);
         $sha256 = hash('sha256', $body);
         $existing = $this->existing($connection['id'], $envelope);
@@ -71,9 +75,10 @@ final readonly class ReceivePackageAction
             $id = $db->fetchOne(<<<'SQL'
                 INSERT INTO onec_package (id, connection_id, package_id, part, parts_total, kind, period_from, period_to,
                     include_open_outside_period, processor_version, versions, warnings, document_count, storage_path,
-                    sha256, byte_size, status, received_at)
+                    sha256, byte_size, status, received_at, snapshot_at)
                 VALUES (:id, :connection, :package, :part, :total, :kind, :from, :to, :open, :processor,
-                    CAST(:versions AS jsonb), CAST(:warnings AS jsonb), :documents, :path, :sha, :size, 'stored', :now)
+                    CAST(:versions AS jsonb), CAST(:warnings AS jsonb), :documents, :path, :sha, :size, 'stored', :now,
+                    CAST(:snapshot AS timestamptz))
                 ON CONFLICT (connection_id, package_id, part) DO NOTHING
                 RETURNING id
                 SQL, [
@@ -83,6 +88,7 @@ final readonly class ReceivePackageAction
                 'open' => $envelope->includeOpenOutsidePeriod ? 'true' : 'false', 'processor' => $envelope->processorVersion,
                 'versions' => $connection['versions'], 'warnings' => json_encode($envelope->warnings, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE),
                 'documents' => $envelope->documentCount, 'path' => $path, 'sha' => $sha256, 'size' => \strlen($body), 'now' => $now,
+                'snapshot' => $envelope->snapshotAt->format(\DATE_ATOM),
             ]);
             if (false === $id) {
                 return false;
@@ -117,11 +123,13 @@ final readonly class ReceivePackageAction
     private function assertSiblings(string $connectionId, PackageEnvelope $envelope): void
     {
         $sibling = $this->em->getConnection()->fetchAssociative(
-            'SELECT kind, period_from, period_to, include_open_outside_period, parts_total FROM onec_package WHERE connection_id = ? AND package_id = ? AND part <> ? LIMIT 1',
-            [$connectionId, $envelope->packageId, $envelope->part],
+            'SELECT kind, period_from, period_to, include_open_outside_period, parts_total,
+                snapshot_at IS NOT DISTINCT FROM CAST(? AS timestamptz) AS same_snapshot
+            FROM onec_package WHERE connection_id = ? AND package_id = ? AND part <> ? LIMIT 1',
+            [$envelope->snapshotAt->format(\DATE_ATOM), $connectionId, $envelope->packageId, $envelope->part],
         );
-        if (false !== $sibling && [$sibling['kind'], $sibling['period_from'], $sibling['period_to'], (bool) $sibling['include_open_outside_period'], (int) $sibling['parts_total']]
-            !== [$envelope->kind, $envelope->periodFrom, $envelope->periodTo, $envelope->includeOpenOutsidePeriod, $envelope->partsTotal]) {
+        if (false !== $sibling && [$sibling['kind'], $sibling['period_from'], $sibling['period_to'], (bool) $sibling['include_open_outside_period'], (int) $sibling['parts_total'], (bool) $sibling['same_snapshot']]
+            !== [$envelope->kind, $envelope->periodFrom, $envelope->periodTo, $envelope->includeOpenOutsidePeriod, $envelope->partsTotal, true]) {
             throw self::conflict();
         }
     }

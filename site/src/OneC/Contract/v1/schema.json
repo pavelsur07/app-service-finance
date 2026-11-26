@@ -14,6 +14,7 @@
         "inn": {"anyOf": [{"type": "string", "pattern": "^\\d{10}$"}, {"type": "null"}], "description": "ИНН юрлица; ИНН физлица (12 цифр) не передаётся"},
         "kpp": {"anyOf": [{"type": "string", "pattern": "^\\d{4}[0-9A-Z]{2}\\d{3}$"}, {"type": "null"}]},
         "invoice_type": {"enum": ["customer_invoice", "supplier_invoice"]},
+        "coverage_state": {"enum": ["complete", "partial", "not_selected"]},
 
         "handshake_request": {
             "description": "Тело POST /api/onec/v1/handshake — полный снимок справочника организаций.",
@@ -69,14 +70,21 @@
                         }
                     }
                 },
-                "messages": {"type": "array"}
+                "messages": {"type": "array"},
+                "settings": {
+                    "type": "object",
+                    "description": "Параметры выгрузки от сервера. Отсутствующий ключ — значение по умолчанию из контракта.",
+                    "properties": {
+                        "open_outside_period_months": {"type": "integer", "minimum": 1, "description": "Открытые счета вне периода — не старше стольких месяцев от даты начала чтения"}
+                    }
+                }
             }
         },
 
         "package_part": {
             "description": "Тело POST /api/onec/v1/packages — одна часть выгрузки. Оболочка (всё, кроме part, warnings, documents) одинакова во всех частях одного package_id.",
             "type": "object",
-            "required": ["package_id", "base_id", "kind", "processor_version", "period_from", "period_to", "include_open_outside_period", "part", "parts_total", "documents"],
+            "required": ["package_id", "base_id", "kind", "processor_version", "period_from", "period_to", "include_open_outside_period", "snapshot_at", "part", "parts_total", "documents"],
             "properties": {
                 "package_id": {"$ref": "#/$defs/uuid"},
                 "base_id": {"$ref": "#/$defs/uuid"},
@@ -85,6 +93,7 @@
                 "period_from": {"$ref": "#/$defs/date"},
                 "period_to": {"$ref": "#/$defs/date"},
                 "include_open_outside_period": {"type": "boolean"},
+                "snapshot_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(Z|[+-]\\d{2}:\\d{2})$", "description": "Время начала чтения в 1С, RFC 3339 со смещением, до секунды. Одно на все части выгрузки, при повторе не меняется"},
                 "part": {"type": "integer", "minimum": 1, "maximum": 10000},
                 "parts_total": {"type": "integer", "minimum": 1, "maximum": 10000},
                 "warnings": {"type": "array", "items": {"type": "string"}},
@@ -93,13 +102,14 @@
             }
         },
         "coverage": {
-            "description": "Полнота выборки пары «организация + вид счёта» за период. Отсутствующая пара считается partial.",
+            "description": "Полнота выборки пары «организация + вид счёта». Отсутствующая пара или поле — partial.",
             "type": "object",
             "required": ["organization_guid", "type", "state"],
             "properties": {
                 "organization_guid": {"$ref": "#/$defs/uuid"},
                 "type": {"$ref": "#/$defs/invoice_type"},
-                "state": {"enum": ["complete", "partial", "not_selected"]}
+                "state": {"$ref": "#/$defs/coverage_state", "description": "Счета пары с датой в периоде"},
+                "outside_period_state": {"$ref": "#/$defs/coverage_state", "description": "Открытые счета пары вне периода по критерию контракта; при include_open_outside_period=false — not_selected"}
             }
         },
         "invoice": {

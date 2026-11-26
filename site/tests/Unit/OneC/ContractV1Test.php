@@ -53,6 +53,14 @@ final class ContractV1Test extends TestCase
         self::assertFalse($this->validate($invoice, 'invoice'));
     }
 
+    public function testPartWithoutSnapshotAtIsRejected(): void
+    {
+        $part = $this->example('package_part');
+        unset($part->snapshot_at);
+
+        self::assertFalse($this->validate($part, 'package_part'));
+    }
+
     private function example(string $name): \stdClass
     {
         $data = json_decode((string) file_get_contents(self::DIR.'/examples/'.$name.'.json'), false, 64, \JSON_THROW_ON_ERROR);

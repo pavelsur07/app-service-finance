@@ -5,7 +5,8 @@
   "processor_version": "1.0",
   "period_from": "2026-11-01",
   "period_to": "2026-11-30",
-  "include_open_outside_period": false,
+  "include_open_outside_period": true,
+  "snapshot_at": "2026-11-26T10:15:00+03:00",
   "part": 1,
   "parts_total": 1,
   "warnings": [
@@ -16,12 +17,14 @@
     {
       "organization_guid": "23c15967-e31e-49bb-afa7-8441c7784b63",
       "type": "customer_invoice",
-      "state": "complete"
+      "state": "complete",
+      "outside_period_state": "complete"
     },
     {
       "organization_guid": "23c15967-e31e-49bb-afa7-8441c7784b63",
       "type": "supplier_invoice",
-      "state": "partial"
+      "state": "partial",
+      "outside_period_state": "partial"
     }
   ],
   "documents": [

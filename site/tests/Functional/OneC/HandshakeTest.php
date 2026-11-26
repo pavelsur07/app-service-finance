@@ -23,6 +23,7 @@ final class HandshakeTest extends WebTestCaseBase
         $result = json_decode((string) $client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
         self::assertSame('connected', $result['status']);
         self::assertSame('supported', $result['support']['level']);
+        self::assertSame(['open_outside_period_months' => 12], $result['settings']);
         self::assertFalse($result['organizations'][0]['mapped']);
         $db = $this->em()->getConnection();
         self::assertSame(hash('sha256', $token), $db->fetchOne('SELECT token_hash FROM onec_connection WHERE id = ?', [$result['connection_id']]));
