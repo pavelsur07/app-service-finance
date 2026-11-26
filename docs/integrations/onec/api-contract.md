@@ -2,6 +2,8 @@
 
 Два эндпоинта: рукопожатие и приём частей пакета. Адрес пакетов — адрес рукопожатия с заменой `/handshake` на `/packages`.
 
+Машинная форма контракта — JSON Schema [`site/src/OneC/Contract/v1/schema.json`](../../../site/src/OneC/Contract/v1/schema.json) (draft 2020-12, определения в `$defs`: `handshake_request`, `handshake_response`, `package_part`, `coverage`, `invoice`, `invoice_item`, `package_response`, `error`) и примеры в [`examples/`](../../../site/src/OneC/Contract/v1/examples/). Обработка может проверять по ней тело перед отправкой. Тест `ContractV1Test` держит схему, примеры и разбор сервера в согласии. Где текст и схема расходятся, правят оба в одном PR.
+
 ## Рукопожатие
 
 Обработка ВФ_Обмен отправляет HTTPS POST на `/api/onec/v1/handshake` с заголовками `Authorization: Bearer <token>` и `Content-Type: application/json`. Кодировка UTF-8. Лимиты — 10 МиБ, до 65 536 открывающих скобок и запятых вне строк в сумме, 60 рукопожатий за минуту на действующее подключение. Владелец получает токен в кабинете.

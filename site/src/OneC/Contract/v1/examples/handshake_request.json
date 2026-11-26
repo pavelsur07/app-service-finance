@@ -1,0 +1,11 @@
+{
+  "base_id": "26c4bc0e-58e8-4411-84f8-e434b7387894",
+  "config_name": "БухгалтерияПредприятия",
+  "config_synonym": "Бухгалтерия предприятия",
+  "config_version": "3.0.100.1",
+  "platform_version": "8.3.24.1",
+  "processor_version": "1.0",
+  "organizations": [
+    {"guid": "23c15967-e31e-49bb-afa7-8441c7784b63", "name": "Тестовая организация", "inn": null, "kpp": null}
+  ]
+}
