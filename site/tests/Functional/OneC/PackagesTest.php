@@ -49,6 +49,7 @@ final class PackagesTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(409);
         self::assertSame('package_conflict', $this->error($client));
         self::assertSame($body, gzdecode($storage->read($row['storage_path'])));
+        self::assertFalse($storage->exists(\dirname($row['storage_path']).'/1-'.hash('sha256', $changed).'.json.gz'));
 
         $second = $this->body($baseId, ['package_id' => $package['package_id'], 'part' => 2]);
         $this->send($client, $token, $second);

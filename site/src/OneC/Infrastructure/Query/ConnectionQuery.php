@@ -18,7 +18,7 @@ use Ramsey\Uuid\Uuid;
  */
 final readonly class ConnectionQuery
 {
-    private const MAX_PARTS = 500;
+    private const MAX_PACKAGES = 50;
 
     public function __construct(private EntityManagerInterface $em)
     {
@@ -48,7 +48,7 @@ final readonly class ConnectionQuery
     }
 
     /**
-     * Последние принятые части, сгруппированные по выгрузке.
+     * Последние выгрузки со всеми их частями.
      *
      * @return list<PackageSummary>
      */
@@ -56,8 +56,10 @@ final readonly class ConnectionQuery
     {
         $rows = $this->em->getConnection()->fetchAllAssociative(
             'SELECT id, package_id, part, parts_total, kind, period_from, period_to, warnings, document_count, byte_size, received_at
-             FROM onec_package WHERE connection_id = ? ORDER BY received_at DESC, part LIMIT '.self::MAX_PARTS,
-            [$connection->id],
+             FROM onec_package WHERE connection_id = ? AND package_id IN (
+                 SELECT package_id FROM onec_package WHERE connection_id = ? GROUP BY package_id ORDER BY MAX(received_at) DESC LIMIT '.self::MAX_PACKAGES.'
+             ) ORDER BY received_at DESC, part',
+            [$connection->id, $connection->id],
         );
         $groups = [];
         foreach ($rows as $row) {

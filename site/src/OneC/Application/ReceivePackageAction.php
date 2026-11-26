@@ -34,42 +34,38 @@ final readonly class ReceivePackageAction
         if (false === $connection) {
             throw new OneCApiException(401, 'invalid_token', 'Неверный токен подключения.');
         }
-        if ('disabled' === $connection['status']) {
-            throw new OneCApiException(403, 'disabled', 'Подключение отключено.');
-        }
         if (!$this->onecPackagesLimiter->create($connection['id'])->consume()->isAccepted()) {
             throw new OneCApiException(429, 'rate_limited', 'Повторите отправку через минуту.');
         }
         $envelope = PackageEnvelope::parse($body);
-        if ($connection['base_id'] !== $envelope->baseId) {
-            throw new OneCApiException(409, 'base_conflict', null === $connection['base_id'] ? 'Сначала выполните рукопожатие.' : 'Подключение привязано к другой базе.');
-        }
-        if ('error' === $connection['status']) {
-            throw new OneCApiException(422, 'unsupported', 'Конфигурация или обработка не поддерживается, см. ответ рукопожатия.');
-        }
-
-        // ponytail: согласованность частей проверяется без блокировки пакета; две
-        // разные части с разной оболочкой, пришедшие одновременно, обе пройдут.
-        $sibling = $db->fetchAssociative(
-            'SELECT kind, period_from, period_to, include_open_outside_period, parts_total FROM onec_package WHERE connection_id = ? AND package_id = ? AND part <> ? LIMIT 1',
-            [$connection['id'], $envelope->packageId, $envelope->part],
-        );
-        if (false !== $sibling && [$sibling['kind'], $sibling['period_from'], $sibling['period_to'], (bool) $sibling['include_open_outside_period'], (int) $sibling['parts_total']]
-            !== [$envelope->kind, $envelope->periodFrom, $envelope->periodTo, $envelope->includeOpenOutsidePeriod, $envelope->partsTotal]) {
-            throw self::conflict();
-        }
-
-        // Объект пишется до строки и вне транзакции: путь детерминирован, повтор
-        // перезаписывает те же байты, а другое тело ложится рядом и получает 409.
+        self::assertAccepts($connection, $envelope);
         $sha256 = hash('sha256', $body);
+        $existing = $this->existing($connection['id'], $envelope);
+        if (null !== $existing) {
+            return self::repeat($existing, $sha256, $envelope);
+        }
+
+        // Объект пишется до строки и вне транзакции: путь детерминирован, гонка
+        // повторов перезаписывает те же байты.
         $path = \sprintf('onec/%s/%s/%d-%s.json.gz', $connection['id'], $envelope->packageId, $envelope->part, $sha256);
         $this->storage->write($path, (string) gzencode($body));
 
         $inserted = $this->em->wrapInTransaction(function () use ($db, $connection, $tokenHash, $envelope, $sha256, $path, $body): bool {
-            // Токен могли отозвать или перевыпустить, пока писался объект.
-            $live = $db->fetchOne("SELECT 1 FROM onec_connection WHERE id = ? AND token_hash = ? AND status <> 'disabled' FOR SHARE", [$connection['id'], $tokenHash]);
-            if (false === $live) {
+            // Части одного подключения идут по очереди: строка подключения под
+            // FOR NO KEY UPDATE (не FOR SHARE — тот с UPDATE last_success_at даёт
+            // взаимную блокировку). Перевыпуск и отключение ждут её же.
+            $locked = $db->fetchAssociative('SELECT status, base_id FROM onec_connection WHERE id = ? AND token_hash = ? FOR NO KEY UPDATE', [$connection['id'], $tokenHash]);
+            if (false === $locked) {
                 throw new OneCApiException(401, 'invalid_token', 'Неверный токен подключения.');
+            }
+            self::assertAccepts($locked, $envelope);
+            $sibling = $db->fetchAssociative(
+                'SELECT kind, period_from, period_to, include_open_outside_period, parts_total FROM onec_package WHERE connection_id = ? AND package_id = ? AND part <> ? LIMIT 1',
+                [$connection['id'], $envelope->packageId, $envelope->part],
+            );
+            if (false !== $sibling && [$sibling['kind'], $sibling['period_from'], $sibling['period_to'], (bool) $sibling['include_open_outside_period'], (int) $sibling['parts_total']]
+                !== [$envelope->kind, $envelope->periodFrom, $envelope->periodTo, $envelope->includeOpenOutsidePeriod, $envelope->partsTotal]) {
+                throw self::conflict();
             }
             $now = $this->clock->now()->format('Y-m-d H:i:s');
             $id = $db->fetchOne(<<<'SQL'
@@ -96,16 +92,50 @@ final readonly class ReceivePackageAction
             return true;
         });
 
-        $status = 'stored';
         if (!$inserted) {
-            $existing = $db->fetchAssociative('SELECT sha256, status FROM onec_package WHERE connection_id = ? AND package_id = ? AND part = ?', [$connection['id'], $envelope->packageId, $envelope->part]);
-            if (false === $existing || $existing['sha256'] !== $sha256) {
-                throw self::conflict();
-            }
-            $status = $existing['status'];
+            return self::repeat($this->existing($connection['id'], $envelope), $sha256, $envelope);
         }
 
-        return ['accepted' => true, 'package_id' => $envelope->packageId, 'part' => $envelope->part, 'status' => $status, 'duplicate' => !$inserted];
+        return ['accepted' => true, 'package_id' => $envelope->packageId, 'part' => $envelope->part, 'status' => 'stored', 'duplicate' => false];
+    }
+
+    /** @param array<string, mixed> $connection строка onec_connection: status, base_id */
+    private static function assertAccepts(array $connection, PackageEnvelope $envelope): void
+    {
+        if (null !== $connection['base_id'] && $connection['base_id'] !== $envelope->baseId) {
+            throw new OneCApiException(409, 'base_conflict', 'Подключение привязано к другой базе.');
+        }
+        if ('error' === $connection['status']) {
+            throw new OneCApiException(422, 'unsupported', 'Конфигурация или обработка не поддерживается, см. ответ рукопожатия.');
+        }
+        if ('connected' !== $connection['status']) {
+            throw new OneCApiException(409, 'base_conflict', 'Сначала выполните рукопожатие.');
+        }
+    }
+
+    /** @return array<string, mixed>|null sha256, status */
+    private function existing(string $connectionId, PackageEnvelope $envelope): ?array
+    {
+        $row = $this->em->getConnection()->fetchAssociative(
+            'SELECT sha256, status FROM onec_package WHERE connection_id = ? AND package_id = ? AND part = ?',
+            [$connectionId, $envelope->packageId, $envelope->part],
+        );
+
+        return false === $row ? null : $row;
+    }
+
+    /**
+     * @param array<string, mixed>|null $existing
+     *
+     * @return array{accepted: true, package_id: string, part: int, status: string, duplicate: true}
+     */
+    private static function repeat(?array $existing, string $sha256, PackageEnvelope $envelope): array
+    {
+        if (null === $existing || $existing['sha256'] !== $sha256) {
+            throw self::conflict();
+        }
+
+        return ['accepted' => true, 'package_id' => $envelope->packageId, 'part' => $envelope->part, 'status' => (string) $existing['status'], 'duplicate' => true];
     }
 
     private static function conflict(): OneCApiException

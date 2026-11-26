@@ -13,11 +13,12 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManager;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Process\Process;
 
 /**
- * Конкурент успел закоммитить ту же часть между нашими проверками и вставкой:
- * отвечаем как на повтор, EntityManager остаётся открытым. Без DAMA-отката:
- * строки конкурента закоммичены другой сессией, база чистится после теста.
+ * Повтор той же части из другой сессии: уже закоммиченный и одновременный.
+ * Отвечаем как на повтор, без 500 и взаимной блокировки. Без DAMA-отката:
+ * строки конкурента коммитит другая сессия, база чистится после теста.
  */
 final class ReceivePackageRaceTest extends PostgresResetTestCase
 {
@@ -46,6 +47,41 @@ final class ReceivePackageRaceTest extends PostgresResetTestCase
     {
         $this->writer->close();
         parent::tearDown();
+    }
+
+    public function testConcurrentCompetitorHoldingTheConnectionIsAwaitedAndGivesDuplicate(): void
+    {
+        $packageId = Uuid::uuid7()->toString();
+        $body = $this->body($packageId);
+        $params = $this->connection->getParams();
+        // Конкурент повторяет шаги приёма: блокировка подключения, та же часть, last_success_at, коммит.
+        // При FOR SHARE вместо FOR NO KEY UPDATE это взаимная блокировка (40P01).
+        $child = new Process([\PHP_BINARY, '-r', <<<'PHP'
+            $db = new PDO(getenv('DSN'), getenv('DBUSER'), getenv('DBPASS'), [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+            $db->beginTransaction();
+            $db->prepare('SELECT 1 FROM onec_connection WHERE id = ? FOR SHARE')->execute([getenv('CONNECTION')]);
+            $db->prepare("INSERT INTO onec_package (id, connection_id, package_id, part, parts_total, kind, period_from, period_to,
+                include_open_outside_period, processor_version, versions, warnings, document_count, storage_path, sha256, byte_size, status, received_at)
+                VALUES (gen_random_uuid(), ?, ?, 1, 1, 'invoices', '2026-11-01', '2026-11-30', false, '1.0', '{}', '[]', 0, 'onec/race', ?, 1, 'stored', now())")
+                ->execute([getenv('CONNECTION'), getenv('PACKAGE'), getenv('SHA')]);
+            echo "ready\n";
+            usleep(1000000);
+            $db->prepare('UPDATE onec_connection SET last_success_at = now() WHERE id = ?')->execute([getenv('CONNECTION')]);
+            $db->commit();
+            PHP], null, [
+            'DSN' => \sprintf('pgsql:host=%s;port=%d;dbname=%s', $params['host'] ?? 'localhost', $params['port'] ?? 5432, $params['dbname'] ?? ''),
+            'DBUSER' => $params['user'] ?? '', 'DBPASS' => $params['password'] ?? '',
+            'CONNECTION' => $this->connectionId, 'PACKAGE' => $packageId, 'SHA' => hash('sha256', $body),
+        ], timeout: 30);
+        $child->start();
+        self::assertTrue($child->waitUntil(static fn (string $type, string $out): bool => str_contains($out, "ready\n")), $child->getErrorOutput());
+
+        $result = self::getContainer()->get(ReceivePackageAction::class)($this->token, $body);
+
+        self::assertSame(0, $child->wait(), $child->getErrorOutput());
+        self::assertSame(['accepted' => true, 'package_id' => $packageId, 'part' => 1, 'status' => 'stored', 'duplicate' => true], $result);
+        self::assertTrue($this->em->isOpen());
+        self::assertSame(1, $this->connection->fetchOne('SELECT COUNT(*) FROM onec_package WHERE package_id = ?', [$packageId]));
     }
 
     public function testCommittedCompetitorWithSameBytesIsADuplicate(): void

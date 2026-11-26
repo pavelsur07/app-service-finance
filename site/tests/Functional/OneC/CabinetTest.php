@@ -54,6 +54,14 @@ final class CabinetTest extends WebTestCaseBase
         $client->request('GET', '/onec/packages/'.$partId.'/raw');
         self::assertResponseStatusCodeSame(404);
 
+        $userAdminId = Uuid::uuid7()->toString();
+        $userAdmin = UserBuilder::aUser()->withId($userAdminId)->withEmail($userAdminId.'@example.test')->withRoles(['ROLE_ADMIN'])->build();
+        $this->em()->persist($userAdmin);
+        $this->em()->flush();
+        $client->loginUser($userAdmin);
+        $client->request('GET', '/onec/packages/'.$partId.'/raw');
+        self::assertResponseStatusCodeSame(404);
+
         $adminId = Uuid::uuid7()->toString();
         $admin = UserBuilder::aUser()->withId($adminId)->withEmail($adminId.'@example.test')->withRoles(['ROLE_ADMIN'])->build();
         $this->em()->persist($admin);
@@ -101,7 +109,10 @@ final class CabinetTest extends WebTestCaseBase
         $client->request('POST', '/onec/connections/'.$id.'/reissue', ['_token' => $this->csrfToken($client, 'onec_reissue_'.$id)]);
         self::assertResponseIsSuccessful();
         self::assertSame('pending', $db->fetchOne('SELECT status FROM onec_connection WHERE id = ?', [$id]));
-        $this->handshake($client, $client->getCrawler()->filter('[data-onec-token]')->text(), 200, $baseId);
+        $new = $client->getCrawler()->filter('[data-onec-token]')->text();
+        $this->package($client, $new, $baseId, Uuid::uuid7()->toString(), 1, 409);
+        $this->handshake($client, $new, 200, $baseId);
+        $this->package($client, $new, $baseId, Uuid::uuid7()->toString(), 1);
     }
 
     public function testForeignConnectionIsNotFound(): void
@@ -112,6 +123,8 @@ final class CabinetTest extends WebTestCaseBase
         $client->request('GET', '/onec/connections/'.$id);
         self::assertResponseStatusCodeSame(404);
         $client->request('POST', '/onec/connections/'.$id.'/disable', ['_token' => $this->csrfToken($client, 'onec_disable_'.$id)]);
+        self::assertResponseStatusCodeSame(404);
+        $client->request('POST', '/onec/connections/'.$id.'/reissue', ['_token' => $this->csrfToken($client, 'onec_reissue_'.$id)]);
         self::assertResponseStatusCodeSame(404);
         self::assertSame('pending', $this->em()->getConnection()->fetchOne('SELECT status FROM onec_connection WHERE id = ?', [$id]));
     }

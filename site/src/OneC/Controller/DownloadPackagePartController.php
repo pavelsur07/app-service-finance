@@ -24,9 +24,10 @@ final class DownloadPackagePartController extends AbstractController
 {
     #[Route('/onec/packages/{id}/raw', name: 'onec_package_raw', requirements: ['id' => Requirement::UUID], methods: ['GET'])]
     #[Route('/admin/onec/packages/{id}/raw', name: 'admin_onec_package_raw', requirements: ['id' => Requirement::UUID], methods: ['GET'])]
-    public function __invoke(string $id, #[CurrentUser] User $user, ConnectionQuery $connections, ObjectStorageInterface $storage): Response
+    public function __invoke(string $id, string $_route, #[CurrentUser] User $user, ConnectionQuery $connections, ObjectStorageInterface $storage): Response
     {
-        $part = $connections->rawPart($id, $this->isGranted('ROLE_ADMIN') ? null : (string) $user->getId());
+        // Чужое сырьё — только через админку: там ROLE_ADMIN гарантирует firewall admin.
+        $part = $connections->rawPart($id, 'admin_onec_package_raw' === $_route ? null : (string) $user->getId());
         if (null === $part) {
             throw $this->createNotFoundException();
         }

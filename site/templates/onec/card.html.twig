@@ -24,10 +24,12 @@
             <dt class="col-sm-3">Рукопожатие</dt><dd class="col-sm-9">{{ connection.lastHandshakeAt ? connection.lastHandshakeAt|date('d.m.Y H:i') : '—' }}</dd>
             <dt class="col-sm-3">Последняя загрузка</dt><dd class="col-sm-9">{{ connection.lastSuccessAt ? connection.lastSuccessAt|date('d.m.Y H:i') : '—' }}</dd>
         </dl>
-        <form method="post" action="{{ path('onec_connection_reissue', {id: connection.id}) }}" class="d-inline">
-            <input type="hidden" name="_token" value="{{ csrf_token('onec_reissue_' ~ connection.id) }}">
-            <button class="btn btn-outline-primary" type="submit">Перевыпустить токен</button>
-        </form>
+        <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#onec-confirm"
+            data-confirm-action="{{ path('onec_connection_reissue', {id: connection.id}) }}"
+            data-confirm-token="{{ csrf_token('onec_reissue_' ~ connection.id) }}"
+            data-confirm-title="Перевыпустить токен?"
+            data-confirm-body="Текущий токен сразу перестанет работать. Новый нужно будет вставить в обработку ВФ_Обмен."
+            data-confirm-submit="Перевыпустить">Перевыпустить токен</button>
         {% if connection.status != 'disabled' %}
             <button class="btn btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#onec-confirm"
                 data-confirm-action="{{ path('onec_connection_disable', {id: connection.id}) }}"
