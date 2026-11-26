@@ -2365,3 +2365,71 @@
 .u-min-w-280 { min-width: 280px; }
 .u-min-w-16r { min-width: 16rem; }
 .vf-spinner-xs { width: .7rem; height: .7rem; }   /* spinner-border-sm ещё меньше (кнопка «Проверить» в подключениях) */
+
+/* Раскрывающийся блок-карточка (details.vf-disclosure > summary.vf-disclosure__summary): шеврон, сводка,
+   «Показать/Скрыть» справа, фон при наведении. Первое применение — «Данные по счетам» в ДДС группы. */
+.vf-disclosure > .vf-disclosure__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--vf-space-2);
+  padding: var(--vf-space-3) var(--vf-space-4);
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  border-radius: inherit;
+}
+
+.vf-disclosure > .vf-disclosure__summary::-webkit-details-marker {
+  display: none;
+}
+
+.vf-disclosure > .vf-disclosure__summary:hover {
+  background: var(--vf-hover-bg);
+}
+
+.vf-disclosure > .vf-disclosure__summary:focus-visible {
+  outline: 2px solid var(--vf-primary);
+  outline-offset: -2px;
+}
+
+.vf-disclosure[open] > .vf-disclosure__summary {
+  border-bottom: 1px solid var(--vf-border);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.vf-disclosure__chevron {
+  color: var(--vf-text-muted);
+  transition: transform 0.15s ease;
+}
+
+.vf-disclosure[open] .vf-disclosure__chevron {
+  transform: rotate(90deg);
+}
+
+.vf-disclosure__title {
+  font-weight: var(--vf-weight-semibold);
+}
+
+.vf-disclosure__meta {
+  color: var(--vf-text-muted);
+}
+
+.vf-disclosure__action {
+  margin-left: auto;
+  color: var(--vf-primary);
+  font-size: var(--vf-size-xs);
+  font-weight: var(--vf-weight-medium);
+}
+
+.vf-disclosure:not([open]) .vf-disclosure__action-hide,
+.vf-disclosure[open] .vf-disclosure__action-show {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vf-disclosure__chevron {
+    transition: none;
+  }
+}
