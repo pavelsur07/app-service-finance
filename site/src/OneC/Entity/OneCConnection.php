@@ -58,4 +58,37 @@ class OneCConnection
         $this->status = $supported ? 'connected' : 'error';
         $this->lastHandshakeAt = $now;
     }
+
+    /** Прежний токен перестаёт действовать; отключённое подключение снова ждёт рукопожатия. */
+    public function reissueToken(string $tokenHash): void
+    {
+        $this->tokenHash = $tokenHash;
+        if ('disabled' === $this->status) {
+            $this->status = 'pending';
+        }
+    }
+
+    /** Отключение = отзыв: хэш никому не известного токена, старый токен получает 401. */
+    public function disable(): void
+    {
+        $this->tokenHash = hash('sha256', random_bytes(32));
+        $this->status = 'disabled';
+    }
+
+    public function statusLabel(): string
+    {
+        return match ($this->status) {
+            'pending' => 'Ждёт рукопожатия',
+            'connected' => 'Подключено',
+            'error' => 'Версия не поддерживается',
+            'disabled' => 'Отключено',
+            default => $this->status,
+        };
+    }
+
+    /** Подключено, но частей не было больше суток. */
+    public function isStale(\DateTimeImmutable $now): bool
+    {
+        return 'connected' === $this->status && (null === $this->lastSuccessAt || $this->lastSuccessAt < $now->modify('-1 day'));
+    }
 }

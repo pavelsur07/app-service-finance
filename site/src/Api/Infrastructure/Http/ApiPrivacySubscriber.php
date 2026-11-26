@@ -43,6 +43,7 @@ final readonly class ApiPrivacySubscriber implements EventSubscriberInterface
         return str_starts_with($path, '/api/external/v1/')
             || str_starts_with($path, '/api/onec/v1/')
             || '/onec/connections/new' === $path
+            || 1 === preg_match('#^/onec/connections/[^/]+/reissue$#D', $path)
             || '/settings/api' === $path
             || str_starts_with($path, '/settings/api/')
             || McpRequestPath::containsSensitiveData($path);

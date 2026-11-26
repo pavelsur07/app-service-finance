@@ -38,6 +38,10 @@ final class ModuleAccessMap
      */
     private const EXACT = [
         \App\OneC\Controller\CreateConnectionController::class => Module::ADMIN,
+        \App\OneC\Controller\ConnectionsController::class => Module::ADMIN,
+        \App\OneC\Controller\ConnectionCardController::class => Module::ADMIN,
+        \App\OneC\Controller\ReissueTokenController::class => Module::ADMIN,
+        \App\OneC\Controller\DisableConnectionController::class => Module::ADMIN,
         // Контрагенты, ЦФО и направления проектов живут в App\Company, но относятся к финансам.
         CounterpartyController::class => Module::FINANCE,
         ApplyCounterpartyDisplayNameController::class => Module::FINANCE,
@@ -106,6 +110,7 @@ final class ModuleAccessMap
         // из двух. Exemption снимает только автоматический гейт: сам контроллер требует
         // finance.read ИЛИ deals.read самостоятельно. Tenant-safe — компания из сессии.
         CounterpartySearchController::class,
+        \App\OneC\Controller\DownloadPackagePartController::class, // сырьё подключения пользователя: владельца или ROLE_ADMIN сверяет запрос, компания ни при чём
     ];
 
     /**
