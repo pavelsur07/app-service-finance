@@ -1,0 +1,97 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ connection.name }} — 1С{% endblock %}
+
+{% block content %}
+    {% include 'partials/_page_header.html.twig' with {title: connection.name, container: false} only %}
+    <p><a href="{{ path('onec_connections') }}">← Все подключения 1С</a></p>
+
+    {% if secret %}
+        <section class="card mb-3"><div class="card-body">
+            <p>Новый токен показан один раз. Замените токен в обработке ВФ_Обмен — прежний больше не действует.</p>
+            <dl>
+                <dt>Адрес рукопожатия</dt><dd><code>{{ url('onec_handshake') }}</code></dd>
+                <dt>Токен</dt><dd><code data-onec-token>{{ secret }}</code></dd>
+            </dl>
+        </div></section>
+    {% endif %}
+
+    <section class="card mb-3"><div class="card-body">
+        <dl class="row mb-3">
+            <dt class="col-sm-3">Статус</dt><dd class="col-sm-9">{{ connection.statusLabel }}{% if connection.stale(now) %} <span class="badge bg-warning-lt">нет загрузок больше суток</span>{% endif %}</dd>
+            <dt class="col-sm-3">Конфигурация</dt><dd class="col-sm-9">{{ connection.versions.config_name ?? '—' }} {{ connection.versions.config_version ?? '' }}</dd>
+            <dt class="col-sm-3">Платформа / обработка</dt><dd class="col-sm-9">{{ connection.versions.platform_version ?? '—' }} / {{ connection.versions.processor_version ?? '—' }}</dd>
+            <dt class="col-sm-3">Рукопожатие</dt><dd class="col-sm-9">{{ connection.lastHandshakeAt ? connection.lastHandshakeAt|date('d.m.Y H:i') : '—' }}</dd>
+            <dt class="col-sm-3">Последняя загрузка</dt><dd class="col-sm-9">{{ connection.lastSuccessAt ? connection.lastSuccessAt|date('d.m.Y H:i') : '—' }}</dd>
+        </dl>
+        <form method="post" action="{{ path('onec_connection_reissue', {id: connection.id}) }}" class="d-inline">
+            <input type="hidden" name="_token" value="{{ csrf_token('onec_reissue_' ~ connection.id) }}">
+            <button class="btn btn-outline-primary" type="submit">Перевыпустить токен</button>
+        </form>
+        {% if connection.status != 'disabled' %}
+            <button class="btn btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#onec-confirm"
+                data-confirm-action="{{ path('onec_connection_disable', {id: connection.id}) }}"
+                data-confirm-token="{{ csrf_token('onec_disable_' ~ connection.id) }}"
+                data-confirm-title="Отключить подключение?"
+                data-confirm-body="Токен будет отозван, обработка перестанет отправлять данные. Включить снова — перевыпуском токена."
+                data-confirm-submit="Отключить"
+                data-confirm-variant="danger">Отключить</button>
+        {% endif %}
+    </div></section>
+
+    <section class="card mb-3" data-onec-organizations>
+        <div class="card-header"><h3 class="card-title">Организации</h3></div>
+        {% if organizations is empty %}
+            <div class="card-body text-secondary">Обработка ещё не прислала справочник организаций.</div>
+        {% else %}
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <thead><tr><th>Наименование</th><th>ИНН / КПП</th><th>Привязка</th></tr></thead>
+                    <tbody>
+                    {% for organization in organizations %}
+                        <tr>
+                            <td>{{ organization.name }}{% if not organization.present %} <span class="badge bg-secondary-lt">нет в 1С</span>{% endif %}</td>
+                            <td>{{ organization.inn ?? '—' }} / {{ organization.kpp ?? '—' }}</td>
+                            <td class="text-secondary">{{ organization.companyId ? 'привязана' : 'не привязана' }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </section>
+
+    <section class="card" data-onec-packages>
+        <div class="card-header"><h3 class="card-title">Пакеты</h3></div>
+        {% if packages is empty %}
+            <div class="card-body text-secondary">Пакетов пока не было.</div>
+        {% else %}
+            <div class="list-group list-group-flush">
+                {% for package in packages %}
+                    <div class="list-group-item" data-onec-package="{{ package.packageId }}">
+                        <div>
+                            <strong>Счета на оплату</strong>, {{ package.periodFrom|date('d.m.Y') }}–{{ package.periodTo|date('d.m.Y') }},
+                            частей {{ package.partsReceived }} из {{ package.partsTotal }}
+                            <span class="text-secondary small">{{ package.packageId }}</span>
+                        </div>
+                        <ul class="list-inline mb-1">
+                            {% for part in package.parts %}
+                                <li class="list-inline-item">
+                                    <a href="{{ path('onec_package_raw', {id: part.id}) }}">часть {{ part.part }}</a>
+                                    <span class="text-secondary small">{{ part.receivedAt|date('d.m.Y H:i') }}, документов {{ part.documentCount }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                        {% if package.warnings is not empty %}
+                            <ul class="text-warning small mb-0">
+                                {% for warning in package.warnings %}<li>{{ warning }}</li>{% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </section>
+
+    {% include 'partials/_confirm_modal.html.twig' with {id: 'onec-confirm'} only %}
+{% endblock %}

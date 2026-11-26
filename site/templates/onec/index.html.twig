@@ -1,0 +1,32 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Подключения 1С{% endblock %}
+
+{% block content %}
+    {% include 'partials/_page_header.html.twig' with {title: 'Подключения 1С', container: false} only %}
+    <p><a class="btn btn-primary" href="{{ path('onec_connection_create') }}">Подключить 1С</a></p>
+    <section class="card" data-onec-connections>
+        {% if connections is empty %}
+            <div class="card-body text-secondary">Подключений пока нет. Создайте подключение и вставьте токен в обработку ВФ_Обмен.</div>
+        {% else %}
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <thead><tr><th>Название</th><th>Конфигурация</th><th>Статус</th><th>Последняя загрузка</th></tr></thead>
+                    <tbody>
+                    {% for connection in connections %}
+                        <tr>
+                            <td><a href="{{ path('onec_connection_card', {id: connection.id}) }}">{{ connection.name }}</a></td>
+                            <td>{{ connection.versions.config_synonym ?? connection.versions.config_name ?? '—' }} {{ connection.versions.config_version ?? '' }}</td>
+                            <td>{{ connection.statusLabel }}</td>
+                            <td>
+                                {{ connection.lastSuccessAt ? connection.lastSuccessAt|date('d.m.Y H:i') : '—' }}
+                                {% if connection.stale(now) %}<span class="badge bg-warning-lt">нет загрузок больше суток</span>{% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </section>
+{% endblock %}
