@@ -33,11 +33,11 @@
         <form method="get" class="card-body row g-3 align-items-end">
             <div class="col-12 col-sm-6 col-lg-auto">
                 <label class="form-label" for="pp-from">С даты</label>
-                <input class="form-control" id="pp-from" type="date" name="from" required value="{{ from|date('Y-m-d') }}">
+                <input class="form-control" id="pp-from" type="date" name="from" required value="{{ from|date('Y-m-d', false) }}">
             </div>
             <div class="col-12 col-sm-6 col-lg-auto">
                 <label class="form-label" for="pp-to">По дату</label>
-                <input class="form-control" id="pp-to" type="date" name="to" required value="{{ to|date('Y-m-d') }}">
+                <input class="form-control" id="pp-to" type="date" name="to" required value="{{ to|date('Y-m-d', false) }}">
             </div>
             <div class="col-12 col-sm-6 col-lg-auto">
                 <label class="form-label" for="pp-channel">Канал</label>
@@ -56,6 +56,9 @@
             </div>
             <div class="col-12 col-sm-6 col-lg-auto">
                 <button class="btn btn-primary" type="submit">Показать</button>
+                <a class="btn btn-outline-secondary" href="{{ path('marketplace_pl_projection', {
+                    from: from|date('Y-m-d', false), to: to|date('Y-m-d', false), channel: channel, hide_empty: hideEmpty ? 1 : 0, export: 'xls',
+                }) }}">Скачать XLS</a>
             </div>
         </form>
     </div>
@@ -96,7 +99,6 @@
         </div>
     {% endif %}
 
-    {% set visible = hideEmpty ? rows|filter(r => (r.values.new ?? 0) != 0 or (r.values.legacy ?? 0) != 0) : rows %}
     <section class="card mb-3 me-table-card" data-economics-table>
         <div class="me-table-scroll" data-economics-scroll tabindex="0" role="region" aria-label="ОПиУ маркетплейсов">
         <table class="table table-vcenter card-table me-table" data-pl-projection>
@@ -109,7 +111,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for row in visible %}
+                {% for row in rows %}
                     {% set new = row.values.new ?? 0 %}
                     {% set legacy = row.values.legacy ?? 0 %}
                     <tr data-row-code="{{ row.code }}"{{ row.type.value != 'LEAF_INPUT' ? ' class="fw-bold"' }}>

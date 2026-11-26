@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace App\MarketplacePlProjection\Controller;
 
 use App\Finance\Application\DTO\PlPreviewColumn;
+use App\Finance\Application\DTO\PlPreviewRow;
 use App\Finance\Facade\FinanceFacade;
 use App\Marketplace\Facade\LegacyPlPreviewFacadeInterface;
 use App\MarketplacePlProjection\Application\Service\ProjectionBuilder;
 use App\MarketplacePlProjection\Application\Service\TreeCut;
 use App\MarketplacePlProjection\Enum\ProjectionStatus;
+use App\MarketplacePlProjection\Infrastructure\Export\PlProjectionXlsExporter;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Clock\ClockInterface;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -35,6 +39,7 @@ final class PlProjectionController extends AbstractController
         private readonly LegacyPlPreviewFacadeInterface $legacy,
         private readonly FinanceFacade $finance,
         private readonly ClockInterface $clock,
+        private readonly PlProjectionXlsExporter $exporter,
     ) {
     }
 
@@ -60,17 +65,33 @@ final class PlProjectionController extends AbstractController
         ]);
         $cut = TreeCut::cut($tree->rows);
 
+        $hideEmpty = $request->query->getBoolean('hide_empty');
+        $rows = $cut['rows'];
+        if ($hideEmpty) {
+            $rows = array_values(array_filter($rows, static fn (PlPreviewRow $row): bool => [] !== array_filter($row->values)));
+        }
+
+        if ('xls' === $request->query->getString('export')) {
+            $filename = sprintf('marketplace-pl-%s-%s-%s.xls', $channel ?? 'all', $from->format('Y-m-d'), $to->format('Y-m-d'));
+
+            return new StreamedResponse(fn () => $this->exporter->write($rows, 'php://output'), headers: [
+                'Content-Type' => 'application/vnd.ms-excel',
+                'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_ATTACHMENT, $filename),
+                'Cache-Control' => 'private, no-store',
+            ]);
+        }
+
         return $this->render('marketplace_pl_projection/index.html.twig', [
             'from' => $from,
             'to' => $to,
             'channel' => $channel,
             'channels' => self::CHANNELS,
             'periodError' => $periodError,
-            'rows' => $cut['rows'],
+            'rows' => $rows,
             'below' => $cut['below'],
             'boundaryFound' => $cut['found'],
             'hasTree' => [] !== $tree->rows,
-            'hideEmpty' => $request->query->getBoolean('hide_empty'),
+            'hideEmpty' => $hideEmpty,
             'warnings' => $tree->warnings,
             'unplaced' => $tree->unplaced,
             'unmapped' => $report->linesOf(ProjectionStatus::UNMAPPED),

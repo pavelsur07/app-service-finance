@@ -13,6 +13,7 @@ use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Finance\PLCategoryBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 use Doctrine\DBAL\Connection;
+use PhpOffice\PhpSpreadsheet\Reader\Xls;
 use Ramsey\Uuid\Uuid;
 
 final class PlProjectionPageTest extends WebTestCaseBase
@@ -71,6 +72,40 @@ final class PlProjectionPageTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('[data-pl-projection] tbody', 'За период нет сумм.');
         self::assertSelectorNotExists('[data-pl-lines]');
+    }
+
+    public function testDownloadsOnlyVisibleArticlesAndNewValuesForAppliedFilters(): void
+    {
+        $client = static::createClient();
+        $client->loginUser($this->seed());
+        $this->setClientSessionValue($client, 'active_company_id', self::COMPANY_ID);
+        $this->op(self::COMPANY_ID, 'ozon', 'commission', 'ozon:field:commission', -15025);
+        $this->op(self::COMPANY_ID, 'ozon', 'service_correction', 'ozon:service:18', -1200);
+        $this->op(self::COMPANY_ID, 'wildberries', 'commission', 'ozon:field:commission', -99900);
+        $this->op(self::COMPANY_ID, 'ozon', 'commission', 'ozon:field:commission', -99900, '2026-11-11');
+        $this->op(self::OTHER_ID, 'ozon', 'commission', 'ozon:field:commission', -99900);
+        (static::getContainer()->get(SyncTemplateAction::class))(self::COMPANY_ID, true);
+
+        $crawler = $client->request('GET', self::URL.'&channel=ozon&hide_empty=1');
+        $link = $crawler->selectLink('Скачать XLS')->link();
+        $client->click($link);
+        self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame('content-type', 'application/vnd.ms-excel');
+        self::assertMatchesRegularExpression('/^attachment;.*\.xls"?$/', (string) $client->getResponse()->headers->get('Content-Disposition'));
+        parse_str((string) parse_url($link->getUri(), \PHP_URL_QUERY), $query);
+        self::assertSame('ozon', $query['channel']);
+        self::assertSame('2026-11-01', $query['from']);
+        self::assertSame('2026-11-10', $query['to']);
+        $file = tempnam(sys_get_temp_dir(), 'pl-export');
+        self::assertNotFalse($file);
+        try {
+            file_put_contents($file, $client->getInternalResponse()->getContent());
+            $book = (new Xls())->load($file);
+            self::assertSame(1, $book->getSheetCount());
+            self::assertSame([['Статья', 'Новый расчёт'], ['COGS_MP_COMMISSION', -150.25]], $book->getActiveSheet()->toArray(null, false, false));
+        } finally {
+            unlink($file);
+        }
     }
 
     public function testBadPeriodFallsBackToCurrentMonthWithMessage(): void
