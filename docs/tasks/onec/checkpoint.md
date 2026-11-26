@@ -4,4 +4,4 @@
 
 - [x] Stage 1 — приём частей пакета
 - [x] Stage 2 — кабинет: список, карточка, перевыпуск, отключение, скачивание
-- [ ] Stage 3 — README, ARCHITECTURE, handoff
+- [x] Stage 3 — README, ARCHITECTURE, handoff
