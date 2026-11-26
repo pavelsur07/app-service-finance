@@ -591,7 +591,8 @@
 
 /* Отрицательный margin Tabler у .card-header-tabs при нулевом padding шапки уводил вкладки
    под верхнюю границу карточки и прятал подчёркивание активной. */
-.cashflow-ops > .card-header .card-header-tabs {
+.cashflow-ops > .card-header .card-header-tabs,
+.vf-card > .card-header .card-header-tabs {
   margin: 0;
   padding: 0;
   background: transparent;

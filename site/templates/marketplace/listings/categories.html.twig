@@ -1,33 +1,93 @@
 {% extends 'inventory/layout.html.twig' %}
 
-{% block tab_content %}
-    {# Обычные формы с CSRF: создание, переименование в строке, удаление через диалог.
-       Используемую категорию удалить нельзя — диалог в blocked-режиме со ссылкой на её листинги. #}
+{% block title %}Категории — Товары и остатки{% endblock %}
+
+{# Вёрстка по «Операциям ДДС» (transaction/index.html.twig): шапка vf-page-head, карточки vf-card с полосой
+   vf-card-bar и таблицей vf-table (docs/tasks/listing-categories-ds/plan.md). Шапку и карточку layout'а
+   страница заменяет целиком, вкладки раздела — общий inventory/_tabs.html.twig.
+   Обычные формы с CSRF: создание, переименование в строке, удаление через диалог.
+   Используемую категорию удалить нельзя — диалог в blocked-режиме со ссылкой на её листинги. #}
+
+{% macro platform_label(row) %}
+    <div class="vf-strong">{{ row.marketplace == 'wildberries' ? 'WB' : 'Ozon' }} · {{ row.subjectName ?? row.sourceKey }}</div>
+    {% if row.subjectName %}<div class="vf-sub">{{ row.sourceKey }}</div>{% endif %}
+{% endmacro %}
+
+{# Правила: категория площадки (Ozon — категория и тип, WB — предмет) → категория компании.
+   Применяются сразу и после каждой загрузки каталога; ручное назначение не перезаписывают. #}
+{% macro rule_form(key, categories, token, selected=null, label='Назначить правилом') %}
+    <form method="post" action="{{ path('marketplace_listing_categories_rule_save') }}" class="d-flex gap-2">
+        <input type="hidden" name="_token" value="{{ token }}">
+        <input type="hidden" name="sourceKey" value="{{ key }}">
+        <select class="form-select form-select-sm u-max-w-320 u-min-w-16r" name="categoryId" required aria-label="Категория для {{ key }}">
+            <option value="">Выберите категорию</option>
+            {% for category in categories %}
+                <option value="{{ category.id }}" {{ category.id == selected ? 'selected' }}>{{ category.name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-sm">{{ label }}</button>
+    </form>
+{% endmacro %}
+
+{% block body %}
     {% set token = csrf_token('listing_categories') %}
     {% set max_length = constant('App\\Marketplace\\Entity\\MarketplaceListingCategory::NAME_MAX_LENGTH') %}
-    <div class="container-xl py-4" data-testid="listing-categories">
-        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-            <h3 class="mb-0 me-auto">Категории листингов</h3>
-            <form method="post" action="{{ path('marketplace_listing_categories_create') }}" class="d-flex gap-2">
-                <input type="hidden" name="_token" value="{{ token }}">
-                <input type="text" class="form-control" name="name" maxlength="{{ max_length }}" required
-                       placeholder="Новая категория" aria-label="Название новой категории" autocomplete="off">
-                <button type="submit" class="btn btn-primary">Добавить</button>
-            </form>
+    {% set total = categories|length %}
+    <div class="container-xl" data-testid="listing-categories">
+        <div class="vf-page-head">
+            <div class="vf-page-head__title">
+                <nav aria-label="Путь">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item">Маркетплейсы</li>
+                        <li class="breadcrumb-item"><a href="{{ path('marketplace_listings_index') }}">Товары и остатки</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">Категории</li>
+                    </ol>
+                </nav>
+                <h1>Категории листингов</h1>
+                <p class="vf-page-head__lead">
+                    Своя аналитика по категориям в отчётах. У листинга одна категория, поэтому суммы по категориям складываются в итог.
+                    Назначить категорию можно в реестре или правилом по категории площадки.
+                </p>
+            </div>
+            <div class="btn-list d-print-none">
+                <a href="{{ path('inventory_snapshots_index') }}" class="btn">К загрузкам</a>
+                <a href="{{ path('marketplace_listings_index') }}" class="btn">
+                    <i class="ti ti-list me-1" aria-hidden="true"></i>
+                    Назначить в реестре
+                </a>
+            </div>
         </div>
-        <p class="text-secondary small">
-            У листинга может быть только одна категория, поэтому суммы по категориям в отчётах складываются в итог.
-            Назначить категорию можно в реестре: отметьте строки и выберите категорию в панели над таблицей.
-        </p>
 
-        <div class="card">
+        <div class="card vf-card mb-4">
+            <div class="card-header">
+                {% include 'inventory/_tabs.html.twig' with {active_tab: active_tab} only %}
+            </div>
+
+            <div class="vf-card-bar d-print-none">
+                <div class="vf-card-bar__row">
+                    <form method="post" action="{{ path('marketplace_listing_categories_create') }}" class="d-flex gap-2">
+                        <input type="hidden" name="_token" value="{{ token }}">
+                        <input type="text" class="form-control u-min-w-16r" name="name" maxlength="{{ max_length }}" required
+                               placeholder="Новая категория" aria-label="Название новой категории" autocomplete="off">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ti ti-plus me-1" aria-hidden="true"></i>
+                            Добавить
+                        </button>
+                    </form>
+                </div>
+            </div>
+
             {% if categories is empty %}
-                <div class="card-body">
-                    {% include 'partials/_empty.html.twig' with {title: 'Категорий пока нет', hint: 'Введите название и нажмите «Добавить».'} only %}
+                <div class="vf-empty">
+                    <div class="vf-empty__title">Категорий пока нет</div>
+                    <div class="vf-empty__hint">Введите название и нажмите «Добавить».</div>
                 </div>
             {% else %}
+                <div class="vf-bar" role="status">
+                    Всего {{ total|vf_number }} {{ total % 10 == 1 and total % 100 != 11 ? 'категория' : (total % 10 in 2..4 and (total % 100 < 10 or total % 100 >= 20) ? 'категории' : 'категорий') }}
+                </div>
                 <div class="table-responsive">
-                    <table class="table card-table table-vcenter">
+                    <table class="table card-table table-vcenter vf-table">
                         <thead>
                         <tr>
                             <th>Категория</th>
@@ -49,7 +109,7 @@
                                     </form>
                                 </td>
                                 <td class="text-end">
-                                    <a href="{{ path('marketplace_listings_index', {category: category.id}) }}">{{ category.listingsCount|vf_number }}</a>
+                                    <a class="vf-strong" href="{{ path('marketplace_listings_index', {category: category.id}) }}">{{ category.listingsCount|vf_number }}</a>
                                 </td>
                                 <td>
                                     {# Диалогу нужны адрес и токен даже в blocked-режиме — без них он не откроется. #}
@@ -68,6 +128,7 @@
                                             data-confirm-submit="Удалить"
                                             data-confirm-variant="danger"
                                             {% endif %}>
+                                        <i class="ti ti-trash me-1" aria-hidden="true"></i>
                                         Удалить
                                     </button>
                                 </td>
@@ -79,31 +140,17 @@
             {% endif %}
         </div>
 
-        {# Правила: категория площадки (Ozon — категория и тип, WB — предмет) → категория компании.
-           Применяются сразу и после каждой загрузки каталога; ручное назначение не перезаписывают. #}
-        {% macro rule_form(key, categories, token, selected=null, label='Назначить правилом') %}
-            <form method="post" action="{{ path('marketplace_listing_categories_rule_save') }}" class="d-flex gap-2">
-                <input type="hidden" name="_token" value="{{ token }}">
-                <input type="hidden" name="sourceKey" value="{{ key }}">
-                <select class="form-select form-select-sm u-max-w-320 u-min-w-16r" name="categoryId" required aria-label="Категория для {{ key }}">
-                    <option value="">Выберите категорию</option>
-                    {% for category in categories %}
-                        <option value="{{ category.id }}" {{ category.id == selected ? 'selected' }}>{{ category.name }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="btn btn-sm btn-primary">{{ label }}</button>
-            </form>
-        {% endmacro %}
-
         {% if categories is not empty and unmatched is not empty %}
-            <h4 class="mt-4">Категории площадок без вашей категории</h4>
-            <p class="text-secondary small">
-                Правило назначит категорию всем листингам с этой категорией площадки — сейчас и после каждой загрузки каталога.
-                Ручное назначение в реестре правило не меняет.
-            </p>
-            <div class="card">
+            <div class="card vf-card mb-4">
+                <div class="vf-card-bar">
+                    <h3 class="card-title mb-0">Категории площадок без вашей категории</h3>
+                    <div class="text-secondary small">
+                        Правило назначит категорию всем листингам с этой категорией площадки — сейчас и после каждой загрузки каталога.
+                        Ручное назначение в реестре правило не меняет.
+                    </div>
+                </div>
                 <div class="table-responsive">
-                    <table class="table card-table table-vcenter">
+                    <table class="table card-table table-vcenter vf-table">
                         <thead>
                         <tr>
                             <th>Категория площадки</th>
@@ -115,11 +162,8 @@
                         <tbody>
                         {% for row in unmatched %}
                             <tr data-unmatched-key="{{ row.sourceKey }}">
-                                <td>
-                                    {{ row.marketplace == 'wildberries' ? 'WB' : 'Ozon' }} · {{ row.subjectName ?? row.sourceKey }}
-                                    {% if row.subjectName %}<div class="text-secondary small">{{ row.sourceKey }}</div>{% endif %}
-                                </td>
-                                <td class="text-secondary small">{{ row.examples|join('; ') }}</td>
+                                <td>{{ _self.platform_label(row) }}</td>
+                                <td class="vf-sub">{{ row.examples|join('; ') }}</td>
                                 <td class="text-end">{{ row.listingsCount|vf_number }}</td>
                                 <td>{{ _self.rule_form(row.sourceKey, categories, token) }}</td>
                             </tr>
@@ -131,10 +175,12 @@
         {% endif %}
 
         {% if rules is not empty %}
-            <h4 class="mt-4">Правила</h4>
-            <div class="card">
+            <div class="card vf-card mb-4">
+                <div class="vf-card-bar">
+                    <h3 class="card-title mb-0">Правила</h3>
+                </div>
                 <div class="table-responsive">
-                    <table class="table card-table table-vcenter">
+                    <table class="table card-table table-vcenter vf-table">
                         <thead>
                         <tr>
                             <th>Категория площадки</th>
@@ -145,10 +191,7 @@
                         <tbody>
                         {% for rule in rules %}
                             <tr data-rule-key="{{ rule.sourceKey }}">
-                                <td>
-                                    {{ rule.marketplace == 'wildberries' ? 'WB' : 'Ozon' }} · {{ rule.subjectName ?? rule.sourceKey }}
-                                    {% if rule.subjectName %}<div class="text-secondary small">{{ rule.sourceKey }}</div>{% endif %}
-                                </td>
+                                <td>{{ _self.platform_label(rule) }}</td>
                                 <td class="text-end">{{ rule.listingsCount|vf_number }}</td>
                                 <td>{{ _self.rule_form(rule.sourceKey, categories, token, rule.categoryId, 'Заменить') }}</td>
                             </tr>
@@ -159,8 +202,6 @@
             </div>
         {% endif %}
     </div>
-{% endblock %}
 
-{% block modals %}
     {% include 'partials/_confirm_modal.html.twig' with {id: 'categories-confirm'} only %}
 {% endblock %}
