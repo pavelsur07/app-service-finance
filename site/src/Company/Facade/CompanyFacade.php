@@ -203,19 +203,6 @@ final class CompanyFacade
         );
     }
 
-    /** @return array<string, string> Имена доступных для привязки компаний владельца по ID. */
-    public function activeOwnedCompanyNames(string $userId): array
-    {
-        $names = [];
-        foreach ($this->repository->findByUserId($userId) as $company) {
-            if (!$company->isDeletionRequested()) {
-                $names[(string) $company->getId()] = (string) $company->getName();
-            }
-        }
-
-        return $names;
-    }
-
     /**
      * ID компаний, которыми пользователь владеет (без компаний, где он только участник).
      *

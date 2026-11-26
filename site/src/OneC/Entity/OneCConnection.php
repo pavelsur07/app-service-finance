@@ -10,7 +10,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity]
 #[ORM\Table(name: 'onec_connection')]
 #[ORM\UniqueConstraint(name: 'onec_connection_token_hash_key', columns: ['token_hash'])]
-#[ORM\UniqueConstraint(name: 'uniq_onec_owner_base', columns: ['owner_id', 'base_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_onec_company_base', columns: ['company_id', 'base_id'])]
 class OneCConnection
 {
     #[ORM\Id]
@@ -33,18 +33,25 @@ class OneCConnection
     #[ORM\Column(nullable: true)]
     public private(set) ?\DateTimeImmutable $lastSuccessAt = null;
 
+    /** Автор подключения — только для аудита, доступ определяет компания. */
+    #[ORM\Column(type: 'guid', nullable: true)]
+    public private(set) ?string $createdByUserId;
+
     public function __construct(
         string $id,
         #[ORM\Column(type: 'guid')]
-        public private(set) string $ownerId,
+        public private(set) string $companyId,
+        string $createdByUserId,
         #[ORM\Column(length: 255)]
         public private(set) string $name,
         #[ORM\Column(length: 64)]
         private string $tokenHash,
     ) {
         Assert::uuid($id);
-        Assert::uuid($ownerId);
+        Assert::uuid($companyId);
+        Assert::uuid($createdByUserId);
         $this->id = $id;
+        $this->createdByUserId = $createdByUserId;
     }
 
     /** @param array<string, string> $versions */

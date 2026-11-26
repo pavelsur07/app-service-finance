@@ -137,7 +137,7 @@ final class PackagesTest extends WebTestCaseBase
         self::assertSame('unsupported', $this->error($client));
     }
 
-    public function testOwnersAreIsolated(): void
+    public function testCompaniesAreIsolated(): void
     {
         [$client, $token, $baseId] = $this->connected();
         [, $foreignToken, $foreignBase] = $this->connected($client, $baseId);

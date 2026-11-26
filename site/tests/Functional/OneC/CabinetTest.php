@@ -60,7 +60,7 @@ final class CabinetTest extends WebTestCaseBase
         $this->em()->flush();
         $client->loginUser($userAdmin);
         $client->request('GET', '/onec/packages/'.$partId.'/raw');
-        self::assertResponseStatusCodeSame(404);
+        self::assertResponseStatusCodeSame(403);
 
         $adminId = Uuid::uuid7()->toString();
         $admin = UserBuilder::aUser()->withId($adminId)->withEmail($adminId.'@example.test')->withRoles(['ROLE_ADMIN'])->build();

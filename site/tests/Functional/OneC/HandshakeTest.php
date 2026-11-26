@@ -16,7 +16,7 @@ final class HandshakeTest extends WebTestCaseBase
 {
     public function testHandshakeBindsBaseAndPreservesMapping(): void
     {
-        [$client, $token, $companyId] = $this->createConnection();
+        [$client, $token] = $this->createConnection();
         $body = $this->payload();
         $client->jsonRequest('POST', '/api/onec/v1/handshake', $body, ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
         self::assertResponseIsSuccessful();
@@ -27,7 +27,7 @@ final class HandshakeTest extends WebTestCaseBase
         self::assertFalse($result['organizations'][0]['mapped']);
         $db = $this->em()->getConnection();
         self::assertSame(hash('sha256', $token), $db->fetchOne('SELECT token_hash FROM onec_connection WHERE id = ?', [$result['connection_id']]));
-        $db->update('onec_organization', ['company_id' => $companyId, 'enabled' => true], ['connection_id' => $result['connection_id']]);
+        $db->update('onec_organization', ['enabled' => true], ['connection_id' => $result['connection_id']]);
         $client->jsonRequest('POST', '/api/onec/v1/handshake', array_replace($body, ['organizations' => []]), ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
         self::assertResponseIsSuccessful();
         self::assertFalse($db->fetchOne('SELECT present FROM onec_organization WHERE connection_id = ?', [$result['connection_id']]));
@@ -63,30 +63,7 @@ final class HandshakeTest extends WebTestCaseBase
         self::assertSame('unsupported', $result['support']['level']);
     }
 
-    public function testSameBaseIsUniquePerOwnerAndForeignMappingIsHidden(): void
-    {
-        [$client, $first] = $this->createConnection();
-        $client->request('GET', '/onec/connections/new');
-        $second = $client->submitForm('Создать подключение', ['name' => 'Копия'])->filter('[data-onec-token]')->text();
-        [, $foreign, $foreignCompanyId] = $this->createConnection($client);
-        $body = $this->payload();
-        $url = '/api/onec/v1/handshake';
-        $client->jsonRequest('POST', $url, $body, ['HTTP_AUTHORIZATION' => 'Bearer '.$first]);
-        self::assertResponseIsSuccessful();
-        $id = json_decode((string) $client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR)['connection_id'];
-        $client->jsonRequest('POST', $url, $body, ['HTTP_AUTHORIZATION' => 'Bearer '.$second]);
-        self::assertResponseStatusCodeSame(409);
-        $client->jsonRequest('POST', $url, $body, ['HTTP_AUTHORIZATION' => 'Bearer '.$foreign]);
-        self::assertResponseIsSuccessful();
-        $this->em()->getConnection()->update('onec_organization', ['company_id' => $foreignCompanyId], ['connection_id' => $id]);
-        $client->jsonRequest('POST', $url, $body, ['HTTP_AUTHORIZATION' => 'Bearer '.$first]);
-        self::assertResponseIsSuccessful();
-        $result = json_decode((string) $client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
-        self::assertNull($result['organizations'][0]['company_name']);
-        self::assertFalse($result['organizations'][0]['mapped']);
-    }
-
-    public function testTokenCannotBeReadAgainAndCreatingRequiresOwnerAndCsrf(): void
+    public function testTokenCannotBeReadAgainAndCreatingRequiresFinanceWriteAndCsrf(): void
     {
         [$client, $token, $companyId] = $this->createConnection();
         $form = $client->request('GET', '/onec/connections/new');
@@ -108,7 +85,7 @@ final class HandshakeTest extends WebTestCaseBase
         $this->setClientSessionValue($client, 'active_company_id', $companyId);
         $client->request('GET', '/onec/connections/new');
         self::assertResponseStatusCodeSame(403);
-        self::assertSame(1, $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM onec_connection WHERE owner_id = ?', [$company->getUser()?->getId()]));
+        self::assertSame(1, $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM onec_connection WHERE company_id = ?', [$companyId]));
     }
 
     public function testDuplicateFormIdCannotIssueASecondTokenEvenWithValidCsrf(): void

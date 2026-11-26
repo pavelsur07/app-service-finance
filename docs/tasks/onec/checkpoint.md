@@ -5,3 +5,4 @@
 - [x] Stage 1 — приём частей пакета
 - [x] Stage 2 — кабинет: список, карточка, перевыпуск, отключение, скачивание
 - [x] Stage 3 — README, ARCHITECTURE, handoff
+- [x] Stage 4 — подключение принадлежит компании (stages/stage-4-company-scope.md)

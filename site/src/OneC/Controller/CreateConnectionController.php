@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\OneC\Controller;
 
 use App\Company\Entity\User;
-use App\Company\Facade\CompanyFacade;
 use App\Company\Security\ModuleAccess;
 use App\OneC\Application\CreateConnectionAction;
 use App\Shared\Service\ActiveCompanyService;
@@ -19,23 +18,19 @@ use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-#[IsGranted('ROLE_USER')]
+#[IsGranted(ModuleAccess::FINANCE_READ)]
 final class CreateConnectionController extends AbstractController
 {
     #[Route('/onec/connections/new', name: 'onec_connection_create', methods: ['GET', 'POST'])]
-    public function __invoke(Request $request, #[CurrentUser] User $user, ActiveCompanyService $activeCompany, CompanyFacade $companies, CreateConnectionAction $create, CsrfTokenManagerInterface $csrf): Response
+    public function __invoke(Request $request, #[CurrentUser] User $user, ActiveCompanyService $activeCompany, CreateConnectionAction $create, CsrfTokenManagerInterface $csrf): Response
     {
         $companyId = (string) $activeCompany->getActiveCompany()->getId();
-        $ownerId = (string) $user->getId();
-        if (!$companies->isOwner($companyId, $ownerId)) {
-            throw $this->createAccessDeniedException();
-        }
         $requestId = $request->isMethod('POST') ? $request->request->getString('request_id') : Uuid::uuid7()->toString();
         $tokenId = 'onec_create_'.$companyId.'_'.$requestId;
         $secret = null;
         $status = 200;
         if ($request->isMethod('POST')) {
-            $this->denyAccessUnlessGranted(ModuleAccess::ADMIN_WRITE);
+            $this->denyAccessUnlessGranted(ModuleAccess::FINANCE_WRITE);
             if (!Uuid::isValid($requestId) || !$this->isCsrfTokenValid($tokenId, $request->request->getString('_token'))) {
                 throw $this->createAccessDeniedException();
             }
@@ -44,7 +39,7 @@ final class CreateConnectionController extends AbstractController
                 $status = 422;
             } else {
                 try {
-                    $secret = $create($requestId, $companyId, $ownerId, $name);
+                    $secret = $create($requestId, $companyId, (string) $user->getId(), $name);
                 } catch (UniqueConstraintViolationException) {
                     throw $this->createAccessDeniedException('Эта форма уже отправлена.');
                 }
