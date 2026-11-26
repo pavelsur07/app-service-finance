@@ -1,0 +1,200 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://vashfindir.ru/contracts/onec/v1/schema.json",
+    "title": "Обмен 1С v1",
+    "description": "Машинная форма контракта docs/integrations/onec/api-contract.md: рукопожатие, часть пакета invoices, документ счёта, ответы и ошибка. Изменения v1 только добавляющие; неизвестные поля приёмник игнорирует.",
+    "$defs": {
+        "uuid": {"type": "string", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"},
+        "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "ГГГГ-ММ-ДД"},
+        "version": {"type": "string", "maxLength": 255, "pattern": "^\\d+(\\.\\d+)*$"},
+        "text": {"type": "string", "minLength": 1, "maxLength": 255},
+        "decimal": {"type": "string", "pattern": "^-?\\d+(\\.\\d+)?$", "description": "Десятичная строка с точкой и исходной точностью, без разделителей разрядов"},
+        "decimal_or_null": {"anyOf": [{"$ref": "#/$defs/decimal"}, {"type": "null"}]},
+        "string_or_null": {"type": ["string", "null"]},
+        "inn": {"anyOf": [{"type": "string", "pattern": "^\\d{10}$"}, {"type": "null"}], "description": "ИНН юрлица; ИНН физлица (12 цифр) не передаётся"},
+        "kpp": {"anyOf": [{"type": "string", "pattern": "^\\d{4}[0-9A-Z]{2}\\d{3}$"}, {"type": "null"}]},
+        "invoice_type": {"enum": ["customer_invoice", "supplier_invoice"]},
+
+        "handshake_request": {
+            "description": "Тело POST /api/onec/v1/handshake — полный снимок справочника организаций.",
+            "type": "object",
+            "required": ["base_id", "config_name", "config_version", "platform_version", "processor_version", "organizations"],
+            "properties": {
+                "base_id": {"$ref": "#/$defs/uuid"},
+                "config_name": {"$ref": "#/$defs/text"},
+                "config_synonym": {"$ref": "#/$defs/text"},
+                "config_version": {"$ref": "#/$defs/version"},
+                "platform_version": {"$ref": "#/$defs/version"},
+                "processor_version": {"$ref": "#/$defs/version"},
+                "organizations": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["guid", "name"],
+                        "properties": {
+                            "guid": {"$ref": "#/$defs/uuid"},
+                            "name": {"$ref": "#/$defs/text"},
+                            "inn": {"$ref": "#/$defs/inn"},
+                            "kpp": {"$ref": "#/$defs/kpp"}
+                        }
+                    }
+                }
+            }
+        },
+        "handshake_response": {
+            "description": "Ответ 200 на рукопожатие.",
+            "type": "object",
+            "required": ["connection_id", "status", "server_time", "support", "organizations", "messages"],
+            "properties": {
+                "connection_id": {"$ref": "#/$defs/uuid"},
+                "status": {"enum": ["connected", "error"]},
+                "server_time": {"type": "string", "format": "date-time"},
+                "support": {
+                    "type": "object",
+                    "required": ["level", "message"],
+                    "properties": {
+                        "level": {"enum": ["supported", "warning", "unsupported"]},
+                        "message": {"type": "string"}
+                    }
+                },
+                "organizations": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["guid", "mapped", "company_name"],
+                        "properties": {
+                            "guid": {"$ref": "#/$defs/uuid"},
+                            "mapped": {"type": "boolean"},
+                            "company_name": {"$ref": "#/$defs/string_or_null"}
+                        }
+                    }
+                },
+                "messages": {"type": "array"}
+            }
+        },
+
+        "package_part": {
+            "description": "Тело POST /api/onec/v1/packages — одна часть выгрузки. Оболочка (всё, кроме part, warnings, documents) одинакова во всех частях одного package_id.",
+            "type": "object",
+            "required": ["package_id", "base_id", "kind", "processor_version", "period_from", "period_to", "include_open_outside_period", "part", "parts_total", "documents"],
+            "properties": {
+                "package_id": {"$ref": "#/$defs/uuid"},
+                "base_id": {"$ref": "#/$defs/uuid"},
+                "kind": {"const": "invoices"},
+                "processor_version": {"$ref": "#/$defs/version"},
+                "period_from": {"$ref": "#/$defs/date"},
+                "period_to": {"$ref": "#/$defs/date"},
+                "include_open_outside_period": {"type": "boolean"},
+                "part": {"type": "integer", "minimum": 1, "maximum": 10000},
+                "parts_total": {"type": "integer", "minimum": 1, "maximum": 10000},
+                "warnings": {"type": "array", "items": {"type": "string"}},
+                "coverage": {"type": "array", "items": {"$ref": "#/$defs/coverage"}},
+                "documents": {"type": "array", "maxItems": 500, "items": {"$ref": "#/$defs/invoice"}}
+            }
+        },
+        "coverage": {
+            "description": "Полнота выборки пары «организация + вид счёта» за период. Отсутствующая пара считается partial.",
+            "type": "object",
+            "required": ["organization_guid", "type", "state"],
+            "properties": {
+                "organization_guid": {"$ref": "#/$defs/uuid"},
+                "type": {"$ref": "#/$defs/invoice_type"},
+                "state": {"enum": ["complete", "partial", "not_selected"]}
+            }
+        },
+        "invoice": {
+            "description": "Счёт на оплату. Обязательный минимум — guid, type, date, organization_guid, amount; неизвестное значение — null.",
+            "type": "object",
+            "required": ["guid", "type", "date", "organization_guid", "amount"],
+            "properties": {
+                "guid": {"$ref": "#/$defs/uuid"},
+                "type": {"$ref": "#/$defs/invoice_type"},
+                "number": {"$ref": "#/$defs/string_or_null"},
+                "date": {"$ref": "#/$defs/date"},
+                "organization_guid": {"$ref": "#/$defs/uuid"},
+                "counterparty": {
+                    "anyOf": [{"type": "null"}, {
+                        "type": "object",
+                        "required": ["guid", "name"],
+                        "properties": {
+                            "guid": {"$ref": "#/$defs/uuid"},
+                            "name": {"type": "string"},
+                            "inn": {"$ref": "#/$defs/inn"},
+                            "kpp": {"$ref": "#/$defs/kpp"}
+                        }
+                    }]
+                },
+                "contract": {
+                    "anyOf": [{"type": "null"}, {
+                        "type": "object",
+                        "required": ["guid", "name"],
+                        "properties": {"guid": {"$ref": "#/$defs/uuid"}, "name": {"type": "string"}}
+                    }]
+                },
+                "bank_account_guid": {"anyOf": [{"$ref": "#/$defs/uuid"}, {"type": "null"}]},
+                "amount": {"$ref": "#/$defs/decimal"},
+                "vat_amount": {"$ref": "#/$defs/decimal_or_null"},
+                "amounts_include_vat": {"type": ["boolean", "null"]},
+                "currency": {"$ref": "#/$defs/string_or_null"},
+                "due_date": {"anyOf": [{"$ref": "#/$defs/date"}, {"type": "null"}]},
+                "status": {"enum": ["not_paid", "partially_paid", "paid", "cancelled", null]},
+                "status_raw": {"$ref": "#/$defs/string_or_null"},
+                "paid_amount": {"$ref": "#/$defs/decimal_or_null"},
+                "comment": {"$ref": "#/$defs/string_or_null"},
+                "posted": {"type": ["boolean", "null"]},
+                "deletion_mark": {"type": ["boolean", "null"]},
+                "items": {"anyOf": [{"type": "null"}, {"type": "array", "items": {"$ref": "#/$defs/invoice_item"}}], "description": "[] — строк нет; null — строки не прочитаны (с предупреждением)"}
+            }
+        },
+        "invoice_item": {
+            "description": "Строка табличной части счёта. Включают ли price и amount НДС — по amounts_include_vat документа.",
+            "type": "object",
+            "properties": {
+                "line_no": {"type": "integer", "minimum": 1},
+                "nomenclature": {
+                    "anyOf": [{"type": "null"}, {
+                        "type": "object",
+                        "required": ["guid", "name"],
+                        "properties": {
+                            "guid": {"$ref": "#/$defs/uuid"},
+                            "name": {"type": "string"},
+                            "article": {"$ref": "#/$defs/string_or_null"},
+                            "kind": {"enum": ["goods", "service", null]}
+                        }
+                    }]
+                },
+                "content": {"$ref": "#/$defs/string_or_null"},
+                "unit": {
+                    "anyOf": [{"type": "null"}, {
+                        "type": "object",
+                        "properties": {"name": {"$ref": "#/$defs/string_or_null"}, "code": {"$ref": "#/$defs/string_or_null"}}
+                    }]
+                },
+                "quantity": {"$ref": "#/$defs/decimal_or_null"},
+                "price": {"$ref": "#/$defs/decimal_or_null"},
+                "amount": {"$ref": "#/$defs/decimal_or_null"},
+                "vat_rate": {"$ref": "#/$defs/string_or_null"},
+                "vat_amount": {"$ref": "#/$defs/decimal_or_null"},
+                "comment": {"$ref": "#/$defs/string_or_null"}
+            }
+        },
+        "package_response": {
+            "description": "Ответ 200 на часть пакета. Счётчики разбора добавятся с этапом нормализации.",
+            "type": "object",
+            "required": ["accepted", "package_id", "part", "status", "duplicate"],
+            "properties": {
+                "accepted": {"const": true},
+                "package_id": {"$ref": "#/$defs/uuid"},
+                "part": {"type": "integer", "minimum": 1},
+                "status": {"const": "stored"},
+                "duplicate": {"type": "boolean"}
+            }
+        },
+        "error": {
+            "description": "Ответ 4xx/5xx.",
+            "type": "object",
+            "required": ["error", "message"],
+            "properties": {"error": {"type": "string"}, "message": {"type": "string"}}
+        }
+    }
+}
