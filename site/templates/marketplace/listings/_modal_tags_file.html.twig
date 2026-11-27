@@ -1,0 +1,23 @@
+{# Загрузка файла разметки тегов → предпросмотр. Параметров нет. #}
+<div class="modal modal-blur fade" id="listingTagsFileModal" tabindex="-1" role="dialog" aria-labelledby="listingTagsFileModalTitle">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <form class="modal-content" method="post" enctype="multipart/form-data" action="{{ path('marketplace_listing_tags_file_upload') }}">
+            <input type="hidden" name="_token" value="{{ csrf_token(constant('App\\Marketplace\\Controller\\ListingTagsFileUploadController::CSRF_ID')) }}">
+            <div class="modal-header">
+                <h5 class="modal-title" id="listingTagsFileModalTitle">Загрузить разметку тегов</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <input type="file" class="form-control" name="tags_file" accept=".xlsx" required aria-label="Файл xlsx">
+                <p class="text-secondary small mt-2 mb-0">
+                    Файл из «Скачать для разметки», до 5 000 строк и 2 МБ. Теги — в колонке «Теги» через «;»,
+                    пустая ячейка ничего не меняет, «-» снимает все теги. Перед записью покажем, что изменится.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="submit" class="btn btn-primary">Проверить файл</button>
+            </div>
+        </form>
+    </div>
+</div>

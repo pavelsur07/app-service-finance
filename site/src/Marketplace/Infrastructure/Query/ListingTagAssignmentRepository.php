@@ -82,6 +82,38 @@ final readonly class ListingTagAssignmentRepository
     }
 
     /**
+     * Листинги компании из списка с подписью для экрана: чужие и несуществующие id
+     * в ответ не попадают — так импорт тегов отличает «не наш листинг».
+     *
+     * @param list<string> $listingIds
+     *
+     * @return array<string, string> listingId → название (артикул или SKU, если названия нет)
+     */
+    public function companyListingNames(string $companyId, array $listingIds): array
+    {
+        if ([] === $listingIds) {
+            return [];
+        }
+
+        /** @var array<string, string> $names */
+        $names = $this->connection->fetchAllKeyValue(
+            <<<'SQL'
+            SELECT id, COALESCE(NULLIF(name, ''), NULLIF(supplier_sku, ''), marketplace_sku)
+            FROM marketplace_listings
+            WHERE company_id = :companyId
+              AND id IN (:listingIds)
+            SQL,
+            [
+                'companyId' => $companyId,
+                'listingIds' => $listingIds,
+            ],
+            ['listingIds' => ArrayParameterType::STRING],
+        );
+
+        return $names;
+    }
+
+    /**
      * @param list<string> $listingIds
      *
      * @return int сколько связей реально снято

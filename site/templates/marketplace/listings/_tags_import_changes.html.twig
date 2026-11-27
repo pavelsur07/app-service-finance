@@ -1,0 +1,37 @@
+{#
+  Таблица изменений одного режима импорта тегов (первые 200 листингов).
+  Параметры: result (ListingTagsImportResult).
+#}
+{% if result.changes is empty %}
+    <p class="text-secondary mb-0">Изменений нет: теги уже совпадают с файлом.</p>
+{% else %}
+    <div class="table-responsive">
+        <table class="table table-sm table-vcenter mb-0">
+            <thead>
+            <tr>
+                <th class="w-1">Строка</th>
+                <th>Листинг</th>
+                <th>Добавится</th>
+                <th>Снимется</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for change in result.changes|slice(0, 200) %}
+                <tr>
+                    <td class="text-secondary">{{ change.row }}</td>
+                    <td>{{ change.name }}</td>
+                    <td>
+                        {% for tag in change.add %}<span class="tag-chip tag-name me-1">{{ tag }}</span>{% endfor %}
+                    </td>
+                    <td>
+                        {% for tag in change.remove %}<span class="tag-chip tag-name me-1 text-decoration-line-through">{{ tag }}</span>{% endfor %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if result.changes|length > 200 %}
+        <p class="text-secondary small mt-2 mb-0">Показаны первые 200 из {{ result.changes|length|vf_number }} листингов.</p>
+    {% endif %}
+{% endif %}
