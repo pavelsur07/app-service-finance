@@ -215,6 +215,8 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
         $suggestions->addColumn('prompt_version', 'string', ['length' => 64]);
         $suggestions->addColumn('status', 'string', ['length' => 16]);
         $suggestions->addColumn('attempts', 'smallint', ['default' => 1]);
+        $suggestions->addColumn('request_seq', 'integer', ['default' => 1]);
+        $suggestions->addColumn('payload_hash', 'string', ['length' => 64]);
         $suggestions->addColumn('account_code', 'string', ['length' => 64, 'notnull' => false]);
         $suggestions->addColumn('excluded', 'boolean', ['default' => false]);
         $suggestions->addColumn('confident', 'boolean', ['default' => false]);

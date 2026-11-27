@@ -37,9 +37,11 @@ final class SaveStoreBalanceController extends AbstractController
         if (!is_string($target) || ('' !== $target && 'excluded' !== $target && !Uuid::isValid($target))) {
             throw new UnprocessableEntityHttpException('Некорректный счёт.');
         }
+        // «Принять» предложение не перезаписывает назначение, сделанное после показа страницы.
+        $onlyIfUnassigned = '1' === ($values['onlyIfUnassigned'] ?? null);
         try {
-            $action($companyId, $connectionId, $storeExternalId, Uuid::isValid($target) ? $target : null, 'excluded' === $target, $actorId);
-            $this->addFlash('success', 'Назначение склада сохранено.');
+            $saved = $action($companyId, $connectionId, $storeExternalId, Uuid::isValid($target) ? $target : null, 'excluded' === $target, $actorId, $onlyIfUnassigned);
+            $saved ? $this->addFlash('success', 'Назначение склада сохранено.') : $this->addFlash('warning', 'Склад уже назначен — предложение не применено.');
         } catch (StoreBalanceException $error) {
             if ('store_not_found' === $error->reason) {
                 throw $this->createNotFoundException();

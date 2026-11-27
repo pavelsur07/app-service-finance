@@ -61,6 +61,8 @@ final class StoreAccountRulePolicyTest extends TestCase
         yield 'пусто' => ['  '];
         yield 'fbo без площадки' => ['FBO'];
         yield 'обе площадки' => ['Ozon/WB'];
+        yield 'отрицание брака' => ['Годный товар (без брака)'];
+        yield 'тест внутри слова' => ['Протестированные'];
     }
 
     #[DataProvider('unknown')]

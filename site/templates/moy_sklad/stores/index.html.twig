@@ -117,6 +117,7 @@
                                                 <input type="hidden" name="_token" value="{{ csrf_token(csrfId) }}">
                                                 <input type="hidden" name="filter" value="{{ unassignedOnly ? 'unassigned' : '' }}">
                                                 <input type="hidden" name="target" value="{{ suggestion.target }}">
+                                                <input type="hidden" name="onlyIfUnassigned" value="1">
                                                 <button class="btn btn-sm btn-outline-primary" type="submit">Принять</button>
                                             </form>
                                         {% endif %}

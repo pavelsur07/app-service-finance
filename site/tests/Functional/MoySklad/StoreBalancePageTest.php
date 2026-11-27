@@ -69,6 +69,13 @@ final class StoreBalancePageTest extends WebTestCaseBase
         self::assertSelectorTextContains('[data-store-accept-suggestions] button', '2');
 
         $form = $client->getCrawler()->filter('[data-store="'.$ff->getExternalId().'"] [data-store-suggestion-accept]')->form();
+        $stockAccount = (string) $db->fetchOne("SELECT id FROM balance_accounts WHERE company_id = ? AND code = 'ACC_INV_WAREHOUSE'", [$companyId]);
+        $db->executeStatement('INSERT INTO moysklad_store_balance_links (company_id, connection_id, store_external_id, balance_account_id, excluded, actor_user_id, updated_at) VALUES (?, ?, ?, ?, false, ?, now())',
+            [$companyId, $connectionId, $ff->getExternalId(), $stockAccount, (string) $db->fetchOne('SELECT user_id FROM companies WHERE id = ?', [$companyId])]);
+        $client->submit($form);
+        self::assertResponseStatusCodeSame(303);
+        self::assertSame($stockAccount, $db->fetchOne('SELECT balance_account_id FROM moysklad_store_balance_links WHERE store_external_id = ?', [$ff->getExternalId()]), 'Назначение, сделанное после показа страницы, не перезаписано.');
+        $db->executeStatement('DELETE FROM moysklad_store_balance_links WHERE store_external_id = ?', [$ff->getExternalId()]);
         $client->submit($form);
         self::assertResponseStatusCodeSame(303);
         self::assertSame($ffAccount, $db->fetchOne('SELECT balance_account_id FROM moysklad_store_balance_links WHERE store_external_id = ?', [$ff->getExternalId()]));

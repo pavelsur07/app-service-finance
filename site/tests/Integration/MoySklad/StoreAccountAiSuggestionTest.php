@@ -123,8 +123,13 @@ final class StoreAccountAiSuggestionTest extends IntegrationTestCase
         $this->ai->fail = false;
         self::assertSame(2, $this->request());
         $this->clock->modify('+2 hours');
-        self::assertSame(2, $this->request(), 'Зависший запрос старше часа ставится снова тем же ключом.');
+        self::assertSame(2, $this->request(), 'Зависший запрос старше часа ставится снова.');
         self::assertSame(2, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM moysklad_store_account_suggestions'));
+        self::assertCount(2, array_unique(array_column($this->ai->requests, 'key')), 'Payload не менялся — тот же ключ, сервис вернёт ту же задачу.');
+        $this->clock->modify('+2 hours');
+        self::assertSame(2, $this->request(), 'Третья отправка.');
+        $this->clock->modify('+2 hours');
+        self::assertSame(0, $this->request(), 'Отказ при отправке (неизвестная задача у сервиса) не повторяется бесконечно: три отправки на название.');
     }
 
     public function testFailedAnswerIsAskedAgainWithNewKeyUpToThreeAttempts(): void
@@ -138,6 +143,17 @@ final class StoreAccountAiSuggestionTest extends IntegrationTestCase
         self::assertCount(3, array_unique($keys), 'Новая попытка — новый ключ, иначе сервис вернёт ту же упавшую задачу.');
         $this->answer('Газелька', AiResultStatus::FAILED, null);
         self::assertSame(0, $this->request(), 'После трёх попыток — до переименования или нового промпта.');
+    }
+
+    public function testStaleRetryWithChangedPayloadUsesNewKey(): void
+    {
+        $this->request();
+        $this->connection->executeStatement('INSERT INTO moysklad_store_balance_links (company_id, connection_id, store_external_id, balance_account_id, excluded, actor_user_id, updated_at) VALUES (?, ?, ?, NULL, true, ?, now())',
+            [self::COMPANY, self::CONNECTION, $this->stores['Брак'], $this->owner]);
+        $this->clock->modify('+2 hours');
+
+        self::assertSame(2, $this->request());
+        self::assertCount(4, array_unique(array_column($this->ai->requests, 'key')), 'Примеры изменились — иначе сервис ответит idempotency_conflict.');
     }
 
     public function testRejectedAnswerIsFinal(): void
@@ -155,7 +171,7 @@ final class StoreAccountAiSuggestionTest extends IntegrationTestCase
         $request = array_values(array_filter($this->ai->requests, static fn (array $r): bool => 'Газелька' === $r['payload']['store']['name']))[0];
         $row = $store->requests(self::COMPANY, self::CONNECTION)[$this->stores['Газелька']];
         // прогон прочитал строку как зависшую до ответа и пишет её снова уже после ответа
-        $store->markRequested(self::COMPANY, self::CONNECTION, $this->stores['Газелька'], $row['fingerprint'], $row['promptVersion'], $request['taskId'], 1, new \DateTimeImmutable());
+        $store->markRequested(self::COMPANY, self::CONNECTION, $this->stores['Газелька'], $row['fingerprint'], $row['promptVersion'], $request['taskId'], 1, $row['seq'], $row['payloadHash'], new \DateTimeImmutable());
 
         self::assertArrayHasKey($this->stores['Газелька'], $this->suggestions());
     }
