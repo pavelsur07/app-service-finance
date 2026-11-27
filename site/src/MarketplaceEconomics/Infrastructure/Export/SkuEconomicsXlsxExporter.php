@@ -51,7 +51,7 @@ final readonly class SkuEconomicsXlsxExporter
                 foreach ($rows as $row) {
                     $classes = [$row->abcRevenue->value];
                     if ($allocated) {
-                        $classes[] = $row->abcProfit?->value ?? '';
+                        $classes[] = $row->abcProfit->value ?? '';
                     }
                     $writer->addRow($this->skuRow([...$prefix, $row->sku, (string) $row->title, ...$classes, SkuEconomicsFilter::CHANNELS[(string) $row->channel] ?? ''], $row->current, $allocated));
                 }
