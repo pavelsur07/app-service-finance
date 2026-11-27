@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Marketplace\Infrastructure\Query;
 
 use App\Marketplace\Application\DTO\ListingsFilter;
+use App\Marketplace\Application\DTO\ListingTagsExportRow;
+use App\Marketplace\DTO\ListingTagDTO;
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
@@ -51,6 +54,36 @@ final class MarketplaceListingsQuery
             ->getSingleColumnResult();
 
         return $ids;
+    }
+
+    /**
+     * Строки файла разметки тегов под фильтром реестра, в порядке списка, с текущими тегами.
+     *
+     * @return list<ListingTagsExportRow>
+     */
+    public function exportRows(string $companyId, ListingsFilter $filter, int $limit): array
+    {
+        /** @var list<array{id: string, marketplace: MarketplaceType, supplierSku: ?string, marketplaceSku: string, size: string, name: ?string}> $rows */
+        $rows = $this->filteredQueryBuilder($companyId, $filter)
+            ->select('l.id', 'l.marketplace', 'l.supplierSku', 'l.marketplaceSku', 'l.size', 'l.name')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getArrayResult();
+
+        $tags = [];
+        foreach (array_chunk(array_column($rows, 'id'), 1000) as $chunk) {
+            $tags += $this->tagAssignments->tagsForListings($companyId, $chunk);
+        }
+
+        return array_map(static fn (array $row): ListingTagsExportRow => new ListingTagsExportRow(
+            $row['id'],
+            $row['marketplace']->value,
+            $row['supplierSku'],
+            $row['marketplaceSku'],
+            $row['size'],
+            $row['name'],
+            array_map(static fn (ListingTagDTO $tag): string => $tag->name, $tags[$row['id']] ?? []),
+        ), $rows);
     }
 
     private function filteredQueryBuilder(string $companyId, ListingsFilter $filter): QueryBuilder

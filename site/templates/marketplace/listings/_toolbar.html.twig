@@ -25,7 +25,7 @@
     </span>
 {% endif %}
 
-<a href="{{ path('marketplace_listing_tags_manage') }}" class="btn btn-ghost-secondary me-auto">
+<a href="{{ path('marketplace_listing_tags_manage') }}" class="btn btn-ghost-secondary">
     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="16" height="16"
          viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
@@ -35,6 +35,13 @@
     </svg>
     Управление тегами
 </a>
+<a href="{{ path('marketplace_listing_tags_file_export', listings_filter.toQueryParams()) }}" class="btn btn-ghost-secondary"
+   title="Листинги по текущему фильтру в xlsx: впишите теги в Excel и загрузите обратно" data-testid="listing-tags-file-export">
+    Скачать для разметки
+</a>
+<button type="button" class="btn btn-ghost-secondary me-auto" data-bs-toggle="modal" data-bs-target="#listingTagsFileModal">
+    Загрузить разметку
+</button>
 <form method="get" action="{{ path('marketplace_listings_index') }}"
       class="d-flex align-items-center gap-2 flex-wrap" id="listings-filter-form" role="search" data-listings-filter>
     <select class="form-select w-auto" name="filter" aria-label="Привязка к товару" data-autosubmit>

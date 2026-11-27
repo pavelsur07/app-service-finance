@@ -1,0 +1,73 @@
+{% extends 'inventory/layout.html.twig' %}
+
+{% block tab_content %}
+    <div class="container-xl py-4" data-listing-tags-import>
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+            <h3 class="mb-0 me-auto">Разметка тегов из файла</h3>
+            <span class="text-secondary small">{{ fileName }} · строк: {{ rowsCount|vf_number }}</span>
+        </div>
+
+        {% if add.errors is not empty %}
+            <div class="card mb-3 border-danger" data-testid="tags-import-errors">
+                <div class="card-header">
+                    <h4 class="card-title text-danger mb-0">Строки с ошибками не применятся: {{ add.errors|length|vf_number }}</h4>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm card-table mb-0">
+                        <thead>
+                        <tr>
+                            <th class="w-1">Строка</th>
+                            <th>Ошибка</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for error in add.errors %}
+                            <tr>
+                                <td class="text-secondary">{{ error.row }}</td>
+                                <td>{{ error.message }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        <form method="post" action="{{ path('marketplace_listing_tags_file_apply') }}" class="card">
+            <input type="hidden" name="_token" value="{{ csrf_token(constant('App\\Marketplace\\Controller\\ListingTagsFileUploadController::CSRF_ID')) }}">
+            <input type="hidden" name="rows" value="{{ rowsJson }}">
+            <input type="hidden" name="fingerprintAdd" value="{{ add.fingerprint }}">
+            <input type="hidden" name="fingerprintReplace" value="{{ replace.fingerprint }}">
+
+            {% for mode in [{key: 'add', title: 'Добавить', hint: 'Теги из файла дописываются, существующие остаются.', result: add}, {key: 'replace', title: 'Заменить', hint: 'У листингов из файла остаются ровно теги из ячейки, остальные снимаются.', result: replace}] %}
+                <div class="card-body border-bottom" data-testid="tags-import-mode-{{ mode.key }}">
+                    <label class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="mode" value="{{ mode.key }}" {{ mode.key == 'add' ? 'checked' : '' }}>
+                        <span class="form-check-label fw-bold">{{ mode.title }}</span>
+                        <span class="form-check-description">{{ mode.hint }}</span>
+                    </label>
+                    <div class="mb-2">
+                        Листингов: {{ mode.result.changes|length|vf_number }} ·
+                        добавится связей: {{ mode.result.added|vf_number }} ·
+                        снимется: {{ mode.result.removed|vf_number }}
+                        {% if mode.result.newTags is not empty %}
+                            · новые теги:
+                            {% for tag in mode.result.newTags %}<span class="tag-chip tag-name me-1">{{ tag }}</span>{% endfor %}
+                        {% endif %}
+                    </div>
+                    <details>
+                        <summary class="text-secondary small">Что изменится</summary>
+                        <div class="mt-2">
+                            {% include 'marketplace/listings/_tags_import_changes.html.twig' with {result: mode.result} only %}
+                        </div>
+                    </details>
+                </div>
+            {% endfor %}
+
+            <div class="card-footer d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Применить</button>
+                <a href="{{ path('marketplace_listings_index') }}" class="btn btn-link link-secondary">Отмена</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}
