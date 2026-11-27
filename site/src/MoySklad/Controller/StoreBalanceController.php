@@ -8,6 +8,7 @@ use App\Balance\Facade\BalanceFacade;
 use App\Company\Entity\User;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Security\ModuleAccess;
+use App\MoySklad\Application\StoreAccountSuggestions;
 use App\MoySklad\Enum\StoreBalanceStatus;
 use App\MoySklad\Infrastructure\Query\MoySkladConnectionsQuery;
 use App\MoySklad\Infrastructure\Query\StoreBalanceQuery;
@@ -50,7 +51,7 @@ final class StoreBalanceController extends AbstractController
 
     #[Route('/moy-sklad/connections/{connectionId}/stores', name: 'moysklad_stores', requirements: ['connectionId' => Requirement::UUID], methods: ['GET'])]
     public function __invoke(string $connectionId, Request $request, ActiveCompanyService $activeCompany, MoySkladConnectionWriteRepository $connections,
-        StoreBalanceQuery $query, BalanceFacade $balance, CompanyFacade $companies): Response
+        StoreBalanceQuery $query, BalanceFacade $balance, CompanyFacade $companies, StoreAccountSuggestions $suggestions): Response
     {
         $connectionId = strtolower($connectionId);
         $companyId = (string) $activeCompany->getActiveCompany()->getId();
@@ -76,6 +77,7 @@ final class StoreBalanceController extends AbstractController
                 $totals[$store['accountId']] = bcadd($totals[$store['accountId']] ?? '0', $store['amountMinor'] ?? '0', 0);
             }
         }
+        $suggested = $financeRead ? $suggestions->forStores($allStores, $accounts) : [];
         $stores = $unassignedOnly ? array_values(array_filter($allStores, static fn (array $store): bool => null === $store['accountId'] && !$store['excluded'])) : $allStores;
         $postings = $financeRead ? $query->latestPostings($companyId, $connectionId) : [];
         if (!$financeRead) {
@@ -85,6 +87,7 @@ final class StoreBalanceController extends AbstractController
         return $this->render('moy_sklad/stores/index.html.twig', [
             'connection' => $connection,
             'stores' => $stores,
+            'suggestions' => $suggested,
             'counts' => $query->counts($companyId, $connectionId),
             'unassignedOnly' => $unassignedOnly,
             'assetAccounts' => array_values(array_filter($accounts, static fn ($account): bool => $account->isAsset)),

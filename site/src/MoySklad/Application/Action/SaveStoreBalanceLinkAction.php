@@ -24,7 +24,7 @@ final readonly class SaveStoreBalanceLinkAction
     {
     }
 
-    public function __invoke(string $companyId, string $connectionId, string $storeExternalId, ?string $balanceAccountId, bool $excluded, string $actorUserId): void
+    public function __invoke(string $companyId, string $connectionId, string $storeExternalId, ?string $balanceAccountId, bool $excluded, string $actorUserId, bool $onlyIfUnassigned = false): bool
     {
         Assert::uuid($companyId);
         Assert::uuid($connectionId);
@@ -40,15 +40,20 @@ final readonly class SaveStoreBalanceLinkAction
         }
         $balanceAccountId = null === $balanceAccountId ? null : strtolower($balanceAccountId);
         $key = [$companyId, $connectionId, $store->getExternalId()];
-        $this->db->transactional(function () use ($companyId, $connectionId, $balanceAccountId, $excluded, $actorUserId, $key): void {
+
+        return $this->db->transactional(function () use ($companyId, $connectionId, $balanceAccountId, $excluded, $actorUserId, $key, $onlyIfUnassigned): bool {
             self::lockCompany($this->db, $companyId);
             if (!$this->balance->canPostFromSource($companyId, $actorUserId)) {
                 throw new StoreBalanceException('actor_forbidden', 'Назначать счета Баланса складам может пользователь с правом проводить документы в Балансе.');
             }
+            // Принятие предложений не перетирает назначение, сделанное вручную после показа страницы: проверка под company-lock.
+            if ($onlyIfUnassigned && false !== $this->db->fetchOne('SELECT 1 FROM moysklad_store_balance_links WHERE company_id = ? AND connection_id = ? AND store_external_id = ?', $key)) {
+                return false;
+            }
             if (null === $balanceAccountId && !$excluded) {
                 $this->db->executeStatement('DELETE FROM moysklad_store_balance_links WHERE company_id = ? AND connection_id = ? AND store_external_id = ?', $key);
 
-                return;
+                return true;
             }
             if (null !== $balanceAccountId) {
                 $this->assertAccountFree($companyId, $connectionId, $balanceAccountId);
@@ -57,6 +62,8 @@ final readonly class SaveStoreBalanceLinkAction
                 VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (company_id, connection_id, store_external_id)
                 DO UPDATE SET balance_account_id = EXCLUDED.balance_account_id, excluded = EXCLUDED.excluded, actor_user_id = EXCLUDED.actor_user_id, updated_at = EXCLUDED.updated_at',
                 [...$key, $balanceAccountId, $excluded ? 'true' : 'false', $actorUserId, $this->clock->now()->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s.v')]);
+
+            return true;
         });
     }
 
