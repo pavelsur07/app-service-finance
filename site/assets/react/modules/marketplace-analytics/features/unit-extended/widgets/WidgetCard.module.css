@@ -1,0 +1,4 @@
+.amount {
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
