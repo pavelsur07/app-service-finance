@@ -15,6 +15,9 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 final class PackagesTest extends WebTestCaseBase
 {
     private const URL = '/api/onec/v1/packages';
+    private const ORG = '23c15967-e31e-49bb-afa7-8441c7784b63';
+    private const ORG2 = '5b1d7a2e-9c4f-4e21-8a3b-6d0f2c9e7b14';
+    private const UNSET = "\0unset";
 
     public function testPartIsStoredOnceAndRepeatReturnsSameAnswer(): void
     {
@@ -35,7 +38,8 @@ final class PackagesTest extends WebTestCaseBase
         self::assertSame(2, $row['parts_total']);
         self::assertSame(['Документ не найден'], json_decode($row['warnings'], true));
         self::assertTrue($db->fetchOne("SELECT snapshot_at = TIMESTAMPTZ '2026-11-20 06:00:00+00' FROM onec_package WHERE package_id = ?", [$package['package_id']]));
-        self::assertStringStartsWith('onec/', $row['storage_path']);
+        $connectionId = $db->fetchOne('SELECT id FROM onec_connection WHERE base_id = ?', [$baseId]);
+        self::assertSame(\sprintf('onec/%s/invoices/2026/11/%s/1-%s.json.gz', $connectionId, $package['package_id'], hash('sha256', $body)), $row['storage_path']);
         $storage = static::getContainer()->get(ObjectStorageInterface::class);
         self::assertSame($body, gzdecode($storage->read($row['storage_path'])));
         self::assertNotNull($db->fetchOne('SELECT last_success_at FROM onec_connection WHERE base_id = ?', [$baseId]));
@@ -95,6 +99,14 @@ final class PackagesTest extends WebTestCaseBase
             ['snapshot_at' => '2026-11-20T09:00:00+03:99'],
             ['snapshot_at' => '2026-11-20T09:00:00+24:00'],
             ['snapshot_at' => (new \DateTimeImmutable('+2 days'))->format(\DATE_ATOM)],
+            ['organization_guids' => self::UNSET],
+            ['organization_guids' => null],
+            ['organization_guids' => []],
+            ['organization_guids' => ['not-a-uuid']],
+            ['organization_guids' => [self::ORG, self::ORG]],
+            ['organization_guids' => [self::ORG, strtoupper(self::ORG)]],
+            ['organization_guids' => array_fill(0, 1001, self::ORG)],
+            ['organization_guids' => ['guid' => self::ORG]],
         ] as $override) {
             $this->send($client, $token, $this->body($baseId, $override));
             self::assertResponseStatusCodeSame(422, json_encode($override, \JSON_THROW_ON_ERROR));
@@ -109,6 +121,70 @@ final class PackagesTest extends WebTestCaseBase
         $this->send($client, str_repeat('0', 64), str_repeat(' ', 10 * 1024 * 1024 + 1));
         self::assertResponseStatusCodeSame(401);
         self::assertSame(0, $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM onec_package p JOIN onec_connection c ON c.id = p.connection_id WHERE c.base_id = ?', [$baseId]));
+    }
+
+    public function testOrganizationsMustAllowExport(): void
+    {
+        [$client, $token, $baseId] = $this->connected(allowExport: false);
+        $db = $this->em()->getConnection();
+        $connectionId = $db->fetchOne('SELECT id FROM onec_connection WHERE base_id = ?', [$baseId]);
+        $storage = static::getContainer()->get(ObjectStorageInterface::class);
+
+        foreach ([[self::ORG], [self::ORG, Uuid::uuid4()->toString()]] as $guids) {
+            $body = $this->body($baseId, ['organization_guids' => $guids]);
+            $this->send($client, $token, $body);
+            self::assertResponseStatusCodeSame(422);
+            self::assertSame('invalid_package', $this->error($client));
+            self::assertStringContainsString(self::ORG, $this->decode($client)['message']);
+            $packageId = json_decode($body, true, flags: \JSON_THROW_ON_ERROR)['package_id'];
+            self::assertFalse($storage->exists(\sprintf('onec/%s/invoices/2026/11/%s/1-%s.json.gz', $connectionId, $packageId, hash('sha256', $body))));
+        }
+        self::assertSame(0, $db->fetchOne('SELECT COUNT(*) FROM onec_package WHERE connection_id = ?', [$connectionId]));
+
+        $db->executeStatement('UPDATE onec_organization SET export_allowed = TRUE WHERE connection_id = ?', [$connectionId]);
+        $unknown = Uuid::uuid4()->toString();
+        $this->send($client, $token, $this->body($baseId, ['organization_guids' => [self::ORG, $unknown]]));
+        self::assertResponseStatusCodeSame(422);
+        self::assertStringContainsString($unknown, $this->decode($client)['message']);
+
+        $body = $this->body($baseId, ['organization_guids' => [self::ORG2, self::ORG]]);
+        $packageId = json_decode($body, true, flags: \JSON_THROW_ON_ERROR)['package_id'];
+        $this->send($client, $token, $body);
+        self::assertResponseIsSuccessful();
+        self::assertSame([self::ORG, self::ORG2], json_decode((string) $db->fetchOne('SELECT organization_guids FROM onec_package WHERE package_id = ?', [$packageId]), true));
+
+        // Части одной выгрузки совпадают и по organization_guids.
+        $this->send($client, $token, $this->body($baseId, ['package_id' => $packageId, 'part' => 2, 'organization_guids' => [self::ORG]]));
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame('package_conflict', $this->error($client));
+        $this->send($client, $token, $this->body($baseId, ['package_id' => $packageId, 'part' => 2, 'organization_guids' => [self::ORG, self::ORG2]]));
+        self::assertResponseIsSuccessful();
+
+        // Разрешение сняли: повтор принятой части — тот же ответ, новая часть — 422.
+        $db->executeStatement('UPDATE onec_organization SET export_allowed = FALSE WHERE connection_id = ? AND guid = ?', [$connectionId, self::ORG2]);
+        $repeat = $this->send($client, $token, $body);
+        self::assertResponseIsSuccessful();
+        self::assertTrue($repeat['duplicate']);
+        $this->send($client, $token, $this->body($baseId, ['organization_guids' => [self::ORG, self::ORG2]]));
+        self::assertResponseStatusCodeSame(422);
+        self::assertStringContainsString(self::ORG2, $this->decode($client)['message']);
+        self::assertStringNotContainsString(self::ORG, $this->decode($client)['message']);
+        self::assertSame(2, $db->fetchOne('SELECT COUNT(*) FROM onec_package WHERE connection_id = ?', [$connectionId]));
+    }
+
+    public function testRawPathUsesKindAndUtcMonthOfSnapshot(): void
+    {
+        [$client, $token, $baseId] = $this->connected();
+        $body = $this->body($baseId, ['snapshot_at' => '2026-11-01T01:30:00+03:00', 'part' => 2]);
+        $this->send($client, $token, $body);
+        self::assertResponseIsSuccessful();
+        $db = $this->em()->getConnection();
+        $packageId = json_decode($body, true, flags: \JSON_THROW_ON_ERROR)['package_id'];
+        $connectionId = $db->fetchOne('SELECT id FROM onec_connection WHERE base_id = ?', [$baseId]);
+        self::assertSame(
+            \sprintf('onec/%s/invoices/2026/10/%s/2-%s.json.gz', $connectionId, $packageId, hash('sha256', $body)),
+            $db->fetchOne('SELECT storage_path FROM onec_package WHERE package_id = ?', [$packageId]),
+        );
     }
 
     public function testTokenBaseAndSupportAreChecked(): void
@@ -165,12 +241,18 @@ final class PackagesTest extends WebTestCaseBase
     }
 
     /** @return array{KernelBrowser, string, string} */
-    private function connected(?KernelBrowser $client = null, ?string $baseId = null): array
+    private function connected(?KernelBrowser $client = null, ?string $baseId = null, bool $allowExport = true): array
     {
         [$client, $token] = $this->connection($client);
         $baseId ??= Uuid::uuid4()->toString();
         $client->jsonRequest('POST', '/api/onec/v1/handshake', $this->handshake($baseId), ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
         self::assertResponseIsSuccessful();
+        if ($allowExport) {
+            $this->em()->getConnection()->executeStatement(
+                'UPDATE onec_organization SET export_allowed = TRUE WHERE connection_id = (SELECT id FROM onec_connection WHERE token_hash = ?)',
+                [hash('sha256', $token)],
+            );
+        }
 
         return [$client, $token, $baseId];
     }
@@ -199,14 +281,17 @@ final class PackagesTest extends WebTestCaseBase
             'config_version' => $configVersion,
             'platform_version' => '8.3',
             'processor_version' => '1.0',
-            'organizations' => [],
+            'organizations' => [
+                ['guid' => self::ORG, 'name' => 'ООО Ромашка', 'inn' => null, 'kpp' => null],
+                ['guid' => self::ORG2, 'name' => 'ООО Лютик', 'inn' => null, 'kpp' => null],
+            ],
         ];
     }
 
     /** @param array<string, mixed> $override */
     private function body(string $baseId, array $override = []): string
     {
-        return json_encode(array_replace([
+        return json_encode(array_filter(array_replace([
             'package_id' => Uuid::uuid7()->toString(),
             'base_id' => $baseId,
             'kind' => 'invoices',
@@ -219,8 +304,9 @@ final class PackagesTest extends WebTestCaseBase
             'snapshot_at' => '2026-11-20T09:00:00+03:00',
             'warnings' => ['Документ не найден'],
             'documents' => [['guid' => Uuid::uuid4()->toString(), 'type' => 'customer_invoice', 'amount' => '100.00']],
+            'organization_guids' => [self::ORG],
             'unknown_field' => 'игнорируется',
-        ], $override), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
+        ], $override), static fn (mixed $value): bool => self::UNSET !== $value), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
     }
 
     /** @return array<string, mixed> */

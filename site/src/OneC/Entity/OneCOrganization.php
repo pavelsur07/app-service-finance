@@ -6,7 +6,10 @@ namespace App\OneC\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
 
-/** Организация относится к компании своего подключения; enabled — привязана к обмену. */
+/**
+ * Организация относится к компании своего подключения; enabled — привязана к обмену,
+ * exportAllowed — владелец разрешил загружать её счета (галочка «Загружать»).
+ */
 #[ORM\Entity]
 #[ORM\Table(name: 'onec_organization')]
 class OneCOrganization
@@ -34,4 +37,7 @@ class OneCOrganization
 
     #[ORM\Column]
     public bool $present = true;
+
+    #[ORM\Column]
+    public bool $exportAllowed = false;
 }

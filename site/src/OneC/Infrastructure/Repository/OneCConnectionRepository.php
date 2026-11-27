@@ -50,6 +50,11 @@ final readonly class OneCConnectionRepository
         return $this->em->getRepository(OneCOrganization::class)->findBy(['connection' => $connection], ['present' => 'DESC', 'name' => 'ASC']);
     }
 
+    public function organization(OneCConnection $connection, string $guid): ?OneCOrganization
+    {
+        return Uuid::isValid($guid) ? $this->em->find(OneCOrganization::class, ['connection' => $connection->id, 'guid' => Uuid::fromString($guid)->toString()]) : null;
+    }
+
     /**
      * Последние выгрузки: число частей считает SQL, частей и предупреждений
      * в выборке не больше MAX_PARTS_SHOWN / MAX_WARNINGS_SHOWN на выгрузку.

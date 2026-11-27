@@ -16,10 +16,14 @@ final readonly class PackageEnvelope
     public const KIND_INVOICES = 'invoices';
     private const MAX_DOCUMENTS = 500;
     private const MAX_PARTS = 10000;
+    private const MAX_ORGANIZATIONS = 1000;
     /** Скобки и запятые вне строк: 500 документов по ~100 полей с запасом. */
     private const MAX_JSON_ELEMENTS = 200000;
 
-    /** @param list<mixed> $warnings */
+    /**
+     * @param list<mixed> $warnings
+     * @param list<string> $organizationGuids отсортированы, в нижнем регистре
+     */
     private function __construct(
         public string $packageId,
         public string $baseId,
@@ -33,6 +37,7 @@ final readonly class PackageEnvelope
         public \DateTimeImmutable $snapshotAt,
         public array $warnings,
         public int $documentCount,
+        public array $organizationGuids,
     ) {
     }
 
@@ -78,6 +83,7 @@ final readonly class PackageEnvelope
         if (\count($documents) > self::MAX_DOCUMENTS) {
             throw self::invalid('В части не больше 500 документов.');
         }
+        $organizationGuids = self::organizationGuids($data->organization_guids ?? null);
 
         return new self(
             self::uuid($data->package_id ?? null),
@@ -92,6 +98,7 @@ final readonly class PackageEnvelope
             $snapshotAt,
             self::warnings($warnings),
             \count($documents),
+            $organizationGuids,
         );
     }
 
@@ -109,6 +116,27 @@ final readonly class PackageEnvelope
         }
 
         return json_decode($json, true, flags: \JSON_THROW_ON_ERROR);
+    }
+
+    /** @return list<string> */
+    private static function organizationGuids(mixed $value): array
+    {
+        if (!\is_array($value) || [] === $value || !array_is_list($value) || \count($value) > self::MAX_ORGANIZATIONS) {
+            throw self::invalid('organization_guids — непустой массив GUID организаций, не больше 1000.');
+        }
+        $guids = [];
+        foreach ($value as $guid) {
+            if (!\is_string($guid) || !Uuid::isValid($guid)) {
+                throw self::invalid('organization_guids: некорректный GUID организации.');
+            }
+            $guids[] = Uuid::fromString($guid)->toString();
+        }
+        if (\count(array_unique($guids)) !== \count($guids)) {
+            throw self::invalid('organization_guids: GUID организаций не должны повторяться.');
+        }
+        sort($guids);
+
+        return $guids;
     }
 
     private static function uuid(mixed $value): string

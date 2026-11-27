@@ -152,7 +152,7 @@ final class CabinetTest extends WebTestCaseBase
         $client->jsonRequest('POST', '/api/onec/v1/handshake', [
             'base_id' => $baseId, 'config_name' => 'БухгалтерияПредприятия', 'config_version' => '3.0.1.1',
             'platform_version' => '8.3', 'processor_version' => '1.0',
-            'organizations' => [['guid' => Uuid::uuid4()->toString(), 'name' => 'ООО Ромашка', 'inn' => '7701234567', 'kpp' => null]],
+            'organizations' => [['guid' => '0b3c4d5e-6f70-4182-93a4-b5c6d7e8f901', 'name' => 'ООО Ромашка', 'inn' => '7701234567', 'kpp' => null]],
         ], ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
         self::assertResponseStatusCodeSame($status);
 
@@ -164,8 +164,9 @@ final class CabinetTest extends WebTestCaseBase
         $body = json_encode([
             'package_id' => $packageId, 'base_id' => $baseId, 'kind' => 'invoices', 'processor_version' => '1.0',
             'period_from' => '2026-11-01', 'period_to' => '2026-11-30', 'include_open_outside_period' => false, 'snapshot_at' => '2026-11-20T09:00:00+03:00',
-            'part' => $part, 'parts_total' => 2, 'warnings' => ['Документ не найден'], 'documents' => [],
+            'part' => $part, 'parts_total' => 2, 'warnings' => ['Документ не найден'], 'documents' => [], 'organization_guids' => ['0b3c4d5e-6f70-4182-93a4-b5c6d7e8f901'],
         ], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
+        $this->em()->getConnection()->executeStatement('UPDATE onec_organization SET export_allowed = TRUE WHERE connection_id = (SELECT id FROM onec_connection WHERE token_hash = ?)', [hash('sha256', $token)]);
         $client->request('POST', '/api/onec/v1/packages', server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token], content: $body);
         self::assertResponseStatusCodeSame($status);
 

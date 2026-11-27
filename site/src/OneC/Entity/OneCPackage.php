@@ -77,4 +77,12 @@ class OneCPackage
     /** Начало чтения в 1С; NULL у частей, принятых до обязательного snapshot_at. */
     #[ORM\Column(type: 'datetimetz_immutable', nullable: true)]
     public private(set) ?\DateTimeImmutable $snapshotAt;
+
+    /**
+     * Организации, по которым выгрузка полная, отсортированы; NULL у частей, принятых до обязательного organization_guids.
+     *
+     * @var list<string>|null
+     */
+    #[ORM\Column(type: 'jsonb', nullable: true)]
+    public private(set) ?array $organizationGuids;
 }

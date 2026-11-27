@@ -61,6 +61,28 @@ final class ContractV1Test extends TestCase
         self::assertFalse($this->validate($part, 'package_part'));
     }
 
+    public function testPartNeedsNonEmptyUniqueOrganizationGuids(): void
+    {
+        $part = $this->example('package_part');
+        self::assertSame(['23c15967-e31e-49bb-afa7-8441c7784b63'], $part->organization_guids);
+        self::assertSame(['23c15967-e31e-49bb-afa7-8441c7784b63'], PackageEnvelope::parse((string) file_get_contents(self::DIR.'/examples/package_part.json'))->organizationGuids);
+        foreach ([[], [$part->organization_guids[0], $part->organization_guids[0]], ['x']] as $invalid) {
+            $part->organization_guids = $invalid;
+            self::assertFalse($this->validate($part, 'package_part'), json_encode($invalid, \JSON_THROW_ON_ERROR));
+        }
+        unset($part->organization_guids);
+        self::assertFalse($this->validate($part, 'package_part'));
+    }
+
+    public function testHandshakeResponseCarriesExportAllowed(): void
+    {
+        $response = $this->example('handshake_response');
+        self::assertTrue($response->organizations[0]->export_allowed);
+        unset($response->organizations[0]->export_allowed);
+
+        self::assertFalse($this->validate($response, 'handshake_response'));
+    }
+
     private function example(string $name): \stdClass
     {
         $data = json_decode((string) file_get_contents(self::DIR.'/examples/'.$name.'.json'), false, 64, \JSON_THROW_ON_ERROR);
