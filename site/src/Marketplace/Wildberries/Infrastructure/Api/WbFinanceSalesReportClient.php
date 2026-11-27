@@ -429,11 +429,6 @@ final readonly class WbFinanceSalesReportClient
         return $parsed->setTimezone($now->getTimezone());
     }
 
-    private function extractRetryAfter(array $headers): ?int
-    {
-        return $this->calculateRemote429Cooldown($headers)['retry_after_seconds'];
-    }
-
     private function extractHeaderInt(array $headers, string $name): ?int
     {
         $value = $this->extractHeaderFirstValue($headers, $name);
