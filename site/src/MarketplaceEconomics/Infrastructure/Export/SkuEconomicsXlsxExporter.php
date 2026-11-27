@@ -41,20 +41,25 @@ final readonly class SkuEconomicsXlsxExporter
             // чтобы сумма столбца в Excel не задваивалась.
             $byCategory = null !== $report->groups;
             $lead = $byCategory ? ['Категория'] : [];
-            $blank = $byCategory ? [''] : [];
-            $writer->addRow(Row::fromValues([...$lead, ...self::header($allocated), 'Себест./ед., ₽', 'Логист./ед., ₽', 'CAC/ед., ₽']));
+            $abcHeaders = $allocated ? ['ABC оборот', 'ABC СМ3'] : ['ABC оборот'];
+            $emptyLabels = array_fill(0, \count($lead) + \count($abcHeaders) + 2, '');
+            $writer->addRow(Row::fromValues([...$lead, 'SKU', 'Название', ...$abcHeaders, 'Канал', ...self::metricHeaders($allocated), 'Себест./ед., ₽', 'Логист./ед., ₽', 'CAC/ед., ₽']));
             $sections = $byCategory
                 ? array_map(static fn (SkuEconomicsCategoryGroup $g): array => [[$g->name], $g->rows], $report->groups)
                 : [[[], $report->rows]];
             foreach ($sections as [$prefix, $rows]) {
                 foreach ($rows as $row) {
-                    $writer->addRow($this->skuRow([...$prefix, $row->sku, (string) $row->title, SkuEconomicsFilter::CHANNELS[(string) $row->channel] ?? ''], $row->current, $allocated));
+                    $classes = [$row->abcRevenue->value];
+                    if ($allocated) {
+                        $classes[] = $row->abcProfit?->value ?? '';
+                    }
+                    $writer->addRow($this->skuRow([...$prefix, $row->sku, (string) $row->title, ...$classes, SkuEconomicsFilter::CHANNELS[(string) $row->channel] ?? ''], $row->current, $allocated));
                 }
             }
             if (null !== $report->unallocated) {
-                $writer->addRow($this->skuRow(['Нераспределено', ...$blank, '', ''], $report->unallocated, $allocated));
+                $writer->addRow($this->skuRow(['Нераспределено', ...$emptyLabels], $report->unallocated, $allocated));
             }
-            $writer->addRow($this->skuRow(['Итого', ...$blank, '', ''], $report->total, $allocated));
+            $writer->addRow($this->skuRow(['Итого', ...$emptyLabels], $report->total, $allocated));
         } finally {
             $writer->close();
         }
@@ -69,7 +74,7 @@ final readonly class SkuEconomicsXlsxExporter
         $writer->openToFile($path);
         try {
             $writer->addRow(new Row([Cell::fromValue(sprintf('Динамика · %s – %s', $report->from->format('d.m.Y'), $report->to->format('d.m.Y')))]));
-            $writer->addRow(new Row(array_map(static fn (string $h): Cell => Cell::fromValue($h), ['С', 'По', ...\array_slice(self::header($allocated), 3)])));
+            $writer->addRow(new Row(array_map(static fn (string $h): Cell => Cell::fromValue($h), ['С', 'По', ...self::metricHeaders($allocated)])));
             foreach ($report->steps as $step) {
                 $writer->addRow($this->row([$step['from']->format('d.m.Y'), $step['to']->format('d.m.Y')], $step['metrics'], $allocated));
             }
@@ -87,9 +92,9 @@ final readonly class SkuEconomicsXlsxExporter
     }
 
     /** @return list<string> */
-    private static function header(bool $allocated): array
+    private static function metricHeaders(bool $allocated): array
     {
-        $columns = ['SKU', 'Название', 'Канал', 'Продано, шт.', 'Возвраты, шт.', 'Выручка', 'Выручка с СПП', 'НДС к уплате', 'Выручка без НДС', 'Себестоимость', 'Выручка без НДС − себестоимость',
+        $columns = ['Продано, шт.', 'Возвраты, шт.', 'Выручка', 'Выручка с СПП', 'НДС к уплате', 'Выручка без НДС', 'Себестоимость', 'Выручка без НДС − себестоимость',
             'Комиссия', 'Логистика туда', 'Логистика обратно', 'Эквайринг', 'Прочие СМ1', 'СМ1', 'СМ1, %', 'Реклама', 'ДРР, %', 'СМ2', 'СМ2, %'];
 
         return $allocated ? [...$columns, 'Склад и прочие МП', 'СМ3', 'СМ3, %', 'СПП (справочно)'] : [...$columns, 'СПП (справочно)'];

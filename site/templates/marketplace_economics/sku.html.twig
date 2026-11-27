@@ -27,10 +27,25 @@
         <span class="me-sku-value text-truncate" title="{{ value }}">{{ value }}</span>
     {% endif %}
 {% endmacro %}
-{% macro cell(m, column) %}
+{% macro cell(m, column, row=null, showReturns=true) %}
     {%- import _self as ui -%}
     {%- set kind = column.kind ?? 'money' -%}
-    {%- if kind == 'share' -%}
+    {%- if kind == 'abc' -%}
+        {%- if row is null -%}
+            —
+        {%- else -%}
+            {%- set abc = attribute(row, column.id).value -%}
+            {%- set badge = {
+                A: {color: 'success', title: 'Первые 80 %'},
+                B: {color: 'warning', title: 'Следующие 15 %'},
+                C: {color: 'secondary', title: column.id == 'abcRevenue' ? 'Остальные 5 % или оборот ≤ 0' : 'Остальные 5 % прибыли'},
+                D: {color: 'red', title: 'СМ3 ≤ 0'},
+            }[abc] -%}
+            <span class="badge bg-{{ badge.color }}-lt" title="{{ badge.title }}">{{ abc }}</span>
+        {%- endif -%}
+    {%- elseif kind == 'quantity' -%}
+        {{ m.salesQty|vf_number }}{% if showReturns and m.returnsQty %}<p class="text-secondary small mb-0">возвр. {{ m.returnsQty|vf_number }}</p>{% endif %}
+    {%- elseif kind == 'share' -%}
         {{ ui.pct(m.percentOfRevenue(attribute(m, column.value))) }}
     {%- elseif kind == 'percent' -%}
         {{ ui.pct(attribute(m, column.value)) }}
@@ -39,12 +54,26 @@
     {%- endif -%}
 {% endmacro %}
 
+{% macro cells(m, columns, row=null, showReturns=true) %}
+    {% import _self as ui %}
+    {% for column in columns %}
+        <td class="{{ (column.kind ?? '') == 'abc' ? 'text-center' : 'text-end' }}" data-column="{{ column.id }}">
+            {{ ui.cell(m, column, row, showReturns) }}
+        </td>
+    {% endfor %}
+{% endmacro %}
+
 {% block content %}
     {% import _self as ui %}
     {% set params = app.request.query.all %}
     {# value — метод/поле SkuMetrics; kind: money — ₽, share — % от выручки до СПП, percent — уже %;
        group — верхняя строка шапки, short — подпись под группой, label — полное название (title, «Колонки») #}
-    {% set columns = [
+    {% set abcColumns = [{id: 'abcRevenue', kind: 'abc', group: 'ABC', short: 'Оборот', label: 'ABC по обороту за вычетом возвратов', hint: 'ABC по обороту: A — первые 80 %, B — следующие 15 %, C — остальные и SKU с оборотом ≤ 0'}] %}
+    {% if allocated %}
+        {% set abcColumns = abcColumns|merge([{id: 'abcProfit', kind: 'abc', group: 'ABC', short: 'СМ3', label: 'ABC по прибыли СМ3', hint: 'ABC по СМ3: A — первые 80 %, B — следующие 15 %, C — остальные прибыльные SKU, D — СМ3 ≤ 0'}]) %}
+    {% endif %}
+    {% set columns = abcColumns|merge([
+        {id: 'sales', group: 'Продажи', kind: 'quantity', short: 'Прод., шт', label: 'Продано, шт.', sort: 'sales', required: true},
         {id: 'revenue', value: 'revenue', group: 'Выручка', short: 'до СПП', label: 'Выручка, ₽', sort: 'revenue', required: true},
         {id: 'revenueWithSpp', value: 'revenueWithSpp', group: 'Выручка', short: 'с СПП', label: 'Выручка с СПП, ₽'},
         {id: 'spp', value: 'spp', group: 'Выручка', short: 'СПП', label: 'СПП, ₽'},
@@ -63,7 +92,7 @@
         {id: 'drr', value: 'drr', group: 'Реклама', short: 'ДРР %', label: 'ДРР, %', kind: 'percent'},
         {id: 'md2', value: 'md2', group: 'СМ2', short: '₽', label: 'СМ2, ₽', sort: 'md2', required: true},
         {id: 'md2Pct', value: 'md2', group: 'СМ2', short: '%', label: 'СМ2, %', kind: 'share', required: not allocated},
-    ] %}
+    ]) %}
     {% if allocated %}
         {% set columns = columns|merge([
             {id: 'overhead', value: 'overhead', group: 'Склад и пр. МП', short: '₽', label: 'Склад и прочие МП, ₽'},
@@ -291,16 +320,13 @@
                             <th class="me-sku-code" scope="col" rowspan="2">SKU</th>
                             <th class="me-sku-name" scope="col" rowspan="2">Наименование</th>
                         {% endif %}
-                        <th class="text-end me-col-qty" scope="col" rowspan="2" title="Продано, шт.">
-                            <a href="{{ path('marketplace_economics_sku', params|merge({sort: 'sales', dir: sort == 'sales' and desc ? 'asc' : 'desc', page: null})) }}">Прод., шт</a>
-                        </th>
                         {% for group, ids in groups %}
                             <th class="me-col-group text-center" scope="colgroup" colspan="{{ ids|length }}" data-columns="{{ ids|join(' ') }}">{{ group }}</th>
                         {% endfor %}
                     </tr>
                     <tr>
                         {% for column in columns %}
-                            <th class="text-end{{ (column.kind ?? 'money') == 'money' ? '' : ' me-col-pct' }}" scope="col" data-column="{{ column.id }}" title="{{ column.label }}">
+                            <th class="{{ (column.kind ?? '') == 'abc' ? 'text-center' : 'text-end' }}{{ (column.kind ?? 'money') == 'money' ? '' : ' me-col-pct' }}" scope="col" data-column="{{ column.id }}" title="{{ column.hint ?? column.label }}">
                                 {% if column.sort is defined %}
                                     <a href="{{ path('marketplace_economics_sku', params|merge({sort: column.sort, dir: sort == column.sort and desc ? 'asc' : 'desc', page: null})) }}">{{ column.short }}</a>
                                 {% else %}
@@ -319,12 +345,7 @@
                                    title="Показать листинги категории">{{ group.name }}</a>
                                 <span class="text-secondary small">· {{ group.rows|length|vf_number }}</span>
                             </td>
-                            <td class="text-end">{{ m.salesQty|vf_number }}{% if m.returnsQty %}<p class="text-secondary small mb-0">возвр. {{ m.returnsQty|vf_number }}</p>{% endif %}</td>
-                            {% for column in columns %}
-                                <td class="text-end" data-column="{{ column.id }}">
-                                    {{ ui.cell(m, column) }}
-                                </td>
-                            {% endfor %}
+                            {{ ui.cells(m, columns) }}
                         </tr>
                     {% endfor %}
                     {% for row in pager.currentPageResults %}
@@ -339,17 +360,12 @@
                             <td class="me-sku-name">
                                 {{ ui.skuValue(row.title is not empty ? row.title : row.supplierSku) }}
                             </td>
-                            <td class="text-end">{{ m.salesQty|vf_number }}{% if m.returnsQty %}<p class="text-secondary small mb-0">возвр. {{ m.returnsQty|vf_number }}</p>{% endif %}</td>
-                            {% for column in columns %}
-                                <td class="text-end" data-column="{{ column.id }}">
-                                    {{ ui.cell(m, column) }}
-                                </td>
-                            {% endfor %}
+                            {{ ui.cells(m, columns, row) }}
                         </tr>
                     {% else %}
                         {% if report.groups is null or report.groups is empty %}
                         <tr>
-                            <td class="text-secondary py-5" colspan="{{ columns|length + 3 }}">
+                            <td class="text-secondary py-5" colspan="{{ columns|length + 2 }}">
                                 <span class="me-sku-empty d-inline-block">Нет продаж и затрат по SKU за период.</span>
                             </td>
                         </tr>
@@ -358,12 +374,7 @@
                     {% for label, m in report.unallocated is not null ? {'Нераспределено': report.unallocated, 'Итого': report.total} : {'Итого по выбранным': report.total} %}
                         <tr class="me-totals">
                             <td class="me-sku-summary fw-semibold" colspan="2">{{ label }}</td>
-                            <td class="text-end">{{ m.salesQty|vf_number }}</td>
-                            {% for column in columns %}
-                                <td class="text-end" data-column="{{ column.id }}">
-                                    {{ ui.cell(m, column) }}
-                                </td>
-                            {% endfor %}
+                            {{ ui.cells(m, columns, null, false) }}
                         </tr>
                     {% endfor %}
                 </tbody>

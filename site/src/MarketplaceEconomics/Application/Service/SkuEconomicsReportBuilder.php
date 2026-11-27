@@ -121,8 +121,8 @@ final readonly class SkuEconomicsReportBuilder
      * Строки (уже отсортированные) раскладываются по категориям; группы сортируются по той же
      * колонке, «Без категории» — последней. Показатели группы — сумма строк, проценты считает SkuMetrics.
      *
-     * @param list<SkuEconomicsRow>     $rows
-     * @param array<string, string>     $categoryOf listingId → categoryId
+     * @param list<SkuEconomicsRow> $rows
+     * @param array<string, string> $categoryOf listingId → categoryId
      * @param callable(SkuMetrics): int $value
      *
      * @return list<SkuEconomicsCategoryGroup>

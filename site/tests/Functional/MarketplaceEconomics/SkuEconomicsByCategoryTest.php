@@ -124,11 +124,14 @@ final class SkuEconomicsByCategoryTest extends WebTestCaseBase
 
         $columns = ['costPricePerUnit', 'logisticsPerUnit', 'cacPerUnit'];
         $byCategory = $client->request('GET', self::URL, self::PERIOD + ['group' => 'category']);
+        self::assertSame('—', $this->cell($byCategory->filter('tr[data-category-group]')->first(), 'abcRevenue'));
         $group = $byCategory->filter(sprintf('tr[data-category-group="%s"]', $category));
         self::assertSame(['60,00', '15,00', '9,00'], array_map(fn (string $col): string => $this->cell($group, $col), $columns));
 
         $bySku = $client->request('GET', self::URL, self::PERIOD + ['alloc' => '0']);
         $returned = $bySku->filter('tbody tr')->reduce(static fn (Crawler $row): bool => str_contains($row->text(), 'OZ-1'));
+        self::assertSame('C', $this->cell($returned, 'abcRevenue'));
+        self::assertCount(0, $bySku->filter('[data-column="abcProfit"]'));
         self::assertSame(['—', '—', '—'], array_map(fn (string $col): string => $this->cell($returned, $col), $columns));
 
         $client->request('GET', self::URL, self::PERIOD + ['group' => 'category', 'format' => 'xlsx']);
@@ -142,6 +145,49 @@ final class SkuEconomicsByCategoryTest extends WebTestCaseBase
         ));
         $path = $container->get(SkuEconomicsXlsxExporter::class)->writeFile($report, true);
 
+        $rows = $this->readXlsx($path);
+
+        self::assertSame('Категория', $rows[1][0]);
+        self::assertSame(['SKU', 'Название', 'ABC оборот', 'ABC СМ3', 'Канал'], \array_slice($rows[1], 1, 5));
+        $body = \array_slice($rows, 2);
+        self::assertSame(['Платья', 'Платья', 'Без категории', 'Нераспределено', 'Итого'], array_column($body, 0));
+        $revenue = array_search('Выручка', $rows[1], true);
+        self::assertIsInt($revenue);
+        $last = array_pop($body);
+        self::assertNotNull($last);
+        self::assertEqualsWithDelta(2500.0, $last[$revenue] ?? null, 0.001);
+        $returnedRows = array_values(array_filter($body, static fn (array $row): bool => 'OZ-1' === $row[1]));
+        self::assertCount(1, $returnedRows);
+        self::assertSame(['C', 'D'], \array_slice($returnedRows[0], 3, 2));
+        self::assertSame(['', ''], \array_slice($last, 3, 2));
+        foreach (['Себест./ед., ₽' => 40, 'Логист./ед., ₽' => 10, 'CAC/ед., ₽' => 6] as $header => $expected) {
+            $index = array_search($header, $rows[1], true);
+            self::assertIsInt($index);
+            self::assertSame($expected, $last[$index]);
+            self::assertSame('', $returnedRows[0][$index]);
+        }
+    }
+
+    public function testXlsxWithoutAllocationShowsOnlyRevenueClassAfterTitle(): void
+    {
+        static::createClient();
+        $this->seed();
+        $container = static::getContainer();
+        $report = $container->get(SkuEconomicsReportBuilder::class)->build(self::COMPANY_ID, new SkuEconomicsFilter(
+            new \DateTimeImmutable(self::PERIOD['from']), new \DateTimeImmutable(self::PERIOD['to']), search: 'OZ-2', allocated: false,
+        ));
+        $rows = $this->readXlsx($container->get(SkuEconomicsXlsxExporter::class)->writeFile($report, false));
+
+        self::assertSame(['SKU', 'Название', 'ABC оборот', 'Канал'], \array_slice($rows[1], 0, 4));
+        self::assertNotContains('ABC СМ3', $rows[1]);
+        self::assertSame(['OZ-2', 'Носки', 'B', 'Ozon'], \array_slice($rows[2], 0, 4));
+        self::assertSame('Итого', $rows[3][0]);
+        self::assertSame('', $rows[3][2]);
+    }
+
+    /** @return list<array<int, mixed>> */
+    private function readXlsx(string $path): array
+    {
         $rows = [];
         $reader = new Reader();
         $reader->open($path);
@@ -153,23 +199,7 @@ final class SkuEconomicsByCategoryTest extends WebTestCaseBase
         $reader->close();
         unlink($path);
 
-        self::assertSame('Категория', $rows[1][0]);
-        self::assertSame('SKU', $rows[1][1]);
-        $body = \array_slice($rows, 2);
-        self::assertSame(['Платья', 'Платья', 'Без категории', 'Нераспределено', 'Итого'], array_column($body, 0));
-        $revenue = array_search('Выручка', $rows[1], true);
-        self::assertIsInt($revenue);
-        $last = array_pop($body);
-        self::assertNotNull($last);
-        self::assertEqualsWithDelta(2500.0, $last[$revenue] ?? null, 0.001);
-        $returnedRows = array_values(array_filter($body, static fn (array $row): bool => 'OZ-1' === $row[1]));
-        self::assertCount(1, $returnedRows);
-        foreach (['Себест./ед., ₽' => 40, 'Логист./ед., ₽' => 10, 'CAC/ед., ₽' => 6] as $header => $expected) {
-            $index = array_search($header, $rows[1], true);
-            self::assertIsInt($index);
-            self::assertSame($expected, $last[$index]);
-            self::assertSame('', $returnedRows[0][$index]);
-        }
+        return $rows;
     }
 
     /**
