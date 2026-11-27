@@ -6947,9 +6947,11 @@ marketplace)` ставит запуск, если подключение акт�
   иначе ИИ-задача `moysklad_store_account_suggest` (`ai-task/v1` `store_account_suggest_*`, risk medium).
   `RequestStoreAccountSuggestionsAction` — после completed-снимка из `SyncStockSnapshotHandler` (best-effort, сбой → `error`
   в лог, синхронизация не падает): одна задача — один склад, примеры — назначенные склады компании, ключ —
-  подключение+склад+отпечаток sha256(name, path_name)+`PROMPT_VERSION`(+номер попытки); примеры — назначенные склады
-  подключения; компания без доступа к ИИ или с исчерпанным лимитом — без задач; `requested` дольше часа ставится снова
-  тем же ключом, `failed` — новой попыткой (до 3), `rejected` окончательный; upsert не возвращает `completed` в `requested`. Строка `moysklad_store_account_suggestions` пишется до
+  подключение+склад+`PROMPT_VERSION`+`request_seq` (растёт с каждым новым payload); отпечаток sha256(name, path_name)
+  отличает устаревший ответ; примеры — назначенные склады подключения; компания без доступа к ИИ или с исчерпанным
+  лимитом — без задач; `requested` дольше часа ставится снова (тот же ключ при том же `payload_hash`), `failed` — новым
+  запросом, всего до 3 отправок на название и промпт; `rejected` окончательный; upsert не возвращает `completed` в `requested`.
+  «Принять» в строке шлёт `onlyIfUnassigned`. Строка `moysklad_store_account_suggestions` пишется до
   постановки (unique `(company_id, ai_task_id)`, FK на склад `CASCADE`); `StoreAccountSuggestionConsumer` пишет ответ
   в транзакции импорта ServiceGateway (`accepted` → `confident`). Ответ на прежнее название не показывается.
   `StoreAccountSuggestions` разрешает код в действующий счёт актива компании; нет счёта — нет предложения.
