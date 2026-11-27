@@ -44,6 +44,7 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
 }) => {
     const currentValue = config.getValue(current);
     const revenueShare = formatWidgetRevenueShare(config, currentValue, current);
+    const isReturns = config.key === 'returns';
     const previousValue = config.getValue(previous);
     const delta = calcDeltaPercent(currentValue, previousValue);
     const note = config.getNote?.(current) ?? null;
@@ -85,11 +86,13 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
 
                 <div className="d-flex flex-wrap align-items-baseline gap-2 mb-1">
                     <div className="h2 mb-0">{formatMoney(currentValue)}</div>
-                    {revenueShare !== null && (
-                        <span className="text-muted small" title="Выручка за вычетом возвратов">
-                            {revenueShare} от нетто-выручки
-                        </span>
-                    )}
+                    <span
+                        className="d-inline-flex align-items-center gap-1 text-muted small"
+                        title={isReturns ? 'Выручка до вычета возвратов' : 'Выручка за вычетом возвратов'}
+                    >
+                        <span className="badge bg-secondary-lt">{revenueShare}</span>
+                        {isReturns ? 'от выручки' : 'от нетто-выручки'}
+                    </span>
                 </div>
                 {allocationNote && <div className="text-muted small mb-1">{allocationNote}</div>}
                 {note && <div className="text-muted small mb-1">{note}</div>}
