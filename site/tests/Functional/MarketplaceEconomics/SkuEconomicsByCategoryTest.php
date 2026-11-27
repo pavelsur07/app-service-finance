@@ -188,8 +188,8 @@ final class SkuEconomicsByCategoryTest extends WebTestCaseBase
         self::assertSame(['OZ-2', 'Носки', 'B', 'Ozon'], \array_slice($rows[2], 0, 4));
         self::assertSame('Итого', $rows[3][0]);
         self::assertSame('', $rows[3][2]);
-        self::assertSame('Ср. чек, ₽', $rows[1][array_key_last($rows[1])]);
-        self::assertSame(500, $rows[2][array_key_last($rows[2])]);
+        self::assertSame(['Ср. чек, ₽'], \array_slice($rows[1], -1));
+        self::assertSame([500], \array_slice($rows[2], -1));
     }
 
     /** @return list<array<int, mixed>> */
