@@ -102,25 +102,31 @@ final class SkuMetrics
 
     public function costPricePerUnit(): ?int
     {
-        return $this->costPerNetUnit($this->costPrice);
+        return $this->amountPerNetUnit($this->costPrice, '-1');
     }
 
     public function logisticsPerUnit(): ?int
     {
-        return $this->costPerNetUnit($this->logisticsTo + $this->logisticsBack);
+        return $this->amountPerNetUnit($this->logisticsTo + $this->logisticsBack, '-1');
     }
 
     public function cacPerUnit(): ?int
     {
-        return $this->costPerNetUnit($this->ads);
+        return $this->amountPerNetUnit($this->ads, '-1');
     }
 
-    /** Расход на единицу в копейках: в каноне расход имеет отрицательный знак. */
-    private function costPerNetUnit(int $signedCost): ?int
+    /** Средний чек в копейках по выручке до СПП, с учётом возвратов. */
+    public function averageCheck(): ?int
+    {
+        return $this->amountPerNetUnit($this->revenue, '1');
+    }
+
+    /** Расходы передаются с множителем −1, поскольку в каноне у них отрицательный знак. */
+    private function amountPerNetUnit(int $amount, string $multiplier): ?int
     {
         $quantity = $this->salesQty - $this->returnsQty;
 
-        return 0 === $quantity ? null : Money::fromMinor($signedCost, 'RUB')->multiplyByRatio('-1', (string) $quantity)->amountMinor();
+        return 0 === $quantity ? null : Money::fromMinor($amount, 'RUB')->multiplyByRatio($multiplier, (string) $quantity)->amountMinor();
     }
 
     /** ДРР, % — реклама к выручке. */

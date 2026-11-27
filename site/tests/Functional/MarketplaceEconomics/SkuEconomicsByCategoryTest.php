@@ -122,17 +122,21 @@ final class SkuEconomicsByCategoryTest extends WebTestCaseBase
         $this->line('wildberries', $wbId, 'ads_cpc', 'md2', -1800);
         $this->login($client, $owner);
 
-        $columns = ['costPricePerUnit', 'logisticsPerUnit', 'cacPerUnit'];
+        $columns = ['costPricePerUnit', 'logisticsPerUnit', 'cacPerUnit', 'averageCheck'];
         $byCategory = $client->request('GET', self::URL, self::PERIOD + ['group' => 'category']);
         self::assertSame('—', $this->cell($byCategory->filter('tr[data-category-group]')->first(), 'abcRevenue'));
         $group = $byCategory->filter(sprintf('tr[data-category-group="%s"]', $category));
-        self::assertSame(['60,00', '15,00', '9,00'], array_map(fn (string $col): string => $this->cell($group, $col), $columns));
+        self::assertSame(['60,00', '15,00', '9,00', '1 000,00'], array_map(fn (string $col): string => $this->cell($group, $col), $columns));
+
+        self::assertSame('833,33', $this->totalsRow($byCategory, 'Итого')['averageCheck']);
 
         $bySku = $client->request('GET', self::URL, self::PERIOD + ['alloc' => '0']);
+        $header = $bySku->filter('th[data-column="cacPerUnit"] + th[data-column="averageCheck"]');
+        self::assertSame('Ср. чек', $header->text());
         $returned = $bySku->filter('tbody tr')->reduce(static fn (Crawler $row): bool => str_contains($row->text(), 'OZ-1'));
         self::assertSame('C', $this->cell($returned, 'abcRevenue'));
         self::assertCount(0, $bySku->filter('[data-column="abcProfit"]'));
-        self::assertSame(['—', '—', '—'], array_map(fn (string $col): string => $this->cell($returned, $col), $columns));
+        self::assertSame(['—', '—', '—', '—'], array_map(fn (string $col): string => $this->cell($returned, $col), $columns));
 
         $client->request('GET', self::URL, self::PERIOD + ['group' => 'category', 'format' => 'xlsx']);
         self::assertResponseIsSuccessful();
@@ -160,7 +164,8 @@ final class SkuEconomicsByCategoryTest extends WebTestCaseBase
         self::assertCount(1, $returnedRows);
         self::assertSame(['C', 'D'], \array_slice($returnedRows[0], 3, 2));
         self::assertSame(['', ''], \array_slice($last, 3, 2));
-        foreach (['Себест./ед., ₽' => 40, 'Логист./ед., ₽' => 10, 'CAC/ед., ₽' => 6] as $header => $expected) {
+        self::assertSame(['CAC/ед., ₽', 'Ср. чек, ₽'], \array_slice($rows[1], -2));
+        foreach (['Себест./ед., ₽' => 40, 'Логист./ед., ₽' => 10, 'CAC/ед., ₽' => 6, 'Ср. чек, ₽' => 833.33] as $header => $expected) {
             $index = array_search($header, $rows[1], true);
             self::assertIsInt($index);
             self::assertSame($expected, $last[$index]);
@@ -183,6 +188,8 @@ final class SkuEconomicsByCategoryTest extends WebTestCaseBase
         self::assertSame(['OZ-2', 'Носки', 'B', 'Ozon'], \array_slice($rows[2], 0, 4));
         self::assertSame('Итого', $rows[3][0]);
         self::assertSame('', $rows[3][2]);
+        self::assertSame(['Ср. чек, ₽'], \array_slice($rows[1], -1));
+        self::assertSame([500], \array_slice($rows[2], -1));
     }
 
     /** @return list<array<int, mixed>> */

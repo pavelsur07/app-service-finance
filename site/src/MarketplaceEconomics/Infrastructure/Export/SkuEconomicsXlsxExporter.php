@@ -43,7 +43,7 @@ final readonly class SkuEconomicsXlsxExporter
             $lead = $byCategory ? ['Категория'] : [];
             $abcHeaders = $allocated ? ['ABC оборот', 'ABC СМ3'] : ['ABC оборот'];
             $emptyLabels = array_fill(0, \count($lead) + \count($abcHeaders) + 2, '');
-            $writer->addRow(Row::fromValues([...$lead, 'SKU', 'Название', ...$abcHeaders, 'Канал', ...self::metricHeaders($allocated), 'Себест./ед., ₽', 'Логист./ед., ₽', 'CAC/ед., ₽']));
+            $writer->addRow(Row::fromValues([...$lead, 'SKU', 'Название', ...$abcHeaders, 'Канал', ...self::metricHeaders($allocated), 'Себест./ед., ₽', 'Логист./ед., ₽', 'CAC/ед., ₽', 'Ср. чек, ₽']));
             $sections = $byCategory
                 ? array_map(static fn (SkuEconomicsCategoryGroup $g): array => [[$g->name], $g->rows], $report->groups)
                 : [[[], $report->rows]];
@@ -104,7 +104,7 @@ final readonly class SkuEconomicsXlsxExporter
     private function skuRow(array $label, SkuMetrics $metrics, bool $allocated): Row
     {
         $row = $this->row($label, $metrics, $allocated);
-        foreach ([$metrics->costPricePerUnit(), $metrics->logisticsPerUnit(), $metrics->cacPerUnit()] as $minor) {
+        foreach ([$metrics->costPricePerUnit(), $metrics->logisticsPerUnit(), $metrics->cacPerUnit(), $metrics->averageCheck()] as $minor) {
             $row->addCell(Cell::fromValue(null === $minor ? null : $minor / 100));
         }
 

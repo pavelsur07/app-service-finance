@@ -92,6 +92,25 @@ final class SkuMetricsTest extends TestCase
         self::assertSame(-250, $m->logisticsPerUnit());
     }
 
+    public function testAverageCheckUsesRevenueBeforeSppAndNetUnits(): void
+    {
+        $metrics = new SkuMetrics();
+        $metrics->add('sale', L::REVENUE, 33000, 3);
+        $metrics->add('return', L::REVENUE, -10001, 1);
+        $metrics->add('spp', L::INFO, 2000, 0);
+        $metrics->vat = -1000;
+
+        self::assertSame(11500, $metrics->averageCheck());
+
+        $other = new SkuMetrics();
+        $other->add('sale', L::REVENUE, 4000, 1);
+        $metrics->merge($other);
+        self::assertSame(9000, $metrics->averageCheck());
+
+        $metrics->add('return', L::REVENUE, -27000, 3);
+        self::assertNull($metrics->averageCheck());
+    }
+
     public function testMergeAddsVat(): void
     {
         $a = new SkuMetrics();
