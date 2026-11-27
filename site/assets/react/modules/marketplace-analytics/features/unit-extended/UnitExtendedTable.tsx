@@ -1,42 +1,14 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import type { AbcClass, ListingTag, UnallocatedCosts, UnitExtendedItem, UnitExtendedTotals } from './unitExtended.types';
-import CostsBreakdown from './CostsBreakdown';
-import { formatMoney, formatQty } from '@/react/shared/format/number';
+import { SortableColumnHeader } from './SortableColumnHeader';
+import type { UnallocatedCosts, UnitExtendedItem, UnitExtendedTotals } from './unitExtended.types';
+import { UnitExtendedFooter, UnitExtendedItemRow } from './UnitExtendedRows';
+import type { ExpandedCostType } from './UnitExtendedRows';
+import { sortUnitExtendedItems } from './unitExtendedSort';
+import type { UnitExtendedSortDirection, UnitExtendedSortField } from './unitExtendedSort';
 import { useFixedHeader } from './useFixedHeader';
 import { cn } from '@/react/shared/lib/cn';
 import styles from './UnitExtendedTable.module.css';
-
-type SortField =
-    | 'sku'
-    | 'title'
-    | 'sellerArticle'
-    | 'tags'
-    | 'abcRevenue'
-    | 'abcProfit'
-    | 'revenue'
-    | 'quantity'
-    | 'averageCheckRub'
-    | 'returnsTotal'
-    | 'returnsQuantity'
-    | 'costPriceTotal'
-    | 'costPriceUnit'
-    | 'stockQty'
-    | 'stockCapitalRub'
-    | 'commission'
-    | 'commissionAverageRub'
-    | 'adSpend'
-    | 'cacRub'
-    | 'drrPercent'
-    | 'logistics'
-    | 'otherCosts'
-    | 'totalCosts'
-    | 'profitUnit'
-    | 'profit'
-    | 'marginPercent'
-    | 'roiPercent';
-
-type SortDir = 'asc' | 'desc';
 
 interface UnitExtendedTableProps {
     items: UnitExtendedItem[];
@@ -48,14 +20,12 @@ interface UnitExtendedTableProps {
     onToggleTag: (tagId: string) => void;
 }
 
-type ExpandedType = 'other' | 'all';
-
 /** Ключ раскрытия строки «Не распределено по товарам» — не пересекается с UUID листингов. */
 const UNALLOCATED_KEY = '__unallocated__';
 
 interface ExpandedState {
     listingId: string;
-    type: ExpandedType;
+    type: ExpandedCostType;
 }
 
 interface FloatingScrollbarStyle {
@@ -83,7 +53,16 @@ function resolveScrollContainer(wrapper: HTMLDivElement | null): HTMLElement | n
     return wrapper;
 }
 
-const HEADERS: { field: SortField; label: React.ReactNode; align?: string; tooltip?: string; className?: string }[] = [
+interface TableHeader {
+    field: UnitExtendedSortField;
+    label: React.ReactNode;
+    align?: string;
+    tooltip?: string;
+    className?: string;
+    accessibleLabel?: string;
+}
+
+const HEADERS: TableHeader[] = [
     { field: 'sku', label: 'SKU' },
     { field: 'title', label: 'Наименование' },
     { field: 'sellerArticle', label: 'Артикул' },
@@ -91,10 +70,10 @@ const HEADERS: { field: SortField; label: React.ReactNode; align?: string; toolt
     { field: 'abcRevenue', label: 'ABC выр.', align: 'text-center', tooltip: 'ABC по нетто-выручке (выручка − возвраты): A — первые 80% выручки, B — следующие 15%, C — остальные 5% и товары без выручки' },
     { field: 'abcProfit', label: 'ABC приб.', align: 'text-center', tooltip: 'ABC по прибыли: A — первые 80% прибыли, B — следующие 15%, C — остальные 5%, D — убыток (прибыль ≤ 0)' },
     { field: 'revenue', label: 'Выручка', align: 'text-end' },
-    { field: 'quantity', label: 'Кол-во', align: 'text-end' },
+    { field: 'quantity', label: 'Кол-во', align: 'text-end', accessibleLabel: 'Кол-во продаж' },
     { field: 'averageCheckRub', label: 'Сред. чек', align: 'text-end', tooltip: 'Средний чек: (выручка − возвраты) / (продано − возвращено, шт.)' },
     { field: 'returnsTotal', label: 'Возвраты', align: 'text-end' },
-    { field: 'returnsQuantity', label: 'Кол-во', align: 'text-end', tooltip: 'Возвращено, шт.' },
+    { field: 'returnsQuantity', label: 'Кол-во', align: 'text-end', tooltip: 'Возвращено, шт.', accessibleLabel: 'Кол-во возвратов' },
     { field: 'costPriceTotal', label: 'Себестоимость', align: 'text-end' },
     { field: 'costPriceUnit', label: 'Себест. ед.', align: 'text-end' },
     { field: 'stockQty', label: 'Ост. шт.', align: 'text-end' },
@@ -113,141 +92,6 @@ const HEADERS: { field: SortField; label: React.ReactNode; align?: string; toolt
     { field: 'roiPercent', label: 'ROI %', align: 'text-end' },
 ];
 
-/** Ключ сортировки по тегам: имена в порядке выдачи API, склеенные как в ячейке и в XLS. */
-function tagsSortKey(item: UnitExtendedItem): string {
-    return item.tags.map((tag) => tag.name).join(', ');
-}
-
-function comparator(a: UnitExtendedItem, b: UnitExtendedItem, field: SortField): number {
-    if (field === 'tags') {
-        return tagsSortKey(a).localeCompare(tagsSortKey(b), 'ru');
-    }
-    if (field === 'title') {
-        return a.title.localeCompare(b.title, 'ru');
-    }
-    if (field === 'abcRevenue' || field === 'abcProfit') {
-        // Обратный порядок букв: первый клик (desc), как у чисел, ставит лучших — A — сверху.
-        return b[field].localeCompare(a[field]);
-    }
-    if (field === 'sku') {
-        return a.sku.localeCompare(b.sku, 'ru');
-    }
-    if (field === 'sellerArticle') {
-        return (a.sellerArticle ?? '').localeCompare(b.sellerArticle ?? '', 'ru');
-    }
-    const valA = (a[field] as number | null) ?? -Infinity;
-    const valB = (b[field] as number | null) ?? -Infinity;
-    if (valA === valB) return 0;
-    return valA - valB;
-}
-
-function marginColor(v: number | null): string {
-    if (v === null) return '';
-    if (v < 5) return 'text-red';
-    if (v <= 15) return 'text-yellow';
-    return 'text-green';
-}
-
-function roiColor(v: number | null): string {
-    return v !== null && v < 0 ? 'text-red' : '';
-}
-
-function formatPercent(v: number | null): React.ReactNode {
-    if (v === null) return '—';
-    return `${v.toFixed(1)}%`;
-}
-
-const ABC_BADGE_COLOR: Record<AbcClass, string> = {
-    A: 'success',
-    B: 'warning',
-    C: 'secondary',
-    D: 'red',
-};
-
-const ABC_TITLE: Record<AbcClass, string> = {
-    A: 'Класс A — первые 80%',
-    B: 'Класс B — следующие 15%',
-    C: 'Класс C — остальные 5% или без вклада',
-    D: 'Класс D — убыток',
-};
-
-function AbcCell({ value }: { value: AbcClass }): React.ReactElement {
-    return (
-        <td className="text-center">
-            <span className={`badge bg-${ABC_BADGE_COLOR[value]}-lt`} title={ABC_TITLE[value]}>
-                {value}
-            </span>
-        </td>
-    );
-}
-
-const MAX_VISIBLE_TAGS = 2;
-/**
- * Ячейка тегов — 180px. Два коротких имени в неё помещаются, два длинных ужимаются
- * до нечитаемых огрызков («Возвратн…», «З…»), поэтому при длинной паре показываем
- * один целый чип и «+N»: узнать один тег полностью полезнее, чем не узнать два.
- */
-const MAX_VISIBLE_TAGS_NAME_LENGTH = 16;
-
-function visibleTagCount(tags: ListingTag[]): number {
-    if (tags.length < 2) {
-        return tags.length;
-    }
-
-    const pairLength = tags[0].name.length + tags[1].name.length;
-
-    return pairLength <= MAX_VISIBLE_TAGS_NAME_LENGTH ? MAX_VISIBLE_TAGS : 1;
-}
-
-interface TagCellProps {
-    tags: ListingTag[];
-    selectedTagIds: string[];
-    onToggleTag: (tagId: string) => void;
-}
-
-const TagCell: React.FC<TagCellProps> = ({ tags, selectedTagIds, onToggleTag }) => {
-    if (tags.length === 0) {
-        return <td className={`${styles.tags} text-muted`}>—</td>;
-    }
-
-    const visible = tags.slice(0, visibleTagCount(tags));
-    const hiddenCount = tags.length - visible.length;
-
-    return (
-        <td className={styles.tags} title={tags.map((tag) => tag.name).join(', ')}>
-            <div className={styles.tagsList}>
-                {visible.map((tag) => {
-                    const isActive = selectedTagIds.includes(tag.id);
-                    return (
-                        <button
-                            key={tag.id}
-                            type="button"
-                            className={cn('tag-chip', styles.tagChip, isActive && styles.active)}
-                            aria-pressed={isActive}
-                            title={isActive
-                                ? `Убрать «${tag.name}» из фильтра`
-                                : `Отфильтровать по «${tag.name}»`}
-                            onClick={() => onToggleTag(tag.id)}
-                        >
-                            {tag.name}
-                        </button>
-                    );
-                })}
-                {hiddenCount > 0 && (
-                    <>
-                        <span className="text-muted small" aria-hidden="true">+{hiddenCount}</span>
-                        {/* title у td скринридеру недоступен и клавиатурой не берётся —
-                            имена скрытых тегов отдаём текстом. */}
-                        <span className="visually-hidden">
-                            Ещё теги: {tags.slice(visible.length).map((tag) => tag.name).join(', ')}
-                        </span>
-                    </>
-                )}
-            </div>
-        </td>
-    );
-};
-
 const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
     items,
     totals,
@@ -257,8 +101,8 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
     selectedTagIds,
     onToggleTag,
 }) => {
-    const [sortField, setSortField] = useState<SortField>('revenue');
-    const [sortDir, setSortDir] = useState<SortDir>('desc');
+    const [sortField, setSortField] = useState<UnitExtendedSortField>('revenue');
+    const [sortDir, setSortDir] = useState<UnitExtendedSortDirection>('desc');
     const [expanded, setExpanded] = useState<ExpandedState | null>(null);
     const { tableWrapperRef: fixedHeaderTableWrapperRef, theadRef, showFixed, columnWidths, scrollLeft, wrapperRect } = useFixedHeader();
     const floatingScrollbarRef = useRef<HTMLDivElement | null>(null);
@@ -317,16 +161,12 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
         }
     }, []);
 
-    const sorted = useMemo(() => {
-        const copy = [...items];
-        copy.sort((a, b) => {
-            const cmp = comparator(a, b, sortField);
-            return sortDir === 'asc' ? cmp : -cmp;
-        });
-        return copy;
-    }, [items, sortField, sortDir]);
+    const sorted = useMemo(
+        () => sortUnitExtendedItems(items, sortField, sortDir),
+        [items, sortField, sortDir],
+    );
 
-    const handleSort = (field: SortField) => {
+    const handleSort = (field: UnitExtendedSortField) => {
         if (field === sortField) {
             setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
         } else {
@@ -335,7 +175,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
         }
     };
 
-    const handleExpandToggle = (listingId: string, type: ExpandedType) => {
+    const handleExpandToggle = (listingId: string, type: ExpandedCostType) => {
         setExpanded((prev) => {
             if (prev && prev.listingId === listingId && prev.type === type) {
                 return null;
@@ -413,12 +253,13 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
     // The frozen first column uses a counter-transform to stay visible despite the
     // table's translateX(-scrollLeft) shift.
     const renderHeaderCells = (widths?: number[]) => {
+        const mirror = widths !== undefined;
         const getWidthStyle = (i: number): React.CSSProperties => {
             const w = widths?.[i];
             return w !== undefined ? { width: w, minWidth: w, maxWidth: w } : {};
         };
 
-        const frozenClass = (field: SortField): string => {
+        const frozenClass = (field: UnitExtendedSortField): string => {
             if (field === 'sku') return `${styles.frozen} ${styles.frozenSku}`;
             if (field === 'title') return `${styles.frozen} ${styles.frozenTitle}`;
             return '';
@@ -429,13 +270,12 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                 {HEADERS.map((h, i) => {
                     const isFrozen = h.field === 'sku' || h.field === 'title';
                     return (
-                        <th
+                        <SortableColumnHeader
                             key={h.field}
-                            className={`${h.align ?? ''} ${h.className ?? ''} ${frozenClass(h.field)}`}
+                            className={cn(h.align, h.className, frozenClass(h.field))}
                             style={{
-                                cursor: 'pointer',
                                 ...getWidthStyle(i),
-                                ...(widths !== undefined && isFrozen
+                                ...(mirror && isFrozen
                                     ? {
                                         position: 'relative' as const,
                                         zIndex: 10,
@@ -447,16 +287,16 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                                     : {}),
                             }}
                             title={h.tooltip}
-                            onClick={() => handleSort(h.field)}
+                            accessibleLabel={h.accessibleLabel}
+                            direction={sortField === h.field ? sortDir : undefined}
+                            onSort={() => handleSort(h.field)}
+                            mirror={mirror}
                         >
                             {h.label}
-                            {sortField === h.field && (
-                                <i className={`ti ti-chevron-${sortDir === 'asc' ? 'up' : 'down'} ms-1`} />
-                            )}
-                        </th>
+                        </SortableColumnHeader>
                     );
                 })}
-                <th className="text-end" style={getWidthStyle(HEADERS.length)}>
+                <th scope="col" className="text-end" style={getWidthStyle(HEADERS.length)}>
                     Все затраты
                 </th>
             </tr>
@@ -489,9 +329,8 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
 
     return (
         <>
-            
             {showFixed && wrapperRect && createPortal(
-                <div style={{
+                <div aria-hidden="true" style={{
                     position: 'fixed',
                     top: 0,
                     left: wrapperRect.left,
@@ -524,219 +363,26 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({
                         {renderHeaderCells()}
                     </thead>
                     <tbody>
-                        {sorted.map((row) => {
-                            const isOtherExpanded = expanded?.listingId === row.listingId && expanded?.type === 'other';
-                            const isAllExpanded = expanded?.listingId === row.listingId && expanded?.type === 'all';
-
-                            return (
-                                <React.Fragment key={row.listingId}>
-                                    <tr>
-                                        <td className={`${styles.frozen} ${styles.frozenSku}`}>
-                                            <div className="text-muted small text-truncate">{row.sku || '—'}</div>
-                                        </td>
-                                        <td className={`${styles.frozen} ${styles.frozenTitle}`}>
-                                            <div className="text-truncate">{row.title || '—'}</div>
-                                        </td>
-                                        <td>
-                                            <div className="text-truncate">{row.sellerArticle || '—'}</div>
-                                        </td>
-                                        <TagCell
-                                            tags={row.tags}
-                                            selectedTagIds={selectedTagIds}
-                                            onToggleTag={onToggleTag}
-                                        />
-                                        <AbcCell value={row.abcRevenue} />
-                                        <AbcCell value={row.abcProfit} />
-                                        <td className="text-end">{formatMoney(row.revenue)}</td>
-                                        <td className="text-end">{row.quantity.toLocaleString('ru-RU')}</td>
-                                        <td className="text-end">{formatMoney(row.averageCheckRub)}</td>
-                                        <td className="text-end text-red">{formatMoney(row.returnsTotal)}</td>
-                                        <td className="text-end">{row.returnsQuantity.toLocaleString('ru-RU')}</td>
-                                        <td className="text-end">{formatMoney(row.costPriceTotal)}</td>
-                                        <td className="text-end">{formatMoney(row.costPriceUnit)}</td>
-                                        <td className="text-end">{formatQty(row.stockQty)}</td>
-                                        <td className="text-end">{formatMoney(row.stockCapitalRub)}</td>
-                                        <td className="text-end">{formatMoney(row.commission)}</td>
-                                        <td className="text-end">{formatMoney(row.commissionAverageRub)}</td>
-                                        <td className="text-end">{formatMoney(row.adSpend)}</td>
-                                        <td className="text-end">{formatMoney(row.cacRub)}</td>
-                                        <td className="text-end">{formatPercent(row.drrPercent)}</td>
-                                        <td className="text-end">{formatMoney(row.logistics)}</td>
-                                        <td className="text-end">
-                                            <button
-                                                type="button"
-                                                className={`btn btn-sm ${isOtherExpanded ? 'btn-primary' : 'btn-ghost-primary'} p-1`}
-                                                onClick={() => handleExpandToggle(row.listingId, 'other')}
-                                                title="Показать детали прочих затрат"
-                                            >
-                                                {formatMoney(row.otherCosts)}
-                                                <i className={`ti ti-chevron-${isOtherExpanded ? 'up' : 'down'} ms-1`} />
-                                            </button>
-                                        </td>
-                                        <td className="text-end">{formatMoney(row.totalCosts)}</td>
-                                        <td className="text-end">
-                                            {row.profitUnit === null ? '—' : (
-                                                <span className={row.profitUnit >= 0 ? 'text-green' : 'text-red'}>
-                                                    {formatMoney(row.profitUnit)}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="text-end">
-                                            <span className={row.profit >= 0 ? 'text-green' : 'text-red'}>
-                                                {formatMoney(row.profit)}
-                                            </span>
-                                        </td>
-                                        <td className={`text-end ${marginColor(row.marginPercent)}`}>
-                                            {formatPercent(row.marginPercent)}
-                                        </td>
-                                        <td className={`text-end ${roiColor(row.roiPercent)}`}>
-                                            {formatPercent(row.roiPercent)}
-                                        </td>
-                                        <td className="text-end">
-                                            <button
-                                                type="button"
-                                                className={`btn btn-sm ${isAllExpanded ? 'btn-primary' : 'btn-ghost-secondary'} p-1`}
-                                                onClick={() => handleExpandToggle(row.listingId, 'all')}
-                                                title="Показать все затраты"
-                                            >
-                                                <i className={`ti ti-list-details`} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    {isOtherExpanded && (
-                                        <tr>
-                                            <td colSpan={colCount} className="p-0 bg-light">
-                                                <CostsBreakdown
-                                                    groups={row.otherCostsBreakdown}
-                                                    title="Прочие затраты (без комиссии и логистики)"
-                                                />
-                                            </td>
-                                        </tr>
-                                    )}
-                                    {isAllExpanded && (
-                                        <tr>
-                                            <td colSpan={colCount} className="p-0 bg-light">
-                                                <CostsBreakdown
-                                                    groups={row.allCostsBreakdown}
-                                                    title="Все затраты по категориям"
-                                                />
-                                            </td>
-                                        </tr>
-                                    )}
-                                </React.Fragment>
-                            );
-                        })}
+                        {sorted.map((row) => (
+                            <UnitExtendedItemRow
+                                key={row.listingId}
+                                row={row}
+                                colCount={colCount}
+                                expandedType={expanded?.listingId === row.listingId ? expanded.type : undefined}
+                                selectedTagIds={selectedTagIds}
+                                onToggleTag={onToggleTag}
+                                onExpandToggle={handleExpandToggle}
+                            />
+                        ))}
                     </tbody>
                     {totals && (
-                        <tfoot>
-                            {unallocated && (
-                                <>
-                                    <tr>
-                                        <td className={`${styles.frozen} ${styles.frozenSku}`}></td>
-                                        <td className={`${styles.frozen} ${styles.frozenTitle}`}>
-                                            Не распределено по товарам
-                                            <div className="text-muted small">
-                                                Общие затраты кабинета без привязки к товару
-                                            </div>
-                                        </td>
-                                        <td></td>
-                                        <td className={styles.tags}></td>
-                                        <td></td>
-                                        <td></td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{formatMoney(unallocated.commission)}</td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{formatMoney(unallocated.adSpend, 2)}</td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{formatMoney(unallocated.logistics)}</td>
-                                        <td className="text-end">{formatMoney(unallocated.otherCosts)}</td>
-                                        <td className="text-end">{formatMoney(unallocated.totalCosts)}</td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">
-                                            <span className={unallocated.profit >= 0 ? 'text-green' : 'text-red'}>
-                                                {formatMoney(unallocated.profit)}
-                                            </span>
-                                        </td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">{'—'}</td>
-                                        <td className="text-end">
-                                            <button
-                                                type="button"
-                                                className={`btn btn-sm ${isUnallocatedExpanded ? 'btn-primary' : 'btn-ghost-secondary'} p-1`}
-                                                onClick={() => handleExpandToggle(UNALLOCATED_KEY, 'all')}
-                                                title="Показать затраты по категориям"
-                                                aria-expanded={isUnallocatedExpanded}
-                                            >
-                                                <i className="ti ti-list-details" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    {isUnallocatedExpanded && (
-                                        <tr>
-                                            <td colSpan={colCount} className="p-0 bg-light">
-                                                <CostsBreakdown
-                                                    groups={unallocated.allCostsBreakdown}
-                                                    title="Затраты без привязки к товару"
-                                                />
-                                            </td>
-                                        </tr>
-                                    )}
-                                </>
-                            )}
-                            <tr className="fw-bold">
-                                <td className={`${styles.frozen} ${styles.frozenSku}`}></td>
-                                <td className={`${styles.frozen} ${styles.frozenTitle}`}>Итого</td>
-                                <td></td>
-                                <td className={styles.tags}></td>
-                                <td></td>
-                                <td></td>
-                                <td className="text-end">{formatMoney(totals.revenue)}</td>
-                                <td className="text-end">{totals.quantity.toLocaleString('ru-RU')}</td>
-                                <td className="text-end">{formatMoney(totals.averageCheckRub)}</td>
-                                <td className="text-end text-red">{formatMoney(totals.returnsTotal)}</td>
-                                <td className="text-end">{totals.returnsQuantity.toLocaleString('ru-RU')}</td>
-                                <td className="text-end">{formatMoney(totals.costPriceTotal)}</td>
-                                <td className="text-end">{'—'}</td>
-                                <td className="text-end">{'—'}</td>
-                                <td className="text-end">{'—'}</td>
-                                <td className="text-end">{formatMoney(totals.commission)}</td>
-                                <td className="text-end">{formatMoney(totals.commissionAverageRub)}</td>
-                                <td className="text-end">{formatMoney(totals.adSpend)}</td>
-                                <td className="text-end">{formatMoney(totals.cacRub)}</td>
-                                <td className="text-end">{formatPercent(totals.drrPercent)}</td>
-                                <td className="text-end">{formatMoney(totals.logistics)}</td>
-                                <td className="text-end">{formatMoney(totals.otherCosts)}</td>
-                                <td className="text-end">{formatMoney(totals.totalCosts)}</td>
-                                <td className="text-end">
-                                    {totals.profitUnit === null ? '—' : (
-                                        <span className={totals.profitUnit >= 0 ? 'text-green' : 'text-red'}>
-                                            {formatMoney(totals.profitUnit)}
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="text-end">
-                                    <span className={totals.profit >= 0 ? 'text-green' : 'text-red'}>
-                                        {formatMoney(totals.profit)}
-                                    </span>
-                                </td>
-                                <td className={`text-end ${marginColor(totals.marginPercent)}`}>
-                                    {formatPercent(totals.marginPercent)}
-                                </td>
-                                <td className={`text-end ${roiColor(totals.roiPercent)}`}>
-                                    {formatPercent(totals.roiPercent)}
-                                </td>
-                                <td></td>
-                            </tr>
-                        </tfoot>
+                        <UnitExtendedFooter
+                            totals={totals}
+                            unallocated={unallocated}
+                            colCount={colCount}
+                            isUnallocatedExpanded={isUnallocatedExpanded}
+                            onUnallocatedToggle={() => handleExpandToggle(UNALLOCATED_KEY, 'all')}
+                        />
                     )}
                 </table>
             </div>

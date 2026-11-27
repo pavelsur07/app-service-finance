@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { SortableColumnHeader } from './SortableColumnHeader';
 import type { TagSummaryRow } from './unitExtended.types';
 import { sortTagSummary } from './tagSummarySort';
 import type { TagSummarySortDirection, TagSummarySortField } from './tagSummarySort';
@@ -78,20 +79,15 @@ const TagSummaryTable: React.FC<TagSummaryTableProps> = ({ rows, isLoading }) =>
                     <thead>
                         <tr>
                             {HEADERS.map((header) => (
-                                <th
+                                <SortableColumnHeader
                                     key={header.field}
-                                    className={`cursor-pointer${header.field === 'name' ? '' : ' text-end'}`}
+                                    className={header.field === 'name' ? undefined : 'text-end'}
                                     title={header.tooltip}
-                                    aria-sort={sortField === header.field
-                                        ? (sortDirection === 'asc' ? 'ascending' : 'descending')
-                                        : 'none'}
-                                    onClick={() => handleSort(header.field)}
+                                    direction={sortField === header.field ? sortDirection : undefined}
+                                    onSort={() => handleSort(header.field)}
                                 >
                                     {header.label}
-                                    {sortField === header.field && (
-                                        <i className={`ti ti-chevron-${sortDirection === 'asc' ? 'up' : 'down'} ms-1`} />
-                                    )}
-                                </th>
+                                </SortableColumnHeader>
                             ))}
                         </tr>
                     </thead>
