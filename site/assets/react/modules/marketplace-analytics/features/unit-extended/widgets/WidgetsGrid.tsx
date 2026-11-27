@@ -9,6 +9,7 @@ import type { WidgetsApiResponse } from './widgets.types';
 
 interface WidgetsGridProps {
     summary: WidgetsApiResponse | null;
+    marketplace: string;
     isLoading: boolean;
     error: string | null;
     expandedKey: string | null;
@@ -43,6 +44,7 @@ const WidgetCardSkeleton: React.FC = () => (
  */
 const WidgetsGrid: React.FC<WidgetsGridProps> = ({
     summary,
+    marketplace,
     isLoading,
     error,
     expandedKey,
@@ -89,6 +91,29 @@ const WidgetsGrid: React.FC<WidgetsGridProps> = ({
     const hasDetails = (key: string): boolean => Boolean(key === 'ads' ? orderAds : WIDGET_KEY_TO_GROUPS[key]);
     const expandedWidget = WIDGETS.find((config) => config.key === expandedKey && hasDetails(config.key));
     const expandedOrderAds = expandedWidget?.key === 'ads' ? orderAds : null;
+    const ozonAdExplanation = (marketplace === 'ozon' || marketplace === '') && (
+        <>
+            <p className="text-muted small mt-1 mb-0">
+                Рекламная статистика и финансовые начисления{marketplace === 'ozon' ? ' Ozon' : ''} обновляются в разное время.
+                {' '}Поэтому суммы за последние дни могут расходиться.
+            </p>
+            <details className="small mt-1">
+                <summary className="text-primary cursor-pointer py-1">Как считается</summary>
+                <p className="text-muted mb-0">
+                    В расход отчёта входят данные рекламной статистики площадок. Для Ozon это клики и оплата за заказ.
+                    {' '}В расход Ozon также входит часть начислений по статье «Маркетинговые акции», которую статистика не покрывает.
+                </p>
+                <p className="text-muted mt-1 mb-0">
+                    Справочная сумма по начислениям Ozon может включать предоплату рекламного баланса.
+                </p>
+                {orderAds && (
+                    <p className="text-muted mt-1 mb-0">
+                        Кнопка «Детали» показывает только оплату за заказ — по товарам и без привязки к ним.
+                    </p>
+                )}
+            </details>
+        </>
+    );
 
     return (
         <>
@@ -107,6 +132,7 @@ const WidgetsGrid: React.FC<WidgetsGridProps> = ({
                                 allocationNote={config.key === 'ads' && orderAds && orderAds.unlinked !== 0
                                     ? `Оплата за заказ Ozon без привязки к товарам — ${formatMoney(orderAds.unlinked, 2)}`
                                     : undefined}
+                                noteDetails={config.key === 'ads' ? ozonAdExplanation : undefined}
                                 onToggle={onToggle}
                             />
                         </div>

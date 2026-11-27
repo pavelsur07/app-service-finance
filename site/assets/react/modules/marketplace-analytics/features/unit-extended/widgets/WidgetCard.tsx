@@ -12,6 +12,7 @@ interface WidgetCardProps {
     detailsId?: string;
     detailsButtonRef?: React.Ref<HTMLButtonElement>;
     allocationNote?: string;
+    noteDetails?: React.ReactNode;
     onToggle: (key: string) => void;
 }
 
@@ -41,6 +42,7 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
     detailsId,
     detailsButtonRef,
     allocationNote,
+    noteDetails,
     onToggle,
 }) => {
     const currentValue = config.getValue(current);
@@ -86,7 +88,12 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
                     </span>
                 </div>
                 {allocationNote && <p className="text-muted small mt-2 mb-0">{allocationNote}</p>}
-                {note && <p className="text-muted small mt-2 mb-0">{note}</p>}
+                {note && (
+                    <>
+                        <p className="text-muted small mt-2 mb-0">{note}</p>
+                        {noteDetails}
+                    </>
+                )}
 
                 <div className="mt-auto pt-3">
                     <div className="border-top pt-2">

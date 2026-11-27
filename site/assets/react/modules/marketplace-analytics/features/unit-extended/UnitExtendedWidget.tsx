@@ -136,6 +136,7 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces, t
             <ErrorBoundary widgetName="UnitEconomyWidgets">
                 <WidgetsGrid
                     summary={widgets.summary}
+                    marketplace={filters.marketplace}
                     isLoading={widgets.isLoading}
                     error={widgets.error}
                     expandedKey={widgets.expandedKey}
