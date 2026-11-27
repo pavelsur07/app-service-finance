@@ -14,8 +14,8 @@ use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use App\MarketplaceAnalytics\Application\Service\OzonOrderAdCoverage;
-use App\MarketplaceAnalytics\Domain\Service\AbcClassificationPolicy;
-use App\MarketplaceAnalytics\Enum\AbcClass;
+use App\Shared\Domain\AbcClass;
+use App\Shared\Domain\AbcClassificationPolicy;
 
 final readonly class UnitExtendedQuery
 {

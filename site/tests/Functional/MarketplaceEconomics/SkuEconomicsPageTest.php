@@ -49,12 +49,14 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         $headers = $crawler->filter('[data-economics-table] thead th:not(.me-col-group)');
         self::assertSame('SKU', $headers->eq(0)->text());
         self::assertSame('Наименование', $headers->eq(1)->text());
-        self::assertSame('Прод., шт', $headers->eq(2)->text());
-        self::assertSame('Продано, шт.', $headers->eq(2)->attr('title'));
+        self::assertSame('Оборот', $headers->eq(2)->text());
+        self::assertSame('СМ3', $headers->eq(3)->text());
+        self::assertSame('Прод., шт', $headers->eq(4)->text());
+        self::assertSame('Продано, шт.', $headers->eq(4)->attr('title'));
         $groups = $crawler->filter('[data-economics-table] thead th.me-col-group');
-        self::assertSame(['Выручка', 'Товар', 'Расходы МП', 'СМ1', 'Реклама', 'СМ2', 'Склад и пр. МП', 'СМ3', 'На единицу'], $groups->each(static fn ($th): string => $th->text()));
-        self::assertSame('5', $groups->first()->attr('colspan'));
-        self::assertSame('revenue revenueWithSpp spp vat revenueNet', $groups->first()->attr('data-columns'));
+        self::assertSame(['ABC', 'Продажи', 'Выручка', 'Товар', 'Расходы МП', 'СМ1', 'Реклама', 'СМ2', 'Склад и пр. МП', 'СМ3', 'На единицу'], $groups->each(static fn ($th): string => $th->text()));
+        self::assertSame('5', $groups->eq(2)->attr('colspan'));
+        self::assertSame('revenue revenueWithSpp spp vat revenueNet', $groups->eq(2)->attr('data-columns'));
         $gross = $crawler->filter('[data-economics-table] thead th[data-column="gross"]');
         self::assertSame('Выр. − себест.', $gross->text());
         self::assertSame('Выручка без НДС − себестоимость, ₽', $gross->attr('title'));
@@ -64,6 +66,8 @@ final class SkuEconomicsPageTest extends WebTestCaseBase
         self::assertSame('SKU-991', $product->filter('td')->eq(0)->text());
         self::assertSame('Платье', $product->filter('td')->eq(1)->text());
         self::assertCount($headers->count(), $product->filter('td'));
+        self::assertSame('A', $product->filter('td')->eq(2)->text());
+        self::assertSame('A', $product->filter('td')->eq(3)->text());
         $row = $product->text();
         // СМ1 = 3000 − 900 − 450 = 1650; СМ2 = 1500; СМ3 = 1450
         self::assertMatchesRegularExpression('/1\s650,00/u', $row);

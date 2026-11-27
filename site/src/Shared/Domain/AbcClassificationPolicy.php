@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\MarketplaceAnalytics\Domain\Service;
-
-use App\MarketplaceAnalytics\Enum\AbcClass;
+namespace App\Shared\Domain;
 
 /**
  * ABC-анализ по накопленной доле: листинги по убыванию значения, A — пока накопленная
@@ -26,11 +24,20 @@ final readonly class AbcClassificationPolicy
      */
     public function classify(array $valueById, AbcClass $nonPositiveClass): array
     {
+        return $this->classifyMinor(array_map(static fn (float $value): int => (int) round($value * 100), $valueById), $nonPositiveClass);
+    }
+
+    /**
+     * @param array<string, int> $centsById
+     *
+     * @return array<string, AbcClass>
+     */
+    public function classifyMinor(array $centsById, AbcClass $nonPositiveClass): array
+    {
         $result = [];
         // Копейки целыми: граница ровно 80% не должна зависеть от ошибки float-суммы.
         $positiveCents = [];
-        foreach ($valueById as $id => $value) {
-            $cents = (int) round($value * 100);
+        foreach ($centsById as $id => $cents) {
             if ($cents > 0) {
                 $positiveCents[(string) $id] = $cents;
             } else {

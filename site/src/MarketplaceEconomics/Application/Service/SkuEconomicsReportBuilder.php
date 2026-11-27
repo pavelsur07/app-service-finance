@@ -13,6 +13,8 @@ use App\MarketplaceEconomics\Application\DTO\SkuEconomicsReport;
 use App\MarketplaceEconomics\Application\DTO\SkuEconomicsRow;
 use App\MarketplaceEconomics\Domain\SkuMetrics;
 use App\MarketplaceEconomics\Infrastructure\Query\SkuEconomicsQuery;
+use App\Shared\Domain\AbcClass;
+use App\Shared\Domain\AbcClassificationPolicy;
 
 /**
  * Отчёт R1 из витрины: текущий и прошлый период той же длины, названия листингов, фильтр по тегам,
@@ -27,6 +29,7 @@ final readonly class SkuEconomicsReportBuilder
         private ListingTagFacade $tags,
         private ListingCategoryFacadeInterface $categories,
         private VatRatesByMonth $vatRates,
+        private AbcClassificationPolicy $abc,
     ) {
     }
 
@@ -49,20 +52,26 @@ final readonly class SkuEconomicsReportBuilder
         $needCategories = null !== $filter->category || $filter->byCategory;
         $categoryOf = $needCategories ? $this->categories->categoriesForListings($companyId, array_map('strval', $listingIds)) : [];
 
+        $selected = $current;
+        if (null !== $tagged) {
+            $selected = array_intersect_key($selected, $tagged);
+        }
+        if (null !== $filter->category) {
+            $selected = array_filter($selected, static fn (string $id): bool => ($categoryOf[$id] ?? SkuEconomicsFilter::CATEGORY_NONE) === $filter->category, \ARRAY_FILTER_USE_KEY);
+        }
+
+        // Поиск и пагинация меняют видимые строки, но сохраняют класс в выбранном наборе.
+        $abcRevenue = $this->abc->classifyMinor(array_map(static fn (SkuMetrics $m): int => $m->revenue, $selected), AbcClass::C);
+        $abcProfit = $filter->allocated ? $this->abc->classifyMinor(array_map(static fn (SkuMetrics $m): int => $m->full(), $selected), AbcClass::D) : [];
+
         $rows = [];
-        foreach ($current as $listingId => $metrics) {
+        foreach ($selected as $listingId => $metrics) {
             $listingId = (string) $listingId;
             $item = $meta[$listingId] ?? null;
-            if (null !== $tagged && !isset($tagged[$listingId])) {
-                continue;
-            }
-            if (null !== $filter->category && (SkuEconomicsFilter::CATEGORY_NONE === $filter->category ? isset($categoryOf[$listingId]) : ($categoryOf[$listingId] ?? null) !== $filter->category)) {
-                continue;
-            }
             if ('' !== $needle && !str_contains(mb_strtolower(implode(' ', [$item?->sku, $item?->title, $item?->supplierSku])), $needle)) {
                 continue;
             }
-            $rows[] = new SkuEconomicsRow($listingId, $item->sku ?? '—', $item?->title, $item?->supplierSku, $metrics, $previous[$listingId] ?? new SkuMetrics(), $item?->marketplace);
+            $rows[] = new SkuEconomicsRow($listingId, $item->sku ?? '—', $item?->title, $item?->supplierSku, $metrics, $previous[$listingId] ?? new SkuMetrics(), $abcRevenue[$listingId], $abcProfit[$listingId] ?? null, $item?->marketplace);
         }
 
         $value = static fn (SkuMetrics $m): int => match ($filter->sort) {

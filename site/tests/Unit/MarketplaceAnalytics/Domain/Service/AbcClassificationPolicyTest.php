@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\MarketplaceAnalytics\Domain\Service;
 
-use App\MarketplaceAnalytics\Domain\Service\AbcClassificationPolicy;
-use App\MarketplaceAnalytics\Enum\AbcClass;
+use App\Shared\Domain\AbcClass;
+use App\Shared\Domain\AbcClassificationPolicy;
 use PHPUnit\Framework\TestCase;
 
 final class AbcClassificationPolicyTest extends TestCase

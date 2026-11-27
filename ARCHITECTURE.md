@@ -796,6 +796,7 @@
   `VatMode::ratePercentOn()`; `SkuEconomicsQuery` считает НДС в SQL (`numeric`, без float) с округлением по
   листингу × дню и сворачивает в ключ (листинг / шаг) — итоги R1 и R2 совпадают при любом шаге. Нет профиля или
   «без НДС» — 0. Уровни с НДС общие для R1, R2, xlsx (с ДРР) и R3 (в письме — «СМ — за вычетом НДС»).
+- Классы ABC строк SKU считаются по выручке до СПП с учётом возвратов и по СМ3 за период, после отбора кабинета, канала, тегов и категории, до поиска и пагинации. Без разнесения доступен только класс оборота.
 - Колонки R1: обязательные — SKU, наименование, продано, выручка, СМ1, СМ2, СМ3 (с разнесением) и % итогового
   уровня; остальные скрываются окном «Колонки» (`data-economics-columns`), скрытые хранятся в `localStorage`
   браузера (`marketplace-economics:hidden-columns`) и применяются только к необязательным колонкам текущего
@@ -4947,7 +4948,7 @@ enum SnapshotRecalcScope: string
 }
 ```
 
-### `src/MarketplaceAnalytics/Enum/AbcClass.php`
+### `src/Shared/Domain/AbcClass.php`
 ```php
 enum AbcClass: string
 {
@@ -4957,7 +4958,7 @@ enum AbcClass: string
     case D = 'D'; // убыток: прибыль ≤ 0 (только ABC по прибыли)
 }
 ```
-Классы считает `Domain\Service\AbcClassificationPolicy` (в копейках, равные значения — по ID).
+Классы обоих отчётов считает `Shared\Domain\AbcClassificationPolicy` (в копейках, равные значения — по ID).
 `UnitExtendedQuery` отдаёт `abcRevenue` (база — выручка − возвраты) и `abcProfit` по всему
 набору периода/маркетплейса/тегов — до поиска и лимита строк.
 Без фильтра по тегам `UnitExtendedQuery` отдаёт `unallocated` — затраты без листинга
