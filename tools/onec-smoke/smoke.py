@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Приёмка серверного модуля OneC по HTTP, без 1С.
 
-Запуск: VF_ONEC_URL=https://… VF_ONEC_TOKEN=… python3 tools/onec-smoke/smoke.py [--out DIR] [--big]
+Запуск: VF_ONEC_URL=https://… VF_ONEC_TOKEN=… python3 tools/onec-smoke/smoke.py [--out DIR] [--big] [--base-id UUID] [--org GUID]
 
-Подключение должно быть новым: первое рукопожатие закрепляет base_id.
+Новое подключение — без --base-id: первое рукопожатие закрепляет новый base_id.
+Подключение с уже закреплённой базой — --base-id этой базы, сценарий 1 пропускается.
+У организации --org (по умолчанию из примера) владелец должен включить «Загружать»;
+вторая организация EXTRA_ORG добавляется в справочник и остаётся без разрешения.
 Тела частей пишутся в файлы в --out и отправляются байтами из файла.
 Итог — results.json в --out (без токена) и список package_id в stdout.
 """
@@ -22,6 +25,7 @@ import uuid
 
 EXAMPLES = pathlib.Path(__file__).resolve().parents[2] / "site/src/OneC/Contract/v1/examples"
 PAUSE = 1.1
+EXTRA_ORG = "5b1d7a2e-9c4f-4e21-8a3b-6d0f2c9e7b14"
 
 
 def now_rfc3339(delta=dt.timedelta()):
@@ -68,6 +72,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=f"onec-smoke-{dt.datetime.now():%Y%m%d-%H%M%S}")
     ap.add_argument("--big", action="store_true", help="сценарий 15: часть больше 10 МиБ")
+    ap.add_argument("--base-id", help="база, уже закреплённая за подключением")
+    ap.add_argument("--org", help="GUID организации с «Загружать»; по умолчанию из примера")
     args = ap.parse_args()
     url, token = os.environ.get("VF_ONEC_URL"), os.environ.get("VF_ONEC_TOKEN")
     if not url or not token:
@@ -78,13 +84,14 @@ def main():
     c = Client(url, token)
     hs_example = json.loads((EXAMPLES / "handshake_request.json").read_text("utf-8"))
     part_example = json.loads((EXAMPLES / "package_part.json").read_text("utf-8"))
-    base_id = str(uuid.uuid4())
+    base_id = args.base_id or str(uuid.uuid4())
+    org = args.org or hs_example["organizations"][0]["guid"]
     snapshot = now_rfc3339()
     results, packages, ctx = [], [], {"base_id": base_id}
 
     def part(file, **changes):
         body = copy.deepcopy(part_example)
-        body.update({"base_id": base_id, "snapshot_at": snapshot}, **changes)
+        body.update({"base_id": base_id, "snapshot_at": snapshot, "organization_guids": [org]}, **changes)
         for k, v in list(body.items()):
             if v is ...:
                 del body[k]
@@ -102,22 +109,33 @@ def main():
         return c.post("/packages", path.read_bytes(), **kw)
 
     # 1. Часть до рукопожатия.
-    check("1", "часть до рукопожатия", 409, "base_conflict", *send_file(part("p1-before-handshake.json", package_id=str(uuid.uuid4()))))
+    if args.base_id is None:
+        check("1", "часть до рукопожатия", 409, "base_conflict", *send_file(part("p1-before-handshake.json", package_id=str(uuid.uuid4()))))
 
     # 2–3. Рукопожатие и повтор.
-    hs = dict(hs_example, base_id=base_id)
+    organizations = [o for o in hs_example["organizations"] if o["guid"] != org]
+    organizations += [dict(hs_example["organizations"][0], guid=org), {"guid": EXTRA_ORG, "name": "Организация без разрешения (smoke)", "inn": None, "kpp": None}]
+    hs = dict(hs_example, base_id=base_id, organizations=organizations)
     hs_bytes = json.dumps(hs, ensure_ascii=False).encode("utf-8")
     r = check("2", "рукопожатие", 200, None, *c.post("/handshake", hs_bytes))
     orgs = r.get("organizations") or []
     ok2 = (r.get("status") == "connected" and (r.get("support") or {}).get("level") == "supported"
            and (r.get("settings") or {}).get("open_outside_period_months") == 12
-           and bool(orgs) and all(o.get("mapped") is False for o in orgs))
+           and bool(orgs) and all(o.get("mapped") is False and isinstance(o.get("export_allowed"), bool) for o in orgs))
     results[-1]["ok"] = results[-1]["ok"] and ok2
     if not ok2:
         print("     поля ответа не совпали с ожиданием")
     ctx["connection_id"] = r.get("connection_id")
     r3 = check("3", "повтор рукопожатия", 200, None, *c.post("/handshake", hs_bytes))
     results[-1]["ok"] = results[-1]["ok"] and r3.get("connection_id") == ctx["connection_id"]
+
+    allowed = {o.get("guid"): o.get("export_allowed") for o in orgs}
+    ctx["export_allowed"] = allowed
+    if allowed.get(org) is not True:
+        (out / "results.json").write_text(json.dumps({"context": ctx, "results": results}, ensure_ascii=False, indent=2), "utf-8")
+        sys.exit(f"у организации {org} не включено «Загружать»: поставьте галочку в карточке подключения и запустите снова")
+    hs_check = next(x for x in results if x["no"] == "2")
+    hs_check["ok"] = hs_check["ok"] and allowed.get(EXTRA_ORG) is False
 
     # 4–5. Ошибки рукопожатия.
     other = json.dumps(dict(hs, base_id=str(uuid.uuid4())), ensure_ascii=False).encode("utf-8")
@@ -144,6 +162,13 @@ def main():
           *send_file(part("p10.json", package_id=str(uuid.uuid4()), snapshot_at=now_rfc3339(dt.timedelta(days=2)))))
     check("11", "kind bank_statements", 422, "invalid_package", *send_file(part("p11.json", package_id=str(uuid.uuid4()), kind="bank_statements")))
 
+    # 16–17. Организации выгрузки.
+    check("16", "organization_guids с неизвестной организацией", 422, "invalid_package",
+          *send_file(part("p16.json", package_id=str(uuid.uuid4()), organization_guids=[org, str(uuid.uuid4())])))
+    check("17", "organization_guids с организацией без «Загружать»", 422, "invalid_package",
+          *send_file(part("p17.json", package_id=str(uuid.uuid4()), organization_guids=[org, EXTRA_ORG])))
+    check("18", "без organization_guids", 422, "invalid_package", *send_file(part("p18.json", package_id=str(uuid.uuid4()), organization_guids=...)))
+
     # 12. Авторизация.
     p12 = part("p12.json", package_id=str(uuid.uuid4()))
     check("12a", "без Authorization", 401, "invalid_token", *send_file(p12, token=None))
@@ -158,11 +183,17 @@ def main():
         packages.append((p13_id, n, f"п. 13, {n} из 2", path))
     p14 = part("p14.json", package_id=p13_id, part=2, parts_total=2, period_to="2026-11-29")
     check("14", "часть 2/2 с другим period_to", 409, None, *send_file(p14))
+    p19_id = str(uuid.uuid4())
+    path = part("p19-part1.json", package_id=p19_id, part=1, parts_total=2)
+    check("19.1", "выгрузка 2 части: часть 1", 200, None, *send_file(path))
+    packages.append((p19_id, 1, "п. 19, 1 из 2", path))
+    check("19.2", "часть 2 с другим organization_guids", 409, "package_conflict",
+          *send_file(part("p19-part2.json", package_id=p19_id, part=2, parts_total=2, organization_guids=[org, EXTRA_ORG])))
 
     # 15. Слишком большая часть.
     if args.big:
         body = copy.deepcopy(part_example)
-        body.update(base_id=base_id, snapshot_at=snapshot, package_id=str(uuid.uuid4()), warnings=["x" * (10 * 1024 * 1024 + 1024)])
+        body.update(base_id=base_id, snapshot_at=snapshot, organization_guids=[org], package_id=str(uuid.uuid4()), warnings=["x" * (10 * 1024 * 1024 + 1024)])
         p15 = write(out, "p15-big.json", body)
         check("15", "часть больше 10 МиБ", 413, "payload_too_large", *send_file(p15))
 

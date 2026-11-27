@@ -10,7 +10,8 @@
     {
       "guid": "23c15967-e31e-49bb-afa7-8441c7784b63",
       "mapped": false,
-      "company_name": null
+      "company_name": null,
+      "export_allowed": true
     }
   ],
   "messages": [],

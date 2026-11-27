@@ -25,9 +25,10 @@ final class HandshakeTest extends WebTestCaseBase
         self::assertSame('supported', $result['support']['level']);
         self::assertSame(['open_outside_period_months' => 12], $result['settings']);
         self::assertFalse($result['organizations'][0]['mapped']);
+        self::assertFalse($result['organizations'][0]['export_allowed']);
         $db = $this->em()->getConnection();
         self::assertSame(hash('sha256', $token), $db->fetchOne('SELECT token_hash FROM onec_connection WHERE id = ?', [$result['connection_id']]));
-        $db->update('onec_organization', ['enabled' => true], ['connection_id' => $result['connection_id']]);
+        $db->update('onec_organization', ['enabled' => true, 'export_allowed' => true], ['connection_id' => $result['connection_id']], ['enabled' => 'boolean', 'export_allowed' => 'boolean']);
         $client->jsonRequest('POST', '/api/onec/v1/handshake', array_replace($body, ['organizations' => []]), ['HTTP_AUTHORIZATION' => 'Bearer '.$token]);
         self::assertResponseIsSuccessful();
         self::assertFalse($db->fetchOne('SELECT present FROM onec_organization WHERE connection_id = ?', [$result['connection_id']]));
@@ -35,6 +36,7 @@ final class HandshakeTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
         $repeat = json_decode((string) $client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
         self::assertTrue($repeat['organizations'][0]['mapped']);
+        self::assertTrue($repeat['organizations'][0]['export_allowed']);
         self::assertTrue($db->fetchOne('SELECT enabled FROM onec_organization WHERE connection_id = ?', [$result['connection_id']]));
         self::assertNotEmpty($repeat['organizations'][0]['company_name']);
         $body['base_id'] = Uuid::uuid4()->toString();

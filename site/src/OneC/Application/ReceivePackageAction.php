@@ -55,10 +55,12 @@ final readonly class ReceivePackageAction
         }
         // До записи объекта, чтобы отклонённая часть не оставила сырья; повторно — под блокировкой.
         $this->assertSiblings($connection['id'], $envelope);
+        $this->assertExportAllowed($connection['id'], $envelope);
 
-        // Объект пишется до строки и вне транзакции: путь детерминирован, гонка
+        // Объект пишется до строки и вне транзакции: путь детерминирован (месяц —
+        // из snapshot_at в UTC, одинакового во всех частях и повторах), гонка
         // повторов перезаписывает те же байты.
-        $path = \sprintf('onec/%s/%s/%d-%s.json.gz', $connection['id'], $envelope->packageId, $envelope->part, $sha256);
+        $path = \sprintf('onec/%s/%s/%s/%s/%d-%s.json.gz', $connection['id'], $envelope->kind, $envelope->snapshotAt->format('Y/m'), $envelope->packageId, $envelope->part, $sha256);
         $this->storage->write($path, (string) gzencode($body));
 
         $inserted = $this->em->wrapInTransaction(function () use ($db, $connection, $tokenHash, $envelope, $sha256, $path, $body): bool {
@@ -71,14 +73,16 @@ final readonly class ReceivePackageAction
             }
             self::assertAccepts($locked, $envelope);
             $this->assertSiblings($connection['id'], $envelope);
+            // Галочку «Загружать» снимают под той же блокировкой подключения.
+            $this->assertExportAllowed($connection['id'], $envelope);
             $now = $this->clock->now()->format('Y-m-d H:i:s');
             $id = $db->fetchOne(<<<'SQL'
                 INSERT INTO onec_package (id, connection_id, package_id, part, parts_total, kind, period_from, period_to,
                     include_open_outside_period, processor_version, versions, warnings, document_count, storage_path,
-                    sha256, byte_size, status, received_at, snapshot_at)
+                    sha256, byte_size, status, received_at, snapshot_at, organization_guids)
                 VALUES (:id, :connection, :package, :part, :total, :kind, :from, :to, :open, :processor,
                     CAST(:versions AS jsonb), CAST(:warnings AS jsonb), :documents, :path, :sha, :size, 'stored', :now,
-                    CAST(:snapshot AS timestamptz))
+                    CAST(:snapshot AS timestamptz), CAST(:organizations AS jsonb))
                 ON CONFLICT (connection_id, package_id, part) DO NOTHING
                 RETURNING id
                 SQL, [
@@ -89,6 +93,7 @@ final readonly class ReceivePackageAction
                 'versions' => $connection['versions'], 'warnings' => json_encode($envelope->warnings, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE),
                 'documents' => $envelope->documentCount, 'path' => $path, 'sha' => $sha256, 'size' => \strlen($body), 'now' => $now,
                 'snapshot' => $envelope->snapshotAt->format(\DATE_ATOM),
+                'organizations' => json_encode($envelope->organizationGuids, \JSON_THROW_ON_ERROR),
             ]);
             if (false === $id) {
                 return false;
@@ -124,13 +129,27 @@ final readonly class ReceivePackageAction
     {
         $sibling = $this->em->getConnection()->fetchAssociative(
             'SELECT kind, period_from, period_to, include_open_outside_period, parts_total,
-                snapshot_at IS NOT DISTINCT FROM CAST(? AS timestamptz) AS same_snapshot
+                snapshot_at IS NOT DISTINCT FROM CAST(? AS timestamptz) AS same_snapshot,
+                organization_guids IS NOT DISTINCT FROM CAST(? AS jsonb) AS same_organizations
             FROM onec_package WHERE connection_id = ? AND package_id = ? AND part <> ? LIMIT 1',
-            [$envelope->snapshotAt->format(\DATE_ATOM), $connectionId, $envelope->packageId, $envelope->part],
+            [$envelope->snapshotAt->format(\DATE_ATOM), json_encode($envelope->organizationGuids, \JSON_THROW_ON_ERROR), $connectionId, $envelope->packageId, $envelope->part],
         );
-        if (false !== $sibling && [$sibling['kind'], $sibling['period_from'], $sibling['period_to'], (bool) $sibling['include_open_outside_period'], (int) $sibling['parts_total'], (bool) $sibling['same_snapshot']]
-            !== [$envelope->kind, $envelope->periodFrom, $envelope->periodTo, $envelope->includeOpenOutsidePeriod, $envelope->partsTotal, true]) {
+        if (false !== $sibling && [$sibling['kind'], $sibling['period_from'], $sibling['period_to'], (bool) $sibling['include_open_outside_period'], (int) $sibling['parts_total'], (bool) $sibling['same_snapshot'], (bool) $sibling['same_organizations']]
+            !== [$envelope->kind, $envelope->periodFrom, $envelope->periodTo, $envelope->includeOpenOutsidePeriod, $envelope->partsTotal, true, true]) {
             throw self::conflict();
+        }
+    }
+
+    /** Каждая организация выгрузки известна подключению и разрешена к загрузке владельцем. */
+    private function assertExportAllowed(string $connectionId, PackageEnvelope $envelope): void
+    {
+        $allowed = $this->em->getConnection()->fetchFirstColumn(
+            'SELECT CAST(guid AS text) FROM onec_organization WHERE connection_id = ? AND export_allowed AND guid IN (SELECT CAST(jsonb_array_elements_text(CAST(? AS jsonb)) AS uuid))',
+            [$connectionId, json_encode($envelope->organizationGuids, \JSON_THROW_ON_ERROR)],
+        );
+        $denied = array_values(array_diff($envelope->organizationGuids, $allowed));
+        if ([] !== $denied) {
+            throw new OneCApiException(422, 'invalid_package', 'Загрузка не разрешена для организаций: '.implode(', ', $denied).'. Владелец включает «Загружать» в карточке подключения.');
         }
     }
 

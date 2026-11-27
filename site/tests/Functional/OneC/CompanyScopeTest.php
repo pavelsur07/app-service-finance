@@ -107,6 +107,64 @@ final class CompanyScopeTest extends WebTestCaseBase
         self::assertSame(hash('sha256', $token), $this->em()->getConnection()->fetchOne('SELECT token_hash FROM onec_connection WHERE id = ?', [$id]));
     }
 
+    public function testExportFlagIsSetByFinanceWriterOfTheConnectionCompanyOnly(): void
+    {
+        $client = self::createClient();
+        $owner = $this->user();
+        $a = $this->company($owner, 'Альфа');
+        $b = $this->company($owner, 'Бета');
+        [$id, $token] = $this->connection($a, $owner, 'База Альфы');
+        $this->handshake($client, $token);
+        $guid = '0b3c4d5e-6f70-4182-93a4-b5c6d7e8f901';
+        $url = '/onec/connections/'.$id.'/organizations/'.$guid.'/export';
+        $db = $this->em()->getConnection();
+
+        $client->loginUser($this->member($a, ['finance' => 'read']));
+        $this->setClientSessionValue($client, 'active_company_id', $a->getId());
+        $client->request('GET', '/onec/connections/'.$id);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists('[data-onec-export-form]');
+        self::assertSelectorTextContains('[data-onec-export="'.$guid.'"]', 'нет');
+        $client->request('POST', $url, ['allowed' => '1', '_token' => $this->csrfToken($client, 'onec_export_'.$id)]);
+        self::assertResponseStatusCodeSame(403);
+
+        $writer = $this->member($a, ['finance' => 'write']);
+        $client->loginUser($writer);
+        $this->setClientSessionValue($client, 'active_company_id', $a->getId());
+        $client->request('GET', '/onec/connections/'.$id);
+        self::assertSelectorExists('[data-onec-export-form] input[type=checkbox][name=allowed]:not([checked])');
+        $client->request('POST', $url, ['allowed' => '1', '_token' => 'invalid']);
+        self::assertResponseStatusCodeSame(403);
+        $client->request('POST', '/onec/connections/'.$id.'/organizations/'.Uuid::uuid4()->toString().'/export', ['allowed' => '1', '_token' => $this->csrfToken($client, 'onec_export_'.$id)]);
+        self::assertResponseStatusCodeSame(404);
+        $client->request('POST', $url, ['allowed' => '1', '_token' => $this->csrfToken($client, 'onec_export_'.$id)]);
+        self::assertResponseRedirects('/onec/connections/'.$id);
+        self::assertTrue($db->fetchOne('SELECT export_allowed FROM onec_organization WHERE connection_id = ? AND guid = ?', [$id, $guid]));
+        $client->request('POST', $url, ['allowed' => '1', '_token' => $this->csrfToken($client, 'onec_export_'.$id)]);
+        self::assertResponseRedirects('/onec/connections/'.$id);
+        $client->request('GET', '/onec/connections/'.$id);
+        self::assertSelectorExists('[data-onec-export-form] input[name=allowed][checked]');
+        self::assertSame(
+            [['company_id' => (string) $a->getId(), 'actor_user_id' => (string) $writer->getId(), 'diff' => '{"organization": "'.$guid.'", "export_allowed": [false, true]}']],
+            $db->fetchAllAssociative("SELECT company_id, actor_user_id, CAST(diff AS jsonb)::text AS diff FROM audit_log WHERE entity_id = ? AND action = 'UPDATE'", [$id]),
+        );
+        $this->handshake($client, $token, $db->fetchOne('SELECT base_id FROM onec_connection WHERE id = ?', [$id]));
+        self::assertSame([true], array_column($this->decode($client)['organizations'], 'export_allowed'));
+
+        // Галочка снимается: в форме нет allowed.
+        $client->loginUser($writer);
+        $this->setClientSessionValue($client, 'active_company_id', $a->getId());
+        $client->request('POST', $url, ['_token' => $this->csrfToken($client, 'onec_export_'.$id)]);
+        self::assertResponseRedirects('/onec/connections/'.$id);
+        self::assertFalse($db->fetchOne('SELECT export_allowed FROM onec_organization WHERE connection_id = ? AND guid = ?', [$id, $guid]));
+
+        $client->loginUser($owner);
+        $this->setClientSessionValue($client, 'active_company_id', $b->getId());
+        $client->request('POST', $url, ['allowed' => '1', '_token' => $this->csrfToken($client, 'onec_export_'.$id)]);
+        self::assertResponseStatusCodeSame(404);
+        self::assertFalse($db->fetchOne('SELECT export_allowed FROM onec_organization WHERE connection_id = ? AND guid = ?', [$id, $guid]));
+    }
+
     public function testHandshakeNamesOnlyTheConnectionCompany(): void
     {
         $client = self::createClient();
@@ -198,8 +256,9 @@ final class CompanyScopeTest extends WebTestCaseBase
         $body = json_encode([
             'package_id' => Uuid::uuid7()->toString(), 'base_id' => $baseId, 'kind' => 'invoices', 'processor_version' => '1.0',
             'period_from' => '2026-11-01', 'period_to' => '2026-11-30', 'include_open_outside_period' => false, 'snapshot_at' => '2026-11-20T09:00:00+03:00',
-            'part' => 1, 'parts_total' => 1, 'warnings' => [], 'documents' => [],
+            'part' => 1, 'parts_total' => 1, 'warnings' => [], 'documents' => [], 'organization_guids' => ['0b3c4d5e-6f70-4182-93a4-b5c6d7e8f901'],
         ], \JSON_THROW_ON_ERROR);
+        $this->em()->getConnection()->executeStatement('UPDATE onec_organization SET export_allowed = TRUE WHERE connection_id = (SELECT id FROM onec_connection WHERE token_hash = ?)', [hash('sha256', $token)]);
         $client->request('POST', '/api/onec/v1/packages', server: ['HTTP_AUTHORIZATION' => 'Bearer '.$token], content: $body);
         self::assertResponseIsSuccessful();
 

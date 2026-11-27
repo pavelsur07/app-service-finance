@@ -45,6 +45,7 @@ final class ReceivePackageRaceTest extends PostgresResetTestCase
         $em->persist(CompanyBuilder::aCompany()->withId($companyId)->withOwner($owner)->build());
         $em->persist($connection);
         $em->flush();
+        $this->writer->insert('onec_organization', ['connection_id' => $this->connectionId, 'guid' => '0b3c4d5e-6f70-4182-93a4-b5c6d7e8f901', 'name' => 'ООО Ромашка', 'present' => true, 'enabled' => false, 'export_allowed' => true], ['present' => 'boolean', 'enabled' => 'boolean', 'export_allowed' => 'boolean']);
     }
 
     protected function tearDown(): void
@@ -132,7 +133,7 @@ final class ReceivePackageRaceTest extends PostgresResetTestCase
         return json_encode([
             'package_id' => $packageId, 'base_id' => $this->baseId, 'kind' => 'invoices', 'processor_version' => '1.0',
             'period_from' => '2026-11-01', 'period_to' => '2026-11-30', 'include_open_outside_period' => false, 'snapshot_at' => '2026-11-20T09:00:00+03:00',
-            'part' => 1, 'parts_total' => 1, 'warnings' => [], 'documents' => [],
+            'part' => 1, 'parts_total' => 1, 'warnings' => [], 'documents' => [], 'organization_guids' => ['0b3c4d5e-6f70-4182-93a4-b5c6d7e8f901'],
         ], \JSON_THROW_ON_ERROR);
     }
 }

@@ -48,13 +48,26 @@
         {% else %}
             <div class="table-responsive">
                 <table class="table table-vcenter card-table">
-                    <thead><tr><th>Наименование</th><th>ИНН / КПП</th><th>Привязка</th></tr></thead>
+                    <thead><tr><th>Наименование</th><th>ИНН / КПП</th><th>Привязка</th><th>Загружать</th></tr></thead>
                     <tbody>
                     {% for organization in organizations %}
                         <tr>
                             <td>{{ organization.name }}{% if not organization.present %} <span class="badge bg-secondary-lt">нет в 1С</span>{% endif %}</td>
                             <td>{{ organization.inn ?? '—' }} / {{ organization.kpp ?? '—' }}</td>
                             <td class="text-secondary">{{ organization.enabled ? 'привязана' : 'не привязана' }}</td>
+                            <td data-onec-export="{{ organization.guid }}">
+                                {% if can_write %}
+                                    <form method="post" action="{{ path('onec_organization_export', {id: connection.id, guid: organization.guid}) }}" data-autosubmit data-onec-export-form>
+                                        <input type="hidden" name="_token" value="{{ export_token }}">
+                                        <label class="form-check form-switch mb-0">
+                                            <input class="form-check-input" type="checkbox" name="allowed" value="1" aria-label="Загружать счета {{ organization.name }}"{% if organization.exportAllowed %} checked{% endif %}>
+                                        </label>
+                                        <noscript><button class="btn btn-sm btn-outline-primary" type="submit">Сохранить</button></noscript>
+                                    </form>
+                                {% else %}
+                                    <span class="text-secondary">{{ organization.exportAllowed ? 'да' : 'нет' }}</span>
+                                {% endif %}
+                            </td>
                         </tr>
                     {% endfor %}
                     </tbody>

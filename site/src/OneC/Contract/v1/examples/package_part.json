@@ -8,6 +8,7 @@
   "include_open_outside_period": true,
   "open_outside_period_months": 12,
   "snapshot_at": "2026-11-26T10:15:00+03:00",
+  "organization_guids": ["23c15967-e31e-49bb-afa7-8441c7784b63"],
   "part": 1,
   "parts_total": 1,
   "warnings": [

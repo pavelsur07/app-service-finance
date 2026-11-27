@@ -71,18 +71,18 @@ final readonly class HandshakeAction
         });
     }
 
-    /** @return list<array{guid: string, mapped: bool, company_name: ?string}> */
+    /** @return list<array{guid: string, mapped: bool, company_name: ?string, export_allowed: bool}> */
     private function syncOrganizations(OneCConnection $connection, HandshakeSnapshot $snapshot): array
     {
         $db = $this->em->getConnection();
         $db->executeStatement('UPDATE onec_organization SET present = FALSE WHERE connection_id = ? AND present', [$connection->id]);
         $rows = $db->fetchAllAssociative(<<<'SQL'
-            INSERT INTO onec_organization (connection_id, guid, name, inn, kpp, present, enabled)
-            SELECT :id, guid, name, inn, kpp, TRUE, FALSE FROM jsonb_to_recordset(CAST(:organizations AS jsonb))
+            INSERT INTO onec_organization (connection_id, guid, name, inn, kpp, present, enabled, export_allowed)
+            SELECT :id, guid, name, inn, kpp, TRUE, FALSE, FALSE FROM jsonb_to_recordset(CAST(:organizations AS jsonb))
                 AS org(guid uuid, name text, inn text, kpp text)
             ON CONFLICT (connection_id, guid) DO UPDATE SET
                 name = EXCLUDED.name, inn = EXCLUDED.inn, kpp = EXCLUDED.kpp, present = TRUE
-            RETURNING guid, enabled
+            RETURNING guid, enabled, export_allowed
             SQL, ['id' => $connection->id, 'organizations' => json_encode($snapshot->organizations, \JSON_THROW_ON_ERROR)]);
         // Организация привязывается только к компании своего подключения; имя чужих компаний не раскрывается.
         $name = null;
@@ -94,7 +94,7 @@ final readonly class HandshakeAction
         return array_map(static function (array $row) use ($name): array {
             $mapped = $row['enabled'] && null !== $name;
 
-            return ['guid' => (string) $row['guid'], 'mapped' => $mapped, 'company_name' => $mapped ? $name : null];
+            return ['guid' => (string) $row['guid'], 'mapped' => $mapped, 'company_name' => $mapped ? $name : null, 'export_allowed' => (bool) $row['export_allowed']];
         }, $rows);
     }
 }

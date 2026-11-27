@@ -62,11 +62,12 @@
                     "type": "array",
                     "items": {
                         "type": "object",
-                        "required": ["guid", "mapped", "company_name"],
+                        "required": ["guid", "mapped", "company_name", "export_allowed"],
                         "properties": {
                             "guid": {"$ref": "#/$defs/uuid"},
                             "mapped": {"type": "boolean"},
-                            "company_name": {"$ref": "#/$defs/string_or_null"}
+                            "company_name": {"$ref": "#/$defs/string_or_null"},
+                            "export_allowed": {"type": "boolean", "description": "Владелец разрешил загружать счета организации; выгружать только такие"}
                         }
                     }
                 },
@@ -84,7 +85,7 @@
         "package_part": {
             "description": "Тело POST /api/onec/v1/packages — одна часть выгрузки. Оболочка (всё, кроме part, warnings, documents) одинакова во всех частях одного package_id.",
             "type": "object",
-            "required": ["package_id", "base_id", "kind", "processor_version", "period_from", "period_to", "include_open_outside_period", "snapshot_at", "part", "parts_total", "documents"],
+            "required": ["package_id", "base_id", "kind", "processor_version", "period_from", "period_to", "include_open_outside_period", "snapshot_at", "organization_guids", "part", "parts_total", "documents"],
             "properties": {
                 "package_id": {"$ref": "#/$defs/uuid"},
                 "base_id": {"$ref": "#/$defs/uuid"},
@@ -95,6 +96,7 @@
                 "include_open_outside_period": {"type": "boolean"},
                 "snapshot_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(Z|[+-]([01]\\d|2[0-3]):[0-5]\\d)$", "description": "Время начала чтения в 1С, RFC 3339 со смещением, до секунды. Одно на все части выгрузки, при повторе не меняется"},
                 "open_outside_period_months": {"type": "integer", "minimum": 1, "description": "Глубина, с которой обработка отобрала открытые счета вне периода (из рукопожатия). Без поля сервер не закрывает счета вне периода по отсутствию"},
+                "organization_guids": {"type": "array", "minItems": 1, "maxItems": 1000, "uniqueItems": true, "items": {"$ref": "#/$defs/uuid"}, "description": "Организации, по которым выгрузка полная; у каждой export_allowed=true. Отмена по отсутствию и coverage — только в их пределах"},
                 "part": {"type": "integer", "minimum": 1, "maximum": 10000},
                 "parts_total": {"type": "integer", "minimum": 1, "maximum": 10000},
                 "warnings": {"type": "array", "items": {"type": "string"}},
