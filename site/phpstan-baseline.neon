@@ -3199,30 +3199,6 @@ parameters:
 			path: src/Marketplace/Ozon/Application/Action/ProcessOzonRealizationAction.php
 
 		-
-			message: '#^Cannot call method getId\(\) on App\\Marketplace\\Entity\\MarketplaceListing\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: src/Marketplace/Ozon/Application/Action/ProcessOzonReturnsAction.php
-
-		-
-			message: '#^Parameter \#2 \$company of class App\\Marketplace\\Entity\\MarketplaceReturn constructor expects App\\Company\\Entity\\Company, App\\Company\\Entity\\Company\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Marketplace/Ozon/Application/Action/ProcessOzonReturnsAction.php
-
-		-
-			message: '#^Cannot call method getId\(\) on App\\Marketplace\\Entity\\MarketplaceListing\|null\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: src/Marketplace/Ozon/Application/Action/ProcessOzonSalesAction.php
-
-		-
-			message: '#^Parameter \#2 \$company of class App\\Marketplace\\Entity\\MarketplaceSale constructor expects App\\Company\\Entity\\Company, App\\Company\\Entity\\Company\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Marketplace/Ozon/Application/Action/ProcessOzonSalesAction.php
-
-		-
 			message: '#^Method App\\Marketplace\\Wildberries\\Application\\Action\\ProcessWbCostsAction\:\:__construct\(\) has parameter \$costCalculators with no value type specified in iterable type iterable\.$#'
 			identifier: missingType.iterableValue
 			count: 1

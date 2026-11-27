@@ -26,7 +26,7 @@ final class ProcessRawDocumentAction implements ProcessRawDocumentActionInterfac
         }
 
         $marketplace = MarketplaceType::from($marketplaceValue);
-        $processor = $this->registry->get($marketplaceValue, $marketplace, $cmd->kind);
+        $processor = $this->registry->getForDocument($marketplaceValue, $marketplace, $cmd->kind);
 
         return $processor->process($cmd->companyId, $cmd->rawDocId);
     }

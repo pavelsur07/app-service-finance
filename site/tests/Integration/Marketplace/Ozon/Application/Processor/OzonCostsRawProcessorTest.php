@@ -11,7 +11,11 @@ use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
+use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Facade\MarketplaceSyncFacade;
+use App\Marketplace\Message\ProcessRawDocumentStepMessage;
+use App\Marketplace\MessageHandler\ProcessRawDocumentStepMessageHandler;
 use App\Marketplace\Ozon\Application\Processor\OzonCostsRawProcessor;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -155,6 +159,40 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
         ]], $rawDocId);
 
         self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_costs WHERE raw_document_id=:raw', ['raw' => $rawDocId]));
+    }
+
+    public function testManualAndMessengerProcessingReadOrderCommissionsFromTheWholeDocument(): void
+    {
+        $company = $this->buildCompanyWithOwnerIndex(306);
+        $this->persistCompanyWithUser($company);
+        $companyId = $company->getId();
+        self::assertNotNull($companyId);
+        $day = new \DateTimeImmutable('2026-03-12');
+        $doc = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)
+            ->withMarketplace(MarketplaceType::OZON)->withPeriod($day, $day)
+            ->withApiEndpoint(MarketplaceRawFormat::OZON_TRANSACTION_LIST_V3->value)->build();
+        $doc->setRawData(['result' => ['operations' => $this->buildOrderOperations([
+            ['id' => 'A', 'commission' => -100.0],
+        ])]]);
+        $this->em->persist($doc);
+        $this->em->flush();
+
+        $amounts = fn (): array => $this->connection->fetchFirstColumn(
+            'SELECT amount FROM marketplace_costs WHERE company_id = :company AND raw_document_id = :doc',
+            ['company' => $companyId, 'doc' => $doc->getId()],
+        );
+
+        self::getContainer()->get(MarketplaceSyncFacade::class)->processCostsFromRaw($companyId, $doc->getId());
+        self::assertSame(['100.00'], $amounts());
+
+        $doc->setRawData(['result' => ['operations' => $this->buildOrderOperations([
+            ['id' => 'A', 'commission' => -150.0],
+        ])]]);
+        $this->em->flush();
+        self::getContainer()->get(ProcessRawDocumentStepMessageHandler::class)(
+            new ProcessRawDocumentStepMessage($doc->getId(), 'costs', $companyId),
+        );
+        self::assertSame(['150.00'], $amounts());
     }
 
     public function testCostsReprocessSameRawDocIsIdempotent(): void

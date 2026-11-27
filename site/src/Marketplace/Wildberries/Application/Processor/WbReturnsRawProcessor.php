@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Wildberries\Application\Processor;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
+use App\Marketplace\Application\Processor\MarketplaceRawDocumentProcessorInterface;
 use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
 use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Entity\MarketplaceReturn;
@@ -22,7 +22,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
-final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
+final class WbReturnsRawProcessor implements MarketplaceRawDocumentProcessorInterface
 {
     public function __construct(
         private readonly ProcessWbReturnsAction $action,

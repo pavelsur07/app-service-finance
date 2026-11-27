@@ -124,6 +124,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
         // commissions, delivery charges, and logistics services that are costs.
         // process() reads ALL operations from the raw document and handles them correctly.
         if ('costs' === $command->kind) {
+            $processor = $this->processorRegistry->getForDocument(StagingRecordType::COST, $marketplace, $command->kind, $format);
             $linkedRows = $command->forceReprocess && MarketplaceType::WILDBERRIES === $marketplace
                 ? $this->costRepository->countDocumentLinkedByRawDocument($document->getCompany(), $marketplace, $command->rawDocId)
                 : 0;
@@ -144,7 +145,6 @@ final readonly class ProcessMarketplaceRawDocumentAction
                 );
             }
 
-            $processor = $this->processorRegistry->get(StagingRecordType::COST, $marketplace, $command->kind, $format);
             // Процессор затрат сам перечитывает документ, нормализует, сопоставляет и пишет:
             // processor_total — всё вместе, mapping/posting замеряются внутри отдельно.
             $processStartedAt = $this->performance->start();

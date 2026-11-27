@@ -12,7 +12,6 @@ use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
-use App\Marketplace\Ozon\Application\Action\ProcessOzonReturnsAction;
 use App\Marketplace\Ozon\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
@@ -31,7 +30,6 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
     private ?string $cleanedUpRawDocId = null;
 
     public function __construct(
-        private readonly ProcessOzonReturnsAction $action,
         private readonly EntityManagerInterface $em,
         private readonly Connection $connection,
         private readonly MarketplaceReturnRepository $returnRepository,
@@ -59,32 +57,6 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
         }
 
         return $type === MarketplaceType::OZON->value && 'returns' === $kind;
-    }
-
-    /**
-     * @deprecated Use processBatch() instead. This method delegates to legacy ProcessOzonReturnsAction which lacks OperationItemReturn → costs classification. No active callers in production.
-     */
-    public function process(string $companyId, string $rawDocId): int
-    {
-        $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
-        if (!$rawDoc instanceof MarketplaceRawDocument) {
-            throw new \RuntimeException('Raw document not found: '.$rawDocId);
-        }
-
-        $this->connection->beginTransaction();
-
-        try {
-            $this->cleanupLegacyReturns($companyId, $rawDocId);
-
-            $result = ($this->action)($companyId, $rawDocId);
-
-            $this->connection->commit();
-
-            return $result;
-        } catch (\Throwable $e) {
-            $this->connection->rollBack();
-            throw $e;
-        }
     }
 
     /**

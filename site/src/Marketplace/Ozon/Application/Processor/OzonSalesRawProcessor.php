@@ -12,7 +12,6 @@ use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
-use App\Marketplace\Ozon\Application\Action\ProcessOzonSalesAction;
 use App\Marketplace\Ozon\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\DBAL\Connection;
@@ -44,7 +43,6 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
     private array $perRunBlockedBaseKeys = [];
 
     public function __construct(
-        private readonly ProcessOzonSalesAction $action,
         private readonly EntityManagerInterface $em,
         private readonly Connection $connection,
         private readonly MarketplaceSaleRepository $saleRepository,
@@ -71,32 +69,6 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
         }
 
         return $type === MarketplaceType::OZON->value && 'sales' === $kind;
-    }
-
-    /**
-     * @deprecated Use processBatch() instead. This method delegates to legacy ProcessOzonSalesAction which lacks storno classification and version suffix logic. No active callers in production.
-     */
-    public function process(string $companyId, string $rawDocId): int
-    {
-        $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
-        if (!$rawDoc instanceof MarketplaceRawDocument) {
-            throw new \RuntimeException('Raw document not found: '.$rawDocId);
-        }
-
-        $this->connection->beginTransaction();
-
-        try {
-            $this->cleanupLegacySales($companyId, $rawDocId);
-
-            $result = ($this->action)($companyId, $rawDocId);
-
-            $this->connection->commit();
-
-            return $result;
-        } catch (\Throwable $e) {
-            $this->connection->rollBack();
-            throw $e;
-        }
     }
 
     public function resetPerRunState(): void
@@ -303,7 +275,7 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
      *   reprocess запрещён, если период raw-документа пересекается с закрытым диапазоном.
      * - `price_per_unit > 0` в легаси-DELETE — отсекает storno-записи
      *   (negative accruals_for_sale, суффикс `_storno`, price_per_unit < 0),
-     *   которых у старого потока `ProcessOzonSalesAction` не было.
+     *   которых у исторических продаж не было.
      */
     private function cleanupLegacySales(string $companyId, string $rawDocId): void
     {

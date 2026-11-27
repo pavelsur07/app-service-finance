@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Ozon\Application\Processor;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
+use App\Marketplace\Application\Processor\MarketplaceRawDocumentProcessorInterface;
 use App\Marketplace\Application\Service\ByDayRowReplacement;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Entity\MarketplaceCost;
@@ -40,7 +40,7 @@ use Ramsey\Uuid\Uuid;
  * Комиссия за продажу — не услуга со справочным `type_id`, а именованное поле,
  * поэтому её код берётся тот же, что в легаси-пути.
  */
-final class OzonAccrualCostsRawProcessor implements MarketplaceRawProcessorInterface
+final class OzonAccrualCostsRawProcessor implements MarketplaceRawDocumentProcessorInterface
 {
     private const MONEY_SCALE = 2;
 

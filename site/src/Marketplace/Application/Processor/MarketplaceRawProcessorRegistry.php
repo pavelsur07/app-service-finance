@@ -35,4 +35,14 @@ final readonly class MarketplaceRawProcessorRegistry implements MarketplaceRawPr
         $formatName = null !== $format ? $format->value : 'unknown';
         throw new \RuntimeException(sprintf('Processor not found for type "%s", marketplace "%s", kind "%s", format "%s"', $typeName, $marketplace->value, $kind, $formatName));
     }
+
+    public function getForDocument(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = '', ?MarketplaceRawFormat $format = null): MarketplaceRawDocumentProcessorInterface
+    {
+        $processor = $this->get($type, $marketplace, $kind, $format);
+        if (!$processor instanceof MarketplaceRawDocumentProcessorInterface) {
+            throw new \LogicException(sprintf('Processor %s only supports batch processing.', $processor::class));
+        }
+
+        return $processor;
+    }
 }

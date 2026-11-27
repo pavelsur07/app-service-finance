@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Ozon\Application\Processor;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
+use App\Marketplace\Application\Processor\MarketplaceRawDocumentProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
 use App\Marketplace\Application\Service\MappingErrorLogger;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
@@ -35,7 +35,7 @@ use Ramsey\Uuid\Uuid;
  * - Нулевые маркеры (price=0) пропускаются
  * - Multi-SKU эквайринг делится поровну по items
  */
-final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
+final class OzonCostsRawProcessor implements MarketplaceRawDocumentProcessorInterface
 {
     /**
      * Последний rawDocId, для которого уже выполнена очистка legacy/stale-записей
