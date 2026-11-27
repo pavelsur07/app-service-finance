@@ -29,6 +29,8 @@ final class ImportListingTagsAction
     public const int MAX_ROWS = 5000;
     public const string CLEAR_MARKER = '-';
     private const int CHUNK = 500;
+    // Только канонический вид: Uuid::isValid() пропускает urn:uuid: и {…}, которые PostgreSQL не примет.
+    private const string UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
 
     public function __construct(
         private readonly MarketplaceListingTagRepository $tagRepository,
@@ -56,6 +58,11 @@ final class ImportListingTagsAction
         return $this->connection->transactional(function () use ($companyId, $rows, $replace, $applyFingerprint): ListingTagsImportResult {
             $plan = $this->plan($companyId, $rows, $replace);
             if (!hash_equals($applyFingerprint, $plan->fingerprint)) {
+                // Повторное «Применить» (двойной клик, F5): план уже выполнен — это не устаревание.
+                if ($plan->isEmpty()) {
+                    return new ListingTagsImportResult([], [], $plan->errors, $plan->fingerprint, true);
+                }
+
                 throw new ListingTagsImportOutdatedException();
             }
 
@@ -81,7 +88,7 @@ final class ImportListingTagsAction
             if ('' === $listingId && '' === $cell) {
                 continue;
             }
-            if (!Uuid::isValid($listingId)) {
+            if (1 !== preg_match(self::UUID_PATTERN, $listingId)) {
                 $errors[] = ['row' => $row->rowNumber, 'message' => 'Не распознан listing_id.'];
                 continue;
             }
@@ -104,6 +111,10 @@ final class ImportListingTagsAction
                 $name = trim($name);
                 if ('' === $name) {
                     continue;
+                }
+                if (self::CLEAR_MARKER === $name) {
+                    $errors[] = ['row' => $row->rowNumber, 'message' => '«-» снимает все теги и пишется в ячейке один, без других тегов.'];
+                    continue 2;
                 }
                 if (mb_strlen($name) > MarketplaceListingTag::NAME_MAX_LENGTH) {
                     $errors[] = ['row' => $row->rowNumber, 'message' => sprintf('Тег длиннее %d символов: «%s…».', MarketplaceListingTag::NAME_MAX_LENGTH, mb_substr($name, 0, 20))];
@@ -179,13 +190,16 @@ final class ImportListingTagsAction
             $tagIds[MarketplaceListingTag::slugify($tag->name)] = $tag->id;
         }
 
+        // Тег удалили или переименовали между планом и записью — план устарел, а не 500.
+        $tagId = static fn (string $name): string => $tagIds[MarketplaceListingTag::slugify($name)] ?? throw new ListingTagsImportOutdatedException();
+
         $toAdd = $toRemove = [];
         foreach ($plan->changes as $change) {
             foreach ($change['add'] as $name) {
-                $toAdd[$tagIds[MarketplaceListingTag::slugify($name)]][] = $change['listingId'];
+                $toAdd[$tagId($name)][] = $change['listingId'];
             }
             foreach ($change['remove'] as $name) {
-                $toRemove[$tagIds[MarketplaceListingTag::slugify($name)]][] = $change['listingId'];
+                $toRemove[$tagId($name)][] = $change['listingId'];
             }
         }
 

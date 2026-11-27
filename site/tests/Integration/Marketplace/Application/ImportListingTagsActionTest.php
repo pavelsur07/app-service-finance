@@ -105,10 +105,12 @@ final class ImportListingTagsActionTest extends IntegrationTestCase
             new ListingTagsFileRow(5, self::L3, 'Лето'),
             new ListingTagsFileRow(6, strtoupper(self::L3), 'Осень'),
             new ListingTagsFileRow(7, '', ''),
+            new ListingTagsFileRow(8, 'urn:uuid:'.self::L1, 'Лето'),
+            new ListingTagsFileRow(9, self::L1, '-; Лето'),
         ];
         $preview = $this->action()(self::COMPANY_ID, $rows, false);
 
-        self::assertSame([2, 3, 4, 6], array_column($preview->errors, 'row'));
+        self::assertSame([2, 3, 4, 6, 8, 9], array_column($preview->errors, 'row'));
 
         $result = $this->action()(self::COMPANY_ID, $rows, false, $preview->fingerprint);
 
@@ -131,6 +133,19 @@ final class ImportListingTagsActionTest extends IntegrationTestCase
         self::assertSame(0, $applied->added() + $applied->removed());
         self::assertSame($countAfterFirst, $this->assignmentsCount());
         self::assertSame(3, $this->tagsCount());
+    }
+
+    public function testSecondApplyOfSamePlanReportsNoChanges(): void
+    {
+        $rows = [new ListingTagsFileRow(2, self::L2, '2026; Лето')];
+        $preview = $this->action()(self::COMPANY_ID, $rows, false);
+        $this->action()(self::COMPANY_ID, $rows, false, $preview->fingerprint);
+
+        $again = $this->action()(self::COMPANY_ID, $rows, false, $preview->fingerprint);
+
+        self::assertTrue($again->applied);
+        self::assertTrue($again->isEmpty());
+        self::assertSame(['2026', 'Лето'], $this->tagNames(self::L2));
     }
 
     public function testOutdatedFingerprintIsRejectedWithoutWrites(): void

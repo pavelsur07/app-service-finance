@@ -7,7 +7,7 @@ namespace App\Marketplace\Infrastructure\Import;
 use App\Marketplace\Application\DTO\ListingTagsFileRow;
 use App\Marketplace\Application\ImportListingTagsAction;
 use App\Marketplace\Exception\InvalidListingTagsFileException;
-use OpenSpout\Common\Exception\IOException;
+use OpenSpout\Common\Exception\OpenSpoutException;
 use OpenSpout\Reader\XLSX\Reader;
 
 /**
@@ -32,19 +32,17 @@ final readonly class ListingTagsFileReader
         $reader = new Reader();
         try {
             $reader->open($path);
-        } catch (IOException) {
-            throw new InvalidListingTagsFileException('Файл не читается как xlsx.');
-        }
-
-        try {
             foreach ($reader->getSheetIterator() as $sheet) {
                 return $this->readSheet($sheet->getRowIterator());
             }
+        } catch (OpenSpoutException) {
+            // Битый zip, .docx с расширением xlsx, файл без листов.
+            throw new InvalidListingTagsFileException('Файл не читается как xlsx.');
         } finally {
             $reader->close();
         }
 
-        throw new InvalidListingTagsFileException('В файле нет листов.');
+        throw new InvalidListingTagsFileException('Файл не читается как xlsx.');
     }
 
     /**
