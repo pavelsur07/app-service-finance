@@ -6,9 +6,9 @@ namespace App\OneC\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
 
+/** Организация относится к компании своего подключения; enabled — привязана к обмену. */
 #[ORM\Entity]
 #[ORM\Table(name: 'onec_organization')]
-#[ORM\Index(name: 'idx_onec_organization_company', columns: ['company_id'])]
 class OneCOrganization
 {
     #[ORM\Id]
@@ -28,9 +28,6 @@ class OneCOrganization
 
     #[ORM\Column(length: 9, nullable: true)]
     public ?string $kpp = null;
-
-    #[ORM\Column(type: 'guid', nullable: true)]
-    public ?string $companyId = null;
 
     #[ORM\Column]
     public bool $enabled = false;

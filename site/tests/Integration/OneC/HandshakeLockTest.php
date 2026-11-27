@@ -6,6 +6,7 @@ namespace App\Tests\Integration\OneC;
 
 use App\OneC\Application\HandshakeAction;
 use App\OneC\Entity\OneCConnection;
+use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Doctrine\DBAL\DriverManager;
@@ -23,9 +24,12 @@ final class HandshakeLockTest extends IntegrationTestCase
         $ownerId = Uuid::uuid7()->toString();
         $token = bin2hex(random_bytes(32));
         $owner = UserBuilder::aUser()->withId($ownerId)->withEmail($id.'@example.test')->build();
-        $connection = new OneCConnection($id, $ownerId, 'Lock test', hash('sha256', $token));
+        $companyId = Uuid::uuid7()->toString();
+        $company = CompanyBuilder::aCompany()->withId($companyId)->withOwner($owner)->build();
+        $connection = new OneCConnection($id, $companyId, $ownerId, 'Lock test', hash('sha256', $token));
         $connection->handshake(Uuid::uuid4()->toString(), [], true, new \DateTimeImmutable());
         $em->persist($owner);
+        $em->persist($company);
         $em->persist($connection);
         $em->flush();
 
@@ -45,6 +49,7 @@ final class HandshakeLockTest extends IntegrationTestCase
             if ($writer->isTransactionActive()) {
                 $writer->rollBack();
             }
+            $writer->executeStatement('DELETE FROM companies WHERE id = ?', [$companyId]);
             $writer->executeStatement('DELETE FROM "user" WHERE id = ?', [$ownerId]);
             $writer->close();
         }

@@ -82,17 +82,19 @@ final readonly class HandshakeAction
                 AS org(guid uuid, name text, inn text, kpp text)
             ON CONFLICT (connection_id, guid) DO UPDATE SET
                 name = EXCLUDED.name, inn = EXCLUDED.inn, kpp = EXCLUDED.kpp, present = TRUE
-            RETURNING guid, company_id
+            RETURNING guid, enabled
             SQL, ['id' => $connection->id, 'organizations' => json_encode($snapshot->organizations, \JSON_THROW_ON_ERROR)]);
-        $names = [];
-        if ([] !== array_filter(array_column($rows, 'company_id'))) {
-            $names = $this->companies->activeOwnedCompanyNames($connection->ownerId);
+        // Организация привязывается только к компании своего подключения; имя чужих компаний не раскрывается.
+        $name = null;
+        if (\in_array(true, array_column($rows, 'enabled'), true)) {
+            $company = $this->companies->findById($connection->companyId);
+            $name = null === $company || $company->isDeletionRequested() ? null : (string) $company->getName();
         }
 
-        return array_map(static function (array $row) use ($names): array {
-            $name = $names[$row['company_id']] ?? null;
+        return array_map(static function (array $row) use ($name): array {
+            $mapped = $row['enabled'] && null !== $name;
 
-            return ['guid' => (string) $row['guid'], 'mapped' => null !== $name, 'company_name' => $name];
+            return ['guid' => (string) $row['guid'], 'mapped' => $mapped, 'company_name' => $mapped ? $name : null];
         }, $rows);
     }
 }

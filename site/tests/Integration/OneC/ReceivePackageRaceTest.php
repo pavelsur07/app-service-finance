@@ -7,6 +7,7 @@ namespace App\Tests\Integration\OneC;
 use App\OneC\Application\ReceivePackageAction;
 use App\OneC\Entity\OneCConnection;
 use App\OneC\Exception\OneCApiException;
+use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\PostgresResetTestCase;
 use Doctrine\DBAL\Connection;
@@ -36,9 +37,12 @@ final class ReceivePackageRaceTest extends PostgresResetTestCase
         $this->connectionId = Uuid::uuid7()->toString();
         $this->token = bin2hex(random_bytes(32));
         $this->baseId = Uuid::uuid4()->toString();
-        $connection = new OneCConnection($this->connectionId, $ownerId, 'Race', hash('sha256', $this->token));
+        $companyId = Uuid::uuid7()->toString();
+        $owner = UserBuilder::aUser()->withId($ownerId)->withEmail($ownerId.'@example.test')->build();
+        $connection = new OneCConnection($this->connectionId, $companyId, $ownerId, 'Race', hash('sha256', $this->token));
         $connection->handshake($this->baseId, ['config_name' => 'БухгалтерияПредприятия', 'config_version' => '3.0.1.1'], true, new \DateTimeImmutable());
-        $em->persist(UserBuilder::aUser()->withId($ownerId)->withEmail($ownerId.'@example.test')->build());
+        $em->persist($owner);
+        $em->persist(CompanyBuilder::aCompany()->withId($companyId)->withOwner($owner)->build());
         $em->persist($connection);
         $em->flush();
     }

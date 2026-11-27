@@ -54,7 +54,7 @@
                         <tr>
                             <td>{{ organization.name }}{% if not organization.present %} <span class="badge bg-secondary-lt">нет в 1С</span>{% endif %}</td>
                             <td>{{ organization.inn ?? '—' }} / {{ organization.kpp ?? '—' }}</td>
-                            <td class="text-secondary">{{ organization.companyId ? 'привязана' : 'не привязана' }}</td>
+                            <td class="text-secondary">{{ organization.enabled ? 'привязана' : 'не привязана' }}</td>
                         </tr>
                     {% endfor %}
                     </tbody>

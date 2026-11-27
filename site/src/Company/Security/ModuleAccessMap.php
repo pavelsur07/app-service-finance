@@ -37,11 +37,6 @@ final class ModuleAccessMap
      * @var array<string, Module>
      */
     private const EXACT = [
-        \App\OneC\Controller\CreateConnectionController::class => Module::ADMIN,
-        \App\OneC\Controller\ConnectionsController::class => Module::ADMIN,
-        \App\OneC\Controller\ConnectionCardController::class => Module::ADMIN,
-        \App\OneC\Controller\ReissueTokenController::class => Module::ADMIN,
-        \App\OneC\Controller\DisableConnectionController::class => Module::ADMIN,
         // Контрагенты, ЦФО и направления проектов живут в App\Company, но относятся к финансам.
         CounterpartyController::class => Module::FINANCE,
         ApplyCounterpartyDisplayNameController::class => Module::FINANCE,
@@ -78,6 +73,7 @@ final class ModuleAccessMap
         'App\\Inventory\\' => Module::MARKETPLACE,
         'App\\Ingestion\\' => Module::MARKETPLACE,
         'App\\MoySklad\\' => Module::MARKETPLACE,
+        'App\\OneC\\Controller\\' => Module::FINANCE, // счета на оплату из 1С; API обработки — PublicAccess по токену
         'App\\Deals\\' => Module::DEALS,
         'App\\Catalog\\' => Module::CATALOG,
         'App\\Company\\Controller\\ProjectDirection\\' => Module::FINANCE,
@@ -110,7 +106,6 @@ final class ModuleAccessMap
         // из двух. Exemption снимает только автоматический гейт: сам контроллер требует
         // finance.read ИЛИ deals.read самостоятельно. Tenant-safe — компания из сессии.
         CounterpartySearchController::class,
-        \App\OneC\Controller\DownloadPackagePartController::class, // сырьё подключения пользователя: владельца или ROLE_ADMIN сверяет запрос, компания ни при чём
     ];
 
     /**
@@ -127,6 +122,7 @@ final class ModuleAccessMap
         'App\\Marketplace\\Controller\\Internal\\',
 
         'App\\Admin\\',                          // админка под ROLE_ADMIN
+        'App\\OneC\\Controller\\Admin\\',         // /admin/onec/*, ROLE_ADMIN, сырьё любой компании
         'App\\Analytics\\',                      // общий дашборд/health; Stage 5 разделит виджеты
         'App\\Notification\\',                   // общие уведомления дашборда, не привязаны к модулю
         'App\\Telegram\\Controller\\Admin\\',    // /admin/*, гейт ROLE_ADMIN

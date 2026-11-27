@@ -11,7 +11,8 @@ final readonly class OneCSchemaExtension implements SchemaExtension
 {
     public function extend(Schema $schema): void
     {
-        $schema->getTable('onec_connection')->addForeignKeyConstraint('user', ['owner_id'], ['id'], ['onDelete' => 'CASCADE'], 'onec_connection_owner_id_fkey');
-        $schema->getTable('onec_organization')->addForeignKeyConstraint('companies', ['company_id'], ['id'], ['onDelete' => 'SET NULL'], 'onec_organization_company_id_fkey');
+        $connection = $schema->getTable('onec_connection');
+        $connection->addForeignKeyConstraint('companies', ['company_id'], ['id'], ['onDelete' => 'CASCADE'], 'onec_connection_company_id_fkey');
+        $connection->addForeignKeyConstraint('user', ['created_by_user_id'], ['id'], ['onDelete' => 'SET NULL'], 'onec_connection_created_by_user_id_fkey');
     }
 }

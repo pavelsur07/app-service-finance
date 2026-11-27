@@ -15,13 +15,13 @@ final readonly class CreateConnectionAction
     {
     }
 
-    public function __invoke(string $requestId, string $companyId, string $ownerId, string $name): string
+    public function __invoke(string $requestId, string $companyId, string $actorUserId, string $name): string
     {
         $token = bin2hex(random_bytes(32));
-        $connection = new OneCConnection($requestId, $ownerId, $name, hash('sha256', $token));
-        $this->em->wrapInTransaction(function () use ($companyId, $ownerId, $connection): void {
+        $connection = new OneCConnection($requestId, $companyId, $actorUserId, $name, hash('sha256', $token));
+        $this->em->wrapInTransaction(function () use ($actorUserId, $connection): void {
             $this->em->persist($connection);
-            $this->em->persist(new AuditLog($companyId, OneCConnection::class, $connection->id, AuditLogAction::CREATE, ['name' => [null, $connection->name]], $ownerId));
+            $this->em->persist(new AuditLog($connection->companyId, OneCConnection::class, $connection->id, AuditLogAction::CREATE, ['name' => [null, $connection->name]], $actorUserId));
         });
 
         return $token;

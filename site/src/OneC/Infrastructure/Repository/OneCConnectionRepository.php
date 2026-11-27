@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\OneC\Infrastructure\Query;
+namespace App\OneC\Infrastructure\Repository;
 
 use App\OneC\Application\DTO\PackagePart;
 use App\OneC\Application\DTO\PackageSummary;
@@ -14,9 +14,9 @@ use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
 /**
- * Подключение принадлежит пользователю: каждый запрос сужен владельцем.
+ * Подключение принадлежит компании: каждый запрос сужен компанией.
  */
-final readonly class ConnectionQuery
+final readonly class OneCConnectionRepository
 {
     private const MAX_PACKAGES = 20;
     private const MAX_PARTS_SHOWN = 100;
@@ -28,20 +28,20 @@ final readonly class ConnectionQuery
     }
 
     /** @return list<OneCConnection> */
-    public function listOwned(string $ownerId): array
+    public function listForCompany(string $companyId): array
     {
-        return $this->em->getRepository(OneCConnection::class)->findBy(['ownerId' => $ownerId], ['name' => 'ASC']);
+        return $this->em->getRepository(OneCConnection::class)->findBy(['companyId' => $companyId], ['name' => 'ASC']);
     }
 
-    public function getOwned(string $ownerId, string $connectionId): OneCConnection
+    public function getForCompany(string $connectionId, string $companyId): OneCConnection
     {
-        return $this->owned($ownerId, $connectionId, LockMode::NONE);
+        return $this->forCompany($connectionId, $companyId, LockMode::NONE);
     }
 
     /** Для смены токена и статуса: внутри транзакции вызывающего. */
-    public function lockOwned(string $ownerId, string $connectionId): OneCConnection
+    public function lockForCompany(string $connectionId, string $companyId): OneCConnection
     {
-        return $this->owned($ownerId, $connectionId, LockMode::PESSIMISTIC_WRITE);
+        return $this->forCompany($connectionId, $companyId, LockMode::PESSIMISTIC_WRITE);
     }
 
     /** @return list<OneCOrganization> */
@@ -95,29 +95,45 @@ final readonly class ConnectionQuery
     }
 
     /**
-     * Сырая часть: владельцу подключения или администратору ($ownerId = null).
+     * Сырая часть подключения компании.
      *
      * @return array{path: string, filename: string}|null
      */
-    public function rawPart(string $partId, ?string $ownerId): ?array
+    public function findRawPart(string $partId, string $companyId): ?array
+    {
+        return $this->rawPart($partId, $companyId);
+    }
+
+    /**
+     * @companyScopeExempt админка под ROLE_ADMIN (firewall admin) скачивает сырьё любой компании для разбора обращений
+     *
+     * @return array{path: string, filename: string}|null
+     */
+    public function findRawPartAnyCompany(string $partId): ?array
+    {
+        return $this->rawPart($partId, null);
+    }
+
+    /** @return array{path: string, filename: string}|null */
+    private function rawPart(string $partId, ?string $companyId): ?array
     {
         if (!Uuid::isValid($partId)) {
             return null;
         }
         $row = $this->em->getConnection()->fetchAssociative(
             'SELECT p.storage_path, p.package_id, p.part FROM onec_package p JOIN onec_connection c ON c.id = p.connection_id
-             WHERE p.id = ? AND (CAST(? AS uuid) IS NULL OR c.owner_id = ?)',
-            [$partId, $ownerId, $ownerId],
+             WHERE p.id = ? AND (CAST(? AS uuid) IS NULL OR c.company_id = ?)',
+            [$partId, $companyId, $companyId],
         );
 
         return false === $row ? null : ['path' => $row['storage_path'], 'filename' => \sprintf('onec-%s-%d.json', $row['package_id'], $row['part'])];
     }
 
-    private function owned(string $ownerId, string $connectionId, LockMode $lock): OneCConnection
+    private function forCompany(string $connectionId, string $companyId, LockMode $lock): OneCConnection
     {
         $connection = Uuid::isValid($connectionId)
             ? $this->em->createQueryBuilder()->select('c')->from(OneCConnection::class, 'c')
-                ->where('c.id = :id AND c.ownerId = :owner')->setParameter('id', $connectionId)->setParameter('owner', $ownerId)
+                ->where('c.id = :id AND c.companyId = :company')->setParameter('id', $connectionId)->setParameter('company', $companyId)
                 ->getQuery()->setLockMode($lock)->getOneOrNullResult()
             : null;
         if (!$connection instanceof OneCConnection) {
