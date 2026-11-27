@@ -149,19 +149,19 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'unknown'));
     }
 
-    /** @return iterable<string, array{MarketplaceRawFormat}> */
+    /** @return iterable<string, array{string, MarketplaceRawFormat}> */
     public static function ozonCostFormats(): iterable
     {
-        yield 'v3' => [MarketplaceRawFormat::OZON_TRANSACTION_LIST_V3];
-        yield 'by-day' => [MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY];
+        yield 'v3' => ['ozon::v3/finance/transaction/list', MarketplaceRawFormat::OZON_TRANSACTION_LIST_V3];
+        yield 'by-day' => ['ozon::v1/finance/accrual/by-day', MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY];
     }
 
     #[DataProvider('ozonCostFormats')]
-    public function testOzonCostsProcessTheWholeDocumentWithItsFormat(MarketplaceRawFormat $format): void
+    public function testOzonCostsProcessTheWholeDocumentWithItsFormat(string $endpoint, MarketplaceRawFormat $format): void
     {
         $document = $this->createMock(MarketplaceRawDocument::class);
         $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
-        $document->method('getApiEndpoint')->willReturn($format->value);
+        $document->method('getApiEndpoint')->willReturn($endpoint);
         $company = $this->createMock(Company::class);
         $company->method('getId')->willReturn('company-1');
         $document->method('getCompany')->willReturn($company);

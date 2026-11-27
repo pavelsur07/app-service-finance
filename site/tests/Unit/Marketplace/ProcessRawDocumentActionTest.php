@@ -29,7 +29,7 @@ final class ProcessRawDocumentActionTest extends TestCase
         $registry
             ->expects(self::once())
             ->method('getForDocument')
-            ->with('ozon', MarketplaceType::OZON, 'costs')
+            ->with('ozon', MarketplaceType::OZON, 'costs', null)
             ->willReturn($processor);
 
         $processor

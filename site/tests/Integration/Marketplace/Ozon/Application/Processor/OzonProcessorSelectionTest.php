@@ -20,27 +20,27 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 final class OzonProcessorSelectionTest extends KernelTestCase
 {
-    /** @return iterable<string, array{MarketplaceRawFormat, StagingRecordType, class-string<MarketplaceRawProcessorInterface>}> */
+    /** @return iterable<string, array{MarketplaceRawFormat, StagingRecordType, string, class-string<MarketplaceRawProcessorInterface>}> */
     public static function formats(): iterable
     {
         $v3 = MarketplaceRawFormat::OZON_TRANSACTION_LIST_V3;
         $byDay = MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY;
-        yield 'v3 sales' => [$v3, StagingRecordType::SALE, OzonSalesRawProcessor::class];
-        yield 'v3 returns' => [$v3, StagingRecordType::RETURN, OzonReturnsRawProcessor::class];
-        yield 'v3 costs' => [$v3, StagingRecordType::COST, OzonCostsRawProcessor::class];
-        yield 'by-day sales' => [$byDay, StagingRecordType::SALE, OzonAccrualSalesRawProcessor::class];
-        yield 'by-day returns' => [$byDay, StagingRecordType::RETURN, OzonAccrualReturnsRawProcessor::class];
-        yield 'by-day costs' => [$byDay, StagingRecordType::COST, OzonAccrualCostsRawProcessor::class];
+        yield 'v3 sales' => [$v3, StagingRecordType::SALE, 'sales', OzonSalesRawProcessor::class];
+        yield 'v3 returns' => [$v3, StagingRecordType::RETURN, 'returns', OzonReturnsRawProcessor::class];
+        yield 'v3 costs' => [$v3, StagingRecordType::COST, 'costs', OzonCostsRawProcessor::class];
+        yield 'by-day sales' => [$byDay, StagingRecordType::SALE, 'sales', OzonAccrualSalesRawProcessor::class];
+        yield 'by-day returns' => [$byDay, StagingRecordType::RETURN, 'returns', OzonAccrualReturnsRawProcessor::class];
+        yield 'by-day costs' => [$byDay, StagingRecordType::COST, 'costs', OzonAccrualCostsRawProcessor::class];
     }
 
     /** @param class-string<MarketplaceRawProcessorInterface> $expected */
     #[DataProvider('formats')]
-    public function testRegisteredProcessorMatchesFormat(MarketplaceRawFormat $format, StagingRecordType $type, string $expected): void
+    public function testRegisteredProcessorMatchesFormat(MarketplaceRawFormat $format, StagingRecordType $type, string $kind, string $expected): void
     {
         $registry = self::getContainer()->get(MarketplaceRawProcessorRegistry::class);
         $processor = StagingRecordType::COST === $type
-            ? $registry->getForDocument($type, MarketplaceType::OZON, 'costs', $format)
-            : $registry->get($type, MarketplaceType::OZON, '', $format);
+            ? $registry->getForDocument($type, MarketplaceType::OZON, $kind, $format)
+            : $registry->get($type, MarketplaceType::OZON, $kind, $format);
         self::assertInstanceOf($expected, $processor);
     }
 }
