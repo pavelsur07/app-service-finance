@@ -104,6 +104,7 @@
         {id: 'costPricePerUnit', value: 'costPricePerUnit', group: 'На единицу', short: 'Себест./ед.', label: 'Средняя себестоимость единицы, ₽'},
         {id: 'logisticsPerUnit', value: 'logisticsPerUnit', group: 'На единицу', short: 'Логист./ед.', label: 'Доставка туда и обратно на единицу, ₽'},
         {id: 'cacPerUnit', value: 'cacPerUnit', group: 'На единицу', short: 'CAC/ед.', label: 'Расходы на рекламу на единицу, ₽'},
+        {id: 'averageCheck', value: 'averageCheck', group: 'На единицу', short: 'Ср. чек', label: 'Средний чек на единицу, ' ~ vf_currency_symbol('RUB'), hint: 'Выручка до СПП с учётом возвратов на проданную единицу за вычетом возвратов'},
     ]) %}
     {# колонки группы идут подряд: группа → id её колонок, порядок — порядок columns #}
     {% set groups = {} %}
