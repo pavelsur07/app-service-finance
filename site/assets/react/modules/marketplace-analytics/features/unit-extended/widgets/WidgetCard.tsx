@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatMoney } from '@/react/shared/format/number';
+import { formatWidgetRevenueShare } from './widgetRevenueShare';
 import type { WidgetCardConfig, WidgetsSummary, WidgetType } from './widgets.types';
 
 interface WidgetCardProps {
@@ -42,6 +43,7 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
     onToggle,
 }) => {
     const currentValue = config.getValue(current);
+    const revenueShare = formatWidgetRevenueShare(config, currentValue, current);
     const previousValue = config.getValue(previous);
     const delta = calcDeltaPercent(currentValue, previousValue);
     const note = config.getNote?.(current) ?? null;
@@ -81,7 +83,14 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
                     <div className="subheader">{config.label}</div>
                 </div>
 
-                <div className="h2 mb-1">{formatMoney(currentValue)}</div>
+                <div className="d-flex flex-wrap align-items-baseline gap-2 mb-1">
+                    <div className="h2 mb-0">{formatMoney(currentValue)}</div>
+                    {revenueShare !== null && (
+                        <span className="text-muted small" title="Выручка за вычетом возвратов">
+                            {revenueShare} от нетто-выручки
+                        </span>
+                    )}
+                </div>
                 {allocationNote && <div className="text-muted small mb-1">{allocationNote}</div>}
                 {note && <div className="text-muted small mb-1">{note}</div>}
                 {detailLabel && <div className="text-primary small mb-1">{detailLabel}</div>}
