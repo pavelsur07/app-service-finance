@@ -1,0 +1,9 @@
+[
+    {"code": "ACC_MAIN_BANK", "name": "Расчётный счёт (основной)", "article_path": "Денежные средства / Расчётные счета"},
+    {"code": "ACC_AR_OZON", "name": "Ozon к выплате", "article_path": "Дебиторская задолженность / Маркетплейсы, к выплате"},
+    {"code": "ACC_INV_WAREHOUSE", "name": "Собственный склад", "article_path": "Товарные запасы / Собственный склад"},
+    {"code": "ACC_INV_OZON", "name": "Склады Ozon", "article_path": "Товарные запасы / Склады маркетплейсов"},
+    {"code": "ACC_INV_WB", "name": "Склады Wildberries", "article_path": "Товарные запасы / Склады маркетплейсов"},
+    {"code": "ACC_INV_FF", "name": "Склады фулфилмента", "article_path": "Товарные запасы / Склады ФФ (фулфилмент)"},
+    {"code": "ACC_INV_TRANSIT", "name": "Товар в пути", "article_path": "Товарные запасы / Товар в пути"}
+]

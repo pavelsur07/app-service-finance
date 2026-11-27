@@ -3,7 +3,8 @@
 Модели: `echo` — возвращает {"text": <содержимое блока данных>}; `categorize` —
 детерминированная эвристика для categorize_transactions (локальный e2e и прогон evals
 без сети, не модель); `source-type-draft` — вид самого похожего по словам примера для
-marketplace_source_type_draft; `fail` — всегда повторяемая ошибка; `invalid` — ответ не JSON.
+marketplace_source_type_draft; `store-account` — счёт самого похожего по словам назначенного склада
+для moysklad_store_account_suggest; `fail` — всегда повторяемая ошибка; `invalid` — ответ не JSON.
 """
 
 import json
@@ -29,6 +30,8 @@ class StubAdapter:
                 text = json.dumps({"phrase": _phrase(samples)}, ensure_ascii=False)
             case "source-type-draft":
                 text = json.dumps(_source_type_draft(json.loads(extract_data_block(request.user))), ensure_ascii=False)
+            case "store-account":
+                text = json.dumps(_store_account(json.loads(extract_data_block(request.user))), ensure_ascii=False)
             case "invalid":
                 text = "не JSON"
             case "fail":
@@ -78,6 +81,29 @@ def _source_type_draft(data: dict[str, Any]) -> dict[str, Any]:
         "title": data["name"],
         "reason": "похожих кодов нет",
         "confidence": 0.3,
+    }
+
+
+def _store_account(data: dict[str, Any]) -> dict[str, Any]:
+    """Решение примера с общими словами в названии; без совпадений — «не знаю»."""
+
+    def words(text: str) -> set[str]:
+        return set(re.findall(r"[а-яёa-z0-9]{2,}", text.lower()))
+
+    own = words(data["store"]["name"])
+    best = max(data["examples"], key=lambda e: len(own & words(e["name"])), default=None)
+    if best is not None and own & words(best["name"]):
+        return {
+            "account_code": best["account_code"],
+            "excluded": best["excluded"],
+            "reason": f"как «{best['name']}»",
+            "confidence": 0.9,
+        }
+    return {
+        "account_code": None,
+        "excluded": False,
+        "reason": "по названию не понять, где лежит товар",
+        "confidence": 0.0,
     }
 
 

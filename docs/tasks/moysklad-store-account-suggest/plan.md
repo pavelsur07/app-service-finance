@@ -59,8 +59,8 @@ Symfony: `RequestStoreAccountSuggestionsAction` через `AiTaskFacadeInterfac
 - Payload: склады (external_id, name, path_name, code) только со статусом unknown, список счетов
   актива (code, name, article_path). Без контрагентов, цен и токенов.
 - Ключ повтора: `connectionId + sha256(отсортированные fingerprint складов) + prompt_version`.
-- Триггер — конец синхронизации складов в `SyncStockSnapshotAction` (после commit, best-effort:
-  потеря запроса не страшна, следующий синк пошлёт снова). Не из GET-контроллера.
+- Триггер — `SyncStockSnapshotHandler` после completed-снимка (best-effort: сбой → `error` в лог,
+  следующий синк пошлёт снова). Не из GET-контроллера.
 - Компания без доступа к ИИ (`ai_company_access`) — запроса нет, на странице «нет предложения».
 
 **Хранение (только ИИ):** `moysklad_store_account_suggestions`
@@ -89,7 +89,8 @@ Fingerprint = sha256(name, path_name, code); не совпал с текущим
 ### Stage 2: ИИ-задача (HIGH-LOCAL — миграция, новая задача сервиса)
 Таблица + миграция; задача в `ai-service` + `_contracts/ai-task/v1` (CHANGELOG); request/consumer;
 триггер после синка; evals на эталоне.
-**Выполнено, когда:** evals ≥ 90 % верных среди high, «не знаю» вместо выдуманных кодов, stub-адаптер в тестах.
+**Выполнено, когда:** проверки отвергают выдуманные коды, «не знаю» не уверенно, stub-адаптер в тестах.
+Живой прогон evals (≥ 90 % верных среди high) — только с app-сервера через шлюз, после деплоя.
 
 ### Stage 3: документация и handoff (LOW)
 `ARCHITECTURE.md` (MoySklad: таблица, задача, кто коммитит), README задачи, handoff.

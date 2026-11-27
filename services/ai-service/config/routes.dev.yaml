@@ -16,6 +16,10 @@ tasks:
     mode: single
     models: [stub/source-type-draft]
 
+  moysklad_store_account_suggest:
+    mode: single
+    models: [stub/store-account]
+
   cash_rule_phrase:
     mode: single
     models: [stub/cash-rule-phrase]

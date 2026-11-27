@@ -206,5 +206,22 @@ final readonly class MoySkladSchemaExtension implements SchemaExtension
         $postings->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'connection_id', 'valuation_date', 'balance_account_id')->create());
         $postings->addIndex(['company_id', 'snapshot_id'], 'idx_ms_store_balance_postings_run');
         $postings->addForeignKeyConstraint('moysklad_store_balance_runs', ['company_id', 'snapshot_id'], ['company_id', 'snapshot_id'], ['onDelete' => 'RESTRICT'], 'fk_ms_store_balance_postings_run');
+
+        $suggestions = $schema->createTable('moysklad_store_account_suggestions');
+        foreach (['company_id', 'connection_id', 'store_external_id', 'ai_task_id'] as $column) {
+            $suggestions->addColumn($column, 'guid');
+        }
+        $suggestions->addColumn('store_fingerprint', 'string', ['length' => 64]);
+        $suggestions->addColumn('prompt_version', 'string', ['length' => 64]);
+        $suggestions->addColumn('status', 'string', ['length' => 16]);
+        $suggestions->addColumn('account_code', 'string', ['length' => 64, 'notnull' => false]);
+        $suggestions->addColumn('excluded', 'boolean', ['default' => false]);
+        $suggestions->addColumn('confident', 'boolean', ['default' => false]);
+        $suggestions->addColumn('reason', 'string', ['length' => 500, 'notnull' => false]);
+        $suggestions->addColumn('requested_at', 'datetime_immutable_utc_ms', ['precision' => 3]);
+        $suggestions->addColumn('completed_at', 'datetime_immutable_utc_ms', ['precision' => 3, 'notnull' => false]);
+        $suggestions->addPrimaryKeyConstraint(PrimaryKeyConstraint::editor()->setUnquotedColumnNames('company_id', 'connection_id', 'store_external_id')->create());
+        $suggestions->addUniqueIndex(['company_id', 'ai_task_id'], 'uniq_ms_store_account_suggestions_task');
+        $suggestions->addForeignKeyConstraint('moysklad_stores', ['company_id', 'connection_id', 'store_external_id'], ['company_id', 'connection_id', 'external_id'], ['onDelete' => 'CASCADE'], 'fk_ms_store_account_suggestions_store');
     }
 }

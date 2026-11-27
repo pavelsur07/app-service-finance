@@ -18,3 +18,18 @@ def test_symfony_knows_the_current_categorize_prompt_version() -> None:
 
     assert match is not None
     assert match.group(1) == f"{categorize.TASK_TYPE}/{categorize.PROMPT_VERSION}"
+
+
+STORE_ACTION = SERVICE.parents[1] / "site/src/MoySklad/Application/Action/RequestStoreAccountSuggestionsAction.php"
+
+
+def test_symfony_knows_the_current_store_account_prompt_version() -> None:
+    """По версии Symfony переспрашивает склады после смены промпта."""
+    from ai_service.tasks.moysklad_store_account_suggest import task as store_account
+
+    if not STORE_ACTION.is_file():
+        pytest.skip("site/ не смонтирован (локальный контейнер сервиса)")
+    match = re.search(r"PROMPT_VERSION = '([^']+)'", STORE_ACTION.read_text(encoding="utf-8"))
+
+    assert match is not None
+    assert match.group(1) == f"{store_account.TASK_TYPE}/{store_account.PROMPT_VERSION}"

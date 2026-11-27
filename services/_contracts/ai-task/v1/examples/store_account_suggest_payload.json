@@ -1,0 +1,12 @@
+{
+    "store": {"name": "FBS К2 (РНД)", "path_name": ""},
+    "accounts": [
+        {"code": "ACC_INV_WAREHOUSE", "name": "Собственный склад", "article_path": "Товарные запасы / Собственный склад"},
+        {"code": "ACC_INV_FF", "name": "Склады фулфилмента", "article_path": "Товарные запасы / Склады ФФ (фулфилмент)"},
+        {"code": "ACC_INV_TRANSIT", "name": "Товар в пути", "article_path": "Товарные запасы / Товар в пути"}
+    ],
+    "examples": [
+        {"name": "ФФ К2 (РнД)", "account_code": "ACC_INV_FF", "excluded": false},
+        {"name": "Брак", "account_code": null, "excluded": true}
+    ]
+}

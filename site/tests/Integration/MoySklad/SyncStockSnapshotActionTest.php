@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\MoySklad;
 
+use App\MoySklad\Application\Action\RequestStoreAccountSuggestionsAction;
 use App\MoySklad\Application\Action\SyncStockSnapshotAction;
 use App\MoySklad\Application\StockReportPageParser;
 use App\MoySklad\Application\StockSnapshotRunner;
@@ -457,6 +458,7 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
             $this->action([new MockResponse('', ['http_code' => 429, 'response_headers' => ['X-Lognex-Retry-After: 60000']])]),
             $bus,
             new NullLogger(),
+            $this->storeSuggestions(),
         );
 
         $handler(new SyncStockSnapshotMessage($connection->getCompanyId(), $connection->getId()));
@@ -477,7 +479,7 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
             return new Envelope($message);
         });
-        $handler = new SyncStockSnapshotHandler($this->action([new MockResponse('', ['http_code' => 503])]), $bus, new NullLogger());
+        $handler = new SyncStockSnapshotHandler($this->action([new MockResponse('', ['http_code' => 503])]), $bus, new NullLogger(), $this->storeSuggestions());
 
         $handler(new SyncStockSnapshotMessage($connection->getCompanyId(), $connection->getId(), 2));
 
@@ -490,7 +492,7 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
         $connection = $this->catalog();
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
-        $handler = new SyncStockSnapshotHandler($this->action([new MockResponse($body, ['http_code' => $status])]), $bus, new NullLogger());
+        $handler = new SyncStockSnapshotHandler($this->action([new MockResponse($body, ['http_code' => $status])]), $bus, new NullLogger(), $this->storeSuggestions());
 
         $handler(new SyncStockSnapshotMessage($connection->getCompanyId(), $connection->getId()));
 
@@ -514,7 +516,7 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
 
-        (new SyncStockSnapshotHandler($this->action([]), $bus, new NullLogger()))(
+        (new SyncStockSnapshotHandler($this->action([]), $bus, new NullLogger(), $this->storeSuggestions()))(
             new SyncStockSnapshotMessage($connection->getCompanyId(), $connection->getId()),
         );
 
@@ -534,7 +536,7 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
 
             return true;
         }));
-        $handler = new SyncStockSnapshotHandler($this->action([new MockResponse('private-response', ['http_code' => 429])]), $bus, $logger);
+        $handler = new SyncStockSnapshotHandler($this->action([new MockResponse('private-response', ['http_code' => 429])]), $bus, $logger, $this->storeSuggestions());
 
         $handler(new SyncStockSnapshotMessage($connection->getCompanyId(), $connection->getId(), 3));
     }
@@ -713,5 +715,10 @@ final class SyncStockSnapshotActionTest extends WebTestCaseBase
             'meta' => ['type' => 'stockbystore', 'size' => $size, 'limit' => 1000, 'offset' => $offset],
             'rows' => $rows,
         ], \JSON_THROW_ON_ERROR);
+    }
+
+    private function storeSuggestions(): RequestStoreAccountSuggestionsAction
+    {
+        return self::getContainer()->get(RequestStoreAccountSuggestionsAction::class);
     }
 }

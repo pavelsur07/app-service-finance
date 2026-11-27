@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\MoySklad\Application\DTO;
 
-/** Предложение назначения склада, привязанное к счёту компании: target — id счёта или «excluded». */
+/** Предложение назначения склада, привязанное к счёту компании: target — id счёта или «excluded»; source — rule|ai; confident — входит в «Принять все». */
 final readonly class ResolvedStoreSuggestion
 {
     public function __construct(
@@ -13,6 +13,7 @@ final readonly class ResolvedStoreSuggestion
         public string $reason,
         public ?string $warning,
         public string $source,
+        public bool $confident = true,
     ) {
     }
 }
