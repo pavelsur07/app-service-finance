@@ -1,16 +1,17 @@
 import React from 'react';
 import { formatMoney } from '@/react/shared/format/number';
 import { formatWidgetRevenueShare } from './widgetRevenueShare';
-import type { WidgetCardConfig, WidgetsSummary, WidgetType } from './widgets.types';
+import type { WidgetCardConfig, WidgetsSummary } from './widgets.types';
+import styles from './WidgetCard.module.css';
 
 interface WidgetCardProps {
     config: WidgetCardConfig;
     current: WidgetsSummary;
     previous: WidgetsSummary;
     isExpanded: boolean;
-    isExpandable: boolean;
+    detailsId?: string;
+    detailsButtonRef?: React.Ref<HTMLButtonElement>;
     allocationNote?: string;
-    detailLabel?: string;
     onToggle: (key: string) => void;
 }
 
@@ -25,7 +26,7 @@ function calcDeltaPercent(current: number, previous: number): number | null {
     return ((current - previous) / Math.abs(previous)) * 100;
 }
 
-function getBadgeColor(type: WidgetType, delta: number): 'green' | 'red' | 'secondary' {
+function getBadgeColor(delta: number): 'green' | 'red' | 'secondary' {
     if (delta === 0) {
         return 'secondary';
     }
@@ -37,9 +38,9 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
     current,
     previous,
     isExpanded,
-    isExpandable,
+    detailsId,
+    detailsButtonRef,
     allocationNote,
-    detailLabel,
     onToggle,
 }) => {
     const currentValue = config.getValue(current);
@@ -49,69 +50,62 @@ const WidgetCard: React.FC<WidgetCardProps> = ({
     const delta = calcDeltaPercent(currentValue, previousValue);
     const note = config.getNote?.(current) ?? null;
 
-    const handleClick = () => {
-        if (isExpandable) {
-            onToggle(config.key);
-        }
-    };
-
-    const cardClass = [
-        'card',
-        'h-100',
-        isExpandable ? 'cursor-pointer' : '',
-        isExpanded ? 'border-primary' : '',
-    ]
-        .filter(Boolean)
-        .join(' ');
-
     return (
-        <div
-            className={cardClass}
-            onClick={handleClick}
-            role={isExpandable ? 'button' : undefined}
-            aria-expanded={isExpandable ? isExpanded : undefined}
-            tabIndex={isExpandable ? 0 : undefined}
-            onKeyDown={(e) => {
-                if (isExpandable && (e.key === 'Enter' || e.key === ' ')) {
-                    e.preventDefault();
-                    onToggle(config.key);
-                }
-            }}
-        >
-            <div className="card-body">
-                <div className="d-flex align-items-center mb-2">
-                    <i className={`${config.icon} me-2 text-muted`} />
-                    <div className="subheader">{config.label}</div>
+        <div className={isExpanded ? 'card h-100 border-primary' : 'card h-100'}>
+            {config.type === 'profit' && <div className="card-status-top bg-primary" aria-hidden="true" />}
+            <div className="card-body d-flex flex-column">
+                <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <span className="avatar avatar-sm bg-primary-lt flex-shrink-0" aria-hidden="true">
+                        <i className={config.icon} />
+                    </span>
+                    <h3 className="card-title mb-0">{config.label}</h3>
+                    {detailsId && (
+                        <button
+                            ref={detailsButtonRef}
+                            type="button"
+                            className="btn btn-sm btn-ghost-primary ms-auto"
+                            aria-label={`Детали — ${config.label}`}
+                            aria-expanded={isExpanded}
+                            aria-controls={isExpanded ? detailsId : undefined}
+                            onClick={() => onToggle(config.key)}
+                        >
+                            Детали
+                            <i className={`ti ti-chevron-${isExpanded ? 'up' : 'down'} ms-1`} aria-hidden="true" />
+                        </button>
+                    )}
                 </div>
 
-                <div className="d-flex flex-wrap align-items-baseline gap-2 mb-1">
-                    <div className="h2 mb-0">{formatMoney(currentValue)}</div>
+                <div className={`h1 mb-2 ${styles.amount}`}>{formatMoney(currentValue)}</div>
+                <div className="d-flex">
                     <span
                         className="d-inline-flex align-items-center gap-1 text-muted small"
                         title={isReturns ? 'Выручка до вычета возвратов' : 'Выручка за вычетом возвратов'}
                     >
                         <span className="badge bg-secondary-lt">{revenueShare}</span>
-                        {isReturns ? 'от выручки' : 'от нетто-выручки'}
+                        <span>{isReturns ? 'от выручки' : 'от нетто-выручки'}</span>
                     </span>
                 </div>
-                {allocationNote && <div className="text-muted small mb-1">{allocationNote}</div>}
-                {note && <div className="text-muted small mb-1">{note}</div>}
-                {detailLabel && <div className="text-primary small mb-1">{detailLabel}</div>}
+                {allocationNote && <p className="text-muted small mt-2 mb-0">{allocationNote}</p>}
+                {note && <p className="text-muted small mt-2 mb-0">{note}</p>}
 
-                <div className="d-flex align-items-center">
-                    {delta === null ? (
-                        <span className="text-secondary small">—</span>
-                    ) : (
-                        <span
-                            className={`badge bg-${getBadgeColor(config.type, delta)}-lt`}
-                        >
-                            {delta > 0 ? '+' : ''}
-                            {delta.toFixed(1)}%
-                        </span>
-                    )}
-                    <span className="text-muted small ms-2">
-                        пред: {formatMoney(previousValue)}
-                    </span>
+                <div className="mt-auto pt-3">
+                    <div className="border-top pt-2">
+                        <span className="d-block text-muted small mb-1">Прошлый период</span>
+                        <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <span className={`fw-medium ${styles.amount}`}>{formatMoney(previousValue)}</span>
+                            {delta === null ? (
+                                <span className="text-muted small" title="Сумма прошлого периода равна нулю">
+                                    <span aria-hidden="true">—</span>
+                                    <span className="visually-hidden">Изменение не рассчитано</span>
+                                </span>
+                            ) : (
+                                <span className={`badge bg-${getBadgeColor(delta)}-lt`}>
+                                    {delta > 0 ? '+' : ''}
+                                    {delta.toFixed(1)}%
+                                </span>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
