@@ -8,19 +8,17 @@ export function formatWidgetRevenueShare(
     config: WidgetCardConfig,
     value: number,
     current: WidgetsSummary,
-): string | null {
-    if (config.key === 'returns') {
-        return null;
-    }
-
+): string {
     // Возвраты уже приходят в P&L-знаке.
-    const netRevenue = current.revenue + current.returnsTotal;
-    if (netRevenue === 0) {
+    const revenueBase = config.key === 'returns'
+        ? current.revenue
+        : current.revenue + current.returnsTotal;
+    if (revenueBase === 0) {
         return '—';
     }
 
     // Расход увеличивает долю затрат, компенсация уменьшает её.
     const amount = config.type === 'expense' ? -value : value;
-    const share = percent.format(amount / netRevenue);
+    const share = percent.format(amount / revenueBase);
     return share === negativeZero ? zero : share;
 }

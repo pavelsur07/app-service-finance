@@ -19,18 +19,18 @@ const summary: WidgetsSummary = {
     ],
 };
 
-function shares(current: WidgetsSummary): Record<string, string | null> {
+function shares(current: WidgetsSummary): Record<string, string> {
     return Object.fromEntries(WIDGETS.map((config) => [
         config.key,
         formatWidgetRevenueShare(config, config.getValue(current), current),
     ]));
 }
 
-describe('доли карточек от нетто-выручки', () => {
-    it('использует выручку за вычетом возвратов, учитывая расходный знак и компенсации', () => {
+describe('доли от выручки в карточках', () => {
+    it('считает возвраты от полной выручки, а остальные показатели от нетто-выручки', () => {
         expect(shares(summary)).toEqual({
             revenue: '125\u00a0%',
-            returns: null,
+            returns: '20\u00a0%',
             cost_price: '37,5\u00a0%',
             commission: '6,3\u00a0%',
             logistics: '3,8\u00a0%',
@@ -40,10 +40,10 @@ describe('доли карточек от нетто-выручки', () => {
         });
     });
 
-    it('показывает прочерк при нулевой базе и по-прежнему исключает карточку возвратов', () => {
+    it('показывает долю возвратов при нулевой нетто-выручке', () => {
         expect(shares({ ...summary, revenue: 20_000 })).toEqual({
             revenue: '—',
-            returns: null,
+            returns: '100\u00a0%',
             cost_price: '—',
             commission: '—',
             logistics: '—',
@@ -51,6 +51,14 @@ describe('доли карточек от нетто-выручки', () => {
             other: '—',
             profit: '—',
         });
+    });
+
+    it('показывает прочерк у возвратов при нулевой полной выручке', () => {
+        expect(shares({ ...summary, revenue: 0 }).returns).toBe('—');
+    });
+
+    it('показывает нулевую долю, когда при полной выручке возвратов нет', () => {
+        expect(shares({ ...summary, returnsTotal: 0 }).returns).toBe('0\u00a0%');
     });
 
     it('сохраняет знак убытка и форматирует нулевой расход без минуса', () => {
