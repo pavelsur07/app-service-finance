@@ -8,6 +8,7 @@ use App\MarketplaceEconomics\Application\DTO\SkuEconomicsReport;
 use App\MarketplaceEconomics\Application\DTO\SkuEconomicsRow;
 use App\MarketplaceEconomics\Application\DTO\WeeklyEconomicsSummary;
 use App\MarketplaceEconomics\Domain\SkuMetrics;
+use App\Shared\Domain\AbcClass;
 use PHPUnit\Framework\TestCase;
 
 final class WeeklyEconomicsSummaryTest extends TestCase
@@ -17,7 +18,7 @@ final class WeeklyEconomicsSummaryTest extends TestCase
         $rows = [];
         // md2 текущей недели и прошлой; реклама — для ДРР
         foreach ([['A', 500, 100, 0], ['B', -300, 200, 0], ['C', 100, 100, -30_00], ['D', -50, -50, 0], ['E', 0, 0, 0]] as [$sku, $now, $before, $ads]) {
-            $rows[] = new SkuEconomicsRow($sku, $sku, 'Товар '.$sku, null, self::metrics(100_00, $now * 100, $ads), self::metrics(100_00, $before * 100, 0));
+            $rows[] = new SkuEconomicsRow($sku, $sku, 'Товар '.$sku, null, self::metrics(100_00, $now * 100, $ads), self::metrics(100_00, $before * 100, 0), AbcClass::A, AbcClass::A);
         }
         $total = self::metrics(500_00, 250_00, -30_00);
         $report = new SkuEconomicsReport(new \DateTimeImmutable('2026-11-02'), new \DateTimeImmutable('2026-11-08'), new \DateTimeImmutable('2026-10-26'), new \DateTimeImmutable('2026-11-01'),
@@ -36,7 +37,7 @@ final class WeeklyEconomicsSummaryTest extends TestCase
 
     public function testChannelOfSkuAndChannelTotals(): void
     {
-        $row = new SkuEconomicsRow('L1', '123', 'Платье', null, self::metrics(100_00, 50_00, 0), self::metrics(0, 0, 0), 'wildberries');
+        $row = new SkuEconomicsRow('L1', '123', 'Платье', null, self::metrics(100_00, 50_00, 0), self::metrics(0, 0, 0), AbcClass::A, AbcClass::A, 'wildberries');
         $report = new SkuEconomicsReport(new \DateTimeImmutable('2026-11-02'), new \DateTimeImmutable('2026-11-08'), new \DateTimeImmutable('2026-10-26'), new \DateTimeImmutable('2026-11-01'),
             [$row], new SkuMetrics(), $row->current, new SkuMetrics(), ['c1', 'c2'], 7, 0, ['ozon', 'wildberries']);
         $byChannel = ['ozon' => new SkuMetrics(), 'wildberries' => $row->current];

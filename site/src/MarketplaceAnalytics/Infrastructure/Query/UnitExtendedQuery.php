@@ -14,8 +14,8 @@ use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use App\MarketplaceAnalytics\Application\Service\OzonOrderAdCoverage;
-use App\MarketplaceAnalytics\Domain\Service\AbcClassificationPolicy;
-use App\MarketplaceAnalytics\Enum\AbcClass;
+use App\Shared\Domain\AbcClass;
+use App\Shared\Domain\AbcClassificationPolicy;
 
 final readonly class UnitExtendedQuery
 {
@@ -514,7 +514,7 @@ final readonly class UnitExtendedQuery
 
     /**
      * @param array<string, array<string, mixed>> $buckets
-     * @param array<string, mixed> $row
+     * @param array<string, mixed>                $row
      */
     private function accumulateSummaryBucket(array &$buckets, string $key, ?string $tagId, string $name, array $row): void
     {

@@ -82,6 +82,35 @@ final class SkuEconomicsByCategoryTest extends WebTestCaseBase
         self::assertSame('500,00', $this->totalsRow($crawler, 'Итого по выбранным')['revenue']);
     }
 
+    public function testAbcClassesUseSelectedListingsBeforeSearchAndOnlyAllocatedFullProfit(): void
+    {
+        static::createClient();
+        [, , $ozon, $wb] = $this->seed();
+        $this->line('ozon', $ozon, 'return', 'revenue', -100000, 1);
+        $this->line('wildberries', $wb, 'overhead_share', 'overhead', -170000);
+        $this->line('ozon', null, 'sale', 'revenue', 900000, 1);
+        $builder = static::getContainer()->get(SkuEconomicsReportBuilder::class);
+        $from = new \DateTimeImmutable(self::PERIOD['from']);
+        $to = new \DateTimeImmutable(self::PERIOD['to']);
+
+        $report = $builder->build(self::COMPANY_ID, new SkuEconomicsFilter($from, $to));
+        $classes = [];
+        foreach ($report->rows as $row) {
+            $classes[$row->sku] = [$row->abcRevenue->value, $row->abcProfit?->value];
+        }
+        self::assertSame(['A', 'D'], $classes['WB-1']);
+        self::assertSame(['B', 'A'], $classes['OZ-2']);
+        self::assertSame(['C', 'D'], $classes['OZ-1']);
+
+        $search = $builder->build(self::COMPANY_ID, new SkuEconomicsFilter($from, $to, search: 'OZ-2', allocated: false));
+        self::assertCount(1, $search->rows);
+        self::assertSame('B', $search->rows[0]->abcRevenue->value);
+        self::assertNull($search->rows[0]->abcProfit);
+
+        $category = $builder->build(self::COMPANY_ID, new SkuEconomicsFilter($from, $to, category: 'none'));
+        self::assertSame('A', $category->rows[0]->abcRevenue->value);
+    }
+
     public function testXlsxByCategoryHasCategoryColumnAndSameTotal(): void
     {
         $client = static::createClient();

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\MarketplaceAnalytics\Enum;
+namespace App\Shared\Domain;
 
 /**
  * Класс ABC-анализа листинга. A/B/C — доля во вкладе (80/15/5 по накопленной сумме),

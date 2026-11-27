@@ -18,8 +18,8 @@ use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use App\MarketplaceAnalytics\Application\Service\OzonOrderAdCoverage;
-use App\MarketplaceAnalytics\Domain\Service\AbcClassificationPolicy;
 use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
+use App\Shared\Domain\AbcClassificationPolicy;
 use DG\BypassFinals;
 use PHPUnit\Framework\TestCase;
 
