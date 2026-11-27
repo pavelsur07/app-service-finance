@@ -12,7 +12,8 @@ use App\ServiceGateway\Facade\AiTaskResultConsumerInterface;
 
 /**
  * Ответ `moysklad_store_account_suggest` → строка предложения. accepted — уверенное (входит в «Принять все»),
- * needs_review — показывается «проверьте». rejected/failed — предложения нет. Назначение не пишется никогда.
+ * needs_review — показывается «проверьте». rejected — предложения нет окончательно; failed (сбой моделей,
+ * неизвестная задача при раннем деплое сайта) — склад спросят снова. Назначение не пишется никогда.
  * Код счёта сверяется с компанией при показе и принятии. Идемпотентен: повтор того же task_id пишет то же.
  */
 final readonly class StoreAccountSuggestionConsumer implements AiTaskResultConsumerInterface
@@ -28,6 +29,11 @@ final readonly class StoreAccountSuggestionConsumer implements AiTaskResultConsu
 
     public function consume(AiTaskResult $result): void
     {
+        if (AiResultStatus::FAILED === $result->status) {
+            $this->store->fail($result->companyId, $result->taskId, $result->completedAt);
+
+            return;
+        }
         $output = $result->output;
         $usable = null !== $output && \in_array($result->status, [AiResultStatus::ACCEPTED, AiResultStatus::NEEDS_REVIEW], true);
         $code = $usable && \is_string($output['account_code'] ?? null) ? $output['account_code'] : null;

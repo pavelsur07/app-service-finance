@@ -31,7 +31,7 @@ def build() -> TaskSpec[SuggestInput, SuggestOutput]:
         checks=(account_known, single_decision),
         confidence=suggestion_confidence,
         confidence_threshold=0.8,
-        # Названия складов и счетов — не ПДн, маскирование ломает смысл («ФФ К2 (РнД)»).
-        mask_skip_keys=frozenset({"name", "path_name", "code", "article_path", "account_code", "excluded"}),
+        # Коды счетов — идентификаторы. Названия складов маскируются: ФИО, телефон или ИНН в названии не уходят модели.
+        mask_skip_keys=frozenset({"code", "account_code", "excluded"}),
         max_tokens=512,
     )

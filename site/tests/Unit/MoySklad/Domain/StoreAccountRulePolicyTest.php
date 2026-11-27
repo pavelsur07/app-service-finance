@@ -31,7 +31,9 @@ final class StoreAccountRulePolicyTest extends TestCase
         yield 'основной склад' => ['Основной склад (офис)', 'ACC_INV_WAREHOUSE', false];
         yield 'ozon' => ['Ozon', 'ACC_INV_OZON', false];
         yield 'озон кириллицей' => ['Склад ОЗОН', 'ACC_INV_OZON', false];
-        yield 'fbo' => ['FBO', 'ACC_INV_OZON', false];
+        yield 'fbo со словом WB' => ['WB FBO Коледино', 'ACC_INV_WB', false];
+        yield 'fbo с Wildberries' => ['FBO Wildberries', 'ACC_INV_WB', false];
+        yield 'fbo с Ozon' => ['Ozon FBO Хоругвино', 'ACC_INV_OZON', false];
         yield 'wb' => ['WB Коледино', 'ACC_INV_WB', false];
         yield 'wildberries' => ['Wildberries', 'ACC_INV_WB', false];
     }
@@ -57,6 +59,8 @@ final class StoreAccountRulePolicyTest extends TestCase
         yield 'ФФ внутри слова не считается' => ['ФФормат'];
         yield 'wb внутри слова не считается' => ['Swbox'];
         yield 'пусто' => ['  '];
+        yield 'fbo без площадки' => ['FBO'];
+        yield 'обе площадки' => ['Ozon/WB'];
     }
 
     #[DataProvider('unknown')]

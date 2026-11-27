@@ -58,7 +58,7 @@ final class SaveStoreBalanceController extends AbstractController
             $result = $action($companyId, $connectionId, $actorId);
             $this->addFlash('success', sprintf('Принято предложений: %d.', $result['accepted']));
             if ($result['failed'] > 0) {
-                $this->addFlash('warning', sprintf('Не принято: %d — счёт занят другим подключением или стал корреспондирующим, назначьте вручную.', $result['failed']));
+                $this->addFlash('warning', sprintf('Не принято: %d — назначьте эти склады вручную.', $result['failed']));
             }
         } catch (StoreBalanceException $error) {
             $this->addFlash('danger', $error->getMessage());

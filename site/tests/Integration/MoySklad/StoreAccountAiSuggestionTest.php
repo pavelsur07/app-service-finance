@@ -127,6 +127,45 @@ final class StoreAccountAiSuggestionTest extends IntegrationTestCase
         self::assertSame(2, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM moysklad_store_account_suggestions'));
     }
 
+    public function testFailedAnswerIsAskedAgainWithNewKeyUpToThreeAttempts(): void
+    {
+        $this->request();
+        for ($attempt = 2; $attempt <= 3; ++$attempt) {
+            $this->answer('Газелька', AiResultStatus::FAILED, null);
+            self::assertSame(1, $this->request(), 'Технический сбой — повтор, попытка '.$attempt);
+        }
+        $keys = array_column(array_filter($this->ai->requests, static fn (array $r): bool => 'Газелька' === $r['payload']['store']['name']), 'key');
+        self::assertCount(3, array_unique($keys), 'Новая попытка — новый ключ, иначе сервис вернёт ту же упавшую задачу.');
+        $this->answer('Газелька', AiResultStatus::FAILED, null);
+        self::assertSame(0, $this->request(), 'После трёх попыток — до переименования или нового промпта.');
+    }
+
+    public function testRejectedAnswerIsFinal(): void
+    {
+        $this->request();
+        $this->answer('Газелька', AiResultStatus::REJECTED, null);
+        self::assertSame(0, $this->request());
+    }
+
+    public function testLateRetryDoesNotReopenCompletedAnswer(): void
+    {
+        $this->request();
+        $this->answer('Газелька', AiResultStatus::ACCEPTED, ['account_code' => 'ACC_INV_WAREHOUSE', 'excluded' => false, 'reason' => 'машина', 'confidence' => 0.9]);
+        $store = self::getContainer()->get(StoreAccountSuggestionStore::class);
+        $request = array_values(array_filter($this->ai->requests, static fn (array $r): bool => 'Газелька' === $r['payload']['store']['name']))[0];
+        $row = $store->requests(self::COMPANY, self::CONNECTION)[$this->stores['Газелька']];
+        // прогон прочитал строку как зависшую до ответа и пишет её снова уже после ответа
+        $store->markRequested(self::COMPANY, self::CONNECTION, $this->stores['Газелька'], $row['fingerprint'], $row['promptVersion'], $request['taskId'], 1, new \DateTimeImmutable());
+
+        self::assertArrayHasKey($this->stores['Газелька'], $this->suggestions());
+    }
+
+    public function testExhaustedBudgetRequestsNothing(): void
+    {
+        $this->ai->budgetExceeded = true;
+        self::assertSame(0, $this->request());
+    }
+
     private function request(): int
     {
         $c = self::getContainer();

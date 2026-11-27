@@ -6943,12 +6943,13 @@ marketplace)` ставит запуск, если подключение акт�
   закрывает `app:moysklad:store-balance:requeue`.
 - Порядок блокировок: advisory подключения (оценка) → транзакция Баланса (company → book) на каждый счёт.
 - Предложения счёта складу без назначения (только при финансовом чтении): сначала правила по названию
-  `Domain/StoreAccountRulePolicy` (версия `1`, коды типового справочника `ACC_INV_*`, «не учитывать»; FBS — без правила),
+  `Domain/StoreAccountRulePolicy` (коды типового справочника `ACC_INV_*`, «не учитывать»; FBS — без правила),
   иначе ИИ-задача `moysklad_store_account_suggest` (`ai-task/v1` `store_account_suggest_*`, risk medium).
   `RequestStoreAccountSuggestionsAction` — после completed-снимка из `SyncStockSnapshotHandler` (best-effort, сбой → `error`
   в лог, синхронизация не падает): одна задача — один склад, примеры — назначенные склады компании, ключ —
-  подключение+склад+отпечаток sha256(name, path_name)+`PROMPT_VERSION`; компания без доступа к ИИ — без задач;
-  `requested` дольше часа ставится снова тем же ключом. Строка `moysklad_store_account_suggestions` пишется до
+  подключение+склад+отпечаток sha256(name, path_name)+`PROMPT_VERSION`(+номер попытки); примеры — назначенные склады
+  подключения; компания без доступа к ИИ или с исчерпанным лимитом — без задач; `requested` дольше часа ставится снова
+  тем же ключом, `failed` — новой попыткой (до 3), `rejected` окончательный; upsert не возвращает `completed` в `requested`. Строка `moysklad_store_account_suggestions` пишется до
   постановки (unique `(company_id, ai_task_id)`, FK на склад `CASCADE`); `StoreAccountSuggestionConsumer` пишет ответ
   в транзакции импорта ServiceGateway (`accepted` → `confident`). Ответ на прежнее название не показывается.
   `StoreAccountSuggestions` разрешает код в действующий счёт актива компании; нет счёта — нет предложения.

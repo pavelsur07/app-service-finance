@@ -91,7 +91,7 @@ def _store_account(data: dict[str, Any]) -> dict[str, Any]:
         return set(re.findall(r"[а-яёa-z0-9]{2,}", text.lower()))
 
     own = words(data["store"]["name"])
-    best = max(data["examples"], key=lambda e: len(own & words(e["name"])), default=None)
+    best = max(data.get("examples", []), key=lambda e: len(own & words(e["name"])), default=None)
     if best is not None and own & words(best["name"]):
         return {
             "account_code": best["account_code"],

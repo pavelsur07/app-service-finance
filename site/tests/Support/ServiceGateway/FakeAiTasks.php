@@ -14,6 +14,7 @@ final class FakeAiTasks implements AiTaskFacadeInterface
 {
     public bool $enabled = true;
     public bool $fail = false;
+    public bool $budgetExceeded = false;
     /** @var list<array{taskId: string, companyId: string, taskType: string, payload: array<string, mixed>, key: string}> */
     public array $requests = [];
 
@@ -73,7 +74,7 @@ final class FakeAiTasks implements AiTaskFacadeInterface
 
     public function budgetFor(string $companyId): AiCompanyBudget
     {
-        throw new \LogicException('not used');
+        return new AiCompanyBudget(500.0, $this->budgetExceeded ? 500.0 : 0.0, 5000.0, 0.0, 30);
     }
 
     public function recordRun(string $companyId, string $taskType, int $requested = 0, int $tasks = 0, int $redispatched = 0, int $expired = 0, ?string $skippedReason = null, ?string $error = null): void

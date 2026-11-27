@@ -19,7 +19,7 @@ final class Version20261127150000 extends AbstractMigration
         $this->addSql(<<<'SQL'
             CREATE TABLE moysklad_store_account_suggestions (
                 company_id UUID NOT NULL, connection_id UUID NOT NULL, store_external_id UUID NOT NULL, ai_task_id UUID NOT NULL,
-                store_fingerprint VARCHAR(64) NOT NULL, prompt_version VARCHAR(64) NOT NULL, status VARCHAR(16) NOT NULL,
+                store_fingerprint VARCHAR(64) NOT NULL, prompt_version VARCHAR(64) NOT NULL, status VARCHAR(16) NOT NULL, attempts SMALLINT DEFAULT 1 NOT NULL,
                 account_code VARCHAR(64) DEFAULT NULL, excluded BOOLEAN DEFAULT false NOT NULL, confident BOOLEAN DEFAULT false NOT NULL,
                 reason VARCHAR(500) DEFAULT NULL,
                 requested_at TIMESTAMP(3) WITHOUT TIME ZONE NOT NULL, completed_at TIMESTAMP(3) WITHOUT TIME ZONE DEFAULT NULL,

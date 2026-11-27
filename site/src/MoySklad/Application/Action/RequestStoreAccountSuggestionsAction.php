@@ -16,9 +16,10 @@ use Webmozart\Assert\Assert;
 
 /**
  * ИИ-предложение счёта для складов без назначения, которые не разобрали правила (plan.md §4).
- * Одна задача — один склад; примеры — уже назначенные склады компании. Ключ повтора — склад, его отпечаток и
- * версия промпта: переименование или новый промпт — новый вопрос, зависший дольше часа запрос ставится снова тем же
- * ключом (сервис вернёт ту же задачу). Компания без доступа к ИИ — ничего не ставится, страница живёт на правилах.
+ * Одна задача — один склад; примеры — уже назначенные склады этого подключения. Ключ повтора — склад, его отпечаток,
+ * версия промпта и номер попытки: переименование или новый промпт — новый вопрос; зависший дольше часа запрос ставится
+ * снова тем же ключом (сервис вернёт ту же задачу); технический сбой (`failed`) — новой попыткой, не больше
+ * MAX_ATTEMPTS. Компания без доступа к ИИ или с исчерпанным лимитом — ничего не ставится, страница живёт на правилах.
  * Вызывать вне транзакции: строка пишется до постановки, иначе быстрый ответ не найдёт её.
  */
 final readonly class RequestStoreAccountSuggestionsAction
@@ -26,6 +27,7 @@ final readonly class RequestStoreAccountSuggestionsAction
     public const TASK_TYPE = 'moysklad_store_account_suggest';
     public const PROMPT_VERSION = 'moysklad_store_account_suggest/v1';
     private const STALE_REQUEST = '-1 hour';
+    private const MAX_ATTEMPTS = 3;
 
     public function __construct(
         private StoreBalanceQuery $query,
@@ -46,9 +48,14 @@ final readonly class RequestStoreAccountSuggestionsAction
         if (!$this->ai->isEnabledForCompany($companyId)) {
             return 0;
         }
+        if ($this->ai->budgetFor($companyId)->exceeded()) {
+            $this->logger->warning('MoySklad store account suggestions skipped: monthly AI budget is exhausted.', ['companyId' => $companyId]);
+
+            return 0;
+        }
         $accounts = $codes = [];
         foreach ($this->balance->getPostingAccounts($companyId) as $account) {
-            if ($account->isAsset) {
+            if ($account->isAsset && \count($accounts) < 200) { // предел контракта; примеры — только на переданные счета
                 $accounts[] = ['code' => $account->code, 'name' => $account->name, 'article_path' => $account->articlePath];
                 $codes[$account->id] = $account->code;
             }
@@ -73,17 +80,24 @@ final readonly class RequestStoreAccountSuggestionsAction
             }
             $fingerprint = StoreAccountSuggestions::fingerprint($s['name'], $s['pathName']);
             $previous = $requests[$s['externalId']] ?? null;
-            if (null !== $previous && $previous['fingerprint'] === $fingerprint && self::PROMPT_VERSION === $previous['promptVersion']
-                && ('requested' !== $previous['status'] || new \DateTimeImmutable($previous['requestedAt'], new \DateTimeZone('UTC')) > $stale)) {
-                continue;
+            $attempt = 1;
+            if (null !== $previous && $previous['fingerprint'] === $fingerprint && self::PROMPT_VERSION === $previous['promptVersion']) {
+                $attempt = match ($previous['status']) {
+                    'failed' => $previous['attempts'] < self::MAX_ATTEMPTS ? $previous['attempts'] + 1 : null,
+                    'requested' => new \DateTimeImmutable($previous['requestedAt'], new \DateTimeZone('UTC')) <= $stale ? $previous['attempts'] : null,
+                    default => null, // ответ получен
+                };
+                if (null === $attempt) {
+                    continue;
+                }
             }
-            $key = $connectionId.':'.$s['externalId'].':'.$fingerprint.':'.self::PROMPT_VERSION;
+            $key = $connectionId.':'.$s['externalId'].':'.$fingerprint.':'.self::PROMPT_VERSION.($attempt > 1 ? ':attempt:'.$attempt : '');
             $taskId = $this->ai->taskIdFor($companyId, self::TASK_TYPE, $key);
-            $this->store->markRequested($companyId, $connectionId, $s['externalId'], $fingerprint, self::PROMPT_VERSION, $taskId, $now);
+            $this->store->markRequested($companyId, $connectionId, $s['externalId'], $fingerprint, self::PROMPT_VERSION, $taskId, $attempt, $now);
             try {
                 $accepted = $this->ai->requestTask($companyId, self::TASK_TYPE, [
                     'store' => ['name' => $s['name'], 'path_name' => $s['pathName']],
-                    'accounts' => \array_slice($accounts, 0, 200),
+                    'accounts' => $accounts,
                     'examples' => \array_slice($examples, 0, 100),
                 ], $key);
             } catch (\Throwable $e) {

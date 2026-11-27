@@ -28,8 +28,8 @@ class Example(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1, max_length=255)
-    account_code: str | None = Field(default=None, max_length=64)
-    excluded: bool = False
+    account_code: str | None = Field(min_length=1, max_length=64)
+    excluded: bool
 
 
 class SuggestInput(BaseModel):
@@ -54,7 +54,7 @@ class SuggestOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Код из accounts; null вместе с excluded=false — данных мало, решает человек.
-    account_code: str | None = Field(max_length=64)
+    account_code: str | None = Field(min_length=1, max_length=64)
     excluded: bool
     reason: str = Field(min_length=1, max_length=500)
     confidence: float = Field(ge=0.0, le=1.0)

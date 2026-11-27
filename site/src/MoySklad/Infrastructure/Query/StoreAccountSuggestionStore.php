@@ -16,12 +16,12 @@ final readonly class StoreAccountSuggestionStore
     {
     }
 
-    /** @return array<string, array{fingerprint: string, promptVersion: string, status: string, requestedAt: string}> по external id склада */
+    /** @return array<string, array{fingerprint: string, promptVersion: string, status: string, attempts: int, requestedAt: string}> по external id склада */
     public function requests(string $companyId, string $connectionId): array
     {
         $rows = [];
-        foreach ($this->db->fetchAllAssociative('SELECT store_external_id, store_fingerprint, prompt_version, status, requested_at FROM moysklad_store_account_suggestions WHERE company_id = ? AND connection_id = ?', [$companyId, $connectionId]) as $row) {
-            $rows[(string) $row['store_external_id']] = ['fingerprint' => (string) $row['store_fingerprint'], 'promptVersion' => (string) $row['prompt_version'], 'status' => (string) $row['status'], 'requestedAt' => (string) $row['requested_at']];
+        foreach ($this->db->fetchAllAssociative('SELECT store_external_id, store_fingerprint, prompt_version, status, attempts, requested_at FROM moysklad_store_account_suggestions WHERE company_id = ? AND connection_id = ?', [$companyId, $connectionId]) as $row) {
+            $rows[(string) $row['store_external_id']] = ['fingerprint' => (string) $row['store_fingerprint'], 'promptVersion' => (string) $row['prompt_version'], 'status' => (string) $row['status'], 'attempts' => (int) $row['attempts'], 'requestedAt' => (string) $row['requested_at']];
         }
 
         return $rows;
@@ -39,13 +39,24 @@ final readonly class StoreAccountSuggestionStore
         return $rows;
     }
 
-    public function markRequested(string $companyId, string $connectionId, string $storeExternalId, string $fingerprint, string $promptVersion, string $taskId, \DateTimeImmutable $now): void
+    /**
+     * Ответ на тот же склад и промпт, пришедший после чтения строки прогоном, не возвращается в `requested`:
+     * результат уже подтверждён сервису и повторно не придёт.
+     */
+    public function markRequested(string $companyId, string $connectionId, string $storeExternalId, string $fingerprint, string $promptVersion, string $taskId, int $attempt, \DateTimeImmutable $now): void
     {
-        $this->db->executeStatement("INSERT INTO moysklad_store_account_suggestions (company_id, connection_id, store_external_id, ai_task_id, store_fingerprint, prompt_version, status, requested_at)
-            VALUES (?, ?, ?, ?, ?, ?, 'requested', ?) ON CONFLICT (company_id, connection_id, store_external_id) DO UPDATE SET ai_task_id = EXCLUDED.ai_task_id,
-            store_fingerprint = EXCLUDED.store_fingerprint, prompt_version = EXCLUDED.prompt_version, status = 'requested', account_code = NULL, excluded = false,
-            confident = false, reason = NULL, requested_at = EXCLUDED.requested_at, completed_at = NULL",
-            [$companyId, $connectionId, $storeExternalId, $taskId, $fingerprint, $promptVersion, self::utc($now)]);
+        $this->db->executeStatement("INSERT INTO moysklad_store_account_suggestions AS t (company_id, connection_id, store_external_id, ai_task_id, store_fingerprint, prompt_version, status, attempts, requested_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'requested', ?, ?) ON CONFLICT (company_id, connection_id, store_external_id) DO UPDATE SET ai_task_id = EXCLUDED.ai_task_id,
+            store_fingerprint = EXCLUDED.store_fingerprint, prompt_version = EXCLUDED.prompt_version, status = 'requested', attempts = EXCLUDED.attempts,
+            account_code = NULL, excluded = false, confident = false, reason = NULL, requested_at = EXCLUDED.requested_at, completed_at = NULL
+            WHERE t.status <> 'completed' OR t.store_fingerprint <> EXCLUDED.store_fingerprint OR t.prompt_version <> EXCLUDED.prompt_version",
+            [$companyId, $connectionId, $storeExternalId, $taskId, $fingerprint, $promptVersion, $attempt, self::utc($now)]);
+    }
+
+    /** Технический сбой ИИ: склад спросят снова следующим прогоном с новым ключом (лимит попыток — у вызывающего). */
+    public function fail(string $companyId, string $taskId, \DateTimeImmutable $completedAt): void
+    {
+        $this->db->executeStatement("UPDATE moysklad_store_account_suggestions SET status = 'failed', completed_at = ? WHERE company_id = ? AND ai_task_id = ?", [self::utc($completedAt), $companyId, $taskId]);
     }
 
     public function forget(string $companyId, string $taskId): void
