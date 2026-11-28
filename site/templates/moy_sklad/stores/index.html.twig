@@ -61,6 +61,15 @@
         <a href="{{ path('moysklad_stores', {connectionId: connection.id, filter: 'unassigned'}) }}"{% if unassignedOnly %} class="active" aria-current="page"{% endif %}>Без счёта · {{ counts.active - counts.linked - counts.excluded }}</a>
     </nav>
 
+    {% if canWrite and confidentSuggestions > 0 %}
+        <form method="post" action="{{ path('moysklad_store_accept_suggestions', {connectionId: connection.id}) }}" class="d-flex flex-wrap align-items-center gap-2 mb-3" data-store-accept-suggestions>
+            <input type="hidden" name="_token" value="{{ csrf_token(csrfId) }}">
+            <input type="hidden" name="filter" value="{{ unassignedOnly ? 'unassigned' : '' }}">
+            <button class="btn btn-primary" type="submit">Принять все уверенные · {{ confidentSuggestions }}</button>
+            <span class="text-secondary small">Только склады без назначения. Предложения ИИ с пометкой «проверьте» и склады без предложения — по одному.</span>
+        </form>
+    {% endif %}
+
     <div class="card mb-3">
         <div class="table-responsive">
             <table class="table table-vcenter card-table" data-store-balance-table>
@@ -94,6 +103,25 @@
                                     {{ store.accountId ? 'Назначен' : '—' }}
                                 {% else %}
                                     {{ store.accountId and accountsById[store.accountId] is defined ? accountsById[store.accountId].label : '—' }}
+                                {% endif %}
+                                {% if suggestions[store.externalId] is defined %}
+                                    {% set suggestion = suggestions[store.externalId] %}
+                                    <div class="mt-2 small" data-store-suggestion="{{ suggestion.target }}">
+                                        <span class="badge bg-azure-lt">Предложение · {{ suggestion.source == 'ai' ? 'ИИ' : 'правило' }}</span>
+                                        {% if not suggestion.confident %}<span class="badge bg-warning-lt" data-store-suggestion-unsure>проверьте</span>{% endif %}
+                                        <strong>{{ suggestion.label }}</strong>
+                                        <div class="text-secondary">{{ suggestion.reason }}</div>
+                                        {% if suggestion.warning %}<div class="text-warning" data-store-suggestion-warning>{{ suggestion.warning }}</div>{% endif %}
+                                        {% if canWrite %}
+                                            <form method="post" action="{{ path('moysklad_store_balance_link', {connectionId: connection.id, storeExternalId: store.externalId}) }}" class="mt-1" data-store-suggestion-accept>
+                                                <input type="hidden" name="_token" value="{{ csrf_token(csrfId) }}">
+                                                <input type="hidden" name="filter" value="{{ unassignedOnly ? 'unassigned' : '' }}">
+                                                <input type="hidden" name="target" value="{{ suggestion.target }}">
+                                                <input type="hidden" name="onlyIfUnassigned" value="1">
+                                                <button class="btn btn-sm btn-outline-primary" type="submit">Принять</button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
                                 {% endif %}
                                 {% if financeRead and store.accountId and accountsById[store.accountId] is not defined %}<div class="text-danger small">Счёт в архиве или удалён — выберите другой.</div>{% endif %}
                             </td>

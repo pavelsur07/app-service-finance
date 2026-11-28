@@ -48,6 +48,11 @@ tasks:
     mode: fallback
     models: [deepseek/deepseek-flash, openai/gpt-4.1-mini]
 
+  # Предложение счёта Баланса складу МойСклад: десятки складов на компанию, редкая задача.
+  moysklad_store_account_suggest:
+    mode: fallback
+    models: [deepseek/deepseek-flash, openai/gpt-4.1-mini]
+
   cash_rule_phrase:
     mode: fallback
     models: [deepseek/deepseek-flash, openai/gpt-4.1-mini]

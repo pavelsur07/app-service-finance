@@ -6,6 +6,7 @@ namespace App\MoySklad\Controller;
 
 use App\Company\Entity\User;
 use App\Company\Security\ModuleAccess;
+use App\MoySklad\Application\Action\AcceptStoreAccountSuggestionsAction;
 use App\MoySklad\Application\Action\SaveStoreBalanceLinkAction;
 use App\MoySklad\Application\Action\SaveStoreBalanceSettingsAction;
 use App\MoySklad\Exception\StoreBalanceException;
@@ -36,13 +37,32 @@ final class SaveStoreBalanceController extends AbstractController
         if (!is_string($target) || ('' !== $target && 'excluded' !== $target && !Uuid::isValid($target))) {
             throw new UnprocessableEntityHttpException('Некорректный счёт.');
         }
+        // «Принять» предложение не перезаписывает назначение, сделанное после показа страницы.
+        $onlyIfUnassigned = '1' === ($values['onlyIfUnassigned'] ?? null);
         try {
-            $action($companyId, $connectionId, $storeExternalId, Uuid::isValid($target) ? $target : null, 'excluded' === $target, $actorId);
-            $this->addFlash('success', 'Назначение склада сохранено.');
+            $saved = $action($companyId, $connectionId, $storeExternalId, Uuid::isValid($target) ? $target : null, 'excluded' === $target, $actorId, $onlyIfUnassigned);
+            $saved ? $this->addFlash('success', 'Назначение склада сохранено.') : $this->addFlash('warning', 'Склад уже назначен — предложение не применено.');
         } catch (StoreBalanceException $error) {
             if ('store_not_found' === $error->reason) {
                 throw $this->createNotFoundException();
             }
+            $this->addFlash('danger', $error->getMessage());
+        }
+
+        return $this->back($connectionId, $values);
+    }
+
+    #[Route('/moy-sklad/connections/{connectionId}/stores/accept-suggestions', name: 'moysklad_store_accept_suggestions', requirements: ['connectionId' => Requirement::UUID], methods: ['POST'])]
+    public function acceptSuggestions(string $connectionId, Request $request, AcceptStoreAccountSuggestionsAction $action): Response
+    {
+        [$companyId, $connectionId, $actorId, $values] = $this->guard($connectionId, $request);
+        try {
+            $result = $action($companyId, $connectionId, $actorId);
+            $this->addFlash('success', sprintf('Принято предложений: %d.', $result['accepted']));
+            if ($result['failed'] > 0) {
+                $this->addFlash('warning', sprintf('Не принято: %d — назначьте эти склады вручную.', $result['failed']));
+            }
+        } catch (StoreBalanceException $error) {
             $this->addFlash('danger', $error->getMessage());
         }
 

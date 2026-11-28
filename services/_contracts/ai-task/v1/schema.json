@@ -277,6 +277,64 @@
                 "reason": {"type": "string", "minLength": 1, "maxLength": 500},
                 "confidence": {"type": "number", "minimum": 0, "maximum": 1}
             }
+        },
+        "store_account_suggest_payload": {
+            "description": "payload задачи moysklad_store_account_suggest: склад МойСклад, действующие счета актива компании и уже назначенные склады той же компании (docs/tasks/moysklad-store-account-suggest/plan.md)",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["store", "accounts"],
+            "properties": {
+                "store": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["name"],
+                    "properties": {
+                        "name": {"type": "string", "minLength": 1, "maxLength": 255},
+                        "path_name": {"type": "string", "maxLength": 4096}
+                    }
+                },
+                "accounts": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 200,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["code", "name"],
+                        "properties": {
+                            "code": {"type": "string", "minLength": 1, "maxLength": 64},
+                            "name": {"type": "string", "minLength": 1, "maxLength": 255},
+                            "article_path": {"type": "string", "maxLength": 1024}
+                        }
+                    }
+                },
+                "examples": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["name", "account_code", "excluded"],
+                        "properties": {
+                            "name": {"type": "string", "minLength": 1, "maxLength": 255},
+                            "account_code": {"oneOf": [{"type": "string", "minLength": 1, "maxLength": 64}, {"type": "null"}]},
+                            "excluded": {"type": "boolean"}
+                        }
+                    }
+                }
+            }
+        },
+        "store_account_suggest_output": {
+            "description": "output moysklad_store_account_suggest: код счёта из accounts, «не учитывать» (excluded) или ни то ни другое — данных мало; пояснение, уверенность",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["account_code", "excluded", "reason", "confidence"],
+            "properties": {
+                "account_code": {"oneOf": [{"type": "string", "minLength": 1, "maxLength": 64}, {"type": "null"}]},
+                "excluded": {"type": "boolean"},
+                "reason": {"type": "string", "minLength": 1, "maxLength": 500},
+                "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+            }
         }
     }
 }

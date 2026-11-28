@@ -3,7 +3,9 @@
 Python-сервис ИИ-задач для Symfony (`docs/tasks/ai/`). Статус: ядро (этап 1),
 задачи `echo`, `categorize_transactions` (этап 2, подсказки статей ДДС) и
 `marketplace_source_type_draft` (черновик решения по новому коду маркетплейса,
-`docs/tasks/marketplace-profit-pipeline` этап 4.3; риск high — всегда на проверку человеку). Прод —
+`docs/tasks/marketplace-profit-pipeline` этап 4.3; риск high — всегда на проверку человеку),
+`moysklad_store_account_suggest` (предложение счёта Баланса складу МойСклад,
+`docs/tasks/moysklad-store-account-suggest`; риск medium — принимает человек). Прод —
 постоянно в production; доступ компаний — админка. См. `docs/maintenance/ai-service-prod.md`.
 
 ## Запуск (dev)

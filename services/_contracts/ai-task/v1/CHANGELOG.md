@@ -1,5 +1,11 @@
 # ai-task — CHANGELOG
 
+## v1.4.0 (2026-11-27)
+
+Добавлены `store_account_suggest_payload` / `store_account_suggest_output` — задача
+`moysklad_store_account_suggest` (предложение счёта Баланса складу МойСклад,
+`docs/tasks/moysklad-store-account-suggest`). Конверты не менялись: изменение аддитивное.
+
 ## v1.3.0 (2026-11-14)
 
 Добавлены `source_type_draft_payload` / `source_type_draft_output` — задача

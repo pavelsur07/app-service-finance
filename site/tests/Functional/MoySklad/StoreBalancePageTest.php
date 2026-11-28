@@ -45,6 +45,50 @@ final class StoreBalancePageTest extends WebTestCaseBase
         self::assertResponseStatusCodeSame(403);
     }
 
+    public function testShowsRuleSuggestionAndAcceptsIt(): void
+    {
+        [$client, $connectionId, $plain] = $this->seed();
+        $db = $this->em()->getConnection();
+        $companyId = (string) $db->fetchOne('SELECT company_id FROM moysklad_connections WHERE id = ?', [$connectionId]);
+        $db->executeStatement('DELETE FROM balance_accounts WHERE company_id = ?', [$companyId]);
+        $db->executeStatement('DELETE FROM balance_articles WHERE company_id = ?', [$companyId]);
+        self::assertTrue(self::getContainer()->get(SeedBalanceStructureAction::class)($companyId));
+        $ff = MoySkladStoreBuilder::aStore()->withIndex(7)->withTenant($companyId, $connectionId)->withName('ФФ К2 (РнД)')->build();
+        $ozon = MoySkladStoreBuilder::aStore()->withIndex(8)->withTenant($companyId, $connectionId)->withName('Ozon')->build();
+        $this->em()->persist($ff);
+        $this->em()->persist($ozon);
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $client->request('GET', '/moy-sklad/connections/'.$connectionId.'/stores');
+        self::assertResponseIsSuccessful();
+        $ffAccount = (string) $db->fetchOne("SELECT id FROM balance_accounts WHERE company_id = ? AND code = 'ACC_INV_FF'", [$companyId]);
+        self::assertSelectorTextContains('[data-store="'.$ff->getExternalId().'"] [data-store-suggestion="'.$ffAccount.'"]', 'Склады фулфилмента');
+        self::assertSelectorTextContains('[data-store="'.$ozon->getExternalId().'"] [data-store-suggestion-warning]', 'в Баланс не проводятся');
+        self::assertSelectorNotExists('[data-store="'.$plain.'"] [data-store-suggestion]', 'Склад без признаков — без предложения.');
+        self::assertSelectorTextContains('[data-store-accept-suggestions] button', '2');
+
+        $form = $client->getCrawler()->filter('[data-store="'.$ff->getExternalId().'"] [data-store-suggestion-accept]')->form();
+        $stockAccount = (string) $db->fetchOne("SELECT id FROM balance_accounts WHERE company_id = ? AND code = 'ACC_INV_WAREHOUSE'", [$companyId]);
+        $db->executeStatement('INSERT INTO moysklad_store_balance_links (company_id, connection_id, store_external_id, balance_account_id, excluded, actor_user_id, updated_at) VALUES (?, ?, ?, ?, false, ?, now())',
+            [$companyId, $connectionId, $ff->getExternalId(), $stockAccount, (string) $db->fetchOne('SELECT user_id FROM companies WHERE id = ?', [$companyId])]);
+        $client->submit($form);
+        self::assertResponseStatusCodeSame(303);
+        self::assertSame($stockAccount, $db->fetchOne('SELECT balance_account_id FROM moysklad_store_balance_links WHERE store_external_id = ?', [$ff->getExternalId()]), 'Назначение, сделанное после показа страницы, не перезаписано.');
+        $db->executeStatement('DELETE FROM moysklad_store_balance_links WHERE store_external_id = ?', [$ff->getExternalId()]);
+        $client->submit($form);
+        self::assertResponseStatusCodeSame(303);
+        self::assertSame($ffAccount, $db->fetchOne('SELECT balance_account_id FROM moysklad_store_balance_links WHERE store_external_id = ?', [$ff->getExternalId()]));
+
+        $client->request('GET', '/moy-sklad/connections/'.$connectionId.'/stores');
+        self::assertSelectorNotExists('[data-store="'.$ff->getExternalId().'"] [data-store-suggestion]', 'Назначенный склад предложения не показывает.');
+        $client->submit($client->getCrawler()->filter('[data-store-accept-suggestions]')->form());
+        self::assertResponseStatusCodeSame(303);
+        self::assertSame((string) $db->fetchOne("SELECT id FROM balance_accounts WHERE company_id = ? AND code = 'ACC_INV_OZON'", [$companyId]),
+            $db->fetchOne('SELECT balance_account_id FROM moysklad_store_balance_links WHERE store_external_id = ?', [$ozon->getExternalId()]));
+        self::assertFalse($db->fetchOne('SELECT 1 FROM moysklad_store_balance_links WHERE store_external_id = ?', [$plain]));
+    }
+
     public function testOpeningPageAddsStandardChartForExistingStructure(): void
     {
         [$client, $connectionId, $store] = $this->seed();

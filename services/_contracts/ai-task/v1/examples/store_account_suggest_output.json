@@ -1,0 +1,6 @@
+{
+    "account_code": "ACC_INV_FF",
+    "excluded": false,
+    "reason": "Тот же оператор К2 в Ростове, что у склада «ФФ К2 (РнД)» — склад фулфилмента.",
+    "confidence": 0.85
+}

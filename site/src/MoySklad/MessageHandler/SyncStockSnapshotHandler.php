@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MoySklad\MessageHandler;
 
+use App\MoySklad\Application\Action\RequestStoreAccountSuggestionsAction;
 use App\MoySklad\Application\Action\SyncStockSnapshotAction;
 use App\MoySklad\Exception\StockSyncException;
 use App\MoySklad\Message\SyncStockSnapshotMessage;
@@ -16,7 +17,7 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 #[AsMessageHandler]
 final readonly class SyncStockSnapshotHandler
 {
-    public function __construct(private SyncStockSnapshotAction $action, private MessageBusInterface $bus, private LoggerInterface $logger)
+    public function __construct(private SyncStockSnapshotAction $action, private MessageBusInterface $bus, private LoggerInterface $logger, private RequestStoreAccountSuggestionsAction $suggestions)
     {
     }
 
@@ -38,6 +39,7 @@ final readonly class SyncStockSnapshotHandler
             if (null !== $snapshotId) {
                 // Снимок уже закоммичен; потерю этого dispatch закрывает app:moysklad:store-balance:requeue.
                 $this->bus->dispatch(new ValueStoreStocksMessage($message->companyId, $message->connectionId, $snapshotId));
+                $this->requestStoreSuggestions($message->companyId, $message->connectionId);
             }
         } catch (StockSyncException $error) {
             $runId = $error->runId;
@@ -66,6 +68,16 @@ final readonly class SyncStockSnapshotHandler
                 'outcome' => $outcome,
                 'category' => $category,
             ]);
+        }
+    }
+
+    /** Склады загружены — ИИ для новых складов без правила. Подсказка необязательна: сбой не роняет синхронизацию, повтор — следующим синком. */
+    private function requestStoreSuggestions(string $companyId, string $connectionId): void
+    {
+        try {
+            ($this->suggestions)($companyId, $connectionId);
+        } catch (\Throwable $error) {
+            $this->logger->error('MoySklad store account suggestions failed', ['companyId' => $companyId, 'connectionId' => $connectionId, 'error' => $error->getMessage()]);
         }
     }
 }

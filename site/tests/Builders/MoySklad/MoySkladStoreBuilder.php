@@ -17,6 +17,7 @@ final class MoySkladStoreBuilder
     private string $externalId = self::DEFAULT_EXTERNAL_ID;
     private string $companyId = MoySkladConnectionBuilder::DEFAULT_COMPANY_ID;
     private string $connectionId = MoySkladConnectionBuilder::DEFAULT_ID;
+    private string $name = 'Test store';
 
     private function __construct()
     {
@@ -46,10 +47,18 @@ final class MoySkladStoreBuilder
         return $copy;
     }
 
+    public function withName(string $name): self
+    {
+        $copy = clone $this;
+        $copy->name = $name;
+
+        return $copy;
+    }
+
     public function build(): MoySkladStore
     {
         $now = new \DateTimeImmutable('2026-09-21T08:00:00+00:00');
 
-        return new MoySkladStore($this->id, $this->companyId, $this->connectionId, new StoreSnapshot($this->externalId, 'Test store', 'store-external', null, '', false, $now), $now);
+        return new MoySkladStore($this->id, $this->companyId, $this->connectionId, new StoreSnapshot($this->externalId, $this->name, 'store-external', null, '', false, $now), $now);
     }
 }
