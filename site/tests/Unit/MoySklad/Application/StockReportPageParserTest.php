@@ -60,8 +60,27 @@ final class StockReportPageParserTest extends TestCase
 
     public function testCostPageWithWrongRowCountIsInvalid(): void
     {
-        $this->expectException(StockSyncException::class);
-        (new StockReportPageParser())->parseCosts('{"meta":{"size":2,"limit":1000,"offset":0},"rows":[]}');
+        try {
+            (new StockReportPageParser())->parseCosts('{"meta":{"size":2,"limit":1000,"offset":0},"rows":[]}');
+            self::fail('Wrong row count must be rejected.');
+        } catch (StockSyncException $error) {
+            self::assertSame(['invalid_response', 'page_meta'], [$error->category, $error->detail]);
+        }
+    }
+
+    /** Регрессия 28.11.2026 (b57d7682): одна позиция с отрицательной или пустой себестоимостью роняла оценку всех складов. */
+    public function testNegativeOrNullCostSkipsOnlyThatPosition(): void
+    {
+        $json = '{"meta":{"size":3,"limit":1000,"offset":0},"rows":['
+            .'{"meta":{"type":"product","href":"https://api.moysklad.ru/api/remap/1.2/entity/product/00000000-0000-4000-8000-000000000001"},"price":-1250.5,"stock":-3},'
+            .'{"meta":{"type":"product","href":"https://api.moysklad.ru/api/remap/1.2/entity/product/00000000-0000-4000-8000-000000000002"},"price":null,"stock":1},'
+            .'{"meta":{"type":"variant","href":"https://api.moysklad.ru/api/remap/1.2/entity/variant/00000000-0000-4000-8000-000000000003"},"price":700,"stock":1}]}';
+
+        $page = (new StockReportPageParser())->parseCosts($json);
+
+        self::assertSame(3, $page->size);
+        self::assertCount(1, $page->rows);
+        self::assertSame(['variant', '00000000-0000-4000-8000-000000000003', '700'], [$page->rows[0]->assortmentType, $page->rows[0]->assortmentExternalId, $page->rows[0]->priceMinor]);
     }
 
     #[DataProvider('sanitizedLiveReport')]

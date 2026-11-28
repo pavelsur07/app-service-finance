@@ -73,6 +73,7 @@ final readonly class ValueStoreStocksAction
                 try {
                     $prices = $this->prices($companyId, $connectionId);
                 } catch (StockSyncException $error) {
+                    $this->logger->warning('MoySklad stock cost report rejected.', ['companyId' => $companyId, 'connectionId' => $connectionId, 'snapshotId' => $snapshotId, 'reason' => $error->category, 'detail' => $error->detail]);
                     $this->finish($companyId, $snapshotId, 'failed', $error->category);
                     throw $error;
                 }
