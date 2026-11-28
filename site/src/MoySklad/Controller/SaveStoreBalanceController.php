@@ -25,11 +25,14 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
 final class SaveStoreBalanceController extends AbstractController
 {
+    /** id МойСклад похож на UUID, но вариант не RFC 4122 (`…-11e5-7a69-…`) — Requirement::UUID давал 404. */
+    private const MOYSKLAD_ID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+
     public function __construct(private readonly ActiveCompanyService $activeCompany, private readonly MoySkladConnectionWriteRepository $connections)
     {
     }
 
-    #[Route('/moy-sklad/connections/{connectionId}/stores/{storeExternalId}/balance-link', name: 'moysklad_store_balance_link', requirements: ['connectionId' => Requirement::UUID, 'storeExternalId' => Requirement::UUID], methods: ['POST'])]
+    #[Route('/moy-sklad/connections/{connectionId}/stores/{storeExternalId}/balance-link', name: 'moysklad_store_balance_link', requirements: ['connectionId' => Requirement::UUID, 'storeExternalId' => self::MOYSKLAD_ID], methods: ['POST'])]
     public function link(string $connectionId, string $storeExternalId, Request $request, SaveStoreBalanceLinkAction $action): Response
     {
         [$companyId, $connectionId, $actorId, $values] = $this->guard($connectionId, $request);
