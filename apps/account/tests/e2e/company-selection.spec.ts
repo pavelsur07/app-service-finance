@@ -50,6 +50,8 @@ test('company pagination, switching and revoked access on focus', async ({
     });
   });
   await page.goto('/');
+  if (test.info().project.name === 'mobile')
+    await page.getByRole('button', { name: 'Развернуть меню' }).click();
   await expect(
     page.getByRole('radio', { name: 'Первая компания' }),
   ).toBeChecked();
@@ -72,6 +74,9 @@ test('company pagination, switching and revoked access on focus', async ({
   await expect(
     page.getByRole('navigation', { name: 'Пагинация' }),
   ).toContainText('2–2');
+  await expect(
+    page.getByRole('button', { name: 'Свернуть меню' }),
+  ).toBeVisible();
   revoked = true;
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(page.getByRole('radio')).toHaveCount(0);

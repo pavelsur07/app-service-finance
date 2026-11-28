@@ -1,5 +1,6 @@
-import { Outlet, useLocation } from 'react-router';
+import { Outlet, useLocation, useOutletContext } from 'react-router';
 import {
+  Alert,
   AppShell,
   AppHeader,
   Sidebar,
@@ -14,6 +15,9 @@ import {
 import { NavigationLink } from '../shared/NavigationLink';
 import { useSession } from './SessionProvider';
 import styles from './App.module.css';
+
+export const ACCOUNT_SIDEBAR_STORAGE_KEY = 'vf.account.sidebar';
+type SidebarState = ReturnType<typeof useSidebarState>;
 
 const items: readonly SidebarItem[] = [
   {
@@ -32,12 +36,19 @@ const items: readonly SidebarItem[] = [
   },
 ];
 interface LayoutProps {
+  sidebar: SidebarState;
   user?: SidebarUser | undefined;
   onLogout?: (() => void) | undefined;
   workspace?: string | undefined;
+  sessionError?: string | null;
 }
-function Layout({ user, onLogout, workspace }: LayoutProps) {
-  const sidebar = useSidebarState('vf.account.sidebar');
+function Layout({
+  sidebar,
+  user,
+  onLogout,
+  workspace,
+  sessionError,
+}: LayoutProps) {
   const { pathname } = useLocation();
   const title =
     pathname === '/'
@@ -90,6 +101,11 @@ function Layout({ user, onLogout, workspace }: LayoutProps) {
       }
     >
       <div className={styles.content}>
+        {sessionError && (
+          <Alert tone="danger" className="mb-4">
+            {sessionError}
+          </Alert>
+        )}
         <Outlet />
       </div>
     </AppShell>
@@ -97,12 +113,15 @@ function Layout({ user, onLogout, workspace }: LayoutProps) {
 }
 // Public routes intentionally stay outside SessionProvider: no bootstrap/data calls.
 export function PublicLayout() {
-  return <Layout />;
+  const sidebar = useSidebarState(ACCOUNT_SIDEBAR_STORAGE_KEY);
+  return <Layout sidebar={sidebar} />;
 }
 export function SessionLayout() {
   const { store, state } = useSession();
+  const sidebar = useOutletContext<SidebarState>();
   return (
     <Layout
+      sidebar={sidebar}
       user={
         state.data
           ? { name: state.data.user.email, detail: 'Клиентский кабинет' }
@@ -110,6 +129,7 @@ export function SessionLayout() {
       }
       onLogout={state.data ? () => void store.logout() : undefined}
       workspace={state.data?.active_company?.name}
+      sessionError={state.error}
     />
   );
 }

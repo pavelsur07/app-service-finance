@@ -15,8 +15,8 @@ export function App() {
         <Routes>
           <Route element={<SessionProvider />}>
             <Route path="/login" element={<LoginPage />} />
-            <Route element={<SessionLayout />}>
-              <Route element={<RequireSession />}>
+            <Route element={<RequireSession />}>
+              <Route element={<SessionLayout />}>
                 <Route path="/" element={<HomePage />} />
               </Route>
             </Route>

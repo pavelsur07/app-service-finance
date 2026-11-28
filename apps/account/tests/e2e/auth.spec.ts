@@ -4,6 +4,10 @@ test('anonymous login, invalid credentials and protected reload', async ({
   page,
 }) => {
   let authenticated = false;
+  let releaseSession: (() => void) | undefined;
+  const pendingSession = new Promise<void>((resolve) => {
+    releaseSession = resolve;
+  });
   await page.route('**/api/account/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith('/auth/csrf'))
@@ -30,11 +34,13 @@ test('anonymous login, invalid credentials and protected reload', async ({
       authenticated = false;
       return route.fulfill({ status: 204 });
     }
-    if (!authenticated)
+    if (!authenticated) {
+      if (path.endsWith('/session')) await pendingSession;
       return route.fulfill({
         status: 401,
         json: { error: { code: 'unauthenticated', message: 'Login' } },
       });
+    }
     if (path.endsWith('/companies'))
       return route.fulfill({
         json: { data: [], meta: { total: 0, page: 1, per_page: 50, pages: 1 } },
@@ -48,7 +54,15 @@ test('anonymous login, invalid credentials and protected reload', async ({
       },
     });
   });
-  await page.goto('/');
+  try {
+    await page.goto('/');
+    await expect(
+      page.getByText('Проверяем сессию…', { exact: true }),
+    ).toBeVisible();
+    await expect(page.locator('header, nav, footer')).toHaveCount(0);
+  } finally {
+    releaseSession?.();
+  }
   await expect(page).toHaveURL(/\/login/);
   await page.getByLabel('Email', { exact: true }).fill('person@example.test');
   await page.getByLabel('Пароль', { exact: true }).fill('incorrect');
