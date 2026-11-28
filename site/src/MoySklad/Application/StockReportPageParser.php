@@ -98,7 +98,7 @@ final class StockReportPageParser
         $offset = is_array($meta) ? ($meta['offset'] ?? null) : null;
         if (!is_array($rows) || !array_is_list($rows) || !is_int($size) || $size < 0 || !is_int($limit) || $limit < 1 || $limit > 1000
             || !is_int($offset) || $offset < 0 || $offset > $size || count($rows) !== max(0, min($limit, $size - $offset))) {
-            throw new StockSyncException('invalid_response');
+            throw new StockSyncException('invalid_response', detail: 'page_meta');
         }
         $costs = [];
         foreach ($rows as $row) {
@@ -106,13 +106,24 @@ final class StockReportPageParser
             if (!in_array($type, ['product', 'variant'], true)) {
                 continue; // услуги и комплекты в снимок остатков не попадают
             }
-            [$type, $externalId] = $this->identity($row['meta'], ['product', 'variant']);
+            try {
+                [$type, $externalId] = $this->identity($row['meta'], ['product', 'variant']);
+            } catch (StockSyncException) {
+                throw new StockSyncException('invalid_response', detail: 'row_identity');
+            }
             if (!array_key_exists('price', $row)) {
                 throw new StockSyncException('forbidden');
             }
-            $price = $this->decimal($row['price'], $decimalMarker);
+            if (null === $row['price']) {
+                continue; // себестоимость не определена — позиция без цены, склад оценивается неполно
+            }
+            try {
+                $price = $this->decimal($row['price'], $decimalMarker);
+            } catch (StockSyncException) {
+                throw new StockSyncException('invalid_response', detail: 'price_format');
+            }
             if (str_starts_with($price, '-')) {
-                throw new StockSyncException('invalid_response');
+                continue; // отрицательная себестоимость (отрицательные остатки) — позиция без цены, а не сбой всего отчёта
             }
             $costs[] = new StockCostSnapshot($type, $externalId, $price);
         }
