@@ -6114,6 +6114,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 2.261 | 2026-11-28 | MoySklad: вкладка «Склады» — одна форма на таблицу (`moysklad_store_balance_links`, `SaveStoreBalanceLinksAction`, `SaveStoreBalanceLinkAction(expected)`), вкладки и подстановка уверенных предложений; удалены `moysklad_store_balance_link`, `moysklad_store_accept_suggestions`, `AcceptStoreAccountSuggestionsAction` |
 | 2.260 | 2026-11-27 | MoySklad: предложение счёта Баланса складу — правила `StoreAccountRulePolicy` и ИИ-задача `moysklad_store_account_suggest` (`moysklad_store_account_suggestions`, `Version20261127150000`), «Принять все уверенные», `SaveStoreBalanceLinkAction(onlyIfUnassigned)` |
 | 2.259 | 2026-11-27 | OneC: галочка «Загружать» — `onec_organization.export_allowed` (`SetOrganizationExportAction`, `Version20261127120000`), `export_allowed` в рукопожатии, обязательный `organization_guids` части (`onec_package.organization_guids`), путь сырья `onec/{connection}/{kind}/{yyyy}/{mm}/…` |
 | 2.258 | 2026-11-27 | OneC: подключение принадлежит компании (`company_id` из audit_log, `Version20261127090000`), `OneCConnectionRepository` вместо `ConnectionQuery`, доступ через модуль `finance`, привязка организации — `enabled` в пределах компании подключения; удалён `CompanyFacade::activeOwnedCompanyNames` |
@@ -6920,8 +6921,8 @@ marketplace)` ставит запуск, если подключение акт�
 ### MoySklad: склады → счета Баланса
 
 Страница `moysklad_stores` (`/moy-sklad/connections/{id}/stores`, READ; POST — READ+WRITE+CSRF):
-складу назначается счёт актива Баланса или «не учитывать» (`moysklad_store_balance_links`,
-`SaveStoreBalanceLinkAction`, счёт проверяется через `BalanceFacade::getPostingAccounts`; счёт — одного
+складу назначается счёт актива Баланса или «не учитывать» (`moysklad_store_balance_links`, одна форма на таблицу —
+POST `moysklad_store_balance_links`, `SaveStoreBalanceLinksAction` → `SaveStoreBalanceLinkAction`, счёт проверяется через `BalanceFacade::getPostingAccounts`; счёт — одного
 подключения и не корреспондирующий, проверка под company advisory-lock);
 настройки подключения — корреспондирующий счёт, включено, автор (`moysklad_store_balance_settings`,
 `SaveStoreBalanceSettingsAction`: включение требует корр. счёт). Назначения и настройки меняет только
@@ -6951,16 +6952,17 @@ marketplace)` ставит запуск, если подключение акт�
   отличает устаревший ответ; примеры — назначенные склады подключения; компания без доступа к ИИ или с исчерпанным
   лимитом — без задач; `requested` дольше часа ставится снова (тот же ключ при том же `payload_hash`), `failed` — новым
   запросом, всего до 3 отправок на название и промпт; `rejected` окончательный; upsert не возвращает `completed` в `requested`.
-  «Принять» в строке шлёт `onlyIfUnassigned`. Строка `moysklad_store_account_suggestions` пишется до
+  Строка `moysklad_store_account_suggestions` пишется до
   постановки (unique `(company_id, ai_task_id)`, FK на склад `CASCADE`); `StoreAccountSuggestionConsumer` пишет ответ
   в транзакции импорта ServiceGateway (`accepted` → `confident`). Ответ на прежнее название не показывается.
   `StoreAccountSuggestions` разрешает код в действующий счёт актива компании; нет счёта — нет предложения.
   Ни предложение, ни ответ ИИ не пишут `moysklad_store_balance_links`.
-- «Принять» — обычный POST назначения; «Принять все уверенные» (`moysklad_store_accept_suggestions`,
-  `AcceptStoreAccountSuggestionsAction`): правила и уверенные ответы ИИ, пересчитанные на сервере, каждое —
-  своей транзакцией `SaveStoreBalanceLinkAction(..., onlyIfUnassigned: true)` (назначенный за это время склад
-  не перезаписывается, проверка под company-lock); отказ по складу — `failed`, без права проводить — исключение
-  до первой записи.
+- Таблица: вкладки `filter` = `todo` (без назначения; по умолчанию, если не пусто; старый `unassigned` = `todo`) |
+  `linked` | `excluded` | `all`, по убыванию остатка. Уверенное предложение подставлено в выбор, неуверенное — подсказка.
+  Строка шлёт `links[<склад>][target]` ('' / `excluded` / id счёта) и `was` (состояние при показе):
+  `SaveStoreBalanceLinksAction` пишет только изменённые, каждую своей транзакцией `SaveStoreBalanceLinkAction(..., expected: was)` —
+  под company-lock склад, изменённый после показа, пропускается (`skipped`), повтор той же отправки — успех без записи;
+  отказ по складу — `failed`, остальные сохраняются; без права проводить — исключение до первой записи.
 
 ### MoySklad: legacy UI качества сопоставления
 

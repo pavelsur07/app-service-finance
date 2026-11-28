@@ -8,6 +8,7 @@ use App\Balance\Facade\BalanceFacade;
 use App\Company\Entity\User;
 use App\Company\Facade\CompanyFacade;
 use App\Company\Security\ModuleAccess;
+use App\MoySklad\Application\DTO\ResolvedStoreSuggestion;
 use App\MoySklad\Application\StoreAccountSuggestions;
 use App\MoySklad\Enum\StoreBalanceStatus;
 use App\MoySklad\Infrastructure\Query\MoySkladConnectionsQuery;
@@ -29,6 +30,10 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted(ModuleAccess::MARKETPLACE_READ)]
 final class StoreBalanceController extends AbstractController
 {
+    /** Вкладки таблицы складов; «Требуют решения» — без назначения (с предложением или без). */
+    public const FILTERS = ['todo', 'linked', 'excluded', 'all'];
+    private const STATUS_FILTER = ['todo' => 'todo', 'suggested' => 'todo', 'unsure' => 'todo', 'linked' => 'linked', 'excluded' => 'excluded'];
+
     public static function csrfId(string $companyId, string $connectionId): string
     {
         return 'moysklad_store_balance'.$companyId.$connectionId;
@@ -57,7 +62,6 @@ final class StoreBalanceController extends AbstractController
         $connectionId = strtolower($connectionId);
         $companyId = (string) $activeCompany->getActiveCompany()->getId();
         $connection = $connections->findByIdAndCompanyId($connectionId, $companyId) ?? throw $this->createNotFoundException();
-        $unassignedOnly = 'unassigned' === $request->query->get('filter');
         $user = $this->getUser();
         // План счетов и суммы Баланса — только при финансовом доступе; без него страница показывает склады и оценку.
         $financeRead = $user instanceof User && null !== $user->getId() && $companies->financialAccess($companyId, $user->getId())['read'];
@@ -79,7 +83,22 @@ final class StoreBalanceController extends AbstractController
             }
         }
         $suggested = $financeRead ? $suggestions->forStores($allStores, $accounts, $answers->answers($companyId, $connectionId)) : [];
-        $stores = $unassignedOnly ? array_values(array_filter($allStores, static fn (array $store): bool => null === $store['accountId'] && !$store['excluded'])) : $allStores;
+        $rows = [];
+        $counts = array_fill_keys(self::FILTERS, 0);
+        foreach ($allStores as $store) {
+            $row = self::row($store, $suggested[$store['externalId']] ?? null);
+            ++$counts[self::STATUS_FILTER[$row['status']]];
+            ++$counts['all'];
+            $rows[] = $row;
+        }
+        $filter = $request->query->get('filter');
+        $filter = 'unassigned' === $filter ? 'todo' : $filter;
+        $filter = \in_array($filter, self::FILTERS, true) ? $filter : ($counts['todo'] > 0 ? 'todo' : 'all');
+        $stores = array_values(array_filter($rows, static fn (array $row): bool => 'all' === $filter || self::STATUS_FILTER[$row['status']] === $filter));
+        // Крупные остатки — первыми: их ошибка дороже.
+        usort($stores, static fn (array $a, array $b): int => bccomp($b['amountMinor'] ?? '0', $a['amountMinor'] ?? '0', 0) ?: strcmp($a['name'], $b['name']));
+        $assetAccounts = array_values(array_filter($accounts, static fn ($account): bool => $account->isAsset));
+        $isInventory = static fn ($account): bool => str_starts_with($account->code, 'ACC_INV_');
         $postings = $financeRead ? $query->latestPostings($companyId, $connectionId) : [];
         if (!$financeRead) {
             $totals = [];
@@ -88,11 +107,9 @@ final class StoreBalanceController extends AbstractController
         return $this->render('moy_sklad/stores/index.html.twig', [
             'connection' => $connection,
             'stores' => $stores,
-            'suggestions' => $suggested,
-            'confidentSuggestions' => \count(array_filter($suggested, static fn ($suggestion): bool => $suggestion->confident)),
-            'counts' => $query->counts($companyId, $connectionId),
-            'unassignedOnly' => $unassignedOnly,
-            'assetAccounts' => array_values(array_filter($accounts, static fn ($account): bool => $account->isAsset)),
+            'counts' => $counts,
+            'filter' => $filter,
+            'accountGroups' => array_filter(['Запасы' => array_filter($assetAccounts, $isInventory), 'Другие счета актива' => array_filter($assetAccounts, static fn ($account): bool => !$isInventory($account))]),
             'accounts' => $accounts,
             'accountsById' => $accountsById,
             'totals' => $totals,
@@ -104,5 +121,26 @@ final class StoreBalanceController extends AbstractController
             'book' => $balance->getBookStatus($companyId),
             'csrfId' => self::csrfId($companyId, $connectionId),
         ]);
+    }
+
+    /**
+     * Строка таблицы: статус, выбор в списке и состояние на момент показа (`was`) — по нему сохранение не перетирает правку из другого окна.
+     * Уверенное предложение подставлено в выбор, «Сохранить» его принимает; неуверенное — только подсказка.
+     *
+     * @param array{externalId: string, name: string, pathName: string, accountId: ?string, excluded: bool, quantity: ?string, amountMinor: ?string, unpriced: int, missing: int} $store
+     *
+     * @return array{externalId: string, name: string, pathName: string, accountId: ?string, excluded: bool, quantity: ?string, amountMinor: ?string, unpriced: int, missing: int, status: string, value: string, was: string, suggestion: ?ResolvedStoreSuggestion}
+     */
+    private static function row(array $store, ?ResolvedStoreSuggestion $suggestion): array
+    {
+        $was = $store['excluded'] ? 'excluded' : ($store['accountId'] ?? '');
+        if ('' !== $was) {
+            return $store + ['status' => $store['excluded'] ? 'excluded' : 'linked', 'value' => $was, 'was' => $was, 'suggestion' => null];
+        }
+        if (null === $suggestion) {
+            return $store + ['status' => 'todo', 'value' => '', 'was' => '', 'suggestion' => null];
+        }
+
+        return $store + ['status' => $suggestion->confident ? 'suggested' : 'unsure', 'value' => $suggestion->confident ? $suggestion->target : '', 'was' => '', 'suggestion' => $suggestion];
     }
 }
