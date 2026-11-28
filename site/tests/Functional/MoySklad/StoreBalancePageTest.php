@@ -25,27 +25,34 @@ final class StoreBalancePageTest extends WebTestCaseBase
         $client->request('GET', $url);
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('[data-store-balance-book-not-started]');
-        self::assertSelectorExists('[data-store="'.$store.'"] select[name="target"] option[value="'.$accounts['stock'].'"]');
-        self::assertSelectorNotExists('[data-store="'.$store.'"] select[name="target"] option[value="'.$accounts['equity'].'"]', 'Склад держится только на активе.');
+        self::assertSelectorExists('[data-store-balance-settings][open]', 'Не настроено — блок настроек раскрыт.');
+        self::assertSelectorExists('[data-store="'.$store.'"] [data-store-status="todo"]');
+        self::assertSelectorExists('[data-store="'.$store.'"] select option[value="'.$accounts['stock'].'"]');
+        self::assertSelectorNotExists('[data-store="'.$store.'"] select option[value="'.$accounts['equity'].'"]', 'Склад держится только на активе.');
+        self::assertSelectorTextContains('[data-store-filter="todo"][aria-current="page"]', '1');
         self::assertSelectorTextContains('[data-moysklad-tabs] [aria-current="page"]', 'Склады');
         $client->request('GET', '/moy-sklad/stores');
         self::assertResponseRedirects($url);
         $client->request('GET', $url);
 
-        $form = $client->getCrawler()->filter('[data-store="'.$store.'"] form')->form();
-        $client->request('POST', $form->getUri(), array_replace($form->getPhpValues(), ['target' => $accounts['stock']]));
-        self::assertResponseStatusCodeSame(303);
+        $form = $client->getCrawler()->filter('[data-store-links]')->form();
+        $client->request('POST', $form->getUri(), $this->pick($form->getPhpValues(), $store, $accounts['stock']));
+        self::assertResponseRedirects($url.'?filter=todo', 303);
         self::assertSame($accounts['stock'], $this->em()->getConnection()->fetchOne('SELECT balance_account_id FROM moysklad_store_balance_links WHERE store_external_id = ?', [$store]));
 
-        $client->request('POST', $form->getUri(), array_replace($form->getPhpValues(), ['target' => $accounts['foreign']]));
+        $client->request('GET', $url);
+        self::assertSelectorExists('[data-store-filter="all"][aria-current="page"]', 'Нечего решать — открыты все склады.');
+        self::assertSelectorExists('[data-store="'.$store.'"] [data-store-status="linked"]');
+        $form = $client->getCrawler()->filter('[data-store-links]')->form();
+        $client->request('POST', $form->getUri(), $this->pick($form->getPhpValues(), $store, $accounts['foreign']));
         self::assertResponseStatusCodeSame(303);
         self::assertSame($accounts['stock'], $this->em()->getConnection()->fetchOne('SELECT balance_account_id FROM moysklad_store_balance_links WHERE store_external_id = ?', [$store]), 'Чужой счёт не сохраняется.');
 
-        $client->request('POST', $form->getUri(), ['target' => $accounts['stock'], '_token' => 'bad']);
+        $client->request('POST', $form->getUri(), ['links' => [$store => ['target' => $accounts['stock'], 'was' => '']], '_token' => 'bad']);
         self::assertResponseStatusCodeSame(403);
     }
 
-    public function testShowsRuleSuggestionAndAcceptsIt(): void
+    public function testPrefillsConfidentSuggestionAndSavesItWithTheForm(): void
     {
         [$client, $connectionId, $plain] = $this->seed();
         $db = $this->em()->getConnection();
@@ -59,34 +66,29 @@ final class StoreBalancePageTest extends WebTestCaseBase
         $this->em()->persist($ozon);
         $this->em()->flush();
         $this->em()->clear();
+        $code = static fn (string $code): string => (string) $db->fetchOne('SELECT id FROM balance_accounts WHERE company_id = ? AND code = ?', [$companyId, $code]);
 
         $client->request('GET', '/moy-sklad/connections/'.$connectionId.'/stores');
         self::assertResponseIsSuccessful();
-        $ffAccount = (string) $db->fetchOne("SELECT id FROM balance_accounts WHERE company_id = ? AND code = 'ACC_INV_FF'", [$companyId]);
-        self::assertSelectorTextContains('[data-store="'.$ff->getExternalId().'"] [data-store-suggestion="'.$ffAccount.'"]', 'Склады фулфилмента');
+        self::assertSelectorTextContains('[data-store="'.$ff->getExternalId().'"] [data-store-suggestion="'.$code('ACC_INV_FF').'"]', 'Склад фулфилмент-оператора');
+        self::assertSelectorExists('[data-store="'.$ff->getExternalId().'"] [data-store-status="suggested"]');
+        self::assertSelectorExists('[data-store="'.$ff->getExternalId().'"] select option[value="'.$code('ACC_INV_FF').'"][selected]', 'Уверенное предложение подставлено.');
+        self::assertSelectorTextContains('[data-store="'.$ff->getExternalId().'"] select optgroup[label="Запасы"]', 'Склады фулфилмента');
         self::assertSelectorTextContains('[data-store="'.$ozon->getExternalId().'"] [data-store-suggestion-warning]', 'в Баланс не проводятся');
         self::assertSelectorNotExists('[data-store="'.$plain.'"] [data-store-suggestion]', 'Склад без признаков — без предложения.');
-        self::assertSelectorTextContains('[data-store-accept-suggestions] button', '2');
+        self::assertSelectorTextContains('[data-store-links-save]', '2');
 
-        $form = $client->getCrawler()->filter('[data-store="'.$ff->getExternalId().'"] [data-store-suggestion-accept]')->form();
-        $stockAccount = (string) $db->fetchOne("SELECT id FROM balance_accounts WHERE company_id = ? AND code = 'ACC_INV_WAREHOUSE'", [$companyId]);
+        $form = $client->getCrawler()->filter('[data-store-links]')->form();
+        $stock = $code('ACC_INV_WAREHOUSE');
         $db->executeStatement('INSERT INTO moysklad_store_balance_links (company_id, connection_id, store_external_id, balance_account_id, excluded, actor_user_id, updated_at) VALUES (?, ?, ?, ?, false, ?, now())',
-            [$companyId, $connectionId, $ff->getExternalId(), $stockAccount, (string) $db->fetchOne('SELECT user_id FROM companies WHERE id = ?', [$companyId])]);
+            [$companyId, $connectionId, $ff->getExternalId(), $stock, (string) $db->fetchOne('SELECT user_id FROM companies WHERE id = ?', [$companyId])]);
         $client->submit($form);
         self::assertResponseStatusCodeSame(303);
-        self::assertSame($stockAccount, $db->fetchOne('SELECT balance_account_id FROM moysklad_store_balance_links WHERE store_external_id = ?', [$ff->getExternalId()]), 'Назначение, сделанное после показа страницы, не перезаписано.');
-        $db->executeStatement('DELETE FROM moysklad_store_balance_links WHERE store_external_id = ?', [$ff->getExternalId()]);
-        $client->submit($form);
-        self::assertResponseStatusCodeSame(303);
-        self::assertSame($ffAccount, $db->fetchOne('SELECT balance_account_id FROM moysklad_store_balance_links WHERE store_external_id = ?', [$ff->getExternalId()]));
-
-        $client->request('GET', '/moy-sklad/connections/'.$connectionId.'/stores');
-        self::assertSelectorNotExists('[data-store="'.$ff->getExternalId().'"] [data-store-suggestion]', 'Назначенный склад предложения не показывает.');
-        $client->submit($client->getCrawler()->filter('[data-store-accept-suggestions]')->form());
-        self::assertResponseStatusCodeSame(303);
-        self::assertSame((string) $db->fetchOne("SELECT id FROM balance_accounts WHERE company_id = ? AND code = 'ACC_INV_OZON'", [$companyId]),
-            $db->fetchOne('SELECT balance_account_id FROM moysklad_store_balance_links WHERE store_external_id = ?', [$ozon->getExternalId()]));
+        self::assertSame($stock, $db->fetchOne('SELECT balance_account_id FROM moysklad_store_balance_links WHERE store_external_id = ?', [$ff->getExternalId()]), 'Назначение, сделанное после показа страницы, не перезаписано.');
+        self::assertSame($code('ACC_INV_OZON'), $db->fetchOne('SELECT balance_account_id FROM moysklad_store_balance_links WHERE store_external_id = ?', [$ozon->getExternalId()]));
         self::assertFalse($db->fetchOne('SELECT 1 FROM moysklad_store_balance_links WHERE store_external_id = ?', [$plain]));
+        $client->followRedirect();
+        self::assertSelectorTextContains('.toast', 'Сохранено: 1');
     }
 
     public function testOpeningPageAddsStandardChartForExistingStructure(): void
@@ -99,7 +101,7 @@ final class StoreBalancePageTest extends WebTestCaseBase
 
         $client->request('GET', '/moy-sklad/connections/'.$connectionId.'/stores');
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('[data-store="'.$store.'"] select[name="target"]', 'Склады фулфилмента');
+        self::assertSelectorTextContains('[data-store="'.$store.'"] select', 'Склады фулфилмента');
         self::assertSame(28, (int) $this->em()->getConnection()->fetchOne('SELECT COUNT(*) FROM balance_accounts WHERE company_id = ?', [$companyId]));
     }
 
@@ -125,8 +127,11 @@ final class StoreBalancePageTest extends WebTestCaseBase
 
         $client->request('GET', '/moy-sklad/connections/'.$connectionId.'/stores');
         $token = $client->getCrawler()->filter('[data-store-balance-settings] input[name="_token"]')->attr('value');
-        $client->request('POST', '/moy-sklad/connections/'.$connectionId.'/stores/'.Uuid::uuid4()->toString().'/balance-link', ['_token' => $token, 'target' => $accounts['stock']]);
+        $client->request('POST', '/moy-sklad/connections/'.Uuid::uuid4()->toString().'/stores/balance-links', ['_token' => $token, 'links' => []]);
         self::assertResponseStatusCodeSame(404);
+        $client->request('POST', '/moy-sklad/connections/'.$connectionId.'/stores/balance-links', ['_token' => $token, 'links' => [Uuid::uuid4()->toString() => ['target' => $accounts['stock'], 'was' => '']]]);
+        self::assertResponseStatusCodeSame(303, 'Чужой или неизвестный склад — отказ по строке, не 500.');
+        self::assertFalse($this->em()->getConnection()->fetchOne('SELECT 1 FROM moysklad_store_balance_links'));
     }
 
     /** @return array{KernelBrowser, string, string, array<string, string>} */
@@ -155,6 +160,18 @@ final class StoreBalancePageTest extends WebTestCaseBase
         $this->setClientSessionValue($client, 'active_company_id', $companyId);
 
         return [$client, $d['connection']->getId(), $store->getExternalId(), $accounts];
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     *
+     * @return array<string, mixed>
+     */
+    private function pick(array $values, string $store, string $target): array
+    {
+        $values['links'][$store]['target'] = $target;
+
+        return $values;
     }
 
     private function account(string $companyId, string $type, string $name): string

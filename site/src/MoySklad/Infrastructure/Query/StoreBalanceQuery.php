@@ -32,16 +32,6 @@ final readonly class StoreBalanceQuery
         ], $rows);
     }
 
-    /** @return array{active: int, linked: int, excluded: int} */
-    public function counts(string $companyId, string $connectionId): array
-    {
-        $row = $this->db->fetchAssociative('SELECT COUNT(*) AS active, COUNT(k.store_external_id) FILTER (WHERE NOT k.excluded) AS linked, COUNT(k.store_external_id) FILTER (WHERE k.excluded) AS excluded
-            FROM moysklad_stores s LEFT JOIN moysklad_store_balance_links k ON k.company_id = s.company_id AND k.connection_id = s.connection_id AND k.store_external_id = s.external_id
-            WHERE s.company_id = ? AND s.connection_id = ? AND NOT s.archived', [$companyId, $connectionId]) ?: [];
-
-        return ['active' => (int) ($row['active'] ?? 0), 'linked' => (int) ($row['linked'] ?? 0), 'excluded' => (int) ($row['excluded'] ?? 0)];
-    }
-
     /** @return array{snapshotId: string, date: string, status: string, errorReason: ?string, finishedAt: ?string}|null */
     public function latestRun(string $companyId, string $connectionId): ?array
     {

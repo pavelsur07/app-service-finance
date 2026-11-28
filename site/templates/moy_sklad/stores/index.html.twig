@@ -10,8 +10,14 @@
 {% endblock %}
 
 {% block integration_content %}
-    <div class="card mb-3" data-store-balance-settings>
-        <div class="card-header"><h2 class="card-title">Запись в Баланс</h2></div>
+    {% set settingsReady = financeRead and book.initialized and settings and settings.enabled and settings.counterAccountId %}
+    <details class="card mb-3" data-store-balance-settings{% if not settingsReady %} open{% endif %}>
+        <summary class="card-header">
+            <h2 class="card-title">Запись в Баланс</h2>
+            {% if settingsReady %}
+                <span class="ms-2 text-secondary small" data-store-balance-settings-summary>Проводится каждый день в 23:30 · корр. счёт {{ accountsById[settings.counterAccountId] is defined ? accountsById[settings.counterAccountId].label : 'в архиве' }} · Изменить</span>
+            {% endif %}
+        </summary>
         <div class="card-body">
             {% if not financeRead %}
                 <p class="text-secondary mb-0" data-store-balance-no-finance>Счета Баланса видны пользователям с доступом к финансам компании.</p>
@@ -23,7 +29,7 @@
             {% endif %}
             <form method="post" action="{{ path('moysklad_store_balance_settings', {connectionId: connection.id}) }}" class="row g-3 align-items-end">
                 <input type="hidden" name="_token" value="{{ csrf_token(csrfId) }}">
-                <input type="hidden" name="filter" value="{{ unassignedOnly ? 'unassigned' : '' }}">
+                <input type="hidden" name="filter" value="{{ filter }}">
                 <div class="col-md-6">
                     <label class="form-label" for="store-balance-counter">Корреспондирующий счёт изменения остатков</label>
                     <select id="store-balance-counter" name="counterAccountId" class="form-select"{% if not canWrite %} disabled{% endif %}>
@@ -54,90 +60,96 @@
             {% endif %}
             {% endif %}
         </div>
-    </div>
+    </details>
 
+    {% set filterLabels = {todo: 'Требуют решения', linked: 'Назначены', excluded: 'Не учитываются', all: 'Все'} %}
     <nav class="vf-seg mb-3" aria-label="Фильтр складов">
-        <a href="{{ path('moysklad_stores', {connectionId: connection.id}) }}"{% if not unassignedOnly %} class="active" aria-current="page"{% endif %}>Все · {{ counts.active }}</a>
-        <a href="{{ path('moysklad_stores', {connectionId: connection.id, filter: 'unassigned'}) }}"{% if unassignedOnly %} class="active" aria-current="page"{% endif %}>Без счёта · {{ counts.active - counts.linked - counts.excluded }}</a>
+        {% for key, label in filterLabels %}
+            <a href="{{ path('moysklad_stores', {connectionId: connection.id, filter: key}) }}" data-store-filter="{{ key }}"{% if filter == key %} class="active" aria-current="page"{% endif %}>{{ label }} · {{ counts[key] }}</a>
+        {% endfor %}
     </nav>
 
-    {% if canWrite and confidentSuggestions > 0 %}
-        <form method="post" action="{{ path('moysklad_store_accept_suggestions', {connectionId: connection.id}) }}" class="d-flex flex-wrap align-items-center gap-2 mb-3" data-store-accept-suggestions>
-            <input type="hidden" name="_token" value="{{ csrf_token(csrfId) }}">
-            <input type="hidden" name="filter" value="{{ unassignedOnly ? 'unassigned' : '' }}">
-            <button class="btn btn-primary" type="submit">Принять все уверенные · {{ confidentSuggestions }}</button>
-            <span class="text-secondary small">Только склады без назначения. Предложения ИИ с пометкой «проверьте» и склады без предложения — по одному.</span>
-        </form>
-    {% endif %}
-
-    <div class="card mb-3">
-        <div class="table-responsive">
-            <table class="table table-vcenter card-table" data-store-balance-table>
-                <thead>
-                    <tr><th>Склад</th><th>Счёт Баланса</th><th class="text-end" data-store-balance-valued-date>Остаток по себестоимости{% if valuedDate %} на {{ valuedDate|date('d.m.Y') }}{% endif %}</th></tr>
-                </thead>
-                <tbody>
-                    {% for store in stores %}
-                        <tr data-store="{{ store.externalId }}">
-                            <td>
-                                <div class="text-break">{{ store.name }}</div>
-                                {% if store.pathName %}<div class="text-secondary small">{{ store.pathName }}</div>{% endif %}
-                            </td>
-                            <td>
-                                {% if canWrite %}
-                                    <form method="post" action="{{ path('moysklad_store_balance_link', {connectionId: connection.id, storeExternalId: store.externalId}) }}" class="d-flex gap-2">
-                                        <input type="hidden" name="_token" value="{{ csrf_token(csrfId) }}">
-                                        <input type="hidden" name="filter" value="{{ unassignedOnly ? 'unassigned' : '' }}">
-                                        <select name="target" class="form-select form-select-sm" aria-label="Счёт Баланса для склада {{ store.name }}">
+    {% set statusBadges = {
+        todo: ['Не назначен', 'secondary'],
+        suggested: ['Предложено', 'azure'],
+        unsure: ['Проверьте', 'warning'],
+        linked: ['Назначен', 'green'],
+        excluded: ['Не учитывается', 'secondary'],
+    } %}
+    {% set prefilled = stores|filter(store => store.value != store.was)|length %}
+    <form method="post" action="{{ path('moysklad_store_balance_links', {connectionId: connection.id}) }}" data-store-links data-controller="store-links">
+        <input type="hidden" name="_token" value="{{ csrf_token(csrfId) }}">
+        <input type="hidden" name="filter" value="{{ filter }}">
+        <div class="card mb-3">
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table" data-store-balance-table>
+                    <thead>
+                        <tr><th>Склад</th><th>Счёт Баланса</th><th class="text-end" data-store-balance-valued-date>Остаток по себестоимости{% if valuedDate %} на {{ valuedDate|date('d.m.Y') }}{% endif %}</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for store in stores %}
+                            {% set badge = statusBadges[store.status] %}
+                            {% set suggestion = store.suggestion %}
+                            <tr data-store="{{ store.externalId }}" data-store-links-target="row"{% if store.value != store.was %} class="table-active"{% endif %}>
+                                <td>
+                                    <div class="text-break">{{ store.name }}</div>
+                                    {% if store.pathName %}<div class="text-secondary small">{{ store.pathName }}</div>{% endif %}
+                                    <span class="badge bg-{{ badge[1] }}-lt mt-1" data-store-status="{{ store.status }}">{{ badge[0] }}{% if suggestion %} · {{ suggestion.source == 'ai' ? 'ИИ' : 'правило' }}{% endif %}</span>
+                                </td>
+                                <td>
+                                    {% if canWrite %}
+                                        <input type="hidden" name="links[{{ store.externalId }}][was]" value="{{ store.was }}">
+                                        <select name="links[{{ store.externalId }}][target]" class="form-select form-select-sm" data-was="{{ store.was }}" data-action="store-links#refresh" aria-label="Счёт Баланса для склада {{ store.name }}">
                                             <option value="">— не назначен —</option>
-                                            <option value="excluded"{% if store.excluded %} selected{% endif %}>Не учитывать</option>
-                                            {% for account in assetAccounts %}
-                                                <option value="{{ account.id }}"{% if store.accountId == account.id %} selected{% endif %}>{{ account.label }}</option>
+                                            <option value="excluded"{% if store.value == 'excluded' %} selected{% endif %}>Не учитывать</option>
+                                            {% for groupLabel, groupAccounts in accountGroups %}
+                                                <optgroup label="{{ groupLabel }}">
+                                                    {% for account in groupAccounts %}
+                                                        <option value="{{ account.id }}"{% if store.value == account.id %} selected{% endif %}>{{ groupLabel == 'Запасы' ? account.name : account.label }}</option>
+                                                    {% endfor %}
+                                                </optgroup>
                                             {% endfor %}
+                                            {% if store.accountId and accountsById[store.accountId] is not defined %}
+                                                <option value="{{ store.accountId }}" selected>Счёт в архиве или удалён</option>
+                                            {% endif %}
                                         </select>
-                                        <button class="btn btn-sm" type="submit">Сохранить</button>
-                                    </form>
-                                {% elseif store.excluded %}
-                                    Не учитывать
-                                {% elseif not financeRead %}
-                                    {{ store.accountId ? 'Назначен' : '—' }}
-                                {% else %}
-                                    {{ store.accountId and accountsById[store.accountId] is defined ? accountsById[store.accountId].label : '—' }}
-                                {% endif %}
-                                {% if suggestions[store.externalId] is defined %}
-                                    {% set suggestion = suggestions[store.externalId] %}
-                                    <div class="mt-2 small" data-store-suggestion="{{ suggestion.target }}">
-                                        <span class="badge bg-azure-lt">Предложение · {{ suggestion.source == 'ai' ? 'ИИ' : 'правило' }}</span>
-                                        {% if not suggestion.confident %}<span class="badge bg-warning-lt" data-store-suggestion-unsure>проверьте</span>{% endif %}
-                                        <strong>{{ suggestion.label }}</strong>
-                                        <div class="text-secondary">{{ suggestion.reason }}</div>
-                                        {% if suggestion.warning %}<div class="text-warning" data-store-suggestion-warning>{{ suggestion.warning }}</div>{% endif %}
-                                        {% if canWrite %}
-                                            <form method="post" action="{{ path('moysklad_store_balance_link', {connectionId: connection.id, storeExternalId: store.externalId}) }}" class="mt-1" data-store-suggestion-accept>
-                                                <input type="hidden" name="_token" value="{{ csrf_token(csrfId) }}">
-                                                <input type="hidden" name="filter" value="{{ unassignedOnly ? 'unassigned' : '' }}">
-                                                <input type="hidden" name="target" value="{{ suggestion.target }}">
-                                                <input type="hidden" name="onlyIfUnassigned" value="1">
-                                                <button class="btn btn-sm btn-outline-primary" type="submit">Принять</button>
-                                            </form>
-                                        {% endif %}
-                                    </div>
-                                {% endif %}
-                                {% if financeRead and store.accountId and accountsById[store.accountId] is not defined %}<div class="text-danger small">Счёт в архиве или удалён — выберите другой.</div>{% endif %}
-                            </td>
-                            <td class="text-end">
-                                {{ store.amountMinor|vf_minor|vf_amount }}
-                                {% if store.missing > 0 %}<div class="text-danger small">Нет в отчёте себестоимости: {{ store.missing|vf_number }} поз. — счёт не проводится</div>{% endif %}
-                                {% if store.unpriced > 0 %}<div class="text-warning small">Без себестоимости: {{ store.unpriced|vf_number }} поз.</div>{% endif %}
-                            </td>
-                        </tr>
-                    {% else %}
-                        <tr><td colspan="3" class="text-secondary">{{ unassignedOnly ? 'Все склады назначены.' : 'Склады ещё не загружены: запустите загрузку остатков в подключении.' }}</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                                    {% elseif store.excluded %}
+                                        Не учитывать
+                                    {% elseif not financeRead %}
+                                        {{ store.accountId ? 'Назначен' : '—' }}
+                                    {% else %}
+                                        {{ store.accountId and accountsById[store.accountId] is defined ? accountsById[store.accountId].label : '—' }}
+                                    {% endif %}
+                                    {% if suggestion %}
+                                        <div class="mt-1 small" data-store-suggestion="{{ suggestion.target }}">
+                                            {% if not suggestion.confident %}<span class="text-warning">ИИ предлагает «{{ suggestion.label }}» — проверьте и выберите вручную.</span>{% endif %}
+                                            <span class="text-secondary">{{ suggestion.reason }}</span>
+                                            {% if suggestion.warning %}<div class="text-warning" data-store-suggestion-warning>{{ suggestion.warning }}</div>{% endif %}
+                                        </div>
+                                    {% endif %}
+                                    {% if financeRead and store.accountId and accountsById[store.accountId] is not defined %}<div class="text-danger small">Счёт в архиве или удалён — выберите другой.</div>{% endif %}
+                                </td>
+                                <td class="text-end{% if not store.amountMinor %} text-secondary{% endif %}">
+                                    {{ store.amountMinor|vf_minor|vf_amount }}
+                                    {% if store.missing > 0 %}<div class="text-danger small">Нет в отчёте себестоимости: {{ store.missing|vf_number }} поз. — счёт не проводится</div>{% endif %}
+                                    {% if store.unpriced > 0 %}<div class="text-warning small">Без себестоимости: {{ store.unpriced|vf_number }} поз.</div>{% endif %}
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="3" class="text-secondary">{{ counts.all == 0 ? 'Склады ещё не загружены: запустите загрузку остатков в подключении.' : 'В этой вкладке складов нет.' }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
+        {% if canWrite and stores is not empty %}
+            <div class="sticky-bottom bg-body border-top shadow-sm px-3 py-2 mb-3 d-flex flex-wrap align-items-center gap-2" data-store-links-bar>
+                <button class="btn btn-primary" type="submit" data-store-links-save data-store-links-target="save">Сохранить&nbsp;·&nbsp;<span data-store-links-target="count">{{ prefilled }}</span></button>
+                <button class="btn" type="reset" data-action="store-links#reset">Сбросить</button>
+                <span class="text-secondary small">Подсвечены строки, которые будут записаны; подставленные предложения тоже. Склад, изменённый в другом окне, не перезаписывается.</span>
+            </div>
+        {% endif %}
+    </form>
 
     {% if totals is not empty %}
         <div class="card" data-store-balance-totals>

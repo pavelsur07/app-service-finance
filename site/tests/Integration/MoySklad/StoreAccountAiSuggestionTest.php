@@ -6,7 +6,6 @@ namespace App\Tests\Integration\MoySklad;
 
 use App\Balance\Application\SeedBalanceStructureAction;
 use App\Balance\Facade\BalanceFacade;
-use App\MoySklad\Application\Action\AcceptStoreAccountSuggestionsAction;
 use App\MoySklad\Application\Action\RequestStoreAccountSuggestionsAction;
 use App\MoySklad\Application\Service\StoreAccountSuggestionConsumer;
 use App\MoySklad\Application\StoreAccountSuggestions;
@@ -73,7 +72,7 @@ final class StoreAccountAiSuggestionTest extends IntegrationTestCase
         self::assertNotContains('ACC_INV_ADJUSTMENT', $codes, 'Только счета актива.');
     }
 
-    public function testConfidentAiSuggestionIsAcceptedTogetherWithRulesAndUnsureIsNot(): void
+    public function testConfidentAiSuggestionIsMarkedConfidentAndUnsureIsNot(): void
     {
         $this->request();
         $this->answer('FBS К2 (РНД)', AiResultStatus::ACCEPTED, ['account_code' => 'ACC_INV_FF', 'excluded' => false, 'reason' => 'тот же оператор К2', 'confidence' => 0.9]);
@@ -82,11 +81,6 @@ final class StoreAccountAiSuggestionTest extends IntegrationTestCase
         $shown = $this->suggestions();
         self::assertSame(['ai', true, 'тот же оператор К2'], [$shown[$this->stores['FBS К2 (РНД)']]->source, $shown[$this->stores['FBS К2 (РНД)']]->confident, $shown[$this->stores['FBS К2 (РНД)']]->reason]);
         self::assertFalse($shown[$this->stores['Газелька']]->confident);
-
-        $result = (self::getContainer()->get(AcceptStoreAccountSuggestionsAction::class))(self::COMPANY, self::CONNECTION, $this->owner);
-        self::assertSame(['accepted' => 2, 'failed' => 0], $result, 'Брак по правилу и FBS по уверенному ИИ.');
-        self::assertSame($this->account('ACC_INV_FF'), $this->connection->fetchOne('SELECT balance_account_id FROM moysklad_store_balance_links WHERE store_external_id = ?', [$this->stores['FBS К2 (РНД)']]));
-        self::assertFalse($this->connection->fetchOne('SELECT 1 FROM moysklad_store_balance_links WHERE store_external_id = ?', [$this->stores['Газелька']]));
     }
 
     public function testRenamedStoreHidesOldAnswerAndIsAskedAgain(): void

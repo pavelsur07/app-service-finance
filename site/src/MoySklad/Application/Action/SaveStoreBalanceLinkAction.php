@@ -24,7 +24,7 @@ final readonly class SaveStoreBalanceLinkAction
     {
     }
 
-    public function __invoke(string $companyId, string $connectionId, string $storeExternalId, ?string $balanceAccountId, bool $excluded, string $actorUserId, bool $onlyIfUnassigned = false): bool
+    public function __invoke(string $companyId, string $connectionId, string $storeExternalId, ?string $balanceAccountId, bool $excluded, string $actorUserId, ?string $expected = null): bool
     {
         Assert::uuid($companyId);
         Assert::uuid($connectionId);
@@ -41,14 +41,20 @@ final readonly class SaveStoreBalanceLinkAction
         $balanceAccountId = null === $balanceAccountId ? null : strtolower($balanceAccountId);
         $key = [$companyId, $connectionId, $store->getExternalId()];
 
-        return $this->db->transactional(function () use ($companyId, $connectionId, $balanceAccountId, $excluded, $actorUserId, $key, $onlyIfUnassigned): bool {
+        return $this->db->transactional(function () use ($companyId, $connectionId, $balanceAccountId, $excluded, $actorUserId, $key, $expected): bool {
             self::lockCompany($this->db, $companyId);
             if (!$this->balance->canPostFromSource($companyId, $actorUserId)) {
                 throw new StoreBalanceException('actor_forbidden', 'Назначать счета Баланса складам может пользователь с правом проводить документы в Балансе.');
             }
-            // Принятие предложений не перетирает назначение, сделанное вручную после показа страницы: проверка под company-lock.
-            if ($onlyIfUnassigned && false !== $this->db->fetchOne('SELECT 1 FROM moysklad_store_balance_links WHERE company_id = ? AND connection_id = ? AND store_external_id = ?', $key)) {
-                return false;
+            // $expected — состояние на момент показа страницы ('' / 'excluded' / id счёта): правку из другого окна не перетираем.
+            if (null !== $expected) {
+                $state = $this->state($key);
+                if ($state === ($excluded ? 'excluded' : ($balanceAccountId ?? ''))) {
+                    return true; // повтор той же отправки — уже записано
+                }
+                if ($expected !== $state) {
+                    return false;
+                }
             }
             if (null === $balanceAccountId && !$excluded) {
                 $this->db->executeStatement('DELETE FROM moysklad_store_balance_links WHERE company_id = ? AND connection_id = ? AND store_external_id = ?', $key);
@@ -71,6 +77,17 @@ final readonly class SaveStoreBalanceLinkAction
     public static function lockCompany(Connection $db, string $companyId): void
     {
         $db->fetchOne('SELECT pg_advisory_xact_lock(hashtext(?), hashtext(?))', ['moysklad-store-balance-accounts', $companyId]);
+    }
+
+    /** @param list<string> $key */
+    private function state(array $key): string
+    {
+        $row = $this->db->fetchAssociative('SELECT balance_account_id, excluded FROM moysklad_store_balance_links WHERE company_id = ? AND connection_id = ? AND store_external_id = ?', $key);
+        if (false === $row) {
+            return '';
+        }
+
+        return $row['excluded'] ? 'excluded' : (string) $row['balance_account_id'];
     }
 
     private function assertAccountFree(string $companyId, string $connectionId, string $accountId): void

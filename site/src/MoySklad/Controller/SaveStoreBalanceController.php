@@ -6,8 +6,7 @@ namespace App\MoySklad\Controller;
 
 use App\Company\Entity\User;
 use App\Company\Security\ModuleAccess;
-use App\MoySklad\Application\Action\AcceptStoreAccountSuggestionsAction;
-use App\MoySklad\Application\Action\SaveStoreBalanceLinkAction;
+use App\MoySklad\Application\Action\SaveStoreBalanceLinksAction;
 use App\MoySklad\Application\Action\SaveStoreBalanceSettingsAction;
 use App\MoySklad\Exception\StoreBalanceException;
 use App\MoySklad\Infrastructure\Repository\MoySkladConnectionWriteRepository;
@@ -25,45 +24,38 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted(ModuleAccess::MARKETPLACE_WRITE)]
 final class SaveStoreBalanceController extends AbstractController
 {
-    /** id МойСклад похож на UUID, но вариант не RFC 4122 (`…-11e5-7a69-…`) — Requirement::UUID давал 404. */
-    private const MOYSKLAD_ID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+    /** id МойСклад похож на UUID, но вариант не RFC 4122 (`…-11e5-7a69-…`) — Uuid::isValid нестрогий, Requirement::UUID давал 404. */
+    private const MOYSKLAD_ID = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
+    private const MAX_ROWS = 1000;
 
     public function __construct(private readonly ActiveCompanyService $activeCompany, private readonly MoySkladConnectionWriteRepository $connections)
     {
     }
 
-    #[Route('/moy-sklad/connections/{connectionId}/stores/{storeExternalId}/balance-link', name: 'moysklad_store_balance_link', requirements: ['connectionId' => Requirement::UUID, 'storeExternalId' => self::MOYSKLAD_ID], methods: ['POST'])]
-    public function link(string $connectionId, string $storeExternalId, Request $request, SaveStoreBalanceLinkAction $action): Response
+    #[Route('/moy-sklad/connections/{connectionId}/stores/balance-links', name: 'moysklad_store_balance_links', requirements: ['connectionId' => Requirement::UUID], methods: ['POST'])]
+    public function links(string $connectionId, Request $request, SaveStoreBalanceLinksAction $action): Response
     {
         [$companyId, $connectionId, $actorId, $values] = $this->guard($connectionId, $request);
-        $target = $values['target'] ?? '';
-        if (!is_string($target) || ('' !== $target && 'excluded' !== $target && !Uuid::isValid($target))) {
-            throw new UnprocessableEntityHttpException('Некорректный счёт.');
+        $links = $values['links'] ?? [];
+        if (!is_array($links) || \count($links) > self::MAX_ROWS) {
+            throw new UnprocessableEntityHttpException('Некорректные назначения складов.');
         }
-        // «Принять» предложение не перезаписывает назначение, сделанное после показа страницы.
-        $onlyIfUnassigned = '1' === ($values['onlyIfUnassigned'] ?? null);
-        try {
-            $saved = $action($companyId, $connectionId, $storeExternalId, Uuid::isValid($target) ? $target : null, 'excluded' === $target, $actorId, $onlyIfUnassigned);
-            $saved ? $this->addFlash('success', 'Назначение склада сохранено.') : $this->addFlash('warning', 'Склад уже назначен — предложение не применено.');
-        } catch (StoreBalanceException $error) {
-            if ('store_not_found' === $error->reason) {
-                throw $this->createNotFoundException();
+        $rows = [];
+        foreach ($links as $storeExternalId => $row) {
+            $storeExternalId = strtolower((string) $storeExternalId);
+            if (1 !== preg_match(self::MOYSKLAD_ID, $storeExternalId) || !is_array($row) || !self::isTarget($row['target'] ?? null) || !self::isTarget($row['was'] ?? null)) {
+                throw new UnprocessableEntityHttpException('Некорректные назначения складов.');
             }
-            $this->addFlash('danger', $error->getMessage());
+            $rows[$storeExternalId] = ['target' => strtolower($row['target']), 'was' => strtolower($row['was'])];
         }
-
-        return $this->back($connectionId, $values);
-    }
-
-    #[Route('/moy-sklad/connections/{connectionId}/stores/accept-suggestions', name: 'moysklad_store_accept_suggestions', requirements: ['connectionId' => Requirement::UUID], methods: ['POST'])]
-    public function acceptSuggestions(string $connectionId, Request $request, AcceptStoreAccountSuggestionsAction $action): Response
-    {
-        [$companyId, $connectionId, $actorId, $values] = $this->guard($connectionId, $request);
         try {
-            $result = $action($companyId, $connectionId, $actorId);
-            $this->addFlash('success', sprintf('Принято предложений: %d.', $result['accepted']));
-            if ($result['failed'] > 0) {
-                $this->addFlash('warning', sprintf('Не принято: %d — назначьте эти склады вручную.', $result['failed']));
+            $result = $action($companyId, $connectionId, $rows, $actorId);
+            $this->addFlash('success', sprintf('Сохранено: %d.', $result['saved']));
+            if ($result['skipped'] > 0) {
+                $this->addFlash('warning', sprintf('Пропущено: %d — склад изменили в другом окне, проверьте его.', $result['skipped']));
+            }
+            foreach (array_count_values($result['failed']) as $message => $count) {
+                $this->addFlash('danger', sprintf('Не сохранено: %d — %s', $count, $message));
             }
         } catch (StoreBalanceException $error) {
             $this->addFlash('danger', $error->getMessage());
@@ -112,6 +104,13 @@ final class SaveStoreBalanceController extends AbstractController
     /** @param array<string, mixed> $values */
     private function back(string $connectionId, array $values): Response
     {
-        return $this->redirectToRoute('moysklad_stores', ['connectionId' => $connectionId] + ('unassigned' === ($values['filter'] ?? null) ? ['filter' => 'unassigned'] : []), 303);
+        $filter = $values['filter'] ?? null;
+
+        return $this->redirectToRoute('moysklad_stores', ['connectionId' => $connectionId] + (\in_array($filter, StoreBalanceController::FILTERS, true) ? ['filter' => $filter] : []), 303);
+    }
+
+    private static function isTarget(mixed $value): bool
+    {
+        return is_string($value) && ('' === $value || 'excluded' === $value || Uuid::isValid($value));
     }
 }
