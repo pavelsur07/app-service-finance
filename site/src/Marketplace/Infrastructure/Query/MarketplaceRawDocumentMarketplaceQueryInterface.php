@@ -6,5 +6,6 @@ namespace App\Marketplace\Infrastructure\Query;
 
 interface MarketplaceRawDocumentMarketplaceQueryInterface
 {
-    public function getMarketplaceValue(string $companyId, string $rawDocId): ?string;
+    /** @return array{marketplace: string, api_endpoint: string}|null */
+    public function findDocumentSource(string $companyId, string $rawDocId): ?array;
 }

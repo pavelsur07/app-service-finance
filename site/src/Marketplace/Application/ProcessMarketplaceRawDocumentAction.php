@@ -88,20 +88,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
 
         $marketplace = $document->getMarketplace();
 
-        // Поколение API, из которого получен документ. Отличает форматы, живущие
-        // под одним document_type: у Ozon это снятый v3 против accrual by-day, у
-        // WB — два поколения отчёта о продажах.
-        $apiEndpoint = trim($document->getApiEndpoint());
-        $format = MarketplaceRawFormat::tryFromApiEndpoint($apiEndpoint);
-
-        // Пустой endpoint и незнакомый — разные вещи. Пустой означает «формат не
-        // проставлен», и конвейер работает как прежде. Незнакомый означает
-        // документ, про который мы ничего не знаем: отдать его легаси-процессору
-        // значит молча создать финансовые записи по чужой схеме. Падаем до любой
-        // обработки и без ретраев — новый endpoint чинится кодом, а не повтором.
-        if (null === $format && '' !== $apiEndpoint) {
-            throw new UnrecoverableMessageHandlingException(sprintf('Unknown raw document format "%s" for document %s. Add it to %s before processing.', $apiEndpoint, $command->rawDocId, MarketplaceRawFormat::class));
-        }
+        $format = MarketplaceRawFormat::forProcessing($document->getApiEndpoint(), $command->rawDocId);
 
         if ($command->forceReprocess && MarketplaceType::WILDBERRIES === $marketplace) {
             $company = $document->getCompany();
