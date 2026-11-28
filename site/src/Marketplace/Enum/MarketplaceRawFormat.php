@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Enum;
 
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
+
 /**
  * Формат сырого документа — то, чем один и тот же `document_type` отличается
  * между поколениями API маркетплейса.
@@ -33,20 +35,20 @@ enum MarketplaceRawFormat: string
     /** Легаси WB; документы до 14.05.2026. */
     case WB_REPORT_DETAIL_BY_PERIOD = 'wildberries::reportDetailByPeriod';
 
-    /**
-     * Формат документа по его `api_endpoint`.
-     *
-     * Неизвестное значение даёт `null`, а не исключение: `null` означает
-     * «формат не определён» и сохраняет прежнее поведение конвейера. Ронять
-     * обработку исторического документа из-за незнакомой строки нельзя —
-     * это превратило бы расширение справочника в инцидент.
-     */
     public static function tryFromApiEndpoint(?string $apiEndpoint): ?self
     {
-        if (null === $apiEndpoint || '' === trim($apiEndpoint)) {
-            return null;
+        return self::tryFrom(trim($apiEndpoint ?? ''));
+    }
+
+    /** Пустой endpoint сохраняет исторический выбор процессора. Неизвестный формат требует поддержки в коде. */
+    public static function forProcessing(?string $apiEndpoint, string $rawDocId): ?self
+    {
+        $endpoint = trim($apiEndpoint ?? '');
+        $format = self::tryFromApiEndpoint($endpoint);
+        if (null === $format && '' !== $endpoint) {
+            throw new UnrecoverableMessageHandlingException(sprintf('Unknown raw document format "%s" for document %s. Add it to %s before processing.', $endpoint, $rawDocId, self::class));
         }
 
-        return self::tryFrom(trim($apiEndpoint));
+        return $format;
     }
 }

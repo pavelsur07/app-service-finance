@@ -12,16 +12,19 @@ final class MarketplaceRawDocumentMarketplaceQuery implements MarketplaceRawDocu
     {
     }
 
-    public function getMarketplaceValue(string $companyId, string $rawDocId): ?string
+    public function findDocumentSource(string $companyId, string $rawDocId): ?array
     {
-        $marketplace = $this->connection->fetchOne(
-            'SELECT marketplace FROM marketplace_raw_documents WHERE company_id = :companyId AND id = :id LIMIT 1',
+        $row = $this->connection->fetchAssociative(
+            'SELECT marketplace, api_endpoint FROM marketplace_raw_documents WHERE company_id = :companyId AND id = :id LIMIT 1',
             [
                 'companyId' => $companyId,
                 'id' => $rawDocId,
             ],
         );
 
-        return false === $marketplace ? null : (string) $marketplace;
+        return false === $row ? null : [
+            'marketplace' => (string) $row['marketplace'],
+            'api_endpoint' => (string) $row['api_endpoint'],
+        ];
     }
 }
