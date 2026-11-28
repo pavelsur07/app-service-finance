@@ -11,4 +11,6 @@ use App\Marketplace\Enum\StagingRecordType;
 interface MarketplaceRawProcessorRegistryInterface
 {
     public function get(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = '', ?MarketplaceRawFormat $format = null): MarketplaceRawProcessorInterface;
+
+    public function getForDocument(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = '', ?MarketplaceRawFormat $format = null): MarketplaceRawDocumentProcessorInterface;
 }

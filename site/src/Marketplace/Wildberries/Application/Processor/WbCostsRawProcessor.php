@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Wildberries\Application\Processor;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
+use App\Marketplace\Application\Processor\MarketplaceRawDocumentProcessorInterface;
 use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Entity\MarketplaceCost;
@@ -24,7 +24,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
-final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
+final class WbCostsRawProcessor implements MarketplaceRawDocumentProcessorInterface
 {
     /** @var iterable<CostCalculatorInterface> */
     private iterable $costCalculators;

@@ -21,11 +21,6 @@ final class MarketplaceRawProcessorRegistryTest extends TestCase
                 return 'ozon' === $type && 'sales' === $kind;
             }
 
-            public function process(string $companyId, string $rawDocId): int
-            {
-                return 5;
-            }
-
             public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows, ?string $rawDocId = null): void
             {
             }
@@ -38,11 +33,6 @@ final class MarketplaceRawProcessorRegistryTest extends TestCase
                     return false;
                 }
 
-                public function process(string $companyId, string $rawDocId): int
-                {
-                    return 0;
-                }
-
                 public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows, ?string $rawDocId = null): void
                 {
                 }
@@ -51,6 +41,16 @@ final class MarketplaceRawProcessorRegistryTest extends TestCase
         ]);
 
         self::assertSame($target, $registry->get('ozon', MarketplaceType::OZON, 'sales'));
+    }
+
+    public function testWholeDocumentCannotBeSentToABatchOnlyProcessor(): void
+    {
+        $processor = $this->createStub(MarketplaceRawProcessorInterface::class);
+        $processor->method('supports')->willReturn(true);
+        $registry = new MarketplaceRawProcessorRegistry([$processor]);
+
+        $this->expectException(\LogicException::class);
+        $registry->getForDocument(StagingRecordType::SALE, MarketplaceType::OZON, 'sales');
     }
 
     public function testThrowsWhenNoProcessorFound(): void

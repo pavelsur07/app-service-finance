@@ -8,7 +8,7 @@ use App\Marketplace\Enum\MarketplaceRawFormat;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 
-final readonly class MarketplaceOtherProcessor implements MarketplaceRawProcessorInterface
+final readonly class MarketplaceOtherProcessor implements MarketplaceRawDocumentProcessorInterface
 {
     public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = '', ?MarketplaceRawFormat $format = null): bool
     {

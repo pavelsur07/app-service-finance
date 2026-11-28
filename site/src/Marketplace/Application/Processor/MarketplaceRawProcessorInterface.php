@@ -25,8 +25,6 @@ interface MarketplaceRawProcessorInterface
      */
     public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = '', ?MarketplaceRawFormat $format = null): bool;
 
-    public function process(string $companyId, string $rawDocId): int;
-
     /**
      * Обработка батча из daily pipeline.
      * rawDocId проставляется на создаваемые entity (raw_document_id)

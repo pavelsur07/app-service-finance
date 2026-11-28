@@ -9,6 +9,7 @@ use App\Company\Facade\CompanyFacade;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
+use App\Marketplace\Application\Processor\MarketplaceRawDocumentProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
 use App\Marketplace\Application\Service\ByDayRowReplacement;
@@ -148,18 +149,19 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'unknown'));
     }
 
-    /**
-     * DoD Stage 3: легаси-документ уходит тому же процессору, что и прежде, и
-     * даёт тот же результат. Проверяется на уровне Action, а не supports():
-     * тест на supports() остался бы зелёным, перестань Action извлекать или
-     * передавать формат.
-     */
-    public function testLegacyOzonDocumentGoesToLegacyProcessorWithItsFormat(): void
+    /** @return iterable<string, array{string, MarketplaceRawFormat}> */
+    public static function ozonCostFormats(): iterable
+    {
+        yield 'v3' => ['ozon::v3/finance/transaction/list', MarketplaceRawFormat::OZON_TRANSACTION_LIST_V3];
+        yield 'by-day' => ['ozon::v1/finance/accrual/by-day', MarketplaceRawFormat::OZON_ACCRUAL_BY_DAY];
+    }
+
+    #[DataProvider('ozonCostFormats')]
+    public function testOzonCostsProcessTheWholeDocumentWithItsFormat(string $endpoint, MarketplaceRawFormat $format): void
     {
         $document = $this->createMock(MarketplaceRawDocument::class);
-        $document->method('getRawData')->willReturn([['x' => 1]]);
         $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
-        $document->method('getApiEndpoint')->willReturn('ozon::v3/finance/transaction/list');
+        $document->method('getApiEndpoint')->willReturn($endpoint);
         $company = $this->createMock(Company::class);
         $company->method('getId')->willReturn('company-1');
         $document->method('getCompany')->willReturn($company);
@@ -167,18 +169,18 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
         $repository->method('find')->willReturn($document);
 
-        $processor = $this->createMock(MarketplaceRawProcessorInterface::class);
+        $processor = $this->createMock(MarketplaceRawDocumentProcessorInterface::class);
         $processor->expects(self::once())->method('process')->with('company-1', 'doc-1')->willReturn(7);
 
         $processorRegistry = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
         $processorRegistry
             ->expects(self::once())
-            ->method('get')
+            ->method('getForDocument')
             ->with(
                 StagingRecordType::COST,
                 MarketplaceType::OZON,
                 'costs',
-                MarketplaceRawFormat::OZON_TRANSACTION_LIST_V3,
+                $format,
             )
             ->willReturn($processor);
 
@@ -479,7 +481,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $repository->method('find')->willReturn($document);
 
         $processorRegistry = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
-        $processorRegistry->expects(self::never())->method('get');
+        $processorRegistry->expects(self::never())->method('getForDocument');
 
         $connection = $this->createMock(Connection::class);
         $connection->expects(self::never())->method('executeStatement');
@@ -516,7 +518,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
         $repository->method('find')->willReturn($document);
 
-        $processor = $this->createMock(MarketplaceRawProcessorInterface::class);
+        $processor = $this->createMock(MarketplaceRawDocumentProcessorInterface::class);
         $processor
             ->expects(self::once())
             ->method('process')
@@ -529,7 +531,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $processorRegistry = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
         $processorRegistry
             ->expects(self::once())
-            ->method('get')
+            ->method('getForDocument')
             ->with(StagingRecordType::COST, MarketplaceType::WILDBERRIES)
             ->willReturn($processor);
 
@@ -661,10 +663,10 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
         $repository->method('find')->willReturn($document);
 
-        $processor = $this->createMock(MarketplaceRawProcessorInterface::class);
+        $processor = $this->createMock(MarketplaceRawDocumentProcessorInterface::class);
         $processor->expects(self::once())->method('process')->with('company-1', 'doc-costs')->willReturn(7);
         $processorRegistry = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
-        $processorRegistry->expects(self::once())->method('get')->with(StagingRecordType::COST, MarketplaceType::WILDBERRIES)->willReturn($processor);
+        $processorRegistry->expects(self::once())->method('getForDocument')->with(StagingRecordType::COST, MarketplaceType::WILDBERRIES)->willReturn($processor);
 
         $costRepository = $this->createMock(MarketplaceCostRepository::class);
         $costRepository->expects(self::once())
@@ -726,7 +728,6 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $returnRepository->expects(self::never())->method('deleteByRawDocument');
 
         $processor = $this->createMock(MarketplaceRawProcessorInterface::class);
-        $processor->expects(self::never())->method('process');
         $processor->expects(self::never())->method('processBatch');
 
         $processorRegistry = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
