@@ -11,7 +11,7 @@ use Webmozart\Assert\Assert;
 final class MoySkladStoreBuilder
 {
     public const DEFAULT_ID = '44444444-4444-7444-8444-444444444444';
-    public const DEFAULT_EXTERNAL_ID = '55555555-5555-4555-8555-555555555555';
+    public const DEFAULT_EXTERNAL_ID = '55555555-5555-11e5-7a69-555555555555'; // как у МойСклад: вариант не RFC 4122
 
     private string $id = self::DEFAULT_ID;
     private string $externalId = self::DEFAULT_EXTERNAL_ID;
@@ -33,7 +33,7 @@ final class MoySkladStoreBuilder
         Assert::range($index, 0, 999999999999);
         $copy = clone $this;
         $copy->id = sprintf('44444444-4444-7444-8444-%012d', $index);
-        $copy->externalId = sprintf('55555555-5555-4555-8555-%012d', $index);
+        $copy->externalId = sprintf('55555555-5555-11e5-7a69-%012d', $index);
 
         return $copy;
     }
